@@ -15,6 +15,8 @@ the read endpoint, the response and the errors. Parts of this file are built:
 - the page parameter binding of a table, with the not-found page for a
   required page parameter that is missing or malformed
 - the table binding of grouped data sources
+- date buckets: a `groupBy` entry that groups a date or date-time field into
+  days, weeks, months or years
 - record and field policies: the root entity's read filters in the query,
   the field check on every projected field, and labels limited to readable
   target display fields
@@ -133,8 +135,22 @@ A grouped data source adds `aggregate`. Its rows are groups, not records:
 
 ### Aggregates
 
-- **`groupBy`.** A list of names from `fields`. An empty list gives one total
-  row.
+- **`groupBy`.** A list of entries. An entry is a name from `fields`, or
+  `{ "field": "<name>", "bucket": "day" }` with `day`, `week`, `month` or
+  `year` on a date or date-time field. A field appears once in the list, in
+  either form. An empty list gives one total row.
+- **Date buckets.** A bucketed group value in a row is the first date of the
+  bucket, as a date such as `2026-11-01`. A week starts on Monday. A date is
+  bucketed as it is. A date-time is bucketed in the application time zone of
+  [D75](../decisions/d75-the-application-time-zone.md), so each record counts
+  on the local day it happened, even when that day differs in UTC. In SQL the
+  bucket is `date_trunc('<bucket>', col::timestamp)::date` for a date and
+  `date_trunc('<bucket>', col AT TIME ZONE @tz)::date` for a date-time, where
+  `@tz` is the time zone id as a text parameter. The same expression is used
+  for the select list, the grouping, the tie-break order and a sort by that
+  group field. A measure over the same field reads the raw values, so `max`
+  of a date-time stays a date-time. Page metadata, export and Studio's names
+  give a bucketed group the type `date`.
 - **`measures`.** Each has a `name` and a `function`: `count`, `sum`, `min`,
   `max`, `avg` or `countDistinct`. It may also have a `filter`.
 - **`count`.** It takes no `field` and counts rows.
@@ -179,7 +195,7 @@ A grouped data source adds `aggregate`. Its rows are groups, not records:
 - **`null` groups.** Rows whose group field is `null`, such as items with no
   department, form one group of their own.
 - **Row values.** A grouped row holds the group fields in `groupBy` order,
-  then the measures. The other `fields` are only inputs of the measures.
+  then the measures. A group field is keyed by its field name, bucketed or not. The other `fields` are only inputs of the measures.
 - **Names.** Group fields name entries of `fields`, and measure names are
   keys of a grouped row. Both match exactly, so letter case matters, as for
   projected names.
@@ -193,11 +209,6 @@ These are _(planned for M15)_. See
 [D76](../decisions/d76-file-money-and-enum-label-field-types.md) and
 [D80](../decisions/d80-search-more-aggregates-and-query-timeouts.md).
 
-- **Date buckets.** A `groupBy` entry may be `{ "field": "<name>", "bucket":
-  "day" }`, with `day`, `week`, `month` or `year`, on a date or date-time
-  field. The row holds the first date of the bucket. A week starts on
-  Monday. Date-time values are bucketed in the application time zone of
-  [D75](../decisions/d75-the-application-time-zone.md).
 - **Enum labels and files.** Rows hold enum values, and page metadata gives
   their labels. A `file` field cannot be a group field or a measure field.
 - **Export.** A data source can be exported to CSV or a spreadsheet, see
@@ -263,7 +274,12 @@ see the Data sources bullet of the Resolve step in
   diagnostic, because that parameter may have no usable type.
 
 - `groupBy` names entries of `fields`, compared exactly. An unknown name is
-  `AXC0061` at `/aggregate/groupBy/{i}`.
+  `AXC0061` at `/aggregate/groupBy/{i}`, or at `/aggregate/groupBy/{i}/field`
+  for the object form. A field that is already grouped by an earlier entry,
+  in either form, is `AXC0061` at the later entry. A `bucket` on a field that
+  is not a date or a date-time is `AXC0061` at
+  `/aggregate/groupBy/{i}/bucket`. A field whose path is already `AXC0043`, or
+  a `file` field (`AXC0259`), is not reported a second time.
 - Measure names are unique. A measure name also differs from every group
   field, because both are keys of one row. A clash is `AXC0062` at
   `/aggregate/measures/{i}/name`.
@@ -376,7 +392,7 @@ grants, the record filters, the fields and the joined targets are built.
   record API computes the pending field on a single read.
 - **Order.** Ties are broken by the root `id` ascending, or by the group
   fields in `groupBy` order, each ascending, when the data source is
-  grouped. `NULL` ordering and the count statement work as in the record
+  grouped. A bucketed group field orders by its bucket. `NULL` ordering and the count statement work as in the record
   API. Without a `sort`, grouped rows are in group field order.
 
 Query strings have no JSON types, so each parameter type has a plain text
@@ -586,7 +602,8 @@ data sources.
   [D64](../decisions/d64-detail-chart-and-kpi-widgets.md). The compile checks:
   - A `dataSource` that names no loaded data source is `AXC0059`.
   - The data source has an `aggregate` with exactly one `groupBy` entry, and
-    the chart's `category` equals it, ignoring letter case, otherwise it is
+    the chart's `category` equals the entry's field, ignoring letter case,
+    otherwise it is
     `AXC0240` at `/widgets/{i}/dataSource` or `/widgets/{i}/category`.
   - Each chart measure names a measure of the data source, ignoring letter
     case, and it is numeric, otherwise it is `AXC0241` at
