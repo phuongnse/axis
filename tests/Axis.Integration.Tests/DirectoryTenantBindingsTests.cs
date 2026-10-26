@@ -133,6 +133,31 @@ public sealed class DirectoryTenantBindingsTests(PostgreSqlFixture database) : I
         });
     }
 
+    [Fact]
+    public async Task A_storage_binding_holding_database_is_loaded_and_one_holding_another_value_fails_the_read_naming_the_tenant_and_the_binding()
+    {
+        var tenantDatabase = await database.CreateDatabaseAsync("bindings_tenant", CancellationToken);
+        var good = await database.CreateDatabaseAsync("bindings_platform", CancellationToken);
+        await SeedPlatformAsync(good, new SeededTenant("a", tenantDatabase, "a.example.test", [Storage("Files", "database")]));
+        await GrantPlatformAsync(good);
+
+        var catalog = await DirectoryTenantCatalog.LoadAsync(PostgreSqlServer.RuntimeConnectionString(good), _cipher, CancellationToken);
+
+        var binding = catalog.Find("a")!.Bindings["Files"];
+        Assert.Equal((DeploymentBindingKinds.Storage, "database"), (binding.Kind, binding.Url));
+
+        var bad = await database.CreateDatabaseAsync("bindings_platform", CancellationToken);
+        await SeedPlatformAsync(bad, new SeededTenant("a", tenantDatabase, "a.example.test", [Storage("Files", "s3")]));
+        await GrantPlatformAsync(bad);
+
+        var failure = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => DirectoryTenantCatalog.LoadAsync(PostgreSqlServer.RuntimeConnectionString(bad), _cipher, CancellationToken));
+
+        Assert.Contains("Tenant 'a'", failure.Message, StringComparison.Ordinal);
+        Assert.Contains("Files", failure.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("s3", failure.Message, StringComparison.Ordinal);
+    }
+
     private static WebApplication BuildWorker(string platform, LogCollector logs)
     {
         var builder = WebApplication.CreateSlimBuilder(new WebApplicationOptions { EnvironmentName = "Testing" });
@@ -154,6 +179,8 @@ public sealed class DirectoryTenantBindingsTests(PostgreSqlFixture database) : I
     }
 
     private static TenantBindingRow Url(string name, string url) => new() { Name = name, Kind = DeploymentBindingKinds.Url, Url = url };
+
+    private static TenantBindingRow Storage(string name, string value) => new() { Name = name, Kind = DeploymentBindingKinds.Storage, Url = value };
 
     private static TenantBindingRow Secret(string tenantId, string name, string value) =>
         new() { Name = name, Kind = DeploymentBindingKinds.Secret, SecretValue = _cipher.Encrypt(tenantId, TenantSecretFields.Binding(name), value) };

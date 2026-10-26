@@ -117,7 +117,7 @@ namespace Axis.Tenancy.Platform.Migrations
 
                     b.ToTable("tenant_bindings", "platform", t =>
                         {
-                            t.HasCheckConstraint("ck_tenant_bindings_kind", "kind IN ('url', 'secret')");
+                            t.HasCheckConstraint("ck_tenant_bindings_kind", "kind IN ('url', 'secret', 'storage')");
                         });
                 });
 

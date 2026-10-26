@@ -102,6 +102,40 @@ public sealed class AdminTenantSettingTests(PostgreSqlFixture database) : IClass
     }
 
     [Fact]
+    public async Task A_storage_binding_is_set_and_listed_with_its_value_and_any_other_value_is_refused_and_writes_nothing()
+    {
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        var id = scenario.NewTenantId();
+        Assert.Equal(0, (await scenario.CreateAsync(id, $"{id}.example.test")).Exit);
+        var before = await scenario.SnapshotAsync();
+        var records = (await RecordsAsync(scenario)).Count;
+
+        foreach (var value in new[] { "s3", "Database", "" })
+        {
+            var refused = await scenario.RunAsync(["tenant", "binding", "set", id, "Files", "--storage", value], extra: AdminScenario.Directory);
+
+            Assert.Equal(2, refused.Exit);
+            Assert.Empty(refused.Output);
+            Assert.Equal(["The binding 'Files' is a storage binding, and its only value is 'database'."], refused.Error);
+        }
+
+        Assert.Equal(before, await scenario.SnapshotAsync());
+        Assert.Equal(records, (await RecordsAsync(scenario)).Count);
+        Assert.Equal(0, await scenario.CountBindingsAsync(id));
+
+        var set = await scenario.RunAsync(["tenant", "binding", "set", id, "Files", "--storage", "database"], extra: AdminScenario.Directory);
+
+        Assert.Equal(0, set.Exit);
+        Assert.Equal([$"{id} binding ok"], set.Output);
+        var list = await scenario.RunAsync(["tenant", "binding", "list", id], extra: AdminScenario.Directory);
+        Assert.Equal(["name   kind     value", "Files  storage  database"], list.Output);
+        var record = (await RecordsAsync(scenario))[^1];
+        Assert.Equal(records + 1, (await RecordsAsync(scenario)).Count);
+        Assert.Equal(["binding:Files"], record.Changed);
+        Assert.Contains(UsageLines(), line => line.Contains("tenant binding set <id> <name> --storage database", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task A_replaced_binding_keeps_its_name_and_a_removed_binding_is_gone()
     {
         await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
