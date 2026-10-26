@@ -298,7 +298,10 @@ flowchart LR
      otherwise it is `AXC0045` at `/sort`. A sort naming an entry whose path
      is already `AXC0043` is not reported again. An `aggregate` groups by
      projected names, compared exactly: a `groupBy` entry that names no
-     projected field is `AXC0061` at `/aggregate/groupBy/{i}`. A measure name
+     projected field is `AXC0061` at `/aggregate/groupBy/{i}`, or at
+     `/aggregate/groupBy/{i}/field` for the object form. A field grouped twice is
+     `AXC0061` at the later entry, and a `bucket` on a field that is not a date or a
+     date-time is `AXC0061` at `/aggregate/groupBy/{i}/bucket`. A measure name
      that is a group field or repeats an earlier measure, compared exactly,
      is `AXC0062` at `/aggregate/measures/{i}/name`. A `count` with a `field`,
      or a `sum`, `min` or `max` without one, is `AXC0063` at
