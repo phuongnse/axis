@@ -60,6 +60,11 @@ namespace Axis.Data;
 /// owner of each changed child row. The transaction then recomputes the rows of the touched entities that have no
 /// stamp, unless it already recomputed the whole entity.
 /// </para>
+/// <para>
+/// A new non-unique index on an existing table that has more rows than the inline limit is not created in this
+/// transaction. The activation commits without it, leaves it out of <see cref="ProvisioningResult.Statements"/>, and
+/// <see cref="EntityIndexBuilder"/> creates it later without blocking writes.
+/// </para>
 /// </summary>
 public static class EntityProvisioner
 {
@@ -181,8 +186,25 @@ public static class EntityProvisioner
                 }
             }
 
+            var applied = new List<string>();
+            var largeTables = new Dictionary<string, bool>(StringComparer.Ordinal);
             foreach (var command in plan.Commands)
             {
+                if (command.DeferrableOn is { } deferrable)
+                {
+                    if (!largeTables.TryGetValue(deferrable, out var large))
+                    {
+                        large = await ExceedsAsync(connection, npgsqlTransaction, deferrable, migrations.InlineRecomputeLimit, cancellationToken);
+                        largeTables[deferrable] = large;
+                    }
+
+                    if (large)
+                    {
+                        continue;
+                    }
+                }
+
+                applied.Add(command.Sql);
                 long counted;
                 try
                 {
@@ -277,7 +299,7 @@ public static class EntityProvisioner
                 await outer!.ReleaseSavepointAsync(savepoint, cancellationToken);
             }
 
-            return new ProvisioningResult([], plan.Statements) { ActiveReleaseSet = activeReleaseSet };
+            return new ProvisioningResult([], applied) { ActiveReleaseSet = activeReleaseSet };
         }
         catch
         {
@@ -589,6 +611,14 @@ public static class EntityProvisioner
     {
         await using var command = new NpgsqlCommand(sql, connection, transaction);
         await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    // Whether the table has more than limit rows. The count stops at limit + 1, so a large table is not counted whole.
+    private static async Task<bool> ExceedsAsync(NpgsqlConnection connection, NpgsqlTransaction transaction, string table, int limit, CancellationToken cancellationToken)
+    {
+        await using var command = new NpgsqlCommand($"SELECT count(*) FROM (SELECT 1 FROM {EntityNaming.QualifiedTable(table)} LIMIT @limit) t", connection, transaction);
+        command.Parameters.AddWithValue("limit", (long)limit + 1);
+        return Convert.ToInt64(await command.ExecuteScalarAsync(cancellationToken), System.Globalization.CultureInfo.InvariantCulture) > limit;
     }
 
     // A fill returns the number of rows it left null, and an enum convert the number of rows with an unlisted value.

@@ -20,17 +20,18 @@ internal static class SequenceCounters
 
     /// <summary>
     /// Increments the counter of <paramref name="sequence"/> for the period of
-    /// <paramref name="utcNow"/> and returns the formatted number. The row stays locked until the
+    /// <paramref name="now"/> in <paramref name="timeZone"/> and returns the formatted number. The row stays locked until the
     /// caller's transaction ends, so concurrent creates wait, and a rollback hands the number back.
     /// </summary>
     internal static async Task<string> NextAsync(
         NpgsqlConnection connection,
         Guid applicationId,
         SequenceModel sequence,
-        DateTimeOffset utcNow,
+        DateTimeOffset now,
+        TimeZoneInfo timeZone,
         CancellationToken cancellationToken)
     {
-        var year = utcNow.UtcDateTime.Year;
+        var year = TimeZoneInfo.ConvertTime(now, timeZone).Year;
         await using var command = new NpgsqlCommand(NextValueSql, connection);
         command.Parameters.AddWithValue("sequence", sequence.Id);
         command.Parameters.AddWithValue("application", applicationId);

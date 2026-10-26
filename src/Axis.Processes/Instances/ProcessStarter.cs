@@ -184,7 +184,7 @@ public static class ProcessStarter
         if (process.StartCondition is { } condition)
         {
             var now = await RecordQueries.TransactionTimeAsync(connection, cancellationToken);
-            var result = ProcessParameters.Evaluate(condition.Expression, ProcessParameters.Values(process, parameters), now);
+            var result = ProcessParameters.Evaluate(condition.Expression, ProcessParameters.Values(process, parameters), now, application.TimeZone);
             if (result.Value is not true)
             {
                 return new ProcessStartResult(ProcessStartOutcome.ConditionFailed, condition.Message.TextKey, result.Error?.Kind);

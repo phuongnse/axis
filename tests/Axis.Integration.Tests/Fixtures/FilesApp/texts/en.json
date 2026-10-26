@@ -1,0 +1,12 @@
+{
+  "id": "3b7c1d52-4e8a-4f60-9a1b-7d2e5c8f0a0a",
+  "kind": "text",
+  "name": "TextsEn",
+  "formatVersion": 1,
+  "locale": "en",
+  "texts": {
+    "role.employee": "Employee",
+    "role.reader": "Reader",
+    "role.fielded": "Fielded"
+  }
+}

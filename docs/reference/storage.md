@@ -44,8 +44,8 @@ apply: sections marked _(planned for Mx)_ are not built yet, and Dn refers to
     [recompute of computed fields](migrations.md#recomputing-computed-fields). It also owns
     `axis.pending_computed_fields`, the entities whose recompute the worker
     finishes in batches. It also owns `axis.record_imports`, the uploads of
-    [record imports](import-export.md#import) with their file, their state and
-    the errors of their dry run.
+    [record imports](import-export.md#import) with their file, its format
+    (`csv` or `xlsx`), their state and the errors of their dry run.
   - `Axis.Processes` owns `axis.process_instances` (one row per process
     instance), `axis.process_step_history` (one row per step occurrence),
     `axis.process_tasks` (one row per human task),
@@ -71,6 +71,18 @@ apply: sections marked _(planned for Mx)_ are not built yet, and Dn refers to
     updates and deletes its rows. The worker deletes the expired rows, and
     `tenant restore` empties the table, see
     [sign-in and the session](security.md#sign-in-and-the-session).
+  - `Axis.Data` also owns `axis.files` and `axis.file_contents`, with history
+    in `axis.__data_migrations`. A row of `axis.files` is the details of one
+    uploaded file of a [file field](file-fields.md#storage-and-clean-up): `id`
+    (the primary key), `application_id`, `entity_id`, `field_path` (the field
+    name, or `collection/field` for a field of a child entity),
+    `owner_record_id` (null until the file is attached), `name`, `media_type`,
+    `size`, `sha256` (`bytea`), `storage_kind` (`database`), `state`
+    (`pending`, `attached` or `deleted`), `uploaded_by` and `uploaded_at`. A
+    row of `axis.file_contents` is the bytes (`content`, `bytea`) of the file
+    with the same `file_id`, and is deleted with it. The server reads, inserts,
+    updates and deletes their rows. A file field's column in the `entities`
+    schema is a `uuid` with a foreign key to `axis.files (id)`.
   - `Axis.Data` also owns `axis.user_profiles`, one row for each user who
     signed in, with the display name, email, locale and the first and last
     sign-in. Each sign-in upserts it through `UserProfiles.UpsertAsync`, see
@@ -326,7 +338,7 @@ What each database role may do:
 | Objects                                                                                                                                                                                                                                                                                                       | Schema database role                                             | Runtime database role                                             |
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------------- |
 | `entities` tables                                                                                                                                                                                                                                                                                             | Owns them                                                        | Read and write rows                                               |
-| `axis` tables that runtime writes: `process_*`, `connector_calls`, `package_calls`, `events`, `notifications`, `notification_reads`, the receipts, `trigger_schedules`, `trigger_starts`, `delivery_failures`, `dead_letters`, `audit_records`, `user_profiles`, `sequence_counters`, `computed_field_errors`, `pending_computed_fields`, `sessions`, `record_imports` | Owns them                                                        | Read and write rows                                               |
+| `axis` tables that runtime writes: `process_*`, `connector_calls`, `package_calls`, `events`, `notifications`, `notification_reads`, the receipts, `trigger_schedules`, `trigger_starts`, `delivery_failures`, `dead_letters`, `audit_records`, `user_profiles`, `sequence_counters`, `computed_field_errors`, `pending_computed_fields`, `sessions`, `record_imports`, `files`, `file_contents` | Owns them                                                        | Read and write rows                                               |
 | Tables that activation writes: `active_releases`, `active_sites`, `provisioned_entities`, `provisioned_enum_values`, `applied_migrations`, `release_computed_fingerprints`, the `__*_migrations` tables                                                                                                       | Owns them                                                        | Read only                                                         |
 | Release tables: `releases`, `release_resources`, `release_packages`                                                                                                                                                                                                                                           | Insert and read. The trigger refuses update, delete and truncate | Read only                                                         |
 | `publish_requests`                                                                                                                                                                                                                                                                                            | Owns it. The publisher changes the status and the lease          | `SELECT` and `INSERT` only. It never updates or deletes a request |
@@ -469,7 +481,8 @@ publisher` runs it with the tenant's schema role.
 
 `Axis.Data` compares a compiled application with a snapshot of the tenant
 catalog (entity tables, their columns, types, `NOT NULL`, single-column
-unique constraints, foreign key targets and whether the table has rows) and
+unique constraints, foreign key targets, their `ix_` indexes with whether each
+is valid, and whether the table has rows) and
 with the provisioning records (each provisioned entity with its application
 and table, and each recorded enum value). The records cover the application's
 entities and any entity recorded with one of its entity `id`s, whatever its
@@ -584,8 +597,19 @@ access. It returns diagnostics, SQL statements and the new records to write.
 - **Errors.** When any diagnostic exists, the plan has no statements and no
   new records; nothing is applied.
 - **Indexes.** See [D77](../decisions/d77-indexes-defaults-and-ranges.md).
-  Every index is built inside the activation transaction for now. Building a
-  large index with `CREATE INDEX CONCURRENTLY` is _(planned for M15)_.
+  A unique index, an index on an empty table and an index on a table with at
+  most `Activation:InlineRecomputeLimit` rows are built inside the activation
+  transaction. A new non-unique index on a table with more rows is left out:
+  activation commits without it, and `EntityIndexBuilder` creates it later
+  with `CREATE INDEX CONCURRENTLY`, so reads and writes on the table go on.
+  The catalog snapshot reads whether each index is valid. An `ix_` index that
+  PostgreSQL marks `INVALID`, for example after a cancelled concurrent build,
+  counts as missing: activation and the builder drop it and create it again.
+  The builder runs without a transaction, holds the schema lock that
+  activation takes, and uses the schema role. The worker cannot build, because
+  its runtime role cannot create indexes, see
+  [D31](../decisions/d31-separate-database-roles.md). Calling the builder from
+  the hosts is _(planned for M15)_. Until then, a deferred index stays missing.
   - Every `reference` column and every child table's `owner_id` gets an
     `ix_` index without being declared. An existing tenant gets them on its
     next activation. A junction table's `target_id` index is created with the
@@ -749,7 +773,7 @@ schema of the tenant database.
   | ---------------- | --------- | -------------------------------------------------- |
   | `sequence_id`    | `uuid`    | The `sequence` resource `id`                       |
   | `application_id` | `uuid`    | The application `id`                               |
-  | `period`         | `integer` | The UTC year, or 0 when the format has no `{yyyy}` |
+  | `period`         | `integer` | The local year, or 0 when the format has no `{yyyy}` |
   | `last_value`     | `bigint`  | The last number handed out                         |
   - The primary key is `(sequence_id, period)`.
   - For a module sequence, `sequence_id` is the id derived

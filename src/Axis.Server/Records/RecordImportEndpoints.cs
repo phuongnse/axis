@@ -14,13 +14,14 @@ using Microsoft.Net.Http.Headers;
 namespace Axis.Server.Records;
 
 /// <summary>
-/// Endpoints for the imports of an entity: the upload of a CSV file, and the state of an upload. Only a
+/// Endpoints for the imports of an entity: the upload of a CSV file or an <c>xlsx</c> workbook, and the state of an upload. Only a
 /// signed-in user uses them, never a service account. Every request is checked in order: session (401), then the
 /// path (404), then the user's grant (403), and only then the body. An upload needs the <c>import</c> grant and a
 /// <c>create</c> grant on the entity, and the <c>update</c> grant too when it names a <c>key</c>. A <c>key</c>
 /// that is not the name of a unique field of the entity is a 400 at <c>key</c>. The file is the raw request
-/// body with the content type <c>text/csv</c>, at most <c>Data:ImportMaxBytes</c> bytes: another content type
-/// is a 415 and a larger body a 413. The upload stores the import <c>pending</c>, queues the work item that
+/// body with the content type <c>text/csv</c> or the <c>xlsx</c> content type, at most <c>Data:ImportMaxBytes</c>
+/// bytes: another content type is a 415 and a larger body a 413. The upload does not look inside the file, so a
+/// body that is not a workbook fails its dry run. The upload stores the import <c>pending</c>, queues the work item that
 /// dry-runs it, and answers 202 with the import and its <c>Location</c>. The worker then checks every row as a
 /// create would, and writes no record. An import is read by the user who uploaded it, and
 /// any other user, or an unknown id, gets a 404. An entity of a module has the same routes as in
@@ -75,9 +76,9 @@ internal static class RecordImportEndpoints
             return Results.ValidationProblem(new Dictionary<string, string[]> { ["key"] = ["Must be the name of a unique field of the entity."] });
         }
 
-        if (!IsCsv(request))
+        if (Format(request) is not { } format)
         {
-            return Results.Problem(statusCode: StatusCodes.Status415UnsupportedMediaType, title: "The request body must be text/csv.");
+            return Results.Problem(statusCode: StatusCodes.Status415UnsupportedMediaType, title: "The request body must be text/csv or an xlsx workbook.");
         }
 
         if (await ReadFileAsync(request, settings.MaxBytes, cancellationToken) is not { } file)
@@ -95,7 +96,7 @@ internal static class RecordImportEndpoints
             await RecordImports.InsertAsync(
                 connection,
                 transaction,
-                new RecordImport(id, tenantId, application!.Manifest.Id, model.Id, user.Id, user.DisplayName, user.Roles, key, file, itemId, created),
+                new RecordImport(id, tenantId, application!.Manifest.Id, model.Id, user.Id, user.DisplayName, user.Roles, key, format, file, itemId, created),
                 cancellationToken);
             await transaction.CommitAsync(cancellationToken);
         }
@@ -138,13 +139,29 @@ internal static class RecordImportEndpoints
             : ImportNotFound();
     }
 
-    // The content type is text/csv with at most a utf-8 charset, as the reader reads UTF-8 only.
-    private static bool IsCsv(HttpRequest request) =>
-        MediaTypeHeaderValue.TryParse(request.ContentType, out var contentType)
-        && contentType.MediaType.Equals("text/csv", StringComparison.OrdinalIgnoreCase)
-        && contentType.Parameters.All(parameter =>
-            parameter.Name.Equals("charset", StringComparison.OrdinalIgnoreCase)
-            && HeaderUtilities.RemoveQuotes(parameter.Value).Equals("utf-8", StringComparison.OrdinalIgnoreCase));
+    private const string XlsxMediaType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
+    // The format the content type names, or null for any other. A CSV file is text/csv with at most a utf-8
+    // charset, as the reader reads UTF-8 only. A workbook is the xlsx media type with no parameter.
+    private static string? Format(HttpRequest request)
+    {
+        if (!MediaTypeHeaderValue.TryParse(request.ContentType, out var contentType))
+        {
+            return null;
+        }
+
+        if (contentType.MediaType.Equals(XlsxMediaType, StringComparison.OrdinalIgnoreCase))
+        {
+            return contentType.Parameters.Count == 0 ? RecordImportFormats.Xlsx : null;
+        }
+
+        return contentType.MediaType.Equals("text/csv", StringComparison.OrdinalIgnoreCase)
+            && contentType.Parameters.All(parameter =>
+                parameter.Name.Equals("charset", StringComparison.OrdinalIgnoreCase)
+                && HeaderUtilities.RemoveQuotes(parameter.Value).Equals("utf-8", StringComparison.OrdinalIgnoreCase))
+            ? RecordImportFormats.Csv
+            : null;
+    }
 
     // Reads the body, or returns null when it is larger than maxBytes. A body that announces more is refused
     // before a byte is read, and one that does not is cut off at maxBytes + 1.

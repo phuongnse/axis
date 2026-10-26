@@ -4,6 +4,7 @@ import path from 'node:path'
 import { expect, test } from '../test'
 import type { Browser, Page, TestInfo } from '@playwright/test'
 import { activateFolder, startServer } from '../activate'
+import { csrfHeaders } from '../csrf'
 import { confirmDialog, waitForDialog } from '../dialogs'
 import { guardStep } from '../hang-guard'
 import { appPath, createRequest, decide, expectStatus, submit, waitForTask } from '../purchase-requests'
@@ -54,6 +55,7 @@ async function studioServer(testInfo: TestInfo) {
  * Edits the JSON of the resource in `file` through Studio's JSON view and saves it. `change` edits the content
  * as it is in the copy `folder`. A click here once waited for the browser until the test timeout ran out, so the
  * edit gets a limit of its own, and a hang leaves a screenshot, the console and the machine state in the report.
+ * Only the journey that tests the edit uses it. The others set up their change with `writeInStudio`.
  */
 async function editInStudio(
   page: Page,
@@ -74,6 +76,35 @@ async function editInStudio(
     await page.getByRole('textbox', { name: 'JSON', exact: true }).fill(JSON.stringify(content, null, 2))
     await page.getByRole('button', { name: 'Save', exact: true }).click()
     await expect(page.getByTestId('studio-saved')).toBeVisible()
+  })
+}
+
+/**
+ * Replaces the member at the JSON pointer `pointer` of the resource in `file` through Studio's resource API, as
+ * the signed-in author, without the browser. A refused write fails at once with its status.
+ */
+async function writeInStudio(page: Page, serverUrl: string, file: string, pointer: string, value: unknown) {
+  const resources = `${serverUrl}/api/studio/apps/PurchaseRequests/resources`
+  const list = await page.request.get(resources)
+  expect(list.status()).toBe(200)
+  const { items } = (await list.json()) as { items: { id: string; file: string; version: string }[] }
+  const resource = items.find((item) => item.file === file)!
+  const response = await page.request.patch(`${resources}/${resource.id}`, {
+    headers: {
+      ...csrfHeaders,
+      'Content-Type': 'application/json-patch+json',
+      'If-Match': `"${resource.version}"`,
+    },
+    data: JSON.stringify([{ op: 'replace', path: pointer, value }]),
+  })
+  expect(response.status(), await response.text()).toBe(200)
+}
+
+/** Opens Studio for the purchase request sample and waits for Publish. A hang here leaves evidence. */
+async function openStudio(page: Page, serverUrl: string) {
+  await guardStep(page, test.info(), 'Opening Studio', 60_000, async () => {
+    await page.goto(`${serverUrl}/studio?app=PurchaseRequests`)
+    await expect(page.getByRole('button', { name: 'Publish', exact: true })).toBeVisible()
   })
 }
 
@@ -174,10 +205,10 @@ test.describe('the active release of the purchase request sample changes', () =>
     const heading = `Name ${Date.now().toString(36)}`
     try {
       await useSession(page, 'hoa')
-      await editInStudio(page, server.url, folder, 'texts/en.json', (content) => {
-        expect(content.texts['supplier.name']).toBe('Name')
-        content.texts['supplier.name'] = heading
-      })
+      const texts = JSON.parse(await readFile(path.join(folder, 'texts/en.json'), 'utf8'))
+      expect(texts.texts['supplier.name']).toBe('Name')
+      await writeInStudio(page, server.url, 'texts/en.json', '/texts/supplier.name', heading)
+      await openStudio(page, server.url)
 
       await publishWithLabel(page, 'Supplier heading')
 
@@ -202,10 +233,10 @@ test.describe('the active release of the purchase request sample changes', () =>
     const heading = `Name ${Date.now().toString(36)}`
     try {
       await useSession(page, 'hoa')
-      await editInStudio(page, server.url, folder, 'texts/en.json', (content) => {
-        expect(content.texts['supplier.name']).toBe('Name')
-        content.texts['supplier.name'] = heading
-      })
+      const texts = JSON.parse(await readFile(path.join(folder, 'texts/en.json'), 'utf8'))
+      expect(texts.texts['supplier.name']).toBe('Name')
+      await writeInStudio(page, server.url, 'texts/en.json', '/texts/supplier.name', heading)
+      await openStudio(page, server.url)
 
       await page.getByTestId('studio-preview').click()
 
@@ -246,12 +277,11 @@ test.describe('the active release of the purchase request sample changes', () =>
     const heading = `Name ${Date.now().toString(36)}`
     try {
       await useSession(page, 'hoa')
-      await editInStudio(page, server.url, folder, 'texts/en.json', (content) => {
-        content.texts['supplier.name'] = heading
-      })
-      await editInStudio(page, server.url, folder, 'connectors/purchasing-system.json', (content) => {
-        content.baseUrl.binding = 'NoSuchBinding'
-      })
+      const connector = JSON.parse(await readFile(path.join(folder, 'connectors/purchasing-system.json'), 'utf8'))
+      expect(connector.baseUrl.binding).toBeDefined()
+      await writeInStudio(page, server.url, 'texts/en.json', '/texts/supplier.name', heading)
+      await writeInStudio(page, server.url, 'connectors/purchasing-system.json', '/baseUrl/binding', 'NoSuchBinding')
+      await openStudio(page, server.url)
 
       await publishWithLabel(page, 'Missing binding')
 
@@ -273,16 +303,15 @@ test.describe('the active release of the purchase request sample changes', () =>
     page,
   }, testInfo) => {
     test.setTimeout(300_000)
-    const { server, folder } = await studioServer(testInfo)
+    const { server } = await studioServer(testInfo)
     const stamp = Date.now().toString(36)
     const headingA = `Name A ${stamp}`
     const headingB = `Name B ${stamp}`
     const status = page.getByTestId('studio-request-status')
     try {
       await useSession(page, 'hoa')
-      await editInStudio(page, server.url, folder, 'texts/en.json', (content) => {
-        content.texts['supplier.name'] = headingA
-      })
+      await writeInStudio(page, server.url, 'texts/en.json', '/texts/supplier.name', headingA)
+      await openStudio(page, server.url)
       await publishWithLabel(page, `First ${stamp}`)
       await expect(status).toHaveAttribute('data-status', 'succeeded', {
         timeout: 60_000,
@@ -294,9 +323,8 @@ test.describe('the active release of the purchase request sample changes', () =>
       )
       await expect(page.getByTestId('studio-folder-differs')).toHaveCount(0)
 
-      await editInStudio(page, server.url, folder, 'texts/en.json', (content) => {
-        content.texts['supplier.name'] = headingB
-      })
+      await writeInStudio(page, server.url, 'texts/en.json', '/texts/supplier.name', headingB)
+      await openStudio(page, server.url)
       await publishWithLabel(page, `Second ${stamp}`)
       await expect(page.getByTestId('studio-release-row').filter({ hasText: `Second ${stamp}` })).toHaveAttribute(
         'data-active',

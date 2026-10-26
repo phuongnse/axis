@@ -20,9 +20,13 @@ const fixtureMarker = 'DesignSystemSample'
 
 const modes = ['light', 'dark'] as const
 
-// Each preview and a locator for its widget.
+// Each preview and a locator for its widget. The table and the kpi also draw an empty state, so they are looked up in
+// the "With data" figure.
 const previews: Record<string, (page: Page) => Locator> = {
-  table: (page) => page.getByRole('columnheader', { name: 'Title', exact: true }),
+  table: (page) =>
+    page
+      .getByRole('figure', { name: 'With data', exact: true })
+      .getByRole('columnheader', { name: 'Title', exact: true }),
   form: (page) => page.getByRole('button', { name: 'Save', exact: true }),
   taskInbox: (page) => page.getByRole('link', { name: 'Review the request', exact: true }).first(),
   processInspector: (page) => page.getByRole('combobox', { name: 'State', exact: true }),
@@ -30,7 +34,7 @@ const previews: Record<string, (page: Page) => Locator> = {
   'chart-bar': (page) => page.getByRole('img', { name: 'Requests by status', exact: true }).locator('svg'),
   'chart-line': (page) => page.getByRole('img', { name: 'Requests by status', exact: true }).locator('svg'),
   'chart-pie': (page) => page.getByRole('img', { name: 'Requests by status', exact: true }).locator('svg'),
-  kpi: (page) => page.getByTestId('kpi-value'),
+  kpi: (page) => page.getByRole('figure', { name: 'With data', exact: true }).getByTestId('kpi-value'),
   columns: (page) => page.getByRole('region', { name: 'Tasks', exact: true }),
   tabs: (page) => page.getByRole('tab', { name: 'Requests', exact: true }),
   section: (page) => page.getByRole('region', { name: 'Tasks', exact: true }),
@@ -44,6 +48,27 @@ const previews: Record<string, (page: Page) => Locator> = {
   'field-enum': (page) => page.getByLabel('Status', { exact: true }),
   'field-reference': (page) => page.getByLabel('Category', { exact: true }),
   'field-child-collection': (page) => page.getByRole('columnheader', { name: 'Description', exact: true }),
+}
+
+/** The text a preview's empty state shows, or none for a preview that draws no empty state. */
+function emptyTextOf(name: string): string | undefined {
+  if (name === 'table') {
+    return 'No records yet.'
+  }
+  if (name === 'taskInbox') {
+    return 'No open tasks.'
+  }
+  if (name === 'detail') {
+    // Ant Design's placeholder for the empty Lines table.
+    return 'No data'
+  }
+  if (name === 'kpi') {
+    return 'No value'
+  }
+  if (name.startsWith('chart-')) {
+    return 'No data to show'
+  }
+  return undefined
 }
 
 /** Files of a folder with their paths relative to it, or none when the folder does not exist. */
@@ -100,6 +125,30 @@ for (const [name, widget] of Object.entries(previews)) {
           page.getByRole('figure', { name: 'Loading', exact: true }).locator('[aria-busy="true"]').first(),
         ).toBeVisible()
       }
+      const emptyText = emptyTextOf(name)
+      if (emptyText !== undefined) {
+        await expect(
+          page
+            .getByRole('figure', { name: 'Empty', exact: true })
+            .getByText(emptyText, { exact: true })
+            .filter({ visible: true })
+            .first(),
+        ).toBeVisible()
+      }
+      const withData = page.getByRole('figure', { name: 'With data', exact: true })
+      if (name === 'table') {
+        await expect(withData.getByRole('button', { name: 'Open', exact: true }).first()).toBeVisible()
+        await expect(withData.getByRole('button', { name: 'New request', exact: true })).toBeVisible()
+      }
+      if (name === 'taskInbox') {
+        await expect(withData.getByText('Overdue', { exact: true })).toBeVisible()
+        await expect(withData.getByText('Claimed by you', { exact: true })).toBeVisible()
+      }
+      if (name === 'processInspector') {
+        await expect(page.getByRole('cell', { name: 'Failed', exact: true }).first()).toBeVisible()
+        await expect(page.getByRole('button', { name: 'Redeliver', exact: true })).toBeVisible()
+        await expect(page.getByRole('button', { name: 'Discard', exact: true })).toBeVisible()
+      }
       await page.waitForLoadState('networkidle')
 
       if (name.startsWith('field-')) {
@@ -148,7 +197,9 @@ test('the field-child-collection preview adds a row', async ({ page }) => {
 
 test('a mounted table redraws in the other mode when the page changes data-theme', async ({ page }) => {
   const recording = await openHarness(page, '?preview=table&mode=light')
-  const header = page.getByRole('columnheader', { name: 'Title', exact: true })
+  const header = page
+    .getByRole('figure', { name: 'With data', exact: true })
+    .getByRole('columnheader', { name: 'Title', exact: true })
   await expect(header).toBeVisible()
   const background = () => header.evaluate((cell) => getComputedStyle(cell).backgroundColor)
   const light = await background()
@@ -182,6 +233,23 @@ test("a mounted form uses the page's --primary and redraws when it changes", asy
   await expect.poll(background).toBe('rgb(235, 47, 150)')
   expect(recording.errors).toEqual([])
 })
+
+for (const mode of modes) {
+  test(`a form validation message follows the page's --dangerText in ${mode} mode`, async ({ page }) => {
+    const recording = await openHarness(page, `?preview=form&mode=${mode}`)
+    await expect(previews.form(page)).toBeVisible()
+    await page.evaluate(() => document.documentElement.style.setProperty('--dangerText', '#13c2c2'))
+
+    const title = page.getByLabel('Title', { exact: true })
+    await title.fill('Standing desks')
+    await title.press('Tab')
+
+    const message = page.getByText('Another request has this title.', { exact: true })
+    await expect(message).toBeVisible()
+    await expect.poll(() => message.evaluate((element) => getComputedStyle(element).color)).toBe('rgb(19, 194, 194)')
+    expect(recording.errors).toEqual([])
+  })
+}
 
 test('the bundle sets window.Axis with one mount for each preview', async ({ page }) => {
   const recording = await openHarness(page, '')

@@ -26,7 +26,7 @@ public sealed class RecordDefaultsTests
     {
         var entity = Without("note", "ratio", "owner");
 
-        var result = RecordDefaults.Apply(entity, [new RecordValue(entity.Fields[0], "Hi")], _now);
+        var result = RecordDefaults.Apply(entity, [new RecordValue(entity.Fields[0], "Hi")], _now, TimeZoneInfo.Utc);
 
         Assert.Null(result.Errors);
         Assert.Equal(
@@ -45,7 +45,7 @@ public sealed class RecordDefaultsTests
             new RecordValue(entity.Fields[1], "closed"),
         };
 
-        var result = RecordDefaults.Apply(entity, values, _now);
+        var result = RecordDefaults.Apply(entity, values, _now, TimeZoneInfo.Utc);
 
         Assert.Null(result.Errors);
         Assert.Equal(
@@ -59,7 +59,7 @@ public sealed class RecordDefaultsTests
         var entity = Entity(Guid.Parse("5a1d0c2e-7b3f-4e48-9c61-2b3c4d5e6f02"), "Plain", "entities/plain.json", Field("title", FieldType.Text));
         IReadOnlyList<RecordValue> values = [];
 
-        var result = RecordDefaults.Apply(entity, values, _now);
+        var result = RecordDefaults.Apply(entity, values, _now, TimeZoneInfo.Utc);
 
         Assert.Same(values, result.Values);
         Assert.Null(result.Errors);
@@ -70,7 +70,7 @@ public sealed class RecordDefaultsTests
     {
         var entity = Without("note", "owner");
 
-        var result = RecordDefaults.Apply(entity, [new RecordValue(entity.Fields[0], "Hi")], _now);
+        var result = RecordDefaults.Apply(entity, [new RecordValue(entity.Fields[0], "Hi")], _now, TimeZoneInfo.Utc);
 
         Assert.Equal(["/values/ratio"], result.Errors!.Keys);
         Assert.Equal(["Could not be computed."], result.Errors["/values/ratio"]);
@@ -81,7 +81,7 @@ public sealed class RecordDefaultsTests
     {
         var entity = Without("ratio", "owner");
 
-        var result = RecordDefaults.Apply(entity, [new RecordValue(entity.Fields[0], "Hi")], _now);
+        var result = RecordDefaults.Apply(entity, [new RecordValue(entity.Fields[0], "Hi")], _now, TimeZoneInfo.Utc);
 
         Assert.Equal(["/values/note"], result.Errors!.Keys);
         Assert.Equal(["Must be at most 3 characters."], result.Errors["/values/note"]);
@@ -92,7 +92,7 @@ public sealed class RecordDefaultsTests
     {
         var entity = Without("note", "ratio");
 
-        var result = RecordDefaults.Apply(entity, [new RecordValue(entity.Fields[0], "Hi")], _now);
+        var result = RecordDefaults.Apply(entity, [new RecordValue(entity.Fields[0], "Hi")], _now, TimeZoneInfo.Utc);
 
         Assert.Equal(["/values/owner"], result.Errors!.Keys);
         Assert.Equal(["Required."], result.Errors["/values/owner"]);
@@ -103,12 +103,36 @@ public sealed class RecordDefaultsTests
     {
         var entity = Without("note", "owner");
 
-        var result = RecordDefaults.Apply(entity, [new RecordValue(entity.Fields[0], "Hi")], _now);
+        var result = RecordDefaults.Apply(entity, [new RecordValue(entity.Fields[0], "Hi")], _now, TimeZoneInfo.Utc);
 
         Assert.Equal(["/values/ratio"], result.Errors!.Keys);
         Assert.Equal(
             [("title", (object?)"Hi"), ("state", "open"), ("priority", 3L), ("remindAt", _now)],
             result.Values.Select(value => (value.Field.Name, value.Value)));
+    }
+
+    [Theory]
+    [InlineData("today()")]
+    [InlineData("toDate(now())")]
+    public void A_date_default_uses_the_application_time_zone(string expression)
+    {
+        var entity = Entity(
+            Guid.Parse("5a1d0c2e-7b3f-4e48-9c61-2b3c4d5e6f03"),
+            "Dated",
+            "entities/dated.json",
+            Field("title", FieldType.Text),
+            WithDefault(Field("openedOn", FieldType.Date), expression));
+        var values = new[] { new RecordValue(entity.Fields[0], "Hi") };
+        var evening = new DateTimeOffset(2026, 12, 31, 18, 0, 0, TimeSpan.Zero);
+        var vietnam = TimeZoneInfo.FindSystemTimeZoneById("Asia/Ho_Chi_Minh");
+
+        var local = RecordDefaults.Apply(entity, values, evening, vietnam);
+        var utc = RecordDefaults.Apply(entity, values, evening, TimeZoneInfo.Utc);
+
+        Assert.Null(local.Errors);
+        Assert.Null(utc.Errors);
+        Assert.Equal(new DateOnly(2027, 1, 1), local.Values.Single(value => value.Field.Name == "openedOn").Value);
+        Assert.Equal(new DateOnly(2026, 12, 31), utc.Values.Single(value => value.Field.Name == "openedOn").Value);
     }
 
     /// <summary>The entity without the named fields, so one test reaches one default.</summary>

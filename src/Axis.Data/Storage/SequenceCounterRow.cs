@@ -11,7 +11,7 @@ public sealed class SequenceCounterRow
     /// <summary>The <c>id</c> of the application manifest that declares the sequence.</summary>
     public required Guid ApplicationId { get; init; }
 
-    /// <summary>The UTC year, or 0 when the sequence's format has no <c>{yyyy}</c>.</summary>
+    /// <summary>The year in the application's time zone, or 0 when the sequence's format has no <c>{yyyy}</c>.</summary>
     public required int Period { get; init; }
 
     /// <summary>The last number handed out.</summary>

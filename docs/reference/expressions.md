@@ -263,10 +263,10 @@ and in [functions](#functions).
 - **Current time.** `now()` gives the start time of the current database
   transaction as a `date-time`. It is an instant, so it never depends on a
   time zone, and every call in one transaction gives the same value. See
-  [Functions](#functions). `today()` and taking a date from an instant wait
-  for the [time zone rule](../decisions/d22-current-time-and-time-zones.md).
-  _(Planned for M14)_ They follow the
-  [application time zone](resource-files.md#application-time-zone).
+  [Functions](#functions). `today()` and `toDate(date-time)` take a calendar
+  date in the
+  [application time zone](resource-files.md#application-time-zone), which is
+  `UTC` when the application names none.
 
 ## Names and references
 
@@ -338,7 +338,7 @@ Paths in validations and computed fields are not built. There a path is
   reference path. Another computed field, itself included, is an unknown
   name, and so is a `references` field. Inside an item expression, names are
   the child row's fields, computed ones included, and no rules. It cannot call
-  `now()`, which is `AXC0086`.
+  `now()`, `today()` or `toDate`, which is `AXC0086`.
 - **Scope in a field default.** The expression sees no fields, no
   collections and no reference path, because no record exists yet. It has the
   named rules, and may call `now()`. Its type must fit the field, so a `date`
@@ -414,23 +414,27 @@ argument is `null`.
 | `date(text literal)` | date | See [Literals](#literals). | Yes |
 | `dateTime(text literal)` | date-time | See [Literals](#literals). | Yes |
 | `now()` | date-time | The start time of the current transaction. Not allowed in a computed field (`AXC0086`). | Yes |
+| `today()` | date | The calendar date of the transaction's time in the application's time zone. Not allowed in a computed field (`AXC0086`). | Yes |
+| `toDate(date-time)` | date | The calendar date of an instant in the application's time zone. `null` gives `null`. Not allowed in a computed field (`AXC0086`). | Yes |
 | `currentUser()` | text | The signed-in user's id. Allowed only in a policy filter (`AXC0095`). See [Current user](#current-user). | Yes |
 
 The date functions work on `date` only, not on `date-time`. Taking a calendar
-day from an instant needs a time zone, so it waits for the
-[time zone rule](../decisions/d22-current-time-and-time-zones.md).
+day from an instant needs a time zone, so `toDate` does it.
 
-_(Planned for M14)_ Two functions use the
+Two functions use the
 [application time zone](resource-files.md#application-time-zone), per
-[D75](../decisions/d75-the-application-time-zone.md):
+[D75](../decisions/d75-the-application-time-zone.md). The time zone is part of
+the release, so a change applies to work that runs on the new release:
 
 - `today()` gives a `date`: the calendar date of the transaction's time in the
   application's time zone. Every call in one transaction gives the same value.
 - `toDate(date-time)` gives the calendar `date` of an instant in that time
   zone. `null` gives `null`.
 - Neither is allowed in a computed field, as `now()` is not. The
-  SQL translation converts with `AT TIME ZONE`, so the interpreter and SQL
-  agree.
+  SQL translation converts with `AT TIME ZONE` and the time zone id as a
+  bound parameter, so the interpreter and SQL agree.
+- At 18:00 UTC on 31 December, both give 1 January of the next year in
+  `Asia/Ho_Chi_Minh` and 31 December in `UTC`.
 
 `now()` gives the same instant for every call in one transaction, and the
 interpreter and the SQL translation agree on it:
@@ -445,9 +449,9 @@ interpreter and the SQL translation agree on it:
   reads first.
 - **Rule.** The transaction of whatever calls it.
 
-A computed field's value is stored and would go stale, so `now()` in a
-computed field, including inside an aggregate's item expression, is
-`AXC0086` at the call.
+`today()` takes its instant the same way. A computed field's value is stored
+and would go stale, so `now()`, `today()` or `toDate` in a computed field,
+including inside an aggregate's item expression, is `AXC0086` at the call.
 
 The text functions take `text` only. An enum value is not text to them,
 because no conversion is implicit except integer to decimal.
@@ -488,11 +492,11 @@ them over child collections and `references` fields.
 | `count(list)` | integer | 0 |
 | `count(list, condition)` | integer | 0 |
 | `sum(list, item)` | type of `item` | 0 |
+| `avg(list, item)` | decimal | `null` |
 | `min(list, item)` | type of `item` | `null` |
 | `max(list, item)` | type of `item` | `null` |
 | `any(list, condition)` | boolean | false |
 | `all(list, condition)` | boolean | true |
-| `avg(list, item)` _(planned for M15)_ | decimal | `null` |
 
 - **Example.** `sum(lines, quantity * unitPrice)` adds up the line totals.
 - **Item types.** `sum` takes integer or decimal items. `min` and `max` take
@@ -507,10 +511,11 @@ them over child collections and `references` fields.
   is known. So a run-time error in any row is always reported. Put guards
   inside the item expression, where `and` and `or` short-circuit.
 - **Errors.** A `sum` past the integer range, or one that a .NET `decimal`
-  cannot hold exactly, is a [run-time error](#run-time-errors).
-- **`avg`** _(planned for M15)_. It takes integer or decimal items, skips
-  `null` items and is `null` when none is left. Its result is a decimal
-  rounded to 6 digits after the point.
+  cannot hold exactly, is a [run-time error](#run-time-errors). An `avg`
+  whose total a .NET `decimal` cannot hold exactly is one too.
+- **`avg`.** It takes integer or decimal items, skips `null` items and is
+  `null` when none is left. Its result is a decimal rounded to 6 digits
+  after the point.
 - **SQL.** No aggregate is in the SQL subset. From M15 `any` and `count` are,
   see [SQL subset](#sql-subset) _(planned for M15)_.
 
@@ -785,9 +790,9 @@ codes are in the [diagnostic table](configuration.md#configuration-pipeline):
   more than 2,000 syntax nodes. The message names what is not translated, or the rule. It is reported only after the filter type-checks. A migration's `fill` or `convert` value is checked against the subset at `/changes/{i}/value`, even when its type check waits for activation. See [migrations](resource-files.md#resource-file-shape).
 - **`AXC0058`.** A path takes more than 3 hops, at the `.` that goes past
   the limit.
-- **`AXC0086`.** A computed field calls `now()`, including inside an
-  aggregate's item expression, at the call. A stored value cannot depend on
-  the current time.
+- **`AXC0086`.** A computed field calls `now()`, `today()` or `toDate`,
+  including inside an aggregate's item expression, at the call. A stored value
+  cannot depend on the current time or the application's time zone.
 - **`AXC0095`.** An expression that is not a policy filter calls
   `currentUser()`, at the call. This includes a validation, a computed field,
   a data source filter, a process expression and a rule body. A rule

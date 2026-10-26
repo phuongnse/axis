@@ -85,6 +85,10 @@ internal static class RecordClrValues
             case FieldType.Reference:
                 value = Guid.Parse(node.GetValue<string>());
                 return true;
+            case FieldType.File:
+                // A stored file value is an object that holds the id, with the file's details.
+                value = Guid.Parse((node is JsonObject file ? file["id"]! : node).GetValue<string>());
+                return true;
             default:
                 throw new ArgumentOutOfRangeException(nameof(type), type, "A field without a column has no stored value.");
         }

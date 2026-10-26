@@ -5,21 +5,26 @@ import { DetailWidget } from '../platform/DetailWidget'
 import { FormWidget } from '../platform/FormWidget'
 import { KpiWidget } from '../platform/KpiWidget'
 import { ProcessInspectorWidget } from '../platform/ProcessInspectorWidget'
-import type { WidgetMetadata } from '../platform/site'
+import type { EntityWidgetMetadata, WidgetMetadata } from '../platform/site'
 import { TableWidget } from '../platform/TableWidget'
 import { TaskInboxWidget } from '../platform/TaskInboxWidget'
 import { WidgetTree } from '../platform/WidgetTree'
 import { FieldPreview } from './FieldPreview'
 import {
+  blankDetailWidget,
   chartWidget,
   columnsWidget,
   detailWidget,
+  emptyKpiWidget,
+  emptyTableWidget,
+  emptyTaskInboxWidget,
   failingRoutes,
   failingTableWidget,
   formWidget,
   kpiWidget,
   loadingRoutes,
   loadingTableWidget,
+  noRowsPath,
   type PreviewFieldType,
   locale,
   processInspectorWidget,
@@ -65,14 +70,35 @@ function typical(draw: () => ReactNode): readonly PreviewState[] {
   return [{ caption: 'Typical', draw }]
 }
 
+/** A preview of a data widget: with the fixture data, and with none. */
+function withAndWithoutData(data: () => ReactNode, empty: () => ReactNode): readonly PreviewState[] {
+  return [
+    { caption: 'With data', draw: data },
+    { caption: 'Empty', draw: empty },
+  ]
+}
+
 /** The request table over the given metadata, with the same props as the table preview. */
 function requestTable(widget: WidgetMetadata): ReactNode {
   return <TableWidget sitePath={sitePath} widget={widget} locale={locale} pageValues={{}} />
 }
 
+function inbox(widget: WidgetMetadata): ReactNode {
+  return (
+    <TaskInboxWidget sitePath={sitePath} pageName="Tasks" widget={widget} locale={locale} fallbackLocale={locale} />
+  )
+}
+
+function detail(widget: EntityWidgetMetadata): ReactNode {
+  return <DetailWidget widget={widget} sitePath={sitePath} recordId={requestId} locale={locale} />
+}
+
 /** What a preview draws: its states, each the shared widget component over fixture metadata. */
 export const previews: Record<string, readonly PreviewState[]> = {
-  table: typical(() => requestTable(tableWidget)),
+  table: withAndWithoutData(
+    () => requestTable(tableWidget),
+    () => requestTable(emptyTableWidget),
+  ),
   form: typical(() => (
     <FormWidget
       widget={formWidget}
@@ -83,28 +109,30 @@ export const previews: Record<string, readonly PreviewState[]> = {
       locale={locale}
     />
   )),
-  taskInbox: typical(() => (
-    <TaskInboxWidget
-      sitePath={sitePath}
-      pageName="Tasks"
-      widget={taskInboxWidget}
-      locale={locale}
-      fallbackLocale={locale}
-    />
-  )),
+  taskInbox: withAndWithoutData(
+    () => inbox(taskInboxWidget),
+    () => inbox(emptyTaskInboxWidget),
+  ),
   processInspector: typical(() => (
     <ProcessInspectorWidget sitePath={sitePath} pageName="Instances" widget={processInspectorWidget} locale={locale} />
   )),
-  detail: typical(() => (
-    <DetailWidget widget={detailWidget} sitePath={sitePath} recordId={requestId} locale={locale} />
-  )),
+  detail: withAndWithoutData(
+    () => detail(detailWidget),
+    () => detail(blankDetailWidget),
+  ),
   ...Object.fromEntries(
     (['bar', 'line', 'pie'] as const).map((kind) => [
       `chart-${kind}`,
-      typical(() => <ChartWidget widget={chartWidget(kind)} locale={locale} />),
+      withAndWithoutData(
+        () => <ChartWidget widget={chartWidget(kind)} locale={locale} />,
+        () => <ChartWidget widget={chartWidget(kind, noRowsPath)} locale={locale} />,
+      ),
     ]),
   ),
-  kpi: typical(() => <KpiWidget sitePath={sitePath} widget={kpiWidget} locale={locale} pageValues={{}} />),
+  kpi: withAndWithoutData(
+    () => <KpiWidget sitePath={sitePath} widget={kpiWidget} locale={locale} pageValues={{}} />,
+    () => <KpiWidget sitePath={sitePath} widget={emptyKpiWidget} locale={locale} pageValues={{}} />,
+  ),
   columns: typical(() => <WidgetTree widgets={[columnsWidget]} renderLeaf={renderLeaf} />),
   tabs: typical(() => <WidgetTree widgets={[tabsWidget]} renderLeaf={renderLeaf} />),
   section: typical(() => <WidgetTree widgets={[sectionWidget]} renderLeaf={renderLeaf} />),

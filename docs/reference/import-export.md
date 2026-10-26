@@ -8,9 +8,10 @@ _(planned for M15)_ are not built yet, and Dn refers to
 [decisions.md](../decisions.md).
 
 Everything on this page is _(planned for M15)_, except the grants, the
-policy matrix, the export routes, and the upload and dry run of a CSV import,
-which are built. The commit, `xlsx` files, `key` matching, references and the
-file cleanup of an import are not.
+policy matrix, the export routes, and the upload and dry run of a CSV or
+`xlsx` import, which are built. The commit, `key` matching, references and the
+file cleanup of an import are not, and the commit reads CSV files only until
+it is built for `xlsx` too.
 
 ## Grants
 
@@ -88,26 +89,42 @@ file cleanup of an import are not.
 | `GET /api/apps/{app}/entities/{entity}/imports/{id}` | `200` with the import's state and errors |
 | `POST /api/apps/{app}/entities/{entity}/imports/{id}/commit` | `202` |
 
-- **Upload.** _(built for CSV)_ The file is the raw request body with
-  `Content-Type: text/csv` and at most `Data:ImportMaxBytes` bytes, UTF-8, not a
-  multipart form. An optional `?key=` names a unique field of the entity, and
+- **Upload.** _(built)_ The file is the raw request body, not a multipart form,
+  with at most `Data:ImportMaxBytes` bytes. Its `Content-Type` names its format:
+  `text/csv`, UTF-8, or the `xlsx` type
+  `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet` with no
+  parameter. The import stores the format. An optional `?key=` names a unique field of the entity, and
   nothing uses it until commit is built. Only a signed-in user uploads, never
   a service account. The checks come in order: session `401`, the path `404`,
   `import` and `create` `403`, `update` `403` when there is a `key`, a `key`
   that is no unique field `400` at `key`, another content type `415`, and a
   file over the limit `413`. The answer is `202` with the import, `pending`.
-  An `xlsx` file, read from its first sheet, is _(planned for M15)_.
-- **File format.** UTF-8 with the quoting of RFC 4180: a cell in double quotes
+  The upload does not look inside the file, so a body that is no `xlsx`
+  workbook is `202` and then fails its dry run.
+- **CSV format.** UTF-8 with the quoting of RFC 4180: a cell in double quotes
   may hold commas, line breaks and doubled quotes. A leading byte order mark is
   skipped. The first row names the fields of the entity's table, matching
   ignoring letter case. An unknown name, a field named twice, and a child
   collection are errors.
+- **Spreadsheet format.** _(built for the dry run)_ Only the first sheet of an
+  `xlsx` workbook is read, and other sheets are ignored. Its first row with a
+  value is the header, and a row with no value is skipped. A data row's number
+  is its sheet row minus the header's, so it is the number Excel shows. A cell
+  to the right of the header that holds a value is an error of its row, keyed
+  `/rows/{n}`, as is a cell that holds an error value such as `#DIV/0!` and a
+  date that does not exist. Cells become the text a CSV file holds: a string as
+  it is, a number as written, a boolean as `true` or `false`, and a formula cell
+  as the value saved with it. A date cell is `yyyy-MM-dd`, and one that holds a
+  time is `yyyy-MM-ddTHH:mm:ssZ`. A workbook stores no time zone, so the time is
+  read as UTC. A date-only cell in a date-time field fails the check, as it has
+  no time. A workbook that is not readable, or that unpacks to more than 1,000
+  entries or 100 MiB, is a header problem at `/columns`.
 - **Cells.** An empty cell leaves the field out, so its default applies or
   `Required.` is reported. A cell of an integer, decimal or money field that
   is written as a JSON number is a number, and `true` or `false` in a boolean
   field is a boolean. Every other cell is text. The record parser then checks
   the row exactly as it checks a JSON body.
-- **Dry run.** _(built for CSV)_ The worker runs one `records.importCheck` work
+- **Dry run.** _(built)_ The worker runs one `records.importCheck` work
   item per import. It parses every row and runs each through the record
   command's checks as the user who uploaded the file, without storing
   anything: parsing, field grants, defaults, computed fields and validations.

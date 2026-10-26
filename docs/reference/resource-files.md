@@ -683,8 +683,9 @@ validation calls the rules of its own module, see [modules](modules-and-template
   - It reads only the record's own fields and its child rows, never a
     reference path. It reads the entity's own fields that are not computed.
     Naming a computed field, itself included, is `AXC0046`.
-  - It cannot call `now()`, because its stored value would go stale. A call,
-    also inside an aggregate's item expression, is `AXC0086`.
+  - It cannot call `now()`, `today()` or `toDate`, because its stored value
+    would go stale. A call, also inside an aggregate's item expression, is
+    `AXC0086`.
   - It reads child rows only through an
     [aggregate](expressions.md#aggregates), such as `sum(lineItems, amount)`.
     Inside the item expression, names are the child row's fields, computed
@@ -873,22 +874,19 @@ record create fills a field that names a sequence with the next number.
 }
 ```
 
-- **Tokens.** `{yyyy}` is the four-digit UTC year of the create's transaction
-  time. The local year waits for
-  the [time zone rule](../decisions/d22-current-time-and-time-zones.md).
-  _(Planned for M14)_ It is the year in the
-  [application time zone](#application-time-zone). `{n}` is the number, and
+- **Tokens.** `{yyyy}` is the four-digit year of the create's transaction
+  time in the [application time zone](#application-time-zone), which is `UTC`
+  when the application names none. `{n}` is the number, and
   `{n:k}` is the number zero-padded to `k` digits, with `k` from 1 to 18.
   Every other character is literal.
 - **One number.** The format holds exactly one `{n}` or `{n:k}` token. It
   may hold `{yyyy}`, even more than once, and no other braces. Any other
   format is `AXC0004` at `/format`.
-- **Yearly restart.** The counter restarts each UTC year, but only when the
-  format holds `{yyyy}`. Without a year, a restart would hand out the same
-  number twice. Application time zones wait for the
-  [time zone rule](../decisions/d22-current-time-and-time-zones.md).
-  _(Planned for M14)_ The restart follows the year in the
-  [application time zone](#application-time-zone).
+- **Yearly restart.** The counter restarts each year in the
+  [application time zone](#application-time-zone), but only when the format
+  holds `{yyyy}`. Without a year, a restart would hand out the same number
+  twice. In `Asia/Ho_Chi_Minh`, a record created at 18:00 UTC on 31 December
+  gets the first number of the next year.
 
 An entity `text` field names the sequence in its `sequence` property:
 
@@ -918,8 +916,7 @@ An entity `text` field names the sequence in its `sequence` property:
 
 ## Application time zone
 
-_(Planned for M14.)_ The `application` manifest may name the application's
-time zone, see [D75](../decisions/d75-the-application-time-zone.md):
+The `application` manifest may name the application's time zone, see [D75](../decisions/d75-the-application-time-zone.md):
 
 ```json
 {
@@ -932,14 +929,16 @@ time zone, see [D75](../decisions/d75-the-application-time-zone.md):
 ```
 
 - `timeZone` is optional. It is an IANA time zone id. Without it, the time
-  zone is `UTC`, so an application that names none behaves as before. An
-  unknown id is a new diagnostic at `/timeZone`.
+  zone is `UTC`, so an application that names none behaves as before. An id
+  is known when .NET finds it as an IANA id written with its exact letter
+  case, as for a schedule trigger. An unknown id is `AXC0277` at
+  `/timeZone`. Studio's application form offers `timeZone`.
 - It is part of the release. A change applies to work that runs on the new
   release.
 - **What uses it.** [`today()` and `toDate`](expressions.md#functions), a
-  sequence's [`{yyyy}`](#sequences) and its yearly restart, the dates in
-  [notifications](notifications.md#placeholders), and M15's date buckets of
-  data sources.
+  sequence's [`{yyyy}`](#sequences) and its yearly restart. The dates in
+  [notifications](notifications.md#placeholders) _(planned for M14)_ and M15's
+  date buckets of data sources use it too.
 - **What does not.** `now()` stays an instant. A schedule trigger keeps its own
   `timeZone`. The SPA shows a `date-time` in the browser's time zone, as
   before. Calendar durations such as `P1M` stay `AXC0084`.
