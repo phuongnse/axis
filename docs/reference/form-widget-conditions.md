@@ -39,6 +39,13 @@ widget, is in [form-widget.md](form-widget.md) and [frontend.md](frontend.md).
     while the user types. A message for a row cell, such as
     `/values/lines/1/quantity`, shows after a save, as it does without the
     answer.
+  - **Defaults.** For a new record the widget fills each empty field that the
+    user has not touched from the `defaults` of an answer, as the form's
+    starting value. A value that the user typed or cleared is kept. The widget
+    does not send an unchanged default, so the save applies it, and clearing
+    a default sends `null`. A saved record and the task page ignore
+    `defaults`. See
+    [D77](../decisions/d77-indexes-defaults-and-ranges.md).
   - **Touched.** A field becomes touched when it loses focus or changes.
   - **Save.** The widget always sends `?form=` with the form's name on
     create, on update and on the save before a `startProcess` action, so

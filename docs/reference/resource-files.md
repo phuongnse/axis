@@ -540,7 +540,7 @@ new check is a new compile diagnostic.
   records. A required field with a default may be left out of a create, and
   `now()` is the start time of the write transaction. An update never applies
   a default. The [form state endpoint](record-api.md#form-state) returns the
-  defaults of a new record. A default on a field of a child entity does nothing for its rows
+  defaults of a new record, and the form widget shows them on a new form. A default on a field of a child entity does nothing for its rows
   yet. `file` and `references` are refused when those types arrive.
 - **`searchable`.** On a `text` field. `search` reads every searchable field,
   and the display field is always searchable. See
