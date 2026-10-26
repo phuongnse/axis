@@ -13,8 +13,11 @@ public sealed class ProcessStartReceiptRow
 
     public required string Key { get; init; }
 
-    /// <summary>The subject record of the start, so the key cannot be reused with another record.</summary>
-    public required Guid SubjectId { get; init; }
+    /// <summary>
+    /// The subject record of the start, so the key cannot be reused with another record. It is
+    /// <see langword="null"/> for a process without a subject, whose parameters are on the instance.
+    /// </summary>
+    public required Guid? SubjectId { get; init; }
 
     public required Guid InstanceId { get; init; }
 

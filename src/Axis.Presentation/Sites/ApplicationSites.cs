@@ -324,6 +324,7 @@ public static class ApplicationSites
                 parameter.Required,
                 parameter.Label?.TextKey,
                 parameter.Values,
+                LabelKeys(parameter.Values, parameter.ValueLabels),
                 parameter.Target is { } target ? Target(application, target.Name) : null))],
             dataSource.PageSize,
             // A grouped row holds the group fields, then the measures, not the projected fields.
@@ -340,6 +341,7 @@ public static class ApplicationSites
             FieldTypes.Name(column.Field.Type),
             column.Field.Label?.TextKey,
             column.Field.Values,
+            LabelKeys(column.Field.Values, column.Field.ValueLabels),
             column.Field.Type == FieldType.Reference
                 ? new ReferenceTarget(column.Field.Target!.Name, column.Field.TargetDisplayField, RecordsPath(application, column.Field.Target.Name))
                 : null,
@@ -362,12 +364,12 @@ public static class ApplicationSites
         };
         if (field?.Type != FieldType.Money)
         {
-            return new(measure.Name, type, null, null, null);
+            return new(measure.Name, type, null, null, null, null);
         }
 
         return field.CurrencyField is null
-            ? new(measure.Name, type, null, null, null, Currency: field.Currency)
-            : new(measure.Name, type, null, null, null, CurrencyColumn: CurrencyColumnOf(aggregate.GroupBy, measure.Field!, field.CurrencyField)?.Name);
+            ? new(measure.Name, type, null, null, null, null, Currency: field.Currency)
+            : new(measure.Name, type, null, null, null, null, CurrencyColumn: CurrencyColumnOf(aggregate.GroupBy, measure.Field!, field.CurrencyField)?.Name);
     }
 
     // The column that reads the currency field on the same record as the money field: the same
@@ -409,10 +411,17 @@ public static class ApplicationSites
             field.Max,
             field.MinLength,
             field.Values,
+            LabelKeys(field.Values, field.ValueLabels),
             field.Type == FieldType.Reference
                 ? new ReferenceTarget(field.Target!.Name, field.TargetDisplayField, RecordsPath(application, field.Target.Name))
                 : null,
             field.Type == FieldType.ChildCollection ? ChildFields(application, field) : null);
+
+    // Keys follow the enum's values, so the JSON order is stable and matches the choice order.
+    private static Dictionary<string, string>? LabelKeys(IReadOnlyList<string>? values, IReadOnlyDictionary<string, TextReference>? labels) =>
+        values is null || labels is null
+            ? null
+            : values.Where(labels.ContainsKey).ToDictionary(value => value, value => labels[value].TextKey, StringComparer.Ordinal);
 
     // A child entity has no child collection fields, so this goes one level deep.
     private static FieldMetadata[] ChildFields(ApplicationModel application, FieldModel collection)

@@ -331,12 +331,14 @@ public sealed record DataSourceMetadata(
 /// <see cref="Target"/> for reference.
 /// </summary>
 /// <param name="Type">The type name as written in data source files, such as <c>date-time</c>.</param>
+/// <param name="ValueLabelKeys">Maps each enum value to the text key of its label, or is null when the enum has no labels.</param>
 public sealed record DataSourceParameterMetadata(
     string Name,
     string Type,
     bool Required,
     string? LabelKey,
     IReadOnlyList<string>? Values,
+    IReadOnlyDictionary<string, string>? ValueLabelKeys,
     ReferenceTarget? Target);
 
 /// <summary>
@@ -350,11 +352,13 @@ public sealed record DataSourceParameterMetadata(
 /// <param name="Name">The projected name: the column's key in a row.</param>
 /// <param name="Currency">The fixed currency code of a money column or measure.</param>
 /// <param name="CurrencyColumn">The name of the column that holds the currency code of a money column or measure.</param>
+/// <param name="ValueLabelKeys">Maps each enum value to the text key of its label, or is null when the enum has no labels.</param>
 public sealed record DataSourceColumnMetadata(
     string Name,
     string Type,
     string? LabelKey,
     IReadOnlyList<string>? Values,
+    IReadOnlyDictionary<string, string>? ValueLabelKeys,
     ReferenceTarget? Target,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Currency = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? CurrencyColumn = null);
@@ -375,6 +379,7 @@ public sealed record DataSourceColumnMetadata(
 /// <param name="Currency">The fixed currency code of a money field, or null when the field has none.</param>
 /// <param name="CurrencyField">The name of the field that holds the currency code of a money field, or null when the field has none.</param>
 /// <param name="Fields">The child entity's fields in declaration order, for a child collection.</param>
+/// <param name="ValueLabelKeys">Maps each enum value to the text key of its label, or is null when the enum has no labels.</param>
 public sealed record FieldMetadata(
     string Name,
     string Type,
@@ -393,6 +398,7 @@ public sealed record FieldMetadata(
     string? Max,
     int? MinLength,
     IReadOnlyList<string>? Values,
+    IReadOnlyDictionary<string, string>? ValueLabelKeys,
     ReferenceTarget? Target,
     IReadOnlyList<FieldMetadata>? Fields);
 

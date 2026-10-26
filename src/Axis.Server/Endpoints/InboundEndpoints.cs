@@ -165,15 +165,6 @@ internal static class InboundEndpoints
             return new(Results.ValidationProblem(mapErrors));
         }
 
-        // The creator fields are set before the computed fields and validations, as in a record API
-        // create, so they see the record as it will be stored.
-        var values = RecordCreator.WithCreator(entity, mapped.Values, caller.Id);
-        var computed = RecordComputer.ComputeCreate(application, entity, values, mapped.Rows);
-        if (computed.Errors is { } computeErrors)
-        {
-            return new(Results.ValidationProblem(computeErrors));
-        }
-
         var tenantId = (tenants.Current ?? throw new InvalidOperationException("No tenant context is set.")).TenantId;
         var details = new JsonObject { ["endpoint"] = endpoint.Name };
         var recordId = Guid.CreateVersion7();
@@ -206,8 +197,25 @@ internal static class InboundEndpoints
             }
         }
 
-        // The validations run in the write transaction, so their now() is its start time.
+        // The defaults, the computed fields and the validations run in the write transaction, so their
+        // now() is its start time. The defaults and the creator fields are set first, as in a record API
+        // create, so the computed fields and validations see the record as it will be stored.
         var now = await RecordQueries.TransactionTimeAsync(connection, cancellationToken);
+        var defaults = RecordDefaults.Apply(entity, mapped.Values, now);
+        if (defaults.Errors is { } defaultErrors)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return new(Results.ValidationProblem(defaultErrors));
+        }
+
+        var values = RecordCreator.WithCreator(entity, defaults.Values, caller.Id);
+        var computed = RecordComputer.ComputeCreate(application, entity, values, mapped.Rows);
+        if (computed.Errors is { } computeErrors)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            return new(Results.ValidationProblem(computeErrors));
+        }
+
         if (RecordValidator.ValidateCreate(application, entity, computed.Values, computed.Rows, now) is { } failures)
         {
             await transaction.RollbackAsync(cancellationToken);

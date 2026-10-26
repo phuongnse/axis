@@ -1,0 +1,12 @@
+{
+  "id": "a7c3d1e4-5b2f-4e86-9a1d-3c8f6b2e4d0a",
+  "kind": "dataSource",
+  "name": "ReportStatuses",
+  "formatVersion": 1,
+  "entity": "Report",
+  "fields": [
+    { "name": "title", "path": "title" },
+    { "name": "status", "path": "status" }
+  ],
+  "sort": "title"
+}

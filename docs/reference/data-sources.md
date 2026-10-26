@@ -289,7 +289,10 @@ source has the same checks as any other.
 It follows [Authorization](security.md#authorization). The session, the
 grants, the record filters, the fields and the joined targets are built.
 
-- **Session.** A request without a session is a `401`, before the path.
+- **Session or bearer token.** A request needs a session, or a bearer token of
+  a [service account](security.md#service-accounts), which is judged by the
+  token alone. A request with neither, or with a bad token, is a `401`, before
+  the path. A bad token gets `WWW-Authenticate: Bearer`.
 - **Grants.** The user needs a `read` grant on the data source and a `read`
   grant on its root entity, otherwise `403`. Only roles claim values that
   name a declared role count. An entity grant with a `filter` or a `fields`
@@ -441,7 +444,9 @@ query. The pending fields of the `sort`, `filter` and `aggregate` are checked
 after the query and before the database.
 
 - **`401`.** A request without a session, or with a session from another
-  tenant. It comes before the path, so it is a `401` even for an unknown
+  tenant. A request with a bearer token that fails the checks of
+  [service accounts](security.md#service-accounts) is a `401` too, with
+  `WWW-Authenticate: Bearer`. It comes before the path, so it is a `401` even for an unknown
   application. The title is fixed.
 - **`403`.** The user has no `read` grant on the data source or on its root
   entity, or may not read one of its projected or aggregated fields. The
