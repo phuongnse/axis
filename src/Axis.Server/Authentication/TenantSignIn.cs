@@ -3,6 +3,7 @@ using Axis.Data.Audit;
 using Axis.Data.Profiles;
 using Axis.Server.Tenancy;
 using Axis.Server.Users;
+using Axis.Tenancy;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -90,7 +91,9 @@ internal sealed partial class TenantSignInOptions(TenantSignInSettings settings,
 
         options.Authority = tenant.Authority;
         options.ClientId = tenant.ClientId;
-        options.ClientSecret = tenant.ClientSecret?.Reveal();
+        // A fapi2 tenant proves who it is with a signed assertion, so it sends no client secret even when one is set.
+        var fapi2 = tenant.Profile == TenantSignInProfiles.Fapi2;
+        options.ClientSecret = fapi2 ? null : tenant.ClientSecret?.Reveal();
         options.RequireHttpsMetadata = !allowHttp;
         options.ResponseType = "code";
         // The identity provider returns with a GET. A cross-site form post would not carry
@@ -103,9 +106,9 @@ internal sealed partial class TenantSignInOptions(TenantSignInSettings settings,
             options.Scope.Add("email");
         }
 
-        // D9 leaves pushed authorization requests (PAR) to a later FAPI 2.0 milestone, so the
-        // authorization request, PKCE included, goes in the redirect.
-        options.PushedAuthorizationBehavior = PushedAuthorizationBehavior.Disable;
+        // A standard tenant sends the authorization request, PKCE included, in the redirect (D9). A fapi2 tenant
+        // pushes it (PAR, D83). The redirect event handles a provider without a PAR endpoint, so Require is a backstop.
+        options.PushedAuthorizationBehavior = fapi2 ? PushedAuthorizationBehavior.Require : PushedAuthorizationBehavior.Disable;
         options.SaveTokens = false;
         options.MapInboundClaims = false;
         options.GetClaimsFromUserInfoEndpoint = false;
@@ -154,6 +157,11 @@ internal sealed partial class TenantSignInOptions(TenantSignInSettings settings,
                 roles);
             return Task.CompletedTask;
         };
+        if (fapi2)
+        {
+            ConfigureFapi2(options, tenant, tenantId);
+        }
+
         // A failure here fails the callback, so a sign-in never leaves a session without its record.
         options.Events.OnTicketReceived = async context =>
         {
@@ -199,6 +207,40 @@ internal sealed partial class TenantSignInOptions(TenantSignInSettings settings,
             context.Response.Redirect(TenantSignIn.FailedPath);
             context.HandleResponse();
         };
+    }
+
+    // Under fapi2 the client authenticates with private_key_jwt at the PAR and token endpoints, signed with the newest
+    // client key. The identity provider refuses a reused jti, so each request gets its own assertion.
+    private static void ConfigureFapi2(OpenIdConnectOptions options, TenantOidcSettings tenant, string tenantId)
+    {
+        options.Events.OnRedirectToIdentityProvider = async context =>
+        {
+            var configuration = await context.Options.ConfigurationManager!.GetConfigurationAsync(context.HttpContext.RequestAborted);
+            if (string.IsNullOrEmpty(configuration.PushedAuthorizationRequestEndpoint))
+            {
+                LogNoPushedAuthorization(context.HttpContext.RequestServices.GetRequiredService<ILogger<TenantSignInOptions>>(), tenantId);
+                context.Response.Redirect(TenantSignIn.FailedPath);
+                context.HandleResponse();
+            }
+        };
+        options.Events.OnPushAuthorization = context =>
+        {
+            Authenticate(context.HttpContext, context.ProtocolMessage, tenant);
+            context.HandleClientAuthentication();
+            return Task.CompletedTask;
+        };
+        options.Events.OnAuthorizationCodeReceived = context =>
+        {
+            Authenticate(context.HttpContext, context.TokenEndpointRequest!, tenant);
+            return Task.CompletedTask;
+        };
+    }
+
+    private static void Authenticate(HttpContext httpContext, OpenIdConnectMessage message, TenantOidcSettings tenant)
+    {
+        var clock = httpContext.RequestServices.GetRequiredService<TimeProvider>();
+        message.ClientAssertionType = ClientAssertion.Type;
+        message.ClientAssertion = ClientAssertion.Create(tenant.ClientId!, tenant.Authority!, tenant.ClientKeys[0], clock.GetUtcNow());
     }
 
     // A profile that cannot be written never refuses the sign-in. The log holds no email or locale.
@@ -252,6 +294,9 @@ internal sealed partial class TenantSignInOptions(TenantSignInSettings settings,
 
         return false;
     }
+
+    [LoggerMessage(LogLevel.Warning, "Sign-in of tenant {TenantId} failed: its fapi2 profile needs pushed authorization requests, and the identity provider offers no such endpoint.")]
+    private static partial void LogNoPushedAuthorization(ILogger logger, string tenantId);
 
     [LoggerMessage(LogLevel.Warning, "The profile of the signed-in user could not be written.")]
     private static partial void LogProfileNotWritten(ILogger logger, Exception exception);

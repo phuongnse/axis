@@ -288,7 +288,7 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
 
             foreach (var binding in migrated ? await context.TenantBindings.AsNoTracking().Where(row => row.Kind == "secret" && row.SecretValue != null).ToListAsync(CancellationToken) : [])
             {
-                secrets.Add(Cipher.Decrypt(binding.TenantId, TenantSecretFields.Binding(binding.Name), binding.SecretValue!).Reveal());
+                secrets.Add(cipher.Decrypt(binding.TenantId, TenantSecretFields.Binding(binding.Name), binding.SecretValue!).Reveal());
             }
         }
 

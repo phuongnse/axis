@@ -45,6 +45,8 @@
     "note.dueOn": "Due on",
     "note.dueAt": "Due at",
     "note.status": "Status",
+    "note.status.open": "In progress",
+    "note.status.closed": "Closed",
     "note.category": "Category",
     "note.createdBy": "Created by",
     "note.lines": "Lines",

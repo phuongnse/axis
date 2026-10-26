@@ -1,7 +1,9 @@
+using System.Text.Json;
 using Axis.Configuration.Model;
 using Axis.Configuration.Releases;
 using Axis.Core.Tenancy;
 using Axis.Data.Forms;
+using Axis.Data.Profiles;
 using Axis.Data.Records;
 using Axis.Policy;
 using Axis.Presentation.Sites;
@@ -19,7 +21,7 @@ namespace Axis.Server.Processes;
 
 /// <summary>
 /// The task API endpoints that list the current user's open human tasks, read one task, complete
-/// one, and claim or release one. The current user is the session user. A user may act on a task assigned to their
+/// one, claim or release one, and reassign one. The current user is the session user. A user may act on a task assigned to their
 /// id, or to a role they hold. A request is checked in order:
 /// signed-in user (401), application (404), then for a list the paging (400), and for a read or a
 /// completion the task id and the task's application (404) and who may act (403).
@@ -44,6 +46,16 @@ namespace Axis.Server.Processes;
 /// claimed (409), and a holder who is not the claimer (403). Each runs in one transaction on the
 /// locked task, takes no start lock, appends <c>task.claimed</c> or <c>task.released</c> and
 /// answers with the task as a single read returns it.
+/// A holder of <c>reassign</c> on the task's process in the active release may also release a claim another user
+/// made, with no role on the task.
+/// The reassign route checks in this order: signed-in user (401), application and task id and task (404), the
+/// <c>reassign</c> grant on the task's process in the active release (403, "You have no grant for this action."
+/// whoever the assignee is, and nobody holds it when the active release no longer has the process), the task being
+/// open (409), the content type (415), the body (400) and the target (400). The body has exactly one of <c>user</c>
+/// and <c>role</c>, and a <c>reason</c> that is not blank and at most 500 characters. A <c>role</c> that the
+/// active release does not declare is a 400 at <c>/role</c>, and a <c>user</c> with no user profile is a 400 at
+/// <c>/user</c>. It takes no start lock, locks the task, hands it over with <see cref="TaskReassignCommand"/>,
+/// which clears the claim and appends <c>task.reassigned</c>, and answers with the task as a single read returns it.
 /// A claimed role task is listed and completed only by its claimer. Other holders may still read it
 /// and ask for its form state.
 /// The assignee check is the only gate: no entity grant is needed and no record filter applies.
@@ -57,6 +69,10 @@ namespace Axis.Server.Processes;
 /// </summary>
 internal static class TaskEndpoints
 {
+    private const string UserProperty = "user";
+
+    private const string RoleProperty = "role";
+
     public static void MapTaskEndpoints(this IEndpointRouteBuilder endpoints)
     {
         var tasks = endpoints.MapGroup("/api/apps/{app}/tasks");
@@ -66,6 +82,7 @@ internal static class TaskEndpoints
         tasks.MapPost("/{id}/form-state", FormStateAsync);
         tasks.MapPost("/{id}/claim", ClaimAsync);
         tasks.MapPost("/{id}/release", ReleaseAsync);
+        tasks.MapPost("/{id}/reassign", ReassignAsync);
     }
 
     // The query parameters are bound as strings so every invalid one is reported in one problem.
@@ -310,7 +327,9 @@ internal static class TaskEndpoints
         ActiveApplicationResolver resolver,
         TenantDatabase database,
         CancellationToken cancellationToken) =>
-        ChangeClaimAsync(app, id, httpContext, resolver, database, TaskClaimCommand.ClaimLockedAsync, cancellationToken);
+        ChangeClaimAsync(app, id, httpContext, resolver, database,
+            (transaction, applicationId, task, actor, _, ct) => TaskClaimCommand.ClaimLockedAsync(transaction, applicationId, task, actor, ct),
+            cancellationToken);
 
     private static Task<IResult> ReleaseAsync(
         string app,
@@ -329,7 +348,7 @@ internal static class TaskEndpoints
         HttpContext httpContext,
         ActiveApplicationResolver resolver,
         TenantDatabase database,
-        Func<NpgsqlTransaction, Guid, ProcessTaskRow?, RecordActor, CancellationToken, Task<TaskClaimOutcome>> change,
+        Func<NpgsqlTransaction, Guid, ProcessTaskRow?, RecordActor, bool, CancellationToken, Task<TaskClaimOutcome>> change,
         CancellationToken cancellationToken)
     {
         if (await CurrentUsers.FindAsync(httpContext) is not { } user)
@@ -352,8 +371,11 @@ internal static class TaskEndpoints
         await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))
         {
             var task = await TaskQueries.LockAsync(transaction, taskId, cancellationToken);
+            var mayReassign = task is not null
+                && active.Model.Processes.FirstOrDefault(process => process.Id == task.ProcessId) is { } taskProcess
+                && PolicyEvaluator.AllowsReassign(active.Model, user.Roles, taskProcess);
             var outcome = await change(
-                transaction, active.Model.Manifest.Id, task, new RecordActor(user.Id, user.DisplayName, roles), cancellationToken);
+                transaction, active.Model.Manifest.Id, task, new RecordActor(user.Id, user.DisplayName, roles), mayReassign, cancellationToken);
             if (outcome != TaskClaimOutcome.Done)
             {
                 await transaction.RollbackAsync(cancellationToken);
@@ -374,6 +396,148 @@ internal static class TaskEndpoints
         var changed = await TaskQueries.FindAsync(connection, taskId, cancellationToken)
             ?? throw new InvalidOperationException($"The task '{taskId}' could not be read.");
         return Results.Ok(await DescribeAsync(resolver, connection, active.Model, roles, changed, cancellationToken));
+    }
+
+    // Like a claim, a reassignment only changes the task row and writes an audit record, so it takes no start lock.
+    // The grant is checked before the body, so a caller without it learns nothing about the target.
+    private static async Task<IResult> ReassignAsync(
+        string app,
+        string id,
+        HttpRequest request,
+        ActiveApplicationResolver resolver,
+        TenantDatabase database,
+        CancellationToken cancellationToken)
+    {
+        if (await CurrentUsers.FindAsync(request.HttpContext) is not { } user)
+        {
+            return SignInRequired();
+        }
+
+        if (await resolver.ResolveReleaseAsync(app, cancellationToken) is not { } active)
+        {
+            return ApplicationNotFound();
+        }
+
+        if (!TryParseId(id, out var taskId))
+        {
+            return TaskNotFound();
+        }
+
+        var roles = PolicyEvaluator.HeldRoles(active.Model, user.Roles);
+        var connection = await database.GetConnectionAsync(cancellationToken);
+        await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))
+        {
+            var task = await TaskQueries.LockAsync(transaction, taskId, cancellationToken);
+            var failure = await ReassignLockedAsync(request, connection, transaction, active, task, user, roles, cancellationToken);
+            if (failure is not null)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                return failure;
+            }
+
+            await transaction.CommitAsync(cancellationToken);
+        }
+
+        var changed = await TaskQueries.FindAsync(connection, taskId, cancellationToken)
+            ?? throw new InvalidOperationException($"The task '{taskId}' could not be read.");
+        return Results.Ok(await DescribeAsync(resolver, connection, active.Model, roles, changed, cancellationToken));
+    }
+
+    /// <summary>
+    /// Runs the checks of a reassignment on the locked <paramref name="task"/> and hands it over, or
+    /// returns the failure, after which the caller rolls every write back.
+    /// </summary>
+    private static async Task<IResult?> ReassignLockedAsync(
+        HttpRequest request,
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        ActiveApplication active,
+        ProcessTaskRow? task,
+        CurrentUserResponse user,
+        IReadOnlyList<string> roles,
+        CancellationToken cancellationToken)
+    {
+        // A task of another application does not exist under this one, so it is a 404 as well.
+        if (task is null || task.ApplicationId != active.Model.Manifest.Id)
+        {
+            return TaskNotFound();
+        }
+
+        if (active.Model.Processes.FirstOrDefault(process => process.Id == task.ProcessId) is not { } taskProcess
+            || !PolicyEvaluator.AllowsReassign(active.Model, user.Roles, taskProcess))
+        {
+            return Grants.Forbidden();
+        }
+
+        if (task.State != ProcessTasks.Open)
+        {
+            return AlreadyCompleted();
+        }
+
+        if (!JsonRequest.IsJson(request))
+        {
+            return JsonRequest.UnsupportedMediaType();
+        }
+
+        var (body, errors) = ProcessOperatorEndpoints.ReadObject(
+            await RecordEndpoints.ReadBodyAsync(request, cancellationToken),
+            [UserProperty, RoleProperty, ProcessOperatorEndpoints.ReasonProperty],
+            ReadReassignBody);
+        if (errors is not null)
+        {
+            return Results.ValidationProblem(errors);
+        }
+
+        if (body!.Kind == ProcessTasks.RoleAssignee)
+        {
+            if (!active.Model.Roles.Any(role => string.Equals(role.Name, body.Assignee, StringComparison.Ordinal)))
+            {
+                return TargetNotFound("/" + RoleProperty, "No role with this name is declared.");
+            }
+        }
+        else if (!await UserProfiles.ExistsAsync(connection, transaction, body.Assignee, cancellationToken))
+        {
+            return TargetNotFound("/" + UserProperty, "No user with this id has signed in.");
+        }
+
+        var outcome = await TaskReassignCommand.ReassignLockedAsync(
+            transaction,
+            active.Model.Manifest.Id,
+            task,
+            body.Kind,
+            body.Assignee,
+            body.Reason,
+            new RecordActor(user.Id, user.DisplayName, roles),
+            cancellationToken);
+        return outcome switch
+        {
+            TaskReassignOutcome.Done => null,
+            TaskReassignOutcome.NotFound => TaskNotFound(),
+            _ => AlreadyCompleted(),
+        };
+    }
+
+    // Exactly one of user and role is the target. Both or neither is one problem on the whole body.
+    private static ReassignBody? ReadReassignBody(Dictionary<string, JsonElement> properties, SortedDictionary<string, string[]> errors)
+    {
+        var reason = ProcessOperatorEndpoints.ReadReasonText(properties, errors);
+        var hasUser = properties.ContainsKey(UserProperty);
+        var hasRole = properties.ContainsKey(RoleProperty);
+        if (hasUser == hasRole)
+        {
+            errors[""] = ["Must have exactly one of user and role."];
+            return null;
+        }
+
+        var property = hasUser ? UserProperty : RoleProperty;
+        var assignee = properties[property].ValueKind == JsonValueKind.String ? properties[property].GetString() : null;
+        if (string.IsNullOrWhiteSpace(assignee))
+        {
+            errors["/" + property] = ["Required."];
+            return null;
+        }
+
+        return reason is null ? null : new ReassignBody(hasUser ? ProcessTasks.UserAssignee : ProcessTasks.RoleAssignee, assignee, reason);
     }
 
     /// <summary>
@@ -543,6 +707,9 @@ internal static class TaskEndpoints
     private static IResult NotClaimed() =>
         Results.Problem(statusCode: StatusCodes.Status409Conflict, title: "This task is not claimed.");
 
+    private static IResult TargetNotFound(string pointer, string message) =>
+        Results.ValidationProblem(new Dictionary<string, string[]> { [pointer] = [message] });
+
     private static IResult StaleVersion() =>
         Results.ValidationProblem(
             new Dictionary<string, string[]> { ["/version"] = ["Must be the record's current version."] },
@@ -571,6 +738,9 @@ internal sealed record TaskListItem(
 
 /// <summary>The subject record of a task. <see cref="Label"/> is its display field value, or null when there is none.</summary>
 internal sealed record TaskSubject(string Entity, Guid Id, string? Label);
+
+/// <summary>The body of a reassignment: whether the target is a user or a role, its id or name, and the reason.</summary>
+internal sealed record ReassignBody(string Kind, string Assignee, string Reason);
 
 /// <summary>The assignee of a task: the user id or the role name, and the other is null.</summary>
 internal sealed record TaskAssignee(string? User, string? Role);

@@ -17,7 +17,7 @@ internal static class DeliveryFailures
     internal const string TriggerFanOutKind = ProcessStarts.TriggerFanOutWorkItemKind;
 
     /// <summary>The state of a dead letter that waits for an operator.</summary>
-    internal const string Open = "open";
+    internal const string Open = DeadLetters.Open;
 
     private static readonly TimeSpan _firstBackoff = TimeSpan.FromSeconds(30);
 

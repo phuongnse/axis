@@ -4,6 +4,8 @@ import type { FieldMetadata, FieldType } from './site'
 
 function field(name: string, type: FieldType, valueLabelKeys?: Record<string, string>): FieldMetadata {
   return {
+    currency: null,
+    currencyField: null,
     name,
     type,
     labelKey: null,
@@ -91,5 +93,52 @@ describe('formatValue', () => {
   it('shows null as an empty cell', () => {
     expect(formatValue(field('title', 'text'), null, {}, options)).toBe('')
     expect(formatValue(field('done', 'boolean'), null, {}, options)).toBe('')
+  })
+
+  describe('money', () => {
+    // ICU puts no-break spaces before some currency signs, so spaces are matched loosely.
+    const amount = (currency: string, scale: number) => ({ ...field('amount', 'money'), currency, scale })
+    const vi: FormatOptions = { ...options, locale: 'vi' }
+
+    it('shows a fixed currency at the field scale in the UI locale', () => {
+      expect(formatValue(amount('USD', 2), '1250.50', {}, options)).toBe('$1,250.50')
+      expect(formatValue(amount('VND', 0), '1250000', {}, options)).toMatch(/^₫1,250,000$/)
+      expect(formatValue(amount('USD', 2), '1250.50', {}, vi)).toMatch(/^1\.250,50\sUS\$$/)
+      expect(formatValue(amount('VND', 0), '1250000', {}, vi)).toMatch(/^1\.250\.000\s₫$/)
+    })
+
+    it('pads to the scale and never rounds away a written digit', () => {
+      expect(formatValue(amount('USD', 2), '1250.5', {}, options)).toBe('$1,250.50')
+      expect(formatValue(amount('VND', 0), '1250.50', {}, options)).toMatch(/^₫1,250\.50$/)
+      expect(formatValue(amount('USD', 2), '12345678901234567.89', {}, options)).toBe('$12,345,678,901,234,567.89')
+    })
+
+    it('reads the currency from the row when the field names a currency field', () => {
+      const money = { ...field('amount', 'money'), scale: 2, currencyField: 'currency' }
+      expect(formatValue(money, '1250.50', {}, options, { currency: 'USD', amount: '1250.50' })).toBe('$1,250.50')
+      expect(formatValue(money, '1250.50', {}, options, { currency: 'EUR' })).toMatch(/^€1,250\.50$/)
+    })
+
+    it('reads the currency from the currency column of a data source column', () => {
+      const column = {
+        name: 'amountSum',
+        type: 'money' as const,
+        labelKey: null,
+        values: null,
+        target: null,
+        currencyColumn: 'currency',
+      }
+      expect(formatValue(column, '1250.50', {}, options, { currency: 'USD', amountSum: '1250.50' })).toBe('$1,250.50')
+    })
+
+    it('shows the plain number without a usable currency', () => {
+      const money = { ...field('amount', 'money'), scale: 2, currencyField: 'currency' }
+      expect(formatValue(money, '1250.50', {}, options)).toBe('1250.50')
+      expect(formatValue(money, '1250.50', {}, options, { currency: null })).toBe('1250.50')
+      expect(formatValue(money, '1250.50', {}, options, { currency: 'dollars' })).toBe('1250.50')
+      expect(formatValue(money, '1250.50', {}, options, { currency: true })).toBe('1250.50')
+      expect(formatValue(amount('US', 2), '1250.50', {}, options)).toBe('1250.50')
+      expect(formatValue(amount('USD', 2), 'abc', {}, options)).toBe('abc')
+    })
   })
 })

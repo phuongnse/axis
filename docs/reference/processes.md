@@ -9,7 +9,7 @@ work, and the tables. The rest of the process reference is in these files:
   steps, loops, the `createRecord` operation and processes without a subject.
   Loops through a `task` are built, the rest is _(planned for M14)_.
 - [task-deadlines.md](task-deadlines.md): task escalations, deadlines, claim
-  and reassign _(planned for M14)_.
+  and reassign. Claim and reassign are built, the rest is _(planned for M14)_.
 - [notifications.md](notifications.md): the `notify` operation and in-app and
   email notifications _(planned for M14)_.
 - [process-execution.md](process-execution.md): execution, connector calls,
@@ -711,7 +711,8 @@ database, with history in `axis.__processes_migrations` (see
   `process_instance_id` of the call's instance and the `package_call_id` of
   the call. See [Package operations](process-execution.md#package-operations). An `event.deliver` item delivers one event occurrence to
   the `async` event triggers, see [Event delivery](process-events.md#event-delivery). It has
-  the `event_id` of the occurrence. Every item also has the `trace_id` and
+  the `event_id` of the occurrence, and the `trigger_id` of the one trigger it delivers
+  to when an operator [redelivered](process-events.md#routes) a dead letter. Every item also has the `trace_id` and
   `span_id` of the span whose transaction queued it, or null when no span was
   current. A run starts a new trace with a link to that span, see
   [Telemetry](../architecture.md#telemetry). A rescheduled item keeps them.
@@ -890,6 +891,6 @@ database, with history in `axis.__processes_migrations` (see
   through a `timer` or `waitEvent` step is allowed too.
 - **No user check.** The user id that a `user` assignee gives is not checked
   against any list of users. A wrong id creates a task that nobody sees. A
-  reassign in M14 checks its target against the
+  [reassign](task-deadlines.md#reassign) checks its target against the
   [user profiles](notifications.md#user-profiles), but the `user` expression
   stays unchecked.

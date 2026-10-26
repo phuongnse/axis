@@ -139,6 +139,9 @@ Compose is not wired yet: the server in its container cannot reach Keycloak at t
 browser uses. The site endpoints, the record API and the data source endpoint need a session, so
 under Compose they answer `401`, and an application page starts a sign-in that cannot complete yet.
 See [sign-in and the session](reference/security.md#sign-in-and-the-session).
+The realm also has the client `axis-fapi` for the `fapi2` sign-in profile. Only an integration
+test host uses it, and it signs in with the development keys in `samples/keycloak`, see
+[FAPI 2.0 profile](reference/security.md#fapi-20-profile).
 
 ## Hot reload with `scripts/dev.sh`
 

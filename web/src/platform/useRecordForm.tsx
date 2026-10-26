@@ -4,7 +4,7 @@ import { ChildCollectionTable } from './ChildCollectionTable'
 import { FieldInput } from './FieldInput'
 import { FormCanvasContext } from './formCanvas'
 import { fetchFormState, type FormStateAnswer } from './formState'
-import { formatValue } from './formatValue'
+import { formatValue, moneyCurrency } from './formatValue'
 import { buildFormStateBody } from './recordBody'
 import type { FieldValue, RecordItem, RecordProblem, RecordRow, RecordValue, RowLabels } from './records'
 import { ReferenceLookup } from './ReferenceLookup'
@@ -79,7 +79,9 @@ const fieldPointer = '/values/'
 // Typing sends many changes, so a text or number input and a child collection wait for a pause. A
 // choice is one change, so it asks at once.
 function delayOf(type: FieldMetadata['type'] | undefined): StateRequest['delay'] {
-  return type === 'text' || type === 'integer' || type === 'decimal' || type === 'child-collection' ? 300 : 0
+  return type === 'text' || type === 'integer' || type === 'decimal' || type === 'money' || type === 'child-collection'
+    ? 300
+    : 0
 }
 
 function emptySnapshot(fields: readonly FieldMetadata[]): Snapshot {
@@ -354,7 +356,9 @@ export function useRecordForm(
     const id = field.name
     if (field.type !== 'child-collection' && (readOnly || field.computed || field.sequence || field.creator)) {
       // The server sets the value on save, so it is shown as a table cell shows it.
-      return <Input id={id} readOnly value={formatValue(field, value as RecordValue, labels, { locale, text: t })} />
+      return (
+        <Input id={id} readOnly value={formatValue(field, value as RecordValue, labels, { locale, text: t }, values)} />
+      )
     }
     switch (field.type) {
       case 'reference': {
@@ -382,7 +386,13 @@ export function useRecordForm(
         )
       default:
         return (
-          <FieldInput field={field} id={id} value={value as RecordValue} onChange={(next) => set(field.name, next)} />
+          <FieldInput
+            field={field}
+            id={id}
+            value={value as RecordValue}
+            currency={moneyCurrency(field, values)}
+            onChange={(next) => set(field.name, next)}
+          />
         )
     }
   }
