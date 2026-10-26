@@ -593,6 +593,7 @@ public sealed class ExpressionInterpreterTests
     [InlineData("sum(lines, qty)", 0L)]
     [InlineData("min(lines, qty)", null)]
     [InlineData("max(lines, amount)", null)]
+    [InlineData("avg(lines, qty)", null)]
     [InlineData("any(lines, ok)", false)]
     [InlineData("all(lines, ok)", true)]
     public void An_aggregate_over_an_empty_list_gives_its_empty_value(string text, object? expected)
@@ -679,6 +680,33 @@ public sealed class ExpressionInterpreterTests
         Assert.Equal(0m, EvaluateOver("sum(lines, amount)", lines).Value);
         Assert.Null(EvaluateOver("min(lines, qty)", lines).Value);
         Assert.Null(EvaluateOver("max(lines, amount)", lines).Value);
+    }
+
+    [Fact]
+    public void Avg_skips_null_items_and_gives_a_decimal_rounded_to_6_digits()
+    {
+        Assert.Equal(2.5m, Assert.IsType<decimal>(EvaluateOver("avg(lines, qty)", Rows((2L, null, null), (3L, null, null))).Value));
+
+        var lines = Rows((2L, 1.5m, true), (null, null, null), (3L, 0.25m, false), (1L, null, null));
+        Assert.Equal(2m, Assert.IsType<decimal>(EvaluateOver("avg(lines, qty)", lines).Value));
+        Assert.Equal(0.875m, Assert.IsType<decimal>(EvaluateOver("avg(lines, amount)", lines).Value));
+
+        var thirds = Rows((1L, null, null), (0L, null, null), (0L, null, null));
+        Assert.Equal(0.333333m, Assert.IsType<decimal>(EvaluateOver("avg(lines, qty)", thirds).Value));
+
+        var allNull = Rows((null, null, null), (null, null, null));
+        Assert.Null(EvaluateOver("avg(lines, qty)", allNull).Value);
+        Assert.Null(EvaluateOver("avg(lines, amount)", allNull).Value);
+    }
+
+    [Fact]
+    public void An_avg_whose_total_overflows_a_decimal_is_a_run_time_error_that_names_avg()
+    {
+        var result = EvaluateOver("avg(lines, amount)", Rows((null, decimal.MaxValue, null), (null, decimal.MaxValue, null)));
+
+        Assert.False(result.Succeeded);
+        Assert.Equal(ExpressionRuntimeErrorKind.DecimalOverflow, result.Error?.Kind);
+        Assert.StartsWith("The result of 'avg' cannot be held exactly as a decimal", result.Error?.Message, StringComparison.Ordinal);
     }
 
     [Fact]
