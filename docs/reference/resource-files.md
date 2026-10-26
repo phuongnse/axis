@@ -564,8 +564,8 @@ new check is a new compile diagnostic.
   `AXC0013` at `/fields/{i}/searchable`, even when it is `false`. The compile
   check and the indexes are built: a searchable field and the display field
   get a trigram index, see [schema planning](storage.md#schema-planning).
-  `search` reading every searchable field, with the display field always
-  searchable, is _(planned for M15)_. See
+  `search` reads every searchable field the user may read, and the display
+  field, which is always searched. See
   [paging and sorting](record-api.md#paging-and-sorting).
 
 ### Indexes

@@ -133,7 +133,7 @@ public sealed class RecordEndpointTests(RecordApiFixture fixture) : IClassFixtur
     {
         await fixture.ResetAsync();
         var ids = new Dictionary<string, Guid>();
-        foreach (var name in new[] { "Finance", "FINAL", "Sales", "50% off", "5000 off", "a_b", "axb", "O'Brien", "OBrien" })
+        foreach (var name in new[] { "Finance", "FINAL", "Sales", "50% off", "5000 off", "a_b", "axb", "O'Brien", "OBrien", "a\\b", "ab" })
         {
             ids[name] = await InsertDepartmentAsync(TenantA, name);
         }
@@ -142,6 +142,7 @@ public sealed class RecordEndpointTests(RecordApiFixture fixture) : IClassFixtur
         using var percent = await GetJsonAsync($"{Departments}?search=%25", HostA);
         using var underscore = await GetJsonAsync($"{Departments}?search=_", HostA);
         using var quote = await GetJsonAsync($"{Departments}?search={Uri.EscapeDataString("O'B")}", HostA);
+        using var backslash = await GetJsonAsync($"{Departments}?search={Uri.EscapeDataString("\\")}", HostA);
         using var empty = await GetJsonAsync($"{Departments}?search=", HostA);
 
         Assert.Equal([ids["FINAL"], ids["Finance"]], ItemIds(fin));
@@ -152,8 +153,10 @@ public sealed class RecordEndpointTests(RecordApiFixture fixture) : IClassFixtur
         Assert.Equal(1L, Paging(underscore).TotalCount);
         Assert.Equal([ids["O'Brien"]], ItemIds(quote));
         Assert.Equal(1L, Paging(quote).TotalCount);
+        Assert.Equal([ids["a\\b"]], ItemIds(backslash));
+        Assert.Equal(1L, Paging(backslash).TotalCount);
         Assert.Equal(ids.Values.Order().ToList(), ItemIds(empty).Order().ToList());
-        Assert.Equal(9L, Paging(empty).TotalCount);
+        Assert.Equal(11L, Paging(empty).TotalCount);
     }
 
     public static TheoryData<string> MissingPaths => new()

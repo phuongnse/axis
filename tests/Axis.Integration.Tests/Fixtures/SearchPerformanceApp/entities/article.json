@@ -1,0 +1,11 @@
+{
+  "id": "b15238c5-ed73-4cb6-9215-3170acc1b569",
+  "kind": "entity",
+  "name": "Article",
+  "formatVersion": 1,
+  "displayField": "title",
+  "fields": [
+    { "name": "title", "type": "text", "required": true, "maxLength": 100 },
+    { "name": "note", "type": "text", "maxLength": 200, "searchable": true }
+  ]
+}

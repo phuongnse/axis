@@ -155,20 +155,20 @@ covers reads the whole entity table.
   order. The name matches exactly, so letter case matters. A
   `child-collection` field is not a valid `sort`. A field the user may not
   read is not a valid `sort` either, as for an unknown field.
-- **`search`.** Keeps only the records whose display field contains the text,
-  ignoring letter case. Both sides go through PostgreSQL `lower()`, so case
-  folding follows the tenant database. The text has no wildcards: `%`, `_`,
-  quotes and backslashes match as plain characters. The text is a parameter
-  and never part of the SQL. It matches exactly as given, spaces included,
-  and an empty `search` means no filter. It is invalid on an entity without a
-  display field, when repeated, when longer than 200 characters, or when it
-  contains U+0000. The filter cannot use an index, so it reads the whole
-  table. A `search` is invalid when the user may not read the display field.
-  From M15 _(planned for M15)_, `search` matches the display field and every
-  `searchable` field the user may read, and a `pg_trgm` index serves it. It
-  stays a substring match ignoring letter case, with the same limits. A
-  searchable field the user may not read is skipped, and only an unreadable
-  display field makes `search` invalid. See
+- **`search`.** Keeps only the records where the display field or any
+  `searchable` field the user may read contains the text, ignoring letter
+  case. Both sides go through PostgreSQL `lower()`, so case folding follows the
+  tenant database. The match is `lower(column) LIKE lower(@search)`, joined
+  with `OR`, so the `pg_trgm` index of each searched column can serve it. The
+  text has no wildcards: `%`, `_`, quotes and backslashes match as plain
+  characters, because they are escaped before the match. The text is a
+  parameter and never part of the SQL. It matches exactly as given, spaces
+  included, and an empty `search` means no filter. It is invalid on an entity
+  without a display field, when repeated, when longer than 200 characters, or
+  when it contains U+0000. A searchable field the user may not read is skipped
+  without an error, and only an unreadable display field makes `search`
+  invalid. A text shorter than three characters has no trigrams, so the index
+  does not speed it up. See
   [D80](../decisions/d80-search-more-aggregates-and-query-timeouts.md).
 - **Order.** Records are ordered by the sort column and then by `id`
   ascending, also for descending sorts. Without `sort`, they are ordered by
@@ -187,12 +187,12 @@ The paging parameters are digits only: a sign, a space or a repeated parameter
 
 A `sort` or `search` that names a
 [pending field](migrations.md#recomputing-computed-fields) is a `409`. For
-`search`, that is the display field. The title is fixed: "A field is being
-recomputed." `errors` is keyed `sort` or `search`, with a message that names
-the field. The request is valid, so this is a state conflict, not a `400`. It
-is only reported once the query is valid. A list with no `sort` or `search` on
-a pending field answers with the stored values. A single read computes the
-pending field on the spot.
+`search`, that is any searched field. The title is fixed: "A field is being
+recomputed." `errors` is keyed `sort` or `search`, with one message for each
+such field, in field order, that names the field. The request is valid, so this
+is a state conflict, not a `400`. It is only reported once the query is valid.
+A list with no `sort` or `search` on a pending field answers with the stored
+values. A single read computes the pending field on the spot.
 
 ## Create, update and delete
 
