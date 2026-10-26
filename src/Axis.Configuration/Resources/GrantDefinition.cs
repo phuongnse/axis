@@ -17,7 +17,7 @@ public sealed record GrantDefinition
 
     public string? Endpoint { get; init; }
 
-    /// <summary>The actions, each one of <c>read</c>, <c>create</c>, <c>update</c>, <c>delete</c>, <c>start</c> and <c>invoke</c>.</summary>
+    /// <summary>The actions, each one of <c>read</c>, <c>create</c>, <c>update</c>, <c>delete</c>, <c>export</c>, <c>import</c>, <c>start</c>, <c>invoke</c>, <c>inspect</c>, <c>cancel</c>, <c>retry</c>, <c>resolve</c> and <c>reassign</c>.</summary>
     public required IReadOnlyList<string> Actions { get; init; }
 
     /// <summary>A boolean expression over the entity's fields that limits the rows the grant covers.</summary>

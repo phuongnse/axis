@@ -14,7 +14,7 @@ namespace Axis.Admin;
 /// <summary>
 /// <c>tenant restore</c>: checks the archive, writes a directory entry as <c>provisioning</c>, creates the database roles and
 /// the database, restores the dump with <c>pg_restore</c> as the schema role, grants and migrates it, gives every work item
-/// the new tenant id, checks the runtime role and sets the entry <c>suspended</c>. A rerun on a <c>provisioning</c> entry skips what is done, and a database that already
+/// the new tenant id, empties the sessions, checks the runtime role and sets the entry <c>suspended</c>. A rerun on a <c>provisioning</c> entry skips what is done, and a database that already
 /// holds tables counts as restored. Each step writes one line that names the tenant and never a password, a database host or a
 /// connection string. The dump goes to <c>pg_restore</c> on its standard input, so no copy of the business data is left on disk.
 /// </summary>
@@ -109,6 +109,7 @@ internal sealed class TenantRestore : IAsyncDisposable
                 && (!older || await Step("migrations", () => Steps.MigrateAsync()))
                 && await Step("grants", () => Steps.GrantAsync())
                 && await Step("work", RetagWorkAsync)
+                && await Step("sessions", EmptySessionsAsync)
                 && await Step("role-check", () => Steps.CheckRuntimeRoleAsync())
                 && await Step("version", SuspendAsync))
             {
@@ -544,6 +545,14 @@ internal sealed class TenantRestore : IAsyncDisposable
         var connection = await Steps.SchemaConnectionAsync();
         await using var command = new NpgsqlCommand("UPDATE axis.process_work_items SET tenant_id = @tenant WHERE tenant_id <> @tenant", connection);
         command.Parameters.AddWithValue("tenant", _id);
+        await command.ExecuteNonQueryAsync(_cancellationToken);
+    }
+
+    // No session of the archive may sign anyone in. Migrations ran before this step, so even an archive older than the table has it here.
+    private async Task EmptySessionsAsync()
+    {
+        var connection = await Steps.SchemaConnectionAsync();
+        await using var command = new NpgsqlCommand("DELETE FROM axis.sessions", connection);
         await command.ExecuteNonQueryAsync(_cancellationToken);
     }
 
