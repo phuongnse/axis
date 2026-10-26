@@ -4,17 +4,18 @@ import { ChildCollectionTable } from './ChildCollectionTable'
 import { FieldInput } from './FieldInput'
 import { FormCanvasContext } from './formCanvas'
 import { fetchFormState, type FormStateAnswer } from './formState'
-import { formatValue, moneyCurrency } from './formatValue'
+import { formatValue, moneyCurrency, referencesLabels } from './formatValue'
 import { buildFormStateBody } from './recordBody'
-import type { FieldValue, RecordItem, RecordProblem, RecordRow, RecordValue, RowLabels } from './records'
+import type { FieldLabel, FieldValue, RecordItem, RecordProblem, RecordRow, RecordValue, RowLabels } from './records'
 import { ReferenceLookup } from './ReferenceLookup'
+import { ReferencesInput } from './ReferencesInput'
 import type { EntityMetadata, FieldMetadata, FormMetadata } from './site'
 import { useText } from './texts'
 
 /** The values the form started from, which decide what changed, with the record's labels and version. */
 interface Snapshot {
   initial: Record<string, FieldValue>
-  labels: Record<string, string | RowLabels[]>
+  labels: Record<string, FieldLabel>
   version: number
 }
 
@@ -86,7 +87,9 @@ function delayOf(type: FieldMetadata['type'] | undefined): StateRequest['delay']
 
 function emptySnapshot(fields: readonly FieldMetadata[]): Snapshot {
   return {
-    initial: Object.fromEntries(fields.map((field) => [field.name, field.type === 'child-collection' ? [] : null])),
+    initial: Object.fromEntries(
+      fields.map((field) => [field.name, field.type === 'child-collection' || field.type === 'references' ? [] : null]),
+    ),
     labels: {},
     version: 0,
   }
@@ -97,16 +100,22 @@ function snapshotOf(record: RecordItem): Snapshot {
 }
 
 function rowsOf(value: FieldValue | undefined): RecordRow[] {
-  return Array.isArray(value) ? value : []
+  return Array.isArray(value) ? (value as RecordRow[]) : []
 }
 
 /** The labels of a child collection's rows, which are an array only for a collection with references. */
-function rowLabelsOf(label: string | RowLabels[] | undefined): RowLabels[] {
-  return Array.isArray(label) ? label : []
+function rowLabelsOf(label: FieldLabel | undefined): RowLabels[] {
+  return Array.isArray(label) ? (label as RowLabels[]) : []
 }
 
-// Rows are compared by value, so an edit that is typed and then undone sends nothing.
+// Rows and ids are compared by value, so an edit that is typed and then undone sends nothing. A set of
+// references is the same only with the same ids in the same order.
 function sameValue(field: FieldMetadata, a: FieldValue | undefined, b: FieldValue | undefined): boolean {
+  if (field.type === 'references') {
+    const idsA = Array.isArray(a) ? (a as string[]) : []
+    const idsB = Array.isArray(b) ? (b as string[]) : []
+    return idsA.length === idsB.length && idsA.every((id, index) => id === idsB[index])
+  }
   if (field.type !== 'child-collection') {
     return a === b
   }
@@ -147,7 +156,7 @@ export function useRecordForm(
   const [snapshot, setSnapshot] = useState<Snapshot>(() => emptySnapshot(entity.fields))
   const [values, setValues] = useState<Record<string, FieldValue>>(snapshot.initial)
   // The label of each reference, which follows the record picked in the lookup.
-  const [labels, setLabels] = useState<Record<string, string | RowLabels[]>>(snapshot.labels)
+  const [labels, setLabels] = useState<Record<string, FieldLabel>>(snapshot.labels)
   // The name of the reference field whose lookup is open.
   const [lookup, setLookup] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({})
@@ -387,6 +396,9 @@ export function useRecordForm(
     const value = values[field.name] ?? null
     const id = field.name
     if (field.type !== 'child-collection' && (readOnly || field.computed || field.sequence || field.creator)) {
+      if (field.type === 'references') {
+        return <Input id={id} readOnly value={referencesLabels(value, labels[field.name]).join(', ')} />
+      }
       // The server sets the value on save, so it is shown as a table cell shows it.
       return (
         <Input id={id} readOnly value={formatValue(field, value as RecordValue, labels, { locale, text: t }, values)} />
@@ -404,6 +416,19 @@ export function useRecordForm(
           </Space.Compact>
         )
       }
+      case 'references':
+        return (
+          <ReferencesInput
+            field={field}
+            title={labelOf(field)}
+            ids={Array.isArray(value) ? (value as string[]) : []}
+            labels={Array.isArray(labels[field.name]) ? (labels[field.name] as (string | null)[]) : []}
+            onChange={(ids, idLabels) => {
+              set(field.name, ids)
+              setLabels((previous) => ({ ...previous, [field.name]: idLabels }))
+            }}
+          />
+        )
       case 'child-collection':
         return (
           <ChildCollectionTable

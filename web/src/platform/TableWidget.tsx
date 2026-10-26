@@ -94,8 +94,8 @@ function tableSource({ entity, dataSource }: WidgetMetadata): TableSource {
   return {
     name,
     path: recordsPath,
-    // A child collection has no column and cannot be sorted by.
-    columns: fields.filter((field) => field.type !== 'child-collection'),
+    // A child collection and a references field have no column and cannot be sorted by.
+    columns: fields.filter((field) => field.type !== 'child-collection' && field.type !== 'references'),
     parameters: [],
     defaultPageSize: recordPageSize,
   }
