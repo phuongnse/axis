@@ -215,7 +215,7 @@ public static class RecordCommand
                 return Invalid(failures);
             }
 
-            result = await RecordCommands.CreateAsync(connection, application, model, releaseId, computed.Values, computed.Rows, cancellationToken: cancellationToken);
+            result = await RecordCommands.CreateAsync(connection, application, model, releaseId, computed.Values, computed.Rows, input.Links, cancellationToken: cancellationToken);
             var written = result is { Outcome: RecordWriteOutcome.Written, Record: { } record } ? record : null;
             var outside = written is not null
                 && !await WithinFiltersAsync(connection, transaction, application, model, written.Id, access, actor.Id, loggerFactory, cancellationToken);
@@ -391,7 +391,7 @@ public static class RecordCommand
                 before = await RecordQueries.GetAsync(connection, application, model, recordId, cancellationToken);
             }
 
-            result = await RecordCommands.UpdateAsync(connection, application, model, releaseId, recordId, input.Version!.Value, computed.Values, computed.Rows, cancellationToken);
+            result = await RecordCommands.UpdateAsync(connection, application, model, releaseId, recordId, input.Version!.Value, computed.Values, computed.Rows, input.Links, cancellationToken);
             var written = result is { Outcome: RecordWriteOutcome.Written, Record: { } record } ? record : null;
             var outside = written is not null
                 && !await WithinFiltersAsync(connection, transaction, application, model, written.Id, access, actor.Id, loggerFactory, cancellationToken);
@@ -410,7 +410,7 @@ public static class RecordCommand
                     written!,
                     before is null
                         ? null
-                        : DataChangeTriggerStarts.ChangedFields(model, before, written!, input.Rows.Select(rows => rows.Collection.Name)),
+                        : DataChangeTriggerStarts.ChangedFields(model, before, written!, input.Rows.Select(rows => rows.Collection.Name).Concat(input.Links.Select(links => links.Field.Name))),
                     loggerFactory.CreateLogger(typeof(DataChangeTriggerStarts)),
                     cancellationToken),
                 cancellationToken);
@@ -603,13 +603,14 @@ public static class RecordCommand
     }
 
     /// <summary>
-    /// The declared names of the fields and child collections an update body sets, in declaration
+    /// The declared names of the fields, child collections and references fields an update body sets, in declaration
     /// order. A field sent with its stored value is listed too, and a computed field never is.
     /// </summary>
     public static IEnumerable<string> SetFields(EntityModel model, RecordInput input)
     {
         var named = input.Values.Select(value => value.Field.Name)
             .Concat(input.Rows.Select(rows => rows.Collection.Name))
+            .Concat(input.Links.Select(links => links.Field.Name))
             .ToHashSet(StringComparer.Ordinal);
         return model.Fields.Select(field => field.Name).Where(named.Contains);
     }

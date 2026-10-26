@@ -247,6 +247,7 @@ public sealed class EntityProvisionerTests(DataDatabaseFixture database) : IClas
             [
                 new CatalogColumn("owner_id", "uuid", NotNull: true, Unique: false, EntityNaming.Table(_orderId)),
                 new CatalogColumn("target_id", "uuid", NotNull: true, Unique: false, EntityNaming.Table(_supplierId)),
+                new CatalogColumn("position", "integer", NotNull: true, Unique: false, null),
             ],
             table.Columns);
 
@@ -282,7 +283,7 @@ public sealed class EntityProvisionerTests(DataDatabaseFixture database) : IClas
         await ExecuteAsync(
             dataSource,
             $"""INSERT INTO {EntityNaming.QualifiedTable(EntityNaming.Table(_orderId))} ("id", "f_code", "f_title", "f_customer", "f_status") VALUES ('{orderId}', 'PO-1', 'First', '{customerId}', 'draft')""");
-        await ExecuteAsync(dataSource, $"""INSERT INTO {junction} ("owner_id", "target_id") VALUES ('{orderId}', '{supplierId}')""");
+        await ExecuteAsync(dataSource, $"""INSERT INTO {junction} ("owner_id", "target_id", "position") VALUES ('{orderId}', '{supplierId}', 0)""");
 
         var refused = await Assert.ThrowsAsync<PostgresException>(
             () => ExecuteAsync(dataSource, $"""DELETE FROM {EntityNaming.QualifiedTable(EntityNaming.Table(_supplierId))} WHERE "id" = '{supplierId}'"""));

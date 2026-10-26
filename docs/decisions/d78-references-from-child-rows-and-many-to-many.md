@@ -24,8 +24,9 @@ limits on a child entity, and extends the SQL subset of
   - A new field type, `references`, holds a set of records of its `target`.
   - It is stored in a platform junction table named `m_` + entity id + `_` +
     hash of the field name, with `owner_id` (deleted with the owner) and
-    `target_id` (a delete of the target is refused while linked), and a
-    primary key over both.
+    `target_id` (a delete of the target is refused while linked), a
+    `position` that keeps the written order, and a primary key over the first
+    two.
   - The value is an array of ids, and its labels an array in the same order.
     A write replaces the whole set under the owner's version, as a child
     collection does. A set holds at most 1,000 ids.

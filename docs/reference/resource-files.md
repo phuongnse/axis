@@ -530,10 +530,10 @@ new check is a new compile diagnostic.
   entity is `AXC0040`, and one without a `displayField` is `AXC0030`. A
   `references` field on a child entity is `AXC0041`. It has no column, so a
   data source cannot project it (`AXC0043`), an endpoint cannot map it
-  (`AXC0121`) and a process `updateRecord` cannot set it. Its storage and the
-  record API are still planned, so until they land the record API leaves the
-  field out of record values and a body that sets it is a `400` unknown
-  property.
+  (`AXC0121`) and a process `updateRecord` cannot set it. The record API
+  writes it as an array of record ids and reads it with its labels, see
+  [reading values](record-api.md#reading-values). Its links live in a junction
+  table, see [storage](storage.md#schema-planning).
 - **`valueLabels`.** On an `enum` field, a map from every value to a
   `{ "textKey" }` label: `"valueLabels": { "low": { "textKey":
   "priority.low" } }`. It covers every value, and its keys join `AXC0028`. An

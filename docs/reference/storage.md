@@ -155,7 +155,7 @@ apply: sections marked _(planned for Mx)_ are not built yet, and Dn refers to
   | `child-collection`               | No column on the owner table. See [Child tables and computed columns](#child-tables-and-computed-columns)                |
   | `money`                          | `numeric(p,s)`, as `decimal` with its defaults. The currency is the field's or the `currencyField` column's              |
   | `file` _(planned for M15)_       | `uuid` with a foreign key to `axis.files`. See [file fields](file-fields.md#storage-and-clean-up)                        |
-  | `references` _(planned for M15)_ | No column on the owner table. A junction table holds `owner_id` and `target_id`, see [Schema planning](#schema-planning) |
+  | `references`                     | No column on the owner table. A junction table holds `owner_id`, `target_id` and `position`, see [Schema planning](#schema-planning) |
 
 - **SQL safety.** Every SQL statement for entity data is built by the data
   module from compiled metadata. Identifiers are resolved and quoted by the
@@ -598,14 +598,17 @@ access. It returns diagnostics, SQL statements and the new records to write.
 - **Junction tables.** A `references` field gets a junction table with
   `owner_id`, a foreign key to the owner deleted with it, and `target_id`, a
   foreign key to the target that refuses a delete while linked. Its primary
-  key is both columns, and `target_id` has an `ix_` index. A junction table
+  key is both columns, and `target_id` has an `ix_` index. Its `position`
+  holds the zero-based index of the id in the written array, and a read
+  orders by it. A junction table
   whose `target_id` foreign key is missing gets it, and one that points at
   another table than the field's target is `AXC0016` at
   `/fields/{i}/target`. Junction tables are not recorded in
   `provisioned_entities`: the planner finds them in the catalog by the
   `m_` + entity `id` prefix. Removing the field drops nothing and is
-  `AXC0015` at `/fields`, as for a column. The record API does not read or
-  write the links yet. See
+  `AXC0015` at `/fields`, as for a column. The record API writes the whole set
+  of a field in one write and reads it in `position` order. A junction table
+  made before `position` existed is not migrated. See
   [D78](../decisions/d78-references-from-child-rows-and-many-to-many.md).
 
 ## Child tables and computed columns
