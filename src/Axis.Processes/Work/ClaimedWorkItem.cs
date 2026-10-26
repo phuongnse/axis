@@ -18,6 +18,7 @@ namespace Axis.Processes.Work;
 /// <param name="TaskId">The task a <c>task.deadline</c> item expires or a <c>task.escalate</c> item escalates, or <see langword="null"/> for other work.</param>
 /// <param name="Revision">The instance revision a <c>process.timer</c> item resumes at, or <see langword="null"/> for other work.</param>
 /// <param name="Escalation">The zero-based index of the escalation a <c>task.escalate</c> item runs, or <see langword="null"/> for other work.</param>
+/// <param name="EmailId">The outbox email a <c>notification.email</c> item sends, or <see langword="null"/> for other work.</param>
 public sealed record ClaimedWorkItem(
     Guid Id,
     string TenantId,
@@ -37,4 +38,5 @@ public sealed record ClaimedWorkItem(
     ActivityContext? QueuedBy = null,
     Guid? TaskId = null,
     long? Revision = null,
-    int? Escalation = null);
+    int? Escalation = null,
+    Guid? EmailId = null);

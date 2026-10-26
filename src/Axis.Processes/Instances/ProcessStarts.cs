@@ -41,6 +41,9 @@ public static class ProcessStarts
     /// <summary>The kind of the work item that resumes a parent instance when its sub-process child completes.</summary>
     public const string ProcessResumeWorkItemKind = "process.resume";
 
+    /// <summary>The kind of the work item that sends one email of the outbox.</summary>
+    public const string NotificationEmailWorkItemKind = "notification.email";
+
     /// <summary>The state of an instance that has work ready or claimed.</summary>
     public const string Running = "running";
 

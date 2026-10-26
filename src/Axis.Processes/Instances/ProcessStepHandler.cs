@@ -6,10 +6,12 @@ using Axis.Configuration.Packages;
 using Axis.Configuration.Releases;
 using Axis.Core.Telemetry;
 using Axis.Data.Audit;
+using Axis.Data.Profiles;
 using Axis.Data.Records;
 using Axis.Expressions.Evaluation;
 using Axis.Expressions.Typing;
 using Axis.Processes.Work;
+using Axis.Tenancy;
 using Microsoft.Extensions.Logging;
 
 namespace Axis.Processes.Instances;
@@ -19,7 +21,8 @@ namespace Axis.Processes.Instances;
 /// commits in the work item's transaction: an operation's record write, a task step's open human
 /// task, a <c>callConnector</c> step's staged call, a <c>raiseEvent</c> step's event occurrence,
 /// the instances its <c>sync</c> event triggers start and the <c>event.deliver</c> item that
-/// delivers it to its <c>async</c> triggers, a <c>notify</c> step's in-app notification rows, the new instance state and revision, a step
+/// delivers it to its <c>async</c> triggers, a <c>notify</c> step's in-app notification rows and its staged emails with their
+/// <c>notification.email</c> items, the new instance state and revision, a step
 /// history row, its <c>system</c> audit records and the next work item. A task step leaves the
 /// instance <c>waiting</c>, with no next work item. A <c>callConnector</c> step leaves it
 /// <c>waiting</c> too, and queues the <c>connector.call</c> item of its call, so no request is sent
@@ -42,7 +45,7 @@ namespace Axis.Processes.Instances;
 /// <c>process.resume</c> item that moves the parent on. A step that throws is rolled back, and the
 /// failure callback then records the error in the history and marks the instance <c>failed</c>.
 /// </summary>
-internal sealed partial class ProcessStepHandler(ReleaseModelCache models, PackageCatalog packages, ILogger<ProcessStepHandler> logger) : IWorkItemHandler
+internal sealed partial class ProcessStepHandler(ReleaseModelCache models, PackageCatalog packages, ITenantCatalog? tenants, ILogger<ProcessStepHandler> logger) : IWorkItemHandler
 {
     /// <summary>The decision recorded when no branch was true.</summary>
     internal const string Otherwise = "otherwise";
@@ -639,10 +642,15 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
                 eventId: occurrence.Id);
         }
 
-        // The email channel stores nothing yet, and a notification with no recipient has no row.
+        // A notification with no recipient has no in-app row.
         if (notification is not null && step is NotifyStepModel { Channels: var channels } && ProcessNotifications.ShouldStore(notification, channels))
         {
             await ProcessNotifications.InsertAsync(context.Transaction, notification, cancellationToken);
+        }
+
+        if (notification is not null && step is NotifyStepModel emailStep && emailStep.Channels.Contains(ProcessNotifications.EmailChannel, StringComparer.Ordinal))
+        {
+            await StageEmailsAsync(context, instance, model, emailStep, notification, cancellationToken);
         }
 
         await ProcessSteps.InsertHistoryAsync(
@@ -1097,6 +1105,85 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
     }
 
     /// <summary>
+    /// Stages the emails of a <c>notify</c> step with the <c>email</c> channel: one <c>pending</c> outbox row for each
+    /// address and one queued <c>notification.email</c> item for each row. The addresses are those of the <c>user</c>
+    /// recipients' profiles, then those of the <c>email</c> recipients. An address is used once, ignoring letter case,
+    /// with the locale of its first recipient. A <c>user</c> recipient with no profile or no email gets none, and is logged
+    /// by user id, never by address. An <c>email</c> recipient gets the release's first locale.
+    /// </summary>
+    private async Task StageEmailsAsync(
+        WorkItemContext context,
+        LoadedInstance instance,
+        ApplicationModel model,
+        NotifyStepModel step,
+        NewNotification notification,
+        CancellationToken cancellationToken)
+    {
+        var userIds = notification.Recipients
+            .Where(recipient => recipient.Kind == ProcessNotifications.UserRecipient)
+            .Select(recipient => recipient.Recipient)
+            .ToArray();
+        var contacts = await UserProfiles.FindContactsAsync(context.Connection, context.Transaction, userIds, cancellationToken);
+        var targets = new List<(string Address, string? Locale)>();
+        foreach (var userId in userIds)
+        {
+            if (contacts.TryGetValue(userId, out var contact) && !string.IsNullOrWhiteSpace(contact.Email))
+            {
+                targets.Add((contact.Email, contact.Locale));
+            }
+            else
+            {
+                LogNoEmailAddress(step.Name, instance.Id, userId);
+            }
+        }
+
+        targets.AddRange(notification.EmailAddresses.Select(address => (address, (string?)null)));
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        targets = [.. targets.Where(target => seen.Add(target.Address))];
+        if (targets.Count == 0)
+        {
+            return;
+        }
+
+        var hosts = tenants?.Find(context.Item.TenantId)?.Hosts;
+        var host = hosts is { Count: > 0 } ? hosts[0] : null;
+        var link = ProcessEmails.PageLink(model, host, notification.OpenPage, notification.OpenParameters);
+        var values = NotificationTexts.RawValues(notification.Values);
+        var emails = new List<NewEmail>(targets.Count);
+        foreach (var (address, locale) in targets)
+        {
+            var texts = NotificationTexts.ChooseTexts(model, locale);
+            var body = NotificationTexts.Render(texts, step.Body.TextKey, values);
+            var id = Guid.CreateVersion7();
+            emails.Add(new NewEmail(
+                id,
+                instance.ApplicationId,
+                instance.ReleaseId,
+                notification.Id,
+                step.Name,
+                address,
+                texts?.Locale,
+                NotificationTexts.Render(texts, step.Subject.TextKey, values),
+                link is null ? body : $"{body}\n\n{link}",
+                ProcessEmails.MessageId(id, host)));
+        }
+
+        await ProcessEmails.InsertAsync(context.Transaction, emails, cancellationToken);
+        foreach (var email in emails)
+        {
+            await WorkItemQueue.EnqueueAsync(
+                context.Connection,
+                context.Transaction,
+                context.Item.TenantId,
+                ProcessStarts.NotificationEmailWorkItemKind,
+                DateTimeOffset.UtcNow,
+                cancellationToken,
+                processInstanceId: instance.Id,
+                emailId: email.Id);
+        }
+    }
+
+    /// <summary>
     /// A value an expression gave, in the record API's JSON form. <paramref name="name"/> names
     /// what gave it, such as <c>input 'amount'</c>, for the error of a value with no JSON form.
     /// </summary>
@@ -1124,6 +1211,9 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
 
     [LoggerMessage(LogLevel.Information, "Trigger {Trigger} skipped the start of process {Process} for record {SubjectId} of event {EventId}: {Reason}.")]
     private partial void LogSyncSkipped(string trigger, string process, Guid subjectId, Guid eventId, string reason);
+
+    [LoggerMessage(LogLevel.Information, "Step {Step} of process instance {InstanceId} sends no email to user {UserId}, who has no profile or no email.")]
+    private partial void LogNoEmailAddress(string step, Guid instanceId, string userId);
 
     [LoggerMessage(LogLevel.Warning, "Step work item {ItemId} names no process instance, so it was discarded.")]
     private partial void LogNoInstance(Guid itemId);

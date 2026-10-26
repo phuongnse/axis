@@ -24,6 +24,9 @@ internal static class ProcessNotifications
     /// <summary>The in-app channel, the only one that stores a notification yet.</summary>
     internal const string InAppChannel = "inApp";
 
+    /// <summary>The email channel. A <c>notify</c> step stages emails for it, and a task escalation stores nothing for it yet.</summary>
+    internal const string EmailChannel = "email";
+
     private const string DateFormat = "yyyy-MM-dd";
 
     // PostgreSQL stores microseconds, so six fraction digits show every stored value exactly.
@@ -32,9 +35,10 @@ internal static class ProcessNotifications
     /// <summary>
     /// Evaluates <paramref name="notification"/> into the notification it stores: its recipients first,
     /// then its placeholder values and the parameters of the page it opens, in the raw JSON form of an
-    /// event payload. A <c>user</c> recipient that gives no non-blank text has no row, an <c>email</c>
-    /// recipient is not evaluated yet, and two recipients of one kind and name are one. An expression
-    /// that fails at run time fails the evaluation, whatever the channels. The caller gives the
+    /// event payload. A <c>user</c> recipient that gives no non-blank text has no row, and two recipients
+    /// of one kind and name are one. An <c>email</c> recipient is evaluated when there is the <c>email</c>
+    /// channel, and one that gives no non-blank text adds no address. An expression that fails at run
+    /// time fails the evaluation, whatever the channels. The caller gives the
     /// exceptions to throw for a failed expression, named by its part, and for a value with no JSON form.
     /// </summary>
     internal static async Task<NewNotification> EvaluateAsync(
@@ -46,6 +50,7 @@ internal static class ProcessNotifications
         Func<object?, string, JsonValue?> toJson)
     {
         var recipients = new List<(string Kind, string Recipient)>();
+        var addresses = new List<string>();
         for (var index = 0; index < notification.Recipients.Count; index++)
         {
             var recipient = notification.Recipients[index];
@@ -65,6 +70,19 @@ internal static class ProcessNotifications
             else if (recipient.Role is { } role)
             {
                 recipients.Add((RoleRecipient, role));
+            }
+            else if (recipient.Email is { } email && notification.Channels.Contains(EmailChannel, StringComparer.Ordinal))
+            {
+                var result = await evaluate(email);
+                if (result.Error is { } error)
+                {
+                    throw expressionFailure($"email of recipient {index}", error);
+                }
+
+                if (result.Value is string address && !string.IsNullOrWhiteSpace(address))
+                {
+                    addresses.Add(address);
+                }
             }
         }
 
@@ -111,7 +129,8 @@ internal static class ProcessNotifications
             valueTypes,
             notification.Open?.Page.Name,
             openParameters,
-            [.. recipients.Distinct()]);
+            [.. recipients.Distinct()],
+            addresses);
     }
 
     /// <summary>Whether <paramref name="notification"/> has a row to store: it has a recipient and goes out on the in-app channel. The email channel stores nothing yet.</summary>
@@ -197,7 +216,7 @@ internal static class ProcessNotifications
     }
 }
 
-/// <summary>An in-app notification that a <c>notify</c> step stores for its recipients.</summary>
+/// <summary>A notification that a <c>notify</c> step or a task escalation evaluates for its recipients.</summary>
 /// <param name="Id">The notification's id, a version 7 UUID. Every recipient's row has it.</param>
 /// <param name="ReleaseId">The release the notifying instance is pinned to.</param>
 /// <param name="SubjectKey">The text key of the subject.</param>
@@ -207,6 +226,7 @@ internal static class ProcessNotifications
 /// <param name="OpenPage">The declared name of the page the notification opens, or null.</param>
 /// <param name="OpenParameters">The raw evaluated page parameters, keyed by the parameters' declared names, or null when there is no page.</param>
 /// <param name="Recipients">The distinct user and role recipients, each by kind and by user id or role name.</param>
+/// <param name="EmailAddresses">The addresses the <c>email</c> recipients gave, in order. It is empty unless the step has the <c>email</c> channel.</param>
 internal sealed record NewNotification(
     Guid Id,
     Guid ApplicationId,
@@ -217,4 +237,5 @@ internal sealed record NewNotification(
     JsonObject ValueTypes,
     string? OpenPage,
     JsonObject? OpenParameters,
-    IReadOnlyList<(string Kind, string Recipient)> Recipients);
+    IReadOnlyList<(string Kind, string Recipient)> Recipients,
+    IReadOnlyList<string> EmailAddresses);
