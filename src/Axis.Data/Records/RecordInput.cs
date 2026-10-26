@@ -12,6 +12,12 @@ public sealed record RecordInput
     /// </summary>
     public IReadOnlyList<RecordRows> Rows { get; init; } = [];
 
+    /// <summary>
+    /// The references fields the body names, in the entity's field declaration order. A field the
+    /// body leaves out is not here.
+    /// </summary>
+    public IReadOnlyList<RecordLinks> Links { get; init; } = [];
+
     /// <summary>The version the update expects; set on update only.</summary>
     public long? Version { get; init; }
 }

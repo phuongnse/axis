@@ -6,8 +6,17 @@ public sealed record CatalogSnapshot(IReadOnlyList<CatalogTable> Tables)
     public static CatalogSnapshot Empty { get; } = new([]);
 }
 
-/// <summary>An entity table. <see cref="Name"/> is the physical name without the schema.</summary>
-public sealed record CatalogTable(string Name, IReadOnlyList<CatalogColumn> Columns, bool HasRows);
+/// <summary>
+/// An entity table. <see cref="Name"/> is the physical name without the schema. <see cref="Indexes"/>
+/// are the table's indexes whose names start with <c>ix_</c>, in name order.
+/// </summary>
+public sealed record CatalogTable(string Name, IReadOnlyList<CatalogColumn> Columns, bool HasRows)
+{
+    public IReadOnlyList<CatalogIndex> Indexes { get; init; } = [];
+}
+
+/// <summary>An index of an entity table. <see cref="Columns"/> are the physical column names in index order.</summary>
+public sealed record CatalogIndex(string Name, IReadOnlyList<string> Columns, bool Unique);
 
 /// <summary>
 /// A column of an entity table. <see cref="Type"/> is spelled as <c>format_type</c> renders it.

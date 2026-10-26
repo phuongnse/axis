@@ -465,6 +465,7 @@ internal static class ProcessInspectionEndpoints
             PackageOperationStepModel package => Operation(package.Name, package.Next),
             RaiseEventStepModel raise => Operation(raise.Name, raise.Next),
             TimerStepModel timer => new(timer.Name, "timer", null, [new ProcessGraphTransition(timer.Next, null)]),
+            CreateRecordStepModel create => Operation(create.Name, create.Next),
             NotifyStepModel notify => Operation(notify.Name, notify.Next),
             SubProcessStepModel sub => Operation(sub.Name, sub.Next),
             EndStepModel end => new(end.Name, "end", null, []),

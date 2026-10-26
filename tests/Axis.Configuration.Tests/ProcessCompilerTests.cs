@@ -44,6 +44,20 @@ public sealed class ProcessCompilerTests
           "fields": [ { "name": "amount", "type": "decimal" }, { "name": "status", "type": "text" } ] }
         """;
 
+    /// <summary>
+    /// The entity <c>Note</c> with a <c>ticket</c> reference to <c>Customer</c>, a required <c>text</c>, a
+    /// <c>kind</c> with a default and an <c>author</c> that the server sets to the creator.
+    /// </summary>
+    private const string Note = """
+        { "id": "11111111-1111-4111-8111-111111111114", "kind": "entity", "name": "Note", "formatVersion": 1,
+          "fields": [
+            { "name": "ticket", "type": "reference", "target": "Customer" },
+            { "name": "text", "type": "text", "required": true },
+            { "name": "kind", "type": "text", "default": "'note'" },
+            { "name": "author", "type": "text", "creator": true }
+          ] }
+        """;
+
     private const string CallCreateOrder = """ "connector": { "name": "Purchasing", "operation": "createOrder" }, """;
     private const string CreateOrderInput = """ "input": { "reference": "status", "amount": "amount" }, """;
 
@@ -687,8 +701,8 @@ public sealed class ProcessCompilerTests
     }
 
     [Theory]
-    [InlineData("sendEmail", """{ "status": "'x'" }""", DiagnosticCodes.UnknownOperation, "/steps/0/operation", "The operation 'sendEmail' was not found. The built-in operations are 'updateRecord', 'callConnector', 'raiseEvent' and 'notify'. A package operation is written '<package>/<operation>'.")]
-    [InlineData("UpdateRecord", """{ "status": "'x'" }""", DiagnosticCodes.UnknownOperation, "/steps/0/operation", "The operation 'UpdateRecord' was not found. The built-in operations are 'updateRecord', 'callConnector', 'raiseEvent' and 'notify'. A package operation is written '<package>/<operation>'.")]
+    [InlineData("sendEmail", """{ "status": "'x'" }""", DiagnosticCodes.UnknownOperation, "/steps/0/operation", "The operation 'sendEmail' was not found. The built-in operations are 'updateRecord', 'callConnector', 'raiseEvent', 'createRecord' and 'notify'. A package operation is written '<package>/<operation>'.")]
+    [InlineData("UpdateRecord", """{ "status": "'x'" }""", DiagnosticCodes.UnknownOperation, "/steps/0/operation", "The operation 'UpdateRecord' was not found. The built-in operations are 'updateRecord', 'callConnector', 'raiseEvent', 'createRecord' and 'notify'. A package operation is written '<package>/<operation>'.")]
     [InlineData("updateRecord", """{ "nope": "'x'" }""", DiagnosticCodes.UnknownSetField, "/steps/0/set/nope", "The field 'nope' was not found. The entity 'Order' has no field with that name.")]
     [InlineData("updateRecord", """{ "status": "'x'", "STATUS": "'y'" }""", DiagnosticCodes.UnknownSetField, "/steps/0/set/STATUS", "The field 'status' is already set by 'status' in this step.")]
     [InlineData("updateRecord", """{ "large": "true" }""", DiagnosticCodes.ReadOnlySetField, "/steps/0/set/large", "The field 'large' is computed, so an operation cannot set it.")]
@@ -709,6 +723,131 @@ public sealed class ProcessCompilerTests
 
         var diagnostic = Assert.Single(result.Diagnostics);
         Assert.Equal((code, "processes/order-review.json", path, message), (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.Message));
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void A_create_record_step_compiles_with_its_entity_and_its_values_in_field_order()
+    {
+        using var folder = Folder(Process("Customer", """
+            [
+              { "name": "log", "type": "operation", "operation": "createRecord", "entity": "NOTE",
+                "set": { "text": "name", "TICKET": "id" }, "next": "DONE" },
+              { "name": "done", "type": "end" }
+            ]
+            """, start: "log"))
+            .With("entities/note.json", Note);
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+        var create = Assert.IsType<CreateRecordStepModel>(Assert.Single(result.Model.Processes).Steps[0]);
+        Assert.Equal(("log", new EntityReference(Guid.Parse("11111111-1111-4111-8111-111111111114"), "Note"), "done"), (create.Name, create.Entity, create.Next));
+        Assert.Equal(
+            [("ticket", "id"), ("text", "name")],
+            create.Set.Select(assignment => (assignment.Field, assignment.Value.Expression)));
+    }
+
+    [Fact]
+    public void A_create_record_step_compiles_in_a_process_without_a_subject()
+    {
+        using var folder = Folder(SubjectlessProcess(
+            """[{ "name": "message", "type": "text" }]""",
+            """
+            [
+              { "name": "log", "type": "operation", "operation": "createRecord", "entity": "Note", "set": { "text": "message" }, "next": "done" },
+              { "name": "done", "type": "end" }
+            ]
+            """,
+            start: "log"))
+            .With("entities/note.json", Note);
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+        var create = Assert.IsType<CreateRecordStepModel>(Assert.Single(result.Model.Processes).Steps[0]);
+        Assert.Equal("Note", create.Entity.Name);
+        Assert.Equal("message", Assert.Single(create.Set).Value.Expression);
+    }
+
+    [Theory]
+    [InlineData(
+        "Nope", """{ "text": "name" }""",
+        DiagnosticCodes.UnknownCreateRecordEntity, "/steps/0/entity", "The entity 'Nope' was not found. No loaded entity has that name.")]
+    [InlineData(
+        "OrderLine", """{ "quantity": "1" }""",
+        DiagnosticCodes.CreateRecordOverChildEntity, "/steps/0/entity", "The entity 'OrderLine' is a child entity owned by 'Order.lines'. A createRecord step creates a record of a root entity.")]
+    [InlineData(
+        "Note", """{ "nope": "name" }""",
+        DiagnosticCodes.UnknownSetField, "/steps/0/set/nope", "The field 'nope' was not found. The entity 'Note' has no field with that name.")]
+    [InlineData(
+        "Note", """{ "text": "true" }""",
+        ExpressionDiagnosticCodes.ResultTypeMismatch, "/steps/0/set/text", "The expression must be text, but it is boolean.")]
+    [InlineData(
+        "Note", """{ "text": "name", "TEXT": "status" }""",
+        DiagnosticCodes.UnknownSetField, "/steps/0/set/TEXT", "The field 'text' is already set by 'text' in this step.")]
+    [InlineData(
+        "Note", """{ "author": "'someone'" }""",
+        DiagnosticCodes.ReadOnlySetField, "/steps/0/set/author", "The field 'author' is set to its creator, so an operation cannot set it.")]
+    public void A_create_record_problem_is_reported_at_its_path_in_the_step_and_gives_no_model(
+        string entity, string set, string code, string path, string message)
+    {
+        using var folder = Folder(Process("Customer", $$"""
+            [
+              { "name": "log", "type": "operation", "operation": "createRecord", "entity": "{{entity}}", "set": {{set}}, "next": "done" },
+              { "name": "done", "type": "end" }
+            ]
+            """, start: "log"))
+            .With("entities/note.json", Note);
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((code, "processes/order-review.json", path, message), (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.Message));
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void A_create_record_entity_whose_file_was_not_loaded_is_not_reported_again()
+    {
+        using var folder = Folder(Process("Customer", """
+            [
+              { "name": "log", "type": "operation", "operation": "createRecord", "entity": "Broken", "set": { "text": "name" }, "next": "done" },
+              { "name": "done", "type": "end" }
+            ]
+            """, start: "log"))
+            .With("entities/broken.json", """{ "id": "11111111-1111-4111-8111-111111111115", "kind": "entity", "name": "Broken", "formatVersion": 1 }""");
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.NotEmpty(result.Diagnostics);
+        Assert.All(result.Diagnostics, diagnostic => Assert.Equal(
+            (DiagnosticCodes.SchemaViolation, "entities/broken.json"), (diagnostic.Code, diagnostic.File)));
+        Assert.Null(result.Model);
+    }
+
+    [Theory]
+    [InlineData("""{ "name": "log", "type": "operation", "operation": "createRecord", "set": { "text": "name" }, "next": "done" }""")]
+    [InlineData("""{ "name": "log", "type": "operation", "operation": "createRecord", "entity": "Note", "next": "done" }""")]
+    [InlineData("""{ "name": "log", "type": "operation", "operation": "createRecord", "entity": "Note", "set": {}, "next": "done" }""")]
+    [InlineData("""{ "name": "log", "type": "operation", "operation": "createRecord", "entity": "Note", "set": { "text": "name" }, "fields": {}, "next": "done" }""")]
+    [InlineData("""{ "name": "log", "type": "operation", "operation": "updateRecord", "entity": "Note", "set": { "text": "name" }, "next": "done" }""")]
+    [InlineData("""{ "name": "log", "type": "end", "entity": "Note" }""")]
+    public void A_create_record_step_without_its_entity_or_set_and_an_entity_elsewhere_are_schema_violations(string step)
+    {
+        using var folder = Folder(Process("Customer", $$"""
+            [
+              {{step}},
+              { "name": "done", "type": "end" }
+            ]
+            """, start: "log"))
+            .With("entities/note.json", Note);
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCodes.SchemaViolation);
         Assert.Null(result.Model);
     }
 
