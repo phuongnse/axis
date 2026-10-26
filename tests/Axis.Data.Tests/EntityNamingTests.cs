@@ -56,6 +56,29 @@ public sealed class EntityNamingTests
     }
 
     [Fact]
+    public void Junction_names_hash_the_lowercase_field_name_and_fit_in_63_bytes()
+    {
+        var fieldName = "T" + new string('z', 59);
+        var junction = EntityNaming.Junction(_entityId, fieldName);
+
+        Assert.Matches("^m_4b6f0c1e6a0e4c479a530f5f8f8b1a01_[0-9a-f]{16}$", junction);
+        Assert.StartsWith(EntityNaming.JunctionPrefix(_entityId), junction, StringComparison.Ordinal);
+        Assert.Equal(junction, EntityNaming.Junction(_entityId, fieldName.ToUpperInvariant()));
+        Assert.NotEqual(junction, EntityNaming.Junction(_entityId, "other"));
+
+        var primaryKey = EntityNaming.PrimaryKey(junction);
+        var foreignKey = EntityNaming.JunctionForeignKey(junction, EntityNaming.TargetColumn);
+        var index = EntityNaming.JunctionIndex(junction, EntityNaming.TargetColumn);
+        Assert.Matches($"^pk_{junction}$", primaryKey);
+        Assert.Matches($"^fk_{junction}_[0-9a-f]{{8}}$", foreignKey);
+        Assert.Matches($"^ix_{junction}_[0-9a-f]{{8}}$", index);
+        Assert.All(
+            [junction, primaryKey, foreignKey, index],
+            name => Assert.InRange(Encoding.UTF8.GetByteCount(name), 1, MaxIdentifierBytes));
+        Assert.NotEqual(foreignKey, EntityNaming.JunctionForeignKey(junction, EntityNaming.OwnerColumn));
+    }
+
+    [Fact]
     public void Column_names_ignore_the_letter_case_of_the_field_name()
     {
         Assert.Equal("f_ordernumber", EntityNaming.Column("OrderNumber"));

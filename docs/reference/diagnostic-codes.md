@@ -261,4 +261,4 @@ sorted by file and then path.
 | `AXC0265` | A policy grant has an `export` with no `read`, or an `import` with no `create`, on the same target in the same policy, ignoring letter case. Reported at `/grants/{i}/actions/{j}`. The message names the action, the target and the grant it needs. An action the target's kind does not take is `AXC0091` instead. |
 | `AXC0266` | An entity declares an index that lists the same fields in the same order as an earlier index, ignoring letter case. Reported at `/indexes/{j}/fields` of the later index, naming the earlier one. |
 | `AXC0267` | A field of an entity's index names no field of the entity, ignoring letter case. Reported at `/indexes/{j}/fields/{k}`. |
-| `AXC0268` | A field of an entity's index has a type an index cannot hold, which today is `child-collection`. Reported at `/indexes/{j}/fields/{k}`. |
+| `AXC0268` | A field of an entity's index has a type an index cannot hold, which today is `child-collection` or `file`. Reported at `/indexes/{j}/fields/{k}`. |

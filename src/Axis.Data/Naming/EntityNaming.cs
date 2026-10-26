@@ -7,6 +7,7 @@ namespace Axis.Data.Naming;
 /// Physical names of entity tables, derived from entity ids and field names, never from labels.
 /// Every name fits PostgreSQL's 63-byte identifier limit by construction: entity and field names
 /// are at most 60 ASCII characters, ids are 32 hex characters and constraint and index names hash the column or columns.
+/// A junction table's own constraint names use a shorter hash, because its name is longer.
 /// </summary>
 public static class EntityNaming
 {
@@ -31,6 +32,9 @@ public static class EntityNaming
     /// <summary>The row's order in its child collection, the zero-based index in the array.</summary>
     public const string PositionColumn = "position";
 
+    /// <summary>The linked record's id in a junction table, with a foreign key that refuses a delete of the target.</summary>
+    public const string TargetColumn = "target_id";
+
     /// <summary>The prefix of every index the planner owns. The planner drops an index with this prefix that the release does not declare.</summary>
     public const string IndexPrefix = "ix_";
 
@@ -51,6 +55,18 @@ public static class EntityNaming
 
     /// <summary><c>ix_</c>, the table name and a hash of the comma-joined column names, in index order (54 characters).</summary>
     public static string Index(string table, IReadOnlyList<string> columns) => $"{IndexPrefix}{table}_{Hash(string.Join(',', columns))}";
+
+    /// <summary><c>m_</c>, the entity id, <c>_</c> and a hash of the lowercase field name (51 characters).</summary>
+    public static string Junction(Guid entityId, string fieldName) => $"m_{entityId:N}_{Hash(fieldName.ToLowerInvariant())}";
+
+    /// <summary><c>m_</c>, the entity id and <c>_</c>, the start of the name of every junction table of the entity (36 characters).</summary>
+    public static string JunctionPrefix(Guid entityId) => $"m_{entityId:N}_";
+
+    /// <summary><c>fk_</c>, the junction table name and the first 8 hex characters of the column hash (63 characters).</summary>
+    public static string JunctionForeignKey(string junction, string column) => $"fk_{junction}_{Hash(column)[..8]}";
+
+    /// <summary><c>ix_</c>, the junction table name and the first 8 hex characters of the column hash (63 characters).</summary>
+    public static string JunctionIndex(string junction, string column) => $"ix_{junction}_{Hash(column)[..8]}";
 
     /// <summary>Quotes an identifier for SQL, doubling any embedded double quote.</summary>
     public static string Quote(string identifier) => "\"" + identifier.Replace("\"", "\"\"", StringComparison.Ordinal) + "\"";

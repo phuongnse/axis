@@ -231,6 +231,93 @@ public sealed class EntityProvisionerTests(DataDatabaseFixture database) : IClas
         Assert.Equal(before.EnumValues.Count + 1, after.EnumValues.Count);
     }
 
+    [Fact]
+    public async Task A_references_field_gets_a_junction_table_with_its_keys_and_index()
+    {
+        var model = WithTags(BaseModel());
+        var junction = EntityNaming.Junction(_orderId, "tags");
+
+        var result = await ProvisionAsync(model);
+
+        Assert.Empty(result.Diagnostics);
+        await using var connection = new NpgsqlConnection(database.ConnectionString);
+        await connection.OpenAsync(CancellationToken);
+        var catalog = await CatalogReader.ReadAsync(connection, null, CancellationToken);
+        var table = Assert.Single(catalog.Tables, table => table.Name == junction);
+        Assert.Equal(
+            [
+                new CatalogColumn("owner_id", "uuid", NotNull: true, Unique: false, EntityNaming.Table(_orderId)),
+                new CatalogColumn("target_id", "uuid", NotNull: true, Unique: false, EntityNaming.Table(_supplierId)),
+            ],
+            table.Columns);
+
+        var constraints = await QueryAsync(
+            connection,
+            $"SELECT conname, pg_get_constraintdef(oid) FROM pg_constraint WHERE contype IN ('p', 'f') AND conrelid = '{EntityNaming.QualifiedTable(junction)}'::regclass ORDER BY conname");
+        List<(string, string)> expectedConstraints =
+            [
+                (EntityNaming.PrimaryKey(junction), "PRIMARY KEY (owner_id, target_id)"),
+                (EntityNaming.JunctionForeignKey(junction, "owner_id"), $"FOREIGN KEY (owner_id) REFERENCES entities.{EntityNaming.Table(_orderId)}(id) ON DELETE CASCADE"),
+                (EntityNaming.JunctionForeignKey(junction, "target_id"), $"FOREIGN KEY (target_id) REFERENCES entities.{EntityNaming.Table(_supplierId)}(id)"),
+            ];
+        Assert.Equal(expectedConstraints.OrderBy(constraint => constraint.Item1, StringComparer.Ordinal), constraints);
+
+        var indexes = await QueryAsync(
+            connection,
+            $"SELECT indexname, indexdef FROM pg_indexes WHERE schemaname = 'entities' AND tablename = '{junction}' ORDER BY indexname");
+        var index = EntityNaming.JunctionIndex(junction, "target_id");
+        Assert.Contains((index, $"CREATE INDEX {index} ON entities.{junction} USING btree (target_id)"), indexes);
+    }
+
+    [Fact]
+    public async Task Deleting_the_owner_deletes_its_links_and_deleting_a_linked_target_is_refused()
+    {
+        await ProvisionAsync(WithTags(BaseModel()));
+        var junction = EntityNaming.QualifiedTable(EntityNaming.Junction(_orderId, "tags"));
+        var orderId = Guid.NewGuid();
+        var customerId = Guid.NewGuid();
+        var supplierId = Guid.NewGuid();
+        await using var dataSource = NpgsqlDataSource.Create(database.ConnectionString);
+        await ExecuteAsync(dataSource, $"""INSERT INTO {EntityNaming.QualifiedTable(EntityNaming.Table(_customerId))} ("id", "f_name") VALUES ('{customerId}', 'Ann')""");
+        await ExecuteAsync(dataSource, $"""INSERT INTO {EntityNaming.QualifiedTable(EntityNaming.Table(_supplierId))} ("id", "f_name") VALUES ('{supplierId}', 'Acme')""");
+        await ExecuteAsync(
+            dataSource,
+            $"""INSERT INTO {EntityNaming.QualifiedTable(EntityNaming.Table(_orderId))} ("id", "f_code", "f_title", "f_customer", "f_status") VALUES ('{orderId}', 'PO-1', 'First', '{customerId}', 'draft')""");
+        await ExecuteAsync(dataSource, $"""INSERT INTO {junction} ("owner_id", "target_id") VALUES ('{orderId}', '{supplierId}')""");
+
+        var refused = await Assert.ThrowsAsync<PostgresException>(
+            () => ExecuteAsync(dataSource, $"""DELETE FROM {EntityNaming.QualifiedTable(EntityNaming.Table(_supplierId))} WHERE "id" = '{supplierId}'"""));
+        Assert.Equal(PostgresErrorCodes.ForeignKeyViolation, refused.SqlState);
+
+        await ExecuteAsync(dataSource, $"""DELETE FROM {EntityNaming.QualifiedTable(EntityNaming.Table(_orderId))} WHERE "id" = '{orderId}'""");
+        await using var count = dataSource.CreateCommand($"SELECT count(*) FROM {junction}");
+        Assert.Equal(0L, await count.ExecuteScalarAsync(CancellationToken));
+    }
+
+    [Fact]
+    public async Task Removing_a_references_field_is_a_removed_field_and_keeps_the_junction_table()
+    {
+        var model = WithTags(BaseModel());
+        await ProvisionAsync(model);
+        var junction = EntityNaming.Junction(_orderId, "tags");
+
+        // The release also adds an optional field, so an unchanged catalog shows no DDL ran.
+        var changed = ChangeEntity(BaseModel(), _orderId, fields => [.. fields, Field("extra", FieldType.Integer)]);
+        var result = await ProvisionAsync(changed);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.RemovedField, "entities/order.json", "/fields", _orderId),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.ResourceId));
+        Assert.Empty(result.Statements);
+        await using var connection = new NpgsqlConnection(database.ConnectionString);
+        await connection.OpenAsync(CancellationToken);
+        var catalog = await CatalogReader.ReadAsync(connection, null, CancellationToken);
+        Assert.Contains(catalog.Tables, table => table.Name == junction);
+        var order = Assert.Single(catalog.Tables, table => table.Name == EntityNaming.Table(_orderId));
+        Assert.DoesNotContain(order.Columns, column => column.Name == "f_extra");
+    }
+
     [Theory]
     [InlineData("removed field", DiagnosticCodes.RemovedField, "entities/order.json", "/fields")]
     [InlineData("changed type", DiagnosticCodes.IncompatibleFieldChange, "entities/order.json", "/fields/6/type")]
@@ -422,6 +509,29 @@ public sealed class EntityProvisionerTests(DataDatabaseFixture database) : IClas
         var line = Entity(_lineId, "Line", "entities/line.json", Field("description", FieldType.Text, maxLength: 200));
         var changed = ChangeEntity(model, _customerId, fields => [fields[0], Field("lines", FieldType.ChildCollection, target: line), .. fields.Skip(1)]);
         return changed with { Entities = [.. changed.Entities, line] };
+    }
+
+    // Order links to many suppliers.
+    private ApplicationModel WithTags(ApplicationModel model) =>
+        ChangeEntity(model, _orderId, fields => [.. fields, Field("tags", FieldType.References, target: Entity(_supplierId, "Supplier", "entities/supplier.json"))]);
+
+    private static async Task<List<(string, string)>> QueryAsync(NpgsqlConnection connection, string sql)
+    {
+        await using var command = new NpgsqlCommand(sql, connection);
+        await using var reader = await command.ExecuteReaderAsync(CancellationToken);
+        var rows = new List<(string, string)>();
+        while (await reader.ReadAsync(CancellationToken))
+        {
+            rows.Add((reader.GetString(0), reader.GetString(1)));
+        }
+
+        return rows;
+    }
+
+    private static async Task ExecuteAsync(NpgsqlDataSource dataSource, string sql)
+    {
+        await using var command = dataSource.CreateCommand(sql);
+        await command.ExecuteNonQueryAsync(CancellationToken);
     }
 
     private static ApplicationModel WithApplicationId(ApplicationModel model, Guid applicationId) =>

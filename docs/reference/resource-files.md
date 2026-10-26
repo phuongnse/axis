@@ -575,8 +575,8 @@ new check is a new compile diagnostic.
   ignoring letter case. They are the index columns, in order. An empty list,
   a repeated name and more than 32 names break the JSON Schema (`AXC0004`).
 - **Field types.** An index holds a field that has a column. A
-  `child-collection` field is `AXC0268`. `references` and `file` fields join
-  it when they are built.
+  `child-collection` or `file` field is `AXC0268`. A `references` field joins
+  them when it is built.
 - **Compile diagnostics.** Each is reported in the entity file:
   - `AXC0266`: an index lists the same fields in the same order as an earlier
     one, at `/indexes/{j}/fields`.

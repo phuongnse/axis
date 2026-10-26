@@ -1034,6 +1034,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     await grantIn(page, 'service-desk-lead', 'dataSource', 'OpenTicketTotals', [{ actions: ['read'] }])
     await grantIn(page, 'service-desk-lead', 'dataSource', 'UrgentTicketTotals', [{ actions: ['read'] }])
     await grantIn(page, 'service-desk-lead', 'dataSource', 'OpenTicketsByCategory', [{ actions: ['read'] }])
+    await grantIn(page, 'service-desk-lead', 'process', 'TicketHandling', [{ actions: ['reassign'] }])
   })
 
   for (const [name, file] of scenarios) {

@@ -116,11 +116,15 @@ apply: sections marked _(planned for Mx)_ are not built yet, and Dn refers to
   | Unique constraint                  | `uq_` + table + `_` + hash of the column name                             | 54         |
   | Foreign key                        | `fk_` + table + `_` + hash of the column name                             | 54         |
   | Index                              | `ix_` + table + `_` + hash of the column list                             | 54         |
-  | Junction table _(planned for M15)_ | `m_` + entity `id` + `_` + hash of the field name                         | 51         |
+  | Junction table                     | `m_` + entity `id` + `_` + hash of the field name                         | 51         |
+  | Junction foreign key / index       | `fk_` or `ix_` + junction table + `_` + first 8 hex of the hash           | 63         |
 
   The hash is the first 16 lowercase hex characters of SHA-256 over the UTF-8
   column name. For an index it is over the column names joined by commas, in
-  order, and for a junction table over the field name in lowercase. Because names are ASCII and at most 60 characters, every
+  order, and for a junction table over the field name in lowercase. A junction
+  table's foreign keys and index use only the first 8 hex characters of the
+  hash, because the full hash after the 51-character table name would be 71
+  bytes. Because names are ASCII and at most 60 characters, every
   identifier fits PostgreSQL's 63-byte limit by construction and is never
   truncated. Identifiers are always double-quoted in SQL.
 
@@ -580,9 +584,9 @@ access. It returns diagnostics, SQL statements and the new records to write.
   large index with `CREATE INDEX CONCURRENTLY` is _(planned for M15)_.
   - Every `reference` column and every child table's `owner_id` gets an
     `ix_` index without being declared. An existing tenant gets them on its
-    next activation. A junction table's `target_id` and every `searchable`
-    field, whose index is a `pg_trgm` GIN index on `lower()` of the column,
-    are _(planned for M15)_.
+    next activation. A junction table's `target_id` index is created with the
+    table. Every `searchable` field, whose index is a `pg_trgm` GIN index on
+    `lower()` of the column, is _(planned for M15)_.
   - An entity's `indexes` add the declared indexes, with the columns in the
     order of `fields`. A declared index over one `reference` field has the
     same name as the automatic index on that field. They are one index, which
@@ -602,11 +606,17 @@ access. It returns diagnostics, SQL statements and the new records to write.
     with the column, and the planner does not drop them again.
   - A second record that repeats the values of a unique index is a `409`, as
     for a `unique` field. See [record API](record-api.md#create-update-and-delete).
-- **Junction tables** _(planned for M15)_. A `references` field gets a
-  junction table with `owner_id`, a foreign key to the owner deleted with it,
-  and `target_id`, a foreign key to the target that refuses a delete while
-  linked. Its primary key is both columns. Removing the field drops nothing
-  and is `AXC0015`, as for a column. See
+- **Junction tables.** A `references` field gets a junction table with
+  `owner_id`, a foreign key to the owner deleted with it, and `target_id`, a
+  foreign key to the target that refuses a delete while linked. Its primary
+  key is both columns, and `target_id` has an `ix_` index. A junction table
+  whose `target_id` foreign key is missing gets it, and one that points at
+  another table than the field's target is `AXC0016` at
+  `/fields/{i}/target`. Junction tables are not recorded in
+  `provisioned_entities`: the planner finds them in the catalog by the
+  `m_` + entity `id` prefix. Removing the field drops nothing and is
+  `AXC0015` at `/fields`, as for a column. The record API does not read or
+  write the links yet. See
   [D78](../decisions/d78-references-from-child-rows-and-many-to-many.md).
 
 ## Child tables and computed columns

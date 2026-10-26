@@ -920,8 +920,8 @@ public static partial class ApplicationCompiler
         }
     }
 
-    // A child collection has no column. The reference and file types of a later issue can be added here.
-    private static bool CanIndex(FieldType type) => type != FieldType.ChildCollection;
+    // A child collection has no column, and a file field holds a stored file. The references type of a later issue can be added here.
+    private static bool CanIndex(FieldType type) => type is not (FieldType.ChildCollection or FieldType.File);
 
     /// <summary>
     /// Checks the expression of each computed field of a scalar type: it parses and type-checks to

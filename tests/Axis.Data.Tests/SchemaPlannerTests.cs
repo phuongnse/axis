@@ -1177,6 +1177,54 @@ public sealed class SchemaPlannerTests
     private static string DropIndex(string table, params string[] columns) =>
         $"DROP INDEX \"entities\".\"{EntityNaming.Index(table, columns)}\"";
 
+    [Fact]
+    public void A_references_field_plans_a_junction_table_with_its_index_and_foreign_keys_after_every_entity_table()
+    {
+        var supplierShell = Entity(_supplierId, "Supplier", "supplier.json");
+        var order = Entity(_orderId, "Order", "order.json", Field("tags", FieldType.References, target: supplierShell));
+        var junction = EntityNaming.Junction(_orderId, "tags");
+        var supplierTable = "e_33333333333343338333333333333333";
+
+        var plan = SchemaPlanner.Plan(Application(supplierShell, order), CatalogSnapshot.Empty, ProvisioningRecords.Empty);
+
+        Assert.Empty(plan.Diagnostics);
+        Assert.Equal(
+            [
+                $"""CREATE TABLE "entities"."{supplierTable}" ("id" uuid NOT NULL, "version" bigint NOT NULL DEFAULT 1, "computed_release_id" uuid, CONSTRAINT "pk_{supplierTable}" PRIMARY KEY ("id"))""",
+                $"""CREATE TABLE "entities"."{OrderTable}" ("id" uuid NOT NULL, "version" bigint NOT NULL DEFAULT 1, "computed_release_id" uuid, CONSTRAINT "pk_{OrderTable}" PRIMARY KEY ("id"))""",
+                $"""CREATE TABLE "entities"."{junction}" ("owner_id" uuid NOT NULL, "target_id" uuid NOT NULL, CONSTRAINT "pk_{junction}" PRIMARY KEY ("owner_id", "target_id"))""",
+                $"""CREATE INDEX "{EntityNaming.JunctionIndex(junction, "target_id")}" ON "entities"."{junction}" ("target_id")""",
+                $"""ALTER TABLE "entities"."{junction}" ADD CONSTRAINT "{EntityNaming.JunctionForeignKey(junction, "owner_id")}" FOREIGN KEY ("owner_id") REFERENCES "entities"."{OrderTable}" ("id") ON DELETE CASCADE""",
+                $"""ALTER TABLE "entities"."{junction}" ADD CONSTRAINT "{EntityNaming.JunctionForeignKey(junction, "target_id")}" FOREIGN KEY ("target_id") REFERENCES "entities"."{supplierTable}" ("id")""",
+            ],
+            plan.Statements);
+    }
+
+    [Fact]
+    public void A_junction_table_without_its_references_field_is_a_removed_field()
+    {
+        var supplierShell = Entity(_supplierId, "Supplier", "supplier.json");
+        var junction = EntityNaming.Junction(_orderId, "tags");
+        var order = Entity(_orderId, "Order", "order.json");
+        var catalog = new CatalogSnapshot(
+        [
+            .. Catalog(Application(order, supplierShell), hasRows: false).Tables,
+            new CatalogTable(
+                junction,
+                [
+                    new CatalogColumn("owner_id", "uuid", NotNull: true, Unique: false, OrderTable),
+                    new CatalogColumn("target_id", "uuid", NotNull: true, Unique: false, "e_33333333333343338333333333333333"),
+                ],
+                HasRows: false),
+        ]);
+
+        var plan = SchemaPlanner.Plan(Application(order, supplierShell), catalog, ProvisioningRecords.Empty);
+
+        var diagnostic = Assert.Single(plan.Diagnostics);
+        Assert.Equal((DiagnosticCodes.RemovedField, "order.json", "/fields", _orderId), (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.ResourceId));
+        Assert.Empty(plan.Statements);
+    }
+
     private static string ForeignKey(string table, string column, string targetTable) =>
         $"""ALTER TABLE "entities"."{table}" ADD CONSTRAINT "{EntityNaming.ForeignKey(table, column)}" FOREIGN KEY ("{column}") REFERENCES "entities"."{targetTable}" ("id")""";
 

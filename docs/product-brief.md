@@ -218,12 +218,14 @@ the parts built in M12,
 ### Security
 
 - The roles are `requester`, `agent` and `service-desk-lead`.
-- The realm adds one user with `agent` and one with `service-desk-lead`, and
+- The realm adds one user with `agent` and two with `service-desk-lead`, and
   gives an existing employee the `requester` role. See the
   [development users](reference/security.md#development-users) table.
 - The roles of the existing users stay as they are.
 - A requester reads and edits only their own tickets. An agent reads the
   tickets assigned to them. The lead reads every ticket.
+- The lead may reassign the tasks of a ticket's handling. The lead and the
+  agent already claim and release through their roles.
 - The requester cannot edit the resolution.
 - A requester may delete their own ticket while its status is `draft`. An
   agent and the lead may not delete.
