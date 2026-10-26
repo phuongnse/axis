@@ -8,7 +8,8 @@ namespace Axis.Server.Authentication;
 /// <summary>
 /// Keeps the ASP.NET data protection keys in <c>platform.data_protection_keys</c>, so every server replica and every
 /// restart reads the same keys. Each key is encrypted with <c>Platform:SecretKey</c>, bound to the key's own id, so
-/// the table holds no plain key material. The connection is the platform reader role, which may insert here and
+/// the table holds no plain key material. During a key rotation a key that <c>Platform:PreviousSecretKey</c> encrypted
+/// still decrypts, until <c>platform rekey</c> re-encrypts it. The connection is the platform reader role, which may insert here and
 /// nothing more. <see cref="IXmlRepository"/> is synchronous, so the calls are too.
 /// </summary>
 internal sealed class PlatformKeyRing(NpgsqlDataSource dataSource, TenantSecretCipher cipher) : IXmlRepository

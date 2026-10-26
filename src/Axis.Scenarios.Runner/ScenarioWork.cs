@@ -9,7 +9,7 @@ using Npgsql;
 namespace Axis.Scenarios.Runner;
 
 /// <summary>
-/// Runs the due process step, connector call, package call and event delivery work items of the
+/// Runs the due process step, process resume, connector call, package call and event delivery work items of the
 /// scenario's tenant in-process, as the worker would, until none is due. The items run in the order
 /// they were queued, so a clock that steps back during a run cannot reorder them. The handlers are the real
 /// ones, with the scenario's placeholder bindings, so an <c>async</c> event trigger starts its process
@@ -50,9 +50,10 @@ internal sealed class ScenarioWork : IDisposable
             new PackageCallHandler(models, packages, bindings, settings, _transport, loggerFactory.CreateLogger<PackageCallHandler>(), stubs.CreateOperation),
             new EventDeliveryHandler(models, new DeliverySettings(5), loggerFactory.CreateLogger<EventDeliveryHandler>()),
         ];
-        _runner = CreateRunner([handler], externalHandlers, loggerFactory);
+        var resume = new ProcessResumeHandler(models, loggerFactory.CreateLogger<ProcessResumeHandler>());
+        _runner = CreateRunner([handler, resume], externalHandlers, loggerFactory);
         _timeRunner = CreateRunner(
-            [handler, new TaskDeadlineHandler(models, loggerFactory.CreateLogger<TaskDeadlineHandler>())],
+            [handler, resume, new TaskDeadlineHandler(models, loggerFactory.CreateLogger<TaskDeadlineHandler>())],
             [
                 .. externalHandlers,
                 new TriggerScheduleHandler(models, loggerFactory.CreateLogger<TriggerScheduleHandler>()),
@@ -185,6 +186,7 @@ internal sealed class ScenarioWork : IDisposable
             new[]
             {
                 ProcessStarts.StepWorkItemKind,
+                ProcessStarts.ProcessResumeWorkItemKind,
                 ProcessStarts.ConnectorCallWorkItemKind,
                 ProcessStarts.PackageCallWorkItemKind,
                 ProcessStarts.EventDeliverWorkItemKind,

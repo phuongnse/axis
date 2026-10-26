@@ -132,6 +132,8 @@ function sameValue(field: FieldMetadata, a: FieldValue | undefined, b: FieldValu
  * states while a call is pending and drops an answer that a newer call has overtaken. It never
  * sends a field the answer hides or locks, and shows the answer's messages under touched fields.
  * A task's conditions have no `recordId`, so the hook asks when the task's subject record starts.
+ * For a new record it fills each empty, untouched field from the answer's `defaults`, as both the
+ * starting and the current value, so an unchanged default is not sent.
  */
 export function useRecordForm(
   entity: EntityMetadata,
@@ -160,6 +162,10 @@ export function useRecordForm(
   const [request, setRequest] = useState<StateRequest>({ delay: 0, n: asking && conditions.recordId === null ? 1 : 0 })
   // The number of the newest call sent. An answer that is not for it is dropped.
   const sequence = useRef(0)
+  // The touched fields as of the last render, read when an answer arrives.
+  const touchedNow = useRef(touched)
+  // The handler of an answer, read when the timer's call returns so it uses the newest render.
+  const receiving = useRef<((next: FormStateAnswer) => void) | null>(null)
   // The call the timer sends, read when it fires so it uses the newest values.
   const draft = useRef<(() => { statePath: string; body: string }) | null>(null)
 
@@ -271,6 +277,32 @@ export function useRecordForm(
     return [...named]
   }
 
+  // Keeps the answer. For a new record, an empty field the user has not touched takes the answer's
+  // default as its starting and its current value, so the form does not count it as changed.
+  const receive = (next: FormStateAnswer) => {
+    setAnswer(next)
+    if (conditions?.recordId !== null) {
+      return
+    }
+    const fill = Object.entries(next.defaults ?? {}).filter(
+      ([name]) =>
+        !touchedNow.current.has(name) &&
+        entity.fields.some((field) => field.name === name && field.type !== 'child-collection'),
+    )
+    if (fill.length === 0) {
+      return
+    }
+    const filled = (record: Record<string, FieldValue>) => {
+      const empty = fill.filter(([name]) => (record[name] ?? null) === null)
+      return empty.length === 0 ? record : { ...record, ...Object.fromEntries(empty) }
+    }
+    setSnapshot((previous) => {
+      const initial = filled(previous.initial)
+      return initial === previous.initial ? previous : { ...previous, initial }
+    })
+    setValues(filled)
+  }
+
   // The field becomes touched, and the form asks for its states: at once, or after typing pauses.
   const touch = (name: string, delay: StateRequest['delay']) => {
     if (asking) {
@@ -309,7 +341,7 @@ export function useRecordForm(
         buildFormStateBody(entity.fields, changed(), conditions.recordId, [...all]),
       )
       if (mine === sequence.current) {
-        setAnswer(next)
+        receive(next)
       }
       return !names.some((name) => `${fieldPointer}${name}` in next.errors)
     } catch (error) {
@@ -475,6 +507,8 @@ export function useRecordForm(
           body: buildFormStateBody(entity.fields, changed(), conditions.recordId, [...touched]),
         })
       : null
+    touchedNow.current = touched
+    receiving.current = receive
   })
 
   // One timer for the request that waits: a newer request clears it, which debounces typing.
@@ -491,7 +525,7 @@ export function useRecordForm(
       fetchFormState(call.statePath, call.body)
         .then((next) => {
           if (mine === sequence.current) {
-            setAnswer(next)
+            receiving.current?.(next)
           }
         })
         .catch((error: unknown) => {

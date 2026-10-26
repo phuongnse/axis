@@ -177,7 +177,7 @@ public sealed class AdminTenantOidcSetTests(PostgreSqlFixture database, Keycloak
         Assert.Null(row.OidcPreviousClientKey);
         Assert.Null(row.OidcPreviousClientKeyId);
         Assert.Equal(first, AdminScenario.Cipher.Decrypt(id, TenantSecretFields.OidcClientKey, row.OidcClientKey!).Reveal());
-        Assert.False(row.OidcClientKey.AsSpan().IndexOf(Encoding.UTF8.GetBytes(Body(first))) >= 0, "The stored client key holds the plain key.");
+        Assert.All(AdminScenario.PemBodyLines(first), line => Assert.False(row.OidcClientKey.AsSpan().IndexOf(Encoding.UTF8.GetBytes(line)) >= 0, "The stored client key holds the plain key."));
         Assert.Equal(start.Version + 1, row.Version);
         var records = await scenario.AuditRecordsAsync();
         Assert.Equal(recordCount + 1, records.Count);
@@ -223,7 +223,7 @@ public sealed class AdminTenantOidcSetTests(PostgreSqlFixture database, Keycloak
         Assert.Equal(secondId, rest.OidcClientKeyId);
         Assert.Null(rest.OidcPreviousClientKeyId);
         Assert.Equal(second, AdminScenario.Cipher.Decrypt(id, TenantSecretFields.OidcClientKey, rest.OidcClientKey!).Reveal());
-        Assert.All(await scenario.AuditRecordsAsync(), entry => Assert.DoesNotContain(Body(first), entry.Text, StringComparison.Ordinal));
+        Assert.All(await scenario.AuditRecordsAsync(), entry => Assert.False(AdminScenario.HoldsPemBody(entry.Text, first), "An audit record holds the client key."));
         await scenario.AssertNoSecretsAsync();
     }
 
@@ -358,9 +358,6 @@ public sealed class AdminTenantOidcSetTests(PostgreSqlFixture database, Keycloak
     }
 
     private static string[] Lines(string pem) => pem.ReplaceLineEndings("\n").TrimEnd('\n').Split('\n');
-
-    // The PEM without its BEGIN and END lines and its line breaks.
-    private static string Body(string pem) => string.Concat(Lines(pem).Where(line => !line.StartsWith("-----", StringComparison.Ordinal)));
 
     private static string[] CreateArgs(string id, string host, Uri authority) =>
         ["tenant", "create", id, "--host", host, "--oidc-authority", authority.ToString(), "--oidc-client-id", KeycloakFixture.ClientId];

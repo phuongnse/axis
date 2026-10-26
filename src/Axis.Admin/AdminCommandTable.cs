@@ -11,6 +11,9 @@ internal enum AuditMark
     Unmarked,
     None,
     OnePerTenant,
+
+    /// <summary>One record for the whole run, with no tenant.</summary>
+    OnePerRun,
 }
 
 /// <summary>One row of the command table. <paramref name="Name"/> is the leading arguments that pick the command, joined by spaces.</summary>

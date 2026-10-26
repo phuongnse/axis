@@ -8,7 +8,8 @@ sections marked _(planned for Mx)_ are not built yet, and Dn refers to [decision
 The design follows [D87](../decisions/d87-tenant-setting-commands-and-key-rotation.md). The
 `platform.audit_records` table, `PlatformAuditRecords.WriteAsync` and the records of the commands
 that already exist are built, see [platform audit records](#platform-audit-records). The database
-password rotation, [`tenant rotate-passwords`](#database-passwords), is built. The
+password rotation, [`tenant rotate-passwords`](#database-passwords), is built. The key rotation is
+built, see [installation key](#installation-key). The
 [deployment binding](#deployment-bindings) and [host](#hosts) commands are built too. So is
 [`tenant oidc set`](#sign-in-settings), with its client key options. The rest is _(planned for M16)_.
 
@@ -16,7 +17,8 @@ password rotation, [`tenant rotate-passwords`](#database-passwords), is built. T
 
 - **Directory only.** Every command here needs `Tenancy:Source=directory`, because it writes the
   [tenant directory](../architecture.md#tenant-directory). Under `configuration` the host settings
-  hold the tenants, so the command exits with code 2.
+  hold the tenants, so the command exits with code 2. `platform rekey` is the exception: it works
+  under both sources, see [installation key](#installation-key).
 - **Over the schema role.** The commands write over `ConnectionStrings:PlatformSchema`, as
   `tenant create` does. A command that encrypts needs `Platform:SecretKey`.
 - **Picked up without a restart.** Every change raises the tenant `version`. The server and the
@@ -183,6 +185,28 @@ keys. It can be rotated without signing anyone out.
   code 2. A value that fails to decrypt with both keys stops the command, and nothing changes.
 - **Data protection keys.** Rekey is the one action that updates rows of
   `platform.data_protection_keys`. The server's role still only inserts them.
+- **Both tenancy sources.** `platform rekey` does not read `Tenancy:Source`. The server keeps its
+  data protection keys in the platform database under both sources, so both need the rotation.
+  Under `configuration` the tenant directory is just empty.
+- **Exit codes.** `0` when every value is re-encrypted. `2` when the usage is wrong, a setting is
+  missing or malformed, the platform tables do not exist, `Platform:PreviousSecretKey` is not set
+  (a blank value counts as not set), or a value decrypts with neither key. Then nothing changes and
+  no audit record is written. A message for a value that decrypts with neither key names the tenant
+  and the field, or the key id, and never a value. `1` when the audit record or the update fails,
+  and nothing changes.
+- **Summary line.** `platform rekey ok: <n> tenant secrets, <m> data protection keys`.
+- **Every non-empty value.** Rekey re-encrypts each non-empty value, even one that the new key
+  already encrypts, and skips empty values, such as the client secret of a preview tenant. Running
+  it twice is harmless.
+- **Version.** Rekey raises the `version` of each tenant whose secrets it re-encrypted, so each
+  host loads the new ciphertext at its next `Tenancy:RefreshInterval`. That refresh rebuilds the
+  database pool and the sign-in client of each tenant once.
+- **Locks.** The transaction takes an `EXCLUSIVE` lock on `platform.tenants`,
+  `platform.tenant_bindings` and `platform.data_protection_keys`. Another admin command, and a
+  server that stores a new data protection key, wait for the commit. Readers are not blocked.
+- **Audit record.** One record with no tenant. Its `changed` holds `tenant secrets: <n>` and
+  `data protection keys: <m>`, never a value. It is written after every value has decrypted and
+  before the first update.
 
 ## Platform audit records
 
@@ -193,12 +217,14 @@ keys. It can be rotated without signing anyone out.
   `tenant suspend`, `tenant resume`, `tenant rotate-passwords`, `tenant oidc set`, `tenant backup`,
   `tenant restore`, `migrate` and `activate` are built. `tenant backup` writes one because an
   archive holds a tenant's data. `tenant binding set`, `tenant binding remove`, `tenant host add`,
-  `tenant host remove` and `tenant host move` are built and write one each. The other setting
-  commands and `platform rekey` are _(planned for M16)_. `tenant list`, `tenant binding list`,
-  `version` and `publisher` write none. The dispatcher of `Axis.Admin` reads a table of commands, and each is
-  marked as writing one record per tenant or none. A command without a mark fails a test.
+  `tenant host remove` and `tenant host move` are built and write one each. `platform rekey` is
+  built and writes one record for the whole run, with no tenant. The other setting commands on this
+  page are _(planned for M16)_. `tenant list`, `tenant binding list`, `version` and `publisher`
+  write none. The dispatcher of `Axis.Admin` reads a table of commands, and each is marked as
+  writing one record per tenant, one per run or none. A command without a mark fails a test.
 - **When.** One record per tenant, when tenant work starts: after the checks of the command and
-  before its first change for that tenant. A usage error, a missing setting, an unknown tenant or a
+  before its first change for that tenant. `platform rekey` writes its one record after every value
+  has decrypted and before the first update, and `changed` holds the counts. A usage error, a missing setting, an unknown tenant or a
   host that another tenant holds writes none, because nothing started. A record means the command
   started work for the tenant, not that the work succeeded. The `changed` names of these commands
   are empty, because the command already says what changed. `tenant rotate-passwords` and

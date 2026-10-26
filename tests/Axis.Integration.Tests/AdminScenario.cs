@@ -284,10 +284,11 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
 
     /// <summary>
     /// Checks that no output of any command held the admin password, a generated password, the client secret or a
-    /// connection string with a password.
+    /// connection string with a password. A test that changed the installation key passes a cipher that decrypts the stored values.
     /// </summary>
-    public async Task AssertNoSecretsAsync()
+    public async Task AssertNoSecretsAsync(TenantSecretCipher? cipher = null)
     {
+        cipher ??= Cipher;
         var secrets = new List<string>([.. _adminPasswords, _clientSecret]);
         await using (var context = NewContext())
         {
@@ -296,28 +297,29 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
             {
                 if (tenant.SchemaPassword.Length > 0)
                 {
-                    secrets.Add(Cipher.Decrypt(tenant.Id, TenantSecretFields.SchemaPassword, tenant.SchemaPassword).Reveal());
+                    secrets.Add(cipher.Decrypt(tenant.Id, TenantSecretFields.SchemaPassword, tenant.SchemaPassword).Reveal());
                 }
 
                 if (tenant.RuntimePassword.Length > 0)
                 {
-                    secrets.Add(Cipher.Decrypt(tenant.Id, TenantSecretFields.RuntimePassword, tenant.RuntimePassword).Reveal());
+                    secrets.Add(cipher.Decrypt(tenant.Id, TenantSecretFields.RuntimePassword, tenant.RuntimePassword).Reveal());
                 }
 
                 foreach (var encrypted in new[] { tenant.OidcClientKey, tenant.OidcPreviousClientKey })
                 {
                     if (encrypted is { Length: > 0 })
                     {
-                        // The PEM body without the BEGIN and END lines and the line breaks.
+                        // Each body line is a secret on its own, because a leaked key keeps its line breaks.
                         var pem = Cipher.Decrypt(tenant.Id, TenantSecretFields.OidcClientKey, encrypted).Reveal();
-                        secrets.Add(string.Concat(pem.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Where(line => !line.StartsWith("-----", StringComparison.Ordinal))));
+                        secrets.AddRange(PemBodyLines(pem));
+                        secrets.Add(string.Concat(PemBodyLines(pem)));
                     }
                 }
             }
 
             foreach (var binding in migrated ? await context.TenantBindings.AsNoTracking().Where(row => row.Kind == "secret" && row.SecretValue != null).ToListAsync(CancellationToken) : [])
             {
-                secrets.Add(Cipher.Decrypt(binding.TenantId, TenantSecretFields.Binding(binding.Name), binding.SecretValue!).Reveal());
+                secrets.Add(cipher.Decrypt(binding.TenantId, TenantSecretFields.Binding(binding.Name), binding.SecretValue!).Reveal());
             }
         }
 
@@ -334,6 +336,23 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
         {
             await PostgreSqlServer.DropDatabaseAsync($"axis_{id}");
         }
+    }
+
+    /// <summary>The lines of a PEM between its BEGIN and END lines, the base64 of the key.</summary>
+    public static string[] PemBodyLines(string pem) =>
+        [.. Lines(pem).Where(line => !line.StartsWith("-----", StringComparison.Ordinal))];
+
+    /// <summary>
+    /// Whether the text holds the key's PEM body: any body line, which a key written with line breaks or
+    /// JSON-escaped line breaks keeps, or the body with its line breaks removed.
+    /// </summary>
+    public static bool HoldsPemBody(string text, string pem)
+    {
+        var lines = PemBodyLines(pem);
+        var flat = text.Replace("\\r", string.Empty, StringComparison.Ordinal).Replace("\\n", string.Empty, StringComparison.Ordinal)
+            .Replace("\r", string.Empty, StringComparison.Ordinal).Replace("\n", string.Empty, StringComparison.Ordinal);
+        return lines.Any(line => text.Contains(line, StringComparison.Ordinal))
+            || flat.Contains(string.Concat(lines), StringComparison.Ordinal);
     }
 
     private PlatformDbContext NewContext() => new(new DbContextOptionsBuilder<PlatformDbContext>().UseNpgsql(Platform).Options);

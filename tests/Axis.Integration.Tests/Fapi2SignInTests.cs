@@ -239,8 +239,7 @@ public sealed partial class Fapi2SignInTests(KeycloakFixture keycloak, PostgreSq
 
         foreach (var key in new[] { oldKey, newKey })
         {
-            var body = string.Concat(key.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Where(line => !line.StartsWith("-----", StringComparison.Ordinal)));
-            Assert.DoesNotContain(logs.Entries, entry => entry.Contains(body, StringComparison.Ordinal));
+            Assert.DoesNotContain(logs.Entries, entry => AdminScenario.HoldsPemBody(entry, key));
         }
     }
 

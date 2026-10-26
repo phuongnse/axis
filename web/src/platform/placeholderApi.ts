@@ -167,6 +167,7 @@ export function placeholderApi(metadata: Pick<PageMetadata, 'widgets'>): ApiGuar
             ]),
           ),
           errors: {},
+          defaults: {},
         }
         exact.set(`POST ${formStatePath(entity.recordsPath, form.name)}`, () => state)
       }
