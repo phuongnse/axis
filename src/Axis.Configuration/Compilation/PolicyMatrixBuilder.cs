@@ -17,7 +17,7 @@ internal static class PolicyMatrixBuilder
 
     private static readonly string[] _entityActions = ["read", "create", "update", "delete"];
     private static readonly string[] _dataSourceActions = [ReadAction];
-    private static readonly string[] _processActions = ["start", "inspect", "cancel", "retry", "resolve"];
+    private static readonly string[] _processActions = ["start", "inspect", "cancel", "retry", "resolve", "reassign"];
     private static readonly string[] _endpointActions = ["invoke"];
 
     public static PolicyMatrix Build(

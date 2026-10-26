@@ -4,11 +4,21 @@ using NpgsqlTypes;
 namespace Axis.Data.Profiles;
 
 /// <summary>
-/// Writes <c>axis.user_profiles</c> of the tenant database. Other modules write a user profile only through this
-/// class, never through the table.
+/// Writes and reads <c>axis.user_profiles</c> of the tenant database. Other modules reach a user profile only through
+/// this class, never through the table.
 /// </summary>
 public static class UserProfiles
 {
+    private const string ExistsSql = """SELECT EXISTS (SELECT 1 FROM "axis"."user_profiles" WHERE "user_id" = @user)""";
+
+    private const string SearchSql =
+        """
+        SELECT "user_id", "display_name" FROM "axis"."user_profiles"
+        WHERE position(lower(@search) in lower("display_name")) > 0
+        ORDER BY "display_name", "user_id"
+        LIMIT @limit
+        """;
+
     private const string UpsertSql =
         """
         INSERT INTO "axis"."user_profiles"
@@ -46,4 +56,46 @@ public static class UserProfiles
         command.Parameters.Add(new NpgsqlParameter("locale", NpgsqlDbType.Text) { Value = locale is { } tag ? tag : DBNull.Value });
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
+
+    /// <summary>Whether the user has a profile, which is so once the user has signed in.</summary>
+    /// <param name="transaction">The transaction the read joins, or null.</param>
+    public static async Task<bool> ExistsAsync(
+        NpgsqlConnection connection, NpgsqlTransaction? transaction, string userId, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+        ArgumentException.ThrowIfNullOrWhiteSpace(userId);
+
+        await using var command = new NpgsqlCommand(ExistsSql, connection, transaction);
+        command.Parameters.AddWithValue("user", userId);
+        return (bool)(await command.ExecuteScalarAsync(cancellationToken))!;
+    }
+
+    /// <summary>
+    /// The profiles whose display name contains <paramref name="search"/>, ignoring letter case, sorted by display name and
+    /// then user id. An empty search matches every profile.
+    /// </summary>
+    /// <param name="limit">The most profiles to return.</param>
+    public static async Task<IReadOnlyList<UserProfileSummary>> SearchAsync(
+        NpgsqlConnection connection, string search, int limit, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+        ArgumentNullException.ThrowIfNull(search);
+
+        await using var command = new NpgsqlCommand(SearchSql, connection);
+        command.Parameters.AddWithValue("search", search);
+        command.Parameters.AddWithValue("limit", limit);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        var profiles = new List<UserProfileSummary>();
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            profiles.Add(new UserProfileSummary(reader.GetString(0), reader.GetString(1)));
+        }
+
+        return profiles;
+    }
 }
+
+/// <summary>What a user picker shows of a profile.</summary>
+/// <param name="Id">The user id, the subject of the ID token.</param>
+/// <param name="DisplayName">The name shown for the user.</param>
+public sealed record UserProfileSummary(string Id, string DisplayName);

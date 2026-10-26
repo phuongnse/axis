@@ -266,6 +266,7 @@ sessions.MapDeadLetterEndpoints();
 sessions.MapTaskEndpoints();
 sessions.MapDataSourceEndpoints();
 sessions.MapUserEndpoints();
+sessions.MapUserPickerEndpoints();
 sessions.MapStudioEndpoints();
 sessions.MapAuthEndpoints();
 

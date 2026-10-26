@@ -1,0 +1,10 @@
+{
+  "id": "6b2e1d3f-8c40-4f59-a072-3c4d5e6f7a02",
+  "kind": "entity",
+  "name": "Gauge",
+  "formatVersion": 1,
+  "fields": [
+    { "name": "label", "type": "text", "maxLength": 100 },
+    { "name": "ratio", "type": "decimal", "precision": 10, "scale": 2, "default": "1 / 0" }
+  ]
+}

@@ -129,6 +129,19 @@ public static class PolicyEvaluator
         return Grants(application, roles).Any(grant => grant.Process?.Id == process.Id && grant.Actions.Contains(PolicyAction.Resolve));
     }
 
+    /// <summary>Whether <paramref name="roles"/> grant <c>reassign</c> on <paramref name="process"/>.</summary>
+    public static bool AllowsReassign(ApplicationModel application, IEnumerable<string> roles, ProcessModel process)
+    {
+        ArgumentNullException.ThrowIfNull(process);
+        return Grants(application, roles).Any(grant => grant.Process?.Id == process.Id && grant.Actions.Contains(PolicyAction.Reassign));
+    }
+
+    /// <summary>Whether <paramref name="roles"/> grant <c>reassign</c> on some process of <paramref name="application"/>.</summary>
+    public static bool AllowsReassignAny(ApplicationModel application, IEnumerable<string> roles)
+    {
+        return Grants(application, roles).Any(grant => grant.Process is not null && grant.Actions.Contains(PolicyAction.Reassign));
+    }
+
     /// <summary>Whether <paramref name="roles"/> grant <c>invoke</c> on <paramref name="endpoint"/>.</summary>
     public static bool AllowsInvoke(ApplicationModel application, IEnumerable<string> roles, EndpointModel endpoint)
     {

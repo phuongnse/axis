@@ -202,7 +202,7 @@ public static class DeadLetterCommand
             return DeadLetterOutcome.NotRedeliverable;
         }
 
-        if (!active.Triggers.Any(trigger => trigger.Id == triggerId && trigger.DataSource is not null))
+        if (!active.Triggers.Any(trigger => trigger.Id == triggerId && trigger.Type == TriggerType.Schedule))
         {
             return DeadLetterOutcome.TriggerGone;
         }

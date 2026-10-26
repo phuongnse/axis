@@ -51,7 +51,7 @@ namespace Axis.Server.Processes;
 /// </summary>
 internal static class ProcessOperatorEndpoints
 {
-    private const string ReasonProperty = "reason";
+    internal const string ReasonProperty = "reason";
 
     private const string OutcomeProperty = "outcome";
 
@@ -168,7 +168,7 @@ internal static class ProcessOperatorEndpoints
 
         await transaction.CommitAsync(cancellationToken);
         return Results.Json(
-            new ProcessInstanceResponse(instanceId, model.Name, result.SubjectId!.Value, result.ReleaseId!.Value, ProcessStarts.Cancelled));
+            new ProcessInstanceResponse(instanceId, model.Name, result.SubjectId, result.ReleaseId!.Value, ProcessStarts.Cancelled));
     }
 
     private static async Task<IResult> RetryAsync(
@@ -301,7 +301,7 @@ internal static class ProcessOperatorEndpoints
 
         await transaction.CommitAsync(cancellationToken);
         return Results.Json(
-            new ProcessInstanceResponse(instanceId, model.Name, result.SubjectId!.Value, result.ReleaseId!.Value, ProcessStarts.Running));
+            new ProcessInstanceResponse(instanceId, model.Name, result.SubjectId, result.ReleaseId!.Value, ProcessStarts.Running));
     }
 
     private static async Task<IResult> ResolveAsync(
@@ -450,7 +450,7 @@ internal static class ProcessOperatorEndpoints
 
         await transaction.CommitAsync(cancellationToken);
         return Results.Json(
-            new ProcessInstanceResponse(instanceId, model.Name, result.SubjectId!.Value, result.ReleaseId!.Value, result.State!));
+            new ProcessInstanceResponse(instanceId, model.Name, result.SubjectId, result.ReleaseId!.Value, result.State!));
     }
 
     /// <summary>
@@ -556,7 +556,7 @@ internal static class ProcessOperatorEndpoints
         return output;
     }
 
-    private static string? ReadReasonText(Dictionary<string, JsonElement> properties, SortedDictionary<string, string[]> errors)
+    internal static string? ReadReasonText(Dictionary<string, JsonElement> properties, SortedDictionary<string, string[]> errors)
     {
         if (errors.ContainsKey("/" + ReasonProperty))
         {
@@ -584,7 +584,7 @@ internal static class ProcessOperatorEndpoints
     /// and reports an unknown or a repeated property. <paramref name="read"/> reads the properties that were
     /// accepted and adds its own errors. A body that is not a JSON object is one problem on the whole body.
     /// </summary>
-    private static (T? Value, SortedDictionary<string, string[]>? Errors) ReadObject<T>(
+    internal static (T? Value, SortedDictionary<string, string[]>? Errors) ReadObject<T>(
         byte[] utf8Body,
         string[] allowed,
         Func<Dictionary<string, JsonElement>, SortedDictionary<string, string[]>, T?> read)
