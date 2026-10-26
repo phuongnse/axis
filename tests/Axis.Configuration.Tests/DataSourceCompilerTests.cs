@@ -413,6 +413,7 @@ public sealed class DataSourceCompilerTests
     [Theory]
     // A filter type-checks with the child collections, but no aggregate is in the SQL subset.
     [InlineData("sum(lines, amount) > 0", ExpressionDiagnosticCodes.OutsideSqlSubset)]
+    [InlineData("avg(lines, amount) > 0", ExpressionDiagnosticCodes.OutsideSqlSubset)]
     [InlineData("number != 'x' and count(lines) > 0", ExpressionDiagnosticCodes.OutsideSqlSubset)]
     [InlineData("sum(lines, description) > 0", ExpressionDiagnosticCodes.TypeMismatch)]
     [InlineData("lines is null", ExpressionDiagnosticCodes.TypeMismatch)]

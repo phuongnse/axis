@@ -40,6 +40,7 @@ public static class ExpressionFunctions
     [
         new("count", 1, 2) { IsAggregate = true },
         new("sum", 2, 2) { IsAggregate = true },
+        new("avg", 2, 2) { IsAggregate = true },
         new("min", 2, 2) { IsAggregate = true },
         new("max", 2, 2) { IsAggregate = true },
         new("any", 2, 2) { IsAggregate = true },

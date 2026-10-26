@@ -492,11 +492,11 @@ them over child collections and `references` fields.
 | `count(list)` | integer | 0 |
 | `count(list, condition)` | integer | 0 |
 | `sum(list, item)` | type of `item` | 0 |
+| `avg(list, item)` | decimal | `null` |
 | `min(list, item)` | type of `item` | `null` |
 | `max(list, item)` | type of `item` | `null` |
 | `any(list, condition)` | boolean | false |
 | `all(list, condition)` | boolean | true |
-| `avg(list, item)` _(planned for M15)_ | decimal | `null` |
 
 - **Example.** `sum(lines, quantity * unitPrice)` adds up the line totals.
 - **Item types.** `sum` takes integer or decimal items. `min` and `max` take
@@ -511,10 +511,11 @@ them over child collections and `references` fields.
   is known. So a run-time error in any row is always reported. Put guards
   inside the item expression, where `and` and `or` short-circuit.
 - **Errors.** A `sum` past the integer range, or one that a .NET `decimal`
-  cannot hold exactly, is a [run-time error](#run-time-errors).
-- **`avg`** _(planned for M15)_. It takes integer or decimal items, skips
-  `null` items and is `null` when none is left. Its result is a decimal
-  rounded to 6 digits after the point.
+  cannot hold exactly, is a [run-time error](#run-time-errors). An `avg`
+  whose total a .NET `decimal` cannot hold exactly is one too.
+- **`avg`.** It takes integer or decimal items, skips `null` items and is
+  `null` when none is left. Its result is a decimal rounded to 6 digits
+  after the point.
 - **SQL.** No aggregate is in the SQL subset. From M15 `any` and `count` are,
   see [SQL subset](#sql-subset) _(planned for M15)_.
 

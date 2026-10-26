@@ -290,8 +290,8 @@ public static class ExpressionInterpreter
         /// Evaluates the item expression on every row of the collection, in order, on the same
         /// budget. The collection argument is read, not evaluated, so it costs no step. Every row
         /// is evaluated, even after <c>any</c> or <c>all</c> knows its result. <c>sum</c>,
-        /// <c>min</c> and <c>max</c> skip <c>null</c> items, and a <c>null</c> condition counts as
-        /// false.
+        /// <c>avg</c>, <c>min</c> and <c>max</c> skip <c>null</c> items, and a <c>null</c> condition
+        /// counts as false.
         /// </summary>
         private object? Aggregate(CallNode call, string name)
         {
@@ -317,7 +317,16 @@ public static class ExpressionInterpreter
                 case "all":
                     return items.All(value => Boolean(value) == true);
                 case "sum":
-                    return Widen(call, Sum(call, items));
+                    return Widen(call, Sum(call, name, items));
+                case "avg":
+                    object?[] numbers = [.. items.OfType<object>().Select(value => (object?)Number(value))];
+                    if (numbers.Length == 0)
+                    {
+                        return null;
+                    }
+
+                    var total = (decimal)Sum(call, name, numbers);
+                    return Math.Round(total / numbers.Length, 6, MidpointRounding.AwayFromZero);
                 case "min" or "max":
                     object? best = null;
                     foreach (var value in items)
@@ -348,7 +357,7 @@ public static class ExpressionInterpreter
         }
 
         /// <summary>The exact sum of the items that are not <c>null</c>, starting at the integer 0.</summary>
-        private static object Sum(CallNode call, object?[] items)
+        private static object Sum(CallNode call, string name, object?[] items)
         {
             object total = 0L;
             foreach (var value in items)
@@ -365,8 +374,8 @@ public static class ExpressionInterpreter
                 catch (OverflowException)
                 {
                     throw total is long && value is long
-                        ? Fail(ExpressionRuntimeErrorKind.IntegerOverflow, "The result of 'sum' is outside the integer range", call.Offset)
-                        : Fail(ExpressionRuntimeErrorKind.DecimalOverflow, "The result of 'sum' cannot be held exactly as a decimal", call.Offset);
+                        ? Fail(ExpressionRuntimeErrorKind.IntegerOverflow, $"The result of '{name}' is outside the integer range", call.Offset)
+                        : Fail(ExpressionRuntimeErrorKind.DecimalOverflow, $"The result of '{name}' cannot be held exactly as a decimal", call.Offset);
                 }
             }
 

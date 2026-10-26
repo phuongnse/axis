@@ -34,7 +34,7 @@ const functionNames = [
   'toDate',
 ]
 
-const aggregateNames = ['count', 'sum', 'min', 'max', 'any', 'all']
+const aggregateNames = ['count', 'sum', 'avg', 'min', 'max', 'any', 'all']
 
 const zeroArgumentFunctions = ['now', 'today', 'currentUser']
 
