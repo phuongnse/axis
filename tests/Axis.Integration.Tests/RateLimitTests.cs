@@ -194,6 +194,7 @@ public sealed class RateLimitTests(KeycloakFixture keycloak) : IAsyncLifetime
             builder.UseEnvironment("Testing");
             builder.UseTestPlatform(UnreachableDatabase);
             builder.WithoutPlatformMigration();
+            builder.UseInMemorySessions();
             UseTenant(builder, "a", HostA, authority, endpointAudience: "axis-endpoints");
             UseTenant(builder, "c", HostC, authority, endpointAudience: null);
             builder.ConfigureTestServices(services =>

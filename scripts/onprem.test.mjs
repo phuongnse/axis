@@ -706,10 +706,15 @@ RETURNING id;`,
         'x-forwarded-for': '203.0.113.9',
       })
 
-      // Every session cookie the callback sets is Secure.
-      const sessionCookies = done.setCookie.filter((line) => line.startsWith('Axis.Session'))
-      assert.ok(sessionCookies.length > 0, 'the callback set no Axis.Session cookie')
-      for (const line of sessionCookies) assert.match(line, /;\s*secure/i, `not Secure: ${line}`)
+      // The stack runs in Production, so every session cookie the callback sets is a __Host- cookie: Secure,
+      // Path=/ and no domain.
+      const sessionCookies = done.setCookie.filter((line) => line.startsWith('__Host-Axis.Session='))
+      assert.ok(sessionCookies.length > 0, 'the callback set no __Host-Axis.Session cookie')
+      for (const line of sessionCookies) {
+        assert.match(line, /;\s*secure/i, `not Secure: ${line}`)
+        assert.match(line, /;\s*path=\/(;|$)/i, `not Path=/: ${line}`)
+        assert.doesNotMatch(line, /;\s*domain=/i, `has a domain: ${line}`)
+      }
       const me = await viaProxy('/api/me', proxyJar)
       assert.equal(me.status, 200, `GET /api/me through the proxy: ${me.body}`)
 

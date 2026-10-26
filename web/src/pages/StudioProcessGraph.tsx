@@ -1,10 +1,10 @@
 import dagre from '@dagrejs/dagre'
 import { type Edge, Handle, MarkerType, type Node, type NodeProps, Position, ReactFlow } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { useMemo } from 'react'
+import { type KeyboardEvent, useMemo } from 'react'
 import { useText } from '../platform/texts'
 import { useDesignTokens, useThemeMode } from '../platform/themeMode'
-import { buildProcessGraph, type ProcessGraph } from './processGraph'
+import { type ProcessGraph, type ProcessGraphTransition, transitionName } from './processGraph'
 
 const nodeWidth = 200
 const nodeHeight = 48
@@ -75,27 +75,36 @@ function StepNodeView({ data }: NodeProps<StepNode>) {
 
 const nodeTypes = { step: StepNodeView }
 
+const edgeTestIdPrefix = 'rf__edge-'
+
 /**
  * The graph of the draft's steps and transitions, laid out again after every edit. A node selects its step, and an
- * edge selects the step it leaves. The selected step is the node marked current. A step that a diagnostic path names has an error-coloured border and "has diagnostics" in its label.
+ * edge selects itself and the step it leaves. The selected step is the node marked current, and the selected edge is
+ * drawn in the primary colour. A step that a diagnostic path names has an error-coloured border and "has diagnostics"
+ * in its label. Tab reaches the edges, which come before the nodes, and each edge is named by its two steps and its
+ * branch or outcome. Enter or Space on an edge selects it. Delete or Backspace in the canvas calls `onRemove`.
  */
 export default function StudioProcessGraph({
-  draft,
+  graph,
   selected,
-  diagnosticPaths,
+  selectedEdge,
   onSelect,
+  onSelectEdge,
+  onRemove,
 }: {
-  draft: Record<string, unknown>
+  graph: ProcessGraph
   selected: number | null
-  diagnosticPaths: readonly string[]
+  selectedEdge: string | null
   onSelect: (index: number) => void
+  onSelectEdge: (transition: ProcessGraphTransition) => void
+  onRemove: () => void
 }) {
   const t = useText()
   const { mode } = useThemeMode()
   const { colour } = useDesignTokens()
+  const to = t('shell.studio.processGraph.to')
 
   const { nodes, edges } = useMemo(() => {
-    const graph = buildProcessGraph(draft, diagnosticPaths)
     const place = placeSteps(graph)
     return {
       nodes: graph.steps.map((step): StepNode => ({
@@ -117,21 +126,52 @@ export default function StudioProcessGraph({
           marked: step.marked,
         },
       })),
-      edges: graph.transitions.map((transition): Edge => ({
-        id: transition.path,
-        source: String(transition.source),
-        target: String(transition.target),
-        label: transition.label ?? transition.kind,
-        style: { stroke: colour.textMuted },
-        markerEnd: { type: MarkerType.ArrowClosed, color: colour.textMuted },
-        labelStyle: { fill: colour.text },
-        labelBgStyle: { fill: colour.surface },
-      })),
+      edges: graph.transitions.map((transition): Edge => {
+        const current = transition.path === selectedEdge
+        const stroke = current ? colour.primary : colour.textMuted
+        return {
+          id: transition.path,
+          source: String(transition.source),
+          target: String(transition.target),
+          label: transition.label ?? transition.kind,
+          ariaLabel: transitionName(graph, transition, to),
+          ariaRole: 'button',
+          domAttributes: current ? { 'aria-current': 'true' } : undefined,
+          style: { stroke, strokeWidth: current ? 2 : undefined },
+          markerEnd: { type: MarkerType.ArrowClosed, color: stroke },
+          labelStyle: { fill: colour.text },
+          labelBgStyle: { fill: colour.surface },
+        }
+      }),
     }
-  }, [draft, diagnosticPaths, selected, colour])
+  }, [graph, selected, selectedEdge, colour, to])
+
+  const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
+    if (event.key === 'Delete' || event.key === 'Backspace') {
+      event.preventDefault()
+      onRemove()
+      return
+    }
+    if (event.key !== 'Enter' && event.key !== ' ') {
+      return
+    }
+    const element =
+      event.target instanceof Element ? event.target.closest(`[data-testid^="${edgeTestIdPrefix}"]`) : null
+    const path = element?.getAttribute('data-testid')?.slice(edgeTestIdPrefix.length)
+    const transition = graph.transitions.find((candidate) => candidate.path === path)
+    if (transition) {
+      event.preventDefault()
+      onSelectEdge(transition)
+    }
+  }
 
   return (
-    <section data-testid="studio-process-graph" aria-label={t('shell.studio.processGraph')} style={{ height: 480 }}>
+    <section
+      data-testid="studio-process-graph"
+      aria-label={t('shell.studio.processGraph')}
+      style={{ height: 480 }}
+      onKeyDown={onKeyDown}
+    >
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -142,10 +182,16 @@ export default function StudioProcessGraph({
         nodesConnectable={false}
         nodesFocusable={false}
         elementsSelectable={false}
-        edgesFocusable={false}
+        edgesFocusable
+        deleteKeyCode={null}
         zoomOnScroll={false}
         onNodeClick={(_, node) => onSelect(Number(node.id))}
-        onEdgeClick={(_, edge) => onSelect(Number(edge.source))}
+        onEdgeClick={(_, edge) => {
+          const transition = graph.transitions.find((candidate) => candidate.path === edge.id)
+          if (transition) {
+            onSelectEdge(transition)
+          }
+        }}
       />
     </section>
   )

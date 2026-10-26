@@ -326,8 +326,8 @@ reported in one pass. See
   or a package operation written `<package>/<operation>`, matched exactly as
   a step `type` is (`AXC0078` at `/steps/{i}/operation`).
 - A `notify` step's checks are listed under
-  [Notify operation](notifications.md#notify-operation) (`AXC0257` to
-  `AXC0264`). The step compiles, but a published process that reaches it
+  [Notify operation](notifications.md#notify-operation) (`AXC0266` to
+  `AXC0273`). The step compiles, but a published process that reaches it
   fails until the runtime part of D73 is built.
 - Each key of an `updateRecord` `set` names a field of the subject entity,
   ignoring letter case, that no earlier key of the step names (`AXC0079`).
