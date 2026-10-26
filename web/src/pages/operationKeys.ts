@@ -1,6 +1,6 @@
 type Content = Record<string, unknown>
 
-export const builtInOperations = ['updateRecord', 'callConnector', 'raiseEvent']
+export const builtInOperations = ['updateRecord', 'callConnector', 'raiseEvent', 'notify']
 
 export const packageChoice = 'package'
 
@@ -11,6 +11,7 @@ export const forbiddenByOperation: Record<string, string[]> = {
   updateRecord: ['connector', 'input', 'output', 'retry', 'event', 'fields'],
   callConnector: ['set', 'event', 'fields'],
   raiseEvent: ['set', 'connector', 'input', 'output', 'retry'],
+  notify: ['set', 'connector', 'input', 'output', 'retry', 'event', 'fields'],
   [packageChoice]: ['set', 'connector', 'event', 'fields'],
 }
 
