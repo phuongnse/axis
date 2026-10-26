@@ -3,8 +3,8 @@ using System.Diagnostics.CodeAnalysis;
 namespace Axis.Expressions.Typing;
 
 /// <summary>
-/// A child collection an aggregate can name: the collection field, the child entity's name and the
-/// scope of the aggregate's item expression, which holds the child row's fields.
+/// A child collection or references field an aggregate can name: the field, the child or target
+/// entity's name and the scope of the aggregate's item expression, which holds that entity's fields.
 /// </summary>
 [SuppressMessage("Naming", "CA1711:Identifiers should not have incorrect suffix", Justification = "A child collection is the concept's name.")]
 public sealed record ExpressionCollection(string Name, string Entity, ExpressionScope Items);

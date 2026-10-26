@@ -273,7 +273,8 @@ public static partial class RecordInputParser
 
             // Field names are matched exactly; EntityModel.TryGetField ignores letter case.
             var field = entity.Fields.FirstOrDefault(candidate => string.Equals(candidate.Name, name, StringComparison.Ordinal));
-            if (field is null || (field.Type == FieldType.ChildCollection && rows is null))
+            // A references field has no storage yet, so a body cannot set it.
+            if (field is null || field.Type == FieldType.References || (field.Type == FieldType.ChildCollection && rows is null))
             {
                 AddError(errors, propertyPointer, Messages.UnknownProperty);
                 continue;
