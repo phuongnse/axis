@@ -24,6 +24,7 @@ public sealed class FieldRangeCompilerTests
         [FieldType.Reference] = (false, false),
         [FieldType.References] = (false, false),
         [FieldType.ChildCollection] = (false, false),
+        [FieldType.File] = (false, false),
     };
 
     // The field of each type with the properties it needs, without a limit.
@@ -40,6 +41,7 @@ public sealed class FieldRangeCompilerTests
         [FieldType.Reference] = "\"type\": \"reference\", \"target\": \"Tag\"",
         [FieldType.References] = "\"type\": \"references\", \"target\": \"Tag\"",
         [FieldType.ChildCollection] = "\"type\": \"child-collection\", \"target\": \"Line\"",
+        [FieldType.File] = "\"type\": \"file\"",
     };
 
     public static TheoryData<FieldType> Types => new(Enum.GetValues<FieldType>());

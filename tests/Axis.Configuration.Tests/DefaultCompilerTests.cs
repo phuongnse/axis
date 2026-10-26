@@ -120,6 +120,7 @@ public sealed class DefaultCompilerTests
             FieldType.Reference => ("""{ "name": "extra", "type": "reference", "target": "Customer", "default": "null" }""", false),
             FieldType.References => ("""{ "name": "extra", "type": "references", "target": "Customer", "default": "null" }""", false),
             FieldType.ChildCollection => ("""{ "name": "extra", "type": "child-collection", "target": "Note", "default": "null" }""", false),
+            FieldType.File => ("""{ "name": "extra", "type": "file", "default": "null" }""", false),
             _ => throw new ArgumentOutOfRangeException(nameof(type), type, "Add this field type to the test."),
         };
         Assert.Contains($"\"{FieldTypes.Name(type)}\"", field, StringComparison.Ordinal);

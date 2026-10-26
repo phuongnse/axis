@@ -15,4 +15,5 @@ public enum ExpressionTypeKind
     DateTime,
     Enum,
     Reference,
+    File,
 }

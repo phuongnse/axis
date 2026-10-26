@@ -8,9 +8,9 @@ namespace Axis.Configuration.Model;
 /// <see cref="Max"/> for integer, decimal, date and date-time, <see cref="Precision"/> and <see cref="Scale"/> for decimal and
 /// money, <see cref="Currency"/> and <see cref="CurrencyField"/> for money, <see cref="Values"/> for enum,
 /// <see cref="Target"/> for reference, references and child collection,
-/// <see cref="TargetDisplayField"/> for reference and references, and <see cref="Sequence"/> and
-/// <see cref="Creator"/> for text, and <see cref="Default"/> for text, integer, decimal, money, boolean,
-/// date, date-time and enum.
+/// <see cref="TargetDisplayField"/> for reference and references, <see cref="MaxSize"/> and <see cref="Accept"/> for file,
+/// and <see cref="Sequence"/> and <see cref="Creator"/> for text, and <see cref="Default"/> for text,
+/// integer, decimal, money, boolean, date, date-time and enum.
 /// </summary>
 public sealed record FieldModel
 {
@@ -40,6 +40,12 @@ public sealed record FieldModel
     public int? Precision { get; init; }
 
     public int? Scale { get; init; }
+
+    /// <summary>The largest size in bytes of a file field's file, or null when the host limit applies.</summary>
+    public long? MaxSize { get; init; }
+
+    /// <summary>The media types a file field accepts, or null for any.</summary>
+    public IReadOnlyList<string>? Accept { get; init; }
 
     /// <summary>The ISO 4217 code of the fixed currency, set only for money fields that declare one.</summary>
     public string? Currency { get; init; }

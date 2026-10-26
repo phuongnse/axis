@@ -57,7 +57,7 @@
       "properties": {
         "name": { "$ref": "#/$defs/name" },
         "type": {
-          "enum": ["text", "integer", "decimal", "boolean", "date", "date-time", "enum", "reference", "references", "child-collection", "money"]
+          "enum": ["text", "integer", "decimal", "boolean", "date", "date-time", "enum", "reference", "references", "child-collection", "money", "file"]
         },
         "label": { "$ref": "#/$defs/textReference" },
         "required": { "type": "boolean" },
@@ -68,6 +68,13 @@
         "max": { "type": ["number", "string"] },
         "precision": { "type": "integer", "minimum": 0, "maximum": 2147483647 },
         "scale": { "type": "integer", "minimum": 0, "maximum": 2147483647 },
+        "maxSize": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+        "accept": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "type": "string" }
+        },
         "target": { "type": "string", "x-axis-reference": "entity" },
         "currency": { "type": "string" },
         "currencyField": { "type": "string" },

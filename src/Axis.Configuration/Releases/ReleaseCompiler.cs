@@ -48,13 +48,26 @@ public static class ReleaseCompiler
         ConfigurationDbContext context,
         IReadOnlyCollection<PackageVersion> installedPackages,
         IReadOnlyCollection<InstalledModule> installedModules,
+        CancellationToken cancellationToken = default) =>
+        await CompileAsync(folderPath, context, installedPackages, installedModules, ApplicationCompiler.DefaultMaxFileSize, cancellationToken);
+
+    /// <summary>
+    /// Compiles the folder as the overload with modules does. A <c>file</c> field's <c>maxSize</c> may be at most
+    /// <paramref name="maxFileSize"/> bytes.
+    /// </summary>
+    public static async Task<ReleaseCompilationResult> CompileAsync(
+        string folderPath,
+        ConfigurationDbContext context,
+        IReadOnlyCollection<PackageVersion> installedPackages,
+        IReadOnlyCollection<InstalledModule> installedModules,
+        long maxFileSize,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(context);
         ArgumentNullException.ThrowIfNull(installedPackages);
         ArgumentNullException.ThrowIfNull(installedModules);
 
-        return await StoreAsync(ApplicationCompiler.Compile(folderPath, installedPackages, installedModules), context, cancellationToken);
+        return await StoreAsync(ApplicationCompiler.Compile(folderPath, installedPackages, installedModules, maxFileSize), context, cancellationToken);
     }
 
     /// <summary>
@@ -68,6 +81,20 @@ public static class ReleaseCompiler
         ConfigurationDbContext context,
         IReadOnlyCollection<PackageVersion> installedPackages,
         IReadOnlyCollection<InstalledModule> installedModules,
+        CancellationToken cancellationToken = default) =>
+        await CompileAsync(files, context, installedPackages, installedModules, ApplicationCompiler.DefaultMaxFileSize, cancellationToken);
+
+    /// <summary>
+    /// Compiles the files as the overload for files does. A <c>file</c> field's <c>maxSize</c> may be at most
+    /// <paramref name="maxFileSize"/> bytes.
+    /// </summary>
+    /// <exception cref="ArgumentException">A path appears more than once.</exception>
+    public static async Task<ReleaseCompilationResult> CompileAsync(
+        IReadOnlyList<ResourceContent> files,
+        ConfigurationDbContext context,
+        IReadOnlyCollection<PackageVersion> installedPackages,
+        IReadOnlyCollection<InstalledModule> installedModules,
+        long maxFileSize,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(files);
@@ -75,7 +102,7 @@ public static class ReleaseCompiler
         ArgumentNullException.ThrowIfNull(installedPackages);
         ArgumentNullException.ThrowIfNull(installedModules);
 
-        return await StoreAsync(ApplicationCompiler.CompileFiles(files, installedPackages, installedModules), context, cancellationToken);
+        return await StoreAsync(ApplicationCompiler.CompileFiles(files, installedPackages, installedModules, maxFileSize), context, cancellationToken);
     }
 
     private static async Task<ReleaseCompilationResult> StoreAsync(
@@ -145,7 +172,8 @@ public static class ReleaseCompiler
     /// its stored resources, so the model is rebuilt from those copies alone, never from the
     /// modules installed now. A release is stored
     /// only when it compiles clean, so any diagnostic, another content hash or another application
-    /// id means the stored rows are wrong.
+    /// id means the stored rows are wrong. It applies no file size limit, so raising or lowering the
+    /// limit never breaks a stored release.
     /// </summary>
     /// <exception cref="InvalidOperationException">The stored release does not compile back into the same application.</exception>
     public static ApplicationModel BuildModel(Release release, IReadOnlyCollection<PackageVersion>? installedPackages = null)
@@ -157,7 +185,8 @@ public static class ReleaseCompiler
             release.Packages
                 .Select(package => installedPackages?.FirstOrDefault(installed => installed.Id == package.PackageId && installed.Version == package.Version)
                     ?? new PackageVersion(package.PackageId, package.Version))
-                .ToList());
+                .ToList(),
+            maxFileSize: long.MaxValue);
         if (compiled.Diagnostics.Count > 0 || compiled.Model is null)
         {
             var code = compiled.Diagnostics.Count > 0 ? compiled.Diagnostics[0].Code : "none";

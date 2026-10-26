@@ -259,7 +259,8 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
                 t.Id, t.Status, t.Version, t.DatabaseHost, t.DatabasePort, t.DatabaseName, t.RuntimeUser, t.SchemaUser,
                 Convert.ToHexString(t.RuntimePassword), Convert.ToHexString(t.SchemaPassword), t.OidcAuthority, t.OidcClientId,
                 Convert.ToHexString(t.OidcClientSecret), t.OidcProfile, t.ClaimUserId, t.ClaimDisplayName, t.ClaimRoles, t.ClaimEmail, t.ClaimLocale,
-                t.EndpointAudience, t.ServiceAudience, t.OidcClientKeyId, t.OidcPreviousClientKeyId, t.SchemaVersion, t.PreviewOf))
+                t.EndpointAudience, t.ServiceAudience, t.OidcClientKeyId, Convert.ToHexString(t.OidcClientKey ?? []), t.OidcPreviousClientKeyId,
+                Convert.ToHexString(t.OidcPreviousClientKey ?? []), t.SchemaVersion, t.PreviewOf))
             .Concat(hosts.Select(host => $"{host.TenantId}|{host.Host}"))
             .Concat(bindings.Select(binding => $"{binding.TenantId}|{binding.Name}|{binding.Kind}|{binding.Url}")));
     }
@@ -303,6 +304,17 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
                 {
                     secrets.Add(cipher.Decrypt(tenant.Id, TenantSecretFields.RuntimePassword, tenant.RuntimePassword).Reveal());
                 }
+
+                foreach (var encrypted in new[] { tenant.OidcClientKey, tenant.OidcPreviousClientKey })
+                {
+                    if (encrypted is { Length: > 0 })
+                    {
+                        // Each body line is a secret on its own, because a leaked key keeps its line breaks.
+                        var pem = cipher.Decrypt(tenant.Id, TenantSecretFields.OidcClientKey, encrypted).Reveal();
+                        secrets.AddRange(PemBodyLines(pem));
+                        secrets.Add(string.Concat(PemBodyLines(pem)));
+                    }
+                }
             }
 
             foreach (var binding in migrated ? await context.TenantBindings.AsNoTracking().Where(row => row.Kind == "secret" && row.SecretValue != null).ToListAsync(CancellationToken) : [])
@@ -324,6 +336,23 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
         {
             await PostgreSqlServer.DropDatabaseAsync($"axis_{id}");
         }
+    }
+
+    /// <summary>The lines of a PEM between its BEGIN and END lines, the base64 of the key.</summary>
+    public static string[] PemBodyLines(string pem) =>
+        [.. Lines(pem).Where(line => !line.StartsWith("-----", StringComparison.Ordinal))];
+
+    /// <summary>
+    /// Whether the text holds the key's PEM body: any body line, which a key written with line breaks or
+    /// JSON-escaped line breaks keeps, or the body with its line breaks removed.
+    /// </summary>
+    public static bool HoldsPemBody(string text, string pem)
+    {
+        var lines = PemBodyLines(pem);
+        var flat = text.Replace("\\r", string.Empty, StringComparison.Ordinal).Replace("\\n", string.Empty, StringComparison.Ordinal)
+            .Replace("\r", string.Empty, StringComparison.Ordinal).Replace("\n", string.Empty, StringComparison.Ordinal);
+        return lines.Any(line => text.Contains(line, StringComparison.Ordinal))
+            || flat.Contains(string.Concat(lines), StringComparison.Ordinal);
     }
 
     private PlatformDbContext NewContext() => new(new DbContextOptionsBuilder<PlatformDbContext>().UseNpgsql(Platform).Options);

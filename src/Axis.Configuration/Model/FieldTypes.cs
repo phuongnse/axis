@@ -15,6 +15,7 @@ public static class FieldTypes
         ["reference"] = FieldType.Reference,
         ["references"] = FieldType.References,
         ["child-collection"] = FieldType.ChildCollection,
+        ["file"] = FieldType.File,
         ["money"] = FieldType.Money,
     };
 

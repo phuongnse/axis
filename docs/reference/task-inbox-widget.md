@@ -108,8 +108,8 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
     it then.
   - The task page has no history panel.
   - The platform texts `shell.task.*` hold the assigned elsewhere, already
-    completed and expired messages, the Claim and Release labels, the refused
-    and failed messages of those two actions, and the load and complete
-    errors.
-- **Reassign** _(planned for M14)_. The task page shows Reassign, see
+    completed and expired messages, the Claim, Release and Reassign labels, the
+    refused and failed messages of those actions, the texts of the Reassign
+    dialog, and the load and complete errors.
+- **Reassign.** The task page shows Reassign, see
   [Inbox and task page](task-deadlines.md#inbox-and-task-page).
