@@ -147,6 +147,8 @@ internal static class ModelAssert
                 $"{package.Name} package {package.Package} {package.Version} {package.Operation} [{string.Join(", ", package.Input.Select(input => $"{input.Input} = {input.Value.Expression}"))}] [{string.Join(", ", package.Output.Select(output => $"{output.Output} → {output.Field}"))}] retry {package.Retry.Attempts} {package.Retry.Backoff} idempotent {package.Idempotent} timeout {package.Timeout} next {package.Next}",
             RaiseEventStepModel raise =>
                 $"{raise.Name} raiseEvent {raise.Event} [{string.Join(", ", raise.Fields.Select(field => $"{field.Field} = {field.Value.Expression}"))}] next {raise.Next}",
+            NotifyStepModel notify =>
+                $"{notify.Name} notify [{string.Join(", ", notify.Recipients.Select(recipient => $"user {recipient.User?.Expression} role {recipient.Role} email {recipient.Email?.Expression}"))}] [{string.Join(", ", notify.Channels)}] subject {notify.Subject.TextKey} body {notify.Body.TextKey} [{string.Join(", ", notify.Values.Select(value => $"{value.Name} = {value.Value.Expression}"))}] open {(notify.Open is null ? "none" : $"{notify.Open.Page.Id} {notify.Open.Page.Name} [{string.Join(", ", notify.Open.Parameters.Select(parameter => $"{parameter.Parameter} = {parameter.Value.Expression}"))}]")} next {notify.Next}",
             _ => $"{step.Name} {step.GetType().Name}",
         };
 }

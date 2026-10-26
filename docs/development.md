@@ -127,7 +127,7 @@ for every user. The [development users table](reference/security.md#development-
 user and the roles they hold. The `operator` role opens the purchase request sample's Approvals
 inspector page. The leave request sample, `samples/apps/leave-requests`, reuses the `employee` and
 `department-manager` users, in a site at `/leave`. The service desk sample, `samples/apps/service-desk`,
-adds the `agent` and `service-desk-lead` users and gives an employee the `requester` role, in a site
+adds the `agent` user and two `service-desk-lead` users and gives an employee the `requester` role, in a site
 at `/service-desk`. The request-approval template journey, `tests/e2e/specs/request-approval-journey.spec.ts`,
 adds the `approver` user, `minh`. The `author` role lets the authoring API list and read the resources of every sample under
 `samples/apps/` under `scripts/dev.sh`, and opens the Studio page at http://localhost:5173/studio.

@@ -227,9 +227,10 @@ a payment reference from the sample extension package, see
 M3 has four step types. Wait for event and timer come later. The engine runs
 a `subProcess` step, see [Sub-process step](process-flow.md#sub-process-step).
 Its failure handling and cancel rules are _(planned for M14)_, as are `timer`
-and `waitEvent` steps, and the `createRecord` and `notify` operations, see
-[process flow](process-flow.md) and
-[notifications](notifications.md#notify-operation).
+and `waitEvent` steps, the `createRecord` operation, and running the `notify`
+operation, see [process flow](process-flow.md) and
+[notifications](notifications.md#notify-operation). The compiler already
+checks and builds a `notify` step.
 
 - **`decision`.** `branches` is an ordered list. Each branch has a `when`
   expression and a `next` step. The branches are evaluated in order, and the
@@ -321,9 +322,13 @@ reported in one pass. See
   paths through reference fields such as `department.manager.name`. A path takes at most 3 hops
   (`AXC0058`), and a `.` after a field that is not a reference is `AXC0047`.
   See [Scope in a process expression](expressions.md#names-and-references).
-- An operation names `updateRecord`, `callConnector`, `raiseEvent` or a
-  package operation written `<package>/<operation>`, matched exactly as a
-  step `type` is (`AXC0078` at `/steps/{i}/operation`).
+- An operation names `updateRecord`, `callConnector`, `raiseEvent`, `notify`
+  or a package operation written `<package>/<operation>`, matched exactly as
+  a step `type` is (`AXC0078` at `/steps/{i}/operation`).
+- A `notify` step's checks are listed under
+  [Notify operation](notifications.md#notify-operation) (`AXC0266` to
+  `AXC0273`). The step compiles, but a published process that reaches it
+  fails until the runtime part of D73 is built.
 - Each key of an `updateRecord` `set` names a field of the subject entity,
   ignoring letter case, that no earlier key of the step names (`AXC0079`).
   The field is not computed, not numbered by a sequence and not a child
@@ -342,9 +347,12 @@ reported in one pass. See
   `connector`, `input`, `output`, `retry`, `event` or `fields`. A
   `callConnector` step has `connector` and `input`, and no `set`, `event` or
   `fields`. A `raiseEvent` step has `event` and `fields`, and no `set`,
-  `connector`, `input`, `output` or `retry`. A decision has no `operation`,
-  `set`, `connector`, `input`, `output`, `retry`, `event`, `fields` or
-  `next`. Neither an operation nor a decision has a task's `label`,
+  `connector`, `input`, `output` or `retry`. A `notify` step has `to`,
+  `channels` and `message`, and no `set`, `connector`, `input`, `output`,
+  `retry`, `event` or `fields`. A decision has no `operation`,
+  `set`, `connector`, `input`, `output`, `retry`, `event`, `fields`, `to`,
+  `channels`, `message`, `open` or `next`. `to`, `channels`, `message` and
+  `open` are on a `notify` step only. Neither an operation nor a decision has a task's `label`,
   `assignee`, `form`, `dueIn` or `outcomes` (`AXC0004`).
 - A task has `label`, `assignee`, `form` and at least one outcome, and no
   `branches`, `otherwise`, `operation`, `set`, `connector`, `input`,
