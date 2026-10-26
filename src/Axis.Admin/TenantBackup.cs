@@ -385,7 +385,7 @@ internal sealed class TenantBackup : IAsyncDisposable
             row.ServiceAudience,
             [.. _plan.Bindings
                 .OrderBy(binding => binding.Name, StringComparer.Ordinal)
-                .Select(binding => new ManifestBinding(binding.Name, binding.Kind, binding.Kind == "url" ? binding.Url : null))]);
+                .Select(binding => new ManifestBinding(binding.Name, binding.Kind, binding.Kind == "secret" ? null : binding.Url))]);
 
         return new BackupManifest(
             Format: 1,
@@ -472,7 +472,7 @@ internal sealed record ManifestDirectory(
     string? ServiceAudience,
     IReadOnlyList<ManifestBinding> Bindings);
 
-/// <summary>A binding in the manifest. <c>Url</c> is set only for a <c>url</c> binding.</summary>
+/// <summary>A binding in the manifest. <c>Url</c> holds the value of a <c>url</c> or <c>storage</c> binding and is unset for a <c>secret</c> binding.</summary>
 internal sealed record ManifestBinding(string Name, string Kind, [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Url);
 
 internal sealed record ManifestPackage(string Id, string Version, bool Required);

@@ -278,6 +278,39 @@ public sealed class AdminTenantRestoreTests(AdminBackupFixture fixture) : IClass
     }
 
     [Fact]
+    public async Task A_storage_binding_is_restored_with_its_value_and_an_archive_whose_storage_binding_is_not_database_is_refused()
+    {
+        using var folder = new TemporaryFolder();
+        var file = Path.Combine(folder.Path, "backup.tar");
+        Assert.Equal(0, (await fixture.BackupAsync(file)).Exit);
+        var scenario = fixture.Scenario;
+        var storage = Rewrite(file, folder.Path, "storage", manifest => AddStorageBinding(manifest, "database"));
+        var other = Rewrite(file, folder.Path, "storage-other", manifest => AddStorageBinding(manifest, "s3"));
+        var empty = Rewrite(file, folder.Path, "storage-empty", manifest => AddStorageBinding(manifest, null));
+
+        foreach (var refused in new[] { other, empty })
+        {
+            var refusedId = scenario.NewTenantId();
+            var entries = await scenario.CountEntriesAsync();
+
+            var check = await scenario.RunAsync(RestoreArgs(refused, refusedId, $"{refusedId}.example.test"), path: fixture.Tools.PathSetting);
+
+            Assert.Equal(2, check.Exit);
+            Assert.Equal([$"{refusedId} check failed: the archive cannot be read"], check.Output.Select(line => line.TrimEnd('.')));
+            await AssertNothingCreatedAsync(refusedId, entries);
+        }
+
+        var id = scenario.NewTenantId();
+        var result = await RestoreAsync(storage, id, $"{id}.example.test");
+
+        Assert.Equal(0, result.Exit);
+        await using var context = new PlatformDbContext(new DbContextOptionsBuilder<PlatformDbContext>().UseNpgsql(scenario.Platform).Options);
+        var files = await context.TenantBindings.AsNoTracking().SingleAsync(binding => binding.TenantId == id && binding.Name == "Files", CancellationToken);
+        Assert.Equal((DeploymentBindingKinds.Storage, "database"), (files.Kind, files.Url));
+        Assert.Null(files.SecretValue);
+    }
+
+    [Fact]
     public async Task A_preview_tenants_archive_is_refused_with_the_preview_message_and_creates_nothing()
     {
         var scenario = fixture.Scenario;
@@ -525,6 +558,20 @@ public sealed class AdminTenantRestoreTests(AdminBackupFixture fixture) : IClass
         await using var connection = new NpgsqlConnection(connectionString);
         await connection.OpenAsync(CancellationToken);
         return (await TenantSchemaVersion.ReadAsync(connection, CancellationToken), connectionString);
+    }
+
+    // Adds a storage binding to the directory of the manifest, keeping the bindings in ordinal name order.
+    private static void AddStorageBinding(JsonObject manifest, string? value)
+    {
+        var bindings = (JsonArray)((JsonObject)manifest["directory"]!)["bindings"]!;
+        var binding = new JsonObject { ["name"] = "Files", ["kind"] = "storage" };
+        if (value is not null)
+        {
+            binding["url"] = value;
+        }
+
+        var position = bindings.Count(existing => string.CompareOrdinal((string)existing!["name"]!, "Files") < 0);
+        bindings.Insert(position, binding);
     }
 
     // Copies the archive and edits its manifest. The dump stays as it was.

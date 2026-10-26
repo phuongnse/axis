@@ -97,7 +97,7 @@ internal sealed partial class TriggerFanOutHandler(ReleaseModelCache models, Del
                         .ToList();
 
                     // The filter or a group field on a field that is being recomputed would select records by a stale stored value.
-                    var pending = await DataSourcePendingFields.ReadAsync(connection, transaction, stored, dataSource, sort: null, cancellationToken);
+                    var pending = await DataSourcePendingFields.ReadAsync(connection, transaction, stored, dataSource, sort: null, search: false, cancellationToken);
                     if (pending.Count > 0)
                     {
                         LogPending(trigger.Name, occurrence);

@@ -27,10 +27,12 @@ namespace Axis.Server.DataSources;
 /// decides. The rows, the count and the measures cover only the root records that match one of
 /// the user's read filters on the root entity, as well as the data source's filter. The paging
 /// and sorting rules are those of the record list, except that the default page size and sort are
-/// the data source's own. A request is a 409 when a read filter of the user reads a computed field that
+/// the data source's own. A data source with <c>search</c> takes the record list's <c>search</c> and keeps
+/// only the root records where a search field contains it. Without that option a given
+/// <c>search</c> is a 400. A request is a 409 when a read filter of the user reads a computed field that
 /// is being recomputed, with the policy title and no <c>errors</c>. After the query is valid, it is a 409
-/// with <c>errors</c> keyed <c>sort</c>, <c>filter</c> or <c>aggregate</c> when the sort, the filter, a
-/// group field or a measure reads such a field. A projected field shows its stored value. The data
+/// with <c>errors</c> keyed <c>sort</c>, <c>filter</c>, <c>aggregate</c> or <c>search</c> when the sort, the filter, a
+/// group field, a measure or a searched field is such a field. A projected field shows its stored value. The data
 /// source parameters are read by <see cref="DataSourceParameterReader"/>. A database error while evaluating the filter or the
 /// read filters is a 400 problem with a fixed title, and each read filter is logged by its policy
 /// and grant. The problem titles never contain text from the request, SQL or storage names.
@@ -72,6 +74,7 @@ internal static class DataSourceEndpoints
         string? page,
         string? pageSize,
         string? sort,
+        string? search,
         ActiveApplicationResolver resolver,
         TenantDatabase database,
         ILoggerFactory loggerFactory,
@@ -127,6 +130,21 @@ internal static class DataSourceEndpoints
             errors["sort"] = ["Must be a projected field name that is not a reference, or a group field or measure name when the data source is grouped, optionally preceded by '-'."];
         }
 
+        // Without the option, only a given search is refused, and an empty one is no search.
+        var searching = !string.IsNullOrEmpty(search);
+        if (SearchQuery.IsRepeated(context.Request))
+        {
+            errors["search"] = model.Search ? SearchQuery.RepeatedError : ["The data source does not take a search."];
+        }
+        else if (searching && !model.Search)
+        {
+            errors["search"] = ["The data source does not take a search."];
+        }
+        else if (searching && SearchQuery.InvalidError(search!) is { } invalid)
+        {
+            errors["search"] = invalid;
+        }
+
         var parameters = DataSourceParameterReader.Read(context.Request.QueryString, model, errors);
 
         if (errors.Count > 0)
@@ -134,8 +152,8 @@ internal static class DataSourceEndpoints
             return Results.ValidationProblem(errors);
         }
 
-        // A sort, a group field, a measure or a filter on a field that is being recomputed would decide from a stale stored value.
-        var pending = await DataSourcePendingFields.ReadAsync(connection, database.ReadTransaction, application, model, order, cancellationToken);
+        // A sort, a group field, a measure, a filter or a search on a field that is being recomputed would decide from a stale stored value.
+        var pending = await DataSourcePendingFields.ReadAsync(connection, database.ReadTransaction, application, model, order, searching, cancellationToken);
         if (pending.Count > 0)
         {
             return Results.ValidationProblem(pending.ToDictionary(), statusCode: StatusCodes.Status409Conflict, title: "A field is being recomputed.");
@@ -145,7 +163,7 @@ internal static class DataSourceEndpoints
             ? RecordFilters.Condition(application, root, [.. filters.Select(filter => filter.Expression)], user.Id)
             : null;
         var result = await DataSourceQueries.ListAsync(
-            connection, database.ReadTransaction, application, model, pageNumber, size, order, parameters, condition, cancellationToken);
+            connection, database.ReadTransaction, application, model, pageNumber, size, order, parameters, condition, search, cancellationToken);
         if (result is null)
         {
             // PostgreSQL cannot say which part of the WHERE clause failed, so every read filter is named.
@@ -228,7 +246,7 @@ internal static class DataSourceEndpoints
         }
 
         // A sort, a group field, a measure or a filter on a field that is being recomputed would decide from a stale stored value.
-        var pending = await DataSourcePendingFields.ReadAsync(connection, database.ReadTransaction, application, model, order, cancellationToken);
+        var pending = await DataSourcePendingFields.ReadAsync(connection, database.ReadTransaction, application, model, order, search: false, cancellationToken);
         if (pending.Count > 0)
         {
             return Results.ValidationProblem(pending.ToDictionary(), statusCode: StatusCodes.Status409Conflict, title: "A field is being recomputed.");
