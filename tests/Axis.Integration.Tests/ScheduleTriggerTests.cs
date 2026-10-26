@@ -23,6 +23,7 @@ public sealed class ScheduleTriggerTests(ScheduleTriggerFixture fixture) : IClas
         ProcessStarts.StepWorkItemKind,
         ProcessStarts.TimerWorkItemKind,
         ProcessStarts.TaskDeadlineWorkItemKind,
+        ProcessStarts.TaskEscalateWorkItemKind,
         ProcessStarts.ConnectorCallWorkItemKind,
         ProcessStarts.PackageCallWorkItemKind,
         ProcessStarts.TriggerScheduleWorkItemKind,

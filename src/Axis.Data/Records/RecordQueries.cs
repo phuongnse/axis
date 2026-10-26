@@ -28,9 +28,9 @@ public static class RecordQueries
     /// <summary>
     /// Reads page <paramref name="page"/> of <paramref name="pageSize"/> records, ordered by the
     /// sort field and then by id ascending, or by id alone without a sort, and counts the records
-    /// that match. A page past the last one has no items. A non-empty <paramref name="search"/>
-    /// keeps only the records whose display field contains it, ignoring case, with no wildcard
-    /// characters; the text is a parameter. An entity without a display field ignores it. A
+    /// that match. A page past the last one has no items. A <paramref name="search"/>
+    /// with fields keeps only the records where any searched field contains its text, ignoring case,
+    /// with no wildcard characters; the text is a parameter. A
     /// <paramref name="condition"/>, such as the user's read filters, keeps only the records that
     /// match it, in both the page and the count. Returns <see langword="null"/> when the database
     /// rejects the condition for these records with a data exception (SQLSTATE class 22), such as
@@ -47,7 +47,7 @@ public static class RecordQueries
         int page,
         int pageSize,
         RecordSort? sort,
-        string? search,
+        RecordSearch? search,
         RecordCondition? condition = null,
         CancellationToken cancellationToken = default)
     {
@@ -56,8 +56,7 @@ public static class RecordQueries
         ArgumentOutOfRangeException.ThrowIfLessThan(page, 1);
         ArgumentOutOfRangeException.ThrowIfLessThan(pageSize, 1);
 
-        var filtered = !string.IsNullOrEmpty(search) && entity.DisplayField is not null;
-        var statement = ListStatement(entity, sort, filtered, condition);
+        var statement = ListStatement(entity, sort, search, condition);
         try
         {
             long? totalCount = null;
@@ -69,10 +68,7 @@ public static class RecordQueries
             try
             {
                 await using var count = new NpgsqlCommand(statement.CountSql, connection);
-                if (filtered)
-                {
-                    count.Parameters.Add(SearchParameter(search!));
-                }
+                search?.AddTo(count);
 
                 condition?.AddTo(count);
                 totalCount = (long)(await count.ExecuteScalarAsync(cancellationToken))!;
@@ -89,10 +85,7 @@ public static class RecordQueries
             }
 
             await using var command = new NpgsqlCommand(statement.PageSql, connection);
-            if (filtered)
-            {
-                command.Parameters.Add(SearchParameter(search!));
-            }
+            search?.AddTo(command);
 
             condition?.AddTo(command);
             command.Parameters.AddWithValue("limit", pageSize);
@@ -124,7 +117,7 @@ public static class RecordQueries
         NpgsqlConnection connection,
         EntityModel entity,
         RecordSort? sort,
-        string? search,
+        RecordSearch? search,
         RecordCondition? condition,
         int limit,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
@@ -133,13 +126,9 @@ public static class RecordQueries
         ArgumentNullException.ThrowIfNull(entity);
         ArgumentOutOfRangeException.ThrowIfLessThan(limit, 1);
 
-        var filtered = !string.IsNullOrEmpty(search) && entity.DisplayField is not null;
-        var statement = ListStatement(entity, sort, filtered, condition);
+        var statement = ListStatement(entity, sort, search, condition);
         await using var command = new NpgsqlCommand(statement.PageSql, connection);
-        if (filtered)
-        {
-            command.Parameters.Add(SearchParameter(search!));
-        }
+        search?.AddTo(command);
 
         condition?.AddTo(command);
         command.Parameters.AddWithValue("limit", limit);
@@ -154,19 +143,19 @@ public static class RecordQueries
 
     /// <summary>
     /// The count and the page statement of a list of <paramref name="entity"/>. The page statement
-    /// ends with <c>LIMIT @limit OFFSET @offset</c>. When <paramref name="search"/> is set, both
-    /// keep only the records whose display field contains <c>@search</c>, and the entity must
-    /// have a display field. Both keep only the records that match <paramref name="condition"/>.
+    /// ends with <c>LIMIT @limit OFFSET @offset</c>. When <paramref name="search"/> has fields, both
+    /// keep only the records where any searched field contains <c>@search</c>. Both keep only the
+    /// records that match <paramref name="condition"/>.
     /// Neither holds a value: each is a parameter that the caller adds.
     /// </summary>
-    internal static RecordListStatement ListStatement(EntityModel entity, RecordSort? sort, bool search, RecordCondition? condition)
+    internal static RecordListStatement ListStatement(EntityModel entity, RecordSort? sort, RecordSearch? search, RecordCondition? condition)
     {
         var table = Table(entity);
         var row = EntityNaming.Quote(RowAlias);
         var conditions = new List<string>();
-        if (search)
+        if (search is { Fields.Count: > 0 })
         {
-            conditions.Add(SearchTerm($"{row}.{EntityNaming.Quote(EntityNaming.Column(entity.DisplayField!))}"));
+            conditions.Add(search.Sql(RowAlias));
         }
 
         if (condition is not null)
@@ -184,11 +173,19 @@ public static class RecordQueries
             $"SELECT {SelectList(entity, RowAlias)} FROM {table} AS {row}{LabelJoins(entity, RowAlias)}{where} ORDER BY {order} LIMIT @limit OFFSET @offset");
     }
 
-    /// <summary>The condition that <paramref name="column"/> contains <c>@search</c>, ignoring letter case.</summary>
-    internal static string SearchTerm(string column) => $"strpos(lower({column}), lower(@search)) > 0";
+    /// <summary>
+    /// The condition that <paramref name="column"/> contains <c>@search</c>, ignoring letter case.
+    /// It is a <c>LIKE</c> over <c>lower(column)</c>, so the trigram index of the column serves it.
+    /// </summary>
+    internal static string SearchTerm(string column) => $"lower({column}) LIKE lower(@search)";
 
+    /// <summary>The <c>@search</c> parameter for <paramref name="search"/>, as a pattern that matches it as plain text.</summary>
     internal static NpgsqlParameter SearchParameter(string search) =>
-        new("search", NpgsqlDbType.Text) { Value = search };
+        new("search", NpgsqlDbType.Text) { Value = SearchPattern(search) };
+
+    // The backslash is the default LIKE escape character, and it is escaped first.
+    internal static string SearchPattern(string text) =>
+        "%" + text.Replace("\\", "\\\\", StringComparison.Ordinal).Replace("%", "\\%", StringComparison.Ordinal).Replace("_", "\\_", StringComparison.Ordinal) + "%";
 
     /// <summary>
     /// Reads the start time of the current transaction, which is what <c>now()</c> gives in an

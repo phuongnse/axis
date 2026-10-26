@@ -65,7 +65,7 @@ public sealed class PolicyQueryPerformanceTests(DataDatabaseFixture fixture) : I
         Assert.Equal(RequestCount / DepartmentCount, page.TotalCount);
         Assert.Equal(PageSize, page.Items.Count);
 
-        var statement = RecordQueries.ListStatement(request, null, false, condition);
+        var statement = RecordQueries.ListStatement(request, null, null, condition);
         AssertPolicyReadsDepartmentsByPrimaryKey(model, await ExplainAsync(dataSource, statement.CountSql, condition.AddTo));
         AssertPolicyReadsDepartmentsByPrimaryKey(
             model, await ExplainAsync(dataSource, statement.PageSql, command => BindPage(condition.AddTo, command)));

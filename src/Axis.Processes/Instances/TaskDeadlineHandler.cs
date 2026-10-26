@@ -55,6 +55,8 @@ internal sealed partial class TaskDeadlineHandler(ReleaseModelCache models, ILog
             return;
         }
 
+        // The escalations that have not run are moot. This item stays: the worker deletes it last.
+        await ProcessTasks.DeletePendingEscalationsAsync(context.Transaction, taskId, cancellationToken);
         var revision = await ProcessSteps.TryResumeAsync(context.Transaction, task.ProcessInstanceId, task.Step, deadline.Next, cancellationToken)
             ?? throw new InvalidOperationException($"The instance of task '{taskId}' is not waiting on the task's step.");
         await ProcessSteps.InsertHistoryAsync(

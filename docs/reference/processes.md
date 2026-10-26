@@ -264,8 +264,8 @@ operation is built, see
     step. When the task is still `open` after that time, the task becomes
     `expired` and the instance moves to `next`, see
     [Escalations and deadline](task-deadlines.md#escalations-and-deadline).
-    `escalations` is optional and checked in the same section. Running them is
-    _(planned for M14)_.
+    `escalations` is optional and checked in the same section. The engine runs
+    the `reassign` of an escalation. Sending its `notify` is _(planned for M14)_.
   - `outcomes` is an array of `{ "name", "label": { "textKey" }, "next" }`,
     such as `approve`, `return` and `reject`. Each names the step taken when
     the task is completed with it.
@@ -781,9 +781,12 @@ database, with history in `axis.__processes_migrations` (see
     `task_id` of the task and the `process_instance_id` of its instance, and
     its `due_at` is the task step's time plus the deadline's `after`. See
     [Escalations and deadline](task-deadlines.md#escalations-and-deadline).
+  - `task.escalate` runs one escalation of one task. Its item also has the
+    `task_id`, the `process_instance_id` and the `escalation` index in file
+    order. Its `due_at` is the step's time plus the escalation's `after`. See
+    [Escalations and deadline](task-deadlines.md#escalations-and-deadline).
   - `notification.email` sends one email of `axis.email_outbox`. Its item also
     has the `email_id` of the row. No handler runs it yet _(planned for M14)_.
-    See [Email](notifications.md#email).
   - `computed.backfill` recomputes the out-of-date rows of
     one entity. Its item also has the `entity_id`, and each claim runs one
     batch of up to 500 rows. See
@@ -953,13 +956,10 @@ database, with history in `axis.__processes_migrations` (see
   | Column | Type | Meaning |
   | --- | --- | --- |
   | `id` | `uuid` | A version 7 UUID. The row's `notification.email` item names it in `email_id`, without a foreign key |
-  | `application_id`, `release_id` | `uuid` | The application, and the release the notifying instance is pinned to, which gave the texts |
-  | `notification_id`, `step` | `uuid`, `text` | The step run's notification id, which all its emails share, and the name of the `notify` step |
+  | `application_id`, `release_id`, `notification_id`, `step` | `uuid`, `uuid`, `uuid`, `text` | The application, the release the notifying instance is pinned to, which gave the texts, the step run's notification id, which all its emails share, and the name of the `notify` step |
   | `address`, `locale` | `text`, `text` null | The address the email goes to, not validated when staged, and the locale of the texts. The locale is null when the release has none |
-  | `subject`, `body` | `text` | The rendered subject, and the plain text body with the page link if any |
-  | `message_id` | `text` | The `Message-ID` header. A unique index keeps it once |
-  | `state` | `text` | `pending` or `sent`, `pending` at first |
-  | `created_at`, `sent_at` | `timestamptz` | The start of the step's transaction, `now()`, and when the email was sent, null while it is pending |
+  | `subject`, `body`, `message_id` | `text` | The rendered subject, the plain text body with the page link if any, and the `Message-ID` header, which a unique index keeps once |
+  | `state`, `created_at`, `sent_at` | `text`, `timestamptz`, `timestamptz` null | `pending` or `sent`, `pending` at first. The start of the step's transaction, `now()`. When the email was sent, null while it is pending |
 - `axis.trigger_schedules`: the schedule state, one row per
   schedule trigger of the tenant, see [Schedules](process-events.md#schedules). Activation
   writes it.
