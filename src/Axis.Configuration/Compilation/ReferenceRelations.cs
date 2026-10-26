@@ -27,6 +27,7 @@ public static class ReferenceRelations
     public const string ConnectorCall = "connector call";
     public const string PackageOperation = "package operation";
     public const string RaisedEvent = "raised event";
+    public const string CreatedEntity = "created entity";
     public const string PolicyRole = "policy role";
     public const string Grant = "grant";
     public const string EventEntity = "event entity";

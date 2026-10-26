@@ -633,6 +633,9 @@ public sealed class ReleaseActivatorTests(DataDatabaseFixture database) : IClass
         foreach (var (expectedTable, actualTable) in expected.Zip(actual))
         {
             Assert.Equal(expectedTable.Columns, actualTable.Columns);
+            Assert.Equal(
+                expectedTable.Indexes.Select(index => (index.Name, Columns: string.Join(',', index.Columns), index.Unique)),
+                actualTable.Indexes.Select(index => (index.Name, Columns: string.Join(',', index.Columns), index.Unique)));
         }
     }
 }

@@ -258,6 +258,7 @@ public sealed class ReferenceIndexTests
                 (ReferenceRelations.TaskRole, "/steps/5/assignee/role", "approver"),
                 (ReferenceRelations.TaskForm, "/steps/5/form", "OrderEntry"),
                 (ReferenceRelations.TaskForm, "/steps/6/form", "OrderEntry"),
+                (ReferenceRelations.CreatedEntity, "/steps/7/entity", "Order"),
             },
             ProcessEdges(result).Where(edge => edge.Relation != ReferenceRelations.RuleCall && edge.Relation != ReferenceRelations.LabelText));
     }
@@ -576,7 +577,7 @@ public sealed class ReferenceIndexTests
             .Where(field => field.IsLiteral)
             .Select(field => (string)field.GetRawConstantValue()!)
             .ToList();
-        Assert.Equal(39, expected.Count);
+        Assert.Equal(40, expected.Count);
 
         var relations = new HashSet<string>();
         using (var packages = new TemporaryFolder().Install("1.0.0"))
@@ -766,7 +767,8 @@ public sealed class ReferenceIndexTests
                     { "name": "approve", "type": "task", "label": { "textKey": "task.review" }, "assignee": { "role": "approver" }, "form": "OrderEntry",
                       "outcomes": [ { "name": "ok", "label": { "textKey": "task.ok" }, "next": "confirm" } ] },
                     { "name": "confirm", "type": "task", "label": { "textKey": "task.review" }, "assignee": { "user": "Assignee(quantity)" }, "form": "OrderEntry",
-                      "outcomes": [ { "name": "ok", "label": { "textKey": "task.ok" }, "next": "done" } ] },
+                      "outcomes": [ { "name": "ok", "label": { "textKey": "task.ok" }, "next": "log" } ] },
+                    { "name": "log", "type": "operation", "operation": "createRecord", "entity": "Order", "set": { "quantity": "2" }, "next": "done" },
                     { "name": "done", "type": "end" } ] }
                 """)
             .With("endpoints/import-order.json", """

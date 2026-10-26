@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Runtime.CompilerServices;
 using System.Text.Json.Nodes;
 using Axis.Configuration.Model;
 using Axis.Data.Naming;
@@ -110,6 +111,44 @@ public static class RecordQueries
         {
             // Class 22 is a data exception: the condition could not be evaluated for some record.
             return null;
+        }
+    }
+
+    /// <summary>
+    /// Streams up to <paramref name="limit"/> records in the order and under the search and condition of
+    /// <see cref="ListAsync"/>, one at a time, so a caller never holds them all. It does not count. A database
+    /// error is thrown as it is, including a data exception (SQLSTATE class 22) that the
+    /// <paramref name="condition"/> raises for some record, which the caller maps.
+    /// </summary>
+    public static async IAsyncEnumerable<Record> ReadAllAsync(
+        NpgsqlConnection connection,
+        EntityModel entity,
+        RecordSort? sort,
+        string? search,
+        RecordCondition? condition,
+        int limit,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+        ArgumentNullException.ThrowIfNull(entity);
+        ArgumentOutOfRangeException.ThrowIfLessThan(limit, 1);
+
+        var filtered = !string.IsNullOrEmpty(search) && entity.DisplayField is not null;
+        var statement = ListStatement(entity, sort, filtered, condition);
+        await using var command = new NpgsqlCommand(statement.PageSql, connection);
+        if (filtered)
+        {
+            command.Parameters.Add(SearchParameter(search!));
+        }
+
+        condition?.AddTo(command);
+        command.Parameters.AddWithValue("limit", limit);
+        command.Parameters.AddWithValue("offset", 0L);
+
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            yield return ReadRecord(reader, entity);
         }
     }
 
@@ -240,7 +279,8 @@ public static class RecordQueries
     /// <paramref name="record"/>, in position order, with one query per collection. The values
     /// keep the entity's field declaration order. A collection whose child entity has reference
     /// fields also adds the row labels, read in the same query, under the collection's name.
-    /// A references field has no value.
+    /// A references field gets its ids in written order as the value, and the label of each id at
+    /// the same position as its labels, with <see langword="null"/> for a target without a display value.
     /// </summary>
     internal static async Task<Record> WithRowsAsync(
         NpgsqlConnection connection,
@@ -253,13 +293,13 @@ public static class RecordQueries
         var labels = new Dictionary<string, JsonNode>(record.Labels, StringComparer.Ordinal);
         foreach (var field in entity.Fields)
         {
-            // A references field has no column yet, so a record carries no value for it.
-            if (!field.HasColumn && field.Type != FieldType.ChildCollection)
+            if (field.Type == FieldType.References)
             {
-                continue;
+                var (ids, setLabels) = await ReadLinksAsync(connection, entity, field, record.Id, cancellationToken);
+                values[field.Name] = ids;
+                labels[field.Name] = setLabels;
             }
-
-            if (field.Type == FieldType.ChildCollection)
+            else if (field.Type == FieldType.ChildCollection)
             {
                 var (rows, rowLabels) = await ReadRowsAsync(connection, application, field, record.Id, cancellationToken);
                 values[field.Name] = rows;
@@ -275,6 +315,45 @@ public static class RecordQueries
         }
 
         return record with { Values = values, Labels = labels };
+    }
+
+    /// <summary>
+    /// The ids of a references field in the order they were written, and the display value of each
+    /// target at the same position. A target whose display value is NULL, or an entity without a
+    /// display field, gives <see langword="null"/>.
+    /// </summary>
+    private static async Task<(JsonArray Ids, JsonArray Labels)> ReadLinksAsync(
+        NpgsqlConnection connection,
+        EntityModel entity,
+        FieldModel field,
+        Guid ownerId,
+        CancellationToken cancellationToken)
+    {
+        var junction = EntityNaming.Quote("j");
+        var target = EntityNaming.Quote("t");
+        var display = field.TargetDisplayField is null
+            ? "NULL"
+            : $"{target}.{EntityNaming.Quote(EntityNaming.Column(field.TargetDisplayField))}";
+        await using var command = new NpgsqlCommand(
+            $"SELECT {junction}.{EntityNaming.Quote(EntityNaming.TargetColumn)}, {display} "
+            + $"FROM {EntityNaming.QualifiedTable(EntityNaming.Junction(entity.Id, field.Name))} AS {junction} "
+            + $"JOIN {EntityNaming.QualifiedTable(EntityNaming.Table(field.Target!.Id))} AS {target} "
+            + $"ON {target}.{EntityNaming.Quote(EntityNaming.IdColumn)} = {junction}.{EntityNaming.Quote(EntityNaming.TargetColumn)} "
+            + $"WHERE {junction}.{EntityNaming.Quote(EntityNaming.OwnerColumn)} = @owner "
+            + $"ORDER BY {junction}.{EntityNaming.Quote(EntityNaming.PositionColumn)}",
+            connection);
+        command.Parameters.AddWithValue("owner", ownerId);
+
+        var ids = new JsonArray();
+        var labels = new JsonArray();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            ids.Add(reader.GetGuid(0).ToString("D"));
+            labels.Add(reader.IsDBNull(1) ? null : reader.GetString(1));
+        }
+
+        return (ids, labels);
     }
 
     /// <summary>

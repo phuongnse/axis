@@ -100,7 +100,8 @@ public static partial class RecordInputParser
         var errors = new SortedDictionary<string, string[]>(StringComparer.Ordinal);
         var parsed = new Dictionary<string, object?>(StringComparer.Ordinal);
         var rows = new Dictionary<string, RecordRows>(StringComparer.Ordinal);
-        if (!ReadValues(values, "/" + ValuesProperty, entity, application, parsed, rows, errors, draft: true))
+        var links = new Dictionary<string, RecordLinks>(StringComparer.Ordinal);
+        if (!ReadValues(values, "/" + ValuesProperty, entity, application, parsed, rows, links, errors, draft: true))
         {
             return null;
         }
@@ -114,6 +115,10 @@ public static partial class RecordInputParser
             Rows = entity.Fields
                 .Where(field => rows.ContainsKey(field.Name))
                 .Select(field => rows[field.Name])
+                .ToList(),
+            Links = entity.Fields
+                .Where(field => links.ContainsKey(field.Name))
+                .Select(field => links[field.Name])
                 .ToList(),
         };
         return new RecordDraftResult(input, errors);
@@ -158,6 +163,7 @@ public static partial class RecordInputParser
             JsonElement? values = null;
             var parsed = new Dictionary<string, object?>(StringComparer.Ordinal);
             var rows = new Dictionary<string, RecordRows>(StringComparer.Ordinal);
+            var links = new Dictionary<string, RecordLinks>(StringComparer.Ordinal);
             long? version = null;
 
             foreach (var property in root.EnumerateObject())
@@ -177,7 +183,7 @@ public static partial class RecordInputParser
                 if (name == valuesProperty && property.Value.ValueKind == JsonValueKind.Object)
                 {
                     values = property.Value;
-                    if (!ReadValues(property.Value, valuesPointer, entity, application, parsed, rows, errors))
+                    if (!ReadValues(property.Value, valuesPointer, entity, application, parsed, rows, links, errors))
                     {
                         return MalformedBody();
                     }
@@ -234,6 +240,10 @@ public static partial class RecordInputParser
                     .Where(field => rows.ContainsKey(field.Name))
                     .Select(field => rows[field.Name])
                     .ToList(),
+                Links = entity.Fields
+                    .Where(field => links.ContainsKey(field.Name))
+                    .Select(field => links[field.Name])
+                    .ToList(),
                 Version = version,
             });
         }
@@ -242,7 +252,8 @@ public static partial class RecordInputParser
     /// <summary>
     /// Reads the values object at <paramref name="pointer"/>, the owner's values or one row, against
     /// the fields of <paramref name="entity"/>. Returns false when a property name cannot be read.
-    /// <paramref name="rows"/> is null for a row, whose entity has no child collection. In a
+    /// <paramref name="rows"/> and <paramref name="links"/> are null for a row, whose entity has no
+    /// child collection and no references field. In a
     /// <paramref name="draft"/> a <c>null</c> is a value even for a required field, because the
     /// user may be clearing it; the caller reports it as missing.
     /// </summary>
@@ -253,6 +264,7 @@ public static partial class RecordInputParser
         ApplicationModel application,
         Dictionary<string, object?> parsed,
         Dictionary<string, RecordRows>? rows,
+        Dictionary<string, RecordLinks>? links,
         SortedDictionary<string, string[]> errors,
         bool draft = false)
     {
@@ -273,8 +285,9 @@ public static partial class RecordInputParser
 
             // Field names are matched exactly; EntityModel.TryGetField ignores letter case.
             var field = entity.Fields.FirstOrDefault(candidate => string.Equals(candidate.Name, name, StringComparison.Ordinal));
-            // A references field has no storage yet, so a body cannot set it.
-            if (field is null || field.Type == FieldType.References || (field.Type == FieldType.ChildCollection && rows is null))
+            if (field is null
+                || (field.Type == FieldType.ChildCollection && rows is null)
+                || (field.Type == FieldType.References && links is null))
             {
                 AddError(errors, propertyPointer, Messages.UnknownProperty);
                 continue;
@@ -295,6 +308,12 @@ public static partial class RecordInputParser
                     return false;
                 }
 
+                continue;
+            }
+
+            if (field.Type == FieldType.References)
+            {
+                ReadLinks(property.Value, propertyPointer, field, links!, errors, draft);
                 continue;
             }
 
@@ -349,7 +368,7 @@ public static partial class RecordInputParser
             }
 
             var parsed = new Dictionary<string, object?>(StringComparer.Ordinal);
-            if (!ReadValues(row, rowPointer, child, application, parsed, rows: null, errors))
+            if (!ReadValues(row, rowPointer, child, application, parsed, rows: null, links: null, errors))
             {
                 return false;
             }
@@ -365,6 +384,71 @@ public static partial class RecordInputParser
     }
 
     /// <summary>
+    /// Reads the ids of a references field. The array replaces the stored set, so it must hold distinct
+    /// ids, at most <see cref="RecordLinks.Max"/>. A malformed or repeated id is reported at its index.
+    /// Too many ids are reported once at the field, without a check of each id. An empty set for a
+    /// required field is <see cref="Messages.Required"/>, except in a <paramref name="draft"/>, whose
+    /// caller reports it.
+    /// </summary>
+    private static void ReadLinks(
+        JsonElement element,
+        string pointer,
+        FieldModel field,
+        Dictionary<string, RecordLinks> links,
+        SortedDictionary<string, string[]> errors,
+        bool draft)
+    {
+        if (element.ValueKind != JsonValueKind.Array)
+        {
+            AddError(errors, pointer, Messages.MustBeIdArray);
+            return;
+        }
+
+        if (element.GetArrayLength() > RecordLinks.Max)
+        {
+            AddError(errors, pointer, Messages.MaxIds(RecordLinks.Max));
+            return;
+        }
+
+        var ids = new List<Guid>();
+        var seen = new HashSet<Guid>();
+        var failed = false;
+        var index = 0;
+        foreach (var item in element.EnumerateArray())
+        {
+            var itemPointer = Pointer(pointer, index.ToString(CultureInfo.InvariantCulture));
+            index++;
+            if (ReadReference(item, out var value) is { } message)
+            {
+                AddError(errors, itemPointer, message);
+                failed = true;
+            }
+            else if (!seen.Add((Guid)value!))
+            {
+                AddError(errors, itemPointer, Messages.DuplicateId);
+                failed = true;
+            }
+            else
+            {
+                ids.Add((Guid)value);
+            }
+        }
+
+        if (failed)
+        {
+            return;
+        }
+
+        if (ids.Count == 0 && field.Required && !draft)
+        {
+            AddError(errors, pointer, Messages.Required);
+            return;
+        }
+
+        links[field.Name] = new RecordLinks(field, ids);
+    }
+
+    /// <summary>
     /// Reports each required column field of <paramref name="entity"/> that <paramref name="values"/> leaves out.
     /// The owner's required field with a default may be left out, because a create fills it. A row has
     /// no defaults, so it keeps every required field required.
@@ -373,6 +457,13 @@ public static partial class RecordInputParser
     {
         foreach (var field in RecordQueries.Columns(entity).Where(field =>
             field.Required && !(owner && field.Default is not null) && !values.TryGetProperty(field.Name, out _)))
+        {
+            AddError(errors, Pointer(pointer, field.Name), Messages.Required);
+        }
+
+        // A set has no column, but a required one needs at least one id, so a create cannot leave it out.
+        foreach (var field in entity.Fields.Where(field =>
+            owner && field.Type == FieldType.References && field.Required && !values.TryGetProperty(field.Name, out _)))
         {
             AddError(errors, Pointer(pointer, field.Name), Messages.Required);
         }

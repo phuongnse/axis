@@ -24,7 +24,7 @@ namespace Axis.Integration.Tests;
 /// <summary>
 /// Two tenant databases in one PostgreSQL container, each with both migrations applied and the
 /// RecordsApp fixture application activated, served by the real server on hosts
-/// <c>a.example.test</c> and <c>b.example.test</c>. Tenant A also has the SecondApp fixture
+/// <c>a.example.test</c> and <c>b.example.test</c>. Tenant A also has the SecondApp and FilesApp fixtures
 /// activated, and a compiled release of an application that was never activated. The test
 /// authentication scheme signs in <c>anna</c>, an employee with every grant of both applications,
 /// and users with fewer grants: <c>binh</c> holds no role, <c>rita</c> is a reader, <c>uma</c>
@@ -33,7 +33,8 @@ namespace Axis.Integration.Tests;
 /// and <c>dora</c> holds only a data source grant. <c>fern</c>
 /// and <see cref="SqlTextUser"/> hold the record filters of the <c>filtered</c> role, <c>fred</c>
 /// holds only a read filter that is <c>false</c>, and <c>faye</c> holds a read filter that
-/// overflows for some items and one that matches items of the Finance department.
+/// overflows for some items and one that matches items of the Finance department. <c>eve</c> may read
+/// and export the items that have a status, without some of their fields, and export a grouped data source.
 /// <see cref="Client"/> is signed in as <c>anna</c>.
 /// </summary>
 public sealed class RecordApiFixture : IAsyncLifetime
@@ -126,6 +127,11 @@ public sealed class RecordApiFixture : IAsyncLifetime
                 var secondActivated = await ReleaseActivator.ActivateAsync(second, new ActiveReleaseStore(configuration), data, ActivationBindings.None("default"), OpenInstanceCounter.Instance);
                 Assert.Empty(secondActivated.Diagnostics);
 
+                var files = await ReleaseCompiler.CompileAsync(Path.Combine(AppContext.BaseDirectory, "Fixtures", "FilesApp"), configuration);
+                Assert.Empty(files.Diagnostics);
+                var filesActivated = await ReleaseActivator.ActivateAsync(files, new ActiveReleaseStore(configuration), data, ActivationBindings.None("default"), OpenInstanceCounter.Instance);
+                Assert.Empty(filesActivated.Diagnostics);
+
                 using var dormant = new TemporaryFolder().With(
                     "application.json",
                     $$"""{ "id": "{{Guid.NewGuid()}}", "kind": "application", "name": "{{DormantApp}}", "formatVersion": 1 }""");
@@ -158,6 +164,7 @@ public sealed class RecordApiFixture : IAsyncLifetime
                 new TestIdentity("dora", "Dora Data Source", "dsonly"),
                 new TestIdentity("fred", "Fred False", "false-only"),
                 new TestIdentity("faye", "Faye Failing", "failing"),
+                new TestIdentity("eve", "Eve Exporter", "exporter"),
                 new TestIdentity(SqlTextUser, "Mallory", "filtered"));
         });
         _client = _factory.CreateClient().SignedInAs("anna");
@@ -215,12 +222,13 @@ public sealed class RecordApiFixture : IAsyncLifetime
         Assert.True(Model.TryGetEntity("Ticket", out var ticket));
         Assert.True(Model.TryGetEntity("Reading", out var reading));
         Assert.True(Model.TryGetEntity("Product", out var product));
+        Assert.True(Model.TryGetEntity("Bundle", out var bundle));
         Assert.True(Model.TryGetEntity("Expense", out var expense));
         Assert.True(Model.TryGetEntity("Reminder", out var reminder));
         Assert.True(Model.TryGetEntity("Gauge", out var gauge));
         foreach (var dataSource in _dataSources.Values)
         {
-            foreach (var entity in new[] { item, department, order, product, ticket, reading, expense, reminder, gauge })
+            foreach (var entity in new[] { item, department, order, bundle, product, ticket, reading, expense, reminder, gauge })
             {
                 await using var command = dataSource.CreateCommand($"DELETE FROM {EntityNaming.QualifiedTable(EntityNaming.Table(entity.Id))}");
                 await command.ExecuteNonQueryAsync();

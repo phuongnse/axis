@@ -92,13 +92,13 @@ services:
       - ${AXIS_STUDIO_APPS_DIR:-./artifacts/studio-apps}:/studio-apps
     ports:
       - "127.0.0.1:${AXIS_SERVER_PORT:-5206}:8080"
-    # Healthy only once activation has finished and the server answers.
+    # Healthy only once activation has finished and the server answers. A slow runner needs up to 5 minutes for it.
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8080/health/ready"]
       interval: 5s
       timeout: 5s
       retries: 3
-      start_period: 120s
+      start_period: 300s
       start_interval: 2s
 
   # Waits until the server has migrated the tenant database, then runs its due work items. It
@@ -130,7 +130,7 @@ services:
       interval: 5s
       timeout: 5s
       retries: 3
-      start_period: 180s
+      start_period: 360s
       start_interval: 2s
 
   # Runs the publish requests of Studio for the tenant. It waits until the server has migrated the tenant
