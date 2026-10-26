@@ -81,7 +81,8 @@ A grouped data source adds `aggregate`. Its rows are groups, not records:
     "groupBy": ["departmentName"],
     "measures": [
       { "name": "requests", "function": "count" },
-      { "name": "totalSum", "function": "sum", "field": "total" }
+      { "name": "totalSum", "function": "sum", "field": "total" },
+      { "name": "openRequests", "function": "count", "filter": "status == 'open'" }
     ]
   },
   "sort": "-totalSum"
@@ -131,7 +132,7 @@ A grouped data source adds `aggregate`. Its rows are groups, not records:
 - **`groupBy`.** A list of names from `fields`. An empty list gives one total
   row.
 - **`measures`.** Each has a `name` and a `function`: `count`, `sum`, `min`,
-  `max`, `avg` or `countDistinct`.
+  `max`, `avg` or `countDistinct`. It may also have a `filter`.
 - **`count`.** It takes no `field` and counts rows.
 - **`sum`, `min`, `max`, `avg` and `countDistinct`.** They need a `field` that
   names an entry of `fields`. `sum` and `avg` take an integer, a decimal or a
@@ -157,6 +158,20 @@ A grouped data source adds `aggregate`. Its rows are groups, not records:
   only `null` values they are `null`, not 0, as in SQL. This tells "no values"
   apart from a real zero. `countDistinct` skips `null` values and is 0 over
   only `null` values. `count` counts every row, whatever its values.
+- **Measure `filter`.** A measure takes an optional `filter`, a boolean
+  expression that sees the same names as the data source `filter`: the root
+  entity's fields, the parameters, paths through `reference` fields and named
+  rules. It stays inside the [SQL subset](expressions.md#sql-subset) and runs
+  as SQL `FILTER (WHERE ...)`. The measure reads only the rows where it is
+  `true`, and a `null` result leaves the row out, as in SQL. The data source
+  `filter` and the user's read filters still apply first. So one data source
+  can count open and closed tickets side by side. Equality is
+  [null-safe](expressions.md#null-semantics), so `status != 'open'` also keeps a row
+  whose `status` is `null`, but `quantity > 5` is `null` and drops a row with no
+  `quantity`. Two opposite comparisons of a field that can be `null` may
+  therefore not add up to the number of rows. A `sort` by the measure orders
+  the groups by the filtered value. Like the data source `filter`, a measure
+  filter may compare a field that the user cannot read.
 - **`null` groups.** Rows whose group field is `null`, such as items with no
   department, form one group of their own.
 - **Row values.** A grouped row holds the group fields in `groupBy` order,
@@ -174,11 +189,6 @@ These are _(planned for M15)_. See
 [D76](../decisions/d76-file-money-and-enum-label-field-types.md) and
 [D80](../decisions/d80-search-more-aggregates-and-query-timeouts.md).
 
-- **Measure `filter`.** A measure takes an optional `filter`, a boolean
-  expression in the [SQL subset](expressions.md#sql-subset) over the same
-  names as the data source filter. The measure counts only the rows where it
-  is `true`, as SQL `FILTER (WHERE ...)`. So one data source can count open
-  and closed tickets side by side.
 - **Date buckets.** A `groupBy` entry may be `{ "field": "<name>", "bucket":
   "day" }`, with `day`, `week`, `month` or `year`, on a date or date-time
   field. The row holds the first date of the bucket. A week starts on
@@ -240,7 +250,9 @@ see the Data sources bullet of the Resolve step in
 - An enum parameter compares with an enum field only when every value in the
   parameter's `values` is also in the field's `values`. Otherwise the filter
   is `AXC0047`. See [Types](expressions.md#types).
-- The filter is not checked while a parameter of the data source has a
+- Each measure `filter` is checked like the `filter`, with the same codes, at
+  `/aggregate/measures/{i}/filter`. For example `AXC0053` is a call to `lower`.
+- No `filter` is checked while a parameter of the data source has a
   diagnostic, because that parameter may have no usable type.
 
 - `groupBy` names entries of `fields`, compared exactly. An unknown name is
@@ -340,8 +352,9 @@ grants, the record filters, the fields and the joined targets are built.
   projected [pending field](migrations.md#recomputing-computed-fields) shows its
   stored value, which may come from an older expression. A query is refused
   with the `409` in [Errors](#errors) when its `sort`, its default `sort`,
-  its `filter` or its `groupBy` field or measure reads a pending field. That
-  includes a path through references and a filter that inlines a rule. The
+  its `filter`, its `groupBy` field, its measure or a measure `filter` reads
+  a pending field. That includes a path through references and a filter that
+  inlines a rule, and a `count` whose `filter` reads one. The
   record API computes the pending field on a single read.
 - **Order.** Ties are broken by the root `id` ascending, or by the group
   fields in `groupBy` order, each ascending, when the data source is
@@ -458,9 +471,10 @@ after the query and before the database.
   missing required value and a repeated parameter. Every invalid parameter is
   reported in the same response.
 - **`409` for a pending field.** The `sort`, default
-  `sort`, `filter`, `groupBy` field or measure reads a field that is being
-  recomputed. The title is fixed: "A field is being recomputed." `errors` is
-  keyed `sort`, `filter` or `aggregate`, with a message that names the field.
+  `sort`, `filter`, `groupBy` field, measure or measure `filter` reads a field
+  that is being recomputed. The title is fixed: "A field is being recomputed."
+  `errors` is keyed `sort`, `filter` or `aggregate`, with a message that names
+  the field. A measure `filter` is keyed `aggregate` and names the path it reads.
   The request is valid, so this is a state conflict, not a `400`. A sum over
   stale totals would be the same silent failure.
 - **`409` for a policy that reads a pending field.** A root

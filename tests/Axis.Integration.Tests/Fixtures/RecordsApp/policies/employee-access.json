@@ -23,6 +23,8 @@
     { "dataSource": "ItemCountsByDepartment", "actions": ["read"] },
     { "dataSource": "ItemsByDepartment", "actions": ["read"] },
     { "dataSource": "ItemStatuses", "actions": ["read"] },
+    { "dataSource": "ItemStatusMeasures", "actions": ["read"] },
+    { "dataSource": "ItemStatusMeasuresByDepartment", "actions": ["read"] },
     { "dataSource": "ItemsByName", "actions": ["read"] },
     { "dataSource": "ItemsMatching", "actions": ["read"] },
     { "dataSource": "ItemsNamed", "actions": ["read"] },
