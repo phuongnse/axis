@@ -47,6 +47,8 @@ const taskPage = JSON.stringify({
       labelKey: 'noteReview.task',
       subject: { entity: 'Note', id: '11111111-1111-4111-8111-111111111111', label: 'Buy paper' },
       dueAt,
+      claimedBy: null,
+      overdue: false,
       createdAt: '2026-10-10T09:30:00Z',
     },
     {
@@ -57,6 +59,8 @@ const taskPage = JSON.stringify({
       labelKey: 'noteApproval.task',
       subject: { entity: 'Note', id: '22222222-2222-4222-8222-222222222222', label: 'Order chairs' },
       dueAt: null,
+      claimedBy: null,
+      overdue: false,
       createdAt: '2026-10-09T09:30:00Z',
     },
   ],
@@ -69,6 +73,8 @@ const texts = {
   'shell.tasks.task': 'Task',
   'shell.tasks.subject': 'Record',
   'shell.tasks.dueAt': 'Due',
+  'shell.tasks.overdue': 'Overdue',
+  'shell.tasks.claimedByYou': 'Claimed by you',
   'shell.tasks.empty': 'No open tasks.',
   'shell.tasks.loadFailed': 'The tasks could not be loaded.',
   'noteReview.task': 'Review the note',
@@ -110,6 +116,30 @@ function renderWidget(search = '', outerCatalogs: TextCatalog[] = catalogs) {
 }
 
 describe('TaskInboxWidget', () => {
+  it('tags only the overdue row as overdue and only the claimed row as claimed by you', async () => {
+    const [review, approve] = (JSON.parse(taskPage) as { items: Record<string, unknown>[] }).items
+    stubTasks(
+      JSON.stringify({
+        items: [
+          { ...review, overdue: true, claimedBy: 'maria' },
+          { ...approve, overdue: false, claimedBy: null },
+        ],
+        page: 1,
+        pageSize: 20,
+        totalCount: 2,
+      }),
+    )
+
+    renderWidget()
+
+    await screen.findByRole('row', { name: /Review the note/ })
+    const [first, second] = screen.getAllByRole('row').slice(1)
+    expect(within(first).getByText('Overdue')).toBeInTheDocument()
+    expect(within(first).getByText('Claimed by you')).toBeInTheDocument()
+    expect(within(second).queryByText('Overdue')).not.toBeInTheDocument()
+    expect(within(second).queryByText('Claimed by you')).not.toBeInTheDocument()
+  })
+
   it('lists the tasks in the order of the task API, each linking to its address under the inbox page', async () => {
     stubTasks()
 

@@ -256,6 +256,14 @@ Run and the Test results list, the read-only view of a module entity, and the re
     `integer` and `decimal`, a checkbox for `boolean` and a text box for the
     rest. Picking another key for a row keeps its value when the value fits
     the new type. A `null` value is edited in the JSON view.
+  - A trigger's `parameters` take their keys from the process's
+    [parameters](authoring.md#names) for a scheduled job without a data
+    source, and for a data change trigger whose `on` holds `delete`. A scheduled
+    job's values follow each parameter's type as a literal. A delete trigger's
+    values are expressions over the deleted record, in the expression editor.
+    A delete trigger does not show `fields`, unless the file already has the
+    list, so the author can remove it. Changing `type` does not remove the keys
+    the new type forbids, and the compiler reports them.
   - A value that is not one of the names stays in the select as the first
     option, tagged **unknown**, so nothing is lost. The select takes only the
     listed names. To set a name that is not listed, the author edits the value
@@ -299,12 +307,18 @@ Run and the Test results list, the read-only view of a module entity, and the re
     [names route](authoring.md#names), loaded with the application and again
     after a save, a delete and a reconnect.
     - The fields of the entity at the place: the entity being edited, a policy
-      grant's `entity`, or a data source's or process's `entity`.
+      grant's `entity`, or the `entity` of a data source, a process or a data
+      change trigger.
+    - `id`, the record's reference, before the fields, in a process with an
+      entity and in a data change trigger. It is offered as a parameter, not
+      as a field, because a path cannot start from it.
     - A data source filter offers its parameters, and a rule offers its own.
+      A process without a subject offers its `parameters` and no field.
     - The application's rules, with module rules as `<module>:<name>`, and the
       functions and aggregates of the [expression language](expressions.md#functions).
-    - `currentUser()` only in a policy grant's filter. Other expressions, such
-      as triggers, migrations and endpoints, offer the rules and the functions only.
+    - `currentUser()` only in a policy grant's filter. Expressions in
+      migrations and endpoints, and in a trigger that has no entity, offer the
+      rules and the functions only.
     - A function or rule inserts with its brackets and puts the cursor inside
       them. `now()` and `currentUser()` put the cursor after them.
     - When the names do not load, the list offers the functions only. Typing and
@@ -622,8 +636,15 @@ Run and the Test results list, the read-only view of a module entity, and the re
       widget, is saved unchanged. A widget of a type with no panel shows its
       type and points to the JSON view.
   - **Process step editor.** The Form tab opens the process with its name,
-    entity and optional start condition, and its start step. The JSON view
+    subject and optional start condition, and its start step. The JSON view
     stays as a second view of the same draft.
+    - **Subject** _(built)_. A choice between **Entity** and **Parameters**.
+      Entity shows the entity picker. Parameters shows rows of a name and a
+      scalar type (`text`, `integer`, `decimal`, `boolean`, `date` or
+      `date-time`), with Add and Remove. Switching replaces the draft in one
+      change, so one undo brings it back. The other key is removed and the new
+      key, empty, takes its place in the file. See
+      [processes without a subject](process-flow.md#processes-without-a-subject).
     - **Step list** _(built)_. The steps show as cards in file order. Each card
       shows the step's name and type, with move up, move down and remove. Add
       step appends a step of the chosen type, with an empty name.

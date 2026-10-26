@@ -13,9 +13,9 @@ The design follows
 `task.deadline` work item are built. [Claim and release](#claim-and-release) and
 the `claimed_by` and `claimed_at` columns are built, and so are release by a
 `reassign` grant and [reassign](#reassign) with its user picker. The
-[overdue](#task-states) rule and the server half of the
-[inbox and task page](#inbox-and-task-page) are built. Escalations are
-_(planned for M14)_.
+[overdue](#task-states) rule and the [inbox and task page](#inbox-and-task-page)
+are built, except Reassign: the inbox marks, and Claim and Release on the task
+page. Escalations and the Reassign dialog are _(planned for M14)_.
 
 ## Escalations and deadline
 
@@ -195,7 +195,7 @@ and `process_instance_id`. _(Planned for M14)_ It also adds the kind
 
 ## Inbox and task page
 
-The task API tells the page what to show. The UI below is _(planned for M14)_.
+The task API tells the page what to show.
 
 - A single read, and the claim, release, reassign and complete responses, add
   `commands`: the actions the signed-in user may take on the task now, from
@@ -214,10 +214,15 @@ The task API tells the page what to show. The UI below is _(planned for M14)_.
   task's role gets `403` on a read, so they see `reassign` only in the claim,
   release and reassign responses.
 
-_(Planned for M14)_ The UI is not built yet.
+The [task inbox widget](task-inbox-widget.md) and the task page use these
+fields.
 
-- The [task inbox widget](task-inbox-widget.md) marks an overdue task and
-  shows who claimed a task.
-- The task page shows **Claim** on an unclaimed role task, **Release** to the
-  claimer, and **Reassign** to a user with the grant. Reassign opens a dialog
-  with a role list, the user picker and the reason.
+- The inbox shows an "Overdue" tag beside the due date of an `overdue` task, and
+  a "Claimed by you" tag on a row whose `claimedBy` is set.
+- The task page shows the "Overdue" tag. It shows **Claim** and **Release** when
+  `commands` lists them, and shows the task the route returns. A `403` or `409`
+  shows a message and loads the task again.
+- An `expired` task shows that its deadline passed, with no form or buttons.
+- _(Planned for M14)_ The task page shows **Reassign** to a user with the
+  grant. Reassign opens a dialog with a role list, the user picker and the
+  reason.
