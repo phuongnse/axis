@@ -65,6 +65,8 @@
     "noteReview.reject": "Reject",
     "noteClose.action": "Close note",
     "noteClose.cannotClose": "Only an open note can be closed.",
+    "noteNotify.subject": "Note {title} is ready",
+    "noteNotify.body": "Open the note {title} to read it.",
     "category.label": "Category",
     "category.name": "Name",
     "pages.assetForm.title": "Asset",

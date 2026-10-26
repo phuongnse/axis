@@ -47,7 +47,7 @@ internal static class SiteEndpoints
                 return SiteNotFound();
             }
 
-            var site = ApplicationSites.Describe(active.Site);
+            var site = ApplicationSites.Describe(active.Application, active.Site);
 
             // The compiler resolves every navigation entry's page, so the lookup always succeeds.
             var readable = active.Site.Navigation

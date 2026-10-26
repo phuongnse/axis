@@ -24,15 +24,17 @@ public static class ApplicationSites
         return new SiteListItem(site.Path, site.Title.TextKey, titles);
     }
 
-    public static ApplicationSite Describe(SiteModel site)
+    public static ApplicationSite Describe(ApplicationModel application, SiteModel site)
     {
+        ArgumentNullException.ThrowIfNull(application);
         ArgumentNullException.ThrowIfNull(site);
 
         return new ApplicationSite(
             site.Path,
             site.Title.TextKey,
             new SiteLocales(site.Locales.Default, site.Locales.Fallback, site.Locales.Available),
-            [.. site.Navigation.Select(entry => new SiteNavigationItem(entry.Page.Name, entry.Label.TextKey))]);
+            [.. site.Navigation.Select(entry => new SiteNavigationItem(entry.Page.Name, entry.Label.TextKey))],
+            $"/api/apps/{application.Manifest.Name}/notifications");
     }
 
     /// <summary>The texts of <paramref name="locale"/>, ignoring letter case, or null when the application has none.</summary>
