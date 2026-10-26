@@ -38,12 +38,13 @@ const aggregateNames = ['count', 'sum', 'avg', 'min', 'max', 'any', 'all']
 
 const zeroArgumentFunctions = ['now', 'today', 'currentUser']
 
+const fieldDefault = /^\/fields\/\d+\/default$/
 const grantFilter = /^\/grants\/\d+\/filter$/
 const grantIndex = /^\/grants\/(\d+)\//
 
 /**
  * The names an expression can use at a JSON Pointer of a resource of the given kind. With no names loaded, only
- * the functions are offered. A malformed draft yields fewer names, never an error.
+ * the functions are offered. A field's `default` has no record in scope, so it offers rules and functions only. A malformed draft yields fewer names, never an error.
  */
 export function expressionScope(
   kind: string,
@@ -83,6 +84,10 @@ function fieldOptions(
   names: StudioNames,
 ): ScopeOption[] {
   if (kind === 'entity') {
+    // A default is evaluated with no record, so no field is in scope.
+    if (fieldDefault.test(pointer)) {
+      return []
+    }
     return namesOf(draft.fields).map((name) => option(name, 'field', false))
   }
   const entity = entityOf(kind, draft, pointer)
@@ -127,7 +132,9 @@ function entityOf(kind: string, draft: Record<string, unknown>, pointer: string)
 }
 
 function functionOptions(kind: string, pointer: string): ScopeOption[] {
-  const names = [...functionNames, ...aggregateNames]
+  // A default sees no child collections, so an aggregate can never be valid in it.
+  const names =
+    kind === 'entity' && fieldDefault.test(pointer) ? [...functionNames] : [...functionNames, ...aggregateNames]
   if (kind === 'policy' && grantFilter.test(pointer)) {
     names.push('currentUser')
   }
