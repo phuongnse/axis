@@ -8,12 +8,16 @@ namespace Axis.Tenancy.Platform;
 /// Encrypts and decrypts the secrets of the tenant directory with AES-256-GCM under the installation key
 /// <c>Platform:SecretKey</c>. A stored value is a 12-byte nonce, the ciphertext and a 16-byte tag. The associated data
 /// is the UTF-8 bytes of the tenant id, a single zero byte and the UTF-8 bytes of the field name, so a value copied to
-/// another tenant or field does not decrypt.
+/// another tenant or field does not decrypt. During a key rotation the optional <c>Platform:PreviousSecretKey</c> decrypts
+/// the values that the current key does not. It never encrypts.
 /// </summary>
 public sealed class TenantSecretCipher
 {
     /// <summary>The setting that holds the installation key, 32 bytes in base64.</summary>
     public const string KeySetting = "Platform:SecretKey";
+
+    /// <summary>The optional setting that holds the previous installation key, in the same form. Set it only during a rotation.</summary>
+    public const string PreviousKeySetting = "Platform:PreviousSecretKey";
 
     public const int NonceSize = 12;
 
@@ -23,35 +27,54 @@ public sealed class TenantSecretCipher
 
     private readonly byte[] _key;
 
-    private TenantSecretCipher(byte[] key)
+    private readonly byte[]? _previousKey;
+
+    private TenantSecretCipher(byte[] key, byte[]? previousKey)
     {
         _key = key;
+        _previousKey = previousKey;
     }
 
-    /// <summary>Reads <c>Platform:SecretKey</c>. A message never contains the value.</summary>
-    /// <exception cref="InvalidOperationException">The setting is missing, is not base64 or is not 32 bytes.</exception>
+    /// <summary>Whether <c>Platform:PreviousSecretKey</c> is set.</summary>
+    public bool HasPreviousKey => _previousKey is not null;
+
+    /// <summary>
+    /// Reads <c>Platform:SecretKey</c> and the optional <c>Platform:PreviousSecretKey</c>. A blank previous key counts as not
+    /// set. A message never contains a value.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">
+    /// <c>Platform:SecretKey</c> is missing, or either setting is set and is not base64 or is not 32 bytes.
+    /// </exception>
     public static TenantSecretCipher Load(IConfiguration configuration)
     {
         ArgumentNullException.ThrowIfNull(configuration);
 
-        var value = configuration[KeySetting];
+        var key = ReadKey(configuration, KeySetting)!;
+        var previousKey = ReadKey(configuration, PreviousKeySetting);
+        return new TenantSecretCipher(key, previousKey);
+    }
+
+    /// <summary>Returns the key of the setting, or <see langword="null"/> for a blank optional setting.</summary>
+    private static byte[]? ReadKey(IConfiguration configuration, string setting)
+    {
+        var value = configuration[setting];
         if (string.IsNullOrWhiteSpace(value))
         {
-            throw new InvalidOperationException($"The setting {KeySetting} is required.");
+            return setting == KeySetting ? throw new InvalidOperationException($"The setting {setting} is required.") : null;
         }
 
         var buffer = new byte[64];
         if (!Convert.TryFromBase64String(value.Trim(), buffer, out var length))
         {
-            throw new InvalidOperationException($"The setting {KeySetting} is not base64.");
+            throw new InvalidOperationException($"The setting {setting} is not base64.");
         }
 
         if (length != KeySize)
         {
-            throw new InvalidOperationException($"The setting {KeySetting} must be {KeySize} bytes in base64.");
+            throw new InvalidOperationException($"The setting {setting} must be {KeySize} bytes in base64.");
         }
 
-        return new TenantSecretCipher(buffer[..KeySize]);
+        return buffer[..KeySize];
     }
 
     /// <summary>Returns the nonce, the ciphertext and the tag of the plain text, bound to the tenant and the field.</summary>
@@ -79,7 +102,7 @@ public sealed class TenantSecretCipher
     public SecretValue DecryptDataProtectionKey(Guid id, byte[] stored)
     {
         ArgumentNullException.ThrowIfNull(stored);
-        return DecryptBound("", TenantSecretFields.DataProtectionKey(id), stored, $"The data protection key '{id}' does not decrypt with {KeySetting}.");
+        return DecryptBound("", TenantSecretFields.DataProtectionKey(id), stored, $"The data protection key '{id}' does not decrypt with {Keys()}.");
     }
 
     private byte[] EncryptBound(string tenantId, string field, string plainText)
@@ -104,8 +127,11 @@ public sealed class TenantSecretCipher
         ArgumentException.ThrowIfNullOrEmpty(field);
         ArgumentNullException.ThrowIfNull(stored);
 
-        return DecryptBound(tenantId, field, stored, $"The {field} of tenant '{tenantId}' does not decrypt with {KeySetting}.");
+        return DecryptBound(tenantId, field, stored, $"The {field} of tenant '{tenantId}' does not decrypt with {Keys()}.");
     }
+
+    // The settings that a failed decryption tried, for a message.
+    private string Keys() => _previousKey is null ? KeySetting : $"{KeySetting} or {PreviousKeySetting}";
 
     private SecretValue DecryptBound(string tenantId, string field, byte[] stored, string failureMessage)
     {
@@ -116,22 +142,40 @@ public sealed class TenantSecretCipher
 
         var cipherLength = stored.Length - NonceSize - TagSize;
         var plain = new byte[cipherLength];
+        var associatedData = AssociatedData(tenantId, field);
         try
         {
-            using var aes = new AesGcm(_key, TagSize);
-            aes.Decrypt(
-                stored.AsSpan(0, NonceSize),
-                stored.AsSpan(NonceSize, cipherLength),
-                stored.AsSpan(NonceSize + cipherLength, TagSize),
-                plain,
-                AssociatedData(tenantId, field));
+            Decrypt(_key, stored, cipherLength, plain, associatedData);
         }
         catch (CryptographicException exception)
         {
-            throw new InvalidOperationException(failureMessage, exception);
+            if (_previousKey is null)
+            {
+                throw new InvalidOperationException(failureMessage, exception);
+            }
+
+            try
+            {
+                Decrypt(_previousKey, stored, cipherLength, plain, associatedData);
+            }
+            catch (CryptographicException)
+            {
+                throw new InvalidOperationException(failureMessage, exception);
+            }
         }
 
         return new SecretValue(Encoding.UTF8.GetString(plain));
+    }
+
+    private static void Decrypt(byte[] key, byte[] stored, int cipherLength, byte[] plain, byte[] associatedData)
+    {
+        using var aes = new AesGcm(key, TagSize);
+        aes.Decrypt(
+            stored.AsSpan(0, NonceSize),
+            stored.AsSpan(NonceSize, cipherLength),
+            stored.AsSpan(NonceSize + cipherLength, TagSize),
+            plain,
+            associatedData);
     }
 
     private static byte[] AssociatedData(string tenantId, string field)

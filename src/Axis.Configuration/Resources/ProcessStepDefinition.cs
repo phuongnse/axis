@@ -15,6 +15,9 @@ public sealed record ProcessStepDefinition
     /// <summary>The <c>operation</c> step type. <see cref="Operation"/> is the operation the step runs.</summary>
     public const string OperationStep = "operation";
 
+    /// <summary>The <c>subProcess</c> step type: it starts another process and waits for it to end.</summary>
+    public const string SubProcess = "subProcess";
+
     public const string End = "end";
 
     /// <summary>The built-in operation that sets fields of the subject record.</summary>
@@ -31,7 +34,7 @@ public sealed record ProcessStepDefinition
 
     public required string Name { get; init; }
 
-    /// <summary>The step type: <c>decision</c>, <c>task</c>, <c>operation</c> or <c>end</c>.</summary>
+    /// <summary>The step type: <c>decision</c>, <c>task</c>, <c>operation</c>, <c>subProcess</c> or <c>end</c>.</summary>
     public required string Type { get; init; }
 
     /// <summary>The ordered branches of a decision, or null for any other step.</summary>
@@ -88,7 +91,22 @@ public sealed record ProcessStepDefinition
     /// <summary>The page a <c>notify</c> step's notification opens, or null when it opens none or for any other step.</summary>
     public NotifyOpenDefinition? Open { get; init; }
 
-    /// <summary>The step an operation step leads to, or null for any other step.</summary>
+    /// <summary>The name of the process a <c>subProcess</c> step starts, or null for any other step.</summary>
+    public string? Process { get; init; }
+
+    /// <summary>
+    /// The expression that gives the record a <c>subProcess</c> step starts its process for, or null
+    /// when the child has no subject, or the same subject as the parent, or for any other step.
+    /// </summary>
+    public string? Subject { get; init; }
+
+    /// <summary>
+    /// The parameters of the process a <c>subProcess</c> step starts, each to an expression, in file
+    /// order, or null for any other step.
+    /// </summary>
+    public IReadOnlyDictionary<string, string>? Parameters { get; init; }
+
+    /// <summary>The step an operation or <c>subProcess</c> step leads to, or null for any other step.</summary>
     public string? Next { get; init; }
 
     /// <summary>The label of a task, shown in the task inbox and on the task page, or null for any other step.</summary>

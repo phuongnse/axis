@@ -3,7 +3,11 @@
  * Relative JSON Pointer from the property.
  */
 export type ReferenceMark =
-  string | { part: 'field' | 'step' | 'parameter' | 'column' | 'outcome' | 'operation'; of: string }
+  | string
+  | {
+      part: 'field' | 'step' | 'parameter' | 'processParameter' | 'column' | 'outcome' | 'operation'
+      of: string
+    }
 
 /** The part of JSON Schema that Studio's form reads. Other keywords are ignored. */
 export interface JsonSchema {

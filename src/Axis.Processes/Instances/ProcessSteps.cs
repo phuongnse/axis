@@ -21,7 +21,8 @@ internal static class ProcessSteps
     {
         await using var command = new NpgsqlCommand(
             $"""
-            SELECT application_id, process_id, subject_entity_id, subject_id, release_id, state, revision, step, {SqlTranslator.NowSql}, parameters::text
+            SELECT application_id, process_id, subject_entity_id, subject_id, release_id, state, revision, step, {SqlTranslator.NowSql}, parameters::text,
+                   parent_instance_id, parent_step
             FROM axis.process_instances WHERE id = @id
             """,
             Connection(transaction),
@@ -44,7 +45,29 @@ internal static class ProcessSteps
             reader.GetInt64(6),
             reader.GetString(7),
             reader.GetFieldValue<DateTimeOffset>(8),
-            reader.IsDBNull(9) ? null : JsonNode.Parse(reader.GetString(9))!.AsObject());
+            reader.IsDBNull(9) ? null : JsonNode.Parse(reader.GetString(9))!.AsObject(),
+            reader.IsDBNull(10) ? null : reader.GetGuid(10),
+            reader.IsDBNull(11) ? null : reader.GetString(11));
+    }
+
+    /// <summary>
+    /// Returns the output of the latest history row of <paramref name="step"/> of the instance
+    /// <paramref name="id"/>, or <see langword="null"/> when the step has no row or the row has no output.
+    /// </summary>
+    public static async Task<JsonObject?> FindLatestOutputAsync(NpgsqlTransaction transaction, Guid id, string step, CancellationToken cancellationToken)
+    {
+        await using var command = new NpgsqlCommand(
+            """
+            SELECT output::text FROM axis.process_step_history
+            WHERE process_instance_id = @id AND step = @step
+            ORDER BY revision DESC, finished_at DESC
+            LIMIT 1
+            """,
+            Connection(transaction),
+            transaction);
+        command.Parameters.AddWithValue("id", id);
+        command.Parameters.AddWithValue("step", step);
+        return await command.ExecuteScalarAsync(cancellationToken) is string output ? JsonNode.Parse(output)?.AsObject() : null;
     }
 
     /// <summary>
@@ -219,6 +242,8 @@ internal static class ProcessSteps
 /// An instance as a step loads it. <see cref="Now"/> is the time of the step's transaction. The subject
 /// ids are <see langword="null"/> for an instance of a process without a subject, and
 /// <see cref="Parameters"/> holds its parameter values. It is <see langword="null"/> for an instance with a subject.
+/// The parent fields name the instance and the sub-process step that started it, and are <see langword="null"/>
+/// for an instance that has no parent.
 /// </summary>
 internal sealed record LoadedInstance(
     Guid Id,
@@ -231,7 +256,9 @@ internal sealed record LoadedInstance(
     long Revision,
     string Step,
     DateTimeOffset Now,
-    JsonObject? Parameters);
+    JsonObject? Parameters,
+    Guid? ParentInstanceId,
+    string? ParentStep);
 
 /// <summary>One occurrence of a step, as its history row records it.</summary>
 /// <param name="Revision">The instance revision the step ran at.</param>

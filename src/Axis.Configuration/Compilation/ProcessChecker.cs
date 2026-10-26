@@ -39,7 +39,12 @@ namespace Axis.Configuration.Compilation;
 /// is left out of the reachability, end and cycle checks, a step with a transition to an
 /// unknown step is not also reported as having no path to an end, and a form, entity, role,
 /// connector or event file that was not loaded because of its own errors, or a package that failed
-/// pinning, is not reported again.
+/// pinning, is not reported again. A <c>subProcess</c> step names a process of the application.
+/// With no subject the child takes every one of its parameters, each named once, and a <c>subject</c>
+/// is not allowed. A child with a subject takes a <c>subject</c> expression that gives a record of
+/// its entity, which may be left out only when the parent runs for a record of the same entity, and
+/// no <c>parameters</c>. The expressions type-check over the same scope as a condition. No process
+/// starts itself through <c>subProcess</c> steps, directly or through others.
 /// </summary>
 internal static class ProcessChecker
 {
@@ -57,7 +62,7 @@ internal static class ProcessChecker
     /// the application lists in <c>packages</c>, or is null when <c>application.json</c> was not
     /// loaded. <paramref name="findPage"/> finds a loaded page by name and <paramref name="unloadedPageNames"/>
     /// holds the pages that failed to load. <paramref name="textValues"/> gives the value of a text key
-    /// in each locale that has it.
+    /// in each locale that has it. <paramref name="findProcess"/> finds a process by name, ignoring letter case.
     /// </summary>
     public static void Check(
         IReadOnlyList<ProcessResource> processes,
@@ -77,6 +82,8 @@ internal static class ProcessChecker
         Func<string, PageResource?> findPage,
         IReadOnlySet<string> unloadedPageNames,
         Func<string, IReadOnlyList<(string Locale, string Value)>> textValues,
+        Func<string, ProcessResource?> findProcess,
+        IReadOnlySet<string> unloadedProcessNames,
         ReferenceIndexBuilder references,
         IEnumerable<ExpressionRule> rules,
         IReadOnlySet<string> modules,
@@ -93,6 +100,7 @@ internal static class ProcessChecker
                     process,
                     rules,
                     modules,
+                    findEntity,
                     findConnector,
                     unloadedConnectorNames,
                     findEvent,
@@ -104,6 +112,8 @@ internal static class ProcessChecker
                     findPage,
                     unloadedPageNames,
                     textValues,
+                    findProcess,
+                    unloadedProcessNames,
                     references,
                     Report,
                     diagnostics);
@@ -175,24 +185,29 @@ internal static class ProcessChecker
                 Report,
                 diagnostics);
 
+            CheckSubProcesses(process, entity, scope, findEntity, findProcess, unloadedProcessNames, references, Report);
+
             CheckTasks(process, entity, scope, findEntity, findForm, unloadedFormNames, findRole, unloadedRoleNames, references, Report);
 
             CheckTextKeys(process, references, diagnostics);
         }
+
+        CheckSubProcessCycles(processes, findProcess, diagnostics);
     }
 
     /// <summary>
     /// Checks a process that has no <c>entity</c>. With no <c>parameters</c> either, it has no
     /// subject to check against, so only the step graph and the text keys are checked. With
     /// <c>parameters</c>, a repeated name, ignoring letter case, is reported once, and the start
-    /// condition, decision <c>when</c> and connector or package inputs are checked over the
-    /// parameters and the named rules. A step that needs a subject record is reported once at the
+    /// condition, decision <c>when</c>, connector or package inputs and sub-process expressions are
+    /// checked over the parameters and the named rules. A step that needs a subject record is reported once at the
     /// property to change, and its other properties are not checked.
     /// </summary>
     private static void CheckWithoutSubject(
         ProcessResource process,
         IEnumerable<ExpressionRule> rules,
         IReadOnlySet<string> modules,
+        Func<string, EntityResource?> findEntity,
         Func<string, ConnectorResource?> findConnector,
         IReadOnlySet<string> unloadedConnectorNames,
         Func<string, EventResource?> findEvent,
@@ -204,6 +219,8 @@ internal static class ProcessChecker
         Func<string, PageResource?> findPage,
         IReadOnlySet<string> unloadedPageNames,
         Func<string, IReadOnlyList<(string Locale, string Value)>> textValues,
+        Func<string, ProcessResource?> findProcess,
+        IReadOnlySet<string> unloadedProcessNames,
         ReferenceIndexBuilder references,
         Action<string, string, string> report,
         List<Diagnostic> diagnostics)
@@ -260,6 +277,8 @@ internal static class ProcessChecker
             report,
             diagnostics);
 
+        CheckSubProcesses(process, null, scope, findEntity, findProcess, unloadedProcessNames, references, report);
+
         CheckTextKeys(process, references, diagnostics);
     }
 
@@ -306,6 +325,264 @@ internal static class ProcessChecker
         }
     }
 
+    /// <summary>
+    /// Checks each <c>subProcess</c> step against the process it names, found ignoring letter case.
+    /// A name that is not found is reported, unless its file was not loaded because of its own
+    /// errors, and then the step's <c>subject</c> and <c>parameters</c> are not checked. A child
+    /// without a subject takes no <c>subject</c> and every one of its parameters, each named once,
+    /// ignoring letter case, with an expression that fits the parameter's type over
+    /// <paramref name="scope"/>. A child with a subject takes no <c>parameters</c>. Its
+    /// <c>subject</c> is needed when the parent has no subject, or when both entities are known and
+    /// differ, and it is an expression over <paramref name="scope"/> that gives a reference to the
+    /// child's entity. The expressions are not checked when <paramref name="scope"/> is null, which
+    /// is when the subject entity is unknown, and the entities are not compared when either is unknown.
+    /// </summary>
+    private static void CheckSubProcesses(
+        ProcessResource process,
+        EntityResource? entity,
+        ExpressionScope? scope,
+        Func<string, EntityResource?> findEntity,
+        Func<string, ProcessResource?> findProcess,
+        IReadOnlySet<string> unloadedProcessNames,
+        ReferenceIndexBuilder references,
+        Action<string, string, string> report)
+    {
+        for (var index = 0; index < process.Steps.Count; index++)
+        {
+            var step = process.Steps[index];
+            if (step.Type != ProcessStepDefinition.SubProcess)
+            {
+                continue;
+            }
+
+            var path = $"/steps/{index}";
+            if (findProcess(step.Process!) is not { } child)
+            {
+                // A process file that was not loaded because of its own errors is not reported again.
+                if (!unloadedProcessNames.Contains(step.Process!))
+                {
+                    report(
+                        DiagnosticCodes.UnknownSubProcess,
+                        $"The process '{step.Process}' was not found. The application has no process with that name.",
+                        $"{path}/process");
+                }
+
+                continue;
+            }
+
+            if (child.Entity is null)
+            {
+                CheckSubProcessParameters(process, step, path, child, scope, references, report);
+            }
+            else
+            {
+                CheckSubProcessSubject(process, step, path, child, entity, scope, findEntity, references, report);
+            }
+        }
+    }
+
+    private static void CheckSubProcessParameters(
+        ProcessResource process,
+        ProcessStepDefinition step,
+        string path,
+        ProcessResource child,
+        ExpressionScope? scope,
+        ReferenceIndexBuilder references,
+        Action<string, string, string> report)
+    {
+        if (step.Subject is not null)
+        {
+            report(
+                DiagnosticCodes.InvalidSubProcessSubject,
+                $"The process '{child.Name}' has no subject, so the step cannot give a 'subject'. Give its parameters in 'parameters' instead.",
+                $"{path}/subject");
+        }
+
+        var declared = child.Parameters ?? [];
+        var givenBy = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (key, expression) in step.Parameters ?? new Dictionary<string, string>())
+        {
+            var keyPath = $"{path}/parameters/{key}";
+            var parameter = declared.FirstOrDefault(candidate => string.Equals(candidate.Name, key, StringComparison.OrdinalIgnoreCase));
+            if (parameter is null)
+            {
+                report(
+                    DiagnosticCodes.InvalidSubProcessParameters,
+                    $"The parameter '{key}' was not found. The process '{child.Name}' has no parameter with that name.",
+                    keyPath);
+                continue;
+            }
+
+            if (!givenBy.TryAdd(parameter.Name, key))
+            {
+                report(
+                    DiagnosticCodes.InvalidSubProcessParameters,
+                    $"The parameter '{parameter.Name}' is already given by '{givenBy[parameter.Name]}' in this step.",
+                    keyPath);
+                continue;
+            }
+
+            // The expression cannot be checked without the subject entity.
+            if (scope is null)
+            {
+                continue;
+            }
+
+            var problem = CheckExpression(process, expression, scope, ExpressionScopes.TypeOf(parameter.Type), keyPath, references);
+            if (problem is not null)
+            {
+                report(problem.Code, problem.Message, keyPath);
+            }
+        }
+
+        foreach (var parameter in declared)
+        {
+            if (!givenBy.ContainsKey(parameter.Name))
+            {
+                report(
+                    DiagnosticCodes.InvalidSubProcessParameters,
+                    $"The parameter '{parameter.Name}' is needed by the process '{child.Name}', but the step does not give it.",
+                    $"{path}/parameters");
+            }
+        }
+    }
+
+    private static void CheckSubProcessSubject(
+        ProcessResource process,
+        ProcessStepDefinition step,
+        string path,
+        ProcessResource child,
+        EntityResource? entity,
+        ExpressionScope? scope,
+        Func<string, EntityResource?> findEntity,
+        ReferenceIndexBuilder references,
+        Action<string, string, string> report)
+    {
+        if (step.Parameters is not null)
+        {
+            report(
+                DiagnosticCodes.InvalidSubProcessParameters,
+                $"The process '{child.Name}' has a subject, so the step cannot give 'parameters'. Give the record it runs for in 'subject' instead.",
+                $"{path}/parameters");
+        }
+
+        var childEntity = findEntity(child.Entity!);
+        if (step.Subject is not { } subject)
+        {
+            if (process.Entity is null)
+            {
+                report(
+                    DiagnosticCodes.InvalidSubProcessSubject,
+                    $"The process '{child.Name}' runs for a record of '{child.Entity}', and this process has no subject. Give a 'subject' that names the record.",
+                    path);
+            }
+            else if (entity is not null && childEntity is not null && !ReferenceEquals(entity, childEntity))
+            {
+                report(
+                    DiagnosticCodes.InvalidSubProcessSubject,
+                    $"The process '{child.Name}' runs for a record of '{childEntity.Name}', and this process for one of '{entity.Name}'. Give a 'subject' that names the record.",
+                    path);
+            }
+
+            return;
+        }
+
+        // The expression cannot be checked without both entities.
+        if (scope is null || childEntity is null)
+        {
+            return;
+        }
+
+        var problem = CheckExpression(process, subject, scope, ExpressionType.Reference(childEntity.Name), $"{path}/subject", references);
+        if (problem is not null)
+        {
+            report(problem.Code, problem.Message, $"{path}/subject");
+        }
+    }
+
+    /// <summary>
+    /// Reports each <c>subProcess</c> step that closes a loop between processes: the process it
+    /// starts reaches the step's own process through <c>subProcess</c> steps, or is that process. The
+    /// instances would start each other for ever. A step is reported once, at its <c>process</c>,
+    /// naming the shortest chain back to its process. Processes are found by name, ignoring letter
+    /// case, and a name that is not found has no children.
+    /// </summary>
+    private static void CheckSubProcessCycles(
+        IReadOnlyList<ProcessResource> processes, Func<string, ProcessResource?> findProcess, List<Diagnostic> diagnostics)
+    {
+        List<(int Index, ProcessResource Child)> Children(ProcessResource process) =>
+        [
+            .. process.Steps
+                .Select((step, index) => (Step: step, Index: index))
+                .Where(pair => pair.Step.Type == ProcessStepDefinition.SubProcess)
+                .Select(pair => (pair.Index, Child: findProcess(pair.Step.Process!)))
+                .Where(pair => pair.Child is not null)
+                .Select(pair => (pair.Index, pair.Child!)),
+        ];
+
+        foreach (var process in processes)
+        {
+            foreach (var (index, child) in Children(process))
+            {
+                // A breadth-first walk from the child gives the shortest way back to the process.
+                var previous = new Dictionary<string, ProcessResource>(StringComparer.Ordinal);
+                var queue = new Queue<ProcessResource>([child]);
+                var visited = new HashSet<string>(StringComparer.Ordinal) { child.File };
+                var found = string.Equals(child.File, process.File, StringComparison.Ordinal);
+                while (!found && queue.TryDequeue(out var current))
+                {
+                    foreach (var (_, next) in Children(current))
+                    {
+                        if (!visited.Add(next.File))
+                        {
+                            continue;
+                        }
+
+                        previous[next.File] = current;
+                        if (string.Equals(next.File, process.File, StringComparison.Ordinal))
+                        {
+                            found = true;
+                            break;
+                        }
+
+                        queue.Enqueue(next);
+                    }
+                }
+
+                if (!found)
+                {
+                    continue;
+                }
+
+                // The way from the child to the process's last step, then back to the process.
+                var way = new List<ProcessResource>();
+                if (!string.Equals(child.File, process.File, StringComparison.Ordinal))
+                {
+                    for (var member = previous[process.File]; ; member = previous[member.File])
+                    {
+                        way.Add(member);
+                        if (string.Equals(member.File, child.File, StringComparison.Ordinal))
+                        {
+                            break;
+                        }
+                    }
+
+                    way.Reverse();
+                }
+
+                var chain = new[] { process }.Concat(way).Append(process);
+
+                var names = string.Join(" → ", chain.Select(member => $"'{member.Name}'"));
+                diagnostics.Add(new Diagnostic(
+                    DiagnosticCodes.SubProcessCycle,
+                    $"Processes {names} start each other through sub-process steps, so they would never end.",
+                    process.File,
+                    $"/steps/{index}/process",
+                    process.Id));
+            }
+        }
+    }
+
     private static void CheckTextKeys(ProcessResource process, ReferenceIndexBuilder references, List<Diagnostic> diagnostics)
     {
         if (process.StartCondition is { } startCondition)
@@ -339,7 +616,9 @@ internal static class ProcessChecker
     /// policy with the defaults filled in, and the manifest's <c>idempotent</c> and <c>timeout</c>. A
     /// notify step holds its recipients and channels in file order and its placeholder values in ordinal
     /// order of their names. The page it opens holds the page's declared name, and the parameters it gives
-    /// are in the page's declaration order.
+    /// are in the page's declaration order. A
+    /// sub-process step holds the child's id and declared name, the compiled <c>subject</c> as a
+    /// reference to the child's entity, and the parameters in the child's declaration order.
     /// </summary>
     public static ProcessModel Build(
         ProcessResource process,
@@ -349,6 +628,7 @@ internal static class ProcessChecker
         Func<string, EventResource?> findEvent,
         Func<string, PinnedOperations?> findPackage,
         Func<string, PageResource?> findPage,
+        Func<string, ProcessResource?> findProcess,
         IEnumerable<ExpressionRule> rules,
         IReadOnlySet<string> modules)
     {
@@ -459,6 +739,29 @@ internal static class ProcessChecker
                 operation.Capabilities);
         }
 
+        // A checked step names a process of the application and gives what the process needs: a
+        // subject for a child with one, unless it is the parent's own, or each of its parameters.
+        SubProcessStepModel BuildSubProcess(ProcessStepDefinition step)
+        {
+            var child = findProcess(step.Process!)!;
+            var values = new Dictionary<string, string>(step.Parameters ?? new Dictionary<string, string>(), StringComparer.OrdinalIgnoreCase);
+            return new SubProcessStepModel(
+                step.Name,
+                child.Id,
+                child.Name,
+                step.Subject is { } subject
+                    ? ExpressionModel.Compile(subject, scope, ExpressionType.Reference(findEntity(child.Entity!)!.Name))
+                    : null,
+                [
+                    .. (child.Parameters ?? [])
+                        .Where(parameter => values.ContainsKey(parameter.Name))
+                        .Select(parameter => new SubProcessParameterModel(
+                            parameter.Name,
+                            ExpressionModel.Compile(values[parameter.Name], scope, ExpressionScopes.TypeOf(parameter.Type)))),
+                ],
+                Resolve(step.Next!));
+        }
+
         // A checked raise names a loaded event and gives each of its payload fields once.
         RaiseEventStepModel BuildRaiseEvent(ProcessStepDefinition step)
         {
@@ -543,8 +846,9 @@ internal static class ProcessChecker
                         step.Operation!,
                         Assign(step.Set!),
                         Resolve(step.Next!)),
+                    ProcessStepDefinition.SubProcess => BuildSubProcess(step),
                     ProcessStepDefinition.End => new EndStepModel(step.Name),
-                    _ => throw new ArgumentOutOfRangeException(nameof(process), step.Type, "The JSON Schema allows only decision, task, operation and end steps."),
+                    _ => throw new ArgumentOutOfRangeException(nameof(process), step.Type, "The JSON Schema allows only decision, task, operation, subProcess and end steps."),
                 })
                 .ToList(),
         };

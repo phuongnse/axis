@@ -9,7 +9,7 @@ work, and the tables. The rest of the process reference is in these files:
   steps, loops, the `createRecord` operation and processes without a subject.
   Loops through a `task` are built, the rest is _(planned for M14)_.
 - [task-deadlines.md](task-deadlines.md): task escalations, deadlines, claim
-  and reassign _(planned for M14)_.
+  and reassign. Claim and reassign are built, the rest is _(planned for M14)_.
 - [notifications.md](notifications.md): the `notify` operation and in-app and
   email notifications _(planned for M14)_.
 - [process-execution.md](process-execution.md): execution, connector calls,
@@ -224,10 +224,11 @@ a payment reference from the sample extension package, see
 
 ## Steps
 
-M3 has four step types. Wait for event, timer and sub-process come later.
-_(Planned for M14)_ `timer`, `waitEvent` and `subProcess` steps, and the
-`createRecord` operation, and running the `notify` operation, see
-[process flow](process-flow.md) and
+M3 has four step types. Wait for event and timer come later. The engine runs
+a `subProcess` step, see [Sub-process step](process-flow.md#sub-process-step).
+Its failure handling and cancel rules are _(planned for M14)_, as are `timer`
+and `waitEvent` steps, the `createRecord` operation, and running the `notify`
+operation, see [process flow](process-flow.md) and
 [notifications](notifications.md#notify-operation). The compiler already
 checks and builds a `notify` step.
 
@@ -244,7 +245,7 @@ checks and builds a `notify` step.
     such as `department.manager`. A `role` names a role the user must hold.
     Queues come later. _(Planned for M14)_ A user who holds the role may
     claim the task, see [Claim and release](task-deadlines.md#claim-and-release).
-  - `form` names a [form resource](frontend.md) whose entity is the subject
+  - `form` names a [form resource](form-widget.md) whose entity is the subject
     entity. The task page shows it over the subject record.
   - `dueIn` is optional. It is a positive ISO 8601 duration in whole
     numbers: either weeks, such as `P2W`, or days with an optional time part
@@ -296,7 +297,9 @@ reported in one pass. See
   A process without a subject has no `task`, `updateRecord` or `raiseEvent`
   step and no `output` on a connector or package step (`AXC0246`). Its start
   condition and each `when` see its parameters and the named rules, and no
-  field, path or `id`. A trigger that names such a process is `AXC0247`. The
+  field, path or `id`. A trigger that names such a process is `AXC0247`, except a schedule trigger
+  without a data source, see [Scheduled
+  jobs](process-events.md#scheduled-jobs). The
   start endpoint answers `400` for it until starting these processes is built,
   see [Processes without a
   subject](process-flow.md#processes-without-a-subject).
@@ -383,7 +386,8 @@ reported in one pass. See
 
 ## Start endpoint
 
-A start creates an instance for one subject record:
+A start creates an instance for one subject record. A process without a subject
+takes [parameters instead](#a-process-without-a-subject):
 
 ```http
 POST /api/apps/{app}/processes/{process}/instances
@@ -432,9 +436,13 @@ The `201` has no `Location` header. Reading an instance needs an `inspect`
 grant, which the user who started it may not hold. See the
 [instance detail](process-inspection.md#instance-detail).
 
-A start needs a session, a `start` grant on the process and read access to
-the subject record, as [Authorization](security.md#authorization)
-describes.
+A start needs a session, or a bearer token of a
+[service account](security.md#service-accounts), a `start` grant on the process
+and read access to the subject record, as
+[Authorization](security.md#authorization) describes. A request with a bearer
+token needs no CSRF header, and its caller id is the actor of the
+`process.started` audit record. A bad token is a `401` with
+`WWW-Authenticate: Bearer`.
 
 - **Subject the user may not read.** A subject record the user may not read
   does not exist for them. That is a record outside every filter of their
@@ -444,14 +452,14 @@ describes.
 
 A request is checked in this order, and the first failure is the response:
 
-1. The session, `401`.
+1. The session or the bearer token, `401`.
 2. The application and the process, `404`.
 3. The `start` grant on the process, `403`.
 4. The content type, `415`.
 5. The body, `400`.
 6. The `Idempotency-Key` header, `400`.
 
-A start without the CSRF header is a `403` before any of these checks. Read
+A start by a session without the CSRF header is a `403` before any of these checks. Read
 access to the subject record is checked in the transaction, when the record
 is read.
 
@@ -496,12 +504,49 @@ caller, and its details add the endpoint's name.
 - Concurrent repeats are serialized by the receipt's unique key, so only one
   of them starts an instance.
 
+### A process without a subject
+
+A [process without a subject](process-flow.md#processes-without-a-subject)
+takes its typed parameters instead of a record id:
+
+```http
+POST /api/apps/{app}/processes/{process}/instances
+Content-Type: application/json
+
+{ "parameters": { "days": 31 } }
+```
+
+The checks run in the order above, and so do the answers. The differences are
+these:
+
+- **`201`.** The body has the same keys, and `subjectId` is `null`. The
+  instance stores the parameter values.
+- **`400` for a body.** The body must be exactly one `parameters` property,
+  and its value must be an object. Anything else is one error keyed
+  `/parameters`.
+- **`400` for a parameter.** Each declared parameter must be given once, by its
+  exact name, letter case included, with a value of its type, read as a record
+  field value of that type is. A missing, unknown, repeated, `null` or
+  mistyped parameter is an error keyed `/parameters/{name}`. All the errors
+  are in one response.
+- **`400` for a start condition.** The `startCondition` is checked over the
+  parameters. A failure is an error keyed `/parameters` that holds the
+  condition's message text key.
+- **`409`.** A `running` or `waiting` instance of the process exists. The title
+  is "A running or waiting instance of this process already exists.".
+- **`403`.** The user needs the `start` grant only. There is no record, so no
+  `read` check runs and there is no policy `409`.
+- **`422`.** The `Idempotency-Key` was used before with other parameter values.
+  The receipt stores a null subject, and the values are compared with those
+  stored on the receipt's instance. Decimals count as equal when they are the
+  same number.
+
 ## Instance states
 
 | State | Meaning |
 | --- | --- |
 | `running` | The instance has work that is ready or claimed by a worker. |
-| `waiting` | The instance waits for a human task to be completed or for a connector call to settle, see [Connector calls](process-execution.md#connector-calls). It also waits for a package operation call, see [Package operations](process-execution.md#package-operations). _(Planned for M14)_ It also waits for a timer, an event or a sub-process, see [process flow](process-flow.md). |
+| `waiting` | The instance waits for a human task to be completed or for a connector call to settle, see [Connector calls](process-execution.md#connector-calls). It also waits for a package operation call, see [Package operations](process-execution.md#package-operations), and for the child of a sub-process step, see [Sub-process step](process-flow.md#sub-process-step). _(Planned for M14)_ It also waits for a timer or an event, see [process flow](process-flow.md). |
 | `completed` | The instance reached an `end` step. |
 | `failed` | A step failed. The error is in the history. |
 | `cancelled` | An operator cancelled the instance while it was `running` or `waiting`. It is an end state. See [Cancel](process-inspection.md#cancel). |
@@ -549,7 +594,7 @@ for texts. **Both** means different parts use different releases.
 | Task completion | Both | Form, outcomes and the record write use the pinned release. Data change triggers come from the active release. |
 | Instance list | Active | Roles and policies come from the active release. |
 | Instance detail | Both | The graph and the step names use the instance's release. So do the fields a call's mapping reads or writes. Roles and policies come from the active release, and so do the fields the user may read. The `sensitive` flag counts when the pinned release or the active release marks the field. See [Values and masking](process-inspection.md#values-and-masking). |
-| Worker steps (`decision`, `task`, `operation`, `updateRecord`, `end`) | Pinned | Step definitions, expressions, rules and record writes use the instance's release. |
+| Worker steps (`decision`, `task`, `operation`, `updateRecord`, `subProcess`, `end`) | Pinned | Step definitions, expressions, rules and record writes use the instance's release. |
 | `connector.call` and `package.call` | Pinned | Calls use the instance's release, including its pinned package version. Deployment binding values are resolved at run time. |
 | Operator retry | Pinned steps, active policies | The instance runs its steps on its pinned release. The `retry` grant comes from the active release. |
 | Operator resolve | Both | The output check and the record write use the pinned release. The `resolve` grant and data change triggers come from the active release. |
@@ -575,7 +620,7 @@ for texts. **Both** means different parts use different releases.
   with no pending migration never takes it. A server request that finds a
   different active release under the lock runs again on the new release. The
   process start endpoint, the [inbound endpoint](inbound-endpoints.md#responses),
-  task completion and record creates and updates answer `503` after three
+  task completion and record creates, updates and deletes answer `503` after three
   release changes. A record delete takes the lock shared too, and the subject's row lock decides between a
   start and a delete of the same record. Operator [retry](process-inspection.md#retry) takes it too, as the first
   statement of its transaction, and answers `503` after three release changes.
@@ -638,7 +683,9 @@ database, with history in `axis.__processes_migrations` (see
   open instance. The subject columns are null for such an instance, and its
   `parameters` `jsonb` column holds the values it started with, see
   [process flow](process-flow.md#processes-without-a-subject).
-  _(Planned for M14)_ The table gains `parent_instance_id` and `parent_step`.
+  An instance that a sub-process step started also holds the `parent_instance_id`
+  and the `parent_step` of its parent, and both are null for any other
+  instance. An index on `parent_instance_id` finds the children of a parent.
   Three more indexes serve the inspector's instance list: one by application,
   process and start time, newest first, one by application, process, state and
   start time, and one by subject record.
@@ -676,12 +723,14 @@ database, with history in `axis.__processes_migrations` (see
   `process_instance_id` of the call's instance and the `package_call_id` of
   the call. See [Package operations](process-execution.md#package-operations). An `event.deliver` item delivers one event occurrence to
   the `async` event triggers, see [Event delivery](process-events.md#event-delivery). It has
-  the `event_id` of the occurrence. Every item also has the `trace_id` and
+  the `event_id` of the occurrence, and the `trigger_id` of the one trigger it delivers
+  to when an operator [redelivered](process-events.md#routes) a dead letter. Every item also has the `trace_id` and
   `span_id` of the span whose transaction queued it, or null when no span was
   current. A run starts a new trace with a link to that span, see
   [Telemetry](../architecture.md#telemetry). A rescheduled item keeps them.
   Activation that queues a `trigger.schedule` item again replaces them.
-  Two more kinds come with [schedules](process-events.md#schedules), one with
+  Three more kinds come with [schedules](process-events.md#schedules), one with
+  [sub-processes](process-flow.md#sub-process-step), one with
   [task deadlines](task-deadlines.md), and one with
   [computed fields](migrations.md#recomputing-computed-fields):
   - `trigger.schedule` runs the occurrences of one schedule trigger. Its item
@@ -691,6 +740,10 @@ database, with history in `axis.__processes_migrations` (see
     Its item also has the `trigger_id`, the `release_id` that was active at
     the occurrence and the `occurrence_at` time. Its `cursor` is the last
     record id it handled, and is null before its first batch.
+  - `process.resume` resumes the parent of a completed child. Its item also
+    has the `process_instance_id` of the child, and the handler finds the
+    parent from the child's `parent_instance_id`. See
+    [Sub-process step](process-flow.md#sub-process-step).
   - `task.deadline` expires one task at its deadline. Its item also has the
     `task_id` of the task and the `process_instance_id` of its instance, and
     its `due_at` is the task step's time plus the deadline's `after`. See
@@ -700,7 +753,8 @@ database, with history in `axis.__processes_migrations` (see
     batch of up to 500 rows. See
     [Recomputing computed fields](migrations.md#recomputing-computed-fields).
 - `axis.process_start_receipts`: the stored `201` response of each
-  `Idempotency-Key`, unique per application, process and key.
+  `Idempotency-Key`, unique per application, process and key. The subject is
+  null for a process without a subject.
 - `axis.endpoint_receipts`: the record and instance of each endpoint call's
   `Idempotency-Key`, unique per application, endpoint, caller and key, with a
   hash of the input. See [Idempotency](inbound-endpoints.md#idempotency).
@@ -854,6 +908,6 @@ database, with history in `axis.__processes_migrations` (see
   through a `timer` or `waitEvent` step is allowed too.
 - **No user check.** The user id that a `user` assignee gives is not checked
   against any list of users. A wrong id creates a task that nobody sees. A
-  reassign in M14 checks its target against the
+  [reassign](task-deadlines.md#reassign) checks its target against the
   [user profiles](notifications.md#user-profiles), but the `user` expression
   stays unchecked.

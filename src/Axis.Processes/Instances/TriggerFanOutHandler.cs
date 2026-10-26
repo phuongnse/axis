@@ -25,6 +25,9 @@ namespace Axis.Processes.Instances;
 /// starts nothing. Each record gets a receipt in <c>axis.trigger_starts</c> keyed by the trigger,
 /// the occurrence and the record, so a run again after a crash starts nothing twice. A start marks
 /// the receipt <c>started</c>, and a skip leaves it <c>skipped</c> and is logged with its reason after the commit.
+/// A trigger without a data source is a scheduled job. Its occurrence starts the process, which has no subject,
+/// once with the trigger's parameter values, in one batch with no cursor. Its receipt has the nil UUID as the
+/// record, and a skip, such as one for a process that still runs, is logged without a record.
 /// A data error in the data source's filter ends the occurrence with a warning. When the data
 /// source's filter or a group field reads a computed field that is being recomputed, the batch starts
 /// nothing, writes no receipt and keeps the cursor. It logs a warning and makes the item due again one
@@ -54,6 +57,7 @@ internal sealed partial class TriggerFanOutHandler(ReleaseModelCache models, Del
         var occurrence = occurrenceAt.UtcDateTime.ToString("yyyy'-'MM'-'dd'T'HH':'mm':'ss'Z'", CultureInfo.InvariantCulture);
 
         var skips = new List<(Guid SubjectId, string Reason)>();
+        string? jobSkip = null;
         var outcome = WorkItemOutcome.Completed;
         TriggerModel trigger;
         try
@@ -70,7 +74,6 @@ internal sealed partial class TriggerFanOutHandler(ReleaseModelCache models, Del
                 var context = new WorkItemContext(item, connection, transaction);
                 var stored = await models.GetAsync(context, releaseId, cancellationToken);
                 trigger = stored.Triggers.First(candidate => candidate.Id == triggerId);
-                var dataSource = stored.DataSources.First(candidate => candidate.Id == trigger.DataSource!.Id);
 
                 // The start lock comes before the active release is read and before any entity table, so a
                 // migrating activation cannot deadlock with this batch, and the release is the one the starts pin.
@@ -81,8 +84,14 @@ internal sealed partial class TriggerFanOutHandler(ReleaseModelCache models, Del
                 {
                     LogNothingToStart(trigger.Name, occurrence, trigger.Process.Name);
                 }
+                else if (trigger.DataSource is null)
+                {
+                    // A scheduled job starts the process once. It has no cursor, no pending fields and no data error.
+                    jobSkip = await StartJobAsync(item, transaction, current.Model, current.ReleaseId, trigger, process, occurrence, cancellationToken);
+                }
                 else
                 {
+                    var dataSource = stored.DataSources.First(candidate => candidate.Id == trigger.DataSource.Id);
                     var parameters = dataSource.Parameters
                         .Select(parameter => new DataSourceParameterValue(parameter, trigger.Parameters!.GetValueOrDefault(parameter.Name)))
                         .ToList();
@@ -153,6 +162,11 @@ internal sealed partial class TriggerFanOutHandler(ReleaseModelCache models, Del
         foreach (var (subjectId, reason) in skips)
         {
             LogSkipped(trigger.Name, trigger.Process.Name, subjectId, occurrence, reason);
+        }
+
+        if (jobSkip is not null)
+        {
+            LogJobSkipped(trigger.Name, trigger.Process.Name, occurrence, jobSkip);
         }
 
         return outcome;
@@ -307,6 +321,68 @@ internal sealed partial class TriggerFanOutHandler(ReleaseModelCache models, Del
             ? "the process already runs for the record"
             : started.ErrorKind is { } kind ? $"the start condition failed: {kind}" : "the start condition is not true";
     }
+
+    /// <summary>
+    /// Inserts the receipt of a scheduled job, which has the nil UUID as its record, then starts the
+    /// trigger's process without a subject with the trigger's parameters. Returns the reason the start
+    /// was skipped, or <see langword="null"/> when it happened.
+    /// </summary>
+    private static async Task<string?> StartJobAsync(
+        ClaimedWorkItem item,
+        NpgsqlTransaction transaction,
+        ApplicationModel active,
+        Guid activeReleaseId,
+        TriggerModel trigger,
+        ProcessModel process,
+        string occurrence,
+        CancellationToken cancellationToken)
+    {
+        var connection = transaction.Connection ?? throw new ArgumentException("The transaction is completed.", nameof(transaction));
+
+        // The receipt goes first, so a concurrent or repeated run waits on its key and then skips.
+        if (!await TriggerStarts.TryInsertAsync(transaction, trigger.Id, occurrence, Guid.Empty, cancellationToken))
+        {
+            return "the occurrence was already handled";
+        }
+
+        // The release that is active now can differ from the one the trigger comes from.
+        if (process.Entity is not null)
+        {
+            return "the process has a subject in the active release";
+        }
+
+        if (ProcessParameters.ToJson(process, trigger.Parameters ?? new Dictionary<string, object?>()) is not { } parameters)
+        {
+            return "the trigger's parameters do not fit the process in the active release";
+        }
+
+        var instanceId = Guid.CreateVersion7();
+        var started = await ProcessStarter.StartWithParametersAsync(
+            connection,
+            transaction,
+            item.TenantId,
+            active,
+            activeReleaseId,
+            process,
+            parameters,
+            instanceId,
+            AuditActors.System,
+            actorName: null,
+            new JsonObject { ["trigger"] = trigger.Name, ["occurrenceAt"] = occurrence },
+            cancellationToken);
+        if (started.Outcome == ProcessStartOutcome.Started)
+        {
+            await TriggerStarts.MarkStartedAsync(transaction, trigger.Id, occurrence, Guid.Empty, instanceId, cancellationToken);
+            return null;
+        }
+
+        return started.Outcome == ProcessStartOutcome.AlreadyRunning
+            ? "the process is already running"
+            : started.ErrorKind is { } kind ? $"the start condition failed: {kind}" : "the start condition is not true";
+    }
+
+    [LoggerMessage(LogLevel.Information, "Trigger {Trigger} skipped the start of process {Process} for occurrence {OccurrenceAt}: {Reason}.")]
+    private partial void LogJobSkipped(string trigger, string process, string occurrenceAt, string reason);
 
     [LoggerMessage(LogLevel.Information, "Trigger {Trigger} skipped the start of process {Process} for record {SubjectId} of occurrence {OccurrenceAt}: {Reason}.")]
     private partial void LogSkipped(string trigger, string process, Guid subjectId, string occurrenceAt, string reason);

@@ -32,10 +32,13 @@ public static class ProcessStarts
     /// <summary>The kind of the work item that expires one open task at its step's deadline.</summary>
     public const string TaskDeadlineWorkItemKind = "task.deadline";
 
+    /// <summary>The kind of the work item that resumes a parent instance when its sub-process child completes.</summary>
+    public const string ProcessResumeWorkItemKind = "process.resume";
+
     /// <summary>The state of an instance that has work ready or claimed.</summary>
     public const string Running = "running";
 
-    /// <summary>The state of an instance that waits for a human task to be completed or a connector call to settle.</summary>
+    /// <summary>The state of an instance that waits for a human task to be completed, a connector call to settle or a sub-process child to complete.</summary>
     public const string Waiting = "waiting";
 
     /// <summary>The state of an instance that reached an <c>end</c> step.</summary>
@@ -62,7 +65,7 @@ public static class ProcessStarts
         Guid applicationId,
         Guid processId,
         string key,
-        Guid subjectId,
+        Guid? subjectId,
         Guid instanceId,
         string body,
         CancellationToken cancellationToken = default)
@@ -79,13 +82,16 @@ public static class ProcessStarts
         command.Parameters.AddWithValue("application", applicationId);
         command.Parameters.AddWithValue("process", processId);
         command.Parameters.AddWithValue("key", key);
-        command.Parameters.AddWithValue("subject", subjectId);
+        command.Parameters.Add(new NpgsqlParameter("subject", NpgsqlDbType.Uuid) { Value = (object?)subjectId ?? DBNull.Value });
         command.Parameters.AddWithValue("instance", instanceId);
         command.Parameters.Add(new NpgsqlParameter("body", NpgsqlDbType.Jsonb) { Value = body });
         return await command.ExecuteNonQueryAsync(cancellationToken) == 1;
     }
 
-    /// <summary>Returns the stored receipt of <paramref name="key"/>, or <see langword="null"/> when there is none.</summary>
+    /// <summary>
+    /// Returns the stored receipt of <paramref name="key"/>, or <see langword="null"/> when there is none.
+    /// For a process without a subject, the receipt carries the parameters stored on its instance.
+    /// </summary>
     public static async Task<ProcessStartReceipt?> FindReceiptAsync(
         NpgsqlConnection connection,
         Guid applicationId,
@@ -96,8 +102,10 @@ public static class ProcessStarts
         ArgumentNullException.ThrowIfNull(connection);
         await using var command = new NpgsqlCommand(
             """
-            SELECT subject_id, status_code, body::text FROM axis.process_start_receipts
-            WHERE application_id = @application AND process_id = @process AND key = @key
+            SELECT r.subject_id, r.status_code, r.body::text, i.parameters::text
+            FROM axis.process_start_receipts r
+            LEFT JOIN axis.process_instances i ON i.id = r.instance_id
+            WHERE r.application_id = @application AND r.process_id = @process AND r.key = @key
             """,
             connection);
         command.Parameters.AddWithValue("application", applicationId);
@@ -105,7 +113,11 @@ public static class ProcessStarts
         command.Parameters.AddWithValue("key", key);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         return await reader.ReadAsync(cancellationToken)
-            ? new ProcessStartReceipt(reader.GetGuid(0), reader.GetInt32(1), reader.GetString(2))
+            ? new ProcessStartReceipt(
+                reader.IsDBNull(0) ? null : reader.GetGuid(0),
+                reader.GetInt32(1),
+                reader.GetString(2),
+                reader.IsDBNull(3) ? null : reader.GetString(3))
             : null;
     }
 
@@ -125,8 +137,10 @@ public static class ProcessStarts
         await using var command = new NpgsqlCommand(
             """
             INSERT INTO axis.process_instances
-                (id, application_id, process_id, subject_entity_id, subject_id, release_id, state, revision, step, parameters)
-            VALUES (@id, @application, @process, @entity, @subject, @release, @state, 1, @step, @parameters)
+                (id, application_id, process_id, subject_entity_id, subject_id, release_id, state, revision, step, parameters,
+                 parent_instance_id, parent_step)
+            VALUES (@id, @application, @process, @entity, @subject, @release, @state, 1, @step, @parameters,
+                    @parentInstance, @parentStep)
             """,
             Connection(transaction),
             transaction);
@@ -139,6 +153,8 @@ public static class ProcessStarts
         command.Parameters.AddWithValue("state", Running);
         command.Parameters.AddWithValue("step", instance.Step);
         command.Parameters.Add(new NpgsqlParameter("parameters", NpgsqlDbType.Jsonb) { Value = (object?)instance.Parameters ?? DBNull.Value });
+        command.Parameters.Add(new NpgsqlParameter("parentInstance", NpgsqlDbType.Uuid) { Value = (object?)instance.ParentInstanceId ?? DBNull.Value });
+        command.Parameters.Add(new NpgsqlParameter("parentStep", NpgsqlDbType.Text) { Value = (object?)instance.ParentStep ?? DBNull.Value });
         try
         {
             await command.ExecuteNonQueryAsync(cancellationToken);
@@ -204,8 +220,12 @@ public static class ProcessStarts
         transaction.Connection ?? throw new ArgumentException("The transaction is completed.", nameof(transaction));
 }
 
-/// <summary>A stored start response: the subject record it started for, its status code and its body as JSON text.</summary>
-public sealed record ProcessStartReceipt(Guid SubjectId, int StatusCode, string Body);
+/// <summary>
+/// A stored start response: the subject record it started for, its status code and its body as JSON
+/// text, and the parameters stored on its instance as JSON text. The subject is <see langword="null"/>
+/// for a process without a subject, and the parameters are <see langword="null"/> for one with a subject.
+/// </summary>
+public sealed record ProcessStartReceipt(Guid? SubjectId, int StatusCode, string Body, string? Parameters);
 
 /// <summary>
 /// An instance's application, process, subject record and state. The subject fields are

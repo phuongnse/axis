@@ -25,6 +25,9 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
 
     public const string TestSecretKey = TestPlatform.SecretKey;
 
+    /// <summary>The settings that make the tenant setting commands run: they need the directory source. It is not the default, because the publisher tests branch on it.</summary>
+    public static readonly IReadOnlyDictionary<string, string?> Directory = new Dictionary<string, string?> { ["Tenancy:Source"] = "directory" };
+
     public const string Authority = "https://127.0.0.1:1/realms/axis";
 
     public static readonly TenantSecretCipher Cipher = TenantSecretCipher.Load(
@@ -125,7 +128,8 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
         string? path = null,
         IReadOnlyDictionary<string, string?>? extra = null,
         TimeSpan? publisherLease = null,
-        TimeSpan? publisherTestLimit = null)
+        TimeSpan? publisherTestLimit = null,
+        string? input = null)
     {
         var settings = new Dictionary<string, string?>
         {
@@ -149,12 +153,13 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
             ? await AdminCommands.RunAsync(
                 args,
                 configuration,
+                new StringReader(input ?? ""),
                 output,
                 error,
                 publisherLease ?? Publisher.DefaultLeaseDuration,
                 publisherTestLimit ?? Publisher.DefaultTestLimit,
                 stop?.Token ?? CancellationToken)
-            : await AdminCommands.RunAsync(args, configuration, output, error, stop?.Token ?? CancellationToken);
+            : await AdminCommands.RunAsync(args, configuration, new StringReader(input ?? ""), output, error, stop?.Token ?? CancellationToken);
         var text = output.ToString()!;
         _texts.Add(text);
         _texts.Add(error.ToString());
@@ -176,22 +181,13 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
         return await context.TenantHosts.AsNoTracking().Where(host => host.TenantId == id).Select(host => host.Host).ToArrayAsync(CancellationToken);
     }
 
-    /// <summary>Changes a binding of a tenant in the directory, as the operator does until a command sets bindings.</summary>
-    public async Task SetBindingAsync(string id, string name, Action<TenantBindingRow> change)
-    {
-        await using var context = NewContext();
-        var binding = await context.TenantBindings.SingleAsync(row => row.TenantId == id && row.Name == name, CancellationToken);
-        change(binding);
-        await context.SaveChangesAsync(CancellationToken);
-    }
-
     public async Task<int> CountBindingsAsync(string id)
     {
         await using var context = NewContext();
         return await context.TenantBindings.AsNoTracking().CountAsync(binding => binding.TenantId == id, CancellationToken);
     }
 
-    /// <summary>Sets the endpoint audience of a tenant in the directory, which no command sets.</summary>
+    /// <summary>Sets the endpoint audience of a tenant in the directory, as the operator does without <c>tenant oidc set</c>.</summary>
     public async Task SetEndpointAudienceAsync(string id, string audience)
     {
         await using var context = NewContext();
@@ -200,7 +196,7 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
         await context.SaveChangesAsync(CancellationToken);
     }
 
-    /// <summary>Sets the service audience of a tenant in the directory, which no command sets.</summary>
+    /// <summary>Sets the service audience of a tenant in the directory, as the operator does without <c>tenant oidc set</c>.</summary>
     public async Task SetServiceAudienceAsync(string id, string audience)
     {
         await using var context = NewContext();
@@ -209,7 +205,7 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
         await context.SaveChangesAsync(CancellationToken);
     }
 
-    /// <summary>Sets the email and locale claim names of a tenant in the directory, which no command sets.</summary>
+    /// <summary>Sets the email and locale claim names of a tenant in the directory, as the operator does without <c>tenant oidc set</c>.</summary>
     public async Task SetEmailAndLocaleClaimsAsync(string id, string email, string locale)
     {
         await using var context = NewContext();
@@ -217,6 +213,24 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
         row.ClaimEmail = email;
         row.ClaimLocale = locale;
         await context.SaveChangesAsync(CancellationToken);
+    }
+
+    /// <summary>Every platform audit record in the order it was written, with the whole row as text for the leak checks.</summary>
+    public async Task<List<(string Command, string? TenantId, string[] Changed, string Text)>> AuditRecordsAsync()
+    {
+        await using var connection = new NpgsqlConnection(Platform);
+        await connection.OpenAsync(CancellationToken);
+        await using var command = new NpgsqlCommand(
+            "SELECT command, tenant_id, changed, t::text FROM platform.audit_records t ORDER BY occurred_at, id",
+            connection);
+        await using var reader = await command.ExecuteReaderAsync(CancellationToken);
+        var rows = new List<(string, string?, string[], string)>();
+        while (await reader.ReadAsync(CancellationToken))
+        {
+            rows.Add((reader.GetString(0), reader.IsDBNull(1) ? null : reader.GetString(1), reader.GetFieldValue<string[]>(2), reader.GetString(3)));
+        }
+
+        return rows;
     }
 
     public async Task<long> CountEntriesAsync()
@@ -244,7 +258,8 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
                 '|',
                 t.Id, t.Status, t.Version, t.DatabaseHost, t.DatabasePort, t.DatabaseName, t.RuntimeUser, t.SchemaUser,
                 Convert.ToHexString(t.RuntimePassword), Convert.ToHexString(t.SchemaPassword), t.OidcAuthority, t.OidcClientId,
-                Convert.ToHexString(t.OidcClientSecret), t.SchemaVersion, t.PreviewOf))
+                Convert.ToHexString(t.OidcClientSecret), t.OidcProfile, t.ClaimUserId, t.ClaimDisplayName, t.ClaimRoles, t.ClaimEmail, t.ClaimLocale,
+                t.EndpointAudience, t.ServiceAudience, t.OidcClientKeyId, t.OidcPreviousClientKeyId, t.SchemaVersion, t.PreviewOf))
             .Concat(hosts.Select(host => $"{host.TenantId}|{host.Host}"))
             .Concat(bindings.Select(binding => $"{binding.TenantId}|{binding.Name}|{binding.Kind}|{binding.Url}")));
     }
@@ -268,10 +283,11 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
 
     /// <summary>
     /// Checks that no output of any command held the admin password, a generated password, the client secret or a
-    /// connection string with a password.
+    /// connection string with a password. A test that changed the installation key passes a cipher that decrypts the stored values.
     /// </summary>
-    public async Task AssertNoSecretsAsync()
+    public async Task AssertNoSecretsAsync(TenantSecretCipher? cipher = null)
     {
+        cipher ??= Cipher;
         var secrets = new List<string>([.. _adminPasswords, _clientSecret]);
         await using (var context = NewContext())
         {
@@ -280,13 +296,18 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
             {
                 if (tenant.SchemaPassword.Length > 0)
                 {
-                    secrets.Add(Cipher.Decrypt(tenant.Id, TenantSecretFields.SchemaPassword, tenant.SchemaPassword).Reveal());
+                    secrets.Add(cipher.Decrypt(tenant.Id, TenantSecretFields.SchemaPassword, tenant.SchemaPassword).Reveal());
                 }
 
                 if (tenant.RuntimePassword.Length > 0)
                 {
-                    secrets.Add(Cipher.Decrypt(tenant.Id, TenantSecretFields.RuntimePassword, tenant.RuntimePassword).Reveal());
+                    secrets.Add(cipher.Decrypt(tenant.Id, TenantSecretFields.RuntimePassword, tenant.RuntimePassword).Reveal());
                 }
+            }
+
+            foreach (var binding in migrated ? await context.TenantBindings.AsNoTracking().Where(row => row.Kind == "secret" && row.SecretValue != null).ToListAsync(CancellationToken) : [])
+            {
+                secrets.Add(cipher.Decrypt(binding.TenantId, TenantSecretFields.Binding(binding.Name), binding.SecretValue!).Reveal());
             }
         }
 

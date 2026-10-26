@@ -77,7 +77,7 @@
       "required": ["name", "type"],
       "properties": {
         "name": { "$ref": "#/$defs/name" },
-        "type": { "enum": ["decision", "task", "operation", "end"] },
+        "type": { "enum": ["decision", "task", "operation", "subProcess", "end"] },
         "branches": {
           "type": "array",
           "minItems": 1,
@@ -135,6 +135,13 @@
         },
         "message": { "$ref": "#/$defs/notifyMessage" },
         "open": { "$ref": "#/$defs/notifyOpen" },
+        "process": { "$ref": "#/$defs/name" },
+        "subject": { "type": "string", "minLength": 1, "x-axis-expression": true },
+        "parameters": {
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/name" },
+          "additionalProperties": { "type": "string", "minLength": 1, "x-axis-expression": true }
+        },
         "next": { "$ref": "#/$defs/name", "x-axis-reference": { "part": "step", "of": "/name" } },
         "label": { "$ref": "#/$defs/textReference" },
         "assignee": { "$ref": "#/$defs/assignee" },
@@ -161,6 +168,9 @@
           "then": {
             "required": ["branches", "otherwise"],
             "properties": {
+              "process": false,
+              "subject": false,
+              "parameters": false,
               "operation": false,
               "set": false,
               "connector": false,
@@ -188,6 +198,9 @@
           "then": {
             "required": ["label", "assignee", "form", "outcomes"],
             "properties": {
+              "process": false,
+              "subject": false,
+              "parameters": false,
               "branches": false,
               "otherwise": false,
               "operation": false,
@@ -211,8 +224,39 @@
           "then": {
             "required": ["operation", "next"],
             "properties": {
+              "process": false,
+              "subject": false,
+              "parameters": false,
               "branches": false,
               "otherwise": false,
+              "label": false,
+              "assignee": false,
+              "form": false,
+              "dueIn": false,
+              "outcomes": false,
+              "deadline": false
+            }
+          }
+        },
+        {
+          "if": { "required": ["type"], "properties": { "type": { "const": "subProcess" } } },
+          "then": {
+            "required": ["process", "next"],
+            "properties": {
+              "branches": false,
+              "otherwise": false,
+              "operation": false,
+              "set": false,
+              "connector": false,
+              "input": false,
+              "output": false,
+              "retry": false,
+              "event": false,
+              "fields": false,
+              "to": false,
+              "channels": false,
+              "message": false,
+              "open": false,
               "label": false,
               "assignee": false,
               "form": false,
@@ -226,6 +270,9 @@
           "if": { "required": ["type"], "properties": { "type": { "const": "end" } } },
           "then": {
             "properties": {
+              "process": false,
+              "subject": false,
+              "parameters": false,
               "branches": false,
               "otherwise": false,
               "operation": false,

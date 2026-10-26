@@ -24,6 +24,47 @@ internal static class DpopProof
     private const string ProofType = "dpop+jwt";
 
     /// <summary>
+    /// A proof that this server makes for a request it sends, signed with <paramref name="key"/>, which must be a P-256 key.
+    /// Its <c>jwk</c> header holds the public key only. Its <c>htu</c> is the <paramref name="url"/> without the query and
+    /// fragment, and it carries the <paramref name="nonce"/> when the receiver asked for one. It has no <c>ath</c>, as
+    /// no access token exists yet at the token endpoint.
+    /// </summary>
+    public static string Create(ECDsa key, string method, string url, DateTimeOffset now, string? nonce = null)
+    {
+        var parameters = key.ExportParameters(false);
+        var claims = new Dictionary<string, object>
+        {
+            ["jti"] = Guid.NewGuid().ToString("N"),
+            ["htm"] = method,
+            ["htu"] = new Uri(url).GetLeftPart(UriPartial.Path),
+            ["iat"] = now.ToUnixTimeSeconds(),
+        };
+        if (nonce is not null)
+        {
+            claims["nonce"] = nonce;
+        }
+
+        var jwk = new Dictionary<string, object>
+        {
+            ["kty"] = "EC",
+            ["crv"] = "P-256",
+            ["x"] = Base64UrlEncoder.Encode(parameters.Q.X),
+            ["y"] = Base64UrlEncoder.Encode(parameters.Q.Y),
+        };
+        return new JsonWebTokenHandler { SetDefaultTimesOnTokenCreation = false }.CreateToken(new SecurityTokenDescriptor
+        {
+            TokenType = ProofType,
+            Claims = claims,
+            AdditionalHeaderClaims = new Dictionary<string, object> { ["jwk"] = jwk },
+            SigningCredentials = new SigningCredentials(new ECDsaSecurityKey(key), SecurityAlgorithms.EcdsaSha256)
+            {
+                // A cached signature provider would keep the ECDsa after the caller disposes it.
+                CryptoProviderFactory = new CryptoProviderFactory { CacheSignatureProviders = false },
+            },
+        });
+    }
+
+    /// <summary>
     /// Whether the request carries exactly one valid proof for the access token. The proof must be signed with the key in
     /// its own <c>jwk</c> header, which must hold no private key. Its <c>htm</c> must be the request's method, its
     /// <c>htu</c> the request's scheme, host and path (the query and fragment are ignored), its <c>iat</c> within

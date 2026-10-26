@@ -80,6 +80,49 @@ describe('expressionScope', () => {
     expect(labelsOf(expressionScope('form', draft, '/sections/0/visibleWhen', names))).not.toContain('title')
   })
 
+  it('offers a process with a subject its id and its entity fields, id first', () => {
+    const labels = labelsOf(
+      expressionScope('process', { entity: 'PurchaseRequest' }, '/steps/0/branches/0/when', names),
+    )
+
+    expect(labels.slice(0, 3)).toEqual(['id', 'title', 'requester'])
+    expect(labels).toContain('departments:IsManager()')
+  })
+
+  it('offers a process without a subject its parameters and the rules, and no field or id', () => {
+    const draft = { parameters: [{ name: 'daysOverdue', type: 'integer' }, { type: 'text' }] }
+    const options = expressionScope('process', draft, '/steps/0/branches/0/when', names)
+    const labels = labelsOf(options)
+
+    expect(options.find((option) => option.label === 'daysOverdue')?.type).toBe('parameter')
+    expect(labels).toContain('departments:IsManager()')
+    expect(labels).toContain('length()')
+    expect(labels).not.toContain('id')
+    expect(labels).not.toContain('title')
+    expect(labels).not.toContain('code')
+  })
+
+  it('does not offer the parameters of a process that also has an entity', () => {
+    const draft = { entity: 'PurchaseRequest', parameters: [{ name: 'daysOverdue', type: 'integer' }] }
+
+    expect(labelsOf(expressionScope('process', draft, '/steps/0/branches/0/when', names))).not.toContain('daysOverdue')
+  })
+
+  it('offers a data change trigger the fields and id of its entity', () => {
+    const draft = { type: 'dataChange', entity: 'PurchaseRequest', on: ['delete'] }
+    const labels = labelsOf(expressionScope('trigger', draft, '/parameters/daysOverdue', names))
+
+    expect(labels.slice(0, 3)).toEqual(['id', 'title', 'requester'])
+    expect(labels).toContain('departments:IsManager()')
+  })
+
+  it('offers a trigger without an entity no field', () => {
+    const labels = labelsOf(expressionScope('trigger', { type: 'event', event: 'Paid' }, '/when', names))
+
+    expect(labels).not.toContain('id')
+    expect(labels).toContain('departments:IsManager()')
+  })
+
   it('offers only the functions and aggregates when no names are loaded', () => {
     const options = expressionScope('policy', { grants: [{ entity: 'PurchaseRequest' }] }, '/grants/0/filter', null)
 

@@ -40,7 +40,16 @@ export interface ApplicationSite {
 
 /** A field type as written in entity files. */
 export type FieldType =
-  'text' | 'integer' | 'decimal' | 'boolean' | 'date' | 'date-time' | 'enum' | 'reference' | 'child-collection'
+  | 'text'
+  | 'integer'
+  | 'decimal'
+  | 'money'
+  | 'boolean'
+  | 'date'
+  | 'date-time'
+  | 'enum'
+  | 'reference'
+  | 'child-collection'
 
 /** The entity a reference field points to, its display field and the path of its record API. */
 export interface ReferenceTarget {
@@ -68,6 +77,10 @@ export interface FieldMetadata {
   maxLength: number | null
   precision: number | null
   scale: number | null
+  /** The fixed currency code of a money field, or missing or `null` otherwise. */
+  currency?: string | null
+  /** The name of the field that holds the currency code of a money field, or missing or `null` otherwise. */
+  currencyField?: string | null
   /** The lowest accepted value as the literal was written, such as `10`, `0.5` or `2026-01-01`. */
   min: string | null
   /** The highest accepted value, written like `min`. */
@@ -114,9 +127,9 @@ export interface DataSourceColumn {
   /** The text key of each enum value's label, by value, or missing or `null` when the enum has no labels. */
   valueLabelKeys?: Record<string, string> | null
   target: ReferenceTarget | null
-  /** The fixed currency code of a money measure, or missing or `null` otherwise. */
+  /** The fixed currency code of a money column or measure, or missing or `null` otherwise. */
   currency?: string | null
-  /** The name of the group column that holds the currency code of a money measure, or missing or `null` otherwise. */
+  /** The name of the column that holds the currency code of a money column or measure, or missing or `null` otherwise. */
   currencyColumn?: string | null
 }
 
@@ -240,7 +253,8 @@ export interface WidgetAccess {
  * widget shows all records of an entity, or the rows of a data source. `form` is set only on a form
  * widget that names a form, and `entity` is then the form's entity with every field. A task inbox has
  * neither an entity nor a data source, and lists the signed-in user's tasks from `tasksPath`. A process
- * inspector has neither, and lists the instances of its `process` from `instancesPath`.
+ * inspector has neither, and lists the instances of its `process` from `instancesPath` and its open dead
+ * letters from `deadLettersPath`.
  */
 export interface WidgetMetadata {
   type: 'table' | 'form' | 'taskInbox' | 'processInspector' | 'kpi' | 'chart' | 'detail'
@@ -255,6 +269,8 @@ export interface WidgetMetadata {
   process: string | null
   /** The inspection API's instance list path on a process inspector, and `null` on every other widget. */
   instancesPath: string | null
+  /** The dead letter list path on a process inspector, and `null` on every other widget. */
+  deadLettersPath: string | null
   /** The actions of a form or detail widget the user may take, and `[]` on every other widget. */
   actions: WidgetAction[]
   /** The `startProcess`, navigate and `delete` actions a table shows on each row, and `[]` on every other widget. */
