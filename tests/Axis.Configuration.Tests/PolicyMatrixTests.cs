@@ -20,6 +20,7 @@ public sealed class PolicyMatrixTests
     [InlineData("purchase-requests")]
     [InlineData("leave-requests")]
     [InlineData("service-desk")]
+    [InlineData("asset-management")]
     public void Every_cell_of_a_sample_equals_what_the_policy_evaluator_grants(string sample)
     {
         var result = ApplicationCompiler.Compile(
@@ -265,6 +266,26 @@ public sealed class PolicyMatrixTests
         Assert.Contains(requester.Grants, grant => grant.Filter == "requester == currentUser() and status == 'draft'");
         Assert.DoesNotContain("delete", Cell(Role(matrix, "agent"), "entity", "Ticket").Actions);
         Assert.DoesNotContain("delete", Cell(Role(matrix, "service-desk-lead"), "entity", "Ticket").Actions);
+    }
+
+    [Fact]
+    public void In_asset_management_only_the_asset_manager_writes_and_imports_and_the_employee_cannot_export()
+    {
+        var result = ApplicationCompiler.Compile(
+            Path.Combine(AppContext.BaseDirectory, "Samples", "asset-management"), SamplePackages.Versions, SampleModules.Modules);
+
+        Assert.Empty(result.Diagnostics);
+        var matrix = result.PolicyMatrix;
+
+        Assert.Equal(
+            ["read", "create", "update", "delete", "export", "import"],
+            Cell(Role(matrix, "asset-manager"), "entity", "Asset").Actions);
+        var employee = Cell(Role(matrix, "employee"), "entity", "Asset");
+        Assert.Contains("read", employee.Actions);
+        Assert.DoesNotContain("export", employee.Actions);
+        Assert.DoesNotContain("import", employee.Actions);
+        Assert.Contains(employee.Grants, grant => grant.Filter == "holder == currentUser()");
+        Assert.Equal(["read", "export"], Cell(Role(matrix, "auditor"), "entity", "Asset").Actions);
     }
 
     private static string Name(PolicyAction action) => action.ToString().ToLowerInvariant();

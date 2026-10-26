@@ -1,0 +1,33 @@
+{
+  "id": "0096cde0-8800-4ccf-8a7c-72ec282bbe91",
+  "kind": "scenario",
+  "name": "AssetIsRegistered",
+  "formatVersion": 1,
+  "now": "2026-10-01T09:00:00Z",
+  "users": {
+    "quan": [
+      "asset-manager"
+    ]
+  },
+  "steps": [
+    {
+      "type": "createRecord",
+      "entity": "Asset",
+      "as": "quan",
+      "save": "asset",
+      "values": {
+        "name": "Dell Latitude 7440",
+        "currency": "USD",
+        "purchaseCost": 1500
+      }
+    },
+    {
+      "type": "expectRecord",
+      "record": "asset",
+      "values": {
+        "number": "AS-000001",
+        "status": "in-stock"
+      }
+    }
+  ]
+}

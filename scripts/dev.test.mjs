@@ -279,8 +279,8 @@ describe('scripts/dev.sh', { concurrency: false }, () => {
     assert.equal(await siteStatus(`preview.localhost:${ports.server}`), 200)
     assert.equal(await siteStatus('unknown.localhost'), 404)
 
-    // The server activated the three samples on the preview tenant, in its own database axis_preview.
-    for (const application of ['PurchaseRequests', 'LeaveRequests', 'ServiceDesk']) {
+    // The server activated the four samples on the preview tenant, in its own database axis_preview.
+    for (const application of ['PurchaseRequests', 'LeaveRequests', 'ServiceDesk', 'AssetManagement']) {
       assert.match(run.stdout, new RegExp(`Activated application ${application} .* for tenant default-preview\\.`))
     }
     const previewReleases = execFileSync(
@@ -288,7 +288,7 @@ describe('scripts/dev.sh', { concurrency: false }, () => {
       ['compose', '-p', project, 'exec', '-T', 'postgres', 'psql', '-U', 'axis', '-d', 'axis_preview', '-tAc', 'select count(*) from axis.active_releases'],
       { cwd: copy, encoding: 'utf8' },
     )
-    assert.ok(Number(previewReleases.trim()) >= 3, `axis.active_releases in axis_preview holds ${previewReleases}`)
+    assert.ok(Number(previewReleases.trim()) >= 4, `axis.active_releases in axis_preview holds ${previewReleases}`)
 
     // The worker starts only after the server has migrated the tenant databases.
     await waitForOutput(run, /\[worker\] .*Tenant default is ready for work/)

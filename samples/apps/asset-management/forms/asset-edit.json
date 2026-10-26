@@ -1,0 +1,88 @@
+{
+  "id": "f0851665-899b-489a-9588-480b3e8e8520",
+  "kind": "form",
+  "name": "AssetEdit",
+  "formatVersion": 1,
+  "entity": "Asset",
+  "sections": [
+    {
+      "name": "general",
+      "title": {
+        "textKey": "asset.sections.general"
+      },
+      "fields": [
+        {
+          "field": "number"
+        },
+        {
+          "field": "name"
+        },
+        {
+          "field": "category"
+        },
+        {
+          "field": "status"
+        },
+        {
+          "field": "location"
+        },
+        {
+          "field": "holder"
+        }
+      ]
+    },
+    {
+      "name": "purchase",
+      "title": {
+        "textKey": "asset.sections.purchase"
+      },
+      "fields": [
+        {
+          "field": "currency"
+        },
+        {
+          "field": "purchaseCost"
+        },
+        {
+          "field": "purchaseDate"
+        },
+        {
+          "field": "warrantyEnd"
+        }
+      ]
+    },
+    {
+      "name": "software",
+      "title": {
+        "textKey": "asset.sections.software"
+      },
+      "fields": [
+        {
+          "field": "software"
+        }
+      ]
+    },
+    {
+      "name": "attachments",
+      "title": {
+        "textKey": "asset.sections.attachments"
+      },
+      "fields": [
+        {
+          "field": "attachments"
+        }
+      ]
+    },
+    {
+      "name": "maintenance",
+      "title": {
+        "textKey": "asset.sections.maintenance"
+      },
+      "fields": [
+        {
+          "field": "maintenance"
+        }
+      ]
+    }
+  ]
+}

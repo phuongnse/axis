@@ -1,0 +1,87 @@
+{
+  "id": "6eaf079a-ce31-442b-9b25-b1b2761aca0c",
+  "kind": "policy",
+  "name": "AssetManagerAccess",
+  "formatVersion": 1,
+  "roles": [
+    "asset-manager"
+  ],
+  "grants": [
+    {
+      "entity": "Asset",
+      "actions": [
+        "read",
+        "create",
+        "update",
+        "delete",
+        "import",
+        "export"
+      ]
+    },
+    {
+      "entity": "Category",
+      "actions": [
+        "read",
+        "create",
+        "update",
+        "delete",
+        "import",
+        "export"
+      ]
+    },
+    {
+      "entity": "Location",
+      "actions": [
+        "read",
+        "create",
+        "update",
+        "delete",
+        "import",
+        "export"
+      ]
+    },
+    {
+      "entity": "Vendor",
+      "actions": [
+        "read",
+        "create",
+        "update",
+        "delete",
+        "import",
+        "export"
+      ]
+    },
+    {
+      "entity": "Software",
+      "actions": [
+        "read",
+        "create",
+        "update",
+        "delete",
+        "import",
+        "export"
+      ]
+    },
+    {
+      "dataSource": "AssetValueByLocation",
+      "actions": [
+        "read",
+        "export"
+      ]
+    },
+    {
+      "dataSource": "AssetsByStatus",
+      "actions": [
+        "read",
+        "export"
+      ]
+    },
+    {
+      "dataSource": "WarrantiesEndingSoon",
+      "actions": [
+        "read",
+        "export"
+      ]
+    }
+  ]
+}

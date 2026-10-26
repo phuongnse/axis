@@ -1,0 +1,42 @@
+{
+  "id": "fd2a4737-daa1-4558-8916-72b090b4e941",
+  "kind": "policy",
+  "name": "EmployeeAccess",
+  "formatVersion": 1,
+  "roles": [
+    "employee"
+  ],
+  "grants": [
+    {
+      "entity": "Asset",
+      "actions": [
+        "read"
+      ],
+      "filter": "holder == currentUser()"
+    },
+    {
+      "entity": "Category",
+      "actions": [
+        "read"
+      ]
+    },
+    {
+      "entity": "Location",
+      "actions": [
+        "read"
+      ]
+    },
+    {
+      "entity": "Vendor",
+      "actions": [
+        "read"
+      ]
+    },
+    {
+      "entity": "Software",
+      "actions": [
+        "read"
+      ]
+    }
+  ]
+}
