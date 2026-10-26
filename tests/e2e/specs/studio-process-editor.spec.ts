@@ -237,4 +237,56 @@ test.describe('Studio edits a process in the process editor', () => {
       await writeFile(target, original)
     }
   })
+
+  test('an author drags a task handle to a step, picks an outcome, undoes it and saves it after a redo', async ({
+    page,
+  }) => {
+    await useSession(page, 'hoa')
+    const id = await processId(page)
+    const target = path.join(copy, file)
+    const original = await readFile(target, 'utf8')
+
+    try {
+      // The earlier journeys changed the copy, so the steps and the outcome are found by name.
+      const content = JSON.parse(original) as { steps: { name: string; outcomes?: { name: string; next: string }[] }[] }
+      const task = content.steps.findIndex((step) => step.name === 'managerApproval')
+      const done = content.steps.findIndex((step) => step.name === 'done')
+      const outcome = content.steps[task].outcomes?.findIndex((candidate) => candidate.name === 'approve') ?? -1
+      expect(task).toBeGreaterThanOrEqual(0)
+      expect(done).toBeGreaterThanOrEqual(0)
+      expect(outcome).toBeGreaterThanOrEqual(0)
+      await page.goto(`${server.url}/studio?app=PurchaseRequests&resource=${id}`)
+
+      const edge = page.getByTestId(`rf__edge-/steps/${task}/outcomes/${outcome}`)
+      const before = await edge.getAttribute('aria-label')
+      expect(before).not.toBeNull()
+      expect(before).not.toBe('managerApproval to done · approve')
+
+      // The mouse works in viewport coordinates, and the graph starts below the release table.
+      await page.getByTestId('studio-process-graph').evaluate((element) => element.scrollIntoView({ block: 'start' }))
+      const handle = (await page.getByTestId(`studio-graph-handle-${task}`).boundingBox())!
+      const node = (await page.getByTestId(`studio-graph-node-${done}`).boundingBox())!
+      await page.mouse.move(handle.x + handle.width / 2, handle.y + handle.height / 2)
+      await page.mouse.down()
+      await page.mouse.move(node.x + node.width / 2, node.y + node.height / 2, { steps: 10 })
+      await page.mouse.up()
+
+      await expect(page.getByTestId('studio-process-connect-menu')).toBeVisible()
+      await page.getByRole('menuitem', { name: 'approve', exact: true }).click()
+      await expect(edge).toHaveAccessibleName('managerApproval to done · approve')
+      await expect(page.getByTestId('studio-process-announcement')).toContainText('now goes to done')
+
+      await page.getByRole('button', { name: 'Undo', exact: true }).click()
+      await expect(edge).toHaveAccessibleName(before!)
+      await page.getByRole('button', { name: 'Redo', exact: true }).click()
+      await expect(edge).toHaveAccessibleName('managerApproval to done · approve')
+
+      await page.getByRole('button', { name: 'Save', exact: true }).click()
+      await expect(page.getByTestId('studio-saved')).toBeVisible()
+      const saved = JSON.parse(await readFile(target, 'utf8')) as typeof content
+      expect(saved.steps[task].outcomes?.[outcome].next).toBe('done')
+    } finally {
+      await writeFile(target, original)
+    }
+  })
 })
