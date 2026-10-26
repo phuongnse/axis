@@ -70,6 +70,7 @@ public sealed record DecisionBranchModel(ExpressionModel When, string Next);
 /// <see cref="Form"/>, shown over the subject record, with one of its <see cref="Outcomes"/>.
 /// <see cref="DueIn"/> is the time from the task's creation to its due date, or null when it has none.
 /// <see cref="Deadline"/> is when the task expires and where the process goes then, or null when it has none.
+/// <see cref="Escalations"/> are what happens to the task before its deadline, in file order. The engine does not run them yet.
 /// </summary>
 public sealed record TaskStepModel(
     string Name,
@@ -78,7 +79,8 @@ public sealed record TaskStepModel(
     FormReference Form,
     TimeSpan? DueIn,
     IReadOnlyList<TaskOutcomeModel> Outcomes,
-    TaskDeadlineModel? Deadline) : ProcessStepModel(Name);
+    TaskDeadlineModel? Deadline,
+    IReadOnlyList<TaskEscalationModel> Escalations) : ProcessStepModel(Name);
 
 /// <summary>
 /// The assignee of a task: exactly one of <see cref="User"/>, a <c>text</c> expression over the
@@ -91,6 +93,24 @@ public sealed record TaskOutcomeModel(string Name, TextReference Label, string N
 
 /// <summary>The deadline of a task: the time from the task's creation until it expires, and the declared name of the step the process then moves to.</summary>
 public sealed record TaskDeadlineModel(TimeSpan After, string Next);
+
+/// <summary>
+/// An escalation of a task: the time from the task's creation until it runs, who the task is
+/// reassigned to, or null, and the notification it sends, or null. At least one of them is set.
+/// </summary>
+public sealed record TaskEscalationModel(TimeSpan After, TaskAssigneeModel? Reassign, TaskEscalationNotifyModel? Notify);
+
+/// <summary>
+/// The notification of a task escalation: the same as a <see cref="NotifyStepModel"/> without its
+/// next step. The values are in ordinal order of their names.
+/// </summary>
+public sealed record TaskEscalationNotifyModel(
+    IReadOnlyList<NotifyRecipientModel> Recipients,
+    IReadOnlyList<string> Channels,
+    TextReference Subject,
+    TextReference Body,
+    IReadOnlyList<NotifyValueModel> Values,
+    NotifyOpenModel? Open);
 
 /// <summary>
 /// A timer: the process waits for <see cref="Wait"/> from the time the step runs, or until the time
