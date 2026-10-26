@@ -1,5 +1,6 @@
 import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { ConfigProvider } from 'antd'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
@@ -64,21 +65,23 @@ function Location() {
 function renderBell() {
   return render(
     <MemoryRouter initialEntries={['/e2e/notes']}>
-      <ThemeModeProvider>
-        <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
-          <Routes>
-            <Route
-              path="*"
-              element={
-                <>
-                  <NotificationBell path={path} sitePath="e2e" locale="en" />
-                  <Location />
-                </>
-              }
-            />
-          </Routes>
-        </TextProvider>
-      </ThemeModeProvider>
+      <ConfigProvider theme={{ token: { motion: false } }}>
+        <ThemeModeProvider>
+          <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+            <Routes>
+              <Route
+                path="*"
+                element={
+                  <>
+                    <NotificationBell path={path} sitePath="e2e" locale="en" />
+                    <Location />
+                  </>
+                }
+              />
+            </Routes>
+          </TextProvider>
+        </ThemeModeProvider>
+      </ConfigProvider>
     </MemoryRouter>,
   )
 }

@@ -18,26 +18,30 @@ export interface TableSort {
   descending: boolean
 }
 
-/** The paging, sorting and data source parameter values of a table, as kept in the URL. */
+/** The paging, sorting, search and data source parameter values of a table, as kept in the URL. */
 export interface TableQuery {
   page: number
   pageSize: number
   sort: TableSort | null
   /** The data source parameter values by parameter name, in declaration order. None is empty. */
   parameters?: Record<string, string>
+  /** The search text, as typed. Never empty: no search leaves it out. */
+  search?: string
 }
 
 /**
- * Reads `page`, `pageSize`, `sort` and the values of `parameterNames` from the URL. An invalid value
+ * Reads `page`, `pageSize`, `sort`, `search` and the values of `parameterNames` from the URL. An invalid value
  * falls back to its default: a `page` that is not a positive integer, a `pageSize` the table does
  * not offer, or a `sort` that names no field or a reference or file field. `fields` are the table's columns.
- * A repeated parameter keeps its first value, and an empty value is left out.
+ * A repeated parameter keeps its first value, and an empty value is left out. `search` is read only
+ * when the table is `searchable`, and it is not trimmed.
  */
 export function parseTableQuery(
   params: URLSearchParams,
   fields: readonly Pick<FieldMetadata, 'name' | 'type'>[],
   defaultPageSize: number = recordPageSize,
   parameterNames: readonly string[] = [],
+  searchable = false,
 ): TableQuery {
   const parameters: Record<string, string> = {}
   for (const name of parameterNames) {
@@ -47,6 +51,7 @@ export function parseTableQuery(
       parameters[name] = value
     }
   }
+  const search = searchable ? params.get('search') : null
   const page = params.get('page')
   const pageSize = tablePageSizes(defaultPageSize).find((size) => String(size) === params.get('pageSize'))
   const sort = params.get('sort')
@@ -59,13 +64,15 @@ export function parseTableQuery(
     pageSize: pageSize ?? defaultPageSize,
     sort: sortField && sortable ? { field: sortField, descending: sort !== sortField } : null,
     parameters,
+    ...(search ? { search } : {}),
   }
 }
 
 /**
  * Writes the table's parameters into a copy of the URL parameters. Other parameters stay first, as
- * they are. The data source parameter values follow, then `page`, `pageSize` and `sort` in that
- * order, and defaults are left out. `parameterNames` are removed first, so a cleared value goes.
+ * they are. The data source parameter values follow, then `search`, `page`, `pageSize` and `sort` in
+ * that order, and defaults are left out. `parameterNames` and `search` are removed first, so a
+ * cleared value goes.
  */
 export function writeTableQuery(
   current: URLSearchParams,
@@ -77,6 +84,7 @@ export function writeTableQuery(
   for (const name of parameterNames) {
     next.delete(name)
   }
+  next.delete('search')
   next.delete('page')
   next.delete('pageSize')
   next.delete('sort')
@@ -87,8 +95,8 @@ export function writeTableQuery(
 }
 
 /**
- * The record API query for a table query: the data source parameter values, then only the paging and
- * sorting parameters that differ from the defaults.
+ * The record API query for a table query: the data source parameter values, the search text, then
+ * only the paging and sorting parameters that differ from the defaults.
  */
 export function recordQuery(query: TableQuery, defaultPageSize: number = recordPageSize): string {
   const params = new URLSearchParams()
@@ -96,6 +104,9 @@ export function recordQuery(query: TableQuery, defaultPageSize: number = recordP
     if (value) {
       params.append(name, value)
     }
+  }
+  if (query.search) {
+    params.set('search', query.search)
   }
   if (query.page !== defaultPage) {
     params.set('page', String(query.page))

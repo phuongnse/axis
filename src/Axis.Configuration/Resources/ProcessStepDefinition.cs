@@ -150,4 +150,7 @@ public sealed record ProcessStepDefinition
 
     /// <summary>When a task expires and the step it then leads to, or null when the task has no deadline or for any other step.</summary>
     public TaskDeadlineDefinition? Deadline { get; init; }
+
+    /// <summary>What happens to a task before its deadline, in file order, or null when the task has none or for any other step.</summary>
+    public IReadOnlyList<TaskEscalationDefinition>? Escalations { get; init; }
 }
