@@ -283,8 +283,12 @@ fixtures, only for the API paths of the fixture application. It needs no server,
   `tabs`, `section`, `states` and `field-<type>` for each field type. The `states` preview draws, once,
   the states every widget shares: a table while it loads and a table whose request fails. A
   `field-<type>` preview draws the input the form widget uses for that field type,
-  with its label and the fixture value, laid out as on a form. It has no Save, Cancel or action buttons and no history,
-  which only the `form` preview shows. Its input works as on a form, and nothing is saved. A mounted widget follows
+  with its label and the fixture value, laid out as on a form, in four states: Typical, Required, Read-only, and
+  Validation error, which shows a fixed message under the input. `field-child-collection` draws line items with a
+  reference cell and a computed cell, in four states: Reference and computed cells, Cell error, Read-only, and Empty.
+  The `form` preview draws Validation errors, which submits the form once when it mounts to a fixture that answers
+  with a validation problem, Read-only by a condition, and Wizard steps. A field preview has no Save, Cancel or action
+  buttons and no history, which only the `form` preview shows. Its input works as on a form, and nothing is saved. A mounted widget follows
   `data-theme` on the root element of the page.
   `dark` is dark mode, and any other value or none is light mode. A mounted widget also follows the token custom
   properties of the root element, such as `--primary`, see [frontend](reference/frontend.md).
@@ -296,8 +300,10 @@ fixtures, only for the API paths of the fixture application. It needs no server,
 and fails on a console error or on a request other than the harness and the bundle. It also checks that
 changing `data-theme` redraws a table, that a mounted form follows `--primary` on the root element and redraws when
 it changes, and that no fixture reaches the server's web root. It checks that a field preview has no Save button and
-no history, and that the `states` preview shows a busy widget and the load error alert. It opens the date-time
-picker and the reference lookup and adds a child collection row.
+no history, and that the `states` preview shows a busy widget and the load error alert. For each field type except
+the child collection, it checks in both modes that the required, read-only and error states show. It checks the
+child collection's reference, computed, error, read-only and empty states, and the form's validation, read-only and
+wizard states. It opens the date-time picker and the reference lookup and adds a child collection row.
 
 ## Formatting
 
