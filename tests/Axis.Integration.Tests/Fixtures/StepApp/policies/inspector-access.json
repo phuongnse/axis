@@ -6,7 +6,7 @@
   "roles": ["inspector"],
   "grants": [
     { "entity": "Request", "actions": ["read"], "filter": "department is null" },
-    { "process": "RoleApprove", "actions": ["inspect"] },
+    { "process": "RoleApprove", "actions": ["inspect", "reassign"] },
     { "process": "Break", "actions": ["inspect"] },
     { "process": "Submit", "actions": ["inspect"] },
     { "process": "Divide", "actions": ["inspect"] },

@@ -68,6 +68,19 @@ public sealed class EndpointCallTests(EndpointCallFixture fixture) : IClassFixtu
     }
 
     [Fact]
+    public async Task A_field_the_mapping_leaves_out_gets_its_default()
+    {
+        using var response = await CallAsync("""{ "input": { "title": "Desk", "status": "open" } }""");
+
+        var body = await response.Content.ReadAsStringAsync(CancellationToken);
+        Assert.True(response.StatusCode == HttpStatusCode.Created, body);
+        using var json = JsonDocument.Parse(body);
+        Assert.Equal(1L, await fixture.CountAsync(
+            $"SELECT count(*) FROM {fixture.NoteTable} WHERE {Column("id")} = @id AND {Column("source")} = 'imported'",
+            ("id", json.RootElement.GetProperty("recordId").GetGuid())));
+    }
+
+    [Fact]
     public async Task The_create_and_the_start_are_audited_with_the_caller_as_the_actor_and_the_endpoint_in_their_details()
     {
         using var response = await CallAsync("""{ "input": { "title": "Chair", "status": "open" } }""");

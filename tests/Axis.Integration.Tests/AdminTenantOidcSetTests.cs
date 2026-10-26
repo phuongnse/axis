@@ -99,7 +99,7 @@ public sealed class AdminTenantOidcSetTests(PostgreSqlFixture database, Keycloak
             ["tenant", "oidc", "set", id, "--client-secret"],
             withClientSecret: false,
             extra: _directory,
-            input: new StringReader($"{second}\nignored\n"));
+            input: $"{second}\nignored\n");
 
         Assert.Equal(0, piped.Exit);
         var after = await scenario.RowAsync(id);
@@ -109,7 +109,7 @@ public sealed class AdminTenantOidcSetTests(PostgreSqlFixture database, Keycloak
 
         // An empty secret on standard input is refused and changes nothing.
         var snapshot = await scenario.SnapshotAsync();
-        var empty = await scenario.RunAsync(["tenant", "oidc", "set", id, "--client-secret"], withClientSecret: false, extra: _directory, input: new StringReader("\n"));
+        var empty = await scenario.RunAsync(["tenant", "oidc", "set", id, "--client-secret"], withClientSecret: false, extra: _directory, input: "\n");
 
         Assert.Equal(2, empty.Exit);
         Assert.Equal(snapshot, await scenario.SnapshotAsync());

@@ -7,9 +7,11 @@ activate releases, and back up and restore tenants. It follows
 and
 [D45](../decisions/d45-tenant-backup-and-restore.md).
 The commands are `tenant create`, `tenant suspend`, `tenant resume`, `tenant rotate-passwords`,
-`tenant oidc set`, `tenant list`, `tenant backup`, `tenant restore`, `migrate`, `activate`, `publisher` and `version`. The commands that change a tenant
-after it is created and rotate keys are in [tenant setting commands](tenant-setting-commands.md)
-_(planned for M16)_. A tenant can also come from the `Tenants`
+`tenant list`, `tenant backup`, `tenant restore`, `tenant oidc set`, `tenant binding list|set|remove`,
+`tenant host add|remove|move`, `migrate`, `activate`, `publisher` and `version`. The commands that
+change a tenant after it is created and rotate keys are in
+[tenant setting commands](tenant-setting-commands.md). The client key options and the key rotation
+are _(planned for M16)_ on the same page. A tenant can also come from the `Tenants`
 section, where the server migrates and activates at start, see
 [startup activation](host-settings.md#startup-activation).
 
@@ -39,6 +41,8 @@ which host holds which connection. There is no HTTP API for provisioning.
 | `Scenarios:ServerConnectionString` | `Scenarios__ServerConnectionString` | A database role with `CREATEDB`, not a superuser, that owns no tenant database. Only `publisher` reads it, to run `test` requests. It creates and drops the `axis_scenario_<uuid>` databases of the scenarios. Empty means a `test` request fails with `AXC0217`, which names this setting. A value that is not a connection string exits with code 2. See [database roles](storage.md#database-roles). |
 | `Extensions:Path` | `Extensions__Path` | The installed extension packages. Only `activate`, `publisher` and `tenant restore` read it. |
 | `Modules:Path` | `Modules__Path` | The installed modules. Only `activate` and `publisher` read it. `tenant restore` never reads it, because a missing module refuses nothing. |
+| `Tenancy:Source` | `Tenancy__Source` | `directory` for the tenant setting commands, which exit with code 2 under any other value. `publisher` reads it too, see [publisher](#publisher). |
+| none | `AXIS_BINDING_SECRET` | The value of the `secret` binding that `tenant binding set --secret` sets. When it is unset, the value comes from standard input. It is never a command-line option. Only that command reads it. |
 | none | `AXIS_OIDC_CLIENT_SECRET` | The OIDC client secret of the new tenant. `tenant create` and `tenant restore` read it, and so does `tenant oidc set --client-secret`, which reads the first line of standard input when the variable is not set. It is never a command-line option, so it does not appear in a process list. |
 | none | `PATH` | `tenant backup` and `tenant restore` run `pg_dump` and `pg_restore`, so both must be on `PATH`. Their version must match the database server. A missing tool exits with code 2. |
 
@@ -49,6 +53,11 @@ message names the setting and never holds its value.
 `ConnectionStrings:PlatformSchema`. They decrypt nothing and create no role or
 database, so they need neither `Platform:SecretKey`, `Admin:ConnectionString`
 nor `AXIS_OIDC_CLIENT_SECRET`.
+
+The `tenant binding` and `tenant host` commands read `ConnectionStrings:PlatformSchema` and
+need `Tenancy:Source=directory`. Only `tenant binding set --secret` also reads
+`Platform:SecretKey`, because it encrypts. See
+[tenant setting commands](tenant-setting-commands.md).
 
 `tenant backup` reads only `ConnectionStrings:PlatformSchema`,
 `Platform:SecretKey` and `PATH`. It creates no role or database, so it needs
@@ -442,9 +451,10 @@ option or a missing setting.
    holds none of them.
 2. Run [`tenant resume <id>`](#tenant-resume).
 
-No command sets a binding yet, see [Not built yet](#not-built-yet).
-[`tenant oidc set --client-secret`](tenant-setting-commands.md#sign-in-settings) sets the client
-secret again. `tenant binding set` will set the bindings again _(planned for M16)_, see
+Set each `secret` binding with
+[`tenant binding set <id> <name> --secret`](tenant-setting-commands.md#deployment-bindings).
+[`tenant oidc set --client-secret`](tenant-setting-commands.md#sign-in-settings) sets the OIDC
+client secret again, see
 [tenant setting commands](tenant-setting-commands.md).
 
 **Restoring over an existing tenant.** There is no in-place overwrite.
@@ -452,8 +462,8 @@ secret again. `tenant binding set` will set the bindings again _(planned for M16
 1. Run [`tenant suspend`](#tenant-suspend) on the tenant.
 2. Restore the archive under a new id, with a temporary host.
 3. Set the secrets again and resume the new tenant.
-4. Move the hosts from the old tenant to the new one. No command does this yet,
-   see [Not built yet](#not-built-yet).
+4. Move the hosts from the old tenant to the new one with
+   [`tenant host move`](tenant-setting-commands.md#hosts).
 
 The old tenant stays in the directory, because there is no tenant delete.
 
@@ -884,17 +894,12 @@ admin host carries the same version in its OCI label, see
 - Deleting a tenant.
 - An HTTP API for provisioning.
 - Moving a tenant to another database server.
-- Commands that set a tenant's deployment bindings. `tenant create` sets none of
-  them, so they stay empty. The one exception is `--binding` on a
-  `tenant create --preview-of`. `tenant binding` is _(planned for M16)_, see
-  [tenant setting commands](tenant-setting-commands.md) and
+- Commands that set a tenant's client key. `tenant oidc set --client-key` is _(planned for M16)_,
+  see [tenant setting commands](tenant-setting-commands.md) and
   [D87](../decisions/d87-tenant-setting-commands-and-key-rotation.md).
 - Point-in-time recovery of a tenant, and restoring a tenant into another
   installation.
 - Overwriting a tenant in place with a restore.
-- A command that moves a host from one tenant to another. Restoring over an
-  existing tenant ends with this step. `tenant host move` is
-  _(planned for M16)_, see [hosts](tenant-setting-commands.md#hosts).
 - Rotating the installation key. It is _(planned for M16)_, see
   [installation key](tenant-setting-commands.md#installation-key). The platform audit records of
   the setting commands are planned with them, see

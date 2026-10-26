@@ -10,7 +10,12 @@
     { "name": "active", "type": "boolean" },
     { "name": "neededBy", "type": "date" },
     { "name": "orderedAt", "type": "date-time" },
-    { "name": "status", "type": "enum", "values": ["open", "closed"] },
+    {
+      "name": "status",
+      "type": "enum",
+      "values": ["open", "closed"],
+      "valueLabels": { "open": { "textKey": "item.status.open" }, "closed": { "textKey": "item.status.closed" } }
+    },
     { "name": "parts", "type": "child-collection", "target": "ItemPart" },
     { "name": "department", "type": "reference", "target": "Department", "label": { "textKey": "item.department" } },
     { "name": "total", "type": "decimal", "precision": 20, "scale": 2, "expression": "quantity * price" }

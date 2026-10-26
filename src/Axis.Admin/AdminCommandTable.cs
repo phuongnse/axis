@@ -16,7 +16,7 @@ internal enum AuditMark
 /// <summary>One row of the command table. <paramref name="Name"/> is the leading arguments that pick the command, joined by spaces.</summary>
 internal sealed record AdminCommand(string Name, AuditMark Audit, Func<AdminRun, Task<int>> RunAsync);
 
-/// <summary>What a command needs to run: its arguments, the settings and the writers.</summary>
+/// <summary>What a command needs to run: its arguments, the settings, standard input and the writers.</summary>
 internal sealed record AdminRun(
     AdminCommand Command,
     string[] Args,

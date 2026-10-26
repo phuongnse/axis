@@ -1,0 +1,13 @@
+{
+  "id": "7aafb157-6ddc-4abf-8886-fefd98dab9bb",
+  "kind": "page",
+  "name": "ItemStatuses",
+  "formatVersion": 1,
+  "title": { "textKey": "itemStatuses.title" },
+  "widgets": [
+    {
+      "type": "table",
+      "dataSource": "ItemStatuses"
+    }
+  ]
+}

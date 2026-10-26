@@ -20,8 +20,19 @@ public sealed class KeycloakFixture : IAsyncDisposable
     public const string ReportingClientId = "reporting-system";
     public const string ReportingClientSecret = "reporting-system-development-secret";
 
+    /// <summary>The client that the realm's FAPI 2.0 client policy covers. It has no secret, only the two keys below.</summary>
+    public const string FapiClientId = "axis-fapi";
+
     // The start takes no test's cancellation token, so cancelling one test does not fail the other.
     private readonly Lazy<Task<KeycloakContainer>> _container = new(StartContainerAsync);
+
+    /// <summary>
+    /// The private key of <c>axis-fapi</c> with the key id <paramref name="keyId"/>, <c>key-1</c> or <c>key-2</c>, as a PEM.
+    /// Both keys are for development and tests only. Their public keys are in the client's JWKS in the realm, and
+    /// the keys are registered nowhere else.
+    /// </summary>
+    public static string FapiClientKey(string keyId) =>
+        File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Keycloak", $"axis-fapi-{keyId}.pem"));
 
     /// <summary>Starts the container if no test has yet, and returns the issuer of the axis realm.</summary>
     public async Task<Uri> StartAsync()
