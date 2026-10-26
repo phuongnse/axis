@@ -5,7 +5,7 @@
   "formatVersion": 1,
   "fields": [
     { "name": "title", "type": "text" },
-    { "name": "receipt", "type": "file", "maxSize": 1024, "accept": ["application/pdf", "image/*"] },
+    { "name": "receipt", "type": "file", "sensitive": true, "maxSize": 1024, "accept": ["application/pdf", "image/*"] },
     { "name": "attachments", "type": "child-collection", "target": "ClaimAttachment" }
   ]
 }

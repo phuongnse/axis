@@ -8,8 +8,8 @@ marked _(planned for M15)_ are not built yet, and Dn refers to
 [decisions.md](../decisions.md).
 
 Upload up to the `pending` state, the storage of a file's details and bytes,
-attach by a record write and the file value in a read are _(built)_. Download,
-replace, remove, the sweep, audit and the SPA are _(planned for M15)_. Inbound
+attach by a record write, the file value in a read, replace and remove, and
+audit are _(built)_. Download, the sweep and the SPA are _(planned for M15)_. Inbound
 endpoints, task completion and process steps attach nothing for now, so a file
 id they send that the record does not already hold fails.
 
@@ -88,8 +88,9 @@ write records.
   - **Other writers.** Inbound endpoints, task completion and process steps
     pass no uploader, so they attach nothing and refuse any id the record does
     not already hold.
-  - **Replace and remove.** A file that a write replaces or clears stays
-    `attached` to the record until replace and remove are built.
+  - **Replaced and removed files.** A file that a write replaced or cleared
+    is `deleted`, see [storage and clean-up](#storage-and-clean-up). Its id is
+    refused like any other unknown id, so it cannot be attached again.
 
 ## Download
 
@@ -120,17 +121,23 @@ This is _(planned for M15)_.
   [deployment bindings](integration-resources.md#deployment-bindings). In M15
   its only value is `database`. An application without `fileStorage` in its
   manifest uses the tenant database too.
-- **Replace and remove** _(planned for M15)_. A write that replaces or
-  removes a file, a removed child row and a deleted record mark the old file `deleted` in the write's
-  transaction.
+- **Replace and remove** _(built)_. A write that replaces or removes a file,
+  an update that removes a child row and a record delete mark each old file
+  `deleted` in the write's transaction. An update marks the files that the
+  record holds at a written file field, or at the file field of a written
+  collection, and that the write did not send. A record delete marks every
+  file of the record, also a file of a child row, in the same statement as the
+  delete. A refused write leaves the files as they were.
 - **Sweep** _(planned for M15)_. A worker sweep purges `deleted` files and
   `pending` files older than 24 hours. Until it is built, failed and abandoned
   uploads stay in the tenant database. It is internal, so it needs no scheduled job.
 - **Backup.** Files in the tenant database are in the tenant's `pg_dump`, so
   [tenant backup](administration.md) archives hold them.
-- **Audit** _(planned for M15)_. An audit record names the file field that changed, never the
-  file's name or bytes. A `sensitive` file field also hides its name and id in
-  step history and inspection.
+- **Audit** _(built)_. An audit record names the file field that changed,
+  never the file's name or bytes. A `sensitive` file field also hides its name
+  and id in step history and inspection. Step history stores no field values,
+  and a call input can never map a file, because only `is null` and
+  `is not null` accept one, so a file's name and id never reach either.
 
 ## In the SPA
 
