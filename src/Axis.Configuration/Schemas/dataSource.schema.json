@@ -103,7 +103,7 @@
       "required": ["name", "function"],
       "properties": {
         "name": { "$ref": "#/$defs/name" },
-        "function": { "enum": ["count", "sum", "min", "max"] },
+        "function": { "enum": ["count", "sum", "min", "max", "avg", "countDistinct"] },
         "field": { "$ref": "#/$defs/name" }
       }
     },

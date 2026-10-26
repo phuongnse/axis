@@ -351,19 +351,20 @@ public static class ApplicationSites
                 ? CurrencyColumnOf(siblings, column, currencyField)?.Name
                 : null);
 
-    // A measure has no label, so its header is its name. A count is an integer. A sum of integers or
-    // decimals is written like a decimal, and a sum of money stays money. A min or max keeps the type
-    // of its field. A money measure names its fixed currency or the group column that holds it.
+    // A measure has no label, so its header is its name. A count or a count of distinct values is an
+    // integer. A sum or average of integers or decimals is written like a decimal, and a sum or average of
+    // money stays money. A min or max keeps the type of its field. Only a money measure names a currency,
+    // which its fixed currency or the group column that holds it gives.
     private static DataSourceColumnMetadata Measure(DataSourceAggregateModel aggregate, DataSourceMeasureModel measure)
     {
         var field = measure.Field?.Field;
         var type = measure.Function switch
         {
-            AggregateFunction.Count => FieldTypes.Name(FieldType.Integer),
-            AggregateFunction.Sum when !FieldTypes.HoldsDecimal(field!.Type) => FieldTypes.Name(FieldType.Decimal),
+            AggregateFunction.Count or AggregateFunction.CountDistinct => FieldTypes.Name(FieldType.Integer),
+            AggregateFunction.Sum or AggregateFunction.Avg when !FieldTypes.HoldsDecimal(field!.Type) => FieldTypes.Name(FieldType.Decimal),
             _ => FieldTypes.Name(field!.Type),
         };
-        if (field?.Type != FieldType.Money)
+        if (field is null || type != FieldTypes.Name(FieldType.Money))
         {
             return new(measure.Name, type, null, null, null, null);
         }

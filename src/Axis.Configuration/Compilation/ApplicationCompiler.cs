@@ -849,6 +849,7 @@ public static partial class ApplicationCompiler
             AddFieldTarget(entity, field, path, findEntity, references);
             CheckSequence(entity, field, path, childOwner, findSequence, unloadedSequenceNames, moduleReferences, references, Report);
             CheckCreator(field, path, childOwner, Report);
+            CheckSearchable(field, path, Report);
             CheckMoney(entity, field, path, Report);
             CheckDefault(entity, field, path, defaultScope, references, Report);
 
@@ -1121,6 +1122,18 @@ public static partial class ApplicationCompiler
         if (problem is not null)
         {
             report(DiagnosticCodes.InvalidConstraint, problem, $"{path}/creator");
+        }
+    }
+
+    /// <summary>Checks a field's <c>searchable</c> property: it applies only to text fields, whatever its value.</summary>
+    private static void CheckSearchable(FieldDefinition field, string path, Action<string, string, string> report)
+    {
+        if (field.Searchable is not null && FieldTypes.Parse(field.Type) != FieldType.Text)
+        {
+            report(
+                DiagnosticCodes.InvalidConstraint,
+                $"'searchable' applies only to text fields, not to {field.Type} fields.",
+                $"{path}/searchable");
         }
     }
 
@@ -1991,9 +2004,9 @@ public static partial class ApplicationCompiler
 
     /// <summary>
     /// The problem of a measure and its path below the measure, or null when it is valid.
-    /// <c>count</c> takes no field. <c>sum</c>, <c>min</c> and <c>max</c> need a projected field:
-    /// <c>sum</c> of an integer or a decimal, <c>min</c> and <c>max</c> of an integer, a decimal, a
-    /// date or a date-time, and <c>sum</c>, <c>min</c> and <c>max</c> also of a money field. A
+    /// <c>count</c> takes no field. Every other function needs a projected field: <c>sum</c> and <c>avg</c>
+    /// of an integer, a decimal or a money field, <c>min</c> and <c>max</c> of an integer, a decimal, a
+    /// money field, a date or a date-time, and <c>countDistinct</c> of any field except a file. A
     /// projected field with an invalid path is not reported again.
     /// </summary>
     private static (string Message, string Path)? CheckMeasure(
@@ -2021,26 +2034,30 @@ public static partial class ApplicationCompiler
         }
 
         var type = FieldTypes.Parse(field.Type);
-        var accepted = function == AggregateFunction.Sum
-            ? type == FieldType.Integer || FieldTypes.HoldsDecimal(type)
-            : type == FieldType.Integer || FieldTypes.HoldsDecimal(type) || type is FieldType.Date or FieldType.DateTime;
+        var accepted = function switch
+        {
+            AggregateFunction.Sum or AggregateFunction.Avg => type == FieldType.Integer || FieldTypes.HoldsDecimal(type),
+            AggregateFunction.CountDistinct => type != FieldType.File,
+            _ => type == FieldType.Integer || FieldTypes.HoldsDecimal(type) || type is FieldType.Date or FieldType.DateTime,
+        };
         return accepted
             ? null
             : (
                 $"The measure function '{measure.Function}' cannot take the {field.Type} field '{name}'. "
-                    + "'sum' takes an integer, a decimal or a money field. 'min' and 'max' take an integer, a decimal, a money field, a date or a date-time.",
+                    + "'sum' and 'avg' take an integer, a decimal or a money field. 'min' and 'max' take an integer, a decimal, a money field, a date or a date-time. "
+                    + "'countDistinct' takes any field except a file.",
                 "/field");
     }
 
     /// <summary>
-    /// The functions that add or compare amounts, so a money field with a <c>currencyField</c> must
-    /// be grouped by that currency.
+    /// The functions that add, average or compare amounts, so a money field with a <c>currencyField</c>
+    /// must be grouped by that currency. A <c>countDistinct</c> counts values and mixes no currencies.
     /// </summary>
     private static readonly HashSet<AggregateFunction> _currencyMixingFunctions =
-        [AggregateFunction.Sum, AggregateFunction.Min, AggregateFunction.Max];
+        [AggregateFunction.Sum, AggregateFunction.Avg, AggregateFunction.Min, AggregateFunction.Max];
 
     /// <summary>
-    /// The message of a <c>sum</c>, <c>min</c> or <c>max</c> over a money field with a
+    /// The message of a <c>sum</c>, <c>avg</c>, <c>min</c> or <c>max</c> over a money field with a
     /// <c>currencyField</c> when no group field reaches that currency field on the same record,
     /// through the same reference fields. Null when the measure needs no currency group, or when the
     /// currency field is itself invalid, which <see cref="CheckMoney"/> already reports.
@@ -2076,7 +2093,7 @@ public static partial class ApplicationCompiler
         }
 
         var prefix = string.Concat(hops.Take(hops.Count - 1).Select(hop => hop.Name + "."));
-        return $"The measure '{measure.Name}' adds or compares the money field '{name}', whose currency comes from '{currencyFieldName}'. "
+        return $"The measure '{measure.Name}' adds, averages or compares the money field '{name}', whose currency comes from '{currencyFieldName}'. "
             + $"Group by a projected field with the path '{prefix}{currencyFieldName}' so that each total has one currency.";
     }
 
@@ -2106,7 +2123,9 @@ public static partial class ApplicationCompiler
             "sum" => AggregateFunction.Sum,
             "min" => AggregateFunction.Min,
             "max" => AggregateFunction.Max,
-            _ => throw new ArgumentOutOfRangeException(nameof(function), function, "The JSON Schema allows only count, sum, min and max."),
+            "avg" => AggregateFunction.Avg,
+            "countDistinct" => AggregateFunction.CountDistinct,
+            _ => throw new ArgumentOutOfRangeException(nameof(function), function, "The JSON Schema allows only count, sum, min, max, avg and countDistinct."),
         };
 
     /// <summary>
@@ -2293,6 +2312,7 @@ public static partial class ApplicationCompiler
                 : ComputedFieldModel.Compile(field.Expression, inputScope, ExpressionScopes.TypeOf(field)!),
             Sequence = sequence is null ? null : new SequenceModel(sequence.Id, sequence.Name, sequence.Format),
             Creator = field.Creator == true,
+            Searchable = field.Searchable == true,
             Default = field.Default is null
                 ? null
                 : ExpressionModel.Compile(field.Default, defaultScope, ExpressionScopes.TypeOf(field)!),

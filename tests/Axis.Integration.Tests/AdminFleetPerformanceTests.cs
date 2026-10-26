@@ -15,7 +15,7 @@ public sealed class AdminFleetPerformanceTests(AdminFleetFixture fixture) : ICla
 {
     private const string OldVersion = "20000101000000_Old";
 
-    private static readonly string[] _steps = ["version", "compile", "activate", "seed"];
+    private static readonly string[] _steps = ["version", "compile", "activate", "seed", "indexes"];
 
     // A tenant that is marked as on an old schema runs every migrate step, but its database has no EF Core migration left
     // to apply. The 20 tenants took about 2.6 s with --parallel 1 and about 1.5 s with --parallel 4 when measured. The

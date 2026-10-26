@@ -56,6 +56,9 @@ public static class EntityNaming
     /// <summary><c>ix_</c>, the table name and a hash of the comma-joined column names, in index order (54 characters).</summary>
     public static string Index(string table, IReadOnlyList<string> columns) => $"{IndexPrefix}{table}_{Hash(string.Join(',', columns))}";
 
+    /// <summary><c>ix_</c>, the table name and a hash of <c>trgm:</c> and the column name (54 characters). It names the trigram index of a searchable or display field.</summary>
+    public static string TrigramIndex(string table, string column) => $"{IndexPrefix}{table}_{Hash("trgm:" + column)}";
+
     /// <summary><c>m_</c>, the entity id, <c>_</c> and a hash of the lowercase field name (51 characters).</summary>
     public static string Junction(Guid entityId, string fieldName) => $"m_{entityId:N}_{Hash(fieldName.ToLowerInvariant())}";
 

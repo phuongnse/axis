@@ -66,6 +66,7 @@ public sealed class DataSourcePolicyTests(RecordApiFixture fixture) : IClassFixt
     [InlineData("fia", "ItemsByName")] // projects quantity and price
     [InlineData("fia", "ItemTotals")] // aggregates quantity and price
     [InlineData("fia", "ItemsByDepartment")] // department.name, with no grant on departments
+    [InlineData("fia", "ItemAveragesByDepartment")] // department.name, with no grant on departments
     [InlineData("fern", "ItemsByDepartment")] // every item field, but no grant on departments
     public async Task A_data_source_that_shows_a_field_the_user_may_not_read_is_403(string user, string dataSource)
     {

@@ -146,29 +146,33 @@ A grouped data source adds `aggregate`. Its rows are groups, not records:
   group field. A measure over the same field reads the raw values, so `max`
   of a date-time stays a date-time. Page metadata, export and Studio's names
   give a bucketed group the type `date`.
-- **`measures`.** Each has a `name` and a `function`: `count`, `sum`, `min` or
-  `max`. `avg` and `countDistinct` are _(planned for M15)_, see
-  [Added in M15](#added-in-m15).
+- **`measures`.** Each has a `name` and a `function`: `count`, `sum`, `min`,
+  `max`, `avg` or `countDistinct`.
 - **`count`.** It takes no `field` and counts rows.
-- **`sum`, `min` and `max`.** They need a `field` that names an entry of
-  `fields`. `sum` takes an integer, a decimal or a money field. `min` and
-  `max` take an integer, a decimal, a money field, a date or a date-time.
-- **Result types.** `count` is an integer. `sum` is written like a decimal,
-  except that a `sum` over a money field is money. `min` and `max` keep the
-  type of their field.
-- **Money.** A `sum`, `min` or `max` over a `money` field whose currency
+- **`sum`, `min`, `max`, `avg` and `countDistinct`.** They need a `field` that
+  names an entry of `fields`. `sum` and `avg` take an integer, a decimal or a
+  money field. `min` and `max` take an integer, a decimal, a money field, a
+  date or a date-time. `countDistinct` takes any field except a `file` field.
+- **Result types.** `count` and `countDistinct` are integers. `sum` and `avg`
+  are written like a decimal, except that over a money field they are money.
+  `min` and `max` keep the type of their field.
+- **`avg` rounding.** An `avg` is rounded to the field's `scale`. An integer
+  field rounds to 6 digits. A decimal with a `precision` but no `scale`
+  rounds to 0 digits, and a decimal with neither rounds to 6 digits.
+- **Money.** A `sum`, `avg`, `min` or `max` over a `money` field whose currency
   comes from a `currencyField` must group by that field, or the data source
   mixes currencies. The group field is a projected field whose path reaches
   the money field's `currencyField` on the same record, through the same
   reference fields. A root `currency` field does not cover `order.amount`,
   whose currency is `order.currency`. Without it the compile fails with
-  `AXC0248`. A `count` and a money field with a fixed `currency` need no
-  currency group. A grouped row keeps the currency with each amount: the
-  currency code is in the group column, and the total is summed in
-  PostgreSQL `numeric`, so no digit is lost.
-- **`null` values.** `sum`, `min` and `max` skip `null` values. Over only
-  `null` values they are `null`, not 0, as in SQL. This tells "no values"
-  apart from a real zero. `count` counts every row, whatever its values.
+  `AXC0248`. A `count`, a `countDistinct` and a money field with a fixed
+  `currency` need no currency group. A grouped row keeps the currency with
+  each amount: the currency code is in the group column, and the total is
+  summed in PostgreSQL `numeric`, so no digit is lost.
+- **`null` values.** `sum`, `avg`, `min` and `max` skip `null` values. Over
+  only `null` values they are `null`, not 0, as in SQL. This tells "no values"
+  apart from a real zero. `countDistinct` skips `null` values and is 0 over
+  only `null` values. `count` counts every row, whatever its values.
 - **`null` groups.** Rows whose group field is `null`, such as items with no
   department, form one group of their own.
 - **Row values.** A grouped row holds the group fields in `groupBy` order,
@@ -177,7 +181,8 @@ A grouped data source adds `aggregate`. Its rows are groups, not records:
   keys of a grouped row. Both match exactly, so letter case matters, as for
   projected names.
 - **Empty `groupBy`.** The data source has one total row, even when no row
-  passes the filter. Then `count` is 0 and the other measures are `null`.
+  passes the filter. Then `count` and `countDistinct` are 0 and the other
+  measures are `null`.
 
 ### Added in M15
 
@@ -185,20 +190,11 @@ These are _(planned for M15)_. See
 [D76](../decisions/d76-file-money-and-enum-label-field-types.md) and
 [D80](../decisions/d80-search-more-aggregates-and-query-timeouts.md).
 
-- **`avg`.** Needs a `field` of type integer, decimal or money, and gives a
-  decimal rounded to the field's scale, or to 6 digits for an integer. It
-  skips `null` values and is `null` over none.
-- **`countDistinct`.** Needs a `field` of any type a `groupBy` accepts, and
-  counts its distinct values that are not `null`.
 - **Measure `filter`.** A measure takes an optional `filter`, a boolean
   expression in the [SQL subset](expressions.md#sql-subset) over the same
   names as the data source filter. The measure counts only the rows where it
   is `true`, as SQL `FILTER (WHERE ...)`. So one data source can count open
   and closed tickets side by side.
-- **Money and `avg`.** `avg` over a `money` field whose currency comes from a
-  `currencyField` needs that field among the group fields, as `sum`, `min`
-  and `max` do now, see [Aggregates](#aggregates). The compile check keeps
-  its list of such functions, and `avg` joins it.
 - **Enum labels and files.** Rows hold enum values, and page metadata gives
   their labels. A `file` field cannot be a group field or a measure field.
 - **Search.** `"search": true` lets the rows route take `search`, matched
@@ -268,17 +264,17 @@ see the Data sources bullet of the Resolve step in
 - Measure names are unique. A measure name also differs from every group
   field, because both are keys of one row. A clash is `AXC0062` at
   `/aggregate/measures/{i}/name`.
-- `count` takes no `field`, and `sum`, `min` and `max` need one. Otherwise
+- `count` takes no `field`, and every other function needs one. Otherwise
   it is `AXC0063` at `/aggregate/measures/{i}`.
 - A measure `field` names an entry of `fields`, and its type follows the
   aggregate rules above. Otherwise it is `AXC0063` at
   `/aggregate/measures/{i}/field`. A field whose path is already `AXC0043`
   is not reported again.
-- A `sum`, `min` or `max` over a money field with a `currencyField` needs a
-  group field that reaches that currency field on the same record. Otherwise
-  it is `AXC0248` at `/aggregate/measures/{i}/field`. A `count`, a money field
-  with a fixed `currency`, and a money field whose `currencyField` is
-  already `AXC0243` are not reported.
+- A `sum`, `avg`, `min` or `max` over a money field with a `currencyField`
+  needs a group field that reaches that currency field on the same record.
+  Otherwise it is `AXC0248` at `/aggregate/measures/{i}/field`. A `count`, a
+  `countDistinct`, a money field with a fixed `currency`, and a money field
+  whose `currencyField` is already `AXC0243` are not reported.
 - When the data source is grouped, `sort` names a group field whose path
   does not end at a `reference`, or a measure, instead of a projected field
   (`AXC0045`).

@@ -586,6 +586,9 @@ public sealed class ExpressionTypeCheckerTests
     [InlineData("any(lineItems, ok)", "boolean")]
     [InlineData("all(lineItems, ok or name == 'a')", "boolean")]
     [InlineData("min(lineItems, amount)", "decimal")]
+    [InlineData("avg(lineItems, qty)", "decimal")]
+    [InlineData("avg(lineItems, amount)", "decimal")]
+    [InlineData("avg(lineItems, null)", "decimal")]
     [InlineData("max(lineItems, due)", "date")]
     [InlineData("count(lineItems) >= 1 and title != null", "boolean")]
     public void An_aggregate_over_a_child_collection_has_its_result_type(string text, string expected)
@@ -605,6 +608,7 @@ public sealed class ExpressionTypeCheckerTests
     [InlineData("lineItems == null", ExpressionDiagnosticCodes.TypeMismatch, "Collection 'lineItems' is list<LineItem>, which only an aggregate accepts at character 1.")]
     [InlineData("lineItems is null", ExpressionDiagnosticCodes.TypeMismatch, "Collection 'lineItems' is list<LineItem>, which only an aggregate accepts at character 1.")]
     [InlineData("sum(lineItems, name)", ExpressionDiagnosticCodes.TypeMismatch, "Function 'sum' needs a number for argument 2, found text at character 1.")]
+    [InlineData("avg(lineItems, name)", ExpressionDiagnosticCodes.TypeMismatch, "Function 'avg' needs a number for argument 2, found text at character 1.")]
     [InlineData("any(lineItems, qty)", ExpressionDiagnosticCodes.TypeMismatch, "Function 'any' needs boolean for argument 2, found integer at character 1.")]
     [InlineData("count(lineItems, amount)", ExpressionDiagnosticCodes.TypeMismatch, "Function 'count' needs boolean for argument 2, found decimal at character 1.")]
     [InlineData("min(lineItems, name)", ExpressionDiagnosticCodes.TypeMismatch, "Function 'min' needs a number, date or date-time for argument 2, found text at character 1.")]

@@ -8,7 +8,8 @@ namespace Axis.Data.Records;
 /// <summary>
 /// Evaluates a compiled expression, such as a process condition, against a stored record. A path
 /// such as <c>department.manager.name</c> reads the records it names through
-/// <see cref="RecordQueries"/>.
+/// <see cref="RecordQueries"/>. An aggregate over a <c>references</c> field reads the target
+/// records of the stored set.
 /// </summary>
 public static class RecordExpressions
 {
@@ -51,8 +52,14 @@ public static class RecordExpressions
             subject[field.Name] = (value, true);
         }
 
+        var sets = await RecordSets.ReadAsync(connection, application, entity, record, [], cancellationToken);
+        if (sets.Inexact is { } inexact)
+        {
+            return Inexact(inexact.Entity, inexact.Field);
+        }
+
         var errors = new SortedDictionary<string, string[]>(StringComparer.Ordinal);
-        if (!RecordCollections.TryAdd(application, entity, record, [], subject, errors))
+        if (!RecordCollections.TryAdd(application, entity, record, [], subject, errors, sets))
         {
             // The first error is at /values/<collection>/<index>/<field>.
             var pointer = errors.Keys.First().Split('/');

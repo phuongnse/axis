@@ -560,8 +560,12 @@ new check is a new compile diagnostic.
   defaults of a new record, and the form widget shows them on a new form. A
   default on a field of a child entity does nothing for its rows yet. `file` is
   refused when that type arrives.
-- **`searchable`.** On a `text` field. `search` reads every searchable field,
-  and the display field is always searchable. See
+- **`searchable`.** On a `text` field. `searchable` on any other type is
+  `AXC0013` at `/fields/{i}/searchable`, even when it is `false`. The compile
+  check and the indexes are built: a searchable field and the display field
+  get a trigram index, see [schema planning](storage.md#schema-planning).
+  `search` reading every searchable field, with the display field always
+  searchable, is _(planned for M15)_. See
   [paging and sorting](record-api.md#paging-and-sorting).
 
 ### Indexes

@@ -203,7 +203,11 @@ public sealed class DataDbContext(DbContextOptions<DataDbContext> options) : DbC
 
         modelBuilder.Entity<RecordImportRow>(import =>
         {
-            import.ToTable("record_imports", table => table.HasCheckConstraint("ck_record_imports_state", "state IN ('pending', 'checked', 'failed', 'committed')"));
+            import.ToTable("record_imports", table =>
+            {
+                table.HasCheckConstraint("ck_record_imports_state", "state IN ('pending', 'checked', 'failed', 'committed')");
+                table.HasCheckConstraint("ck_record_imports_format", "format IN ('csv', 'xlsx')");
+            });
             import.HasKey(i => i.Id).HasName("pk_record_imports");
             import.Property(i => i.Id).HasColumnName("id").ValueGeneratedNever();
             import.Property(i => i.TenantId).HasColumnName("tenant_id");
@@ -214,6 +218,7 @@ public sealed class DataDbContext(DbContextOptions<DataDbContext> options) : DbC
             import.Property(i => i.UploaderRoles).HasColumnName("uploader_roles").HasColumnType("text[]");
             import.Property(i => i.Key).HasColumnName("key");
             import.Property(i => i.State).HasColumnName("state");
+            import.Property(i => i.Format).HasColumnName("format").HasDefaultValue("csv");
             import.Property(i => i.File).HasColumnName("file").HasColumnType("bytea");
             import.Property(i => i.Errors).HasColumnName("errors").HasColumnType("jsonb");
             import.Property(i => i.WorkItemId).HasColumnName("work_item_id");

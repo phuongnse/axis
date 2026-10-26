@@ -258,7 +258,7 @@ public static class RecordComputer
 
                 value = new RecordValue(field, computed);
                 return null;
-            case FieldType.Integer or FieldType.Boolean or FieldType.Date or FieldType.Reference:
+            case FieldType.Integer or FieldType.Boolean or FieldType.Date or FieldType.Reference or FieldType.File:
                 value = new RecordValue(field, computed);
                 return null;
             case FieldType.DateTime:

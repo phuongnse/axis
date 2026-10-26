@@ -142,11 +142,20 @@ public enum AggregateFunction
 
     /// <summary>The largest value of an integer, decimal, money, date or date-time field.</summary>
     Max,
+
+    /// <summary>
+    /// The average of an integer, decimal or money field, rounded to the field's scale, or to 6 digits
+    /// for an integer. A money average stays money.
+    /// </summary>
+    Avg,
+
+    /// <summary>The number of distinct non-null values of a field of any type except file.</summary>
+    CountDistinct,
 }
 
 /// <summary>
 /// A measure of a grouped data source: its key in a grouped row, its function and the projected
-/// field it reads, which is null for <see cref="AggregateFunction.Count"/>. A sum, min or max over
+/// field it reads, which is null for <see cref="AggregateFunction.Count"/>. A sum, min, max or avg over
 /// only null values is null.
 /// </summary>
 public sealed record DataSourceMeasureModel(string Name, AggregateFunction Function, DataSourceFieldModel? Field);

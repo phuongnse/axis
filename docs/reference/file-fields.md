@@ -7,10 +7,11 @@ The conventions of [architecture.md](../architecture.md) apply: sections
 marked _(planned for M15)_ are not built yet, and Dn refers to
 [decisions.md](../decisions.md).
 
-Upload up to the `pending` state, and the storage of a file's details and bytes,
-are _(built)_. Attach, download, replace, remove, the sweep, audit and the SPA
-are _(planned for M15)_. Until attach is built, a record create or update cannot
-set a file field, and a file id in a body fails.
+Upload up to the `pending` state, the storage of a file's details and bytes,
+attach by a record write, the file value in a read, replace and remove, and
+audit are _(built)_. Download, the sweep and the SPA are _(planned for M15)_. Inbound
+endpoints, task completion and process steps attach nothing for now, so a file
+id they send that the record does not already hold fails.
 
 ## Field and value
 
@@ -71,10 +72,25 @@ write records.
   download route does not exist yet.
 - **Memory.** The server holds one upload in memory, up to the limit, before
   it writes the file to the database.
-- **Attach** _(planned for M15)_. A create or update that sends the id
-  attaches the file in its transaction. The file must be `pending`, uploaded by the same user, for the
-  same entity and field. Any other id is a `400` at the field's pointer, with
-  the same message whether the id is unknown or belongs to someone else.
+- **Attach** _(built)_. A create or update that sends the id attaches the
+  file in its transaction: the state becomes `attached` and the owner record
+  becomes the root record, also for a field of a child row. The file must be
+  `pending`, uploaded by the same user, for the same entity and field path.
+  - **Kept ids.** An id the record already holds at the same path stays as it
+    is. This covers a resent unchanged field and a kept child row.
+  - **Refusal.** Any other id is a `400` at the field's pointer, such as
+    `/values/receipt` or `/values/attachments/0/file`, with one message, "No
+    uploaded file for this field has this id." The message is the same whether
+    the id is unknown, belongs to another user, is attached elsewhere or was
+    uploaded for another field. A malformed id is "Must be a UUID."
+  - **Repeated id.** An id sent twice in one body is refused at every pointer
+    after the first.
+  - **Other writers.** Inbound endpoints, task completion and process steps
+    pass no uploader, so they attach nothing and refuse any id the record does
+    not already hold.
+  - **Replaced and removed files.** A file that a write replaced or cleared
+    is `deleted`, see [storage and clean-up](#storage-and-clean-up). Its id is
+    refused like any other unknown id, so it cannot be attached again.
 
 ## Download
 
@@ -105,17 +121,23 @@ This is _(planned for M15)_.
   [deployment bindings](integration-resources.md#deployment-bindings). In M15
   its only value is `database`. An application without `fileStorage` in its
   manifest uses the tenant database too.
-- **Replace and remove** _(planned for M15)_. A write that replaces or
-  removes a file, a removed child row and a deleted record mark the old file `deleted` in the write's
-  transaction.
+- **Replace and remove** _(built)_. A write that replaces or removes a file,
+  an update that removes a child row and a record delete mark each old file
+  `deleted` in the write's transaction. An update marks the files that the
+  record holds at a written file field, or at the file field of a written
+  collection, and that the write did not send. A record delete marks every
+  file of the record, also a file of a child row, in the same statement as the
+  delete. A refused write leaves the files as they were.
 - **Sweep** _(planned for M15)_. A worker sweep purges `deleted` files and
   `pending` files older than 24 hours. Until it is built, failed and abandoned
   uploads stay in the tenant database. It is internal, so it needs no scheduled job.
 - **Backup.** Files in the tenant database are in the tenant's `pg_dump`, so
   [tenant backup](administration.md) archives hold them.
-- **Audit** _(planned for M15)_. An audit record names the file field that changed, never the
-  file's name or bytes. A `sensitive` file field also hides its name and id in
-  step history and inspection.
+- **Audit** _(built)_. An audit record names the file field that changed,
+  never the file's name or bytes. A `sensitive` file field also hides its name
+  and id in step history and inspection. Step history stores no field values,
+  and a call input can never map a file, because only `is null` and
+  `is not null` accept one, so a file's name and id never reach either.
 
 ## In the SPA
 

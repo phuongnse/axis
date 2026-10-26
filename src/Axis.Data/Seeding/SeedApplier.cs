@@ -121,7 +121,7 @@ public static class SeedApplier
                         return NotComputed(seed, index, errors);
                     }
 
-                    result = await RecordCommands.CreateAsync(connection, model, entity, releaseId, computed.Values, computed.Rows, input.Links, id, cancellationToken);
+                    result = await RecordCommands.CreateAsync(connection, model, entity, releaseId, computed.Values, computed.Rows, input.Links, id, cancellationToken: cancellationToken);
                 }
             }
             else
@@ -145,7 +145,7 @@ public static class SeedApplier
                     return NotComputed(seed, index, errors);
                 }
 
-                result = await RecordCommands.CreateAsync(connection, model, entity, releaseId, computed.Values, computed.Rows, input.Links, id, cancellationToken);
+                result = await RecordCommands.CreateAsync(connection, model, entity, releaseId, computed.Values, computed.Rows, input.Links, id, cancellationToken: cancellationToken);
             }
 
             if (result.Outcome != RecordWriteOutcome.Written)

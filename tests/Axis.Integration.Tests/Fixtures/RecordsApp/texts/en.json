@@ -50,6 +50,8 @@
     "item.status.closed": "Closed",
     "itemPart.noLeadingSpace": "A part name must not start with a space.",
     "order.needsLine": "An order needs at least one line.",
+    "workstation.tooMuchSoftware": "A workstation holds at most two software products.",
+    "workstation.tooFewSeats": "Seats cannot be fewer than the software products.",
     "ticket.priorityPositive": "Priority must be greater than zero.",
     "ticket.dueInPast": "The due time must be in the future.",
     "role.employee": "Employee",

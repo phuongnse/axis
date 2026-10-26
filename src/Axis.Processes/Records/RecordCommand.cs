@@ -191,7 +191,10 @@ public static class RecordCommand
             // The defaults, the computed fields and the validations run in the write transaction, so their
             // now() is its start time.
             var now = await RecordQueries.TransactionTimeAsync(connection, cancellationToken);
-            var prepared = PrepareCreate(application, model, actor, input, formModel, now);
+            var sets = model.Validations.Count > 0 || formModel?.HasRequiredWhen == true
+                ? await RecordSets.ReadAsync(connection, application, model, null, input.Links, cancellationToken)
+                : RecordSets.Empty;
+            var prepared = PrepareCreate(application, model, actor, input, formModel, now, sets);
             if (prepared.Errors is { } prepareErrors)
             {
                 await transaction.RollbackAsync(cancellationToken);
@@ -199,7 +202,7 @@ public static class RecordCommand
             }
 
             var computed = prepared.Computed!;
-            result = await RecordCommands.CreateAsync(connection, application, model, releaseId, computed.Values, computed.Rows, input.Links, cancellationToken: cancellationToken);
+            result = await RecordCommands.CreateAsync(connection, application, model, releaseId, computed.Values, computed.Rows, input.Links, uploader: actor.Id, cancellationToken: cancellationToken);
             var written = result is { Outcome: RecordWriteOutcome.Written, Record: { } record } ? record : null;
             var outside = written is not null
                 && !await WithinFiltersAsync(connection, transaction, application, model, written.Id, access, actor.Id, loggerFactory, cancellationToken);
@@ -254,7 +257,8 @@ public static class RecordCommand
     /// <summary>
     /// Runs the checks of a create on a parsed input, without storage: the defaults, then the creator
     /// fields, the computed fields, and the form's <c>requiredWhen</c> conditions and the entity's validations.
-    /// <paramref name="now"/> is the start time of the transaction that does the work. The result holds the
+    /// <paramref name="now"/> is the start time of the transaction that does the work. <paramref name="sets"/> holds
+    /// the target records an aggregate over a <c>references</c> field reads, none when it is null. The result holds the
     /// computed values and rows, or the errors by JSON Pointer.
     /// </summary>
     public static RecordCreatePrepared PrepareCreate(
@@ -263,7 +267,8 @@ public static class RecordCommand
         RecordActor actor,
         RecordInput input,
         FormModel? form,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        RecordSets? sets = null)
     {
         ArgumentNullException.ThrowIfNull(application);
         ArgumentNullException.ThrowIfNull(model);
@@ -286,8 +291,8 @@ public static class RecordCommand
         }
 
         var failures = RecordFormRequirements.Merge(
-            form is null ? null : RecordFormRequirements.Check(application, model, form, null, computed.Values, computed.Rows, now),
-            RecordValidator.ValidateCreate(application, model, computed.Values, computed.Rows, now));
+            form is null ? null : RecordFormRequirements.Check(application, model, form, null, computed.Values, computed.Rows, now, sets: sets),
+            RecordValidator.ValidateCreate(application, model, computed.Values, computed.Rows, now, sets));
         return new RecordCreatePrepared(failures is null ? computed : null, failures);
     }
 
@@ -419,9 +424,12 @@ public static class RecordCommand
 
             // The validations run in the write transaction, so their now() is its start time.
             var now = await RecordQueries.TransactionTimeAsync(connection, cancellationToken);
+            var sets = model.Validations.Count > 0 || formModel?.HasRequiredWhen == true
+                ? await RecordSets.ReadAsync(connection, application, model, stored, input.Links, cancellationToken)
+                : RecordSets.Empty;
             var failures = RecordFormRequirements.Merge(
-                formModel is null ? null : RecordFormRequirements.Check(application, model, formModel, stored, computed.Values, computed.Rows, now),
-                RecordValidator.ValidateUpdate(application, model, stored, computed.Values, computed.Rows, now));
+                formModel is null ? null : RecordFormRequirements.Check(application, model, formModel, stored, computed.Values, computed.Rows, now, sets: sets),
+                RecordValidator.ValidateUpdate(application, model, stored, computed.Values, computed.Rows, now, sets));
             if (failures is not null)
             {
                 await transaction.RollbackAsync(cancellationToken);
@@ -437,7 +445,7 @@ public static class RecordCommand
                 before = await RecordQueries.GetAsync(connection, application, model, recordId, cancellationToken);
             }
 
-            result = await RecordCommands.UpdateAsync(connection, application, model, releaseId, recordId, input.Version!.Value, computed.Values, computed.Rows, input.Links, cancellationToken);
+            result = await RecordCommands.UpdateAsync(connection, application, model, releaseId, recordId, input.Version!.Value, computed.Values, computed.Rows, input.Links, uploader: actor.Id, cancellationToken: cancellationToken);
             var written = result is { Outcome: RecordWriteOutcome.Written, Record: { } record } ? record : null;
             var outside = written is not null
                 && !await WithinFiltersAsync(connection, transaction, application, model, written.Id, access, actor.Id, loggerFactory, cancellationToken);
@@ -554,7 +562,7 @@ public static class RecordCommand
 
             // The triggers see the record whole, so they are worked out before its row and child rows go.
             var prepared = await DataChangeTriggerStarts.PrepareDeleteAsync(transaction, application, model, recordId, cancellationToken);
-            result = await RecordCommands.DeleteAsync(connection, model, recordId, cancellationToken);
+            result = await RecordCommands.DeleteAsync(connection, application, model, recordId, cancellationToken);
             await CompleteAsync(
                 transaction,
                 result is { Outcome: RecordDeleteOutcome.Deleted, Version: { } version }

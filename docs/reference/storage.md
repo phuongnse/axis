@@ -44,8 +44,8 @@ apply: sections marked _(planned for Mx)_ are not built yet, and Dn refers to
     [recompute of computed fields](migrations.md#recomputing-computed-fields). It also owns
     `axis.pending_computed_fields`, the entities whose recompute the worker
     finishes in batches. It also owns `axis.record_imports`, the uploads of
-    [record imports](import-export.md#import) with their file, their state and
-    the errors of their dry run.
+    [record imports](import-export.md#import) with their file, its format
+    (`csv` or `xlsx`), their state and the errors of their dry run.
   - `Axis.Processes` owns `axis.process_instances` (one row per process
     instance), `axis.process_step_history` (one row per step occurrence),
     `axis.process_tasks` (one row per human task),
@@ -130,12 +130,14 @@ apply: sections marked _(planned for Mx)_ are not built yet, and Dn refers to
   | Unique constraint                  | `uq_` + table + `_` + hash of the column name                             | 54         |
   | Foreign key                        | `fk_` + table + `_` + hash of the column name                             | 54         |
   | Index                              | `ix_` + table + `_` + hash of the column list                             | 54         |
+  | Trigram index                      | `ix_` + table + `_` + hash of `trgm:` + column name                       | 54         |
   | Junction table                     | `m_` + entity `id` + `_` + hash of the field name                         | 51         |
   | Junction foreign key / index       | `fk_` or `ix_` + junction table + `_` + first 8 hex of the hash           | 63         |
 
   The hash is the first 16 lowercase hex characters of SHA-256 over the UTF-8
   column name. For an index it is over the column names joined by commas, in
-  order, and for a junction table over the field name in lowercase. A junction
+  order, for a trigram index over `trgm:` and the column name, so its name differs
+  from a plain index on the same column, and for a junction table over the field name in lowercase. A junction
   table's foreign keys and index use only the first 8 hex characters of the
   hash, because the full hash after the 51-character table name would be 71
   bytes. Because names are ASCII and at most 60 characters, every
@@ -606,13 +608,21 @@ access. It returns diagnostics, SQL statements and the new records to write.
   The builder runs without a transaction, holds the schema lock that
   activation takes, and uses the schema role. The worker cannot build, because
   its runtime role cannot create indexes, see
-  [D31](../decisions/d31-separate-database-roles.md). Calling the builder from
-  the hosts is _(planned for M15)_. Until then, a deferred index stays missing.
+  [D31](../decisions/d31-separate-database-roles.md). Every host that
+  activates calls the builder after activation commits: `Axis.Admin activate`,
+  the publisher's publish and rollback, and the server's startup activation.
+  A publisher validate builds nothing.
   - Every `reference` column and every child table's `owner_id` gets an
     `ix_` index without being declared. An existing tenant gets them on its
     next activation. A junction table's `target_id` index is created with the
-    table. Every `searchable` field, whose index is a `pg_trgm` GIN index on
-    `lower()` of the column, is _(planned for M15)_.
+    table. Every `searchable` field and every entity's display field gets a
+    `pg_trgm` GIN `ix_` index on `lower()` of the column, named by the trigram
+    index name. A field that is both has one. The statement names the operator
+    class as `public.gin_trgm_ops`, because `tenant create` and `migrate`
+    install `pg_trgm` in `public`. An existing tenant gets the display field
+    indexes on its next activation, and removing `searchable` drops the index
+    on the next activation. The catalog reads such an index, which is a GIN
+    index built on an expression, and takes its column from `pg_depend`.
   - An entity's `indexes` add the declared indexes, with the columns in the
     order of `fields`. A declared index over one `reference` field has the
     same name as the automatic index on that field. They are one index, which
@@ -627,8 +637,8 @@ access. It returns diagnostics, SQL statements and the new records to write.
   - A unique index added to a table with rows is `AXC0016` at
     `/indexes/{i}/unique`, as for `unique`, even when all of its columns are
     new in the release. Removing `unique` from an index is allowed.
-  - A `renameField` change renames the `ix_` indexes over the column, so a
-    renamed field keeps its unique index. A `dropField` change drops them
+  - A `renameField` change renames the `ix_` indexes over the column, trigram
+    ones included, so a renamed field keeps its unique index. A `dropField` change drops them
     with the column, and the planner does not drop them again.
   - A second record that repeats the values of a unique index is a `409`, as
     for a `unique` field. See [record API](record-api.md#create-update-and-delete).
