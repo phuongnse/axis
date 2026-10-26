@@ -82,6 +82,7 @@ public sealed class PolicyMatrixTests
                 Assert.Equal(PolicyEvaluator.AllowsCancel(model, held, process), cell.Actions.Contains("cancel"));
                 Assert.Equal(PolicyEvaluator.AllowsRetry(model, held, process), cell.Actions.Contains("retry"));
                 Assert.Equal(PolicyEvaluator.AllowsResolve(model, held, process), cell.Actions.Contains("resolve"));
+                Assert.Equal(PolicyEvaluator.AllowsReassign(model, held, process), cell.Actions.Contains("reassign"));
             }
 
             foreach (var endpoint in model.Endpoints)
@@ -220,7 +221,7 @@ public sealed class PolicyMatrixTests
         Assert.Equal(
             [("entity", "Department"), ("entity", "Request"), ("dataSource", "RequestList"), ("process", "RequestReview"), ("endpoint", "SubmitRequest")],
             matrix.Targets.Select(target => (target.Kind, target.Name)).OrderBy(target => Array.IndexOf(["entity", "dataSource", "process", "endpoint"], target.Kind)).ThenBy(target => target.Name, StringComparer.Ordinal));
-        Assert.Equal(["start", "inspect", "cancel", "retry", "resolve"], Assert.Single(matrix.Targets, target => target.Kind == "process").Actions);
+        Assert.Equal(["start", "inspect", "cancel", "retry", "resolve", "reassign"], Assert.Single(matrix.Targets, target => target.Kind == "process").Actions);
 
         // A grant on a child entity has no column, and an action the column does not accept is left out of the cell.
         var employee = Role(matrix, "employee");

@@ -115,8 +115,8 @@ Run and the Test results list, the read-only view of a module entity, and the re
     entry's own lists. It loads them once. Collapsing and expanding again shows
     the same lists.
   - A package or a module entry is plain text. It cannot be opened or expanded.
-  - Uses and Used by stay lists. The **Process graph** below is the only
-    drawn graph.
+  - Uses and Used by stay lists. The **Process graph** on a process's Design
+    tab is the only drawn graph.
 - **Text keys.** A text resource's **Uses** list holds its keys, each as an
   entry. Expanding a key lists the labels that use it and the locales that
   define it, as its **Used by** list.
@@ -428,7 +428,7 @@ Run and the Test results list, the read-only view of a module entity, and the re
   - Only the actions a target takes can be chosen. An entity takes `read`,
     `create`, `update`, `delete`, `export` and `import`. A data source takes
     `read` and `export`. A process takes `start`, `inspect`, `cancel`,
-    `retry` and `resolve`. An endpoint takes `invoke`. Studio reads each list
+    `retry`, `resolve` and `reassign`. An endpoint takes `invoke`. Studio reads each list
     from `policy.schema.json`. Filter and fields are only on entity grants.
   - The view reads the [policy matrix route](authoring.md#policy-matrix).
   - A Resources / Policy matrix switch sits under the application picker. The
@@ -477,7 +477,7 @@ Run and the Test results list, the read-only view of a module entity, and the re
   | `page`        | Typed editor, Design tab (see Page designer)                    | Nothing                                                               |
   | `form`        | Generic form, typed steps panel, Design tab (see Form designer) | Nothing                                                               |
   | `site`        | Generic form                                                    | Nothing                                                               |
-  | `process`     | Typed editor with the process graph                             | Nothing                                                               |
+  | `process`     | Typed editor, Design tab with the process graph                 | Nothing                                                               |
   | `rule`        | Generic form                                                    | Nothing                                                               |
   | `sequence`    | Generic form                                                    | Nothing                                                               |
   | `role`        | Generic form                                                    | Nothing                                                               |
@@ -769,27 +769,33 @@ Run and the Test results list, the read-only view of a module entity, and the re
     that the form lists, because a condition reads only those. A `steps` value
     that is not a list is left to the JSON view.
 
-- **Process graph** _(built)_. A process shows a
-  drawn graph of its steps and transitions above its editor, see
+- **Process graph** _(built)_. A process opens on a Design tab, which draws a
+  graph of its steps and transitions, see
   [D53](../decisions/d53-typed-editors-and-the-process-graph-in-studio.md).
-  It is read-only. The author edits steps in the list. _(Planned for M14)_ The
-  graph becomes the process designer, on a Design tab, see
-  [process designer](process-designer.md).
+  The step card of the selected step is beside it. The author edits steps in
+  the card, the Form tab or the JSON view. _(Planned for M14)_ The graph becomes
+  the process designer, see [process designer](process-designer.md).
   - Dagre, `@dagrejs/dagre`, lays out the graph, and React Flow,
     `@xyflow/react`, draws it. Their sizes are about 30 KB and 50 KB min+gzip.
-    The SPA loads them in their own chunk when a process opens. M14's process
-    designer builds on both.
+    The SPA loads them in their own chunk when the Design tab opens. M14's
+    process designer builds on both.
   - The graph and the step editor stay in step. Both read the same unsaved
-    draft, so an edit in the list or the JSON view redraws the graph at once.
-  - A node opens its step at `/steps/{i}`, and the editor scrolls to that step's
-    card. An edge opens its transition: the outcome, the branch, `otherwise` or
-    `next`.
-  - The node of the open path is current, and it has `aria-current`. Its
-    highlight follows the open path, not the focus in the step list.
-  - Nodes are reached with Tab, in step order, and opened with Enter. Each node
-    has a text label with the step's name and type. Edges are reached with the
-    pointer only. A keyboard user reaches each transition through the pickers
-    in the step list.
+    draft, so an edit in the card, the Form tab or the JSON view redraws the
+    graph at once.
+  - A node selects its step, and the step's card shows beside the graph. An edge
+    selects the step it leaves, because that card holds the picker of the
+    transition. The selection is not written to the URL, because a path in the
+    URL opens the Form tab.
+  - The selected step's node is current, and it has `aria-current`. A path in
+    the URL that is `/steps/{i}` or inside it opens the Form tab and also
+    selects step `{i}`, so the Design tab shows it on return. The card has Move
+    up, Move down and Remove as the Form tab has, and Remove clears the
+    selection. With no step selected, the panel says "Select a step on the
+    canvas."
+  - Nodes are reached with Tab, in step order, and selected with Enter. Each
+    node has a text label with the step's name and type. Edges are reached with
+    the pointer only. A keyboard user reaches each transition through the
+    pickers in the step card.
   - A transition to a step that does not exist draws no edge. The graph never
     invents a node.
   - A step of the open process is marked when a diagnostic of the open resource
@@ -805,11 +811,11 @@ Run and the Test results list, the read-only view of a module entity, and the re
   process designer for M14, see
   [D74](../decisions/d74-a-visual-process-designer.md) and
   [process designer](process-designer.md).
-  The process graph is read-only, and not a designer.
+  The process graph is not a designer yet.
   - **Design tab.** It sits next to the Form and JSON tabs. The three tabs edit
-    one draft. _Built:_ the tab is there, and Form is the default tab. Opening a
-    page on the Design tab is _(planned for M14)_. The canvas is mounted only
-    while the Design tab is active, so it asks again when the author returns.
+    one draft. _Built:_ the tab is there, and a page opens on it. The canvas is
+    mounted only while the Design tab is active, so it asks again when the
+    author returns.
   - **Canvas.** It draws the unsaved draft with the site's own widget
     components. Tables, charts and other data widgets show placeholder rows and
     values made from the field types, as the widget previews do with fixtures.
@@ -925,7 +931,7 @@ Run and the Test results list, the read-only view of a module entity, and the re
     memory, up to 100 steps, with one step for each box. It is cleared by a
     reload (a reload after a reconnect too), a conflict reload or opening
     another resource. A save keeps it. Studio's undo replaces the browser's own
-    inside the editor's boxes. _Built:_ it covers pages and forms. The buttons
+    inside the editor's boxes. _Built:_ it covers pages, forms and processes. The buttons
     sit beside Save and are off when there is nothing to undo or redo, and while
     a save runs. A step ends when the author edits another property or leaves
     the box, and a pick in a dropdown or a button action is always a step of its

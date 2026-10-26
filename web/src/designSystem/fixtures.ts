@@ -54,8 +54,11 @@ function field(name: string, type: FieldType, labelKey: string): FieldMetadata {
   }
 }
 
-/** One field of each type. The names are the labels' keys without their prefix. */
-export const fields: Record<FieldType, FieldMetadata> = {
+/** A field type the design system previews: all but money. */
+export type PreviewFieldType = Exclude<FieldType, 'money'>
+
+/** One field of each type but money, which the previews do not draw. The names are the labels' keys without their prefix. */
+export const fields: Record<PreviewFieldType, FieldMetadata> = {
   text: { ...field('title', 'text', 'request.title'), maxLength: 200 },
   integer: field('quantity', 'integer', 'request.quantity'),
   decimal: { ...field('amount', 'decimal', 'request.amount'), precision: 18, scale: 2 },
@@ -85,7 +88,7 @@ export const entity: EntityMetadata = {
 }
 
 /** The entity cut down to one field, so a preview shows only that field's input. */
-export function entityWithField(type: FieldType): EntityMetadata {
+export function entityWithField(type: PreviewFieldType): EntityMetadata {
   return { ...entity, fields: [fields[type]] }
 }
 
@@ -450,7 +453,7 @@ export const routes: Record<string, () => unknown> = {
   [requestsPath]: () => recordPage,
   [`${requestsPath}/${requestId}`]: () => savedRecord,
   [`${requestsPath}/${requestId}/history`]: () => history,
-  [formStatePath]: () => ({ sections: [], fields: {}, errors: {} }),
+  [formStatePath]: () => ({ sections: [], fields: {}, errors: {}, defaults: {} }),
   [categoriesPath]: () => categoryPage,
   [tasksPath]: () => taskPage,
   [instancesPath]: () => instancePage,

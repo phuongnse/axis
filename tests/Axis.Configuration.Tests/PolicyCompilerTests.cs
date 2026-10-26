@@ -79,6 +79,19 @@ public sealed class PolicyCompilerTests
     }
 
     [Fact]
+    public void A_process_grant_with_reassign_compiles()
+    {
+        using var folder = Folder(Policy("""["manager"]""", """[{ "process": "RequestReview", "actions": ["start", "reassign"] }]"""));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        var grant = Assert.Single(Assert.Single(result.Model!.Policies).Grants);
+        Assert.Equal([PolicyAction.Start, PolicyAction.Reassign], grant.Actions);
+        Assert.Equal(["manager"], Assert.Single(result.Model.Policies).Roles);
+    }
+
+    [Fact]
     public void A_policy_filter_can_pass_current_user_to_a_rule()
     {
         using var folder = Folder(Policy("""["employee"]""", """[{ "entity": "Request", "actions": ["read"], "filter": "IsOwner(owner, currentUser())" }]"""));
@@ -139,14 +152,14 @@ public sealed class PolicyCompilerTests
     [Theory]
     [InlineData("""{ "entity": "Request", "actions": ["read", "start"] }""", "/grants/0/actions/1", "An entity grant cannot allow 'start'. It takes only 'read', 'create', 'update', 'delete', 'export' and 'import'.")]
     [InlineData("""{ "dataSource": "RequestList", "actions": ["read", "update"] }""", "/grants/0/actions/1", "A data source grant cannot allow 'update'. It takes only 'read' and 'export'.")]
-    [InlineData("""{ "process": "RequestReview", "actions": ["read"] }""", "/grants/0/actions/0", "A process grant cannot allow 'read'. It takes only 'start', 'inspect', 'cancel', 'retry' and 'resolve'.")]
+    [InlineData("""{ "process": "RequestReview", "actions": ["read"] }""", "/grants/0/actions/0", "A process grant cannot allow 'read'. It takes only 'start', 'inspect', 'cancel', 'retry', 'resolve' and 'reassign'.")]
     [InlineData("""{ "endpoint": "SubmitRequest", "actions": ["invoke", "read"] }""", "/grants/0/actions/1", "An endpoint grant cannot allow 'read'. It takes only 'invoke'.")]
     [InlineData("""{ "entity": "Request", "actions": ["inspect"] }""", "/grants/0/actions/0", "An entity grant cannot allow 'inspect'. It takes only 'read', 'create', 'update', 'delete', 'export' and 'import'.")]
     [InlineData("""{ "endpoint": "SubmitRequest", "actions": ["inspect"] }""", "/grants/0/actions/0", "An endpoint grant cannot allow 'inspect'. It takes only 'invoke'.")]
-    [InlineData("""{ "process": "RequestReview", "actions": ["invoke"] }""", "/grants/0/actions/0", "A process grant cannot allow 'invoke'. It takes only 'start', 'inspect', 'cancel', 'retry' and 'resolve'.")]
+    [InlineData("""{ "process": "RequestReview", "actions": ["invoke"] }""", "/grants/0/actions/0", "A process grant cannot allow 'invoke'. It takes only 'start', 'inspect', 'cancel', 'retry', 'resolve' and 'reassign'.")]
     [InlineData("""{ "dataSource": "RequestList", "actions": ["read", "import"] }""", "/grants/0/actions/1", "A data source grant cannot allow 'import'. It takes only 'read' and 'export'.")]
-    [InlineData("""{ "process": "RequestReview", "actions": ["start", "export"] }""", "/grants/0/actions/1", "A process grant cannot allow 'export'. It takes only 'start', 'inspect', 'cancel', 'retry' and 'resolve'.")]
-    [InlineData("""{ "process": "RequestReview", "actions": ["import"] }""", "/grants/0/actions/0", "A process grant cannot allow 'import'. It takes only 'start', 'inspect', 'cancel', 'retry' and 'resolve'.")]
+    [InlineData("""{ "process": "RequestReview", "actions": ["start", "export"] }""", "/grants/0/actions/1", "A process grant cannot allow 'export'. It takes only 'start', 'inspect', 'cancel', 'retry', 'resolve' and 'reassign'.")]
+    [InlineData("""{ "process": "RequestReview", "actions": ["import"] }""", "/grants/0/actions/0", "A process grant cannot allow 'import'. It takes only 'start', 'inspect', 'cancel', 'retry', 'resolve' and 'reassign'.")]
     [InlineData("""{ "endpoint": "SubmitRequest", "actions": ["export"] }""", "/grants/0/actions/0", "An endpoint grant cannot allow 'export'. It takes only 'invoke'.")]
     [InlineData("""{ "endpoint": "SubmitRequest", "actions": ["invoke", "import"] }""", "/grants/0/actions/1", "An endpoint grant cannot allow 'import'. It takes only 'invoke'.")]
     [InlineData("""{ "endpoint": "SubmitRequest", "actions": ["invoke"], "filter": "true" }""", "/grants/0/filter", "An endpoint grant has no 'filter'. Only an entity grant limits rows.")]
@@ -182,7 +195,7 @@ public sealed class PolicyCompilerTests
 
         var diagnostic = Assert.Single(result.Diagnostics);
         Assert.Equal((DiagnosticCodes.ActionWithoutRequiredGrant, PolicyFile, path, message), (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.Message));
-        Assert.Equal("AXC0250", diagnostic.Code);
+        Assert.Equal("AXC0254", diagnostic.Code);
         Assert.Null(result.Model);
     }
 

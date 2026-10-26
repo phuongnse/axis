@@ -54,7 +54,7 @@ function cellText(
   if (value === null || value === undefined) {
     return ''
   }
-  return column ? formatValue(column, value, item.labels, options) : String(value)
+  return column ? formatValue(column, value, item.labels, options, item.values) : String(value)
 }
 
 /**

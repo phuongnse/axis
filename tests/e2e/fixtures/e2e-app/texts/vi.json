@@ -45,6 +45,8 @@
     "note.dueOn": "Hạn ngày",
     "note.dueAt": "Hạn",
     "note.status": "Trạng thái",
+    "note.status.open": "Đang mở",
+    "note.status.closed": "Đã đóng",
     "note.category": "Danh mục",
     "note.createdBy": "Người tạo",
     "note.lines": "Các dòng",

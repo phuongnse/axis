@@ -42,7 +42,7 @@ describe('grantActions and targetActions', () => {
   it('reads policy.schema.json for the real lists', () => {
     expect(targetActions('entity')).toEqual(['read', 'create', 'update', 'delete', 'export', 'import'])
     expect(targetActions('dataSource')).toEqual(['read', 'export'])
-    expect(targetActions('process')).toEqual(['start', 'inspect', 'cancel', 'retry', 'resolve'])
+    expect(targetActions('process')).toEqual(['start', 'inspect', 'cancel', 'retry', 'resolve', 'reassign'])
     expect(targetActions('endpoint')).toEqual(['invoke'])
   })
 })

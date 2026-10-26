@@ -46,7 +46,11 @@ function rowText(fields: readonly FieldMetadata[], row: RecordRow): string {
 }
 
 function valueText(field: FieldMetadata, value: RecordValue): string {
-  if ((field.type === 'integer' || field.type === 'decimal') && typeof value === 'string' && isJsonNumber(value)) {
+  if (
+    (field.type === 'integer' || field.type === 'decimal' || field.type === 'money') &&
+    typeof value === 'string' &&
+    isJsonNumber(value)
+  ) {
     return value
   }
   return JSON.stringify(value)

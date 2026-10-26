@@ -51,7 +51,7 @@ const matrix: StudioPolicyMatrix = {
       id: 'pr1',
       name: 'PurchaseApproval',
       module: null,
-      actions: ['start', 'inspect', 'cancel', 'retry', 'resolve'],
+      actions: ['start', 'inspect', 'cancel', 'retry', 'resolve', 'reassign'],
       entity: null,
     },
     { kind: 'endpoint', id: 'ep1', name: 'Intake', module: null, actions: ['invoke'], entity: null },
@@ -234,7 +234,7 @@ describe.each(['light', 'dark'])('StudioPolicyMatrixTable in %s mode', (mode) =>
       within(group)
         .getAllByRole('checkbox')
         .map((box) => (box as HTMLInputElement).value),
-    ).toEqual(['start', 'inspect', 'cancel', 'retry', 'resolve'])
+    ).toEqual(['start', 'inspect', 'cancel', 'retry', 'resolve', 'reassign'])
     expect(within(group).getByRole('checkbox', { name: 'start' })).toBeChecked()
     expect(within(group).getByRole('checkbox', { name: 'inspect' })).not.toBeChecked()
   })

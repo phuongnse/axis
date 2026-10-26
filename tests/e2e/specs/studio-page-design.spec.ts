@@ -704,7 +704,7 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
     await page.getByRole("tab", { name: "Design", exact: true }).click();
 
     const canvas = page.getByTestId("studio-page-canvas");
-    // The Form tab stays mounted while it is hidden, so the panel is the Design tab's own.
+    // The Form tab may be mounted while it is hidden, so the panel is the Design tab's own.
     const panel = page.getByTestId("studio-design-panel");
     const rows = panel.getByTestId("studio-field-/widgets/0/rowActions");
     await canvas.locator('[data-action="rowActions/1"]').first().click();

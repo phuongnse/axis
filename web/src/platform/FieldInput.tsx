@@ -1,4 +1,4 @@
-import { Checkbox, DatePicker, Input, Select } from 'antd'
+import { Checkbox, DatePicker, Input, Select, Space } from 'antd'
 import dayjs from 'dayjs'
 import type { CSSProperties, KeyboardEvent } from 'react'
 import { enumLabel } from './formatValue'
@@ -16,6 +16,8 @@ interface FieldInputProps {
   ariaLabel?: string
   /** The input's style, such as a fixed width where the layout gives it none. */
   style?: CSSProperties
+  /** The currency code of a money field, shown beside the box. Left out, nothing is shown. */
+  currency?: string | null
 }
 
 // Enter in a picker only confirms the picked value. The picker handles it first, so stopping the
@@ -49,7 +51,7 @@ function outsideRange(value: RecordValue, field: FieldMetadata) {
 }
 
 /** The input for one value of a field, the same in the form and in a child collection's cells. */
-export function FieldInput({ field, value, onChange, id, ariaLabel, style }: FieldInputProps) {
+export function FieldInput({ field, value, onChange, id, ariaLabel, style, currency }: FieldInputProps) {
   const t = useText()
   const text = (event: { target: { value: string } }) => onChange(event.target.value || null)
   switch (field.type) {
@@ -74,22 +76,31 @@ export function FieldInput({ field, value, onChange, id, ariaLabel, style }: Fie
         />
       )
     case 'integer':
-    case 'decimal': {
+    case 'decimal':
+    case 'money': {
       // Plain text inputs keep the typed text unchanged, so no digit is lost. A value outside the
       // limits is marked but never blocked, so 150 can be typed when the minimum is 100.
       const invalid = outsideRange(value, field)
-      return (
+      const input = (
         <Input
           id={id}
           aria-label={ariaLabel}
           aria-invalid={invalid || undefined}
           status={invalid ? 'error' : undefined}
           placeholder={rangeText(field.min, field.max)}
-          style={style}
+          style={currency ? undefined : style}
           inputMode={field.type === 'integer' ? 'numeric' : 'decimal'}
           value={value === null ? '' : String(value)}
           onChange={text}
         />
+      )
+      return currency ? (
+        <Space.Compact block style={style}>
+          {input}
+          <Space.Addon>{currency}</Space.Addon>
+        </Space.Compact>
+      ) : (
+        input
       )
     }
     case 'boolean':

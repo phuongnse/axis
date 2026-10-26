@@ -1,7 +1,6 @@
 using System.Net;
 using System.Text;
 using System.Text.Json;
-using System.Text.RegularExpressions;
 using Axis.Processes.Storage;
 using Axis.Server.Authentication;
 using Axis.Tenancy;
@@ -21,7 +20,7 @@ namespace Axis.Integration.Tests;
 /// encrypted. The development realm accepts the callback of each host. Each tenant has a migrated database, where
 /// a completed sign-in writes its audit record.
 /// </summary>
-public sealed partial class DirectorySignInTests(PostgreSqlFixture database, KeycloakFixture keycloak) : IClassFixture<PostgreSqlFixture>
+public sealed class DirectorySignInTests(PostgreSqlFixture database, KeycloakFixture keycloak) : IClassFixture<PostgreSqlFixture>
 {
     private const string TestSecretKey = TestPlatform.SecretKey;
 
@@ -154,43 +153,8 @@ public sealed partial class DirectorySignInTests(PostgreSqlFixture database, Key
             HandleCookies = handleCookies,
         });
 
-    /// <summary>
-    /// Starts sign-in on the server and logs in at Keycloak's login form as a browser would. Returns the callback
-    /// address that Keycloak sends the browser to, which has not been called.
-    /// </summary>
-    private async Task<Uri> LogInAtKeycloakAsync(HttpClient client, Uri authority, string username, Uri expectedBase)
-    {
-        using var challenge = await SendAsync(client, "/api/auth/sign-in");
-        Assert.Equal(HttpStatusCode.Found, challenge.StatusCode);
-        var authorize = challenge.Headers.Location!;
-        Assert.StartsWith($"{authority}/protocol/openid-connect/auth?", authorize.AbsoluteUri, StringComparison.Ordinal);
-        Assert.Contains(Uri.EscapeDataString($"{expectedBase.GetLeftPart(UriPartial.Authority)}/api/auth/callback"), authorize.Query, StringComparison.Ordinal);
-
-        // A separate client plays the browser at Keycloak. Keycloak marks its cookies Secure, which a
-        // browser sends to http://localhost but a CookieContainer does not, so the client carries them itself.
-        using var browserHandler = new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false };
-        using var browser = new HttpClient(browserHandler);
-        var loginPage = await browser.GetAsync(authorize, CancellationToken);
-        var html = await loginPage.Content.ReadAsStringAsync(CancellationToken);
-        Assert.True(loginPage.StatusCode == HttpStatusCode.OK, html);
-        var action = WebUtility.HtmlDecode(FormActionPattern().Match(html).Groups["action"].Value);
-        using var loginRequest = new HttpRequestMessage(HttpMethod.Post, new Uri(action))
-        {
-            Content = new FormUrlEncodedContent(new Dictionary<string, string>
-            {
-                ["username"] = username,
-                ["password"] = KeycloakFixture.Password,
-                ["credentialId"] = "",
-            }),
-        };
-        loginRequest.Headers.Add("Cookie", string.Join("; ", loginPage.Headers.GetValues("Set-Cookie")
-            .Select(cookie => cookie.Split(';')[0])));
-        var login = await browser.SendAsync(loginRequest, CancellationToken);
-        Assert.True(login.StatusCode == HttpStatusCode.Found, await login.Content.ReadAsStringAsync(CancellationToken));
-        var callback = login.Headers.Location!;
-        Assert.Equal($"{expectedBase.GetLeftPart(UriPartial.Authority)}/api/auth/callback", callback.GetLeftPart(UriPartial.Path));
-        return callback;
-    }
+    private Task<Uri> LogInAtKeycloakAsync(HttpClient client, Uri authority, string username, Uri expectedBase) =>
+        KeycloakSignIn.LogInAsync(client, authority, username, expectedBase, Record);
 
     private async Task<SignInResult> SignInAsync(HttpClient client, Uri authority, string username, Uri expectedBase)
     {
@@ -249,9 +213,6 @@ public sealed partial class DirectorySignInTests(PostgreSqlFixture database, Key
             Assert.False(stored.AsSpan().IndexOf(secret) >= 0, "The stored client secret holds the plain secret.");
         }
     }
-
-    [GeneratedRegex("""<form\b[^>]*\baction="(?<action>[^"]+)""")]
-    private static partial Regex FormActionPattern();
 
     private sealed record SignInResult(string SessionCookie);
 }

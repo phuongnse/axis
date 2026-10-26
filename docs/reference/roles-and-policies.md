@@ -152,14 +152,13 @@ outcomes. Operators inspect the approvals and change nothing:
   - an `entity` takes `read`, `create`, `update`, `delete`, `export` and
     `import`;
   - a `dataSource` takes `read` and `export`;
-  - a `process` takes `start`, `inspect`, `cancel`, `retry` and `resolve`,
-    and `reassign` _(planned for M14)_, see
-    [Reassign](task-deadlines.md#reassign);
+  - a `process` takes `start`, `inspect`, `cancel`, `retry`, `resolve` and
+    `reassign`, see [Reassign](task-deadlines.md#reassign);
   - an `endpoint` takes `invoke`.
   - `export` reaches only what the user's `read` grants reach, and needs a
-    `read` grant on the same target in the same policy, or it is `AXC0250`.
+    `read` grant on the same target in the same policy, or it is `AXC0254`.
     `import` writes through the user's `create` grants, and needs a `create`
-    grant on the same entity in the same policy, or it is `AXC0250`. The
+    grant on the same entity in the same policy, or it is `AXC0254`. The
     import checks `update` as well for an import with a key
     _(planned for M15)_. See [import and export](import-export.md#grants) and
     [D79](../decisions/d79-import-and-export-under-policies.md).
@@ -247,7 +246,7 @@ Compile checks, each a compile error:
   entity or `read` on an endpoint, is `AXC0091`. So is `inspect` on anything
   but a process.
 - An `export` without a `read`, or an `import` without a `create`, on the
-  same target in the same policy, ignoring letter case, is `AXC0250` at the
+  same target in the same policy, ignoring letter case, is `AXC0254` at the
   action. An action the target's kind does not take is left to `AXC0091`.
 - A grant on a child entity is `AXC0093`. Child rows are read and written
   through their owner's grants.
@@ -263,7 +262,7 @@ Compile checks, each a compile error:
 
 The schema checks the shape of each property: `roles` and `grants` are
 non-empty lists, each action is one of `read`, `create`, `update`, `delete`,
-`export`, `import`, `start`, `invoke`, `inspect`, `cancel`, `retry` and `resolve`, and a grant has no other properties. A problem there is
+`export`, `import`, `start`, `invoke`, `inspect`, `cancel`, `retry`, `resolve` and `reassign`, and a grant has no other properties. A problem there is
 `AXC0004`. The schema also lists the actions each target kind takes, as
 `entityAction`, `dataSourceAction`, `processAction` and `endpointAction`. The
 compiler, the policy matrix and Studio read those lists, so each lives in one
