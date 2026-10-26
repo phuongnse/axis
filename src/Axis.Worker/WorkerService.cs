@@ -23,6 +23,7 @@ namespace Axis.Worker;
 /// the tenant still uses are checked against the installed extension packages. A role that can change
 /// the schema, a pinned version that is not installed, or a release that no longer compiles records
 /// the failure in <see cref="StartupCheckState"/> and stops the host before any work of that tenant runs.
+/// Once a tenant is ready, the worker also deletes its expired sessions, at most every five minutes by its own clock.
 /// </summary>
 internal sealed partial class WorkerService(
     WorkerTenantCatalog tenants,
@@ -48,6 +49,10 @@ internal sealed partial class WorkerService(
     private IReadOnlyDictionary<string, string>? _schemaVersions;
     private bool _schemaReadFailureLogged;
     private DateTimeOffset _lastRefresh;
+
+    // The time of the last clean-up of expired sessions of each ready tenant. It is a fixed interval, short next to the idle limit.
+    private static readonly TimeSpan _sessionCleanupInterval = TimeSpan.FromMinutes(5);
+    private readonly Dictionary<string, DateTimeOffset> _sessionsCleanedAt = new(StringComparer.Ordinal);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -164,6 +169,7 @@ internal sealed partial class WorkerService(
                 _ready.Remove(tenantId);
                 _waitingLogged.Remove(tenantId);
                 _schemaWaiting.Remove(tenantId);
+                _sessionsCleanedAt.Remove(tenantId);
                 health.TenantDropped(tenantId);
             }
 
@@ -242,6 +248,8 @@ internal sealed partial class WorkerService(
                 LogReady(tenantId);
             }
 
+            await RemoveExpiredSessionsAsync(tenantId, stoppingToken);
+
             // A refresh between two items can end the service of the tenant. The item already claimed has finished.
             while (tenants.Find(tenantId) is not null && await runner.RunNextAsync(tenantId, options.LeaseDuration, stoppingToken))
             {
@@ -262,6 +270,43 @@ internal sealed partial class WorkerService(
         }
 
         return ran;
+    }
+
+    /// <summary>
+    /// Deletes the expired rows of <c>axis.sessions</c> of the tenant, at most once per five minutes.
+    /// The time comes from the worker's clock. A database without the table yet is skipped. Any other database failure is
+    /// logged and does not hold back the work items.
+    /// </summary>
+    private async Task RemoveExpiredSessionsAsync(string tenantId, CancellationToken cancellationToken)
+    {
+        var now = time.GetUtcNow();
+        if (_sessionsCleanedAt.TryGetValue(tenantId, out var cleanedAt) && now - cleanedAt < _sessionCleanupInterval)
+        {
+            return;
+        }
+
+        // Recorded first, so a failure is not retried in every poll.
+        _sessionsCleanedAt[tenantId] = now;
+        var previous = accessor.Current;
+        accessor.Current = new TenantContext(tenantId);
+        try
+        {
+            await using var connection = await connections.OpenConnectionAsync(cancellationToken);
+            var removed = await SessionLifetime.DeleteExpiredAsync(connection, now, cancellationToken);
+            LogSessionsRemoved(removed, tenantId);
+        }
+        catch (PostgresException exception) when (exception.SqlState == PostgresErrorCodes.UndefinedTable)
+        {
+            // The data migrations have not created the table yet.
+        }
+        catch (NpgsqlException exception)
+        {
+            LogSessionCleanupFailed(exception, tenantId);
+        }
+        finally
+        {
+            accessor.Current = previous;
+        }
     }
 
     /// <exception cref="StartupCheckException">The runtime database role is a superuser, owns a schema or may create objects.</exception>
@@ -359,6 +404,12 @@ internal sealed partial class WorkerService(
 
     [LoggerMessage(LogLevel.Error, "The runtime database role check for tenant {TenantId} failed.")]
     private partial void LogRoleCheckFailed(Exception exception, string tenantId);
+
+    [LoggerMessage(LogLevel.Warning, "Removing the expired sessions of tenant {TenantId} failed.")]
+    private partial void LogSessionCleanupFailed(Exception exception, string tenantId);
+
+    [LoggerMessage(LogLevel.Debug, "Removed {Count} expired session(s) of tenant {TenantId}.")]
+    private partial void LogSessionsRemoved(int count, string tenantId);
 
     [LoggerMessage(LogLevel.Error, "Running work items for tenant {TenantId} failed.")]
     private partial void LogRunFailed(Exception exception, string tenantId);
