@@ -15,7 +15,7 @@ public static class ProcessesServiceCollectionExtensions
     /// raised events to their triggers, the handler that runs the occurrences of schedule triggers,
     /// the handler that starts their processes for the records of their data sources, and the handler that
     /// backfills the computed values of an entity that activation left pending, and the handler that runs the
-    /// dry run of an uploaded record import. The runner
+    /// dry run of an uploaded record import, and the handler that commits a checked import. The runner
     /// runs the registered <see cref="IWorkItemHandler"/> and <see cref="IExternalWorkItemHandler"/>
     /// services and needs the tenancy services.
     /// </summary>
@@ -45,6 +45,7 @@ public static class ProcessesServiceCollectionExtensions
         services.AddSingleton<IExternalWorkItemHandler, ComputedBackfillHandler>();
         services.AddSingleton(new RecordImportSettings(importMaxRows));
         services.AddSingleton<IExternalWorkItemHandler, RecordImportCheckHandler>();
+        services.AddSingleton<IExternalWorkItemHandler, RecordImportCommitHandler>();
         return services;
     }
 }
