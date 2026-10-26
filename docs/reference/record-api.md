@@ -106,8 +106,11 @@ row order, read in the same statement as the rows. A collection gets an entry
 only when its child entity has a reference whose label the user may see. The
 object is `{}` for a row without a label, and the entry is `[]` when there are
 no rows. A list response leaves child collections out, so it has no such
-entry. A `references` field has an array of labels in the order of its ids
-_(planned for M15)_.
+entry. A `references` field has an array of labels in the order of its ids, one per
+id, in a single read and in the response of a create or update. A target whose
+display field is `null` has `null` at its position. A user who may not read the
+field, or the target's display field, gets no entry for it. A list response has no
+such entry.
 
 A label shows when the user may read the reference field and the target
 entity's display field. For a child row's label, the reference field is the
@@ -123,9 +126,10 @@ the records of the entity that match the `search`, or every record without
 one. A list holds only records that match one of the user's read filters,
 and `totalCount` counts only those. A grant without a `filter` matches every
 record. Each reference step of a read filter finds the target record through its
-primary key. No field has an index yet, so a filtered list reads the whole entity
-table. From M15 every reference column and declared index has one, see
-[schema planning](storage.md#schema-planning) _(planned for M15)_.
+primary key. Every reference column and every child table's `owner_id` has an
+index, and so does each index an entity declares, see
+[schema planning](storage.md#schema-planning). A filter on a field no index
+covers reads the whole entity table.
 
 ## Reading values
 
@@ -141,7 +145,7 @@ table. From M15 every reference column and declared index has one, see
 | `child-collection` | An array of row objects in stored order, in a single read and in the response of a create or update. List responses leave it out. See [Child rows](#child-rows-computed-fields-and-validations) |
 | `money` | A number written as for `decimal`. The currency is the field's, or the value of its `currencyField` |
 | `file` _(planned for M15)_ | An object `{ "id", "name", "mediaType", "size" }`. See [file fields](file-fields.md#field-and-value) |
-| `references` _(planned for M15)_ | An array of record ids, in the order they were written. Its labels are an array in the same order in `labels`. List responses leave it out, as for a child collection |
+| `references` | An array of record ids, in the order they were written. Its labels are an array in the same order in `labels`. List responses leave it out, as for a child collection |
 
 ## Paging and sorting
 
@@ -433,8 +437,10 @@ otherwise the answer is the stale-version `409`. See
   field in another record is a validation problem with status `409`, whose
   `errors` is keyed `/values/<field>`. A unique field of a child row repeats
   a value of any row in the child table, and is keyed
-  `/values/<collection>/<index>/<field>`. The field is found by matching the
-  violated constraint against the names the model declares.
+  `/values/<collection>/<index>/<field>`. A record that repeats the values of
+  a unique index the entity declares is the same `409`, keyed at the first
+  field of the index. The field is found by matching the violated constraint
+  or index against the names the model declares.
 - **`409` for a stale version.** An update whose `version` is not the stored
   one.
 - **`409` for a referenced record.** A delete of a record that another record
@@ -507,12 +513,26 @@ holding only the fields the body names.
   against the child entity, with its errors keyed
   `/values/<collection>/<index>/<field>`. A parsed row holds every field of
   the child entity, and a field the row leaves out is SQL `NULL`.
+- **Sets of records.** A `references` value must be an array of record ids
+  in the form of a `reference`. `null` or any other JSON type is an error at
+  `/values/<field>`: "Must be an array of record ids.". An empty array `[]`
+  clears the set, and it has no other empty form. A malformed id, a repeated
+  id and an id that names no record are errors at
+  `/values/<field>/<index>`, the index of the element, and a repeat is
+  reported at each element after the first. More than 1,000 ids are one error
+  at `/values/<field>`, and the ids are not checked one by one. The array
+  replaces the stored set and, like a child collection, raises the owner's
+  `version` by one. A stale `version` is a `409` and leaves the links as they
+  were. A user who holds no write grant on the field is refused with a `403`,
+  as for any field.
 - **Duplicates.** A property name repeated in the body or in `values` is an
   error at that property's pointer; the repeated value is not parsed.
 - **Required fields.** On create, a required field that is missing or `null`
   is an error at `/values/<field>`. On update, missing fields are left
   untouched; `null` clears a field that is not required and is an error for a
-  required one. `null` is SQL `NULL`.
+  required one. `null` is SQL `NULL`. A required `references` field needs at
+  least one id: a create must send it, and an update cannot set it to `[]`.
+  Both are an error at `/values/<field>`.
 - **`version`.** On update it is required and is an integral number from 1 to
   2^63 − 1, by the same integral rule as `integer`; otherwise an error at
   `/version`.
@@ -533,7 +553,7 @@ is not a `text`. A wrong JSON type or a value outside its bounds is an error at
 | `reference` | A string in the hyphenated 8-4-4-4-12 hex form, in either letter case; whether the record exists is checked when it is written | `Guid` |
 | `money` | A number, checked as for `decimal` with the field's `precision` and `scale` | `string`, as for `decimal` |
 | `file` _(planned for M15)_ | A file id from an upload, in the form of a `reference`. The file must be `pending` and uploaded by the same user for the same entity and field, see [file fields](file-fields.md#upload) | `Guid` |
-| `references` _(planned for M15)_ | An array of distinct record ids, at most 1,000. The whole set replaces the stored one | `Guid[]` |
+| `references` | An array of distinct record ids, at most 1,000. The whole set replaces the stored one | `Guid[]` |
 
 A value outside a field's limits is an error at the field's pointer, as for
 `maxLength`. A value equal to a limit is accepted, and a missing or `null`
@@ -558,7 +578,7 @@ value is never checked against a limit.
 messages, in ordinal key order, usable as is for a validation problem
 response. The keys are `""` for the body, `/<property>` for a body property,
 `/values`, `/values/<field>`, `/values/<collection>/<index>`,
-`/values/<collection>/<index>/<field>` and `/version`. Pointers escape `~` as `~0` and
+`/values/<collection>/<index>/<field>`, `/values/<field>/<index>` for the id of a set and `/version`. Pointers escape `~` as `~0` and
 `/` as `~1`; declared names never need it, but unknown names can. Each key has
 one fixed English message for the first problem found there, such as
 "Unknown property." or "Must be at most 200 characters.". The message of a

@@ -45,19 +45,20 @@ test('the shell renders in light and dark mode', async ({ page }) => {
   }
 })
 
-// The colours below were recorded before the theme moved to the Axis token file. They show the shell is unchanged.
+// The selected navigation entry is drawn in primaryText. The other colours were recorded before the theme moved to
+// the Axis token file and are unchanged.
 const shellColours = {
   light: {
     header: 'rgb(255, 255, 255)',
     page: 'rgb(245, 245, 245)',
     title: 'rgba(0, 0, 0, 0.88)',
-    selectedItem: 'rgb(47, 84, 235)',
+    selectedItem: 'rgb(91, 63, 217)',
   },
   dark: {
     header: 'rgb(20, 20, 20)',
     page: 'rgb(0, 0, 0)',
     title: 'rgba(255, 255, 255, 0.85)',
-    selectedItem: 'rgb(43, 74, 203)',
+    selectedItem: 'rgb(163, 142, 231)',
   },
 }
 

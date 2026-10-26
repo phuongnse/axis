@@ -455,9 +455,26 @@ internal sealed class MigrationPlanning
             Commands.Add(new SchemaCommand($"{alterTable} RENAME CONSTRAINT {EntityNaming.Quote(EntityNaming.ForeignKey(table.Name, from))} TO {EntityNaming.Quote(EntityNaming.ForeignKey(table.Name, to))}"));
         }
 
+        // An index is named after its columns, so each index over the column gets the name its renamed column list has.
+        var indexes = new List<CatalogIndex>();
+        foreach (var index in table.Indexes)
+        {
+            if (!index.Columns.Contains(from, StringComparer.Ordinal))
+            {
+                indexes.Add(index);
+                continue;
+            }
+
+            List<string> columns = [.. index.Columns.Select(candidate => candidate == from ? to : candidate)];
+            var name = EntityNaming.Index(table.Name, columns);
+            Commands.Add(new SchemaCommand($"ALTER INDEX {EntityNaming.Quote(EntityNaming.Schema)}.{EntityNaming.Quote(index.Name)} RENAME TO {EntityNaming.Quote(name)}"));
+            indexes.Add(index with { Name = name, Columns = columns });
+        }
+
         _tables[tableIndex] = table with
         {
             Columns = [.. table.Columns.Select(candidate => candidate == column ? column with { Name = to } : candidate)],
+            Indexes = [.. indexes.OrderBy(index => index.Name, StringComparer.Ordinal)],
         };
         for (var index = 0; index < _enumValues.Count; index++)
         {
@@ -483,7 +500,13 @@ internal sealed class MigrationPlanning
 
         // Without CASCADE, so a dependency the planner does not know of stops the drop.
         Commands.Add(new SchemaCommand($"ALTER TABLE {EntityNaming.QualifiedTable(table.Name)} DROP COLUMN {EntityNaming.Quote(name)}"));
-        _tables[tableIndex] = table with { Columns = [.. table.Columns.Where(candidate => candidate.Name != name)] };
+
+        // PostgreSQL drops every index over the column along with it, so the planner must not drop them again.
+        _tables[tableIndex] = table with
+        {
+            Columns = [.. table.Columns.Where(candidate => candidate.Name != name)],
+            Indexes = [.. table.Indexes.Where(index => !index.Columns.Contains(name, StringComparer.Ordinal))],
+        };
         _enumValues.RemoveAll(recorded => recorded.EntityId == entityId && string.Equals(recorded.FieldName, change.Field, StringComparison.OrdinalIgnoreCase));
         RecordChanges.Add(new MigrationRecordChange(MigrationChangeType.DropField, entityId, change.Field, null));
         DestructiveChanges.Add(new DestructiveChange(migration, entityId, change.Field));
