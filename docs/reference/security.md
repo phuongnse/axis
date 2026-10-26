@@ -145,7 +145,10 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
     The keys are in `platform.data_protection_keys`, encrypted with
     `Platform:SecretKey`. It protects the cookie's session id wrapper, so
     every replica reads it. The session itself survives a restart and works
-    on every replica because its row is in the database. The server fixes the data protection application name to `Axis`,
+    on every replica because its row is in the database. During a key
+    rotation a key that `Platform:PreviousSecretKey` encrypted still
+    decrypts, and `platform rekey` then re-encrypts it, so nobody is signed
+    out. The server fixes the data protection application name to `Axis`,
     so replicas at different paths read the same keys. A key that does not
     decrypt stops the start.
 - **Tenant binding.** A session whose tenant id differs from the tenant
@@ -248,18 +251,18 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
 These are test fixtures. Docs and GitHub text name roles instead. A new
 sample reuses a user that holds the role it needs before it adds a user.
 
-| User    | Roles                   | Used by                                                                                          |
-| ------- | ----------------------- | ------------------------------------------------------------------------------------------------ |
+| User    | Roles                   | Used by                                                                                                                                       |
+| ------- | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
 | `anna`  | `employee`, `requester` | Purchase request, leave request and service desk samples; E2E journeys, request approval journey. Has the locale `vi`, the only user with one |
-| `lan`   | `employee`              | Purchase request and leave request samples; E2E journeys                                         |
-| `binh`  | `department-manager`    | Purchase request and leave request samples; E2E journeys                                         |
-| `chau`  | `department-manager`    | Purchase request and leave request samples; E2E journeys                                         |
-| `dung`  | `finance-reviewer`      | Purchase request sample seeds; E2E journeys                                                      |
-| `giang` | `operator`              | Purchase request sample's Approvals inspector; E2E journeys                                      |
-| `hoa`   | `author`, `publisher`   | Studio and the authoring API under `scripts/dev.sh`; E2E Studio journeys                         |
-| `khoa`  | `agent`                 | Service desk sample; E2E journeys                                                                |
-| `linh`  | `service-desk-lead`     | Service desk sample; E2E journeys                                                                |
-| `minh`  | `approver`              | Request approval template journey; E2E journeys                                                  |
+| `lan`   | `employee`              | Purchase request and leave request samples; E2E journeys                                                                                      |
+| `binh`  | `department-manager`    | Purchase request and leave request samples; E2E journeys                                                                                      |
+| `chau`  | `department-manager`    | Purchase request and leave request samples; E2E journeys                                                                                      |
+| `dung`  | `finance-reviewer`      | Purchase request sample seeds; E2E journeys                                                                                                   |
+| `giang` | `operator`              | Purchase request sample's Approvals inspector; E2E journeys                                                                                   |
+| `hoa`   | `author`, `publisher`   | Studio and the authoring API under `scripts/dev.sh`; E2E Studio journeys                                                                      |
+| `khoa`  | `agent`                 | Service desk sample; E2E journeys                                                                                                             |
+| `linh`  | `service-desk-lead`     | Service desk sample; E2E journeys                                                                                                             |
+| `minh`  | `approver`              | Request approval template journey; E2E journeys                                                                                               |
 
 ## Machine callers
 
@@ -372,10 +375,9 @@ stay session-only until then.
   `axis-services`. A tenant without it accepts no service account token, and
   neither does a preview tenant, which takes neither audience from its main
   tenant. Under `Tenancy:Source=directory` the setting is the
-  `service_audience` column of `platform.tenants`. `tenant oidc set` will
-  change it _(planned for M16)_, see
-  [tenant setting commands](tenant-setting-commands.md). Until then an operator
-  sets the column by hand.
+  `service_audience` column of `platform.tenants`.
+  [`tenant oidc set --service-audience`](tenant-setting-commands.md#sign-in-settings)
+  changes it.
 - **Routes.** A service account may call:
   - every route of the [record API](record-api.md), record history included;
   - `GET /api/apps/{app}/data-sources/{dataSource}/rows`;
@@ -387,6 +389,7 @@ stay session-only until then.
   The server marks each of these routes, so the choice of scheme, the CSRF
   exemption and the test of every route read the same mark and no path is
   matched by text.
+
 - **Not reached.** The task API, the form state endpoint, site and page
   metadata, `GET /api/me`, Studio and the authoring API. A task asks a person
   to decide, so a service account never completes one. A bearer token on these
@@ -431,9 +434,8 @@ stay session-only until then.
 It follows [D83](../decisions/d83-the-fapi-20-profile-per-tenant.md). A tenant
 can turn on the FAPI 2.0 Security Profile for sign-in and for machine callers.
 The tenant setting, the client key, the startup check, the machine callers, and
-PAR and `private_key_jwt` at sign-in are built. The `iss` check and DPoP at
-sign-in, and the rotation and verification bullets below are _(planned for
-M16)_.
+PAR, `private_key_jwt`, the `iss` check and DPoP at sign-in are built. The
+rotation and verification bullets below are _(planned for M16)_.
 
 - **Tenant setting.** `Oidc:Profile` is `standard` or `fapi2`, and
   `standard` when unset. Any other value stops the server's start, naming the
@@ -452,10 +454,26 @@ M16)_.
     `jti`. The server sends no client secret, even when the tenant has one.
     Client keys are EC P-256 keys and the assertion is signed with ES256. RSA
     keys are not supported.
-  - A `standard` tenant is unchanged: no PAR, and a client secret.
-  - _(Planned for M16.)_ The server checks the `iss` parameter of the
-    authorization response against the tenant's `Authority` (RFC 9207).
-  - _(Planned for M16.)_ The token request carries a DPoP proof.
+  - The server checks the `iss` parameter of the authorization response
+    (RFC 9207). It must equal the tenant's `Authority` character for
+    character, after one trailing `/` is removed from the `Authority`. A
+    callback with no `iss`, or a different one, creates no session and writes
+    `session.signInRefused` with the reason `invalidIssuer`. The check runs
+    after the state checks, so a callback with a bad state is still refused as
+    `invalidState` or `otherTenant`. The code is never sent to the token
+    endpoint. An error response from the provider is refused as
+    `providerError`, whatever its `iss`.
+  - The token request carries a DPoP proof (RFC 9449), signed with a new P-256
+    key that is made for each sign-in and thrown away after it. The proof has
+    `typ` `dpop+jwt`, the `htm` `POST` and the token endpoint as `htu`, and
+    holds only the public key. If the provider answers `use_dpop_nonce`, the
+    server sends the request once more, with the nonce in a new proof signed
+    with the same key and with a new client assertion. A second refusal fails
+    the sign-in as `providerError`. The authorization code is not bound to the
+    key, and the PAR request carries no proof. The server keeps no token after
+    sign-in, so the DPoP-bound access token is discarded.
+  - A `standard` tenant is unchanged: no PAR, no `iss` check, no DPoP, and a
+    client secret.
 - **Machine callers under `fapi2`.** Inbound endpoints and service accounts
   accept only access tokens bound to a DPoP key (RFC 9449). A DPoP proof is a
   short signed JWT that the caller makes for each request, so a stolen token is

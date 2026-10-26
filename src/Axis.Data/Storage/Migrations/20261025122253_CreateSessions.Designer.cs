@@ -289,6 +289,39 @@ namespace Axis.Data.Storage.Migrations
                     b.ToTable("sessions", "axis");
                 });
 
+            modelBuilder.Entity("Axis.Data.Storage.UserProfileRow", b =>
+                {
+                    b.Property<string>("UserId")
+                        .HasColumnType("text")
+                        .HasColumnName("user_id");
+
+                    b.Property<string>("DisplayName")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("display_name");
+
+                    b.Property<string>("Email")
+                        .HasColumnType("text")
+                        .HasColumnName("email");
+
+                    b.Property<DateTimeOffset>("FirstSignedInAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("first_signed_in_at");
+
+                    b.Property<DateTimeOffset>("LastSignedInAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("last_signed_in_at");
+
+                    b.Property<string>("Locale")
+                        .HasColumnType("text")
+                        .HasColumnName("locale");
+
+                    b.HasKey("UserId")
+                        .HasName("pk_user_profiles");
+
+                    b.ToTable("user_profiles", "axis");
+                });
+
             modelBuilder.Entity("Axis.Data.Storage.ProvisionedEnumValueRow", b =>
                 {
                     b.HasOne("Axis.Data.Storage.ProvisionedEntityRow", null)

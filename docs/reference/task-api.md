@@ -3,7 +3,7 @@
 Detailed reference for the task API: the routes that list a user's tasks, read one task and
 complete it, and their errors. The task states are in [processes.md](processes.md#task-states).
 Claim, release and reassign are in [task-deadlines.md](task-deadlines.md#claim-and-release), as are
-overdue tasks, escalations and deadlines, where some are _(planned for M14)_.
+overdue tasks, escalations and deadlines, where escalations are _(planned for M14)_.
 The conventions of [architecture.md](../architecture.md) apply: sections marked
 _(planned for Mx)_ are not built yet, and Dn refers to [decisions.md](../decisions.md).
 
@@ -64,6 +64,7 @@ by `createdAt`, then by `id`.
       },
       "claimedBy": null,
       "dueAt": "2026-10-13T02:05:00Z",
+      "overdue": false,
       "createdAt": "2026-10-10T02:05:00.123456Z"
     }
   ],
@@ -82,6 +83,8 @@ by `createdAt`, then by `id`.
 - `claimedBy` is the user id of the holder who claimed the role task, or
   `null`. A claimed task is listed for its claimer only.
 - `dueAt` is `null` when the step has no `dueIn`.
+- `overdue` is `true` when `dueAt` has passed. It is worked out when read with
+  database time. See [task-deadlines.md](task-deadlines.md#task-states).
 
 **Read one task.** `GET /api/apps/{app}/tasks/{id}` returns one task in any
 state:
@@ -121,10 +124,13 @@ state:
     { "name": "reject", "labelKey": "task.reject" }
   ],
   "dueAt": "2026-10-13T02:05:00Z",
+  "overdue": false,
   "createdAt": "2026-10-10T02:05:00.123456Z",
   "completedAt": null,
   "completedBy": null,
-  "outcome": null
+  "outcome": null,
+  "commands": [],
+  "reassignRoles": []
 }
 ```
 
@@ -150,6 +156,14 @@ state:
   [Form conditions and steps](resource-files.md#form-conditions-and-steps).
 - `completedAt`, `completedBy` and `outcome` are `null` while the task is
   `open`.
+- `overdue` is `true` only for an open task whose `dueAt` has passed. A
+  completed, cancelled or expired task reads `false`.
+- `commands` lists what the user may do with the task now, from `claim`,
+  `release` and `reassign`, in that order. It is empty unless the task is
+  `open`. The claim, release, reassign and complete responses carry it too.
+- `reassignRoles` holds the `name` and `labelKey` of each role of the active
+  release, and is empty unless `commands` has `reassign`. See
+  [task-deadlines.md](task-deadlines.md#inbox-and-task-page).
 
 **Complete a task.** `POST /api/apps/{app}/tasks/{id}/complete` records the
 decision:

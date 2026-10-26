@@ -33,6 +33,9 @@ internal static class TenantSignIn
     /// <summary>The request item that <c>OnTokenValidated</c> sets when it rejects the ID token.</summary>
     public const string TokenRejectedItem = "axis:sign_in_token_rejected";
 
+    /// <summary>The request item that <c>OnAuthorizationCodeReceived</c> sets when it rejects the callback's <c>iss</c>.</summary>
+    public const string IssuerRejectedItem = "axis:sign_in_issuer_rejected";
+
     /// <summary>The request item that <c>OnTokenValidated</c> fills with the <see cref="ProfileClaims"/> for <c>OnTicketReceived</c>.</summary>
     public const string ProfileClaimsItem = "axis:sign_in_profile";
 
@@ -187,13 +190,14 @@ internal sealed partial class TenantSignInOptions(TenantSignInSettings settings,
             {
                 var query = httpContext.Request.Query;
                 var tokenRejected = httpContext.Items.ContainsKey(TenantSignIn.TokenRejectedItem);
-                // A rejected token comes after the state was read, but the failure it leaves carries no properties.
-                var stateRead = context.Properties is not null || tokenRejected;
+                var issuerRejected = httpContext.Items.ContainsKey(TenantSignIn.IssuerRejectedItem);
+                // A rejected token or issuer comes after the state was read, but the failure it leaves carries no properties.
+                var stateRead = context.Properties is not null || tokenRejected || issuerRejected;
                 var otherTenantReadsState = !stateRead
                     && query["state"].ToString() is { Length: > 0 } state
                     && OtherTenantReadsState(httpContext, tenantId, state);
                 var providerError = !string.IsNullOrEmpty(query["error"].ToString());
-                var reason = SignInRefusals.Classify(stateRead, otherTenantReadsState, providerError, context.Failure, tokenRejected);
+                var reason = SignInRefusals.Classify(stateRead, otherTenantReadsState, providerError, context.Failure, tokenRejected, issuerRejected);
                 await SessionAudit.AppendAsync(
                     httpContext,
                     AuditActions.SessionSignInRefused,
@@ -213,7 +217,9 @@ internal sealed partial class TenantSignInOptions(TenantSignInSettings settings,
     }
 
     // Under fapi2 the client authenticates with private_key_jwt at the PAR and token endpoints, signed with the newest
-    // client key. The identity provider refuses a reused jti, so each request gets its own assertion.
+    // client key. The identity provider refuses a reused jti, so each request gets its own assertion. The callback must
+    // carry an iss that is the tenant's authority (RFC 9207), and the token request carries a DPoP proof (RFC 9449).
+    // Both run in the code event, so a refused issuer never sends the code to the token endpoint.
     private static void ConfigureFapi2(OpenIdConnectOptions options, TenantOidcSettings tenant, string tenantId)
     {
         options.Events.OnRedirectToIdentityProvider = async context =>
@@ -232,10 +238,29 @@ internal sealed partial class TenantSignInOptions(TenantSignInSettings settings,
             context.HandleClientAuthentication();
             return Task.CompletedTask;
         };
-        options.Events.OnAuthorizationCodeReceived = context =>
+        options.Events.OnAuthorizationCodeReceived = async context =>
         {
-            Authenticate(context.HttpContext, context.TokenEndpointRequest!, tenant);
-            return Task.CompletedTask;
+            var httpContext = context.HttpContext;
+            var issuer = context.ProtocolMessage.GetParameter(OpenIdConnectParameterNames.Iss);
+            if (!string.Equals(issuer, tenant.Authority!.TrimEnd('/'), StringComparison.Ordinal))
+            {
+                httpContext.Items[TenantSignIn.IssuerRejectedItem] = true;
+                context.Fail("The authorization response's iss is not the tenant's authority.");
+                return;
+            }
+
+            var configuration = await context.Options.ConfigurationManager!.GetConfigurationAsync(httpContext.RequestAborted);
+            var response = await DpopTokenRequest.SendAsync(
+                context.Backchannel,
+                configuration.TokenEndpoint,
+                () =>
+                {
+                    Authenticate(httpContext, context.TokenEndpointRequest!, tenant);
+                    return context.TokenEndpointRequest!;
+                },
+                httpContext.RequestServices.GetRequiredService<TimeProvider>(),
+                httpContext.RequestAborted);
+            context.HandleCodeRedemption(response);
         };
     }
 

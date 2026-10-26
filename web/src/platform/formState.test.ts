@@ -15,7 +15,12 @@ describe('fetchFormState', () => {
   })
 
   it('posts the body as JSON with the CSRF header and returns the answer', async () => {
-    const answer = { sections: [], fields: { title: { visible: true, required: true, readOnly: false } }, errors: {} }
+    const answer = {
+      sections: [],
+      fields: { title: { visible: true, required: true, readOnly: false } },
+      errors: {},
+      defaults: {},
+    }
     const fetchMock = vi.fn(async (_input: string, _init?: RequestInit) => new Response(JSON.stringify(answer)))
     vi.stubGlobal('fetch', fetchMock)
 
@@ -29,6 +34,20 @@ describe('fetchFormState', () => {
     ])
     expect(new Headers(init?.headers).get('Content-Type')).toBe('application/json')
     expect(new Headers(init?.headers).get('X-Axis-Csrf')).toBe('1')
+  })
+
+  it('keeps the digits of a decimal default', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response('{"sections":[],"fields":{},"errors":{},"defaults":{"amount":12.50,"priority":3,"title":"x"}}'),
+      ),
+    )
+
+    const answer = await fetchFormState('/state', '{}')
+
+    expect(answer.defaults).toEqual({ amount: '12.50', priority: '3', title: 'x' })
   })
 
   it('throws on any other status', async () => {

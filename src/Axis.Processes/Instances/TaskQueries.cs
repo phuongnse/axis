@@ -161,6 +161,17 @@ public static class TaskQueries
             && (task.ClaimedBy is null || string.Equals(task.ClaimedBy, userId, StringComparison.Ordinal));
     }
 
+    /// <summary>
+    /// Whether <paramref name="task"/> is overdue at <paramref name="now"/>: it is open and its due
+    /// date is before <paramref name="now"/>. A task in any other state is never overdue.
+    /// </summary>
+    public static bool IsOverdue(ProcessTaskRow task, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(task);
+
+        return task.State == ProcessTasks.Open && task.DueAt is { } due && due < now;
+    }
+
     internal static void AddMayActParameters(NpgsqlCommand command, Guid applicationId, string userId, IReadOnlyCollection<string> roles)
     {
         command.Parameters.AddWithValue("application", applicationId);

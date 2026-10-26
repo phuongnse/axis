@@ -56,6 +56,10 @@ namespace Axis.Server.Processes;
 /// active release does not declare is a 400 at <c>/role</c>, and a <c>user</c> with no user profile is a 400 at
 /// <c>/user</c>. It takes no start lock, locks the task, hands it over with <see cref="TaskReassignCommand"/>,
 /// which clears the claim and appends <c>task.reassigned</c>, and answers with the task as a single read returns it.
+/// A task list item and a single read say whether the task is overdue: it is open and its due date is before the
+/// database's current time. A single read, and the claim, release, reassign and complete responses, also list the
+/// <c>commands</c> the user may take on the task now (<c>claim</c>, <c>release</c> and <c>reassign</c>, in that order,
+/// and none unless the task is open) and, when that includes <c>reassign</c>, the roles of the active release.
 /// A claimed role task is listed and completed only by its claimer. Other holders may still read it
 /// and ask for its form state.
 /// The assignee check is the only gate: no entity grant is needed and no record filter applies.
@@ -72,6 +76,8 @@ internal static class TaskEndpoints
     private const string UserProperty = "user";
 
     private const string RoleProperty = "role";
+
+    private const string ReassignCommand = "reassign";
 
     public static void MapTaskEndpoints(this IEndpointRouteBuilder endpoints)
     {
@@ -115,6 +121,7 @@ internal static class TaskEndpoints
         var connection = await database.GetConnectionAsync(cancellationToken);
         var result = await TaskQueries.ListOpenAsync(
             connection, active.Model.Manifest.Id, user.Id, roles, pageNumber, size, cancellationToken);
+        var now = await RecordQueries.TransactionTimeAsync(connection, cancellationToken);
         var steps = new List<(ProcessTaskRow Task, ApplicationModel Release, ProcessModel Process, TaskStepModel Step)>(result.Items.Count);
         foreach (var task in result.Items)
         {
@@ -142,6 +149,7 @@ internal static class TaskEndpoints
                 Subject(release, task, labels, fields),
                 task.ClaimedBy,
                 task.DueAt?.UtcDateTime,
+                TaskQueries.IsOverdue(task, now),
                 task.CreatedAt.UtcDateTime));
         }
 
@@ -185,7 +193,7 @@ internal static class TaskEndpoints
             return AssignedToSomeoneElse();
         }
 
-        return Results.Ok(await DescribeAsync(resolver, connection, active.Model, roles, task, cancellationToken));
+        return Results.Ok(await DescribeAsync(resolver, connection, active.Model, user, roles, task, cancellationToken));
     }
 
     // The body is read here rather than bound, so every body problem is reported by JSON Pointer,
@@ -246,7 +254,7 @@ internal static class TaskEndpoints
 
             var completed = await TaskQueries.FindAsync(connection, taskId, cancellationToken)
                 ?? throw new InvalidOperationException($"The completed task '{taskId}' could not be read.");
-            return Results.Ok(await DescribeAsync(resolver, connection, active.Model, roles, completed, cancellationToken));
+            return Results.Ok(await DescribeAsync(resolver, connection, active.Model, user, roles, completed, cancellationToken));
         }
 
         return ReleaseRetry.Changed();
@@ -371,9 +379,7 @@ internal static class TaskEndpoints
         await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))
         {
             var task = await TaskQueries.LockAsync(transaction, taskId, cancellationToken);
-            var mayReassign = task is not null
-                && active.Model.Processes.FirstOrDefault(process => process.Id == task.ProcessId) is { } taskProcess
-                && PolicyEvaluator.AllowsReassign(active.Model, user.Roles, taskProcess);
+            var mayReassign = task is not null && MayReassign(active.Model, user, task);
             var outcome = await change(
                 transaction, active.Model.Manifest.Id, task, new RecordActor(user.Id, user.DisplayName, roles), mayReassign, cancellationToken);
             if (outcome != TaskClaimOutcome.Done)
@@ -395,7 +401,7 @@ internal static class TaskEndpoints
 
         var changed = await TaskQueries.FindAsync(connection, taskId, cancellationToken)
             ?? throw new InvalidOperationException($"The task '{taskId}' could not be read.");
-        return Results.Ok(await DescribeAsync(resolver, connection, active.Model, roles, changed, cancellationToken));
+        return Results.Ok(await DescribeAsync(resolver, connection, active.Model, user, roles, changed, cancellationToken));
     }
 
     // Like a claim, a reassignment only changes the task row and writes an audit record, so it takes no start lock.
@@ -440,7 +446,7 @@ internal static class TaskEndpoints
 
         var changed = await TaskQueries.FindAsync(connection, taskId, cancellationToken)
             ?? throw new InvalidOperationException($"The task '{taskId}' could not be read.");
-        return Results.Ok(await DescribeAsync(resolver, connection, active.Model, roles, changed, cancellationToken));
+        return Results.Ok(await DescribeAsync(resolver, connection, active.Model, user, roles, changed, cancellationToken));
     }
 
     /// <summary>
@@ -463,8 +469,7 @@ internal static class TaskEndpoints
             return TaskNotFound();
         }
 
-        if (active.Model.Processes.FirstOrDefault(process => process.Id == task.ProcessId) is not { } taskProcess
-            || !PolicyEvaluator.AllowsReassign(active.Model, user.Roles, taskProcess))
+        if (!MayReassign(active.Model, user, task))
         {
             return Grants.Forbidden();
         }
@@ -591,11 +596,14 @@ internal static class TaskEndpoints
         ActiveApplicationResolver resolver,
         NpgsqlConnection connection,
         ApplicationModel active,
+        CurrentUserResponse user,
         IReadOnlyList<string> roles,
         ProcessTaskRow task,
         CancellationToken cancellationToken)
     {
         var (release, process, step) = await TaskStepAsync(resolver, task, cancellationToken);
+        var now = await RecordQueries.TransactionTimeAsync(connection, cancellationToken);
+        var commands = Commands(task, user.Id, roles, MayReassign(active, user, task));
         var labels = await ReadLabelsAsync(connection, [(task, release)], cancellationToken);
         var formModel = TaskCompletionCommand.FormOf(release, task, step);
         var form = ApplicationSites.DescribeForm(release, formModel.Name);
@@ -623,10 +631,52 @@ internal static class TaskEndpoints
             new TaskForm(form.Name, form.Sections, form.Steps, entity),
             [.. step.Outcomes.Select(outcome => new TaskOutcome(outcome.Name, outcome.Label.TextKey))],
             task.DueAt?.UtcDateTime,
+            TaskQueries.IsOverdue(task, now),
             task.CreatedAt.UtcDateTime,
             task.CompletedAt?.UtcDateTime,
             task.CompletedBy,
-            task.Outcome);
+            task.Outcome,
+            commands,
+            commands.Contains(ReassignCommand)
+                ? [.. active.Roles.OrderBy(role => role.Name, StringComparer.Ordinal).Select(role => new TaskRole(role.Name, role.Label?.TextKey))]
+                : []);
+    }
+
+    /// <summary>Whether <paramref name="user"/> holds <c>reassign</c> on the process of <paramref name="task"/> in the <paramref name="active"/> release.</summary>
+    private static bool MayReassign(ApplicationModel active, CurrentUserResponse user, ProcessTaskRow task) =>
+        active.Processes.FirstOrDefault(process => process.Id == task.ProcessId) is { } process
+        && PolicyEvaluator.AllowsReassign(active, user.Roles, process);
+
+    /// <summary>
+    /// The commands the user may take on <paramref name="task"/> now, in the order <c>claim</c>,
+    /// <c>release</c>, <c>reassign</c>. Each mirrors what its route accepts, and none is listed unless the task is open.
+    /// </summary>
+    private static List<string> Commands(ProcessTaskRow task, string userId, IReadOnlyList<string> roles, bool mayReassign)
+    {
+        var commands = new List<string>();
+        if (task.State != ProcessTasks.Open)
+        {
+            return commands;
+        }
+
+        var mayAct = TaskQueries.MayAct(task, userId, roles);
+        if (task.AssigneeKind == ProcessTasks.RoleAssignee && task.ClaimedBy is null && mayAct)
+        {
+            commands.Add("claim");
+        }
+
+        if (task.ClaimedBy is not null
+            && (mayReassign || (mayAct && string.Equals(task.ClaimedBy, userId, StringComparison.Ordinal))))
+        {
+            commands.Add("release");
+        }
+
+        if (mayReassign)
+        {
+            commands.Add(ReassignCommand);
+        }
+
+        return commands;
     }
 
     /// <summary>The model of the task's release, with the task's process and step as that release declares them.</summary>
@@ -724,7 +774,7 @@ internal static class TaskEndpoints
 /// <summary>One page of the open tasks the user may act on, and the number of them on every page.</summary>
 internal sealed record TaskListResponse(IReadOnlyList<TaskListItem> Items, int Page, int PageSize, long TotalCount);
 
-/// <summary>An open task as a task list shows it, with the release it started on. <see cref="ClaimedBy"/> is the claimer's user id, or null. <see cref="DueAt"/> is null when the step has no <c>dueIn</c>.</summary>
+/// <summary>An open task as a task list shows it, with the release it started on. <see cref="ClaimedBy"/> is the claimer's user id, or null. <see cref="DueAt"/> is null when the step has no <c>dueIn</c>. <see cref="Overdue"/> is true when <see cref="DueAt"/> has passed.</summary>
 internal sealed record TaskListItem(
     Guid Id,
     Guid ReleaseId,
@@ -734,6 +784,7 @@ internal sealed record TaskListItem(
     TaskSubject Subject,
     string? ClaimedBy,
     DateTime? DueAt,
+    bool Overdue,
     DateTime CreatedAt);
 
 /// <summary>The subject record of a task. <see cref="Label"/> is its display field value, or null when there is none.</summary>
@@ -751,7 +802,11 @@ internal sealed record TaskForm(string Name, IReadOnlyList<FormSectionMetadata> 
 /// <summary>An outcome a task can be completed with.</summary>
 internal sealed record TaskOutcome(string Name, string LabelKey);
 
-/// <summary>One task in any state, as a task read returns it.</summary>
+/// <summary>
+/// One task in any state, as a task read returns it. <see cref="Overdue"/> is true only for an open task whose
+/// <see cref="DueAt"/> has passed. <see cref="Commands"/> are the actions the user may take on it now, and
+/// <see cref="ReassignRoles"/> the roles it can be reassigned to, empty unless <see cref="Commands"/> has <c>reassign</c>.
+/// </summary>
 internal sealed record TaskResponse(
     Guid Id,
     Guid ReleaseId,
@@ -766,7 +821,13 @@ internal sealed record TaskResponse(
     TaskForm Form,
     IReadOnlyList<TaskOutcome> Outcomes,
     DateTime? DueAt,
+    bool Overdue,
     DateTime CreatedAt,
     DateTime? CompletedAt,
     string? CompletedBy,
-    string? Outcome);
+    string? Outcome,
+    IReadOnlyList<string> Commands,
+    IReadOnlyList<TaskRole> ReassignRoles);
+
+/// <summary>A role a task can be reassigned to, with its label's text key, or null when it has none.</summary>
+internal sealed record TaskRole(string Name, string? LabelKey);

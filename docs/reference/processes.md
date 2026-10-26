@@ -225,6 +225,8 @@ a payment reference from the sample extension package, see
 ## Steps
 
 M3 has four step types. Wait for event, timer and sub-process come later.
+The compiler already checks and builds a `subProcess` step, but the engine
+does not run it yet, see [Sub-process step](process-flow.md#sub-process-step).
 _(Planned for M14)_ `timer`, `waitEvent` and `subProcess` steps, and the
 `createRecord` and `notify` operations, see [process flow](process-flow.md)
 and [notifications](notifications.md#notify-operation).
@@ -711,7 +713,8 @@ database, with history in `axis.__processes_migrations` (see
   `process_instance_id` of the call's instance and the `package_call_id` of
   the call. See [Package operations](process-execution.md#package-operations). An `event.deliver` item delivers one event occurrence to
   the `async` event triggers, see [Event delivery](process-events.md#event-delivery). It has
-  the `event_id` of the occurrence. Every item also has the `trace_id` and
+  the `event_id` of the occurrence, and the `trigger_id` of the one trigger it delivers
+  to when an operator [redelivered](process-events.md#routes) a dead letter. Every item also has the `trace_id` and
   `span_id` of the span whose transaction queued it, or null when no span was
   current. A run starts a new trace with a link to that span, see
   [Telemetry](../architecture.md#telemetry). A rescheduled item keeps them.

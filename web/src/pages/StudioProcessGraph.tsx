@@ -76,19 +76,19 @@ function StepNodeView({ data }: NodeProps<StepNode>) {
 const nodeTypes = { step: StepNodeView }
 
 /**
- * A read-only graph of the draft's steps and transitions: a node opens its step, an edge opens its transition.
- * A step that a diagnostic path names has an error-coloured border and "has diagnostics" in its label.
+ * The graph of the draft's steps and transitions, laid out again after every edit. A node selects its step, and an
+ * edge selects the step it leaves. The selected step is the node marked current. A step that a diagnostic path names has an error-coloured border and "has diagnostics" in its label.
  */
 export default function StudioProcessGraph({
   draft,
-  path,
+  selected,
   diagnosticPaths,
-  onOpenPath,
+  onSelect,
 }: {
   draft: Record<string, unknown>
-  path: string | null
+  selected: number | null
   diagnosticPaths: readonly string[]
-  onOpenPath: (path: string) => void
+  onSelect: (index: number) => void
 }) {
   const t = useText()
   const { mode } = useThemeMode()
@@ -113,7 +113,7 @@ export default function StudioProcessGraph({
           name: step.name ?? '',
           type: step.type ?? '',
           start: graph.start === step.index,
-          current: path === `/steps/${step.index}` || (path?.startsWith(`/steps/${step.index}/`) ?? false),
+          current: selected === step.index,
           marked: step.marked,
         },
       })),
@@ -128,10 +128,10 @@ export default function StudioProcessGraph({
         labelBgStyle: { fill: colour.surface },
       })),
     }
-  }, [draft, diagnosticPaths, path, colour])
+  }, [draft, diagnosticPaths, selected, colour])
 
   return (
-    <section data-testid="studio-process-graph" aria-label={t('shell.studio.processGraph')} style={{ height: 320 }}>
+    <section data-testid="studio-process-graph" aria-label={t('shell.studio.processGraph')} style={{ height: 480 }}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
@@ -144,8 +144,8 @@ export default function StudioProcessGraph({
         elementsSelectable={false}
         edgesFocusable={false}
         zoomOnScroll={false}
-        onNodeClick={(_, node) => onOpenPath(`/steps/${node.id}`)}
-        onEdgeClick={(_, edge) => onOpenPath(edge.id)}
+        onNodeClick={(_, node) => onSelect(Number(node.id))}
+        onEdgeClick={(_, edge) => onSelect(Number(edge.source))}
       />
     </section>
   )
