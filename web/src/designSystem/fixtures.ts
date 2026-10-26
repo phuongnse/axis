@@ -457,7 +457,7 @@ export const routes: Record<string, () => unknown> = {
   [requestsPath]: () => recordPage,
   [`${requestsPath}/${requestId}`]: () => savedRecord,
   [`${requestsPath}/${requestId}/history`]: () => history,
-  [formStatePath]: () => ({ sections: [], fields: {}, errors: {} }),
+  [formStatePath]: () => ({ sections: [], fields: {}, errors: {}, defaults: {} }),
   [categoriesPath]: () => categoryPage,
   [tasksPath]: () => taskPage,
   [instancesPath]: () => instancePage,

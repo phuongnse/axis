@@ -62,6 +62,7 @@ internal static partial class AdminCommands
                tenant host add <id> <host>
                tenant host remove <id> <host>
                tenant host move <host> --to <id>
+               platform rekey
                publisher
                version
         """;
@@ -132,6 +133,7 @@ internal static partial class AdminCommands
         new("tenant host move", AuditMark.OnePerTenant, TenantSettings.HostMoveAsync),
         new("migrate", AuditMark.OnePerTenant, run => MigrateAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.CancellationToken)),
         new("activate", AuditMark.OnePerTenant, run => ActivateAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.CancellationToken)),
+        new("platform rekey", AuditMark.OnePerRun, run => RekeyAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.CancellationToken)),
         new("publisher", AuditMark.None, run => PublisherAsync(run.Args, run.Configuration, run.Output, run.Error, run.PublisherLease, run.PublisherTestLimit, run.CancellationToken)),
         new("version", AuditMark.None, VersionAsync),
     ];
@@ -192,6 +194,60 @@ internal static partial class AdminCommands
         }
 
         return await new TenantCreate(settings, request, new TenantAudit(command, settings.PlatformConnectionString), output, cancellationToken).RunAsync();
+    }
+
+    private static async Task<int> RekeyAsync(
+        string command,
+        string[] args,
+        IConfiguration configuration,
+        TextWriter output,
+        TextWriter error,
+        CancellationToken cancellationToken)
+    {
+        if (args.Length != 2)
+        {
+            error.WriteLine(Usage);
+            return 2;
+        }
+
+        // The rekey works under both tenancy sources, so it never reads Tenancy:Source.
+        var settings = ReadPlatformSettings(configuration, out var problem);
+        if (settings is null)
+        {
+            error.WriteLine(problem);
+            return 2;
+        }
+
+        if (!settings.Cipher.HasPreviousKey)
+        {
+            error.WriteLine($"The setting {TenantSecretCipher.PreviousKeySetting} is required.");
+            return 2;
+        }
+
+        try
+        {
+            var tablesProblem = await PlatformTablesProblemAsync(settings.PlatformConnectionString, cancellationToken);
+            if (tablesProblem is not null)
+            {
+                error.WriteLine(tablesProblem);
+                return 2;
+            }
+
+            var result = await PlatformRekey.RunAsync(settings.PlatformConnectionString, settings.Cipher, command, cancellationToken);
+            if (result.Problem is not null)
+            {
+                error.WriteLine(result.Problem);
+                return result.Exit;
+            }
+
+            output.WriteLine($"platform rekey ok: {result.TenantSecrets} tenant secrets, {result.DataProtectionKeys} data protection keys");
+            return 0;
+        }
+        catch (OperationCanceledException)
+        {
+            error.WriteLine("The command was canceled before any change.");
+            return 1;
+        }
     }
 
     private static async Task<int> StatusAsync(
@@ -1307,10 +1363,10 @@ internal static partial class AdminCommands
         {
             cipher = TenantSecretCipher.Load(configuration);
         }
-        catch (InvalidOperationException)
+        catch (InvalidOperationException exception)
         {
-            // The cipher's own message mentions Tenancy:Source, which does not apply here.
-            problem = $"The setting {TenantSecretCipher.KeySetting} must be {TenantSecretCipher.KeySize} bytes in base64.";
+            // The cipher's message names the setting and never its value.
+            problem = exception.Message;
             return null;
         }
 

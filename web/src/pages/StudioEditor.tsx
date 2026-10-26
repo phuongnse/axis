@@ -65,7 +65,7 @@ interface SeedEntity {
 
 const noProblems = new Map<string, string>()
 
-const LazyStudioProcessGraph = lazy(() => import('./StudioProcessGraph'))
+const LazyStudioProcessDesign = lazy(() => import('./StudioProcessDesign'))
 const LazyStudioPageDesign = lazy(() => import('./StudioPageDesign'))
 const LazyStudioFormDesign = lazy(() => import('./StudioFormDesign'))
 
@@ -150,13 +150,14 @@ function Drawn({ onDrawn, children }: { onDrawn: (drawn: boolean) => void; child
  * steps as cards, with the decision, end and task panels and a picker of the draft's step names for every transition.
  * A page also has a Design tab, which draws the draft with the site's widgets over placeholder data, beside a palette
  * of the ten widget types and the same widget tree and panel as the Form tab. The two tabs share the selected widget, which is not written to the URL.
- * A page or a form also has Undo and Redo, as buttons beside Save and as Ctrl+Z and Ctrl+Shift+Z (Cmd on macOS), for up to
+ * A page, a form or a process also has Undo and Redo, as buttons beside Save and as Ctrl+Z and Ctrl+Shift+Z (Cmd on macOS), for up to
  * 100 steps of its draft on all its tabs. Typing in one box is one step, and a load of the file clears the history.
  * A form's Design tab shows a Used on list above its canvas, with the pages and process steps that use the form, and an entry calls `onOpen`.
  * Beside the canvas it has a palette of the entity's fields that no section lists and an outline of the draft's steps, sections and fields.
  * Its code loads when the tab first opens.
- * A page or a form opens on its Design tab, and every other kind opens on Form. A path switches to the Form tab, or to JSON when the form cannot show it. A process also shows its steps and transitions as a read-only graph above the tabs, and a click on a node or an edge
- * calls `onOpenPath`. A step that a diagnostic path names is marked on the graph. An entity opens in the entity designer, which shows its header, a table of its fields with the
+ * A page, a form or a process opens on its Design tab, and every other kind opens on Form. A path switches to the Form tab, or to JSON when the form cannot show it. A process's Design tab draws its steps and transitions as a graph, laid out again after every edit,
+ * beside the card of the selected step. A click on a node or an edge selects a step, which is not written to the URL, and a path into a step selects it too.
+ * A step that a diagnostic path names is marked on the graph. An entity opens in the entity designer, which shows its header, a table of its fields with the
  * settings of each field's type, and its validations. An endpoint keeps the generic form and shows its `values` as rows
  * of a field of its entity and an expression. When the server does not answer, the draft stays, and the resource loads
  * again after the reconnect unless the draft has changes. When an entity's loaded field was renamed or removed, Save asks one question per field first, and the answers
@@ -171,7 +172,6 @@ export function StudioEditor({
   onSaved,
   onTextsWritten,
   onDeleted,
-  onOpenPath,
   onOpen,
 }: {
   application: string
@@ -179,7 +179,6 @@ export function StudioEditor({
   resources: StudioResourceItem[]
   path: string | null
   diagnosticPaths: readonly string[]
-  onOpenPath: (path: string) => void
   onOpen: OpenResource
   onSaved: (diagnostics: StudioDiagnostic[], created?: StudioResourceItem[]) => void
   onTextsWritten: (diagnostics: StudioDiagnostic[]) => void
@@ -206,14 +205,20 @@ export function StudioEditor({
   const [deleting, setDeleting] = useState(false)
   const [deleteFailed, setDeleteFailed] = useState(false)
   const [tab, setTab] = useState<'design' | 'form' | 'json'>(
-    item.kind === 'page' || item.kind === 'form' ? 'design' : 'form',
+    item.kind === 'page' || item.kind === 'form' || item.kind === 'process' ? 'design' : 'form',
   )
   const [formDrawn, setFormDrawn] = useState(false)
   const [seenPath, setSeenPath] = useState<string | null>(null)
+  // The step that the Design tab of a process shows. It is not written to the URL, which would switch to Form.
+  const [processStep, setProcessStep] = useState<number | null>(null)
   if (path !== seenPath) {
     setSeenPath(path)
     if (path !== null) {
       setTab('form')
+      const step = item.kind === 'process' ? /^\/steps\/(\d+)(\/|$)/.exec(path) : null
+      if (step) {
+        setProcessStep(Number(step[1]))
+      }
     }
   }
   const [widgetPath, setWidgetPath] = useState('/widgets/0')
@@ -228,7 +233,7 @@ export function StudioEditor({
   // The pages and process steps that use a form, or `failed` when their references did not load.
   const [usedOn, setUsedOn] = useState<FormUse[] | 'failed'>()
   const [history, setHistory] = useState(emptyHistory)
-  const undoable = item.kind === 'page' || item.kind === 'form'
+  const undoable = item.kind === 'page' || item.kind === 'form' || item.kind === 'process'
   const handledPath = useRef<string | null>(null)
   // A field to scroll to once the form tab is shown, because a hidden field cannot be scrolled to.
   const pendingField = useRef<HTMLElement | null>(null)
@@ -754,16 +759,6 @@ export function StudioEditor({
     >
       <ExpressionCheckContext.Provider value={checkContext}>
         <LabelTextsContext.Provider value={labelContext}>
-          {item.kind === 'process' && (
-            <Suspense fallback={null}>
-              <LazyStudioProcessGraph
-                draft={draft}
-                path={path}
-                diagnosticPaths={diagnosticPaths}
-                onOpenPath={onOpenPath}
-              />
-            </Suspense>
-          )}
           <Tabs
             activeKey={tab}
             onChange={(key) => setTab(key as 'design' | 'form' | 'json')}
@@ -812,7 +807,26 @@ export function StudioEditor({
                           ) : null,
                       },
                     ]
-                  : []),
+                  : item.kind === 'process' && schema
+                    ? [
+                        {
+                          key: 'design',
+                          label: t('shell.studio.design'),
+                          children:
+                            tab === 'design' ? (
+                              <Suspense fallback={null}>
+                                <LazyStudioProcessDesign
+                                  draft={draft}
+                                  diagnosticPaths={diagnosticPaths}
+                                  selected={processStep}
+                                  onSelect={setProcessStep}
+                                  onChange={change}
+                                />
+                              </Suspense>
+                            ) : null,
+                        },
+                      ]
+                    : []),
               {
                 key: 'form',
                 label: t('shell.studio.form'),

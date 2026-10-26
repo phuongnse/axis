@@ -46,7 +46,18 @@ test('a note status shows its label in English and Vietnamese, and the record ke
   await page.goto(`/e2e/noteform/${id}`)
   await expectChosen(page.getByRole('combobox', { name: 'Status', exact: true }), 'In progress')
 
+  // Slows the switch so that leaving the page before it lands would lose the choice on every run.
+  await page.route(
+    '**/api/sites/e2e/texts/vi',
+    async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 2_000))
+      await route.continue()
+    },
+    { times: 1 },
+  )
   await page.getByRole('radiogroup', { name: 'Language', exact: true }).getByText('Tiếng Việt', { exact: true }).click()
+  // The site stores the chosen language only once its texts have loaded, so the page waits for that first.
+  await expectChosen(page.getByRole('combobox', { name: 'Trạng thái', exact: true }), 'Đang mở')
 
   await page.goto('/e2e/notes?pageSize=100&sort=-title')
   const viRow = page.getByRole('row', { name: new RegExp(`${title} `) })

@@ -666,7 +666,7 @@ test.describe('the author builds the service desk with Studio only', () => {
 
     const en = await texts('en')
     await createResource(page, 'process', 'TicketHandling')
-    await expectForm(page)
+    await openFormTab(page)
     await pick(page, 'studio-field-/entity', 'Ticket')
     await page.getByTestId('studio-step-0').getByRole('button', { name: 'Remove step', exact: true }).click()
 

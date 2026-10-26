@@ -181,6 +181,7 @@
   "shell.studio.design.cannotDraw": "The page cannot be drawn until its errors are fixed.",
   "shell.studio.design.loadFailed": "The page could not be drawn.",
   "shell.studio.design.hasDiagnostics": "has diagnostics",
+  "shell.studio.design.selectStep": "Select a step on the canvas.",
   "shell.studio.design.width": "Canvas width",
   "shell.studio.design.desktop": "Desktop",
   "shell.studio.design.phone": "Phone",
