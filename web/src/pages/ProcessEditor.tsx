@@ -16,6 +16,8 @@ type Content = Record<string, unknown>
 
 const stepTypes = ['decision', 'task', 'operation', 'end']
 
+const parameterTypes = ['text', 'integer', 'decimal', 'boolean', 'date', 'date-time']
+
 /** The keys a step type forbids, from the first four conditionals of the process schema. */
 const forbiddenStepKeys: Record<string, string[]> = {
   decision: [
@@ -103,6 +105,47 @@ function withType(step: Content, type: string): Content {
 }
 
 /**
+ * The process with its subject switched: the other key goes and the new key, empty, takes its place, so the key order
+ * of the file holds. A process with neither key gets the new key last.
+ */
+function withSubject(process: Content, subject: 'entity' | 'parameters'): Content {
+  const other = subject === 'entity' ? 'parameters' : 'entity'
+  const initial = subject === 'entity' ? '' : []
+  const next: [string, unknown][] = []
+  let placed = false
+  for (const [key, value] of Object.entries(process)) {
+    if (key === other && !placed) {
+      next.push([subject, initial])
+      placed = true
+    } else if (key !== other && key !== subject) {
+      next.push([key, value])
+    }
+  }
+  if (!placed) {
+    next.push([subject, initial])
+  }
+  return Object.fromEntries(next)
+}
+
+/** The distinct, non-empty step names of a draft, for the pickers of every transition. */
+function stepNames(steps: unknown[]): string[] {
+  return [
+    ...new Set(
+      steps.flatMap((step) =>
+        isContent(step) && typeof step.name === 'string' && step.name !== '' ? [step.name] : [],
+      ),
+    ),
+  ]
+}
+
+/** The steps with the step at `index` swapped with its neighbour `offset` places away. */
+function moved(steps: unknown[], index: number, offset: number): unknown[] {
+  const next = [...steps]
+  ;[next[index], next[index + offset]] = [next[index + offset], next[index]]
+  return next
+}
+
+/**
  * The editor of a process. It shows the process's name, entity and start condition with the generic form, the start
  * step, and the steps as cards in file order. A decision shows its branches and its `otherwise`, an end shows only
  * its name and type, and every transition is a picker over the step names of the draft. A task shows its full panel:
@@ -122,23 +165,12 @@ export function ProcessEditor({
 }) {
   const t = useText()
   const steps = Array.isArray(value.steps) ? value.steps : []
-  const names = [
-    ...new Set(
-      steps.flatMap((step) =>
-        isContent(step) && typeof step.name === 'string' && step.name !== '' ? [step.name] : [],
-      ),
-    ),
-  ]
-
-  function move(index: number, offset: number) {
-    const next = [...steps]
-    ;[next[index], next[index + offset]] = [next[index + offset], next[index]]
-    onChange('/steps', next)
-  }
+  const names = stepNames(steps)
 
   return (
     <Flex vertical gap="middle" data-testid="studio-process-editor">
-      <SchemaForm schema={schema} value={value} onChange={onChange} />
+      <SchemaForm schema={withoutSubject(schema)} value={value} onChange={onChange} />
+      <Subject value={value} onChange={onChange} />
       <div data-testid="studio-field-/start">
         <div>{t('shell.studio.process.start')}</div>
         <ReferencePicker
@@ -159,7 +191,7 @@ export function ProcessEditor({
               entity={text(value.entity)}
               names={names}
               last={index === steps.length - 1}
-              onMove={(offset) => move(index, offset)}
+              onMove={(offset) => onChange('/steps', moved(steps, index, offset))}
               onRemove={() =>
                 onChange(
                   '/steps',
@@ -185,6 +217,139 @@ export function ProcessEditor({
         </Flex>
       </div>
     </Flex>
+  )
+}
+
+/** The schema without `entity` and `parameters`, which the Subject choice edits. */
+function withoutSubject(schema: JsonSchema): JsonSchema {
+  const { entity: _entity, parameters: _parameters, ...properties } = schema.properties ?? {}
+  return {
+    ...schema,
+    properties,
+    required: schema.required?.filter((name) => name !== 'entity' && name !== 'parameters'),
+  }
+}
+
+/**
+ * The subject of a process: a choice of an entity or parameters. A switch replaces the draft, so that it holds only the
+ * chosen key, and one undo step brings the other back.
+ */
+function Subject({ value, onChange }: { value: Content; onChange: ChangeHandler }) {
+  const t = useText()
+  const mode = value.parameters !== undefined && value.entity === undefined ? 'parameters' : 'entity'
+  const parameters = Array.isArray(value.parameters) ? value.parameters : []
+
+  return (
+    // The entity picker carries the `/entity` field marker itself.
+    <div data-testid={mode === 'parameters' ? 'studio-field-/parameters' : undefined}>
+      <Flex vertical gap="small">
+        <Typography.Text strong>{t('shell.studio.process.subject')}</Typography.Text>
+        <Radio.Group
+          // A name of its own keeps the assignee radios of a task from joining this group when ids are not unique.
+          name="process-subject"
+          optionType="button"
+          aria-label={t('shell.studio.process.subject')}
+          value={mode}
+          options={[
+            { value: 'entity', label: t('shell.studio.process.subjectEntity') },
+            { value: 'parameters', label: t('shell.studio.process.subjectParameters') },
+          ]}
+          onChange={(event) => {
+            if (event.target.value !== mode) {
+              onChange('', withSubject(value, event.target.value))
+            }
+          }}
+        />
+        {mode === 'entity' ? (
+          <NamePicker
+            pointer="/entity"
+            label={t('shell.studio.process.subjectEntity')}
+            kind="entity"
+            value={value.entity}
+            onPick={(next) => onChange('/entity', next)}
+          />
+        ) : (
+          <>
+            {parameters.map((parameter, index) => {
+              const pointer = `/parameters/${index}`
+              const content = isContent(parameter) ? parameter : {}
+              return (
+                <Flex key={index} gap="small" align="flex-start" wrap data-testid={`studio-field-${pointer}`}>
+                  <div data-testid={`studio-field-${pointer}/name`}>
+                    <div>{t('shell.studio.process.parameterName')}</div>
+                    <Input
+                      aria-label={t('shell.studio.process.parameterName')}
+                      value={text(content.name)}
+                      onChange={(event) => onChange(`${pointer}/name`, event.target.value)}
+                    />
+                  </div>
+                  <div data-testid={`studio-field-${pointer}/type`}>
+                    <div>{t('shell.studio.process.parameterType')}</div>
+                    <Select
+                      aria-label={t('shell.studio.process.parameterType')}
+                      style={{ minWidth: 160 }}
+                      virtual={false}
+                      value={typeof content.type === 'string' ? content.type : undefined}
+                      options={parameterTypes.map((type) => ({ value: type, label: type }))}
+                      onChange={(next: string) => onChange(`${pointer}/type`, next)}
+                    />
+                  </div>
+                  <Button onClick={() => onChange(pointer, undefined)}>
+                    {t('shell.studio.process.removeParameter')}
+                  </Button>
+                </Flex>
+              )
+            })}
+            <div>
+              <Button onClick={() => onChange('/parameters', [...parameters, { name: '', type: 'text' }])}>
+                {t('shell.studio.process.addParameter')}
+              </Button>
+            </div>
+          </>
+        )}
+      </Flex>
+    </div>
+  )
+}
+
+/**
+ * The card of one step of a process, as the Form tab shows it, for the Design tab's side panel. Move up and Move down
+ * select the step at its new place, and Remove clears the selection.
+ */
+export function ProcessStepPanel({
+  value,
+  index,
+  onChange,
+  onSelect,
+}: {
+  value: Content
+  index: number
+  onChange: ChangeHandler
+  onSelect: (index: number | null) => void
+}) {
+  const steps = Array.isArray(value.steps) ? value.steps : []
+  const step = steps[index]
+
+  return (
+    <Step
+      index={index}
+      step={isContent(step) ? step : {}}
+      entity={text(value.entity)}
+      names={stepNames(steps)}
+      last={index === steps.length - 1}
+      onMove={(offset) => {
+        onChange('/steps', moved(steps, index, offset))
+        onSelect(index + offset)
+      }}
+      onRemove={() => {
+        onChange(
+          '/steps',
+          steps.filter((_, position) => position !== index),
+        )
+        onSelect(null)
+      }}
+      onChange={onChange}
+    />
   )
 }
 

@@ -1,4 +1,5 @@
 import { apiFetch } from './api'
+import { parseRecordJson, type RecordValue } from './records'
 
 /** What a form shows of one field, as the server's form state endpoint answers. */
 export interface FieldState {
@@ -9,12 +10,14 @@ export interface FieldState {
 
 /**
  * The answer of the form state endpoint. `errors` maps a JSON Pointer such as `/values/title` to its
- * messages, for the fields the user touched.
+ * messages, for the fields the user touched. `defaults` holds the default of each form field `values`
+ * left out, for a new record only, in the value format of the record API.
  */
 export interface FormStateAnswer {
   sections: { name: string; visible: boolean }[]
   fields: Record<string, FieldState>
   errors: Record<string, string[]>
+  defaults: Record<string, RecordValue>
 }
 
 const recordsSuffix = /\/entities\/[^/]+\/records$/
@@ -39,6 +42,6 @@ export async function fetchFormState(statePath: string, body: string, signal?: A
   if (response.status !== 200) {
     throw new Error(`Loading the form state from '${statePath}' failed with status ${response.status}.`)
   }
-  // The answer holds no field values, so plain numbers are safe.
-  return JSON.parse(await response.text()) as FormStateAnswer
+  // The parser keeps number source text, so a decimal default keeps its digits. The answer has no other numbers.
+  return parseRecordJson<FormStateAnswer>(await response.text())
 }

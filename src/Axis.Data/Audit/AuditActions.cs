@@ -29,6 +29,8 @@ public static class AuditActions
 
     public const string TaskReleased = "task.released";
 
+    public const string TaskReassigned = "task.reassigned";
+
     public const string TaskExpired = "task.expired";
 
     public const string ConnectorCallStaged = "connector.callStaged";
@@ -42,6 +44,10 @@ public static class AuditActions
     public const string OperationCalled = "operation.called";
 
     public const string OperationCallResolved = "operation.callResolved";
+
+    public const string DeadLetterRedelivered = "deadLetter.redelivered";
+
+    public const string DeadLetterDiscarded = "deadLetter.discarded";
 
     public const string SessionSignedIn = "session.signedIn";
 

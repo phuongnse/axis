@@ -172,8 +172,8 @@ var sessionCookiePolicy = plainHttpAllowed ? CookieSecurePolicy.SameAsRequest : 
 builder.Services.TryAddSingleton(TimeProvider.System);
 
 // Record writes, process starts, tasks and GET /api/me read the session. It is the default
-// everywhere except endpoint paths and record routes with a bearer token, so a request that carries a
-// session renews it. On endpoint paths the default is the caller's bearer token, and on a record route
+// everywhere except endpoint paths and service account routes with a bearer token, so a request that carries a
+// session renews it. On endpoint paths the default is the caller's bearer token, and on a service account route
 // that has one it is the service account's, so a session cookie there is never read or renewed.
 builder.Services.AddAuthentication(EndpointCaller.RequestScheme)
     .AddSession(sessionCookiePolicy)
@@ -262,9 +262,11 @@ sessions.MapFormStateEndpoints();
 sessions.MapProcessEndpoints();
 sessions.MapProcessInspectionEndpoints();
 sessions.MapProcessOperatorEndpoints();
+sessions.MapDeadLetterEndpoints();
 sessions.MapTaskEndpoints();
 sessions.MapDataSourceEndpoints();
 sessions.MapUserEndpoints();
+sessions.MapUserPickerEndpoints();
 sessions.MapStudioEndpoints();
 sessions.MapAuthEndpoints();
 

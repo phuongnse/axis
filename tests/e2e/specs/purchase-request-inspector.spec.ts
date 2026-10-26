@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto'
+import { spawnSync } from 'node:child_process'
 import { expect, test } from '../test'
 import type { Page } from '@playwright/test'
 import { csrfHeaders } from '../csrf'
@@ -19,10 +21,37 @@ test.use({ storageState: sessionFile('anna') })
 
 const instancesPath = `${appPath}/processes/PurchaseRequestApproval/instances`
 
+// The ids of the sample application and of its approval process, from samples/apps/purchase-requests.
+const applicationId = '219102bc-864f-42ed-874a-c19eaee0d1ba'
+const processId = '4b60c03e-02d0-4329-80c6-75f972190399'
+
 interface InstanceItem {
   id: string
   subjectId: string
   step: string
+}
+
+/**
+ * Inserts an open dead letter of the approval process into the E2E database and returns its id. No sample
+ * declares an async or schedule trigger, so a delivery never dead-letters here. The trigger of the row is
+ * a random id, which is not in the active release.
+ */
+function seedDeadLetter(): string {
+  const container = process.env.AXIS_E2E_POSTGRES_CONTAINER
+  if (!container) {
+    throw new Error('AXIS_E2E_POSTGRES_CONTAINER is not set. Run the E2E tests with scripts/e2e.sh.')
+  }
+  const id = randomUUID()
+  const query =
+    'INSERT INTO axis.dead_letters (id, kind, application_id, process_id, trigger_id, occurrence_at, attempts, last_error, state, created_at) ' +
+    `VALUES ('${id}', 'trigger.fanOut', '${applicationId}', '${processId}', '${randomUUID()}', '2026-01-01T05:00:00Z', 5, 'System.InvalidOperationException', 'open', now())`
+  const result = spawnSync('docker', ['exec', container, 'psql', '-U', 'axis', '-d', 'axis', '-tAc', query], {
+    encoding: 'utf8',
+  })
+  if (result.status !== 0) {
+    throw new Error(`psql failed with status ${result.status}: ${result.stderr}`)
+  }
+  return id
 }
 
 /**
@@ -217,4 +246,43 @@ test('a finance reviewer resolves an unknown purchase order call in the inspecto
   expect(values.status).toBe('approved')
   expect(values.purchaseOrderNumber).toBe(orderNumber)
   expect((await purchaseOrders(page, number)).map((order) => order.orderNumber)).toEqual([orderNumber])
+})
+
+test('a finance reviewer is refused a redeliver and discards a dead letter, and its row leaves the list', async ({
+  page,
+}) => {
+  const id = seedDeadLetter()
+  await useSession(page, 'dung')
+
+  await page.goto('/purchasing/approvals')
+  const row = page.locator(`tr[data-row-key="${id}"]`)
+  await expect(row).toContainText('trigger.fanOut')
+  await expect(row).toContainText('System.InvalidOperationException')
+
+  await row.getByTestId(`inspector-dead-letter-redeliver-${id}`).click()
+  let dialog = await waitForDialog(page)
+  await dialog.getByLabel('Reason', { exact: true }).fill('The trigger is back')
+  await dialog.getByRole('button', { name: 'Send', exact: true }).click()
+  await expect(dialog.getByTestId('inspector-command-error')).toHaveText(
+    'The trigger of the dead letter is not in the active release.',
+  )
+  await page.keyboard.press('Escape')
+  await expect(dialog).toHaveCount(0)
+  await expect(row).toBeVisible()
+
+  await row.getByTestId(`inspector-dead-letter-discard-${id}`).click()
+  dialog = await waitForDialog(page)
+  await dialog.getByLabel('Reason', { exact: true }).fill('The delivery is not needed')
+  await dialog.getByRole('button', { name: 'Send', exact: true }).click()
+  await expect(dialog).toHaveCount(0)
+  await expect(row).toHaveCount(0)
+})
+
+test('the operator sees an open dead letter and no Redeliver or Discard button', async ({ page }) => {
+  const id = seedDeadLetter()
+  await useSession(page, 'giang')
+
+  await page.goto('/purchasing/approvals')
+  await expect(page.locator(`tr[data-row-key="${id}"]`)).toBeVisible()
+  await expect(page.getByTestId(/^inspector-dead-letter-(redeliver|discard)-/)).toHaveCount(0)
 })

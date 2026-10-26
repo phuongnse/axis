@@ -76,8 +76,11 @@ development or E2E server serves a real application without a separate step.
     computed value alone never causes a write.
 
   Each record goes through the record input parser as a create body, so the
-  record API's rules apply, and a synced seed still needs every required
-  field. Every record is parsed before any write, and every invalid value is
+  record API's rules apply. A seed record that leaves out a field with a
+  `default` gets the default when it is inserted, with `now()` the start time
+  of the transaction, and a required field with a default may be left out. A
+  synced seed still needs every required field that has no default, and its
+  update of an existing record applies no default. Every record is parsed before any write, and every invalid value is
   `AXC0033` at `/records/{i}/values/<field>`, as is a value for a
   [computed field](resource-files.md#entity-logic) or a [sequence](resource-files.md#sequences) field. An
   inserted seed record gets the sequence's next number, like any other
@@ -228,7 +231,7 @@ read when a refresh fails, and `/health/ready` is Degraded until a refresh works
 | `Tenancy:Source` | `configuration` | `configuration` reads the `Tenants` section. `directory` reads the tenants from the platform database and ignores a `Tenants` section, with a warning at start. |
 | `Tenancy:RefreshInterval` | `00:00:30` | How often the server and the worker read the tenant directory again. It must be positive. Only `directory` reads it, and a value that is zero, negative or unreadable stops the start of the server and of the worker, naming the setting. |
 | `Platform:SecretKey` | none | The installation key for the encrypted secrets. It is 32 bytes in base64 and is needed by the server under both sources, and by the worker and `Axis.Admin` under `directory`. A missing or invalid key stops the start. The server also uses it under both sources, to encrypt the data protection keys, and a stored key that does not decrypt stops the start. |
-| `Platform:PreviousSecretKey` | none | _(Planned for M16.)_ The old installation key during a rotation, in the same form as `Platform:SecretKey`. A host decrypts with it when `Platform:SecretKey` does not match, and never encrypts with it. See [installation key](tenant-setting-commands.md#installation-key). |
+| `Platform:PreviousSecretKey` | none | The old installation key during a rotation, in the same form as `Platform:SecretKey`. Optional. The server, the worker and `Axis.Admin` read it. A host decrypts with it when `Platform:SecretKey` does not match, and never encrypts with it. A blank value counts as not set. A malformed value stops the start, naming the setting and never its value. `platform rekey` needs it. See [installation key](tenant-setting-commands.md#installation-key). |
 | `ConnectionStrings:Platform` | none | A role that may only read the `platform` schema, and insert rows into `platform.data_protection_keys`. Both hosts need it under `directory`. |
 | `ConnectionStrings:PlatformSchema` | none | The role that owns the `platform` schema. The server reads it only at start, for the platform migrations, under both sources. `Axis.Admin` reads it to write the tenant directory, see [administration](administration.md). The worker never reads it. |
 

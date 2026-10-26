@@ -4,7 +4,8 @@ Status: **Agreed**
 
 M16 gives `Axis.Admin` the commands that change a tenant after it is created,
 and the commands that rotate keys and passwords. Each command leaves a record
-in a new platform audit table. All of it is _(planned for M16)_. See
+in a new platform audit table. The installation key rotation and the binding and host commands
+are built. The rest is _(planned for M16)_. See
 [tenant setting commands](../reference/tenant-setting-commands.md) for the
 detail. The owner agreed these points on 2026-10-25.
 
@@ -37,6 +38,10 @@ detail. The owner agreed these points on 2026-10-25.
   - Then the operator removes `Platform:PreviousSecretKey`. Nobody is signed
     out, and no secret has to be set again.
   - The encrypted format does not change.
+  - Built: `platform rekey` works under both tenancy sources, because the server
+    keeps its data protection keys in the platform database under both. It
+    writes one platform audit record with no tenant, and it raises the `version`
+    of each tenant whose secrets it re-encrypts.
 - **Database password rotation:** `tenant rotate-passwords` sets new runtime
   and schema passwords for a tenant's database roles and stores them
   encrypted. A connection opened before the next refresh may fail once. Open

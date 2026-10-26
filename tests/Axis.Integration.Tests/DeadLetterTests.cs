@@ -11,8 +11,12 @@ namespace Axis.Integration.Tests;
 /// <c>Decide</c> fail for one record, with an error message that quotes the event's ratio. The class
 /// has its own fixture, so that trigger cannot affect <see cref="EventDeliveryTests"/>.
 /// </summary>
+[Collection(CollectionName)]
 public sealed class DeadLetterTests(EventDeliveryFixture fixture) : IClassFixture<EventDeliveryFixture>
 {
+    /// <summary>The collection of the classes whose dead letters one metric listener must not see.</summary>
+    public const string CollectionName = "Dead letters";
+
     private const int Limit = 5;
 
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;

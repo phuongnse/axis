@@ -8,7 +8,8 @@ subject. The process resource and the first four step types are in
 are not built yet, and Dn refers to [decisions.md](../decisions.md).
 
 Everything in this file is _(planned for M14)_, except [Loops](#loops) through
-a `task` and the calls in them, which are built. The design follows
+a `task` and the calls in them, and the [sub-process step](#sub-process-step),
+which are built. The design follows
 [D69](../decisions/d69-timer-wait-for-event-and-sub-process-steps-loops-and-create-record.md)
 and
 [D70](../decisions/d70-processes-without-a-subject-scheduled-jobs-and-delete-triggers.md).
@@ -96,31 +97,60 @@ A `subProcess` step starts another process and waits until it ends:
 { "name": "fulfil", "type": "subProcess", "process": "OrderFulfilment", "subject": "order", "next": "close" }
 ```
 
-- `process` names a process of the same application. A process may not reach
-  itself through sub-process steps, directly or through others. Such a cycle is
-  a new diagnostic.
+- **Built.** The compiler checks and builds the
+  step, and the engine runs it: Start, Cannot start, End, Failure, Cancel and
+  the history output below are built. The instance detail graph shows the step as an
+  `operation` step.
+- `process` names a process of the same application, ignoring letter case,
+  otherwise it is `AXC0250` at `/steps/{i}/process`. A process may not reach
+  itself through sub-process steps, directly or through others. Each step that
+  closes such a loop is `AXC0251` at `/steps/{i}/process`, naming the chain,
+  such as `'A' → 'B' → 'A'`. A process that starts itself is `'A' → 'A'`.
 - `subject` is an expression that gives a reference to a record of the child's
   subject entity. It may be left out when the child's subject entity is the
-  parent's. The child then runs for the same record.
+  parent's. The child then runs for the same record. A missing `subject` is
+  `AXC0252` at `/steps/{i}` when the child's entity is not the parent's or the
+  parent has no subject. It is not checked when either entity is unknown. A
+  `subject` given to a child without a subject is `AXC0252` at
+  `/steps/{i}/subject`. The expression is type-checked over the parent's scope,
+  as a decision `when` is, and keeps its own code.
 - A child without a subject takes `parameters` instead of `subject`, see
-  [Processes without a subject](#processes-without-a-subject).
+  [Processes without a subject](#processes-without-a-subject). `parameters`
+  maps each parameter name of the child to an expression of its type. Every
+  parameter is required. A parameter that is missing is `AXC0253` at
+  `/steps/{i}/parameters`, and one that is unknown or repeated, ignoring
+  letter case, is `AXC0253` at `/steps/{i}/parameters/{name}`. `parameters`
+  given to a child with a subject are `AXC0253` at `/steps/{i}/parameters`.
 - **Start.** The step's transaction starts the child as a
   [start from a trigger](process-events.md#starts-from-triggers) does, as
   `system`, and sets the parent `waiting`. The child is pinned to the
   parent's release, not the active one. Its instance row holds
   `parent_instance_id` and `parent_step`. The `process.started` audit record
-  adds `"parentInstanceId"`.
-- **Cannot start.** A child that already runs for that record, or whose
-  `startCondition` is not true, fails the parent's step with a fixed error.
+  adds `"parentInstanceId"`. The parent's waiting step writes no audit record
+  of its own: the child's `process.started` record stands for it.
+- **Cannot start.** A child that already runs for that record, whose
+  `startCondition` is not true, or whose record is missing, fails the parent's
+  step with a fixed error that names the step and the child process, never a
+  value.
 - **End.** A child that completes queues a `process.resume` item for its
-  parent. The item resumes the parent at `next`, by the revision check.
-- **Failure.** A child that fails leaves the parent `waiting`. The inspector
-  shows the failed child under the parent, and an operator retries the child.
-  A cancelled child fails the parent's step.
+  parent. The item resumes the parent at `next`, by the revision check, and
+  writes the `process.stepCompleted` audit record as `system`. An item for a
+  parent that is not waiting on that child is logged and discarded.
+- **Failure.** A child that fails leaves the parent `waiting`, and an operator
+  retries the child. When the retried child completes, the `process.resume`
+  item resumes the parent at `next`. _(Planned for M14)_ The inspector shows
+  the failed child under the parent. A cancelled child fails the parent's step
+  when the parent is `waiting` on that step for this child. The error is
+  fixed, `The sub-process of the step '{step}' was cancelled.`, and the
+  history row's output is `{ "childInstanceId" }`. The audit record
+  `process.failed` is written as `system`.
 - **Cancel.** Cancelling the parent cancels its `running` and `waiting`
-  children, in the same transaction.
+  children, in the same transaction, see
+  [Cancel](process-inspection.md#cancel). The parent ends `cancelled`, not
+  `failed`.
 - History output: `{ "state": "waiting", "childInstanceId" }`, then
-  `{ "next", "childInstanceId" }`.
+  `{ "next", "childInstanceId" }`, or `{ "childInstanceId" }` with the error
+  when a cancelled child fails the step.
 
 ## Loops
 
@@ -176,11 +206,11 @@ A `createRecord` operation creates a record of another entity:
 ## Processes without a subject
 
 A process may leave out `entity`. It then declares typed `parameters`. The
-compile checks in this section are built, and so are the instance storage and
-running such an instance on the engine. The start endpoint, the other starts and
-inspection described below are _(planned for M14)_. Until the start endpoint is
-built, it answers `400` for such a process, the instance list is empty, and the
-instance detail and the operator commands answer `404`.
+compile checks in this section are built, and so are the instance storage,
+running such an instance on the engine and the start endpoint. The other starts
+and inspection described below are _(planned for M14)_. Until inspection is
+built, the instance list is empty, and the instance detail and the operator
+commands answer `404`.
 
 ```json
 {
@@ -226,7 +256,9 @@ instance detail and the operator commands answer `404`.
   `updateRecord`, `raiseEvent` and the outputs. The compiler reports no other
   problem in such a step.
 - **Triggers and other starts by name.** An event, data change or schedule
-  trigger that names a process without a subject is `AXC0247`. An endpoint, a
+  trigger that names a process without a subject is `AXC0247`, except a
+  schedule trigger without a data source, which must name one (`AXC0249`
+  otherwise). An endpoint, a
   page `startProcess` action and a scenario step that name one are reported
   with their usual codes for a process over another entity: `AXC0117`,
   `AXC0088` and `AXC0184`.
@@ -240,7 +272,8 @@ instance detail and the operator commands answer `404`.
 - **Start endpoint.** The body is `{ "parameters": { … } }` instead of
   `{ "subjectId" }`. A missing, unknown or mistyped parameter is a `400` keyed
   `/parameters/{name}`. The `startCondition` sees the parameters. A running
-  instance is the `409`. The user needs the `start` grant only.
+  instance is the `409`. The user needs the `start` grant only. See
+  [the start endpoint](processes.md#a-process-without-a-subject).
 - **Other starts.** A [schedule trigger without a data
   source](process-events.md#scheduled-jobs), a [delete
   trigger](process-events.md#delete-triggers) and a sub-process step give the

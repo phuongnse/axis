@@ -484,6 +484,14 @@ namespace Axis.Processes.Storage.Migrations
                         .HasColumnType("jsonb")
                         .HasColumnName("parameters");
 
+                    b.Property<Guid?>("ParentInstanceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("parent_instance_id");
+
+                    b.Property<string>("ParentStep")
+                        .HasColumnType("text")
+                        .HasColumnName("parent_step");
+
                     b.Property<Guid>("ProcessId")
                         .HasColumnType("uuid")
                         .HasColumnName("process_id");
@@ -516,6 +524,9 @@ namespace Axis.Processes.Storage.Migrations
 
                     b.HasKey("Id")
                         .HasName("pk_process_instances");
+
+                    b.HasIndex("ParentInstanceId")
+                        .HasDatabaseName("ix_process_instances_parent_instance_id");
 
                     b.HasIndex("SubjectId")
                         .HasDatabaseName("ix_process_instances_subject_id");
@@ -571,7 +582,7 @@ namespace Axis.Processes.Storage.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("status_code");
 
-                    b.Property<Guid>("SubjectId")
+                    b.Property<Guid?>("SubjectId")
                         .HasColumnType("uuid")
                         .HasColumnName("subject_id");
 

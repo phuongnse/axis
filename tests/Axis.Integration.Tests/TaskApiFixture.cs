@@ -4,6 +4,7 @@ using Axis.Configuration.Storage;
 using Axis.Configuration.Tests;
 using Axis.Data;
 using Axis.Data.Naming;
+using Axis.Data.Profiles;
 using Axis.Data.Schema;
 using Axis.Data.Storage;
 using Axis.Processes.Instances;
@@ -27,7 +28,7 @@ namespace Axis.Integration.Tests;
 /// migrations applied and the StepApp fixture activated, served by the real server on hosts
 /// <c>a.example.test</c> and <c>b.example.test</c>. The test authentication scheme signs in
 /// <c>maria</c> and <c>fiona</c>, who hold the role <c>finance</c>, <c>rita</c>, who holds
-/// <c>reviewer</c>, <c>ines</c>, who holds <c>inspector</c>, <c>ada</c>, who holds <c>auditor</c>, <c>carl</c>, who holds <c>clerk</c>, and <c>otto</c>, who holds <c>employee</c>, which StepApp does not declare.
+/// <c>reviewer</c>, <c>ines</c>, who holds <c>inspector</c>, <c>lena</c>, who holds <c>finance</c> and <c>inspector</c>, <c>ada</c>, who holds <c>auditor</c>, <c>carl</c>, who holds <c>clerk</c>, and <c>otto</c>, who holds <c>employee</c>, which StepApp does not declare.
 /// The fixture also holds the worker's services for both tenants, with the host never started, so
 /// a test runs the work items that create tasks itself.
 /// </summary>
@@ -92,6 +93,7 @@ public sealed class TaskApiFixture : IAsyncLifetime
                 new TestIdentity("fiona", "Fiona Finance", "finance"),
                 new TestIdentity("rita", "Rita Reviewer", "reviewer"),
                 new TestIdentity("ines", "Ines Inspector", "inspector"),
+                new TestIdentity("lena", "Lena Lead", "finance", "inspector"),
                 new TestIdentity("ada", "Ada Auditor", "auditor"),
                 new TestIdentity("carl", "Carl Clerk", "clerk"),
                 new TestIdentity("otto", "Otto Other", "employee"));
@@ -127,6 +129,13 @@ public sealed class TaskApiFixture : IAsyncLifetime
         }
 
         await _database.DisposeAsync();
+    }
+
+    /// <summary>Gives <paramref name="userId"/> a user profile in <paramref name="tenant"/>, as a first sign-in does.</summary>
+    public async Task InsertProfileAsync(string tenant, string userId, string displayName)
+    {
+        await using var connection = await DataSource(tenant).OpenConnectionAsync();
+        await UserProfiles.UpsertAsync(connection, userId, displayName, null, null);
     }
 
     /// <summary>Inserts a department of <paramref name="tenant"/> with a new name and <paramref name="manager"/>, and returns its id.</summary>

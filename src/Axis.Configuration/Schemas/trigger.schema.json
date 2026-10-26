@@ -16,7 +16,7 @@
       "type": "array",
       "minItems": 1,
       "uniqueItems": true,
-      "items": { "enum": ["create", "update"] }
+      "items": { "enum": ["create", "update", "delete"] }
     },
     "fields": {
       "type": "array",
@@ -44,13 +44,20 @@
       "if": { "required": ["type"], "properties": { "type": { "const": "dataChange" } } },
       "then": {
         "required": ["entity", "on"],
-        "properties": { "event": false, "mode": false, "schedule": false, "timeZone": false, "dataSource": false, "parameters": false }
+        "properties": { "event": false, "mode": false, "schedule": false, "timeZone": false, "dataSource": false }
       }
+    },
+    {
+      "if": {
+        "required": ["type", "on"],
+        "properties": { "type": { "const": "dataChange" }, "on": { "not": { "contains": { "const": "delete" } } } }
+      },
+      "then": { "properties": { "parameters": false } }
     },
     {
       "if": { "required": ["type"], "properties": { "type": { "const": "schedule" } } },
       "then": {
-        "required": ["schedule", "timeZone", "dataSource"],
+        "required": ["schedule", "timeZone"],
         "properties": { "event": false, "entity": false, "on": false, "fields": false, "when": false, "mode": false }
       }
     }

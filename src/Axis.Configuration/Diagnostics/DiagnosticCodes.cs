@@ -75,6 +75,14 @@ public static class DiagnosticCodes
     public const string DuplicateProcessParameter = "AXC0245";
     public const string StepNeedsSubject = "AXC0246";
     public const string TriggerProcessWithoutSubject = "AXC0247";
+    public const string ScheduleJobProcessWithSubject = "AXC0249";
+    public const string UnknownSubProcess = "AXC0250";
+    public const string SubProcessCycle = "AXC0251";
+    public const string InvalidSubProcessSubject = "AXC0252";
+    public const string InvalidSubProcessParameters = "AXC0253";
+    public const string DeleteTriggerWithOtherKinds = "AXC0254";
+    public const string DeleteTriggerWithFields = "AXC0255";
+    public const string DeleteTriggerProcessWithSubject = "AXC0256";
     public const string UnknownOperation = "AXC0078";
     public const string UnknownSetField = "AXC0079";
     public const string ReadOnlySetField = "AXC0080";
@@ -237,7 +245,7 @@ public static class DiagnosticCodes
     public const string InvalidValueLabels = "AXC0242";
     public const string InvalidMoneyCurrency = "AXC0243";
     public const string UngroupedMoneyCurrency = "AXC0248";
-    public const string InvalidFileMaxSize = "AXC0249";
-    public const string InvalidFileAccept = "AXC0250";
-    public const string FileFieldNotAllowed = "AXC0251";
+    public const string InvalidFileMaxSize = "AXC0257";
+    public const string InvalidFileAccept = "AXC0258";
+    public const string FileFieldNotAllowed = "AXC0259";
 }

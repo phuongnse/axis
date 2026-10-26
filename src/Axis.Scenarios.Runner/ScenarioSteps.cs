@@ -88,7 +88,8 @@ internal sealed class ScenarioSteps(
     private async Task DeleteAsync(ScenarioStepDefinition step, CancellationToken cancellationToken)
     {
         var (entity, id) = Saved(step.Record);
-        var result = await RecordCommand.DeleteAsync(connection, model, entity, id, Actor(step), loggerFactory, cancellationToken);
+        var result = await RecordCommand.DeleteAsync(
+            connection, ScenarioRunner.TenantId, model, releaseId, entity, id, Actor(step), loggerFactory, cancellationToken);
         Check(step, Action(result, RecordCommandOutcome.Deleted));
     }
 

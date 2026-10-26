@@ -243,7 +243,7 @@ flowchart LR
      `record` on a target that holds no form widget, or whose form is over
      another entity, is `AXC0235` at `/record`. A parse error or an unknown
      name keeps the expression's own code.
-   - **Forms.** A [form](frontend.md)'s `entity` must name a loaded
+   - **Forms.** A [form](form-widget.md)'s `entity` must name a loaded
      entity, ignoring letter case, otherwise it is `AXC0074` at `/entity`,
      and its fields are not checked. A name whose entity file was not loaded
      because of its own errors is not reported again. Each section `field`
@@ -342,8 +342,8 @@ flowchart LR
      (`AXC0244`). Without an `entity` it is checked over its `parameters`, see
      [Compile checks](processes.md#compile-checks). Step names are unique ignoring letter case: a later step with a
      name already used is `AXC0069` at `/steps/{i}/name`, naming the first
-     step. `start`, each branch `next`, each `otherwise`, each operation
-     `next`, each task outcome `next` and each task `deadline` `next` must name a
+     step. `start`, each branch `next`, each `otherwise`, each operation and
+     sub-process `next`, each task outcome `next` and each task `deadline` `next` must name a
      step, ignoring letter case, otherwise it is `AXC0070` at that property. A
      transition goes to the first step with its name. A step that cannot be
      reached from `start` is `AXC0071` at `/steps/{i}`. It is not checked
@@ -440,7 +440,21 @@ flowchart LR
      without `input` or with `set`, `connector`, `event` or `fields`, an
      `event` or `fields` on any other step, a retry `attempts` outside 1 to 10, a task without
      `label`, `assignee`, `form` or an outcome, and an `end` step with
-     `branches`, `otherwise` or any other property, are `AXC0004`. See
+     `branches`, `otherwise` or any other property, are `AXC0004`. A
+     sub-process step without `process` or `next`, or with a property of
+     another step type, is `AXC0004` too, and so is `process`, `subject` or
+     `parameters` on any other step. A sub-process step's `process` that names
+     no process of the application, ignoring letter case, is `AXC0250` at
+     `/steps/{i}/process`, unless that process file was not loaded because
+     of its own errors, and then its `subject` and `parameters` are not
+     checked. A process that reaches itself through sub-process steps is
+     `AXC0251` at the `process` of each step that closes the loop, naming the
+     chain. A `subject` that is missing, when the child's entity is not the
+     parent's, or given to a child without a subject, is `AXC0252`, and
+     `parameters` given to a child with a subject, or a child parameter that
+     is missing, unknown or repeated, is `AXC0253`. The `subject` and
+     parameter expressions are type-checked with the same scope as a `when`.
+     See [Sub-process step](process-flow.md#sub-process-step) and
      [processes](processes.md#compile-checks).
    - **Policies.** Each `roles` entry of a [policy](roles-and-policies.md) must
      name a declared role, compared exactly, otherwise it is `AXC0090` at
@@ -562,7 +576,11 @@ flowchart LR
      type is `AXC0166` at `/parameters/{key}`. Each parameter that no key
      gives is `AXC0167` at `/parameters`, once for each parameter, even when
      `parameters` is left out. The parameters are not checked when the data
-     source is unknown. A name whose data source file was not loaded because
+     source is unknown. A schedule trigger without a `dataSource` is a
+     scheduled job. Its process must have no subject, otherwise it is
+     `AXC0249` at `/process`, and the parameter checks then read the process's
+     parameters. A `null` is `AXC0166` there. They are not checked when the
+     process is unknown or has a subject. A name whose data source file was not loaded because
      of its own errors is not reported again. The
      [schedule trigger](integration-resources.md#events-and-triggers) section lists the rules.
 

@@ -22,7 +22,8 @@ namespace Axis.Server.Records;
 /// reach is a 404, and a <c>read</c> filter on a field that is being recomputed is a 409. The first
 /// two grant checks are in this order because the body holds <c>recordId</c>. A value that does not
 /// fit its field is not a 400: it is a message in a 200 answer. The answer leaves out the fields
-/// the user may not read.
+/// the user may not read. For a new record it also returns <c>defaults</c>, the default of each
+/// readable form field that the body leaves out, and the draft is evaluated with them in place.
 /// </summary>
 internal static class FormStateEndpoints
 {

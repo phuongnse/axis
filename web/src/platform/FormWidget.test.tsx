@@ -45,6 +45,7 @@ const noteWidget: EntityWidgetMetadata = {
   tasksPath: null,
   process: null,
   instancesPath: null,
+  deadLettersPath: null,
   actions: [],
   rowActions: [],
   toolbarActions: [],
@@ -110,6 +111,18 @@ const computedWidget: EntityWidgetMetadata = {
           { ...field('code', 'text', 'noteLine.code'), computed: true },
         ],
       },
+    ],
+  },
+}
+
+// A note whose amount is money in the currency its currency field holds.
+const moneyWidget: EntityWidgetMetadata = {
+  ...noteWidget,
+  entity: {
+    ...noteWidget.entity,
+    fields: [
+      { ...field('currency', 'enum', 'note.currency'), values: ['VND', 'USD'] },
+      { ...field('amount', 'money', 'note.amount'), precision: 18, scale: 2, currencyField: 'currency' },
     ],
   },
 }
@@ -224,6 +237,10 @@ function computedJson(version: number) {
   return `{"id":"${noteId}","version":${version},"values":{"title":"Buy paper","priority":2,"amount":1.50,"total":3.00,"lines":[{"description":"Pens","code":"PENS"}]},"labels":{}}`
 }
 
+function moneyJson(version: number) {
+  return `{"id":"${noteId}","version":${version},"values":{"currency":"USD","amount":1.50},"labels":{}}`
+}
+
 function linesJson(version: number) {
   return `{"id":"${noteId}","version":${version},"values":{"title":"Buy paper","lines":[{"description":"Pens","quantity":2},{"description":"Ink","quantity":1}]},"labels":{}}`
 }
@@ -261,6 +278,7 @@ const texts = {
   'note.code': 'Code',
   'note.priority': 'Priority',
   'note.amount': 'Amount',
+  'note.currency': 'Currency',
   'note.done': 'Done',
   'note.dueOn': 'Due on',
   'note.dueAt': 'Due at',
@@ -816,6 +834,34 @@ describe('FormWidget', () => {
     })
   })
 
+  it('shows the currency beside a money input and sends the typed amount as a plain number', async () => {
+    const requests = stubFetch({ status: 200, body: moneyJson(1) }, { status: 200, body: moneyJson(2) })
+    renderForm(noteId, moneyWidget)
+
+    const amount = await screen.findByLabelText('Amount')
+    expect(amount).toHaveValue('1.50')
+    expect(within(amount.closest('.ant-space-compact') as HTMLElement).getByText('USD')).toBeInTheDocument()
+
+    await userEvent.clear(amount)
+    await userEvent.type(amount, '1250.50')
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await waitFor(() => expect(requests()).toHaveLength(2))
+    expect(requests()[1]).toEqual({
+      url: `${recordsPath}/${noteId}`,
+      method: 'PATCH',
+      body: '{"version":1,"values":{"amount":1250.50}}',
+    })
+  })
+
+  it('shows no currency beside a money input whose currency field is empty', async () => {
+    stubFetch({ status: 200, body: moneyJson(1).replace('"USD"', 'null') })
+    renderForm(noteId, moneyWidget)
+
+    const amount = await screen.findByLabelText('Amount')
+    expect(amount.closest('.ant-space-compact')).toBeNull()
+  })
+
   it('leaves computed fields out of a create body', async () => {
     const requests = stubFetch({ status: 201, body: computedJson(1) })
     renderForm(null, computedWidget)
@@ -1108,6 +1154,62 @@ describe('FormWidget', () => {
         url: `${recordsPath}?form=NoteSections`,
         method: 'POST',
         body: '{"values":{"title":"Pen"}}',
+      })
+    })
+
+    describe('defaults', () => {
+      const withDefaults = (defaults: string) => `{"sections":[],"fields":{},"errors":{},"defaults":${defaults}}`
+
+      it('fills untouched empty fields of a new record, keeps a typed value and does not send a default', async () => {
+        let answerFirst: (answer: string) => void = () => {}
+        const first = new Promise<string>((resolve) => (answerFirst = resolve))
+        stateAnswers = [first]
+        const requests = stubFetch({ status: 201, body: noteJson('Pen', 1) })
+        const user = renderWithTimers()
+        await waitFor(() => expect(stateRequests()).toHaveLength(1))
+
+        await user.type(screen.getByLabelText('Title'), 'Pen')
+        await act(async () => {
+          answerFirst(withDefaults('{"title":"Untitled","priority":3}'))
+          await vi.advanceTimersByTimeAsync(50)
+        })
+        expect(screen.getByLabelText('Title')).toHaveValue('Pen')
+        await waitFor(() => expect(screen.getByLabelText('Priority')).toHaveValue('3'))
+
+        await act(() => vi.advanceTimersByTimeAsync(300))
+        await waitFor(() => expect(stateRequests()).toHaveLength(2))
+        expect(stateRequests()[1].body).toEqual({ recordId: null, values: { title: 'Pen' }, touched: ['title'] })
+
+        await user.click(screen.getByRole('button', { name: 'Save' }))
+        await waitFor(() => expect(requests()).toHaveLength(1))
+        expect(requests()[0].body).toBe('{"values":{"title":"Pen"}}')
+      })
+
+      it('sends null when the user clears a default', async () => {
+        stateAnswers = [withDefaults('{"priority":3}')]
+        const requests = stubFetch({ status: 201, body: noteJson('Pen', 1) })
+        const user = renderWithTimers()
+        await waitFor(() => expect(screen.getByLabelText('Priority')).toHaveValue('3'))
+
+        await user.clear(screen.getByLabelText('Priority'))
+        await user.type(screen.getByLabelText('Title'), 'Pen')
+        await user.click(screen.getByRole('button', { name: 'Save' }))
+        await waitFor(() => expect(requests()).toHaveLength(1))
+        expect(requests()[0].body).toBe('{"values":{"title":"Pen","priority":null}}')
+      })
+
+      it('ignores the defaults of a saved record', async () => {
+        stateAnswers = [withDefaults('{"priority":3,"status":"open"}')]
+        stubFetch({ status: 200, body: sectionsJson(1) })
+        const user = renderWithTimers(noteId)
+        await waitFor(() => expect(stateRequests()).toHaveLength(1))
+
+        await waitFor(() => expect(screen.getByLabelText('Priority')).toHaveValue('7'))
+        await act(() => vi.advanceTimersByTimeAsync(50))
+        expect(screen.getByLabelText('Priority')).toHaveValue('7')
+        await user.click(screen.getByRole('combobox', { name: 'Status' }))
+        const listbox = await screen.findByRole('listbox')
+        expect(within(listbox).getByRole('option', { name: 'open' })).toHaveAttribute('aria-selected', 'false')
       })
     })
 

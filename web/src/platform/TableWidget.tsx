@@ -330,8 +330,9 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
       // The record API sorts a reference by its id, which is not the label people see.
       sorter: field.type !== 'reference',
       sortOrder: field.type === 'reference' ? undefined : sortOrder(field.name),
-      align: field.type === 'integer' || field.type === 'decimal' ? 'right' : undefined,
-      render: (value: RecordValue, record: TableRow) => formatValue(field, value, record.labels, { locale, text: t }),
+      align: field.type === 'integer' || field.type === 'decimal' || field.type === 'money' ? 'right' : undefined,
+      render: (value: RecordValue, record: TableRow) =>
+        formatValue(field, value, record.labels, { locale, text: t }, record.values),
     }))
     const result = [...fieldColumns]
     if (rowActions.length > 0) {

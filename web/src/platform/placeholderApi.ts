@@ -1,6 +1,6 @@
 import type { ApiGuard } from './api'
 import { formStatePath, type FieldState, type FormStateAnswer } from './formState'
-import type { InstancePage } from './inspection'
+import type { DeadLetterPage, InstancePage } from './inspection'
 import type { FieldValue, RecordItem, RecordRow } from './records'
 import type { DataSourceMetadata, FieldMetadata, PageMetadata, PageParameter, ReferenceTarget } from './site'
 import type { TaskPage } from './tasks'
@@ -32,6 +32,7 @@ function value(field: Typed, n: number): FieldValue {
     case 'integer':
       return String(n * 10)
     case 'decimal':
+    case 'money':
       return (n * 1250.5).toFixed(field.scale ?? 2)
     case 'boolean':
       return n % 2 === 1
@@ -166,6 +167,7 @@ export function placeholderApi(metadata: Pick<PageMetadata, 'widgets'>): ApiGuar
             ]),
           ),
           errors: {},
+          defaults: {},
         }
         exact.set(`POST ${formStatePath(entity.recordsPath, form.name)}`, () => state)
       }
@@ -188,6 +190,9 @@ export function placeholderApi(metadata: Pick<PageMetadata, 'widgets'>): ApiGuar
     }
     if (widget.instancesPath) {
       exact.set(`GET ${widget.instancesPath}`, (query): InstancePage => pageOf([], query))
+    }
+    if (widget.deadLettersPath) {
+      exact.set(`GET ${widget.deadLettersPath}`, (query): DeadLetterPage => pageOf([], query))
     }
   }
 

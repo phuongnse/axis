@@ -20,7 +20,8 @@ creates and updates, on an inbound endpoint's record create, on task form
 saves, on `updateRecord` steps, on connector outputs and on package operation
 outputs, see [Starts from triggers](#starts-from-triggers). The worker runs
 schedule triggers too, once for each occurrence and for each record of the
-trigger's data source, see [Schedules](#schedules).
+trigger's data source, or once for each occurrence when the trigger has no data
+source, see [Schedules](#schedules) and [Scheduled jobs](#scheduled-jobs).
 A `raiseEvent` step raises an
 [event](integration-resources.md#event-resource) for its subject record. A
 [trigger](integration-resources.md#trigger-resource) starts a process for one record
@@ -30,10 +31,10 @@ same cause, even after a worker crash.
 
 _(Planned for M14)_ Event delivery also wakes the instances that wait for an
 event ([D69](../decisions/d69-timer-wait-for-event-and-sub-process-steps-loops-and-create-record.md)).
-A schedule trigger may start a process without a subject, and a delete starts
-one through a delete trigger
+
+A delete starts a process without a subject through a delete trigger
 ([D70](../decisions/d70-processes-without-a-subject-scheduled-jobs-and-delete-triggers.md)).
-See [Scheduled jobs](#scheduled-jobs) and [Delete triggers](#delete-triggers).
+See [Delete triggers](#delete-triggers).
 
 Deliveries to `async` triggers and schedule fan-outs that keep failing back off,
 stop after a limit and become dead letters
@@ -179,8 +180,8 @@ record.
 | --- | --- | --- |
 | Event, `async` | The `event.deliver` transaction, one for each occurrence and trigger | The trigger already handled the occurrence, the `when` is not true, the record no longer exists, the process already runs for the record, or the `startCondition` is not true |
 | Event, `sync` | The transaction of the `raiseEvent` step, so both commit or neither does | The `when` is not true, the record no longer exists, the process already runs for the record, or the `startCondition` is not true |
-| Data change | The write's transaction: a record API create or update, an inbound endpoint's create, a task form save, an `updateRecord` step, a connector output or a package operation output | The write is not in `on`, an update changed none of the `fields`, the `when` is not true, the process already runs for the record, or the `startCondition` is not true |
-| Schedule | The `trigger.fanOut` transaction of one batch, which holds the starts of up to 100 records | The record was already handled for the occurrence, the record no longer exists, the process already runs for the record, or the `startCondition` is not true |
+| Data change | The write's transaction: a record API create or update, an inbound endpoint's create, a task form save, an `updateRecord` step, a connector output or a package operation output. For a delete trigger, the transaction of a record API or Studio scenario delete, after `record.deleted` | The write is not in `on`, an update changed none of the `fields`, the `when` is not true, the process already runs for the record, or the `startCondition` is not true. For a delete trigger: the `when` is not true or fails, a parameter fails or is `null`, the process already runs, or the `startCondition` is not true |
+| Schedule | The `trigger.fanOut` transaction of one batch, which holds the starts of up to 100 records. Without a data source, the one start of the occurrence | The record was already handled for the occurrence, the record no longer exists, the process already runs for the record, or the `startCondition` is not true. Without a data source: the occurrence was already handled, the process is already running, or the `startCondition` is not true |
 
 A `when` or a `startCondition` is not true when it gives `false` or `null`,
 or hits a run-time error.
@@ -212,7 +213,10 @@ triggers of the active release:
 
 1. The worker reads the triggers for the event's name, ignoring letter case.
    With none, or when the application has no active release, the item is
-   deleted with no other write.
+   deleted with no other write. An item that names a trigger, one queued by a
+   [redeliver](#dead-letters), keeps only that trigger. When the active release
+   does not have it as an `async` trigger on the event, the item is deleted
+   with no other write, and the worker logs a warning.
 2. For each trigger, one transaction does this:
    1. It checks the item's claim and extends its lease.
    2. It inserts a receipt into `axis.trigger_starts`, keyed by the trigger,
@@ -312,6 +316,11 @@ the data source:
    item. A full batch of 100 stores the last record id as the item's `cursor`
    and makes the item due again at once. A shorter batch deletes the item.
 
+A trigger without a data source is a [scheduled job](#scheduled-jobs). Its
+fan-out runs one start in one transaction, with no data source, cursor or
+batches. The receipt uses the nil UUID as the record, and the start passes the
+trigger's parameter values.
+
 **Failures.** A fan-out transaction that fails rolls the batch back. A
 separate transaction counts the failure for the trigger and the occurrence, and
 the item is due again after the [backoff](#dead-letters). After
@@ -341,7 +350,7 @@ further occurrence runs, but a running fan-out finishes.
 
 ## Scheduled jobs
 
-_(Planned for M14.)_ A schedule trigger may leave out `dataSource`. It then
+A schedule trigger may leave out `dataSource`. It then
 starts a [process without a subject](process-flow.md#processes-without-a-subject)
 once per occurrence, see
 [D70](../decisions/d70-processes-without-a-subject-scheduled-jobs-and-delete-triggers.md):
@@ -364,18 +373,26 @@ once per occurrence, see
   gives each of the process's parameters a literal value, in the JSON forms
   the [trigger resource](integration-resources.md#trigger-resource) uses for a
   data source's parameters. With `dataSource`, the process must have a subject
-  and `parameters` keeps its meaning, the data source's parameters. Each
-  mismatch is a new diagnostic.
+  and `parameters` keeps its meaning, the data source's parameters. A job
+  whose process has a subject is `AXC0249`. A parameter that is unknown,
+  repeated, mistyped or missing is `AXC0165`, `AXC0166` or `AXC0167`, as for a
+  data source. A `null` is a mistyped value, because a process parameter has no
+  optional flag.
 - Occurrences, daylight saving and downtime work as in [Schedules](#schedules).
 - The `trigger.fanOut` item of the occurrence starts the process once, in one
   transaction. Its receipt in `axis.trigger_starts` uses the nil UUID as
-  `subject_id`, so the occurrence starts at most once.
+  `subject_id`, so the occurrence starts at most once. The instance holds the
+  trigger's parameter values.
 - A start that finds the process still running from an earlier occurrence is
-  skipped and logged.
+  skipped and logged at Information level. The receipt stays `skipped`, and the
+  log names no record.
+- The process comes from the release that is active when the fan-out runs. When
+  that process has a subject now, or its parameters no longer match the
+  trigger's values, the start is skipped and logged.
 
 ## Delete triggers
 
-_(Planned for M14.)_ A data change trigger with `"on": ["delete"]` starts a
+A data change trigger with `"on": ["delete"]` starts a
 process without a subject when a record is deleted:
 
 ```json
@@ -392,26 +409,46 @@ process without a subject when a record is deleted:
 }
 ```
 
-- `delete` is listed alone. With `create` or `update` it is a new diagnostic,
-  and so is a `fields` list.
-- The process must have no subject. `parameters` maps each process parameter
-  to an expression over the record as it was before the delete, with the scope
-  of a data change trigger's `when`. So does `when`.
-- It fires on every delete through the record command. The start commits in
-  the delete's transaction, after the `record.deleted` audit record. A run-time
-  error in `when` or a parameter skips the start, and the delete still
-  commits.
-- A record that a `running` or `waiting` instance names still cannot be
-  deleted: that `409` comes first, and no trigger runs.
+- `delete` is listed alone. With `create` or `update` it is `AXC0254`, and a
+  `fields` list is `AXC0255`.
+- The process must have no subject, otherwise it is `AXC0256`. `parameters`
+  maps each process parameter to an expression over the record as it was before
+  the delete, of the parameter's type, with the scope of a data change trigger's
+  `when`. So does `when`. An unknown or repeated key is `AXC0165`, a value that
+  is not a string is `AXC0166`, a parameter the trigger does not give is
+  `AXC0167`, and an expression of another type has the expression checker's own
+  code.
+- It fires on every delete through the record command: the record API and a
+  Studio test scenario. Activation, tenant clean-up and a raw SQL delete start
+  nothing. The start commits in the delete's transaction, after the
+  `record.deleted` audit record, as `system` and pinned to the active release.
+- The `when` and the parameters are worked out after the row lock and the
+  `409` check, and before the row is deleted, so they see the record whole,
+  with its child rows and pending computed fields.
+- A `when` that is not true, or that fails at run time, skips the start. So
+  does a parameter that fails at run time, is `null` or does not fit its type.
+  Each skip is logged at Information level with the trigger, the process and
+  the record id, and the delete still commits. A process without a subject runs
+  one instance at a time, so a delete while an instance of the process is still
+  open skips its start and logs it.
+- A delete that is refused starts nothing and logs nothing. This covers the
+  `409` for a record that a `running` or `waiting` instance names, which comes
+  first, the `409` for a referenced record, a denied delete and a delete
+  outside the filters.
+- A delete takes the application's start lock shared, as the first statement of
+  its transaction, and pins the active release, as a create and an update do. When
+  activation changed the release, the delete runs again on the new release, and
+  it answers `503` after three changes.
 
 ## Dead letters
 
 Deliveries that keep failing stop after a limit and are kept as dead letters, see
 [D72](../decisions/d72-a-delivery-limit-and-dead-letters.md). The counting, the
-backoff, the limit, the two tables, the log and the metric are built for the start
-of an `async` trigger from `event.deliver` and for `trigger.fanOut`.
-_(Planned for M14)_ The email kind, the waiting-instance target and the routes
-below are not built yet.
+backoff, the limit, the two tables, the log, the metric and the
+[routes](#routes) are built for the start of an `async` trigger from
+`event.deliver` and for `trigger.fanOut`.
+_(Planned for M14)_ The email kind and the waiting-instance target are not built
+yet.
 
 **What counts.** Three kinds of work item deliver something, and each
 failure is counted for its own target:
@@ -477,7 +514,7 @@ the trigger and `occurrence_at`.
 | `settled_by` | `text`, null | The user who redelivered or discarded it |
 | `created_at`, `settled_at` | `timestamptz` | When it was written and settled |
 
-**Routes.**
+### Routes
 
 ```http
 GET /api/apps/{app}/processes/{process}/dead-letters?state=open
@@ -490,15 +527,59 @@ Content-Type: application/json
 
 - Listing needs the `inspect` grant on the process. Redeliver and discard need
   its `retry` grant. The `reason` follows the rule of the
-  [operator commands](process-inspection.md#operator-commands).
+  [operator commands](process-inspection.md#operator-commands). Listing does not
+  check whether the user may read the event's record, because a dead letter
+  holds ids and a fixed error text, never a record value.
 - **Redeliver** clears the target's count, removes a `deadLettered` receipt,
   and queues the delivery again for that target only. **Discard** closes the
   dead letter. Either one on a dead letter that is not `open` is a `409`.
 - The audit records are `deadLetter.redelivered` and `deadLetter.discarded`,
-  with the reason.
+  with the reason, see [audit records](storage.md#audit-records-and-sequence-counters).
 - The [process inspector widget](process-inspector-widget.md) lists the open
   dead letters of its process, with Redeliver and Discard for a user with the
   grant.
+
+**The list.** It shows the dead letters of the process, newest first, paged as
+the instance list is, with `page`, `pageSize`, `totalCount` and `items`. The
+optional `state` is `open`, `redelivered` or `discarded`. Any other value is a
+`400` keyed `state`, and without it every state is listed. A request is checked
+in this order: session (`401`), application and process (`404`), the `inspect`
+grant (`403`), then the query (`400`). Each item has `id`, `kind`, `eventId`,
+`triggerId`, `processInstanceId`, `emailId`, `occurrenceAt`, `attempts`,
+`lastError`, `state`, `reason`, `settledBy`, `createdAt`, `settledAt` and
+`commands`, with times in UTC and null for what its kind lacks. `commands` is
+`["redeliver", "discard"]` for an `open` dead letter when the user holds the
+`retry` grant, and empty otherwise.
+
+**The commands.** A command is checked in this order: session (`401`),
+application and process (`404`), the `retry` grant (`403`), content type
+(`415`), then the body (`400`), which is exactly `{ "reason": "<text>" }`. An
+`id` that is not a hyphenated UUID, or that names no dead letter of this
+process, is a `404` titled "No dead letter of this process exists with this
+id.". One transaction then locks the row and runs the command. A dead letter
+that is not `open` is a `409` titled "The dead letter is not open.". A refused
+command writes nothing. A success answers `200` with the dead letter in the
+list's shape, now settled with its reason and the user in `settledBy`, and
+with empty `commands`.
+
+- **`event.deliver`.** A redeliver needs the trigger as an `async` event trigger
+  in the active release. Otherwise it is a `409` titled "The trigger of the dead
+  letter is not in the active release.". It clears the count of the trigger and
+  the event, removes the trigger's `deadLettered` receipt and queues an
+  `event.deliver` item that names the trigger. The worker then delivers to that
+  trigger alone, see [event delivery](#event-delivery). A trigger that already
+  started its process for the occurrence is not run again.
+- **`trigger.fanOut`.** A redeliver needs the schedule trigger in the active
+  release, with the same `409` otherwise. It clears the count of the occurrence
+  and queues the fan-out on the active release. The receipts skip the records
+  that already started for that occurrence.
+- **Other kinds.** A redeliver of a kind that is not built is a `409` titled
+  "This kind of dead letter cannot be redelivered.". Discard closes a dead
+  letter of any kind.
+- **Audit.** Each success writes `deadLetter.redelivered` or `deadLetter.discarded`
+  in the same transaction. It names the application and no entity, record or
+  instance, and its details are `deadLetterId`, `kind`, `triggerId`, `eventId`,
+  `occurrenceAt` and `reason`, with null for what the kind lacks.
 
 **Logs and metrics.** The worker logs each dead letter at Warning level with
 its kind and target ids, and counts it in `axis.dead_letters.created`, with

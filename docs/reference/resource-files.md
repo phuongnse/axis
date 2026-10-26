@@ -91,7 +91,7 @@ site, and its widgets are its content:
 
 - A page holds one or more widgets. A leaf widget `type` is `table`, `form`,
   `taskInbox`, `processInspector`, `kpi` or `detail`. A `form` names a `form` resource, which lays out the fields of
-  one entity in sections (see [frontend.md](frontend.md)), or an `entity`, as
+  one entity in sections (see [form-widget.md](form-widget.md)), or an `entity`, as
   shorthand for all its fields in one section. A `table` names an `entity`, as
   shorthand for all records of that entity, or a `dataSource`. A `kpi` names a
   `dataSource` with one total row, one of its `measure`s and a `label`, and
@@ -257,7 +257,7 @@ A `seed` holds records with fixed ids for one entity:
 - `values` has the shape of the `values` of a record API create body (see
   [Request bodies and values](record-api.md#request-bodies-and-values)).
   A seed cannot set a `file` field, in a record or in a child row
-  _(planned for M15)_ (`AXC0251`).
+  _(planned for M15)_ (`AXC0259`).
 - Seed files are inserted in path order, so a seed whose records reference
   another seed's records sorts after it.
 
@@ -517,9 +517,9 @@ new check is a new compile diagnostic.
 - **`file`.** One file, with optional `maxSize` and `accept`. It takes
   `required` and `sensitive`, and no `unique`, `default` or `expression`. See
   [file fields](file-fields.md). The compiler reports a `maxSize` below 1 or
-  above the file size limit (`AXC0249`), an `accept` entry that is not
-  `type/subtype` or `type/*` (`AXC0250`), and `unique` on the field
-  (`AXC0251`). `maxSize` or `accept` on another type, and `expression` on a
+  above the file size limit (`AXC0257`), an `accept` entry that is not
+  `type/subtype` or `type/*` (`AXC0258`), and `unique` on the field
+  (`AXC0259`). `maxSize` or `accept` on another type, and `expression` on a
   `file`, are `AXC0013`. In an expression a file allows only `is null` and
   `is not null`.
 - **`references`.** A set of records of `target`, at most 1,000. It takes
@@ -540,11 +540,15 @@ new check is a new compile diagnostic.
   `references` and `child-collection` fields. The compiler checks it now. A
   forbidden combination is `AXC0013` at `/fields/{i}/default`, and an
   expression problem reports its own code at the same path. The compiled field
-  carries the checked default. The record command will apply it on create when
-  the body leaves the field out, see
-  [create, update and delete](record-api.md#create-update-and-delete). That is
-  still planned, so a default is not applied yet. `file` and `references` are
-  refused when those types arrive.
+  carries the checked default. A create applies it when the body
+  leaves the field out, see
+  [create, update and delete](record-api.md#create-update-and-delete). That
+  holds for the record API, the record command, inbound endpoints and seed
+  records. A required field with a default may be left out of a create, and
+  `now()` is the start time of the write transaction. An update never applies
+  a default. The [form state endpoint](record-api.md#form-state) returns the
+  defaults of a new record, and the form widget shows them on a new form. A default on a field of a child entity does nothing for its rows
+  yet. `file` and `references` are refused when those types arrive.
 - **`searchable`.** On a `text` field. `search` reads every searchable field,
   and the display field is always searchable. See
   [paging and sorting](record-api.md#paging-and-sorting).
@@ -689,7 +693,7 @@ validation calls the rules of its own module, see [modules](modules-and-template
 
 ## Form conditions and steps
 
-A `form` resource (see [frontend](frontend.md)) can show, require and lock
+A `form` resource (see [form widget](form-widget.md)) can show, require and lock
 fields depending on the record, and can split its sections into wizard steps
 ([D62](../decisions/d62-conditional-form-states-validation-as-you-type-and-wizard-steps.md)).
 The schema, the compile checks, the compiled model, the page and task metadata and the

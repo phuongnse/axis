@@ -2,6 +2,7 @@ import { expect, test } from '../test'
 import type { Page } from '@playwright/test'
 import { expectChosen, pickOption, pickOptions } from '../select'
 import { useSession } from '../sessions'
+import { openFormTab } from '../studio-resources'
 
 // The ids of a scenario and of a page in the purchase request sample, which Studio on the main E2E server edits as a copy.
 const scenarioId = 'bd059896-4e74-43d6-bd45-f6e8abd08d41'
@@ -49,6 +50,7 @@ test.describe('the select helpers pick from the keyboard', () => {
   test('a type is chosen in the Type select of a new parameter although a click on its option would miss', async ({ page }) => {
     await useSession(page, 'hoa')
     await page.goto(`/studio?app=PurchaseRequests&resource=${pageId}`)
+    await openFormTab(page)
     await page.getByRole('button', { name: 'Add parameter', exact: true }).click()
     const type = page.getByTestId('studio-field-/parameters/0/type').getByRole('combobox')
     await expect(type).toBeVisible()
