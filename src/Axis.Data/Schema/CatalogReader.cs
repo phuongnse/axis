@@ -33,14 +33,26 @@ public static class CatalogReader
         WHERE n.nspname = @schema AND c.relkind = 'r' AND con.contype IN ('u', 'f') AND array_length(con.conkey, 1) = 1
         """;
 
-    // The indexes whose names start with ix_, which are the ones the planner owns, with their columns in index order.
+    // The indexes whose names start with ix_, which are the ones the planner owns, with their columns in index order
+    // and whether PostgreSQL marks them valid. An expression index has no columns in indkey, so a trigram index (a GIN index
+    // built on an expression) reads its column from pg_depend, which records the column its expression uses.
     // The pattern escapes the underscore, which is a wildcard in LIKE.
     private const string IndexesSql = """
         SELECT t.relname, i.relname, x.indisunique,
-          ARRAY(SELECT a.attname FROM unnest(x.indkey::int2[]) WITH ORDINALITY k(attnum, ord)
-                JOIN pg_attribute a ON a.attrelid = x.indrelid AND a.attnum = k.attnum ORDER BY k.ord)
+          CASE WHEN x.indexprs IS NULL THEN
+            ARRAY(SELECT a.attname FROM unnest(x.indkey::int2[]) WITH ORDINALITY k(attnum, ord)
+                  JOIN pg_attribute a ON a.attrelid = x.indrelid AND a.attnum = k.attnum ORDER BY k.ord)
+          ELSE
+            ARRAY(SELECT a.attname FROM pg_depend d
+                  JOIN pg_attribute a ON a.attrelid = d.refobjid AND a.attnum = d.refobjsubid
+                  WHERE d.classid = 'pg_class'::regclass AND d.objid = x.indexrelid AND d.refclassid = 'pg_class'::regclass
+                    AND d.refobjid = x.indrelid AND d.refobjsubid > 0 ORDER BY a.attnum)
+          END,
+          x.indisvalid,
+          am.amname = 'gin' AND x.indexprs IS NOT NULL
         FROM pg_index x
         JOIN pg_class i ON i.oid = x.indexrelid
+        JOIN pg_am am ON am.oid = i.relam
         JOIN pg_class t ON t.oid = x.indrelid
         JOIN pg_namespace n ON n.oid = t.relnamespace
         WHERE n.nspname = @schema AND t.relkind = 'r' AND i.relname LIKE 'ix\_%'
@@ -84,7 +96,7 @@ public static class CatalogReader
                 connection,
                 transaction,
                 IndexesSql,
-                reader => (Table: reader.GetString(0), Index: new CatalogIndex(reader.GetString(1), reader.GetFieldValue<string[]>(3), reader.GetBoolean(2))),
+                reader => (Table: reader.GetString(0), Index: new CatalogIndex(reader.GetString(1), reader.GetFieldValue<string[]>(3), reader.GetBoolean(2)) { Valid = reader.GetBoolean(4), Trigram = reader.GetBoolean(5) }),
                 cancellationToken))
             .ToLookup(row => row.Table, row => row.Index, StringComparer.Ordinal);
 

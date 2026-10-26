@@ -8,7 +8,8 @@ namespace Axis.Data.Records;
 /// <summary>
 /// Evaluates a compiled expression, such as a process condition, against a stored record. A path
 /// such as <c>department.manager.name</c> reads the records it names through
-/// <see cref="RecordQueries"/>.
+/// <see cref="RecordQueries"/>. An aggregate over a <c>references</c> field reads the target
+/// records of the stored set.
 /// </summary>
 public static class RecordExpressions
 {
@@ -22,6 +23,7 @@ public static class RecordExpressions
     /// cannot hold exactly, on the record or on a record a path reads, stops the evaluation with a
     /// <see cref="ExpressionRuntimeErrorKind.DecimalOverflow"/> error, as no value is rounded.
     /// <c>now()</c> gives <paramref name="now"/>, which is the start time of the caller's transaction.
+    /// <c>today()</c> and <c>toDate</c> take the date in the application's time zone.
     /// <c>id</c> gives the record's id.
     /// </summary>
     public static async Task<ExpressionEvaluationResult> EvaluateAsync(
@@ -50,8 +52,14 @@ public static class RecordExpressions
             subject[field.Name] = (value, true);
         }
 
+        var sets = await RecordSets.ReadAsync(connection, application, entity, record, [], cancellationToken);
+        if (sets.Inexact is { } inexact)
+        {
+            return Inexact(inexact.Entity, inexact.Field);
+        }
+
         var errors = new SortedDictionary<string, string[]>(StringComparer.Ordinal);
-        if (!RecordCollections.TryAdd(application, entity, record, [], subject, errors))
+        if (!RecordCollections.TryAdd(application, entity, record, [], subject, errors, sets))
         {
             // The first error is at /values/<collection>/<index>/<field>.
             var pointer = errors.Keys.First().Split('/');
@@ -138,7 +146,8 @@ public static class RecordExpressions
             expression.Check,
             new ExpressionValues(subject.Select(pair => KeyValuePair.Create(pair.Key, pair.Value.Value))),
             Resolve,
-            now);
+            now,
+            application.TimeZone);
     }
 
     /// <summary>The field names of a path's target, from the subject's field to the last reference, such as <c>department, manager</c>.</summary>

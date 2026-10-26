@@ -56,6 +56,17 @@ public sealed class EntityNamingTests
     }
 
     [Fact]
+    public void Trigram_index_name_hashes_the_prefixed_column_and_differs_from_a_plain_index_on_the_column()
+    {
+        var table = EntityNaming.Table(_entityId);
+
+        Assert.Matches("^ix_e_4b6f0c1e6a0e4c479a530f5f8f8b1a01_[0-9a-f]{16}$", EntityNaming.TrigramIndex(table, "f_code"));
+        Assert.Equal(54, Encoding.UTF8.GetByteCount(EntityNaming.TrigramIndex(table, "f_code")));
+        Assert.NotEqual(EntityNaming.Index(table, ["f_code"]), EntityNaming.TrigramIndex(table, "f_code"));
+        Assert.NotEqual(EntityNaming.TrigramIndex(table, "f_code"), EntityNaming.TrigramIndex(table, "f_name"));
+    }
+
+    [Fact]
     public void Junction_names_hash_the_lowercase_field_name_and_fit_in_63_bytes()
     {
         var fieldName = "T" + new string('z', 59);

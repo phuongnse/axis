@@ -12,7 +12,8 @@ namespace Axis.Processes.Records;
 internal sealed record RecordImportSettings(int MaxRows);
 
 /// <summary>
-/// Runs a <c>records.importCheck</c> work item: the dry run of one uploaded import file. It checks every row
+/// Runs a <c>records.importCheck</c> work item: the dry run of one uploaded import file, a CSV file or an <c>xlsx</c>
+/// workbook, whichever format the import stored. It checks every row
 /// as a create of the entity checks it, as the uploader: the row is parsed, the fields it sets must be covered
 /// by the uploader's <c>create</c> grants, then the defaults, the computed fields and the entity's validations
 /// run. It writes no record, no audit record and no sequence number, and it does not read storage, so it cannot
@@ -61,7 +62,7 @@ internal sealed partial class RecordImportCheckHandler(ReleaseModelCache models,
         else
         {
             var now = await RecordQueries.TransactionTimeAsync(connection, cancellationToken);
-            Check(application, entity, new RecordActor(import.UploaderId, import.UploaderName, import.UploaderRoles), import.File ?? [], now, errors);
+            Check(application, entity, new RecordActor(import.UploaderId, import.UploaderName, import.UploaderRoles), import.Format, import.File ?? [], now, errors);
         }
 
         await RecordImports.FinishCheckAsync(
@@ -79,18 +80,19 @@ internal sealed partial class RecordImportCheckHandler(ReleaseModelCache models,
         ApplicationModel application,
         EntityModel entity,
         RecordActor actor,
+        string format,
         byte[] file,
         DateTimeOffset now,
         Dictionary<string, string[]> errors)
     {
-        var csv = RecordImportCsv.Open(file);
-        if (csv.HeaderError is { } headerError)
+        IRecordImportFile reader = format == RecordImportFormats.Xlsx ? RecordImportXlsx.Open(file) : RecordImportCsv.Open(file);
+        if (reader.HeaderError is { } headerError)
         {
             errors["/columns"] = [headerError];
             return;
         }
 
-        if (csv.Header is not { } header)
+        if (reader.Header is not { } header)
         {
             errors["/columns"] = ["The file has no header row."];
             return;
@@ -107,7 +109,7 @@ internal sealed partial class RecordImportCheckHandler(ReleaseModelCache models,
             return;
         }
 
-        foreach (var row in csv.Rows())
+        foreach (var row in reader.Rows())
         {
             if (row.Number > settings.MaxRows)
             {

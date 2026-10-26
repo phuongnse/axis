@@ -48,7 +48,8 @@ public static class FormStateEvaluator
     /// Evaluates <paramref name="form"/> of <paramref name="entity"/> on <paramref name="draft"/>.
     /// <paramref name="stored"/> is null for a new record. <paramref name="readable"/> holds the
     /// declared names of the fields the user may read, or is null when the user may read every field.
-    /// <paramref name="now"/> is what <c>now()</c> gives.
+    /// <paramref name="now"/> is what <c>now()</c> gives. <paramref name="sets"/> holds the target
+    /// records an aggregate over a <c>references</c> field reads, which are none when it is null.
     /// </summary>
     public static FormState Evaluate(
         ApplicationModel application,
@@ -59,7 +60,8 @@ public static class FormStateEvaluator
         IReadOnlySet<string> touched,
         IReadOnlySet<string>? readable,
         string actorId,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        RecordSets? sets = null)
     {
         ArgumentNullException.ThrowIfNull(application);
         ArgumentNullException.ThrowIfNull(form);
@@ -69,10 +71,10 @@ public static class FormStateEvaluator
 
         // The parse errors come first, then the compute errors and then the validation failures.
         var errors = new SortedDictionary<string, string[]>(draft.Errors, StringComparer.Ordinal);
-        var (values, rows, filled) = Complete(application, entity, stored, draft, actorId, now, errors);
+        var (values, rows, filled) = Complete(application, entity, stored, draft, actorId, now, errors, sets);
 
         var record = RecordValidator.BuildRecord(entity, stored, values);
-        var conditions = RecordCollections.TryAdd(application, entity, stored, rows, record, errors) && record.Values.All(pair => pair.Exact)
+        var conditions = RecordCollections.TryAdd(application, entity, stored, rows, record, errors, sets) && record.Values.All(pair => pair.Exact)
             ? new ExpressionValues(record.Select(pair => KeyValuePair.Create(pair.Key, pair.Value.Value)))
             : null;
 
@@ -80,7 +82,7 @@ public static class FormStateEvaluator
         var fields = new Dictionary<string, FormFieldState>(StringComparer.Ordinal);
         foreach (var section in form.Sections)
         {
-            var sectionVisible = section.VisibleWhen is null || Holds(section.VisibleWhen, conditions, now);
+            var sectionVisible = section.VisibleWhen is null || Holds(section.VisibleWhen, conditions, now, application.TimeZone);
             var anyReadable = false;
             foreach (var entry in section.Fields)
             {
@@ -89,13 +91,13 @@ public static class FormStateEvaluator
                     continue;
                 }
 
-                var visible = sectionVisible && (entry.VisibleWhen is null || Holds(entry.VisibleWhen, conditions, now));
-                var required = visible && (field.Required || (entry.RequiredWhen is not null && Holds(entry.RequiredWhen, conditions, now)));
+                var visible = sectionVisible && (entry.VisibleWhen is null || Holds(entry.VisibleWhen, conditions, now, application.TimeZone));
+                var required = visible && (field.Required || (entry.RequiredWhen is not null && Holds(entry.RequiredWhen, conditions, now, application.TimeZone)));
                 var readOnly = entry.ReadOnly
                     || field.IsComputed
                     || field.Sequence is not null
                     || field.Creator
-                    || (entry.ReadOnlyWhen is not null && Holds(entry.ReadOnlyWhen, conditions, now));
+                    || (entry.ReadOnlyWhen is not null && Holds(entry.ReadOnlyWhen, conditions, now, application.TimeZone));
                 if (required && field.HasColumn && record[field.Name].Value is null)
                 {
                     errors.TryAdd(ValuesPrefix + field.Name, [Messages.Required]);
@@ -149,7 +151,8 @@ public static class FormStateEvaluator
         RecordDraftResult draft,
         string actorId,
         DateTimeOffset now,
-        SortedDictionary<string, string[]> errors)
+        SortedDictionary<string, string[]> errors,
+        RecordSets? sets)
     {
         // The update overloads throw for a null stored record, so a new record takes the create ones.
         var input = draft.Input;
@@ -158,7 +161,7 @@ public static class FormStateEvaluator
         if (stored is null)
         {
             // A field with a parse error is not left out: the user sent something, so it gets no default.
-            var defaults = RecordDefaults.Apply(entity, input.Values, now);
+            var defaults = RecordDefaults.Apply(entity, input.Values, now, application.TimeZone);
             var given = input.Values.Select(value => value.Field.Name).ToHashSet(StringComparer.Ordinal);
             var sent = new HashSet<string>(given, StringComparer.Ordinal);
             sent.UnionWith(draft.Errors.Keys.Select(FieldOf).OfType<string>());
@@ -180,8 +183,8 @@ public static class FormStateEvaluator
         Merge(errors, computed.Errors);
 
         var failures = stored is null
-            ? RecordValidator.ValidateCreate(application, entity, computed.Values, computed.Rows, now)
-            : RecordValidator.ValidateUpdate(application, entity, stored, computed.Values, computed.Rows, now);
+            ? RecordValidator.ValidateCreate(application, entity, computed.Values, computed.Rows, now, sets)
+            : RecordValidator.ValidateUpdate(application, entity, stored, computed.Values, computed.Rows, now, sets);
         Merge(errors, failures);
         return (computed.Values, computed.Rows, filled);
     }
@@ -200,9 +203,9 @@ public static class FormStateEvaluator
     }
 
     /// <summary>True only when <paramref name="condition"/> gives <c>true</c>; false when it cannot be evaluated.</summary>
-    private static bool Holds(ExpressionModel condition, ExpressionValues? values, DateTimeOffset now) =>
+    private static bool Holds(ExpressionModel condition, ExpressionValues? values, DateTimeOffset now, TimeZoneInfo timeZone) =>
         values is not null
-        && ExpressionInterpreter.Evaluate(condition.Syntax, condition.Check, values, records: null, now: now) is { Succeeded: true, Value: true };
+        && ExpressionInterpreter.Evaluate(condition.Syntax, condition.Check, values, records: null, now: now, timeZone: timeZone) is { Succeeded: true, Value: true };
 
     /// <summary>The field a key <c>/values/&lt;field&gt;[/…]</c> belongs to, or null for any other key.</summary>
     private static string? FieldOf(string key)

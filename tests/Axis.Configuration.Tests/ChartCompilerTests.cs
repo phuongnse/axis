@@ -177,7 +177,9 @@ public sealed class ChartCompilerTests
     [InlineData("maxQuantity")]
     [InlineData("minTotal")]
     [InlineData("maxFee")]
-    public void Chart_naming_a_count_a_sum_or_a_min_or_max_of_a_number_compiles(string measure)
+    [InlineData("totalAvg")]
+    [InlineData("distinctQuantities")]
+    public void Chart_naming_a_count_a_count_distinct_sum_avg_or_a_min_or_max_of_a_number_compiles(string measure)
     {
         using var folder = Folder(Chart(measures: Measure(measure)));
 
@@ -435,7 +437,9 @@ public sealed class ChartCompilerTests
                     { "name": "maxQuantity", "function": "max", "field": "quantity" },
                     { "name": "minTotal", "function": "min", "field": "total" },
                     { "name": "firstPlaced", "function": "min", "field": "placedOn" },
-                    { "name": "lastPlaced", "function": "max", "field": "placedOn" } ] } }
+                    { "name": "lastPlaced", "function": "max", "field": "placedOn" },
+                    { "name": "totalAvg", "function": "avg", "field": "total" },
+                    { "name": "distinctQuantities", "function": "countDistinct", "field": "quantity" } ] } }
                 """)
             .With("data-sources/filtered-stats.json", """
                 { "id": "77777777-7777-4777-8777-777777777774", "kind": "dataSource", "name": "FilteredStats", "formatVersion": 1, "entity": "Order",

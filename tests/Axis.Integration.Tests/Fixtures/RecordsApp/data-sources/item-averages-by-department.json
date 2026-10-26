@@ -1,0 +1,23 @@
+{
+  "id": "83afea52-5a76-4ae6-80b9-8a56ac4476d1",
+  "kind": "dataSource",
+  "name": "ItemAveragesByDepartment",
+  "formatVersion": 1,
+  "entity": "Item",
+  "fields": [
+    { "name": "departmentName", "path": "department.name" },
+    { "name": "quantity", "path": "quantity" },
+    { "name": "price", "path": "price" },
+    { "name": "active", "path": "active" }
+  ],
+  "aggregate": {
+    "groupBy": ["departmentName"],
+    "measures": [
+      { "name": "quantityAvg", "function": "avg", "field": "quantity" },
+      { "name": "priceAvg", "function": "avg", "field": "price" },
+      { "name": "quantityKinds", "function": "countDistinct", "field": "quantity" },
+      { "name": "activeKinds", "function": "countDistinct", "field": "active" }
+    ]
+  },
+  "sort": "departmentName"
+}

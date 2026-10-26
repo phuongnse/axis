@@ -9,7 +9,8 @@ namespace Axis.Data.Records;
 /// The rows an owner's aggregates read, shared by <see cref="RecordComputer"/> and
 /// <see cref="RecordValidator"/> so that both read the same rows. A collection the body sends is
 /// read from the body's rows, with their computed fields already set. A collection an update
-/// leaves out is read from the stored rows. Otherwise it has no rows.
+/// leaves out is read from the stored rows. Otherwise it has no rows. A <c>references</c> field
+/// reads the target records the caller supplies as <see cref="RecordSets"/>, and none without them.
 /// </summary>
 internal static class RecordCollections
 {
@@ -18,6 +19,8 @@ internal static class RecordCollections
     /// rows, as the interpreter reads them. A row value that cannot be held exactly is an error at
     /// <c>/values/&lt;collection&gt;/&lt;index&gt;/&lt;field&gt;</c>. Every collection is still read,
     /// and then the result is false, because no aggregate could be evaluated without rounding.
+    /// Each <c>references</c> field is set to its rows in <paramref name="sets"/>. A stored target
+    /// value that cannot be held exactly is an error at <c>/values/&lt;field&gt;</c> and also gives false.
     /// </summary>
     public static bool TryAdd(
         ApplicationModel application,
@@ -25,7 +28,8 @@ internal static class RecordCollections
         Record? stored,
         IReadOnlyList<RecordRows> rows,
         Dictionary<string, (object? Value, bool Exact)> record,
-        SortedDictionary<string, string[]> errors)
+        SortedDictionary<string, string[]> errors,
+        RecordSets? sets = null)
     {
         var allExact = true;
         foreach (var field in entity.Fields.Where(field => field.Type == FieldType.ChildCollection))
@@ -66,6 +70,18 @@ internal static class RecordCollections
             }
 
             record[field.Name] = (items, true);
+        }
+
+        sets ??= RecordSets.Empty;
+        foreach (var field in entity.Fields.Where(field => field.Type == FieldType.References))
+        {
+            record[field.Name] = (sets.RowsOf(field.Name), true);
+        }
+
+        if (sets.Inexact is { } inexact)
+        {
+            errors.TryAdd($"/values/{inexact.SetField}", [Messages.NotEvaluable]);
+            return false;
         }
 
         return allExact;

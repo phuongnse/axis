@@ -31,6 +31,8 @@ public static class ExpressionFunctions
         new("date", 1, 1),
         new("dateTime", 1, 1),
         new("now", 0, 0),
+        new("today", 0, 0),
+        new("toDate", 1, 1),
         new("currentUser", 0, 0),
     ];
 
@@ -38,6 +40,7 @@ public static class ExpressionFunctions
     [
         new("count", 1, 2) { IsAggregate = true },
         new("sum", 2, 2) { IsAggregate = true },
+        new("avg", 2, 2) { IsAggregate = true },
         new("min", 2, 2) { IsAggregate = true },
         new("max", 2, 2) { IsAggregate = true },
         new("any", 2, 2) { IsAggregate = true },

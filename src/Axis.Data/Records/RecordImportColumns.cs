@@ -1,5 +1,4 @@
 using System.Text.Json;
-using System.Text.RegularExpressions;
 using Axis.Configuration.Model;
 
 namespace Axis.Data.Records;
@@ -14,7 +13,7 @@ namespace Axis.Data.Records;
 /// a boolean field is a boolean, and every other cell is text, so the record parser checks a row exactly as
 /// it checks a JSON body.
 /// </summary>
-internal sealed partial class RecordImportColumns
+internal sealed class RecordImportColumns
 {
     private readonly FieldModel?[] _fields;
 
@@ -85,7 +84,7 @@ internal sealed partial class RecordImportColumns
                 }
 
                 writer.WritePropertyName(field.Name);
-                if (field.Type is FieldType.Integer or FieldType.Decimal or FieldType.Money && JsonNumber().IsMatch(cell))
+                if (field.Type is FieldType.Integer or FieldType.Decimal or FieldType.Money && RecordImportFiles.IsJsonNumber(cell))
                 {
                     writer.WriteRawValue(cell);
                 }
@@ -109,7 +108,4 @@ internal sealed partial class RecordImportColumns
 
         return stream.ToArray();
     }
-
-    [GeneratedRegex(@"^-?(0|[1-9][0-9]*)(\.[0-9]+)?([eE][+-]?[0-9]+)?\z", RegexOptions.CultureInvariant)]
-    private static partial Regex JsonNumber();
 }

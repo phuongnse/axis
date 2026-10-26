@@ -30,11 +30,13 @@ const functionNames = [
   'date',
   'dateTime',
   'now',
+  'today',
+  'toDate',
 ]
 
-const aggregateNames = ['count', 'sum', 'min', 'max', 'any', 'all']
+const aggregateNames = ['count', 'sum', 'avg', 'min', 'max', 'any', 'all']
 
-const zeroArgumentFunctions = ['now', 'currentUser']
+const zeroArgumentFunctions = ['now', 'today', 'currentUser']
 
 const grantFilter = /^\/grants\/\d+\/filter$/
 const grantIndex = /^\/grants\/(\d+)\//

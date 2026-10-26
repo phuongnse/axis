@@ -281,7 +281,10 @@ fixtures, only for the API paths of the fixture application. It needs no server,
   bring its own fixtures, on its own paths in the fixture application. The names are `table`, `form`,
   `taskInbox`, `processInspector`, `detail`, `chart-<kind>` for `bar`, `line` and `pie`, `kpi`, `columns`,
   `tabs`, `section`, `states` and `field-<type>` for each field type. The `states` preview draws, once,
-  the states every widget shares: a table while it loads and a table whose request fails. A
+  the states every widget shares: a table while it loads and a table whose request fails. The `table`,
+  `taskInbox`, `detail`, each `chart-<kind>` and `kpi` previews draw "With data" and "Empty". The table's data
+  has row and toolbar actions and a long-text row, and the inbox's has an overdue and a claimed task.
+  `processInspector` draws one state with a failed instance and an open dead letter. A
   `field-<type>` preview draws the input the form widget uses for that field type,
   with its label and the fixture value, laid out as on a form, in four states: Typical, Required, Read-only, and
   Validation error, which shows a fixed message under the input. `field-child-collection` draws line items with a
@@ -304,7 +307,8 @@ checks that a field preview has no Save button and no history, and that the `sta
 the load error alert. For each field type except the child collection, it checks in both modes that the required,
 read-only and error states show. It checks the child collection's reference, computed, error, read-only and empty
 states, and the form's validation, read-only and wizard states. It opens the date-time picker and the reference lookup
-and adds a child collection row.
+and adds a child collection row. It finds each data preview's empty text under its "Empty" caption, the table's row
+and toolbar actions, the inbox's overdue and claimed tags, and the inspector's failed instance and dead letter actions.
 
 ## Formatting
 

@@ -286,6 +286,29 @@ public sealed class RecordInputParserTests
     }
 
     [Fact]
+    public void A_file_value_parses_as_a_guid_and_a_malformed_one_is_refused_at_the_field()
+    {
+        var entity = Entity(
+            Guid.Parse("7c2e4f10-3b1a-4d5e-8f60-1a2b3c4d5e21"),
+            "Claim",
+            "entities/claim.json",
+            Field("receipt", FieldType.File));
+        var application = Application(entity);
+        var id = Guid.Parse("7c2e4f10-3b1a-4d5e-8f60-1a2b3c4d5e22");
+
+        var valid = RecordInputParser.Parse(Encoding.UTF8.GetBytes($$"""{ "values": { "receipt": "{{id:D}}" } }"""), entity, application, RecordOperation.Create);
+        var cleared = RecordInputParser.Parse(Encoding.UTF8.GetBytes("""{ "values": { "receipt": null } }"""), entity, application, RecordOperation.Create);
+        var malformed = RecordInputParser.Parse(Encoding.UTF8.GetBytes("""{ "values": { "receipt": "abc" } }"""), entity, application, RecordOperation.Create);
+
+        Assert.Null(valid.Errors);
+        Assert.Equal(id, Assert.IsType<Guid>(Assert.Single(valid.Input!.Values).Value));
+        Assert.Null(Assert.Single(cleared.Input!.Values).Value);
+        var error = Assert.Single(malformed.Errors!);
+        Assert.Equal("/values/receipt", error.Key);
+        Assert.Equal(["Must be a UUID."], error.Value);
+    }
+
+    [Fact]
     public void Valid_update_body_has_only_the_named_fields_and_the_version()
     {
         var result = Parse("""{ "version": 7, "values": { "status": "Closed", "count": null } }""", RecordOperation.Update);

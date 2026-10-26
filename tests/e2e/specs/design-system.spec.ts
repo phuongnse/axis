@@ -23,9 +23,10 @@ const modes = ['light', 'dark'] as const
 /** The figure of one state of a preview, found by its caption. */
 const figure = (page: Page, caption: string) => page.getByRole('figure', { name: caption, exact: true })
 
-// Each preview and a locator for its widget. A field preview's first state is its typical one.
+// Each preview and a locator for its widget. The table and the kpi also draw an empty state, so they are looked up in
+// the "With data" figure. A field preview's first state is its typical one.
 const previews: Record<string, (page: Page) => Locator> = {
-  table: (page) => page.getByRole('columnheader', { name: 'Title', exact: true }),
+  table: (page) => figure(page, 'With data').getByRole('columnheader', { name: 'Title', exact: true }),
   form: (page) => page.getByRole('button', { name: 'Save', exact: true }).first(),
   taskInbox: (page) => page.getByRole('link', { name: 'Review the request', exact: true }).first(),
   processInspector: (page) => page.getByRole('combobox', { name: 'State', exact: true }),
@@ -33,7 +34,7 @@ const previews: Record<string, (page: Page) => Locator> = {
   'chart-bar': (page) => page.getByRole('img', { name: 'Requests by status', exact: true }).locator('svg'),
   'chart-line': (page) => page.getByRole('img', { name: 'Requests by status', exact: true }).locator('svg'),
   'chart-pie': (page) => page.getByRole('img', { name: 'Requests by status', exact: true }).locator('svg'),
-  kpi: (page) => page.getByTestId('kpi-value'),
+  kpi: (page) => page.getByRole('figure', { name: 'With data', exact: true }).getByTestId('kpi-value'),
   columns: (page) => page.getByRole('region', { name: 'Tasks', exact: true }),
   tabs: (page) => page.getByRole('tab', { name: 'Requests', exact: true }),
   section: (page) => page.getByRole('region', { name: 'Tasks', exact: true }),
@@ -48,6 +49,27 @@ const previews: Record<string, (page: Page) => Locator> = {
   'field-reference': (page) => figure(page, 'Typical').getByLabel('Category', { exact: true }),
   'field-child-collection': (page) =>
     figure(page, 'Reference and computed cells').getByRole('columnheader', { name: 'Description', exact: true }),
+}
+
+/** The text a preview's empty state shows, or none for a preview that draws no empty state. */
+function emptyTextOf(name: string): string | undefined {
+  if (name === 'table') {
+    return 'No records yet.'
+  }
+  if (name === 'taskInbox') {
+    return 'No open tasks.'
+  }
+  if (name === 'detail') {
+    // Ant Design's placeholder for the empty Lines table.
+    return 'No data'
+  }
+  if (name === 'kpi') {
+    return 'No value'
+  }
+  if (name.startsWith('chart-')) {
+    return 'No data to show'
+  }
+  return undefined
 }
 
 /** Files of a folder with their paths relative to it, or none when the folder does not exist. */
@@ -103,6 +125,30 @@ for (const [name, widget] of Object.entries(previews)) {
         await expect(
           page.getByRole('figure', { name: 'Loading', exact: true }).locator('[aria-busy="true"]').first(),
         ).toBeVisible()
+      }
+      const emptyText = emptyTextOf(name)
+      if (emptyText !== undefined) {
+        await expect(
+          page
+            .getByRole('figure', { name: 'Empty', exact: true })
+            .getByText(emptyText, { exact: true })
+            .filter({ visible: true })
+            .first(),
+        ).toBeVisible()
+      }
+      const withData = page.getByRole('figure', { name: 'With data', exact: true })
+      if (name === 'table') {
+        await expect(withData.getByRole('button', { name: 'Open', exact: true }).first()).toBeVisible()
+        await expect(withData.getByRole('button', { name: 'New request', exact: true })).toBeVisible()
+      }
+      if (name === 'taskInbox') {
+        await expect(withData.getByText('Overdue', { exact: true })).toBeVisible()
+        await expect(withData.getByText('Claimed by you', { exact: true })).toBeVisible()
+      }
+      if (name === 'processInspector') {
+        await expect(page.getByRole('cell', { name: 'Failed', exact: true }).first()).toBeVisible()
+        await expect(page.getByRole('button', { name: 'Redeliver', exact: true })).toBeVisible()
+        await expect(page.getByRole('button', { name: 'Discard', exact: true })).toBeVisible()
       }
       await page.waitForLoadState('networkidle')
 
@@ -213,7 +259,9 @@ test('the field-child-collection preview adds a row', async ({ page }) => {
 
 test('a mounted table redraws in the other mode when the page changes data-theme', async ({ page }) => {
   const recording = await openHarness(page, '?preview=table&mode=light')
-  const header = page.getByRole('columnheader', { name: 'Title', exact: true })
+  const header = page
+    .getByRole('figure', { name: 'With data', exact: true })
+    .getByRole('columnheader', { name: 'Title', exact: true })
   await expect(header).toBeVisible()
   const background = () => header.evaluate((cell) => getComputedStyle(cell).backgroundColor)
   const light = await background()

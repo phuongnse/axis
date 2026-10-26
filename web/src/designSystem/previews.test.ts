@@ -2,6 +2,10 @@ import { describe, expect, test } from 'vitest'
 import { fixtureScopes, routes } from './fixtures'
 import { previews } from './previews'
 
+function hasEmptyState(name: string): boolean {
+  return ['table', 'taskInbox', 'detail', 'kpi'].includes(name) || name.startsWith('chart-')
+}
+
 describe('design-system previews', () => {
   test.each(Object.entries(previews))('the %s preview has states with unique captions', (_, states) => {
     expect(states.length).toBeGreaterThanOrEqual(1)
@@ -11,6 +15,13 @@ describe('design-system previews', () => {
     }
     expect(new Set(states.map(({ caption }) => caption)).size).toBe(states.length)
   })
+
+  test.each(Object.entries(previews).filter(([name]) => hasEmptyState(name)))(
+    'the %s preview draws its data and its empty state',
+    (_, states) => {
+      expect(states.map(({ caption }) => caption)).toEqual(['With data', 'Empty'])
+    },
+  )
 
   test("a state's own fixture paths are scoped and repeat no shared path or other state's path", () => {
     const paths = Object.values(previews).flatMap((states) =>

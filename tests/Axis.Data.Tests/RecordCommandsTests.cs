@@ -29,6 +29,7 @@ public sealed class RecordCommandsTests
         await Assert.ThrowsAsync<ArgumentNullException>(() => RecordCommands.UpdateAsync(connection, _application, null!, Guid.NewGuid(), Guid.NewGuid(), 1, [], [], cancellationToken: TestContext.Current.CancellationToken));
         await Assert.ThrowsAsync<ArgumentNullException>(() => RecordCommands.UpdateAsync(connection, _application, _entity, Guid.NewGuid(), Guid.NewGuid(), 1, null!, [], cancellationToken: TestContext.Current.CancellationToken));
         await Assert.ThrowsAsync<ArgumentNullException>(() => RecordCommands.UpdateAsync(connection, _application, _entity, Guid.NewGuid(), Guid.NewGuid(), 1, [], null!, cancellationToken: TestContext.Current.CancellationToken));
-        await Assert.ThrowsAsync<ArgumentNullException>(() => RecordCommands.DeleteAsync(connection, null!, Guid.NewGuid(), TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<ArgumentNullException>(() => RecordCommands.DeleteAsync(connection, null!, _entity, Guid.NewGuid(), TestContext.Current.CancellationToken));
+        await Assert.ThrowsAsync<ArgumentNullException>(() => RecordCommands.DeleteAsync(connection, _application, null!, Guid.NewGuid(), TestContext.Current.CancellationToken));
     }
 }

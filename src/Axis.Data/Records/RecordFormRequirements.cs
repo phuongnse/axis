@@ -32,7 +32,8 @@ public static class RecordFormRequirements
         IReadOnlyList<RecordValue> values,
         IReadOnlyList<RecordRows> rows,
         DateTimeOffset? now,
-        IReadOnlyCollection<string>? sent = null)
+        IReadOnlyCollection<string>? sent = null,
+        RecordSets? sets = null)
     {
         ArgumentNullException.ThrowIfNull(application);
         ArgumentNullException.ThrowIfNull(entity);
@@ -47,7 +48,7 @@ public static class RecordFormRequirements
         }
 
         var record = RecordValidator.BuildRecord(entity, stored, values);
-        var rowsExact = RecordCollections.TryAdd(application, entity, stored, rows, record, errors);
+        var rowsExact = RecordCollections.TryAdd(application, entity, stored, rows, record, errors, sets);
 
         // A value that cannot be held exactly stops every condition, as it stops the validations.
         var inexact = record.Where(pair => !pair.Value.Exact).Select(pair => pair.Key).ToList();
@@ -65,7 +66,7 @@ public static class RecordFormRequirements
         var expressionValues = new ExpressionValues(record.Select(pair => KeyValuePair.Create(pair.Key, pair.Value.Value)));
         foreach (var section in form.Sections)
         {
-            var sectionVisible = Holds(section.VisibleWhen, true, expressionValues, now);
+            var sectionVisible = Holds(section.VisibleWhen, true, expressionValues, now, application.TimeZone);
             foreach (var formField in section.Fields)
             {
                 if (!entity.TryGetField(formField.Field, out var field))
@@ -73,10 +74,10 @@ public static class RecordFormRequirements
                     continue;
                 }
 
-                var visible = sectionVisible && Holds(formField.VisibleWhen, true, expressionValues, now);
+                var visible = sectionVisible && Holds(formField.VisibleWhen, true, expressionValues, now, application.TimeZone);
                 if (sent is not null
                     && sent.Contains(field.Name, StringComparer.Ordinal)
-                    && (!visible || Holds(formField.ReadOnlyWhen, false, expressionValues, now)))
+                    && (!visible || Holds(formField.ReadOnlyWhen, false, expressionValues, now, application.TimeZone)))
                 {
                     errors[$"/values/{field.Name}"] = [RecordInputMessages.Computed];
                     continue;
@@ -87,7 +88,7 @@ public static class RecordFormRequirements
                     || field.Sequence is not null
                     || record[field.Name].Value is not null
                     || !visible
-                    || !Holds(formField.RequiredWhen, false, expressionValues, now))
+                    || !Holds(formField.RequiredWhen, false, expressionValues, now, application.TimeZone))
                 {
                     continue;
                 }
@@ -125,14 +126,14 @@ public static class RecordFormRequirements
     }
 
     /// <summary>Whether <paramref name="condition"/> is <c>true</c>, or <paramref name="whenAbsent"/> when there is none.</summary>
-    private static bool Holds(ExpressionModel? condition, bool whenAbsent, ExpressionValues values, DateTimeOffset? now)
+    private static bool Holds(ExpressionModel? condition, bool whenAbsent, ExpressionValues values, DateTimeOffset? now, TimeZoneInfo timeZone)
     {
         if (condition is null)
         {
             return whenAbsent;
         }
 
-        var result = ExpressionInterpreter.Evaluate(condition.Syntax, condition.Check, values, records: null, now: now);
+        var result = ExpressionInterpreter.Evaluate(condition.Syntax, condition.Check, values, records: null, now: now, timeZone: timeZone);
         return result.Succeeded && result.Value is true;
     }
 }

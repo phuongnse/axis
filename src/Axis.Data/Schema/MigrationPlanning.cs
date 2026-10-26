@@ -176,7 +176,7 @@ internal sealed class MigrationPlanning
             throw new InvalidOperationException($"The fill value does not parse, though the compiler checked it: {parsed.Diagnostic.Message}");
         }
 
-        var translated = SqlTranslator.Translate(parsed.Expression!, Column);
+        var translated = SqlTranslator.Translate(parsed.Expression!, Column, timeZone: _model.TimeZone);
         if (!translated.Succeeded)
         {
             throw new InvalidOperationException($"The fill value does not translate to SQL, though the compiler checked it: {translated.Diagnostic.Message}");
@@ -273,7 +273,7 @@ internal sealed class MigrationPlanning
             throw new InvalidOperationException($"The convert value does not parse, though the compiler checked it: {parsed.Diagnostic.Message}");
         }
 
-        var translated = SqlTranslator.Translate(parsed.Expression!, Column);
+        var translated = SqlTranslator.Translate(parsed.Expression!, Column, timeZone: _model.TimeZone);
         if (!translated.Succeeded)
         {
             throw new InvalidOperationException($"The convert value does not translate to SQL, though the compiler checked it: {translated.Diagnostic.Message}");
@@ -466,7 +466,7 @@ internal sealed class MigrationPlanning
             }
 
             List<string> columns = [.. index.Columns.Select(candidate => candidate == from ? to : candidate)];
-            var name = EntityNaming.Index(table.Name, columns);
+            var name = index.Trigram ? EntityNaming.TrigramIndex(table.Name, to) : EntityNaming.Index(table.Name, columns);
             Commands.Add(new SchemaCommand($"ALTER INDEX {EntityNaming.Quote(EntityNaming.Schema)}.{EntityNaming.Quote(index.Name)} RENAME TO {EntityNaming.Quote(name)}"));
             indexes.Add(index with { Name = name, Columns = columns });
         }
