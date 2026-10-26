@@ -1,0 +1,34 @@
+{
+  "id": "ae15cab8-b65e-49a0-83ec-377694cba060",
+  "kind": "seed",
+  "name": "Categories",
+  "formatVersion": 1,
+  "entity": "Category",
+  "sync": true,
+  "records": [
+    {
+      "id": "53cf2f43-8fc2-4086-b9cf-77de4d599472",
+      "values": {
+        "name": "Laptop"
+      }
+    },
+    {
+      "id": "b82290dd-e7e9-498e-bd39-c2eb23a8078c",
+      "values": {
+        "name": "Monitor"
+      }
+    },
+    {
+      "id": "ba19bc1f-efbf-4059-85e1-57f4e4911955",
+      "values": {
+        "name": "Phone"
+      }
+    },
+    {
+      "id": "ed7de1a3-fb1e-4308-9c65-20b0ac36ce5d",
+      "values": {
+        "name": "Furniture"
+      }
+    }
+  ]
+}

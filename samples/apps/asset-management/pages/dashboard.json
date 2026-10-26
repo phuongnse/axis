@@ -1,0 +1,55 @@
+{
+  "id": "ed03c9be-43b5-4616-99e6-ddff9a8f2630",
+  "kind": "page",
+  "name": "Dashboard",
+  "formatVersion": 1,
+  "title": {
+    "textKey": "pages.dashboard.title"
+  },
+  "widgets": [
+    {
+      "type": "columns",
+      "columns": [
+        {
+          "width": 4,
+          "widgets": [
+            {
+              "type": "kpi",
+              "dataSource": "WarrantiesEndingSoon",
+              "measure": "endingCount",
+              "label": {
+                "textKey": "dashboard.warranties.label"
+              }
+            }
+          ]
+        },
+        {
+          "width": 8,
+          "widgets": [
+            {
+              "type": "chart",
+              "kind": "bar",
+              "dataSource": "AssetsByStatus",
+              "category": "status",
+              "measures": [
+                {
+                  "name": "assetCount",
+                  "label": {
+                    "textKey": "dashboard.byStatus.count"
+                  }
+                }
+              ],
+              "title": {
+                "textKey": "dashboard.byStatus.title"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "table",
+      "dataSource": "AssetValueByLocation"
+    }
+  ]
+}

@@ -28,7 +28,8 @@ model. The worker host, its claims (see [Execution](process-execution.md#executi
 the `axis.process_instances`, `axis.process_step_history`,
 `axis.process_tasks`, `axis.process_start_receipts`,
 `axis.endpoint_receipts`, `axis.process_work_items`, `axis.connector_calls`,
-`axis.package_calls` and `axis.events` tables are built too. So is the engine that runs
+`axis.package_calls`, `axis.events`, `axis.notifications` and
+`axis.notification_reads` tables are built too. So is the engine that runs
 `decision`, `task`, `operation`, `end` and `timer` steps, see
 [Running a step](process-execution.md#running-a-step). The [task API](task-api.md) routes that
 list the user's tasks, read one task and complete one are built. Completing
@@ -229,10 +230,12 @@ M3 has four step types. The `timer` step is built too. Wait for event comes
 later. The engine runs a `subProcess` step, see
 [Sub-process step](process-flow.md#sub-process-step).
 Its failure handling and cancel rules are _(planned for M14)_, as are `waitEvent`
-steps and running the `notify`
-operation, see [process flow](process-flow.md) and
-[notifications](notifications.md#notify-operation). The compiler already
-checks and builds a `notify` step. The `createRecord` operation is built, see
+steps and the email of the
+`notify` operation, see [process flow](process-flow.md) and
+[notifications](notifications.md#notify-operation). The engine runs a `notify`
+step and stores its in-app notification, see
+[In-app notifications](notifications.md#in-app-notifications). The `createRecord`
+operation is built, see
 [Create record operation](process-flow.md#create-record-operation).
 
 - **`decision`.** `branches` is an ordered list. Each branch has a `when`
@@ -909,6 +912,37 @@ database, with history in `axis.__processes_migrations` (see
   | `payload` | `jsonb` | The evaluated payload fields |
   | `process_instance_id` | `uuid` | The instance that raised the event |
   | `raised_at` | `timestamptz` | The start of the step's transaction, `now()` |
+- `axis.notifications`: one row per in-app notification and recipient, which a
+  `notify` step stores, see
+  [In-app notifications](notifications.md#in-app-notifications). The key is
+  (`id`, `recipient_kind`, `recipient`), so the rows of one step run share the
+  `id`. Times use the database clock. An index on (`application_id`,
+  `recipient_kind`, `recipient`, `created_at`) finds a recipient's
+  notifications.
+
+  | Column | Type | Meaning |
+  | --- | --- | --- |
+  | `id` | `uuid` | A version 7 UUID, the notification's id. Every recipient's row has it |
+  | `application_id` | `uuid` | The application |
+  | `release_id` | `uuid` | The release the notifying instance is pinned to. It resolves the text keys and the page |
+  | `recipient_kind` | `text` | `user` or `role` |
+  | `recipient` | `text` | The user id or the role name |
+  | `subject_key` | `text` | The text key of the subject |
+  | `body_key` | `text` | The text key of the body |
+  | `values` | `jsonb` | The raw evaluated placeholder values, keyed by the placeholders' names. Dates are ISO text, as in an event payload. They are formatted when read |
+  | `open_page` | `text`, null | The declared name of the page the notification opens. Null when the step has no `open` |
+  | `open_parameters` | `jsonb`, null | The raw evaluated page parameters, keyed by the parameters' declared names. Null when the step has no `open` |
+  | `created_at` | `timestamptz` | The start of the step's transaction, `now()` |
+- `axis.notification_reads`: one row per notification and user who read it,
+  see [In-app notifications](notifications.md#in-app-notifications). It has no
+  foreign key to `axis.notifications`, because that table's key has three
+  columns. Times use the database clock.
+
+  | Column | Type | Meaning |
+  | --- | --- | --- |
+  | `notification_id` | `uuid` | The notification's id |
+  | `user_id` | `text` | The user who read it |
+  | `read_at` | `timestamptz` | When the user read it, `now()` |
 - `axis.trigger_schedules`: the schedule state, one row per
   schedule trigger of the tenant, see [Schedules](process-events.md#schedules). Activation
   writes it.

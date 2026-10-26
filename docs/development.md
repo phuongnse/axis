@@ -89,7 +89,7 @@ and `deploy/helm/axis/`, see [installation](reference/installation.md).
 
 To run Axis, run `docker compose up --build`. It builds Axis from source and starts
 PostgreSQL, Keycloak with the `axis` development realm at http://localhost:8080, the server
-with the purchase request, leave request and service desk samples at http://localhost:5206, the worker, the publisher, and the purchasing
+with the purchase request, leave request, service desk and asset management samples at http://localhost:5206, the worker, the publisher, and the purchasing
 system stub at http://localhost:5207. The stub, in `tests/Axis.PurchasingStub`, stands in for
 the purchasing system that the sample calls when a request is approved. It needs only
 Docker. The images hold the `departments` sample module in `/modules`.
@@ -133,7 +133,9 @@ user and the roles they hold. The `operator` role opens the purchase request sam
 inspector page. The leave request sample, `samples/apps/leave-requests`, reuses the `employee` and
 `department-manager` users, in a site at `/leave`. The service desk sample, `samples/apps/service-desk`,
 adds the `agent` user and two `service-desk-lead` users and gives an employee the `requester` role, in a site
-at `/service-desk`. The request-approval template journey, `tests/e2e/specs/request-approval-journey.spec.ts`,
+at `/service-desk`. The asset management sample, `samples/apps/asset-management`, adds the `asset-manager` user `quan`
+and the `auditor` user `thao`, and uses `lan`, an employee, as the holder of assets, in a site at `/asset-management`.
+The request-approval template journey, `tests/e2e/specs/request-approval-journey.spec.ts`,
 adds the `approver` user, `minh`. The `author` role lets the authoring API list and read the resources of every sample under
 `samples/apps/` under `scripts/dev.sh`, and opens the Studio page at http://localhost:5173/studio.
 Studio saves into those committed folders, so `git checkout -- samples/apps` reverts an edit.
@@ -199,7 +201,7 @@ works on a fresh clone:
   and its own roles, `axis_preview_schema` and `axis_preview_runtime`. It has no deployment
   bindings, so the purchase request sample logs `AXC0100` warnings on it, and a connector call
   there fails. It signs people in through the same Keycloak realm as `default`. The server
-  activates the purchase request, leave request and service desk samples on it at start. The worker runs it too,
+  activates the purchase request, leave request, service desk and asset management samples on it at start. The worker runs it too,
   with only its runtime connection string. Its host is `preview.localhost`: Compose and
   `scripts/dev.sh` serve it at `http://preview.localhost:5206`, and `scripts/dev.sh` also serves it
   through the SPA at `http://preview.localhost:5173`. The E2E server and worker serve it on
@@ -258,13 +260,14 @@ folder, which `bash scripts/lib/install-sample-templates.sh` creates.
 `src/Axis.Server/appsettings.Development.json` lists the purchase request
 sample, `../../samples/apps/purchase-requests`, the leave request sample,
 `../../samples/apps/leave-requests`, and the service desk sample,
-`../../samples/apps/service-desk`, in `ActivateOnStartup`. So
-`scripts/dev.sh` migrates every tenant database, then compiles and activates all three
+`../../samples/apps/service-desk`, and the asset management sample,
+`../../samples/apps/asset-management`, in `ActivateOnStartup`. So
+`scripts/dev.sh` migrates every tenant database, then compiles and activates all four
 samples before it listens, and stops on any diagnostic.
 
 To activate another application folder, add it to that list, or set
 `ActivateOnStartup__0=<folder>` to activate it in place of the purchase request
-sample. The leave request and service desk samples stay active.
+sample. The other samples stay active.
 Relative paths are resolved from `src/Axis.Server`.
 
 ## Widget previews

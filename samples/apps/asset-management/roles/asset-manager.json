@@ -1,0 +1,9 @@
+{
+  "id": "7a03e074-bf55-4c39-afd9-34460c81602b",
+  "kind": "role",
+  "name": "asset-manager",
+  "formatVersion": 1,
+  "label": {
+    "textKey": "role.assetManager"
+  }
+}

@@ -11,11 +11,17 @@ public sealed class ScenarioWorkKindsTests
 {
     /// <summary>
     /// The kinds that <c>advanceTime</c> does not run on purpose. <c>computed.backfill</c> is data maintenance,
-    /// not process work, and scenarios have never run it. <c>records.importCheck</c> is the dry run of an
-    /// uploaded import file, not process work, and scenarios have no import step. A new kind fails the test
-    /// until <c>advanceTime</c> runs it or it is added here on purpose.
+    /// not process work, and scenarios have never run it. <c>records.importCheck</c> and
+    /// <c>records.importCommit</c> are the dry run and the commit of an uploaded import file, not process work,
+    /// and scenarios have no import step. A new kind fails the test until <c>advanceTime</c> runs it or it is
+    /// added here on purpose.
     /// </summary>
-    private static readonly string[] _excluded = [ComputedBackfill.WorkItemKind, RecordImports.CheckWorkItemKind];
+    private static readonly string[] _excluded =
+    [
+        ComputedBackfill.WorkItemKind,
+        RecordImports.CheckWorkItemKind,
+        RecordImports.CommitWorkItemKind,
+    ];
 
     [Fact]
     public void Advance_time_runs_every_work_item_kind_named_in_the_code_except_the_excluded_ones()

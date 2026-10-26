@@ -25,7 +25,7 @@ the commands.
 
 Run `docker compose up --build`. It needs only Docker. It builds Axis from source
 and starts PostgreSQL, Keycloak with the development realm at http://localhost:8080,
-the server with the purchase request, leave request and service desk samples at http://localhost:5206, the worker,
+the server with the purchase request, leave request, service desk and asset management samples at http://localhost:5206, the worker,
 and a purchasing system stub at http://localhost:5207 that stands in for the
 external purchasing system. The server also serves a preview tenant of the same samples at
 http://preview.localhost:5206, with its own database and no purchasing system bindings. An existing

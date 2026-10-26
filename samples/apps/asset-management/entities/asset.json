@@ -1,0 +1,146 @@
+{
+  "id": "26248cbe-6b0f-4b5e-bf8d-c0a690d99caf",
+  "kind": "entity",
+  "name": "Asset",
+  "formatVersion": 1,
+  "label": {
+    "textKey": "asset.label"
+  },
+  "displayField": "name",
+  "fields": [
+    {
+      "name": "number",
+      "type": "text",
+      "maxLength": 20,
+      "unique": true,
+      "sequence": "AssetNumber",
+      "label": {
+        "textKey": "asset.number"
+      }
+    },
+    {
+      "name": "name",
+      "type": "text",
+      "required": true,
+      "maxLength": 200,
+      "searchable": true,
+      "label": {
+        "textKey": "asset.name"
+      }
+    },
+    {
+      "name": "category",
+      "type": "reference",
+      "target": "Category",
+      "label": {
+        "textKey": "asset.category"
+      }
+    },
+    {
+      "name": "status",
+      "type": "enum",
+      "values": [
+        "in-stock",
+        "assigned",
+        "in-repair",
+        "retired"
+      ],
+      "required": true,
+      "default": "'in-stock'",
+      "valueLabels": {
+        "in-stock": {
+          "textKey": "asset.status.in-stock"
+        },
+        "assigned": {
+          "textKey": "asset.status.assigned"
+        },
+        "in-repair": {
+          "textKey": "asset.status.in-repair"
+        },
+        "retired": {
+          "textKey": "asset.status.retired"
+        }
+      },
+      "label": {
+        "textKey": "asset.status"
+      }
+    },
+    {
+      "name": "location",
+      "type": "reference",
+      "target": "Location",
+      "label": {
+        "textKey": "asset.location"
+      }
+    },
+    {
+      "name": "holder",
+      "type": "text",
+      "maxLength": 100,
+      "label": {
+        "textKey": "asset.holder"
+      }
+    },
+    {
+      "name": "currency",
+      "type": "enum",
+      "values": [
+        "VND",
+        "USD",
+        "EUR"
+      ],
+      "required": true,
+      "default": "'VND'",
+      "label": {
+        "textKey": "asset.currency"
+      }
+    },
+    {
+      "name": "purchaseCost",
+      "type": "money",
+      "currencyField": "currency",
+      "min": 0,
+      "label": {
+        "textKey": "asset.purchaseCost"
+      }
+    },
+    {
+      "name": "purchaseDate",
+      "type": "date",
+      "label": {
+        "textKey": "asset.purchaseDate"
+      }
+    },
+    {
+      "name": "warrantyEnd",
+      "type": "date",
+      "label": {
+        "textKey": "asset.warrantyEnd"
+      }
+    },
+    {
+      "name": "attachments",
+      "type": "child-collection",
+      "target": "Attachment",
+      "label": {
+        "textKey": "asset.attachments"
+      }
+    },
+    {
+      "name": "maintenance",
+      "type": "child-collection",
+      "target": "MaintenanceEntry",
+      "label": {
+        "textKey": "asset.maintenance"
+      }
+    },
+    {
+      "name": "software",
+      "type": "references",
+      "target": "Software",
+      "label": {
+        "textKey": "asset.software"
+      }
+    }
+  ]
+}

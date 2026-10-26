@@ -5,7 +5,7 @@ namespace Axis.Processes.Storage;
 
 /// <summary>
 /// The processes module's tables in a tenant database: the process instances, the history of
-/// their steps, their human tasks, their staged connector calls, the attempts and lookups of those calls and of package calls, the events they raised, the receipts of starts and of
+/// their steps, their human tasks, their staged connector calls, the attempts and lookups of those calls and of package calls, the events they raised, the in-app notifications they stored and their read marks, the receipts of starts and of
 /// endpoint calls that carried an <c>Idempotency-Key</c>, the receipts of trigger starts, the counted failures of deliveries and their dead letters, the state of schedule triggers, and the work that workers claim and run. The caller supplies the connection to the tenant database.
 /// </summary>
 public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> options) : DbContext(options)
@@ -31,6 +31,10 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
     public DbSet<ProcessCallAttemptRow> CallAttempts => Set<ProcessCallAttemptRow>();
 
     public DbSet<EventRow> Events => Set<EventRow>();
+
+    public DbSet<NotificationRow> Notifications => Set<NotificationRow>();
+
+    public DbSet<NotificationReadRow> NotificationReads => Set<NotificationReadRow>();
 
     public DbSet<ProcessStartReceiptRow> StartReceipts => Set<ProcessStartReceiptRow>();
 
@@ -258,6 +262,35 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
                 .HasForeignKey(e => e.ProcessInstanceId)
                 .HasConstraintName("fk_events_process_instances_process_instance_id")
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<NotificationRow>(notification =>
+        {
+            notification.ToTable("notifications");
+            notification.HasKey(n => new { n.Id, n.RecipientKind, n.Recipient }).HasName("pk_notifications");
+            notification.Property(n => n.Id).HasColumnName("id").ValueGeneratedNever();
+            notification.Property(n => n.ApplicationId).HasColumnName("application_id");
+            notification.Property(n => n.ReleaseId).HasColumnName("release_id");
+            notification.Property(n => n.RecipientKind).HasColumnName("recipient_kind");
+            notification.Property(n => n.Recipient).HasColumnName("recipient");
+            notification.Property(n => n.SubjectKey).HasColumnName("subject_key");
+            notification.Property(n => n.BodyKey).HasColumnName("body_key");
+            notification.Property(n => n.Values).HasColumnName("values").HasColumnType("jsonb");
+            notification.Property(n => n.OpenPage).HasColumnName("open_page");
+            notification.Property(n => n.OpenParameters).HasColumnName("open_parameters").HasColumnType("jsonb");
+            notification.Property(n => n.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
+            notification.HasIndex(n => new { n.ApplicationId, n.RecipientKind, n.Recipient, n.CreatedAt })
+                .HasDatabaseName("ix_notifications_application_id_recipient_created_at");
+        });
+
+        // The notification's key has three columns, so a read mark has no foreign key to it.
+        modelBuilder.Entity<NotificationReadRow>(read =>
+        {
+            read.ToTable("notification_reads");
+            read.HasKey(r => new { r.NotificationId, r.UserId }).HasName("pk_notification_reads");
+            read.Property(r => r.NotificationId).HasColumnName("notification_id");
+            read.Property(r => r.UserId).HasColumnName("user_id");
+            read.Property(r => r.ReadAt).HasColumnName("read_at").HasDefaultValueSql("now()");
         });
 
         modelBuilder.Entity<ProcessStartReceiptRow>(receipt =>

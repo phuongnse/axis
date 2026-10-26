@@ -5,9 +5,10 @@ notifications, user profiles and the mail settings. The conventions of
 [architecture.md](../architecture.md) apply: sections marked _(planned for Mx)_
 are not built yet, and Dn refers to [decisions.md](../decisions.md).
 
-The [user profiles](#user-profiles) section and the compile checks of the notify
-operation and of placeholders are built. Everything else in this file is
-_(planned for M14)_. The design follows
+The [user profiles](#user-profiles) section, the compile checks of the notify
+operation and of placeholders, the run of the notify step and the storage of
+in-app notifications are built. The read routes, the bell, retention and email
+are _(planned for M14)_, as is everything else in this file that says so. The design follows
 [D73](../decisions/d73-in-app-and-email-notifications.md). Dates follow the
 application time zone of
 [D75](../decisions/d75-the-application-time-zone.md). New compile problems are
@@ -89,8 +90,14 @@ A text value may hold named placeholders, such as
 
 - **Storage.** `axis.notifications` holds one row per notification and
   recipient: the application, the release, the recipient kind and recipient,
-  the text keys, the formatted values, the page to open and the time. A role
-  recipient is one row for the role.
+  the text keys, the raw evaluated values, the declared name of the page to
+  open with its raw parameters, and the time. All the rows of one step run
+  share the notification's id. A role recipient is one row for the role. A
+  `user` expression that gives `null` or blank text adds no row, and two
+  recipients of one kind and name add one row. The values are stored as an
+  event payload is, with dates as ISO text, and are formatted when the
+  notification is read, because a role row reaches users with different
+  locales. A step with only the `email` channel stores no row.
 - **Who sees one.** A user sees the notifications addressed to their user id,
   and those addressed to a role they hold that the active release declares,
   checked when read, as a role task is.

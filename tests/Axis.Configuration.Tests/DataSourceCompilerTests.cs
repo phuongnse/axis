@@ -115,6 +115,89 @@ public sealed class DataSourceCompilerTests
     }
 
     [Fact]
+    public void Data_source_without_the_search_option_does_not_search_and_has_no_search_fields()
+    {
+        using var folder = Folder().With("data-sources/orders.json", DataSource("Customer", """[{ "name": "name", "path": "name" }]"""));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+        var dataSource = Assert.Single(result.Model.DataSources);
+        Assert.False(dataSource.Search);
+        Assert.Empty(dataSource.SearchFields);
+    }
+
+    [Fact]
+    public void Data_source_that_searches_a_projected_display_field_has_it_as_its_only_search_field()
+    {
+        using var folder = Folder().With("data-sources/orders.json", DataSource(
+            "Customer",
+            """[{ "name": "name", "path": "name" }, { "name": "since", "path": "since" }, { "name": "again", "path": "name" }]""",
+            """, "search": true"""));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+        var dataSource = Assert.Single(result.Model.DataSources);
+        Assert.True(dataSource.Search);
+        Assert.Equal(["name"], dataSource.SearchFields.Select(field => field.Name));
+    }
+
+    [Fact]
+    public void Data_source_that_searches_a_searchable_field_through_a_reference_has_it_as_a_search_field()
+    {
+        using var folder = Folder()
+            .With("entities/customer.json", Customer.Replace(
+                """{ "name": "name", "type": "text", "required": true }""",
+                """{ "name": "name", "type": "text", "required": true, "searchable": true }""",
+                StringComparison.Ordinal))
+            .With("data-sources/orders.json", DataSource(
+                "Order",
+                """[{ "name": "number", "path": "number" }, { "name": "customerName", "path": "customer.name" }]""",
+                """, "search": true"""));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+        var dataSource = Assert.Single(result.Model.DataSources);
+        Assert.Equal(["customerName"], dataSource.SearchFields.Select(field => field.Name));
+    }
+
+    [Theory]
+    [InlineData("Order", """[{ "name": "number", "path": "number" }]""")]
+    [InlineData("Order", """[{ "name": "customerName", "path": "customer.name" }]""")]
+    [InlineData("Order", """[{ "name": "customer", "path": "customer" }]""")]
+    public void Search_without_a_searchable_projected_field_is_reported_at_search(string entity, string fields)
+    {
+        // A target's display field that is not searchable does not count.
+        using var folder = Folder().With("data-sources/orders.json", DataSource(entity, fields, """, "search": true"""));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.DataSourceSearchWithoutField, "data-sources/orders.json", "/search"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Equal(Guid.Parse(DataSourceId), diagnostic.ResourceId);
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void Search_is_not_reported_when_a_projected_path_is_already_reported()
+    {
+        using var folder = Folder().With("data-sources/orders.json", DataSource(
+            "Order", """[{ "name": "number", "path": "number" }, { "name": "missing", "path": "missing" }]""", """, "search": true"""));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(DiagnosticCodes.InvalidDataSourceFieldPath, diagnostic.Code);
+    }
+
+    [Fact]
     public void Data_source_over_an_unknown_entity_is_reported_at_its_entity()
     {
         using var folder = Folder().With("data-sources/orders.json", DataSource(
@@ -552,6 +635,7 @@ public sealed class DataSourceCompilerTests
     [InlineData("""[{ "name": "Page", "type": "integer" }]""", 0, "'Page'")]
     [InlineData("""[{ "name": "SORT", "type": "text" }]""", 0, "'SORT'")]
     [InlineData("""[{ "name": "pagesize", "type": "integer" }]""", 0, "'pagesize'")]
+    [InlineData("""[{ "name": "Search", "type": "text" }]""", 0, "'Search'")]
     [InlineData("""[{ "name": "Amount", "type": "decimal" }]""", 0, "field of the entity 'Order'")]
     public void Parameter_name_that_repeats_another_is_reserved_or_is_a_field_is_reported_at_that_name(
         string parameters, int index, string messagePart)
