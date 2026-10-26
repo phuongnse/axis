@@ -10,7 +10,7 @@ import {
 } from '../designSystem/fixtures'
 import { apiFetch, setApiGuard } from './api'
 import { fetchFormState } from './formState'
-import { fetchInstances } from './inspection'
+import { fetchDeadLetters, fetchInstances } from './inspection'
 import { placeholderApi, placeholderPageValues } from './placeholderApi'
 import { fetchHistory, fetchRecord, fetchRecords } from './records'
 import type { PageMetadata, PageParameter } from './site'
@@ -128,12 +128,14 @@ describe('placeholderApi', () => {
     expect(state.errors).toEqual({})
   })
 
-  it('answers empty pages for tasks and process instances', async () => {
+  it('answers empty pages for tasks, process instances and dead letters', async () => {
     const tasks = await fetchTasks(taskInboxWidget.tasksPath!, '')
     const instances = await fetchInstances(processInspectorWidget.instancesPath!, '')
+    const deadLetters = await fetchDeadLetters(processInspectorWidget.deadLettersPath!, 'state=open')
 
     expect(tasks).toEqual({ items: [], page: 1, pageSize: 20, totalCount: 0 })
     expect(instances).toEqual({ items: [], page: 1, pageSize: 20, totalCount: 0 })
+    expect(deadLetters).toEqual({ items: [], page: 1, pageSize: 20, totalCount: 0 })
   })
 
   it('answers a write to a records path with a local 404 and a problem body', async () => {

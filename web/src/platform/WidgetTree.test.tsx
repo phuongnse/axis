@@ -17,6 +17,7 @@ function leaf(type: WidgetMetadata['type'], extra: Partial<WidgetMetadata> = {})
     tasksPath: null,
     process: null,
     instancesPath: null,
+    deadLettersPath: null,
     actions: [],
     rowActions: [],
     toolbarActions: [],

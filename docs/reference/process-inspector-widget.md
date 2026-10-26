@@ -18,9 +18,11 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
     `dataSource` and `form` (`AXC0060` at that property).
   - **Metadata.** The widget has `"entity": null`, `"dataSource": null`,
     `"form": null` and `"tasksPath": null`. It adds
-    `process` and an `instancesPath`, such as
+    `process`, an `instancesPath`, such as
     `"/api/apps/PurchasingApp/processes/PurchaseRequestApproval/instances"`,
-    the list endpoint. The SPA never builds the path itself. It uses `process` to link the record history to the page, see
+    the list endpoint, and a `deadLettersPath`, such as
+    `"/api/apps/PurchasingApp/processes/PurchaseRequestApproval/dead-letters"`,
+    the dead letter list endpoint. The SPA never builds a path itself. It uses `process` to link the record history to the page, see
     **History** under the [form widget](form-widget.md). The widget has `"access": null` and
     `"actions": []`. The page endpoint answers `403` to a user without an
     `inspect` grant on the process, and site navigation leaves the page out.
@@ -71,6 +73,25 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
     again. On a `400`, the message of each `/output/{name}` error shows under
     that output's field, and the problem's title shows in the dialog. Any other
     refusal shows its title, and any other failure shows a generic text.
+  - **Dead letters.** Under the instance list, a Dead letters section lists the
+    process's open dead letters from `{deadLettersPath}?state=open`, newest
+    first, with the kind, the attempts, the last error and the time it was
+    dead-lettered. The kind shows as the API sends it. The list has its own page
+    number, which the URL does not hold, because the URL's `page` and `pageSize`
+    belong to the instance list. With none open, it shows an empty text. A row
+    has a Redeliver and a Discard button for each of those commands that the
+    item's `commands` lists, which is an open dead letter and a user with the
+    `retry` grant. A user with only `inspect` sees no button, and a command name
+    this build does not know is left out. A button opens the same reason dialog
+    as Cancel and Retry, with the same rules for the reason, and posts it to
+    `{deadLettersPath}/{id}/redeliver` or `…/discard`. On success, the dialog
+    closes and the list is requested again, so a settled dead letter leaves
+    it. On a `400`, `403`, `404` or `409`, the dialog shows the problem's title,
+    such as the `409` for a trigger that is not in the active release. Any other
+    failure shows a generic text. If the list cannot be loaded, including a
+    `403`, an error shows inside the section and the instance list stays
+    usable. The server checks every command, so the widget never decides who
+    may act.
   - **Labels.** Step labels come from the texts of the instance's `releaseId`,
     loaded with `GET /api/sites/{path}/texts/{locale}?release={releaseId}`, as
     the inbox does. A step without a label shows its name.
@@ -82,11 +103,11 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
     decides who may inspect.
   - The platform texts `shell.inspector.*` hold the column headers, the
     section titles, the instance states, the "hidden" text, the empty texts
-    and the messages. The texts `shell.inspector.commands.*` hold the command
-    buttons, the dialog's labels, the reason errors, the retry warning and the
-    resolve labels and errors.
-- **Dead letters and sub-processes** _(planned for M14)_. The widget lists the
-  open dead letters of its process, with Redeliver and Discard for a user with
-  the `retry` grant, see [Dead letters](process-events.md#dead-letters). The
-  instance detail shows a waiting timer's due time and an instance's
-  sub-processes, and an instance without a subject shows "no subject".
+    and the messages. The texts `shell.inspector.deadLetters.*` hold the
+    dead letter section's title, column headers, empty text and load error. The
+    texts `shell.inspector.commands.*` hold the command buttons, the dialog's
+    labels, the reason errors, the retry warning and the resolve labels and
+    errors.
+- **Timers and sub-processes** _(planned for M14)_. The instance detail shows a
+  waiting timer's due time and an instance's sub-processes, and an instance
+  without a subject shows "no subject".
