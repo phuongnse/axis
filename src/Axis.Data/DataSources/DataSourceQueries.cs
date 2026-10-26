@@ -17,12 +17,15 @@ namespace Axis.Data.DataSources;
 /// of both the count and the page statement, with the body of each rule it calls inlined. Its
 /// literals are <c>@f0</c>, <c>@f1</c>, … and the data source parameters are <c>@p0</c>,
 /// <c>@p1</c>, … in declaration order. The filter of measure <c>i</c> has its own literals,
-/// <c>@m{i}_0</c>, <c>@m{i}_1</c>, …. Each distinct path
+/// <c>@m{i}_0</c>, <c>@m{i}_1</c>, …. A group that buckets a date-time reads the application time
+/// zone from the text parameter <c>@tz</c>, which only the count and page statements of such a data
+/// source carry. Each distinct path
 /// through reference fields, from the projection, the labels, the sort or the filter, is one left
 /// join on the target's id, so a page is one statement plus the count whatever its size, and a
 /// null reference gives null related values without hiding the row. A grouped data source groups
-/// the filtered rows by its group fields, and each row of a page is one group. A measure with a
-/// filter is <c>agg(...) FILTER (WHERE ...)</c>.
+/// the filtered rows by its group fields, and each row of a page is one group. A bucketed group
+/// field is the first date of the bucket that holds its value. A measure with a filter is
+/// <c>agg(...) FILTER (WHERE ...)</c>.
 /// </summary>
 public static class DataSourceQueries
 {
@@ -85,6 +88,7 @@ public static class DataSourceQueries
                 await using var count = new NpgsqlCommand(statement.CountSql, connection);
                 AddValues(count, statement.Values);
                 AddParameters(count, parameters);
+                AddTimeZone(count, statement);
                 condition?.AddTo(count);
                 if (searching)
                 {
@@ -107,6 +111,7 @@ public static class DataSourceQueries
             await using var command = new NpgsqlCommand(statement.PageSql, connection);
             AddValues(command, statement.Values);
             AddParameters(command, parameters);
+            AddTimeZone(command, statement);
             condition?.AddTo(command);
             if (searching)
             {
@@ -159,6 +164,7 @@ public static class DataSourceQueries
         await using var command = new NpgsqlCommand(statement.PageSql, connection);
         AddValues(command, statement.Values);
         AddParameters(command, parameters);
+        AddTimeZone(command, statement);
         condition?.AddTo(command);
         command.Parameters.AddWithValue("limit", limit);
         command.Parameters.AddWithValue("offset", 0L);
@@ -258,7 +264,7 @@ public static class DataSourceQueries
             (select, groupBy) = GroupedSelectList(aggregate, joins, measureFilters);
 
             // Each group is unique by its group fields, so they break every tie.
-            var groupOrder = aggregate.GroupBy.Select(field => $"{joins.ColumnOf(field.Path)} ASC");
+            var groupOrder = aggregate.GroupBy.Select(field => $"{GroupColumn(field, joins)} ASC");
             order = string.Join(", ", sort is null ? groupOrder : [OrderTerm(sort, joins, measureFilters), .. groupOrder]);
         }
         else
@@ -290,7 +296,10 @@ public static class DataSourceQueries
             ? $"SELECT count(*) FROM {from}"
             : $"SELECT count(*) FROM (SELECT count(*) FROM {from}{groupBy}) AS g";
         var pageSql = $"SELECT {select} FROM {from}{groupBy}{orderBy} LIMIT @limit OFFSET @offset";
-        return new DataSourceStatement(countSql, pageSql, [.. filterValues, .. measureValues], from);
+        var timeZoneId = dataSource.Aggregate is { } bucketed && bucketed.GroupBy.Any(field => field.Bucket is not null && field.Field.Type == FieldType.DateTime)
+            ? application.TimeZone.Id
+            : null;
+        return new DataSourceStatement(countSql, pageSql, [.. filterValues, .. measureValues], from, timeZoneId);
     }
 
     /// <summary>
@@ -449,6 +458,15 @@ public static class DataSourceQueries
         }
     }
 
+    /// <summary>Adds the time zone id of a statement that buckets a date-time as the text parameter <c>@tz</c>.</summary>
+    private static void AddTimeZone(NpgsqlCommand command, DataSourceStatement statement)
+    {
+        if (statement.TimeZoneId is { } id)
+        {
+            command.Parameters.Add(new NpgsqlParameter("tz", NpgsqlDbType.Text) { Value = id });
+        }
+    }
+
     private static string ParameterName(int index) => $"p{index}";
 
     /// <summary>
@@ -475,7 +493,7 @@ public static class DataSourceQueries
     /// <paramref name="measureFilters"/> is null without a grouping.
     /// </summary>
     private static string OrderTerm(DataSourceSort sort, Joins joins, IReadOnlyDictionary<string, string>? measureFilters) =>
-        (sort.Measure is { } measure ? Aggregate(measure, joins, measureFilters!) : joins.ColumnOf(sort.Field!.Path))
+        (sort.Measure is { } measure ? Aggregate(measure, joins, measureFilters!) : GroupColumn(sort.Field!, joins))
         + (sort.Descending ? " DESC" : " ASC");
 
     /// <summary>
@@ -489,7 +507,7 @@ public static class DataSourceQueries
     private static (string Select, string GroupBy) GroupedSelectList(
         DataSourceAggregateModel aggregate, Joins joins, IReadOnlyDictionary<string, string> measureFilters)
     {
-        var groupColumns = aggregate.GroupBy.Select(field => joins.ColumnOf(field.Path)).ToList();
+        var groupColumns = aggregate.GroupBy.Select(field => GroupColumn(field, joins)).ToList();
         var labelColumns = References(aggregate.GroupBy)
             .Select(field => $"{joins.TargetAlias(field.Path)}.{EntityNaming.Quote(EntityNaming.Column(field.Field.TargetDisplayField!))}")
             .ToList();
@@ -501,6 +519,31 @@ public static class DataSourceQueries
         ]);
         string[] grouping = [.. groupColumns, .. labelColumns];
         return (select, grouping.Length == 0 ? "" : $" GROUP BY {string.Join(", ", grouping)}");
+    }
+
+    /// <summary>
+    /// The SQL of a group field or of a sort by it: its column, or for a bucketed field the first date of
+    /// the bucket. A date-time is read in the application time zone, <c>@tz</c>, so each value falls in
+    /// its local bucket. The unit comes from a fixed list, never from the file.
+    /// </summary>
+    private static string GroupColumn(DataSourceFieldModel field, Joins joins)
+    {
+        var column = joins.ColumnOf(field.Path);
+        if (field.Bucket is not { } bucket)
+        {
+            return column;
+        }
+
+        var unit = bucket switch
+        {
+            DateBucket.Day => "day",
+            DateBucket.Week => "week",
+            DateBucket.Month => "month",
+            DateBucket.Year => "year",
+            _ => throw new ArgumentOutOfRangeException(nameof(field), bucket, "Unknown date bucket."),
+        };
+        var local = field.Field.Type == FieldType.DateTime ? $"{column} AT TIME ZONE @tz" : $"{column}::timestamp";
+        return $"date_trunc('{unit}', {local})::date";
     }
 
     /// <summary>
@@ -538,7 +581,7 @@ public static class DataSourceQueries
         var ordinal = 0;
         foreach (var field in aggregate.GroupBy)
         {
-            values[field.Name] = reader.IsDBNull(ordinal) ? null : RecordQueries.ReadValue(reader, ordinal, field.Field);
+            values[field.Name] = reader.IsDBNull(ordinal) ? null : RecordQueries.ReadValue(reader, ordinal, field.Bucket is null ? field.Field : field.Field with { Type = FieldType.Date });
             ordinal++;
         }
 
@@ -651,7 +694,10 @@ public static class DataSourceQueries
 
 /// <summary>
 /// The SQL of a data source read: the count statement, the page statement, the values of the
-/// data source filter and then of each measure filter, which only the page statement names, and the <c>FROM</c> clause with its joins and <c>WHERE</c>
-/// that both share, without the keyword.
+/// data source filter and then of each measure filter, which only the page statement names, and the
+/// <c>FROM</c> clause with its joins and <c>WHERE</c> that both share, without the keyword.
+/// <paramref name="TimeZoneId"/> is the id the count and page statements read as <c>@tz</c>, or null
+/// when neither names it.
 /// </summary>
-internal sealed record DataSourceStatement(string CountSql, string PageSql, IReadOnlyList<SqlValue> Values, string From);
+internal sealed record DataSourceStatement(
+    string CountSql, string PageSql, IReadOnlyList<SqlValue> Values, string From, string? TimeZoneId = null);

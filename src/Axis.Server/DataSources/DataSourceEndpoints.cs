@@ -318,7 +318,7 @@ internal static class DataSourceEndpoints
         model.Aggregate is { } aggregate
             ?
             [
-                .. aggregate.GroupBy.Select(field => new ExportColumn(field.Name, field.Field.Type)),
+                .. aggregate.GroupBy.Select(field => new ExportColumn(field.Name, field.ValueType)),
                 .. aggregate.Measures.Select(measure => new ExportColumn(
                     measure.Name,
                     measure.Function switch
@@ -328,7 +328,7 @@ internal static class DataSourceEndpoints
                         _ => measure.Field!.Field.Type,
                     })),
             ]
-            : [.. model.Fields.Select(field => new ExportColumn(field.Name, field.Field.Type))];
+            : [.. model.Fields.Select(field => new ExportColumn(field.Name, field.ValueType))];
 
     // The route of a module data source has a module segment before the data source name.
     private static string DataSourceName(HttpContext context, string dataSource) =>
