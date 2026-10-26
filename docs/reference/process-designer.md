@@ -28,10 +28,10 @@ _(planned for M14)_.
 - **Palette** _(built)_. It sits at the top of the panel beside the canvas and
   lists the step types and operations that `process.schema.json` defines today:
   `decision`, `task`, the operations `updateRecord`, `callConnector`,
-  `raiseEvent` and `createRecord`, one "Package operation" entry, `subProcess`
-  and `end`. A new `createRecord` step starts with an empty `entity` and an
+  `raiseEvent` and `createRecord`, one "Package operation" entry, `subProcess`,
+  `timer` and `end`. A new `createRecord` step starts with an empty `entity` and an
   empty `set`. A Vitest test reads the schema and fails when a step type or a
-  built-in operation is missing from the palette. `timer`, `waitEvent` and
+  built-in operation is missing from the palette. `waitEvent` and
   `notify` join when the schema defines them, because their steps would
   always be invalid before that.
   - The package entry adds an operation step with an empty `operation`, which

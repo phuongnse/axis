@@ -1,0 +1,9 @@
+{
+  "id": "63fe3b17-405b-41f6-ac01-d2d570cbe432",
+  "kind": "page",
+  "name": "AssetDetail",
+  "formatVersion": 1,
+  "title": { "textKey": "pages.assetDetail.title" },
+  "parameters": [{ "name": "asset", "type": "reference", "target": "Asset", "required": true }],
+  "widgets": [{ "type": "detail", "entity": "Asset", "record": "asset" }]
+}

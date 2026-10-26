@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest'
-import { changeFieldType, fieldSettings, fieldTypes, type FieldType } from './entityFields'
+import entitySchema from '../../../src/Axis.Configuration/Schemas/entity.schema.json'
+import {
+  changeFieldType,
+  fieldKeysEditedElsewhere,
+  fieldSettingNames,
+  fieldSettings,
+  fieldTypes,
+  type FieldType,
+} from './entityFields'
 
 const table: Record<FieldType, string[]> = {
   text: ['required', 'unique', 'maxLength', 'expression', 'sequence', 'creator', 'sensitive'],
@@ -8,10 +16,37 @@ const table: Record<FieldType, string[]> = {
   boolean: ['required', 'unique', 'expression', 'sensitive'],
   date: ['required', 'unique', 'expression', 'sensitive'],
   'date-time': ['required', 'unique', 'expression', 'sensitive'],
-  enum: ['required', 'unique', 'values', 'expression', 'sensitive'],
+  enum: ['required', 'unique', 'values', 'valueLabels', 'expression', 'sensitive'],
   reference: ['required', 'unique', 'target', 'sensitive'],
+  references: ['required', 'target', 'sensitive'],
   'child-collection': ['target'],
+  money: ['required', 'unique', 'precision', 'scale', 'currency', 'currencyField', 'expression', 'sensitive'],
+  file: ['required', 'maxSize', 'accept', 'sensitive'],
 }
+
+const schemaField = entitySchema.$defs.field.properties
+
+describe('entity.schema.json', () => {
+  it('lists the same field types as the designer', () => {
+    expect([...fieldTypes].sort()).toEqual([...schemaField.type.enum].sort())
+  })
+
+  it('has no field property that the designer neither edits nor lists as edited elsewhere', () => {
+    const known = new Set<string>([...fieldSettingNames, ...Object.keys(fieldKeysEditedElsewhere)])
+    for (const key of Object.keys(schemaField)) {
+      expect(
+        known.has(key),
+        `The field property "${key}" is not in fieldSettingNames or fieldKeysEditedElsewhere`,
+      ).toBe(true)
+    }
+  })
+
+  it('has every setting and every key edited elsewhere as a field property', () => {
+    for (const key of [...fieldSettingNames, ...Object.keys(fieldKeysEditedElsewhere)]) {
+      expect(Object.hasOwn(schemaField, key), `"${key}" is not a field property of the schema`).toBe(true)
+    }
+  })
+})
 
 describe('fieldSettings', () => {
   it.each(fieldTypes)('lists the settings of %s in the order of the field type table', (type) => {
@@ -19,7 +54,7 @@ describe('fieldSettings', () => {
   })
 
   it('takes no settings for an unknown type', () => {
-    expect(fieldSettings('money')).toEqual([])
+    expect(fieldSettings('blob')).toEqual([])
     expect(fieldSettings('toString')).toEqual([])
   })
 })
@@ -47,7 +82,12 @@ describe('changeFieldType', () => {
 
   it('drops every known setting when the new type is unknown', () => {
     const field = { name: 'Amount', type: 'decimal', precision: 10, unique: true, note: 'keep' }
-    expect(changeFieldType(field, 'money')).toEqual({ name: 'Amount', type: 'money', note: 'keep' })
+    expect(changeFieldType(field, 'blob')).toEqual({ name: 'Amount', type: 'blob', note: 'keep' })
+  })
+
+  it('drops the value labels when an enum becomes text', () => {
+    const field = { name: 'State', type: 'enum', values: ['open'], valueLabels: { open: { textKey: 'state.open' } } }
+    expect(changeFieldType(field, 'text')).toEqual({ name: 'State', type: 'text' })
   })
 
   it('sets the type of a field that has none', () => {

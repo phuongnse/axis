@@ -1,6 +1,7 @@
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Packages;
 using Axis.Core.Tenancy;
+using Axis.Data.Files;
 using Axis.Data.Storage;
 using Axis.Processes.Instances;
 using Axis.Processes.Storage;
@@ -23,7 +24,8 @@ namespace Axis.Worker;
 /// the tenant still uses are checked against the installed extension packages. A role that can change
 /// the schema, a pinned version that is not installed, or a release that no longer compiles records
 /// the failure in <see cref="StartupCheckState"/> and stops the host before any work of that tenant runs.
-/// Once a tenant is ready, the worker also deletes its expired sessions, at most every five minutes by its own clock.
+/// Once a tenant is ready, the worker also deletes its expired sessions and sweeps its deleted and abandoned files,
+/// each at most every five minutes by its own clock.
 /// </summary>
 internal sealed partial class WorkerService(
     WorkerTenantCatalog tenants,
@@ -53,6 +55,10 @@ internal sealed partial class WorkerService(
     // The time of the last clean-up of expired sessions of each ready tenant. It is a fixed interval, short next to the idle limit.
     private static readonly TimeSpan _sessionCleanupInterval = TimeSpan.FromMinutes(5);
     private readonly Dictionary<string, DateTimeOffset> _sessionsCleanedAt = new(StringComparer.Ordinal);
+
+    // The time of the last sweep of deleted and abandoned files of each ready tenant. It has its own timer, so neither clean-up delays the other.
+    private static readonly TimeSpan _fileSweepInterval = TimeSpan.FromMinutes(5);
+    private readonly Dictionary<string, DateTimeOffset> _filesSweptAt = new(StringComparer.Ordinal);
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -170,6 +176,7 @@ internal sealed partial class WorkerService(
                 _waitingLogged.Remove(tenantId);
                 _schemaWaiting.Remove(tenantId);
                 _sessionsCleanedAt.Remove(tenantId);
+                _filesSweptAt.Remove(tenantId);
                 health.TenantDropped(tenantId);
             }
 
@@ -249,6 +256,7 @@ internal sealed partial class WorkerService(
             }
 
             await RemoveExpiredSessionsAsync(tenantId, stoppingToken);
+            await SweepFilesAsync(tenantId, stoppingToken);
 
             // A refresh between two items can end the service of the tenant. The item already claimed has finished.
             while (tenants.Find(tenantId) is not null && await runner.RunNextAsync(tenantId, options.LeaseDuration, stoppingToken))
@@ -302,6 +310,43 @@ internal sealed partial class WorkerService(
         catch (NpgsqlException exception)
         {
             LogSessionCleanupFailed(exception, tenantId);
+        }
+        finally
+        {
+            accessor.Current = previous;
+        }
+    }
+
+    /// <summary>
+    /// Purges the <c>deleted</c> files of the tenant, and its <c>pending</c> files uploaded more than 24 hours ago, with their bytes,
+    /// at most once per five minutes. The time comes from the worker's clock. A database without the table yet is skipped.
+    /// Any other database failure is logged and does not hold back the work items.
+    /// </summary>
+    private async Task SweepFilesAsync(string tenantId, CancellationToken cancellationToken)
+    {
+        var now = time.GetUtcNow();
+        if (_filesSweptAt.TryGetValue(tenantId, out var sweptAt) && now - sweptAt < _fileSweepInterval)
+        {
+            return;
+        }
+
+        // Recorded first, so a failure is not retried in every poll.
+        _filesSweptAt[tenantId] = now;
+        var previous = accessor.Current;
+        accessor.Current = new TenantContext(tenantId);
+        try
+        {
+            await using var connection = await connections.OpenConnectionAsync(cancellationToken);
+            var purged = await FileSweep.PurgeAsync(connection, now, cancellationToken);
+            LogFilesPurged(purged, tenantId);
+        }
+        catch (PostgresException exception) when (exception.SqlState == PostgresErrorCodes.UndefinedTable)
+        {
+            // The data migrations have not created the table yet.
+        }
+        catch (NpgsqlException exception)
+        {
+            LogFileSweepFailed(exception, tenantId);
         }
         finally
         {
@@ -410,6 +455,12 @@ internal sealed partial class WorkerService(
 
     [LoggerMessage(LogLevel.Debug, "Removed {Count} expired session(s) of tenant {TenantId}.")]
     private partial void LogSessionsRemoved(int count, string tenantId);
+
+    [LoggerMessage(LogLevel.Warning, "Sweeping the files of tenant {TenantId} failed.")]
+    private partial void LogFileSweepFailed(Exception exception, string tenantId);
+
+    [LoggerMessage(LogLevel.Debug, "Purged {Count} file(s) of tenant {TenantId}.")]
+    private partial void LogFilesPurged(int count, string tenantId);
 
     [LoggerMessage(LogLevel.Error, "Running work items for tenant {TenantId} failed.")]
     private partial void LogRunFailed(Exception exception, string tenantId);

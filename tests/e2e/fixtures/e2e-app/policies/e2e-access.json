@@ -7,6 +7,8 @@
   "grants": [
     { "entity": "Note", "actions": ["read", "create", "update", "delete"] },
     { "entity": "Category", "actions": ["read", "create", "update", "delete"] },
+    { "entity": "Software", "actions": ["read", "create", "update", "delete"] },
+    { "entity": "Asset", "actions": ["read", "create", "update", "delete"] },
     { "dataSource": "NoteRows", "actions": ["read"] },
     { "dataSource": "CategoryNotes", "actions": ["read"] },
     { "dataSource": "NoteTotals", "actions": ["read"] },

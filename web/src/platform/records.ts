@@ -12,16 +12,22 @@ export type RecordRow = Record<string, RecordValue>
 /** The labels of the reference fields of one child row, by field name. */
 export type RowLabels = Record<string, string>
 
-/** A value of a record field. A child collection holds its rows in order. */
-export type FieldValue = RecordValue | RecordRow[]
+/** A value of a record field. A child collection holds its rows in order, and a references field its ids in order. */
+export type FieldValue = RecordValue | RecordRow[] | string[]
+
+/**
+ * A field's label: a reference's text, a child collection's labels of each row in row order, or a
+ * references field's label of each id in order, where `null` is a label the user may not read.
+ */
+export type FieldLabel = string | RowLabels[] | (string | null)[]
 
 /** One record of the record API. `version` is record metadata, so it is a number. */
 export interface RecordItem {
   id: string
   version: number
   values: Record<string, FieldValue>
-  /** A reference field's label, and for a child collection with references the labels of each row, in row order. */
-  labels: Record<string, string | RowLabels[]>
+  /** A reference field's label, the labels of a references field's ids, and for a child collection with references the labels of each row, in row order. */
+  labels: Record<string, FieldLabel>
 }
 
 /** One page of records of the record API. */

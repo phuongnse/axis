@@ -48,6 +48,20 @@ public sealed class PendingComputedDataSourceTests(TaskApiFixture fixture) : ICl
               ]
             }
             """,
+        ["data-sources/doubled-count.json"] = """
+            {
+              "id": "5b0c2f1e-7a3d-4e8b-9c6a-1d2e3f4a5b6c",
+              "kind": "dataSource",
+              "name": "DoubledCount",
+              "formatVersion": 1,
+              "entity": "Request",
+              "fields": [{ "name": "title", "path": "title" }],
+              "aggregate": {
+                "groupBy": [],
+                "measures": [{ "name": "bigOnes", "function": "count", "filter": "doubled > 10" }]
+              }
+            }
+            """,
     };
 
     // On tenant b, whose Department has the computed field tag.
@@ -99,6 +113,27 @@ public sealed class PendingComputedDataSourceTests(TaskApiFixture fixture) : ICl
         await BackfillAsync(TenantA);
 
         Assert.Equal(HttpStatusCode.OK, (await SendAsync(maria, "DoubledTotal", TenantA)).StatusCode);
+    }
+
+    [Fact]
+    public async Task A_measure_filter_that_reads_a_pending_field_is_409_with_an_error_at_aggregate_even_for_a_count_and_succeeds_after_the_backfill()
+    {
+        await fixture.InsertRequestAsync(TenantA, null, divisor: 7);
+        await ActivateAsync(TenantA, DoubledRequest("divisor * 2"), DoubledRequest("divisor * 3"));
+        using var maria = fixture.CreateClient().SignedInAs("maria");
+
+        using var refused = await SendAsync(maria, "DoubledCount", TenantA);
+
+        Assert.Equal(HttpStatusCode.Conflict, refused.StatusCode);
+        using var problem = await ReadAsync(refused);
+        Assert.Equal("A field is being recomputed.", problem.RootElement.GetProperty("title").GetString());
+        var errors = problem.RootElement.GetProperty("errors");
+        Assert.Equal(["aggregate"], errors.EnumerateObject().Select(error => error.Name));
+        Assert.Contains("doubled", errors.GetProperty("aggregate")[0].GetString(), StringComparison.Ordinal);
+
+        await BackfillAsync(TenantA);
+
+        Assert.Equal(HttpStatusCode.OK, (await SendAsync(maria, "DoubledCount", TenantA)).StatusCode);
     }
 
     [Fact]
@@ -242,6 +277,7 @@ public sealed class PendingComputedDataSourceTests(TaskApiFixture fixture) : ICl
                 ? """
                     { "dataSource": "DoubledTotal", "actions": ["read"] },
                     { "dataSource": "DoubledRequests", "actions": ["read"] },
+                    { "dataSource": "DoubledCount", "actions": ["read"] },
                     """
                 : """
                     { "dataSource": "DepartmentTaggedRequests", "actions": ["read"] },

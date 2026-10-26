@@ -1,11 +1,12 @@
 import { Alert, Card } from 'antd'
-import { useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { boundParameterQuery } from './boundParameters'
 import { Chart } from './Chart'
 import { formatValue, type FormatOptions } from './formatValue'
 import { fetchRecords, type RecordItem, type RecordValue } from './records'
 import type { DataSourceColumn, WidgetMetadata } from './site'
 import { useText } from './texts'
+import { visuallyHidden } from './visuallyHidden'
 
 interface ChartWidgetProps {
   /** A chart widget: it has a data source and its `chart` metadata. */
@@ -28,19 +29,6 @@ interface LoadState {
   /** How many groups the data source has, which can be more than `rows`. */
   totalCount: number
   failed: boolean
-}
-
-/** Hides the table from the eye and keeps it in the accessibility tree. It has no colour of its own. */
-const visuallyHidden: CSSProperties = {
-  position: 'absolute',
-  width: 1,
-  height: 1,
-  margin: -1,
-  padding: 0,
-  border: 0,
-  overflow: 'hidden',
-  clip: 'rect(0 0 0 0)',
-  whiteSpace: 'nowrap',
 }
 
 /** A value as a table cell shows it, or an empty text for a null value. */

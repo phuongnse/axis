@@ -1,0 +1,12 @@
+{
+  "id": "c4a8e3b9-6d2f-4b17-8a53-1f9d7e5c2b42",
+  "kind": "process",
+  "name": "TimerUntil",
+  "formatVersion": 1,
+  "entity": "Request",
+  "start": "pause",
+  "steps": [
+    { "name": "pause", "type": "timer", "until": "submittedAt", "next": "done" },
+    { "name": "done", "type": "end" }
+  ]
+}

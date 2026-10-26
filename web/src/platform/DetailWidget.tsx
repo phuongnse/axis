@@ -1,13 +1,20 @@
-import { Alert, Button, Descriptions, Flex, Typography } from 'antd'
+import { Alert, Button, Descriptions, Flex, Tag, Typography } from 'antd'
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import { NotFoundPage } from '../pages/NotFoundPage'
 import { ChildCollectionTable } from './ChildCollectionTable'
 import { useCanvasActions } from './canvasActions'
-import { formatValue } from './formatValue'
+import { formatValue, referencesLabels } from './formatValue'
 import { navigateTarget, type NavigateOpen } from './navigateAction'
 import { newIdempotencyKey, startProcess } from './processes'
-import { fetchRecord, type RecordItem, type RecordRow, type RecordValue, type RowLabels } from './records'
+import {
+  fetchRecord,
+  type FieldLabel,
+  type RecordItem,
+  type RecordRow,
+  type RecordValue,
+  type RowLabels,
+} from './records'
 import type { EntityWidgetMetadata, NavigateAction, StartProcessAction } from './site'
 import { useText } from './texts'
 import { sectionsOf } from './useRecordForm'
@@ -28,7 +35,7 @@ const noRows: RecordRow[] = []
 const noLabels: RowLabels[] = []
 
 /** The labels of a child collection's rows, which are an array only for a collection with references. */
-const rowLabelsOf = (label: string | RowLabels[] | undefined) => (Array.isArray(label) ? label : noLabels)
+const rowLabelsOf = (label: FieldLabel | undefined) => (Array.isArray(label) ? (label as RowLabels[]) : noLabels)
 
 /**
  * Shows one record of the widget's entity, read-only. A widget that names a form shows the form's
@@ -199,12 +206,18 @@ export function DetailWidget({ widget, sitePath, recordId, locale }: DetailWidge
                     <ChildCollectionTable
                       readOnly
                       field={field}
-                      rows={Array.isArray(value) ? value : noRows}
+                      rows={Array.isArray(value) ? (value as RecordRow[]) : noRows}
                       labels={rowLabelsOf(record.labels[field.name])}
                       onChange={() => {}}
                       errors={{}}
                       locale={locale}
                     />
+                  ) : field.type === 'references' ? (
+                    <Flex wrap gap="small" data-testid={`detail-references-${field.name}`}>
+                      {referencesLabels(record.values[field.name], record.labels[field.name]).map((label, index) => (
+                        <Tag key={index}>{label}</Tag>
+                      ))}
+                    </Flex>
                   ) : (
                     formatValue(field, value as RecordValue, record.labels, { locale, text: t }, record.values)
                   ),

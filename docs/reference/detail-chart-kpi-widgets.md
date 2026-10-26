@@ -36,8 +36,9 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
     drawn too, see [container widgets](container-widgets.md).
   - **Fields.** With a `form`, the widget shows its sections in order under
     their titles. Without one, it shows every readable field in declaration
-    order. Every value is read-only and formatted as a table cell shows it. The
-    widget ignores `visibleWhen`, `requiredWhen`, `readOnlyWhen` and `steps`.
+    order. Every value is read-only and formatted as a table cell shows it. A
+    `references` field shows its labels in order as tags, or a record's id where
+    it has no label. The widget ignores `visibleWhen`, `requiredWhen`, `readOnlyWhen` and `steps`.
   - **Actions.** A `startProcess` button follows the form widget's **Start
     process action**, without a save first. A `navigate` action sees the
     record's fields and `id`, as on a form

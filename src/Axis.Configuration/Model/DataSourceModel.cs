@@ -143,6 +143,8 @@ public enum AggregateFunction
 /// <summary>
 /// A measure of a grouped data source: its key in a grouped row, its function and the projected
 /// field it reads, which is null for <see cref="AggregateFunction.Count"/>. A sum, min, max or avg over
-/// only null values is null.
+/// only null values is null. The optional <paramref name="Filter"/> is a boolean expression: the measure
+/// only reads the rows where it is true, and a null result leaves the row out.
 /// </summary>
-public sealed record DataSourceMeasureModel(string Name, AggregateFunction Function, DataSourceFieldModel? Field);
+public sealed record DataSourceMeasureModel(
+    string Name, AggregateFunction Function, DataSourceFieldModel? Field, ExpressionModel? Filter = null);

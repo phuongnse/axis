@@ -49,9 +49,10 @@ export type FieldType =
   | 'date-time'
   | 'enum'
   | 'reference'
+  | 'references'
   | 'child-collection'
 
-/** The entity a reference field points to, its display field and the path of its record API. */
+/** The entity a reference or references field points to, its display field and the path of its record API. */
 export interface ReferenceTarget {
   entity: string
   displayField: string | null
@@ -60,7 +61,7 @@ export interface ReferenceTarget {
 
 /**
  * One field of an entity. Properties the field's type does not have are `null`: `target` is for a
- * reference, and `fields` holds a child collection's child fields in declaration order.
+ * reference and references, and `fields` holds a child collection's child fields in declaration order.
  */
 export interface FieldMetadata {
   name: string
