@@ -1,0 +1,10 @@
+{
+  "id": "3685cf7f-885c-473f-b58c-0d63f5072d97",
+  "kind": "entity",
+  "name": "AssetAttachment",
+  "formatVersion": 1,
+  "fields": [
+    { "name": "file", "type": "file", "label": { "textKey": "assetAttachment.file" } },
+    { "name": "note", "type": "text", "maxLength": 200, "label": { "textKey": "assetAttachment.note" } }
+  ]
+}

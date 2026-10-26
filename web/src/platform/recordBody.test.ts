@@ -43,6 +43,36 @@ describe('buildRecordBody for a references field', () => {
   })
 })
 
+describe('buildRecordBody for a file field', () => {
+  const stored = {
+    id: '3c1d5e7f-9a2b-4c4d-8e6f-0a1b2c3d4e5f',
+    name: 'paper.pdf',
+    mediaType: 'application/pdf',
+    size: '2048',
+  }
+  const claim = [
+    field('title', 'text'),
+    field('receipt', 'file'),
+    { ...field('attachments', 'child-collection'), fields: [field('file', 'file'), field('note', 'text')] },
+  ]
+
+  it('writes the file as its id, or null after a remove', () => {
+    expect(buildRecordBody(claim, { receipt: stored })).toBe(`{"values":{"receipt":"${stored.id}"}}`)
+    expect(buildRecordBody(claim, { receipt: null })).toBe('{"values":{"receipt":null}}')
+  })
+
+  it('writes the file of a child row as its id and leaves out an empty one', () => {
+    const rows = [
+      { file: stored, note: 'Scan' },
+      { file: null, note: 'None' },
+    ]
+
+    expect(buildRecordBody(claim, { attachments: rows })).toBe(
+      `{"values":{"attachments":[{"file":"${stored.id}","note":"Scan"},{"note":"None"}]}}`,
+    )
+  })
+})
+
 describe('isJsonNumber', () => {
   it('accepts JSON numbers and rejects other text', () => {
     for (const text of ['0', '-7', '12.50', '1e3', '-0.5E-2']) {

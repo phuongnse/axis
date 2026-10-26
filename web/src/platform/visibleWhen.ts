@@ -1,4 +1,5 @@
 import { navigateValue, numberPattern, type NavigateScope } from './navigateAction'
+import { isFileValue } from './records'
 
 /** A value the evaluator holds. A name's value is a `text` unless it is a boolean or null. */
 type Value =
@@ -248,7 +249,11 @@ class Evaluator {
     if (value === null) {
       return nullValue
     }
-    return typeof value === 'boolean' ? { kind: 'boolean', value } : { kind: 'text', value }
+    if (typeof value === 'boolean') {
+      return { kind: 'boolean', value }
+    }
+    // A file is only compared with null, so its id stands for it.
+    return { kind: 'text', value: isFileValue(value) ? value.id : value }
   }
 }
 

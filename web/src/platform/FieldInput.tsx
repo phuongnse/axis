@@ -1,8 +1,9 @@
 import { Checkbox, DatePicker, Input, Select, Space } from 'antd'
 import dayjs from 'dayjs'
 import type { CSSProperties, KeyboardEvent } from 'react'
+import { FileInput } from './FileInput'
 import { enumLabel } from './formatValue'
-import type { RecordValue } from './records'
+import { isFileValue, type RecordValue } from './records'
 import type { FieldMetadata } from './site'
 import { useText } from './texts'
 
@@ -156,6 +157,16 @@ export function FieldInput({ field, value, onChange, id, ariaLabel, style, curre
           value={value === null ? null : String(value)}
           options={(field.values ?? []).map((option) => ({ value: option, label: enumLabel(field, option, t) }))}
           onChange={(option: string | undefined) => onChange(option ?? null)}
+        />
+      )
+    case 'file':
+      return (
+        <FileInput
+          field={field}
+          id={id}
+          value={isFileValue(value) ? value : null}
+          label={ariaLabel ?? field.name}
+          onChange={onChange}
         />
       )
     case 'reference':

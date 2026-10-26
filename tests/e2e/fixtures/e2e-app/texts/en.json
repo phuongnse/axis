@@ -74,6 +74,12 @@
     "asset.label": "Asset",
     "asset.name": "Name",
     "asset.software": "Software",
+    "asset.receipt": "Receipt",
+    "asset.attachments": "Attachments",
+    "assetAttachment.file": "File",
+    "assetAttachment.note": "Note",
+    "pages.assets.title": "Assets",
+    "assets.open": "Open",
     "role.employee": "Employee",
     "role.departmentManager": "Department manager",
     "role.financeReviewer": "Finance reviewer"

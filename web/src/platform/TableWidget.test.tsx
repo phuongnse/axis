@@ -171,6 +171,7 @@ const texts = {
   'note.done': 'Done',
   'note.dueAt': 'Due at',
   'note.category': 'Category',
+  'note.receipt': 'Receipt',
   'note.lines': 'Lines',
   'note.software': 'Software',
   'note.details': 'Details',
@@ -238,7 +239,31 @@ function renderWidget(search = '', widget: WidgetMetadata = noteWidget, pageValu
   )
 }
 
+const receipt = {
+  ...field('receipt', 'file', 'note.receipt'),
+  downloadPath: '/api/apps/E2eApp/files',
+  uploadPath: '/api/apps/E2eApp/entities/Note/fields/receipt/files',
+}
+const receiptWidget: EntityWidgetMetadata = {
+  ...noteWidget,
+  entity: { ...noteWidget.entity!, fields: [...noteWidget.entity!.fields, receipt] },
+}
+const fileId = '3c1d5e7f-9a2b-4c4d-8e6f-0a1b2c3d4e5f'
+const receiptPage = `{"items":[{"id":"${noteId}","version":1,"values":{"title":"Buy paper","done":false,"dueAt":null,"category":"${categoryId}","receipt":{"id":"${fileId}","name":"paper.pdf","mediaType":"application/pdf","size":2048}},"labels":{"category":"Office"}}],"page":1,"pageSize":20,"totalCount":1}`
+
 describe('TableWidget', () => {
+  it('shows a file as a download link and does not sort by it', async () => {
+    stubRecords(receiptPage)
+
+    renderWidget('', receiptWidget)
+
+    const row = await screen.findByRole('row', { name: /Buy paper/ })
+    const link = within(row).getByRole('link', { name: 'paper.pdf' })
+    expect(link).toHaveAttribute('href', `/api/apps/E2eApp/files/${fileId}`)
+    expect(isSortableHeader(screen.getByRole('columnheader', { name: 'Receipt' }))).toBe(false)
+    expect(isSortableHeader(screen.getByRole('columnheader', { name: 'Title' }))).toBe(true)
+  })
+
   it('heads the columns with the field labels and shows formatted values', async () => {
     stubRecords()
 

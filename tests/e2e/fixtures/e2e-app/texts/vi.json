@@ -74,6 +74,12 @@
     "asset.label": "Tài sản",
     "asset.name": "Tên",
     "asset.software": "Phần mềm",
+    "asset.receipt": "Biên nhận",
+    "asset.attachments": "Tệp đính kèm",
+    "assetAttachment.file": "Tệp",
+    "assetAttachment.note": "Ghi chú",
+    "pages.assets.title": "Tài sản",
+    "assets.open": "Mở",
     "role.employee": "Nhân viên",
     "role.departmentManager": "Trưởng phòng",
     "role.financeReviewer": "Người duyệt tài chính"
