@@ -9,13 +9,15 @@ namespace Axis.Integration.Tests;
 /// Field policies on the record API. <c>fia</c> reads an item's <c>name</c> and
 /// <c>department</c>, creates and updates its <c>name</c> and <c>quantity</c>, reads and creates a
 /// ticket's <c>title</c>, and reads an order's <c>lineCount</c> but not its <c>title</c>, the
-/// display field. They hold no grant on departments. <c>anna</c> holds every grant.
+/// display field. They read a bundle's <c>title</c> but not its searchable <c>note</c>. They hold no
+/// grant on departments. <c>anna</c> holds every grant.
 /// </summary>
 public sealed class RecordFieldPolicyTests(RecordApiFixture fixture) : IClassFixture<RecordApiFixture>
 {
     private const string Items = "/api/apps/RecordsApp/entities/Item/records";
     private const string Tickets = "/api/apps/RecordsApp/entities/Ticket/records";
     private const string Orders = "/api/apps/RecordsApp/entities/Order/records";
+    private const string Bundles = "/api/apps/RecordsApp/entities/Bundle/records";
     private const string UnwritableTitle = "You have no grant to write these fields.";
 
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
@@ -169,6 +171,37 @@ public sealed class RecordFieldPolicyTests(RecordApiFixture fixture) : IClassFix
 
         using var full = await SendAsync(fixture.Client, "GET", $"{Orders}?search=Desk", null);
         Assert.Equal(HttpStatusCode.OK, full.StatusCode);
+    }
+
+    [Fact]
+    public async Task A_search_finds_a_record_by_a_searchable_field_only_when_the_user_may_read_it()
+    {
+        await fixture.ResetAsync();
+        var id = await fixture.InsertAsync(TenantA, "Bundle", new Dictionary<string, string?>
+        {
+            ["title"] = "Văn phòng",
+            ["note"] = "Bàn làm việc gỗ sồi",
+        });
+        using var fia = fixture.CreateClient().SignedInAs("fia");
+        var note = $"{Bundles}?search={Uri.EscapeDataString("LÀM VIỆC")}";
+
+        // anna reads every field, so the upper-case text finds the note, which is not the display field.
+        using (var full = await ReadJsonAsync(await SendAsync(fixture.Client, "GET", note, null)))
+        {
+            Assert.Equal(id.ToString("D"), Assert.Single(full.RootElement.GetProperty("items").EnumerateArray()).GetProperty("id").GetString());
+            Assert.Equal(1, full.RootElement.GetProperty("totalCount").GetInt64());
+        }
+
+        // fia may not read the note, so the search skips it without an error and the text finds nothing.
+        using (var hidden = await ReadJsonAsync(await SendAsync(fia, "GET", note, null)))
+        {
+            Assert.Empty(hidden.RootElement.GetProperty("items").EnumerateArray());
+            Assert.Equal(0, hidden.RootElement.GetProperty("totalCount").GetInt64());
+        }
+
+        // The display field is still searched.
+        using var byTitle = await ReadJsonAsync(await SendAsync(fia, "GET", $"{Bundles}?search={Uri.EscapeDataString("PHÒNG")}", null));
+        Assert.Equal(id.ToString("D"), Assert.Single(byTitle.RootElement.GetProperty("items").EnumerateArray()).GetProperty("id").GetString());
     }
 
     /// <summary>Inserts the department Sales and an item Desk in it, with quantity and price, and returns their ids.</summary>

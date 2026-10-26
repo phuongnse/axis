@@ -6,6 +6,7 @@
   "displayField": "title",
   "fields": [
     { "name": "title", "type": "text", "required": true, "maxLength": 100 },
+    { "name": "note", "type": "text", "maxLength": 200, "searchable": true },
     { "name": "products", "type": "references", "target": "Product" }
   ]
 }

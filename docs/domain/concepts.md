@@ -80,7 +80,7 @@ M15 adds *(planned for M15)*:
 
 **Field flags**:
 
-- searchable *(planned for M15)*
+- searchable
 
 Later field flags:
 
