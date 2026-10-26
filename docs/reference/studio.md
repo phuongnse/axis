@@ -808,9 +808,9 @@ Run and the Test results list, the read-only view of a module entity, and the re
   [process designer](process-designer.md).
   The process graph is read-only, and not a designer.
   - **Design tab.** It sits next to the Form and JSON tabs. The three tabs edit
-    one draft. _Built:_ the tab is there, and Form is the default tab. Opening a
-    page on the Design tab is _(planned for M14)_. The canvas is mounted only
-    while the Design tab is active, so it asks again when the author returns.
+    one draft. _Built:_ the tab is there, and a page opens on it. The canvas is
+    mounted only while the Design tab is active, so it asks again when the
+    author returns.
   - **Canvas.** It draws the unsaved draft with the site's own widget
     components. Tables, charts and other data widgets show placeholder rows and
     values made from the field types, as the widget previews do with fixtures.
