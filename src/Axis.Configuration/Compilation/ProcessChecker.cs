@@ -16,7 +16,7 @@ namespace Axis.Configuration.Compilation;
 /// type-check as a boolean over the subject entity's fields, computed ones included, its child
 /// collections, which only aggregates accept, the named rules, and paths through reference fields
 /// of at most 3 hops. An operation step runs <c>updateRecord</c>, <c>callConnector</c>,
-/// <c>raiseEvent</c> or a package operation, named <c>&lt;package&gt;/&lt;operation&gt;</c>. Each field an <c>updateRecord</c> <c>set</c> names is a field of the subject
+/// <c>raiseEvent</c>, <c>notify</c> or a package operation, named <c>&lt;package&gt;/&lt;operation&gt;</c>. Each field an <c>updateRecord</c> <c>set</c> names is a field of the subject
 /// entity, named once, that is not computed, numbered by a sequence or a child collection. Each
 /// <c>set</c> expression type-checks against its field's type over the same scope as a condition.
 /// A <c>callConnector</c> step names a loaded connector and one of its operations. Its inputs are inputs of the operation,
@@ -34,7 +34,9 @@ namespace Axis.Configuration.Compilation;
 /// duration, its outcome names are unique ignoring letter case, and each outcome's <c>next</c> is a
 /// transition. Its <c>deadline</c>'s <c>after</c> is a positive fixed duration too, and its <c>next</c> is a
 /// transition that comes after the outcomes. A timer step has exactly one of <c>wait</c>, a positive
-/// fixed duration, and <c>until</c>, a <c>date-time</c> expression over the same scope. Every problem of a process is
+/// fixed duration, and <c>until</c>, a <c>date-time</c> expression over the same scope.
+/// A <c>notify</c> step is checked by <see cref="CheckNotify"/>.
+/// Every problem of a process is
 /// reported in one pass, and a root cause is reported once: a later step with a name already used
 /// is left out of the reachability, end and cycle checks, a step with a transition to an
 /// unknown step is not also reported as having no path to an end, and a form, entity, role,
@@ -60,7 +62,9 @@ internal static class ProcessChecker
     /// <paramref name="findEvent"/> a loaded event. <paramref name="findPackage"/> finds the pinned
     /// package version by id, compared exactly. <paramref name="declaredPackageIds"/> holds the ids
     /// the application lists in <c>packages</c>, or is null when <c>application.json</c> was not
-    /// loaded. <paramref name="findProcess"/> finds a process by name, ignoring letter case.
+    /// loaded. <paramref name="findPage"/> finds a loaded page by name and <paramref name="unloadedPageNames"/>
+    /// holds the pages that failed to load. <paramref name="textValues"/> gives the value of a text key
+    /// in each locale that has it. <paramref name="findProcess"/> finds a process by name, ignoring letter case.
     /// </summary>
     public static void Check(
         IReadOnlyList<ProcessResource> processes,
@@ -77,6 +81,9 @@ internal static class ProcessChecker
         IReadOnlySet<string> unloadedEventNames,
         Func<string, PinnedOperations?> findPackage,
         IReadOnlySet<string>? declaredPackageIds,
+        Func<string, PageResource?> findPage,
+        IReadOnlySet<string> unloadedPageNames,
+        Func<string, IReadOnlyList<(string Locale, string Value)>> textValues,
         Func<string, ProcessResource?> findProcess,
         IReadOnlySet<string> unloadedProcessNames,
         ReferenceIndexBuilder references,
@@ -92,7 +99,26 @@ internal static class ProcessChecker
             if (process.Entity is null)
             {
                 CheckWithoutSubject(
-                    process, rules, modules, findEntity, findConnector, unloadedConnectorNames, findEvent, unloadedEventNames, findPackage, declaredPackageIds, findProcess, unloadedProcessNames, references, Report, diagnostics);
+                    process,
+                    rules,
+                    modules,
+                    findEntity,
+                    findConnector,
+                    unloadedConnectorNames,
+                    findEvent,
+                    unloadedEventNames,
+                    findPackage,
+                    declaredPackageIds,
+                    findRole,
+                    unloadedRoleNames,
+                    findPage,
+                    unloadedPageNames,
+                    textValues,
+                    findProcess,
+                    unloadedProcessNames,
+                    references,
+                    Report,
+                    diagnostics);
                 continue;
             }
 
@@ -142,7 +168,24 @@ internal static class ProcessChecker
             }
 
             CheckOperations(
-                process, entity, scope, findEntity, findConnector, unloadedConnectorNames, findEvent, unloadedEventNames, findPackage, declaredPackageIds, references, Report);
+                process,
+                entity,
+                scope,
+                findEntity,
+                findConnector,
+                unloadedConnectorNames,
+                findEvent,
+                unloadedEventNames,
+                findPackage,
+                declaredPackageIds,
+                findRole,
+                unloadedRoleNames,
+                findPage,
+                unloadedPageNames,
+                textValues,
+                references,
+                Report,
+                diagnostics);
 
             CheckSubProcesses(process, entity, scope, findEntity, findProcess, unloadedProcessNames, references, Report);
 
@@ -175,6 +218,11 @@ internal static class ProcessChecker
         IReadOnlySet<string> unloadedEventNames,
         Func<string, PinnedOperations?> findPackage,
         IReadOnlySet<string>? declaredPackageIds,
+        Func<string, RoleResource?> findRole,
+        IReadOnlySet<string> unloadedRoleNames,
+        Func<string, PageResource?> findPage,
+        IReadOnlySet<string> unloadedPageNames,
+        Func<string, IReadOnlyList<(string Locale, string Value)>> textValues,
         Func<string, ProcessResource?> findProcess,
         IReadOnlySet<string> unloadedProcessNames,
         ReferenceIndexBuilder references,
@@ -214,7 +262,24 @@ internal static class ProcessChecker
 
         // A step that needs a subject record is skipped, as CheckSubjectSteps has reported it.
         CheckOperations(
-            process, null, scope, _ => null, findConnector, unloadedConnectorNames, findEvent, unloadedEventNames, findPackage, declaredPackageIds, references, report);
+            process,
+            null,
+            scope,
+            _ => null,
+            findConnector,
+            unloadedConnectorNames,
+            findEvent,
+            unloadedEventNames,
+            findPackage,
+            declaredPackageIds,
+            findRole,
+            unloadedRoleNames,
+            findPage,
+            unloadedPageNames,
+            textValues,
+            references,
+            report,
+            diagnostics);
 
         CheckTimers(process, scope, references, report);
 
@@ -555,6 +620,9 @@ internal static class ProcessChecker
     /// event's declaration order. A package operation holds the package id, the pinned version, the
     /// manifest's declared operation name, inputs and outputs in the manifest's order, the retry
     /// policy with the defaults filled in, and the manifest's <c>idempotent</c> and <c>timeout</c>. A
+    /// notify step holds its recipients and channels in file order and its placeholder values in ordinal
+    /// order of their names. The page it opens holds the page's declared name, and the parameters it gives
+    /// are in the page's declaration order. A
     /// sub-process step holds the child's id and declared name, the compiled <c>subject</c> as a
     /// reference to the child's entity, and the parameters in the child's declaration order.
     /// </summary>
@@ -565,6 +633,7 @@ internal static class ProcessChecker
         Func<string, ConnectorResource?> findConnector,
         Func<string, EventResource?> findEvent,
         Func<string, PinnedOperations?> findPackage,
+        Func<string, PageResource?> findPage,
         Func<string, ProcessResource?> findProcess,
         IEnumerable<ExpressionRule> rules,
         IReadOnlySet<string> modules)
@@ -726,6 +795,46 @@ internal static class ProcessChecker
                 Resolve(step.Next!));
         }
 
+        // A checked notify step has recipients that each have one kind, a loaded page when it opens one, and
+        // parameters that each name a parameter of that page once.
+        NotifyStepModel BuildNotify(ProcessStepDefinition step)
+        {
+            NotifyOpenModel? open = null;
+            if (step.Open is { } definition)
+            {
+                var target = findPage(definition.Page)!;
+                var given = new Dictionary<string, string>(definition.Parameters ?? new Dictionary<string, string>(), StringComparer.OrdinalIgnoreCase);
+                open = new NotifyOpenModel(
+                    new PageReference(target.Id, target.Name),
+                    [
+                        .. target.Parameters
+                            .Where(parameter => given.ContainsKey(parameter.Name))
+                            .Select(parameter => new NotifyParameterModel(
+                                parameter.Name,
+                                ExpressionModel.Compile(given[parameter.Name], scope, NavigateChecker.ExpectedType(parameter)!))),
+                    ]);
+            }
+
+            return new NotifyStepModel(
+                step.Name,
+                [
+                    .. step.To!.Select(recipient => new NotifyRecipientModel(
+                        recipient.User is { } user ? ExpressionModel.Compile(user, scope, ExpressionType.Text) : null,
+                        recipient.Role,
+                        recipient.Email is { } email ? ExpressionModel.Compile(email, scope, ExpressionType.Text) : null)),
+                ],
+                [.. step.Channels!],
+                step.Message!.Subject,
+                step.Message.Body,
+                [
+                    .. (step.Message.Values ?? new Dictionary<string, string>())
+                        .OrderBy(pair => pair.Key, StringComparer.Ordinal)
+                        .Select(pair => new NotifyValueModel(pair.Key, ExpressionModel.Compile(pair.Value, scope, ExpressionType.Null))),
+                ],
+                open,
+                Resolve(step.Next!));
+        }
+
         return new ProcessModel
         {
             Id = process.Id,
@@ -747,6 +856,7 @@ internal static class ProcessChecker
                     ProcessStepDefinition.TaskStep => BuildTask(step),
                     ProcessStepDefinition.OperationStep when step.Operation == ProcessStepDefinition.CallConnector => BuildConnectorCall(step),
                     ProcessStepDefinition.OperationStep when step.Operation == ProcessStepDefinition.RaiseEvent => BuildRaiseEvent(step),
+                    ProcessStepDefinition.OperationStep when step.Operation == ProcessStepDefinition.Notify => BuildNotify(step),
                     ProcessStepDefinition.OperationStep when step.Operation!.Contains('/', StringComparison.Ordinal) => BuildPackageCall(step),
                     ProcessStepDefinition.OperationStep => new OperationStepModel(
                         step.Name,
@@ -1025,7 +1135,8 @@ internal static class ProcessChecker
     /// Checks each operation step: its operation is <c>updateRecord</c>, <c>callConnector</c>,
     /// <c>raiseEvent</c> or a package operation, which contains a <c>/</c>, matched exactly as a step
     /// <c>type</c> is. A connector call is checked by <see cref="CheckConnectorCall"/>, a package
-    /// operation by <see cref="CheckPackageCall"/> and a raised event by <see cref="CheckRaiseEvent"/>. Each <c>set</c> key of an <c>updateRecord</c> names a field
+    /// operation by <see cref="CheckPackageCall"/>, a raised event by <see cref="CheckRaiseEvent"/> and a
+    /// notification by <see cref="CheckNotify"/>. Each <c>set</c> key of an <c>updateRecord</c> names a field
     /// of <paramref name="entity"/>, ignoring letter case, that no earlier key of the step names and
     /// that can be set. Its expression then fits the field's type over <paramref name="scope"/>. The
     /// <c>set</c> is not checked when the subject entity is unknown. The other properties of an
@@ -1042,8 +1153,14 @@ internal static class ProcessChecker
         IReadOnlySet<string> unloadedEventNames,
         Func<string, PinnedOperations?> findPackage,
         IReadOnlySet<string>? declaredPackageIds,
+        Func<string, RoleResource?> findRole,
+        IReadOnlySet<string> unloadedRoleNames,
+        Func<string, PageResource?> findPage,
+        IReadOnlySet<string> unloadedPageNames,
+        Func<string, IReadOnlyList<(string Locale, string Value)>> textValues,
         ReferenceIndexBuilder references,
-        Action<string, string, string> report)
+        Action<string, string, string> report,
+        List<Diagnostic> diagnostics)
     {
         for (var index = 0; index < process.Steps.Count; index++)
         {
@@ -1076,11 +1193,18 @@ internal static class ProcessChecker
                 continue;
             }
 
+            if (string.Equals(step.Operation, ProcessStepDefinition.Notify, StringComparison.Ordinal))
+            {
+                CheckNotify(
+                    process, step, index, scope, findRole, unloadedRoleNames, findPage, unloadedPageNames, textValues, references, report, diagnostics);
+                continue;
+            }
+
             if (!string.Equals(step.Operation, ProcessStepDefinition.UpdateRecord, StringComparison.Ordinal))
             {
                 report(
                     DiagnosticCodes.UnknownOperation,
-                    $"The operation '{step.Operation}' was not found. The built-in operations are '{ProcessStepDefinition.UpdateRecord}', '{ProcessStepDefinition.CallConnector}' and '{ProcessStepDefinition.RaiseEvent}'. A package operation is written '<package>/<operation>'.",
+                    $"The operation '{step.Operation}' was not found. The built-in operations are '{ProcessStepDefinition.UpdateRecord}', '{ProcessStepDefinition.CallConnector}', '{ProcessStepDefinition.RaiseEvent}' and '{ProcessStepDefinition.Notify}'. A package operation is written '<package>/<operation>'.",
                     $"/steps/{index}/operation");
                 continue;
             }
@@ -1126,6 +1250,175 @@ internal static class ProcessChecker
                 {
                     report(problem.Code, problem.Message, path);
                 }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Checks a <c>notify</c> step. <c>to</c> has a recipient, and each recipient has exactly one of
+    /// <c>user</c>, <c>role</c> and <c>email</c>. A <c>role</c> is a declared role, compared exactly,
+    /// unless its file was not loaded, and is not used with the <c>email</c> channel, because a role has
+    /// no address. A <c>user</c> and an <c>email</c> are <c>text</c> expressions over
+    /// <paramref name="scope"/>. <c>channels</c> has a channel. The subject and body each have a text key.
+    /// Each <c>values</c> expression is checked over <paramref name="scope"/> for its syntax, names and
+    /// rules, but not for a result type, because a value is formatted by its type. The page <c>open</c>
+    /// names is checked like the page of a navigate action. The expressions are not checked when the
+    /// subject entity is unknown. Last, for each locale that has both texts, each placeholder of the
+    /// subject or body has a key in <c>values</c> and each key appears in a placeholder. A locale with a
+    /// bad brace is reported for that brace only.
+    /// </summary>
+    private static void CheckNotify(
+        ProcessResource process,
+        ProcessStepDefinition step,
+        int index,
+        ExpressionScope? scope,
+        Func<string, RoleResource?> findRole,
+        IReadOnlySet<string> unloadedRoleNames,
+        Func<string, PageResource?> findPage,
+        IReadOnlySet<string> unloadedPageNames,
+        Func<string, IReadOnlyList<(string Locale, string Value)>> textValues,
+        ReferenceIndexBuilder references,
+        Action<string, string, string> report,
+        List<Diagnostic> diagnostics)
+    {
+        var path = $"/steps/{index}";
+        var recipients = step.To!;
+        var channels = step.Channels!;
+        var message = step.Message!;
+        if (recipients.Count == 0)
+        {
+            report(DiagnosticCodes.EmptyNotifyRecipients, "A notify step needs at least one recipient in 'to'.", $"{path}/to");
+        }
+
+        for (var recipient = 0; recipient < recipients.Count; recipient++)
+        {
+            var recipientPath = $"{path}/to/{recipient}";
+            var definition = recipients[recipient];
+            var kinds = (definition.User is null ? 0 : 1) + (definition.Role is null ? 0 : 1) + (definition.Email is null ? 0 : 1);
+            if (kinds != 1)
+            {
+                report(DiagnosticCodes.InvalidNotifyRecipient, "A recipient must have exactly one of 'user', 'role' and 'email'.", recipientPath);
+            }
+
+            // A role file that was not loaded because of its own errors is not reported again.
+            if (definition.Role is { } role)
+            {
+                // A role recipient has no reference edge yet.
+                if (findRole(role) is null && !unloadedRoleNames.Contains(role))
+                {
+                    report(DiagnosticCodes.UnknownNotifyRole, $"The role '{role}' was not found. No declared role has that name.", $"{recipientPath}/role");
+                }
+
+                if (channels.Contains("email", StringComparer.Ordinal))
+                {
+                    report(
+                        DiagnosticCodes.RoleRecipientWithEmail,
+                        $"The role '{role}' has no email address. A role recipient can be notified on the 'inApp' channel only.",
+                        $"{recipientPath}/role");
+                }
+            }
+
+            if (scope is null)
+            {
+                continue;
+            }
+
+            foreach (var (expression, name) in new[] { (definition.User, "user"), (definition.Email, "email") })
+            {
+                if (expression is null)
+                {
+                    continue;
+                }
+
+                var problem = CheckExpression(process, expression, scope, ExpressionType.Text, $"{recipientPath}/{name}", references);
+                if (problem is not null)
+                {
+                    report(problem.Code, problem.Message, $"{recipientPath}/{name}");
+                }
+            }
+        }
+
+        if (channels.Count == 0)
+        {
+            report(DiagnosticCodes.EmptyNotifyChannels, "A notify step needs at least one channel in 'channels'.", $"{path}/channels");
+        }
+
+        ApplicationCompiler.CheckTextKey(message.Subject, process, $"{path}/message/subject", references, diagnostics);
+        ApplicationCompiler.CheckTextKey(message.Body, process, $"{path}/message/body", references, diagnostics);
+
+        var values = message.Values ?? new Dictionary<string, string>();
+        if (scope is not null)
+        {
+            foreach (var (key, expression) in values)
+            {
+                var valuePath = $"{path}/message/values/{key}";
+                var problem = CheckExpression(process, expression, scope, ExpressionType.Null, valuePath, references);
+                if (problem is not null)
+                {
+                    report(problem.Code, problem.Message, valuePath);
+                }
+            }
+        }
+
+        if (step.Open is { } open)
+        {
+            NavigateChecker.CheckTarget(
+                open.Page, open.Parameters, $"{path}/open", scope, process, unloadedPageNames, findPage, references, diagnostics, "step");
+        }
+
+        CheckPlaceholders(message, $"{path}/message", values, textValues, report);
+    }
+
+    /// <summary>
+    /// Checks the placeholders of the subject and the body in each locale that has both texts, in ordinal
+    /// locale order. Each placeholder needs a key in <paramref name="values"/>, and each key needs a
+    /// placeholder. Each problem is reported once for a locale and a name.
+    /// </summary>
+    private static void CheckPlaceholders(
+        NotifyMessageDefinition message,
+        string path,
+        IReadOnlyDictionary<string, string> values,
+        Func<string, IReadOnlyList<(string Locale, string Value)>> textValues,
+        Action<string, string, string> report)
+    {
+        var subjects = textValues(message.Subject.TextKey).DistinctBy(text => text.Locale, StringComparer.OrdinalIgnoreCase).ToDictionary(text => text.Locale, text => text.Value, StringComparer.OrdinalIgnoreCase);
+        var bodies = textValues(message.Body.TextKey).DistinctBy(text => text.Locale, StringComparer.OrdinalIgnoreCase).ToDictionary(text => text.Locale, text => text.Value, StringComparer.OrdinalIgnoreCase);
+        foreach (var locale in subjects.Keys.Where(bodies.ContainsKey).Order(StringComparer.OrdinalIgnoreCase))
+        {
+            var used = new HashSet<string>(StringComparer.Ordinal);
+            var valid = true;
+            foreach (var (key, text) in new[] { (message.Subject.TextKey, subjects[locale]), (message.Body.TextKey, bodies[locale]) })
+            {
+                if (TextPlaceholders.TryParse(text, out var names, out var problem))
+                {
+                    used.UnionWith(names);
+                }
+                else
+                {
+                    report(DiagnosticCodes.InvalidPlaceholder, $"The text '{key}' in the locale '{locale}' is not valid. {problem}", path);
+                    valid = false;
+                }
+            }
+
+            if (!valid)
+            {
+                continue;
+            }
+
+            foreach (var name in used.Where(name => !values.ContainsKey(name)).Order(StringComparer.Ordinal))
+            {
+                report(
+                    DiagnosticCodes.MissingPlaceholderValue,
+                    $"The placeholder '{{{name}}}' in the locale '{locale}' has no value. Add '{name}' to 'values'.",
+                    path);
+            }
+
+            foreach (var key in values.Keys.Where(key => !used.Contains(key)))
+            {
+                report(
+                    DiagnosticCodes.UnusedPlaceholderValue,
+                    $"The value '{key}' has no placeholder in the subject or body in the locale '{locale}'.",
+                    path);
             }
         }
     }

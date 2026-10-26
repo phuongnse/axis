@@ -225,13 +225,14 @@ a payment reference from the sample extension package, see
 
 ## Steps
 
-M3 has four step types, and the `timer` step is built too. Wait for event
-comes later. The engine runs a `subProcess` step, see
+M3 has four step types. The `timer` step is built too. Wait for event comes
+later. The engine runs a `subProcess` step, see
 [Sub-process step](process-flow.md#sub-process-step).
 Its failure handling and cancel rules are _(planned for M14)_, as are `waitEvent`
-steps, and the `createRecord` and `notify` operations, see
-[process flow](process-flow.md) and
-[notifications](notifications.md#notify-operation).
+steps, the `createRecord` operation, and running the `notify`
+operation, see [process flow](process-flow.md) and
+[notifications](notifications.md#notify-operation). The compiler already
+checks and builds a `notify` step.
 
 - **`decision`.** `branches` is an ordered list. Each branch has a `when`
   expression and a `next` step. The branches are evaluated in order, and the
@@ -328,9 +329,13 @@ reported in one pass. See
   paths through reference fields such as `department.manager.name`. A path takes at most 3 hops
   (`AXC0058`), and a `.` after a field that is not a reference is `AXC0047`.
   See [Scope in a process expression](expressions.md#names-and-references).
-- An operation names `updateRecord`, `callConnector`, `raiseEvent` or a
-  package operation written `<package>/<operation>`, matched exactly as a
-  step `type` is (`AXC0078` at `/steps/{i}/operation`).
+- An operation names `updateRecord`, `callConnector`, `raiseEvent`, `notify`
+  or a package operation written `<package>/<operation>`, matched exactly as
+  a step `type` is (`AXC0078` at `/steps/{i}/operation`).
+- A `notify` step's checks are listed under
+  [Notify operation](notifications.md#notify-operation) (`AXC0266` to
+  `AXC0273`). The step compiles, but a published process that reaches it
+  fails until the runtime part of D73 is built.
 - Each key of an `updateRecord` `set` names a field of the subject entity,
   ignoring letter case, that no earlier key of the step names (`AXC0079`).
   The field is not computed, not numbered by a sequence and not a child
@@ -349,9 +354,12 @@ reported in one pass. See
   `connector`, `input`, `output`, `retry`, `event` or `fields`. A
   `callConnector` step has `connector` and `input`, and no `set`, `event` or
   `fields`. A `raiseEvent` step has `event` and `fields`, and no `set`,
-  `connector`, `input`, `output` or `retry`. A decision has no `operation`,
-  `set`, `connector`, `input`, `output`, `retry`, `event`, `fields` or
-  `next`. Neither an operation nor a decision has a task's `label`,
+  `connector`, `input`, `output` or `retry`. A `notify` step has `to`,
+  `channels` and `message`, and no `set`, `connector`, `input`, `output`,
+  `retry`, `event` or `fields`. A decision has no `operation`,
+  `set`, `connector`, `input`, `output`, `retry`, `event`, `fields`, `to`,
+  `channels`, `message`, `open` or `next`. `to`, `channels`, `message` and
+  `open` are on a `notify` step only. Neither an operation nor a decision has a task's `label`,
   `assignee`, `form`, `dueIn` or `outcomes` (`AXC0004`).
 - A task has `label`, `assignee`, `form` and at least one outcome, and no
   `branches`, `otherwise`, `operation`, `set`, `connector`, `input`,
@@ -361,7 +369,7 @@ reported in one pass. See
   or any task property (`AXC0004`).
 - A timer has `next`, and no `branches`, `otherwise`, `operation`, `set`,
   `connector`, `input`, `output`, `retry`, `event`, `fields` or any task
-  property (`AXC0004`). It has exactly one of `wait` and `until` (`AXC0266` at
+  property (`AXC0004`). It has exactly one of `wait` and `until` (`AXC0277` at
   `/steps/{i}`). A `wait` is a positive fixed-length duration, by the rule of a
   task's `dueIn` (`AXC0084` at `/steps/{i}/wait`). An `until` gives a
   `date-time`, with the same scope as a `when`. A problem is reported at
@@ -764,6 +772,9 @@ database, with history in `axis.__processes_migrations` (see
     one entity. Its item also has the `entity_id`, and each claim runs one
     batch of up to 500 rows. See
     [Recomputing computed fields](migrations.md#recomputing-computed-fields).
+  - `records.importCheck` dry-runs one uploaded record import. It has no
+    other id column: the import row names the item in its `work_item_id`. See
+    [Import](import-export.md#import).
 - `axis.process_start_receipts`: the stored `201` response of each
   `Idempotency-Key`, unique per application, process and key. The subject is
   null for a process without a subject.

@@ -71,7 +71,8 @@ The `Dockerfile` also has three production targets, `axis-server`, `axis-worker`
 which hold no samples or development settings. Build one with
 `docker build --target axis-server --build-arg AXIS_VERSION=<version> .`. `scripts/e2e.sh` builds
 and runs all three in the `images` suite, from `scripts/images.test.mjs`. The default target is still
-the development server.
+the development server. The `images` and on-premises suites build each image up to three times, and wait
+15 seconds, then 30 seconds, between attempts, because a download in the build can fail at times.
 
 `Axis.Admin` is the console tool that the platform operator runs. It creates, suspends,
 resumes, lists, backs up and restores tenants, and it migrates and activates them. Run it with

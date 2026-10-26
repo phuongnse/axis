@@ -1,3 +1,4 @@
+using System.Globalization;
 using Axis.Configuration.Modules;
 using Axis.Configuration.Packages;
 using Axis.Core.Telemetry;
@@ -15,11 +16,12 @@ public static class WorkerServiceCollectionExtensions
     /// background service that runs the due work items of every tenant, and the health checks
     /// that <see cref="WorkerHealthEndpoints.MapWorkerHealth"/> serves. Under <c>Tenancy:Source=directory</c> the
     /// tenants are read from the tenant directory over <c>ConnectionStrings:Platform</c> once the worker runs, and again every
-    /// <c>Tenancy:RefreshInterval</c>. Only a worker
+    /// <c>Tenancy:RefreshInterval</c>. The dry run of an import fails a file with more data rows than
+    /// <c>Data:ImportMaxRows</c>, which defaults to 10000. Only a worker
     /// that runs in Development sends connector calls to an <c>http</c> base URL.
     /// </summary>
     /// <exception cref="InvalidOperationException">
-    /// The tenant, worker or health configuration is invalid, <c>Tenancy:Source</c> is unknown, <c>ConnectionStrings:Platform</c>, <c>Platform:SecretKey</c> or <c>Tenancy:RefreshInterval</c> is missing or invalid under
+    /// The tenant, worker or health configuration is invalid, <c>Data:ImportMaxRows</c> is not an integer of at least 1, <c>Tenancy:Source</c> is unknown, <c>ConnectionStrings:Platform</c>, <c>Platform:SecretKey</c> or <c>Tenancy:RefreshInterval</c> is missing or invalid under
     /// <c>directory</c>, <c>Extensions:Path</c> or <c>Modules:Path</c> names a folder that does not exist.
     /// </exception>
     public static IServiceCollection AddAxisWorker(this IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
@@ -88,7 +90,7 @@ public static class WorkerServiceCollectionExtensions
         services.AddSingleton(catalog);
         services.AddExtensionPackages(configuration, environment);
         services.AddModules(configuration, environment);
-        services.AddProcesses(environment.IsDevelopment(), options.DeliveryAttempts);
+        services.AddProcesses(environment.IsDevelopment(), options.DeliveryAttempts, ImportMaxRows(configuration));
         services.AddSingleton(options);
         services.AddSingleton(health);
         services.TryAddSingleton(TimeProvider.System);
@@ -103,5 +105,18 @@ public static class WorkerServiceCollectionExtensions
         services.AddHostedService<WorkerService>();
         services.AddHostedService<WorkerMetricsService>();
         return services;
+    }
+
+    private static int ImportMaxRows(IConfiguration configuration)
+    {
+        const string setting = "Data:ImportMaxRows";
+        if (configuration[setting] is not { Length: > 0 } text)
+        {
+            return 10000;
+        }
+
+        return int.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out var rows) && rows >= 1
+            ? rows
+            : throw new InvalidOperationException($"'{setting}' must be an integer of at least 1.");
     }
 }
