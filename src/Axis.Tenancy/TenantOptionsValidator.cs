@@ -90,27 +90,31 @@ public static class TenantOptionsValidator
 
     /// <summary>
     /// Adds the problems of one binding. <paramref name="hasValue"/> tells whether the binding holds a value, and
-    /// <paramref name="url"/> is the value a <c>url</c> binding is checked on. A binding's value never goes into a
+    /// <paramref name="value"/> is the value a <c>url</c> or <c>storage</c> binding is checked on. A binding's value never goes into a
     /// message, so a bad configuration cannot leak a secret.
     /// </summary>
-    internal static void AddBindingProblems(string tenantId, string name, string? kind, bool hasValue, string? url, List<string> problems)
+    internal static void AddBindingProblems(string tenantId, string name, string? kind, bool hasValue, string? value, List<string> problems)
     {
         if (string.IsNullOrWhiteSpace(kind))
         {
-            problems.Add($"Tenant '{tenantId}' binding '{name}' has no kind: use '{DeploymentBindingKinds.Url}' or '{DeploymentBindingKinds.Secret}'.");
+            problems.Add($"Tenant '{tenantId}' binding '{name}' has no kind: use '{DeploymentBindingKinds.Url}', '{DeploymentBindingKinds.Secret}' or '{DeploymentBindingKinds.Storage}'.");
         }
-        else if (kind is not (DeploymentBindingKinds.Url or DeploymentBindingKinds.Secret))
+        else if (kind is not (DeploymentBindingKinds.Url or DeploymentBindingKinds.Secret or DeploymentBindingKinds.Storage))
         {
-            problems.Add($"Tenant '{tenantId}' binding '{name}' has kind '{kind}': use '{DeploymentBindingKinds.Url}' or '{DeploymentBindingKinds.Secret}'.");
+            problems.Add($"Tenant '{tenantId}' binding '{name}' has kind '{kind}': use '{DeploymentBindingKinds.Url}', '{DeploymentBindingKinds.Secret}' or '{DeploymentBindingKinds.Storage}'.");
         }
 
         if (!hasValue)
         {
             problems.Add($"Tenant '{tenantId}' binding '{name}' has no value.");
         }
-        else if (kind == DeploymentBindingKinds.Url && !IsAbsoluteHttpUrl(url))
+        else if (kind == DeploymentBindingKinds.Url && !IsAbsoluteHttpUrl(value))
         {
             problems.Add($"Tenant '{tenantId}' binding '{name}' is not an absolute http or https URL.");
+        }
+        else if (kind == DeploymentBindingKinds.Storage && value != StorageBindingValues.Database)
+        {
+            problems.Add($"Tenant '{tenantId}' binding '{name}' is a storage binding whose value is not '{StorageBindingValues.Database}'.");
         }
     }
 

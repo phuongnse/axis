@@ -11,7 +11,8 @@ namespace Axis.Integration.Tests;
 /// The upload route of a file field, on the FilesApp fixture in tenant A. Its <c>Claim</c> entity has a
 /// <c>receipt</c> file field with a <c>maxSize</c> of 1024 bytes that accepts PDF and any image, and an
 /// <c>attachments</c> child collection whose rows have a <c>file</c> field. <c>anna</c> may create and update
-/// claims, <c>rita</c> may only read them, and <c>fia</c> may update only their <c>title</c>.
+/// claims, <c>rita</c> may only read them, and <c>fia</c> may update only their <c>title</c>. FilesApp names the
+/// tenant's <c>Files</c> <c>storage</c> binding, so the bytes of an upload go to <c>axis.file_contents</c>.
 /// </summary>
 public sealed class FileUploadTests(RecordApiFixture fixture) : IClassFixture<RecordApiFixture>
 {

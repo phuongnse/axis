@@ -141,6 +141,61 @@ public sealed class ReleaseActivatorTests(DataDatabaseFixture database) : IClass
         Assert.Equal(["id", "version", "computed_release_id", "f_number"], Assert.Single(await ReadTablesAsync(_orderId)).Columns.Select(column => column.Name));
     }
 
+    [Theory]
+    [InlineData(null, "Tenant 'acme' has no binding 'Files'. Add a 'storage' binding with that name to the tenant.")]
+    [InlineData("url", "Tenant 'acme' binding 'Files' is a 'url' binding. It is used here as a 'storage' binding.")]
+    public async Task A_file_storage_binding_the_tenant_lacks_or_holds_with_another_kind_is_a_diagnostic_and_changes_nothing(
+        string? kind, string message)
+    {
+        using var folder = ApplicationFolder(_applicationId, _name, _orderId, NumberField);
+        Assert.Empty((await ActivateAsync(await CompileAsync(folder))).Diagnostics);
+        var before = await FindActiveAsync(_applicationId);
+        folder.With("application.json", Manifest(_applicationId, _name, "Files"));
+        var compiled = await CompileAsync(folder);
+        var bindings = new Dictionary<string, ActivationBinding>(StringComparer.OrdinalIgnoreCase);
+        if (kind is not null)
+        {
+            bindings["Files"] = new ActivationBinding(kind, new Uri("https://files.example.test"));
+        }
+
+        var result = await ActivateAsync(compiled, new ActivationBindings("acme", bindings, AllowHttp: false));
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.MissingDeploymentBinding, "application.json", "/fileStorage/binding", _applicationId, message),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.ResourceId, diagnostic.Message));
+        Assert.Equal(before, await FindActiveAsync(_applicationId));
+    }
+
+    [Fact]
+    public async Task A_storage_binding_the_tenant_holds_activates_a_release_that_names_it()
+    {
+        using var folder = ApplicationFolder(_applicationId, _name, _orderId, NumberField);
+        folder.With("application.json", Manifest(_applicationId, _name, "Files"));
+        var compiled = await CompileAsync(folder);
+        var bindings = new Dictionary<string, ActivationBinding>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["files"] = new(ActivationBinding.StorageKind, null),
+        };
+
+        var result = await ActivateAsync(compiled, new ActivationBindings("acme", bindings, AllowHttp: false));
+
+        Assert.Empty(result.Diagnostics);
+        Assert.Equal(compiled.Release?.Id, (await FindActiveAsync(_applicationId))?.ReleaseId);
+    }
+
+    [Fact]
+    public async Task An_application_without_file_storage_activates_with_no_bindings()
+    {
+        using var folder = ApplicationFolder(_applicationId, _name, _orderId, NumberField);
+        var compiled = await CompileAsync(folder);
+
+        var result = await ActivateAsync(compiled, ActivationBindings.None("acme"));
+
+        Assert.Empty(result.Diagnostics);
+        Assert.Equal(compiled.Release?.Id, (await FindActiveAsync(_applicationId))?.ReleaseId);
+    }
+
     [Fact]
     public async Task Every_binding_a_tenant_lacks_is_reported_and_nothing_is_provisioned_or_activated()
     {
@@ -483,6 +538,9 @@ public sealed class ReleaseActivatorTests(DataDatabaseFixture database) : IClass
 
     private static string Manifest(Guid id, string name) =>
         $$"""{ "id": "{{id}}", "kind": "application", "name": "{{name}}", "formatVersion": 1 }""";
+
+    private static string Manifest(Guid id, string name, string fileStorage) =>
+        $$"""{ "id": "{{id}}", "kind": "application", "name": "{{name}}", "formatVersion": 1, "fileStorage": { "binding": "{{fileStorage}}" } }""";
 
     private static string OrderFile(Guid id, params string[] fields) =>
         $$"""

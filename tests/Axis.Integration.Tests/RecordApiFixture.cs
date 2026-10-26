@@ -25,7 +25,8 @@ namespace Axis.Integration.Tests;
 /// Two tenant databases in one PostgreSQL container, each with both migrations applied and the
 /// RecordsApp fixture application activated, served by the real server on hosts
 /// <c>a.example.test</c> and <c>b.example.test</c>. Tenant A also has the SecondApp and FilesApp fixtures
-/// activated, and a compiled release of an application that was never activated. The test
+/// activated, and a compiled release of an application that was never activated. FilesApp names a
+/// <c>storage</c> binding, <c>Files</c>, which tenant A holds with the value <c>database</c>. The test
 /// authentication scheme signs in <c>anna</c>, an employee with every grant of both applications,
 /// and users with fewer grants: <c>binh</c> holds no role, <c>rita</c> is a reader, <c>uma</c>
 /// holds only undeclared role names, <c>fia</c> holds only grants with fields, on items,
@@ -137,7 +138,11 @@ public sealed class RecordApiFixture : IAsyncLifetime
 
                 var files = await ReleaseCompiler.CompileAsync(Path.Combine(AppContext.BaseDirectory, "Fixtures", "FilesApp"), configuration);
                 Assert.Empty(files.Diagnostics);
-                var filesActivated = await ReleaseActivator.ActivateAsync(files, new ActiveReleaseStore(configuration), data, ActivationBindings.None("default"), OpenInstanceCounter.Instance);
+                var filesBindings = new ActivationBindings(
+                    "default",
+                    new Dictionary<string, ActivationBinding>(StringComparer.OrdinalIgnoreCase) { ["Files"] = new(ActivationBinding.StorageKind, null) },
+                    AllowHttp: false);
+                var filesActivated = await ReleaseActivator.ActivateAsync(files, new ActiveReleaseStore(configuration), data, filesBindings, OpenInstanceCounter.Instance);
                 Assert.Empty(filesActivated.Diagnostics);
                 _filesModel = files.Model;
                 _filesReleaseId = files.Release!.Id;
@@ -160,6 +165,8 @@ public sealed class RecordApiFixture : IAsyncLifetime
             builder.UseSetting("Tenants:a:Hosts:0", HostA);
             builder.UseSetting("Tenants:a:ConnectionString", PostgreSqlServer.RuntimeConnectionString(ConnectionString(TenantA)));
             builder.UseSetting("Tenants:a:SchemaConnectionString", ConnectionString(TenantA));
+            builder.UseSetting("Tenants:a:Bindings:Files:Kind", "storage");
+            builder.UseSetting("Tenants:a:Bindings:Files:Value", "database");
             builder.UseSetting("Tenants:b:Hosts:0", HostB);
             builder.UseSetting("Tenants:b:ConnectionString", PostgreSqlServer.RuntimeConnectionString(ConnectionString(TenantB)));
             builder.UseSetting("Tenants:b:SchemaConnectionString", ConnectionString(TenantB));

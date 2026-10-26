@@ -9,6 +9,9 @@ public sealed record ApplicationManifest : Resource
     /// </summary>
     public string? TimeZone { get; init; }
 
+    /// <summary>The deployment binding that names where the files of file fields are stored, or null for the tenant database.</summary>
+    public BindingReference? FileStorage { get; init; }
+
     /// <summary>The extension packages the application uses, in the order written.</summary>
     public IReadOnlyList<ApplicationPackageDefinition> Packages { get; init; } = [];
 

@@ -39,12 +39,12 @@ public sealed class ConfigurationTenantCatalogTests
         {
             "binding with a bad kind",
             [.. Valid(), "Tenants:default:Bindings:Token:Kind=password", "Tenants:default:Bindings:Token:Value=s3cr3t"],
-            "Tenant 'default' binding 'Token' has kind 'password': use 'url' or 'secret'."
+            "Tenant 'default' binding 'Token' has kind 'password': use 'url', 'secret' or 'storage'."
         },
         {
             "binding without a kind",
             [.. Valid(), "Tenants:default:Bindings:Token:Value=s3cr3t"],
-            "Tenant 'default' binding 'Token' has no kind: use 'url' or 'secret'."
+            "Tenant 'default' binding 'Token' has no kind: use 'url', 'secret' or 'storage'."
         },
         {
             "binding without a value",

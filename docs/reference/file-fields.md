@@ -117,7 +117,7 @@ This is _(planned for M15)_.
   who uploaded it and when. The field's column is a `uuid` that points to it.
 - **Bytes** _(built)_. The bytes live in `axis.file_contents` of the tenant
   database, under the id of the file's row. A `storage` binding that names
-  where the bytes go is _(planned for M15)_, see
+  where the bytes go is _(built)_, see
   [deployment bindings](integration-resources.md#deployment-bindings). In M15
   its only value is `database`. An application without `fileStorage` in its
   manifest uses the tenant database too.
