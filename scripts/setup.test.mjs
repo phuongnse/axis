@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { describe, test } from 'node:test'
@@ -22,6 +22,26 @@ if [ "$count" -le "$STUB_FAIL_TIMES" ]; then exit "$STUB_FAIL_STATUS"; fi
 exit 0
 `
 
+// Stands in for curl. The first three requests for each URL fail with the 403 seen on CI, and the
+// fourth writes a small JSON file to the -o path.
+const curlStub = `#!/usr/bin/env bash
+url="\${@: -1}"
+echo "$url" >> "$STUB_LOG"
+counter="$STUB_COUNTS/$(printf '%s' "$url" | tr -c 'A-Za-z0-9' '_')"
+count=$(( $(cat "$counter" 2>/dev/null || echo 0) + 1 ))
+echo "$count" > "$counter"
+if [ "$count" -le 3 ]; then
+  echo "curl: (22) The requested URL returned error: 403" >&2
+  exit 22
+fi
+out=""
+while [ $# -gt 0 ]; do
+  if [ "$1" = "-o" ]; then out="$2"; fi
+  shift
+done
+echo '{}' > "$out"
+`
+
 const commands = [
   'dotnet restore Axis.slnx',
   'dotnet tool restore',
@@ -36,6 +56,20 @@ const ciCommands = [
   'npx --prefix tests/e2e playwright install chromium',
 ]
 
+function cacheTools(home, { schemas = true } = {}) {
+  const tools = join(home, '.cache', 'axis-tools')
+  for (const file of [
+    `helm-${version('HELM_VERSION')}/helm`,
+    `kubeconform-${version('KUBECONFORM_VERSION')}/kubeconform`,
+  ]) {
+    mkdirSync(dirname(join(tools, file)), { recursive: true })
+    writeFileSync(join(tools, file), '', { mode: 0o755 })
+  }
+  if (schemas) {
+    mkdirSync(join(tools, `kubernetes-schemas-${version('KUBERNETES_VERSION')}`), { recursive: true })
+  }
+}
+
 function runSetup({ failTimes = 0, failStatus = 1, ci = false } = {}) {
   const dir = mkdtempSync(join(tmpdir(), 'axis-setup-'))
   try {
@@ -49,15 +83,7 @@ function runSetup({ failTimes = 0, failStatus = 1, ci = false } = {}) {
       writeFileSync(join(bin, name), stub, { mode: 0o755 })
     }
 
-    const tools = join(home, '.cache', 'axis-tools')
-    for (const file of [
-      `helm-${version('HELM_VERSION')}/helm`,
-      `kubeconform-${version('KUBECONFORM_VERSION')}/kubeconform`,
-    ]) {
-      mkdirSync(dirname(join(tools, file)), { recursive: true })
-      writeFileSync(join(tools, file), '', { mode: 0o755 })
-    }
-    mkdirSync(join(tools, `kubernetes-schemas-${version('KUBERNETES_VERSION')}`), { recursive: true })
+    cacheTools(home)
 
     const result = spawnSync('bash', ['scripts/setup.sh'], {
       cwd: root,
@@ -119,6 +145,46 @@ describe('scripts/setup.sh retries its network steps', () => {
     const result = runSetup({ ci: true })
     assert.equal(result.status, 0, result.stderr)
     assert.deepEqual(result.ran, ciCommands)
+  })
+})
+
+describe('scripts/lib/tools.sh retries a download that the host refuses once', () => {
+  test('a schema download that fails with 403 three times succeeds on its fourth try', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'axis-tools-'))
+    try {
+      const bin = join(dir, 'bin')
+      const counts = join(dir, 'counts')
+      const log = join(dir, 'log')
+      const home = join(dir, 'home')
+      mkdirSync(bin)
+      mkdirSync(counts)
+      writeFileSync(join(bin, 'curl'), curlStub, { mode: 0o755 })
+      cacheTools(home, { schemas: false })
+
+      const result = spawnSync('bash', ['-c', 'source scripts/lib/tools.sh; install_tools'], {
+        cwd: root,
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          PATH: `${bin}:${process.env.PATH}`,
+          HOME: home,
+          AXIS_RETRY_DELAY_SECONDS: '0',
+          STUB_LOG: log,
+          STUB_COUNTS: counts,
+        },
+      })
+      assert.equal(result.status, 0, result.stderr)
+      assert.equal(readFileSync(log, 'utf8').trimEnd().split('\n').length, 12)
+      assert.match(result.stderr, /Attempt 1 of 4 failed with status 22/)
+      const schemas = join(home, '.cache', 'axis-tools', `kubernetes-schemas-${version('KUBERNETES_VERSION')}`)
+      assert.deepEqual(readdirSync(schemas).sort(), [
+        'deployment-apps-v1.json',
+        'job-batch-v1.json',
+        'service-v1.json',
+      ])
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
   })
 })
 
