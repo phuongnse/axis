@@ -71,7 +71,8 @@ The `Dockerfile` also has three production targets, `axis-server`, `axis-worker`
 which hold no samples or development settings. Build one with
 `docker build --target axis-server --build-arg AXIS_VERSION=<version> .`. `scripts/e2e.sh` builds
 and runs all three in the `images` suite, from `scripts/images.test.mjs`. The default target is still
-the development server.
+the development server. The `images` and on-premises suites build each image up to three times, and wait
+15 seconds, then 30 seconds, between attempts, because a download in the build can fail at times.
 
 `Axis.Admin` is the console tool that the platform operator runs. It creates, suspends,
 resumes, lists, backs up and restores tenants, and it migrates and activates them. Run it with
@@ -273,10 +274,15 @@ fixtures, only for the API paths of the fixture application. It needs no server,
   checks it with `scripts/check-design-system.mjs`: one classic script, no `import`, no literal `</script`
   or `<!--`, at most 6 MB, and no HTML file in the folder. It needs no Playwright browser. It is not a
   NexKit check. The local agent session publishes the bundle as the Design System artifact.
-- The bundle sets `window.Axis`. `window.Axis.<name>(element)` mounts one preview into an element and
-  returns a function that unmounts it. The names are `table`, `form`, `taskInbox`, `processInspector`,
-  `detail`, `chart-<kind>` for `bar`, `line` and `pie`, `kpi`, `columns`, `tabs`, `section` and
-  `field-<type>` for each field type. A `field-<type>` preview draws the input the form widget uses for that field type,
+- The bundle sets `window.Axis`. `window.Axis.<name>(element)` mounts one preview into an element. It
+  draws every state of the preview in one card, each under its caption, and returns a function that
+  unmounts them all, see [D95](decisions/d95-widget-previews-show-the-states-a-design-change-touches.md).
+  Every preview has at least one state, and a preview with only one shows it as "Typical". A state can
+  bring its own fixtures, on its own paths in the fixture application. The names are `table`, `form`,
+  `taskInbox`, `processInspector`, `detail`, `chart-<kind>` for `bar`, `line` and `pie`, `kpi`, `columns`,
+  `tabs`, `section`, `states` and `field-<type>` for each field type. The `states` preview draws, once,
+  the states every widget shares: a table while it loads and a table whose request fails. A
+  `field-<type>` preview draws the input the form widget uses for that field type,
   with its label and the fixture value, laid out as on a form. It has no Save, Cancel or action buttons and no history,
   which only the `form` preview shows. Its input works as on a form, and nothing is saved. A mounted widget follows
   `data-theme` on the root element of the page.
@@ -290,7 +296,8 @@ fixtures, only for the API paths of the fixture application. It needs no server,
 and fails on a console error or on a request other than the harness and the bundle. It also checks that
 changing `data-theme` redraws a table, that a mounted form follows `--primary` on the root element and redraws when
 it changes, and that no fixture reaches the server's web root. It checks that a field preview has no Save button and
-no history, and it opens the date-time picker and the reference lookup and adds a child collection row.
+no history, and that the `states` preview shows a busy widget and the load error alert. It opens the date-time
+picker and the reference lookup and adds a child collection row.
 
 ## Formatting
 
