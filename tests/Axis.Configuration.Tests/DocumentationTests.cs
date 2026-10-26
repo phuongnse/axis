@@ -67,8 +67,8 @@ public sealed class DocumentationTests
         var declared = ExpressionFunctions.Names;
 
         Assert.True(!planned.Intersect(declared).Any(), $"Marked planned in the docs but already in ExpressionFunctions: {string.Join(", ", planned.Intersect(declared))}.");
-        Assert.True(!declared.Except(documented).Any(), $"Missing from the docs table: {string.Join(", ", declared.Except(documented))}.");
-        Assert.True(!documented.Except(declared).Any(), $"Not in ExpressionFunctions: {string.Join(", ", documented.Except(declared))}.");
+        Assert.True(!declared.Except(documented).Any(), $"Missing from the docs table: {string.Join(", ", declared.Except(documented))}. Add a row to the table in docs/reference/expressions.md.");
+        Assert.True(!documented.Except(declared).Any(), $"Not in ExpressionFunctions: {string.Join(", ", documented.Except(declared))}. Mark the row _(planned for Mx)_ or add the function to ExpressionFunctions.");
         Assert.Equal(documented.Count, documented.Distinct().Count());
     }
 
@@ -85,8 +85,8 @@ public sealed class DocumentationTests
         var declared = ExpressionFunctions.AggregateNames;
 
         Assert.True(!planned.Intersect(declared).Any(), $"Marked planned in the docs but already in ExpressionFunctions: {string.Join(", ", planned.Intersect(declared))}.");
-        Assert.True(!declared.Except(documented).Any(), $"Missing from the docs table: {string.Join(", ", declared.Except(documented))}.");
-        Assert.True(!documented.Except(declared).Any(), $"Not in ExpressionFunctions: {string.Join(", ", documented.Except(declared))}.");
+        Assert.True(!declared.Except(documented).Any(), $"Missing from the docs table: {string.Join(", ", declared.Except(documented))}. Add a row to the table in docs/reference/expressions.md.");
+        Assert.True(!documented.Except(declared).Any(), $"Not in ExpressionFunctions: {string.Join(", ", documented.Except(declared))}. Mark the row _(planned for Mx)_ or add the function to ExpressionFunctions.");
     }
 
     [Fact]
