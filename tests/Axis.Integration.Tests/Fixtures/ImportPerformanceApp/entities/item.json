@@ -1,0 +1,15 @@
+{
+  "id": "d4ff006c-b0fc-4175-85de-7f0c80189357",
+  "kind": "entity",
+  "name": "Item",
+  "formatVersion": 1,
+  "fields": [
+    { "name": "number", "type": "text", "maxLength": 20, "unique": true, "sequence": "ItemNumber" },
+    { "name": "name", "type": "text", "required": true, "maxLength": 100 },
+    { "name": "quantity", "type": "integer" },
+    { "name": "supplier", "type": "reference", "target": "Supplier" }
+  ],
+  "validations": [
+    { "expression": "quantity is null or quantity > 0", "message": { "textKey": "item.quantityPositive" }, "field": "quantity" }
+  ]
+}

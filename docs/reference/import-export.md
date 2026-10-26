@@ -190,6 +190,7 @@ matching and the file cleanup of an import are not built.
 - **Who sees it.** Only the user who uploaded an import reads it or commits
   it. The uploaded file is deleted when the import is committed, fails or is
   older than 24 hours.
+- **Speed.** A CSV import of 10,000 rows into an entity with a reference, a sequence and a validation finishes its dry run within 3 s and its commit within 96 s. `ImportPerformanceTests` fails past either limit. It also checks that all created rows share one `xmin`, which shows the single transaction.
 
 ## In the SPA
 

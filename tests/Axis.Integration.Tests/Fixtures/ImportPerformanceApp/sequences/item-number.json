@@ -1,0 +1,7 @@
+{
+  "id": "c7dea92b-17b2-4fdb-898d-505e7c42452d",
+  "kind": "sequence",
+  "name": "ItemNumber",
+  "formatVersion": 1,
+  "format": "I-{n:5}"
+}

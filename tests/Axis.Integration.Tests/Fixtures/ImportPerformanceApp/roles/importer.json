@@ -1,0 +1,9 @@
+{
+  "id": "27a0e748-f5c4-43f7-a96b-15d4e380e959",
+  "kind": "role",
+  "name": "importer",
+  "formatVersion": 1,
+  "label": {
+    "textKey": "role.importer"
+  }
+}
