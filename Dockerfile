@@ -20,8 +20,9 @@ WORKDIR /src/web
 COPY web/package.json web/package-lock.json ./
 RUN npm ci
 COPY web/ ./
-# The type check also reads the platform texts and the sample process that web tests import.
+# The type check also reads the platform texts, the process schema and the sample process that web tests import.
 COPY src/Axis.Presentation/Texts/ /src/src/Axis.Presentation/Texts/
+COPY src/Axis.Configuration/Schemas/ /src/src/Axis.Configuration/Schemas/
 COPY samples/apps/purchase-requests/processes/purchase-request-approval.json /src/samples/apps/purchase-requests/processes/
 RUN npm run build
 
