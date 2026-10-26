@@ -16,11 +16,13 @@ namespace Axis.Data.DataSources;
 /// parameter. The filter is translated by <see cref="SqlTranslator"/> into the <c>WHERE</c> clause
 /// of both the count and the page statement, with the body of each rule it calls inlined. Its
 /// literals are <c>@f0</c>, <c>@f1</c>, … and the data source parameters are <c>@p0</c>,
-/// <c>@p1</c>, … in declaration order. Each distinct path
+/// <c>@p1</c>, … in declaration order. The filter of measure <c>i</c> has its own literals,
+/// <c>@m{i}_0</c>, <c>@m{i}_1</c>, …. Each distinct path
 /// through reference fields, from the projection, the labels, the sort or the filter, is one left
 /// join on the target's id, so a page is one statement plus the count whatever its size, and a
 /// null reference gives null related values without hiding the row. A grouped data source groups
-/// the filtered rows by its group fields, and each row of a page is one group.
+/// the filtered rows by its group fields, and each row of a page is one group. A measure with a
+/// filter is <c>agg(...) FILTER (WHERE ...)</c>.
 /// </summary>
 public static class DataSourceQueries
 {
@@ -209,10 +211,12 @@ public static class DataSourceQueries
 
     /// <summary>
     /// The count and the page statement of <paramref name="dataSource"/>, and the values of its
-    /// filter. The page statement ends with <c>LIMIT @limit OFFSET @offset</c>. Both put the
+    /// filter, then of each measure filter. A measure filter is translated once, and the select list
+    /// and the sort both use its SQL. The page statement ends with <c>LIMIT @limit OFFSET @offset</c>. Both put the
     /// filter and <paramref name="condition"/>, joined with <c>AND</c>, in one <c>WHERE</c> clause
-    /// over the root row before any grouping. Neither holds a value from the filter, a parameter
-    /// or the condition: each is a parameter that the caller adds.
+    /// over the root row before any grouping. Neither holds a value from a filter, a parameter
+    /// or the condition: each is a parameter that the caller adds. The count statement names no
+    /// measure filter, so it ignores their values.
     /// </summary>
     internal static DataSourceStatement Statement(
         ApplicationModel application, DataSourceModel dataSource, DataSourceSort? sort, RecordCondition? condition)
@@ -221,23 +225,38 @@ public static class DataSourceQueries
         var row = EntityNaming.Quote(RowAlias);
         var joins = new Joins();
         string select, groupBy, order;
+        var measureValues = new List<SqlValue>();
         if (dataSource.Aggregate is { } aggregate)
         {
-            (select, groupBy) = GroupedSelectList(aggregate, joins);
+            // Keyed by measure name, which is unique in a data source.
+            var measureFilters = new Dictionary<string, string>(StringComparer.Ordinal);
+            for (var index = 0; index < aggregate.Measures.Count; index++)
+            {
+                if (aggregate.Measures[index].Filter is { } measureFilter)
+                {
+                    var (sql, values) = Translate(application, dataSource, measureFilter, joins, $"m{index}_");
+                    measureFilters.Add(aggregate.Measures[index].Name, sql);
+                    measureValues.AddRange(values);
+                }
+            }
+
+            (select, groupBy) = GroupedSelectList(aggregate, joins, measureFilters);
 
             // Each group is unique by its group fields, so they break every tie.
             var groupOrder = aggregate.GroupBy.Select(field => $"{joins.ColumnOf(field.Path)} ASC");
-            order = string.Join(", ", sort is null ? groupOrder : [OrderTerm(sort, joins), .. groupOrder]);
+            order = string.Join(", ", sort is null ? groupOrder : [OrderTerm(sort, joins, measureFilters), .. groupOrder]);
         }
         else
         {
             select = SelectList(dataSource, joins);
             groupBy = "";
             var id = $"{row}.{EntityNaming.Quote(EntityNaming.IdColumn)}";
-            order = sort is null ? $"{id} ASC" : $"{OrderTerm(sort, joins)}, {id} ASC";
+            order = sort is null ? $"{id} ASC" : $"{OrderTerm(sort, joins, null)}, {id} ASC";
         }
 
-        var (filter, values) = Filter(application, dataSource, joins);
+        var (filter, filterValues) = dataSource.Filter is { } dataSourceFilter
+            ? Translate(application, dataSource, dataSourceFilter, joins, "f")
+            : (null, []);
         string[] conditions = [.. new[] { filter, condition?.Sql }.OfType<string>()];
         var where = conditions.Length == 0 ? "" : $" WHERE {string.Join(" AND ", conditions)}";
         var from = $"{table} AS {row}{joins.Sql}{where}";
@@ -251,22 +270,18 @@ public static class DataSourceQueries
             ? $"SELECT count(*) FROM {from}"
             : $"SELECT count(*) FROM (SELECT count(*) FROM {from}{groupBy}) AS g";
         var pageSql = $"SELECT {select} FROM {from}{groupBy}{orderBy} LIMIT @limit OFFSET @offset";
-        return new DataSourceStatement(countSql, pageSql, values, from);
+        return new DataSourceStatement(countSql, pageSql, [.. filterValues, .. measureValues], from);
     }
 
     /// <summary>
-    /// The filter as SQL and the values it names, or null and no values without a filter. A bare
-    /// name in the filter is a parameter, matched ignoring letter case, or else a column of the root
-    /// row. A longer path is a column of a joined target.
+    /// <paramref name="filter"/>, the data source filter or a measure filter, as SQL and the values it
+    /// names, which are called <paramref name="prefix"/> and a counter. A bare name in the filter is a
+    /// parameter, matched ignoring letter case, or else a column of the root row. A longer path is a
+    /// column of a joined target.
     /// </summary>
-    private static (string? Sql, IReadOnlyList<SqlValue> Values) Filter(
-        ApplicationModel application, DataSourceModel dataSource, Joins joins)
+    private static (string Sql, IReadOnlyList<SqlValue> Values) Translate(
+        ApplicationModel application, DataSourceModel dataSource, ExpressionModel filter, Joins joins, string prefix)
     {
-        if (dataSource.Filter is not { } filter)
-        {
-            return (null, []);
-        }
-
         var translated = SqlTranslator.Translate(
             filter.Syntax,
             names =>
@@ -285,6 +300,7 @@ public static class DataSourceQueries
                 return joins.ColumnOf(ResolvePath(application, dataSource, names));
             },
             filter.Check,
+            parameterPrefix: prefix,
             timeZone: application.TimeZone);
         if (!translated.Succeeded)
         {
@@ -301,14 +317,23 @@ public static class DataSourceQueries
     /// field of the entity before it.
     /// </summary>
     internal static IReadOnlyList<(Guid EntityId, string Field, string Path)> FilterFieldsRead(
-        ApplicationModel application, DataSourceModel dataSource)
+        ApplicationModel application, DataSourceModel dataSource) =>
+        dataSource.Filter is { } filter ? FieldsRead(application, dataSource, filter) : [];
+
+    /// <summary>
+    /// The fields the filter of every measure reads, as <see cref="FilterFieldsRead"/> reports them for
+    /// the data source filter, in measure order.
+    /// </summary>
+    internal static IReadOnlyList<(Guid EntityId, string Field, string Path)> MeasureFilterFieldsRead(
+        ApplicationModel application, DataSourceModel dataSource) =>
+        [.. dataSource.Aggregate?.Measures.SelectMany(measure =>
+            measure.Filter is { } filter ? FieldsRead(application, dataSource, filter) : [])
+            ?? []];
+
+    private static List<(Guid EntityId, string Field, string Path)> FieldsRead(
+        ApplicationModel application, DataSourceModel dataSource, ExpressionModel filter)
     {
         var read = new List<(Guid, string, string)>();
-        if (dataSource.Filter is not { } filter)
-        {
-            return read;
-        }
-
         var translated = SqlTranslator.Translate(
             filter.Syntax,
             names =>
@@ -425,9 +450,12 @@ public static class DataSourceQueries
     private static IEnumerable<DataSourceFieldModel> References(IEnumerable<DataSourceFieldModel> fields) =>
         fields.Where(field => field.Field.Type == FieldType.Reference);
 
-    /// <summary>The sort column, or the aggregate of the sort measure, with its direction.</summary>
-    private static string OrderTerm(DataSourceSort sort, Joins joins) =>
-        (sort.Measure is { } measure ? Aggregate(measure, joins) : joins.ColumnOf(sort.Field!.Path))
+    /// <summary>
+    /// The sort column, or the aggregate of the sort measure with its filter, with its direction.
+    /// <paramref name="measureFilters"/> is null without a grouping.
+    /// </summary>
+    private static string OrderTerm(DataSourceSort sort, Joins joins, IReadOnlyDictionary<string, string>? measureFilters) =>
+        (sort.Measure is { } measure ? Aggregate(measure, joins, measureFilters!) : joins.ColumnOf(sort.Field!.Path))
         + (sort.Descending ? " DESC" : " ASC");
 
     /// <summary>
@@ -436,8 +464,10 @@ public static class DataSourceQueries
     /// group reference's target. Also the <c>GROUP BY</c> clause with a leading space: the group
     /// columns and those display columns, which each join matches at most once, so they never split
     /// a group. It is empty without a group field, which gives one total row.
+    /// <paramref name="measureFilters"/> holds the SQL of each measure filter by measure name.
     /// </summary>
-    private static (string Select, string GroupBy) GroupedSelectList(DataSourceAggregateModel aggregate, Joins joins)
+    private static (string Select, string GroupBy) GroupedSelectList(
+        DataSourceAggregateModel aggregate, Joins joins, IReadOnlyDictionary<string, string> measureFilters)
     {
         var groupColumns = aggregate.GroupBy.Select(field => joins.ColumnOf(field.Path)).ToList();
         var labelColumns = References(aggregate.GroupBy)
@@ -446,25 +476,32 @@ public static class DataSourceQueries
         var select = string.Join(", ", [
             .. aggregate.GroupBy.Select((field, index) =>
                 groupColumns[index] + (FieldTypes.HoldsDecimal(field.Field.Type) ? "::text" : "")),
-            .. aggregate.Measures.Select(measure => Aggregate(measure, joins) + (IsWrittenAsText(measure) ? "::text" : "")),
+            .. aggregate.Measures.Select(measure => Aggregate(measure, joins, measureFilters) + (IsWrittenAsText(measure) ? "::text" : "")),
             .. labelColumns,
         ]);
         string[] grouping = [.. groupColumns, .. labelColumns];
         return (select, grouping.Length == 0 ? "" : $" GROUP BY {string.Join(", ", grouping)}");
     }
 
-    /// <summary>The aggregate of a measure. A sum, min, max or avg over only <c>NULL</c> values is <c>NULL</c>.</summary>
-    private static string Aggregate(DataSourceMeasureModel measure, Joins joins) =>
-        measure.Function switch
+    /// <summary>
+    /// The aggregate of a measure, followed by <c>FILTER (WHERE ...)</c> when it has a filter. A sum,
+    /// min, max or avg over only <c>NULL</c> values is <c>NULL</c>.
+    /// </summary>
+    private static string Aggregate(
+        DataSourceMeasureModel measure, Joins joins, IReadOnlyDictionary<string, string> measureFilters)
+    {
+        var filter = measureFilters.TryGetValue(measure.Name, out var sql) ? $" FILTER (WHERE {sql})" : "";
+        return measure.Function switch
         {
-            AggregateFunction.Count => "count(*)",
-            AggregateFunction.Sum => $"sum({joins.ColumnOf(measure.Field!.Path)})",
-            AggregateFunction.Min => $"min({joins.ColumnOf(measure.Field!.Path)})",
-            AggregateFunction.Max => $"max({joins.ColumnOf(measure.Field!.Path)})",
-            AggregateFunction.Avg => $"round(avg({joins.ColumnOf(measure.Field!.Path)}), {AvgScale(measure.Field!.Field)})",
-            AggregateFunction.CountDistinct => $"count(DISTINCT {joins.ColumnOf(measure.Field!.Path)})",
+            AggregateFunction.Count => $"count(*){filter}",
+            AggregateFunction.Sum => $"sum({joins.ColumnOf(measure.Field!.Path)}){filter}",
+            AggregateFunction.Min => $"min({joins.ColumnOf(measure.Field!.Path)}){filter}",
+            AggregateFunction.Max => $"max({joins.ColumnOf(measure.Field!.Path)}){filter}",
+            AggregateFunction.Avg => $"round(avg({joins.ColumnOf(measure.Field!.Path)}){filter}, {AvgScale(measure.Field!.Field)})",
+            AggregateFunction.CountDistinct => $"count(DISTINCT {joins.ColumnOf(measure.Field!.Path)}){filter}",
             _ => throw new ArgumentOutOfRangeException(nameof(measure), measure.Function, "Unknown aggregate function."),
         };
+    }
 
     // A sum sent as text keeps its digits exactly, and so does a min or max of a decimal field.
     private static bool IsWrittenAsText(DataSourceMeasureModel measure) =>
@@ -594,7 +631,7 @@ public static class DataSourceQueries
 
 /// <summary>
 /// The SQL of a data source read: the count statement, the page statement, the values of the
-/// data source filter that both name, and the <c>FROM</c> clause with its joins and <c>WHERE</c>
+/// data source filter and then of each measure filter, which only the page statement names, and the <c>FROM</c> clause with its joins and <c>WHERE</c>
 /// that both share, without the keyword.
 /// </summary>
 internal sealed record DataSourceStatement(string CountSql, string PageSql, IReadOnlyList<SqlValue> Values, string From);

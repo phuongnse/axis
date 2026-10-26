@@ -326,8 +326,9 @@ flowchart LR
      child collection. An enum parameter with a value the compared enum field
      lacks is `AXC0047`, and so is a `.` after a field that is not a
      `reference` or after a parameter. A path with more than 3 hops is
-     `AXC0058`. The filter of a data source
-     whose entity is unknown, or that has a parameter with a diagnostic, is
+     `AXC0058`. A measure `filter` is checked the same way and reported at
+     `/aggregate/measures/{i}/filter`. The filters of a data source
+     whose entity is unknown, or that has a parameter with a diagnostic, are
      not checked. See
      [data sources](data-sources.md#compile-checks).
    - **Roles.** A [role](roles-and-policies.md)'s `label` joins the `AXC0028`

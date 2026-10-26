@@ -24,6 +24,16 @@ public sealed class DataSourceAggregateTests(RecordApiFixture fixture) : IClassF
     // quantitySum = sum(quantity), priceSum = sum(price) and priceMax = max(price).
     private const string Totals = "/api/apps/RecordsApp/data-sources/ItemTotals/rows";
 
+    // ItemStatusMeasures has no group field, with open = count where status is open, notOpen = count where
+    // status is not open, openQuantityAvg = avg(quantity) where status is open, notOpenPriceKinds =
+    // countDistinct(price) where status is not open, and largeQuantity and smallQuantity = count where
+    // quantity is over 5 and where it is at most 5.
+    private const string StatusMeasures = "/api/apps/RecordsApp/data-sources/ItemStatusMeasures/rows";
+
+    // ItemStatusMeasuresByDepartment groups items by department.name as departmentName, with the same two
+    // counts, open and notOpen, sorted by -notOpen.
+    private const string StatusMeasuresByDepartment = "/api/apps/RecordsApp/data-sources/ItemStatusMeasuresByDepartment/rows";
+
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
 
     [Fact]
@@ -97,6 +107,47 @@ public sealed class DataSourceAggregateTests(RecordApiFixture fixture) : IClassF
         Assert.Equal((1, 3, 4L), Paging(byName));
         Assert.Empty(Groups(pastTheEnd));
         Assert.Equal((3, 2, 4L), Paging(pastTheEnd));
+    }
+
+    [Fact]
+    public async Task A_measure_with_a_filter_aggregates_only_the_rows_where_its_filter_is_true_and_a_null_result_leaves_the_row_out()
+    {
+        await SeedStatusesAsync();
+
+        using var rows = await GetJsonAsync(StatusMeasures);
+
+        // Eight items: two open, five closed and N1 with no status. Equality is null-safe, so N1 is not open, and
+        // the prices of the items that are not open are 3, 4, 5, 5, 6 and 9. N1 has no quantity, so both quantity
+        // comparisons are null for it and it is in neither count: large and small add up to 7 and not to 8.
+        Assert.Equal((1, 20, 1L), Paging(rows));
+        Assert.Equal(
+            """{"open":2,"notOpen":6,"openQuantityAvg":3.000000,"notOpenPriceKinds":5,"largeQuantity":2,"smallQuantity":5}""",
+            Assert.Single(rows.RootElement.GetProperty("items").EnumerateArray()).GetProperty("values").GetRawText());
+    }
+
+    [Fact]
+    public async Task A_sort_by_a_measure_with_a_filter_orders_the_groups_by_the_filtered_value()
+    {
+        await SeedStatusesAsync();
+
+        using var byNotOpen = await GetJsonAsync(StatusMeasuresByDepartment);
+        using var byOpen = await GetJsonAsync($"{StatusMeasuresByDepartment}?sort=open");
+        using var byName = await GetJsonAsync($"{StatusMeasuresByDepartment}?sort=departmentName");
+
+        // Sales has 2 open and 3 closed items, Ops has 2 closed, and N1 has no department and no status, so it is not open.
+        // Without a filter, each group would count 5, 2 and 1.
+        Assert.Equal(
+            [
+                """{"departmentName":"Sales","open":2,"notOpen":3}""",
+                """{"departmentName":"Ops","open":0,"notOpen":2}""",
+                """{"departmentName":null,"open":0,"notOpen":1}""",
+            ],
+            byNotOpen.RootElement.GetProperty("items").EnumerateArray().Select(item => item.GetProperty("values").GetRawText()));
+        Assert.Equal((1, 20, 3L), Paging(byNotOpen));
+
+        // Ops and the null group tie on open, so departmentName breaks the tie, with null last.
+        Assert.Equal(["Ops", null, "Sales"], Groups(byOpen));
+        Assert.Equal(["Ops", "Sales", null], Groups(byName));
     }
 
     [Fact]
@@ -181,6 +232,44 @@ public sealed class DataSourceAggregateTests(RecordApiFixture fixture) : IClassF
         }
 
         return ids;
+    }
+
+    /// <summary>
+    /// Empties both tenants, then inserts departments Sales and Ops and these items in tenant A. In Sales: S1 and S2
+    /// open with quantities 2 and 4 and price 10.00, and S3, S4 and S5 closed with prices 3.00, 4.00 and 5.00. In Ops:
+    /// O1 and O2 closed with prices 5.00 and 6.00. N1 has no department, no status and no quantity.
+    /// </summary>
+    private async Task SeedStatusesAsync()
+    {
+        await fixture.ResetAsync();
+        var ids = new Dictionary<string, Guid>(StringComparer.Ordinal);
+        foreach (var name in new[] { "Sales", "Ops" })
+        {
+            ids[name] = await fixture.InsertAsync(TenantA, "Department", new Dictionary<string, string?> { ["name"] = name });
+        }
+
+        var items = new (string Name, string? Department, string? Status, string? Quantity, string Price)[]
+        {
+            ("S1", "Sales", "open", "2", "10.00"),
+            ("S2", "Sales", "open", "4", "10.00"),
+            ("S3", "Sales", "closed", "7", "3.00"),
+            ("S4", "Sales", "closed", "9", "4.00"),
+            ("S5", "Sales", "closed", "1", "5.00"),
+            ("O1", "Ops", "closed", "3", "5.00"),
+            ("O2", "Ops", "closed", "3", "6.00"),
+            ("N1", null, null, null, "9.00"),
+        };
+        foreach (var item in items)
+        {
+            await fixture.InsertAsync(TenantA, "Item", new Dictionary<string, string?>
+            {
+                ["name"] = item.Name,
+                ["department"] = item.Department is null ? null : ids[item.Department].ToString(),
+                ["status"] = item.Status,
+                ["quantity"] = item.Quantity,
+                ["price"] = item.Price,
+            });
+        }
     }
 
     private async Task<JsonDocument> GetJsonAsync(string path)

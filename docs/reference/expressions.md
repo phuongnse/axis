@@ -351,7 +351,8 @@ Paths in validations and computed fields are not built. There a path is
   It can call the named rules, with fields, paths, parameters and literals as
   arguments. Its child collections and `references` fields type-check in
   aggregates, but no aggregate is in the [SQL subset](#sql-subset), so one is
-  `AXC0053`.
+  `AXC0053`. A measure `filter` of a [grouped data source](data-sources.md#aggregates)
+  has the same scope.
 - **Scope in a policy filter.** A
   [policy](roles-and-policies.md) filter sees the entity's
   fields, paths through reference fields of up to 3 hops, the named rules and
@@ -605,7 +606,8 @@ body in place of the call, with each parameter replaced by its argument's SQL.
 These translate to SQL:
 
 - literals, sent as named parameters `@f0`, `@f1`, … in order, each with the
-  PostgreSQL type of its literal. `date('…')` and `dateTime('…')` are
+  PostgreSQL type of its literal. The literals of the filter of measure `i` are
+  `@m{i}_0`, `@m{i}_1`, … so they do not clash. `date('…')` and `dateTime('…')` are
   parsed at compile time and sent as a `date` and a `timestamptz`. The
   literal `null` is written as the keyword `NULL`, which is not a value;
 - data source parameters, sent as named parameters `@p0`, `@p1`, … in
@@ -783,7 +785,7 @@ codes are in the [diagnostic table](configuration.md#configuration-pipeline):
   arguments, at the call. This includes an aggregate without its item
   expression, such as `sum(lineItems)`. The message names the expected count, such as "needs 2 arguments" or
   "needs at least 1 argument", and the count found.
-- **`AXC0053`.** A data source or policy filter uses something outside the
+- **`AXC0053`.** A data source filter, a measure filter or a policy filter uses something outside the
   [SQL subset](#sql-subset), at the operator, call or path step. This
   includes `/`, `lower`, `upper`, `trim`, every aggregate, a call to a rule
   whose body is outside the subset, and a filter whose rule calls inline to
