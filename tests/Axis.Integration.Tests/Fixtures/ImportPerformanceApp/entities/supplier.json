@@ -1,0 +1,15 @@
+{
+  "id": "912ba7dc-4c71-4c5a-bfb2-ec2fb64147e5",
+  "kind": "entity",
+  "name": "Supplier",
+  "formatVersion": 1,
+  "displayField": "name",
+  "fields": [
+    {
+      "name": "name",
+      "type": "text",
+      "required": true,
+      "maxLength": 100
+    }
+  ]
+}

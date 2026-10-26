@@ -1,0 +1,11 @@
+{
+  "id": "c8a6410a-72d0-4774-b108-e637a843f5b8",
+  "kind": "text",
+  "name": "TextsEn",
+  "formatVersion": 1,
+  "locale": "en",
+  "texts": {
+    "role.importer": "Importer",
+    "item.quantityPositive": "The quantity must be above zero."
+  }
+}

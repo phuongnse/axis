@@ -5,6 +5,7 @@ using Axis.Data;
 using Axis.Data.Naming;
 using Axis.Data.Storage;
 using Axis.Processes.Instances;
+using Axis.Processes.Storage;
 using Axis.Server.Tests;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -29,8 +30,12 @@ public abstract class PerformanceServerFixture(string application, string role) 
     private WebApplicationFactory<Program>? _factory;
     private HttpClient? _client;
     private ApplicationModel? _model;
+    private string? _connectionString;
 
     public HttpClient Client => _client ?? throw new InvalidOperationException("The test host is not started.");
+
+    /// <summary>The connection string of the tenant database, with the rights of the schema owner.</summary>
+    public string ConnectionString => _connectionString ?? throw new InvalidOperationException("The fixture is not initialized.");
 
     /// <summary>The compiled model of the fixture application.</summary>
     public ApplicationModel Model => _model ?? throw new InvalidOperationException("The fixture is not initialized.");
@@ -39,6 +44,7 @@ public abstract class PerformanceServerFixture(string application, string role) 
     {
         await _database.InitializeAsync();
         var connectionString = await _database.CreateDatabaseAsync("performance_a");
+        _connectionString = connectionString;
         _dataSource = NpgsqlDataSource.Create(connectionString);
         await using (var connection = new NpgsqlConnection(connectionString))
         {
@@ -47,6 +53,12 @@ public abstract class PerformanceServerFixture(string application, string role) 
             await using var data = DataDatabaseFixture.CreateContext(connection);
             await configuration.Database.MigrateAsync();
             await data.Database.MigrateAsync();
+            await using (var processes = new ProcessesDbContext(new DbContextOptionsBuilder<ProcessesDbContext>().UseNpgsql(connectionString).Options))
+            {
+                // An import queues its dry run and its commit as work items.
+                await processes.Database.MigrateAsync();
+            }
+
             await PostgreSqlServer.GrantRuntimeRoleAsync(connectionString);
 
             var compiled = await ReleaseCompiler.CompileAsync(Path.Combine(AppContext.BaseDirectory, "Fixtures", application), configuration);

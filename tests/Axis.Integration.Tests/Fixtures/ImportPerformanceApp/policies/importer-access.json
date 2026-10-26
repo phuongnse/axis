@@ -1,0 +1,11 @@
+{
+  "id": "aafe28b7-605d-4e87-9238-f75808aaf372",
+  "kind": "policy",
+  "name": "ImporterAccess",
+  "formatVersion": 1,
+  "roles": ["importer"],
+  "grants": [
+    { "entity": "Item", "actions": ["read", "create", "import"] },
+    { "entity": "Supplier", "actions": ["read"] }
+  ]
+}
