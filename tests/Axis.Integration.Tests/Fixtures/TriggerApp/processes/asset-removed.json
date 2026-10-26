@@ -5,7 +5,8 @@
   "formatVersion": 1,
   "parameters": [
     { "name": "tag", "type": "text" },
-    { "name": "cost", "type": "decimal" }
+    { "name": "cost", "type": "decimal" },
+    { "name": "quantity", "type": "decimal" }
   ],
   "start": "done",
   "steps": [{ "name": "done", "type": "end" }]

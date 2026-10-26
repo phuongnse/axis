@@ -24,7 +24,7 @@ public sealed class DeleteTriggerTests(TriggerApiFixture fixture) : IClassFixtur
     public async Task A_delete_starts_the_process_once_with_parameters_from_the_deleted_record_in_the_same_transaction()
     {
         await fixture.RunUntilIdleAsync(CancellationToken);
-        var id = await CreateAssetAsync("""{ "tag": "laptop", "cost": 50 }""");
+        var id = await CreateAssetAsync("""{ "tag": "laptop", "cost": 50, "quantity": 3 }""");
 
         using var deleted = await SendAsync(HttpMethod.Delete, $"{Assets}/{id:D}");
 
@@ -35,6 +35,7 @@ public sealed class DeleteTriggerTests(TriggerApiFixture fixture) : IClassFixtur
             SELECT count(*) FROM axis.process_instances
             WHERE process_id = @process AND subject_id IS NULL AND subject_entity_id IS NULL AND release_id = @release
               AND state = 'running' AND parameters ->> 'tag' = 'laptop' AND (parameters ->> 'cost')::numeric = 50
+              AND (parameters ->> 'quantity')::numeric = 3
             """,
             ("process", fixture.ProcessId("AssetRemoved")), ("release", fixture.ReleaseId)));
         Assert.Equal(1L, await fixture.CountAsync(

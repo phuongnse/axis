@@ -8,5 +8,5 @@
   "on": ["delete"],
   "when": "100 / cost > 0",
   "process": "AssetRemoved",
-  "parameters": { "tag": "tag", "cost": "cost" }
+  "parameters": { "tag": "tag", "cost": "cost", "quantity": "quantity" }
 }
