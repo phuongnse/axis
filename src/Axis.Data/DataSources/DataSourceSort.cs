@@ -6,7 +6,8 @@ namespace Axis.Data.DataSources;
 /// <summary>
 /// The order of a data source page, ascending or descending: one projected field that is not a
 /// reference, or for a grouped data source one group field that is not a reference or one measure.
-/// Exactly one of <see cref="Field"/> and <see cref="Measure"/> is set.
+/// Exactly one of <see cref="Field"/> and <see cref="Measure"/> is set. A group field is the group's
+/// copy of the field, so a bucketed one sorts by its bucket.
 /// </summary>
 public sealed record DataSourceSort(DataSourceFieldModel? Field, bool Descending, DataSourceMeasureModel? Measure = null)
 {
