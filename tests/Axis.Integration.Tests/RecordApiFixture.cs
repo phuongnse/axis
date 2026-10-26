@@ -218,12 +218,13 @@ public sealed class RecordApiFixture : IAsyncLifetime
         Assert.True(Model.TryGetEntity("Reading", out var reading));
         Assert.True(Model.TryGetEntity("Product", out var product));
         Assert.True(Model.TryGetEntity("Bundle", out var bundle));
+        Assert.True(Model.TryGetEntity("Workstation", out var workstation));
         Assert.True(Model.TryGetEntity("Expense", out var expense));
         Assert.True(Model.TryGetEntity("Reminder", out var reminder));
         Assert.True(Model.TryGetEntity("Gauge", out var gauge));
         foreach (var dataSource in _dataSources.Values)
         {
-            foreach (var entity in new[] { item, department, order, bundle, product, ticket, reading, expense, reminder, gauge })
+            foreach (var entity in new[] { item, department, order, bundle, workstation, product, ticket, reading, expense, reminder, gauge })
             {
                 await using var command = dataSource.CreateCommand($"DELETE FROM {EntityNaming.QualifiedTable(EntityNaming.Table(entity.Id))}");
                 await command.ExecuteNonQueryAsync();

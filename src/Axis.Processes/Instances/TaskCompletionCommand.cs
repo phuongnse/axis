@@ -160,9 +160,12 @@ public static class TaskCompletionCommand
 
             var now = await RecordQueries.TransactionTimeAsync(connection, cancellationToken);
             var sent = RecordCommand.SetFields(entity, input).ToList();
+            var sets = entity.Validations.Count > 0 || form.HasRequiredWhen
+                ? await RecordSets.ReadAsync(connection, release, entity, stored, input.Links, cancellationToken)
+                : RecordSets.Empty;
             var failures = RecordFormRequirements.Merge(
-                RecordFormRequirements.Check(release, entity, form, stored, computed.Values, computed.Rows, now, sent),
-                RecordValidator.ValidateUpdate(release, entity, stored, computed.Values, computed.Rows, now));
+                RecordFormRequirements.Check(release, entity, form, stored, computed.Values, computed.Rows, now, sent, sets),
+                RecordValidator.ValidateUpdate(release, entity, stored, computed.Values, computed.Rows, now, sets));
             if (failures is not null)
             {
                 return new TaskCompletionResult(TaskCompletionOutcome.Invalid, failures);
@@ -194,7 +197,8 @@ public static class TaskCompletionCommand
                     TaskCompletionOutcome.WriteFailed, Write: new RecordWriteResult(RecordWriteOutcome.NotFound));
             }
 
-            if (RecordFormRequirements.Check(release, entity, form, stored, [], [], now) is { } missing)
+            var sets = await RecordSets.ReadAsync(connection, release, entity, stored, [], cancellationToken);
+            if (RecordFormRequirements.Check(release, entity, form, stored, [], [], now, sets: sets) is { } missing)
             {
                 return new TaskCompletionResult(TaskCompletionOutcome.Invalid, missing);
             }

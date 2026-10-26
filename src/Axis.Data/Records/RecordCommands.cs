@@ -210,7 +210,10 @@ public static class RecordCommands
             return new RecordWriteResult(RecordWriteOutcome.Invalid, Errors: computeErrors);
         }
 
-        if (RecordValidator.ValidateUpdate(application, entity, stored, computed.Values, computed.Rows, now) is { } failures)
+        var sets = entity.Validations.Count > 0
+            ? await RecordSets.ReadAsync(connection, application, entity, stored, [], cancellationToken)
+            : RecordSets.Empty;
+        if (RecordValidator.ValidateUpdate(application, entity, stored, computed.Values, computed.Rows, now, sets) is { } failures)
         {
             return new RecordWriteResult(RecordWriteOutcome.Invalid, Errors: failures);
         }

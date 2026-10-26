@@ -48,7 +48,8 @@ public static class FormStateEvaluator
     /// Evaluates <paramref name="form"/> of <paramref name="entity"/> on <paramref name="draft"/>.
     /// <paramref name="stored"/> is null for a new record. <paramref name="readable"/> holds the
     /// declared names of the fields the user may read, or is null when the user may read every field.
-    /// <paramref name="now"/> is what <c>now()</c> gives.
+    /// <paramref name="now"/> is what <c>now()</c> gives. <paramref name="sets"/> holds the target
+    /// records an aggregate over a <c>references</c> field reads, which are none when it is null.
     /// </summary>
     public static FormState Evaluate(
         ApplicationModel application,
@@ -59,7 +60,8 @@ public static class FormStateEvaluator
         IReadOnlySet<string> touched,
         IReadOnlySet<string>? readable,
         string actorId,
-        DateTimeOffset now)
+        DateTimeOffset now,
+        RecordSets? sets = null)
     {
         ArgumentNullException.ThrowIfNull(application);
         ArgumentNullException.ThrowIfNull(form);
@@ -69,10 +71,10 @@ public static class FormStateEvaluator
 
         // The parse errors come first, then the compute errors and then the validation failures.
         var errors = new SortedDictionary<string, string[]>(draft.Errors, StringComparer.Ordinal);
-        var (values, rows, filled) = Complete(application, entity, stored, draft, actorId, now, errors);
+        var (values, rows, filled) = Complete(application, entity, stored, draft, actorId, now, errors, sets);
 
         var record = RecordValidator.BuildRecord(entity, stored, values);
-        var conditions = RecordCollections.TryAdd(application, entity, stored, rows, record, errors) && record.Values.All(pair => pair.Exact)
+        var conditions = RecordCollections.TryAdd(application, entity, stored, rows, record, errors, sets) && record.Values.All(pair => pair.Exact)
             ? new ExpressionValues(record.Select(pair => KeyValuePair.Create(pair.Key, pair.Value.Value)))
             : null;
 
@@ -149,7 +151,8 @@ public static class FormStateEvaluator
         RecordDraftResult draft,
         string actorId,
         DateTimeOffset now,
-        SortedDictionary<string, string[]> errors)
+        SortedDictionary<string, string[]> errors,
+        RecordSets? sets)
     {
         // The update overloads throw for a null stored record, so a new record takes the create ones.
         var input = draft.Input;
@@ -180,8 +183,8 @@ public static class FormStateEvaluator
         Merge(errors, computed.Errors);
 
         var failures = stored is null
-            ? RecordValidator.ValidateCreate(application, entity, computed.Values, computed.Rows, now)
-            : RecordValidator.ValidateUpdate(application, entity, stored, computed.Values, computed.Rows, now);
+            ? RecordValidator.ValidateCreate(application, entity, computed.Values, computed.Rows, now, sets)
+            : RecordValidator.ValidateUpdate(application, entity, stored, computed.Values, computed.Rows, now, sets);
         Merge(errors, failures);
         return (computed.Values, computed.Rows, filled);
     }
