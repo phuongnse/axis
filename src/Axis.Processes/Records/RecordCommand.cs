@@ -114,12 +114,14 @@ public delegate Task<byte[]?> RecordBodyReader(CancellationToken cancellationTok
 /// that fails leaves none.
 /// A create or update also starts the processes of the data change triggers that match it, in the
 /// same transaction, as <c>system</c>. A write that fails starts none.
-/// A create or update takes the application's start lock shared, as the first statement of its write
+/// A delete starts the processes of the delete triggers on the entity, in the same transaction, after the
+/// audit record. Each starts a process without a subject, with parameters worked out from the record as it
+/// was before the delete. A delete that is refused starts none.
+/// A create, update or delete takes the application's start lock shared, as the first statement of its write
 /// transaction. When the active release is no longer the given release, it writes nothing and the
 /// outcome is <see cref="RecordCommandOutcome.ReleaseChanged"/>, so the caller can run it again on the
-/// new release. A delete never starts a process. It takes the start lock shared first and then the record's
-/// row lock. It is refused as a conflict when a running or waiting process instance has the record as its
-/// subject, checked after the record filters.
+/// new release. A delete takes the record's row lock after the start lock. It is refused as a conflict when
+/// a running or waiting process instance has the record as its subject, checked after the record filters.
 /// A create or update may name a form of the entity. The form is checked after the grant and the
 /// record checks and before the content type: a name that is no form of the entity is invalid.
 /// A body is checked in order: content type, then body, then a field that no grant for the action
@@ -431,7 +433,9 @@ public static class RecordCommand
     /// <summary>Deletes the record with <paramref name="recordId"/>.</summary>
     public static async Task<RecordCommandResult> DeleteAsync(
         NpgsqlConnection connection,
+        string tenantId,
         ApplicationModel application,
+        Guid releaseId,
         EntityModel model,
         Guid recordId,
         RecordActor actor,
@@ -454,9 +458,14 @@ public static class RecordCommand
         RecordDeleteResult result;
         await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))
         {
-            // A delete pins no release, so the released id is ignored. The lock keeps the lock order with a
-            // migrating activation, and the record's row lock below orders the delete with a start.
-            await StartLock.TakeSharedAsync(transaction, application.Manifest.Id, cancellationToken);
+            // The start lock comes first, so a migrating activation cannot deadlock with this delete, and the
+            // record's row lock below orders the delete with a start. The delete triggers and their starts come
+            // from the active release, so a delete given another release runs again on it.
+            if (await StartLock.TakeSharedAsync(transaction, application.Manifest.Id, cancellationToken) != releaseId)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                return new RecordCommandResult(RecordCommandOutcome.ReleaseChanged);
+            }
 
             // The row is locked first, so the filters and the instance check see the version that is deleted.
             if (read.Filters is { } pendingRead
@@ -497,13 +506,23 @@ public static class RecordCommand
                 return new RecordCommandResult(RecordCommandOutcome.Conflict, Conflict: RecordConflict.RunningProcess);
             }
 
+            // The triggers see the record whole, so they are worked out before its row and child rows go.
+            var prepared = await DataChangeTriggerStarts.PrepareDeleteAsync(transaction, application, model, recordId, cancellationToken);
             result = await RecordCommands.DeleteAsync(connection, model, recordId, cancellationToken);
             await CompleteAsync(
                 transaction,
                 result is { Outcome: RecordDeleteOutcome.Deleted, Version: { } version }
                     ? RecordAudit(actor, AuditActions.RecordDeleted, application, model, recordId, version)
                     : null,
-                beforeCommit: null,
+                () => DataChangeTriggerStarts.StartAfterDeleteAsync(
+                    transaction,
+                    tenantId,
+                    application,
+                    releaseId,
+                    recordId,
+                    prepared,
+                    loggerFactory.CreateLogger(typeof(DataChangeTriggerStarts)),
+                    cancellationToken),
                 cancellationToken);
         }
 

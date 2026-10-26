@@ -166,7 +166,7 @@ Every step has a `type`. These are the step kinds:
   Years and months are refused, because they have no fixed length.
 - It needs `now`. The runner sets the new time on every connection of the
   scenario, including the work item runner's. Every later step reads it.
-- The runner then runs every due work item (`process.step`, `connector.call`,
+- The runner then runs every due work item (`process.step`, `process.resume`, `connector.call`,
   `package.call`, `event.deliver`, `trigger.schedule`, `trigger.fanOut` and
   `task.deadline`) until none is due.
   If more than 1,000 items run in one step, the scenario fails at that step.

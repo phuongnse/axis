@@ -102,6 +102,115 @@ public sealed class TriggerCompilerTests
     }
 
     [Fact]
+    public void A_delete_trigger_compiles_into_the_model_with_an_expression_for_each_process_parameter()
+    {
+        using var folder = WithSubjectlessProcess(Folder())
+            .With("triggers/gone.json", DataChangeTrigger("Note", "nightlyjob", """, "on": ["delete"], "when": "priority >= 3", "parameters": { "days": "priority + 1" } """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        var trigger = Assert.Single(result.Model!.Triggers);
+        Assert.Equal((TriggerType.DataChange, DataChangeKinds.Delete, null), (trigger.Type, trigger.On, trigger.Fields));
+        Assert.Equal(new ProcessReference(Guid.Parse("77777777-7777-4777-8777-777777777703"), "NightlyJob"), trigger.Process);
+        Assert.Equal("priority >= 3", trigger.When!.Expression);
+        var parameter = Assert.Single(trigger.ParameterExpressions!);
+        Assert.Equal(("days", "priority + 1", ExpressionType.Integer), (parameter.Key, parameter.Value.Expression, parameter.Value.Check.Type));
+    }
+
+    [Fact]
+    public void A_delete_trigger_listed_with_create_or_update_is_axc0250_at_on()
+    {
+        using var folder = WithSubjectlessProcess(Folder())
+            .With("triggers/gone.json", DataChangeTrigger("Note", "NightlyJob", """, "on": ["delete", "update"], "parameters": { "days": "priority" } """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.DeleteTriggerWithOtherKinds, "triggers/gone.json", "/on"), (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void A_delete_trigger_with_fields_is_axc0251_at_fields()
+    {
+        using var folder = WithSubjectlessProcess(Folder())
+            .With("triggers/gone.json", DataChangeTrigger("Note", "NightlyJob", """, "on": ["delete"], "fields": ["title"], "parameters": { "days": "priority" } """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.DeleteTriggerWithFields, "/fields"), (diagnostic.Code, diagnostic.Path));
+    }
+
+    [Fact]
+    public void A_delete_trigger_whose_process_has_a_subject_is_axc0252_at_the_process()
+    {
+        using var folder = Folder()
+            .With("triggers/gone.json", DataChangeTrigger("Note", "NoteReview", """, "on": ["delete"] """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.DeleteTriggerProcessWithSubject, "/process"), (diagnostic.Code, diagnostic.Path));
+    }
+
+    [Fact]
+    public void A_delete_trigger_that_does_not_give_a_process_parameter_is_axc0167_at_parameters()
+    {
+        using var folder = WithSubjectlessProcess(Folder())
+            .With("triggers/gone.json", DataChangeTrigger("Note", "NightlyJob", """, "on": ["delete"] """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.MissingTriggerParameter, "/parameters"), (diagnostic.Code, diagnostic.Path));
+    }
+
+    [Theory]
+    [InlineData(""" "days": "priority", "other": "priority" """, DiagnosticCodes.UnknownTriggerParameter, "/parameters/other")]
+    [InlineData(""" "days": "priority", "DAYS": "priority" """, DiagnosticCodes.UnknownTriggerParameter, "/parameters/DAYS")]
+    [InlineData(""" "days": 2 """, DiagnosticCodes.InvalidTriggerParameterValue, "/parameters/days")]
+    public void A_delete_trigger_parameter_that_is_unknown_repeated_or_not_an_expression_is_a_diagnostic_at_its_key(string parameters, string code, string path)
+    {
+        using var folder = WithSubjectlessProcess(Folder())
+            .With("triggers/gone.json", DataChangeTrigger("Note", "NightlyJob", $$""", "on": ["delete"], "parameters": { {{parameters}} } """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((code, path), (diagnostic.Code, diagnostic.Path));
+    }
+
+    [Theory]
+    [InlineData("title", "/parameters/days")]
+    [InlineData("nothing", "/parameters/days")]
+    [InlineData("priority +", "/parameters/days")]
+    public void A_delete_trigger_parameter_expression_that_is_mistyped_or_broken_is_a_diagnostic_at_its_key(string expression, string path)
+    {
+        using var folder = WithSubjectlessProcess(Folder())
+            .With("triggers/gone.json", DataChangeTrigger("Note", "NightlyJob", $$""", "on": ["delete"], "parameters": { "days": "{{expression}}" } """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(path, diagnostic.Path);
+        Assert.NotEqual(DiagnosticCodes.MissingTriggerParameter, diagnostic.Code);
+    }
+
+    [Fact]
+    public void A_delete_trigger_condition_that_is_not_boolean_is_a_diagnostic_at_when()
+    {
+        using var folder = WithSubjectlessProcess(Folder())
+            .With("triggers/gone.json", DataChangeTrigger("Note", "NightlyJob", """, "on": ["delete"], "when": "priority", "parameters": { "days": "priority" } """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal("/when", diagnostic.Path);
+    }
+
+    [Fact]
     public void Process_and_event_mistakes_are_each_a_diagnostic_at_their_path_in_one_pass()
     {
         using var folder = Folder()
@@ -301,7 +410,11 @@ public sealed class TriggerCompilerTests
     [InlineData(""" "type": "dataChange", "entity": "Note", "on": ["create"], "mode": "async" """)]
     [InlineData(""" "type": "dataChange", "entity": "Note", "on": [] """)]
     [InlineData(""" "type": "dataChange", "entity": "Note", "on": ["create", "create"] """)]
-    [InlineData(""" "type": "dataChange", "entity": "Note", "on": ["delete"] """)]
+    [InlineData(""" "type": "dataChange", "entity": "Note", "on": ["remove"] """)]
+    [InlineData(""" "type": "dataChange", "entity": "Note", "on": ["create"], "parameters": { "days": "priority" } """)]
+    [InlineData(""" "type": "dataChange", "entity": "Note", "on": ["create", "update"], "parameters": { "days": "priority" } """)]
+    [InlineData(""" "type": "dataChange", "entity": "Note", "on": ["delete"], "event": "NoteClosed" """)]
+    [InlineData(""" "type": "dataChange", "entity": "Note", "on": ["delete"], "dataSource": "NoteRows" """)]
     [InlineData(""" "type": "dataChange", "on": ["create"] """)]
     [InlineData(""" "type": "dataChange", "entity": "Note" """)]
     [InlineData(""" "type": "dataChange", "entity": "Note", "on": ["update"], "fields": [] """)]
