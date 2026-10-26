@@ -275,3 +275,4 @@ sorted by file and then path.
 | `AXC0277` | An `application` manifest's `timeZone` is not an IANA time zone id known to the machine, or is written in another letter case. Reported at `/timeZone` of `application.json`. |
 | `AXC0278` | A `timer` step has both `wait` and `until`, or neither. Reported at `/steps/{i}`. See [Timer step](process-flow.md#timer-step). |
 | `AXC0279` | A data source with `"search": true` projects no searched field: no path ends at a `searchable` text field, and the root's display field is not projected directly. Not reported while a projected path is `AXC0043`. Reported at `/search`. |
+| `AXC0280` | A `values` expression of a `notify` step reads a field marked `sensitive`, directly, through a reference path, inside an aggregate or as an argument to a rule. Reported at `/steps/{i}/message/values/{key}`, naming the field. See [Placeholders](notifications.md#placeholders). |

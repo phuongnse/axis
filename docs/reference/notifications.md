@@ -80,25 +80,45 @@ A text value may hold named placeholders, such as
   `/steps/{i}/message`, naming the locale and the name.
 - A lone or invalid brace is `AXC0273` at `/steps/{i}/message`. A locale with
   one is reported for that brace only.
-- _(Planned for M14)_ A value whose expression reads a field marked
-  `sensitive`, directly or through a path, is a new diagnostic. A notification
-  never carries a sensitive value.
-- _(Planned for M14)_ Values are formatted in the recipient's locale: numbers
-  with its separators, enum values as written, and dates and times in the
-  application's time zone.
+- A value whose expression reads a field marked `sensitive` is `AXC0280` at
+  `/steps/{i}/message/values/{key}`, naming the field. It covers a field of the
+  subject, a field reached through a path such as `assignee.salary`, one read
+  inside an aggregate and one passed to a rule. A notification never carries a
+  sensitive value. Only `values` is checked, not a page parameter or a
+  recipient expression. The check uses the release being compiled.
+- Values are formatted for the reader when the notification is read. A built-in
+  table gives the formats, because the backend runs with invariant
+  globalization and cannot load the data of a locale. A locale whose language
+  is `vi` uses `vi`, and every other locale uses `en`.
+
+  | Value type | `en` | `vi` |
+  | ---------- | ---- | ---- |
+  | `integer`, `decimal` | `1,234.5` | `1.234,5` |
+  | `date` | `Jan 1, 2027` | `01/01/2027` |
+  | `date-time` | `Jan 1, 2027, 1:00 AM` | `01/01/2027 01:00` |
+
+  Every digit of a number is kept, so formatting never rounds. A `date-time`
+  shows in the time zone of the release the notification was stored with, so
+  `2026-12-31T18:00:00Z` in an `Asia/Ho_Chi_Minh` application shows on
+  1 January 2027 at 01:00. A `date` shows as a local date with no shift. Text,
+  enum, boolean, id and reference values show as written. The locale is the
+  user's profile locale, even when the release has no texts in it. Without a
+  profile locale, it is the locale of the texts that were chosen.
 
 ## In-app notifications
 
 - **Storage.** `axis.notifications` holds one row per notification and
   recipient: the application, the release, the recipient kind and recipient,
-  the text keys, the raw evaluated values, the declared name of the page to
-  open with its raw parameters, and the time. All the rows of one step run
+  the text keys, the raw evaluated values with the type of each (`text`,
+  `integer`, `decimal`, `boolean`, `date`, `date-time`, `enum` or `reference`),
+  the declared name of the page to open with its raw parameters, and the time. All the rows of one step run
   share the notification's id. A role recipient is one row for the role. A
   `user` expression that gives `null` or blank text adds no row, and two
   recipients of one kind and name add one row. The values are stored as an
   event payload is, with dates as ISO text, and are formatted when the
   notification is read, because a role row reaches users with different
-  locales. A step with only the `email` channel stores no row.
+  locales. A notification stored before the types were kept has none, so its
+  numbers are still formatted and its text shows as written. A step with only the `email` channel stores no row.
 - **Who sees one.** A user sees the notifications addressed to their user id,
   and those addressed to a role they hold that the active release declares,
   checked when read, as a role task is.
@@ -118,10 +138,10 @@ A text value may hold named placeholders, such as
   - Texts come from the notification's release, in the user's profile locale
     when that release has texts for it, otherwise its first locale in ordinal
     order, as for [email](#email). Each `{name}` is filled with the stored value
-    as raw text: a string as it is, a number or a boolean as JSON writes it,
-    null as empty text and any other value as JSON. A text key the locale does
-    not have shows as the key. _(Planned for M14)_ Values are formatted in the
-    user's locale, as [placeholders](#placeholders) says.
+    formatted as [placeholders](#placeholders) says: a number, a date and a
+    date-time in the user's locale, a string as it is, a boolean as JSON writes
+    it and null as empty text. A text key the locale does not have shows as the
+    key.
   - `POST /api/apps/{app}/notifications/{id}/read` marks one read, and
     `POST /api/apps/{app}/notifications/read-all` marks every notification the
     user sees now read. Both write read rows for the caller only, so another

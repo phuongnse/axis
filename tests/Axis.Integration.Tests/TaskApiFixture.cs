@@ -132,10 +132,10 @@ public sealed class TaskApiFixture : IAsyncLifetime
     }
 
     /// <summary>Gives <paramref name="userId"/> a user profile in <paramref name="tenant"/>, as a first sign-in does.</summary>
-    public async Task InsertProfileAsync(string tenant, string userId, string displayName)
+    public async Task InsertProfileAsync(string tenant, string userId, string displayName, string? locale = null)
     {
         await using var connection = await DataSource(tenant).OpenConnectionAsync();
-        await UserProfiles.UpsertAsync(connection, userId, displayName, null, null);
+        await UserProfiles.UpsertAsync(connection, userId, displayName, null, locale);
     }
 
     /// <summary>Inserts a department of <paramref name="tenant"/> with a new name and <paramref name="manager"/>, and returns its id.</summary>
