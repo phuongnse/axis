@@ -60,6 +60,26 @@ public sealed class AdminTenantCreateTests(PostgreSqlFixture database) : IClassF
     }
 
     [Fact]
+    public async Task Create_installs_the_pg_trgm_extension_in_the_tenant_database()
+    {
+        await using var scenario = await NewScenarioAsync();
+        var id = scenario.NewTenantId();
+        var host = $"{id}.example.test";
+
+        var result = await scenario.CreateAsync(id, host);
+
+        Assert.Equal(0, result.Exit);
+        var row = await scenario.RowAsync(id);
+        var schema = await PostgreSqlServer.AdminScalarAsync(
+            scenario.TenantConnectionString(id, row.SchemaUser, ""),
+            "SELECT extnamespace::regnamespace::text FROM pg_extension WHERE extname = 'pg_trgm'",
+            CancellationToken);
+        Assert.Equal("public", schema);
+
+        await scenario.AssertNoSecretsAsync();
+    }
+
+    [Fact]
     public async Task A_create_stopped_after_the_database_exists_stays_provisioning_and_a_rerun_finishes_it_with_the_same_passwords()
     {
         await using var scenario = await NewScenarioAsync();
