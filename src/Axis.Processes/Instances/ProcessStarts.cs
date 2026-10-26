@@ -14,6 +14,9 @@ public static class ProcessStarts
     /// <summary>The kind of the work item that runs the next step of an instance.</summary>
     public const string StepWorkItemKind = "process.step";
 
+    /// <summary>The kind of the work item that resumes an instance that waits on a <c>timer</c> step once its time is due.</summary>
+    public const string TimerWorkItemKind = "process.timer";
+
     /// <summary>The kind of the work item that sends or reconciles one staged connector call.</summary>
     public const string ConnectorCallWorkItemKind = "connector.call";
 
@@ -38,7 +41,7 @@ public static class ProcessStarts
     /// <summary>The state of an instance that has work ready or claimed.</summary>
     public const string Running = "running";
 
-    /// <summary>The state of an instance that waits for a human task to be completed, a connector call to settle or a sub-process child to complete.</summary>
+    /// <summary>The state of an instance that waits for a human task to be completed, a connector call to settle, a timer to come due or a sub-process child to complete.</summary>
     public const string Waiting = "waiting";
 
     /// <summary>The state of an instance that reached an <c>end</c> step.</summary>

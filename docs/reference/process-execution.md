@@ -39,7 +39,8 @@ _(planned for Mx)_ are not built yet, and Dn refers to [decisions.md](../decisio
 - **Restarts.** An instance that waits on a task has no work item, so it
   needs no running worker. One that waits on a connector call has the call's
   `connector.call` item, and one that waits on a package call has its
-  `package.call` item. A task decision is accepted while no worker runs: it
+  `package.call` item, and one that waits on a timer has its `process.timer`
+  item. A task decision is accepted while no worker runs: it
   queues the next step's work item. The next worker to start runs that step. A step that
   a worker never committed leaves no trace, and the worker that claims it after
   the lease runs it once.
@@ -48,20 +49,22 @@ _(planned for Mx)_ are not built yet, and Dn refers to [decisions.md](../decisio
 
 ### Running a step
 
-The worker runs the `decision`, `task`, `operation`, `subProcess` and `end` steps. A
+The worker runs the `decision`, `task`, `operation`, `subProcess`, `end` and `timer` steps. A
 `callConnector` operation step stages its call, and a `connector.call` item
 sends it, see [Staging and the call](#staging-and-the-call). A package
 operation step stages its call, and a `package.call` item runs it, see
 [Staging a package call](#staging-a-package-call). A `raiseEvent`
 operation step stores its event, see [Raise event step](process-events.md#raise-event-step).
+A `timer` step sets the instance `waiting`, and a `process.timer` item resumes
+it, see [Timer step](process-flow.md#timer-step).
 A `task.deadline` item expires the task of a task step that has a `deadline`,
 see [task deadlines](task-deadlines.md#escalations-and-deadline).
 A `subProcess` step starts its child and waits, and a `process.resume` item
 resumes the parent when the child completes, see
 [Sub-process step](process-flow.md#sub-process-step).
-_(Planned for M14)_ The worker also runs `timer` and `waitEvent` steps and the
+_(Planned for M14)_ The worker also runs `waitEvent` steps and the
 `notify` operation, with the work item kinds
-`process.timer`, `task.escalate` and `notification.email`, see [process flow](process-flow.md),
+`task.escalate` and `notification.email`, see [process flow](process-flow.md),
 [task deadlines](task-deadlines.md) and [notifications](notifications.md).
 Each work item of kind `process.step` runs the current step of its instance in
 one transaction:
@@ -113,6 +116,10 @@ one transaction:
      and one that gives `null`, blank text or a run-time error fails the step.
      A `role` is the role name. The instance becomes `waiting` on the task
      step.
+   - A **`timer`** step with a `wait` takes the time of the step's transaction
+     plus `wait`. One with an `until` evaluates it on the record. An `until`
+     that gives `null` or a run-time error fails the step. The instance becomes
+     `waiting` on the step.
    - An **end** step sets the instance to `completed` with its `ended_at` time.
 
    `now()` in any of these expressions, a task's `assignee.user` included,
@@ -168,6 +175,8 @@ one transaction:
      `raiseEvent` operation write `process.stepCompleted` with details
      `{ "step", "next" }`.
    - A task step writes `task.created` with details `{ "step", "taskId" }`.
+   - A `timer` step writes no audit record while it waits. No audit action
+     fits waiting for a time. Its resume writes `process.stepCompleted`.
    - A `callConnector` step writes `connector.callStaged` with details
      `{ "step", "connector", "operation", "operationId" }`.
    - A package operation step writes `operation.staged` with details
@@ -177,7 +186,19 @@ one transaction:
    `raiseEvent` operation insert the work item of the next step. A task step inserts none, because
    the instance waits for the task. A `callConnector` step inserts a
    `connector.call` item for its call instead, and a package operation step
-   inserts a `package.call` item.
+   inserts a `package.call` item. A `timer` step inserts a `process.timer`
+   item due at the time of the timer, with the `revision` the step left.
+
+Each work item of kind `process.timer` resumes one instance in one
+transaction. It loads the instance and resumes it only while it is `waiting` on
+a `timer` step at the item's `revision`. The instance then becomes `running`
+on the step's `next`, with the next revision. The item writes the history row
+`{ "next" }`, the audit record `process.stepCompleted` with details
+`{ "step", "next" }` and the work item of the next step. An item whose instance
+moved on, was cancelled or is missing is deleted with no other write. A
+`process.timer` item that throws is rolled back, and a following transaction
+sets the waiting instance to `failed`, writes a history row with the error and
+the audit record `process.failed`, as for a step.
 
 Any exception in the step, such as a `when` that divides by zero, a missing
 subject record, a record write that a validation refuses or a task assignee

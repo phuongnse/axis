@@ -1,0 +1,21 @@
+{
+  "id": "e5b3a7c1-4d82-4f96-a0b7-3c8e1d9f5a27",
+  "kind": "process",
+  "name": "CoolDown",
+  "formatVersion": 1,
+  "entity": "PurchaseRequest",
+  "start": "wait",
+  "steps": [
+    { "name": "wait", "type": "timer", "wait": "PT1H", "next": "count" },
+    {
+      "name": "count",
+      "type": "operation",
+      "operation": "updateRecord",
+      "set": {
+        "amount": "amount + 1"
+      },
+      "next": "done"
+    },
+    { "name": "done", "type": "end" }
+  ]
+}

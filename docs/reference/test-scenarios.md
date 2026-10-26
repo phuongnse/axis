@@ -166,9 +166,11 @@ Every step has a `type`. These are the step kinds:
   Years and months are refused, because they have no fixed length.
 - It needs `now`. The runner sets the new time on every connection of the
   scenario, including the work item runner's. Every later step reads it.
-- The runner then runs every due work item (`process.step`, `process.resume`, `connector.call`,
-  `package.call`, `event.deliver`, `trigger.schedule`, `trigger.fanOut` and
-  `task.deadline`) until none is due.
+- The runner then runs every due work item (`process.step`, `process.timer`,
+  `process.resume`, `connector.call`, `package.call`, `event.deliver`,
+  `trigger.schedule`, `trigger.fanOut` and `task.deadline`) until none is due. A
+  `process.timer` item is due when the scenario's time reaches its time, so a
+  timer resumes its instance in the `advanceTime` that passes it.
   If more than 1,000 items run in one step, the scenario fails at that step.
 - A schedule that missed several occurrences runs only the latest one, once, as
   a worker does after an outage. See [schedules](process-events.md#schedules). To
@@ -298,6 +300,11 @@ What runs now:
   reaches its next wait: an open task, or its end. The runner runs the due items
   in the order they were queued, so a clock change cannot reorder them. If one action makes more than
   1,000 items run, of any kind, the scenario fails at that step.
+- **Timers.** The same loop runs the `process.timer` items. The runner never
+  makes a timer due early, as it does for the other kinds. A timer's time comes
+  from the scenario's clock. So after an action, a timer with a time in the
+  past resumes its instance, and one with a time in the future waits for
+  `advanceTime`.
 - **Connector and package calls.** The same loop runs the `connector.call` and
   `package.call` items. They are the real handlers, so output mapping, resume,
   history, audit records and data change triggers behave as they do on a worker.
