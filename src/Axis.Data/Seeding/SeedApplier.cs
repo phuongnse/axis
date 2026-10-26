@@ -103,11 +103,11 @@ public static class SeedApplier
                         return NotComputed(seed, index, errors);
                     }
 
-                    result = await RecordCommands.UpdateAsync(connection, model, entity, releaseId, id, existing.Version, computed.Values, computed.Rows, cancellationToken);
+                    result = await RecordCommands.UpdateAsync(connection, model, entity, releaseId, id, existing.Version, computed.Values, computed.Rows, input.Links, cancellationToken: cancellationToken);
                 }
                 else
                 {
-                    var defaults = RecordDefaults.Apply(entity, input.Values, now);
+                    var defaults = RecordDefaults.Apply(entity, input.Values, now, model.TimeZone);
                     if (defaults.Errors is { } defaultErrors)
                     {
                         await transaction.RollbackAsync(cancellationToken);
@@ -121,7 +121,7 @@ public static class SeedApplier
                         return NotComputed(seed, index, errors);
                     }
 
-                    result = await RecordCommands.CreateAsync(connection, model, entity, releaseId, computed.Values, computed.Rows, id, cancellationToken);
+                    result = await RecordCommands.CreateAsync(connection, model, entity, releaseId, computed.Values, computed.Rows, input.Links, id, cancellationToken);
                 }
             }
             else
@@ -131,7 +131,7 @@ public static class SeedApplier
                     continue;
                 }
 
-                var defaults = RecordDefaults.Apply(entity, input.Values, now);
+                var defaults = RecordDefaults.Apply(entity, input.Values, now, model.TimeZone);
                 if (defaults.Errors is { } defaultErrors)
                 {
                     await transaction.RollbackAsync(cancellationToken);
@@ -145,7 +145,7 @@ public static class SeedApplier
                     return NotComputed(seed, index, errors);
                 }
 
-                result = await RecordCommands.CreateAsync(connection, model, entity, releaseId, computed.Values, computed.Rows, id, cancellationToken);
+                result = await RecordCommands.CreateAsync(connection, model, entity, releaseId, computed.Values, computed.Rows, input.Links, id, cancellationToken);
             }
 
             if (result.Outcome != RecordWriteOutcome.Written)

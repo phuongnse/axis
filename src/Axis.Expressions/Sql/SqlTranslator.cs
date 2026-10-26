@@ -13,7 +13,8 @@ namespace Axis.Expressions.Sql;
 /// to report what does not translate, and the data source query calls it to build its
 /// <c>WHERE</c> clause. Every literal value becomes a named parameter <c>@f0</c>, <c>@f1</c>, …,
 /// or with another prefix the caller gives, so no value is ever part of the SQL text. Only the literal <c>null</c> is written, as the
-/// keyword <c>NULL</c>. <c>currentUser()</c> becomes the named parameter
+/// keyword <c>NULL</c>. <c>today()</c> and <c>toDate</c> convert with <c>AT TIME ZONE</c> and a text parameter
+/// that holds the application's time zone id, UTC when the caller gives none. <c>currentUser()</c> becomes the named parameter
 /// <see cref="CurrentUserParameter"/>, which is not in the result's parameters. Every operator is wrapped in parentheses, so the SQL keeps the
 /// expression's precedence. A call to a named rule is inlined: the rule's body is rendered with
 /// each parameter replaced by the SQL of its argument. Before any SQL is built, the filter with
@@ -44,14 +45,16 @@ public static class SqlTranslator
     /// <c>department.name</c> is <c>["department", "name"]</c>. <paramref name="check"/> is the type
     /// checker's result, which says the rule each rule call resolved to. Without it no rule call is
     /// translated. <paramref name="parameterPrefix"/> starts each parameter name, so several
-    /// translations can share one statement with different prefixes.
+    /// translations can share one statement with different prefixes. <paramref name="timeZone"/> is the
+    /// application's time zone, which <c>today()</c> and <c>toDate</c> use. It is UTC when null.
     /// </summary>
     public static SqlTranslationResult Translate(
         ExpressionNode expression,
         Func<IReadOnlyList<string>, string> column,
         ExpressionCheckResult? check = null,
-        string parameterPrefix = "f") =>
-        TranslateCountingNodes(expression, column, check, parameterPrefix).Result;
+        string parameterPrefix = "f",
+        TimeZoneInfo? timeZone = null) =>
+        TranslateCountingNodes(expression, column, check, parameterPrefix, timeZone).Result;
 
     /// <summary>
     /// Translates like <see cref="Translate"/> and also gives the syntax nodes counted for the
@@ -61,7 +64,8 @@ public static class SqlTranslator
         ExpressionNode expression,
         Func<IReadOnlyList<string>, string> column,
         ExpressionCheckResult? check = null,
-        string parameterPrefix = "f")
+        string parameterPrefix = "f",
+        TimeZoneInfo? timeZone = null)
     {
         ArgumentNullException.ThrowIfNull(expression);
         ArgumentNullException.ThrowIfNull(column);
@@ -73,7 +77,7 @@ public static class SqlTranslator
         try
         {
             size.Check(expression, ruleCalls);
-            var sql = new Translation(column, parameters, ruleCalls, parameterPrefix).Render(expression);
+            var sql = new Translation(column, parameters, ruleCalls, parameterPrefix, timeZone ?? TimeZoneInfo.Utc).Render(expression);
             return (new SqlTranslationResult(sql, parameters, null), size.Nodes);
         }
         catch (TranslationFailure failure)
@@ -86,7 +90,8 @@ public static class SqlTranslator
         Func<IReadOnlyList<string>, string> column,
         List<SqlValue> parameters,
         IReadOnlyDictionary<CallNode, ExpressionRule> ruleCalls,
-        string parameterPrefix)
+        string parameterPrefix,
+        TimeZoneInfo timeZone)
     {
         /// <summary>The rule calls of the expression being rendered: the filter's, or the body's inside a rule.</summary>
         private IReadOnlyDictionary<CallNode, ExpressionRule> _ruleCalls = ruleCalls;
@@ -244,6 +249,9 @@ public static class SqlTranslator
                 "addDays" => $"({arguments[0]} + ({arguments[1]})::int)",
                 "daysBetween" => $"({arguments[1]} - {arguments[0]})",
                 "now" => NowSql,
+                "today" => $"(({NowSql}) AT TIME ZONE {Parameter(ExpressionTypeKind.Text, timeZone.Id)})::date",
+                // The cast keeps a bare NULL argument unambiguous.
+                "toDate" => $"((({arguments[0]})::timestamptz) AT TIME ZONE {Parameter(ExpressionTypeKind.Text, timeZone.Id)})::date",
                 "currentUser" => "@" + CurrentUserParameter,
                 _ => throw NotTranslated(name, call.Offset),
             };

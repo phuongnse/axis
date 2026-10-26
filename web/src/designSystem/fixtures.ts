@@ -472,6 +472,7 @@ const requestTotalsPage: RecordPage = {
 export const siteTexts: Record<string, string> = {
   'request.label': 'Request',
   'request.title': 'Title',
+  'request.title.taken': 'Another request has this title.',
   'request.quantity': 'Quantity',
   'request.amount': 'Amount',
   'request.urgent': 'Urgent',
@@ -509,7 +510,12 @@ export const routes: Record<string, () => unknown> = {
   [requestsPath]: () => recordPage,
   [`${requestsPath}/${requestId}`]: () => savedRecord,
   [`${requestsPath}/${requestId}/history`]: () => history,
-  [formStatePath]: () => ({ sections: [], fields: {}, errors: {}, defaults: {} }),
+  [formStatePath]: () => ({
+    sections: [],
+    fields: {},
+    errors: { '/values/title': ['request.title.taken'] },
+    defaults: {},
+  }),
   [categoriesPath]: () => categoryPage,
   [tasksPath]: () => taskPage,
   [instancesPath]: () => instancePage,

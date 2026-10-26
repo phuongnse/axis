@@ -383,6 +383,9 @@ stay session-only until then.
   changes it.
 - **Routes.** A service account may call:
   - every route of the [record API](record-api.md), record history included;
+  - the [file upload](file-fields.md#upload) routes
+    `POST /api/apps/{app}/entities/{entity}/fields/{field}/files` and the child
+    field form `.../fields/{collection}/{field}/files`;
   - `GET /api/apps/{app}/data-sources/{dataSource}/rows`;
   - `POST /api/apps/{app}/processes/{process}/instances`;
   - the instance list and one instance of

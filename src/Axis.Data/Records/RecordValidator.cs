@@ -78,7 +78,7 @@ public static class RecordValidator
             // A row value that cannot be held exactly stops every validation of the owner.
             if (RecordCollections.TryAdd(application, entity, stored, rows, record, errors))
             {
-                Run(entity, record, "/values", errors, now);
+                Run(entity, record, "/values", errors, now, application.TimeZone);
             }
         }
 
@@ -97,7 +97,7 @@ public static class RecordValidator
                     row[value.Field.Name] = (RecordClrValues.FromInput(value, out var exact), exact);
                 }
 
-                Run(collection.Child, row, $"/values/{collection.Collection.Name}/{index}", errors, now);
+                Run(collection.Child, row, $"/values/{collection.Collection.Name}/{index}", errors, now, application.TimeZone);
             }
         }
 
@@ -147,7 +147,8 @@ public static class RecordValidator
         Dictionary<string, (object? Value, bool Exact)> record,
         string prefix,
         SortedDictionary<string, string[]> errors,
-        DateTimeOffset? now)
+        DateTimeOffset? now,
+        TimeZoneInfo timeZone)
     {
         var inexact = record.Where(pair => !pair.Value.Exact).Select(pair => pair.Key).ToList();
         if (inexact.Count > 0)
@@ -164,7 +165,7 @@ public static class RecordValidator
         var values = new ExpressionValues(record.Select(pair => KeyValuePair.Create(pair.Key, pair.Value.Value)));
         foreach (var validation in entity.Validations)
         {
-            var result = ExpressionInterpreter.Evaluate(validation.Syntax, validation.Check, values, records: null, now: now);
+            var result = ExpressionInterpreter.Evaluate(validation.Syntax, validation.Check, values, records: null, now: now, timeZone: timeZone);
             if (!result.Succeeded || result.Value is not true)
             {
                 errors.TryAdd($"{prefix}/{validation.Field}", [validation.Message.TextKey]);

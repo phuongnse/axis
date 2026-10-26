@@ -201,7 +201,7 @@ internal static class InboundEndpoints
         // now() is its start time. The defaults and the creator fields are set first, as in a record API
         // create, so the computed fields and validations see the record as it will be stored.
         var now = await RecordQueries.TransactionTimeAsync(connection, cancellationToken);
-        var defaults = RecordDefaults.Apply(entity, mapped.Values, now);
+        var defaults = RecordDefaults.Apply(entity, mapped.Values, now, application.TimeZone);
         if (defaults.Errors is { } defaultErrors)
         {
             await transaction.RollbackAsync(cancellationToken);
@@ -222,7 +222,7 @@ internal static class InboundEndpoints
             return new(Results.ValidationProblem(failures));
         }
 
-        var result = await RecordCommands.CreateAsync(connection, application, entity, active.ReleaseId, computed.Values, computed.Rows, recordId, cancellationToken);
+        var result = await RecordCommands.CreateAsync(connection, application, entity, active.ReleaseId, computed.Values, computed.Rows, id: recordId, cancellationToken: cancellationToken);
         if (result is not { Outcome: RecordWriteOutcome.Written, Record: { } record })
         {
             await transaction.RollbackAsync(cancellationToken);

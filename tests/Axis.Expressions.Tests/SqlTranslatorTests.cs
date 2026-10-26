@@ -83,6 +83,48 @@ public sealed class SqlTranslatorTests
         { "ts < now()", $"(\"ts\" < {SqlTranslator.NowSql})", [] },
     };
 
+    [Fact]
+    public void Today_converts_the_session_time_with_the_time_zone_id_as_a_text_parameter()
+    {
+        var result = Translate("today() == dt", TimeZoneInfo.FindSystemTimeZoneById("Asia/Ho_Chi_Minh"));
+
+        Assert.True(result.Succeeded, result.Diagnostic?.Message);
+        Assert.Equal($"((({SqlTranslator.NowSql}) AT TIME ZONE @f0)::date IS NOT DISTINCT FROM \"dt\")", result.Sql);
+        var parameter = Assert.Single(result.Parameters);
+        Assert.Equal(("f0", ExpressionTypeKind.Text, "Asia/Ho_Chi_Minh"), (parameter.Name, parameter.Kind, parameter.Value));
+        Assert.DoesNotContain("Asia", result.Sql, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void To_date_casts_its_argument_to_an_instant_and_converts_it_with_the_time_zone()
+    {
+        var result = Translate("toDate(ts) == dt", TimeZoneInfo.FindSystemTimeZoneById("Asia/Ho_Chi_Minh"));
+
+        Assert.True(result.Succeeded, result.Diagnostic?.Message);
+        Assert.Equal("((((\"ts\")::timestamptz) AT TIME ZONE @f0)::date IS NOT DISTINCT FROM \"dt\")", result.Sql);
+        var parameter = Assert.Single(result.Parameters);
+        Assert.Equal(("f0", ExpressionTypeKind.Text, "Asia/Ho_Chi_Minh"), (parameter.Name, parameter.Kind, parameter.Value));
+    }
+
+    [Fact]
+    public void To_date_of_a_bare_null_keeps_the_cast_so_the_argument_has_a_type()
+    {
+        var result = Translate("toDate(null) is null", null);
+
+        Assert.True(result.Succeeded, result.Diagnostic?.Message);
+        Assert.Contains("((NULL)::timestamptz)", result.Sql, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Without_a_time_zone_today_and_to_date_use_utc()
+    {
+        var today = Translate("today() == dt", null);
+        var toDate = Translate("toDate(ts) == dt", null);
+
+        Assert.Equal("UTC", Assert.Single(today.Parameters).Value);
+        Assert.Equal("UTC", Assert.Single(toDate.Parameters).Value);
+    }
+
     [Theory]
     [MemberData(nameof(Translations))]
     public void Expression_in_the_subset_renders_the_documented_sql_with_typed_parameters(
@@ -427,6 +469,15 @@ public sealed class SqlTranslatorTests
     }
 
     /// <summary>Parses and type-checks <paramref name="expression"/> as a boolean, then translates it.</summary>
+    private static SqlTranslationResult Translate(string expression, TimeZoneInfo? timeZone)
+    {
+        var parsed = ExpressionParser.Parse(expression);
+        Assert.True(parsed.Succeeded, parsed.Diagnostic?.Message);
+        var check = ExpressionTypeChecker.Check(parsed.Expression, _scope, ExpressionType.Boolean);
+        Assert.True(check.Succeeded, check.Diagnostic?.Message);
+        return SqlTranslator.Translate(parsed.Expression, Column, timeZone: timeZone);
+    }
+
     private static SqlTranslationResult Translate(string expression)
     {
         var parsed = ExpressionParser.Parse(expression);

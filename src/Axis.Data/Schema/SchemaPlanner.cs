@@ -164,7 +164,7 @@ public static class SchemaPlanner
                     var owner = EntityNaming.Quote(EntityNaming.OwnerColumn);
                     var target = EntityNaming.Quote(EntityNaming.TargetColumn);
                     _creates.Add(
-                        $"CREATE TABLE {EntityNaming.QualifiedTable(junction)} ({owner} uuid NOT NULL, {target} uuid NOT NULL, "
+                        $"CREATE TABLE {EntityNaming.QualifiedTable(junction)} ({owner} uuid NOT NULL, {target} uuid NOT NULL, {_positionDefinition}, "
                         + $"CONSTRAINT {EntityNaming.Quote(EntityNaming.PrimaryKey(junction))} PRIMARY KEY ({owner}, {target}))");
                     _alters.Add(
                         $"CREATE INDEX {EntityNaming.Quote(EntityNaming.JunctionIndex(junction, EntityNaming.TargetColumn))} "
@@ -521,6 +521,11 @@ public static class SchemaPlanner
                 }
             }
 
+            if (field.Type == FieldType.File && column.ReferencedTable is null && column.Type == ColumnTypes.Render(field))
+            {
+                AddForeignKey(table.Name, column.Name, field);
+            }
+
             if (isEnum && recordedValues.Count > 0)
             {
                 var removed = recordedValues.Where(value => !field.Values!.Contains(value, StringComparer.Ordinal)).ToList();
@@ -540,6 +545,13 @@ public static class SchemaPlanner
             if (field.Target is { } target)
             {
                 AddForeignKey(table, column, target.Id, "");
+            }
+            else if (field.Type == FieldType.File)
+            {
+                // The column holds the id of an uploaded file, whose row is in a platform table.
+                _foreignKeys.Add(
+                    $"ALTER TABLE {EntityNaming.QualifiedTable(table)} ADD CONSTRAINT {EntityNaming.Quote(EntityNaming.ForeignKey(table, column))} "
+                    + $"FOREIGN KEY ({EntityNaming.Quote(column)}) REFERENCES {EntityNaming.Quote("axis")}.{EntityNaming.Quote("files")} ({EntityNaming.Quote(EntityNaming.IdColumn)})");
             }
         }
 

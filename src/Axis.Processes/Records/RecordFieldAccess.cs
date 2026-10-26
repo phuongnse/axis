@@ -17,12 +17,21 @@ public sealed class RecordFieldAccess
 {
     private readonly HashSet<string> _labelled;
     private readonly Dictionary<string, HashSet<string>> _rowLabelled;
+    private readonly HashSet<string> _sets;
+    private readonly HashSet<string> _setLabelled;
 
-    private RecordFieldAccess(IReadOnlySet<string>? readable, HashSet<string> labelled, Dictionary<string, HashSet<string>> rowLabelled)
+    private RecordFieldAccess(
+        IReadOnlySet<string>? readable,
+        HashSet<string> labelled,
+        Dictionary<string, HashSet<string>> rowLabelled,
+        HashSet<string> sets,
+        HashSet<string> setLabelled)
     {
         Readable = readable;
         _labelled = labelled;
         _rowLabelled = rowLabelled;
+        _sets = sets;
+        _setLabelled = setLabelled;
     }
 
     /// <summary>The declared names of the fields the user may read, or null for every field.</summary>
@@ -35,9 +44,19 @@ public sealed class RecordFieldAccess
         var readable = PolicyEvaluator.Fields(application, held, model, PolicyAction.Read);
         var labelled = new HashSet<string>(StringComparer.Ordinal);
         var rowLabelled = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
+        var sets = new HashSet<string>(StringComparer.Ordinal);
+        var setLabelled = new HashSet<string>(StringComparer.Ordinal);
         foreach (var field in model.Fields)
         {
-            if (field.Type == FieldType.ChildCollection)
+            if (field.Type == FieldType.References)
+            {
+                sets.Add(field.Name);
+                if (CanRead(readable, field.Name) && CanReadLabel(application, held, field))
+                {
+                    setLabelled.Add(field.Name);
+                }
+            }
+            else if (field.Type == FieldType.ChildCollection)
             {
                 if (CanRead(readable, field.Name) && application.FindEntity(field.Target!.Id) is { } child
                     && ReferenceLabelled(application, held, child) is { Count: > 0 } childLabelled)
@@ -52,7 +71,7 @@ public sealed class RecordFieldAccess
             }
         }
 
-        return new RecordFieldAccess(readable, labelled, rowLabelled);
+        return new RecordFieldAccess(readable, labelled, rowLabelled, sets, setLabelled);
     }
 
     /// <summary>The reference fields of <paramref name="child"/> whose label the user may read.</summary>
@@ -65,6 +84,30 @@ public sealed class RecordFieldAccess
     private static bool CanReadLabel(ApplicationModel application, List<string> held, FieldModel reference) =>
         application.FindEntity(reference.Target!.Id) is { } target
         && CanRead(PolicyEvaluator.Fields(application, held, target, PolicyAction.Read), reference.TargetDisplayField!);
+
+    /// <summary>
+    /// Whether <paramref name="roles"/> hold a <c>create</c> or an <c>update</c> grant on <paramref name="model"/>
+    /// whose <c>fields</c> cover <paramref name="field"/>. Record filters are not read, because an upload has no record yet.
+    /// </summary>
+    public static bool CanWrite(ApplicationModel application, IEnumerable<string> roles, EntityModel model, string field)
+    {
+        var held = roles.ToList();
+        foreach (var action in new[] { PolicyAction.Create, PolicyAction.Update })
+        {
+            if (!PolicyEvaluator.Access(application, held, model, action).Granted)
+            {
+                continue;
+            }
+
+            var covered = PolicyEvaluator.Fields(application, held, model, action);
+            if (covered is null || covered.Contains(field))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     /// <summary>Whether the user may read the field named <paramref name="name"/>.</summary>
     public bool CanRead(string name) => CanRead(Readable, name);
@@ -87,10 +130,16 @@ public sealed class RecordFieldAccess
 
     /// <summary>
     /// A string label when the user may see it. A collection's array keeps each row's object with
-    /// only the labels the user may see. Null when there is nothing to show.
+    /// only the labels the user may see. A references field's array of labels is kept whole or left
+    /// out. Null when there is nothing to show.
     /// </summary>
     private JsonNode? VisibleLabel(string name, JsonNode label)
     {
+        if (_sets.Contains(name))
+        {
+            return _setLabelled.Contains(name) ? label : null;
+        }
+
         if (label is not JsonArray rows)
         {
             return _labelled.Contains(name) ? label : null;
@@ -122,7 +171,8 @@ public sealed class RecordFieldAccess
     /// <summary>
     /// An error at <c>/values/&lt;field&gt;</c> for each field and child collection
     /// <paramref name="input"/> sets that <paramref name="writable"/> does not hold, or null when
-    /// there is none. A child collection is one field, so its rows are not checked one by one.
+    /// there is none. A child collection is one field, so its rows are not checked one by one, and a
+    /// references field is one field, so its ids are not.
     /// </summary>
     public static SortedDictionary<string, string[]>? Unwritable(RecordInput input, IReadOnlySet<string>? writable)
     {
@@ -132,7 +182,9 @@ public sealed class RecordFieldAccess
         }
 
         var errors = new SortedDictionary<string, string[]>(StringComparer.Ordinal);
-        foreach (var name in input.Values.Select(value => value.Field.Name).Concat(input.Rows.Select(rows => rows.Collection.Name)))
+        foreach (var name in input.Values.Select(value => value.Field.Name)
+            .Concat(input.Rows.Select(rows => rows.Collection.Name))
+            .Concat(input.Links.Select(links => links.Field.Name)))
         {
             if (!writable.Contains(name))
             {

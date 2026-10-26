@@ -15,7 +15,7 @@ namespace Axis.Expressions.Typing;
 /// reference fields resolves only in a scope that resolves paths, and is an unknown name in any
 /// other scope. The text of a <c>date</c> or <c>dateTime</c> literal must be a valid date or
 /// date-time under <see cref="DateLiterals"/>. A stored value, such as a computed field, cannot call
-/// <c>now()</c>, because the value would go stale. Only a policy filter can call <c>currentUser()</c>,
+/// <c>now()</c>, <c>today()</c> or <c>toDate</c>, because the value would go stale. Only a policy filter can call <c>currentUser()</c>,
 /// including as a rule argument there, because no other expression runs for a signed-in user. A
 /// rule body is checked on its own, so it cannot call it. It stops at the first problem and reports
 /// only that one.
@@ -215,6 +215,23 @@ public static class ExpressionTypeChecker
                         "Function 'now' is not allowed in a computed field, because a stored value cannot depend on the current time",
                         call.Offset)
                     : ExpressionType.DateTime;
+
+            case "today":
+                return context.StoredValue
+                    ? throw Fail(
+                        ExpressionDiagnosticCodes.CurrentTimeInStoredValue,
+                        "Function 'today' is not allowed in a computed field, because a stored value cannot depend on the current time",
+                        call.Offset)
+                    : ExpressionType.Date;
+
+            case "toDate":
+                Need(call, name, types, 0, type => type.Kind == ExpressionTypeKind.DateTime, "date-time");
+                return context.StoredValue
+                    ? throw Fail(
+                        ExpressionDiagnosticCodes.CurrentTimeInStoredValue,
+                        "Function 'toDate' is not allowed in a computed field, because a stored value cannot depend on the application's time zone",
+                        call.Offset)
+                    : ExpressionType.Date;
 
             case "currentUser":
                 return context.PolicyFilter
