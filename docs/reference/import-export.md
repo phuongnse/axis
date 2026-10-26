@@ -8,9 +8,9 @@ _(planned for M15)_ are not built yet, and Dn refers to
 [decisions.md](../decisions.md).
 
 Everything on this page is _(planned for M15)_, except the grants, the
-policy matrix, and the upload and dry run of a CSV import, which are built.
-The commit, `xlsx` files, `key` matching, references and the file cleanup of
-an import are not.
+policy matrix, and the upload, dry run and commit of a CSV import, which are
+built. A commit only creates records. `xlsx` files, `key` matching, references
+and the file cleanup of an import are not built.
 
 ## Grants
 
@@ -66,7 +66,8 @@ an import are not.
 - **Upload.** _(built for CSV)_ The file is the raw request body with
   `Content-Type: text/csv` and at most `Data:ImportMaxBytes` bytes, UTF-8, not a
   multipart form. An optional `?key=` names a unique field of the entity, and
-  nothing uses it until commit is built. Only a signed-in user uploads, never
+  nothing uses it until key matching is built, so a commit creates every row.
+  Only a signed-in user uploads, never
   a service account. The checks come in order: session `401`, the path `404`,
   `import` and `create` `403`, `update` `403` when there is a `key`, a `key`
   that is no unique field `400` at `key`, another content type `415`, and a
@@ -91,7 +92,8 @@ an import are not.
   `checked` import can still fail at commit. The import becomes `checked`
   with no errors, or `failed` with every error keyed
   `/rows/{n}/values/{field}`, `n` counting data rows from 1. A failed import's
-  file is deleted at once.
+  file is deleted at once. The dry run ends the link between the import and its
+  work item.
 - **Other error keys.** A problem of the header is keyed `/columns/{n}`, `n`
   counting the columns from 1, and a file with no header is keyed `/columns`.
   A row with the wrong number of cells, or broken quoting, is keyed
@@ -103,22 +105,37 @@ an import are not.
   user only. Any other user, an unknown id and an import of another entity
   get `404`. The import is stored in `axis.record_imports`, see
   [storage](storage.md).
-- **Commit.** Only a `checked` import commits. The worker writes every row in
-  one transaction, or none, and the import becomes `committed` or `failed`.
-  An import holds at most `Data:ImportMaxRows` rows, 10,000 by default,
-  checked by the dry run.
-- **Each row.** It goes through the record command as the user who uploaded the
-  file. Field grants, record filters, validations, defaults, sequences, the
-  creator field, computed fields and audit records all apply. With a `key`,
+- **Commit.** _(built for CSV creates)_ Only the uploader of a `checked` import
+  commits it. The checks come in order: session `401`, the path `404`, the
+  user's current `import` and `create` grants `403`, then the import and its
+  state. Another user's import and an unknown id are `404`. Any state other
+  than `checked` is `409`, and so is a second commit while one is queued. The
+  answer is `202` with the import, still `checked`, and the route queues one
+  `records.importCommit` work item that the import names in its
+  `work_item_id`. The worker writes every row in one transaction that holds the
+  application's start lock shared, or none, and the import becomes `committed`
+  or `failed`. A row that fails at write time, for example on a unique value
+  that is taken or a reference to a record that does not exist, writes nothing.
+  The import is `failed` with that row's errors, keyed `/rows/{n}/...` as the
+  dry run's errors are. The file is deleted when the commit ends. An import
+  holds at most `Data:ImportMaxRows` rows, 10,000 by default, checked by the
+  dry run.
+- **Each row.** _(built for creates)_ It goes through the record command as the
+  user who uploaded the file, with the roles stored at upload. Field grants,
+  record filters, validations, defaults, sequences, the creator field,
+  computed fields and audit records all apply. Until key matching is built,
+  every row creates a record, even with a `key`, so a row whose key is taken
+  fails the whole import on that unique value. Once it is built, with a `key`,
   a row whose key matches a record updates it, and other rows create records.
 - **References.** A reference column takes a record id, or the target's
   display value when that value is unique.
-- **Triggers.** Each created or updated record fires its data change
-  triggers, as any record command write does. Async triggers go through
-  [event delivery](process-events.md#event-delivery) and its retry limit.
+- **Triggers.** _(built for creates)_ Each created or updated record fires its
+  data change triggers in the commit's transaction, as any record command
+  write does.
 - **Not imported.** Child rows, `references` fields and files.
-- **Audit.** A committed import writes `records.imported` with the entity and
-  the counts of created and updated records.
+- **Audit.** _(built for creates)_ A committed import writes `records.imported`
+  with the entity and the counts of created and updated records. The count of
+  updated records is 0 until key matching is built.
 - **Who sees it.** Only the user who uploaded an import reads it or commits
   it. The uploaded file is deleted when the import is committed, fails or is
   older than 24 hours.

@@ -14,7 +14,7 @@ public static class RecordImportStates
     /// <summary>The dry run found no error.</summary>
     public const string Checked = "checked";
 
-    /// <summary>The dry run found errors. The file is cleared.</summary>
+    /// <summary>The dry run or the commit found errors. The file is cleared.</summary>
     public const string Failed = "failed";
 
     /// <summary>The records of the file are written.</summary>
@@ -49,17 +49,36 @@ public sealed record RecordImportJob(
     string State,
     byte[]? File);
 
+/// <summary>What <see cref="RecordImports.QueueCommitAsync"/> found.</summary>
+public enum RecordImportCommitQueued
+{
+    /// <summary>The uploader has no such import of the entity.</summary>
+    NotFound,
+
+    /// <summary>The import is not <c>checked</c>, or a commit is already queued.</summary>
+    WrongState,
+
+    /// <summary>The import now names the commit's work item.</summary>
+    Queued,
+}
+
 /// <summary>
 /// The storage of record imports in <c>axis.record_imports</c>. An import is stored <c>pending</c> in the
 /// same transaction that queues its <see cref="CheckWorkItemKind"/> work item, and the row names the item.
 /// The worker locks the import through the item, checks the file, and ends the import <c>checked</c> or
-/// <c>failed</c> with <see cref="FinishCheckAsync"/>. A failed import's file is cleared. Only the uploader
-/// finds an import with <see cref="FindAsync"/>.
+/// <c>failed</c> with <see cref="FinishCheckAsync"/>, which also stops the row naming the item. A failed import's
+/// file is cleared. The uploader of a <c>checked</c> import commits it: <see cref="QueueCommitAsync"/> makes the
+/// row name the <see cref="CommitWorkItemKind"/> item, which blocks a second commit, and the worker locks the
+/// import through that item and ends it <c>committed</c> or <c>failed</c> with <see cref="FinishCommitAsync"/>,
+/// which clears the file and the name of the item. Only the uploader finds an import with <see cref="FindAsync"/>.
 /// </summary>
 public static class RecordImports
 {
     /// <summary>The kind of the work item that runs the dry run of one import.</summary>
     public const string CheckWorkItemKind = "records.importCheck";
+
+    /// <summary>The kind of the work item that commits one checked import.</summary>
+    public const string CommitWorkItemKind = "records.importCommit";
 
     /// <summary>Stores <paramref name="import"/> as a pending import.</summary>
     public static async Task InsertAsync(NpgsqlConnection connection, NpgsqlTransaction? transaction, RecordImport import, CancellationToken cancellationToken)
@@ -166,7 +185,8 @@ public static class RecordImports
 
     /// <summary>
     /// Ends the dry run of the import <paramref name="id"/> in <paramref name="state"/>, <c>checked</c> or
-    /// <c>failed</c>, with its <paramref name="errors"/>. A failed import's file is cleared.
+    /// <c>failed</c>, with its <paramref name="errors"/>. A failed import's file is cleared. The import no longer
+    /// names the work item of the dry run.
     /// </summary>
     public static async Task FinishCheckAsync(
         NpgsqlConnection connection,
@@ -190,7 +210,98 @@ public static class RecordImports
             UPDATE axis.record_imports
             SET state = @state,
                 errors = @errors,
-                file = CASE WHEN @state = 'failed' THEN NULL ELSE file END
+                file = CASE WHEN @state = 'failed' THEN NULL ELSE file END,
+                work_item_id = NULL
+            WHERE id = @id
+            """,
+            connection,
+            transaction);
+        command.Parameters.AddWithValue("id", id);
+        command.Parameters.AddWithValue("state", state);
+        command.Parameters.Add(new NpgsqlParameter("errors", NpgsqlDbType.Jsonb) { Value = errors.Count == 0 ? DBNull.Value : WriteErrors(errors) });
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Locks the import <paramref name="id"/> of the uploader <c>FOR UPDATE</c> and makes it name the commit work
+    /// item <paramref name="itemId"/> when it is <c>checked</c> and names no work item. An import that names one
+    /// has a commit queued, so a second commit is a wrong state.
+    /// </summary>
+    public static async Task<RecordImportCommitQueued> QueueCommitAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        Guid id,
+        Guid applicationId,
+        Guid entityId,
+        string uploaderId,
+        Guid itemId,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+        ArgumentNullException.ThrowIfNull(transaction);
+
+        await using (var select = new NpgsqlCommand(
+            """
+            SELECT state, work_item_id
+            FROM axis.record_imports
+            WHERE id = @id AND application_id = @application AND entity_id = @entity AND uploader_id = @uploader
+            FOR UPDATE
+            """,
+            connection,
+            transaction))
+        {
+            select.Parameters.AddWithValue("id", id);
+            select.Parameters.AddWithValue("application", applicationId);
+            select.Parameters.AddWithValue("entity", entityId);
+            select.Parameters.AddWithValue("uploader", uploaderId);
+            await using var reader = await select.ExecuteReaderAsync(cancellationToken);
+            if (!await reader.ReadAsync(cancellationToken))
+            {
+                return RecordImportCommitQueued.NotFound;
+            }
+
+            if (reader.GetString(0) != RecordImportStates.Checked || !reader.IsDBNull(1))
+            {
+                return RecordImportCommitQueued.WrongState;
+            }
+        }
+
+        await using var update = new NpgsqlCommand("UPDATE axis.record_imports SET work_item_id = @item WHERE id = @id", connection, transaction);
+        update.Parameters.AddWithValue("id", id);
+        update.Parameters.AddWithValue("item", itemId);
+        await update.ExecuteNonQueryAsync(cancellationToken);
+        return RecordImportCommitQueued.Queued;
+    }
+
+    /// <summary>
+    /// Ends the commit of the import <paramref name="id"/> in <paramref name="state"/>, <c>committed</c> or
+    /// <c>failed</c>, with its <paramref name="errors"/>. The file is cleared in both, and the import no longer
+    /// names the work item of the commit.
+    /// </summary>
+    public static async Task FinishCommitAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        Guid id,
+        string state,
+        IReadOnlyDictionary<string, string[]> errors,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+        ArgumentNullException.ThrowIfNull(transaction);
+        ArgumentNullException.ThrowIfNull(errors);
+
+        if (state is not (RecordImportStates.Committed or RecordImportStates.Failed))
+        {
+            throw new ArgumentOutOfRangeException(nameof(state), state, "A commit ends committed or failed.");
+        }
+
+        await using var command = new NpgsqlCommand(
+            """
+            UPDATE axis.record_imports
+            SET state = @state,
+                errors = @errors,
+                file = NULL,
+                work_item_id = NULL
             WHERE id = @id
             """,
             connection,

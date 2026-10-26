@@ -45,7 +45,7 @@ apply: sections marked _(planned for Mx)_ are not built yet, and Dn refers to
     `axis.pending_computed_fields`, the entities whose recompute the worker
     finishes in batches. It also owns `axis.record_imports`, the uploads of
     [record imports](import-export.md#import) with their file, their state and
-    the errors of their dry run.
+    the errors of their dry run or commit.
   - `Axis.Processes` owns `axis.process_instances` (one row per process
     instance), `axis.process_step_history` (one row per step occurrence),
     `axis.process_tasks` (one row per human task),
@@ -646,7 +646,8 @@ schema of the tenant database.
 - **Audit records.** `axis.audit_records` is append-only. Each row is
   written in the same transaction as the action it records. The record API
   and the process [start endpoint](processes.md#start-endpoint) write them,
-  and so do [process steps](process-execution.md#running-a-step) and
+  and the commit of a [record import](import-export.md#import) writes one per
+  import, and so do [process steps](process-execution.md#running-a-step) and
   [task completions](task-api.md#completing-a-task). So
   do the [operator commands](process-inspection.md#operator-commands), with the user as
   actor. The BFF session writes them too for sign-in, sign-out and a refused
@@ -669,6 +670,12 @@ schema of the tenant database.
   - A `publish` and a `rollback` write an audit record
     when they succeed and when they fail, see
     [publish requests and release history](#publish-requests-and-release-history).
+  - **Import actions.** The commit of a [record import](import-export.md#import)
+    writes `records.imported`, after the `record.created` audit record of each
+    row, in the transaction that writes the rows. The actor is the uploader
+    with their display name. `entity_id` is set, and `record_id` and
+    `process_instance_id` are null. `details` is
+    `{ "created", "updated" }`, the counts of records, and it holds no value.
   - **Session actions.** The
     BFF session writes three actions, see
     [D50](../decisions/d50-sign-in-audit-records-and-security-scanning-in-ci.md)

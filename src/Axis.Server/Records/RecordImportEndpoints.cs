@@ -14,7 +14,8 @@ using Microsoft.Net.Http.Headers;
 namespace Axis.Server.Records;
 
 /// <summary>
-/// Endpoints for the imports of an entity: the upload of a CSV file, and the state of an upload. Only a
+/// Endpoints for the imports of an entity: the upload of a CSV file, the state of an upload, and the commit of a
+/// checked upload. Only a
 /// signed-in user uses them, never a service account. Every request is checked in order: session (401), then the
 /// path (404), then the user's grant (403), and only then the body. An upload needs the <c>import</c> grant and a
 /// <c>create</c> grant on the entity, and the <c>update</c> grant too when it names a <c>key</c>. A <c>key</c>
@@ -23,8 +24,11 @@ namespace Axis.Server.Records;
 /// is a 415 and a larger body a 413. The upload stores the import <c>pending</c>, queues the work item that
 /// dry-runs it, and answers 202 with the import and its <c>Location</c>. The worker then checks every row as a
 /// create would, and writes no record. An import is read by the user who uploaded it, and
-/// any other user, or an unknown id, gets a 404. An entity of a module has the same routes as in
-/// <see cref="RecordEndpoints"/>.
+/// any other user, or an unknown id, gets a 404. The commit checks the session (401), the path (404), the user's
+/// current <c>import</c> and <c>create</c> grants (403), then the import (404 for another user's or an unknown
+/// one) and its state: only a <c>checked</c> import with no commit queued is committed, and any other state is a
+/// 409. It queues the work item that writes the rows and answers 202 with the import, still <c>checked</c>.
+/// An entity of a module has the same routes as in <see cref="RecordEndpoints"/>.
 /// </summary>
 internal static class RecordImportEndpoints
 {
@@ -35,6 +39,7 @@ internal static class RecordImportEndpoints
             var imports = endpoints.MapGroup(pattern);
             imports.MapPost("", UploadAsync);
             imports.MapGet("/{id}", GetAsync).WithQueryTimeout(QueryTimeoutSettings.Interactive);
+            imports.MapPost("/{id}/commit", CommitAsync);
         }
     }
 
@@ -136,6 +141,73 @@ internal static class RecordImportEndpoints
         return await RecordImports.FindAsync(connection, importId, application!.Manifest.Id, model.Id, user.Id, cancellationToken) is { } import
             ? Results.Ok(new RecordImportResponse(import.Id, import.State, import.Key, import.Errors, import.CreatedAt.UtcDateTime))
             : ImportNotFound();
+    }
+
+    private static async Task<IResult> CommitAsync(
+        string app,
+        string entity,
+        string id,
+        HttpContext httpContext,
+        ActiveApplicationResolver resolver,
+        TenantDatabase database,
+        ITenantContextAccessor tenants,
+        CancellationToken cancellationToken)
+    {
+        if (await CurrentUsers.FindAsync(httpContext) is not { } user)
+        {
+            return Grants.SignInRequired(httpContext);
+        }
+
+        var (application, model, notFound, _) = await RecordEndpoints.ResolveEntityAsync(app, RecordEndpoints.EntityName(httpContext, entity), resolver, cancellationToken);
+        if (model is null)
+        {
+            return notFound!;
+        }
+
+        // The worker writes with the roles stored at upload, so the user's current grants are checked here.
+        if (!PolicyEvaluator.AllowsImport(application!, user.Roles, model) || !PolicyEvaluator.Access(application!, user.Roles, model, PolicyAction.Create).Granted)
+        {
+            return Grants.Forbidden();
+        }
+
+        if (!Guid.TryParseExact(id, "D", out var importId) || id.Length != 36)
+        {
+            return ImportNotFound();
+        }
+
+        var tenantId = (tenants.Current ?? throw new InvalidOperationException("No tenant context is set.")).TenantId;
+        var connection = await database.GetConnectionAsync(cancellationToken);
+        var now = DateTimeOffset.UtcNow;
+        RecordImportCommitQueued queued;
+        await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))
+        {
+            var itemId = await WorkItemQueue.EnqueueAsync(connection, transaction, tenantId, RecordImports.CommitWorkItemKind, now, cancellationToken);
+            queued = await RecordImports.QueueCommitAsync(connection, transaction, importId, application!.Manifest.Id, model.Id, user.Id, itemId, cancellationToken);
+            if (queued == RecordImportCommitQueued.Queued)
+            {
+                await transaction.CommitAsync(cancellationToken);
+            }
+            else
+            {
+                await transaction.RollbackAsync(cancellationToken);
+            }
+        }
+
+        if (queued == RecordImportCommitQueued.NotFound)
+        {
+            return ImportNotFound();
+        }
+
+        if (queued == RecordImportCommitQueued.WrongState)
+        {
+            return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: "Only a checked import with no commit queued can be committed.");
+        }
+
+        var import = await RecordImports.FindAsync(connection, importId, application.Manifest.Id, model.Id, user.Id, cancellationToken)
+            ?? throw new InvalidOperationException("The queued import is gone.");
+        return Results.Accepted(
+            $"/api/apps/{application.Manifest.Name}/entities/{model.Name}/imports/{importId:D}",
+            new RecordImportResponse(import.Id, import.State, import.Key, import.Errors, import.CreatedAt.UtcDateTime));
     }
 
     // The content type is text/csv with at most a utf-8 charset, as the reader reads UTF-8 only.

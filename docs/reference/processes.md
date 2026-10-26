@@ -755,6 +755,10 @@ database, with history in `axis.__processes_migrations` (see
   - `records.importCheck` dry-runs one uploaded record import. It has no
     other id column: the import row names the item in its `work_item_id`. See
     [Import](import-export.md#import).
+  - `records.importCommit` commits one checked import. It has no other id
+    column either: the import row names the item in its `work_item_id` from
+    the commit request until the commit ends. See
+    [Import](import-export.md#import).
 - `axis.process_start_receipts`: the stored `201` response of each
   `Idempotency-Key`, unique per application, process and key. The subject is
   null for a process without a subject.
