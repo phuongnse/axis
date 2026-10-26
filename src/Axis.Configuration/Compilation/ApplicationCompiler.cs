@@ -849,6 +849,7 @@ public static partial class ApplicationCompiler
             AddFieldTarget(entity, field, path, findEntity, references);
             CheckSequence(entity, field, path, childOwner, findSequence, unloadedSequenceNames, moduleReferences, references, Report);
             CheckCreator(field, path, childOwner, Report);
+            CheckSearchable(field, path, Report);
             CheckMoney(entity, field, path, Report);
             CheckDefault(entity, field, path, defaultScope, references, Report);
 
@@ -1121,6 +1122,18 @@ public static partial class ApplicationCompiler
         if (problem is not null)
         {
             report(DiagnosticCodes.InvalidConstraint, problem, $"{path}/creator");
+        }
+    }
+
+    /// <summary>Checks a field's <c>searchable</c> property: it applies only to text fields, whatever its value.</summary>
+    private static void CheckSearchable(FieldDefinition field, string path, Action<string, string, string> report)
+    {
+        if (field.Searchable is not null && FieldTypes.Parse(field.Type) != FieldType.Text)
+        {
+            report(
+                DiagnosticCodes.InvalidConstraint,
+                $"'searchable' applies only to text fields, not to {field.Type} fields.",
+                $"{path}/searchable");
         }
     }
 
@@ -2275,6 +2288,7 @@ public static partial class ApplicationCompiler
                 : ComputedFieldModel.Compile(field.Expression, inputScope, ExpressionScopes.TypeOf(field)!),
             Sequence = sequence is null ? null : new SequenceModel(sequence.Id, sequence.Name, sequence.Format),
             Creator = field.Creator == true,
+            Searchable = field.Searchable == true,
             Default = field.Default is null
                 ? null
                 : ExpressionModel.Compile(field.Default, defaultScope, ExpressionScopes.TypeOf(field)!),

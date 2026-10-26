@@ -40,13 +40,15 @@ internal static class Models
         int? precision = null,
         int? scale = null,
         IReadOnlyList<string>? values = null,
-        EntityModel? target = null) =>
+        EntityModel? target = null,
+        bool searchable = false) =>
         new()
         {
             Name = name,
             Type = type,
             Required = required,
             Unique = unique,
+            Searchable = searchable,
             MaxLength = maxLength,
             Precision = precision,
             Scale = scale,
@@ -88,7 +90,7 @@ internal static class Models
             Indexes =
             [
                 .. EntityIndexes.Expected(entity, EntityNaming.Table(entity.Id), Owner(model, entity) is not null)
-                    .Select(index => new CatalogIndex(index.Name, index.Columns, index.Unique))
+                    .Select(index => new CatalogIndex(index.Name, index.Columns, index.Unique) { Trigram = index.Trigram })
                     .OrderBy(index => index.Name, StringComparer.Ordinal),
             ],
         }).ToList());
