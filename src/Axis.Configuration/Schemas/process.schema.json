@@ -125,6 +125,17 @@
           "propertyNames": { "$ref": "#/$defs/name" },
           "additionalProperties": { "type": "string", "minLength": 1, "x-axis-expression": true }
         },
+        "to": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/recipient" }
+        },
+        "channels": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "enum": ["inApp", "email"] }
+        },
+        "message": { "$ref": "#/$defs/notifyMessage" },
+        "open": { "$ref": "#/$defs/notifyOpen" },
         "process": { "$ref": "#/$defs/name" },
         "subject": { "type": "string", "minLength": 1, "x-axis-expression": true },
         "parameters": {
@@ -170,6 +181,10 @@
               "event": false,
               "entity": false,
               "fields": false,
+              "to": false,
+              "channels": false,
+              "message": false,
+              "open": false,
               "next": false,
               "label": false,
               "assignee": false,
@@ -199,6 +214,10 @@
               "event": false,
               "entity": false,
               "fields": false,
+              "to": false,
+              "channels": false,
+              "message": false,
+              "open": false,
               "next": false
             }
           }
@@ -238,6 +257,10 @@
               "event": false,
               "entity": false,
               "fields": false,
+              "to": false,
+              "channels": false,
+              "message": false,
+              "open": false,
               "label": false,
               "assignee": false,
               "form": false,
@@ -265,6 +288,10 @@
               "event": false,
               "entity": false,
               "fields": false,
+              "to": false,
+              "channels": false,
+              "message": false,
+              "open": false,
               "next": false,
               "label": false,
               "assignee": false,
@@ -282,7 +309,19 @@
           },
           "then": {
             "required": ["set"],
-            "properties": { "connector": false, "input": false, "output": false, "retry": false, "event": false, "entity": false, "fields": false }
+            "properties": {
+              "connector": false,
+              "input": false,
+              "output": false,
+              "retry": false,
+              "event": false,
+              "entity": false,
+              "fields": false,
+              "to": false,
+              "channels": false,
+              "message": false,
+              "open": false
+            }
           }
         },
         {
@@ -292,7 +331,18 @@
           },
           "then": {
             "required": ["entity", "set"],
-            "properties": { "connector": false, "input": false, "output": false, "retry": false, "event": false, "fields": false }
+            "properties": {
+              "connector": false,
+              "input": false,
+              "output": false,
+              "retry": false,
+              "event": false,
+              "fields": false,
+              "to": false,
+              "channels": false,
+              "message": false,
+              "open": false
+            }
           }
         },
         {
@@ -302,7 +352,7 @@
           },
           "then": {
             "required": ["connector", "input"],
-            "properties": { "set": false, "event": false, "entity": false, "fields": false }
+            "properties": { "set": false, "event": false, "entity": false, "fields": false, "to": false, "channels": false, "message": false, "open": false }
           }
         },
         {
@@ -312,7 +362,18 @@
           },
           "then": {
             "required": ["event", "fields"],
-            "properties": { "set": false, "connector": false, "input": false, "output": false, "retry": false, "entity": false }
+            "properties": {
+              "set": false,
+              "connector": false,
+              "input": false,
+              "output": false,
+              "retry": false,
+              "entity": false,
+              "to": false,
+              "channels": false,
+              "message": false,
+              "open": false
+            }
           }
         },
         {
@@ -322,7 +383,26 @@
           },
           "then": {
             "required": ["input"],
-            "properties": { "set": false, "connector": false, "event": false, "entity": false, "fields": false }
+            "properties": { "set": false, "connector": false, "event": false, "entity": false, "fields": false, "to": false, "channels": false, "message": false, "open": false }
+          }
+        },
+        {
+          "if": {
+            "required": ["type", "operation"],
+            "properties": { "type": { "const": "operation" }, "operation": { "const": "notify" } }
+          },
+          "then": {
+            "required": ["to", "channels", "message"],
+            "properties": {
+              "set": false,
+              "connector": false,
+              "input": false,
+              "output": false,
+              "retry": false,
+              "event": false,
+              "entity": false,
+              "fields": false
+            }
           }
         }
       ]
@@ -342,6 +422,42 @@
       "properties": {
         "user": { "type": "string", "minLength": 1, "x-axis-expression": true },
         "role": { "type": "string", "minLength": 1, "x-axis-reference": "role" }
+      }
+    },
+    "recipient": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "user": { "type": "string", "minLength": 1, "x-axis-expression": true },
+        "role": { "type": "string", "minLength": 1 },
+        "email": { "type": "string", "minLength": 1, "x-axis-expression": true }
+      }
+    },
+    "notifyMessage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["subject", "body"],
+      "properties": {
+        "subject": { "$ref": "#/$defs/textReference" },
+        "body": { "$ref": "#/$defs/textReference" },
+        "values": {
+          "type": "object",
+          "propertyNames": { "pattern": "^[A-Za-z0-9]+$" },
+          "additionalProperties": { "type": "string", "minLength": 1, "x-axis-expression": true }
+        }
+      }
+    },
+    "notifyOpen": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["page"],
+      "properties": {
+        "page": { "$ref": "#/$defs/name", "x-axis-reference": "page" },
+        "parameters": {
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/name" },
+          "additionalProperties": { "type": "string", "minLength": 1, "x-axis-expression": true }
+        }
       }
     },
     "outcome": {

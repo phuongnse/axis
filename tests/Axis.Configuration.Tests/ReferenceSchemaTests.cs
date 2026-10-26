@@ -54,6 +54,7 @@ public sealed class ReferenceSchemaTests
         (ReferenceRelations.ConnectorCall, "process", "properties/steps/items/properties/connector/properties/name", "connector"),
         (ReferenceRelations.RaisedEvent, "process", "properties/steps/items/properties/event", "event"),
         (ReferenceRelations.CreatedEntity, "process", "properties/steps/items/properties/entity", "entity"),
+        (ReferenceRelations.NavigatePage, "process", "$defs/notifyOpen/properties/page", "page"),
         (ReferenceRelations.PolicyRole, "policy", "properties/roles/items", "role"),
         (ReferenceRelations.Grant, "policy", "properties/grants/items/properties/entity", "entity"),
         (ReferenceRelations.Grant, "policy", "properties/grants/items/properties/dataSource", "dataSource"),

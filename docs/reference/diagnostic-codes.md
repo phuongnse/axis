@@ -96,7 +96,7 @@ sorted by file and then path.
 | `AXC0075` | A form section's `field` names no field of the form's entity, ignoring letter case. Reported at `/sections/{i}/fields/{j}/field`. |
 | `AXC0076` | An earlier entry of the same form already lists this field, in any section and ignoring letter case. Reported at `/sections/{i}/fields/{j}/field` of the later entry, naming the first one. |
 | `AXC0077` | A `form` widget's `form` names no loaded form. Reported at `/widgets/{i}/form`. Not reported when the name is a form file that was not loaded because of its own errors. |
-| `AXC0078` | A process operation step's `operation` is not `updateRecord`, `callConnector`, `raiseEvent`, `createRecord` or a package operation written `<package>/<operation>`, matched exactly. Reported at `/steps/{i}/operation`. Its other properties are then not checked. |
+| `AXC0078` | A process operation step's `operation` is not `updateRecord`, `callConnector`, `raiseEvent`, `createRecord`, `notify` or a package operation written `<package>/<operation>`, matched exactly. Reported at `/steps/{i}/operation`. Its other properties are then not checked. |
 | `AXC0079` | A key of an `updateRecord` `set` names no field of the subject entity, or a key of a `createRecord` `set` names no field of its `entity`, or a field an earlier key of the step already sets, ignoring letter case. Reported at `/steps/{i}/set/{field}`. |
 | `AXC0080` | A key of an `updateRecord` or `createRecord` `set` names a computed field, a sequence field or a child collection, which a process cannot set. A `createRecord` `set` cannot name a creator field either, as the server sets it to `system`. Reported at `/steps/{i}/set/{field}`. |
 | `AXC0081` | A process task step's `assignee` has both or neither of `user` and `role`. Reported at `/steps/{i}/assignee`. |
@@ -261,3 +261,11 @@ sorted by file and then path.
 | `AXC0260` | The `entity` of a `createRecord` step names no loaded entity. Reported at `/steps/{i}/entity`. Not reported when the name is an entity file that was not loaded because of its own errors. See [Create record operation](process-flow.md#create-record-operation). |
 | `AXC0261` | The `entity` of a `createRecord` step is a child entity. A step creates a record of a root entity. Reported at `/steps/{i}/entity`, naming the owner. |
 | `AXC0265` | A policy grant has an `export` with no `read`, or an `import` with no `create`, on the same target in the same policy, ignoring letter case. Reported at `/grants/{i}/actions/{j}`. The message names the action, the target and the grant it needs. An action the target's kind does not take is `AXC0091` instead. |
+| `AXC0266` | A `notify` step has an empty `to`. Reported at `/steps/{i}/to`. |
+| `AXC0267` | A recipient of a `notify` step has none or more than one of `user`, `role` and `email`. Reported at `/steps/{i}/to/{j}`. |
+| `AXC0268` | A `role` recipient of a `notify` step names no declared role, compared exactly. A role file that was not loaded is not reported again. Reported at `/steps/{i}/to/{j}/role`. |
+| `AXC0269` | A `notify` step has an empty `channels`. Reported at `/steps/{i}/channels`. |
+| `AXC0270` | A `role` recipient of a `notify` step is used with the `email` channel. A role has no email address. Reported at `/steps/{i}/to/{j}/role`. |
+| `AXC0271` | A placeholder of a `notify` step's subject or body has no key in `values`, in a locale that has both texts. Reported at `/steps/{i}/message`, naming the locale and the placeholder. |
+| `AXC0272` | A key of a `notify` step's `values` has no placeholder in the subject or the body, in a locale that has both texts. Reported at `/steps/{i}/message`, naming the locale and the key. |
+| `AXC0273` | A text of a `notify` step holds a lone or invalid brace. A placeholder is `{name}` with ASCII letters and digits, and `{{` and `}}` write a brace. Reported at `/steps/{i}/message`, naming the locale, the text key and the offset. |

@@ -7,7 +7,9 @@
   "grants": [
     { "entity": "Item", "actions": ["read"], "fields": ["name", "department"] },
     { "entity": "Item", "actions": ["create", "update"], "fields": ["name", "quantity"] },
+    { "entity": "Item", "actions": ["import"] },
     { "entity": "Ticket", "actions": ["read", "create"], "fields": ["title"] },
+    { "entity": "Ticket", "actions": ["import"] },
     { "entity": "Order", "actions": ["read"], "fields": ["lineCount"] },
     { "entity": "Reminder", "actions": ["read", "create", "update"], "fields": ["title", "state"] },
     { "dataSource": "ItemsByName", "actions": ["read"] },

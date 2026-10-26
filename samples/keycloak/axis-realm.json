@@ -457,6 +457,28 @@
       }
     },
     {
+      "id": "nam",
+      "username": "nam",
+      "enabled": true,
+      "email": "nam@axis.local",
+      "emailVerified": true,
+      "firstName": "Nam",
+      "lastName": "Service Desk Lead",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "axis",
+          "temporary": false
+        }
+      ],
+      "requiredActions": [],
+      "clientRoles": {
+        "axis": [
+          "service-desk-lead"
+        ]
+      }
+    },
+    {
       "id": "purchasing-system",
       "username": "service-account-purchasing-system",
       "enabled": true,

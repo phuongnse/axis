@@ -227,6 +227,78 @@ namespace Axis.Data.Storage.Migrations
                     b.ToTable("provisioned_enum_values", "axis");
                 });
 
+            modelBuilder.Entity("Axis.Data.Storage.RecordImportRow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ApplicationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("application_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("EntityId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("entity_id");
+
+                    b.Property<string>("Errors")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("errors");
+
+                    b.Property<byte[]>("File")
+                        .HasColumnType("bytea")
+                        .HasColumnName("file");
+
+                    b.Property<string>("Key")
+                        .HasColumnType("text")
+                        .HasColumnName("key");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("state");
+
+                    b.Property<string>("TenantId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("UploaderId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("uploader_id");
+
+                    b.Property<string>("UploaderName")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("uploader_name");
+
+                    b.PrimitiveCollection<string[]>("UploaderRoles")
+                        .IsRequired()
+                        .HasColumnType("text[]")
+                        .HasColumnName("uploader_roles");
+
+                    b.Property<Guid?>("WorkItemId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("work_item_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_record_imports");
+
+                    b.HasIndex("WorkItemId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_record_imports_work_item_id");
+
+                    b.ToTable("record_imports", "axis", t =>
+                        {
+                            t.HasCheckConstraint("ck_record_imports_state", "state IN ('pending', 'checked', 'failed', 'committed')");
+                        });
+                });
+
             modelBuilder.Entity("Axis.Data.Storage.SequenceCounterRow", b =>
                 {
                     b.Property<Guid>("SequenceId")
