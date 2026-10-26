@@ -59,6 +59,9 @@ development or E2E server serves a real application without a separate step.
   Above the limit, the entity becomes pending and the worker recomputes the
   rows in batches. See
   [Recomputing computed fields](migrations.md#recomputing-computed-fields).
+  Above the limit, activation also leaves a new non-unique index on a table
+  with more rows to a concurrent build, see
+  [Schema planning](storage.md#schema-planning).
 - **Seeding.** After a folder is activated in a tenant, the step inserts
   every seed record whose id the entity table does not hold yet, so
   restarts never duplicate seeds. Only the id decides: a seed record that was

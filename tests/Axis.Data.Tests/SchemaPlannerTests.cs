@@ -176,6 +176,36 @@ public sealed class SchemaPlannerTests
     }
 
     [Fact]
+    public void Existing_table_drops_and_creates_again_an_expected_index_that_is_not_valid()
+    {
+        var model = BaseModel();
+        var catalog = ChangeOrderIndexes(Catalog(model, hasRows: true), indexes => [.. indexes.Select(index => index with { Valid = false })]);
+
+        var plan = SchemaPlanner.Plan(model, catalog, Models.Records(model));
+
+        Assert.Empty(plan.Diagnostics);
+        Assert.Equal([DropIndex(OrderTable, "f_customer"), CreateIndex(OrderTable, "f_customer")], plan.Statements);
+    }
+
+    [Fact]
+    public void Index_create_on_a_table_with_rows_is_deferrable_and_on_an_empty_table_is_not()
+    {
+        var stored = BaseModel();
+        var changed = DeclareOrderIndexes(stored, new EntityIndexModel(["title"], false));
+
+        var withRows = SchemaPlanner.Plan(changed, Catalog(stored, hasRows: true), Models.Records(stored));
+        var empty = SchemaPlanner.Plan(changed, Catalog(stored, hasRows: false), Models.Records(stored));
+        var unique = SchemaPlanner.Plan(
+            DeclareOrderIndexes(stored, new EntityIndexModel(["title"], true)),
+            Catalog(stored, hasRows: false),
+            Models.Records(stored));
+
+        Assert.Equal([OrderTable], withRows.Commands.Select(command => command.DeferrableOn));
+        Assert.Equal([null], empty.Commands.Select(command => command.DeferrableOn));
+        Assert.Equal([null], unique.Commands.Select(command => command.DeferrableOn));
+    }
+
+    [Fact]
     public void Existing_table_drops_an_ix_index_the_release_does_not_declare()
     {
         var model = BaseModel();

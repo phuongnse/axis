@@ -33,12 +33,14 @@ public static class CatalogReader
         WHERE n.nspname = @schema AND c.relkind = 'r' AND con.contype IN ('u', 'f') AND array_length(con.conkey, 1) = 1
         """;
 
-    // The indexes whose names start with ix_, which are the ones the planner owns, with their columns in index order.
+    // The indexes whose names start with ix_, which are the ones the planner owns, with their columns in index order
+    // and whether PostgreSQL marks them valid.
     // The pattern escapes the underscore, which is a wildcard in LIKE.
     private const string IndexesSql = """
         SELECT t.relname, i.relname, x.indisunique,
           ARRAY(SELECT a.attname FROM unnest(x.indkey::int2[]) WITH ORDINALITY k(attnum, ord)
-                JOIN pg_attribute a ON a.attrelid = x.indrelid AND a.attnum = k.attnum ORDER BY k.ord)
+                JOIN pg_attribute a ON a.attrelid = x.indrelid AND a.attnum = k.attnum ORDER BY k.ord),
+          x.indisvalid
         FROM pg_index x
         JOIN pg_class i ON i.oid = x.indexrelid
         JOIN pg_class t ON t.oid = x.indrelid
@@ -84,7 +86,7 @@ public static class CatalogReader
                 connection,
                 transaction,
                 IndexesSql,
-                reader => (Table: reader.GetString(0), Index: new CatalogIndex(reader.GetString(1), reader.GetFieldValue<string[]>(3), reader.GetBoolean(2))),
+                reader => (Table: reader.GetString(0), Index: new CatalogIndex(reader.GetString(1), reader.GetFieldValue<string[]>(3), reader.GetBoolean(2)) { Valid = reader.GetBoolean(4) }),
                 cancellationToken))
             .ToLookup(row => row.Table, row => row.Index, StringComparer.Ordinal);
 

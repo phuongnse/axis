@@ -15,8 +15,14 @@ public sealed record CatalogTable(string Name, IReadOnlyList<CatalogColumn> Colu
     public IReadOnlyList<CatalogIndex> Indexes { get; init; } = [];
 }
 
-/// <summary>An index of an entity table. <see cref="Columns"/> are the physical column names in index order.</summary>
-public sealed record CatalogIndex(string Name, IReadOnlyList<string> Columns, bool Unique);
+/// <summary>
+/// An index of an entity table. <see cref="Columns"/> are the physical column names in index order. <see cref="Valid"/> is
+/// whether PostgreSQL marks the index valid: a cancelled or failed <c>CREATE INDEX CONCURRENTLY</c> leaves an invalid one.
+/// </summary>
+public sealed record CatalogIndex(string Name, IReadOnlyList<string> Columns, bool Unique)
+{
+    public bool Valid { get; init; } = true;
+}
 
 /// <summary>
 /// A column of an entity table. <see cref="Type"/> is spelled as <c>format_type</c> renders it.

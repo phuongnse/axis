@@ -467,7 +467,8 @@ publisher` runs it with the tenant's schema role.
 
 `Axis.Data` compares a compiled application with a snapshot of the tenant
 catalog (entity tables, their columns, types, `NOT NULL`, single-column
-unique constraints, foreign key targets and whether the table has rows) and
+unique constraints, foreign key targets, their `ix_` indexes with whether each
+is valid, and whether the table has rows) and
 with the provisioning records (each provisioned entity with its application
 and table, and each recorded enum value). The records cover the application's
 entities and any entity recorded with one of its entity `id`s, whatever its
@@ -582,8 +583,19 @@ access. It returns diagnostics, SQL statements and the new records to write.
 - **Errors.** When any diagnostic exists, the plan has no statements and no
   new records; nothing is applied.
 - **Indexes.** See [D77](../decisions/d77-indexes-defaults-and-ranges.md).
-  Every index is built inside the activation transaction for now. Building a
-  large index with `CREATE INDEX CONCURRENTLY` is _(planned for M15)_.
+  A unique index, an index on an empty table and an index on a table with at
+  most `Activation:InlineRecomputeLimit` rows are built inside the activation
+  transaction. A new non-unique index on a table with more rows is left out:
+  activation commits without it, and `EntityIndexBuilder` creates it later
+  with `CREATE INDEX CONCURRENTLY`, so reads and writes on the table go on.
+  The catalog snapshot reads whether each index is valid. An `ix_` index that
+  PostgreSQL marks `INVALID`, for example after a cancelled concurrent build,
+  counts as missing: activation and the builder drop it and create it again.
+  The builder runs without a transaction, holds the schema lock that
+  activation takes, and uses the schema role. The worker cannot build, because
+  its runtime role cannot create indexes, see
+  [D31](../decisions/d31-separate-database-roles.md). Calling the builder from
+  the hosts is _(planned for M15)_. Until then, a deferred index stays missing.
   - Every `reference` column and every child table's `owner_id` gets an
     `ix_` index without being declared. An existing tenant gets them on its
     next activation. A junction table's `target_id` index is created with the
