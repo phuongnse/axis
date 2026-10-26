@@ -144,7 +144,7 @@ covers reads the whole entity table.
 | `reference` | A string with the record id in the lowercase hyphenated form. Its label is in `labels` |
 | `child-collection` | An array of row objects in stored order, in a single read and in the response of a create or update. List responses leave it out. See [Child rows](#child-rows-computed-fields-and-validations) |
 | `money` | A number written as for `decimal`. The currency is the field's, or the value of its `currencyField` |
-| `file` _(planned for M15)_ | An object `{ "id", "name", "mediaType", "size" }`. See [file fields](file-fields.md#field-and-value) |
+| `file` | An object `{ "id", "name", "mediaType", "size" }`, or `null`, also in child rows and in list responses. See [file fields](file-fields.md#field-and-value) |
 | `references` | An array of record ids, in the order they were written. Its labels are an array in the same order in `labels`. List responses leave it out, as for a child collection |
 
 ## Paging and sorting
@@ -552,7 +552,7 @@ is not a `text`. A wrong JSON type or a value outside its bounds is an error at
 | `enum` | A string equal to one of `values`, compared ordinally | `string` |
 | `reference` | A string in the hyphenated 8-4-4-4-12 hex form, in either letter case; whether the record exists is checked when it is written | `Guid` |
 | `money` | A number, checked as for `decimal` with the field's `precision` and `scale` | `string`, as for `decimal` |
-| `file` _(planned for M15)_ | A file id from an upload, in the form of a `reference`. The file must be `pending` and uploaded by the same user for the same entity and field, see [file fields](file-fields.md#upload) | `Guid` |
+| `file` | A file id from an upload, in the form of a `reference`. The file must be `pending` and uploaded by the same user for the same entity and field path, or already attached to this record at that path, see [file fields](file-fields.md#upload) | `Guid` |
 | `references` | An array of distinct record ids, at most 1,000. The whole set replaces the stored one | `Guid[]` |
 
 A value outside a field's limits is an error at the field's pointer, as for
@@ -662,7 +662,7 @@ A record with a child collection holds its rows inside `values`:
 1. Computed fields and validations run only on a body that parsed cleanly.
    A body with parse errors is answered with those errors alone.
 2. On update of an entity with computed fields or validations, the stored
-   record is read first, with its rows. An unknown record is still a `404`,
+   record is read first, with its rows and sets. An unknown record is still a `404`,
    never a `400`.
    The server then builds the record as it will be stored: the stored values,
    the changes from the body, the rows it will store and the computed fields. A computed field that
@@ -673,8 +673,13 @@ A record with a child collection holds its rows inside `values`:
    validation's aggregates read the same rows as the computed fields, so
    `count(lineItems) >= 1` refuses a create without rows and an update that
    sends an empty array. Rows an update leaves out are unchanged and are not
-   checked again as rows, but the owner's aggregates still read them. Any
-   failure is a `400`.
+   checked again as rows, but the owner's aggregates still read them. An
+   aggregate over a `references` field reads the target records of the ids the
+   body sends, or of the stored set when an update leaves the field out, and a
+   create without the field has an empty set. It reads them whatever the
+   user's read grants and record filters on the target entity. An id that
+   names no record is left out of the aggregate, and then storage refuses it.
+   Any failure is a `400`.
 4. Storage runs. It answers as described above, for example `409` for a stale
    `version`.
 
@@ -694,7 +699,8 @@ digits.". Values are never rounded. So on an entity with computed fields or
 validations, a `decimal` value that the interpreter cannot hold exactly
 (see [expression types](expressions.md#types)) is a `400` at its own
 pointer, with the message "Cannot be evaluated exactly.", and no validation
-of that record runs.
+of that record runs. A stored decimal of a target record that cannot be held
+exactly is the same `400`, at the pointer of the `references` field.
 
 For example, a create or update with `quantity` `0` in the second row is
 answered with `400`:

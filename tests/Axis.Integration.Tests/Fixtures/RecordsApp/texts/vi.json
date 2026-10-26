@@ -50,6 +50,8 @@
     "item.status.closed": "Đã đóng",
     "itemPart.noLeadingSpace": "Tên bộ phận không được bắt đầu bằng khoảng trắng.",
     "order.needsLine": "Đơn hàng cần ít nhất một dòng.",
+    "workstation.tooMuchSoftware": "Một máy trạm chứa tối đa hai phần mềm.",
+    "workstation.tooFewSeats": "Số chỗ không được ít hơn số phần mềm.",
     "ticket.priorityPositive": "Mức ưu tiên phải lớn hơn không.",
     "ticket.dueInPast": "Thời hạn phải ở trong tương lai.",
     "role.employee": "Nhân viên",

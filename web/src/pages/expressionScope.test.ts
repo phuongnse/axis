@@ -128,6 +128,7 @@ describe('expressionScope', () => {
 
     expect(options.every((option) => option.type === 'function')).toBe(true)
     expect(labelsOf(options)).toContain('count()')
+    expect(labelsOf(options)).toContain('avg()')
     expect(labelsOf(options)).toContain('currentUser()')
   })
 

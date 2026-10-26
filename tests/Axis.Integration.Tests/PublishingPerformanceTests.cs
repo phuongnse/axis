@@ -52,7 +52,7 @@ public sealed class PublishingPerformanceTests(PostgreSqlFixture database) : ICl
     // as a key ring that is not cached would, fails the test. Locally, the 1,000 requests took 0.24 s.
     private static readonly TimeSpan _meTime = TimeSpan.FromSeconds(10);
 
-    private static readonly string[] _steps = ["version", "compile", "activate", "seed"];
+    private static readonly string[] _steps = ["version", "compile", "activate", "seed", "indexes"];
 
     private const int Activations = 500;
     private const int Patches = 200;

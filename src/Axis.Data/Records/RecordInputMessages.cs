@@ -48,6 +48,8 @@ internal static class RecordInputMessages
 
     public const string MissingReference = "No record has this id.";
 
+    public const string UnknownFile = "No uploaded file for this field has this id.";
+
     public const string NotUnique = "Must be unique.";
 
     public const string NotEvaluable = "Cannot be evaluated exactly.";

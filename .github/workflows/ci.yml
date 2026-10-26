@@ -36,8 +36,19 @@ jobs:
             name: End-to-end tests
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      # The SDK download fails at times, so a failed install is tried once more after a pause.
+      # The runner image has .NET SDKs, and NexKit's checks use them as they are. When one matches
+      # global.json, CI uses it too, so an outage of the SDK download cannot fail the run.
+      - name: Find a .NET SDK that matches global.json
+        id: sdk
+        run: |
+          if dotnet --version; then
+            echo "DOTNET_ROOT=$(dirname "$(readlink -f "$(command -v dotnet)")")" >> "$GITHUB_ENV"
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          fi
+      # Without one, CI downloads the SDK. The download fails at times, so a failed install is
+      # tried once more after a pause.
       - id: dotnet
+        if: steps.sdk.outputs.found != 'true'
         uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
         continue-on-error: true
         with:

@@ -65,6 +65,12 @@ public sealed record SchemaCommand(string Sql)
 
     /// <summary>Set on a statement of a convert: a failing statement, or a count above zero, names the change.</summary>
     public ConvertTarget? Convert { get; init; }
+
+    /// <summary>
+    /// Set on the create of a non-unique index of an existing table that has rows: the physical name of that table.
+    /// Activation may skip the create when the table has more rows than the inline limit, and the index builder creates it later.
+    /// </summary>
+    public string? DeferrableOn { get; init; }
 }
 
 /// <summary>The change of a pending <c>fill</c> migration, which names it in a diagnostic.</summary>

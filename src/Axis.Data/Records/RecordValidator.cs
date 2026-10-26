@@ -11,6 +11,8 @@ namespace Axis.Data.Records;
 /// validation's text key. When several validations fail on one key, the first in declaration
 /// order is reported. The owner's aggregates read the same rows as <see cref="RecordComputer"/>:
 /// the body's rows of a collection, or the stored rows when an update leaves the collection out.
+/// An aggregate over a <c>references</c> field reads the target records in the
+/// <see cref="RecordSets"/> the caller passes, and none without them.
 /// Rows an update leaves out are not checked again as rows. <c>now()</c> gives the time the caller
 /// passes, which is the start time of the transaction that writes the record.
 /// </summary>
@@ -25,14 +27,15 @@ public static class RecordValidator
         EntityModel entity,
         IReadOnlyList<RecordValue> values,
         IReadOnlyList<RecordRows> rows,
-        DateTimeOffset? now = null)
+        DateTimeOffset? now = null,
+        RecordSets? sets = null)
     {
         ArgumentNullException.ThrowIfNull(application);
         ArgumentNullException.ThrowIfNull(entity);
         ArgumentNullException.ThrowIfNull(values);
         ArgumentNullException.ThrowIfNull(rows);
 
-        return Validate(application, entity, null, values, rows, now);
+        return Validate(application, entity, null, values, rows, now, sets);
     }
 
     /// <summary>
@@ -47,7 +50,8 @@ public static class RecordValidator
         Record? stored,
         IReadOnlyList<RecordValue> values,
         IReadOnlyList<RecordRows> rows,
-        DateTimeOffset? now = null)
+        DateTimeOffset? now = null,
+        RecordSets? sets = null)
     {
         ArgumentNullException.ThrowIfNull(application);
         ArgumentNullException.ThrowIfNull(entity);
@@ -58,7 +62,7 @@ public static class RecordValidator
             throw new ArgumentException("An update of an entity with validations needs the stored record.", nameof(stored));
         }
 
-        return Validate(application, entity, stored, values, rows, now);
+        return Validate(application, entity, stored, values, rows, now, sets);
     }
 
     private static SortedDictionary<string, string[]>? Validate(
@@ -67,7 +71,8 @@ public static class RecordValidator
         Record? stored,
         IReadOnlyList<RecordValue> values,
         IReadOnlyList<RecordRows> rows,
-        DateTimeOffset? now)
+        DateTimeOffset? now,
+        RecordSets? sets)
     {
         var errors = new SortedDictionary<string, string[]>(StringComparer.Ordinal);
 
@@ -76,7 +81,7 @@ public static class RecordValidator
             var record = BuildRecord(entity, stored, values);
 
             // A row value that cannot be held exactly stops every validation of the owner.
-            if (RecordCollections.TryAdd(application, entity, stored, rows, record, errors))
+            if (RecordCollections.TryAdd(application, entity, stored, rows, record, errors, sets))
             {
                 Run(entity, record, "/values", errors, now, application.TimeZone);
             }

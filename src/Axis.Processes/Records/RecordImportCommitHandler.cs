@@ -11,8 +11,8 @@ using Npgsql;
 namespace Axis.Processes.Records;
 
 /// <summary>
-/// Runs a <c>records.importCommit</c> work item: the commit of one checked import. It creates every row of the
-/// file as the uploader, with the roles stored at upload, through <see cref="RecordCommand.CreateInTransactionAsync"/>,
+/// Runs a <c>records.importCommit</c> work item: the commit of one checked import. It reads the file in the format
+/// the import stored, as the dry run does, and creates every row of the file as the uploader, with the roles stored at upload, through <see cref="RecordCommand.CreateInTransactionAsync"/>,
 /// so a row passes the same checks as a record API create: the grants, the record filters, the defaults, the
 /// sequences, the creator fields, the computed fields, the validations and the <c>record.created</c> audit record,
 /// and it starts the data change triggers that match it. Every row is written in one transaction that holds the
@@ -68,7 +68,7 @@ internal sealed partial class RecordImportCommitHandler(
         {
             var now = await RecordQueries.TransactionTimeAsync(connection, cancellationToken);
             var actor = new RecordActor(import.UploaderId, import.UploaderName, import.UploaderRoles);
-            created = await WriteRowsAsync(item, connection, transaction, application, release!.Value, entity, actor, import.File ?? [], now, errors, cancellationToken);
+            created = await WriteRowsAsync(item, connection, transaction, application, release!.Value, entity, actor, import.Format, import.File ?? [], now, errors, cancellationToken);
             if (errors.Count == 0)
             {
                 await AuditRecords.AppendAsync(
@@ -107,19 +107,20 @@ internal sealed partial class RecordImportCommitHandler(
         Guid releaseId,
         EntityModel entity,
         RecordActor actor,
+        string format,
         byte[] file,
         DateTimeOffset now,
         Dictionary<string, string[]> errors,
         CancellationToken cancellationToken)
     {
-        var csv = RecordImportCsv.Open(file);
-        if (csv.HeaderError is { } headerError)
+        IRecordImportFile reader = format == RecordImportFormats.Xlsx ? RecordImportXlsx.Open(file) : RecordImportCsv.Open(file);
+        if (reader.HeaderError is { } headerError)
         {
             errors["/columns"] = [headerError];
             return 0;
         }
 
-        if (csv.Header is not { } header)
+        if (reader.Header is not { } header)
         {
             errors["/columns"] = ["The file has no header row."];
             return 0;
@@ -138,7 +139,7 @@ internal sealed partial class RecordImportCommitHandler(
 
         await transaction.SaveAsync(RowsSavepoint, cancellationToken);
         var created = 0;
-        foreach (var row in csv.Rows())
+        foreach (var row in reader.Rows())
         {
             var prefix = $"/rows/{row.Number}";
             if (row.Cells is not { } cells)

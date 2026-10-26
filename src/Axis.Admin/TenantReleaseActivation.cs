@@ -28,14 +28,15 @@ internal readonly record struct ReleaseRun(bool Succeeded, Guid? ReleaseId);
 internal readonly record struct ScenarioTestRun(bool Succeeded, JsonArray Scenarios);
 
 /// <summary>
-/// The version, compile, activate and seed steps for one tenant, which <c>activate</c> and the publisher share. The caller
+/// The version, compile, activate, seed and indexes steps for one tenant, which <c>activate</c> and the publisher share. The caller
 /// says how to compile: from a folder, or from a snapshot. A tenant stops at its first failed step and keeps its previous
 /// active release. A validate runs the version step and one validate step instead: the compile and every activation check
 /// run in one transaction that is always rolled back, and no seed or schedule trigger step runs. A test runs the version step
 /// and one test step: it compiles the snapshot, then runs the chosen scenarios one at a time, each in its own temporary
 /// database on the scenario server, and touches no tenant database. Each step writes one <c>ok</c> line, or one <c>failed</c> line for each error diagnostic. A line names the
-/// tenant and never a password, a host or a connection string. Compile and activate run as the tenant's schema role. The
-/// schedule trigger state and the seed records run as its runtime role. Warnings go to the error writer.
+/// tenant and never a password, a host or a connection string. Compile, activate and indexes run as the tenant's schema role. The
+/// schedule trigger state and the seed records run as its runtime role. The indexes step builds the non-unique indexes that
+/// activation left out of a large table, and runs last, so a slow build holds back nothing else. Warnings go to the error writer.
 /// </summary>
 internal sealed class TenantReleaseActivation(
     int inlineRecomputeLimit,
@@ -88,7 +89,8 @@ internal sealed class TenantReleaseActivation(
                         throw new DiagnosticsFailure(activated.Diagnostics);
                     }
                 })
-                && await Step(id, "seed", () => SeedAsync(connections, id, compiled!, diagnostics));
+                && await Step(id, "seed", () => SeedAsync(connections, id, compiled!, diagnostics))
+                && await Step(id, "indexes", () => BuildIndexesAsync(connections, compiled!));
             return new ReleaseRun(succeeded, compiled?.Release?.Id);
         }
         finally
@@ -336,6 +338,11 @@ internal sealed class TenantReleaseActivation(
             }
         }
     }
+
+    // Builds the non-unique indexes that activation left out of a large table, as the schema role over its connection. Activation
+    // has committed by now, so the connection has no transaction, which CREATE INDEX CONCURRENTLY needs.
+    private async Task BuildIndexesAsync(ITenantConnections connections, ReleaseCompilationResult compiled) =>
+        _ = await EntityIndexBuilder.BuildAsync(compiled.Model!, await connections.SchemaConnectionAsync(), cancellationToken);
 
     private void WriteWarnings(string id, IReadOnlyList<Diagnostic> diagnostics)
     {

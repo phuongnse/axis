@@ -51,6 +51,12 @@ development or E2E server serves a real application without a separate step.
   committed is logged with the folder and tenant too. The previously active
   release stays active, and the first failing tenant stops the whole start,
   so no server runs with some tenants on old releases and others on new ones.
+- **Indexes.** After a folder is activated and seeded in a tenant, the step
+  builds the non-unique indexes that activation left out of large tables, over
+  the tenant's schema connection, see
+  [Schema planning](storage.md#schema-planning). It runs before the server
+  listens, so readiness turns healthy only after the build. A failed build
+  stops the start, and the next start builds the index again.
 - **Recompute limit** *(built)*. `Activation:InlineRecomputeLimit`
   is the most affected rows of one entity that activation recomputes in its
   own transaction when a release changes stored computed fields, or when a
@@ -59,6 +65,9 @@ development or E2E server serves a real application without a separate step.
   Above the limit, the entity becomes pending and the worker recomputes the
   rows in batches. See
   [Recomputing computed fields](migrations.md#recomputing-computed-fields).
+  Above the limit, activation also leaves a new non-unique index on a table
+  with more rows to a concurrent build. The host builds it right after
+  activation, see [Schema planning](storage.md#schema-planning).
 - **Seeding.** After a folder is activated in a tenant, the step inserts
   every seed record whose id the entity table does not hold yet, so
   restarts never duplicate seeds. Only the id decides: a seed record that was

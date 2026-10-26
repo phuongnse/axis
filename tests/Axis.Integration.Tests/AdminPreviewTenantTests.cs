@@ -21,7 +21,7 @@ public sealed partial class AdminPreviewTenantTests(PostgreSqlFixture database, 
 
     private static readonly string[] _createSteps = ["entry", "roles", "database", "grants", "migrations", "grants", "role-check", "version"];
 
-    private static readonly string[] _activateSteps = ["version", "compile", "activate", "seed"];
+    private static readonly string[] _activateSteps = ["version", "compile", "activate", "seed", "indexes"];
 
     private static readonly Uri _serverAddress = new("http://localhost:5206");
 

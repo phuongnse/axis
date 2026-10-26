@@ -24,7 +24,7 @@ public sealed class AdminPublisherTests(PostgreSqlFixture database) : IClassFixt
 
     private static readonly string _sample = Path.Combine(AppContext.BaseDirectory, "Samples", "purchase-requests");
 
-    private static readonly string[] _steps = ["version", "compile", "activate", "seed"];
+    private static readonly string[] _steps = ["version", "compile", "activate", "seed", "indexes"];
 
     private static readonly Dictionary<string, string?> _directory = new() { ["Tenancy:Source"] = "directory" };
 

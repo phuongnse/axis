@@ -176,6 +176,36 @@ public sealed class SchemaPlannerTests
     }
 
     [Fact]
+    public void Existing_table_drops_and_creates_again_an_expected_index_that_is_not_valid()
+    {
+        var model = BaseModel();
+        var catalog = ChangeOrderIndexes(Catalog(model, hasRows: true), indexes => [.. indexes.Select(index => index with { Valid = false })]);
+
+        var plan = SchemaPlanner.Plan(model, catalog, Models.Records(model));
+
+        Assert.Empty(plan.Diagnostics);
+        Assert.Equal([DropIndex(OrderTable, "f_customer"), CreateIndex(OrderTable, "f_customer")], plan.Statements);
+    }
+
+    [Fact]
+    public void Index_create_on_a_table_with_rows_is_deferrable_and_on_an_empty_table_is_not()
+    {
+        var stored = BaseModel();
+        var changed = DeclareOrderIndexes(stored, new EntityIndexModel(["title"], false));
+
+        var withRows = SchemaPlanner.Plan(changed, Catalog(stored, hasRows: true), Models.Records(stored));
+        var empty = SchemaPlanner.Plan(changed, Catalog(stored, hasRows: false), Models.Records(stored));
+        var unique = SchemaPlanner.Plan(
+            DeclareOrderIndexes(stored, new EntityIndexModel(["title"], true)),
+            Catalog(stored, hasRows: false),
+            Models.Records(stored));
+
+        Assert.Equal([OrderTable], withRows.Commands.Select(command => command.DeferrableOn));
+        Assert.Equal([null], empty.Commands.Select(command => command.DeferrableOn));
+        Assert.Equal([null], unique.Commands.Select(command => command.DeferrableOn));
+    }
+
+    [Fact]
     public void Existing_table_drops_an_ix_index_the_release_does_not_declare()
     {
         var model = BaseModel();
@@ -311,6 +341,91 @@ public sealed class SchemaPlannerTests
 
         Assert.Empty(plan.Diagnostics);
         Assert.Equal([$"ALTER TABLE {EntityNaming.QualifiedTable(OrderTable)} DROP COLUMN {Quote("f_note")}"], plan.Statements);
+    }
+
+    [Fact]
+    public void New_table_creates_a_trigram_index_for_the_display_field_and_each_searchable_field_after_the_reference_index()
+    {
+        var customer = Customer();
+        var order = Entity(
+            _orderId,
+            "Order",
+            "entities/order.json",
+            "title",
+            Field("title", FieldType.Text, maxLength: 100),
+            Field("note", FieldType.Text, searchable: true),
+            Field("code", FieldType.Text),
+            Field("customer", FieldType.Reference, target: customer));
+
+        var plan = SchemaPlanner.Plan(Application(order), CatalogSnapshot.Empty, ProvisioningRecords.Empty);
+
+        Assert.Empty(plan.Diagnostics);
+        Assert.Equal(
+            [
+                CreateIndex(OrderTable, "f_customer"),
+                CreateTrigramIndex(OrderTable, "f_title"),
+                CreateTrigramIndex(OrderTable, "f_note"),
+            ],
+            plan.Statements.Where(statement => statement.StartsWith("CREATE INDEX", StringComparison.Ordinal)));
+        Assert.Equal(
+            $"""CREATE INDEX "{EntityNaming.TrigramIndex(OrderTable, "f_note")}" ON "entities"."{OrderTable}" USING gin (lower("f_note") public.gin_trgm_ops)""",
+            CreateTrigramIndex(OrderTable, "f_note"));
+    }
+
+    [Fact]
+    public void A_field_that_is_the_display_field_and_searchable_gets_one_trigram_index()
+    {
+        var order = Entity(_orderId, "Order", "entities/order.json", "Title", Field("title", FieldType.Text, searchable: true));
+
+        var plan = SchemaPlanner.Plan(Application(order), CatalogSnapshot.Empty, ProvisioningRecords.Empty);
+
+        Assert.Empty(plan.Diagnostics);
+        Assert.Equal([CreateTrigramIndex(OrderTable, "f_title")], plan.Statements.Where(statement => statement.StartsWith("CREATE INDEX", StringComparison.Ordinal)));
+    }
+
+    [Fact]
+    public void Existing_table_drops_the_trigram_index_of_a_field_that_is_no_longer_searchable()
+    {
+        var stored = ChangeOrderField(BaseModel(), 5, field => field with { Searchable = true });
+        var changed = ChangeOrderField(stored, 5, field => field with { Searchable = false });
+
+        var plan = SchemaPlanner.Plan(changed, Catalog(stored, hasRows: true), Models.Records(stored));
+
+        Assert.Empty(plan.Diagnostics);
+        Assert.Equal([$"DROP INDEX \"entities\".\"{EntityNaming.TrigramIndex(OrderTable, "f_note")}\""], plan.Statements);
+    }
+
+    [Fact]
+    public void Existing_table_creates_the_trigram_index_of_a_field_that_becomes_searchable_and_defers_it_when_it_has_rows()
+    {
+        var stored = BaseModel();
+        var changed = ChangeOrderField(stored, 5, field => field with { Searchable = true });
+
+        var plan = SchemaPlanner.Plan(changed, Catalog(stored, hasRows: true), Models.Records(stored));
+
+        Assert.Empty(plan.Diagnostics);
+        Assert.Equal([CreateTrigramIndex(OrderTable, "f_note")], plan.Statements);
+        Assert.Equal([OrderTable], plan.Commands.Select(command => command.DeferrableOn));
+    }
+
+    [Fact]
+    public void Pending_rename_renames_the_trigram_index_instead_of_dropping_and_creating_it()
+    {
+        var stored = ChangeOrderField(BaseModel(), 1, field => field with { Searchable = true });
+        var renamed = ChangeOrder(stored, fields => [.. fields.Select(field => field.Name == "code" ? field with { Name = "number" } : field)]);
+        var migration = Migration("Order", new MigrationChangeModel(MigrationChangeType.RenameField, null, "code", "number", null));
+
+        var plan = SchemaPlanner.Plan(renamed, Catalog(stored, hasRows: true), Models.Records(stored), [migration], StoredIds(stored));
+
+        Assert.Empty(plan.Diagnostics);
+        var alter = $"ALTER TABLE {EntityNaming.QualifiedTable(OrderTable)}";
+        Assert.Equal(
+            [
+                $"{alter} RENAME COLUMN {Quote("f_code")} TO {Quote("f_number")}",
+                $"{alter} RENAME CONSTRAINT {Quote(EntityNaming.Unique(OrderTable, "f_code"))} TO {Quote(EntityNaming.Unique(OrderTable, "f_number"))}",
+                $"ALTER INDEX \"entities\".{Quote(EntityNaming.TrigramIndex(OrderTable, "f_code"))} RENAME TO {Quote(EntityNaming.TrigramIndex(OrderTable, "f_number"))}",
+            ],
+            plan.Statements);
     }
 
     [Fact]
@@ -1235,6 +1350,9 @@ public sealed class SchemaPlannerTests
 
     private static string CreateIndex(string table, params string[] columns) =>
         $"""CREATE INDEX "{EntityNaming.Index(table, columns)}" ON "entities"."{table}" ({string.Join(", ", columns.Select(column => $"\"{column}\""))})""";
+
+    private static string CreateTrigramIndex(string table, string column) =>
+        $"""CREATE INDEX "{EntityNaming.TrigramIndex(table, column)}" ON "entities"."{table}" USING gin (lower("{column}") public.gin_trgm_ops)""";
 
     private static string CreateUniqueIndex(string table, params string[] columns) =>
         CreateIndex(table, columns).Replace("CREATE INDEX", "CREATE UNIQUE INDEX", StringComparison.Ordinal);

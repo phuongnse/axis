@@ -6,7 +6,7 @@ namespace Axis.Integration.Tests;
 
 /// <summary>
 /// Grouped data sources return one row per group of the rows that pass the filter, with count,
-/// sum, min and max per group. Paging and sorting apply to the groups.
+/// sum, min, max, avg and countDistinct per group. Paging and sorting apply to the groups.
 /// </summary>
 public sealed class DataSourceAggregateTests(RecordApiFixture fixture) : IClassFixture<RecordApiFixture>
 {
@@ -14,6 +14,11 @@ public sealed class DataSourceAggregateTests(RecordApiFixture fixture) : IClassF
     // with items = count, quantitySum = sum(quantity), priceMin and priceMax over price,
     // firstNeededBy = min(neededBy) and lastOrderedAt = max(orderedAt), sorted by departmentName.
     private const string ByDepartment = "/api/apps/RecordsApp/data-sources/ItemTotalsByDepartment/rows";
+
+    // ItemAveragesByDepartment groups items by department.name as departmentName, with
+    // quantityAvg = avg(quantity), priceAvg = avg(price), quantityKinds = countDistinct(quantity)
+    // and activeKinds = countDistinct(active), sorted by departmentName.
+    private const string AveragesByDepartment = "/api/apps/RecordsApp/data-sources/ItemAveragesByDepartment/rows";
 
     // ItemTotals has no group field and keeps active items, with items = count,
     // quantitySum = sum(quantity), priceSum = sum(price) and priceMax = max(price).
@@ -49,6 +54,25 @@ public sealed class DataSourceAggregateTests(RecordApiFixture fixture) : IClassF
         Assert.Equal(
             ["""{"department":"Finance"}""", """{"department":"Ops"}""", """{"department":"Sales"}""", "{}"],
             items.EnumerateArray().Select(item => item.GetProperty("labels").GetRawText()));
+    }
+
+    [Fact]
+    public async Task Each_group_holds_the_average_and_the_count_of_distinct_values_of_its_items_including_the_null_group()
+    {
+        await SeedAsync();
+
+        using var rows = await GetJsonAsync(AveragesByDepartment);
+
+        // An average over no value is null, and a count of distinct values over no value is 0.
+        Assert.Equal((1, 20, 4L), Paging(rows));
+        Assert.Equal(
+            [
+                """{"departmentName":"Finance","quantityAvg":4.000000,"priceAvg":2.00,"quantityKinds":1,"activeKinds":1}""",
+                """{"departmentName":"Ops","quantityAvg":4.000000,"priceAvg":7.00,"quantityKinds":1,"activeKinds":1}""",
+                """{"departmentName":"Sales","quantityAvg":3.500000,"priceAvg":6.88,"quantityKinds":2,"activeKinds":1}""",
+                """{"departmentName":null,"quantityAvg":null,"priceAvg":1.00,"quantityKinds":0,"activeKinds":0}""",
+            ],
+            rows.RootElement.GetProperty("items").EnumerateArray().Select(item => item.GetProperty("values").GetRawText()));
     }
 
     [Fact]

@@ -349,6 +349,10 @@ public static class ExpressionTypeChecker
                 result = types[1].Kind == ExpressionTypeKind.Null ? ExpressionType.Integer : types[1];
                 break;
 
+            case "avg":
+                Need(call, name, types, 1, IsNumber, "a number");
+                return ExpressionType.Decimal;
+
             case "min" or "max":
                 Need(
                     call,

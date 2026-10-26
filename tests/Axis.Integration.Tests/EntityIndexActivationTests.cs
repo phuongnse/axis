@@ -6,6 +6,7 @@ using Axis.Configuration.Tests;
 using Axis.Data;
 using Axis.Data.Naming;
 using Axis.Data.Records;
+using Axis.Data.Schema;
 using Axis.Processes.Instances;
 using Npgsql;
 
@@ -54,6 +55,38 @@ public sealed class EntityIndexActivationTests(DataDatabaseFixture database) : I
                 indexes,
                 IndexRowComparer.Instance);
         }
+    }
+
+    [Fact]
+    public async Task Every_searchable_column_and_every_display_column_has_a_trigram_index_that_a_second_provision_leaves_alone()
+    {
+        using var folder = ApplicationFolder(indexes: null);
+        folder.With("entities/order.json", OrderFile(indexes: null, searchableNote: true));
+        var compiled = await CompileAsync(folder);
+
+        Assert.Empty((await ActivateAsync(compiled)).Diagnostics);
+
+        var orderTable = EntityNaming.Table(_orderId);
+        var customerTable = EntityNaming.Table(_customerId);
+        (string Table, string Column)[] expected = [(orderTable, "f_title"), (orderTable, "f_note"), (customerTable, "f_name")];
+        var catalog = await ReadCatalogAsync();
+        foreach (var (table, column) in expected)
+        {
+            var name = EntityNaming.TrigramIndex(table, column);
+            var definition = await ReadIndexDefinitionAsync(name);
+            Assert.Contains("USING gin (lower(", definition, StringComparison.Ordinal);
+            Assert.Contains("gin_trgm_ops", definition, StringComparison.Ordinal);
+            var index = Assert.Single(catalog.Tables.Single(candidate => candidate.Name == table).Indexes, candidate => candidate.Name == name);
+            Assert.True(index.Trigram);
+            Assert.Equal([column], index.Columns);
+        }
+
+        Assert.NotNull(compiled.Model);
+        await using var context = database.CreateContext();
+        var again = await EntityProvisioner.ProvisionAsync(compiled.Model, context, CancellationToken);
+
+        Assert.Empty(again.Diagnostics);
+        Assert.DoesNotContain(again.Statements, statement => statement.Contains("INDEX", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -158,6 +191,146 @@ public sealed class EntityIndexActivationTests(DataDatabaseFixture database) : I
         Assert.Equal(["f_alpha,f_b", "f_customer", "f_parent"], await ReadIndexColumnListsAsync(orderTable));
     }
 
+    [Fact]
+    public async Task Activation_leaves_a_new_index_on_a_table_above_the_limit_to_the_builder()
+    {
+        var (compiled, orderTable) = await ActivateDeferredIndexAsync();
+        var index = EntityNaming.Index(orderTable, ["f_a"]);
+
+        Assert.DoesNotContain(index, (await ReadIndexesAsync(orderTable)).Select(row => row.Name));
+
+        IReadOnlyList<string> built;
+        await using (var connection = await OpenSchemaConnectionAsync())
+        {
+            built = await EntityIndexBuilder.BuildAsync(compiled.Model!, connection, CancellationToken);
+        }
+
+        Assert.Equal([index], built);
+        var row = Assert.Single(await ReadIndexesAsync(orderTable), row => row.Name == index);
+        Assert.True(row.Valid);
+        Assert.Equal(["f_a"], row.Columns);
+    }
+
+    [Fact]
+    public async Task Writes_to_the_table_continue_while_the_builder_builds_an_index()
+    {
+        var (compiled, orderTable) = await ActivateDeferredIndexAsync();
+        var index = EntityNaming.Index(orderTable, ["f_a"]);
+        var qualified = EntityNaming.QualifiedTable(orderTable);
+
+        await using var blocker = await OpenSchemaConnectionAsync();
+        await using (var begin = new NpgsqlCommand($"""BEGIN; INSERT INTO {qualified} ("id", "f_title") VALUES ('{Guid.NewGuid()}', 'blocker')""", blocker))
+        {
+            await begin.ExecuteNonQueryAsync(CancellationToken);
+        }
+
+        await using var builder = await OpenSchemaConnectionAsync();
+        var build = Task.Run(() => EntityIndexBuilder.BuildAsync(compiled.Model!, builder, CancellationToken), CancellationToken);
+        try
+        {
+            await WaitForBuildAsync(qualified, build);
+
+            await using var writer = await OpenSchemaConnectionAsync();
+            await using (var timeout = new NpgsqlCommand("SET statement_timeout = '5s'", writer))
+            {
+                await timeout.ExecuteNonQueryAsync(CancellationToken);
+            }
+
+            await using var insert = new NpgsqlCommand($"""INSERT INTO {qualified} ("id", "f_title") VALUES (@id, 'during')""", writer);
+            insert.Parameters.AddWithValue("id", Guid.NewGuid());
+            Assert.Equal(1, await insert.ExecuteNonQueryAsync(CancellationToken));
+            Assert.False(build.IsCompleted);
+        }
+        finally
+        {
+            await using var commit = new NpgsqlCommand("COMMIT", blocker);
+            await commit.ExecuteNonQueryAsync(CancellationToken);
+        }
+
+        Assert.Equal([index], await build);
+        Assert.True(Assert.Single(await ReadIndexesAsync(orderTable), row => row.Name == index).Valid);
+    }
+
+    [Fact]
+    public async Task The_builder_drops_and_builds_again_an_index_that_a_cancelled_build_left_invalid()
+    {
+        var (compiled, orderTable) = await ActivateDeferredIndexAsync();
+        var index = EntityNaming.Index(orderTable, ["f_a"]);
+        var qualified = EntityNaming.QualifiedTable(orderTable);
+
+        await using (var blocker = await OpenSchemaConnectionAsync())
+        {
+            await using (var begin = new NpgsqlCommand($"""BEGIN; INSERT INTO {qualified} ("id", "f_title") VALUES ('{Guid.NewGuid()}', 'blocker')""", blocker))
+            {
+                await begin.ExecuteNonQueryAsync(CancellationToken);
+            }
+
+            await using var cancelled = await OpenSchemaConnectionAsync();
+            await using (var timeout = new NpgsqlCommand("SET statement_timeout = '1s'", cancelled))
+            {
+                await timeout.ExecuteNonQueryAsync(CancellationToken);
+            }
+
+            await using var create = new NpgsqlCommand($"""CREATE INDEX CONCURRENTLY {EntityNaming.Quote(index)} ON {qualified} ("f_a")""", cancelled);
+            var exception = await Assert.ThrowsAsync<PostgresException>(() => create.ExecuteNonQueryAsync(CancellationToken));
+            Assert.Equal("57014", exception.SqlState);
+
+            await using var rollback = new NpgsqlCommand("ROLLBACK", blocker);
+            await rollback.ExecuteNonQueryAsync(CancellationToken);
+        }
+
+        Assert.False(Assert.Single(await ReadIndexesAsync(orderTable), row => row.Name == index).Valid);
+
+        IReadOnlyList<string> built;
+        await using (var connection = await OpenSchemaConnectionAsync())
+        {
+            built = await EntityIndexBuilder.BuildAsync(compiled.Model!, connection, CancellationToken);
+        }
+
+        Assert.Equal([index], built);
+        Assert.True(Assert.Single(await ReadIndexesAsync(orderTable), row => row.Name == index).Valid);
+    }
+
+    // Activates the application without indexes and with 25 orders, then a release that adds an index over a with the
+    // limit at 10. The index is left to the builder.
+    private async Task<(ReleaseCompilationResult Compiled, string OrderTable)> ActivateDeferredIndexAsync()
+    {
+        var folder = ApplicationFolder(indexes: null);
+        Assert.Empty((await ActivateAsync(await CompileAsync(folder))).Diagnostics);
+        await InsertOrdersAsync(25);
+
+        folder.With("entities/order.json", OrderFile("""[{ "fields": ["a"] }]"""));
+        var compiled = await CompileAsync(folder);
+        Assert.Empty((await ActivateAsync(compiled, limit: 10)).Diagnostics);
+        folder.Dispose();
+
+        await using var context = database.CreateConfigurationContext();
+        var active = await new ActiveReleaseStore(context).FindByApplicationIdAsync(_applicationId, CancellationToken);
+        Assert.Equal(compiled.Release?.Id, active?.ReleaseId);
+        return (compiled, EntityNaming.Table(_orderId));
+    }
+
+    // Waits until the build runs on the table, which needs the blocker's open transaction to end before it goes on.
+    private async Task WaitForBuildAsync(string qualifiedTable, Task build)
+    {
+        await using var monitor = await OpenSchemaConnectionAsync();
+        await using var command = new NpgsqlCommand($"SELECT count(*) FROM pg_stat_progress_create_index WHERE relid = '{qualifiedTable}'::regclass", monitor);
+        var deadline = DateTime.UtcNow.AddSeconds(30);
+        while (Convert.ToInt64(await command.ExecuteScalarAsync(CancellationToken), System.Globalization.CultureInfo.InvariantCulture) == 0)
+        {
+            Assert.False(build.IsCompleted, "The build ended before it was held.");
+            Assert.True(DateTime.UtcNow < deadline, "The build did not start.");
+            await Task.Delay(50, CancellationToken);
+        }
+    }
+
+    private async Task<NpgsqlConnection> OpenSchemaConnectionAsync()
+    {
+        var connection = new NpgsqlConnection(database.ConnectionString);
+        await connection.OpenAsync(CancellationToken);
+        return connection;
+    }
+
     private static string Migration(string changes) =>
         $$"""
         { "id": "{{Guid.NewGuid()}}", "kind": "migration", "name": "M{{Guid.NewGuid():N}}", "formatVersion": 1, "entity": "Order", "changes": {{changes}} }
@@ -170,12 +343,13 @@ public sealed class EntityIndexActivationTests(DataDatabaseFixture database) : I
         return await RecordCommands.CreateAsync(connection, compiled.Model!, order, compiled.Release!.Id, values, [], cancellationToken: CancellationToken);
     }
 
-    private string OrderFile(string? indexes, string aName = "a", bool withoutC = false) => OrderFile(
+    private string OrderFile(string? indexes, string aName = "a", bool withoutC = false, bool searchableNote = false) => OrderFile(
         indexes,
         aName,
-        withoutC ? "" : "{ \"name\": \"c\", \"type\": \"integer\" },");
+        withoutC ? "" : "{ \"name\": \"c\", \"type\": \"integer\" },",
+        searchableNote ? "{ \"name\": \"note\", \"type\": \"text\", \"searchable\": true }," : "");
 
-    private string OrderFile(string? indexes, string aName, string cField) =>
+    private string OrderFile(string? indexes, string aName, string cField, string noteField) =>
         $$"""
         { "id": "{{_orderId}}", "kind": "entity", "name": "Order", "formatVersion": 1,
           "displayField": "title",
@@ -184,6 +358,7 @@ public sealed class EntityIndexActivationTests(DataDatabaseFixture database) : I
             { "name": "{{aName}}", "type": "integer" },
             { "name": "b", "type": "integer" },
             {{cField}}
+            {{noteField}}
             { "name": "customer", "type": "reference", "target": "Customer" },
             { "name": "parent", "type": "reference", "target": "Order" },
             { "name": "lines", "type": "child-collection", "target": "OrderLine" }
@@ -211,14 +386,14 @@ public sealed class EntityIndexActivationTests(DataDatabaseFixture database) : I
         return compiled;
     }
 
-    private async Task<ActivationResult> ActivateAsync(ReleaseCompilationResult compiled)
+    private async Task<ActivationResult> ActivateAsync(ReleaseCompilationResult compiled, int limit = ReleaseActivator.DefaultInlineRecomputeLimit)
     {
         await using var connection = new NpgsqlConnection(database.ConnectionString);
         await connection.OpenAsync(CancellationToken);
         await using var configuration = DataDatabaseFixture.CreateConfigurationContext(connection);
         await using var data = DataDatabaseFixture.CreateContext(connection);
         return await ReleaseActivator.ActivateAsync(
-            compiled, new ActiveReleaseStore(configuration), data, ActivationBindings.None("default"), OpenInstanceCounter.Instance, CancellationToken);
+            compiled, new ActiveReleaseStore(configuration), data, ActivationBindings.None("default"), OpenInstanceCounter.Instance, limit, CancellationToken);
     }
 
     private async Task InsertOrderAsync()
@@ -229,12 +404,36 @@ public sealed class EntityIndexActivationTests(DataDatabaseFixture database) : I
         await command.ExecuteNonQueryAsync(CancellationToken);
     }
 
+    private async Task InsertOrdersAsync(int count)
+    {
+        await using var dataSource = NpgsqlDataSource.Create(database.ConnectionString);
+        await using var command = dataSource.CreateCommand(
+            $"""INSERT INTO {EntityNaming.QualifiedTable(EntityNaming.Table(_orderId))} ("id", "f_title") SELECT gen_random_uuid(), 'PO-' || n FROM generate_series(1, @count) n""");
+        command.Parameters.AddWithValue("count", count);
+        await command.ExecuteNonQueryAsync(CancellationToken);
+    }
+
+    private async Task<CatalogSnapshot> ReadCatalogAsync()
+    {
+        await using var connection = new NpgsqlConnection(database.ConnectionString);
+        await connection.OpenAsync(CancellationToken);
+        return await CatalogReader.ReadAsync(connection, null, CancellationToken);
+    }
+
+    private async Task<string> ReadIndexDefinitionAsync(string index)
+    {
+        await using var dataSource = NpgsqlDataSource.Create(database.ConnectionString);
+        await using var command = dataSource.CreateCommand("SELECT indexdef FROM pg_indexes WHERE schemaname = 'entities' AND indexname = @name");
+        command.Parameters.AddWithValue("name", index);
+        return (string)(await command.ExecuteScalarAsync(CancellationToken))!;
+    }
+
     private async Task<List<string>> ReadIndexColumnListsAsync(string table) => ColumnLists(await ReadIndexesAsync(table));
 
     private static List<string> ColumnLists(IEnumerable<IndexRow> indexes) =>
         [.. indexes.Select(index => string.Join(',', index.Columns)).Order(StringComparer.Ordinal)];
 
-    /// <summary>The <c>ix_</c> indexes of a table, read from <c>pg_index</c>, with their columns in index order.</summary>
+    /// <summary>The <c>ix_</c> indexes of a table that are built on columns only, read from <c>pg_index</c>, with their columns in index order.</summary>
     private async Task<List<IndexRow>> ReadIndexesAsync(string table)
     {
         await using var dataSource = NpgsqlDataSource.Create(database.ConnectionString);
@@ -242,25 +441,29 @@ public sealed class EntityIndexActivationTests(DataDatabaseFixture database) : I
             """
             SELECT i.relname, x.indisunique,
               ARRAY(SELECT a.attname::text FROM unnest(x.indkey::int2[]) WITH ORDINALITY k(attnum, ord)
-                    JOIN pg_attribute a ON a.attrelid = x.indrelid AND a.attnum = k.attnum ORDER BY k.ord)
+                    JOIN pg_attribute a ON a.attrelid = x.indrelid AND a.attnum = k.attnum ORDER BY k.ord),
+              x.indisvalid
             FROM pg_index x
             JOIN pg_class i ON i.oid = x.indexrelid
             JOIN pg_class t ON t.oid = x.indrelid
             JOIN pg_namespace n ON n.oid = t.relnamespace
-            WHERE n.nspname = 'entities' AND t.relname = @table AND i.relname LIKE 'ix\_%'
+            WHERE n.nspname = 'entities' AND t.relname = @table AND i.relname LIKE 'ix\_%' AND x.indexprs IS NULL
             """);
         command.Parameters.AddWithValue("table", table);
         await using var reader = await command.ExecuteReaderAsync(CancellationToken);
         var indexes = new List<IndexRow>();
         while (await reader.ReadAsync(CancellationToken))
         {
-            indexes.Add(new IndexRow(reader.GetString(0), reader.GetFieldValue<string[]>(2), reader.GetBoolean(1)));
+            indexes.Add(new IndexRow(reader.GetString(0), reader.GetFieldValue<string[]>(2), reader.GetBoolean(1)) { Valid = reader.GetBoolean(3) });
         }
 
         return indexes;
     }
 
-    private sealed record IndexRow(string Name, IReadOnlyList<string> Columns, bool Unique);
+    private sealed record IndexRow(string Name, IReadOnlyList<string> Columns, bool Unique)
+    {
+        public bool Valid { get; init; } = true;
+    }
 
     private sealed class IndexRowComparer : IEqualityComparer<IndexRow>
     {

@@ -3,6 +3,7 @@ using System.Text.Json;
 using Axis.Configuration.Packages;
 using Axis.Data.Naming;
 using Axis.Data.Records;
+using Axis.Data.Tests;
 using Axis.Processes.Instances;
 using Axis.Processes.Records;
 using Axis.Processes.Work;
@@ -55,6 +56,52 @@ public sealed class RecordImportEndpointTests(RecordApiFixture fixture) : IClass
         Assert.Equal(0L, await ItemCountAsync());
         Assert.Equal(audits, await fixture.AuditRecordCountAsync(TenantA));
         Assert.False(await FileClearedAsync(second.Id));
+    }
+
+    [Fact]
+    public async Task An_xlsx_file_with_bad_rows_fails_its_dry_run_with_errors_by_sheet_row_and_the_fixed_file_is_checked()
+    {
+        await ResetAsync();
+        var audits = await fixture.AuditRecordCountAsync(TenantA);
+        var bad = XlsxFiles.Rows(["name", "Quantity", "price"], ["Desk", "1", "10.50"], ["Chair", "abc", "5"], ["Lamp", "2", "3"], ["Stool", "3", "4"], ["Table", "-1", "9"]);
+
+        var uploaded = await UploadXlsxAsync(fixture.Client, Items, bad);
+
+        Assert.Equal(HttpStatusCode.Accepted, uploaded.Response.StatusCode);
+        Assert.Equal(1, await RunChecksAsync());
+
+        using var failed = await GetAsync(fixture.Client, Items, uploaded.Id);
+
+        Assert.Equal("failed", failed.RootElement.GetProperty("state").GetString());
+        Assert.Equal(
+            ["/rows/2/values/quantity", "/rows/5/values/quantity"],
+            failed.RootElement.GetProperty("errors").EnumerateObject().Select(error => error.Name));
+        Assert.Equal(0L, await ItemCountAsync());
+        Assert.Equal(audits, await fixture.AuditRecordCountAsync(TenantA));
+        Assert.True(await FileClearedAsync(uploaded.Id));
+
+        var fixedFile = XlsxFiles.Rows(["name", "Quantity", "price"], ["Desk", "1", "10.50"], ["Chair", "4", "5"], ["Lamp", "2", "3"], ["Stool", "3", "4"], ["Table", "1", "9"]);
+        var second = await UploadXlsxAsync(fixture.Client, Items, fixedFile);
+        await RunChecksAsync();
+        using var checkedImport = await GetAsync(fixture.Client, Items, second.Id);
+
+        Assert.Equal("checked", checkedImport.RootElement.GetProperty("state").GetString());
+        Assert.Empty(checkedImport.RootElement.GetProperty("errors").EnumerateObject());
+        Assert.Equal(0L, await ItemCountAsync());
+        Assert.Equal(audits, await fixture.AuditRecordCountAsync(TenantA));
+        Assert.False(await FileClearedAsync(second.Id));
+    }
+
+    [Fact]
+    public async Task A_body_that_is_not_a_workbook_is_accepted_and_fails_its_dry_run_at_the_columns()
+    {
+        await ResetAsync();
+
+        var upload = await UploadXlsxAsync(fixture.Client, Items, "name,quantity\nDesk,1\n"u8.ToArray());
+        await RunChecksAsync();
+
+        Assert.Equal(["/columns"], await ErrorKeysAsync(upload.Id));
+        Assert.Equal("xlsx", await fixture.ScalarAsync(TenantA, $"SELECT format FROM axis.record_imports WHERE id = '{upload.Id:D}'"));
     }
 
     [Fact]
@@ -138,6 +185,8 @@ public sealed class RecordImportEndpointTests(RecordApiFixture fixture) : IClass
         using var badKey = await SendAsync(fixture.Client, HttpMethod.Post, $"{Items}/imports?key=name", "name\nDesk\n");
         using var unknownKey = await SendAsync(fixture.Client, HttpMethod.Post, $"{Tickets}/imports?key=nothing", "title\nA\n");
         using var json = await SendAsync(fixture.Client, HttpMethod.Post, $"{Items}/imports", "name\nDesk\n", "application/json");
+        using var workbookWithParameter = await SendBytesAsync(fixture.Client, $"{Items}/imports", XlsxFiles.Rows(["name"], ["Desk"]), $"{XlsxFiles.ContentType}; charset=utf-8");
+        using var workbook = await SendBytesAsync(fixture.Client, $"{Items}/imports", XlsxFiles.Rows(["name"], ["Desk"]), XlsxFiles.ContentType);
         using var noEntity = await SendAsync(fixture.Client, HttpMethod.Post, "/api/apps/RecordsApp/entities/Nothing/imports", "name\nDesk\n");
         using var goodKey = await SendAsync(fixture.Client, HttpMethod.Post, $"{Tickets}/imports?key=CODE", "title,code\nA,x\n");
 
@@ -148,9 +197,11 @@ public sealed class RecordImportEndpointTests(RecordApiFixture fixture) : IClass
 
         await ReadProblemAsync(unknownKey, HttpStatusCode.BadRequest);
         await ReadProblemAsync(json, HttpStatusCode.UnsupportedMediaType);
+        await ReadProblemAsync(workbookWithParameter, HttpStatusCode.UnsupportedMediaType);
+        Assert.Equal(HttpStatusCode.Accepted, workbook.StatusCode);
         await ReadProblemAsync(noEntity, HttpStatusCode.NotFound);
         Assert.Equal(HttpStatusCode.Accepted, goodKey.StatusCode);
-        Assert.Equal(1L, await ImportCountAsync());
+        Assert.Equal(2L, await ImportCountAsync());
     }
 
     [Fact]
@@ -322,6 +373,14 @@ public sealed class RecordImportEndpointTests(RecordApiFixture fixture) : IClass
         return (response, body, body.RootElement.GetProperty("id").GetGuid());
     }
 
+    private static async Task<(HttpResponseMessage Response, JsonDocument Body, Guid Id)> UploadXlsxAsync(HttpClient client, string path, byte[] workbook)
+    {
+        var response = await SendBytesAsync(client, $"{path}/imports", workbook, XlsxFiles.ContentType);
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+        var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
+        return (response, body, body.RootElement.GetProperty("id").GetGuid());
+    }
+
     private static async Task<JsonDocument> GetAsync(HttpClient client, string path, Guid id)
     {
         using var response = await SendAsync(client, HttpMethod.Get, $"{path}/imports/{id:D}", null);
@@ -331,6 +390,14 @@ public sealed class RecordImportEndpointTests(RecordApiFixture fixture) : IClass
 
     private static Task<HttpResponseMessage> SendAsync(HttpClient client, HttpMethod method, string path, string? body, string contentType = "text/csv") =>
         client.SendAsync(Request(method, path, HostA, body, contentType), CancellationToken);
+
+    private static Task<HttpResponseMessage> SendBytesAsync(HttpClient client, string path, byte[] body, string contentType)
+    {
+        var request = Request(HttpMethod.Post, path, HostA, null, null);
+        request.Content = new ByteArrayContent(body);
+        request.Content.Headers.TryAddWithoutValidation("Content-Type", contentType);
+        return client.SendAsync(request, CancellationToken);
+    }
 
     private async Task<List<string>> ErrorKeysAsync(Guid id)
     {
