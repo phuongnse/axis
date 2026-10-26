@@ -36,6 +36,8 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
 
     public DbSet<NotificationReadRow> NotificationReads => Set<NotificationReadRow>();
 
+    public DbSet<EmailOutboxRow> EmailOutbox => Set<EmailOutboxRow>();
+
     public DbSet<ProcessStartReceiptRow> StartReceipts => Set<ProcessStartReceiptRow>();
 
     public DbSet<EndpointReceiptRow> EndpointReceipts => Set<EndpointReceiptRow>();
@@ -294,6 +296,26 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
             read.Property(r => r.ReadAt).HasColumnName("read_at").HasDefaultValueSql("now()");
         });
 
+        modelBuilder.Entity<EmailOutboxRow>(email =>
+        {
+            email.ToTable("email_outbox");
+            email.HasKey(e => e.Id).HasName("pk_email_outbox");
+            email.Property(e => e.Id).HasColumnName("id").ValueGeneratedNever();
+            email.Property(e => e.ApplicationId).HasColumnName("application_id");
+            email.Property(e => e.ReleaseId).HasColumnName("release_id");
+            email.Property(e => e.NotificationId).HasColumnName("notification_id");
+            email.Property(e => e.Step).HasColumnName("step");
+            email.Property(e => e.Address).HasColumnName("address");
+            email.Property(e => e.Locale).HasColumnName("locale");
+            email.Property(e => e.Subject).HasColumnName("subject");
+            email.Property(e => e.Body).HasColumnName("body");
+            email.Property(e => e.MessageId).HasColumnName("message_id");
+            email.Property(e => e.State).HasColumnName("state").HasDefaultValue("pending");
+            email.Property(e => e.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
+            email.Property(e => e.SentAt).HasColumnName("sent_at");
+            email.HasIndex(e => e.MessageId).IsUnique().HasDatabaseName("ux_email_outbox_message_id");
+        });
+
         modelBuilder.Entity<ProcessStartReceiptRow>(receipt =>
         {
             receipt.ToTable("process_start_receipts");
@@ -404,6 +426,7 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
             item.Property(i => i.Escalation).HasColumnName("escalation");
             item.Property(i => i.PackageCallId).HasColumnName("package_call_id");
             item.Property(i => i.EventId).HasColumnName("event_id");
+            item.Property(i => i.EmailId).HasColumnName("email_id");
             item.Property(i => i.TriggerId).HasColumnName("trigger_id");
             item.Property(i => i.ReleaseId).HasColumnName("release_id");
             item.Property(i => i.OccurrenceAt).HasColumnName("occurrence_at");

@@ -53,6 +53,7 @@ internal static class ProcessNotifications
 /// <param name="OpenPage">The declared name of the page the notification opens, or null.</param>
 /// <param name="OpenParameters">The raw evaluated page parameters, keyed by the parameters' declared names, or null when there is no page.</param>
 /// <param name="Recipients">The distinct user and role recipients, each by kind and by user id or role name.</param>
+/// <param name="EmailAddresses">The addresses the <c>email</c> recipients gave, in order. It is empty unless the step has the <c>email</c> channel.</param>
 internal sealed record NewNotification(
     Guid Id,
     Guid ApplicationId,
@@ -63,4 +64,5 @@ internal sealed record NewNotification(
     JsonObject ValueTypes,
     string? OpenPage,
     JsonObject? OpenParameters,
-    IReadOnlyList<(string Kind, string Recipient)> Recipients);
+    IReadOnlyList<(string Kind, string Recipient)> Recipients,
+    IReadOnlyList<string> EmailAddresses);
