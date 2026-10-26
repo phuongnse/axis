@@ -319,8 +319,10 @@ the operator sets it with
 
 ## Data settings
 
-`Data:QueryTimeout`, `Data:ExportQueryTimeout` and `Files:MaxSize` are built. The rest are
-_(planned for M15)_. The server reads them. See
+`Data:QueryTimeout`, `Data:ExportQueryTimeout`, `Data:ImportMaxRows`, `Data:ImportMaxBytes` and
+`Files:MaxSize` are built. The rest are _(planned for M15)_. The server reads
+`Data:QueryTimeout`, `Data:ExportQueryTimeout`, `Data:ImportMaxBytes` and `Files:MaxSize`, and the worker
+reads `Data:ImportMaxRows`. See
 [D79](../decisions/d79-import-and-export-under-policies.md) and
 [D80](../decisions/d80-search-more-aggregates-and-query-timeouts.md).
 
@@ -329,9 +331,9 @@ _(planned for M15)_. The server reads them. See
 | `Data:QueryTimeout` | `00:00:10` | The `statement_timeout` of every interactive read: record lists, single reads and histories, data source rows, lookups and page reads. A read past it is a `503`. |
 | `Data:ExportQueryTimeout` | `00:01:00` | The `statement_timeout` of an export's query. The server reads and checks it, and no export uses it until exports are built. |
 | `Data:ExportMaxRows` | `100000` | The most rows one export writes. |
-| `Data:ImportMaxRows` | `10000` | The most data rows one import holds. A larger file fails its dry run. |
-| `Data:ImportMaxBytes` | `20971520` | The largest import file, 20 MB. |
-| `Files:MaxSize` | `26214400` | The largest file one upload stores, 25 MB. An upload is refused with `413` above the smaller of this and the field's `maxSize`. Publish checks a field's `maxSize` against the 25 MB default, not against this setting. |
+| `Data:ImportMaxRows` | `10000` | The most data rows one import holds. A larger file fails its dry run. The worker reads it, and a value that is not an integer of at least 1 stops its start. |
+| `Data:ImportMaxBytes` | `20971520` | The largest import file, 20 MB. A larger upload is a `413`. The server reads it, and a value that is not a whole number of at least 1 stops its start. |
+| `Files:MaxSize` | `26214400` | The largest file one upload stores, 25 MB. An upload is refused with `413` above the smaller of this and the field's `maxSize`. Publish checks a field's `maxSize` against the 25 MB default, not against this setting. The server reads it, and a value that is not a whole number of at least 1 stops its start. |
 
 - **Per transaction.** Each timeout is set with `SET LOCAL`, so it never
   outlives its query's transaction and never reaches a pooled connection's

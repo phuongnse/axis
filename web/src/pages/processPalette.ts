@@ -34,6 +34,7 @@ const operationKeys: Record<string, Content> = {
   updateRecord: { set: {} },
   callConnector: { connector: { name: '', operation: '' }, input: {} },
   raiseEvent: { event: '', fields: {} },
+  notify: {},
   [packageChoice]: { input: {} },
 }
 

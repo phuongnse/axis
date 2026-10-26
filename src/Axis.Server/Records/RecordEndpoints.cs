@@ -526,7 +526,7 @@ internal static class RecordEndpoints
     private static RecordActor Actor(CurrentUserResponse user) => new(user.Id, user.DisplayName, user.Roles);
 
     // The route of a module entity has a module segment before the entity name.
-    private static string EntityName(HttpContext context, string entity) =>
+    internal static string EntityName(HttpContext context, string entity) =>
         context.GetRouteValue("module") is string module ? $"{module}/{entity}" : entity;
 
     private static RecordBodyReader BodyReader(HttpRequest request) =>

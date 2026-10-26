@@ -46,6 +46,7 @@ public static class RuntimeRoleGrants
         "sessions",
         "files",
         "file_contents",
+        "record_imports",
     };
 
     /// <summary>

@@ -5,9 +5,9 @@ namespace Axis.Data.Storage;
 /// <summary>
 /// The data module's tables in a tenant database: what has been provisioned in the
 /// <c>entities</c> schema, the migrations applied to it, the counters of the sequences, the audit records, the user
-/// profiles, the computed fields whose expression failed for a record, the signed-in sessions, and the uploaded
-/// files with their bytes. The caller
-/// supplies the connection to the tenant database.
+/// profiles, the computed fields whose expression failed for a record, the signed-in sessions, the uploaded
+/// files with their bytes, and the uploads of record imports. The caller supplies the connection to the tenant
+/// database.
 /// </summary>
 public sealed class DataDbContext(DbContextOptions<DataDbContext> options) : DbContext(options)
 {
@@ -40,6 +40,8 @@ public sealed class DataDbContext(DbContextOptions<DataDbContext> options) : DbC
     public DbSet<FileRow> Files => Set<FileRow>();
 
     public DbSet<FileContentRow> FileContents => Set<FileContentRow>();
+
+    public DbSet<RecordImportRow> RecordImports => Set<RecordImportRow>();
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder) =>
         optionsBuilder.UseNpgsql(npgsql => npgsql.MigrationsHistoryTable(MigrationsHistoryTable, Schema));
@@ -197,6 +199,26 @@ public sealed class DataDbContext(DbContextOptions<DataDbContext> options) : DbC
                 .HasForeignKey<FileContentRow>(c => c.FileId)
                 .HasConstraintName("fk_file_contents_files_file_id")
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<RecordImportRow>(import =>
+        {
+            import.ToTable("record_imports", table => table.HasCheckConstraint("ck_record_imports_state", "state IN ('pending', 'checked', 'failed', 'committed')"));
+            import.HasKey(i => i.Id).HasName("pk_record_imports");
+            import.Property(i => i.Id).HasColumnName("id").ValueGeneratedNever();
+            import.Property(i => i.TenantId).HasColumnName("tenant_id");
+            import.Property(i => i.ApplicationId).HasColumnName("application_id");
+            import.Property(i => i.EntityId).HasColumnName("entity_id");
+            import.Property(i => i.UploaderId).HasColumnName("uploader_id");
+            import.Property(i => i.UploaderName).HasColumnName("uploader_name");
+            import.Property(i => i.UploaderRoles).HasColumnName("uploader_roles").HasColumnType("text[]");
+            import.Property(i => i.Key).HasColumnName("key");
+            import.Property(i => i.State).HasColumnName("state");
+            import.Property(i => i.File).HasColumnName("file").HasColumnType("bytea");
+            import.Property(i => i.Errors).HasColumnName("errors").HasColumnType("jsonb");
+            import.Property(i => i.WorkItemId).HasColumnName("work_item_id");
+            import.Property(i => i.CreatedAt).HasColumnName("created_at");
+            import.HasIndex(i => i.WorkItemId).IsUnique().HasDatabaseName("ix_record_imports_work_item_id");
         });
     }
 }
