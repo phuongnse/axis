@@ -111,6 +111,7 @@ const noteListWidget: WidgetMetadata = {
     entity: 'Note',
     parameters: [],
     pageSize: 10,
+    search: false,
     columns: [
       { name: 'title', type: 'text', labelKey: 'note.title', values: null, target: null },
       { name: 'departmentName', type: 'text', labelKey: null, values: null, target: null },
@@ -156,6 +157,7 @@ const texts = {
   'shell.table.no': 'No',
   'shell.table.empty': 'No records yet.',
   'shell.table.loadFailed': 'The records could not be loaded.',
+  'shell.table.search': 'Search',
   'shell.table.rowActions': 'Actions',
   'shell.table.delete': 'Delete',
   'shell.table.deleteConfirm': 'Delete this record? This cannot be undone.',
@@ -292,6 +294,7 @@ describe('TableWidget', () => {
         entity: 'Note',
         parameters: [],
         pageSize: 10,
+        search: false,
         columns: [
           { name: 'department', type: 'reference', labelKey: 'note.category', values: null, target: departmentTarget },
           { name: 'requests', type: 'integer', labelKey: null, values: null, target: null },
@@ -1123,5 +1126,110 @@ describe('TableWidget', () => {
 
       expect(within(row).queryByRole('button', { name: 'Delete note' })).not.toBeInTheDocument()
     })
+  })
+})
+
+describe('TableWidget search', () => {
+  const searchableWidget: WidgetMetadata = {
+    ...noteWidget,
+    entity: { ...noteWidget.entity, displayField: 'title' },
+  }
+
+  it('applies a search on Enter, keeps it in the URL, goes back to page 1 and sends it', async () => {
+    const urls = stubRecords()
+    const user = userEvent.setup()
+    renderWidget('?page=3', searchableWidget)
+    await screen.findByRole('row', { name: /Buy paper/ })
+
+    await user.type(screen.getByRole('searchbox', { name: 'Search' }), 'paper{Enter}')
+
+    await waitFor(() => expect(search()).toBe('?search=paper'))
+    await waitFor(() => expect(urls().at(-1)).toContain('search=paper'))
+    expect(urls().at(-1)).not.toContain('page=')
+  })
+
+  it('does not apply on every key and sends the text as typed', async () => {
+    const urls = stubRecords()
+    const user = userEvent.setup()
+    renderWidget('', searchableWidget)
+    await screen.findByRole('row', { name: /Buy paper/ })
+    const count = urls().length
+
+    await user.type(screen.getByRole('searchbox', { name: 'Search' }), ' a&b ')
+
+    expect(search()).toBe('')
+    expect(urls()).toHaveLength(count)
+    await user.keyboard('{Enter}')
+    await waitFor(() => expect(search()).toBe('?search=+a%26b+'))
+    await waitFor(() => expect(urls().at(-1)).toContain('search=+a%26b+'))
+  })
+
+  it('shows the search from the URL and removes it when cleared', async () => {
+    stubRecords()
+    const user = userEvent.setup()
+    renderWidget('?search=paper&page=2', searchableWidget)
+    const box = screen.getByRole('searchbox', { name: 'Search' })
+    expect(box).toHaveValue('paper')
+
+    await user.clear(box)
+    await user.keyboard('{Enter}')
+
+    await waitFor(() => expect(search()).toBe(''))
+  })
+
+  it('keeps the search when paging and brings it back with the back button', async () => {
+    stubRecords()
+    const user = userEvent.setup()
+    renderWidget('?search=paper', searchableWidget)
+    await screen.findByRole('row', { name: /Buy paper/ })
+
+    await user.click(await screen.findByRole('listitem', { name: '2' }))
+
+    await waitFor(() => expect(search()).toBe('?search=paper&page=2'))
+    await user.type(screen.getByRole('searchbox', { name: 'Search' }), 'x{Enter}')
+    await waitFor(() => expect(search()).toBe('?search=paperx'))
+    await user.click(screen.getByRole('button', { name: 'Back' }))
+    await waitFor(() => expect(search()).toBe('?search=paper&page=2'))
+    expect(screen.getByRole('searchbox', { name: 'Search' })).toHaveValue('paper')
+  })
+
+  it('shows no search box without a display field the user may read, and drops a search from the URL', async () => {
+    const urls = stubRecords()
+    const hidden: WidgetMetadata = {
+      ...noteWidget,
+      entity: { ...noteWidget.entity, displayField: 'name' },
+    }
+
+    renderWidget('?search=paper', hidden)
+
+    await screen.findByRole('row', { name: /Buy paper/ })
+    expect(screen.queryByRole('searchbox')).not.toBeInTheDocument()
+    await waitFor(() => expect(search()).toBe(''))
+    expect(urls().every((url) => !url.includes('search='))).toBe(true)
+  })
+
+  it('shows no search box on an entity without a display field', async () => {
+    stubRecords()
+
+    renderWidget('', noteWidget)
+
+    await screen.findByRole('row', { name: /Buy paper/ })
+    expect(screen.queryByRole('searchbox')).not.toBeInTheDocument()
+  })
+
+  it('shows a search box on a data source table only when the data source declares search', async () => {
+    stubFetch(() => new Response(emptyRows))
+    const searchable: WidgetMetadata = {
+      ...noteListWidget,
+      dataSource: { ...noteListWidget.dataSource!, search: true },
+    }
+
+    const without = renderWidget('', noteListWidget)
+    await screen.findByText('No records yet.')
+    expect(screen.queryByRole('searchbox')).not.toBeInTheDocument()
+    without.unmount()
+
+    renderWidget('', searchable)
+    expect(await screen.findByRole('searchbox', { name: 'Search' })).toBeInTheDocument()
   })
 })

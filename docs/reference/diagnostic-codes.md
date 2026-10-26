@@ -229,7 +229,7 @@ sorted by file and then path.
 | `AXC0228` | A form step lists a section name that no section of the form has. Reported at the name in the step's `sections`. |
 | `AXC0229` | A form step lists a section that is already in a step. Reported at the repeated name in the step's `sections`. |
 | `AXC0230` | A form has `steps` and a section has no name or is in no step. Reported at the section. |
-| `AXC0231` | A page parameter `name` is reserved, already used by an earlier parameter, or also the name of a parameter of the page's table data source that the table leaves unbound, ignoring letter case. `page`, `pageSize` and `sort` are reserved. Reported at the parameter's `name`. |
+| `AXC0231` | A page parameter `name` is reserved, already used by an earlier parameter, or also the name of a parameter of the page's table data source that the table leaves unbound, ignoring letter case. `page`, `pageSize`, `sort` and `search` are reserved. Reported at the parameter's `name`. |
 | `AXC0232` | A `navigate` action names a `page` that no loaded page has. A page that failed to load is not reported again. Reported at the action's `page`. |
 | `AXC0233` | A `navigate` action gives a parameter that its target page does not declare, or gives one twice, ignoring letter case. Reported at `/parameters/{name}` of the action. |
 | `AXC0234` | A `navigate` action leaves out a required parameter of its target page. Reported at the action. |

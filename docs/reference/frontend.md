@@ -409,7 +409,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   | --- | --- |
   | `/` | the platform home page: the server status and the tenant's sites as links, each titled in the current locale, or in the site's first locale when it lacks the current one. With nobody signed in, a sign-in prompt shows in place of the sites, and the page does not start sign-in. The shell's sign-in page is `/?signIn=failed`, where the server sends the browser after a refused sign-in. It shows the same prompt and, above the page, an alert that screen readers announce, with the platform text `shell.home.signInFailed` and no reason. `/` without the marker shows no message |
   | `/{site}` | the site's first navigation entry, by redirect |
-  | `/{site}/{page}` | the page inside the site shell, with the page title. A table page also takes `?page=&pageSize=&sort=`. A table bound to a data source also takes its parameter values. A page with `tabs` widgets also takes `?tab=`, `?tab2=` and so on |
+  | `/{site}/{page}` | the page inside the site shell, with the page title. A table page also takes `?search=&page=&pageSize=&sort=`. A table bound to a data source also takes its parameter values. A page with `tabs` widgets also takes `?tab=`, `?tab2=` and so on |
   | `/{site}/{page}?ticket=<id>` | a page with parameters: the values sit in the query under the parameter names |
   | `/{site}/{page}/new` | the form of a form page, to create a record |
   | `/{site}/{page}/{id}` | the form of a form page, to edit the record with that id |
@@ -420,7 +420,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     `form`, `taskInbox` or `processInspector`, so every part of the address
     has one owner. A `kpi` owns no part of the address and reads only page
     parameters, so it does not count. A `detail` owns none either, and so does a
-    `chart`. The compiler checks this. `?page=&pageSize=&sort=` and the data source parameter
+    `chart`. The compiler checks this. `?search=&page=&pageSize=&sort=` and the data source parameter
     values belong to the page's one `table`. `/new` and `/{id}` belong to its
     one `form`. `/{taskId}` and `/{instanceId}` belong to its one `taskInbox`
     or `processInspector`.
@@ -455,15 +455,30 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   - **Columns.** There is one column per field, in declaration order. The
     header is the field's label, or the field name when it has no label. A
     child collection and a `references` field have no column.
-  - **URL state.** Paging and sorting live in the URL as the record API's own
-    `page`, `pageSize` and `sort` (`-` and the field name for descending), so
-    reload, sharing and the back button keep them. The widget writes them
-    after every other parameter, always in the order `page`, `pageSize`,
-    `sort`, and leaves out defaults (page 1, 20 a page or the data source's
-    page size, no sort). It changes
-    only its own three parameters and, for a data source, the parameter
-    values described below: any other parameter, such as `x=1`, stays as it
-    is.
+  - **URL state.** Paging, sorting and search live in the URL as the record
+    API's own `page`, `pageSize`, `sort` (`-` and the field name for
+    descending) and `search`, so reload, sharing and the back button keep
+    them. The widget writes them after every other parameter, always in the
+    order `search`, `page`, `pageSize`, `sort`, and leaves out defaults (no
+    search, page 1, 20 a page or the data source's page size, no sort). It
+    changes only its own four parameters and, for a data source, the
+    parameter values described below: any other parameter, such as `x=1`,
+    stays as it is.
+  - **Search.** A table whose rows can be searched shows a search box above
+    the rows, on the left, with the toolbar buttons on the right. An entity
+    table has one when the entity's display field is among the fields the
+    user may read, that is in the widget's `entity.fields`. A data source
+    table has one when the data source's metadata has `"search": true`. The
+    text applies on Enter, on the search button and when the box is cleared,
+    so typing does not request rows and add a history entry for every key.
+    It lives in the URL as `search`. A new search starts again at page 1 and
+    adds a history entry, and paging and sorting keep it. The text is sent to
+    the rows request as typed, without trimming, and an empty text means no
+    search, so clearing the box removes `search` from the URL. The box takes
+    at most 200 characters, the limit of the rows routes. On a table that
+    cannot search, a `search` in the URL is ignored and removed without a
+    history entry, as for an invalid `sort`, and is not sent. `search` is a
+    reserved page parameter name, because the table owns it in the URL.
   - **Data source binding.** A table may name a
     `dataSource` instead of an `entity`. See
     [data-sources.md](data-sources.md#widget-binding). Page metadata then
@@ -485,6 +500,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
         }
       ],
       "pageSize": 20,
+      "search": false,
       "columns": [
         {
           "name": "status", "type": "enum", "labelKey": "request.status",
@@ -513,6 +529,9 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     - **Page size.** The data source's `pageSize` is the table's default page
       size. It is offered with 10, 20, 50 and 100 when it is not one of them,
       and the URL leaves it out.
+    - **Search.** `search` is `true` when the data source declares
+      `"search": true`. The table then shows the search box described under
+      Search above. Otherwise it shows none.
     - **Filter inputs.** A filter bar above the rows has one input per
       parameter, in declaration order. It shows the parameter's label, or its
       name when `labelKey` is `null`. Each input is the kind the [form widget](form-widget.md)
@@ -533,8 +552,8 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
       a picked record apply at once. A cleared value is removed.
     - **URL state.** The parameter values live in the URL under the
       parameter names, and the table sends them to `rowsPath`. The widget
-      writes them after every other parameter and before `page`, `pageSize`
-      and `sort`, in declaration order. A new value starts again at page 1
+      writes them after every other parameter and before `search`, `page`,
+      `pageSize` and `sort`, in declaration order. A new value starts again at page 1
       and adds a history entry, so reload, sharing and the back button keep
       the filter. An empty value is left out, and a repeated parameter keeps
       its first value. Both are rewritten without a history entry, as for

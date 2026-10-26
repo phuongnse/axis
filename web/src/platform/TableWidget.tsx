@@ -1,4 +1,4 @@
-import { Alert, Button, Dropdown, Flex, Modal, Table, type TableColumnsType, type TableProps } from 'antd'
+import { Alert, Button, Dropdown, Flex, Input, Modal, Table, type TableColumnsType, type TableProps } from 'antd'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router'
 import { useCanvasActions } from './canvasActions'
@@ -77,6 +77,8 @@ interface TableSource {
   /** The data source parameters. An entity has none. */
   parameters: readonly DataSourceParameter[]
   defaultPageSize: number
+  /** Whether the rows route takes `search`, so the table shows a search box. */
+  searchable: boolean
 }
 
 function tableSource({ entity, dataSource }: WidgetMetadata): TableSource {
@@ -87,10 +89,11 @@ function tableSource({ entity, dataSource }: WidgetMetadata): TableSource {
       columns: dataSource.columns,
       parameters: dataSource.parameters,
       defaultPageSize: dataSource.pageSize,
+      searchable: dataSource.search,
     }
   }
   // The server sets exactly one of the two.
-  const { name, recordsPath, fields } = entity!
+  const { name, recordsPath, fields, displayField } = entity!
   return {
     name,
     path: recordsPath,
@@ -98,6 +101,8 @@ function tableSource({ entity, dataSource }: WidgetMetadata): TableSource {
     columns: fields.filter((field) => field.type !== 'child-collection' && field.type !== 'references'),
     parameters: [],
     defaultPageSize: recordPageSize,
+    // The record API searches the display field, so the user must be able to read it.
+    searchable: displayField !== null && fields.some((field) => field.name === displayField),
   }
 }
 
@@ -120,7 +125,9 @@ function tableSource({ entity, dataSource }: WidgetMetadata): TableSource {
  * and the back button keep them. A data source table also has a filter bar, whose values live in the
  * URL under the parameter names. A data source parameter that the widget binds to a page parameter has
  * no filter input: the table sends the page parameter's value under the data source parameter's name,
- * and leaves that page parameter in the URL as it is.
+ * and leaves that page parameter in the URL as it is. A table whose rows can be searched has a search
+ * box, whose text lives in the URL as `search`. It applies on Enter, on the search button and when
+ * cleared, and a new search starts at page 1 and adds a history entry. The text is sent as typed.
  */
 export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidgetProps) {
   const t = useText()
@@ -139,6 +146,7 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
     columns: fields,
     parameters: allParameters,
     defaultPageSize,
+    searchable,
   } = useMemo(() => tableSource(widget), [widget])
   // The filter bar, the URL and the server's errors cover only the parameters that no page parameter binds.
   const parameters = useMemo(
@@ -148,9 +156,16 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
   const parameterNames = useMemo(() => parameters.map((parameter) => parameter.name), [parameters])
   const sizes = useMemo(() => tablePageSizes(defaultPageSize), [defaultPageSize])
   const query = useMemo(
-    () => parseTableQuery(searchParams, fields, defaultPageSize, parameterNames),
-    [searchParams, fields, defaultPageSize, parameterNames],
+    () => parseTableQuery(searchParams, fields, defaultPageSize, parameterNames, searchable),
+    [searchParams, fields, defaultPageSize, parameterNames, searchable],
   )
+  // The text in the search box. A search from the URL, such as after the back button, replaces it.
+  const [draft, setDraft] = useState(query.search ?? '')
+  const [shownSearch, setShownSearch] = useState(query.search)
+  if (shownSearch !== query.search) {
+    setShownSearch(query.search)
+    setDraft(query.search ?? '')
+  }
   // The bound values and the filter values, in declaration order.
   const requestQuery = useMemo(() => {
     const values: Record<string, string> = {}
@@ -181,7 +196,7 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
   const parameterErrors = loading ? undefined : state.parameterErrors
   const totalCount = loading ? undefined : state.page?.totalCount
 
-  // An invalid, empty, repeated or out-of-order parameter is rewritten without a history entry.
+  // An invalid, empty, repeated or out-of-order parameter, or a search the table cannot make, is rewritten without a history entry.
   useEffect(() => {
     const canonical = writeTableQuery(searchParams, query, defaultPageSize, parameterNames)
     if (canonical.toString() !== searchParams.toString()) {
@@ -417,6 +432,7 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
       pageSize,
       sort,
       parameters: query.parameters,
+      search: query.search,
     }
     setSearchParams(writeTableQuery(searchParams, next, defaultPageSize, parameterNames))
   }
@@ -436,6 +452,16 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
     )
   }
 
+  // A new search starts again at page 1 and adds a history entry. An empty text means no search.
+  const onSearch = (value: string) => {
+    if (value === (query.search ?? '')) {
+      return
+    }
+    setSearchParams(
+      writeTableQuery(searchParams, { ...query, page: 1, search: value || undefined }, defaultPageSize, parameterNames),
+    )
+  }
+
   // A toolbar has no row, so only the literals of its expressions resolve. An action to a form page
   // without a record creates one, so it needs the `create` grant.
   // The canvas draws every toolbar action, also one that the site would hide.
@@ -450,17 +476,31 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
 
   return (
     <Flex vertical gap="middle" aria-busy={loading}>
-      {toolbarButtons.length > 0 && (
-        <Flex justify="flex-end" gap="small">
-          {toolbarButtons.map(({ action, path, index }) => (
-            <Button
-              key={index}
-              onClick={() => navigate(path, { state: { from } })}
-              {...canvas.props(`toolbarActions/${index}`)}
-            >
-              {t(action.labelKey)}
-            </Button>
-          ))}
+      {(searchable || toolbarButtons.length > 0) && (
+        <Flex justify="space-between" align="center" gap="small" wrap>
+          {searchable && (
+            <Input.Search
+              allowClear
+              maxLength={200}
+              style={{ maxWidth: 320 }}
+              aria-label={t('shell.table.search')}
+              placeholder={t('shell.table.search')}
+              value={draft}
+              onChange={(event) => setDraft(event.target.value)}
+              onSearch={onSearch}
+            />
+          )}
+          <Flex gap="small" style={{ marginInlineStart: 'auto' }}>
+            {toolbarButtons.map(({ action, path, index }) => (
+              <Button
+                key={index}
+                onClick={() => navigate(path, { state: { from } })}
+                {...canvas.props(`toolbarActions/${index}`)}
+              >
+                {t(action.labelKey)}
+              </Button>
+            ))}
+          </Flex>
         </Flex>
       )}
       {parameters.length > 0 && (

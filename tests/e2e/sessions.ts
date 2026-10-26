@@ -3,7 +3,7 @@ import path from "node:path";
 import type { Page } from "@playwright/test";
 import { journeyURL } from "./server-settings";
 
-export type SampleUser = "anna" | "lan" | "binh" | "chau" | "dung" | "giang" | "hoa" | "khoa" | "linh" | "minh" | "nam";
+export type SampleUser = "anna" | "lan" | "binh" | "chau" | "dung" | "giang" | "hoa" | "khoa" | "linh" | "minh" | "nam" | "quan";
 
 /** The sample users and the roles the development realm gives them. */
 export const sampleUsers: Record<SampleUser, string[]> = {
@@ -18,6 +18,7 @@ export const sampleUsers: Record<SampleUser, string[]> = {
   linh: ["service-desk-lead"],
   minh: ["approver"],
   nam: ["service-desk-lead"],
+  quan: ["asset-manager"],
 };
 
 const journeyRoles = ["author", "requester", "service-desk-lead", "agent", "approver"];

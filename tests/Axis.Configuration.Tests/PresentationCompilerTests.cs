@@ -575,6 +575,7 @@ public sealed class PresentationCompilerTests
     [InlineData("""{ "name": "page", "type": "integer" }""", 0)]
     [InlineData("""{ "name": "PageSize", "type": "integer" }""", 0)]
     [InlineData("""{ "name": "SORT", "type": "text" }""", 0)]
+    [InlineData("""{ "name": "Search", "type": "text" }""", 0)]
     public void A_duplicate_or_reserved_page_parameter_name_is_reported(string parameters, int index)
     {
         using var folder = Folder().With("pages/orders.json", Page("Orders", OrdersWidget, parameters: parameters));

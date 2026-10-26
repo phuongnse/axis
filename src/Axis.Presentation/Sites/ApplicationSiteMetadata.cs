@@ -316,7 +316,7 @@ public sealed record EntityMetadata(string Name, string? LabelKey, string? Displ
 
 /// <summary>
 /// The data source a table widget shows: the path of its rows endpoint, its root entity, its
-/// parameters, its default page size and its columns. The columns are the projected fields in
+/// parameters, its default page size, whether its rows route takes <c>search</c> and its columns. The columns are the projected fields in
 /// declaration order or, for a grouped data source, the group fields in <c>groupBy</c> order and then
 /// the measures.
 /// </summary>
@@ -326,6 +326,7 @@ public sealed record DataSourceMetadata(
     string Entity,
     IReadOnlyList<DataSourceParameterMetadata> Parameters,
     int PageSize,
+    bool Search,
     IReadOnlyList<DataSourceColumnMetadata> Columns);
 
 /// <summary>

@@ -173,7 +173,7 @@ flowchart LR
      A page's `parameters` ([D63](../decisions/d63-navigate-actions-and-page-parameters.md))
      are checked in file order, at `/parameters/{i}`:
      - a name that an earlier parameter already uses, or one of `page`,
-       `pageSize` and `sort`, ignoring letter case, is `AXC0231` at `/name`,
+       `pageSize`, `sort` and `search`, ignoring letter case, is `AXC0231` at `/name`,
      - a name that an unbound parameter of the page's table data source also
        has, ignoring letter case, is `AXC0231` at `/name`, because both live in
        the URL query,

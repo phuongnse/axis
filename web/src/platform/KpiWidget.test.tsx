@@ -49,6 +49,7 @@ function kpiWidget(kpi: KpiMetadata): WidgetMetadata {
       entity: 'Note',
       parameters: [],
       pageSize: 1,
+      search: false,
       columns: [
         { name: 'openCount', type: 'decimal', labelKey: null, values: null, target: null },
         { name: 'urgentCount', type: 'integer', labelKey: null, values: null, target: null },

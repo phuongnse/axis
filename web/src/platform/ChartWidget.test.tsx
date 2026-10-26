@@ -50,6 +50,7 @@ function chartWidget(chart: ChartMetadata): WidgetMetadata {
       entity: 'Note',
       parameters: [],
       pageSize: 100,
+      search: false,
       columns: [
         { name: 'category', type: 'text', labelKey: 'chart.category', values: null, target: null },
         { name: 'notes', type: 'integer', labelKey: null, values: null, target: null },

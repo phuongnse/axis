@@ -328,6 +328,7 @@ public static class ApplicationSites
                 LabelKeys(parameter.Values, parameter.ValueLabels),
                 parameter.Target is { } target ? Target(application, target.Name) : null))],
             dataSource.PageSize,
+            dataSource.Search,
             // A grouped row holds the group fields, then the measures, not the projected fields.
             dataSource.Aggregate is { } aggregate
                 ? [.. aggregate.GroupBy.Select(field => Column(application, field, aggregate.GroupBy)), .. aggregate.Measures.Select(measure => Measure(aggregate, measure))]
