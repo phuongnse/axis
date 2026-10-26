@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using Axis.Core.Tenancy;
+using Axis.Data.Storage;
 using Axis.Server.Users;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -26,9 +27,9 @@ internal static class Session
     /// </summary>
     public const string SigningInItem = "axis:signing_in";
 
-    public static readonly TimeSpan IdleTimeout = TimeSpan.FromHours(1);
+    public static readonly TimeSpan IdleTimeout = SessionLifetime.IdleTimeout;
 
-    public static readonly TimeSpan MaxLifetime = TimeSpan.FromHours(8);
+    public static readonly TimeSpan MaxLifetime = SessionLifetime.MaxLifetime;
 
     private const string UserIdClaim = "axis:user_id";
     private const string DisplayNameClaim = "axis:display_name";

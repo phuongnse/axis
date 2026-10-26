@@ -74,8 +74,9 @@ flowchart LR
      entity, owned by that field. The owner is the first such field in path
      order of the entity files, then in field order. A later field with the
      same target is `AXC0039` at its `/fields/{i}/target`, naming the owner.
-     A `reference` whose target is a child entity is `AXC0040` at
-     `/fields/{i}/target`. A `child-collection` field on a
+     A `reference` or `references` whose target is a child entity is
+     `AXC0040` at `/fields/{i}/target`. A `child-collection` or `references`
+     field on a
      child entity is `AXC0041` at its `/fields/{i}/type`, so an entity whose
      child collection names itself is `AXC0041`. A `reference` field on a
      child entity is allowed. See
@@ -461,7 +462,9 @@ flowchart LR
      `/roles/{i}`. A grant without exactly one of `entity`, `dataSource`,
      `process` and `endpoint` is `AXC0091` at `/grants/{i}`, and nothing else
      of it is checked. An action its target's kind does not take is `AXC0091`
-     at `/grants/{i}/actions/{j}`, and a `filter` or `fields` on a
+     at `/grants/{i}/actions/{j}`. An `export` without a `read`, or an
+     `import` without a `create`, on the same target in the same policy is
+     `AXC0265` at `/grants/{i}/actions/{j}`. A `filter` or `fields` on a
      `dataSource`, `process` or `endpoint` grant is `AXC0091` at
      `/grants/{i}/filter` or `/grants/{i}/fields`. A target that names no
      loaded entity, data source, process or endpoint, ignoring letter case, is

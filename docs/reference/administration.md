@@ -89,7 +89,7 @@ Every command writes one line per tenant and step to standard output:
 ```
 
 The step names are `entry`, `roles`, `database`, `grants`, `migrations`,
-`work`, `role-check`, `version`, `compile`, `activate`, `seed`, `dump`, `archive`,
+`work`, `sessions`, `role-check`, `version`, `compile`, `activate`, `seed`, `dump`, `archive`,
 `check`, `restore`, `status`, `runtime-password`, `schema-password` and `audit`. An `audit` step prints only when it fails, see
 [platform audit records](tenant-setting-commands.md#platform-audit-records). The [publisher](#publisher)
 adds `claim`, `validate` and `rollback`. A line names the
@@ -435,8 +435,11 @@ it keeps working without the module installed.
 9. `work`: give every work item the new tenant id. The worker claims only the
    work items of its own tenant, so without this the work that was due at
    backup would never run.
-10. `role-check`: run the runtime role check of D31 over the runtime role.
-11. `version`: record the schema version and set the entry `suspended`. The step
+10. `sessions`: empty `axis.sessions`, so no session of the archive signs
+    anyone in. The migrations ran before this step, so an archive older than the
+    table has it here.
+11. `role-check`: run the runtime role check of D31 over the runtime role.
+12. `version`: record the schema version and set the entry `suspended`. The step
     fails unless the database is on the schema of this build, which catches an
     archive whose manifest does not match its dump.
 

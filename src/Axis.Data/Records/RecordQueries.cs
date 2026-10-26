@@ -240,6 +240,7 @@ public static class RecordQueries
     /// <paramref name="record"/>, in position order, with one query per collection. The values
     /// keep the entity's field declaration order. A collection whose child entity has reference
     /// fields also adds the row labels, read in the same query, under the collection's name.
+    /// A references field has no value.
     /// </summary>
     internal static async Task<Record> WithRowsAsync(
         NpgsqlConnection connection,
@@ -252,6 +253,12 @@ public static class RecordQueries
         var labels = new Dictionary<string, JsonNode>(record.Labels, StringComparer.Ordinal);
         foreach (var field in entity.Fields)
         {
+            // A references field has no column yet, so a record carries no value for it.
+            if (!field.HasColumn && field.Type != FieldType.ChildCollection)
+            {
+                continue;
+            }
+
             if (field.Type == FieldType.ChildCollection)
             {
                 var (rows, rowLabels) = await ReadRowsAsync(connection, application, field, record.Id, cancellationToken);

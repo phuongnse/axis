@@ -248,5 +248,6 @@ public static class DiagnosticCodes
     public const string InvalidFileMaxSize = "AXC0257";
     public const string InvalidFileAccept = "AXC0258";
     public const string FileFieldNotAllowed = "AXC0259";
-    public const string UnknownApplicationTimeZone = "AXC0260";
+    public const string ActionWithoutRequiredGrant = "AXC0265";
+    public const string UnknownApplicationTimeZone = "AXC0266";
 }

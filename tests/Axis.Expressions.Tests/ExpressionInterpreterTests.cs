@@ -632,6 +632,26 @@ public sealed class ExpressionInterpreterTests
     }
 
     [Fact]
+    public void Count_of_a_references_field_is_the_number_of_linked_records()
+    {
+        var result = EvaluateOverSoftware("count(software)", Software("Office", "Browser"));
+
+        Assert.True(result.Succeeded, result.Error?.Message);
+        Assert.Equal(2L, result.Value);
+    }
+
+    [Theory]
+    [InlineData("Office", true)]
+    [InlineData("Browser", false)]
+    public void Any_over_a_references_field_tests_the_linked_records(string name, bool expected)
+    {
+        var result = EvaluateOverSoftware("any(software, name == 'Office')", Software(name, "Editor"));
+
+        Assert.True(result.Succeeded, result.Error?.Message);
+        Assert.Equal(expected, result.Value);
+    }
+
+    [Fact]
     public void A_null_condition_makes_all_false()
     {
         Assert.Equal(false, EvaluateOver("all(lines, ok)", Rows((1L, null, true), (2L, null, null))).Value);
@@ -899,6 +919,21 @@ public sealed class ExpressionInterpreterTests
         Assert.True(checkedType.Succeeded, checkedType.Diagnostic?.Message);
         return ExpressionInterpreter.Evaluate(parsed.Expression, checkedType, Values([("lines", lines)]), now: now);
     }
+
+    /// <summary>Evaluates <paramref name="text"/> over a record whose collection <c>software</c>, a references field, holds <paramref name="software"/>.</summary>
+    private static ExpressionEvaluationResult EvaluateOverSoftware(string text, IReadOnlyList<ExpressionValues> software)
+    {
+        var items = new ExpressionScope(new Dictionary<string, ExpressionType> { ["name"] = ExpressionType.Text });
+        var scope = new ExpressionScope(_fields, collections: [new ExpressionCollection("software", "Software", items)]);
+        var parsed = ExpressionParser.Parse(text);
+        Assert.True(parsed.Succeeded, parsed.Diagnostic?.Message);
+        var checkedType = ExpressionTypeChecker.Check(parsed.Expression, scope, ExpressionType.Null);
+        Assert.True(checkedType.Succeeded, checkedType.Diagnostic?.Message);
+        return ExpressionInterpreter.Evaluate(parsed.Expression, checkedType, Values([("software", software)]));
+    }
+
+    private static IReadOnlyList<ExpressionValues> Software(params string[] names) =>
+        [.. names.Select(name => new ExpressionValues(new Dictionary<string, object?> { ["name"] = name }))];
 
     private static IReadOnlyList<ExpressionValues> Rows(params (long? Qty, decimal? Amount, bool? Ok)[] rows) =>
         [.. rows.Select(row => Row(row.Qty, row.Amount, row.Ok, null))];

@@ -597,8 +597,8 @@ public sealed class ExpressionTypeCheckerTests
     }
 
     [Theory]
-    [InlineData("sum(title, amount)", ExpressionDiagnosticCodes.TypeMismatch, "Function 'sum' needs a child collection for argument 1, found text at character 1.")]
-    [InlineData("count(1)", ExpressionDiagnosticCodes.TypeMismatch, "Function 'count' needs a child collection for argument 1, found integer at character 1.")]
+    [InlineData("sum(title, amount)", ExpressionDiagnosticCodes.TypeMismatch, "Function 'sum' needs a child collection or a references field for argument 1, found text at character 1.")]
+    [InlineData("count(1)", ExpressionDiagnosticCodes.TypeMismatch, "Function 'count' needs a child collection or a references field for argument 1, found integer at character 1.")]
     [InlineData("count(missing)", ExpressionDiagnosticCodes.UnknownName, "Unknown field 'missing' at character 7.")]
     [InlineData("sum(lineItems)", ExpressionDiagnosticCodes.WrongArgumentCount, "Function 'sum' needs 2 arguments, found 1 at character 1.")]
     [InlineData("count(lineItems, ok, 1)", ExpressionDiagnosticCodes.WrongArgumentCount, "Function 'count' needs 1 argument, found 3 at character 1.")]

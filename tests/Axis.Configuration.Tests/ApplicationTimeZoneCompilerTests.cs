@@ -58,7 +58,7 @@ public sealed class ApplicationTimeZoneCompilerTests
 
         var diagnostic = Assert.Single(result.Diagnostics);
         Assert.Equal((DiagnosticCodes.UnknownApplicationTimeZone, "application.json", "/timeZone"), (diagnostic.Code, diagnostic.File, diagnostic.Path));
-        Assert.Equal("AXC0260", diagnostic.Code);
+        Assert.Equal("AXC0266", diagnostic.Code);
         Assert.Equal(Guid.Parse(ApplicationId), diagnostic.ResourceId);
         Assert.Contains($"'{id}'", diagnostic.Message, StringComparison.Ordinal);
         Assert.Null(result.Model);
