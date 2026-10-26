@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import approval from '../../../samples/apps/purchase-requests/processes/purchase-request-approval.json'
-import { buildProcessGraph } from './processGraph'
+import { buildProcessGraph, transitionPointer } from './processGraph'
 
 const approvalContent = approval as Record<string, unknown>
 
@@ -105,5 +105,17 @@ describe('buildProcessGraph', () => {
 
     expect(graph.steps.map((step) => step.index)).toEqual([2, 3])
     expect(graph.transitions).toEqual([{ source: 3, target: 2, kind: 'next', label: null, path: '/steps/3/next' }])
+  })
+})
+
+describe('transitionPointer', () => {
+  it('points at the next field of a branch or an outcome, and at the path of the other kinds', () => {
+    const graph = buildProcessGraph(approvalContent, [])
+    const pointers = new Map(graph.transitions.map((t) => [t.path, transitionPointer(t)]))
+
+    expect(pointers.get('/steps/0/next')).toBe('/steps/0/next')
+    expect(pointers.get('/steps/2/otherwise')).toBe('/steps/2/otherwise')
+    expect(pointers.get('/steps/2/branches/0')).toBe('/steps/2/branches/0/next')
+    expect(pointers.get('/steps/1/outcomes/0')).toBe('/steps/1/outcomes/0/next')
   })
 })
