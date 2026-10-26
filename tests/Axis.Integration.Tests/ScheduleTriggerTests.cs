@@ -27,6 +27,7 @@ public sealed class ScheduleTriggerTests(ScheduleTriggerFixture fixture) : IClas
         ProcessStarts.TaskDeadlineWorkItemKind,
         ProcessStarts.ProcessResumeWorkItemKind,
         ComputedBackfill.WorkItemKind,
+        RecordImports.CheckWorkItemKind,
     ];
 
     private static readonly DateTimeOffset _occurrence = DateTimeOffset.Parse("2026-01-01T05:00:00Z");

@@ -752,6 +752,9 @@ database, with history in `axis.__processes_migrations` (see
     one entity. Its item also has the `entity_id`, and each claim runs one
     batch of up to 500 rows. See
     [Recomputing computed fields](migrations.md#recomputing-computed-fields).
+  - `records.importCheck` dry-runs one uploaded record import. It has no
+    other id column: the import row names the item in its `work_item_id`. See
+    [Import](import-export.md#import).
 - `axis.process_start_receipts`: the stored `201` response of each
   `Idempotency-Key`, unique per application, process and key. The subject is
   null for a process without a subject.
