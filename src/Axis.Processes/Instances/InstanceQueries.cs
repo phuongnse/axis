@@ -9,8 +9,9 @@ namespace Axis.Processes.Instances;
 
 /// <summary>
 /// Reads the instances of a process over a connection to a tenant database, for the people who
-/// inspect the process. An instance is listed only while its subject record exists and matches the
-/// reader's read filter, so a list never shows an instance whose record the reader may not read.
+/// inspect the process. An instance with a subject is listed only while its subject record exists and
+/// matches the reader's read filter, so a list never shows an instance whose record the reader may not
+/// read. An instance of a process without a subject has no record, so the queries for it apply no filter.
 /// </summary>
 public static class InstanceQueries
 {
@@ -106,6 +107,90 @@ public static class InstanceQueries
         command.Parameters.AddWithValue("application", applicationId);
         command.Parameters.AddWithValue("process", processId);
         command.Parameters.AddWithValue("entity", subjectEntity.Id);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        return await reader.ReadAsync(cancellationToken) ? ReadInstance(reader) : null;
+    }
+
+    /// <summary>
+    /// Reads page <paramref name="page"/> of <paramref name="pageSize"/> instances of a process without
+    /// a subject, newest first, and counts them. <paramref name="state"/> narrows the list when set.
+    /// <paramref name="subjectId"/> matches no instance when set, because these instances have no
+    /// subject record. There is no record to read, so no read filter applies.
+    /// </summary>
+    public static async Task<InstanceListPage> ListWithoutSubjectAsync(
+        NpgsqlConnection connection,
+        Guid applicationId,
+        Guid processId,
+        string? state,
+        Guid? subjectId,
+        int page,
+        int pageSize,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+        ArgumentOutOfRangeException.ThrowIfLessThan(page, 1);
+        ArgumentOutOfRangeException.ThrowIfLessThan(pageSize, 1);
+
+        const string where = """
+            WHERE i.application_id = @application AND i.process_id = @process AND i.subject_entity_id IS NULL
+              AND (@state::text IS NULL OR i.state = @state) AND (@subject::uuid IS NULL OR i.subject_id = @subject)
+            """;
+
+        void AddParameters(NpgsqlCommand command)
+        {
+            command.Parameters.AddWithValue("application", applicationId);
+            command.Parameters.AddWithValue("process", processId);
+            command.Parameters.Add(new NpgsqlParameter("state", NpgsqlDbType.Text) { Value = (object?)state ?? DBNull.Value });
+            command.Parameters.Add(new NpgsqlParameter("subject", NpgsqlDbType.Uuid) { Value = (object?)subjectId ?? DBNull.Value });
+        }
+
+        long totalCount;
+        await using (var count = new NpgsqlCommand($"SELECT count(*) FROM axis.process_instances AS {InstanceAlias} {where}", connection))
+        {
+            AddParameters(count);
+            totalCount = (long)(await count.ExecuteScalarAsync(cancellationToken))!;
+        }
+
+        await using var command = new NpgsqlCommand(
+            $"SELECT {Columns} FROM axis.process_instances AS {InstanceAlias} {where} ORDER BY i.created_at DESC, i.id DESC LIMIT @limit OFFSET @offset",
+            connection);
+        AddParameters(command);
+        command.Parameters.AddWithValue("limit", pageSize);
+        command.Parameters.AddWithValue("offset", (long)(page - 1) * pageSize);
+
+        var items = new List<ProcessInstanceRow>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            items.Add(ReadInstance(reader));
+        }
+
+        return new InstanceListPage(items, totalCount);
+    }
+
+    /// <summary>
+    /// Reads the instance <paramref name="id"/> of a process without a subject, or returns
+    /// <see langword="null"/> when there is none, it belongs to another process or application, or it
+    /// has a subject.
+    /// </summary>
+    public static async Task<ProcessInstanceRow?> FindWithoutSubjectAsync(
+        NpgsqlConnection connection,
+        Guid applicationId,
+        Guid processId,
+        Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+
+        await using var command = new NpgsqlCommand(
+            $"""
+            SELECT {Columns} FROM axis.process_instances AS {InstanceAlias}
+            WHERE i.id = @id AND i.application_id = @application AND i.process_id = @process AND i.subject_entity_id IS NULL
+            """,
+            connection);
+        command.Parameters.AddWithValue("id", id);
+        command.Parameters.AddWithValue("application", applicationId);
+        command.Parameters.AddWithValue("process", processId);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         return await reader.ReadAsync(cancellationToken) ? ReadInstance(reader) : null;
     }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatValue, type FormatOptions } from './formatValue'
+import { formatValue, referencesLabels, type FormatOptions } from './formatValue'
 import type { FieldMetadata, FieldType } from './site'
 
 function field(name: string, type: FieldType, valueLabelKeys?: Record<string, string>): FieldMetadata {
@@ -140,5 +140,17 @@ describe('formatValue', () => {
       expect(formatValue(amount('US', 2), '1250.50', {}, options)).toBe('1250.50')
       expect(formatValue(amount('USD', 2), 'abc', {}, options)).toBe('abc')
     })
+  })
+})
+
+describe('referencesLabels', () => {
+  it('returns the label of each id in order, and the id where its label is missing or null', () => {
+    expect(referencesLabels(['a', 'b', 'c', 'd'], ['Word', null, 'Visio'])).toEqual(['Word', 'b', 'Visio', 'd'])
+  })
+
+  it('returns nothing for an empty or missing set', () => {
+    expect(referencesLabels([], ['Word'])).toEqual([])
+    expect(referencesLabels(undefined, undefined)).toEqual([])
+    expect(referencesLabels(null, 'Word')).toEqual([])
   })
 })

@@ -1,0 +1,67 @@
+{
+  "id": "09a79585-93aa-493e-a638-2c6791a51cb8",
+  "kind": "scenario",
+  "name": "AuditorCannotWrite",
+  "formatVersion": 1,
+  "now": "2026-10-01T09:00:00Z",
+  "users": {
+    "quan": [
+      "asset-manager"
+    ],
+    "thao": [
+      "auditor"
+    ]
+  },
+  "steps": [
+    {
+      "type": "createRecord",
+      "entity": "Asset",
+      "as": "quan",
+      "save": "asset",
+      "values": {
+        "name": "Laptop of Lan",
+        "holder": "lan"
+      }
+    },
+    {
+      "type": "createRecord",
+      "entity": "Asset",
+      "as": "thao",
+      "values": {
+        "name": "Audit laptop"
+      },
+      "expect": "denied"
+    },
+    {
+      "type": "updateRecord",
+      "record": "asset",
+      "as": "thao",
+      "values": {
+        "name": "x"
+      },
+      "expect": "denied"
+    },
+    {
+      "type": "deleteRecord",
+      "record": "asset",
+      "as": "thao",
+      "expect": "denied"
+    },
+    {
+      "type": "createRecord",
+      "entity": "Category",
+      "as": "thao",
+      "values": {
+        "name": "Printer"
+      },
+      "expect": "denied"
+    },
+    {
+      "type": "expectRecord",
+      "record": "asset",
+      "values": {
+        "name": "Laptop of Lan"
+      }
+    }
+  ]
+}

@@ -308,6 +308,88 @@ namespace Axis.Processes.Storage.Migrations
                     b.ToTable("events", "axis");
                 });
 
+            modelBuilder.Entity("Axis.Processes.Storage.NotificationReadRow", b =>
+                {
+                    b.Property<Guid>("NotificationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("notification_id");
+
+                    b.Property<string>("UserId")
+                        .HasColumnType("text")
+                        .HasColumnName("user_id");
+
+                    b.Property<DateTimeOffset>("ReadAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("read_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.HasKey("NotificationId", "UserId")
+                        .HasName("pk_notification_reads");
+
+                    b.ToTable("notification_reads", "axis");
+                });
+
+            modelBuilder.Entity("Axis.Processes.Storage.NotificationRow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<string>("RecipientKind")
+                        .HasColumnType("text")
+                        .HasColumnName("recipient_kind");
+
+                    b.Property<string>("Recipient")
+                        .HasColumnType("text")
+                        .HasColumnName("recipient");
+
+                    b.Property<Guid>("ApplicationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("application_id");
+
+                    b.Property<string>("BodyKey")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("body_key");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("OpenPage")
+                        .HasColumnType("text")
+                        .HasColumnName("open_page");
+
+                    b.Property<string>("OpenParameters")
+                        .HasColumnType("jsonb")
+                        .HasColumnName("open_parameters");
+
+                    b.Property<Guid>("ReleaseId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("release_id");
+
+                    b.Property<string>("SubjectKey")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("subject_key");
+
+                    b.Property<string>("Values")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("values");
+
+                    b.HasKey("Id", "RecipientKind", "Recipient")
+                        .HasName("pk_notifications");
+
+                    b.HasIndex("ApplicationId", "RecipientKind", "Recipient", "CreatedAt")
+                        .HasDatabaseName("ix_notifications_application_id_recipient_created_at");
+
+                    b.ToTable("notifications", "axis");
+                });
+
             modelBuilder.Entity("Axis.Processes.Storage.PackageCallRow", b =>
                 {
                     b.Property<Guid>("Id")

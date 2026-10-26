@@ -1,0 +1,57 @@
+{
+  "id": "8d9490c0-4436-443b-90e3-57371add151e",
+  "kind": "entity",
+  "name": "MaintenanceEntry",
+  "formatVersion": 1,
+  "label": {
+    "textKey": "maintenance.label"
+  },
+  "fields": [
+    {
+      "name": "date",
+      "type": "date",
+      "required": true,
+      "label": {
+        "textKey": "maintenance.date"
+      }
+    },
+    {
+      "name": "vendor",
+      "type": "reference",
+      "target": "Vendor",
+      "label": {
+        "textKey": "maintenance.vendor"
+      }
+    },
+    {
+      "name": "currency",
+      "type": "enum",
+      "values": [
+        "VND",
+        "USD",
+        "EUR"
+      ],
+      "required": true,
+      "label": {
+        "textKey": "maintenance.currency"
+      }
+    },
+    {
+      "name": "cost",
+      "type": "money",
+      "currencyField": "currency",
+      "min": 0,
+      "label": {
+        "textKey": "maintenance.cost"
+      }
+    },
+    {
+      "name": "note",
+      "type": "text",
+      "maxLength": 500,
+      "label": {
+        "textKey": "maintenance.note"
+      }
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "id": "031ef979-f82b-4b42-a7ef-8ece351c3818",
+  "kind": "page",
+  "name": "AssetForm",
+  "formatVersion": 1,
+  "title": {
+    "textKey": "pages.assetForm.title"
+  },
+  "widgets": [
+    {
+      "type": "form",
+      "form": "AssetEdit"
+    }
+  ]
+}

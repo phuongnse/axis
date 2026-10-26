@@ -15,8 +15,9 @@ export function isJsonNumber(text: string): boolean {
  * decimal goes out as the typed text, with every digit. Text that is not a JSON number goes out as
  * a JSON string, and the server rejects it on its field. Values are written in field declaration
  * order, and `version` only when it is given. A child collection goes out as its whole row list,
- * each row with its non-null child fields in declaration order. A computed, sequence or creator
- * field is never sent, because the server sets it and rejects a body that does.
+ * each row with its non-null child fields in declaration order. A references field goes out as its
+ * whole array of ids in their order. A computed, sequence or creator field is never sent, because
+ * the server sets it and rejects a body that does.
  */
 export function buildRecordBody(
   fields: readonly FieldMetadata[],
@@ -31,8 +32,11 @@ export function buildRecordBody(
 }
 
 function fieldText(field: FieldMetadata, value: FieldValue): string {
+  if (field.type === 'references') {
+    return JSON.stringify(value ?? [])
+  }
   if (Array.isArray(value)) {
-    return `[${value.map((row) => rowText(field.fields ?? [], row)).join(',')}]`
+    return `[${(value as RecordRow[]).map((row) => rowText(field.fields ?? [], row)).join(',')}]`
   }
   return valueText(field, value)
 }

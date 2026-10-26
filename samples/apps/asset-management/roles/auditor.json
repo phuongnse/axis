@@ -1,0 +1,9 @@
+{
+  "id": "5d218454-9389-4dfb-b864-8a73654e1e4b",
+  "kind": "role",
+  "name": "auditor",
+  "formatVersion": 1,
+  "label": {
+    "textKey": "role.auditor"
+  }
+}

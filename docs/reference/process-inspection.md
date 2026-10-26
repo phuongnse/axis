@@ -48,6 +48,10 @@ failure is the response:
    give one answer, with the title "No instance of this process exists with
    this id.". So the user cannot tell them apart.
 
+A process without a subject has no subject record. Step 5 and the subject
+record part of step 6 do not apply to it, so the `inspect` grant alone is
+enough, see [D70](../decisions/d70-processes-without-a-subject-scheduled-jobs-and-delete-triggers.md).
+
 Both routes only read. They write no audit record.
 
 ### Instance list
@@ -70,6 +74,9 @@ lists the instances of the process, whatever release they are pinned to.
 - A `subject` filter that names a record the user may not read, or that does
   not exist, gives an empty page. It is not a `404`. A list never reveals that
   a hidden record exists.
+- A process without a subject lists its instances, with `subjectId` `null`, on
+  the `inspect` grant alone. No `read` grant or filter applies. A `subject`
+  filter gives an empty page, because these instances have no subject record.
 
 ```json
 {
@@ -99,7 +106,8 @@ lists the instances of the process, whatever release they are pinned to.
 in any state. The body has these parts:
 
 - `id`, `process`, `subjectId`, `releaseId`, `state`, `step`, `createdAt` and
-  `endedAt`, as in the list. `process` is the process name.
+  `endedAt`, as in the list. `process` is the process name. `subjectId` is
+  `null` for an instance of a process without a subject.
 - `graph` is the graph of the release the instance is pinned to:
   `{ "start", "steps": [ { "name", "type", "labelKey", "transitions" } ] }`.
   - `type` is the step type: `decision`, `task`, `operation`, `timer` or `end`.
@@ -161,6 +169,8 @@ in any state. The body has these parts:
     grant.
   - The grants are read from the policies of the active release, as the
     commands themselves do.
+  - It is empty for an instance of a process without a subject, and none of
+    its calls is `resolvable`, because the commands still answer `404` for it.
   - It does not run the other checks of a retry: another active instance for
     the record, or a destructive migration since the pinned release. A command
     in the list can still be refused with `409`.
@@ -284,6 +294,10 @@ evaluated input that the call sent, so it holds field values.
   user may read comes from the policies of the active release, as for
   [tasks](task-api.md) and [D29](../decisions/d29-release-pinning-and-text-resources.md).
   A field that the active release no longer has counts as unreadable.
+- **No subject.** A call's `input` of an instance of a process without a
+  subject is always hidden. The mapping reads parameters, not fields, and they
+  can carry field values from a record that no longer exists, so the rule
+  cannot show that the input is safe.
 - **Sensitive fields.** A field that declares
   [`sensitive`](roles-and-policies.md#sensitive-fields) is never shown in
   inspection, for any user. A call whose mapping reads or writes one has its

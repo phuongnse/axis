@@ -1,0 +1,8 @@
+{
+  "id": "b8508ebf-e206-4531-89de-cb97ad328fb1",
+  "kind": "page",
+  "name": "AssetForm",
+  "formatVersion": 1,
+  "title": { "textKey": "pages.assetForm.title" },
+  "widgets": [{ "type": "form", "entity": "Asset" }]
+}

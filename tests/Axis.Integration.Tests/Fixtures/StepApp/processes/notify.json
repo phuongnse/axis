@@ -1,0 +1,25 @@
+{
+  "id": "d74f217a-8513-4825-9467-c3aa720d70a5",
+  "kind": "process",
+  "name": "Notify",
+  "formatVersion": 1,
+  "entity": "Request",
+  "start": "tell",
+  "steps": [
+    {
+      "name": "tell",
+      "type": "operation",
+      "operation": "notify",
+      "to": [{ "user": "title" }, { "role": "reviewer" }, { "user": "comment" }],
+      "channels": ["inApp"],
+      "message": {
+        "subject": { "textKey": "request.notice.subject" },
+        "body": { "textKey": "request.notice.body" },
+        "values": { "title": "title", "amount": "amount" }
+      },
+      "open": { "page": "Tasks" },
+      "next": "done"
+    },
+    { "name": "done", "type": "end" }
+  ]
+}

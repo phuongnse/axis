@@ -67,6 +67,13 @@
     "noteClose.cannotClose": "Chỉ có thể đóng ghi chú đang mở.",
     "category.label": "Danh mục",
     "category.name": "Tên",
+    "pages.assetForm.title": "Tài sản",
+    "pages.assetDetail.title": "Chi tiết tài sản",
+    "software.label": "Phần mềm",
+    "software.name": "Tên",
+    "asset.label": "Tài sản",
+    "asset.name": "Tên",
+    "asset.software": "Phần mềm",
     "role.employee": "Nhân viên",
     "role.departmentManager": "Trưởng phòng",
     "role.financeReviewer": "Người duyệt tài chính"

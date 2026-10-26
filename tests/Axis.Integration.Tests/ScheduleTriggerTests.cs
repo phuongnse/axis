@@ -29,6 +29,7 @@ public sealed class ScheduleTriggerTests(ScheduleTriggerFixture fixture) : IClas
         ProcessStarts.TaskDeadlineWorkItemKind,
         ProcessStarts.ProcessResumeWorkItemKind,
         ComputedBackfill.WorkItemKind,
+        RecordImports.CommitWorkItemKind,
         RecordImports.CheckWorkItemKind,
     ];
 

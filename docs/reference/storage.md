@@ -45,7 +45,7 @@ apply: sections marked _(planned for Mx)_ are not built yet, and Dn refers to
     `axis.pending_computed_fields`, the entities whose recompute the worker
     finishes in batches. It also owns `axis.record_imports`, the uploads of
     [record imports](import-export.md#import) with their file, its format
-    (`csv` or `xlsx`), their state and the errors of their dry run.
+    (`csv` or `xlsx`), their state and the errors of their dry run or commit.
   - `Axis.Processes` owns `axis.process_instances` (one row per process
     instance), `axis.process_step_history` (one row per step occurrence),
     `axis.process_tasks` (one row per human task),
@@ -54,6 +54,8 @@ apply: sections marked _(planned for Mx)_ are not built yet, and Dn refers to
     `axis.process_call_attempts` (one row per attempt and per lookup of a
     connector or package call),
     `axis.events` (one row per event occurrence that a step raised),
+    `axis.notifications` (one row per in-app notification and recipient),
+    `axis.notification_reads` (one row per notification and user who read it),
     `axis.process_start_receipts` (the stored response of each
     `Idempotency-Key` of a start), `axis.endpoint_receipts` (the record and
     instance of each endpoint call's `Idempotency-Key`, unique per
@@ -338,7 +340,7 @@ What each database role may do:
 | Objects                                                                                                                                                                                                                                                                                                       | Schema database role                                             | Runtime database role                                             |
 | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------------- |
 | `entities` tables                                                                                                                                                                                                                                                                                             | Owns them                                                        | Read and write rows                                               |
-| `axis` tables that runtime writes: `process_*`, `connector_calls`, `package_calls`, `events`, the receipts, `trigger_schedules`, `trigger_starts`, `delivery_failures`, `dead_letters`, `audit_records`, `user_profiles`, `sequence_counters`, `computed_field_errors`, `pending_computed_fields`, `sessions`, `record_imports`, `files`, `file_contents` | Owns them                                                        | Read and write rows                                               |
+| `axis` tables that runtime writes: `process_*`, `connector_calls`, `package_calls`, `events`, `notifications`, `notification_reads`, the receipts, `trigger_schedules`, `trigger_starts`, `delivery_failures`, `dead_letters`, `audit_records`, `user_profiles`, `sequence_counters`, `computed_field_errors`, `pending_computed_fields`, `sessions`, `record_imports`, `files`, `file_contents` | Owns them                                                        | Read and write rows                                               |
 | Tables that activation writes: `active_releases`, `active_sites`, `provisioned_entities`, `provisioned_enum_values`, `applied_migrations`, `release_computed_fingerprints`, the `__*_migrations` tables                                                                                                       | Owns them                                                        | Read only                                                         |
 | Release tables: `releases`, `release_resources`, `release_packages`                                                                                                                                                                                                                                           | Insert and read. The trigger refuses update, delete and truncate | Read only                                                         |
 | `publish_requests`                                                                                                                                                                                                                                                                                            | Owns it. The publisher changes the status and the lease          | `SELECT` and `INSERT` only. It never updates or deletes a request |
@@ -694,7 +696,8 @@ schema of the tenant database.
 - **Audit records.** `axis.audit_records` is append-only. Each row is
   written in the same transaction as the action it records. The record API
   and the process [start endpoint](processes.md#start-endpoint) write them,
-  and so do [process steps](process-execution.md#running-a-step) and
+  and the commit of a [record import](import-export.md#import) writes one per
+  import, and so do [process steps](process-execution.md#running-a-step) and
   [task completions](task-api.md#completing-a-task). So
   do the [operator commands](process-inspection.md#operator-commands), with the user as
   actor. The BFF session writes them too for sign-in, sign-out and a refused
@@ -717,6 +720,12 @@ schema of the tenant database.
   - A `publish` and a `rollback` write an audit record
     when they succeed and when they fail, see
     [publish requests and release history](#publish-requests-and-release-history).
+  - **Import actions.** The commit of a [record import](import-export.md#import)
+    writes `records.imported`, after the `record.created` audit record of each
+    row, in the transaction that writes the rows. The actor is the uploader
+    with their display name. `entity_id` is set, and `record_id` and
+    `process_instance_id` are null. `details` is
+    `{ "created", "updated" }`, the counts of records, and it holds no value.
   - **Session actions.** The
     BFF session writes three actions, see
     [D50](../decisions/d50-sign-in-audit-records-and-security-scanning-in-ci.md)

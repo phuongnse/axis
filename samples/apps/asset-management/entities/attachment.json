@@ -1,0 +1,30 @@
+{
+  "id": "5c7d6eb9-5458-4200-8006-18f2e07b0a06",
+  "kind": "entity",
+  "name": "Attachment",
+  "formatVersion": 1,
+  "label": {
+    "textKey": "attachment.label"
+  },
+  "fields": [
+    {
+      "name": "file",
+      "type": "file",
+      "accept": [
+        "application/pdf",
+        "image/*"
+      ],
+      "label": {
+        "textKey": "attachment.file"
+      }
+    },
+    {
+      "name": "note",
+      "type": "text",
+      "maxLength": 500,
+      "label": {
+        "textKey": "attachment.note"
+      }
+    }
+  ]
+}

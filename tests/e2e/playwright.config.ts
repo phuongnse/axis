@@ -1,5 +1,14 @@
 import { defineConfig, devices } from '@playwright/test'
-import { e2eApp, journeyServerEnv, journeyURL, leaveRequests, purchaseRequests, serverEnv, serviceDesk } from './server-settings'
+import {
+  assetManagement,
+  e2eApp,
+  journeyServerEnv,
+  journeyURL,
+  leaveRequests,
+  purchaseRequests,
+  serverEnv,
+  serviceDesk,
+} from './server-settings'
 
 const port = Number(process.env.AXIS_E2E_PORT ?? 5280)
 const baseURL = `http://127.0.0.1:${port}`
@@ -17,6 +26,7 @@ const environment = {
   ActivateOnStartup__1: purchaseRequests,
   ActivateOnStartup__2: leaveRequests,
   ActivateOnStartup__3: serviceDesk,
+  ActivateOnStartup__4: assetManagement,
 }
 const isShellName = (name: string) => /^[A-Za-z_][A-Za-z0-9_]*$/.test(name)
 const hyphenated = Object.entries(environment).filter(([name]) => !isShellName(name))

@@ -18,7 +18,7 @@ namespace Axis.Processes.Instances;
 /// commits in the work item's transaction: an operation's record write, a task step's open human
 /// task, a <c>callConnector</c> step's staged call, a <c>raiseEvent</c> step's event occurrence,
 /// the instances its <c>sync</c> event triggers start and the <c>event.deliver</c> item that
-/// delivers it to its <c>async</c> triggers, the new instance state and revision, a step
+/// delivers it to its <c>async</c> triggers, a <c>notify</c> step's in-app notification rows, the new instance state and revision, a step
 /// history row, its <c>system</c> audit records and the next work item. A task step leaves the
 /// instance <c>waiting</c>, with no next work item. A <c>callConnector</c> step leaves it
 /// <c>waiting</c> too, and queues the <c>connector.call</c> item of its call, so no request is sent
@@ -45,6 +45,8 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
 {
     /// <summary>The decision recorded when no branch was true.</summary>
     internal const string Otherwise = "otherwise";
+
+    private const string InAppChannel = "inApp";
 
     private const string DateFormat = "yyyy-MM-dd";
 
@@ -238,6 +240,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
         var restagesCall = false;
         var restagesPackageCall = false;
         NewEvent? occurrence = null;
+        NewNotification? notification = null;
         EntityModel? created = null;
         List<KeyValuePair<FieldModel, object?>>? creation = null;
 
@@ -379,6 +382,20 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
                 decision = null;
                 output = new JsonObject { ["next"] = following.Name, ["eventId"] = occurrence.Id };
                 details = new JsonObject { ["step"] = step.Name, ["next"] = following.Name };
+                action = AuditActions.ProcessStepCompleted;
+                break;
+            case NotifyStepModel notifyStep:
+                if (!process.TryGetStep(notifyStep.Next, out var afterNotify))
+                {
+                    throw Failure($"The process '{process.Name}' has no step '{notifyStep.Next}'.", instance, input);
+                }
+
+                notification = await NotificationAsync(evaluate, notifyStep, instance, input);
+                state = ProcessStarts.Running;
+                nextStep = afterNotify.Name;
+                decision = null;
+                output = new JsonObject { ["next"] = afterNotify.Name, ["notificationId"] = notification.Id };
+                details = new JsonObject { ["step"] = step.Name, ["next"] = afterNotify.Name };
                 action = AuditActions.ProcessStepCompleted;
                 break;
             case PackageOperationStepModel packageStep:
@@ -599,6 +616,12 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
                 DateTimeOffset.UtcNow,
                 cancellationToken,
                 eventId: occurrence.Id);
+        }
+
+        // The email channel stores nothing yet, and a notification with no recipient has no row.
+        if (notification is { Recipients.Count: > 0 } && step is NotifyStepModel { Channels: var channels } && channels.Contains(InAppChannel, StringComparer.Ordinal))
+        {
+            await ProcessNotifications.InsertAsync(context.Transaction, notification, cancellationToken);
         }
 
         await ProcessSteps.InsertHistoryAsync(
@@ -1050,6 +1073,82 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
         }
 
         return payload;
+    }
+
+    /// <summary>
+    /// Evaluates a <c>notify</c> step into the notification it stores: its recipients first, then its
+    /// placeholder values and the parameters of the page it opens, in the raw JSON form of an event
+    /// payload. A <c>user</c> recipient that gives no non-blank text has no row, an <c>email</c> recipient
+    /// is not evaluated yet, and two recipients of one kind and name are one. An expression that fails
+    /// at run time fails the step, whatever the channels.
+    /// </summary>
+    private static async Task<NewNotification> NotificationAsync(
+        Func<ExpressionModel, Task<ExpressionEvaluationResult>> evaluate,
+        NotifyStepModel step,
+        LoadedInstance instance,
+        JsonObject input)
+    {
+        var recipients = new List<(string Kind, string Recipient)>();
+        for (var index = 0; index < step.Recipients.Count; index++)
+        {
+            var recipient = step.Recipients[index];
+            if (recipient.User is { } user)
+            {
+                var result = await evaluate(user);
+                if (result.Error is { } error)
+                {
+                    throw ExpressionFailure($"user of recipient {index}", step, error, instance, input);
+                }
+
+                if (result.Value is string id && !string.IsNullOrWhiteSpace(id))
+                {
+                    recipients.Add((ProcessNotifications.UserRecipient, id));
+                }
+            }
+            else if (recipient.Role is { } role)
+            {
+                recipients.Add((ProcessNotifications.RoleRecipient, role));
+            }
+        }
+
+        var values = new JsonObject();
+        foreach (var value in step.Values)
+        {
+            var result = await evaluate(value.Value);
+            if (result.Error is { } error)
+            {
+                throw ExpressionFailure($"value '{value.Name}'", step, error, instance, input);
+            }
+
+            values[value.Name] = ToJson(result.Value, $"value '{value.Name}'", step, instance, input);
+        }
+
+        JsonObject? openParameters = null;
+        if (step.Open is { } open)
+        {
+            openParameters = new JsonObject();
+            foreach (var parameter in open.Parameters)
+            {
+                var result = await evaluate(parameter.Value);
+                if (result.Error is { } error)
+                {
+                    throw ExpressionFailure($"open parameter '{parameter.Parameter}'", step, error, instance, input);
+                }
+
+                openParameters[parameter.Parameter] = ToJson(result.Value, $"open parameter '{parameter.Parameter}'", step, instance, input);
+            }
+        }
+
+        return new NewNotification(
+            Guid.CreateVersion7(),
+            instance.ApplicationId,
+            instance.ReleaseId,
+            step.Subject.TextKey,
+            step.Body.TextKey,
+            values,
+            step.Open?.Page.Name,
+            openParameters,
+            [.. recipients.Distinct()]);
     }
 
     /// <summary>
