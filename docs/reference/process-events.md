@@ -37,9 +37,9 @@ A delete starts a process without a subject through a delete trigger
 See [Delete triggers](#delete-triggers).
 
 Deliveries to `async` triggers and schedule fan-outs that keep failing back off,
-stop after a limit and become dead letters
-([D72](../decisions/d72-a-delivery-limit-and-dead-letters.md)).
-_(Planned for M14)_ Email deliveries follow. See [Dead letters](#dead-letters).
+stop after a limit and become dead letters, and so do failed emails
+([D72](../decisions/d72-a-delivery-limit-and-dead-letters.md)). See
+[Dead letters](#dead-letters).
 
 ## Raise event step
 
@@ -448,9 +448,8 @@ Deliveries that keep failing stop after a limit and are kept as dead letters, se
 [D72](../decisions/d72-a-delivery-limit-and-dead-letters.md). The counting, the
 backoff, the limit, the two tables, the log, the metric and the
 [routes](#routes) are built for the start of an `async` trigger from
-`event.deliver` and for `trigger.fanOut`.
-_(Planned for M14)_ The email kind and the waiting-instance target are not built
-yet.
+`event.deliver`, for `trigger.fanOut` and for `notification.email`.
+_(Planned for M14)_ The waiting-instance target is not built yet.
 
 **What counts.** Three kinds of work item deliver something, and each
 failure is counted for its own target:
@@ -488,6 +487,14 @@ receipts write it, such as `2026-01-01T05:00:00Z`. The count belongs to the
 occurrence, so a failure in any batch adds to it. The stored cursor is kept while
 the item backs off. The dead letter names the application, the trigger's process,
 the trigger and `occurrence_at`.
+
+For an email, the failure is counted under the kind `notification.email` and
+the target `{emailId}`, the id of its row in `axis.email_outbox`. At the limit
+the item is deleted and the row stays `pending`, so nothing more is sent until
+an operator redelivers. The dead letter names the application, the process of
+the instance whose `notify` step staged the email, that instance in
+`process_instance_id` and the row in `email_id`. The process is read through the
+item's instance, since the outbox row does not record it.
 
 **The counter.** `axis.delivery_failures` holds one row per target:
 
@@ -575,6 +582,11 @@ with empty `commands`.
   release, with the same `409` otherwise. It clears the count of the occurrence
   and queues the fan-out on the active release. The receipts skip the records
   that already started for that occurrence.
+- **`notification.email`.** A redeliver needs nothing from the active release,
+  since the email is already rendered and stored. It clears the count of the
+  email and queues a `notification.email` item for the same row and instance.
+  The worker then sends it as before, even when the instance was cancelled
+  meanwhile.
 - **Other kinds.** A redeliver of a kind that is not built is a `409` titled
   "This kind of dead letter cannot be redelivered.". Discard closes a dead
   letter of any kind.

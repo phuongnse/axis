@@ -111,6 +111,7 @@ public static class DeadLetterCommand
             {
                 DeliveryFailures.EventDeliverKind => await RedeliverEventAsync(connection, transaction, tenantId, active, letter, cancellationToken),
                 DeliveryFailures.TriggerFanOutKind => await RedeliverFanOutAsync(connection, transaction, tenantId, active, activeReleaseId, letter, cancellationToken),
+                DeliveryFailures.NotificationEmailKind => await RedeliverEmailAsync(connection, transaction, tenantId, letter, cancellationToken),
                 _ => DeadLetterOutcome.NotRedeliverable,
             };
             if (refused != DeadLetterOutcome.Settled)
@@ -218,6 +219,32 @@ public static class DeadLetterCommand
             triggerId: triggerId,
             releaseId: activeReleaseId,
             occurrenceAt: occurrenceAt);
+        return DeadLetterOutcome.Settled;
+    }
+
+    private static async Task<DeadLetterOutcome> RedeliverEmailAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        string tenantId,
+        DeadLetterRow letter,
+        CancellationToken cancellationToken)
+    {
+        if (letter.EmailId is not { } emailId || letter.ProcessInstanceId is not { } instanceId)
+        {
+            return DeadLetterOutcome.NotRedeliverable;
+        }
+
+        // The email is already rendered and stored, so sending it needs nothing from the active release.
+        await DeleteFailureAsync(transaction, DeliveryFailures.NotificationEmailKind, emailId.ToString("D"), cancellationToken);
+        await WorkItemQueue.EnqueueAsync(
+            connection,
+            transaction,
+            tenantId,
+            ProcessStarts.NotificationEmailWorkItemKind,
+            DateTimeOffset.UtcNow,
+            cancellationToken,
+            processInstanceId: instanceId,
+            emailId: emailId);
         return DeadLetterOutcome.Settled;
     }
 

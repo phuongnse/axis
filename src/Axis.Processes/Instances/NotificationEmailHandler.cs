@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using Axis.Core.Telemetry;
 using Axis.Processes.Work;
 using Axis.Tenancy;
 using MailKit.Net.Smtp;
@@ -20,10 +21,12 @@ namespace Axis.Processes.Instances;
 /// the item. After a send, one transaction deletes the item, which checks the claim, and marks the row <c>sent</c>. A
 /// worker that crashes between the send and that transaction sends the email again with the same <c>Message-ID</c>,
 /// so the receiver can drop the copy. A failed send is counted in <c>axis.delivery_failures</c> for the email,
-/// storing only the exception type, and the item is due again after the backoff of that count. It never becomes a dead
-/// letter yet.
+/// storing only the exception type, and the item is due again after the backoff of that count. At
+/// <see cref="DeliverySettings.Attempts"/> failures one transaction writes an <c>open</c> dead letter that names the
+/// application, the process of the sending instance, the instance and the email, and deletes the item. The row stays
+/// <c>pending</c>, and nothing more is sent until an operator redelivers the dead letter.
 /// </summary>
-internal sealed partial class NotificationEmailHandler(EmailDefaults defaults, ITenantCatalog? tenants, ILogger<NotificationEmailHandler> logger) : IExternalWorkItemHandler
+internal sealed partial class NotificationEmailHandler(EmailDefaults defaults, ITenantCatalog? tenants, DeliverySettings deliverySettings, ILogger<NotificationEmailHandler> logger) : IDeliveryWorkItemHandler
 {
     private readonly ConcurrentDictionary<string, byte> _warned = new(StringComparer.Ordinal);
 
@@ -156,8 +159,9 @@ internal sealed partial class NotificationEmailHandler(EmailDefaults defaults, I
     }
 
     /// <summary>
-    /// Counts the failed send in a transaction of its own and makes the item due after the backoff of the count.
-    /// Only the exception type is kept, since its message can quote an address.
+    /// Counts the failed send in a transaction of its own. Below the limit it makes the item due after the backoff of
+    /// the count. At the limit it writes an <c>open</c> dead letter and deletes the item. Only the exception type is
+    /// kept, since its message can quote an address.
     /// </summary>
     private async Task<WorkItemOutcome> CountFailureAsync(
         ClaimedWorkItem item,
@@ -169,6 +173,27 @@ internal sealed partial class NotificationEmailHandler(EmailDefaults defaults, I
         var error = DeliveryFailures.ErrorText(exception);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
         var attempts = await DeliveryFailures.CountAsync(transaction, DeliveryFailures.NotificationEmailKind, emailId.ToString("D"), error, cancellationToken);
+        if (attempts >= deliverySettings.Attempts)
+        {
+            // The outbox row does not record the process, so it is read through the instance whose step staged the email.
+            var instanceId = item.ProcessInstanceId
+                ?? throw new InvalidOperationException($"Email work item '{item.Id}' names no process instance.");
+            var (applicationId, processId) = await LoadProcessAsync(connection, transaction, instanceId, cancellationToken);
+            var deadLetterId = await DeliveryFailures.InsertEmailDeadLetterAsync(
+                transaction, applicationId, processId, instanceId, emailId, attempts, error, cancellationToken);
+            if (!await WorkItemQueue.CompleteAsync(connection, transaction, item, cancellationToken))
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                LogLostClaim(item.Id, item.EmailId);
+                return WorkItemOutcome.LostClaim;
+            }
+
+            await transaction.CommitAsync(cancellationToken);
+            AxisMetrics.RecordDeadLetter(item.TenantId, DeliveryFailures.NotificationEmailKind);
+            LogDeadLettered(emailId, attempts, deadLetterId, DeliveryFailures.NotificationEmailKind);
+            return WorkItemOutcome.Completed;
+        }
+
         var delay = DeliveryFailures.Backoff(attempts);
         if (!await WorkItemQueue.RescheduleAsync(connection, transaction, item, delay, cancellationToken))
         {
@@ -178,8 +203,25 @@ internal sealed partial class NotificationEmailHandler(EmailDefaults defaults, I
         }
 
         await transaction.CommitAsync(cancellationToken);
-        LogSendFailed(emailId, error, attempts, delay);
+        LogSendFailed(emailId, error, attempts, deliverySettings.Attempts, delay);
         return WorkItemOutcome.Rescheduled;
+    }
+
+    private static async Task<(Guid ApplicationId, Guid ProcessId)> LoadProcessAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        Guid instanceId,
+        CancellationToken cancellationToken)
+    {
+        await using var command = new NpgsqlCommand(
+            "SELECT application_id, process_id FROM axis.process_instances WHERE id = @instance",
+            connection,
+            transaction);
+        command.Parameters.AddWithValue("instance", instanceId);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        return await reader.ReadAsync(cancellationToken)
+            ? (reader.GetGuid(0), reader.GetGuid(1))
+            : throw new InvalidOperationException($"Process instance '{instanceId}' of the email work item does not exist.");
     }
 
     private static async Task<StagedEmail?> LoadAsync(NpgsqlConnection connection, Guid id, CancellationToken cancellationToken)
@@ -202,8 +244,11 @@ internal sealed partial class NotificationEmailHandler(EmailDefaults defaults, I
     [LoggerMessage(LogLevel.Warning, "Email work item {ItemId} names no stored email {EmailId}, so it was discarded.")]
     private partial void LogNoEmail(Guid itemId, Guid? emailId);
 
-    [LoggerMessage(LogLevel.Warning, "Sending email {EmailId} failed with {Error}, failure {Attempts}. It is due again in {Delay}.")]
-    private partial void LogSendFailed(Guid emailId, string error, int attempts, TimeSpan delay);
+    [LoggerMessage(LogLevel.Warning, "Sending email {EmailId} failed with {Error}, failure {Attempts} of {Limit}. It is due again in {Delay}.")]
+    private partial void LogSendFailed(Guid emailId, string error, int attempts, int limit, TimeSpan delay);
+
+    [LoggerMessage(LogLevel.Warning, "Sending email {EmailId} failed {Attempts} times and became dead letter {DeadLetterId} of kind {Kind}.")]
+    private partial void LogDeadLettered(Guid emailId, int attempts, Guid deadLetterId, string kind);
 
     [LoggerMessage(LogLevel.Warning, "Email work item {ItemId} for email {EmailId} was claimed by another worker, so its writes were rolled back.")]
     private partial void LogLostClaim(Guid itemId, Guid? emailId);
