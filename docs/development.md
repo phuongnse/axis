@@ -66,6 +66,24 @@ Playwright does not retry a failed test, on CI or locally, so a flaky test fails
 trace of a failed test is kept. On `main`, NexKit runs a failed job once more. A run that passes
 only on that second attempt is recorded on a `bug` issue.
 
+A test that fails at times is fixed by its cause, for every test with that cause, as
+[D97](decisions/d97-reliable-test-runs.md) says. The plan of its `bug` issue names the cause's
+class. When that class has failed a test before, the change fixes or guards every test of the
+class, through a shared helper, a fixture or a lint rule. The classes seen so far and their guards:
+
+- An outside download or service: `scripts/setup.sh` and the CI install steps try again.
+- A click during an animation or a redraw: `waitForDialog`, `confirmDialog` and the drag helper
+  wait until the element is ready.
+- The real clock: a test fixes the time with `axis.now` and runs schedules in UTC.
+- State left by another test: a test counts from its own baseline.
+- Planner statistics: a seed that a plan depends on runs `ANALYZE` over every row.
+
+_(planned for M16)_ The `*PerformanceTests` classes run in `.github/workflows/performance.yml` on
+every push to `main` and on demand, and no longer in CI's integration job. CI splits Playwright
+into shards that run on several machines at once, while NexKit's `e2e` check runs the whole suite.
+The SPA turns off its animations when the browser asks for reduced motion, and Playwright asks for
+it.
+
 Each application's test scenarios are a suite of their own, named `scenarios-<application name>`.
 The integration tests run them and write `artifacts/test-results/scenarios-<application name>.xml`.
 A failure names the scenario and the step. To run them by hand, run

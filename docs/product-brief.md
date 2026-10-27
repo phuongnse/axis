@@ -299,15 +299,15 @@ of the company's assets with a dashboard. A Playwright journey builds it only
 through Studio. It lives as configuration in
 `samples/apps/asset-management/`. It is not platform code. It proves the data
 modeling of M15: files, money, labelled enum values, many-to-many, references
-from child rows, import and export. All of it is _(planned for M15)_. See
+from child rows, import and export. Those parts are built. See
 [D81](decisions/d81-asset-management-as-the-fourth-sample-application.md).
 
-The folder exists now, with its data, security, pages, dashboard, warranty
-reminder and the scenarios of its access rules. It is active in development,
-Compose and E2E. The Studio journey builds the whole folder, compares it with
-the sample, runs its scenarios from Studio, publishes it and uses its site to
-register, import and export assets. Only the import, attachment and
-maintenance scenarios stay planned.
+The folder holds the data, security, pages, dashboard, five scenarios of its
+access rules, a warranty reminder process and its weekday trigger. It is active
+in development, Compose and E2E. The Studio journey builds the whole folder,
+compares it with the sample, runs its scenarios from Studio, publishes it and
+uses its site to register, import and export assets. Only the import,
+attachment and maintenance scenarios are _(planned for M16)_.
 
 ### Data
 
@@ -358,16 +358,19 @@ SPA serves its bundle there. Texts are in `en` and `vi`.
 
 ### Scenarios the application must pass
 
-- An import of valid assets, and an import whose dry run reports a bad row and
-  writes nothing.
-- An asset with an attachment, a maintenance entry with a vendor, and software.
-- Denied access for each role. An employee cannot read another holder's asset
-  or download its attachment, cannot export, and an auditor cannot write or
+- Built: an asset is registered, an employee and an auditor cannot write, a
+  negative cost is refused, and a user without a role is denied.
+- _(planned for M16)_ An import of valid assets, and an import whose dry run
+  reports a bad row and writes nothing.
+- _(planned for M16)_ An asset with an attachment, a maintenance entry with a
+  vendor, and software.
+- _(planned for M16)_ Denied access for an employee to another holder's asset,
+  to its attachment's download and to an export, and for an auditor to an
   import.
 
 ### Built through Studio
 
-As for the service desk, the main Playwright journey builds the whole
-application with Studio only, compares it with the committed folder, runs its
-scenarios from Studio and publishes it. On the site, the asset manager imports
-assets and attaches a file, and the auditor exports the register.
+As for the service desk, the main Playwright journey builds the application
+with Studio only, compares it with the committed folder, runs its scenarios
+from Studio and publishes it. On the site, the asset manager registers an asset
+with an attachment and imports assets, and the auditor exports the register.

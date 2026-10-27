@@ -3,7 +3,7 @@
 Status: **Agreed**
 
 M15 adds two field types, `file` and `money`, and labels for enum values. The
-owner agreed these points on 2026-10-25. All of it is _(planned for M15)_. See
+owner agreed these points on 2026-10-25. It is built in M15. See
 [file fields](../reference/file-fields.md) and
 [entity field types](../reference/resource-files.md#entity-field-types-and-constraints).
 This decision adds a third binding kind to

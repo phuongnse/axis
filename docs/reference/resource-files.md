@@ -264,8 +264,7 @@ A `seed` holds records with fixed ids for one entity:
   [Startup activation](host-settings.md#startup-activation)).
 - `values` has the shape of the `values` of a record API create body (see
   [Request bodies and values](record-api.md#request-bodies-and-values)).
-  A seed cannot set a `file` field, in a record or in a child row
-  _(planned for M15)_ (`AXC0259`).
+  A seed cannot set a `file` field, in a record or in a child row (`AXC0259`).
 - Seed files are inserted in path order, so a seed whose records reference
   another seed's records sorts after it.
 
@@ -515,7 +514,7 @@ is `AXC0013`.
 
 ### Types and properties added in M15
 
-These are _(planned for M15)_, except [`indexes`](#indexes), which is built.
+These were added in M15.
 They follow
 [D76](../decisions/d76-file-money-and-enum-label-field-types.md),
 [D77](../decisions/d77-indexes-defaults-and-ranges.md),
@@ -550,8 +549,7 @@ new check is a new compile diagnostic.
   label for a value that `values` does not have, is `AXC0242`, at
   `/fields/{i}/valueLabels` or `/fields/{i}/valueLabels/{value}`. Values are
   compared exactly, by letter case too. On a field of another type it is
-  `AXC0013`. The compile checks are built. Showing the labels on pages is
-  planned for M15.
+  `AXC0013`. The compile checks are built, and pages show the labels.
 - **`default`.** An expression with no record in scope: literals, rule calls
   and `now()`. Its type must fit the field. It is not allowed with
   `expression`, `sequence` or `creator`, or on `reference`, `file`,
@@ -566,8 +564,7 @@ new check is a new compile diagnostic.
   `now()` is the start time of the write transaction. An update never applies
   a default. The [form state endpoint](record-api.md#form-state) returns the
   defaults of a new record, and the form widget shows them on a new form. A
-  default on a field of a child entity does nothing for its rows yet. `file` is
-  refused when that type arrives.
+  default on a field of a child entity does nothing for its rows yet.
 - **`searchable`.** On a `text` field. `searchable` on any other type is
   `AXC0013` at `/fields/{i}/searchable`, even when it is `false`. The compile
   check and the indexes are built: a searchable field and the display field
@@ -729,8 +726,7 @@ validation calls the rules of its own module, see [modules](modules-and-template
     reference from a child row gets a foreign key, and its labels follow the
     rows, see
     [child rows](record-api.md#child-rows-computed-fields-and-validations).
-    Its index comes with the platform indexes on every reference column
-    _(planned for M15)_.
+    Its index comes with the platform indexes on every reference column.
 
 ## Form conditions and steps
 
