@@ -6,8 +6,8 @@ test.use({ storageState: sessionFile("anna") });
 
 // Specs run in parallel against one database, so the totals change between runs. The checks match
 // the number pattern; Vitest covers the exact formatting and the empty text.
-const notes = /^Notes: \d+$/;
-const amountTotal = /^Amount total: (-?\d+(\.\d+)?|No value)$/;
+const notes = /^Notes: [\d,]+$/;
+const amountTotal = /^Amount total: (-?[\d,]+(\.\d+)?|—No value)$/;
 
 test("a KPI tile shows its value and comparison, and clicking it opens the target page", async ({
   page,
@@ -16,7 +16,7 @@ test("a KPI tile shows its value and comparison, and clicking it opens the targe
 
   await expect(page.getByTestId("kpi-value")).toHaveText(notes);
   await expect(page.getByTestId("kpi-comparison")).toHaveText(amountTotal);
-  const tile = page.getByRole("link", { name: /^Notes: \d+/ });
+  const tile = page.getByRole("link", { name: /^Notes: [\d,]+/ });
   await expect(tile).toContainText("Show notes");
 
   await tile.click();
@@ -32,5 +32,5 @@ test("a KPI tile without a comparison or an action shows one value and no link",
   await expect(page.getByTestId("kpi-value")).toHaveText(notes);
   await expect(page.getByTestId("kpi-comparison")).toHaveCount(0);
   await expect(page.getByTestId("kpi-tile").getByRole("link")).toHaveCount(0);
-  await expect(page.getByRole("link", { name: /^Notes: \d+/ })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: /^Notes: [\d,]+/ })).toHaveCount(0);
 });

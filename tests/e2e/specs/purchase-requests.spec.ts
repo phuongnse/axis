@@ -69,18 +69,18 @@ test('a purchase request is created with line items, shows the computed total, i
 
   await expect(page).toHaveURL(tablePath)
   const row = page.getByRole('row', { name: new RegExp(`${title} `) })
-  for (const text of ['anna', 'Finance', 'Acme Supplies', 'VND', '2550.90', 'draft']) {
+  for (const text of ['anna', 'Finance', 'Acme Supplies', 'VND', '2,550.90', 'draft']) {
     await expect(row).toContainText(text)
   }
   await page.reload()
-  await expect(row).toContainText('2550.90')
+  await expect(row).toContainText('2,550.90')
 
   // The server computes each line amount and the total on save, so the form shows them once reopened.
   await row.getByRole('link', { name: title, exact: true }).click()
   await expect(page.getByRole('textbox', { name: '* Title', exact: true })).toHaveValue(title)
-  await expect(cell('Amount 1')).toHaveValue('2500.90')
+  await expect(cell('Amount 1')).toHaveValue('2,500.90')
   await expect(cell('Amount 2')).toHaveValue('50.00')
-  await expect(cell('Total amount')).toHaveValue('2550.90')
+  await expect(cell('Total amount')).toHaveValue('2,550.90')
   await page.getByRole('textbox', { name: '* Title', exact: true }).fill(`${title} edited`)
   await page.getByRole('button', { name: 'Save', exact: true }).click()
 
@@ -96,7 +96,7 @@ test('a purchase request is created with line items, shows the computed total, i
   const dark = page.locator('[data-theme-mode="dark"]')
   await expect(dark.getByRole('textbox', { name: '* Title', exact: true })).toHaveValue(`${title} edited`)
   await expect(dark.getByLabel('Department', { exact: true })).toHaveValue('Finance')
-  await expect(dark.getByLabel('Total amount', { exact: true })).toHaveValue('2550.90')
+  await expect(dark.getByLabel('Total amount', { exact: true })).toHaveValue('2,550.90')
   await dark.getByRole('button', { name: 'Cancel', exact: true }).click()
   await expect(page).toHaveURL(tablePath)
 })
@@ -111,7 +111,7 @@ test('a new purchase request gets a number from the sequence on save, and the fo
   // The server numbers the request on create, so the new form shows the field empty and read-only.
   await page.getByRole('button', { name: 'New', exact: true }).click()
   await expect(page).toHaveURL(/\/purchasing\/purchaserequestform\/new$/)
-  await expect(number).toHaveValue('')
+  await expect(number).toHaveValue('Not set')
   await expect(number).toHaveAttribute('readonly')
   await page.getByRole('textbox', { name: '* Title', exact: true }).fill(title)
   await choose(page, 'department', 'Department', 'Finance')

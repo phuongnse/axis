@@ -14,10 +14,11 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router'
 import { useCanvasActions } from './canvasActions'
+import { EmptyDash } from './EmptyValue'
 import { downloadExport, exportAddress, exportPath, saveFile, type ExportFormat } from './exports'
 import { FileLink } from './FileInput'
 import { FilterBar } from './FilterBar'
-import { formatValue } from './formatValue'
+import { formatValue, isNumeric } from './formatValue'
 import { ImportDialog } from './ImportDialog'
 import { importsPath } from './imports'
 import { navigatePath, navigateTarget, type NavigateOpen } from './navigateAction'
@@ -51,7 +52,7 @@ import {
   type TableSort,
 } from './tableQuery'
 import { useText } from './texts'
-import { usePhoneWidth } from './usePhoneWidth'
+import { useNarrowWidth } from './useNarrowWidth'
 import { isVisible } from './visibleWhen'
 
 interface TableWidgetProps {
@@ -157,7 +158,7 @@ function tableSource({ entity, dataSource }: WidgetMetadata): TableSource {
  * action is the link of its cell, with a real address when the SPA can build it, so Ctrl+click opens a new tab. It
  * is plain text when `visibleWhen` hides the action, and shows the action's label when the cell is empty. A file
  * column keeps its download link, so then no action is the link. The other row actions show in the row, a delete
- * as a trash icon. Three or more configured ones, or any number below 768 px, fold into one "Actions" menu. The
+ * as a trash icon. Three or more configured ones, or any number below 992 px, fold into one "Actions" menu. The
  * toolbar always shows. Its right side has a Refresh button that loads the current page of rows again, then Import,
  * Export and the toolbar actions, with the first toolbar action last. Text, enum and reference cells wrap at 320 px.
  * Paging and sorting live in the URL as the API's `page`, `pageSize` and `sort`, so reload, sharing
@@ -170,7 +171,7 @@ function tableSource({ entity, dataSource }: WidgetMetadata): TableSource {
  */
 export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidgetProps) {
   const t = useText()
-  const phone = usePhoneWidth()
+  const narrow = useNarrowWidth()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const { rowActions, toolbarActions } = widget
@@ -490,24 +491,35 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
       // The record API sorts a reference by its id, which is not the label people see, and cannot sort a file.
       sorter: field.type !== 'reference' && field.type !== 'file',
       sortOrder: field.type === 'reference' || field.type === 'file' ? undefined : sortOrder(field.name),
-      align: field.type === 'integer' || field.type === 'decimal' || field.type === 'money' ? 'right' : undefined,
-      onCell: top,
+      align: isNumeric(field.type) ? 'right' : undefined,
+      // Digits of equal width line up in a column.
+      onCell: () => ({
+        style: { verticalAlign: 'top', ...(isNumeric(field.type) ? { fontVariantNumeric: 'tabular-nums' } : {}) },
+      }),
       render: (value: RecordValue, record: TableRow) => {
+        const wrap = (shown: ReactNode) =>
+          field.type === 'text' || field.type === 'enum' || field.type === 'reference' ? (
+            <div style={{ maxWidth: cellMaxWidth, whiteSpace: 'normal', overflowWrap: 'anywhere' }}>{shown}</div>
+          ) : (
+            shown
+          )
+        // A group row of a data source has no id and stays blank.
+        if (value === null || value === undefined) {
+          if (record.id === null) {
+            return null
+          }
+          return wrap(column === 0 ? openLink(<EmptyDash />, '', record) : <EmptyDash />)
+        }
         if (field.type === 'file' && 'downloadPath' in field && isFileValue(value)) {
           return <FileLink field={field} value={value} />
         }
         const text = formatValue(field, value, record.labels, { locale, text: t }, record.values)
-        const shown = column === 0 ? openLink(text, text, record) : text
-        return field.type === 'text' || field.type === 'enum' || field.type === 'reference' ? (
-          <div style={{ maxWidth: cellMaxWidth, whiteSpace: 'normal', overflowWrap: 'anywhere' }}>{shown}</div>
-        ) : (
-          shown
-        )
+        return wrap(column === 0 ? openLink(text, text, record) : text)
       },
     }))
     const result = [...fieldColumns]
     if (otherIndexes.length > 0) {
-      const fold = phone || otherIndexes.length >= foldFrom
+      const fold = narrow || otherIndexes.length >= foldFrom
       result.push({
         key: actionsColumnKey,
         onCell: top,
@@ -606,7 +618,7 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
   }, [
     fields,
     locale,
-    phone,
+    narrow,
     query.sort,
     rowActions,
     openIndex,
@@ -742,6 +754,7 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
           values={query.parameters ?? {}}
           errors={parameterErrors ?? {}}
           onChange={onFilter}
+          locale={locale}
         />
       )}
       {actionError !== null && <Alert data-testid="table-action-error" type="error" title={actionError} />}

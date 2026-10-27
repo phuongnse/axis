@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatValue, referencesLabels, type FormatOptions } from './formatValue'
+import { datePattern, formatValue, referencesLabels, timePattern, type FormatOptions } from './formatValue'
 import type { FieldMetadata, FieldType } from './site'
 
 function field(name: string, type: FieldType, valueLabelKeys?: Record<string, string>): FieldMetadata {
@@ -35,20 +35,37 @@ const texts: Record<string, string> = {
 const options: FormatOptions = { locale: 'en', timeZone: 'UTC', text: (key) => texts[key] ?? key }
 
 describe('formatValue', () => {
-  it('shows a date-time to the second without the fraction', () => {
-    // ICU may put a narrow no-break space before AM.
-    expect(formatValue(field('dueAt', 'date-time'), '2026-10-06T02:00:00.123456Z', {}, options)).toMatch(
-      /^Oct 6, 2026, 2:00:00\sAM$/,
+  const vi: FormatOptions = { ...options, locale: 'vi' }
+
+  it('shows a date-time to the minute on the locale clock, without seconds or the fraction', () => {
+    const dueAt = field('dueAt', 'date-time')
+    expect(formatValue(dueAt, '2026-03-04T16:30:45.123456Z', {}, options)).toBe('03/04/2026 4:30 PM')
+    expect(formatValue(dueAt, '2026-03-04T16:30:45.123456Z', {}, vi)).toBe('04/03/2026 16:30')
+  })
+
+  it('shows a morning hour without a leading zero on a 12-hour clock and with one on a 24-hour clock', () => {
+    const dueAt = field('dueAt', 'date-time')
+    expect(formatValue(dueAt, '2026-03-04T09:05:00Z', {}, options)).toBe('03/04/2026 9:05 AM')
+    expect(formatValue(dueAt, '2026-03-04T09:05:00Z', {}, vi)).toBe('04/03/2026 09:05')
+  })
+
+  it('shows a date-time in the given time zone', () => {
+    const dueAt = field('dueAt', 'date-time')
+    expect(formatValue(dueAt, '2026-03-04T16:30:00Z', {}, { ...vi, timeZone: 'Asia/Ho_Chi_Minh' })).toBe(
+      '04/03/2026 23:30',
     )
   })
 
-  it('shows a date in the locale without shifting the day', () => {
-    expect(formatValue(field('due', 'date'), '2026-10-06', {}, { ...options, timeZone: 'Pacific/Kiritimati' })).toBe(
-      'Oct 6, 2026',
-    )
-    expect(formatValue(field('due', 'date'), '2026-10-06', {}, { ...options, timeZone: 'Pacific/Pago_Pago' })).toBe(
-      'Oct 6, 2026',
-    )
+  it('writes plain spaces, never no-break spaces', () => {
+    expect(formatValue(field('dueAt', 'date-time'), '2026-03-04T16:30:00Z', {}, options)).not.toMatch(/[\u00a0\u202f]/)
+  })
+
+  it('shows a date as the short numeric date of the locale without shifting the day', () => {
+    const due = field('due', 'date')
+    expect(formatValue(due, '2026-03-18', {}, options)).toBe('03/18/2026')
+    expect(formatValue(due, '2026-03-18', {}, vi)).toBe('18/03/2026')
+    expect(formatValue(due, '2026-10-06', {}, { ...options, timeZone: 'Pacific/Kiritimati' })).toBe('10/06/2026')
+    expect(formatValue(due, '2026-10-06', {}, { ...options, timeZone: 'Pacific/Pago_Pago' })).toBe('10/06/2026')
   })
 
   it('shows a file as its name', () => {
@@ -95,9 +112,25 @@ describe('formatValue', () => {
     expect(formatValue(field('done', 'boolean'), false, {}, options)).toBe('No')
   })
 
-  it('keeps numbers exactly as the API wrote them', () => {
-    expect(formatValue(field('price', 'decimal'), '1250.50', {}, options)).toBe('1250.50')
-    expect(formatValue(field('count', 'integer'), '12345678901234567890', {}, options)).toBe('12345678901234567890')
+  it('groups integers and decimals by the locale and loses no digit', () => {
+    const price = field('price', 'decimal')
+    expect(formatValue(price, '16945.75', {}, options)).toBe('16,945.75')
+    expect(formatValue(price, '16945.75', {}, vi)).toBe('16.945,75')
+    expect(formatValue(price, '1250.50', {}, options)).toBe('1,250.50')
+    expect(formatValue(field('count', 'integer'), '12345678901234567890', {}, options)).toBe(
+      '12,345,678,901,234,567,890',
+    )
+    expect(formatValue(field('count', 'integer'), '1250000', {}, vi)).toBe('1.250.000')
+  })
+
+  it('pads a decimal to its scale and never rounds away a written digit', () => {
+    const price = { ...field('price', 'decimal'), scale: 2 }
+    expect(formatValue(price, '1250.5', {}, options)).toBe('1,250.50')
+    expect(formatValue(price, '0.123456', {}, options)).toBe('0.123456')
+  })
+
+  it('leaves text that is not a number unchanged', () => {
+    expect(formatValue(field('price', 'decimal'), 'abc', {}, options)).toBe('abc')
   })
 
   it('shows null as an empty cell', () => {
@@ -141,15 +174,30 @@ describe('formatValue', () => {
       expect(formatValue(column, '1250.50', {}, options, { currency: 'USD', amountSum: '1250.50' })).toBe('$1,250.50')
     })
 
-    it('shows the plain number without a usable currency', () => {
+    it('shows a grouped number without a usable currency', () => {
       const money = { ...field('amount', 'money'), scale: 2, currencyField: 'currency' }
-      expect(formatValue(money, '1250.50', {}, options)).toBe('1250.50')
-      expect(formatValue(money, '1250.50', {}, options, { currency: null })).toBe('1250.50')
-      expect(formatValue(money, '1250.50', {}, options, { currency: 'dollars' })).toBe('1250.50')
-      expect(formatValue(money, '1250.50', {}, options, { currency: true })).toBe('1250.50')
-      expect(formatValue(amount('US', 2), '1250.50', {}, options)).toBe('1250.50')
+      expect(formatValue(money, '1250.50', {}, options)).toBe('1,250.50')
+      expect(formatValue(money, '1250.50', {}, vi)).toBe('1.250,50')
+      expect(formatValue(money, '1250.50', {}, options, { currency: null })).toBe('1,250.50')
+      expect(formatValue(money, '1250.50', {}, options, { currency: 'dollars' })).toBe('1,250.50')
+      expect(formatValue(money, '1250.50', {}, options, { currency: true })).toBe('1,250.50')
+      expect(formatValue(amount('US', 2), '1250.5', {}, options)).toBe('1,250.50')
       expect(formatValue(amount('USD', 2), 'abc', {}, options)).toBe('abc')
     })
+  })
+})
+
+describe('datePattern', () => {
+  it('is the pattern of the shown date, so a picker writes what the text shows', () => {
+    expect(datePattern('en', false)).toBe('MM/DD/YYYY')
+    expect(datePattern('vi', false)).toBe('DD/MM/YYYY')
+  })
+
+  it('adds the time to the minute on the locale clock for a date-time', () => {
+    expect(datePattern('en', true)).toBe('MM/DD/YYYY h:mm A')
+    expect(datePattern('vi', true)).toBe('DD/MM/YYYY HH:mm')
+    expect(timePattern('en')).toBe('h:mm A')
+    expect(timePattern('vi')).toBe('HH:mm')
   })
 })
 

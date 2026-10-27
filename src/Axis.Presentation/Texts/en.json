@@ -73,6 +73,7 @@
   "shell.table.exportPending": "A field is being recomputed. Try the export again shortly.",
   "shell.table.exportTimeout": "The export took too long. Narrow the search or filters and try again.",
   "shell.table.exportFailed": "The records could not be exported.",
+  "shell.value.notSet": "Not set",
   "shell.kpi.empty": "No value",
   "shell.kpi.loading": "Loading…",
   "shell.kpi.loadFailed": "The value could not be loaded.",

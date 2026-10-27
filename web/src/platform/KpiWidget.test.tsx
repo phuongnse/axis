@@ -172,8 +172,20 @@ describe('KpiWidget', () => {
 
     renderKpi(withComparison)
 
-    await waitFor(() => expect(screen.getByTestId('kpi-value')).toHaveTextContent(/^Open: No value$/))
+    await waitFor(() => expect(screen.getByTestId('kpi-value')).toHaveTextContent(/^Open: —No value$/))
     expect(screen.getByTestId('kpi-comparison')).toHaveTextContent(/^Urgent: 3$/)
+  })
+
+  it('shows a muted italic dash with the empty text hidden for assistive technology', async () => {
+    stubRows(totalRow('{"openCount":null,"urgentCount":3}'))
+
+    renderKpi(withComparison)
+
+    const dash = await screen.findByText('—')
+    expect(dash).toHaveAttribute('aria-hidden', 'true')
+    expect(dash.parentElement).toHaveStyle({ fontStyle: 'italic' })
+    // The hidden text stays in the accessibility tree but is clipped out of sight.
+    expect(screen.getByText('No value')).toHaveStyle({ position: 'absolute', width: '1px' })
   })
 
   it('shows the empty text when the data source returns no row', async () => {
@@ -181,7 +193,7 @@ describe('KpiWidget', () => {
 
     renderKpi(withComparison)
 
-    await waitFor(() => expect(screen.getByTestId('kpi-value')).toHaveTextContent(/^Open: No value$/))
+    await waitFor(() => expect(screen.getByTestId('kpi-value')).toHaveTextContent(/^Open: —No value$/))
   })
 
   it('shows the loading text and is busy until the row arrives', async () => {

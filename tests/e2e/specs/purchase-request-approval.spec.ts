@@ -40,7 +40,7 @@ async function expectPurchaseOrderNumber(page: Page, id: string, timeout = 30_00
   const field = page.getByLabel('Purchase order number', { exact: true })
   await expect(async () => {
     await page.goto(`/purchasing/purchaserequestform/${id}`)
-    await expect(field).not.toHaveValue('', { timeout: 1_000 })
+    await expect(field).not.toHaveValue('Not set', { timeout: 1_000 })
   }).toPass({ timeout })
   return field.inputValue()
 }
@@ -202,7 +202,7 @@ test('a rejected request cannot be submitted again, and the manager gets no new 
   await decide(page, title, 'Manager approval', 'Reject')
   await expectStatus(page, id, 'rejected')
   // The process ends with the rejection, so the purchasing system is never called.
-  await expect(page.getByLabel('Purchase order number', { exact: true })).toHaveValue('')
+  await expect(page.getByLabel('Purchase order number', { exact: true })).toHaveValue('Not set')
   expect(await purchaseOrders(page, await requestNumber(page, id))).toEqual([])
 
   await useSession(page, 'anna')

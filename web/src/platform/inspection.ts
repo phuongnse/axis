@@ -26,10 +26,14 @@ export interface InstanceListItem {
   id: string
   /** The subject the instance runs for, or `null` when its process has no subject. */
   subjectId: string | null
+  /** The subject's display field value, or `null` without a subject or when the user may not read it. */
+  subjectLabel: string | null
   state: string
   /** The step the instance runs next, or waits on. */
   step: string
   releaseId: string
+  /** The number of the instance's release in the release history, or `null` when the release has no history row. */
+  releaseNumber: number | null
   createdAt: string
   endedAt: string | null
 }

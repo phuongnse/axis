@@ -64,7 +64,8 @@ function emptyTextOf(name: string): string | undefined {
     return 'No data'
   }
   if (name === 'kpi') {
-    return 'No value'
+    // The dash is what the eye sees. The words are visually hidden for assistive technology.
+    return '—'
   }
   if (name.startsWith('chart-')) {
     return 'No data to show'
