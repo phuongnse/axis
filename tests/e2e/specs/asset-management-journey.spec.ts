@@ -1,18 +1,31 @@
 import { readdir, readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { expect, test } from '../test'
-import type { Page } from '@playwright/test'
+import type { Locator, Page } from '@playwright/test'
 import { confirmDialog, waitForDialog } from '../dialogs'
+import { dragTo } from '../design-drag'
 import { compareApplicationFolders } from '../folder-comparison'
 import { pickOption } from '../select'
 import { assetManagement, journeyApplications, journeyURL } from '../server-settings'
 import { useJourneySession } from '../sessions'
-import { createResource } from '../studio-resources'
+import { createResource, openFormTab } from '../studio-resources'
 
 // Typing the sample one key at a time is slow, and the journey server is shared with other specs.
 test.setTimeout(300_000)
 
 const built = path.join(journeyApplications, 'asset-management')
+
+interface SampleDataSource {
+  entity: string
+  fields: { name: string; path: string }[]
+  filter?: string
+  aggregate?: { groupBy: string[]; measures: { name: string; function: string; field?: string }[] }
+}
+
+interface SampleForm {
+  entity: string
+  sections: { name: string; title: { textKey: string }; fields: { field: string }[] }[]
+}
 
 const sixParts = (file: string) => file === 'application.json' || /^(roles|sequences|entities|seeds|texts)\//.test(file)
 
@@ -20,8 +33,10 @@ test.describe('the author builds the asset management application with Studio on
   // Each step builds on the folder the one before created, so they run in order.
   test.describe.configure({ mode: 'serial' })
 
-  async function pick(page: Page, testId: string, option: string, filter?: string) {
-    await pickOption(page.getByTestId(testId).getByRole('combobox'), option, filter)
+  // The Form tab stays mounted while the Design tab shows, and repeats its test ids. A Design step passes the design
+  // panel as `scope`, so that only the panel's field matches.
+  async function pick(scope: Page | Locator, testId: string, option: string, filter?: string) {
+    await pickOption(scope.getByTestId(testId).getByRole('combobox'), option, filter)
   }
 
   async function save(page: Page, answers: [field: string, choice: string][] = []) {
@@ -50,8 +65,8 @@ test.describe('the author builds the asset management application with Studio on
     await expect(page.getByRole('tab', { name: 'Form', exact: true })).toHaveAttribute('aria-selected', 'true')
   }
 
-  async function writeLabel(page: Page, field: string, key: string, en: string) {
-    const label = page.getByTestId(field).getByTestId('studio-label')
+  async function writeLabel(scope: Page | Locator, field: string, key: string, en: string) {
+    const label = scope.getByTestId(field).getByTestId('studio-label')
     const keyBox = label.getByRole('textbox', { name: 'Text key', exact: true })
     const english = label.getByRole('textbox', { name: 'en', exact: true })
     // The label editor fills the texts when the key is typed, from the names it has then. An editor that was replaced
@@ -70,6 +85,38 @@ test.describe('the author builds the asset management application with Studio on
       texts: Record<string, string>
     }
     return texts
+  }
+
+  async function sample<T>(file: string): Promise<T> {
+    return JSON.parse(await readFile(path.join(assetManagement, file), 'utf8')) as T
+  }
+
+  async function createPage(page: Page, name: string) {
+    await createResource(page, 'page', name)
+    await openFormTab(page)
+    await expect(page.getByTestId('studio-page-editor').getByRole('textbox', { name: 'Name', exact: true })).toHaveValue(name)
+  }
+
+  async function openPage(page: Page, name: string) {
+    await page.getByTestId('studio-group-page').getByRole('button', { name, exact: true }).click()
+    await openFormTab(page)
+    await expect(page.getByTestId('studio-page-editor').getByRole('textbox', { name: 'Name', exact: true })).toHaveValue(name)
+  }
+
+  // The dialog fades out after a choice, and a drag that starts under it does not reach the canvas.
+  async function chooseBinding(page: Page, type: string) {
+    await waitForDialog(page)
+    await page.getByTestId(`studio-binding-${type}`).click()
+    await expect(page.getByTestId('studio-binding-choice')).toBeHidden()
+  }
+
+  async function openDesign(page: Page) {
+    await page.getByRole('tab', { name: 'Design', exact: true }).click()
+  }
+
+  /** The canvas frame of the widget at `pointer`. */
+  function frame(page: Page, pointer: string) {
+    return page.locator(`[data-testid="studio-canvas-widget"][data-path="${pointer}"]`)
   }
 
   async function addField(page: Page, index: number, name: string) {
@@ -414,6 +461,308 @@ test.describe('the author builds the asset management application with Studio on
     await save(page)
   })
 
+  test('the author builds the three aggregate data sources', async ({ page }) => {
+    await useJourneySession(page, 'hoa')
+    await page.goto(`${journeyURL}/studio?app=AssetManagement`)
+
+    for (const [name, file] of [
+      ['AssetValueByLocation', 'data-sources/asset-value-by-location.json'],
+      ['AssetsByStatus', 'data-sources/assets-by-status.json'],
+      ['WarrantiesEndingSoon', 'data-sources/warranties-ending-soon.json'],
+    ]) {
+      const list = await sample<SampleDataSource>(file)
+      await createResource(page, 'dataSource', name)
+      await expectForm(page)
+      await pick(page, 'studio-field-/entity', list.entity)
+      // The starter has the first row, so only the later rows are added.
+      for (const [index, field] of list.fields.entries()) {
+        if (index > 0) {
+          await page.getByTestId('studio-field-/fields').getByRole('button', { name: 'Add', exact: true }).click()
+        }
+        await page.getByTestId(`studio-field-/fields/${index}/name`).getByRole('textbox').fill(field.name)
+        await page.getByTestId(`studio-field-/fields/${index}/path`).getByRole('textbox').fill(field.path)
+      }
+      if (list.filter !== undefined) {
+        const filter = page.getByTestId('studio-field-/filter')
+        await expect(filter.locator('.cm-editor')).toBeVisible()
+        await filter.getByRole('textbox').fill(list.filter)
+      }
+      if (list.aggregate !== undefined) {
+        const groupBy = page.getByTestId('studio-field-/aggregate/groupBy')
+        for (const [index, column] of list.aggregate.groupBy.entries()) {
+          await groupBy.getByRole('button', { name: 'Add', exact: true }).click()
+          await page.getByTestId(`studio-field-/aggregate/groupBy/${index}`).getByRole('textbox').fill(column)
+        }
+        if (list.aggregate.groupBy.length === 0) {
+          // The form has no empty array to start from, so the author adds an entry and removes it to write `[]`.
+          await groupBy.getByRole('button', { name: 'Add', exact: true }).click()
+          await groupBy.getByRole('button', { name: 'Remove', exact: true }).click()
+        }
+        for (const [index, measure] of list.aggregate.measures.entries()) {
+          const at = `studio-field-/aggregate/measures/${index}`
+          await page
+            .getByTestId('studio-field-/aggregate/measures')
+            .getByRole('button', { name: 'Add', exact: true })
+            .click()
+          await page.getByTestId(`${at}/name`).getByRole('textbox').fill(measure.name)
+          await pick(page, `${at}/function`, measure.function)
+          if (measure.field !== undefined) {
+            await page.getByTestId(`${at}/field`).getByRole('textbox').fill(measure.field)
+          }
+        }
+      }
+      await save(page)
+      await expectForm(page)
+    }
+  })
+
+  test('the author lays out the AssetEdit form on the Design tab', async ({ page }) => {
+    // A tall window keeps the palette and the outline in view together, away from the edges where a drag scrolls.
+    await page.setViewportSize({ width: 1280, height: 1000 })
+    await useJourneySession(page, 'hoa')
+    await page.goto(`${journeyURL}/studio?app=AssetManagement`)
+
+    const en = await texts('en')
+    const form = await sample<SampleForm>('forms/asset-edit.json')
+    await createResource(page, 'form', 'AssetEdit')
+    await openFormTab(page)
+    // The Design pane has no editor for the entity, so it is picked on the Form tab.
+    await pick(page, 'studio-field-/entity', form.entity)
+    await openDesign(page)
+    const panel = page.getByTestId('studio-design-panel')
+    await expect(panel.getByTestId('studio-form-palette-number')).toBeVisible()
+
+    const sectionTitle = (index: number) =>
+      panel.locator(`[data-testid="studio-outline-section"][data-path="/sections/${index}"] > span`).first()
+    const outlineRow = (testId: string, pointer: string) =>
+      panel.locator(`[data-testid="${testId}"][data-path="${pointer}"]`)
+
+    // A section gets its name and title, then its fields. The first field is dragged from the palette onto the section's
+    // line in the outline. The others are clicked, and each lands after the field selected before it.
+    async function layOutSection(index: number) {
+      const section = form.sections[index]
+      await sectionTitle(index).click()
+      const name = panel.getByTestId('studio-design-section-name')
+      await name.fill(section.name)
+      await name.press('Enter')
+      await expect(sectionTitle(index)).toHaveText(section.name)
+      const titleKey = section.title.textKey
+      await writeLabel(panel, `studio-field-/sections/${index}/title`, titleKey, en[titleKey])
+      for (const [position, field] of section.fields.entries()) {
+        const button = panel.getByTestId(`studio-form-palette-${field.field}`)
+        if (position === 0) {
+          await dragTo(page, 'studio-form-design', button, sectionTitle(index))
+        } else {
+          await button.click()
+        }
+        await expect(outlineRow('studio-outline-field', `/sections/${index}/fields/${position}`)).toHaveAttribute(
+          'aria-current',
+          'true',
+        )
+      }
+    }
+
+    // The starter section holds one empty field, which the sample does not have. Its outline row has no name and no size
+    // to click, so Enter selects it.
+    await outlineRow('studio-outline-field', '/sections/0/fields/0').press('Enter')
+    await panel.getByTestId('studio-design-remove-field').click()
+    await expect(panel.getByTestId('studio-outline-empty-section')).toBeVisible()
+
+    await layOutSection(0)
+    for (let index = 1; index < form.sections.length; index++) {
+      await panel.getByTestId('studio-form-add-section').click()
+      await expect(sectionTitle(index)).toBeVisible()
+      await layOutSection(index)
+    }
+    await save(page)
+  })
+
+  test('the author builds the AssetForm and AssetDetail pages', async ({ page }) => {
+    await useJourneySession(page, 'hoa')
+    await page.goto(`${journeyURL}/studio?app=AssetManagement`)
+
+    const en = await texts('en')
+    await createPage(page, 'AssetForm')
+    await writeLabel(page, 'studio-field-/title', 'pages.assetForm.title', en['pages.assetForm.title'])
+    await pick(page, 'studio-field-/widgets/0/type', 'form')
+    await pick(page, 'studio-field-/widgets/0/form', 'AssetEdit')
+    await save(page)
+
+    // The detail page takes the asset as a required parameter. Its detail widget is laid out on the Design tab later,
+    // because the canvas draws nothing while any file has an error. The starter Home page and its site entry have errors
+    // until the author finishes the site.
+    await createPage(page, 'AssetDetail')
+    await writeLabel(page, 'studio-field-/title', 'pages.assetDetail.title', en['pages.assetDetail.title'])
+    await page.getByRole('button', { name: 'Add parameter', exact: true }).click()
+    await page.getByRole('textbox', { name: 'Parameter name', exact: true }).fill('asset')
+    await pick(page, 'studio-field-/parameters/0/type', 'reference')
+    await pick(page, 'studio-field-/parameters/0/target', 'Asset')
+    await page.getByRole('switch', { name: 'Required', exact: true }).click()
+    await save(page)
+  })
+
+  test('the author builds the Assets and Dashboard pages', async ({ page }) => {
+    await useJourneySession(page, 'hoa')
+    // The page names load with the application, so AssetForm and AssetDetail are offered below.
+    await page.goto(`${journeyURL}/studio?app=AssetManagement`)
+
+    const en = await texts('en')
+    await createPage(page, 'Assets')
+    await writeLabel(page, 'studio-field-/title', 'pages.assets.title', en['pages.assets.title'])
+    await pick(page, 'studio-field-/widgets/0/type', 'table')
+    await pick(page, 'studio-field-/widgets/0/entity', 'Asset')
+    // The row actions open the asset in its form and show it on the detail page, and a toolbar action starts a new
+    // one. The detail page gets the asset through its parameter.
+    for (const [kind, index, target, key, parameter] of [
+      ['rowActions', 0, 'AssetForm', 'actions.open', undefined],
+      ['rowActions', 1, 'AssetDetail', 'actions.view', 'asset'],
+      ['toolbarActions', 0, 'AssetForm', 'actions.new', undefined],
+    ] as const) {
+      const action = `studio-field-/widgets/0/${kind}/${index}`
+      await page
+        .getByTestId(`studio-field-/widgets/0/${kind}`)
+        .getByRole('button', { name: 'Add navigate action', exact: true })
+        .click()
+      await pick(page, `${action}/page`, target)
+      await writeLabel(page, `${action}/label`, key, en[key])
+      if (kind === 'rowActions') {
+        // The record of the form link and the asset parameter of the detail link both take the id of the row.
+        const input = parameter ? `${action}/parameters/${parameter}` : `${action}/record`
+        await page.getByTestId(input).getByRole('textbox').fill('id')
+      }
+    }
+    await save(page)
+
+    await createPage(page, 'Dashboard')
+    await writeLabel(page, 'studio-field-/title', 'pages.dashboard.title', en['pages.dashboard.title'])
+    await save(page)
+  })
+
+  test('the author finishes the site and deletes the Home page', async ({ page }) => {
+    await useJourneySession(page, 'hoa')
+    await page.goto(`${journeyURL}/studio?app=AssetManagement`)
+
+    const en = await texts('en')
+    await page.getByTestId('studio-group-site').getByRole('button').click()
+    await expectForm(page)
+
+    await page.getByTestId('studio-field-/locales/available').getByRole('button', { name: 'Add', exact: true }).click()
+    await page.getByTestId('studio-field-/locales/available/1').getByRole('textbox').fill('vi')
+
+    // The starter site has the entry for Home, which the author turns into the first entry.
+    const navigation: [page: string, key: string][] = [
+      ['Assets', 'nav.assets'],
+      ['Dashboard', 'nav.dashboard'],
+    ]
+    for (const [index, [target, key]] of navigation.entries()) {
+      if (index > 0) {
+        await page.getByTestId('studio-field-/navigation').getByRole('button', { name: 'Add', exact: true }).click()
+      }
+      await pick(page, `studio-field-/navigation/${index}/page`, target)
+      await writeLabel(page, `studio-field-/navigation/${index}/label`, key, en[key])
+    }
+    await save(page)
+    await expectForm(page)
+
+    // The sample has no Home page, and nothing points to it now.
+    const home = page.getByTestId('studio-group-page').getByRole('button', { name: 'Home', exact: true })
+    await home.click()
+    await openFormTab(page)
+    await page.getByRole('button', { name: 'Delete', exact: true }).click()
+    await confirmDialog(page, 'Delete')
+    await expect(page.getByTestId('studio-group-page').getByRole('button', { name: /Home/i })).toHaveCount(0)
+  })
+
+  test('the author lays out the AssetDetail page on the Design tab', async ({ page }) => {
+    // A tall, wide window keeps the data panel and the canvas in view together, away from the edges where a drag scrolls.
+    await page.setViewportSize({ width: 1920, height: 1000 })
+    await useJourneySession(page, 'hoa')
+    await page.goto(`${journeyURL}/studio?app=AssetManagement`)
+
+    await openPage(page, 'AssetDetail')
+    // The Asset entity dropped on the starter widget binds a detail widget to the required asset parameter. The starter
+    // task inbox is not in the sample, so the author removes it from the widget tree.
+    await openDesign(page)
+    const panel = page.getByTestId('studio-design-panel')
+    const starter = frame(page, '/widgets/0')
+    await expect(starter).toBeVisible()
+    await dragTo(page, 'studio-page-design', panel.getByTestId('studio-data-entity-Asset'), starter, 0.75)
+    await chooseBinding(page, 'detail')
+    await expect(frame(page, '/widgets/1')).toBeVisible()
+    await panel
+      .getByTestId('studio-widget-row-/widgets/0')
+      .getByRole('button', { name: 'Remove widget', exact: true })
+      .click()
+    await expect(panel.getByTestId('studio-widget-/widgets/1')).toHaveCount(0)
+    await save(page)
+  })
+
+  test('the author lays out the Dashboard on the Design tab with a KPI, a chart and the value table', async ({ page }) => {
+    // A tall, wide window keeps the palette, the data panel and the canvas in view together, away from the edges where a
+    // drag scrolls. A table makes the canvas wider than a narrow window, which pushes the panel out of sight of the mouse.
+    await page.setViewportSize({ width: 1920, height: 1000 })
+    await useJourneySession(page, 'hoa')
+    // The names load with the application, so the new data sources are offered below.
+    await page.goto(`${journeyURL}/studio?app=AssetManagement`)
+
+    const en = await texts('en')
+    await openPage(page, 'Dashboard')
+    await openDesign(page)
+    const panel = page.getByTestId('studio-design-panel')
+    const dragOnto = (source: string, target: Locator, fraction?: number) =>
+      dragTo(page, 'studio-page-design', panel.getByTestId(source), target, fraction)
+    const list = (pointer: string) => page.locator(`[data-testid="studio-canvas-list"][data-list="${pointer}"]`)
+    await expect(frame(page, '/widgets/0')).toBeVisible()
+
+    // The value table goes below the starter widget, and the columns widget above it. Then the author removes the
+    // starter task inbox, which the sample does not have.
+    await dragOnto('studio-data-dataSource-AssetValueByLocation', frame(page, '/widgets/0'), 0.75)
+    await chooseBinding(page, 'table')
+    await expect(frame(page, '/widgets/1')).toBeVisible()
+    await dragOnto('studio-palette-columns', frame(page, '/widgets/0'), 0.25)
+    await expect(panel.getByTestId('studio-widget-/widgets/2')).toBeVisible()
+    await panel
+      .getByTestId('studio-widget-row-/widgets/1')
+      .getByRole('button', { name: 'Remove widget', exact: true })
+      .click()
+    await expect(panel.getByTestId('studio-widget-/widgets/2')).toHaveCount(0)
+    await panel.getByTestId('studio-widget-/widgets/0').click()
+    await panel.getByTestId('studio-field-/widgets/0/columns/0/width').getByRole('spinbutton').fill('4')
+    await panel.getByTestId('studio-field-/widgets/0/columns/1/width').getByRole('spinbutton').fill('8')
+
+    // The KPI is a data source dropped on the first column's list. The data source sets the measure, and the author
+    // writes the label. The columns widget does not compile until its tile has a label and its second column has a
+    // widget, so the canvas draws it as a placeholder with its lists, and the widgets are found in the widget tree.
+    const kpi = '/widgets/0/columns/0/widgets/0'
+    await dragOnto('studio-data-dataSource-WarrantiesEndingSoon', list('/widgets/0/columns/0/widgets'))
+    await chooseBinding(page, 'kpi')
+    await expect(panel.getByTestId(`studio-widget-${kpi}`)).toBeVisible()
+    await writeLabel(panel, `studio-field-${kpi}/label`, 'dashboard.warranties.label', en['dashboard.warranties.label'])
+
+    // The chart is a data source with one group field dropped in the second column. The binding picks the category and
+    // the measure.
+    const chart = '/widgets/0/columns/1/widgets/0'
+    await dragOnto('studio-data-dataSource-AssetsByStatus', list('/widgets/0/columns/1/widgets'))
+    await chooseBinding(page, 'chart')
+    await expect(panel.getByTestId(`studio-widget-${chart}`)).toBeVisible()
+    await writeLabel(
+      panel,
+      `studio-field-${chart}/measures/0/label`,
+      'dashboard.byStatus.count',
+      en['dashboard.byStatus.count'],
+    )
+    await writeLabel(panel, `studio-field-${chart}/title`, 'dashboard.byStatus.title', en['dashboard.byStatus.title'])
+    await save(page)
+
+    // After a reload the Design tab draws all three widgets.
+    await page.reload()
+    await openPage(page, 'Dashboard')
+    await openDesign(page)
+    await expect(frame(page, kpi)).toContainText('Warranties ending within 30 days')
+    await expect(frame(page, chart)).toContainText('Assets by status')
+    await expect(frame(page, '/widgets/1').getByRole('table')).toBeVisible()
+  })
+
   test('the built folder matches the sample in its six parts', async ({ page }) => {
     await useJourneySession(page, 'hoa')
     await page.goto(`${journeyURL}/studio?app=AssetManagement`)
@@ -429,5 +778,23 @@ test.describe('the author builds the asset management application with Studio on
     expect(
       diagnostics.filter((diagnostic) => diagnostic.severity === 'error' && files.includes(diagnostic.file)),
     ).toEqual([])
+  })
+
+  test('the built data sources, form, pages and site match the sample', async () => {
+    compareApplicationFolders(assetManagement, built, {
+      files: [
+        'data-sources/asset-value-by-location.json',
+        'data-sources/assets-by-status.json',
+        'data-sources/warranties-ending-soon.json',
+        'forms/asset-edit.json',
+        'pages/asset-detail.json',
+        'pages/asset-form.json',
+        'pages/assets.json',
+        'pages/dashboard.json',
+        'sites/asset-management.json',
+      ],
+    })
+    // The sample has no Home page.
+    expect(await readdir(path.join(built, 'pages'))).not.toContain('home.json')
   })
 })
