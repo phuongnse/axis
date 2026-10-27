@@ -15,6 +15,9 @@ public sealed record FieldDefinition
 
     public TextReference? Label { get; init; }
 
+    /// <summary>The help text of the field, a text resource like <see cref="Label"/>, or null when it has none.</summary>
+    public TextReference? Help { get; init; }
+
     public bool? Required { get; init; }
 
     public bool? Unique { get; init; }

@@ -29,12 +29,12 @@ _(planned for Mx)_ are not built yet, and Dn refers to [decisions.md](../decisio
   starts with a letter, contains only ASCII letters and digits, and is at most
   60 characters long (`AXC0004`). The same rule applies to field names.
 - Labels always come from text resources.
-- A field may have `help` _(planned)_, such as
+- A field may have `help`, such as
   `{ "name": "title", "type": "text", "help": { "textKey": "purchaseRequest.title.help" } }`:
   a text resource like `label`, on any type, which a form shows between the
-  label and the input. It is one or two short lines. Its key joins the
-  `AXC0028` check. Studio's [entity designer](entity-designer.md) edits it. See
-  the [form widget](form-widget.md).
+  label and the input _(planned)_. It is one or two short lines. Its key joins
+  the `AXC0028` check. Studio's [entity designer](entity-designer.md) edits it.
+  Page metadata gives it as `helpKey`. See the [form widget](form-widget.md).
 - `displayField` names the required `text` field that gives a record its
   name, for example in lookups. An entity that is the target of a reference
   must have one.
@@ -775,9 +775,9 @@ hidden or `readOnlyWhen` field.
   label and `sections`, a list of section names. When `steps` is present,
   every section has a `name` and is in exactly one step. The steps show in
   the order listed. A step whose sections are all hidden is skipped. Keep to
-  about six steps: from seven the steps bar shows only numbers. Studio may warn
-  above six, and never blocks _(planned)_.
-- **Field widths** _(planned)_. A field entry may have `width`, a whole number
+  about six steps: from seven the steps bar shows only numbers. Studio warns
+  above six, and never blocks.
+- **Field widths**. A field entry may have `width`, a whole number
   from 1 to 12 in twelfths of its section, 12 when left out, so fields sit in
   columns. See [fields in columns](form-widget.md).
 - **Compile checks.** Each condition is type-checked as a boolean over the

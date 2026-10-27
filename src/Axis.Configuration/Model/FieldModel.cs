@@ -20,6 +20,9 @@ public sealed record FieldModel
 
     public TextReference? Label { get; init; }
 
+    /// <summary>The help text of the field, or null when it has none.</summary>
+    public TextReference? Help { get; init; }
+
     public bool Required { get; init; }
 
     public bool Unique { get; init; }

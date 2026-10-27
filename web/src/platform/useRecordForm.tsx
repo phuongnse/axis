@@ -1,4 +1,4 @@
-import { Button, Form, Input, Space, Typography } from 'antd'
+import { Button, Col, Form, Input, Row, Space, Typography } from 'antd'
 import { Fragment, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { ChildCollectionTable } from './ChildCollectionTable'
 import { FieldInput } from './FieldInput'
@@ -21,6 +21,8 @@ import { ReferenceLookup } from './ReferenceLookup'
 import { ReferencesInput } from './ReferencesInput'
 import type { EntityMetadata, FieldMetadata, FormMetadata } from './site'
 import { useText } from './texts'
+import { useDesignTokens } from './themeMode'
+import { usePhoneWidth } from './usePhoneWidth'
 
 /** The values the form started from, which decide what changed, with the record's labels and version. */
 interface Snapshot {
@@ -29,10 +31,11 @@ interface Snapshot {
   version: number
 }
 
-/** A field the form shows, and whether it is shown without letting it be changed. */
+/** A field the form shows, whether it is shown without letting it be changed, and its width in twelfths of the row. */
 interface ShownField {
   field: FieldMetadata
   readOnly: boolean
+  width: number
 }
 
 /** A titled group of shown fields. The entity shorthand has one section without a title. */
@@ -57,14 +60,20 @@ export function sectionsOf(
   const fixed = (field: FieldMetadata) =>
     field.computed || field.sequence || field.creator || (writable !== undefined && !writable.has(field.name))
   if (form === null) {
-    return [{ name: null, titleKey: null, fields: entity.fields.map((field) => ({ field, readOnly: fixed(field) })) }]
+    return [
+      {
+        name: null,
+        titleKey: null,
+        fields: entity.fields.map((field) => ({ field, readOnly: fixed(field), width: 12 })),
+      },
+    ]
   }
   return form.sections.map((section) => ({
     name: section.name,
     titleKey: section.titleKey,
     fields: section.fields.flatMap((entry) => {
       const field = entity.fields.find((candidate) => candidate.name === entry.name)
-      return field ? [{ field, readOnly: entry.readOnly || fixed(field) }] : []
+      return field ? [{ field, readOnly: entry.readOnly || fixed(field), width: entry.width ?? 12 }] : []
     }),
   }))
 }
@@ -162,6 +171,8 @@ export function useRecordForm(
 ) {
   const t = useText()
   const canvas = useContext(FormCanvasContext)
+  const { spacing } = useDesignTokens()
+  const phone = usePhoneWidth()
   const shown = useMemo(() => sections.flatMap((section) => section.fields), [sections])
   const [snapshot, setSnapshot] = useState<Snapshot>(() => emptySnapshot(entity.fields))
   const [values, setValues] = useState<Record<string, FieldValue>>(snapshot.initial)
@@ -496,33 +507,39 @@ export function useRecordForm(
               !(section.fields.length > 0 && section.fields.every(({ field }) => hiddenOf(field))) && (
                 <Typography.Title level={5}>{t(section.titleKey)}</Typography.Title>
               )}
-            {section.fields
-              .filter(({ field }) => !hiddenOf(field))
-              .map((entry) => {
-                const { field } = entry
-                const errors = errorsOf(field.name)
-                const control = input(field, lockedOf(entry))
-                const item = (
-                  <Form.Item
-                    key={field.name}
-                    label={labelOf(field)}
-                    // A child collection is a table, with no single input for the label to point to.
-                    htmlFor={field.type === 'child-collection' ? undefined : field.name}
-                    required={stateOf(field.name)?.required ?? field.required}
-                    validateStatus={errors ? 'error' : undefined}
-                    help={
-                      errors && (
-                        <span role="alert" data-testid={`field-error-${field.name}`}>
-                          {errors.join(' ')}
-                        </span>
-                      )
-                    }
-                  >
-                    {asking ? <div onBlur={() => leave(field.name)}>{control}</div> : control}
-                  </Form.Item>
-                )
-                return canvas ? <Fragment key={field.name}>{canvas.field(field.name, item)}</Fragment> : item
-              })}
+            <Row gutter={[spacing.md, 0]} align="top">
+              {section.fields
+                .filter(({ field }) => !hiddenOf(field))
+                .map((entry) => {
+                  const { field } = entry
+                  const errors = errorsOf(field.name)
+                  const control = input(field, lockedOf(entry))
+                  const item = (
+                    <Form.Item
+                      key={field.name}
+                      label={labelOf(field)}
+                      // A child collection is a table, with no single input for the label to point to.
+                      htmlFor={field.type === 'child-collection' ? undefined : field.name}
+                      required={stateOf(field.name)?.required ?? field.required}
+                      validateStatus={errors ? 'error' : undefined}
+                      help={
+                        errors && (
+                          <span role="alert" data-testid={`field-error-${field.name}`}>
+                            {errors.join(' ')}
+                          </span>
+                        )
+                      }
+                    >
+                      {asking ? <div onBlur={() => leave(field.name)}>{control}</div> : control}
+                    </Form.Item>
+                  )
+                  return (
+                    <Col key={field.name} xs={24} lg={phone ? 24 : entry.width * 2}>
+                      {canvas ? canvas.field(field.name, item) : item}
+                    </Col>
+                  )
+                })}
+            </Row>
           </>
         )
         return <Fragment key={index}>{canvas ? canvas.section(index, content) : content}</Fragment>

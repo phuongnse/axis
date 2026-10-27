@@ -339,6 +339,7 @@ function Fields({
               title: t('shell.studio.entity.fieldLabel'),
               render: (_, field, index) => (
                 <FieldLabel
+                  name={t('shell.studio.entity.fieldLabel')}
                   pointer={`/fields/${index}/label`}
                   value={isContent(field) ? field.label : undefined}
                   onChange={onChange}
@@ -381,6 +382,12 @@ function Fields({
               title: t('shell.studio.entity.settings'),
               render: (_, field, index) => (
                 <Flex vertical gap="small">
+                  <FieldLabel
+                    name={t('shell.studio.entity.help')}
+                    pointer={`/fields/${index}/help`}
+                    value={isContent(field) ? field.help : undefined}
+                    onChange={onChange}
+                  />
                   <Settings
                     index={index}
                     field={isContent(field) ? field : {}}
@@ -433,11 +440,19 @@ function Fields({
   )
 }
 
-/** The text key picker of a field's label. Clearing it removes the label. */
-function FieldLabel({ pointer, value, onChange }: { pointer: string; value: unknown; onChange: ChangeHandler }) {
-  const t = useText()
+/** The text key picker of a field's label or help, named `name`. Clearing it removes the text. */
+function FieldLabel({
+  name,
+  pointer,
+  value,
+  onChange,
+}: {
+  name: string
+  pointer: string
+  value: unknown
+  onChange: ChangeHandler
+}) {
   const names = useContext(StudioNamesContext)
-  const name = t('shell.studio.entity.fieldLabel')
   const key = isContent(value) && typeof value.textKey === 'string' ? value.textKey : undefined
 
   return (

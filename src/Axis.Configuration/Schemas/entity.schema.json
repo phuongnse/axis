@@ -79,6 +79,7 @@
           "enum": ["text", "integer", "decimal", "boolean", "date", "date-time", "enum", "reference", "references", "child-collection", "money", "file"]
         },
         "label": { "$ref": "#/$defs/textReference" },
+        "help": { "$ref": "#/$defs/textReference" },
         "required": { "type": "boolean" },
         "unique": { "type": "boolean" },
         "maxLength": { "type": "integer", "minimum": 0, "maximum": 2147483647 },

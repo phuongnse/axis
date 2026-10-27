@@ -29,6 +29,7 @@
     "asset.purchaseCost": "Purchase cost",
     "asset.purchaseDate": "Purchase date",
     "asset.warrantyEnd": "Warranty end",
+    "asset.warrantyEnd.help": "The date the supplier warranty ends. The dashboard counts it as ending soon 30 days before.",
     "asset.attachments": "Attachments",
     "asset.maintenance": "Maintenance",
     "asset.software": "Software",

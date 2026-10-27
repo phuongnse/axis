@@ -38,13 +38,13 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
   - Each section has a `title` label and its `fields`, in the order shown.
     Each entry names a `field` of the entity. `readOnly` is optional and
     `false` by default.
-  - **Fields in columns** _(planned)_. A field entry may have `width`, a whole
+  - **Fields in columns**. A field entry may have `width`, a whole
     number from 1 to 12, in twelfths of the section. It is 12 when left out.
     Fields fill a row from left to right, and the next field that does not fit
     starts a new row. A row is as tall as its tallest field and its fields line
     up at the top, so a message under one field never shifts the rows below.
-    At narrow width every field takes the whole row, in file order. A detail
-    lays out the same sections with the same widths. A `width` that is not a
+    Below 992 px every field takes the whole row, in file order. A detail
+    lays out the same sections with the same widths _(planned)_. A `width` that is not a
     whole number from 1 to 12 breaks the schema (`AXC0004`). Studio's
     [form designer](form-designer.md) edits it
     ([D96](../decisions/d96-rules-from-the-design-system-review.md)).
@@ -325,10 +325,10 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
   - **Form metadata**. Page metadata gives the widget's
     `entity` with all its fields, so the SPA knows every field's type. It
     adds:
-    - `form`: `{ "name", "sections": [ { "name", "titleKey", "visibleWhen", "fields": [ { "name", "readOnly", "visibleWhen" } ] } ], "steps": [ { "titleKey", "sections" } ] }`,
+    - `form`: `{ "name", "sections": [ { "name", "titleKey", "visibleWhen", "fields": [ { "name", "readOnly", "visibleWhen", "width" } ] } ], "steps": [ { "titleKey", "sections" } ] }`,
       or `null` when the widget names an `entity`. `readOnly` already
       includes computed, sequence and creator fields. Field names are as the entity
-      declares them. _(planned)_ Each field also has `width`, 12 when the form
+      declares them. Each field also has `width`, 12 when the form
       leaves it out, and each entity field has `helpKey`, the text key of its
       `help`, or `null`.
     - `actions`: `[ { "type", "process", "labelKey", "instancesPath", "visibleWhen" } ]`,

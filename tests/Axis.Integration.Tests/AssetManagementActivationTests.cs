@@ -5,6 +5,7 @@ using Axis.Data;
 using Axis.Data.DataSources;
 using Axis.Data.Naming;
 using Axis.Data.Seeding;
+using Axis.Presentation.Sites;
 using Axis.Processes.Instances;
 using Npgsql;
 
@@ -39,6 +40,24 @@ public sealed class AssetManagementActivationTests(DataDatabaseFixture database)
         var active = await new ActiveReleaseStore(reader).FindByNameAsync("AssetManagement", CancellationToken);
         Assert.NotNull(active);
         Assert.Equal(compiled.Release.Id, active.ReleaseId);
+    }
+
+    [Fact]
+    public async Task The_asset_edit_form_declares_its_widths_and_the_warranty_end_has_a_help_text()
+    {
+        var compiled = await CompileAsync();
+        Assert.Empty(compiled.Diagnostics);
+
+        var form = ApplicationSites.DescribeForm(compiled.Model!, "AssetEdit");
+        var widths = form.Sections.SelectMany(section => section.Fields).ToDictionary(field => field.Name, field => field.Width);
+        Assert.Equal(4, widths["number"]);
+        Assert.Equal(8, widths["name"]);
+        Assert.Equal(6, widths["warrantyEnd"]);
+        Assert.Equal(12, widths["software"]);
+
+        var fields = ApplicationSites.DescribeEntity(compiled.Model!, "Asset").Fields.ToDictionary(field => field.Name);
+        Assert.Equal("asset.warrantyEnd.help", fields["warrantyEnd"].HelpKey);
+        Assert.Null(fields["name"].HelpKey);
     }
 
     [Fact]

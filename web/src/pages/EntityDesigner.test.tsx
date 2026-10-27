@@ -113,7 +113,7 @@ function entity(extra: Record<string, unknown> = {}) {
     fields: [
       { name: 'total', type: 'decimal', label: { textKey: 'field.total' }, unique: true, precision: 18, scale: 2 },
       { name: 'code', type: 'text', maxLength: 20 },
-      { name: 'note', type: 'text' },
+      { name: 'note', type: 'text', help: { textKey: 'field.total' } },
     ],
     displayField: 'code',
     ...extra,
@@ -281,6 +281,28 @@ describe('EntityDesigner', () => {
 
     await chooseOption('field.total', screen.getByTestId('studio-field-/fields/1/label'))
     expect(onChange).toHaveBeenCalledWith('/fields/1/label/textKey', 'field.total')
+  })
+
+  it('removes a field help with undefined and writes a picked key under textKey', async () => {
+    const onChange = renderDesigner(entity())
+
+    await chooseOption('field.total', screen.getByTestId('studio-field-/fields/1/help'))
+    expect(onChange).toHaveBeenCalledWith('/fields/1/help/textKey', 'field.total')
+
+    await clearSelect(screen.getByTestId('studio-field-/fields/2/help'))
+    expect(onChange).toHaveBeenCalledWith('/fields/2/help', undefined)
+  })
+
+  it('keeps the help of a field when its type changes', async () => {
+    const onChange = renderDesigner(entity())
+
+    await chooseOption('integer', screen.getByTestId('studio-field-/fields/2/type'))
+
+    expect(onChange).toHaveBeenCalledWith('/fields/2', {
+      name: 'note',
+      type: 'integer',
+      help: { textKey: 'field.total' },
+    })
   })
 
   it('sends undefined for a cleared maxLength and the number for a typed one', async () => {

@@ -12,22 +12,28 @@
       },
       "fields": [
         {
-          "field": "number"
+          "field": "number",
+          "width": 4
         },
         {
-          "field": "name"
+          "field": "name",
+          "width": 8
         },
         {
-          "field": "category"
+          "field": "category",
+          "width": 6
         },
         {
-          "field": "status"
+          "field": "status",
+          "width": 6
         },
         {
-          "field": "location"
+          "field": "location",
+          "width": 6
         },
         {
-          "field": "holder"
+          "field": "holder",
+          "width": 6
         }
       ]
     },
@@ -38,16 +44,20 @@
       },
       "fields": [
         {
-          "field": "currency"
+          "field": "currency",
+          "width": 4
         },
         {
-          "field": "purchaseCost"
+          "field": "purchaseCost",
+          "width": 8
         },
         {
-          "field": "purchaseDate"
+          "field": "purchaseDate",
+          "width": 6
         },
         {
-          "field": "warrantyEnd"
+          "field": "warrantyEnd",
+          "width": 6
         }
       ]
     },
