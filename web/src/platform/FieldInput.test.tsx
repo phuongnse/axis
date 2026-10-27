@@ -128,6 +128,14 @@ describe('FieldInput dates', () => {
     expect(onChange).toHaveBeenLastCalledWith(dayjs('2026-03-04T16:30:00').toDate().toISOString().replace('.000Z', 'Z'))
   })
 
+  it('fills the width of its column with a date picker', () => {
+    expect(show(field('date', {}), null).closest('.ant-picker')).toHaveStyle({ width: '100%' })
+  })
+
+  it('fills the width of its column with a date-time picker', () => {
+    expect(show(field('date-time', {}), null).closest('.ant-picker')).toHaveStyle({ width: '100%' })
+  })
+
   it('has no seconds column in the time panel', async () => {
     const input = show(field('date-time', {}), instant)
 
