@@ -1,3 +1,4 @@
+using Axis.Processes.Instances;
 using Axis.Worker;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -132,6 +133,62 @@ public sealed class WorkerOptionsTests
         var exception = Assert.Throws<InvalidOperationException>(() => builder.Services.AddAxisWorker(builder.Configuration, builder.Environment));
 
         Assert.Contains("Tenancy:Source", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_mail_host_without_a_sender_stops_the_worker_at_startup_naming_the_setting()
+    {
+        var builder = EmailBuilder(("Email:Smtp:Host", "smtp.example.test"));
+
+        var exception = Assert.Throws<InvalidOperationException>(() => builder.Services.AddAxisWorker(builder.Configuration, builder.Environment));
+
+        Assert.Contains("Email:From", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("Email:Smtp:Port", "0")]
+    [InlineData("Email:Smtp:Port", "70000")]
+    [InlineData("Email:Smtp:Port", "smtp-port-value")]
+    [InlineData("Email:Smtp:UseTls", "maybe")]
+    public void A_bad_mail_value_stops_the_worker_at_startup_naming_the_setting_and_never_quoting_the_value(string key, string value)
+    {
+        var builder = EmailBuilder(("Email:Smtp:Host", "smtp.example.test"), ("Email:From", "axis@example.test"), (key, value));
+
+        var exception = Assert.Throws<InvalidOperationException>(() => builder.Services.AddAxisWorker(builder.Configuration, builder.Environment));
+
+        Assert.Contains(key, exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(value, exception.Message.Replace(key, "", StringComparison.Ordinal), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_valid_mail_section_builds_the_worker_with_those_settings()
+    {
+        var builder = EmailBuilder(
+            ("Email:Smtp:Host", "smtp.example.test"),
+            ("Email:Smtp:Port", "2525"),
+            ("Email:Smtp:UseTls", "false"),
+            ("Email:From", "axis@example.test"));
+
+        builder.Services.AddAxisWorker(builder.Configuration, builder.Environment);
+
+        using var provider = builder.Services.BuildServiceProvider();
+        var settings = provider.GetRequiredService<EmailDefaults>().Settings;
+        Assert.NotNull(settings);
+        Assert.Equal(("smtp.example.test", 2525, false, "axis@example.test"), (settings.Host, settings.Port, settings.UseTls, settings.From));
+    }
+
+    private static HostApplicationBuilder EmailBuilder(params (string Key, string? Value)[] settings)
+    {
+        var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings { EnvironmentName = "Production", DisableDefaults = true });
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Tenants:a:Hosts:0"] = "a.example.test",
+
+            // No database is opened: the worker is built, never started.
+            ["Tenants:a:ConnectionString"] = "Host=127.0.0.1;Port=1;Database=axis;Username=axis;Password=axis",
+        });
+        builder.Configuration.AddInMemoryCollection(settings.ToDictionary(setting => setting.Key, setting => setting.Value));
+        return builder;
     }
 
     private static HostApplicationBuilder WorkerBuilder(
