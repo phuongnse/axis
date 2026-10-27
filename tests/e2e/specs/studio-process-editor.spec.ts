@@ -1,4 +1,4 @@
-import { cp, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { expect, test } from '../test'
@@ -26,6 +26,19 @@ test.describe('Studio edits a process in the process editor', () => {
   test.beforeAll(async () => {
     copy = await mkdtemp(path.join(os.tmpdir(), 'axis-studio-process-editor-'))
     await cp(purchaseRequests, copy, { recursive: true })
+    // No sample application defines an event, and the wait for event journey needs one about the subject entity.
+    await mkdir(path.join(copy, 'events'), { recursive: true })
+    await writeFile(
+      path.join(copy, 'events', 'payment-received.json'),
+      JSON.stringify({
+        id: 'c3b7d1a4-5e2f-4a68-9d01-7b8c9e0f1a23',
+        kind: 'event',
+        name: 'PaymentReceived',
+        formatVersion: 1,
+        entity: 'PurchaseRequest',
+        fields: [{ name: 'amount', type: 'decimal' }],
+      }),
+    )
     // Index 0 of ActivateOnStartup is the purchase request sample, so it stays out of this server and the live
     // release of the main E2E server is not activated again.
     server = await startServer({ ActivateOnStartup__0: e2eApp, Studio__Folders__0: copy })
@@ -378,6 +391,66 @@ test.describe('Studio edits a process in the process editor', () => {
         name: 'coolDown',
         type: 'timer',
         wait: 'PT4H',
+        next: 'done',
+      })
+    } finally {
+      await writeFile(target, original)
+    }
+  })
+
+  test('an author adds a timer and a wait for event with a timeout on the Form tab without the JSON view and saves without a new diagnostic', async ({
+    page,
+  }) => {
+    await useSession(page, 'hoa')
+    const id = await processId(page)
+    const target = path.join(copy, file)
+    const original = await readFile(target, 'utf8')
+
+    try {
+      // The earlier journeys changed the copy, so the steps are found by name.
+      const content = JSON.parse(original) as { steps: { name: string }[] }
+      const timer = content.steps.length
+      const wait = timer + 1
+      const rejected = content.steps.findIndex((step) => step.name === 'markRejected')
+      expect(rejected).toBeGreaterThanOrEqual(0)
+      const before = await diagnostics(page)
+
+      await page.goto(`${server.url}/studio?app=PurchaseRequests&resource=${id}`)
+      await openFormTab(page)
+      await pickAction(
+        page.getByRole('combobox', { name: 'Add step', exact: true }),
+        'timer',
+        page.getByTestId(`studio-step-${timer}`),
+      )
+      const timerCard = page.getByTestId(`studio-step-${timer}`)
+      await timerCard.getByRole('textbox', { name: 'Step name', exact: true }).fill('chase')
+      await timerCard.getByRole('textbox', { name: 'Duration', exact: true }).fill('PT1H')
+      await pick(page, `/steps/${timer}/next`, 'done')
+
+      await pickAction(
+        page.getByRole('combobox', { name: 'Add step', exact: true }),
+        'waitEvent',
+        page.getByTestId(`studio-step-${wait}`),
+      )
+      const card = page.getByTestId(`studio-step-${wait}`)
+      await card.getByRole('textbox', { name: 'Step name', exact: true }).fill('awaitPayment')
+      await pick(page, `/steps/${wait}/event`, 'PaymentReceived')
+      await card.getByRole('button', { name: 'Add timeout', exact: true }).click()
+      await card.getByRole('textbox', { name: 'After', exact: true }).fill('P2D')
+      await pick(page, `/steps/${wait}/timeout/next`, 'chase')
+      await pick(page, `/steps/${wait}/next`, 'done')
+      await pick(page, `/steps/${rejected}/next`, 'awaitPayment')
+      await page.getByRole('button', { name: 'Save', exact: true }).click()
+
+      await expect(page.getByTestId('studio-saved')).toBeVisible()
+      expect(await diagnostics(page)).toEqual(before)
+      const saved = JSON.parse(await readFile(target, 'utf8')) as { steps: Record<string, unknown>[] }
+      expect(saved.steps.find((step) => step.name === 'markRejected')?.next).toBe('awaitPayment')
+      expect(saved.steps.find((step) => step.name === 'awaitPayment')).toEqual({
+        name: 'awaitPayment',
+        type: 'waitEvent',
+        event: 'PaymentReceived',
+        timeout: { after: 'P2D', next: 'chase' },
         next: 'done',
       })
     } finally {

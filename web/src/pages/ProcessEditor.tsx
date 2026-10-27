@@ -16,7 +16,7 @@ import { SchemaForm, type ChangeHandler } from './SchemaForm'
 type Content = Record<string, unknown>
 
 /** The step types that have a panel. The keys of any other type show as markers for the JSON view. */
-const panelTypes = new Set(['decision', 'task', 'operation', 'timer', 'subProcess', 'end'])
+const panelTypes = new Set(['decision', 'task', 'operation', 'timer', 'subProcess', 'waitEvent', 'end'])
 
 const parameterTypes = ['text', 'integer', 'decimal', 'boolean', 'date', 'date-time']
 
@@ -359,6 +359,9 @@ function Step({
           {type === 'task' && <Task pointer={pointer} step={step} names={names} onChange={onChange} />}
           {type === 'timer' && <Timer pointer={pointer} step={step} names={names} onChange={onChange} />}
           {type === 'subProcess' && <SubProcess pointer={pointer} step={step} names={names} onChange={onChange} />}
+          {type === 'waitEvent' && (
+            <WaitEvent pointer={pointer} step={step} entity={entity} names={names} onChange={onChange} />
+          )}
           {type !== undefined && !panelTypes.has(type) && (
             <JsonOnlyKeys
               pointer={pointer}
@@ -574,6 +577,103 @@ function Timer({
             </div>
           )}
         </Flex>
+      </div>
+      <Transition
+        pointer={`${pointer}/next`}
+        label={t('shell.studio.process.next')}
+        value={step.next}
+        names={names}
+        onChange={onChange}
+      />
+    </>
+  )
+}
+
+/**
+ * The panel of a wait for event step: the event, an optional `when` over its payload, an optional timeout and the next
+ * step. The event picker lists only the events about the process's subject entity. Remove timeout deletes the whole
+ * `timeout` key, and Add timeout starts one empty.
+ */
+function WaitEvent({
+  pointer,
+  step,
+  entity,
+  names,
+  onChange,
+}: {
+  pointer: string
+  step: Content
+  entity: string
+  names: string[]
+  onChange: ChangeHandler
+}) {
+  const t = useText()
+  const studioNames = useContext(StudioNamesContext)
+  const timeout = isContent(step.timeout) ? step.timeout : undefined
+  const timeoutPointer = `${pointer}/timeout`
+
+  return (
+    <>
+      <div data-testid={`studio-field-${pointer}/event`}>
+        <div>{t('shell.studio.process.event')}</div>
+        {studioNames === undefined ? (
+          <Input
+            aria-label={t('shell.studio.process.event')}
+            value={text(step.event)}
+            onChange={(event) => onChange(`${pointer}/event`, event.target.value)}
+          />
+        ) : (
+          <ReferencePicker
+            name={t('shell.studio.process.event')}
+            value={text(step.event)}
+            required
+            options={studioNames.events
+              .filter((event) => event.entity.toLowerCase() === entity.toLowerCase())
+              .map((event) => event.name)}
+            onChange={(next) => onChange(`${pointer}/event`, next ?? '')}
+          />
+        )}
+      </div>
+      <div data-testid={`studio-field-${pointer}/when`}>
+        <div>{t('shell.studio.process.when')}</div>
+        <Expression
+          pointer={`${pointer}/when`}
+          name={t('shell.studio.process.when')}
+          value={text(step.when)}
+          required={false}
+          onChange={onChange}
+        />
+      </div>
+      <div data-testid={`studio-field-${timeoutPointer}`}>
+        {timeout === undefined ? (
+          <Button onClick={() => onChange(timeoutPointer, { after: '', next: '' })}>
+            {t('shell.studio.process.addTimeout')}
+          </Button>
+        ) : (
+          <Flex vertical gap="small">
+            <Typography.Text strong>{t('shell.studio.process.timeout')}</Typography.Text>
+            <div data-testid={`studio-field-${timeoutPointer}/after`}>
+              <div>{t('shell.studio.process.timeoutAfter')}</div>
+              <Input
+                aria-label={t('shell.studio.process.timeoutAfter')}
+                value={text(timeout.after)}
+                onChange={(event) => onChange(`${timeoutPointer}/after`, event.target.value)}
+              />
+            </div>
+            <Transition
+              pointer={`${timeoutPointer}/next`}
+              label={t('shell.studio.process.timeoutNext')}
+              value={timeout.next}
+              names={names}
+              onChange={onChange}
+            />
+            <div>
+              <Button danger onClick={() => onChange(timeoutPointer, undefined)}>
+                {t('shell.studio.process.removeTimeout')}
+              </Button>
+            </div>
+          </Flex>
+        )}
       </div>
       <Transition
         pointer={`${pointer}/next`}

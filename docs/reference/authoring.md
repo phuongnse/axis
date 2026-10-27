@@ -314,7 +314,7 @@ agrees it. The answer is:
   processes: [{ id, name, entity, parameters: [{ name, type }], steps: [{ name, type, outcomes: [...] }] }],
   rules: [{ id, name, module, parameters: [{ name, type }], resultType }],
   connectors: [{ id, name, operations: [{ name }] }],
-  events: [{ id, name, fields: [{ name, type }] }],
+  events: [{ id, name, entity, fields: [{ name, type }] }],
   roles, sequences, forms: [{ id, name }],
   pages: [{ id, name, parameters: [{ name, type, required }] }],
   texts: [{ key, texts: { <locale>: <text> }, usedBy }] }
@@ -327,6 +327,11 @@ agrees it. The answer is:
   under their `<module id>/<name>` names too, but only entities, data sources
   and rules carry `module`. A module resource's `id` is the id written in its
   module file.
+- **Event `entity`.** It is the entity the event is about, written as a process
+  writes its `entity`. A module event that names its own module's entity without
+  a slash is listed with the entity qualified, as `<module id>/<name>`. Studio's
+  wait for event panel lists the events whose `entity` is the process's subject
+  entity.
 - **`columns`.** A plain data source lists its fields in order. A column's
   `type` is the type of the field at the end of its path, or null when the path
   does not resolve. A grouped data source lists its group fields in `groupBy`

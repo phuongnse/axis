@@ -37,6 +37,7 @@ public sealed class StudioNamesTests : IAsyncLifetime
         CopyDirectory(Path.Combine(samples, "purchase-requests"), _purchaseRequests.Path);
         CopyDirectory(Path.Combine(samples, "leave-requests"), _leaveRequests.Path);
         AddProcessWithoutSubject(Path.Combine(_leaveRequests.Path, "processes", "daily-reminder.json"));
+        AddEvent(Path.Combine(_purchaseRequests.Path, "events", "payment-received.json"));
         CopyDirectory(Path.Combine(samples, "purchase-requests"), _broken.Path);
         RenameApplication(Path.Combine(_broken.Path, "application.json"), "BrokenRequests");
         BreakProcess(Path.Combine(_broken.Path, "processes", "purchase-request-approval.json"));
@@ -102,6 +103,17 @@ public sealed class StudioNamesTests : IAsyncLifetime
         Assert.Equal("task", step.GetProperty("type").GetString());
         Assert.Equal(["approve", "return", "reject"], step.GetProperty("outcomes").EnumerateArray().Select(outcome => outcome.GetString()));
         Assert.Empty(process.GetProperty("parameters").EnumerateArray());
+    }
+
+    [Fact]
+    public async Task Names_list_each_event_with_its_entity()
+    {
+        var names = await NamesAsync("PurchaseRequests");
+
+        var @event = Named(names, "events", "PaymentReceived");
+        Assert.Equal("PurchaseRequest", @event.GetProperty("entity").GetString());
+        var field = Assert.Single(@event.GetProperty("fields").EnumerateArray());
+        Assert.Equal(("amount", "decimal"), (field.GetProperty("name").GetString(), field.GetProperty("type").GetString()));
     }
 
     [Fact]
@@ -253,6 +265,21 @@ public sealed class StudioNamesTests : IAsyncLifetime
             ["steps"] = new JsonArray(new JsonObject { ["name"] = "done", ["type"] = "end" }),
         };
         File.WriteAllText(file, process.ToJsonString());
+    }
+
+    private static void AddEvent(string file)
+    {
+        var @event = new JsonObject
+        {
+            ["id"] = Guid.NewGuid().ToString(),
+            ["kind"] = "event",
+            ["name"] = "PaymentReceived",
+            ["formatVersion"] = 1,
+            ["entity"] = "PurchaseRequest",
+            ["fields"] = new JsonArray(new JsonObject { ["name"] = "amount", ["type"] = "decimal" }),
+        };
+        Directory.CreateDirectory(Path.GetDirectoryName(file)!);
+        File.WriteAllText(file, @event.ToJsonString());
     }
 
     private static void AddGroupField(string file, string field)

@@ -17,11 +17,13 @@ export function Expression({
   pointer,
   name,
   value,
+  required = true,
   onChange,
 }: {
   pointer: string
   name: string
   value: string
+  required?: boolean
   onChange: ChangeHandler
 }) {
   const check = useContext(ExpressionCheckContext)
@@ -34,13 +36,17 @@ export function Expression({
         path={pointer}
         name={name}
         value={value}
-        required
+        required={required}
         options={expressionScope(check.kind, check.draft, pointer, check.names)}
         onChange={onChange}
       />
     </Suspense>
   ) : (
-    <Input aria-label={name} value={value} onChange={(event) => onChange(pointer, event.target.value)} />
+    <Input
+      aria-label={name}
+      value={value}
+      onChange={(event) => onChange(pointer, event.target.value === '' && !required ? undefined : event.target.value)}
+    />
   )
 }
 

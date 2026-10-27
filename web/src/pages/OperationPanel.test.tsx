@@ -54,6 +54,7 @@ const names: StudioNames = {
     {
       id: '3',
       name: 'PurchaseRequestApproved',
+      entity: 'PurchaseRequest',
       fields: [
         { name: 'reason', type: 'text' },
         { name: 'amount', type: 'decimal' },
