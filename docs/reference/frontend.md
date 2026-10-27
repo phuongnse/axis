@@ -111,7 +111,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
 - **Selected and current states** _(planned)_. The selected tab, the active
   menu entry and the current page of a pagination use `primaryText`.
   Destructive menu entries use `dangerText`.
-- **Shown values** _(planned)_. A value reads the same in every widget: in an
+- **Shown values**. A value reads the same in every widget: in an
   input, a read-only field, a table cell, a detail and a KPI
   ([D96](../decisions/d96-rules-from-the-design-system-review.md)).
   - **Dates and times.** One format per locale. A date is the locale's short
@@ -690,20 +690,20 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     see, and cannot sort a file. Repeated clicks on a header sort ascending, then descending, then
     not at all.
   - **Values.** Values are formatted for display and never changed. The rules
-    of **Shown values** above apply _(planned)_: a date-time to the minute, and
-    numbers in the locale's digit grouping.
+    of **Shown values** above apply: a date-time to the minute, and numbers in
+    the locale's digit grouping.
 
     | Field type | Shown as |
     | --- | --- |
-    | `date-time` | date and time in the UI locale and the browser's time zone, to the second today and to the minute _(planned)_. The fraction is dropped |
+    | `date-time` | date and time in the UI locale and the browser's time zone, to the minute on the locale's clock, with no seconds. The fraction is dropped |
     | `date` | the date in the UI locale, without a time-zone shift |
-    | `integer`, `decimal` | exactly as the API wrote them today, in the locale's digit grouping _(planned)_, right-aligned |
-    | `money` | the amount with its currency in the UI locale, such as `$1,250.50` in `en` and `1.250.000 ₫` in `vi`, right-aligned. It shows the field's `scale` in decimal places, or more when the API wrote more, so it never rounds. The currency is `currency`, or the value of `currencyField` in the same row, or of `currencyColumn` in a data source row. Without a code of three letters it shows the number as the API wrote it |
+    | `integer`, `decimal` | the number in the locale's digit grouping, with every digit the API wrote, right-aligned in tabular figures |
+    | `money` | the amount with its currency in the UI locale, such as `$1,250.50` in `en` and `1.250.000 ₫` in `vi`, right-aligned. It shows the field's `scale` in decimal places, or more when the API wrote more, so it never rounds. The currency is `currency`, or the value of `currencyField` in the same row, or of `currencyColumn` in a data source row. Without a code of three letters it shows the number grouped like a decimal, without a currency |
     | `boolean` | a localized yes or no |
     | `reference` | the label from `labels` |
     | `text`, `enum` | the value. An enum with `valueLabels` shows the label |
     | `file` | the file's name as a download link to `downloadPath` and the file's id. A data source row holds a file as its bare id, so a data source column shows the id and no link |
-    | `null` | an empty cell today, a muted italic "—" _(planned)_. A group row of a data source stays blank |
+    | `null` | a muted italic "—". A group row of a data source stays blank |
 
   - **Number source text.** The SPA parses record responses with the source
     text of each JSON number, so `values` holds integers and decimals as
