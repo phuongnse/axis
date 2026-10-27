@@ -25,7 +25,7 @@ test("the title link opens a note, and saving returns to the table with the edit
     .click();
 
   await expect(page).toHaveURL(new RegExp(`/e2e/noteform/${id}$`));
-  await page.getByRole("textbox", { name: "* Title", exact: true }).fill(`${title} edited`);
+  await page.getByRole("textbox", { name: "Title", exact: true }).fill(`${title} edited`);
   await page.getByRole("button", { name: "Save", exact: true }).click();
 
   await expect(page).toHaveURL(/\/e2e\/noterows$/);

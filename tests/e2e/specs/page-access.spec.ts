@@ -47,7 +47,7 @@ test('a user without a create grant sees no New button, and one without a start 
   await page.goto('/purchasing/purchaserequests')
   await expect(page.getByRole('button', { name: 'New', exact: true })).toBeVisible()
   await page.goto(`/purchasing/purchaserequestform/${id}`)
-  await expect(page.getByRole('textbox', { name: '* Title', exact: true })).toHaveValue(title)
+  await expect(page.getByRole('textbox', { name: 'Title', exact: true })).toHaveValue(title)
   await expect(page.getByRole('button', { name: 'Submit', exact: true })).toBeVisible()
 
   await useSession(page, 'chau')
@@ -56,7 +56,7 @@ test('a user without a create grant sees no New button, and one without a start 
   await expect(page.getByRole('table').getByRole('link').first()).toBeVisible()
   await expect(page.getByRole('button', { name: /New/i })).toHaveCount(0)
   await page.goto(`/purchasing/purchaserequestform/${id}`)
-  await expect(page.getByRole('textbox', { name: '* Title', exact: true })).toHaveValue(title)
+  await expect(page.getByRole('textbox', { name: 'Title', exact: true })).toHaveValue(title)
   await expect(page.getByRole('button', { name: /Submit/i })).toHaveCount(0)
 })
 
@@ -64,7 +64,7 @@ test('a user without an update grant sees the form read-only and no Save button'
   const { title, id } = await createRequest(page)
 
   await page.goto(`/purchasing/purchaserequestform/${id}`)
-  const titleInput = page.getByRole('textbox', { name: '* Title', exact: true })
+  const titleInput = page.getByRole('textbox', { name: 'Title', exact: true })
   await expect(titleInput).toHaveValue(title)
   await expect(titleInput).not.toHaveAttribute('readonly')
   await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeVisible()

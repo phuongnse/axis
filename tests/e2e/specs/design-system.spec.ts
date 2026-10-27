@@ -3,6 +3,7 @@ import type { FrameLocator, Locator, Page } from '@playwright/test'
 import { readdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { waitForDialog } from '../dialogs'
+import { fieldLabel } from '../fields'
 
 // The design-system bundle is a separate build, which scripts/e2e.sh makes with scripts/design-system.sh. The page
 // web/design-system.html is its harness. The bundle answers every API call of the fixture application from fixtures,
@@ -39,14 +40,14 @@ const previews: Record<string, (page: Page) => Locator> = {
   tabs: (page) => page.getByRole('tab', { name: 'Requests', exact: true }),
   section: (page) => page.getByRole('region', { name: 'Tasks', exact: true }),
   states: (page) => page.getByRole('alert').filter({ hasText: 'The records could not be loaded.' }),
-  'field-text': (page) => figure(page, 'Typical').getByLabel('Title', { exact: true }),
-  'field-integer': (page) => figure(page, 'Typical').getByLabel('Quantity', { exact: true }),
-  'field-decimal': (page) => figure(page, 'Typical').getByLabel('Amount', { exact: true }),
-  'field-boolean': (page) => figure(page, 'Typical').getByLabel('Urgent', { exact: true }),
-  'field-date': (page) => figure(page, 'Typical').getByLabel('Needed on', { exact: true }),
-  'field-date-time': (page) => figure(page, 'Typical').getByLabel('Submitted at', { exact: true }),
-  'field-enum': (page) => figure(page, 'Typical').getByLabel('Status', { exact: true }),
-  'field-reference': (page) => figure(page, 'Typical').getByLabel('Category', { exact: true }),
+  'field-text': (page) => figure(page, 'Typical').getByLabel(fieldLabel('Title')),
+  'field-integer': (page) => figure(page, 'Typical').getByLabel(fieldLabel('Quantity')),
+  'field-decimal': (page) => figure(page, 'Typical').getByLabel(fieldLabel('Amount')),
+  'field-boolean': (page) => figure(page, 'Typical').getByLabel(fieldLabel('Urgent')),
+  'field-date': (page) => figure(page, 'Typical').getByLabel(fieldLabel('Needed on')),
+  'field-date-time': (page) => figure(page, 'Typical').getByLabel(fieldLabel('Submitted at')),
+  'field-enum': (page) => figure(page, 'Typical').getByLabel(fieldLabel('Status')),
+  'field-reference': (page) => figure(page, 'Typical').getByLabel(fieldLabel('Category')),
   'field-child-collection': (page) =>
     figure(page, 'Reference and computed cells').getByRole('columnheader', { name: 'Description', exact: true }),
 }
@@ -185,15 +186,10 @@ for (const name of Object.keys(previews).filter((key) => key.startsWith('field-'
     test(`the ${name} preview draws its required, read-only and error states in ${mode} mode`, async ({ page }) => {
       const recording = await openHarness(page, `?preview=${name}&mode=${mode}`)
 
-      // The required asterisk is drawn by CSS on the label, so its computed content is read.
-      await expect
-        .poll(() =>
-          figure(page, 'Required')
-            .locator('label')
-            .first()
-            .evaluate((label) => getComputedStyle(label, '::before').content),
-        )
-        .toContain('*')
+      // The required mark is a hidden element after the label text, so screen readers skip it.
+      await expect(
+        figure(page, 'Required').locator('label').first().locator('span[aria-hidden="true"]').last(),
+      ).toHaveText('*')
       await expect(figure(page, 'Read-only').getByRole('textbox').first()).toHaveAttribute('readonly')
       await expect(figure(page, 'Validation error').getByRole('alert')).toHaveText('This value is not valid.')
       expect(recording.errors).toEqual([])
@@ -206,7 +202,7 @@ for (const mode of modes) {
     const recording = await openHarness(page, `?preview=field-child-collection&mode=${mode}`)
 
     const reference = figure(page, 'Reference and computed cells')
-    await expect(reference.getByLabel('Amount 1', { exact: true })).toHaveAttribute('readonly')
+    await expect(reference.getByLabel(fieldLabel('Amount 1'))).toHaveAttribute('readonly')
     await expect(
       reference.getByTestId('reference-lines-0-category').getByRole('button', { name: 'Choose Category 1', exact: true }),
     ).toBeVisible()
@@ -214,11 +210,11 @@ for (const mode of modes) {
       'Unit price cannot be negative.',
     )
     const readOnly = figure(page, 'Read-only')
-    await expect(readOnly.getByLabel('Description 1', { exact: true })).toHaveAttribute('readonly')
+    await expect(readOnly.getByLabel(fieldLabel('Description 1'))).toHaveAttribute('readonly')
     await expect(readOnly.getByRole('button', { name: 'Add row', exact: true })).toHaveCount(0)
     const empty = figure(page, 'Empty')
     await expect(empty.getByRole('button', { name: 'Add row', exact: true })).toBeVisible()
-    await expect(empty.getByLabel('Description 1', { exact: true })).toHaveCount(0)
+    await expect(empty.getByLabel(fieldLabel('Description 1'))).toHaveCount(0)
     expect(recording.errors).toEqual([])
   })
 }
@@ -272,7 +268,7 @@ test('the form preview validates and saves inside a frame sandboxed without allo
 
 test('the field-date-time preview opens its date picker', async ({ page }) => {
   const recording = await openHarness(page, '?preview=field-date-time&mode=light')
-  await figure(page, 'Typical').getByLabel('Submitted at', { exact: true }).click()
+  await figure(page, 'Typical').getByLabel(fieldLabel('Submitted at')).click()
 
   await expect(page.getByRole('button', { name: 'Next month', exact: true })).toBeVisible()
   expect(recording.errors).toEqual([])
@@ -293,10 +289,10 @@ test('the field-reference preview lists the fixture categories in its lookup', a
 test('the field-child-collection preview adds a row', async ({ page }) => {
   const recording = await openHarness(page, '?preview=field-child-collection&mode=light')
   const reference = figure(page, 'Reference and computed cells')
-  await expect(reference.getByLabel('Description 2', { exact: true })).toBeVisible()
+  await expect(reference.getByLabel(fieldLabel('Description 2'))).toBeVisible()
   await reference.getByRole('button', { name: 'Add row', exact: true }).click()
 
-  await expect(reference.getByLabel('Description 3', { exact: true })).toBeVisible()
+  await expect(reference.getByLabel(fieldLabel('Description 3'))).toBeVisible()
   expect(recording.errors).toEqual([])
 })
 

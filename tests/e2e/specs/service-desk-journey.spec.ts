@@ -4,6 +4,7 @@ import { expect, test } from '../test'
 import type { Locator, Page } from '@playwright/test'
 import { confirmDialog, waitForDialog } from '../dialogs'
 import { dragTo } from '../design-drag'
+import { fieldLabel } from '../fields'
 import { compareApplicationFolders } from '../folder-comparison'
 import { expectChosen, pickAction, pickOption, pickOptions } from '../select'
 import { journeyApplications, journeyURL, serviceDesk } from '../server-settings'
@@ -1328,7 +1329,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     await page.goto(`${journeyURL}/service-desk/mytickets`)
     await page.getByRole('button', { name: 'New', exact: true }).click()
     await expect(page).toHaveURL(/\/service-desk\/ticketform\/new$/)
-    await page.getByRole('textbox', { name: '* Title', exact: true }).fill(title)
+    await page.getByRole('textbox', { name: 'Title', exact: true }).fill(title)
     await page.getByRole('textbox', { name: 'Description', exact: true }).fill('It shows a black screen.')
     await page.getByRole('button', { name: 'Next', exact: true }).click()
     // The requester's create grant only allows the status draft.
@@ -1339,7 +1340,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     await page.getByRole('row', { name: new RegExp(title) }).getByRole('link').click()
     await expect(page).toHaveURL(/\/service-desk\/ticketform\/[^/]+$/)
     const id = page.url().split('/').pop()
-    await expect(page.getByRole('textbox', { name: '* Title', exact: true })).toHaveValue(title)
+    await expect(page.getByRole('textbox', { name: 'Title', exact: true })).toHaveValue(title)
     // Submit shows on the last step only.
     await page.getByRole('button', { name: 'Next', exact: true }).click()
     await page.getByRole('button', { name: 'Submit', exact: true }).click()
@@ -1347,20 +1348,20 @@ test.describe('the author builds the service desk with Studio only', () => {
 
     await useJourneySession(page, 'linh')
     await openTask(page, title, 'Triage ticket')
-    await expect(page.getByRole('textbox', { name: '* Title', exact: true })).toHaveValue(title)
-    await page.getByLabel('Assigned agent', { exact: true }).fill('khoa')
+    await expect(page.getByRole('textbox', { name: 'Title', exact: true })).toHaveValue(title)
+    await page.getByLabel(fieldLabel('Assigned agent')).fill('khoa')
     await page.getByRole('button', { name: 'Assign', exact: true }).click()
     await expect(page).toHaveURL(/\/service-desk\/mytasks$/)
 
     await useJourneySession(page, 'khoa')
     await openTask(page, title, 'Resolve ticket')
-    await page.getByLabel('Resolution', { exact: true }).fill('Replaced the battery.')
+    await page.getByLabel(fieldLabel('Resolution')).fill('Replaced the battery.')
     await page.getByRole('button', { name: 'Resolve', exact: true }).click()
     await expect(page).toHaveURL(/\/service-desk\/mytasks$/)
 
     await useJourneySession(page, 'anna')
     await openTask(page, title, 'Confirm resolution')
-    await expect(page.getByLabel('Resolution', { exact: true })).toHaveValue('Replaced the battery.')
+    await expect(page.getByLabel(fieldLabel('Resolution'))).toHaveValue('Replaced the battery.')
     await page.getByRole('button', { name: 'Confirm', exact: true }).click()
     await expect(page).toHaveURL(/\/service-desk\/mytasks$/)
 

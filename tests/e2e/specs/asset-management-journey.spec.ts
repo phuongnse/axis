@@ -8,6 +8,7 @@ import { compareApplicationFolders } from '../folder-comparison'
 import { pickAction, pickOption, pickOptions } from '../select'
 import { assetManagement, journeyApplications, journeyURL } from '../server-settings'
 import { csrfHeaders } from '../csrf'
+import { fieldLabel } from '../fields'
 import { useJourneySession } from '../sessions'
 import { createResource, openFormTab } from '../studio-resources'
 
@@ -1191,10 +1192,10 @@ test.describe('the author builds the asset management application with Studio on
     await page.goto(`${journeyURL}/asset-management/assets`)
     await page.getByRole('button', { name: 'New', exact: true }).click()
     await expect(page).toHaveURL(/\/asset-management\/assetform\/new$/)
-    await page.getByRole('textbox', { name: '* Name', exact: true }).fill(registered)
+    await page.getByRole('textbox', { name: 'Name', exact: true }).fill(registered)
     await page.getByRole('textbox', { name: 'Holder', exact: true }).fill('lan')
     await pickOption(page.getByRole('combobox', { name: /^(\* )?Currency$/ }), 'USD')
-    await page.getByLabel('Purchase cost', { exact: true }).fill('1500')
+    await page.getByLabel(fieldLabel('Purchase cost')).fill('1500')
 
     for (const name of software) {
       await page.getByRole('button', { name: 'Add Software', exact: true }).click()
@@ -1218,7 +1219,7 @@ test.describe('the author builds the asset management application with Studio on
     await expect(page.getByRole('link', { name: invoice, exact: true })).toBeVisible()
 
     await addRow.nth(1).click()
-    const date = page.getByLabel('Date 1', { exact: true })
+    const date = page.getByLabel(fieldLabel('Date 1'))
     await date.click()
     await date.fill('10/01/2026')
     await date.press('Enter')
@@ -1229,7 +1230,7 @@ test.describe('the author builds the asset management application with Studio on
     await lookup.getByRole('row', { name: new RegExp(vendor) }).click()
     await expect(lookup).toBeHidden()
     await pickOption(page.getByRole('combobox', { name: 'Currency 1', exact: true }), 'USD')
-    await page.getByLabel('Cost 1', { exact: true }).fill('200')
+    await page.getByLabel(fieldLabel('Cost 1')).fill('200')
 
     const saved = page.waitForResponse(
       (response) => response.request().method() === 'POST' && new URL(response.url()).pathname.endsWith('/entities/Asset/records'),
@@ -1254,8 +1255,8 @@ test.describe('the author builds the asset management application with Studio on
     for (const name of software) {
       await expect(labels).toContainText(name)
     }
-    await expect(page.getByLabel('Vendor 1', { exact: true })).toHaveValue(vendor)
-    await expect(page.getByLabel('Cost 1', { exact: true })).toHaveValue(/200/)
+    await expect(page.getByLabel(fieldLabel('Vendor 1'))).toHaveValue(vendor)
+    await expect(page.getByLabel(fieldLabel('Cost 1'))).toHaveValue(/200/)
   })
 
   test('quan imports the asset CSV after a clean dry run and finds the imported assets in the register', async ({

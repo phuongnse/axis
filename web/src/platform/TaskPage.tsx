@@ -6,6 +6,7 @@ import { formatValue } from './formatValue'
 import { buildCompleteBody } from './recordBody'
 import { fetchRecord, type RecordProblem } from './records'
 import { ReassignDialog } from './ReassignDialog'
+import { requiredMark } from './requiredMark'
 import type { WidgetMetadata } from './site'
 import {
   assignedElsewhere,
@@ -428,7 +429,7 @@ function OpenTaskForm({ task, tasksPath, locale, onDone, onAssignedElsewhere, on
       {form.formErrors.length > 0 && <Alert data-testid="form-error" type="error" title={form.formErrors.join(' ')} />}
       {steps.progress}
       {/* Enter acts as Next on a step before the last, and does nothing on the last. */}
-      <Form id={formId} layout="vertical" onFinish={() => void steps.next()}>
+      <Form id={formId} layout="vertical" requiredMark={requiredMark} onFinish={() => void steps.next()}>
         {steps.fields}
       </Form>
       <Flex gap="small">

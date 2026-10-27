@@ -78,6 +78,8 @@ describe('findLooseLocators', () => {
     assert.deepEqual(loose("page.getByRole('row', { name: new RegExp(title, 'i') })"), [])
     assert.deepEqual(loose('page.getByText(/Save/i)'), [])
     assert.deepEqual(loose("page.getByText(new RegExp(title, 'i'))"), [])
+    assert.deepEqual(loose('page.getByLabel(fieldLabel(label))'), [])
+    assert.deepEqual(loose('page.getByLabel(label)'), ['1 getByLabel text without exact: true'])
   })
 
   test('does not treat a regular expression with a quote or a slash as code', () => {

@@ -26,7 +26,7 @@ test('a note status shows its label in English and Vietnamese, and the record ke
 
   await page.getByRole('button', { name: 'New', exact: true }).click()
   await expect(page).toHaveURL(/\/e2e\/noteform\/new$/)
-  await page.getByRole('textbox', { name: '* Title', exact: true }).fill(title)
+  await page.getByRole('textbox', { name: 'Title', exact: true }).fill(title)
   await pickOption(page.getByRole('combobox', { name: 'Status', exact: true }), 'In progress')
   const created = page.waitForResponse(
     (response) => response.url().includes('/entities/Note/records') && response.request().method() === 'POST',

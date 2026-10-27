@@ -4,6 +4,7 @@ import { expect, test } from '../test'
 import type { Page } from '@playwright/test'
 import { csrfHeaders } from '../csrf'
 import { waitForDialog } from '../dialogs'
+import { fieldLabel } from '../fields'
 import {
   appPath,
   createRequest,
@@ -156,7 +157,7 @@ test('a finance reviewer cancels a waiting request in the inspector and its task
   await expect(page.getByTestId('inspector-command-retry')).toHaveCount(0)
   await page.getByTestId('inspector-command-cancel').click()
   const dialog = await waitForDialog(page)
-  await dialog.getByLabel('Reason', { exact: true }).fill('The request was raised by mistake')
+  await dialog.getByLabel(fieldLabel('Reason')).fill('The request was raised by mistake')
   await dialog.getByRole('button', { name: 'Send', exact: true }).click()
 
   await expect(page.getByTestId('inspector-instance')).toContainText('Cancelled')
@@ -227,8 +228,8 @@ test('a finance reviewer resolves an unknown purchase order call in the inspecto
   await page.goto(`/purchasing/approvals/${instanceId}`)
   await page.getByTestId(`inspector-resolve-${callId}`).click()
   const dialog = await waitForDialog(page)
-  await dialog.getByLabel('Reason', { exact: true }).fill('The order exists in the purchasing system')
-  await dialog.getByLabel('Succeeded', { exact: true }).check()
+  await dialog.getByLabel(fieldLabel('Reason')).fill('The order exists in the purchasing system')
+  await dialog.getByLabel(fieldLabel('Succeeded')).check()
   await dialog.getByLabel('orderNumber (text)', { exact: true }).fill(orderNumber)
   await dialog.getByRole('button', { name: 'Send', exact: true }).click()
   await expect(dialog).toHaveCount(0)
@@ -261,7 +262,7 @@ test('a finance reviewer is refused a redeliver and discards a dead letter, and 
 
   await row.getByTestId(`inspector-dead-letter-redeliver-${id}`).click()
   let dialog = await waitForDialog(page)
-  await dialog.getByLabel('Reason', { exact: true }).fill('The trigger is back')
+  await dialog.getByLabel(fieldLabel('Reason')).fill('The trigger is back')
   await dialog.getByRole('button', { name: 'Send', exact: true }).click()
   await expect(dialog.getByTestId('inspector-command-error')).toHaveText(
     'The trigger of the dead letter is not in the active release.',
@@ -272,7 +273,7 @@ test('a finance reviewer is refused a redeliver and discards a dead letter, and 
 
   await row.getByTestId(`inspector-dead-letter-discard-${id}`).click()
   dialog = await waitForDialog(page)
-  await dialog.getByLabel('Reason', { exact: true }).fill('The delivery is not needed')
+  await dialog.getByLabel(fieldLabel('Reason')).fill('The delivery is not needed')
   await dialog.getByRole('button', { name: 'Send', exact: true }).click()
   await expect(dialog).toHaveCount(0)
   await expect(row).toHaveCount(0)

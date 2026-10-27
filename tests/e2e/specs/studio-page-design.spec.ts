@@ -353,7 +353,7 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
     await expect(steps).toContainText("Add details");
     const canvas = page.getByTestId("studio-form-canvas");
     await expect(
-      canvas.getByRole("textbox", { name: "* Title", exact: true }),
+      canvas.getByRole("textbox", { name: "Title", exact: true }),
     ).toBeVisible();
 
     await steps.getByText("Add details", { exact: true }).click();

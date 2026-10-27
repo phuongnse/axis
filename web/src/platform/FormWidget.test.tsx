@@ -562,6 +562,18 @@ describe('FormWidget', () => {
     expect(isRequiredLabel(screen.getByText('Code'))).toBe(false)
   })
 
+  it('shows a hidden star after a required label, and aria-required on its input only', () => {
+    stubFetch()
+    renderForm()
+
+    const mark = document.querySelector('label[for="title"]')?.lastElementChild
+    expect(mark).toHaveTextContent('*')
+    expect(mark).toHaveAttribute('aria-hidden', 'true')
+    expect(screen.getByRole('textbox', { name: 'Title' })).toHaveAttribute('aria-required', 'true')
+    expect(document.querySelector('label[for="code"] [aria-hidden="true"]')).toBeNull()
+    expect(screen.getByRole('textbox', { name: 'Code' })).not.toHaveAttribute('aria-required')
+  })
+
   it('confirms a picker value on Enter without sending the form', async () => {
     const requests = stubFetch()
     renderForm()

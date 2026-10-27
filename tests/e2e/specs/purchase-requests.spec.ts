@@ -2,6 +2,7 @@ import { expect, test } from '../test'
 import type { APIRequestContext, Page } from '@playwright/test'
 import { csrfHeaders } from '../csrf'
 import { waitForDialog } from '../dialogs'
+import { fieldLabel } from '../fields'
 import { expectChosen, pickOption } from '../select'
 import { sessionFile, useSession } from '../sessions'
 
@@ -32,7 +33,7 @@ async function choose(page: Page, field: string, label: string, name: string) {
   const dialog = await waitForDialog(page)
   await dialog.getByRole('row', { name: new RegExp(name) }).click()
   await expect(dialog).toBeHidden()
-  await expect(page.getByLabel(label, { exact: true })).toHaveValue(name)
+  await expect(page.getByLabel(fieldLabel(label))).toHaveValue(name)
 }
 
 /** Opens a select and picks the option with the given value. */
@@ -45,14 +46,14 @@ test('a purchase request is created with line items, shows the computed total, i
 }) => {
   const run = `${Date.now()}-${test.info().retry}`
   const title = `Request ${run}`
-  const cell = (label: string) => page.getByLabel(label, { exact: true })
+  const cell = (label: string) => page.getByLabel(fieldLabel(label))
   await page.goto('/purchasing/purchaserequests?pageSize=100&sort=-title')
 
   await page.getByRole('button', { name: 'New', exact: true }).click()
   await expect(page).toHaveURL(/\/purchasing\/purchaserequestform\/new$/)
-  await page.getByRole('textbox', { name: '* Title', exact: true }).fill(title)
+  await page.getByRole('textbox', { name: 'Title', exact: true }).fill(title)
   // The server sets the requester to the signed-in user, so the form shows it read-only.
-  await expect(page.getByLabel('Requester', { exact: true })).toHaveAttribute('readonly')
+  await expect(page.getByLabel(fieldLabel('Requester'))).toHaveAttribute('readonly')
   await choose(page, 'department', 'Department', 'Finance')
   await choose(page, 'supplier', 'Supplier', 'Acme Supplies')
   await select(page, 'Currency', 'VND')
@@ -77,11 +78,11 @@ test('a purchase request is created with line items, shows the computed total, i
 
   // The server computes each line amount and the total on save, so the form shows them once reopened.
   await row.getByRole('link', { name: title, exact: true }).click()
-  await expect(page.getByRole('textbox', { name: '* Title', exact: true })).toHaveValue(title)
+  await expect(page.getByRole('textbox', { name: 'Title', exact: true })).toHaveValue(title)
   await expect(cell('Amount 1')).toHaveValue('2,500.90')
   await expect(cell('Amount 2')).toHaveValue('50.00')
   await expect(cell('Total amount')).toHaveValue('2,550.90')
-  await page.getByRole('textbox', { name: '* Title', exact: true }).fill(`${title} edited`)
+  await page.getByRole('textbox', { name: 'Title', exact: true }).fill(`${title} edited`)
   await page.getByRole('button', { name: 'Save', exact: true }).click()
 
   await expect(page).toHaveURL(tablePath)
@@ -94,9 +95,9 @@ test('a purchase request is created with line items, shows the computed total, i
   await page.getByRole('switch', { name: 'Dark mode', exact: true }).click()
   await edited.getByRole('link', { name: `${title} edited`, exact: true }).click()
   const dark = page.locator('[data-theme-mode="dark"]')
-  await expect(dark.getByRole('textbox', { name: '* Title', exact: true })).toHaveValue(`${title} edited`)
-  await expect(dark.getByLabel('Department', { exact: true })).toHaveValue('Finance')
-  await expect(dark.getByLabel('Total amount', { exact: true })).toHaveValue('2,550.90')
+  await expect(dark.getByRole('textbox', { name: 'Title', exact: true })).toHaveValue(`${title} edited`)
+  await expect(dark.getByLabel(fieldLabel('Department'))).toHaveValue('Finance')
+  await expect(dark.getByLabel(fieldLabel('Total amount'))).toHaveValue('2,550.90')
   await dark.getByRole('button', { name: 'Cancel', exact: true }).click()
   await expect(page).toHaveURL(tablePath)
 })
@@ -105,7 +106,7 @@ test('a new purchase request gets a number from the sequence on save, and the fo
   page,
 }) => {
   const title = `Numbered ${Date.now()}-${test.info().retry}`
-  const number = page.getByLabel('Number', { exact: true })
+  const number = page.getByLabel(fieldLabel('Number'))
   await page.goto('/purchasing/purchaserequests?pageSize=100&sort=-title')
 
   // The server numbers the request on create, so the new form shows the field empty and read-only.
@@ -113,12 +114,12 @@ test('a new purchase request gets a number from the sequence on save, and the fo
   await expect(page).toHaveURL(/\/purchasing\/purchaserequestform\/new$/)
   await expect(number).toHaveValue('Not set')
   await expect(number).toHaveAttribute('readonly')
-  await page.getByRole('textbox', { name: '* Title', exact: true }).fill(title)
+  await page.getByRole('textbox', { name: 'Title', exact: true }).fill(title)
   await choose(page, 'department', 'Department', 'Finance')
   await page.getByRole('button', { name: 'Add row', exact: true }).click()
-  await page.getByLabel('Description 1', { exact: true }).fill('Paper')
-  await page.getByLabel('Quantity 1', { exact: true }).fill('1')
-  await page.getByLabel('Unit price 1', { exact: true }).fill('10')
+  await page.getByLabel(fieldLabel('Description 1')).fill('Paper')
+  await page.getByLabel(fieldLabel('Quantity 1')).fill('1')
+  await page.getByLabel(fieldLabel('Unit price 1')).fill('10')
   await select(page, 'Status', 'draft')
   await page.getByRole('button', { name: 'Save', exact: true }).click()
 
@@ -127,7 +128,7 @@ test('a new purchase request gets a number from the sequence on save, and the fo
     .getByRole('row', { name: new RegExp(`${title} `) })
     .getByRole('link', { name: title, exact: true })
     .click()
-  await expect(page.getByRole('textbox', { name: '* Title', exact: true })).toHaveValue(title)
+  await expect(page.getByRole('textbox', { name: 'Title', exact: true })).toHaveValue(title)
   await expect(number).toHaveAttribute('readonly')
   await expect(number).toHaveValue(new RegExp(`^PR-${new Date().getUTCFullYear()}-\\d{5}$`))
 })
@@ -328,10 +329,10 @@ test('line rules show under the Quantity and Unit price of the line, and the tot
 }) => {
   const run = `${Date.now()}-${test.info().retry}`
   const title = `Lines ${run}`
-  const cell = (label: string) => page.getByLabel(label, { exact: true })
+  const cell = (label: string) => page.getByLabel(fieldLabel(label))
   await page.goto('/purchasing/purchaserequests?pageSize=100&sort=-title')
   await page.getByRole('button', { name: 'New', exact: true }).click()
-  await page.getByRole('textbox', { name: '* Title', exact: true }).fill(title)
+  await page.getByRole('textbox', { name: 'Title', exact: true }).fill(title)
   await choose(page, 'department', 'Department', 'Finance')
   await select(page, 'Status', 'draft')
   await page.getByRole('button', { name: 'Add row', exact: true }).click()
@@ -360,8 +361,8 @@ test('line rules show under the Quantity and Unit price of the line, and the tot
 
   // A free item, with a unit price of 0, passes the unit price rule.
   const dark = page.locator('[data-theme-mode="dark"]')
-  await dark.getByLabel('Quantity 1', { exact: true }).fill('1')
-  await dark.getByLabel('Unit price 2', { exact: true }).fill('0')
+  await dark.getByLabel(fieldLabel('Quantity 1')).fill('1')
+  await dark.getByLabel(fieldLabel('Unit price 2')).fill('0')
   // Ant Design adds "loading" to the name while the button is busy, and for a moment after the failed save.
   await dark.getByRole('button', { name: /^(loading )?Save$/ }).click()
   await expect(page).toHaveURL(tablePath)
@@ -378,14 +379,14 @@ test('searching in the supplier lookup filters the suppliers by name, and pickin
   await page.getByTestId('reference-supplier').getByRole('button', { name: 'Choose', exact: true }).click()
   const dialog = await waitForDialog(page)
   await expect(dialog.getByRole('row', { name: /Acme Supplies/ })).toBeVisible()
-  await dialog.getByLabel('Search', { exact: true }).fill('glob')
+  await dialog.getByLabel(fieldLabel('Search')).fill('glob')
 
   // The search ignores case, so `glob` finds Globex.
   await expect(dialog.getByRole('row', { name: /Globex/ })).toBeVisible()
   await expect(dialog.getByRole('row', { name: /Acme Supplies/ })).toHaveCount(0)
   await dialog.getByRole('row', { name: /Globex/ }).click()
   await expect(dialog).toBeHidden()
-  await expect(page.getByLabel('Supplier', { exact: true })).toHaveValue('Globex')
+  await expect(page.getByLabel(fieldLabel('Supplier'))).toHaveValue('Globex')
 })
 
 test('switching the locale to Vietnamese shows the Vietnamese navigation', async ({ page }) => {
