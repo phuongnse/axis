@@ -26,6 +26,9 @@ milestone.
   change order.
 - **No limit on parallel runs:** autopilot's `max_parallel` stays unset, to
   see how far parallel work goes. The owner sets a limit when one is needed.
+  - The owner set the limit to six on 2026-10-27, with NexKit's parallel
+    checks and branches that must be up to date. See
+    [delivery](../delivery.md#decisions).
 - **Turned on in steps:** NexKit is upgraded first with the milestone scope
   unchanged, and the scope changes in a pull request of its own, so a problem
   points to one of the two.

@@ -1,6 +1,7 @@
 import { Alert, Button, Dropdown, Flex, Input, Modal, Table, type TableColumnsType, type TableProps } from 'antd'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router'
+import { AxisButton } from './AxisButton'
 import { useCanvasActions } from './canvasActions'
 import { EmptyDash } from './EmptyValue'
 import { downloadExport, exportAddress, exportPath, saveFile, type ExportFormat } from './exports'
@@ -579,7 +580,9 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
               </Button>
             ))}
             {canImport && (
-              <Button onClick={() => !canvas.active && setImporting(true)}>{t('shell.table.import')}</Button>
+              <AxisButton role="secondary" onClick={() => !canvas.active && setImporting(true)}>
+                {t('shell.table.import')}
+              </AxisButton>
             )}
             {canExport && (
               <Dropdown

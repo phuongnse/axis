@@ -16,7 +16,7 @@ on:
   schedule:
     - cron: "23 * * * *" # usage_limit.resume, conflicts.auto_resolve, autopilot
   workflow_run: # autopilot: a finished run of an after-merge workflow starts a sweep at once
-    workflows: [CI, CodeQL]
+    workflows: [CI, CodeQL, Performance]
     types: [completed]
     branches: [main]
   workflow_dispatch:
@@ -60,10 +60,10 @@ jobs:
     # events and sweeps share one group, so they never replace a command that waits.
     concurrency:
       group: nexkit-${{ (github.event_name == 'milestone' || (github.event_name == 'issues' && github.event.action != 'closed')) && 'autopilot' || github.event.issue.number || github.event.pull_request.number || inputs.number || github.event_name }}
-    uses: phuongnse/nexkit/.github/workflows/pipeline.yml@v5.1.0
+    uses: phuongnse/nexkit/.github/workflows/pipeline.yml@v5.3.0
     with:
       nexkit_repository: phuongnse/nexkit
-      nexkit_ref: v5.1.0
+      nexkit_ref: v5.3.0
     # The pipeline passes each job only the secrets .nexkit/config.json names for it (its
     # stages' agents, or the push token), so it can read them by those names.
     secrets: inherit

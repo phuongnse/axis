@@ -210,7 +210,7 @@ A grouped data source adds `aggregate`. Its rows are groups, not records:
 
 ### Added in M15
 
-These are _(planned for M15)_. See
+See
 [D76](../decisions/d76-file-money-and-enum-label-field-types.md) and
 [D80](../decisions/d80-search-more-aggregates-and-query-timeouts.md).
 
@@ -303,7 +303,7 @@ see the Data sources bullet of the Resolve step in
   does not end at a `reference`, or a measure, instead of a projected field
   (`AXC0045`).
 - `sort` and a `groupBy` entry cannot name a projected `file` field
-  _(planned for M15)_ (`AXC0259`, at `/sort` or `/aggregate/groupBy/{i}`).
+  (`AXC0259`, at `/sort` or `/aggregate/groupBy/{i}`).
 
 ## Endpoint
 

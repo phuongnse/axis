@@ -94,8 +94,9 @@ export function hasFieldError(element: HTMLElement): boolean {
   return formItem(element).classList.contains('ant-form-item-has-error')
 }
 
-export function isRequiredLabel(label: HTMLElement): boolean {
-  return label.classList.contains('ant-form-item-required')
+/** Whether the label, or the label that holds `element`, is marked required. */
+export function isRequiredLabel(element: HTMLElement): boolean {
+  return element.closest('label')?.classList.contains('ant-form-item-required') ?? false
 }
 
 export function isSortableHeader(header: HTMLElement): boolean {

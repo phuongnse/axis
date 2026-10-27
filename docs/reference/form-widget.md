@@ -277,8 +277,7 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
   - **Start process action**. A `form` widget can declare
     `startProcess` actions. On a saved record, each is shown as a button
     next to Save and Cancel, with its label. It is outlined at the *main*
-    level of [buttons](frontend.md), and Save is the solid *finish* button
-    _(planned)_. For a signed-in user, page
+    level of [buttons](frontend.md), and Save is the solid *finish* button. For a signed-in user, page
     metadata lists only the actions whose process the user holds a `start`
     grant on. A new record shows no action buttons, so a failed start never
     leaves a record behind on a form that still says new.

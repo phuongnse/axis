@@ -72,6 +72,8 @@ skill lists, only for:
 
 - a choice that rests on a **Proposed** decision the owner has not settled,
   with no basis in the plan, the issue or `docs/`;
+- a NexKit pull request that NexKit did not merge because its issue was
+  closed (`merge_issue_closed`), for the owner to merge or close;
 - a hand-made pull request that is ready for the admin-bypass merge.
 
 ## Timing

@@ -286,13 +286,13 @@ describe('TaskPage', () => {
 
     renderPage()
 
-    expect(await screen.findByLabelText('Title')).toHaveValue('Laptops for Q4')
+    expect(await screen.findByRole('textbox', { name: 'Title' })).toHaveValue('Laptops for Q4')
     expect(screen.getByText('Manager approval')).toBeInTheDocument()
     expect(screen.getByText('PR-2026-00042')).toBeInTheDocument()
     const due = formatValue({ name: 'dueAt', type: 'date-time' }, dueAt, {}, { locale: 'en', text: (key) => key })
     expect(screen.getByText(due)).toBeInTheDocument()
     expect(screen.getByText('Decision')).toBeInTheDocument()
-    expect(screen.getByLabelText('Title')).toHaveAttribute('readonly')
+    expect(screen.getByRole('textbox', { name: 'Title' })).toHaveAttribute('readonly')
     expect(screen.getByLabelText('Comments')).not.toHaveAttribute('readonly')
     expect(screen.getAllByRole('button').map((button) => button.textContent)).toEqual(['Approve', 'Return', 'Reject'])
   })
@@ -308,7 +308,7 @@ describe('TaskPage', () => {
 
     renderPage([{ texts: siteTexts, fallbackTexts: siteTexts }])
 
-    expect(await screen.findByLabelText('Title')).toHaveValue('Laptops for Q4')
+    expect(await screen.findByRole('textbox', { name: 'Title' })).toHaveValue('Laptops for Q4')
     expect(screen.getByText('Manager review')).toBeInTheDocument()
   })
 
@@ -338,7 +338,7 @@ describe('TaskPage', () => {
     const api = stubTaskApi()
     renderPage()
 
-    await screen.findByLabelText('Title')
+    await screen.findByRole('textbox', { name: 'Title' })
     await waitFor(() => expect(api.stateRequests()).toHaveLength(1))
     const [first] = api.stateRequests()
     expect(first.url).toBe(`${tasksPath}/${taskId}/form-state`)
@@ -484,7 +484,7 @@ describe('TaskPage', () => {
 
     stubTaskApi()
     renderPage()
-    await screen.findByLabelText('Title')
+    await screen.findByRole('textbox', { name: 'Title' })
     expect(screen.queryByText('Overdue')).not.toBeInTheDocument()
   })
 
@@ -502,7 +502,7 @@ describe('TaskPage', () => {
       stubTaskApi({ reads: [{ status: 200, body: { ...openTask, commands } }] })
       const { unmount } = renderPage()
 
-      await screen.findByLabelText('Title')
+      await screen.findByRole('textbox', { name: 'Title' })
       expect(screen.queryByRole('button', { name: 'Claim' }) !== null).toBe(buttons.includes('Claim' as never))
       expect(screen.queryByRole('button', { name: 'Release' }) !== null).toBe(buttons.includes('Release' as never))
       expect(screen.queryByRole('button', { name: 'Reassign' }) !== null).toBe(buttons.includes('Reassign' as never))
@@ -826,7 +826,7 @@ describe('TaskPage', () => {
       renderPage()
 
       expect(await screen.findByLabelText('Comments')).toBeInTheDocument()
-      expect(screen.queryByLabelText('Title')).not.toBeInTheDocument()
+      expect(screen.queryByRole('textbox', { name: 'Title' })).not.toBeInTheDocument()
       expect(screen.getByTestId('form-steps')).toHaveTextContent('Step one')
       expect(screen.getByTestId('form-steps')).toHaveTextContent('Step two')
       expect(screen.getAllByRole('button').map((button) => button.textContent)).toEqual(['Next'])
@@ -839,7 +839,7 @@ describe('TaskPage', () => {
 
       await userEvent.type(screen.getByLabelText('Comments'), 'Fine')
       await userEvent.click(screen.getByRole('button', { name: 'Next' }))
-      expect(await screen.findByLabelText('Title')).toHaveAttribute('readonly')
+      expect(await screen.findByRole('textbox', { name: 'Title' })).toHaveAttribute('readonly')
       expect(screen.getAllByRole('button').map((button) => button.textContent)).toEqual([
         'Back',
         'Approve',
