@@ -163,7 +163,8 @@
   "autopilot": {
     "enabled": true,
     "scope": null,
-    "answer": "recommended"
+    "answer": "recommended",
+    "max_parallel": 6
   },
   "evidence": {
     "artifacts": [
