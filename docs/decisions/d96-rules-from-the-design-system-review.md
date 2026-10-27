@@ -42,7 +42,7 @@ docs mark it _(planned)_, and one issue builds it.
   [KPI widget](../reference/detail-chart-kpi-widgets.md).
 - **Process inspector:** the first column names the instance's record and
   opens it, the release shows by its number, and the list API adds
-  `subjectLabel` and `releaseLabel`. See the
+  `subjectLabel` and `releaseNumber`. See the
   [process inspector widget](../reference/process-inspector-widget.md) and
   [process inspection](../reference/process-inspection.md#instance-list).
 - **One breakpoint:** the platform has one layout breakpoint at 992 px, Ant

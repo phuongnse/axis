@@ -36,8 +36,8 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
   - **List columns** _(planned)_. The first column is the instance's record,
     named by `subjectLabel`, and is the link that opens the instance, or reads
     `shell.inspector.open` when `subjectLabel` is `null`. There is no Open
-    column and no record id. The Release column shows `releaseLabel`, the
-    release's number such as "Release 3", never its id. An instance still
+    column and no record id. The Release column shows `releaseNumber`, the
+    release's number such as 3 under the Release header, never its id. An instance still
     running shows a muted "—" under Ended
     ([D96](../decisions/d96-rules-from-the-design-system-review.md)). A
     process without a subject has no record to name its instances, so each

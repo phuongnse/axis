@@ -99,15 +99,15 @@ lists the instances of the process, whatever release they are pinned to.
 
 - `step` is the step the instance runs next, or waits on. `endedAt` is `null`
   until the instance is `completed` or `failed`.
-- _(planned)_ Each item also has `subjectLabel` and `releaseLabel`, so the
+- _(planned)_ Each item also has `subjectLabel` and `releaseNumber`, so the
   [process inspector widget](process-inspector-widget.md) shows no identifier
   ([D96](../decisions/d96-rules-from-the-design-system-review.md)).
   `subjectLabel` is the value of the subject record's display field, such as
   `"Replace the worn carpet tiles"`. It is `null` for a process without a
-  subject and when the user may not read the display field. `releaseLabel`
-  names the release the instance is pinned to by its number in the
-  application's [release history](storage.md#release-history), such as
-  `"Release 3"`.
+  subject and when the user may not read the display field. `releaseNumber`
+  is the number of the release the instance is pinned to in the
+  application's [release history](storage.md#release-history), such as `3`,
+  a JSON number, so the widget writes no API text of its own.
 
 ### Instance detail
 
