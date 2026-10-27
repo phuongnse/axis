@@ -119,8 +119,16 @@ jobs:
     permissions:
       actions: write
     steps:
-      - run: >-
-          gh workflow run nexkit.yml --repo "$GITHUB_REPOSITORY" --ref "$GITHUB_REF_NAME"
-          -f command=autopilot -f number=autopilot -f note="after run $GITHUB_RUN_ID"
+      # GitHub's API rejects a dispatch at times with a server error, so a failed dispatch is
+      # tried again after a pause. The job fails only when every try fails.
+      - run: |
+          for attempt in 1 2 3; do
+            if gh workflow run nexkit.yml --repo "$GITHUB_REPOSITORY" --ref "$GITHUB_REF_NAME" \
+              -f command=autopilot -f number=autopilot -f note="after run $GITHUB_RUN_ID"; then
+              exit 0
+            fi
+            if [ "$attempt" -lt 3 ]; then sleep 30; fi
+          done
+          exit 1
         env:
           GH_TOKEN: ${{ github.token }}
