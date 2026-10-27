@@ -11,8 +11,8 @@ The design follows [D74](../decisions/d74-a-visual-process-designer.md). The
 Design tab, the canvas, the existing step panels, remove, undo, Tab and Enter,
 the diagnostic marks and the live region for removals are _(built)_. The
 palette, the transitions and the live region for adds and transitions are
-_(built)_. The schema-driven type picker and the timer panel are _(built)_. The
-other panels of the new step types and the live region for moves are
+_(built)_. The schema-driven type picker, the timer panel and the sub-process panel
+are _(built)_. The other panels of the new step types and the live region for moves are
 _(planned for M14)_.
 
 - **Design tab** _(built)_. A process opens on a Design tab, next to its Form
@@ -116,9 +116,19 @@ _(planned for M14)_.
   Next step picker. Switching removes the other key and puts the chosen key,
   empty, in its place, and one Undo brings the old key back. A timer with
   neither key or both opens in Wait.
+- **Property panel (sub-process)** _(built)_. A sub-process card has a process
+  picker, then the child's inputs, then a Next step picker. A child with a
+  subject entity shows a `subject` expression editor, checked against the
+  parent process. Clearing it removes the key, because `subject` may be left
+  out when the child's entity is the parent's. A child without a subject shows
+  `MappingRows` with one row per child parameter, each mapped to an expression.
+  Picking a child of the other kind removes the key that no longer applies in
+  the same edit, so one Undo restores it. Picking a child without a subject
+  writes every child parameter, keeping a value the draft already holds for
+  that name. A child that is not in the names list changes only `process`.
 - **Property panel (other new step types)** _(planned for M14)_. The other new
-  step types and keys get panels too: wait for event, sub-process, `notify`,
-  and the escalations and deadline of a task.
+  step types and keys get panels too: wait for event, `notify`, and the
+  escalations and deadline of a task.
 - **Undo** _(built)_. The undo and redo of
   [D65](../decisions/d65-a-visual-page-designer-on-a-canvas-drawn-by-the-sites-widgets.md)
   cover every edit of a process on all three tabs, with 100 steps, cleared by
