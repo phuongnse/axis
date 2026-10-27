@@ -302,12 +302,12 @@ modeling of M15: files, money, labelled enum values, many-to-many, references
 from child rows, import and export. All of it is _(planned for M15)_. See
 [D81](decisions/d81-asset-management-as-the-fourth-sample-application.md).
 
-The folder exists now, with its data, security, pages, dashboard and the
-scenarios of its access rules. It is active in development, Compose and E2E.
-The import, attachment and maintenance scenarios and the last parts of the Studio
-journey stay planned: the sample's warranty reminder process and trigger, and the run of
-its scenarios from Studio. The journey already publishes the built application and uses
-its site to register, import and export assets.
+The folder exists now, with its data, security, pages, dashboard, warranty
+reminder and the scenarios of its access rules. It is active in development,
+Compose and E2E. The Studio journey builds the whole folder, compares it with
+the sample, runs its scenarios from Studio, publishes it and uses its site to
+register, import and export assets. Only the import, attachment and
+maintenance scenarios stay planned.
 
 ### Data
 
