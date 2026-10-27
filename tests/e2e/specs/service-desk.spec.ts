@@ -2,6 +2,7 @@ import { expect, test } from "../test";
 import type { APIRequest, APIRequestContext, Page } from "@playwright/test";
 import { csrfHeaders } from "../csrf";
 import { waitForDialog } from "../dialogs";
+import { fieldLabel } from "../fields";
 import { expectChosen, pickOption } from "../select";
 import { sessionFile, useSession, type SampleUser } from "../sessions";
 
@@ -109,7 +110,7 @@ test("anna submits a ticket, linh triages it to khoa, khoa resolves it, and anna
 
   await useSession(page, "anna");
   await page.goto(`/service-desk/ticketform/${id}`);
-  await expect(page.getByLabel("Title", { exact: true })).toHaveValue(title);
+  await expect(page.getByLabel(fieldLabel("Title"))).toHaveValue(title);
   // Submit shows on the last step only.
   await page.getByRole("button", { name: "Next", exact: true }).click();
   await page.getByRole("button", { name: "Submit", exact: true }).click();
@@ -117,20 +118,20 @@ test("anna submits a ticket, linh triages it to khoa, khoa resolves it, and anna
 
   await useSession(page, "linh");
   await openTask(page, title, "Triage ticket");
-  await expect(page.getByLabel("Title", { exact: true })).toHaveValue(title);
-  await page.getByLabel("Assigned agent", { exact: true }).fill("khoa");
+  await expect(page.getByLabel(fieldLabel("Title"))).toHaveValue(title);
+  await page.getByLabel(fieldLabel("Assigned agent")).fill("khoa");
   await page.getByRole("button", { name: "Assign", exact: true }).click();
   await expect(page).toHaveURL(/\/service-desk\/mytasks$/);
 
   await useSession(page, "khoa");
   await openTask(page, title, "Resolve ticket");
-  await page.getByLabel("Resolution", { exact: true }).fill("Replaced the battery.");
+  await page.getByLabel(fieldLabel("Resolution")).fill("Replaced the battery.");
   await page.getByRole("button", { name: "Resolve", exact: true }).click();
   await expect(page).toHaveURL(/\/service-desk\/mytasks$/);
 
   await useSession(page, "anna");
   await openTask(page, title, "Confirm resolution");
-  await expect(page.getByLabel("Resolution", { exact: true })).toHaveValue(
+  await expect(page.getByLabel(fieldLabel("Resolution"))).toHaveValue(
     "Replaced the battery.",
   );
   await page.getByRole("button", { name: "Confirm", exact: true }).click();
@@ -196,7 +197,7 @@ test("linh claims a triage task so nam no longer lists it, then reassigns it to 
   const dialog = await waitForDialog(page);
   await dialog.getByRole("radio", { name: "Person", exact: true }).check();
   await pickOption(dialog.getByRole("combobox"), "Khoa Agent", "Khoa");
-  await dialog.getByLabel("Reason", { exact: true }).fill("Khoa knows this printer.");
+  await dialog.getByLabel(fieldLabel("Reason")).fill("Khoa knows this printer.");
   // The page has a button with the same name, so the click stays in the dialog.
   await dialog.getByRole("button", { name: "Reassign", exact: true }).click();
   await expect(page).toHaveURL(/\/service-desk\/mytasks$/);
@@ -256,38 +257,38 @@ test("an agent cannot open a ticket that is assigned to another agent, by its fo
 test("the ticket form guides the requester through two steps", async ({ page }) => {
   await useSession(page, "anna");
   await page.goto("/service-desk/ticketform/new");
-  await expect(page.getByLabel("Title", { exact: true })).toBeVisible();
-  await expect(page.getByLabel("Description", { exact: true })).toBeVisible();
+  await expect(page.getByLabel(fieldLabel("Title"))).toBeVisible();
+  await expect(page.getByLabel(fieldLabel("Description"))).toBeVisible();
   await expect(page.getByRole("combobox", { name: "Status", exact: true })).toHaveCount(0);
   const steps = page.getByTestId("form-steps");
   await expect(steps).toContainText("Describe the problem");
   await expect(steps).toContainText("Add details");
 
-  await page.getByLabel("Title", { exact: true }).fill(`Zz Steps ${runId()}`);
+  await page.getByLabel(fieldLabel("Title")).fill(`Zz Steps ${runId()}`);
   await page.getByRole("button", { name: "Next", exact: true }).click();
   for (const name of ["Category", "Priority", "Status"]) {
-    const control = page.getByLabel(name, { exact: true });
+    const control = page.getByLabel(fieldLabel(name));
     await expect(control).toBeVisible();
     await expect(control).toBeEnabled();
   }
-  await expect(page.getByLabel("Title", { exact: true })).toHaveCount(0);
+  await expect(page.getByLabel(fieldLabel("Title"))).toHaveCount(0);
 });
 
 test("the ticket form shows the resolution, marked required, only while the status is resolved", async ({ page }) => {
   await useSession(page, "anna");
   await page.goto("/service-desk/ticketform/new");
-  await page.getByLabel("Title", { exact: true }).fill(`Zz Resolution ${runId()}`);
+  await page.getByLabel(fieldLabel("Title")).fill(`Zz Resolution ${runId()}`);
   await page.getByRole("button", { name: "Next", exact: true }).click();
 
   const status = page.getByRole("combobox", { name: "Status", exact: true });
   // The required mark is CSS content in the accessible name, as with the title.
-  const resolution = page.getByRole("textbox", { name: "* Resolution", exact: true });
+  const resolution = page.getByRole("textbox", { name: "Resolution", exact: true });
   await pickOption(status, "draft");
-  await expect(page.getByLabel("Resolution", { exact: true })).toBeHidden();
+  await expect(page.getByLabel(fieldLabel("Resolution"))).toBeHidden();
   await pickOption(status, "resolved");
   await expect(resolution).toBeVisible();
   await pickOption(status, "draft");
-  await expect(page.getByLabel("Resolution", { exact: true })).toBeHidden();
+  await expect(page.getByLabel(fieldLabel("Resolution"))).toBeHidden();
 });
 
 test("the service desk lead sees the open and urgent tiles and the chart by category on the Dashboard", async ({

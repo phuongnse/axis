@@ -82,10 +82,13 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
     marked, but the mark blocks nothing: the server still decides.
   - **Field look**. These rules are agreed in
     [D96](../decisions/d96-rules-from-the-design-system-review.md).
-    - _(planned)_ **Label.** A field label is weight 500 in `textMuted`, wherever a field
-      is labelled: on a form, on a detail and as a KPI's label.
-    - _(planned)_ **Required mark.** A required field has a `*` after its label, in
-      `dangerText`, and its input carries `aria-required`.
+    - **Label.** On a form, a field label is weight 500 in `textMuted`.
+      _(planned)_ The same on a detail and as a KPI's label.
+    - **Required mark.** A required field has a `*` after its label, in
+      `dangerText`. The mark is hidden from screen readers. An editable input
+      of a required field carries `aria-required`, and a read-only value does
+      not. Required means the form state answer's `required`, or else the
+      field's `required`.
     - _(planned)_ **Help text.** A field whose entity field has
       [`help`](resource-files.md#resource-file-shape) shows it between the
       label and the input, at 12px with a 20px line height in `textMuted`,
@@ -102,7 +105,7 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
       about 6px under its label, and the field keeps the height of an editable
       field. An empty value shows "Not set", see
       [shown values](frontend.md).
-    - **Values.** Dates, date-times and numbers follow the **Shown values**
+    - _(planned)_ **Values.** Dates, date-times and numbers follow the **Shown values**
       rules of [frontend.md](frontend.md). A date picker fills its column, as
       every other input does.
 

@@ -1,6 +1,7 @@
 import { expect, test } from '../test'
 import type { Page } from '@playwright/test'
 import { confirmDialog, waitForDialog } from '../dialogs'
+import { fieldLabel } from '../fields'
 import { expectChosen, pickOption } from '../select'
 import { journeyURL } from '../server-settings'
 import { useJourneySession } from '../sessions'
@@ -76,7 +77,7 @@ test.describe('the author builds an application from the request-approval templa
     await page.goto(`${journeyURL}/equipment-requests/myrequests`)
     await page.getByRole('button', { name: 'New', exact: true }).click()
     await expect(page).toHaveURL(/\/equipment-requests\/requestform\/new$/)
-    await page.getByRole('textbox', { name: '* Title', exact: true }).fill(title)
+    await page.getByRole('textbox', { name: 'Title', exact: true }).fill(title)
     await page.getByRole('textbox', { name: 'Description', exact: true }).fill('The current one is too slow.')
     // The requester's create grant only allows the status draft.
     await pickOption(page.getByRole('combobox', { name: 'Status', exact: true }), 'draft')
@@ -86,7 +87,7 @@ test.describe('the author builds an application from the request-approval templa
     await page.getByRole('row', { name: new RegExp(title) }).getByRole('button', { name: 'Open', exact: true }).click()
     await expect(page).toHaveURL(/\/equipment-requests\/requestform\/[^/]+$/)
     const id = page.url().split('/').pop()
-    await expect(page.getByRole('textbox', { name: '* Title', exact: true })).toHaveValue(title)
+    await expect(page.getByRole('textbox', { name: 'Title', exact: true })).toHaveValue(title)
     await page.getByRole('button', { name: 'Submit', exact: true }).click()
     await expect(page.getByTestId('form-started')).toBeVisible()
 
@@ -100,7 +101,7 @@ test.describe('the author builds an application from the request-approval templa
 
     await useJourneySession(page, 'minh')
     await openTask(page, title, 'Approval')
-    await page.getByLabel('Decision comment', { exact: true }).fill('Approved')
+    await page.getByLabel(fieldLabel('Decision comment')).fill('Approved')
     await page.getByRole('button', { name: 'Approve', exact: true }).click()
     await expect(page).toHaveURL(/\/equipment-requests\/mytasks$/)
 
