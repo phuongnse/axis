@@ -39,7 +39,7 @@ interface CellProps {
 
 /** A number cell keeps the text as typed, because `1.50` and `1.` are not the number the text stands for. */
 function NumberCell({ field, value, problem, onChange }: CellProps) {
-  const type = field.type as 'integer' | 'decimal'
+  const type = field.type === 'integer' ? 'integer' : 'decimal'
   const [text, setText] = useState(display(value))
 
   useEffect(() => {
@@ -73,6 +73,7 @@ export function FieldCell(props: CellProps) {
   switch (field.type) {
     case 'integer':
     case 'decimal':
+    case 'money':
       return <NumberCell {...props} />
     case 'boolean':
       return (

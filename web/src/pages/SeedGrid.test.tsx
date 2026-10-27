@@ -13,6 +13,7 @@ const fields: SeedField[] = [
   { name: 'code', type: 'text', required: true, maxLength: 20 },
   { name: 'size', type: 'integer' },
   { name: 'price', type: 'decimal', precision: 8, scale: 2 },
+  { name: 'cost', type: 'money' },
   { name: 'active', type: 'boolean' },
   { name: 'status', type: 'enum', values: ['Open', 'Closed'], required: true },
   { name: 'due', type: 'date' },
@@ -116,6 +117,8 @@ describe('SeedGrid', () => {
     expect(onChange).toHaveBeenLastCalledWith('/records/0/values/code', undefined)
     await userEvent.type(within(row).getByRole('textbox', { name: 'price' }), '1.5')
     expect(onChange).toHaveBeenLastCalledWith('/records/0/values/price', 1.5)
+    await userEvent.type(within(row).getByRole('textbox', { name: 'cost' }), '1500')
+    expect(onChange).toHaveBeenLastCalledWith('/records/0/values/cost', 1500)
     await userEvent.type(within(row).getByRole('textbox', { name: 'due' }), 'x')
     expect(onChange).toHaveBeenLastCalledWith('/records/0/values/due', 'x')
   })

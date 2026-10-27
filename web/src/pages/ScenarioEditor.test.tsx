@@ -29,6 +29,7 @@ const names: StudioNames = {
       fields: [
         { name: 'code', type: 'text', target: null, values: null },
         { name: 'size', type: 'integer', target: null, values: null },
+        { name: 'cost', type: 'money', target: null, values: null },
         { name: 'state', type: 'enum', target: null, values: ['draft', 'approved'] },
         { name: 'lines', type: 'child-collection', target: 'OrderLine', values: null },
       ],
@@ -322,6 +323,29 @@ describe.each(['light', 'dark'])('ScenarioEditor in %s mode', (mode) => {
 
     expect(screen.getByRole('textbox', { name: 'code' })).toHaveValue('A1')
     expect(screen.getByRole('textbox', { name: 'extra' })).toHaveValue('x')
+  })
+
+  it.each([
+    ['1500', 1500],
+    ['-1', -1],
+    ['12.5', 12.5],
+  ])('writes the number of a money value typed as %s', (text, next) => {
+    const { onChange } = renderEditor(
+      scenario([{ type: 'createRecord', entity: 'Order', as: 'author', values: { cost: 0 } }]),
+    )
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'cost' }), { target: { value: text } })
+
+    expect(onChange).toHaveBeenLastCalledWith('/steps/0/values/cost', next)
+  })
+
+  it('adds a money value with the starting number 0', async () => {
+    const { onChange } = renderEditor(scenario([{ type: 'createRecord', entity: 'Order', as: 'author', values: {} }]))
+
+    await userEvent.click(screen.getByRole('combobox', { name: 'Add value' }))
+    await userEvent.click(screen.getByRole('option', { name: 'cost' }))
+
+    expect(onChange).toHaveBeenCalledWith('/steps/0/values/cost', 0)
   })
 
   it('adds a value of an entity field with a starting value of its type', async () => {

@@ -42,6 +42,7 @@ function startValue(field: StudioNameField): unknown {
       return false
     case 'integer':
     case 'decimal':
+    case 'money':
       return 0
     default:
       return ''

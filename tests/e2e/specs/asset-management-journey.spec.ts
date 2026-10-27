@@ -5,7 +5,7 @@ import type { Locator, Page } from '@playwright/test'
 import { confirmDialog, waitForDialog } from '../dialogs'
 import { dragTo } from '../design-drag'
 import { compareApplicationFolders } from '../folder-comparison'
-import { pickOption } from '../select'
+import { pickAction, pickOption, pickOptions } from '../select'
 import { assetManagement, journeyApplications, journeyURL } from '../server-settings'
 import { useJourneySession } from '../sessions'
 import { createResource, openFormTab } from '../studio-resources'
@@ -22,10 +22,31 @@ interface SampleDataSource {
   aggregate?: { groupBy: string[]; measures: { name: string; function: string; field?: string }[] }
 }
 
+interface SampleScenario {
+  name: string
+  now: string
+  users: Record<string, string[]>
+  steps: Record<string, unknown>[]
+}
+
 interface SampleForm {
   entity: string
   sections: { name: string; title: { textKey: string }; fields: { field: string }[] }[]
 }
+
+const policies = [
+  'policies/asset-manager-access.json',
+  'policies/employee-access.json',
+  'policies/auditor-access.json',
+]
+
+const scenarios = [
+  ['AssetIsRegistered', 'scenarios/asset-is-registered.json'],
+  ['EmployeeCannotWriteAnAsset', 'scenarios/employee-cannot-write-an-asset.json'],
+  ['AuditorCannotWrite', 'scenarios/auditor-cannot-write.json'],
+  ['NegativeCostIsRefused', 'scenarios/negative-cost-is-refused.json'],
+  ['UserWithoutARoleIsDenied', 'scenarios/user-without-a-role-is-denied.json'],
+] as const
 
 const sixParts = (file: string) => file === 'application.json' || /^(roles|sequences|entities|seeds|texts)\//.test(file)
 
@@ -58,7 +79,10 @@ test.describe('the author builds the asset management application with Studio on
       await page.getByRole('button', { name: choice, exact: true }).click()
     }
     await expect(page.getByTestId('studio-saved')).toBeVisible()
-    await answer
+    const { diagnostics } = (await (await answer).json()) as {
+      diagnostics: { file: string; severity: string }[]
+    }
+    return diagnostics
   }
 
   async function expectForm(page: Page) {
@@ -78,6 +102,77 @@ test.describe('the author builds the asset management application with Studio on
     }).toPass({ timeout: 20_000 })
     await label.getByRole('button', { name: 'Write texts', exact: true }).click()
     await expect(label.getByTestId('studio-label-written')).toBeVisible()
+  }
+
+  async function grantIn(
+    page: Page,
+    role: string,
+    kind: string,
+    target: string,
+    grants: { actions: string[]; filter?: string }[],
+  ) {
+    const cell = page.getByTestId(`studio-matrix-cell-${role}-${kind}-${target}`)
+    await cell.click()
+    for (const [index, grant] of grants.entries()) {
+      await page.getByRole('button', { name: 'Add grant', exact: true }).click()
+      const own = page.getByTestId('studio-matrix-own-grant').nth(index)
+      for (const action of grant.actions) {
+        // The matrix ticks the box a moment after the click, which check() would report as no change.
+        const box = own.getByTestId('studio-matrix-actions').getByRole('checkbox', { name: action, exact: true })
+        await box.click()
+        await expect(box).toBeChecked()
+      }
+      if (grant.filter !== undefined) {
+        await expect(own.locator('.cm-editor')).toBeVisible()
+        await own.getByRole('textbox', { name: 'Record filter', exact: true }).fill(grant.filter)
+      }
+    }
+    await page.getByTestId('studio-matrix-own-grants').getByRole('button', { name: 'Save', exact: true }).click()
+    await expect(page.getByTestId('studio-matrix-saved')).toBeVisible()
+    // The matrix loads again after a save. A cell clicked before that could lose its new draft.
+    for (const action of grants.flatMap((grant) => grant.actions)) {
+      await expect(cell).toContainText(action)
+    }
+  }
+
+  async function writeScenarioStep(page: Page, index: number, step: Record<string, unknown>, enumFields: Set<string>) {
+    const at = `studio-field-/steps/${index}`
+    await pick(page, `${at}/type`, String(step.type))
+    for (const key of ['entity', 'record', 'as'] as const) {
+      if (key in step) {
+        await pick(page, `${at}/${key}`, String(step[key]))
+      }
+    }
+    if ('save' in step) {
+      await page.getByTestId(`${at}/save`).getByRole('textbox').fill(String(step.save))
+    }
+    if ('values' in step) {
+      for (const [key, value] of Object.entries(step.values as Record<string, unknown>)) {
+        await pickAction(
+          page.getByTestId(`${at}/values`).getByRole('combobox', { name: 'Add value', exact: true }),
+          key,
+          page.getByTestId(`${at}/values/${key}`),
+        )
+        if (enumFields.has(key)) {
+          await pick(page, `${at}/values/${key}`, String(value))
+        } else {
+          // A money box parses its text as a number, so the text of 1500 is `1500`.
+          await page.getByTestId(`${at}/values/${key}`).getByRole('textbox').fill(String(value))
+        }
+      }
+    }
+    if ('expect' in step) {
+      const expected = step.expect
+      if (typeof expected === 'string') {
+        await pick(page, `${at}/expect`, expected)
+      } else {
+        await pick(page, `${at}/expect`, 'invalid')
+        await page
+          .getByTestId(`${at}/expect`)
+          .getByRole('textbox', { name: 'invalid', exact: true })
+          .fill((expected as { invalid: string }).invalid)
+      }
+    }
   }
 
   async function texts(locale: string) {
@@ -796,5 +891,104 @@ test.describe('the author builds the asset management application with Studio on
     })
     // The sample has no Home page.
     expect(await readdir(path.join(built, 'pages'))).not.toContain('home.json')
+  })
+
+  test('the author builds the three access policies in the policy matrix', async ({ page }) => {
+    await useJourneySession(page, 'hoa')
+    await page.goto(`${journeyURL}/studio?app=AssetManagement`)
+    await page.getByText('Policy matrix', { exact: true }).click()
+
+    const entities = ['Asset', 'Category', 'Location', 'Vendor', 'Software']
+    const dataSources = ['AssetValueByLocation', 'AssetsByStatus', 'WarrantiesEndingSoon']
+    // The matrix appends each grant to the end of the policy, so the order here is the order of the sample.
+    for (const entity of entities) {
+      await grantIn(page, 'asset-manager', 'entity', entity, [
+        { actions: ['read', 'create', 'update', 'delete', 'export', 'import'] },
+      ])
+    }
+    for (const dataSource of dataSources) {
+      await grantIn(page, 'asset-manager', 'dataSource', dataSource, [{ actions: ['read', 'export'] }])
+    }
+
+    for (const entity of entities) {
+      await grantIn(
+        page,
+        'employee',
+        'entity',
+        entity,
+        [entity === 'Asset' ? { actions: ['read'], filter: 'holder == currentUser()' } : { actions: ['read'] }],
+      )
+    }
+
+    for (const entity of entities) {
+      await grantIn(page, 'auditor', 'entity', entity, [{ actions: ['read', 'export'] }])
+    }
+    for (const dataSource of dataSources) {
+      await grantIn(page, 'auditor', 'dataSource', dataSource, [{ actions: ['read', 'export'] }])
+    }
+
+    const cell = (role: string, entity: string) => page.getByTestId(`studio-matrix-cell-${role}-entity-${entity}`)
+    await expect(cell('auditor', 'Asset')).toContainText('export')
+    await expect(cell('auditor', 'Asset')).not.toContainText('import')
+    await expect(cell('asset-manager', 'Asset')).toContainText('export')
+    await expect(cell('asset-manager', 'Asset')).toContainText('import')
+    for (const entity of entities) {
+      await expect(cell('employee', entity)).not.toContainText('export')
+      await expect(cell('employee', entity)).not.toContainText('import')
+    }
+  })
+
+  for (const [name, file] of scenarios) {
+    test(`the author writes the ${name} scenario in the scenario editor`, async ({ page }) => {
+      await useJourneySession(page, 'hoa')
+      await page.goto(`${journeyURL}/studio?app=AssetManagement`)
+
+      await createResource(page, 'scenario', name)
+      await expect(page.getByTestId('studio-resource-details')).toContainText(file)
+      await expectForm(page)
+
+      const scenario = await sample<SampleScenario>(file)
+      const asset = await sample<{ fields: { name: string; type: string }[] }>('entities/asset.json')
+      const enumFields = new Set(asset.fields.filter((field) => field.type === 'enum').map((field) => field.name))
+
+      await page.getByTestId('studio-field-/now').getByRole('textbox').fill(scenario.now)
+      for (const [index, [user, roles]] of Object.entries(scenario.users).entries()) {
+        if (index > 0) {
+          await page.getByRole('button', { name: 'Add user', exact: true }).click()
+        }
+        const newRow = page.getByTestId(`studio-field-/users/${index === 0 ? 'author' : 'user1'}`)
+        const userId = newRow.getByRole('textbox', { name: 'User id', exact: true })
+        await userId.fill(user)
+        // The rename detaches this input, so Tab goes through the page keyboard rather than the locator.
+        await page.keyboard.press('Tab')
+        const row = page.getByTestId(`studio-field-/users/${user}`)
+        await expect(row).toBeVisible()
+        // A user without a role keeps the empty list the starter row has.
+        if (roles.length > 0) {
+          await pickOptions(row.getByRole('combobox', { name: 'Roles', exact: true }), roles)
+          for (const role of roles) {
+            await expect(row).toContainText(role)
+          }
+        }
+      }
+
+      for (const [index, step] of scenario.steps.entries()) {
+        if (index > 0) {
+          await page.getByRole('button', { name: 'Add step', exact: true }).click()
+        }
+        await writeScenarioStep(page, index, step, enumFields)
+      }
+
+      const diagnostics = await save(page)
+      const errors = diagnostics.filter((diagnostic) => diagnostic.file === file && diagnostic.severity === 'error')
+      expect(errors).toEqual([])
+      await expectForm(page)
+    })
+  }
+
+  test('the built policies and scenarios match the sample', async () => {
+    compareApplicationFolders(assetManagement, built, {
+      files: [...policies, ...scenarios.map(([, file]) => file)],
+    })
   })
 })
