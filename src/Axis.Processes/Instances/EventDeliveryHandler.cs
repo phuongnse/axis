@@ -47,6 +47,19 @@ namespace Axis.Processes.Instances;
 /// </summary>
 internal sealed partial class EventDeliveryHandler(ReleaseModelCache models, DeliverySettings settings, ILogger<EventDeliveryHandler> logger) : IDeliveryWorkItemHandler
 {
+    /// <summary>Lists the instances waiting on a record that were created at or before an occurrence was raised.</summary>
+    internal const string WaitingSql =
+        """
+        SELECT i.id, i.process_id, i.release_id, i.step, i.revision
+        FROM axis.process_instances i
+        WHERE i.application_id = @application
+          AND i.subject_entity_id = @entity
+          AND i.subject_id = @subject
+          AND i.state = @waiting
+          AND i.created_at <= (SELECT e.raised_at FROM axis.events e WHERE e.id = @event)
+        ORDER BY i.created_at, i.id
+        """;
+
     public string Kind => ProcessStarts.EventDeliverWorkItemKind;
 
     public async Task<WorkItemOutcome> ExecuteAsync(ClaimedWorkItem item, NpgsqlConnection connection, CancellationToken cancellationToken)
@@ -249,19 +262,7 @@ internal sealed partial class EventDeliveryHandler(ReleaseModelCache models, Del
     private async Task<IReadOnlyList<WaitingInstance>> FindWaitingAsync(WorkItemContext context, StoredEvent occurrence, CancellationToken cancellationToken)
     {
         List<WaitingInstance> candidates = [];
-        await using (var command = new NpgsqlCommand(
-            """
-            SELECT i.id, i.process_id, i.release_id, i.step, i.revision
-            FROM axis.process_instances i
-            WHERE i.application_id = @application
-              AND i.subject_entity_id = @entity
-              AND i.subject_id = @subject
-              AND i.state = @waiting
-              AND i.created_at <= (SELECT e.raised_at FROM axis.events e WHERE e.id = @event)
-            ORDER BY i.created_at, i.id
-            """,
-            context.Connection,
-            context.Transaction))
+        await using (var command = new NpgsqlCommand(WaitingSql, context.Connection, context.Transaction))
         {
             command.Parameters.AddWithValue("application", occurrence.ApplicationId);
             command.Parameters.AddWithValue("entity", occurrence.EntityId);

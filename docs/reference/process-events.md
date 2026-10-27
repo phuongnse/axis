@@ -267,7 +267,11 @@ makes a repeat after a crash do nothing. Every occurrence already gets an
 with no active release, still wakes its waiting instances. Step 1's early
 delete then happens only when there is no trigger and no waiting instance. A
 failed wake is not counted and does not become a dead letter: the item stays
-claimed and is tried again after its lease expires.
+claimed and is tried again after its lease expires. Delivering 100 occurrences
+that each wake one waiting instance, and running the steps they wake, finishes
+within 30 s, and `EventWakePerformanceTests` fails past that. The lookup for
+waiting instances reaches the instances of a record by an index and never reads
+the whole instance table.
 
 ## Event tables
 
