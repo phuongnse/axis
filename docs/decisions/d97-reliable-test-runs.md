@@ -4,7 +4,7 @@ Status: **Agreed**
 
 CI on `main` fails for a fault in Axis, not for the machine it ran on, and the
 slow suites take less wall time. The owner agreed these points on 2026-10-27.
-All but the point on motion hold now. That one is _(planned for M16)_. See
+All of it holds now. See
 [test runs and reports](../development.md#test-runs-and-reports) for the
 detail.
 

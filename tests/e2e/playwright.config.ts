@@ -50,6 +50,9 @@ export default defineConfig({
     // An action that cannot run fails fast and names its element, instead of waiting for the test timeout.
     actionTimeout: 15_000,
     trace: 'retain-on-failure',
+    // The SPA turns its animations off for this preference, so no step clicks during an opening animation or a
+    // fading overlay (D97). Every project inherits it.
+    reducedMotion: 'reduce',
   },
   projects: [
     // Signs the sample users in and saves their sessions. Journeys load them with useSession.
