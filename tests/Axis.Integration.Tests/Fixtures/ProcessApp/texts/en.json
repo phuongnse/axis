@@ -17,6 +17,7 @@
     "request.submit": "Submit",
     "role.reader": "Reader",
     "role.requester": "Requester",
+    "role.statusReader": "Status reader",
     "site.title": "Processes"
   }
 }

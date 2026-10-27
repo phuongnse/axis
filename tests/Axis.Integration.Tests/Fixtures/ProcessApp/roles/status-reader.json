@@ -1,0 +1,7 @@
+{
+  "id": "e3a1b7d4-52c8-4f06-9a1e-7b4d2c8f6a31",
+  "kind": "role",
+  "name": "status-reader",
+  "formatVersion": 1,
+  "label": { "textKey": "role.statusReader" }
+}

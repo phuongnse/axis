@@ -84,9 +84,11 @@ lists the instances of the process, whatever release they are pinned to.
     {
       "id": "0192f4a9-2d3e-7f40-8a1b-2c3d4e5f6a7b",
       "subjectId": "0192f4a7-3b1c-7e2d-9a4f-1c2d3e4f5a6b",
+      "subjectLabel": "Replace the worn carpet tiles",
       "state": "waiting",
       "step": "managerApproval",
       "releaseId": "0192f49a-1b2c-7d3e-8f40-5b6c7d8e9f01",
+      "releaseNumber": 3,
       "createdAt": "2026-10-10T02:05:00.123456Z",
       "endedAt": null
     }
@@ -99,15 +101,20 @@ lists the instances of the process, whatever release they are pinned to.
 
 - `step` is the step the instance runs next, or waits on. `endedAt` is `null`
   until the instance is `completed` or `failed`.
-- _(planned)_ Each item also has `subjectLabel` and `releaseNumber`, so the
+- Each item also has `subjectLabel` and `releaseNumber`, so the
   [process inspector widget](process-inspector-widget.md) shows no identifier
   ([D96](../decisions/d96-rules-from-the-design-system-review.md)).
   `subjectLabel` is the value of the subject record's display field, such as
-  `"Replace the worn carpet tiles"`. It is `null` for a process without a
-  subject and when the user may not read the display field. `releaseNumber`
-  is the number of the release the instance is pinned to in the
-  application's [release history](storage.md#release-history), such as `3`,
-  a JSON number, so the widget writes no API text of its own.
+  `"Replace the worn carpet tiles"`. It is `null` in these cases: the process
+  has no subject, the entity has no display field, the user's field grants on
+  the subject entity do not cover the display field, or the display field is
+  [sensitive](roles-and-policies.md#sensitive-fields) in the active release or in the release the
+  instance is pinned to. `releaseNumber` is the number of the release the
+  instance is pinned to in the application's
+  [release history](storage.md#release-history), such as `3`, a JSON number, so
+  the widget writes no API text of its own. It is `null` only for a release
+  with no row in the release history, such as an old release from before the
+  history existed. Both come from the one query that reads the page.
 
 ### Instance detail
 
