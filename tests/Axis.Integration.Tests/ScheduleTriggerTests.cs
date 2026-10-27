@@ -29,9 +29,6 @@ public sealed class ScheduleTriggerTests(ScheduleTriggerFixture fixture) : IClas
         ProcessStarts.TriggerScheduleWorkItemKind,
         ProcessStarts.TaskDeadlineWorkItemKind,
         ProcessStarts.ProcessResumeWorkItemKind,
-
-        // The handler counts a failed send but writes no dead letter yet, so it does not deliver in the marker's sense.
-        ProcessStarts.NotificationEmailWorkItemKind,
         ComputedBackfill.WorkItemKind,
         RecordImports.CommitWorkItemKind,
         RecordImports.CheckWorkItemKind,
@@ -445,7 +442,17 @@ public sealed class ScheduleTriggerTests(ScheduleTriggerFixture fixture) : IClas
     public async Task Every_worker_kind_is_classed_and_each_delivery_kind_dead_letters_after_one_failure_with_a_limit_of_one()
     {
         var tenant = fixture.Tenant("k");
-        var services = fixture.NewWorkerServices(deliveryAttempts: 1);
+
+        // A host that refuses connections makes every email fail.
+        var services = fixture.NewWorkerServices(
+            deliveryAttempts: 1,
+            new Dictionary<string, string?>
+            {
+                ["Email:Smtp:Host"] = "127.0.0.1",
+                ["Email:Smtp:Port"] = UnusedPort().ToString(CultureInfo.InvariantCulture),
+                ["Email:Smtp:UseTls"] = "false",
+                ["Email:From"] = "axis@example.test",
+            });
         var runner = services.GetRequiredService<WorkItemRunner>();
         var delivering = services.GetServices<IExternalWorkItemHandler>().OfType<IDeliveryWorkItemHandler>().Select(handler => handler.Kind).ToList();
 
@@ -474,6 +481,37 @@ public sealed class ScheduleTriggerTests(ScheduleTriggerFixture fixture) : IClas
                 {
                     await DropFailureAsync(tenant, "test_injected_event_delivery_failure");
                 }
+            },
+            [ProcessStarts.NotificationEmailWorkItemKind] = async () =>
+            {
+                var subjectId = await tenant.InsertRequestAsync(3000m, 2);
+                var instanceId = await tenant.StartAsync("Announce", subjectId, tenant.FirstReleaseId);
+                var emailId = Guid.CreateVersion7();
+                await tenant.ScalarAsync(
+                    """
+                    INSERT INTO axis.email_outbox (id, application_id, release_id, notification_id, step, address, subject, body, message_id, state)
+                    VALUES (@id, @application, @release, @notification, 'x', @address, 'Subject', 'Body', @messageId, 'pending')
+                    """,
+                    ("id", emailId),
+                    ("application", tenant.Model.Manifest.Id),
+                    ("release", tenant.FirstReleaseId),
+                    ("notification", Guid.NewGuid()),
+                    ("address", $"ops+{emailId:N}@example.test"),
+                    ("messageId", $"<{emailId:N}@axis.example.test>"));
+                await using (var connection = await tenant.DataSource.OpenConnectionAsync(CancellationToken))
+                {
+                    await WorkItemQueue.EnqueueAsync(
+                        connection,
+                        transaction: null,
+                        tenant.Tenant,
+                        ProcessStarts.NotificationEmailWorkItemKind,
+                        DateTimeOffset.UtcNow.AddMinutes(-1),
+                        CancellationToken,
+                        processInstanceId: instanceId,
+                        emailId: emailId);
+                }
+
+                await ScheduleTriggerFixture.RunUntilIdleAsync("k", runner, CancellationToken);
             },
             [ProcessStarts.TriggerFanOutWorkItemKind] = async () =>
             {
@@ -509,6 +547,13 @@ public sealed class ScheduleTriggerTests(ScheduleTriggerFixture fixture) : IClas
                 "SELECT count(*) FROM axis.dead_letters WHERE kind = @kind AND occurrence_at = @occurrence",
                 ("kind", ProcessStarts.TriggerFanOutWorkItemKind),
                 ("occurrence", occurrence)));
+    }
+
+    private static int UnusedPort()
+    {
+        using var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+        listener.Start();
+        return ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
     }
 
     /// <summary>Waits for the next hour when less than a minute of the current one is left, so that no hourly occurrence falls due while the test runs.</summary>

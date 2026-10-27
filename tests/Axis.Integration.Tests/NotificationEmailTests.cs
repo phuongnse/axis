@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Sockets;
 using Axis.Configuration.Model;
+using Axis.Processes.Instances;
 using Axis.Processes.Work;
 using Axis.Worker;
 using Microsoft.Extensions.Configuration;
@@ -155,6 +156,69 @@ public sealed class NotificationEmailTests(ProcessStepFixture fixture, MailpitFi
         Assert.Empty(await mailpit.MessagesToAsync(address, CancellationToken));
     }
 
+    [Fact]
+    public async Task Email_that_fails_the_limit_becomes_an_open_dead_letter_with_no_item_and_a_redeliver_queues_it_again_and_sends_it()
+    {
+        var address = UniqueAddress();
+        var (releaseId, model) = await NotifyMailApp.ActivateAsync(fixture, CancellationToken, address);
+        var (title, _, instanceId) = await StageAsync(releaseId, model, viProfile: false);
+        var email = Assert.Single(await EmailsAsync(title));
+        var id = ("id", (object)email.Id);
+        var target = ("id", (object)email.Id.ToString("D"));
+        var process = (Guid)(await fixture.ScalarAsync("SELECT process_id FROM axis.process_instances WHERE id = @id", ("id", instanceId)))!;
+        await using (var failing = Worker(
+            new LogCollector(),
+            [
+                ("Email:Smtp:Host", "127.0.0.1"),
+                ("Email:Smtp:Port", UnusedPort().ToString(System.Globalization.CultureInfo.InvariantCulture)),
+                ("Email:Smtp:UseTls", "false"),
+                ("Email:From", Sender),
+                ("Worker:DeliveryAttempts", "3"),
+            ]))
+        {
+            for (var run = 1; run <= 3; run++)
+            {
+                await fixture.ScalarAsync("UPDATE axis.process_work_items SET due_at = now() WHERE kind = 'notification.email' AND email_id = @id", id);
+                await RunUntilIdleAsync(failing);
+                Assert.Equal(run, await fixture.ScalarAsync("SELECT attempts FROM axis.delivery_failures WHERE kind = 'notification.email' AND target = @id", target));
+                Assert.Equal(
+                    run == 3 ? 1L : 0L,
+                    await fixture.CountAsync("SELECT count(*) FROM axis.dead_letters WHERE kind = 'notification.email' AND email_id = @id", id));
+            }
+        }
+
+        var deadLetterId = (Guid)(await fixture.ScalarAsync("SELECT id FROM axis.dead_letters WHERE kind = 'notification.email' AND email_id = @id AND state = 'open'", id))!;
+        Assert.Equal(
+            (model.Manifest.Id, process, instanceId, 3),
+            await DeadLetterAsync(deadLetterId));
+        var error = (string?)await fixture.ScalarAsync("SELECT last_error FROM axis.dead_letters WHERE id = @id", ("id", deadLetterId));
+        Assert.NotNull(error);
+        Assert.DoesNotContain('@', error);
+        Assert.Equal(0L, await ItemCountAsync([email.Id]));
+        Assert.Equal("pending", Assert.Single(await EmailsAsync(title)).State);
+
+        DeadLetterResult result;
+        await using (var connection = await fixture.DataSource.OpenConnectionAsync(CancellationToken))
+        await using (var transaction = await connection.BeginTransactionAsync(CancellationToken))
+        {
+            result = await DeadLetterCommand.RedeliverAsync(
+                connection, transaction, fixture.Tenant, model, releaseId, process, deadLetterId, "maria", "Maria", "The mail server is back.", CancellationToken);
+            await transaction.CommitAsync(CancellationToken);
+        }
+
+        Assert.Equal(DeadLetterOutcome.Settled, result.Outcome);
+        Assert.Equal("redelivered", (string?)await fixture.ScalarAsync("SELECT state FROM axis.dead_letters WHERE id = @id", ("id", deadLetterId)));
+        Assert.Equal(0L, await fixture.CountAsync("SELECT count(*) FROM axis.delivery_failures WHERE kind = 'notification.email' AND target = @id", target));
+        Assert.Equal(1L, await ItemCountAsync([email.Id], "AND due_at <= now() AND claim_token IS NULL"));
+
+        await using var worker = Worker(new LogCollector(), await MailpitSettingsAsync("Email"));
+        await RunUntilIdleAsync(worker);
+
+        Assert.Single(await mailpit.MessagesToAsync(address, CancellationToken));
+        Assert.Equal("sent", Assert.Single(await EmailsAsync(title)).State);
+        Assert.Equal(0L, await ItemCountAsync([email.Id]));
+    }
+
     private static string UniqueAddress() => $"ops+{Guid.NewGuid():N}@example.test";
 
     private static int UnusedPort()
@@ -227,6 +291,17 @@ public sealed class NotificationEmailTests(ProcessStepFixture fixture, MailpitFi
         await fixture.CountAsync(
             $"SELECT count(*) FROM axis.process_work_items WHERE kind = 'notification.email' AND email_id = ANY(@ids) {condition}",
             ("ids", emailIds.ToArray()));
+
+    /// <summary>The application, process, instance and attempts of a dead letter.</summary>
+    private async Task<(Guid ApplicationId, Guid ProcessId, Guid InstanceId, int Attempts)> DeadLetterAsync(Guid id)
+    {
+        await using var command = fixture.DataSource.CreateCommand(
+            "SELECT application_id, process_id, process_instance_id, attempts FROM axis.dead_letters WHERE id = @id");
+        command.Parameters.AddWithValue("id", id);
+        await using var reader = await command.ExecuteReaderAsync(CancellationToken);
+        Assert.True(await reader.ReadAsync(CancellationToken));
+        return (reader.GetGuid(0), reader.GetGuid(1), reader.GetGuid(2), reader.GetInt32(3));
+    }
 
     /// <summary>The outbox rows whose subject has <paramref name="title"/>, ordered by address.</summary>
     private async Task<IReadOnlyList<StagedEmail>> EmailsAsync(string title)

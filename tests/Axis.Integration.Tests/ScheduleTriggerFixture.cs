@@ -180,14 +180,20 @@ public sealed class ScheduleTriggerFixture : IAsyncLifetime
         NewWorkerServices(deliveryAttempts).GetRequiredService<WorkItemRunner>();
 
     /// <summary>Builds the services of a worker like <see cref="NewWorker"/>, so a test can read its handlers. The fixture disposes them.</summary>
-    internal ServiceProvider NewWorkerServices(int? deliveryAttempts = null)
+    internal ServiceProvider NewWorkerServices(int? deliveryAttempts = null, IReadOnlyDictionary<string, string?>? extraSettings = null)
     {
         var settings = _settings ?? throw new InvalidOperationException("The fixture is not initialized.");
+        var overrides = new Dictionary<string, string?>(extraSettings ?? new Dictionary<string, string?>());
         if (deliveryAttempts is { } attempts)
+        {
+            overrides["Worker:DeliveryAttempts"] = attempts.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        if (overrides.Count > 0)
         {
             settings = new ConfigurationBuilder()
                 .AddConfiguration(settings)
-                .AddInMemoryCollection(new Dictionary<string, string?> { ["Worker:DeliveryAttempts"] = attempts.ToString(System.Globalization.CultureInfo.InvariantCulture) })
+                .AddInMemoryCollection(overrides)
                 .Build();
         }
 
