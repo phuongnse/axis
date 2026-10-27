@@ -29,6 +29,14 @@ The states of each widget:
 | `detail`, `chart-<kind>`, `kpi` | with data, empty                                                       |
 | `columns`, `tabs`, `section`    | their nested layout                                                    |
 
+[D96](d96-rules-from-the-design-system-review.md) replaces the rows of
+`field-<type>`, `form`, `table` and `kpi`. A `field-<type>` preview draws
+Editable, Read-only, and Required, help text and error. `form` draws
+Validation errors, Read-only by a condition, Fields in columns, with errors,
+Wizard steps, and Many steps. `table` draws With data, Empty and Many row
+actions. `kpi` draws With data and Empty. The current states are in
+[widget previews](../development.md#widget-previews).
+
 _Why:_ a preview that draws only the typical case hides the empty list, the validation error and the
 read-only input, which are the pictures a design change most often breaks. Listing the states in the
 decision keeps each preview complete as widgets grow, and drawing loading and the load error once

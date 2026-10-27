@@ -35,7 +35,9 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   focusRing, each with a light and a dark value. The first five are seeds: they
   colour fills, icons and tints. The `*Text` tokens colour text in that state
   colour: state text, links, the selected tab, the active navigation entry and
-  form validation messages. `focusRing` colours the solid 2px keyboard focus of
+  form validation messages. _(planned)_ They also colour the current page of a
+  pagination, destructive menu entries and the text of text, outlined and
+  danger buttons, see **Buttons** below. `focusRing` colours the solid 2px keyboard focus of
   every control. Every text colour reaches 4.5:1 and every border and focus
   ring reaches 3:1 on surface and canvas, in both modes. The shadow group
   holds `overlay`, the only shadow: dialogs, menus, pickers and popovers cast
@@ -81,6 +83,67 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   and the custom widget API never name an icon, as the UI library bullet says
   ([D58](../decisions/d58-ant-design-is-a-detail-of-the-spa-without-procomponents.md)).
   A Vitest test fails on an `<svg>` element in a `.tsx` file under `web/src`.
+- **Buttons** _(planned)_. A button's level follows its role, so the same kind
+  of action always has the same style
+  ([D96](../decisions/d96-rules-from-the-design-system-review.md)).
+  - *Finish*: solid primary. The one action that finishes a task, such as Save
+    or Next, one per screen.
+  - *Main*: outlined in `primaryText`. The main action of a region: a table's
+    first toolbar action, such as New request, Add row of a child collection,
+    and a `startProcess` action on a form or a detail.
+  - *Secondary*: the default grey outline, such as Cancel and Import.
+  - *Icon*: a text button with only an icon, for small actions such as
+    Refresh, Choose and Clear.
+  - *Destructive*: in `dangerText` at any level, such as Remove row and
+    Delete.
+  - Ant Design writes the text of text, outlined and danger buttons in the
+    fill colours `primary` and `danger`, which fail contrast on a dark
+    surface, so Axis writes them in `primaryText` and `dangerText`. One shared
+    Axis button takes the role, and each widget names a role, never an Ant
+    Design button type.
+  - **Icon-only buttons.** Only for actions repeated on every row, or where
+    space is tight. Main toolbar actions keep their text. Every icon-only
+    button shows its name as a tooltip on hover and on keyboard focus, and has
+    the same text as its accessible name, from the text resources.
+    Configuration never names an icon, so the platform gives an icon only to
+    an action whose meaning it knows. At narrow width row actions fold into a
+    menu of text entries, so touch users lose nothing.
+- **Selected and current states** _(planned)_. The selected tab, the active
+  menu entry and the current page of a pagination use `primaryText`.
+  Destructive menu entries use `dangerText`.
+- **Shown values** _(planned)_. A value reads the same in every widget: in an
+  input, a read-only field, a table cell, a detail and a KPI
+  ([D96](../decisions/d96-rules-from-the-design-system-review.md)).
+  - **Dates and times.** One format per locale. A date is the locale's short
+    numeric date from `Intl`, such as 03/18/2026 in `en` and 18/03/2026 in
+    `vi`. A date-time is the date, then the time to the minute on the locale's
+    clock, such as `03/04/2026 4:30 PM` in `en` (12 hours, no leading zero) and
+    `04/03/2026 16:30` in `vi` (24 hours, two digits). There are no seconds.
+    `Intl`'s no-break spaces are written as plain spaces. The pickers use the
+    same pattern, so the input and the text agree.
+  - **Numbers.** Integers, decimals and money show in the locale's digit
+    grouping wherever they are read, such as 16,945.75 in `en` and 16.945,75
+    in `vi`, with a decimal's scale of digits. They are formatted from the
+    value's source text, so no digit is lost. An input shows the digits as
+    typed. In a table and a child collection numbers sit on the right, in
+    the header, the text and the input cells, in tabular figures. On a form
+    and a detail they sit on the left under their label. A number input that
+    takes the locale's decimal comma is not decided yet.
+  - **Booleans.** A read-only boolean shows Yes or No, the platform texts
+    `shell.table.yes` and `shell.table.no`.
+  - **Empty values.** A read-only field on a form or a detail shows the
+    platform text `shell.value.notSet` ("Not set", in `vi` "Chưa có") in muted
+    italics. A table cell, a child collection cell and a KPI show a muted
+    italic "—". A KPI's dash carries a visually hidden `shell.kpi.empty` ("No
+    value") for assistive technology. Words go where fields are read one by
+    one, a dash where values are read at a glance or compared. What tells an
+    empty value from a typed one is the styling, in which no value is ever
+    drawn, never the words.
+  - **No identifiers.** No widget ever shows a GUID to a user. Where a widget
+    has only an identifier to show today, such as a data source's file column,
+    a reference whose label the user may not read, a creator field and a
+    history entry without an actor name, what it shows instead is not decided
+    yet.
 - **How pages and widgets grow.** A page draws its whole tree of widgets.
   Containers show their widgets in file order and can nest. A form binds an entity
   or a `form` resource, which lays the entity's fields out in sections, and a
@@ -99,7 +162,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   are built. The `navigate` buttons on table rows, the table toolbar and saved
   forms are built. A table opens and creates records through them: the table's
   `formPage` link is removed; see [D63](../decisions/d63-navigate-actions-and-page-parameters.md).
-- **Container widgets.** `columns` stack below 768 px, `tabs` keep the
+- **Container widgets.** `columns` stack at narrow width, `tabs` keep the
   selected tab in `?tab=`, and a `section` can start collapsed. See
   [container widgets](container-widgets.md).
 - **Text.** All UI strings come from text resources.
@@ -482,6 +545,15 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   - **Columns.** There is one column per field, in declaration order. The
     header is the field's label, or the field name when it has no label. A
     child collection and a `references` field have no column.
+    - **Identifying column** _(planned)_. The column that names a row is the
+      entity's `displayField` when the table shows it, and otherwise the first
+      column. For a data source it is the first column. It comes first. With a
+      `navigate` row action it is the link that opens the row, see **Links**.
+    - **Layout** _(planned)_. Text, enum and reference columns are at most
+      320 px wide, and their text wraps. Every cell and the actions column
+      line up at the top, so a row with wrapped text reads along its first
+      line. Number columns sit on the right in tabular figures, see **Shown
+      values**.
   - **URL state.** Paging, sorting and search live in the URL as the record
     API's own `page`, `pageSize`, `sort` (`-` and the field name for
     descending) and `search`, so reload, sharing and the back button keep
@@ -491,6 +563,12 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     changes only its own four parameters and, for a data source, the
     parameter values described below: any other parameter, such as `x=1`,
     stays as it is.
+  - **Toolbar** _(planned)_. What changes the view sits on the left: the
+    search box and the filter inputs. On the right is a Refresh icon button,
+    named by the platform text `shell.table.refresh` ("Refresh", in `vi` "Làm
+    mới"), which loads the current page of rows again. Then come the secondary
+    actions, such as Import, and last the first toolbar action, as the table's
+    main action, see **Buttons**.
   - **Search.** A table whose rows can be searched shows a search box above
     the rows, on the left, with the toolbar buttons on the right. An entity
     table has one when the entity's display field is among the fields the
@@ -611,19 +689,21 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     sorts a reference by the stored id, which does not match the label people
     see, and cannot sort a file. Repeated clicks on a header sort ascending, then descending, then
     not at all.
-  - **Values.** Values are formatted for display and never changed:
+  - **Values.** Values are formatted for display and never changed. The rules
+    of **Shown values** above apply _(planned)_: a date-time to the minute, and
+    numbers in the locale's digit grouping.
 
     | Field type | Shown as |
     | --- | --- |
-    | `date-time` | date and time to the second in the UI locale and the browser's time zone. The fraction is dropped |
+    | `date-time` | date and time in the UI locale and the browser's time zone, to the second today and to the minute _(planned)_. The fraction is dropped |
     | `date` | the date in the UI locale, without a time-zone shift |
-    | `integer`, `decimal` | exactly as the API wrote them, right-aligned |
+    | `integer`, `decimal` | exactly as the API wrote them today, in the locale's digit grouping _(planned)_, right-aligned |
     | `money` | the amount with its currency in the UI locale, such as `$1,250.50` in `en` and `1.250.000 ₫` in `vi`, right-aligned. It shows the field's `scale` in decimal places, or more when the API wrote more, so it never rounds. The currency is `currency`, or the value of `currencyField` in the same row, or of `currencyColumn` in a data source row. Without a code of three letters it shows the number as the API wrote it |
     | `boolean` | a localized yes or no |
     | `reference` | the label from `labels` |
     | `text`, `enum` | the value. An enum with `valueLabels` shows the label |
     | `file` | the file's name as a download link to `downloadPath` and the file's id. A data source row holds a file as its bare id, so a data source column shows the id and no link |
-    | `null` | an empty cell |
+    | `null` | an empty cell today, a muted italic "—" _(planned)_. A group row of a data source stays blank |
 
   - **Number source text.** The SPA parses record responses with the source
     text of each JSON number, so `values` holds integers and decimals as
@@ -635,22 +715,32 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     number, so `1250.50` shows as `1250.5` there. The web unit tests need
     Node 22 or later for the same reason. The API never coerces a string to a
     number, so the [form widget](form-widget.md) sends numbers back as JSON numbers.
-  - **Links.** The table has no open link and no create button of its own. A
-    sample opens a record with a `rowActions` navigate with `record: id`, and
-    creates one with a `toolbarActions` navigate without `record`, still gated
-    by `access` `create`. Both pass the table's address, with its paging and
-    sorting, to the form in history state.
+  - **Links.** The table has no open link and no create button set apart from its
+    actions. A sample opens a record with a `rowActions` navigate with
+    `record: id`, and creates one with a `toolbarActions` navigate without
+    `record`, still gated by `access` `create`. Both pass the table's address,
+    with its paging and sorting, to the form in history state. _(planned)_ The
+    first `navigate` row action opens a row from its identifying column, which
+    is a link, and has no button of its own. The link has a real `href` when
+    the address is known at once, so Ctrl+click opens it in a new tab. A
+    reference path in the action, which is read on click, gives no `href`. An
+    action whose `visibleWhen` hides it leaves the cell as plain text.
   - **Row and toolbar actions.** See
     [D59](../decisions/d59-table-row-and-toolbar-actions.md). Page metadata
     lists the `navigate` actions in `rowActions` and `toolbarActions`,
     without those to pages the user cannot read, each with its `parameters`,
     `record`, `opensForm` and `paths`. It lists a `startProcess` in `rowActions` only
     with a `start` grant on its process. The `navigate` and `startProcess`
-    buttons, the `visibleWhen` condition, the delete button and the phone menu
+    buttons, the `visibleWhen` condition, the delete button and the narrow-width menu
     are built.
     - **Where.** Toolbar actions sit above the table. Row actions
-      are buttons in the row. Below 768 px, a row's actions fold into one
-      menu button labelled by the platform text `shell.table.rowActions`. A
+      are buttons in the row. At narrow width, a row's actions fold into one
+      menu button labelled by the platform text `shell.table.rowActions`.
+      _(planned)_ With one or two actions besides the open link, they show in
+      the row: a `delete` is a red trash icon named by its label, and any other
+      action a small text button. With three or more, or at narrow width, they
+      fold into one "…" icon button named `shell.table.rowActions`, which
+      opens a menu of text entries, a delete entry in `dangerText`. A
       `navigate` action may sit in either list. `startProcess` and `delete`
       are row actions only. A row of a data source acts on its root record,
       and a group row has no actions.
@@ -731,7 +821,8 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
       the generic platform error. The success and the failure messages show
       above the table.
     - **Import.** A table over an entity has an Import button next to its
-      toolbar actions only when `access.actions` holds `import`. Without it
+      toolbar actions only when `access.actions` holds `import`. It is a
+      secondary action, before the main action _(planned)_. Without it
       there is no button. The canvas draws it and opens nothing. A click opens
       a dialog with one file picker for a `.csv` or `.xlsx` file, a Check
       button and a Close button. Check sends `POST {entity}/imports` with the
@@ -794,7 +885,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
 - **Process inspector widget**. A page whose widget is a `processInspector` lists the instances of
   one process and opens one. See [process-inspector-widget.md](process-inspector-widget.md).
 - **Locale.** The shell header has a locale switch next to the light/dark
-  toggle, in the Menu panel at phone width. The chosen locale is kept in `localStorage` under `axis.locale`,
+  toggle, in the Menu panel at narrow width. The chosen locale is kept in `localStorage` under `axis.locale`,
   like the theme mode under `axis.themeMode`. One key serves every site: a site starts in the stored locale
   when it offers it, and in its default locale otherwise. The shell keeps the current texts until the chosen
   locale's texts have loaded. If they fail to load, it stays in the current
@@ -840,8 +931,12 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     catalog has the same keys, so the development rule never hides a
     platform text behind a site that lacks it.
 
-- **Phone width.** Below a fixed 768 px breakpoint, Ant Design's `md`, columns stack in file order, tab headers scroll and a row's
-  actions fold into one menu. Every platform table, including form line items and the reference lookup,
+- **Narrow width.** Axis has one layout breakpoint, at 992 px, Ant Design's `lg`, the smallest desktop
+  ([D96](../decisions/d96-rules-from-the-design-system-review.md)). Below it is narrow width: columns stack in file order, tab
+  headers scroll, a row's actions fold into one menu and the shell navigation collapses. Its value is one token in
+  `web/src/platform/designTokens.ts`, which the narrow-width hook and the design system read. Today the breakpoint is 768 px,
+  Ant Design's `md`, and the 992 px token is _(planned)_. Studio's page designer previews the narrow layout at 375 px, see
+  [Studio](studio.md). Every platform table, including form line items and the reference lookup,
   scrolls sideways inside its widget, so the page never does. The shell header keeps the site title, the
   account button and a **Menu** button (`shell.navigation.menu`) with `aria-expanded`. It opens a panel with
   the navigation, locale switch and theme toggle. Escape or following a link closes it, and Escape returns

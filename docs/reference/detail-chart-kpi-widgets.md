@@ -39,8 +39,17 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
     order. Every value is read-only and formatted as a table cell shows it. A
     `references` field shows its labels in order as tags, or a record's id where
     it has no label. The widget ignores `visibleWhen`, `requiredWhen`, `readOnlyWhen` and `steps`.
+  - **Layout** _(planned)_. The fields are a description list (`dl`, `dt`,
+    `dd`). Each label sits above its value, as a read-only form field reads,
+    with about 6px between them and `spacing-md` (16px) between fields. The
+    labels and the values follow the form widget's **Field look**, and an
+    empty value shows "Not set". The fields follow the form sections' widths,
+    see [fields in columns](form-widget.md). A label and its value are no
+    longer drawn side by side
+    ([D96](../decisions/d96-rules-from-the-design-system-review.md)).
   - **Actions.** A `startProcess` button follows the form widget's **Start
-    process action**, without a save first. A `navigate` action sees the
+    process action**, without a save first. It is the region's main action,
+    outlined at the *main* level of [buttons](frontend.md) _(planned)_. A `navigate` action sees the
     record's fields and `id`, as on a form
     ([D63](../decisions/d63-navigate-actions-and-page-parameters.md)).
 - **Chart widget**. A page whose widget is a `chart` draws
@@ -113,7 +122,7 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
   [D64](../decisions/d64-detail-chart-and-kpi-widgets.md).
 
   ```json
-  { "type": "kpi", "dataSource": "OpenTicketTotals", "measure": "openCount", "label": { "textKey": "dashboard.open.label" }, "comparison": { "measure": "urgentCount", "label": { "textKey": "dashboard.urgent.label" } }, "navigate": { "type": "navigate", "page": "AllTickets", "label": { "textKey": "dashboard.open.show" } } }
+  { "type": "kpi", "dataSource": "OpenTicketTotals", "measure": "openCount", "label": { "textKey": "dashboard.open.label" }, "comparison": { "measure": "openLastMonth", "label": { "textKey": "dashboard.open.lastMonth" } }, "navigate": { "type": "navigate", "page": "AllTickets", "label": { "textKey": "dashboard.open.show" } } }
   ```
 
   - **Compile.** The binding checks are in
@@ -133,7 +142,7 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
     "kpi": {
       "measure": "openCount",
       "labelKey": "dashboard.open.label",
-      "comparison": { "measure": "urgentCount", "labelKey": "dashboard.urgent.label" },
+      "comparison": { "measure": "openLastMonth", "labelKey": "dashboard.open.lastMonth" },
       "navigate": { "type": "navigate", "page": "AllTickets", "labelKey": "dashboard.open.show", "parameters": {}, "record": null, "opensForm": false, "paths": {}, "visibleWhen": null }
     }
     ```
@@ -151,6 +160,16 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
     is formatted as a table cell shows it, and a `null` measure shows a
     platform text for an empty value. The comparison is a second labelled
     value. The SPA computes no difference and no percentage.
+  - **Comparison.** A `comparison` is a reference for the same measure, such
+    as last month's total or a target. Two different metrics are two tiles
+    side by side in `columns`, at the same size.
+  - **Look** _(planned)_. The label sits above, in the field label style of
+    the form widget's **Field look**. The measure is below it, large: 24px at
+    a 32px line height, weight 600, in tabular figures. The comparison sits
+    under it at body size, with its label muted. An empty measure is a muted
+    "—" with a visually hidden `shell.kpi.empty`, see **Shown values** in
+    [frontend.md](frontend.md)
+    ([D96](../decisions/d96-rules-from-the-design-system-review.md)).
   - **Click and reading**. With a `navigate`, the tile is a link to the target
     page. The navigate label is the tile's last line, inside the link. The
     tile reads as `<label>: <value>`, and a comparison adds
