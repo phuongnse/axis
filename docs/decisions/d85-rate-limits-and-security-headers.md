@@ -13,11 +13,15 @@ for the detail. The owner agreed these points on 2026-10-25.
   - Content Security Policy: scripts only from the server's own origin, with
     no inline script and no `eval`. Styles from the own origin and inline,
     because the UI library writes `<style>` tags. No plugins, no `<base>`
-    other than the own origin, and no framing by other sites.
-  - HTTP Strict Transport Security, only when the request's scheme is `https`
+    at all (`base-uri 'none'`), and no framing by other sites.
+  - HTTP Strict Transport Security for one year, with `includeSubDomains`, only when the request's scheme is `https`
     after the forwarded headers of
     [D49](d49-several-server-replicas-behind-a-tls-proxy.md), and never in
-    Development.
+    Development. The ASVS sign-off
+    ([#1530](https://github.com/phuongnse/axis/issues/1530)) settled both
+    points.
+  - Every answer with a text, JSON or XML body names `charset=utf-8`, except
+    an attachment, which keeps the stored media type.
   - `X-Content-Type-Options: nosniff`,
     `Referrer-Policy: strict-origin-when-cross-origin`,
     `Cross-Origin-Opener-Policy: same-origin` and a `Permissions-Policy` that
@@ -43,8 +47,8 @@ for the detail. The owner agreed these points on 2026-10-25.
     `Retry-After`.
   - The limits are host settings under `RateLimits`, with defaults that the
     load test of [D82](d82-performance-slos-and-load-tests.md) never reaches.
-- **Tests:** an integration test checks the headers on a page, a static file
-  and an API response. Another sends requests past a limit and expects the
+- **Tests:** an integration test checks the headers and the `Content-Type` on a
+  page, a static file and an API response. Another sends requests past a limit and expects the
   `429`.
 - **Later milestones:** routes that M14, M15 and M17 add take a partition from
   the list above. File downloads and custom widget bundles must keep to the
@@ -54,5 +58,6 @@ _Why:_ headers stop whole classes of attack in the browser, such as framing,
 content sniffing and injected scripts, at no cost to the server. Setting them
 in the server means no install can forget them. A limit per replica needs no
 new store and still stops a single caller from exhausting a replica. The cost
-is that the limit grows with the replicas. Allowing inline styles keeps the UI
+is that the limit grows with the replicas. ASVS Level 2 needs
+`includeSubDomains` and `base-uri 'none'`, and the SPA uses no `<base>`. Allowing inline styles keeps the UI
 library working, and scripts, where the real risk lies, stay strict.
