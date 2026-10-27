@@ -44,6 +44,16 @@
       "group": "fast"
     },
     {
+      "name": "smoke",
+      "run": "scripts/smoke.sh",
+      "timeout_minutes": 30,
+      "slow": true,
+      "results": [
+        "artifacts/test-results"
+      ],
+      "group": "fast"
+    },
+    {
       "name": "integration",
       "run": "scripts/integration.sh",
       "timeout_minutes": 30,
@@ -173,6 +183,7 @@
       "test-results-e2e-3",
       "test-results-integration",
       "test-results-performance",
+      "test-results-smoke",
       "test-results-unit"
     ]
   },

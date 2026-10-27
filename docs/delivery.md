@@ -98,21 +98,21 @@ with the reasons. What each one does is in NexKit's
   merge by NexKit starts no `push` workflow. A run on `main` always finishes:
   a newer merge replaces only a run that is still waiting to start, so the
   next run tests both merges. On any other branch a newer push stops the older
-  run. CI runs the lint and unit tests, the integration tests and three
-  shards of the E2E tests as five parallel jobs, so a run takes as long as its
-  slowest job.
-- **The slow checks run in full only in NexKit's checks.** The integration and
-  E2E checks are marked `slow`. The test, integration and E2E checks name
+  run. CI runs the lint and unit tests, the smoke tests, the integration
+  tests and three shards of the E2E tests as six parallel jobs, so a run takes
+  as long as its slowest job.
+- **The slow checks run in full only in NexKit's checks.** The smoke, integration
+  and E2E checks are marked `slow`. The test, smoke, integration and E2E checks name
   their `results`: `artifacts/test-results`, and for E2E also `artifacts/logs`
   and the Playwright traces in `tests/e2e/test-results`. NexKit's
   [`evidence`][nexkit-evidence] setting names the CI workflow's
-  `test-results-e2e-1` to `test-results-e2e-3`, `test-results-integration`
-  and `test-results-unit` artifacts, which hold the Playwright traces and
+  `test-results-e2e-1` to `test-results-e2e-3`, `test-results-integration`,
+  `test-results-smoke` and `test-results-unit` artifacts, which hold the Playwright traces and
   `error-context.md` files, and the performance workflow's
   `test-results-performance`.
 - **NexKit's checks skip suites that a change cannot affect.** NexKit runs the
-  checks in three jobs at once, with `parallel_checks` on: the build, lint and
-  unit tests in one job, the group `fast`, and the integration and E2E tests
+  checks in three jobs at once, with `parallel_checks` on: the build, lint, unit
+  and smoke tests in one job, the group `fast`, and the integration and E2E tests
   each in their own. A check round then takes about as long as its slowest
   job, instead of all of them in a row, which took 20 to 50 minutes. Under
   NexKit's `NEXKIT_BASE_SHA`, a suite that no changed file can affect is
