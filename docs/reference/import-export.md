@@ -9,8 +9,8 @@ _(planned for M15)_ are not built yet, and Dn refers to
 
 Everything on this page is _(planned for M15)_, except the grants, the
 policy matrix, the export routes, the upload, dry run and commit of a CSV
-or `xlsx` import, and the Import button in the SPA, which are built. A commit only creates records. `key`
-matching and the file cleanup of an import are not built.
+or `xlsx` import with its `key` matching, and the Import button in the SPA, which are built. The file cleanup of
+an import is not built.
 
 ## Grants
 
@@ -97,8 +97,8 @@ matching and the file cleanup of an import are not built.
   `text/csv`, UTF-8, or the `xlsx` type
   `application/vnd.openxmlformats-officedocument.spreadsheetml.sheet` with no
   parameter. The import stores the format. An optional `?key=` names a unique
-  field of the entity, and nothing uses it until key matching is built, so a
-  commit creates every row. Only a signed-in user uploads, never
+  field of the entity, and the dry run and the commit match each row's key cell
+  with a record, see Each row. Only a signed-in user uploads, never
   a service account. The checks come in order: session `401`, the path `404`,
   `import` and `create` `403`, `update` `403` when there is a `key`, a `key`
   that is no unique field `400` at `key`, another content type `415`, and a
@@ -132,9 +132,15 @@ matching and the file cleanup of an import are not built.
   item per import. It parses every row and runs each through the record
   command's checks as the user who uploaded the file, without storing
   anything: parsing, field grants, defaults, computed fields and validations.
+  With a `key`, it also reads the record that each row's key cell matches, and
+  checks a matching row as a record API update: the `update` grant, its record
+  filters and its field lists, then parsing, computed fields and validations.
+  The body of an update leaves out the key column and the empty cells. A refused
+  update is keyed `/rows/{n}`, or `/rows/{n}/values/{field}` for a field outside
+  the grant. A file with a `key` and no column for it fails at `/columns`.
   It writes no record, no audit record and no sequence number. It reads
   storage only to look up the display values of reference cells, see
-  References. It does not check that a record id exists or that a unique value
+  References, and the records that keys match. It does not check that a record id exists or that a unique value
   is free, so a `checked` import can still fail at commit. The import becomes `checked`
   with no errors, or `failed` with every error keyed
   `/rows/{n}/values/{field}`, `n` counting data rows from 1. A failed import's
@@ -151,7 +157,7 @@ matching and the file cleanup of an import are not built.
   user only. Any other user, an unknown id and an import of another entity
   get `404`. The import is stored in `axis.record_imports`, see
   [storage](storage.md).
-- **Commit.** _(built for creates)_ Only the uploader of a `checked` import
+- **Commit.** Only the uploader of a `checked` import
   commits it. The checks come in order: session `401`, the path `404`, the
   user's current `import` and `create` grants `403`, then the import and its
   state. Another user's import and an unknown id are `404`. Any state other
@@ -166,13 +172,20 @@ matching and the file cleanup of an import are not built.
   dry run's errors are. The file is deleted when the commit ends. An import
   holds at most `Data:ImportMaxRows` rows, 10,000 by default, checked by the
   dry run.
-- **Each row.** _(built for creates)_ It goes through the record command as the
+- **Each row.** It goes through the record command as the
   user who uploaded the file, with the roles stored at upload. Field grants,
   record filters, validations, defaults, sequences, the creator field,
-  computed fields and audit records all apply. Until key matching is built,
-  every row creates a record, even with a `key`, so a row whose key is taken
-  fails the whole import on that unique value. Once it is built, with a `key`,
-  a row whose key matches a record updates it, and other rows create records.
+  computed fields and audit records all apply. With a `key`, a row whose key
+  cell matches a record the uploader may read updates it, and other rows create
+  records. A row with an empty key cell, with no match, or whose match the
+  uploader cannot read, creates a record, so a hidden record is never revealed.
+  A row whose key then matches a hidden record fails the commit on the taken
+  unique value. The commit updates a matched record at the version it reads in
+  its own transaction. The body of the update leaves out the key column and the
+  empty cells, so they never change the record. Two rows with the same key value
+  and no stored match both pass the dry run as creates. In the commit, the first
+  creates the record and the second updates it. A grant removed after the upload
+  fails the row as refused, and the import `failed`.
 - **References.** _(built)_ A reference column takes a record id, or the
   target's display value. A cell that is a record id is used as it is. Any
   other cell is looked up by an exact match on the target's display field, in
@@ -182,15 +195,15 @@ matching and the file cleanup of an import are not built.
   a label, see [security](security.md). Otherwise the cell is checked as a
   record id. A value that matches no record, or more than one, is an error at
   `/rows/{n}/values/{field}` that does not repeat the value.
-- **Triggers.** _(built for creates)_ Each created or updated record fires its
+- **Triggers.** Each created or updated record fires its
   data change triggers in the commit's transaction, as any record command
   write does.
 - **Not imported.** _(built)_ Child rows, `references` fields and files. A
   column that names a child collection, a `references` field or a file field
   is an error at `/columns/{n}`.
-- **Audit.** _(built for creates)_ A committed import writes `records.imported`
-  with the entity and the counts of created and updated records. The count of
-  updated records is 0 until key matching is built.
+- **Audit.** A committed import writes `records.imported`
+  with the entity and the counts of created and updated records. Each updated
+  record also has its own `record.updated` audit record by the uploader.
 - **Who sees it.** Only the user who uploaded an import reads it or commits
   it. The uploaded file is deleted when the import is committed, fails or is
   older than 24 hours.

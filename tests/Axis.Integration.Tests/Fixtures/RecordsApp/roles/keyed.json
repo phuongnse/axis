@@ -1,0 +1,9 @@
+{
+  "id": "60c791e8-fde7-43a8-a992-29bb8ab0ab58",
+  "kind": "role",
+  "name": "keyed",
+  "formatVersion": 1,
+  "label": {
+    "textKey": "role.keyed"
+  }
+}
