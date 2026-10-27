@@ -304,10 +304,10 @@ from child rows, import and export. Those parts are built. See
 
 The folder holds the data, security, pages, dashboard, five scenarios of its
 access rules, a warranty reminder process and its weekday trigger. It is active
-in development, Compose and E2E. The Studio journey publishes the application
-and uses its site to register, import and export assets. The import, attachment
-and maintenance scenarios, the warranty reminder in the journey and the run of
-the scenarios from Studio are _(planned for M16)_.
+in development, Compose and E2E. The Studio journey builds the whole folder,
+compares it with the sample, runs its scenarios from Studio, publishes it and
+uses its site to register, import and export assets. Only the import,
+attachment and maintenance scenarios are _(planned for M16)_.
 
 ### Data
 
@@ -371,7 +371,6 @@ SPA serves its bundle there. Texts are in `en` and `vi`.
 ### Built through Studio
 
 As for the service desk, the main Playwright journey builds the application
-with Studio only, compares it with the committed folder and publishes it. On
-the site, the asset manager registers an asset with an attachment and imports
-assets, and the auditor exports the register. The journey does not yet build
-the warranty reminder or run the scenarios from Studio, both _(planned for M16)_.
+with Studio only, compares it with the committed folder, runs its scenarios
+from Studio and publishes it. On the site, the asset manager registers an asset
+with an attachment and imports assets, and the auditor exports the register.

@@ -35,9 +35,8 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   focusRing, each with a light and a dark value. The first five are seeds: they
   colour fills, icons and tints. The `*Text` tokens colour text in that state
   colour: state text, links, the selected tab, the active navigation entry and
-  form validation messages. _(planned)_ They also colour the current page of a
-  pagination, destructive menu entries and the text of text, outlined and
-  danger buttons, see **Buttons** below. `focusRing` colours the solid 2px keyboard focus of
+  form validation messages, the current page of a pagination, destructive menu
+  entries and the text of outlined and danger buttons, see **Buttons** below. `focusRing` colours the solid 2px keyboard focus of
   every control. Every text colour reaches 4.5:1 and every border and focus
   ring reaches 3:1 on surface and canvas, in both modes. The shadow group
   holds `overlay`, the only shadow: dialogs, menus, pickers and popovers cast
@@ -92,32 +91,33 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   end-to-end step clicks during an opening animation, and a spec that proves a
   wait asks for motion again
   ([D97](../decisions/d97-reliable-test-runs.md)).
-- **Buttons** _(planned)_. A button's level follows its role, so the same kind
+- **Buttons**. A button's level follows its role, so the same kind
   of action always has the same style
   ([D96](../decisions/d96-rules-from-the-design-system-review.md)).
   - *Finish*: solid primary. The one action that finishes a task, such as Save
     or Next, one per screen.
   - *Main*: outlined in `primaryText`. The main action of a region: a table's
-    first toolbar action, such as New request, Add row of a child collection,
-    and a `startProcess` action on a form or a detail.
+    first toolbar action, such as New request _(planned)_, Add row of a child
+    collection _(planned)_, and a `startProcess` action on a form or a detail.
   - *Secondary*: the default grey outline, such as Cancel and Import.
   - *Icon*: a text button with only an icon, for small actions such as
-    Refresh, Choose and Clear.
+    Refresh, Choose and Clear _(planned)_.
   - *Destructive*: in `dangerText` at any level, such as Remove row and
-    Delete.
+    Delete _(planned)_.
   - Ant Design writes the text of text, outlined and danger buttons in the
     fill colours `primary` and `danger`, which fail contrast on a dark
     surface, so Axis writes them in `primaryText` and `dangerText`. One shared
-    Axis button takes the role, and each widget names a role, never an Ant
-    Design button type.
+    Axis button, `AxisButton` in `web/src/platform/`, takes the role, and each
+    widget names a role, never an Ant Design button type. The table's toolbar,
+    row action and field buttons _(planned)_ move to it in later parts.
   - **Icon-only buttons.** Only for actions repeated on every row, or where
     space is tight. Main toolbar actions keep their text. Every icon-only
     button shows its name as a tooltip on hover and on keyboard focus, and has
     the same text as its accessible name, from the text resources.
     Configuration never names an icon, so the platform gives an icon only to
     an action whose meaning it knows. At narrow width row actions fold into a
-    menu of text entries, so touch users lose nothing.
-- **Selected and current states** _(planned)_. The selected tab, the active
+    menu of text entries, so touch users lose nothing _(planned)_.
+- **Selected and current states**. The selected tab, the active
   menu entry and the current page of a pagination use `primaryText`.
   Destructive menu entries use `dangerText`.
 - **Shown values**. A value reads the same in every widget: in an

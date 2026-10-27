@@ -5,7 +5,7 @@
 // publisher runs in each tenant. It then starts a second server replica and a TLS proxy, signs anna in
 // through the proxy, and restarts the first replica. With Studio on, it saves a resource through one replica,
 // reads it back through the other, and checks that a stale save answers 409. Requires Docker and openssl, and the
-// sample modules in artifacts/modules (scripts/build.sh). Run from scripts/e2e.sh.
+// sample modules in artifacts/modules, which scripts/smoke.sh installs. Run from scripts/smoke.sh.
 //
 // Everything the test adds lives in an override file in a temporary folder: PostgreSQL, Keycloak over
 // HTTPS with a certificate authority made for the run, the modules folder and a short refresh interval.
@@ -513,7 +513,7 @@ describe('the on-premises installation', () => {
         Studio__AuthorRole: 'author',
       }
       delete env.AXIS_OIDC_CLIENT_SECRET
-      assert.ok(statSync(env.AXIS_MODULES_DIR).isDirectory(), 'run scripts/build.sh first: artifacts/modules is missing')
+      assert.ok(statSync(env.AXIS_MODULES_DIR).isDirectory(), 'run scripts/smoke.sh, which installs the sample modules: artifacts/modules is missing')
     },
     { timeout },
   )

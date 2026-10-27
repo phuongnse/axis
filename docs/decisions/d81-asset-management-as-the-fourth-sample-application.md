@@ -39,10 +39,9 @@ of the product brief for the data, security, pages and scenarios.
   trigger exist, and the reminder is sent in the site. Its email channel is
   planned for M14.
 - **Built through Studio:** a Playwright journey builds the application through
-  Studio only, compares its six parts with the committed folder, publishes it,
-  imports assets and exports the register on the site, as the service desk
-  journey does. The warranty reminder in that journey and running the scenarios
-  from Studio are _(planned for M16)_.
+  Studio only, compares its six parts with the committed folder, runs its
+  scenarios from Studio, publishes it, imports assets and exports the register
+  on the site, as the service desk journey does.
 
 _Why:_ the existing samples are two approvals and a service desk. A register
 with files, money, many-to-many, import and a dashboard is a shape none of
