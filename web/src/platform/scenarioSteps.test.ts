@@ -47,6 +47,11 @@ describe('changeStepType', () => {
   it('sets the type of a step that has none', () => {
     expect(changeStepType({}, 'advanceTime')).toEqual({ type: 'advanceTime' })
   })
+
+  it('drops the recipient and the channel when a notification step becomes a task expectation', () => {
+    const step = { type: 'expectNotification', recipient: { user: 'anna' }, channel: 'email', note: 'keep me' }
+    expect(changeStepType(step, 'expectTask')).toEqual({ type: 'expectTask', note: 'keep me' })
+  })
 })
 
 describe('record aliases and entities', () => {

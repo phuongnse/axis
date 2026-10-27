@@ -78,6 +78,12 @@ const fixtures: Record<StepType, Step> = {
   expectRecord: { type: 'expectRecord', record: 'order', values: { code: 'A1' } },
   expectInstance: { type: 'expectInstance', process: 'Approval', record: 'order', state: 'running', step: 'review' },
   expectTask: { type: 'expectTask', record: 'order', step: 'review', assignee: { user: 'author' } },
+  expectNotification: {
+    type: 'expectNotification',
+    recipient: { user: 'author' },
+    channel: 'email',
+    values: { title: 'Chairs' },
+  },
   advanceTime: { type: 'advanceTime', by: 'PT1H' },
 }
 
@@ -225,6 +231,14 @@ async function showAndEdit(
       expect(field).toHaveTextContent('author')
       await pick(panel, 'user', 'lan')
       return { path: 'assignee/user', next: 'lan' }
+    case 'recipient':
+      expect(field).toHaveTextContent('author')
+      await pick(panel, 'user', 'lan')
+      return { path: 'recipient/user', next: 'lan' }
+    case 'channel':
+      expect(field).toHaveTextContent('email')
+      await pick(panel, 'channel', 'inApp')
+      return { path: 'channel', next: 'inApp' }
     case 'save':
     case 'by': {
       const box = panel.getByRole('textbox', { name: property })
@@ -234,6 +248,12 @@ async function showAndEdit(
       return { path: property, next }
     }
     case 'values': {
+      if (type === 'expectNotification') {
+        const box = panel.getByRole('textbox', { name: 'title' })
+        expect(box).toHaveValue('Chairs')
+        fireEvent.change(box, { target: { value: 'Desks' } })
+        return { path: 'values/title', next: 'Desks' }
+      }
       const key = type === 'createRecord' || type === 'expectRecord' ? 'code' : 'size'
       const box = panel.getByRole('textbox', { name: key })
       expect(box).toHaveValue(String((fixture.values as Record<string, unknown>)[key]))
@@ -317,6 +337,41 @@ describe.each(['light', 'dark'])('ScenarioEditor in %s mode', (mode) => {
     await userEvent.click(screen.getByRole('option', { name: 'advanceTime' }))
 
     expect(onChange).toHaveBeenCalledWith('/steps/0', { type: 'advanceTime', note: 'keep me' })
+  })
+
+  it('switching a step to expectNotification drops as, record and expect', async () => {
+    const { onChange } = renderEditor(scenario([fixtures.completeTask]))
+
+    await userEvent.click(screen.getByRole('combobox', { name: 'Step type' }))
+    await userEvent.click(screen.getByRole('option', { name: 'expectNotification' }))
+
+    expect(onChange).toHaveBeenCalledWith('/steps/0', { type: 'expectNotification', values: { size: 1 } })
+  })
+
+  it('writes an expectNotification step with a recipient, a channel and a value', async () => {
+    const initial = scenario([])
+    const { onChange } = renderHarness(initial)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Add step' }))
+    const panel = within(screen.getByTestId('studio-field-/steps/0'))
+    await pick(panel, 'Step type', 'expectNotification')
+    await pick(panel, 'recipient kind', 'User')
+    await pick(panel, 'user', 'lan')
+    await pick(panel, 'channel', 'email')
+    await userEvent.click(panel.getByRole('button', { name: 'Add value' }))
+    const name = panel.getByRole('textbox', { name: 'Value name' })
+    await userEvent.clear(name)
+    await userEvent.type(name, 'title')
+    await userEvent.tab()
+    await userEvent.type(panel.getByRole('textbox', { name: 'title' }), 'Chairs')
+
+    const saved = onChange.mock.calls.reduce(
+      (draft, [pointer, next]) => setAt(draft, pointer, next),
+      initial as unknown,
+    ) as Record<string, unknown>
+    expect(saved.steps).toEqual([
+      { type: 'expectNotification', recipient: { user: 'lan' }, channel: 'email', values: { title: 'Chairs' } },
+    ])
   })
 
   it('keeps the unknown keys of the scenario, a stub and a step after edits to other properties', () => {

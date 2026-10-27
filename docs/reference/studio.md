@@ -691,6 +691,10 @@ Run and the Test results list, the read-only view of a module entity, and the re
       the entity does not name stays as a text row. A step whose entity is not
       in the folder edits its `values` as a JSON object, and the text is saved
       only when it is one.
+    - **Notifications.** An `expectNotification` step picks its recipient kind:
+      a user, a role or an email address. It picks a channel, `inApp`, `email`
+      or none, and none reads both channels. Its expected values are key and
+      value rows, like a stub's output.
   - **Seed editor** _(built)_. The Form tab shows the seed's name, entity and
     `sync`, then its records as a grid, with a row per record and a column per
     field of the seed's `entity`. The JSON view stays as a second view of the

@@ -1,36 +1,11 @@
 import { Button, Flex, Input, Select, Typography } from 'antd'
-import { useContext, useState } from 'react'
-import {
-  findNamed,
-  freshKey,
-  isObject,
-  literalText,
-  parseLiteral,
-  pointerSegment,
-  renameKey,
-} from '../platform/scenarioSteps'
+import { useContext } from 'react'
+import { findNamed, freshKey, isObject, pointerSegment, renameKey } from '../platform/scenarioSteps'
 import { StudioNamesContext } from '../platform/studioNames'
 import { useText } from '../platform/texts'
 import { ReferencePicker } from './ReferencePicker'
-import { Field, ScenarioStep } from './ScenarioStep'
+import { Field, KeyInput, KeyValueRows, ScenarioStep } from './ScenarioStep'
 import type { ChangeHandler } from './SchemaForm'
-
-/** An input for a key of the file. The key changes when the input loses focus, and a key that is taken or empty is refused. */
-function KeyInput({ name, value, onRename }: { name: string; value: string; onRename: (next: string) => boolean }) {
-  const [text, setText] = useState(value)
-  return (
-    <Input
-      aria-label={name}
-      value={text}
-      onChange={(event) => setText(event.target.value)}
-      onBlur={() => {
-        if (text !== value && !onRename(text)) {
-          setText(value)
-        }
-      }}
-    />
-  )
-}
 
 function StubCard({
   pointer,
@@ -121,39 +96,14 @@ function StubCard({
             />
           </Field>
           {result === 'output' && (
-            <Flex vertical gap="small">
-              {Object.keys(output).map((key) => (
-                <Flex key={key} gap="small">
-                  <KeyInput
-                    name={t('shell.studio.scenario.outputName')}
-                    value={key}
-                    onRename={(next) => {
-                      const renamed = renameKey(output, key, next)
-                      if (renamed === undefined) {
-                        return false
-                      }
-                      onChange(`${pointer}/output`, renamed)
-                      return true
-                    }}
-                  />
-                  <Input
-                    aria-label={key}
-                    value={literalText(output[key])}
-                    onChange={(event) =>
-                      onChange(`${pointer}/output/${pointerSegment(key)}`, parseLiteral(event.target.value))
-                    }
-                  />
-                  <Button onClick={() => onChange(`${pointer}/output/${pointerSegment(key)}`, undefined)}>
-                    {t('shell.studio.scenario.remove')}
-                  </Button>
-                </Flex>
-              ))}
-              <div>
-                <Button onClick={() => onChange(`${pointer}/output/${freshKey(output, 'output')}`, '')}>
-                  {t('shell.studio.scenario.addOutput')}
-                </Button>
-              </div>
-            </Flex>
+            <KeyValueRows
+              pointer={`${pointer}/output`}
+              values={output}
+              keyLabel={t('shell.studio.scenario.outputName')}
+              addLabel={t('shell.studio.scenario.addOutput')}
+              prefix="output"
+              onChange={onChange}
+            />
           )}
           <div>
             <Button onClick={() => onChange(pointer, undefined)}>{t('shell.studio.scenario.remove')}</Button>

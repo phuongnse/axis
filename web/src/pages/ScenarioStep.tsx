@@ -5,6 +5,7 @@ import type { StudioNameField } from '../platform/studio'
 import {
   changeStepType,
   findNamed,
+  freshKey,
   isObject,
   literalText,
   outcomeOptions,
@@ -14,6 +15,7 @@ import {
   processStepOptions,
   recordAliases,
   recordEntity,
+  renameKey,
   stateOptions,
   stepProperties,
   stepTypes,
@@ -56,6 +58,81 @@ export function Field({ pointer, name, children }: { pointer: string; name: stri
       <div>{name}</div>
       {children}
     </div>
+  )
+}
+
+/** An input for a key of the file. The key changes when the input loses focus, and a key that is taken or empty is refused. */
+export function KeyInput({
+  name,
+  value,
+  onRename,
+}: {
+  name: string
+  value: string
+  onRename: (next: string) => boolean
+}) {
+  const [text, setText] = useState(value)
+  return (
+    <Input
+      aria-label={name}
+      value={text}
+      onChange={(event) => setText(event.target.value)}
+      onBlur={() => {
+        if (text !== value && !onRename(text)) {
+          setText(value)
+        }
+      }}
+    />
+  )
+}
+
+/** Rows of a key and a value, each removable, with a button that adds a row under a fresh key. */
+export function KeyValueRows({
+  pointer,
+  values,
+  keyLabel,
+  addLabel,
+  prefix,
+  onChange,
+}: {
+  pointer: string
+  values: Record<string, unknown>
+  keyLabel: string
+  addLabel: string
+  prefix: string
+  onChange: ChangeHandler
+}) {
+  const t = useText()
+  return (
+    <Flex vertical gap="small">
+      {Object.keys(values).map((key) => (
+        <Flex key={key} gap="small">
+          <KeyInput
+            name={keyLabel}
+            value={key}
+            onRename={(next) => {
+              const renamed = renameKey(values, key, next)
+              if (renamed === undefined) {
+                return false
+              }
+              onChange(pointer, renamed)
+              return true
+            }}
+          />
+          <Input
+            aria-label={key}
+            value={literalText(values[key])}
+            onChange={(event) => onChange(`${pointer}/${pointerSegment(key)}`, parseLiteral(event.target.value))}
+          />
+          <Button onClick={() => onChange(`${pointer}/${pointerSegment(key)}`, undefined)}>
+            {t('shell.studio.scenario.remove')}
+          </Button>
+        </Flex>
+      ))}
+      <div>
+        <Button onClick={() => onChange(`${pointer}/${freshKey(values, prefix)}`, '')}>{addLabel}</Button>
+      </div>
+    </Flex>
   )
 }
 
@@ -135,6 +212,18 @@ export function ScenarioStep({
 
   function valuesControl(): ReactNode {
     const values = isObject(step.values) ? step.values : {}
+    if (type === 'expectNotification') {
+      return (
+        <KeyValueRows
+          pointer={at('values')}
+          values={values}
+          keyLabel={t('shell.studio.scenario.valueName')}
+          addLabel={t('shell.studio.scenario.addValue')}
+          prefix="value"
+          onChange={onChange}
+        />
+      )
+    }
     if (fields === undefined) {
       return <JsonValues key={`${index}-${type}`} pointer={pointer} values={step.values} onChange={onChange} />
     }
@@ -215,6 +304,58 @@ export function ScenarioStep({
           />
         )}
       </Flex>
+    )
+  }
+
+  function recipientControl(): ReactNode {
+    const recipient = isObject(step.recipient) ? step.recipient : undefined
+    const kind = (['role', 'user', 'email'] as const).find((key) => recipient?.[key] !== undefined)
+    const recipientText =
+      kind !== undefined && typeof recipient?.[kind] === 'string' ? (recipient[kind] as string) : undefined
+    return (
+      <Flex gap="small">
+        <Select
+          virtual={false}
+          aria-label="recipient kind"
+          value={kind ?? null}
+          style={{ minWidth: 120 }}
+          options={[
+            { value: 'user', label: t('shell.studio.scenario.assigneeUser') },
+            { value: 'role', label: t('shell.studio.scenario.assigneeRole') },
+            { value: 'email', label: t('shell.studio.scenario.recipientEmail') },
+          ]}
+          onChange={(next: string) => onChange(at('recipient'), { [next]: '' })}
+        />
+        {kind === 'email' && (
+          <Input
+            aria-label="email"
+            value={recipientText ?? ''}
+            onChange={(event) => onChange(at('recipient/email'), event.target.value)}
+          />
+        )}
+        {(kind === 'user' || kind === 'role') && (
+          <ReferencePicker
+            name={kind}
+            value={recipientText}
+            required
+            options={kind === 'role' ? roles : users}
+            onChange={(next) => onChange(at(`recipient/${kind}`), next ?? '')}
+          />
+        )}
+      </Flex>
+    )
+  }
+
+  function channelControl(): ReactNode {
+    return (
+      <Select
+        virtual={false}
+        aria-label="channel"
+        value={text('channel') ?? 'none'}
+        style={{ minWidth: 160 }}
+        options={['none', 'inApp', 'email'].map((option) => ({ value: option, label: option }))}
+        onChange={(next: string) => onChange(at('channel'), next === 'none' ? undefined : next)}
+      />
     )
   }
 
@@ -341,6 +482,10 @@ export function ScenarioStep({
         return valuesControl()
       case 'expect':
         return expectControl()
+      case 'recipient':
+        return recipientControl()
+      case 'channel':
+        return channelControl()
       case 'by':
         return (
           <Input
