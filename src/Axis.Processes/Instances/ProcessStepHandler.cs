@@ -29,7 +29,11 @@ namespace Axis.Processes.Instances;
 /// inside the transaction. A package operation step does the same with a <c>package.call</c> item,
 /// so no operation runs inside the transaction. A <c>timer</c> step leaves the instance <c>waiting</c>
 /// too and queues a <c>process.timer</c> item due at the time the timer waits for, with the revision the
-/// step left, and writes no audit record while it waits. An <c>updateRecord</c> step starts the data change
+/// step left, and writes no audit record while it waits. A <c>waitEvent</c> step takes the record's event lock,
+/// then goes on at once with the earliest occurrence of its event that names the subject record, was raised at or after the
+/// instance's creation, was not used before and passes its <c>when</c>, and records the use in
+/// <c>axis.process_event_matches</c>. With no such occurrence it leaves the instance <c>waiting</c>, writes no audit record, and
+/// queues a <c>process.timer</c> item due after its <c>timeout</c>, if it has one. An <c>updateRecord</c> step starts the data change
 /// triggers of the update after its <c>record.updated</c> audit. A <c>createRecord</c> step creates
 /// a record of another entity as <c>system</c>, through the rules of a record create, and starts the
 /// data change triggers of the create after its <c>record.created</c> audit. A <c>sync</c> trigger and a data
@@ -174,6 +178,14 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
                 await StartLock.TakeSharedAsync(context.Transaction, instance.ApplicationId, cancellationToken);
             }
 
+            if (step is WaitEventStepModel)
+            {
+                // The lock comes before the record read and before any write of the instance, so an
+                // occurrence that event delivery wakes the instance for cannot arrive between the
+                // search for a match and the move to waiting.
+                await RecordEventLock.TakeAsync(context.Transaction, subjectId, cancellationToken);
+            }
+
             if (step is OperationStepModel)
             {
                 // The lock makes the read below see the latest version, and a concurrent write of the
@@ -204,7 +216,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
 
             // The compiler rejects these steps in a process without a subject (AXC0246), so this only
             // guards against a broken release. It runs before any lock or record read.
-            if (step is OperationStepModel or RaiseEventStepModel or TaskStepModel)
+            if (step is OperationStepModel or RaiseEventStepModel or TaskStepModel or WaitEventStepModel)
             {
                 throw Failure($"The step '{step.Name}' needs a subject.", instance, input);
             }
@@ -228,6 +240,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
         JsonObject details;
         string? action;
         DateTimeOffset? timerDueAt = null;
+        Guid? matchedEventId = null;
         PendingChild? child = null;
         List<KeyValuePair<FieldModel, object?>>? assignments = null;
         NewTask? task = null;
@@ -473,6 +486,45 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
                 details = new JsonObject();
                 action = null;
                 break;
+            case WaitEventStepModel waitStep:
+                if (!process.TryGetStep(waitStep.Next, out var afterWait))
+                {
+                    throw Failure($"The process '{process.Name}' has no step '{waitStep.Next}'.", instance, input);
+                }
+
+                if (waitStep.Timeout is { } waitTimeout && !process.TryGetStep(waitTimeout.Next, out _))
+                {
+                    throw Failure($"The process '{process.Name}' has no step '{waitTimeout.Next}'.", instance, input);
+                }
+
+                var awaited = model.Events.FirstOrDefault(candidate => string.Equals(candidate.Name, waitStep.Event, StringComparison.OrdinalIgnoreCase))
+                    ?? throw Failure($"The release has no event '{waitStep.Event}'.", instance, input);
+                var matched = await FindMatchAsync(context, model, waitStep, awaited, instance, cancellationToken);
+                decision = null;
+                if (matched is not null)
+                {
+                    matchedEventId = matched.Id;
+                    state = ProcessStarts.Running;
+                    nextStep = afterWait.Name;
+                    output = new JsonObject { ["next"] = afterWait.Name, ["eventId"] = matched.Id };
+                    details = new JsonObject { ["step"] = step.Name, ["next"] = afterWait.Name };
+                    action = AuditActions.ProcessStepCompleted;
+                    break;
+                }
+
+                if (waitStep.Timeout is { } waitFor)
+                {
+                    timerDueAt = instance.Now + waitFor.After;
+                }
+
+                state = ProcessStarts.Waiting;
+                nextStep = step.Name;
+                output = new JsonObject { ["state"] = ProcessStarts.Waiting };
+
+                // Waiting for an event is not an audit action. The step's completion is written when it goes on.
+                details = new JsonObject();
+                action = null;
+                break;
             case SubProcessStepModel subStep:
                 if (!process.TryGetStep(subStep.Next, out _))
                 {
@@ -498,6 +550,11 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
             // The newer revision owns the instance now, so this item is discarded with no other write.
             LogStaleRevision(instance.Id, step.Name, instance.Revision);
             return;
+        }
+
+        if (matchedEventId is { } usedEventId)
+        {
+            await ProcessEvents.InsertMatchAsync(context.Transaction, instance.Id, usedEventId, step.Name, cancellationToken);
         }
 
         if (state == ProcessStarts.Completed)
@@ -943,6 +1000,39 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
         }
 
         return (Otherwise, step.Otherwise);
+    }
+
+    /// <summary>
+    /// Finds the earliest unused occurrence of the step's event about the subject record whose
+    /// <c>when</c> is true, or <see langword="null"/> when there is none. An occurrence whose
+    /// <c>when</c> is false or fails on its payload is no match, as a trigger skips it, and does not fail the step.
+    /// </summary>
+    private static async Task<StoredEvent?> FindMatchAsync(
+        WorkItemContext context,
+        ApplicationModel model,
+        WaitEventStepModel step,
+        EventModel awaited,
+        LoadedInstance instance,
+        CancellationToken cancellationToken)
+    {
+        var candidates = await ProcessEvents.FindUnmatchedAsync(
+            context.Transaction,
+            instance.Id,
+            instance.ApplicationId,
+            awaited.Entity.Id,
+            instance.SubjectId!.Value,
+            awaited.Name,
+            cancellationToken);
+        foreach (var candidate in candidates)
+        {
+            if (step.When is not { } when
+                || await EventTriggerStarts.EvaluateWhenAsync(context.Connection, model.TimeZone, awaited, candidate, when, cancellationToken) is null)
+            {
+                return candidate;
+            }
+        }
+
+        return null;
     }
 
     /// <summary>

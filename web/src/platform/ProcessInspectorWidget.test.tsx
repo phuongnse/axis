@@ -168,6 +168,22 @@ describe('ProcessInspectorWidget', () => {
     expect(within(waiting).getAllByRole('cell')[5]).toHaveTextContent(/^$/)
   })
 
+  it('shows "No subject" in the subject cell of an instance without a subject', async () => {
+    stubInstances(
+      JSON.stringify({
+        items: [{ ...JSON.parse(instancePage).items[0], subjectId: null }],
+        page: 1,
+        pageSize: 20,
+        totalCount: 1,
+      }),
+    )
+
+    renderWidget()
+
+    const row = await screen.findByRole('row', { name: /managerApproval/ })
+    expect(within(row).getByText('No subject')).toBeInTheDocument()
+  })
+
   it('sends the state in the URL to the instance list', async () => {
     const requests = stubInstances()
 

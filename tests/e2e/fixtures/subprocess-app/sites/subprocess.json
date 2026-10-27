@@ -1,0 +1,13 @@
+{
+  "id": "958ab77d-481e-4751-9a5d-d7e0c4a9f8f9",
+  "kind": "site",
+  "name": "SubprocessSite",
+  "formatVersion": 1,
+  "path": "subprocess",
+  "title": { "textKey": "site.title" },
+  "locales": { "default": "en", "fallback": "en", "available": ["en"] },
+  "navigation": [
+    { "page": "Parents", "label": { "textKey": "nav.parents" } },
+    { "page": "Children", "label": { "textKey": "nav.children" } }
+  ]
+}

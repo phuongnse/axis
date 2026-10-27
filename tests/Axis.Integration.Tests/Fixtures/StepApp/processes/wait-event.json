@@ -1,0 +1,20 @@
+{
+  "id": "e7a3c5d1-2b84-4f96-a0d3-9c1e6b7f4a58",
+  "kind": "process",
+  "name": "WaitEvent",
+  "formatVersion": 1,
+  "entity": "Request",
+  "start": "await",
+  "steps": [
+    {
+      "name": "await",
+      "type": "waitEvent",
+      "event": "RequestNoted",
+      "when": "ratio > 1",
+      "timeout": { "after": "PT1H", "next": "timedOut" },
+      "next": "done"
+    },
+    { "name": "done", "type": "end" },
+    { "name": "timedOut", "type": "end" }
+  ]
+}

@@ -5,7 +5,7 @@ namespace Axis.Processes.Storage;
 
 /// <summary>
 /// The processes module's tables in a tenant database: the process instances, the history of
-/// their steps, their human tasks, their staged connector calls, the attempts and lookups of those calls and of package calls, the events they raised, the in-app notifications they stored and their read marks, the receipts of starts and of
+/// their steps, their human tasks, their staged connector calls, the attempts and lookups of those calls and of package calls, the events they raised and the occurrences their <c>waitEvent</c> steps used, the in-app notifications they stored and their read marks, the receipts of starts and of
 /// endpoint calls that carried an <c>Idempotency-Key</c>, the receipts of trigger starts, the counted failures of deliveries and their dead letters, the state of schedule triggers, and the work that workers claim and run. The caller supplies the connection to the tenant database.
 /// </summary>
 public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> options) : DbContext(options)
@@ -31,6 +31,8 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
     public DbSet<ProcessCallAttemptRow> CallAttempts => Set<ProcessCallAttemptRow>();
 
     public DbSet<EventRow> Events => Set<EventRow>();
+
+    public DbSet<ProcessEventMatchRow> EventMatches => Set<ProcessEventMatchRow>();
 
     public DbSet<NotificationRow> Notifications => Set<NotificationRow>();
 
@@ -259,10 +261,36 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
             @event.Property(e => e.ProcessInstanceId).HasColumnName("process_instance_id");
             @event.Property(e => e.RaisedAt).HasColumnName("raised_at").HasDefaultValueSql("now()");
             @event.HasIndex(e => e.ProcessInstanceId).HasDatabaseName("ix_events_process_instance_id");
+
+            // A waitEvent step looks for the earliest unused occurrence about its record.
+            @event.HasIndex(e => new { e.SubjectId, e.RaisedAt }).HasDatabaseName("ix_events_subject_id_raised_at");
             @event.HasOne<ProcessInstanceRow>()
                 .WithMany()
                 .HasForeignKey(e => e.ProcessInstanceId)
                 .HasConstraintName("fk_events_process_instances_process_instance_id")
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<ProcessEventMatchRow>(match =>
+        {
+            match.ToTable("process_event_matches");
+
+            // One use of an occurrence per instance.
+            match.HasKey(m => new { m.ProcessInstanceId, m.EventId }).HasName("pk_process_event_matches");
+            match.Property(m => m.ProcessInstanceId).HasColumnName("process_instance_id");
+            match.Property(m => m.EventId).HasColumnName("event_id");
+            match.Property(m => m.Step).HasColumnName("step");
+            match.Property(m => m.MatchedAt).HasColumnName("matched_at").HasDefaultValueSql("now()");
+            match.HasIndex(m => m.EventId).HasDatabaseName("ix_process_event_matches_event_id");
+            match.HasOne<ProcessInstanceRow>()
+                .WithMany()
+                .HasForeignKey(m => m.ProcessInstanceId)
+                .HasConstraintName("fk_process_event_matches_process_instances_process_instance_id")
+                .OnDelete(DeleteBehavior.Restrict);
+            match.HasOne<EventRow>()
+                .WithMany()
+                .HasForeignKey(m => m.EventId)
+                .HasConstraintName("fk_process_event_matches_events_event_id")
                 .OnDelete(DeleteBehavior.Restrict);
         });
 

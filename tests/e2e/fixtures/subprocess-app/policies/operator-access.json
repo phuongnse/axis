@@ -1,0 +1,11 @@
+{
+  "id": "4fdeb09f-a51c-4d21-a052-25b44f0a265d",
+  "kind": "policy",
+  "name": "OperatorAccess",
+  "formatVersion": 1,
+  "roles": ["operator"],
+  "grants": [
+    { "process": "ParentJob", "actions": ["start", "inspect"] },
+    { "process": "ChildJob", "actions": ["inspect"] }
+  ]
+}

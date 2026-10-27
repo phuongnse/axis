@@ -122,7 +122,7 @@ internal static class EventTriggerStarts
     /// active release's event. Returns why it is not true, or <see langword="null"/> when it is. A
     /// payload value that does not fit its type counts as a run-time error.
     /// </summary>
-    private static async Task<string?> EvaluateWhenAsync(
+    internal static async Task<string?> EvaluateWhenAsync(
         NpgsqlConnection connection,
         TimeZoneInfo timeZone,
         EventModel @event,

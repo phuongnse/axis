@@ -31,7 +31,7 @@ public sealed class RecordImportRow
     /// <summary><c>csv</c> or <c>xlsx</c>, which picks the reader that reads the file.</summary>
     public required string Format { get; init; }
 
-    /// <summary>The uploaded file, or null once a failed dry run has cleared it.</summary>
+    /// <summary>The uploaded file, or null once a failed dry run, a commit or the 24-hour cleanup has cleared it.</summary>
     public byte[]? File { get; init; }
 
     /// <summary>The errors of the dry run as a JSON object of JSON Pointer to messages, or null when there are none.</summary>

@@ -1,0 +1,8 @@
+{
+  "id": "f34fd890-dbdd-4896-a503-fa86bd664bc9",
+  "kind": "page",
+  "name": "Children",
+  "formatVersion": 1,
+  "title": { "textKey": "pages.children.title" },
+  "widgets": [{ "type": "processInspector", "process": "ChildJob" }]
+}

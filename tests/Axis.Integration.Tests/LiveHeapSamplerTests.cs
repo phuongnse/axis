@@ -16,7 +16,7 @@ public sealed class LiveHeapSamplerTests
     [Fact]
     public void Garbage_that_is_not_collected_yet_does_not_count_as_heap_growth()
     {
-        var baseline = LiveHeapSampler.Measure();
+        var baseline = GC.GetTotalMemory(true);
 
         // The region keeps the collector from running, so the garbage stays on the heap.
         Assert.True(GC.TryStartNoGCRegion(160L * 1024 * 1024));
@@ -31,28 +31,26 @@ public sealed class LiveHeapSamplerTests
 
         Assert.True(GC.GetTotalMemory(false) - baseline >= Limit, "A reading without a collection should still see the garbage.");
 
-        var sampler = new LiveHeapSampler(baseline);
-        var peak = sampler.Stop();
+        // The region has ended, but the garbage is still on the heap until the sampler's first collection.
+        var growth = new LiveHeapSampler().Stop();
 
-        Assert.True(peak - baseline < Limit, $"The sampler reported {peak - baseline:N0} bytes of growth for garbage.");
+        Assert.True(growth < Limit, $"The sampler reported {growth:N0} bytes of growth for garbage.");
     }
 
     [Fact]
     public void Memory_that_is_held_counts_as_heap_growth()
     {
-        var baseline = LiveHeapSampler.Measure();
+        var sampler = new LiveHeapSampler();
         var held = new List<byte[]>();
         for (var allocated = 0L; allocated < Allocated; allocated += ChunkSize)
         {
             held.Add(new byte[ChunkSize]);
         }
 
-        var sampler = new LiveHeapSampler(baseline);
-        Thread.Sleep(50);
-        var peak = sampler.Stop();
+        var growth = sampler.Stop();
         GC.KeepAlive(held);
 
-        Assert.True(peak - baseline >= Limit, $"The sampler reported {peak - baseline:N0} bytes of growth for held memory.");
+        Assert.True(growth >= Limit, $"The sampler reported {growth:N0} bytes of growth for held memory.");
     }
 
     /// <summary>Allocates about 80 MB that nothing references afterwards.</summary>

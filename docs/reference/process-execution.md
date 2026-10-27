@@ -40,7 +40,8 @@ _(planned for Mx)_ are not built yet, and Dn refers to [decisions.md](../decisio
   needs no running worker. One that waits on a connector call has the call's
   `connector.call` item, and one that waits on a package call has its
   `package.call` item, and one that waits on a timer has its `process.timer`
-  item. A task decision is accepted while no worker runs: it
+  item. One that waits on a `waitEvent` step with a `timeout` has its
+  `process.timer` item too. A task decision is accepted while no worker runs: it
   queues the next step's work item. The next worker to start runs that step. A step that
   a worker never committed leaves no trace, and the worker that claims it after
   the lease runs it once.
@@ -49,7 +50,7 @@ _(planned for Mx)_ are not built yet, and Dn refers to [decisions.md](../decisio
 
 ### Running a step
 
-The worker runs the `decision`, `task`, `operation`, `subProcess`, `end` and `timer` steps. A
+The worker runs the `decision`, `task`, `operation`, `subProcess`, `end`, `timer` and `waitEvent` steps. A
 `callConnector` operation step stages its call, and a `connector.call` item
 sends it, see [Staging and the call](#staging-and-the-call). A package
 operation step stages its call, and a `package.call` item runs it, see
@@ -59,6 +60,9 @@ A `notify` operation step stores its in-app notification and stages its
 emails, see [Notify operation](notifications.md#notify-operation).
 A `timer` step sets the instance `waiting`, and a `process.timer` item resumes
 it, see [Timer step](process-flow.md#timer-step).
+A `waitEvent` step goes on with an earlier occurrence of its event or sets the
+instance `waiting`, and a `process.timer` item resumes it at its timeout, see
+[Wait for event step](process-flow.md#wait-for-event-step).
 A `task.deadline` item expires the task of a task step that has a `deadline`,
 and a `task.escalate` item runs one of its `escalations`, see
 [task deadlines](task-deadlines.md#escalations-and-deadline).
@@ -67,8 +71,8 @@ resumes the parent when the child completes, see
 [Sub-process step](process-flow.md#sub-process-step).
 A `notify` step queues a `notification.email` item for each email, and that
 item sends it, see [email](notifications.md#email).
-_(Planned for M14)_ The worker also runs `waitEvent` steps. See
-[process flow](process-flow.md), [task deadlines](task-deadlines.md) and
+_(Planned for M14)_ Waking a waiting `waitEvent` step when an event is
+delivered. See [process flow](process-flow.md), [task deadlines](task-deadlines.md) and
 [notifications](notifications.md).
 Each work item of kind `process.step` runs the current step of its instance in
 one transaction:
@@ -81,7 +85,10 @@ one transaction:
    operation first locks the subject record's row, so it reads the latest
    stored version, and a user's write of the same record waits until the
    step's transaction ends. A `callConnector`, `raiseEvent`, `createRecord` or `notify`
-   step only reads the record, so it takes no lock on it. An `updateRecord`,
+   step only reads the record, so it takes no lock on it. A `waitEvent` step takes
+   an advisory lock keyed on the subject record before it reads the record, and
+   holds it until the transaction ends. It does not lock the record's row.
+   An `updateRecord`,
    `raiseEvent` or `createRecord` step takes the application's start lock
    shared first, since it can start an instance. A `createRecord` step in a
    process without a subject takes it too.
@@ -131,6 +138,12 @@ one transaction:
      plus `wait`. One with an `until` evaluates it on the record. An `until`
      that gives `null` or a run-time error fails the step. The instance becomes
      `waiting` on the step.
+   - A **`waitEvent`** step looks for the earliest unused occurrence of its
+     event about the record, raised at or after the instance's creation, whose
+     `when` is true. A `when` that is false or fails at run time is no match.
+     With a match, it records the use in `axis.process_event_matches` and the
+     instance stays `running` on its `next` step. Without one, the instance
+     becomes `waiting` on the step.
    - An **end** step sets the instance to `completed` with its `ended_at` time.
 
    `now()` in any of these expressions, a task's `assignee.user` included,
@@ -202,7 +215,10 @@ one transaction:
      with details `{ "step", "next" }`.
    - A task step writes `task.created` with details `{ "step", "taskId" }`.
    - A `timer` step writes no audit record while it waits. No audit action
-     fits waiting for a time. Its resume writes `process.stepCompleted`.
+     fits waiting for a time. Its resume writes `process.stepCompleted`. A
+     `waitEvent` step writes `process.stepCompleted` with details
+     `{ "step", "next" }` when it goes on with a match, and no audit record
+     while it waits.
    - A `callConnector` step writes `connector.callStaged` with details
      `{ "step", "connector", "operation", "operationId" }`.
    - A package operation step writes `operation.staged` with details
@@ -213,13 +229,15 @@ one transaction:
    the instance waits for the task. A `callConnector` step inserts a
    `connector.call` item for its call instead, and a package operation step
    inserts a `package.call` item. A `timer` step inserts a `process.timer`
-   item due at the time of the timer, with the `revision` the step left.
+   item due at the time of the timer, with the `revision` the step left. A
+   `waitEvent` step that waits and has a `timeout` inserts one due at the
+   step's time plus `after`.
 
 Each work item of kind `process.timer` resumes one instance in one
 transaction. It loads the instance and resumes it only while it is `waiting` on
-a `timer` step at the item's `revision`. The instance then becomes `running`
-on the step's `next`, with the next revision. The item writes the history row
-`{ "next" }`, the audit record `process.stepCompleted` with details
+a `timer` step, or on a `waitEvent` step with a `timeout`, at the item's `revision`. The instance then becomes `running`
+on the timer's `next`, or the `waitEvent` step's `timeout.next`, with the next revision. The item writes the history row
+`{ "next" }`, or `{ "next", "timeout": true }` for a timeout, the audit record `process.stepCompleted` with details
 `{ "step", "next" }` and the work item of the next step. An item whose instance
 moved on, was cancelled or is missing is deleted with no other write. A
 `process.timer` item that throws is rolled back, and a following transaction
@@ -765,6 +783,12 @@ uploaded more than 24 hours ago, see
 [storage and clean-up](file-fields.md#storage-and-clean-up). A database without
 the files table yet is skipped. Any other failure is logged as a warning and
 does not hold back the tenant's work items.
+
+The worker also clears the files of the imports of each ready tenant that were
+uploaded more than 24 hours ago, on the same cadence with its own timer and its
+own clock, and keeps the imports, see [import](import-export.md#import). A
+database without the table yet is skipped. Any other failure is logged as a
+warning and does not hold back the tenant's work items.
 
 The worker also deletes the in-app notifications of each ready tenant that are
 older than `Notifications:RetentionDays`, with their read rows in one

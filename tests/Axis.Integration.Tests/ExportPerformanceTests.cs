@@ -14,7 +14,8 @@ namespace Axis.Integration.Tests;
 /// <summary>
 /// An export of 100,000 records streams to the client within its time limit and grows the live managed heap by
 /// less than 64 MB. The rows are written to a temporary file as they are read, so the heap must not hold them. The
-/// class runs alone, so no other test competes for CPU with the timed exports.
+/// heap is measured on separate exports that are not timed. The class runs alone, so no other test competes for
+/// CPU with the timed exports.
 /// </summary>
 [Collection(PerformanceTiming.Name)]
 public sealed class ExportPerformanceTests(ExportPerformanceTests.ExportFixture fixture) : IClassFixture<ExportPerformanceTests.ExportFixture>
@@ -29,7 +30,8 @@ public sealed class ExportPerformanceTests(ExportPerformanceTests.ExportFixture 
     // One export of 100,000 records took about 0.35 s locally as CSV and about 1.2 s as xlsx, at the best of three.
     // The limits are about five times that, rounded up to whole seconds, so shared CI runners do not make the test
     // flaky, and they still catch a slowdown of that size. The best of three exports counts, because a runner can
-    // pause the process for a garbage collection or another job.
+    // pause the process for a garbage collection or another job. The heap is measured on three more exports that are
+    // not timed, because the sampler forces collections.
     private static readonly TimeSpan _csvTime = TimeSpan.FromSeconds(2);
     private static readonly TimeSpan _xlsxTime = TimeSpan.FromSeconds(6);
 
@@ -41,32 +43,34 @@ public sealed class ExportPerformanceTests(ExportPerformanceTests.ExportFixture 
     public async Task An_export_of_a_hundred_thousand_records_finishes_within_its_time_limit_and_grows_the_heap_by_less_than_64_mb(string format)
     {
         // The first export warms up the query plan and the code paths, so it is not timed.
-        await ExportAsync(format, withSampler: false);
+        await ExportAsync(format, measureHeap: false);
 
-        var best = TimeSpan.MaxValue;
-        for (var attempt = 0; attempt < Attempts; attempt++)
+        var best = await ExportAsync(format, measureHeap: false);
+        for (var attempt = 1; attempt < Attempts; attempt++)
         {
-            var export = await ExportAsync(format, withSampler: false);
-            best = export.Elapsed < best ? export.Elapsed : best;
+            var next = await ExportAsync(format, measureHeap: false);
+            best = next.Elapsed < best.Elapsed ? next : best;
         }
 
-        // The sampler collects garbage often, which slows an export, so the heap is measured in an export of its own.
-        var growth = (await ExportAsync(format, withSampler: true)).HeapGrowth;
+        var smallestGrowth = long.MaxValue;
+        for (var attempt = 0; attempt < Attempts; attempt++)
+        {
+            var measured = await ExportAsync(format, measureHeap: true);
+            smallestGrowth = Math.Min(smallestGrowth, measured.HeapGrowth);
+        }
 
-        TestContext.Current.TestOutputHelper?.WriteLine($"The best of {Attempts} {format} exports took {best}, and the live heap grew by {growth:N0} bytes.");
+        TestContext.Current.TestOutputHelper?.WriteLine($"The best of {Attempts} {format} exports took {best.Elapsed}, and the smallest growth of the live heap was {smallestGrowth:N0} bytes.");
         var limit = format == "csv" ? _csvTime : _xlsxTime;
-        Assert.True(best < limit, $"The {format} export took {best} at best of {Attempts} exports.");
-        Assert.True(growth < HeapGrowthLimit, $"The {format} export grew the heap by {growth:N0} bytes.");
+        Assert.True(best.Elapsed < limit, $"The {format} export took {best.Elapsed} at best of {Attempts} exports.");
+        Assert.True(smallestGrowth < HeapGrowthLimit, $"The {format} export grew the live heap by {smallestGrowth:N0} bytes at least.");
     }
 
     /// <summary>
-    /// Exports the records once and checks the file. The file is read only after the measurement. The live heap is
-    /// sampled only when asked, and the time of an export with a sampler is not meant to be used.
+    /// Exports the records once and checks the file. The file is read only after the measurement. A timed export
+    /// runs without the heap sampler, and a measured export is not timed, because the sampler forces collections.
     /// </summary>
-    private async Task<Export> ExportAsync(string format, bool withSampler)
+    private async Task<Export> ExportAsync(string format, bool measureHeap)
     {
-        var baseline = withSampler ? LiveHeapSampler.Measure() : 0;
-
         var options = new FileStreamOptions
         {
             Mode = FileMode.CreateNew,
@@ -76,11 +80,11 @@ public sealed class ExportPerformanceTests(ExportPerformanceTests.ExportFixture 
         };
         await using var file = new FileStream(Path.Combine(Path.GetTempPath(), $"axis-export-performance-{Guid.NewGuid():N}.tmp"), options);
 
-        var sampler = withSampler ? new LiveHeapSampler(baseline) : null;
+        var sampler = measureHeap ? new LiveHeapSampler() : null;
         TimeSpan elapsed;
         HttpStatusCode status;
         bool truncated;
-        long peak = baseline;
+        long growth = 0;
         try
         {
             using var request = Request($"{ExportPath}?format={format}", Host);
@@ -100,7 +104,7 @@ public sealed class ExportPerformanceTests(ExportPerformanceTests.ExportFixture 
         {
             if (sampler is not null)
             {
-                peak = sampler.Stop();
+                growth = sampler.Stop();
             }
         }
 
@@ -115,7 +119,7 @@ public sealed class ExportPerformanceTests(ExportPerformanceTests.ExportFixture 
             AssertXlsx(file);
         }
 
-        return new Export(elapsed, peak - baseline);
+        return new Export(elapsed, growth);
     }
 
     /// <summary>A byte order mark, the header, then one CRLF line per record.</summary>

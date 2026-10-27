@@ -3,8 +3,9 @@ import path from 'node:path'
 
 const repoRoot = path.resolve(import.meta.dirname, '..', '..')
 
-// The server compiles and activates all five applications in the tenant when it starts: the generic test
-// application, the purchase request sample, the leave request sample, the service desk sample and the asset management sample.
+// The server compiles and activates all six applications in the tenant when it starts: the generic test
+// application, the purchase request sample, the leave request sample, the service desk sample, the asset management sample
+// and the sub-process fixture.
 export const e2eApp = path.resolve(import.meta.dirname, 'fixtures', 'e2e-app')
 export const purchaseRequests = path.resolve(repoRoot, 'samples', 'apps', 'purchase-requests')
 export const leaveRequests = path.resolve(repoRoot, 'samples', 'apps', 'leave-requests')
@@ -12,6 +13,8 @@ export const leaveRequests = path.resolve(repoRoot, 'samples', 'apps', 'leave-re
 export const journeyBase = path.resolve(import.meta.dirname, 'fixtures', 'journey-base')
 export const serviceDesk = path.resolve(repoRoot, 'samples', 'apps', 'service-desk')
 export const assetManagement = path.resolve(repoRoot, 'samples', 'apps', 'asset-management')
+/** A parent process that starts a child sub-process that waits on a 24-hour timer. Neither has a subject. */
+export const subprocessApp = path.resolve(import.meta.dirname, 'fixtures', 'subprocess-app')
 export const extensionsPath = path.resolve(repoRoot, 'artifacts', 'extensions')
 export const modulesPath = path.resolve(repoRoot, 'artifacts', 'modules')
 export const templatesPath = path.resolve(repoRoot, 'artifacts', 'templates')
@@ -75,7 +78,7 @@ export function previewURL(baseURL: string): string {
 
 /**
  * The environment of a server that listens at `baseURL`. Only the applications to activate are left to the
- * caller: the E2E server activates four, and the activation helper one.
+ * caller: the E2E server activates six, and the activation helper one.
  */
 export function serverEnv(baseURL: string): Record<string, string> {
   return {
