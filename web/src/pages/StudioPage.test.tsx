@@ -731,7 +731,7 @@ describe('StudioPage', () => {
       const field = await screen.findByTestId('studio-field-/fields/0/type')
       await waitFor(() => expect(scrollIntoView).toHaveBeenCalledWith({ block: 'center' }))
       expect(scrollIntoView.mock.contexts).toEqual([field])
-      expect(screen.getByRole('tab', { name: 'Form' })).toHaveAttribute('aria-selected', 'true')
+      await waitFor(() => expect(screen.getByRole('tab', { name: 'Form' })).toHaveAttribute('aria-selected', 'true'))
     } finally {
       delete (Element.prototype as Partial<Element>).scrollIntoView
     }
