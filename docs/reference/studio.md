@@ -863,9 +863,13 @@ Run and the Test results list, the read-only view of a module entity, and the re
     removing an action selects its widget. The button runs nothing: it does not
     navigate, start a process, open a delete confirmation or call `/api/apps/`.
     A KPI's navigate action is a link-style button on the label line, and the
-    tile is not a link. At phone width, a table's row actions fold into a menu
+    tile is not a link. At narrow width, a table's row actions fold into a menu
     that the canvas cannot open, because it cancels the click. There the author
-    selects a row action from the tree and the panel.
+    selects a row action from the tree and the panel. _(planned)_ A table's
+    first `navigate` row action draws as the link of its identifying column,
+    which selects the action as a button does. Three or more other row actions
+    fold into the "…" menu at any width, and are selected the same way, see
+    [frontend](frontend.md).
   - **Palette.** It lists the ten widget types. The author drags one onto the
     canvas, or picks one and inserts it after the selected widget or into the
     selected container. A type is disabled, with the reason, when the page
@@ -918,8 +922,8 @@ Run and the Test results list, the read-only view of a module entity, and the re
     takes the first measure. A measure has no label, so a chart and a KPI start
     with empty text keys and draw as placeholders until the author writes them.
   - **Width switch.** It draws the canvas at desktop width, which fills the
-    canvas area, or at phone width, which is 375 px. At phone width the columns
-    stack to full width and tables use their phone layout, even in a wide
+    canvas area, or at narrow width, which it draws at 375 px. At narrow width the columns
+    stack to full width and tables use their narrow layout, even in a wide
     browser window. The choice goes back to desktop when the author returns to
     the Design tab. The live site keeps its own rule, which is the window width.
   - **Undo.** Undo and redo buttons, Ctrl+Z and Ctrl+Shift+Z, or Cmd on macOS,

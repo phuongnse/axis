@@ -21,6 +21,12 @@ included. The owner confirmed these points on issue #932 on 2026-10-21.
 - **Audit:** a delete writes an audit record, as the record API does today.
 - **Layout:** toolbar actions sit next to the create button. Row actions show
   as buttons and fold into a menu at phone width.
+  - [D96](d96-rules-from-the-design-system-review.md) replaces this point:
+    the first `navigate` row action opens a row from its identifying column,
+    which is a link, and has no button. A delete is a red trash icon. With
+    three or more other actions, or at narrow width, they fold into one "…"
+    menu. The toolbar's first action is its main action and sits last, after
+    Refresh and the secondary actions.
 - **Running process:** a delete of a record that a running process holds is
   refused with `409`.
 - **Bulk actions:** actions on selected rows come after M12. M12 acts on one

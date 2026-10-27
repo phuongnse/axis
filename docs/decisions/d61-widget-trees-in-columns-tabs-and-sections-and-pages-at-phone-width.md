@@ -34,6 +34,9 @@ of it is built.
   columns stack in file order, tab headers scroll, tables scroll sideways
   inside their widget and the site shell's navigation collapses into a menu.
   There is no per-widget setting until a sample needs one.
+  - [D96](d96-rules-from-the-design-system-review.md) replaces this point:
+    the one breakpoint is 992 px, Ant Design's `lg`, and below it is narrow
+    width, where row actions also fold into a menu. Its value is one token.
 - **Studio:** the page editor shows the tree, with add, remove, reorder and
   move into a container, and one panel per container type, as
   [D53](d53-typed-editors-and-the-process-graph-in-studio.md) set out.

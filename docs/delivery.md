@@ -24,8 +24,8 @@ profiles' models, are not copied here. Look them up where they live.
 - **The local agent session** works for the owner when the owner asks. It
   writes issues and their order, checks whether a milestone is ready and
   breaks it down, proposes changes to
-  the NexKit settings as hand-made pull requests, and publishes the Design
-  System artifact in Claude from the repository, as
+  the NexKit settings as hand-made pull requests, runs design reviews and
+  publishes the Design System artifact in Claude from the repository, as
   [Design changes](#design-changes) describes. Its runbooks are the
   [`axis-nexkit` skill](../.claude/skills/axis-nexkit/SKILL.md) and the
   [`axis-design` skill](../.claude/skills/axis-design/SKILL.md). It does not
@@ -115,8 +115,9 @@ with the reasons. What each one does is in NexKit's
 - **Everything goes through NexKit, except changes in paths NexKit may not
   change.** Those paths are set by NexKit's `protected_paths` setting. Such
   changes are hand-made pull requests on any branch name, for example a
-  NexKit version bump. Hand-made pull requests are only for those paths, so a
-  design change is never one; see [Design changes](#design-changes). The owner
+  NexKit version bump. Hand-made pull requests are only for those paths and
+  for the docs change that ends a design review, so a design change is never
+  one; see [Design changes](#design-changes). The owner
   or the hourly driver opens them, and the owner merges them.
 
 ## Profiles
@@ -224,22 +225,36 @@ owner.
   issue that links the artifact and states the change in Axis terms: tokens
   such as `primary` and `spacing-md`, and widgets such as `table`, `form` and
   `section`. The docs stay the source of behaviour.
-- **The design runs ahead of the repository only by open issues.** While such
-  an issue is open, the artifact holds the change and its last change note
-  names the issue. Nothing else in the artifact differs from the repository.
+- **Several changes are a design review.** When the owner reviews the design
+  in words, one change at a time, the session runs a design review. Each
+  change is prototyped in the real widget code on a local `design/<topic>`
+  branch and published to the artifact, so the owner sees the real widgets.
+  The branch is never merged.
+- **The design runs ahead of the repository only by open issues and an open
+  review.** While a design issue is open, the artifact holds its change and its
+  last change note names the issue. While a review is open, the artifact may
+  also differ by the review's changes, and its last change note names the
+  review and its branch. Nothing else in the artifact differs from the
+  repository.
+- **A review ends in one docs change and one issue.** When the owner has
+  agreed the changes, one hand-made docs pull request records the rules and
+  any decision, including every change to configuration, an API or a decision.
+  One NexKit issue then builds all of it and links the docs, the artifact and
+  the prototype branch. NexKit splits it if it needs to: the owner does not.
 - **A sync follows the repository.** After a merged change to the tokens or a
   widget, or whenever the owner asks, the session renders the previews again
   with `scripts/design-system.sh`, reads the tokens from
   `web/src/platform/designTokens.ts` and publishes both to the same artifact.
-  It keeps the changes of open design issues. Before it removes anything, it
-  lists every other difference it overwrote and every token the code no longer
-  defines.
+  It keeps the changes of open design issues, and the card groups and their
+  order. Before it removes anything, it lists every other difference it
+  overwrote and every token the code no longer defines. A review's issue,
+  once merged, is followed by a sync.
 - **Only the owner and Claude edit in Claude Design.** NexKit's agents neither
   read nor write it. New screens may be drawn as Design artifacts, and an
   issue may link one as a picture, while the docs stay the source of
   behaviour.
 
-The steps for a requested change and for a sync are in the
+The steps for a requested change, a design review and a sync are in the
 [`axis-design` skill](../.claude/skills/axis-design/SKILL.md).
 
 ## Keeping the docs current

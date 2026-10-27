@@ -29,6 +29,12 @@ _(planned for Mx)_ are not built yet, and Dn refers to [decisions.md](../decisio
   starts with a letter, contains only ASCII letters and digits, and is at most
   60 characters long (`AXC0004`). The same rule applies to field names.
 - Labels always come from text resources.
+- A field may have `help` _(planned)_, such as
+  `{ "name": "title", "type": "text", "help": { "textKey": "purchaseRequest.title.help" } }`:
+  a text resource like `label`, on any type, which a form shows between the
+  label and the input. It is one or two short lines. Its key joins the
+  `AXC0028` check. Studio's [entity designer](entity-designer.md) edits it. See
+  the [form widget](form-widget.md).
 - `displayField` names the required `text` field that gives a record its
   name, for example in lookups. An entity that is the target of a reference
   must have one.
@@ -112,7 +118,9 @@ site, and its widgets are its content:
   [frontend.md](frontend.md).
 - A `table` widget may list `rowActions` and `toolbarActions`. For now each
   entry is a `navigate` action or, in `rowActions`, a `startProcess` or `delete`
-  action. The compiler checks them and the SPA shows each as a button. A `delete`
+  action. The compiler checks them and the SPA shows each as a button. The first
+  `navigate` row action is the link of the identifying column instead
+  _(planned)_, see [frontend](frontend.md). A `delete`
   asks for confirmation, then deletes the row's record. An entry has a `type`, such as
   `{ "type": "startProcess", "process": "PurchaseRequestApproval", "label": { "textKey": "purchaseRequest.submit" } }` or
   `{ "type": "delete", "label": { "textKey": "purchaseRequest.delete" } }`.
@@ -766,7 +774,12 @@ hidden or `readOnlyWhen` field.
 - **Steps.** `steps` is an optional list on the form. Each step has a `title`
   label and `sections`, a list of section names. When `steps` is present,
   every section has a `name` and is in exactly one step. The steps show in
-  the order listed. A step whose sections are all hidden is skipped.
+  the order listed. A step whose sections are all hidden is skipped. Keep to
+  about six steps: from seven the steps bar shows only numbers. Studio may warn
+  above six, and never blocks _(planned)_.
+- **Field widths** _(planned)_. A field entry may have `width`, a whole number
+  from 1 to 12 in twelfths of its section, 12 when left out, so fields sit in
+  columns. See [fields in columns](form-widget.md).
 - **Compile checks.** Each condition is type-checked as a boolean over the
   form's entity, as an entity validation is, and a problem has the
   expression code at the condition's path, such as `AXC0048` for a condition

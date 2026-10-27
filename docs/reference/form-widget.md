@@ -38,6 +38,17 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
   - Each section has a `title` label and its `fields`, in the order shown.
     Each entry names a `field` of the entity. `readOnly` is optional and
     `false` by default.
+  - **Fields in columns** _(planned)_. A field entry may have `width`, a whole
+    number from 1 to 12, in twelfths of the section. It is 12 when left out.
+    Fields fill a row from left to right, and the next field that does not fit
+    starts a new row. A row is as tall as its tallest field and its fields line
+    up at the top, so a message under one field never shifts the rows below.
+    At narrow width every field takes the whole row, in file order. A detail
+    lays out the same sections with the same widths. A `width` that is not a
+    whole number from 1 to 12 breaks the schema (`AXC0004`). Studio's
+    [form designer](form-designer.md) edits it
+    ([D96](../decisions/d96-rules-from-the-design-system-review.md)).
+    `{ "field": "quantity", "width": 4 }` takes a third of the row.
   - A field appears at most once in the form. A field the form does not list
     is not shown and never sent.
   - Computed, sequence and creator fields are always read-only, whatever
@@ -69,21 +80,46 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
     shows only the fields its form lists, in its order, under the section
     titles (see **Form binding**). A required field's label is
     marked, but the mark blocks nothing: the server still decides.
+  - **Field look** _(planned)_. These rules are agreed in
+    [D96](../decisions/d96-rules-from-the-design-system-review.md).
+    - **Label.** A field label is weight 500 in `textMuted`, wherever a field
+      is labelled: on a form, on a detail and as a KPI's label.
+    - **Required mark.** A required field has a `*` after its label, in
+      `dangerText`, and its input carries `aria-required`.
+    - **Help text.** A field whose entity field has
+      [`help`](resource-files.md#resource-file-shape) shows it between the
+      label and the input, at 12px with a 20px line height in `textMuted`,
+      tied to the input with `aria-describedby`. A message under the input
+      never replaces it. It is one or two short lines: longer guidance belongs
+      on the page or the section. Only a form shows it, not a table or a
+      detail.
+    - **Validation messages.** A message is 14px at a 20px line height, 4px
+      under its input, followed by a whole field gap (`spacing-lg`, 24px)
+      before the next field, so the layout grows when a message appears.
+    - **Read-only values.** A field the form makes read-only, by `readOnly` or
+      `readOnlyWhen`, and a `computed`, `sequence` or `creator` field show
+      plain text, not an input. A boolean shows Yes or No. The value starts
+      about 6px under its label, and the field keeps the height of an editable
+      field. An empty value shows "Not set", see
+      [shown values](frontend.md).
+    - **Values.** Dates, date-times and numbers follow the **Shown values**
+      rules of [frontend.md](frontend.md). A date picker fills its column, as
+      every other input does.
 
     | Field type | Input |
     | --- | --- |
     | `text` | a text input limited to `maxLength`. With `minLength` it also has the `minlength` attribute and shows the character count against the limits, such as `0 / 3–10`, or `0 / ≥3` with no `maxLength` |
-    | `integer`, `decimal` | a plain text input with a numeric keyboard hint. It keeps the typed text as it is. With `min` or `max` its placeholder shows the range, such as `1 – 10`, `≥ 1` or `≤ 10`, and a typed number outside the range is marked invalid. It is never blocked, because the server decides |
+    | `integer`, `decimal` | a plain text input with a numeric keyboard hint. It keeps the typed text as it is. With `min` or `max` its placeholder shows the range, such as `1 – 10`, `≥ 1` or `≤ 10`, and a typed number outside the range is marked invalid. It is never blocked, because the server decides. A number input that takes the locale's decimal comma is not decided yet |
     | `money` | the input of a decimal with the currency code beside the box. The code is `currency`, or the current value of `currencyField` in the form, or in the row of a child collection. Without a code of three letters nothing is shown beside the box. It sends the typed text as a plain JSON number |
     | `boolean` | a checkbox |
-    | `date` | a date picker. With `min` or `max` it disables the dates outside them and its placeholder shows the range |
-    | `date-time` | a date and time picker to the second, in the browser's time zone. It sends the instant in UTC with no fraction. With `min` or `max` it disables the dates outside them and its placeholder shows the range |
+    | `date` | a date picker. With `min` or `max` it disables the dates outside them and its placeholder shows the range. It writes the locale's short numeric date _(planned)_ |
+    | `date-time` | a date and time picker, to the second today and to the minute on the locale's clock _(planned)_, in the browser's time zone. It sends the instant in UTC with no fraction. With `min` or `max` it disables the dates outside them and its placeholder shows the range |
     | `enum` | a choice of the declared values, as written in the entity file, or their labels with `valueLabels` |
     | `file` | the [file input](file-fields.md#in-the-spa): the current file's name as a download link, an Upload button and, when the field is not required, a Remove button. A read-only file shows its link only |
-    | `reference` | the label of the chosen record, read-only, with a choose button that opens the lookup. A field that is not required and is set also has a clear button |
+    | `reference` | the label of the chosen record, read-only, with a choose button that opens the lookup. A field that is not required and is set also has a clear button. Choose and Clear are icon buttons, a search and a close icon, with their names as tooltips _(planned)_ |
     | `references` | a list of the chosen records' labels in their order, each with a remove button, and an add button that opens the lookup, described under **Set of references** |
     | `child-collection` | a table of its rows, described under **Child collections** |
-    | any type with `computed`, `sequence` or `creator`, and any field but a child collection that the form makes read-only | a read-only text input with the value the server returned, formatted as a table cell shows it. It changes only when the record is saved and loaded again |
+    | any type with `computed`, `sequence` or `creator`, and any field but a child collection that the form makes read-only | the value the server returned, formatted as a table cell shows it, in a read-only text input today and as plain text _(planned)_, see **Field look**. It changes only when the record is saved and loaded again |
 
   - **Lookup.** The choose button opens a dialog titled with the field's
     label. It lists the target entity's records through their record API,
@@ -129,7 +165,8 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
       The form does not check the limit of 1,000 ids, and the server's message
       shows on the field.
     - A set that the form makes read-only shows its labels joined by a comma
-      in a read-only text input, with no add or remove button.
+      in a read-only text input today and as plain text _(planned)_, with no add or
+      remove button.
   - **Child collections.** A child collection field shows its rows as a
     table under the field's label.
     - There is one column per child field, headed by its label or its name.
@@ -140,8 +177,17 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
       Upload button is named like `Upload File 2`. A computed child field's cell is a
       read-only text input with the row's value, formatted as a table cell
       shows it.
+    - _(planned)_ A read-only or computed cell shows plain text, not an
+      input, and keeps an input's 32px height, so it lines up with the inputs
+      beside it. An empty one shows a muted "—". A reference column is 240px
+      wide. Number cells sit on the right, see **Shown values** in
+      [frontend.md](frontend.md).
     - Each row has a remove button. An add button below the table appends a
       row with every child field `null`. Rows cannot be reordered.
+      _(planned)_ Remove row is a red trash icon button. Add row sits above
+      the table on the right, outlined at the *main* level of
+      [buttons](frontend.md). When a row is added, focus moves to its first
+      input.
     - When rows were added, removed or edited, the form sends the whole row
       list, as [record-api.md](record-api.md#child-rows-computed-fields-and-validations) describes. Each row holds its
       non-null child fields in declaration order, without its computed fields. Rows are compared by value
@@ -149,7 +195,10 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
       undone leaves the collection out of the body.
     - A key `/values/<collection>/<index>/<field>` for an existing row and a
       child field shows its messages under that cell. A key
-      `/values/<collection>` shows under the table. Any other key inside the
+      `/values/<collection>` shows under the table. _(planned)_ A cell's
+      message stays inline under the cell's input, and the cells of a row line
+      up at the top, so the row's other inputs never move. The message is
+      left-aligned, even in a right-aligned number cell. Any other key inside the
       collection, such as a whole row, shows above the form. Adding or
       removing a row clears the collection's cell errors, because their
       indexes would point at the wrong rows.
@@ -226,7 +275,9 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
     does not show appears above the form.
   - **Start process action**. A `form` widget can declare
     `startProcess` actions. On a saved record, each is shown as a button
-    next to Save and Cancel, with its label. For a signed-in user, page
+    next to Save and Cancel, with its label. It is outlined at the *main*
+    level of [buttons](frontend.md), and Save is the solid *finish* button
+    _(planned)_. For a signed-in user, page
     metadata lists only the actions whose process the user holds a `start`
     grant on. A new record shows no action buttons, so a failed start never
     leaves a record behind on a form that still says new.
@@ -277,7 +328,9 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
     - `form`: `{ "name", "sections": [ { "name", "titleKey", "visibleWhen", "fields": [ { "name", "readOnly", "visibleWhen" } ] } ], "steps": [ { "titleKey", "sections" } ] }`,
       or `null` when the widget names an `entity`. `readOnly` already
       includes computed, sequence and creator fields. Field names are as the entity
-      declares them.
+      declares them. _(planned)_ Each field also has `width`, 12 when the form
+      leaves it out, and each entity field has `helpKey`, the text key of its
+      `help`, or `null`.
     - `actions`: `[ { "type", "process", "labelKey", "instancesPath", "visibleWhen" } ]`,
       or `[]`. `instancesPath` is the start endpoint, such as
       `/api/apps/PurchasingApp/processes/PurchaseRequestApproval/instances`,

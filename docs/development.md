@@ -305,10 +305,15 @@ fixtures, only for the API paths of the fixture application. It needs no server,
   `processInspector` draws one state with a failed instance and an open dead letter. A
   `field-<type>` preview draws the input the form widget uses for that field type,
   with its label and the fixture value, laid out as on a form, in four states: Typical, Required, Read-only, and
-  Validation error, which shows a fixed message under the input. `field-child-collection` draws line items with a
+  Validation error, which shows a fixed message under the input. _(planned)_ It draws three states instead, as
+  [D96](decisions/d96-rules-from-the-design-system-review.md) agrees: Editable, Read-only, and Required, help text
+  and error, which shows the required mark, a help text and a fixed message at once. `field-child-collection` draws line items with a
   reference cell and a computed cell, in four states: Reference and computed cells, Cell error, Read-only, and Empty.
   The `form` preview draws Validation errors, which submits the form once when it mounts to a fixture that answers
-  with a validation problem, Read-only by a condition, and Wizard steps. A field preview has no Save, Cancel or action
+  with a validation problem, Read-only by a condition, and Wizard steps. _(planned)_ It adds Fields in columns, with
+  errors, where fields of several widths share rows and some show messages, and Many steps, with seven steps or more,
+  so the steps bar shows numbers. The `table` preview draws With data, Empty and Many row actions, which folds a
+  row's actions into the "…" menu. The `kpi` preview's comparison is last month's total. A field preview has no Save, Cancel or action
   buttons and no history, which only the `form` preview shows. Its input works as on a form, and nothing is saved. A mounted widget follows
   `data-theme` on the root element of the page.
   `dark` is dark mode, and any other value or none is light mode. A mounted widget also follows the token custom
@@ -316,6 +321,14 @@ fixtures, only for the API paths of the fixture application. It needs no server,
   artifact draws each card in a frame sandboxed without `allow-forms`, where the browser blocks a form's own
   submission before its submit event fires. The bundle therefore fires a form's submit event itself, for a click on
   a submit button, Enter in an input and `requestSubmit()`, and cancels the browser's submission.
+- _(planned)_ The artifact lays out every card at 992 px, the [narrow width](reference/frontend.md) breakpoint, with
+  `width=992` in the card's marker, and scales it to fit its frame. So every card shares one scale and shows the
+  desktop layout.
+- _(planned)_ The cards come in six groups, in this order: Field inputs (each `field-<type>`), Data widgets (`table`,
+  `form`, `detail`), Charts and KPIs (each `chart-<kind>`, `kpi`), Process widgets (`taskInbox`,
+  `processInspector`), Containers (`columns`, `tabs`, `section`) and Shared states (`states`).
+  `scripts/design-system.sh` writes the card order as the bundle's first line, `/* @ds-bundle: {...} */`, so a sync
+  keeps it.
 - `web/design-system.html` is the harness. After `scripts/design-system.sh`, open it from disk. With no
   query it mounts every preview. `?preview=<name>&mode=light|dark` mounts one preview in that mode. The
   Vite dev server does not serve the previews.
