@@ -1,0 +1,16 @@
+{
+  "id": "646da861-79c6-44c9-be97-0d849bb45a3a",
+  "kind": "trigger",
+  "name": "TicketDeleted",
+  "formatVersion": 1,
+  "type": "dataChange",
+  "entity": "Ticket",
+  "on": [
+    "delete"
+  ],
+  "process": "TellLeadTicketDeleted",
+  "parameters": {
+    "number": "number",
+    "title": "title"
+  }
+}

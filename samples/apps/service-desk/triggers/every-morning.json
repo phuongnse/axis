@@ -1,0 +1,13 @@
+{
+  "id": "9ae6a09a-a9d5-431c-be38-0d2311dd1e3f",
+  "kind": "trigger",
+  "name": "EveryMorning",
+  "formatVersion": 1,
+  "type": "schedule",
+  "schedule": "0 8 * * 1-5",
+  "timeZone": "Asia/Ho_Chi_Minh",
+  "process": "DailyOverdueReminder",
+  "parameters": {
+    "daysOverdue": 1
+  }
+}

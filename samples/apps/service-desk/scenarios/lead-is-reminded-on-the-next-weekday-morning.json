@@ -1,0 +1,28 @@
+{
+  "id": "d9f17e70-84a9-4b83-8ba0-536a0c9a5e63",
+  "kind": "scenario",
+  "name": "LeadIsRemindedOnTheNextWeekdayMorning",
+  "formatVersion": 1,
+  "now": "2026-10-01T09:00:00Z",
+  "users": {
+    "linh": [
+      "service-desk-lead"
+    ]
+  },
+  "steps": [
+    {
+      "type": "advanceTime",
+      "by": "PT17H"
+    },
+    {
+      "type": "expectNotification",
+      "recipient": {
+        "role": "service-desk-lead"
+      },
+      "channel": "inApp",
+      "values": {
+        "days": 1
+      }
+    }
+  ]
+}

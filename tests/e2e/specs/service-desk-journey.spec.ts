@@ -48,6 +48,8 @@ const scenarios = [
   ['RequesterCannotReachAnotherTicket', 'scenarios/requester-cannot-reach-another-ticket.json'],
   ['RequesterDeletesADraftTicket', 'scenarios/requester-deletes-a-draft-ticket.json'],
   ['AgentCannotDeleteATicket', 'scenarios/agent-cannot-delete-a-ticket.json'],
+  ['LeadIsRemindedOnTheNextWeekdayMorning', 'scenarios/lead-is-reminded-on-the-next-weekday-morning.json'],
+  ['LeadIsToldWhichTicketWasDeleted', 'scenarios/lead-is-told-which-ticket-was-deleted.json'],
 ] as const
 
 test.describe('the author builds the service desk with Studio only', () => {
@@ -218,7 +220,28 @@ test.describe('the author builds the service desk with Studio only', () => {
       await pickNamed(page, `${at}/assignee`, 'assignee kind', 'User')
       await pickNamed(page, `${at}/assignee`, 'user', user)
     }
-    if ('values' in step) {
+    if ('by' in step) {
+      await page.getByTestId(`${at}/by`).getByRole('textbox').fill(String(step.by))
+    }
+    if ('recipient' in step) {
+      const [[kind, name]] = Object.entries(step.recipient as Record<string, string>)
+      await pickNamed(page, `${at}/recipient`, 'recipient kind', kind === 'role' ? 'Role' : 'User')
+      await pickNamed(page, `${at}/recipient`, kind, name)
+    }
+    if ('channel' in step) {
+      await pick(page, `${at}/channel`, String(step.channel))
+    }
+    if ('values' in step && step.type === 'expectNotification') {
+      const values = page.getByTestId(`${at}/values`)
+      for (const [key, value] of Object.entries(step.values as Record<string, unknown>)) {
+        await values.getByRole('button', { name: 'Add value', exact: true }).click()
+        // The new row is the last one, under a fresh key. The rename detaches the input, so Tab goes through the page keyboard.
+        await values.getByRole('textbox', { name: 'Value name', exact: true }).last().fill(key)
+        await page.keyboard.press('Tab')
+        // The box parses its text as JSON, so the text of the number 1 is `1`.
+        await values.getByRole('textbox', { name: key, exact: true }).fill(String(value))
+      }
+    } else if ('values' in step) {
       for (const [key, value] of Object.entries(step.values as Record<string, unknown>)) {
         await pickAction(
           page.getByTestId(`${at}/values`).getByRole('combobox', { name: 'Add value', exact: true }),
@@ -257,6 +280,16 @@ test.describe('the author builds the service desk with Studio only', () => {
     await dialog.getByRole('textbox', { name: 'Name', exact: true }).fill('ServiceDesk')
     await dialog.getByRole('button', { name: 'Create', exact: true }).click()
     await expect(page).toHaveURL(/app=ServiceDesk$/)
+  })
+
+  test('the author sets the application time zone', async ({ page }) => {
+    await useJourneySession(page, 'hoa')
+    await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
+
+    await page.getByTestId('studio-group-application').getByRole('button').click()
+    await expectForm(page)
+    await page.getByTestId('studio-field-/timeZone').getByRole('textbox').fill('Asia/Ho_Chi_Minh')
+    await save(page)
   })
 
   test('the author builds the en and vi texts in the text editor', async ({ page }) => {
@@ -1005,6 +1038,159 @@ test.describe('the author builds the service desk with Studio only', () => {
     await save(page)
   })
 
+  test('the author builds the two notify processes and the schedule and delete triggers', async ({ page }) => {
+    await useJourneySession(page, 'hoa')
+    await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
+
+    const en = await texts('en')
+    const stepCard = (index: number) => page.getByTestId(`studio-step-${index}`)
+
+    // A new trigger starts as an event trigger, and only picking an event and clearing it removes the key. The sample
+    // has no event, so one exists until both triggers are built.
+    await createResource(page, 'event', 'Placeholder')
+    await openFormTab(page)
+    await pick(page, 'studio-field-/entity', 'Ticket')
+    await save(page)
+
+    async function dropEvent() {
+      await pick(page, 'studio-field-/event', 'Placeholder')
+      const field = page.getByTestId('studio-field-/event')
+      await field.hover()
+      await field.getByRole('img', { name: 'close-circle', exact: true }).click()
+      await expect(field.getByTitle('Placeholder', { exact: true })).toHaveCount(0)
+    }
+
+    async function buildNotifyProcess(
+      name: string,
+      parameters: [name: string, type: string][],
+      step: {
+        name: string
+        subject: string
+        body: string
+        values: [placeholder: string, expression: string][]
+        page?: string
+      },
+    ) {
+      await createResource(page, 'process', name)
+      await openFormTab(page)
+      await page
+        .locator('label')
+        .filter({
+          has: page.getByRole('radio', { name: 'Parameters', exact: true }),
+        })
+        .click()
+      await expect(page.getByTestId('studio-field-/entity')).toHaveCount(0)
+      for (const [index, [parameter, type]] of parameters.entries()) {
+        await page.getByRole('button', { name: 'Add parameter', exact: true }).click()
+        await page.getByTestId(`studio-field-/parameters/${index}/name`).getByRole('textbox').fill(parameter)
+        await pick(page, `studio-field-/parameters/${index}/type`, type)
+      }
+      await stepCard(0).getByRole('button', { name: 'Remove step', exact: true }).click()
+      for (const [index, [stepName, type]] of [
+        [step.name, 'operation'],
+        ['done', 'end'],
+      ].entries()) {
+        await pickAction(page.getByRole('combobox', { name: 'Add step', exact: true }), type, stepCard(index))
+        await stepCard(index).getByRole('textbox', { name: 'Step name', exact: true }).fill(stepName)
+      }
+
+      await pick(page, 'studio-field-/steps/0/operation', 'notify')
+      await page
+        .getByTestId('studio-field-/steps/0/to')
+        .getByRole('button', { name: 'Add recipient', exact: true })
+        .click()
+      await page
+        .getByTestId('studio-field-/steps/0/to/0')
+        .locator('label')
+        .filter({ has: page.getByRole('radio', { name: 'Role', exact: true }) })
+        .click()
+      await pick(page, 'studio-field-/steps/0/to/0/role', 'service-desk-lead')
+      await page
+        .getByTestId('studio-field-/steps/0/channels')
+        .getByRole('checkbox', { name: 'In-app', exact: true })
+        .check()
+      await writeLabel(page, 'studio-field-/steps/0/message/subject', step.subject, en[step.subject])
+      await writeLabel(page, 'studio-field-/steps/0/message/body', step.body, en[step.body])
+      const values = page.getByTestId('studio-field-/steps/0/message/values')
+      for (const [placeholder, expression] of step.values) {
+        await values.getByRole('button', { name: 'Add mapping', exact: true }).click()
+        await values.getByRole('textbox', { name: 'Placeholder', exact: true }).last().fill(placeholder)
+        const value = page.getByTestId(`studio-field-/steps/0/message/values/${placeholder}`)
+        await expect(value.locator('.cm-editor')).toBeVisible()
+        await value.getByRole('textbox', { name: 'Expression', exact: true }).fill(expression)
+      }
+      if (step.page !== undefined) {
+        await page
+          .getByTestId('studio-field-/steps/0/open')
+          .getByRole('checkbox', { name: 'Open a page', exact: true })
+          .check()
+        await pick(page, 'studio-field-/steps/0/open/page', step.page)
+      }
+      await pick(page, 'studio-field-/steps/0/next', 'done')
+      await pick(page, 'studio-field-/start', step.name)
+      await save(page)
+      await expectForm(page)
+    }
+
+    await buildNotifyProcess('DailyOverdueReminder', [['daysOverdue', 'integer']], {
+      name: 'remind',
+      subject: 'notifications.overdue.subject',
+      body: 'notifications.overdue.body',
+      values: [['days', 'daysOverdue']],
+      page: 'AllTickets',
+    })
+    await buildNotifyProcess(
+      'TellLeadTicketDeleted',
+      [
+        ['number', 'text'],
+        ['title', 'text'],
+      ],
+      {
+        name: 'tellLead',
+        subject: 'notifications.ticketDeleted.subject',
+        body: 'notifications.ticketDeleted.body',
+        values: [
+          ['number', 'number'],
+          ['title', 'title'],
+        ],
+      },
+    )
+
+    await createResource(page, 'trigger', 'EveryMorning')
+    await openFormTab(page)
+    await pick(page, 'studio-field-/type', 'schedule')
+    await dropEvent()
+    await page.getByTestId('studio-field-/schedule').getByRole('textbox').fill('0 8 * * 1-5')
+    await page.getByTestId('studio-field-/timeZone').getByRole('textbox').fill('Asia/Ho_Chi_Minh')
+    await pick(page, 'studio-field-/process', 'DailyOverdueReminder')
+    const schedule = page.getByTestId('studio-field-/parameters')
+    await schedule.getByRole('button', { name: 'Add', exact: true }).click()
+    await schedule.getByRole('spinbutton', { name: 'daysOverdue', exact: true }).fill('1')
+    await save(page)
+
+    await createResource(page, 'trigger', 'TicketDeleted')
+    await openFormTab(page)
+    await pick(page, 'studio-field-/type', 'dataChange')
+    await dropEvent()
+    await pick(page, 'studio-field-/entity', 'Ticket')
+    await page.getByTestId('studio-field-/on').getByRole('button', { name: 'Add', exact: true }).click()
+    await pick(page, 'studio-field-/on/0', 'delete')
+    await pick(page, 'studio-field-/process', 'TellLeadTicketDeleted')
+    const deleted = page.getByTestId('studio-field-/parameters')
+    for (const parameter of ['number', 'title']) {
+      await deleted.getByRole('button', { name: 'Add', exact: true }).click()
+      const value = page.getByTestId(`studio-field-/parameters/${parameter}`)
+      await expect(value.locator('.cm-editor')).toBeVisible()
+      await value.getByRole('textbox').fill(parameter)
+    }
+    await save(page)
+
+    await page.getByTestId('studio-group-event').getByRole('button', { name: 'Placeholder', exact: true }).click()
+    await page.getByRole('button', { name: 'Delete', exact: true }).click()
+    await confirmDialog(page, 'Delete')
+    await expect(page.getByTestId('studio-group-event')).toHaveCount(0)
+  })
+
   test('the author builds the three access policies in the policy matrix', async ({ page }) => {
     await useJourneySession(page, 'hoa')
     await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
@@ -1090,7 +1276,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     await checkBuilt(page)
   })
 
-  test('the author runs the eight test scenarios from Studio', async ({ page }) => {
+  test('the author runs the ten test scenarios from Studio', async ({ page }) => {
     await useJourneySession(page, 'hoa')
     await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
     await page.getByTestId('studio-run-tests').click()

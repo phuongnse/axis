@@ -207,12 +207,16 @@ the parts built in M12,
 5. A reopened ticket goes back to the status `assigned` and loops to the
    agent's resolve task in the same instance
    ([D69](decisions/d69-timer-wait-for-event-and-sub-process-steps-loops-and-create-record.md)).
-   _(Planned for M14)_ The agent's task escalates to the service desk lead when
-   it is late, the requester is notified when the ticket is resolved, a daily
-   job reminds the lead of overdue tickets, and a deleted ticket is reported to
-   the lead
+6. The service desk runs in the `Asia/Ho_Chi_Minh` time zone
+   ([D75](decisions/d75-the-application-time-zone.md)). Every weekday at 08:00
+   local time a scheduled job notifies the lead in-app that tickets are
+   overdue and opens All tickets. When a requester deletes a draft ticket, a
+   delete trigger notifies the lead in-app with the ticket's number and title
    ([D70](decisions/d70-processes-without-a-subject-scheduled-jobs-and-delete-triggers.md),
-   [D71](decisions/d71-task-deadlines-escalation-claim-and-reassign.md),
+   [D73](decisions/d73-in-app-and-email-notifications.md)).
+   _(Planned for M14)_ The agent's task escalates to the service desk lead when
+   it is late, and the requester is notified when the ticket is resolved
+   ([D71](decisions/d71-task-deadlines-escalation-claim-and-reassign.md),
    [D73](decisions/d73-in-app-and-email-notifications.md)).
 
 ### Security
@@ -253,6 +257,8 @@ tickets and the dashboard for the lead, in a site at path `service-desk`. Texts 
   ticket, an agent cannot see a ticket assigned to someone else, and a user
   cannot act on a task that is not theirs.
 - A requester deletes a draft ticket. An agent's delete is refused.
+- The next weekday morning reminds the lead of overdue tickets, and a deleted
+  draft ticket is reported to the lead.
 
 ### Built through Studio
 
@@ -276,6 +282,10 @@ Studio, publishes it and takes one ticket through the process on the site.
 - The main journey also builds the two-step ticket form, the dashboard and
   the ticket detail page. The comparison with the committed sample covers
   them.
+- The main journey also builds the time zone, the two notify processes and
+  their schedule and delete triggers. It creates a temporary event to clear
+  the `event` of each new trigger, because Studio removes that key only when
+  the author picks an event and clears it, and it deletes the event again.
 - Another Playwright journey uses the sample at phone
   width.
 - A second, smaller journey creates an application from the

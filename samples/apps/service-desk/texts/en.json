@@ -56,6 +56,10 @@
     "task.reopen": "Reopen",
     "role.requester": "Requester",
     "role.agent": "Agent",
-    "role.serviceDeskLead": "Service desk lead"
+    "role.serviceDeskLead": "Service desk lead",
+    "notifications.overdue.subject": "Tickets are overdue",
+    "notifications.overdue.body": "Some tickets are more than {days} day(s) overdue. Open All tickets to see them.",
+    "notifications.ticketDeleted.subject": "Ticket {number} was deleted",
+    "notifications.ticketDeleted.body": "The requester deleted the draft ticket {number}: {title}."
   }
 }
