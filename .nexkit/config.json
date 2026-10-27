@@ -147,7 +147,8 @@
     "auto": true,
     "after_workflows": [
       "ci.yml",
-      "codeql.yml"
+      "codeql.yml",
+      "performance.yml"
     ]
   },
   "conflicts": {
@@ -163,6 +164,7 @@
     "artifacts": [
       "test-results-e2e",
       "test-results-integration",
+      "test-results-performance",
       "test-results-unit"
     ]
   },
