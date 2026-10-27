@@ -2,6 +2,7 @@ import { Alert, Button, Dropdown, Flex, Input, Modal, Table, type TableColumnsTy
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router'
 import { useCanvasActions } from './canvasActions'
+import { downloadExport, exportAddress, exportPath, saveFile, type ExportFormat } from './exports'
 import { FileLink } from './FileInput'
 import { FilterBar } from './FilterBar'
 import { formatValue } from './formatValue'
@@ -124,7 +125,11 @@ function tableSource({ entity, dataSource }: WidgetMetadata): TableSource {
  * message above the table and keeps the rows, and any other answer shows a generic failure. A table
  * over an entity whose access lists `import` has an Import button next to the toolbar actions, which opens the
  * import dialog. When the import is committed the dialog closes, a success message shows above the table and
- * the current page of rows loads again. The canvas draws the button and opens nothing. A toolbar action to a form page
+ * the current page of rows loads again. The canvas draws the button and opens nothing. A table whose access lists
+ * `export` has an Export dropdown with CSV and Excel. It fetches the export route with the table's parameter
+ * values, search and sort, but no paging, and saves the file under the server's name. A file the server cut
+ * at the row limit shows a notice above the table. A `403`, `409` or `503` shows its own message, and any
+ * other failure a generic one. The canvas draws the button and exports nothing. A toolbar action to a form page
  * without `record` needs the user's `create` grant on the entity, as the widget's access says, and
  * a button whose expressions the SPA cannot work out is hidden. Below 768 px, a row's actions fold
  * into one "Actions" menu.
@@ -174,7 +179,7 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
     setDraft(query.search ?? '')
   }
   // The bound values and the filter values, in declaration order.
-  const requestQuery = useMemo(() => {
+  const parameterValues = useMemo(() => {
     const values: Record<string, string> = {}
     for (const parameter of allParameters) {
       const value = Object.hasOwn(widget.parameters, parameter.name)
@@ -184,8 +189,12 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
         values[parameter.name] = value
       }
     }
-    return recordQuery({ ...query, parameters: values }, defaultPageSize)
-  }, [allParameters, widget.parameters, pageValues, query, defaultPageSize])
+    return values
+  }, [allParameters, widget.parameters, pageValues, query.parameters])
+  const requestQuery = useMemo(
+    () => recordQuery({ ...query, parameters: parameterValues }, defaultPageSize),
+    [parameterValues, query, defaultPageSize],
+  )
   const requestUrl = `${path}?${requestQuery}`
   const [state, setState] = useState<LoadState>({ failed: false })
   // Bumped after a row start, so the same URL is requested again.
@@ -200,6 +209,9 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
   const [deleting, setDeleting] = useState(false)
   // Whether the import dialog is open.
   const [importing, setImporting] = useState(false)
+  const [exporting, setExporting] = useState(false)
+  // Whether the last export stopped at the row limit.
+  const [exportTruncated, setExportTruncated] = useState(false)
   const loading = state.url !== requestUrl
   const failed = state.failed && !loading
   const parameterErrors = loading ? undefined : state.parameterErrors
@@ -328,6 +340,46 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
       setConfirming(null)
     }
   }, [confirming, deleting, t])
+
+  // Fetches the file with the table's parameters, search and sort, and saves it. A 403, 409 and 503 each have their own message.
+  const runExport = useCallback(
+    async (format: ExportFormat) => {
+      if (exporting) {
+        return
+      }
+      setExporting(true)
+      setActionError(null)
+      setActionDone(null)
+      setExportTruncated(false)
+      try {
+        let result
+        try {
+          result = await downloadExport(
+            exportAddress(exportPath(widget), query, parameterValues, format, defaultPageSize),
+          )
+        } catch (error) {
+          console.warn(`Exporting the records of '${name}' failed`, error)
+          setActionError(t('shell.table.exportFailed'))
+          return
+        }
+        if (result.ok) {
+          saveFile(result.blob, result.fileName)
+          setExportTruncated(result.truncated)
+        } else if (result.status === 403) {
+          setActionError(t('shell.table.exportDenied'))
+        } else if (result.status === 409) {
+          setActionError(t('shell.table.exportPending'))
+        } else if (result.status === 503) {
+          setActionError(t('shell.table.exportTimeout'))
+        } else {
+          setActionError(t('shell.table.exportFailed'))
+        }
+      } finally {
+        setExporting(false)
+      }
+    },
+    [exporting, widget, query, parameterValues, defaultPageSize, name, t],
+  )
 
   // Opens the page of a navigate action. A refused read on its path opens nothing and shows a message.
   const runNavigate = useCallback(
@@ -489,10 +541,12 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
 
   // An entity table offers an import to a user whose access lists it. The canvas draws the button and opens nothing.
   const canImport = widget.entity !== null && widget.access?.actions.includes('import') === true
+  // A table whose access lists export offers a file of what it shows. The canvas draws the button and exports nothing.
+  const canExport = widget.access?.actions.includes('export') === true
 
   return (
     <Flex vertical gap="middle" aria-busy={loading}>
-      {(searchable || toolbarButtons.length > 0 || canImport) && (
+      {(searchable || toolbarButtons.length > 0 || canImport || canExport) && (
         <Flex justify="space-between" align="center" gap="small" wrap>
           {searchable && (
             <Input.Search
@@ -519,6 +573,20 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
             {canImport && (
               <Button onClick={() => !canvas.active && setImporting(true)}>{t('shell.table.import')}</Button>
             )}
+            {canExport && (
+              <Dropdown
+                trigger={['click']}
+                menu={{
+                  items: [
+                    { key: 'csv', label: t('shell.table.exportCsv') },
+                    { key: 'xlsx', label: t('shell.table.exportXlsx') },
+                  ],
+                  onClick: ({ key }) => !canvas.active && void runExport(key as ExportFormat),
+                }}
+              >
+                <Button loading={exporting}>{t('shell.table.export')}</Button>
+              </Dropdown>
+            )}
           </Flex>
         </Flex>
       )}
@@ -532,6 +600,9 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
       )}
       {actionError !== null && <Alert data-testid="table-action-error" type="error" title={actionError} />}
       {actionDone !== null && <Alert data-testid="table-action-done" type="success" title={actionDone} />}
+      {exportTruncated && (
+        <Alert data-testid="table-export-truncated" type="warning" title={t('shell.table.exportTruncated')} />
+      )}
       {importing && (
         <ImportDialog
           importsPath={importsPath(path)}

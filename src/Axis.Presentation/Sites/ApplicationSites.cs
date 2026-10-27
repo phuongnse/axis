@@ -205,7 +205,7 @@ public static class ApplicationSites
 
     // Without a user to shape it, access lists every entity action and every field. A kpi reads a total
     // row of its data source, not records, and a chart reads its groups, so neither has any. A table
-    // over an entity lists import last.
+    // lists export after delete, and a table over an entity lists import last.
     private static WidgetAccess? FullAccess(ApplicationModel application, WidgetModel widget)
     {
         if (widget.Type is WidgetType.Kpi or WidgetType.Chart || WidgetEntity(application, widget) is not { } entity)
@@ -214,9 +214,11 @@ public static class ApplicationSites
         }
 
         IReadOnlyList<string> fields = [.. entity.Fields.Select(field => field.Name)];
-        IReadOnlyList<string> actions = widget.Type == WidgetType.Table && widget.Entity is not null
-            ? ["read", "create", "update", "delete", "import"]
-            : ["read", "create", "update", "delete"];
+        IReadOnlyList<string> actions = widget.Type != WidgetType.Table
+            ? ["read", "create", "update", "delete"]
+            : widget.Entity is not null
+                ? ["read", "create", "update", "delete", "export", "import"]
+                : ["read", "create", "update", "delete", "export"];
         return new WidgetAccess(actions, fields, fields);
     }
 

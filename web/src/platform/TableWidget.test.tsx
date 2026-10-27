@@ -184,6 +184,14 @@ const texts = {
   'shell.table.importWrongType': 'Only a CSV or Excel file can be imported.',
   'shell.table.importUploadFailed': 'The file could not be imported.',
   'shell.table.importClose': 'Close',
+  'shell.table.export': 'Export',
+  'shell.table.exportCsv': 'CSV',
+  'shell.table.exportXlsx': 'Excel',
+  'shell.table.exportTruncated': 'The file stops at the row limit.',
+  'shell.table.exportDenied': 'You may not export these records.',
+  'shell.table.exportPending': 'A field is being recomputed.',
+  'shell.table.exportTimeout': 'The export took too long.',
+  'shell.table.exportFailed': 'The records could not be exported.',
   'shell.navigate.failed': 'The page could not be opened.',
   'shell.form.cancel': 'Cancel',
   'note.delete': 'Delete note',
@@ -1408,5 +1416,145 @@ describe('TableWidget import', () => {
     await chooseAndCheck()
 
     expect(await screen.findByTestId('import-problem')).toHaveTextContent(message)
+  })
+})
+
+describe('TableWidget export', () => {
+  const exportsPath = `${recordsPath}/export`
+  const withExport: WidgetAccess = { ...everyAction, actions: [...everyAction.actions, 'export'] }
+  // The record API searches the display field, so this table has a search box.
+  const searchableNotes: EntityWidgetMetadata = {
+    ...noteWidget,
+    entity: { ...noteWidget.entity, displayField: 'title' },
+  }
+  const exportWidget: WidgetMetadata = { ...searchableNotes, access: withExport }
+  const createObjectURL = vi.fn((_blob: Blob) => 'blob:notes')
+  const revokeObjectURL = vi.fn()
+
+  /** Stubs `fetch`: the records, and the export with `exported` as its answer. */
+  function stubExport(exported: () => Response) {
+    const fetchMock = vi.fn(async (input: string) =>
+      input.startsWith(exportsPath) || input.endsWith('/export') || input.includes('/export?')
+        ? exported()
+        : new Response(notePage, { status: 200 }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    return () => fetchMock.mock.calls.map(([url]) => url).filter((url) => url.includes('/export'))
+  }
+
+  function file(headers: Record<string, string> = {}) {
+    return new Response('title\nBuy paper\n', {
+      status: 200,
+      headers: { 'Content-Disposition': "attachment; filename=Note.csv; filename*=UTF-8''Note.csv", ...headers },
+    })
+  }
+
+  /** Opens the dropdown with the keyboard, then picks `item` with the keyboard. */
+  async function chooseExport(item: string) {
+    const button = await screen.findByRole('button', { name: 'Export' })
+    button.focus()
+    await userEvent.keyboard('{Enter}')
+    await userEvent.click(await screen.findByRole('menuitem', { name: item }))
+  }
+
+  beforeEach(() => {
+    createObjectURL.mockClear()
+    revokeObjectURL.mockClear()
+    vi.stubGlobal('URL', Object.assign(URL, { createObjectURL, revokeObjectURL }))
+  })
+
+  it('shows the Export button when the access lists export and hides it when it does not', async () => {
+    stubRecords()
+    const { unmount } = renderWidget('', exportWidget)
+    expect(await screen.findByRole('button', { name: 'Export' })).toBeInTheDocument()
+    unmount()
+
+    renderWidget('', searchableNotes)
+    await screen.findByRole('row', { name: /Buy paper/ })
+    expect(screen.queryByRole('button', { name: 'Export' })).not.toBeInTheDocument()
+  })
+
+  it('shows the Export button on a data source table too', async () => {
+    stubRecords()
+    renderWidget('', { ...noteListWidget, access: withExport })
+    expect(await screen.findByRole('button', { name: 'Export' })).toBeInTheDocument()
+  })
+
+  it('fetches the file with the search, the sort and the format, and no paging, and saves it under the server name', async () => {
+    const exported = stubExport(() => file())
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    renderWidget('?search=pap&sort=-title&page=2&pageSize=10', exportWidget)
+
+    await chooseExport('CSV')
+
+    await waitFor(() => expect(exported()).toHaveLength(1))
+    const address = exported()[0]
+    expect(address.startsWith(`${exportsPath}?`)).toBe(true)
+    expect([...new URLSearchParams(address.split('?')[1])]).toEqual([
+      ['search', 'pap'],
+      ['sort', '-title'],
+      ['format', 'csv'],
+    ])
+    await waitFor(() => expect(click).toHaveBeenCalledTimes(1))
+    expect((click.mock.contexts[0] as HTMLAnchorElement).download).toBe('Note.csv')
+    expect(createObjectURL).toHaveBeenCalledTimes(1)
+    expect(revokeObjectURL).toHaveBeenCalledWith('blob:notes')
+    expect(screen.queryByTestId('table-export-truncated')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('table-action-error')).not.toBeInTheDocument()
+    click.mockRestore()
+  })
+
+  it('asks for xlsx from the Excel item', async () => {
+    const exported = stubExport(() => file())
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    renderWidget('', exportWidget)
+
+    await chooseExport('Excel')
+
+    await waitFor(() => expect(exported()).toEqual([`${exportsPath}?format=xlsx`]))
+    click.mockRestore()
+  })
+
+  it('shows a notice when the server cut the file at the row limit', async () => {
+    stubExport(() => file({ 'Axis-Export-Truncated': 'true' }))
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    renderWidget('', exportWidget)
+
+    await chooseExport('CSV')
+
+    expect(await screen.findByTestId('table-export-truncated')).toHaveTextContent('The file stops at the row limit.')
+    expect(click).toHaveBeenCalledTimes(1)
+    click.mockRestore()
+  })
+
+  it.each([
+    [403, 'You may not export these records.'],
+    [409, 'A field is being recomputed.'],
+    [503, 'The export took too long.'],
+    [500, 'The records could not be exported.'],
+  ])('shows its own message for an export answered with %i and saves nothing', async (status, message) => {
+    stubExport(() => new Response(null, { status }))
+    renderWidget('', exportWidget)
+
+    await chooseExport('CSV')
+
+    expect(await screen.findByTestId('table-action-error')).toHaveTextContent(message)
+    expect(createObjectURL).not.toHaveBeenCalled()
+  })
+
+  it('shows the generic message when the request fails', async () => {
+    const fetchMock = vi.fn(async (input: string) => {
+      if (input.includes('/export')) {
+        throw new TypeError('network')
+      }
+      return new Response(notePage, { status: 200 })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    renderWidget('', exportWidget)
+
+    await chooseExport('CSV')
+
+    expect(await screen.findByTestId('table-action-error')).toHaveTextContent('The records could not be exported.')
   })
 })

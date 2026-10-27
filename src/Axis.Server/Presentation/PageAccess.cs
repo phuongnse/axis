@@ -179,16 +179,24 @@ internal static class PageAccess
             || PolicyEvaluator.Access(application, roles, entity, PolicyAction.Read).Granted;
     }
 
-    // A table over an entity ends its actions with import, for roles that may import and create. A
-    // form, a detail and a table over a data source have no import.
+    // A table lists export after the entity actions, for roles that may export its entity, or its data
+    // source when it reads one. A table over an entity then ends with import, for roles that may import
+    // and create. A form and a detail have neither, and a table over a data source has no import.
     private static WidgetAccess Access(ApplicationModel application, IReadOnlyList<string> roles, WidgetModel widget, EntityModel entity) =>
         new(
             [.. _entityActions
                 .Where(entry => PolicyEvaluator.Access(application, roles, entity, entry.Action).Granted)
                 .Select(entry => entry.Name)
+                .Concat(widget.Type == WidgetType.Table && AllowsExport(application, roles, widget, entity) ? ["export"] : [])
                 .Concat(widget.Type == WidgetType.Table && widget.Entity is not null && PolicyEvaluator.AllowsImport(application, roles, entity) ? ["import"] : [])],
             Writable(application, roles, entity, PolicyAction.Create),
             Writable(application, roles, entity, PolicyAction.Update));
+
+    // The compiler resolves every widget data source, so the lookup always succeeds.
+    private static bool AllowsExport(ApplicationModel application, IReadOnlyList<string> roles, WidgetModel widget, EntityModel entity) =>
+        widget.DataSource is { } reference && application.TryGetDataSource(reference.Name, out var dataSource)
+            ? PolicyEvaluator.AllowsExport(application, roles, dataSource)
+            : PolicyEvaluator.AllowsExport(application, roles, entity);
 
     // Fields gives null for every field and an empty set without a grant for the action. The
     // fields are listed from the entity, so they keep its declaration order.

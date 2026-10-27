@@ -64,7 +64,7 @@ public sealed class StudioPageMetadataTests : IAsyncLifetime
         Assert.Equal("table", table.GetProperty("type").GetString());
         Assert.Equal("/widgets/0/columns/0/widgets/0", table.GetProperty("path").GetString());
         Assert.Equal(
-            ["read", "create", "update", "delete"],
+            ["read", "create", "update", "delete", "export"],
             table.GetProperty("access").GetProperty("actions").EnumerateArray().Select(action => action.GetString()).ToArray());
         var chart = columns.GetProperty("columns")[1].GetProperty("widgets")[0];
         Assert.Equal("chart", chart.GetProperty("type").GetString());

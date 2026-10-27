@@ -344,6 +344,28 @@ public sealed class SiteEndpointTests(RecordApiFixture fixture) : IClassFixture<
         Assert.Equal(["read"], AccessActions(readerTable));
     }
 
+    [Fact]
+    public async Task Access_lists_export_on_an_entity_table_and_a_data_source_table_for_a_user_who_holds_it()
+    {
+        using var exporter = fixture.CreateClient().SignedInAs("eve");
+        using var employee = fixture.CreateClient().SignedInAs("anna");
+        using var reader = fixture.CreateClient().SignedInAs("rita");
+
+        using var table = await GetJsonAsync(exporter, "/api/sites/records/pages/items", HostA);
+        using var dataSourceTable = await GetJsonAsync(exporter, "/api/sites/records/pages/itemsbydepartment", HostA);
+        using var form = await GetJsonAsync(exporter, "/api/sites/records/pages/itemform", HostA);
+        using var employeeTable = await GetJsonAsync(employee, "/api/sites/records/pages/items", HostA);
+        using var employeeDataSourceTable = await GetJsonAsync(employee, "/api/sites/records/pages/itemsbydepartment", HostA);
+        using var readerTable = await GetJsonAsync(reader, "/api/sites/records/pages/items", HostA);
+
+        Assert.Equal(["read", "export"], AccessActions(table));
+        Assert.Equal(["read", "export"], AccessActions(dataSourceTable));
+        Assert.DoesNotContain("export", AccessActions(form));
+        Assert.DoesNotContain("export", AccessActions(employeeTable));
+        Assert.DoesNotContain("export", AccessActions(employeeDataSourceTable));
+        Assert.DoesNotContain("export", AccessActions(readerTable));
+    }
+
     private static string[] AccessActions(JsonDocument page) =>
         [.. Assert.Single(page.RootElement.GetProperty("widgets").EnumerateArray().ToList())
             .GetProperty("access").GetProperty("actions").EnumerateArray().Select(action => action.GetString()!)];

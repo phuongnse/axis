@@ -319,7 +319,7 @@ public sealed class ApplicationSitesTests
         // The table is over a data source, so its access is about the data source's root entity.
         Assert.Null(table.Entity);
         Assert.NotNull(table.Access);
-        Assert.Equal(["read", "create", "update", "delete"], table.Access.Actions);
+        Assert.Equal(["read", "create", "update", "delete", "export"], table.Access.Actions);
         result.Model.TryGetEntity("PurchaseRequest", out var entity);
         Assert.Equal(entity!.Fields.Select(field => field.Name), table.Access.CreateFields);
         Assert.Equal(entity.Fields.Select(field => field.Name), table.Access.UpdateFields);
@@ -327,7 +327,7 @@ public sealed class ApplicationSitesTests
     }
 
     [Fact]
-    public void Unshaped_access_lists_import_last_on_an_entity_table_only()
+    public void Unshaped_access_lists_export_on_every_table_and_import_last_on_an_entity_table_only()
     {
         var result = ApplicationCompiler.Compile(Path.Combine(AppContext.BaseDirectory, "Samples", "purchase-requests"), SamplePackages.Versions);
         Assert.Empty(result.Diagnostics);
@@ -338,8 +338,9 @@ public sealed class ApplicationSitesTests
 
         Assert.NotNull(entityTable.Entity);
         Assert.NotNull(entityTable.Access);
-        Assert.Equal(["read", "create", "update", "delete", "import"], entityTable.Access.Actions);
+        Assert.Equal(["read", "create", "update", "delete", "export", "import"], entityTable.Access.Actions);
         Assert.NotNull(dataSourceTable.Access);
+        Assert.Contains("export", dataSourceTable.Access.Actions);
         Assert.DoesNotContain("import", dataSourceTable.Access.Actions);
     }
 }

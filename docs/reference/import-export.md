@@ -9,7 +9,7 @@ _(planned for M15)_ are not built yet, and Dn refers to
 
 Everything on this page is _(planned for M15)_, except the grants, the
 policy matrix, the export routes, the upload, dry run and commit of a CSV
-or `xlsx` import, and the Import button in the SPA, which are built. A commit only creates records. `key`
+or `xlsx` import, and the Export and Import buttons in the SPA, which are built. A commit only creates records. `key`
 matching and the file cleanup of an import are not built.
 
 ## Grants
@@ -198,7 +198,7 @@ matching and the file cleanup of an import are not built.
 
 ## In the SPA
 
-- A table whose user holds `export` shows an Export button with CSV and Excel.
+- _(built)_ A table whose user holds `export` shows an Export button with CSV and Excel.
   It exports the table's data source or entity with the table's current
   parameters, sort and search.
 - _(built)_ An entity table whose user holds `import` shows an Import button. It
