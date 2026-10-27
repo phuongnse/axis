@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { expect, test } from '../test'
 import type { APIRequest, APIRequestContext } from '@playwright/test'
 import { csrfHeaders } from '../csrf'
-import { fieldLabel } from '../fields'
+import { expectShown, fieldLabel, fieldValue } from '../fields'
 import { sessionFile, useSession } from '../sessions'
 
 // The record API needs a session with a grant, so these journeys start signed in as the employee anna.
@@ -62,7 +62,7 @@ test('the manager opens a task from the inbox, fills in a field, approves and re
   await page.goto('/e2e/tasks')
   const row = page.getByRole('row', { name: new RegExp(title) })
   await row.getByRole('link', { name: 'Review the note', exact: true }).click()
-  await expect(page.getByLabel(fieldLabel('Title'))).toHaveValue(title)
+  await expectShown(fieldValue(page, 'title'), title)
   await page.getByLabel(fieldLabel('Priority')).fill('5')
   const inboxLoad = page.waitForResponse((response) => new URL(response.url()).pathname === tasksPath)
   await page.getByRole('button', { name: 'Approve', exact: true }).click()

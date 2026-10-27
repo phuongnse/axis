@@ -2,7 +2,7 @@ import { expect, test } from '../test'
 import type { APIRequestContext, Locator, Page } from '@playwright/test'
 import { csrfHeaders } from '../csrf'
 import { waitForDialog } from '../dialogs'
-import { fieldLabel } from '../fields'
+import { expectShown, fieldLabel, fieldValue } from '../fields'
 import { pickOption } from '../select'
 import { sessionFile, useSession } from '../sessions'
 
@@ -113,7 +113,7 @@ test('a note saved by a signed-in user shows its creator read-only', async ({ pa
   )
   await openForm(page, page.getByRole('button', { name: 'New', exact: true }))
   await expect(page).toHaveURL(/\/e2e\/noteform\/new$/)
-  await expect(page.getByLabel(fieldLabel('Created by'))).toHaveValue('Not set')
+  await expectShown(fieldValue(page, 'createdBy'), 'Not set')
   await page.getByRole('textbox', { name: 'Title', exact: true }).fill(title)
   await page.getByRole('button', { name: 'Save', exact: true }).click()
 
@@ -123,8 +123,8 @@ test('a note saved by a signed-in user shows its creator read-only', async ({ pa
     page.getByRole('row', { name: new RegExp(`${title} `) }).getByRole('button', { name: 'Open', exact: true }),
   )
   await expect(page.getByRole('textbox', { name: 'Title', exact: true })).toHaveValue(title)
-  const createdBy = page.getByLabel(fieldLabel('Created by'))
-  await expect(createdBy).toHaveValue(me.id)
+  const createdBy = fieldValue(page, 'createdBy')
+  await expectShown(createdBy, me.id)
   await expect(createdBy).not.toBeEditable()
 })
 
@@ -329,8 +329,8 @@ test('a form in two sections shows both titles, and saving keeps its read-only f
   await expect(page.getByRole('heading', { name: 'Main', exact: true })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Details', exact: true })).toBeVisible()
   await expect(page.getByRole('textbox', { name: 'Title', exact: true })).toHaveValue(`Sections ${run}`)
-  const code = page.getByLabel(fieldLabel('Code'))
-  await expect(code).toHaveValue(`S-${run}`)
+  const code = fieldValue(page, 'code')
+  await expectShown(code, `S-${run}`)
   await expect(code).not.toBeEditable()
   // A field the form does not list is not shown.
   await expect(page.getByLabel(/Done/)).toBeHidden()

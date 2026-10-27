@@ -4,7 +4,7 @@ import { expect, test } from '../test'
 import type { Locator, Page } from '@playwright/test'
 import { confirmDialog, waitForDialog } from '../dialogs'
 import { dragTo, waitForCanvas } from '../design-drag'
-import { fieldLabel } from '../fields'
+import { expectShown, fieldLabel, fieldValue } from '../fields'
 import { compareApplicationFolders } from '../folder-comparison'
 import { expectChosen, pickAction, pickOption, pickOptions } from '../select'
 import { journeyApplications, journeyURL, serviceDesk } from '../server-settings'
@@ -1508,7 +1508,7 @@ test.describe('the author builds the service desk with Studio only', () => {
 
     await useJourneySession(page, 'anna')
     await openTask(page, title, 'Confirm resolution')
-    await expect(page.getByLabel(fieldLabel('Resolution'))).toHaveValue(resolution)
+    await expectShown(fieldValue(page, 'resolution'), resolution)
     await page.getByRole('button', { name: 'Confirm', exact: true }).click()
     await expect(page).toHaveURL(/\/service-desk\/mytasks$/)
 
