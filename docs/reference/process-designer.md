@@ -11,9 +11,9 @@ The design follows [D74](../decisions/d74-a-visual-process-designer.md). The
 Design tab, the canvas, the existing step panels, remove, undo, Tab and Enter,
 the diagnostic marks and the live region for removals are _(built)_. The
 palette, the transitions and the live region for adds and transitions are
-_(built)_. The schema-driven type picker, the timer panel, the sub-process panel and
-the `notify` panel are _(built)_. The other panels of the new step types and the live
-region for moves are _(planned for M14)_.
+_(built)_. The schema-driven type picker, the timer panel, the sub-process panel, the
+`notify` panel and the deadline and escalations of a task are _(built)_. The other
+panels of the new step types and the live region for moves are _(planned for M14)_.
 
 - **Design tab** _(built)_. A process opens on a Design tab, next to its Form
   and JSON tabs. The three tabs edit one draft.
@@ -115,8 +115,17 @@ region for moves are _(planned for M14)_.
   rows, keyed by the parameters of the picked page. Switching a step from
   `notify` to another operation removes `to`, `channels`, `message` and `open`,
   and adds no empty key. The editor takes the pointer of the object that holds
-  these keys and never shows `next`, so the escalations of a task can use it
-  _(planned for M14)_.
+  these keys and never shows `next`, so the escalations of a task use it.
+- **Property panel (task deadline and escalations)** _(built)_. A task's card
+  has a Deadline section and an Escalations list, after Due in. Add deadline
+  writes `deadline` with an empty `after` and `next`, and the author types the
+  duration and picks the next step from the step names. Remove deadline removes
+  the key. Add escalation appends an escalation with an empty `after`, and
+  Remove escalation removes it. Each escalation has a Reassign switch, which
+  adds `reassign` with the assignee editor of the task, and a Notify switch,
+  which adds `notify` with the notify editor. Turning a switch off removes its
+  key. Removing the last escalation removes `escalations`. A new escalation has
+  neither key yet, so the compiler marks it until one switch is on.
 - **Step type picker** _(built)_. The picker in the card and the Add step
   choice list every type in `$defs.step.properties.type.enum` of the process
   schema, including `timer` and `subProcess`. Changing a step's type removes the
@@ -140,8 +149,7 @@ region for moves are _(planned for M14)_.
   writes every child parameter, keeping a value the draft already holds for
   that name. A child that is not in the names list changes only `process`.
 - **Property panel (other new step types)** _(planned for M14)_. The other new
-  step types and keys get panels too: wait for event, and the
-  escalations and deadline of a task.
+  step type gets a panel too: wait for event.
 - **Undo** _(built)_. The undo and redo of
   [D65](../decisions/d65-a-visual-page-designer-on-a-canvas-drawn-by-the-sites-widgets.md)
   cover every edit of a process on all three tabs, with 100 steps, cleared by

@@ -483,4 +483,100 @@ test.describe('Studio edits a process in the process editor', () => {
       await Promise.all([target, ...texts].map((name, index) => writeFile(name, originals[index])))
     }
   })
+
+  test('an author gives a task a deadline and a notify escalation to a role without the JSON view and saves without a new diagnostic', async ({
+    page,
+  }) => {
+    await useSession(page, 'hoa')
+    const id = await processId(page)
+    const target = path.join(copy, file)
+    const texts = ['en', 'vi'].map((locale) => path.join(copy, 'texts', `${locale}.json`))
+    const originals = await Promise.all([target, ...texts].map((name) => readFile(name, 'utf8')))
+
+    // The label editor writes the texts files at once, outside the save, so the journey restores them too.
+    async function writeTexts(field: string, en: string, vi: string) {
+      const label = page.getByTestId(field)
+      await label.getByRole('textbox', { name: 'en', exact: true }).fill(en)
+      await label.getByRole('textbox', { name: 'vi', exact: true }).fill(vi)
+      await label.getByRole('button', { name: 'Write texts', exact: true }).click()
+      await expect(label.getByTestId('studio-label-written')).toBeVisible()
+    }
+
+    try {
+      // The earlier journeys changed the copy, so the task is found by name.
+      const before = JSON.parse(originals[0]) as { steps: Record<string, unknown>[] }
+      const index = before.steps.findIndex((step) => step.name === 'financeApproval')
+      expect(index).toBeGreaterThanOrEqual(0)
+      const beforeDiagnostics = await diagnostics(page)
+
+      await page.goto(`${server.url}/studio?app=PurchaseRequests&resource=${id}`)
+      await openFormTab(page)
+      await expect(page.getByTestId(`studio-step-${index}`)).toContainText('financeApproval')
+
+      const deadline = page.getByTestId(`studio-field-/steps/${index}/deadline`)
+      await deadline.getByRole('button', { name: 'Add deadline', exact: true }).click()
+      await deadline.getByRole('textbox', { name: 'Deadline after', exact: true }).fill('P5D')
+      await pick(page, `/steps/${index}/deadline/next`, 'markRejected')
+
+      const row = `/steps/${index}/escalations/0`
+      await page
+        .getByTestId(`studio-field-/steps/${index}/escalations`)
+        .getByRole('button', { name: 'Add escalation', exact: true })
+        .click()
+      const escalation = page.getByTestId(`studio-field-${row}`)
+      await escalation.getByRole('textbox', { name: 'Escalate after', exact: true }).fill('P1D')
+      await escalation.getByRole('switch', { name: 'Notify', exact: true }).click()
+
+      const notify = `${row}/notify`
+      await page
+        .getByTestId(`studio-field-${notify}/to`)
+        .getByRole('button', { name: 'Add recipient', exact: true })
+        .click()
+      // The radio input of a button group is not visible, so the click goes to its label.
+      await page
+        .getByTestId(`studio-field-${notify}/to/0`)
+        .locator('label')
+        .filter({ has: page.getByRole('radio', { name: 'Role', exact: true }) })
+        .click()
+      await pick(page, `${notify}/to/0/role`, 'finance-reviewer')
+      await page
+        .getByTestId(`studio-field-${notify}/channels`)
+        .getByRole('checkbox', { name: 'In-app', exact: true })
+        .check()
+      await writeTexts(
+        `studio-field-${notify}/message/subject`,
+        'A request waits for finance',
+        'Một yêu cầu đang chờ tài chính',
+      )
+      await writeTexts(
+        `studio-field-${notify}/message/body`,
+        'A request has waited a day for the finance review',
+        'Một yêu cầu đã chờ tài chính một ngày',
+      )
+      await page.getByRole('button', { name: 'Save', exact: true }).click()
+
+      await expect(page.getByTestId('studio-saved')).toBeVisible()
+      expect(await diagnostics(page)).toEqual(beforeDiagnostics)
+      const saved = JSON.parse(await readFile(target, 'utf8')) as {
+        steps: {
+          deadline?: unknown
+          escalations?: { after: string; notify: Record<string, unknown> & { message: Record<string, { textKey: string }> } }[]
+        }[]
+      }
+      const { escalations, ...step } = saved.steps[index]
+      const { deadline: savedDeadline, ...unchanged } = step
+      expect(unchanged).toEqual(before.steps[index])
+      expect(savedDeadline).toEqual({ after: 'P5D', next: 'markRejected' })
+      expect(escalations).toHaveLength(1)
+      expect(escalations![0]).toMatchObject({
+        after: 'P1D',
+        notify: { to: [{ role: 'finance-reviewer' }], channels: ['inApp'] },
+      })
+      expect(escalations![0].notify).not.toHaveProperty('next')
+      expect(escalations![0].notify.message.subject.textKey).not.toBe('')
+      expect(escalations![0].notify.message.body.textKey).not.toBe('')
+    } finally {
+      await Promise.all([target, ...texts].map((name, i) => writeFile(name, originals[i])))
+    }
+  })
 })

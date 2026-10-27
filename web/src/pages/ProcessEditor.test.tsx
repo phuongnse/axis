@@ -286,6 +286,97 @@ describe.each(['light', 'dark'])('ProcessEditor in %s mode', (mode) => {
     expect(stepOf(latest, 1).assignee).toEqual({ user: 'a' })
   })
 
+  it('adds an escalation with a notify and writes to, channels and message without next', async () => {
+    const latest = renderEditor()
+    const field = (pointer: string) => within(screen.getByTestId(`studio-field-${pointer}`))
+
+    await userEvent.click(field('/steps/1/escalations').getByRole('button', { name: 'Add escalation' }))
+    expect(stepOf(latest, 1).escalations).toEqual([{ after: '' }])
+    await userEvent.type(field('/steps/1/escalations/0/after').getByRole('textbox'), 'P1D')
+    await userEvent.click(field('/steps/1/escalations/0').getByRole('switch', { name: 'Notify' }))
+    expect((stepOf(latest, 1).escalations as Record<string, unknown>[])[0].notify).toEqual({
+      to: [],
+      channels: [],
+      message: { subject: { textKey: '' }, body: { textKey: '' } },
+    })
+
+    const notify = '/steps/1/escalations/0/notify'
+    await userEvent.click(field(`${notify}/to`).getByRole('button', { name: 'Add recipient' }))
+    // The radio input of a button group has no pointer events, so the click goes to its label.
+    await userEvent.click(field(`${notify}/to/0`).getByRole('radio', { name: 'Role' }).closest('label')!)
+    await chooseOption('finance-reviewer', screen.getByTestId(`studio-field-${notify}/to/0/role`))
+    await userEvent.click(field(`${notify}/channels`).getByRole('checkbox', { name: 'In-app' }))
+    await userEvent.type(field(`${notify}/message/subject`).getByRole('textbox', { name: 'Text key' }), 'task.approve')
+    await userEvent.type(field(`${notify}/message/body`).getByRole('textbox', { name: 'Text key' }), 'task.reject')
+
+    expect(stepOf(latest, 1).escalations).toEqual([
+      {
+        after: 'P1D',
+        notify: {
+          to: [{ role: 'finance-reviewer' }],
+          channels: ['inApp'],
+          message: { subject: { textKey: 'task.approve' }, body: { textKey: 'task.reject' } },
+        },
+      },
+    ])
+    expect((stepOf(latest, 1).escalations as Record<string, unknown>[])[0].notify).not.toHaveProperty('next')
+
+    await userEvent.click(field('/steps/1/escalations/0').getByRole('switch', { name: 'Notify' }))
+    expect(stepOf(latest, 1).escalations).toEqual([{ after: 'P1D' }])
+  })
+
+  it('turns on reassign for an escalation with its own assignee editor and removes the key when off', async () => {
+    const latest = renderEditor()
+    const field = (pointer: string) => within(screen.getByTestId(`studio-field-${pointer}`))
+
+    await userEvent.click(field('/steps/1/escalations').getByRole('button', { name: 'Add escalation' }))
+    await userEvent.click(field('/steps/1/escalations/0').getByRole('switch', { name: 'Reassign' }))
+    expect((stepOf(latest, 1).escalations as Record<string, unknown>[])[0].reassign).toEqual({ user: '' })
+
+    // The task's own assignee stays a user while the escalation's group switches.
+    const reassign = field('/steps/1/escalations/0/reassign')
+    await userEvent.click(reassign.getByRole('radio', { name: 'Role' }).closest('label')!)
+    await chooseOption('finance-reviewer', screen.getByTestId('studio-field-/steps/1/escalations/0/reassign/role'))
+    expect((stepOf(latest, 1).escalations as Record<string, unknown>[])[0].reassign).toEqual({
+      role: 'finance-reviewer',
+    })
+    expect(stepOf(latest, 1).assignee).toEqual({ user: 'department.manager' })
+
+    await userEvent.click(field('/steps/1/escalations/0').getByRole('switch', { name: 'Reassign' }))
+    expect(stepOf(latest, 1).escalations).toEqual([{ after: '' }])
+  })
+
+  it('adds a deadline and removes the key when it is removed', async () => {
+    const latest = renderEditor()
+    const field = (pointer: string) => within(screen.getByTestId(`studio-field-${pointer}`))
+
+    await userEvent.click(field('/steps/1/deadline').getByRole('button', { name: 'Add deadline' }))
+    expect(stepOf(latest, 1).deadline).toEqual({ after: '', next: '' })
+    await userEvent.type(field('/steps/1/deadline/after').getByRole('textbox'), 'P5D')
+    await chooseOption('submit', screen.getByTestId('studio-field-/steps/1/deadline/next'))
+    expect(stepOf(latest, 1).deadline).toEqual({ after: 'P5D', next: 'submit' })
+
+    await userEvent.click(field('/steps/1/deadline').getByRole('button', { name: 'Remove deadline' }))
+    expect(stepOf(latest, 1)).not.toHaveProperty('deadline')
+    expect(field('/steps/1/deadline').getByRole('button', { name: 'Add deadline' })).toBeInTheDocument()
+  })
+
+  it('removes the escalations key when the only escalation is removed, and only the row otherwise', async () => {
+    const latest = renderEditor()
+    const field = (pointer: string) => within(screen.getByTestId(`studio-field-${pointer}`))
+    const add = () => userEvent.click(field('/steps/1/escalations').getByRole('button', { name: 'Add escalation' }))
+
+    await add()
+    await userEvent.click(field('/steps/1/escalations/0').getByRole('button', { name: 'Remove escalation' }))
+    expect(stepOf(latest, 1)).not.toHaveProperty('escalations')
+
+    await add()
+    await add()
+    await userEvent.type(field('/steps/1/escalations/1/after').getByRole('textbox'), 'P2D')
+    await userEvent.click(field('/steps/1/escalations/0').getByRole('button', { name: 'Remove escalation' }))
+    expect(stepOf(latest, 1).escalations).toEqual([{ after: 'P2D' }])
+  })
+
   it('switches the subject between an entity and parameters and keeps only the chosen key', async () => {
     const latest = renderEditor(process, true)
     const offered = async () =>
