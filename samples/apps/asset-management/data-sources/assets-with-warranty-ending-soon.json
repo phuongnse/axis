@@ -1,0 +1,18 @@
+{
+  "id": "4fea91d3-50ff-48bc-9c65-63c2b7399f9c",
+  "kind": "dataSource",
+  "name": "AssetsWithWarrantyEndingSoon",
+  "formatVersion": 1,
+  "entity": "Asset",
+  "fields": [
+    {
+      "name": "name",
+      "path": "name"
+    },
+    {
+      "name": "warrantyEnd",
+      "path": "warrantyEnd"
+    }
+  ],
+  "filter": "warrantyEnd >= today() and warrantyEnd <= addDays(today(), 30) and status != 'retired'"
+}

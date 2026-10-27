@@ -41,6 +41,8 @@
     "asset.sections.software": "Software",
     "asset.sections.attachments": "Attachments",
     "asset.sections.maintenance": "Maintenance",
+    "asset.warrantyReminder.subject": "Warranty ends soon: {name}",
+    "asset.warrantyReminder.body": "The warranty of {name} ends on {warrantyEnd}.",
     "attachment.label": "Attachment",
     "attachment.file": "File",
     "attachment.note": "Note",
