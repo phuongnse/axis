@@ -158,6 +158,7 @@ const texts = {
   'shell.table.empty': 'No records yet.',
   'shell.table.loadFailed': 'The records could not be loaded.',
   'shell.table.search': 'Search',
+  'shell.table.refresh': 'Refresh',
   'shell.table.rowActions': 'Actions',
   'shell.table.delete': 'Delete',
   'shell.table.deleteConfirm': 'Delete this record? This cannot be undone.',
@@ -403,11 +404,14 @@ describe('TableWidget', () => {
       renderWidget('?page=2', { ...noteWidget, rowActions: [detail] })
       const row = await screen.findByRole('row', { name: /Buy paper/ })
 
-      await userEvent.click(within(row).getByRole('button', { name: 'Details' }))
+      const link = within(row).getByRole('link', { name: 'Buy paper' })
+      expect(link).toHaveAttribute('href', `/e2e/ticketdetail?ticket=${noteId}`)
+      await userEvent.click(link)
 
       await waitFor(() => expect(screen.getByTestId('path')).toHaveTextContent('/e2e/ticketdetail'))
       expect(search()).toBe(`?ticket=${noteId}`)
       expect(screen.getByTestId('from')).toHaveTextContent('/e2e/notes?page=2')
+      expect(within(row).queryByRole('button', { name: 'Details' })).not.toBeInTheDocument()
     })
 
     it('opens the record of a form page with record', async () => {
@@ -415,10 +419,13 @@ describe('TableWidget', () => {
       renderWidget('', { ...noteWidget, rowActions: [{ ...createNote, labelKey: 'note.edit', record: 'id' }] })
       const row = await screen.findByRole('row', { name: /Buy paper/ })
 
-      await userEvent.click(within(row).getByRole('button', { name: 'Edit' }))
+      const link = within(row).getByRole('link', { name: 'Buy paper' })
+      expect(link).toHaveAttribute('href', `/e2e/noteform/${noteId}`)
+      await userEvent.click(link)
 
       await waitFor(() => expect(screen.getByTestId('path')).toHaveTextContent(`/e2e/noteform/${noteId}`))
       expect(search()).toBe('')
+      expect(within(row).queryByRole('button')).not.toBeInTheDocument()
     })
 
     describe('with a reference path', () => {
@@ -441,7 +448,10 @@ describe('TableWidget', () => {
         renderWidget('', { ...noteWidget, rowActions: [named] })
         const row = await screen.findByRole('row', { name: /Buy paper/ })
 
-        await userEvent.click(within(row).getByRole('button', { name: 'Details' }))
+        // A reference path is read on click, so the link has no address.
+        const link = within(row).getByRole('link', { name: 'Buy paper' })
+        expect(link).not.toHaveAttribute('href')
+        await userEvent.click(link)
 
         await waitFor(() => expect(search()).toBe('?category=Office'))
         expect(screen.getByTestId('path')).toHaveTextContent('/e2e/ticketdetail')
@@ -453,18 +463,19 @@ describe('TableWidget', () => {
         renderWidget('', { ...noteWidget, rowActions: [named] })
         const row = await screen.findByRole('row', { name: /Buy paper/ })
 
-        await userEvent.click(within(row).getByRole('button', { name: 'Details' }))
+        await userEvent.click(within(row).getByRole('link', { name: 'Buy paper' }))
 
         expect(await screen.findByTestId('table-action-error')).toHaveTextContent('The page could not be opened.')
         expect(screen.getByTestId('path')).toHaveTextContent('/e2e/notes')
       })
 
-      it('hides the button when paths has no entry for a hop', async () => {
+      it('shows plain text when paths has no entry for a hop', async () => {
         stubRecords()
         renderWidget('', { ...noteWidget, rowActions: [{ ...named, paths: {} }] })
         const row = await screen.findByRole('row', { name: /Buy paper/ })
 
-        expect(within(row).queryByRole('button', { name: 'Details' })).not.toBeInTheDocument()
+        expect(within(row).queryByRole('link')).not.toBeInTheDocument()
+        expect(within(row).getByText('Buy paper')).toBeInTheDocument()
       })
     })
 
@@ -493,7 +504,7 @@ describe('TableWidget', () => {
         const buttons = within(row).getAllByRole('button')
         expect(buttons).toHaveLength(1)
         expect(buttons[0]).toHaveAccessibleName('Actions')
-        expect(screen.queryByRole('button', { name: 'Details' })).not.toBeInTheDocument()
+        expect(within(row).getByRole('link', { name: 'Buy paper' })).toBeInTheDocument()
         expect(screen.queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument()
       })
 
@@ -506,10 +517,10 @@ describe('TableWidget', () => {
         const row = await screen.findByRole('row', { name: /Buy paper/ })
 
         await userEvent.click(within(row).getByRole('button', { name: 'Actions' }))
-        await userEvent.click(await screen.findByRole('menuitem', { name: 'Details' }))
+        await userEvent.click(await screen.findByRole('menuitem', { name: 'Edit' }))
 
-        await waitFor(() => expect(screen.getByTestId('path')).toHaveTextContent('/e2e/ticketdetail'))
-        expect(search()).toBe(`?ticket=${noteId}`)
+        await waitFor(() => expect(screen.getByTestId('path')).toHaveTextContent(`/e2e/noteform/${noteId}`))
+        expect(search()).toBe('')
         expect(screen.getByTestId('from')).toHaveTextContent('/e2e/notes?page=2')
       })
 
@@ -522,15 +533,16 @@ describe('TableWidget', () => {
       })
     })
 
-    it('hides a row button whose expression the SPA cannot work out', async () => {
+    it('shows plain text when the expression of the link cannot be worked out by the SPA', async () => {
       stubRecords()
       renderWidget('', { ...noteWidget, rowActions: [{ ...detail, parameters: { ticket: 'concat(title, id)' } }] })
       const row = await screen.findByRole('row', { name: /Buy paper/ })
 
-      expect(within(row).queryByRole('button', { name: 'Details' })).not.toBeInTheDocument()
+      expect(within(row).queryByRole('link')).not.toBeInTheDocument()
+      expect(within(row).getByText('Buy paper')).toBeInTheDocument()
     })
 
-    it('shows a row button only on the rows where its visibleWhen is true', async () => {
+    it('shows the identifying cell as a link only on the rows where visibleWhen is true', async () => {
       const otherId = '01926b3e-5f40-7c8a-9b1d-2e3f4a5b6c80'
       stubRecords(
         `{"items":[{"id":"${noteId}","version":1,"values":{"title":"Buy paper","status":"open"},"labels":{}},{"id":"${otherId}","version":1,"values":{"title":"Sell paper","status":"closed"},"labels":{}}],"page":1,"pageSize":20,"totalCount":2}`,
@@ -544,8 +556,9 @@ describe('TableWidget', () => {
       const open = await screen.findByRole('row', { name: /Buy paper/ })
       const closed = await screen.findByRole('row', { name: /Sell paper/ })
 
-      expect(within(open).getByRole('button', { name: 'Details' })).toBeInTheDocument()
-      expect(within(closed).queryByRole('button', { name: 'Details' })).not.toBeInTheDocument()
+      expect(within(open).getByRole('link', { name: 'Buy paper' })).toBeInTheDocument()
+      expect(within(closed).queryByRole('link')).not.toBeInTheDocument()
+      expect(within(closed).getByText('Sell paper')).toBeInTheDocument()
     })
 
     it('shows a toolbar button to a form page only with the create grant', async () => {
@@ -973,6 +986,156 @@ describe('TableWidget', () => {
 
     expect(await screen.findByTestId('records-error')).toBeInTheDocument()
     expect(screen.queryByTestId('filter-error-statusFilter')).not.toBeInTheDocument()
+  })
+
+  describe('identifying column, row action menu and Refresh', () => {
+    const open: NavigateAction = {
+      type: 'navigate',
+      page: 'NoteForm',
+      labelKey: 'note.details',
+      parameters: {},
+      record: 'id',
+      opensForm: true,
+      paths: {},
+      visibleWhen: null,
+    }
+    const close: StartProcessAction = {
+      type: 'startProcess',
+      process: 'NoteClose',
+      labelKey: 'note.close',
+      instancesPath: '/api/apps/E2eApp/processes/NoteClose/instances',
+      visibleWhen: null,
+    }
+    const remove: DeleteAction = { type: 'delete', labelKey: 'note.delete', recordsPath, visibleWhen: null }
+    const edit: NavigateAction = { ...open, labelKey: 'note.edit' }
+
+    it('puts the display field first, also when it is declared later', async () => {
+      stubRecords()
+      const widget = {
+        ...noteWidget,
+        entity: {
+          ...noteWidget.entity,
+          displayField: 'title',
+          fields: [field('done', 'boolean', 'note.done'), field('title', 'text', 'note.title')],
+        },
+        rowActions: [open],
+      }
+
+      renderWidget('', widget)
+
+      const row = await screen.findByRole('row', { name: /Buy paper/ })
+      expect(screen.getAllByRole('columnheader').map((header) => header.textContent)).toEqual(['Title', 'Done'])
+      expect(within(row).getByRole('link', { name: 'Buy paper' })).toHaveAttribute('href', `/e2e/noteform/${noteId}`)
+    })
+
+    it('shows the label as the link text when the identifying cell is empty', async () => {
+      stubRecords(notePage.replace('"title":"Buy paper"', '"title":null'))
+
+      renderWidget('', { ...noteWidget, rowActions: [open] })
+
+      const link = await screen.findByRole('link', { name: 'Details' })
+      expect(link).toHaveAttribute('href', `/e2e/noteform/${noteId}`)
+    })
+
+    it('shows one delete as a trash button named by its label, with no Actions button', async () => {
+      stubRecords()
+
+      renderWidget('', { ...noteWidget, rowActions: [remove] })
+
+      const row = await screen.findByRole('row', { name: /Buy paper/ })
+      expect(within(row).getByRole('button', { name: 'Delete note' })).toBeInTheDocument()
+      expect(within(row).queryByRole('button', { name: 'Actions' })).not.toBeInTheDocument()
+      expect(within(row).queryByRole('link')).not.toBeInTheDocument()
+    })
+
+    it('folds three or more other actions into one Actions menu with the delete marked danger', async () => {
+      stubRecords()
+
+      renderWidget('', { ...noteWidget, rowActions: [open, close, edit, remove] })
+
+      const row = await screen.findByRole('row', { name: /Buy paper/ })
+      const buttons = within(row).getAllByRole('button')
+      expect(buttons).toHaveLength(1)
+      expect(buttons[0]).toHaveAccessibleName('Actions')
+      expect(within(row).getByRole('link', { name: 'Buy paper' })).toBeInTheDocument()
+      await userEvent.click(buttons[0])
+      const items = await screen.findAllByRole('menuitem')
+      expect(items.map((item) => item.textContent)).toEqual(['Close note', 'Edit', 'Delete note'])
+      expect(items[2]).toHaveClass('ant-dropdown-menu-item-danger')
+      expect(items[0]).not.toHaveClass('ant-dropdown-menu-item-danger')
+    })
+
+    it('shows one or two other actions in the row', async () => {
+      stubRecords()
+
+      renderWidget('', { ...noteWidget, rowActions: [open, close, remove] })
+
+      const row = await screen.findByRole('row', { name: /Buy paper/ })
+      expect(within(row).getByRole('button', { name: 'Close note' })).toBeInTheDocument()
+      expect(within(row).getByRole('button', { name: 'Delete note' })).toBeInTheDocument()
+      expect(within(row).queryByRole('button', { name: 'Actions' })).not.toBeInTheDocument()
+    })
+
+    it('keeps a download link in a file column, so the first navigate action stays a row action', async () => {
+      stubRecords(receiptPage)
+      const widget = {
+        ...receiptWidget,
+        entity: {
+          ...receiptWidget.entity,
+          fields: [receiptWidget.entity.fields.find((candidate) => candidate.name === 'receipt')!],
+        },
+        rowActions: [open],
+      }
+
+      renderWidget('', widget)
+
+      const row = await screen.findByRole('row', { name: /paper.pdf/ })
+      expect(within(row).getByRole('link', { name: 'paper.pdf' })).toHaveAttribute(
+        'href',
+        `/api/apps/E2eApp/files/${fileId}`,
+      )
+      expect(within(row).getByRole('button', { name: 'Details' })).toBeInTheDocument()
+    })
+
+    it('loads the same page of rows again when Refresh is clicked', async () => {
+      const requests = stubRecords()
+      renderWidget('?page=2')
+      await screen.findByRole('row', { name: /Buy paper/ })
+
+      await userEvent.click(screen.getByRole('button', { name: 'Refresh' }))
+
+      await waitFor(() => expect(requests()).toHaveLength(2))
+      expect(requests()).toEqual([`${recordsPath}?page=2`, `${recordsPath}?page=2`])
+      expect(search()).toBe('?page=2')
+    })
+
+    it('shows the toolbar with Refresh on a table with no search or toolbar actions', async () => {
+      stubRecords()
+
+      renderWidget()
+
+      expect(await screen.findByRole('button', { name: 'Refresh' })).toBeInTheDocument()
+    })
+
+    it('puts the first toolbar action last, after Refresh, Import and Export', async () => {
+      stubRecords()
+      const main: NavigateAction = { ...open, record: null, labelKey: 'note.add' }
+      const other: NavigateAction = { ...main, labelKey: 'note.close' }
+
+      renderWidget('', {
+        ...noteWidget,
+        access: { ...everyAction, actions: [...everyAction.actions, 'import', 'export'] },
+        toolbarActions: [main, other],
+      })
+
+      await screen.findByRole('row', { name: /Buy paper/ })
+      const bar = screen.getByRole('button', { name: 'Refresh' }).parentElement!
+      expect(
+        within(bar)
+          .getAllByRole('button')
+          .map((button) => button.textContent || button.getAttribute('aria-label')),
+      ).toEqual(['Refresh', 'Import', 'Export', 'Close note', 'Add note'])
+    })
   })
 
   describe('startProcess row action', () => {

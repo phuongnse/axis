@@ -53,7 +53,7 @@ test('a user without a create grant sees no New button, and one without a start 
   await useSession(page, 'chau')
   await page.goto('/purchasing/purchaserequests')
   // The rows show once the page has loaded, so the missing button is not just not rendered yet.
-  await expect(page.getByRole('button', { name: 'Open', exact: true }).first()).toBeVisible()
+  await expect(page.getByRole('table').getByRole('link').first()).toBeVisible()
   await expect(page.getByRole('button', { name: /New/i })).toHaveCount(0)
   await page.goto(`/purchasing/purchaserequestform/${id}`)
   await expect(page.getByRole('textbox', { name: '* Title', exact: true })).toHaveValue(title)

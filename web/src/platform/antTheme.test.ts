@@ -53,8 +53,9 @@ describe.each(['light', 'dark'] as const)('the accessible colours of the Ant Des
     expect(token.colorInfoText).toBe(colour.infoText)
   })
 
-  it('draws validation messages, the selected tab and the selected menu entry in the text tokens', () => {
+  it('draws validation messages, danger menu entries, the selected tab and the selected menu entry in the text tokens', () => {
     expect(config.components?.Form).toMatchObject({ colorError: colour.dangerText })
+    expect(config.components?.Dropdown).toMatchObject({ colorError: colour.dangerText })
     expect(config.components?.Tabs).toMatchObject({
       itemSelectedColor: colour.primaryText,
       itemHoverColor: colour.primaryText,

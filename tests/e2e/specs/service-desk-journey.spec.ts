@@ -1334,7 +1334,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     await page.getByRole('button', { name: 'Save', exact: true }).click()
     await expect(page).toHaveURL(/\/service-desk\/mytickets$/)
 
-    await page.getByRole('row', { name: new RegExp(title) }).getByRole('button', { name: 'Open', exact: true }).click()
+    await page.getByRole('row', { name: new RegExp(title) }).getByRole('link').click()
     await expect(page).toHaveURL(/\/service-desk\/ticketform\/[^/]+$/)
     const id = page.url().split('/').pop()
     await expect(page.getByRole('textbox', { name: '* Title', exact: true })).toHaveValue(title)

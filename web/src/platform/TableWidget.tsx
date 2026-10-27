@@ -1,6 +1,18 @@
-import { Alert, Button, Dropdown, Flex, Input, Modal, Table, type TableColumnsType, type TableProps } from 'antd'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useLocation, useNavigate, useSearchParams } from 'react-router'
+import { DeleteOutlined, EllipsisOutlined, ReloadOutlined } from '@ant-design/icons'
+import {
+  Alert,
+  Button,
+  Dropdown,
+  Flex,
+  Input,
+  Modal,
+  Table,
+  Tooltip,
+  type TableColumnsType,
+  type TableProps,
+} from 'antd'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router'
 import { useCanvasActions } from './canvasActions'
 import { downloadExport, exportAddress, exportPath, saveFile, type ExportFormat } from './exports'
 import { FileLink } from './FileInput'
@@ -86,11 +98,17 @@ interface TableSource {
   searchable: boolean
 }
 
+// A text, enum or reference cell is at most this wide, in px, and wraps.
+const cellMaxWidth = 320
+// A table folds a row's other actions into one menu from this many on.
+const foldFrom = 3
+
 function tableSource({ entity, dataSource }: WidgetMetadata): TableSource {
   if (dataSource) {
     return {
       name: dataSource.name,
       path: dataSource.rowsPath,
+      // The first column identifies a row of a data source.
       columns: dataSource.columns,
       parameters: dataSource.parameters,
       defaultPageSize: dataSource.pageSize,
@@ -99,11 +117,14 @@ function tableSource({ entity, dataSource }: WidgetMetadata): TableSource {
   }
   // The server sets exactly one of the two.
   const { name, recordsPath, fields, displayField } = entity!
+  // A child collection and a references field have no column and cannot be sorted by.
+  const columns = fields.filter((field) => field.type !== 'child-collection' && field.type !== 'references')
+  // The display field identifies a row when the table shows it, and it comes first. Otherwise the first column does.
+  const identifying = columns.findIndex((field) => field.name === displayField)
   return {
     name,
     path: recordsPath,
-    // A child collection and a references field have no column and cannot be sorted by.
-    columns: fields.filter((field) => field.type !== 'child-collection' && field.type !== 'references'),
+    columns: identifying > 0 ? [columns[identifying], ...columns.filter((_, index) => index !== identifying)] : columns,
     parameters: [],
     defaultPageSize: recordPageSize,
     // The record API searches the display field, so the user must be able to read it.
@@ -115,7 +136,7 @@ function tableSource({ entity, dataSource }: WidgetMetadata): TableSource {
  * Shows the records of the widget's entity, or the rows of its data source. A row of a data source
  * carries the id of its root record, so a row action can open a form for it. A row of a grouped
  * data source is a group with no id, so it has no row action buttons. Each `navigate` row action is
- * a button on every row with an id, and each toolbar action a button above the table. Both open
+ * a link or a button on every row with an id, and each toolbar action a button above the table. Both open
  * the target page with the parameter values in the URL query. Each `startProcess` row action is a
  * button on every row with an id that starts the process with that row's record as subject, with an
  * `Idempotency-Key` kept until the start has a final answer. A `201` loads the current page of rows
@@ -131,8 +152,14 @@ function tableSource({ entity, dataSource }: WidgetMetadata): TableSource {
  * at the row limit shows a notice above the table. A `403`, `409` or `503` shows its own message, and any
  * other failure a generic one. The canvas draws the button and exports nothing. A toolbar action to a form page
  * without `record` needs the user's `create` grant on the entity, as the widget's access says, and
- * a button whose expressions the SPA cannot work out is hidden. Below 768 px, a row's actions fold
- * into one "Actions" menu.
+ * a button whose expressions the SPA cannot work out is hidden. The identifying column, which is the entity's
+ * display field when the table shows it and otherwise the first column, comes first. The first `navigate` row
+ * action is the link of its cell, with a real address when the SPA can build it, so Ctrl+click opens a new tab. It
+ * is plain text when `visibleWhen` hides the action, and shows the action's label when the cell is empty. A file
+ * column keeps its download link, so then no action is the link. The other row actions show in the row, a delete
+ * as a trash icon. Three or more configured ones, or any number below 768 px, fold into one "Actions" menu. The
+ * toolbar always shows. Its right side has a Refresh button that loads the current page of rows again, then Import,
+ * Export and the toolbar actions, with the first toolbar action last. Text, enum and reference cells wrap at 320 px.
  * Paging and sorting live in the URL as the API's `page`, `pageSize` and `sort`, so reload, sharing
  * and the back button keep them. A data source table also has a filter bar, whose values live in the
  * URL under the parameter names. A data source parameter that the widget binds to a page parameter has
@@ -396,10 +423,67 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
     [from, navigate, t],
   )
 
+  // The first `navigate` row action is the link of the identifying column, which is the first column. A file
+  // column keeps its download link, and a link cannot hold a link, so then every action stays a row action.
+  const openIndex = fields[0]?.type === 'file' ? -1 : rowActions.findIndex((action) => action.type === 'navigate')
+  // The rule of three counts the configured actions, so every row has the same layout.
+  const otherIndexes = useMemo(
+    () => rowActions.flatMap((_, index) => (index === openIndex ? [] : [index])),
+    [rowActions, openIndex],
+  )
+
   const columns = useMemo<TableColumnsType<TableRow>>(() => {
     const sortOrder = (field: string) =>
       query.sort?.field === field ? (query.sort.descending ? 'descend' : 'ascend') : null
-    const fieldColumns: TableColumnsType<TableRow> = fields.map((field) => ({
+    const top = () => ({ style: { verticalAlign: 'top' } })
+    // The link of the identifying cell. A cell with no id, or with no address the SPA can build, is plain text.
+    const openLink = (shown: ReactNode, text: string, record: TableRow): ReactNode => {
+      const action = rowActions[openIndex]
+      if (openIndex < 0 || action.type !== 'navigate' || record.id === null) {
+        return shown
+      }
+      const label = text === '' ? t(action.labelKey) : shown
+      if (canvas.active) {
+        return (
+          <a
+            role="link"
+            tabIndex={0}
+            onKeyDown={(event) => event.key === 'Enter' && event.currentTarget.click()}
+            {...canvas.props(`rowActions/${openIndex}`)}
+          >
+            {label}
+          </a>
+        )
+      }
+      const scope = { id: record.id, values: record.values }
+      if (!isVisible(action.visibleWhen, scope)) {
+        return shown
+      }
+      const href = navigatePath(sitePath, action, scope)
+      if (href !== null) {
+        return (
+          <Link to={href} state={{ from }}>
+            {label}
+          </Link>
+        )
+      }
+      // A reference path is read on click, so the link has no address.
+      const open = navigateTarget(sitePath, action, scope)
+      if (open === null) {
+        return shown
+      }
+      return (
+        <a
+          role="link"
+          tabIndex={0}
+          onClick={() => void runNavigate(open)}
+          onKeyDown={(event) => event.key === 'Enter' && void runNavigate(open)}
+        >
+          {label}
+        </a>
+      )
+    }
+    const fieldColumns: TableColumnsType<TableRow> = fields.map((field, column) => ({
       key: field.name,
       dataIndex: ['values', field.name],
       title: field.labelKey ? t(field.labelKey) : field.name,
@@ -407,17 +491,26 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
       sorter: field.type !== 'reference' && field.type !== 'file',
       sortOrder: field.type === 'reference' || field.type === 'file' ? undefined : sortOrder(field.name),
       align: field.type === 'integer' || field.type === 'decimal' || field.type === 'money' ? 'right' : undefined,
-      render: (value: RecordValue, record: TableRow) =>
-        field.type === 'file' && 'downloadPath' in field && isFileValue(value) ? (
-          <FileLink field={field} value={value} />
+      onCell: top,
+      render: (value: RecordValue, record: TableRow) => {
+        if (field.type === 'file' && 'downloadPath' in field && isFileValue(value)) {
+          return <FileLink field={field} value={value} />
+        }
+        const text = formatValue(field, value, record.labels, { locale, text: t }, record.values)
+        const shown = column === 0 ? openLink(text, text, record) : text
+        return field.type === 'text' || field.type === 'enum' || field.type === 'reference' ? (
+          <div style={{ maxWidth: cellMaxWidth, whiteSpace: 'normal', overflowWrap: 'anywhere' }}>{shown}</div>
         ) : (
-          formatValue(field, value, record.labels, { locale, text: t }, record.values)
-        ),
+          shown
+        )
+      },
     }))
     const result = [...fieldColumns]
-    if (rowActions.length > 0) {
+    if (otherIndexes.length > 0) {
+      const fold = phone || otherIndexes.length >= foldFrom
       result.push({
         key: actionsColumnKey,
+        onCell: top,
         render: (_value: unknown, record: TableRow) => {
           // A group row has no id and no buttons.
           if (record.id === null) {
@@ -426,7 +519,8 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
           const scope = { id: record.id, values: record.values }
           // A start action runs for the row. A delete action asks for confirmation first. A navigate action opens its page, or is dropped when its path is unknown.
           // An action whose visibleWhen is not plainly true is dropped.
-          const list = rowActions.flatMap((action, index): { action: RowAction; index: number; run: () => void }[] => {
+          const list = otherIndexes.flatMap((index): { action: RowAction; index: number; run: () => void }[] => {
+            const action = rowActions[index]
             // The canvas draws every action, also one that the site would hide.
             if (canvas.active) {
               return [{ action, index, run: () => {} }]
@@ -446,7 +540,8 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
           if (list.length === 0) {
             return null
           }
-          if (phone) {
+          const disabled = (action: RowAction) => action.type !== 'navigate' && (starting || deleting)
+          if (fold) {
             return (
               <Dropdown
                 trigger={['click']}
@@ -455,36 +550,76 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
                   items: list.map(({ action, index, run }) => ({
                     key: String(index),
                     label: t(action.labelKey),
-                    disabled: action.type !== 'navigate' && (starting || deleting),
+                    danger: action.type === 'delete',
+                    disabled: disabled(action),
                     onClick: run,
                   })),
                   'aria-label': t('shell.table.rowActions'),
                 }}
               >
-                <Button size="small">{t('shell.table.rowActions')}</Button>
+                <Tooltip title={t('shell.table.rowActions')}>
+                  <Button
+                    type="text"
+                    size="small"
+                    icon={<EllipsisOutlined />}
+                    aria-label={t('shell.table.rowActions')}
+                  />
+                </Tooltip>
               </Dropdown>
             )
           }
           return (
             <Flex gap="small">
-              {list.map(({ action, index, run }) => (
-                <Button
-                  key={index}
-                  size="small"
-                  disabled={action.type !== 'navigate' && (starting || deleting)}
-                  onClick={run}
-                  {...canvas.props(`rowActions/${index}`)}
-                >
-                  {t(action.labelKey)}
-                </Button>
-              ))}
+              {list.map(({ action, index, run }) =>
+                action.type === 'delete' ? (
+                  <Tooltip key={index} title={t(action.labelKey)}>
+                    <Button
+                      type="text"
+                      size="small"
+                      danger
+                      icon={<DeleteOutlined />}
+                      aria-label={t(action.labelKey)}
+                      disabled={disabled(action)}
+                      onClick={run}
+                      {...canvas.props(`rowActions/${index}`)}
+                    />
+                  </Tooltip>
+                ) : (
+                  <Button
+                    key={index}
+                    type="text"
+                    size="small"
+                    disabled={disabled(action)}
+                    onClick={run}
+                    {...canvas.props(`rowActions/${index}`)}
+                  >
+                    {t(action.labelKey)}
+                  </Button>
+                ),
+              )}
             </Flex>
           )
         },
       })
     }
     return result
-  }, [fields, locale, phone, query.sort, rowActions, runNavigate, runStart, sitePath, starting, deleting, t, canvas])
+  }, [
+    fields,
+    locale,
+    phone,
+    query.sort,
+    rowActions,
+    openIndex,
+    otherIndexes,
+    runNavigate,
+    runStart,
+    sitePath,
+    from,
+    starting,
+    deleting,
+    t,
+    canvas,
+  ])
 
   // A new sort or page size starts again at page 1. Paging and sorting add history entries.
   const onChange: TableProps<TableRow>['onChange'] = (pagination, _filters, sorter) => {
@@ -546,50 +681,61 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
 
   return (
     <Flex vertical gap="middle" aria-busy={loading}>
-      {(searchable || toolbarButtons.length > 0 || canImport || canExport) && (
-        <Flex justify="space-between" align="center" gap="small" wrap>
-          {searchable && (
-            <Input.Search
-              allowClear
-              maxLength={200}
-              style={{ maxWidth: 320 }}
-              aria-label={t('shell.table.search')}
-              placeholder={t('shell.table.search')}
-              value={draft}
-              onChange={(event) => setDraft(event.target.value)}
-              onSearch={onSearch}
+      <Flex justify="space-between" align="center" gap="small" wrap>
+        {searchable && (
+          <Input.Search
+            allowClear
+            maxLength={200}
+            style={{ maxWidth: 320 }}
+            aria-label={t('shell.table.search')}
+            placeholder={t('shell.table.search')}
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            onSearch={onSearch}
+          />
+        )}
+        <Flex gap="small" style={{ marginInlineStart: 'auto' }}>
+          <Tooltip title={t('shell.table.refresh')}>
+            <Button
+              type="text"
+              icon={<ReloadOutlined />}
+              aria-label={t('shell.table.refresh')}
+              onClick={() => {
+                if (!canvas.active) {
+                  // The same URL is requested again, so the table shows busy meanwhile.
+                  setState((current) => ({ ...current, url: undefined }))
+                  setReloads((count) => count + 1)
+                }
+              }}
             />
+          </Tooltip>
+          {canImport && <Button onClick={() => !canvas.active && setImporting(true)}>{t('shell.table.import')}</Button>}
+          {canExport && (
+            <Dropdown
+              trigger={['click']}
+              menu={{
+                items: [
+                  { key: 'csv', label: t('shell.table.exportCsv') },
+                  { key: 'xlsx', label: t('shell.table.exportXlsx') },
+                ],
+                onClick: ({ key }) => !canvas.active && void runExport(key as ExportFormat),
+              }}
+            >
+              <Button loading={exporting}>{t('shell.table.export')}</Button>
+            </Dropdown>
           )}
-          <Flex gap="small" style={{ marginInlineStart: 'auto' }}>
-            {toolbarButtons.map(({ action, path, index }) => (
-              <Button
-                key={index}
-                onClick={() => navigate(path, { state: { from } })}
-                {...canvas.props(`toolbarActions/${index}`)}
-              >
-                {t(action.labelKey)}
-              </Button>
-            ))}
-            {canImport && (
-              <Button onClick={() => !canvas.active && setImporting(true)}>{t('shell.table.import')}</Button>
-            )}
-            {canExport && (
-              <Dropdown
-                trigger={['click']}
-                menu={{
-                  items: [
-                    { key: 'csv', label: t('shell.table.exportCsv') },
-                    { key: 'xlsx', label: t('shell.table.exportXlsx') },
-                  ],
-                  onClick: ({ key }) => !canvas.active && void runExport(key as ExportFormat),
-                }}
-              >
-                <Button loading={exporting}>{t('shell.table.export')}</Button>
-              </Dropdown>
-            )}
-          </Flex>
+          {/* The first toolbar action is the main action, so it comes last. */}
+          {[...toolbarButtons.slice(1), ...toolbarButtons.slice(0, 1)].map(({ action, path, index }) => (
+            <Button
+              key={index}
+              onClick={() => navigate(path, { state: { from } })}
+              {...canvas.props(`toolbarActions/${index}`)}
+            >
+              {t(action.labelKey)}
+            </Button>
+          ))}
         </Flex>
-      )}
+      </Flex>
       {parameters.length > 0 && (
         <FilterBar
           parameters={parameters}

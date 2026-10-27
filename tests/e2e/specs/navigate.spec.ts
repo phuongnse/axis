@@ -5,7 +5,7 @@ import { sessionFile } from "../sessions";
 // The record API needs a session with a grant, so this journey starts signed in as the employee anna.
 test.use({ storageState: sessionFile("anna") });
 
-test("a row button opens a note, and saving returns to the table with the edited row", async ({
+test("the title link opens a note, and saving returns to the table with the edited row", async ({
   page,
   request,
 }) => {
@@ -21,7 +21,7 @@ test("a row button opens a note, and saving returns to the table with the edited
   await page.goto("/e2e/noterows");
   await page
     .getByRole("row", { name: new RegExp(title) })
-    .getByRole("button", { name: "Open", exact: true })
+    .getByRole("link", { name: title, exact: true })
     .click();
 
   await expect(page).toHaveURL(new RegExp(`/e2e/noteform/${id}$`));

@@ -545,11 +545,11 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   - **Columns.** There is one column per field, in declaration order. The
     header is the field's label, or the field name when it has no label. A
     child collection and a `references` field have no column.
-    - **Identifying column** _(planned)_. The column that names a row is the
+    - **Identifying column**. The column that names a row is the
       entity's `displayField` when the table shows it, and otherwise the first
       column. For a data source it is the first column. It comes first. With a
       `navigate` row action it is the link that opens the row, see **Links**.
-    - **Layout** _(planned)_. Text, enum and reference columns are at most
+    - **Layout**. Text, enum and reference columns are at most
       320 px wide, and their text wraps. Every cell and the actions column
       line up at the top, so a row with wrapped text reads along its first
       line. Number columns sit on the right in tabular figures, see **Shown
@@ -563,12 +563,13 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     changes only its own four parameters and, for a data source, the
     parameter values described below: any other parameter, such as `x=1`,
     stays as it is.
-  - **Toolbar** _(planned)_. What changes the view sits on the left: the
+  - **Toolbar**. What changes the view sits on the left: the
     search box and the filter inputs. On the right is a Refresh icon button,
     named by the platform text `shell.table.refresh` ("Refresh", in `vi` "Làm
     mới"), which loads the current page of rows again. Then come the secondary
-    actions, such as Import, and last the first toolbar action, as the table's
-    main action, see **Buttons**.
+    actions, Import, Export and the toolbar actions after the first, and last
+    the first toolbar action, as the table's main action, see **Buttons**. The
+    toolbar always shows, also when the table has no search or toolbar action.
   - **Search.** A table whose rows can be searched shows a search box above
     the rows, on the left, with the toolbar buttons on the right. An entity
     table has one when the entity's display field is among the fields the
@@ -715,16 +716,21 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     number, so `1250.50` shows as `1250.5` there. The web unit tests need
     Node 22 or later for the same reason. The API never coerces a string to a
     number, so the [form widget](form-widget.md) sends numbers back as JSON numbers.
-  - **Links.** The table has no open link and no create button set apart from its
-    actions. A sample opens a record with a `rowActions` navigate with
-    `record: id`, and creates one with a `toolbarActions` navigate without
-    `record`, still gated by `access` `create`. Both pass the table's address,
-    with its paging and sorting, to the form in history state. _(planned)_ The
-    first `navigate` row action opens a row from its identifying column, which
-    is a link, and has no button of its own. The link has a real `href` when
-    the address is known at once, so Ctrl+click opens it in a new tab. A
-    reference path in the action, which is read on click, gives no `href`. An
-    action whose `visibleWhen` hides it leaves the cell as plain text.
+  - **Links.** The table has no create button set apart from its actions. A
+    sample opens a record with a `rowActions` navigate with `record: id`, and
+    creates one with a `toolbarActions` navigate without `record`, still gated
+    by `access` `create`. Both pass the table's address, with its paging and
+    sorting, to the form in history state. The first `navigate` row action
+    opens a row from its identifying column, which is a link, and has no
+    button of its own. The link has a real `href` when the address is known at
+    once, so Ctrl+click opens it in a new tab. A reference path in the action,
+    which is read on click, gives no `href`. An action whose `visibleWhen`
+    hides it leaves the cell as plain text, as does a group row or an action
+    the SPA cannot build an address for. An empty identifying cell shows the
+    action's label as the link text, so the row can still be opened. When the
+    identifying column is a `file` column, its download link stays and no
+    action is the link, so every `navigate` action stays a row action, because
+    a link cannot hold a link.
   - **Row and toolbar actions.** See
     [D59](../decisions/d59-table-row-and-toolbar-actions.md). Page metadata
     lists the `navigate` actions in `rowActions` and `toolbarActions`,
@@ -736,11 +742,14 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     - **Where.** Toolbar actions sit above the table. Row actions
       are buttons in the row. At narrow width, a row's actions fold into one
       menu button labelled by the platform text `shell.table.rowActions`.
-      _(planned)_ With one or two actions besides the open link, they show in
+      With one or two actions besides the open link, they show in
       the row: a `delete` is a red trash icon named by its label, and any other
       action a small text button. With three or more, or at narrow width, they
       fold into one "…" icon button named `shell.table.rowActions`, which
-      opens a menu of text entries, a delete entry in `dangerText`. A
+      opens a menu of text entries, a delete entry in `dangerText`. The count
+      is of the actions the widget configures besides the open link, not of
+      those a row shows, so every row has the same layout even where
+      `visibleWhen` hides an action on some rows. A
       `navigate` action may sit in either list. `startProcess` and `delete`
       are row actions only. A row of a data source acts on its root record,
       and a group row has no actions.
@@ -822,7 +831,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
       above the table.
     - **Import.** A table over an entity has an Import button next to its
       toolbar actions only when `access.actions` holds `import`. It is a
-      secondary action, before the main action _(planned)_. Without it
+      secondary action, before the main action. Without it
       there is no button. The canvas draws it and opens nothing. A click opens
       a dialog with one file picker for a `.csv` or `.xlsx` file, a Check
       button and a Close button. Check sends `POST {entity}/imports` with the

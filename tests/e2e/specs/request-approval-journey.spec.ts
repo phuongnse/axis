@@ -83,7 +83,7 @@ test.describe('the author builds an application from the request-approval templa
     await page.getByRole('button', { name: 'Save', exact: true }).click()
     await expect(page).toHaveURL(/\/equipment-requests\/myrequests$/)
 
-    await page.getByRole('row', { name: new RegExp(title) }).getByRole('button', { name: 'Open', exact: true }).click()
+    await page.getByRole('row', { name: new RegExp(title) }).getByRole('link').click()
     await expect(page).toHaveURL(/\/equipment-requests\/requestform\/[^/]+$/)
     const id = page.url().split('/').pop()
     await expect(page.getByRole('textbox', { name: '* Title', exact: true })).toHaveValue(title)
