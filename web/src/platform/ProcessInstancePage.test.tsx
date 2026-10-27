@@ -127,6 +127,8 @@ const detailText = `{
       "resolvable": false
     }
   ],
+  "parent": null,
+  "subProcesses": [],
   "commands": []
 }`
 
@@ -156,6 +158,58 @@ function detailWith(commands: string[], failed?: 'package' | 'connector') {
     }
   }
   return JSON.stringify(detail)
+}
+
+const parentId = '0192f4c0-1a2b-7c3d-8e4f-5a6b7c8d9e01'
+const childId = '0192f4c0-1a2b-7c3d-8e4f-5a6b7c8d9e02'
+
+/** A detail without a subject, waiting at the timer `wait`, with a parent and one child. */
+function detailWithRelatives() {
+  const detail = JSON.parse(detailText) as Record<string, unknown>
+  return JSON.stringify({
+    ...detail,
+    subjectId: null,
+    step: 'wait',
+    graph: {
+      start: 'wait',
+      steps: [
+        { name: 'wait', type: 'timer', labelKey: null, transitions: [{ next: 'done', on: null }] },
+        { name: 'done', type: 'end', labelKey: null, transitions: [] },
+      ],
+    },
+    path: [
+      {
+        step: 'wait',
+        startedAt: '2026-10-10T02:05:00Z',
+        finishedAt: '2026-10-10T02:05:00Z',
+        decision: null,
+        output: { state: 'waiting', dueAt: '2026-10-11T02:05:00Z' },
+        error: null,
+      },
+    ],
+    tasks: [],
+    calls: [],
+    parent: { id: parentId, process: 'PurchaseRequestApproval', step: 'runChild' },
+    subProcesses: [
+      {
+        id: childId,
+        process: 'ChildJob',
+        step: 'wait',
+        state: 'running',
+        createdAt: '2026-10-10T02:05:00Z',
+        endedAt: null,
+      },
+    ],
+  })
+}
+
+/** The metadata of a page that holds one process inspector of `process`. */
+function inspectorPage(name: string, process: string) {
+  return JSON.stringify({
+    name,
+    titleKey: `${name}.title`,
+    widgets: [{ ...inspectorWidget, process, instancesPath: `/api/apps/PurchasingApp/processes/${process}/instances` }],
+  })
 }
 
 const resolvableCallId = '0192f5c3-4e5f-7a60-9b1c-3d4e5f6a7b8c'
@@ -195,6 +249,12 @@ function stubApi({
     if (init?.method === 'POST' && url.endsWith('/resolve')) {
       return new Response(resolve.body ?? '', { status: resolve.status })
     }
+    if (url === '/api/sites/e2e/pages/Inspector') {
+      return new Response(inspectorPage('Inspector', 'PurchaseRequestApproval'), { status: 200 })
+    }
+    if (url === '/api/sites/e2e/pages/Children') {
+      return new Response(inspectorPage('Children', 'ChildJob'), { status: 200 })
+    }
     if (url === `/api/sites/e2e/texts/en?release=${releaseId}`) {
       return new Response(releaseTexts.body ?? '', { status: releaseTexts.status })
     }
@@ -210,6 +270,7 @@ function renderPage() {
       <TextProvider catalogs={catalogs} development={false}>
         <ProcessInstancePage
           sitePath="e2e"
+          pages={['Inspector', 'Children']}
           widget={inspectorWidget}
           instanceId={instanceId}
           locale="en"
@@ -221,6 +282,33 @@ function renderPage() {
 }
 
 describe('ProcessInstancePage', () => {
+  it('shows no subject, the due time of a waiting timer, the sub-processes and the parent', async () => {
+    stubApi({ detail: { status: 200, body: detailWithRelatives() } })
+
+    renderPage()
+
+    const page = await screen.findByTestId('inspector-instance')
+    expect(within(page).getByText('No subject')).toBeInTheDocument()
+    const due = within(page).getByText('Due').closest('.ant-descriptions-item')
+    expect(due).toHaveTextContent(/2026/)
+    expect(due).toHaveTextContent(/02:05:00|2:05:00/)
+    const childLink = await screen.findByTestId(`inspector-subprocess-${childId}`)
+    expect(childLink).toHaveAttribute('href', `/e2e/children/${childId}`)
+    expect(within(childLink.closest('tr')!).getByText('ChildJob')).toBeInTheDocument()
+    expect(await screen.findByTestId('inspector-parent-link')).toHaveAttribute('href', `/e2e/inspector/${parentId}`)
+  })
+
+  it('shows the empty text, no due time and no parent for an instance without relatives', async () => {
+    stubApi()
+
+    renderPage()
+
+    await screen.findByTestId('inspector-instance')
+    expect(screen.getByText('No sub-processes.')).toBeInTheDocument()
+    expect(screen.queryByText('Due')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('inspector-parent-link')).not.toBeInTheDocument()
+  })
+
   it('lists the steps in graph order with the taken and current marks, and shows the open task', async () => {
     stubApi()
 

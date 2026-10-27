@@ -55,6 +55,16 @@ public sealed class SampleApplicationTests
     }
 
     [Fact]
+    public void Subprocess_fixture_application_compiles_without_diagnostics_with_a_parent_that_starts_a_child()
+    {
+        var result = ApplicationCompiler.Compile(Path.Combine(AppContext.BaseDirectory, "Fixtures", "subprocess-app"));
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+        Assert.Equal(["ChildJob", "ParentJob"], result.Model.Processes.Select(process => process.Name).Order());
+    }
+
+    [Fact]
     public void Purchase_request_start_condition_message_has_an_English_and_a_Vietnamese_text()
     {
         var result = ApplicationCompiler.Compile(Path.Combine(AppContext.BaseDirectory, "Samples", "purchase-requests"), SamplePackages.Versions);

@@ -116,6 +116,7 @@ tests/
   e2e/                    Playwright journeys against the running server
     fixtures/e2e-app/     generic test application the E2E server activates
     fixtures/release-app/ application a spec activates during the run, to test releases
+    fixtures/subprocess-app/ parent and child sub-process the E2E server activates, for the inspector journey
 samples/
   apps/purchase-requests/ the first sample application, as configuration only
   keycloak/               the development Keycloak realm with the sample's users
@@ -814,7 +815,7 @@ kinds in the [configuration pipeline](reference/configuration.md#configuration-p
 `DiagnosticCodes`, `ResourceKinds` and the schema files. They find them by
 heading or table header, so the sections may move within `docs/`.
 
-The E2E server starts with five applications listed in `ActivateOnStartup` (see
+The E2E server starts with six applications listed in `ActivateOnStartup` (see
 [Startup activation](reference/host-settings.md#startup-activation)), so Playwright journeys run against
 real metadata and records:
 
@@ -827,7 +828,10 @@ real metadata and records:
 - the service desk sample in `samples/apps/service-desk`, for the service
   desk journeys;
 - the asset management sample in `samples/apps/asset-management`, which no
-  journey uses yet.
+  journey uses yet;
+- the sub-process fixture in `tests/e2e/fixtures/subprocess-app`, a parent
+  process that starts a child on a 24-hour timer, both without a subject, for
+  the process inspector's sub-process journey.
 
 The E2E server's `Studio:Folders` does not list that sample. It lists a copy
 that `scripts/e2e.sh` makes in a temporary folder for each run and deletes on

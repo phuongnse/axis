@@ -148,7 +148,7 @@ A `subProcess` step starts another process and waits until it ends:
   parent that is not waiting on that child is logged and discarded.
 - **Failure.** A child that fails leaves the parent `waiting`, and an operator
   retries the child. When the retried child completes, the `process.resume`
-  item resumes the parent at `next`. _(Planned for M14)_ The inspector shows
+  item resumes the parent at `next`. The inspector shows
   the failed child under the parent. A cancelled child fails the parent's step
   when the parent is `waiting` on that step for this child. The error is
   fixed, `The sub-process of the step '{step}' was cancelled.`, and the
