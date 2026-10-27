@@ -155,7 +155,8 @@ matching and the file cleanup of an import are not built.
   commits it. The checks come in order: session `401`, the path `404`, the
   user's current `import` and `create` grants `403`, then the import and its
   state. Another user's import and an unknown id are `404`. Any state other
-  than `checked` is `409`, and so is a second commit while one is queued. The
+  than `checked` is `409`, and so is a second commit while one is queued, and so
+  is a `checked` import whose file was deleted, see Who sees it. The
   answer is `202` with the import, still `checked`, and the route queues one
   `records.importCommit` work item that the import names in its
   `work_item_id`. The worker writes every row in one transaction that holds the
@@ -163,7 +164,9 @@ matching and the file cleanup of an import are not built.
   or `failed`. A row that fails at write time, for example on a unique value
   that is taken or a reference to a record that does not exist, writes nothing.
   The import is `failed` with that row's errors, keyed `/rows/{n}/...` as the
-  dry run's errors are. The file is deleted when the commit ends. An import
+  dry run's errors are. The file is deleted when the commit ends. A commit
+  queued before the file was deleted ends `failed` with one error at the empty
+  pointer and writes nothing. An import
   holds at most `Data:ImportMaxRows` rows, 10,000 by default, checked by the
   dry run.
 - **Each row.** _(built for creates)_ It goes through the record command as the
@@ -193,7 +196,11 @@ matching and the file cleanup of an import are not built.
   updated records is 0 until key matching is built.
 - **Who sees it.** Only the user who uploaded an import reads it or commits
   it. The uploaded file is deleted when the import is committed, fails or is
-  older than 24 hours.
+  older than 24 hours. The worker clears the file of an import uploaded more
+  than 24 hours ago at most every 5 minutes, so a file can live a little
+  longer. The import stays, and its uploader still reads its state and errors.
+  A `pending` import whose file is cleared becomes `failed` with one error at
+  the empty pointer.
 - **Speed.** A CSV import of 10,000 rows into an entity with a reference, a sequence and a validation finishes its dry run within 3 s and its commit within 96 s. `ImportPerformanceTests` fails past either limit. It also checks that all created rows share one `xmin`, which shows the single transaction.
 
 ## In the SPA

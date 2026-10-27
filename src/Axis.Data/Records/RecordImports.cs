@@ -14,7 +14,7 @@ public static class RecordImportStates
     /// <summary>The dry run found no error.</summary>
     public const string Checked = "checked";
 
-    /// <summary>The dry run or the commit found errors. The file is cleared.</summary>
+    /// <summary>The dry run or the commit found errors, or the file was deleted before the dry run ended. The file is cleared.</summary>
     public const string Failed = "failed";
 
     /// <summary>The records of the file are written.</summary>
@@ -70,6 +70,9 @@ public enum RecordImportCommitQueued
     /// <summary>The import is not <c>checked</c>, or a commit is already queued.</summary>
     WrongState,
 
+    /// <summary>The import is checked but its file was deleted after 24 hours.</summary>
+    FileDeleted,
+
     /// <summary>The import now names the commit's work item.</summary>
     Queued,
 }
@@ -82,10 +85,18 @@ public enum RecordImportCommitQueued
 /// file is cleared. The uploader of a <c>checked</c> import commits it: <see cref="QueueCommitAsync"/> makes the
 /// row name the <see cref="CommitWorkItemKind"/> item, which blocks a second commit, and the worker locks the
 /// import through that item and ends it <c>committed</c> or <c>failed</c> with <see cref="FinishCommitAsync"/>,
-/// which clears the file and the name of the item. Only the uploader finds an import with <see cref="FindAsync"/>.
+/// which clears the file and the name of the item. The worker clears the file of every import older than
+/// <see cref="FileRetention"/> with <see cref="ClearExpiredFilesAsync"/> and keeps the row. Only the uploader
+/// finds an import with <see cref="FindAsync"/>.
 /// </summary>
 public static class RecordImports
 {
+    /// <summary>How long an import keeps its file, counted from the upload.</summary>
+    public static readonly TimeSpan FileRetention = TimeSpan.FromHours(24);
+
+    /// <summary>The error of an import whose file was deleted before its dry run or its commit ended.</summary>
+    public const string FileDeletedError = "The file was deleted after 24 hours.";
+
     /// <summary>The kind of the work item that runs the dry run of one import.</summary>
     public const string CheckWorkItemKind = "records.importCheck";
 
@@ -237,9 +248,37 @@ public static class RecordImports
     }
 
     /// <summary>
+    /// Clears the file of every import uploaded <see cref="FileRetention"/> or longer before <paramref name="now"/>
+    /// and returns how many imports it changed. The import stays, so its uploader still reads it. A <c>pending</c>
+    /// import ends <c>failed</c> with <see cref="FileDeletedError"/> at the empty pointer, because its dry run has
+    /// no file left to read. Any other import keeps its state.
+    /// </summary>
+    public static async Task<int> ClearExpiredFilesAsync(NpgsqlConnection connection, DateTimeOffset now, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+
+        await using var command = new NpgsqlCommand(
+            """
+            UPDATE axis.record_imports
+            SET file = NULL,
+                state = CASE WHEN state = 'pending' THEN 'failed' ELSE state END,
+                errors = CASE WHEN state = 'pending' THEN @expired ELSE errors END
+            WHERE file IS NOT NULL AND created_at <= @cutoff
+            """,
+            connection);
+        command.Parameters.AddWithValue("cutoff", (now - FileRetention).ToUniversalTime());
+        command.Parameters.Add(new NpgsqlParameter("expired", NpgsqlDbType.Jsonb)
+        {
+            Value = WriteErrors(new Dictionary<string, string[]> { [""] = [FileDeletedError] }),
+        });
+        return await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    /// <summary>
     /// Locks the import <paramref name="id"/> of the uploader <c>FOR UPDATE</c> and makes it name the commit work
     /// item <paramref name="itemId"/> when it is <c>checked</c> and names no work item. An import that names one
-    /// has a commit queued, so a second commit is a wrong state.
+    /// has a commit queued, so a second commit is a wrong state. A <c>checked</c> import whose file was deleted
+    /// cannot be committed.
     /// </summary>
     public static async Task<RecordImportCommitQueued> QueueCommitAsync(
         NpgsqlConnection connection,
@@ -256,7 +295,7 @@ public static class RecordImports
 
         await using (var select = new NpgsqlCommand(
             """
-            SELECT state, work_item_id
+            SELECT state, work_item_id, file IS NULL
             FROM axis.record_imports
             WHERE id = @id AND application_id = @application AND entity_id = @entity AND uploader_id = @uploader
             FOR UPDATE
@@ -277,6 +316,11 @@ public static class RecordImports
             if (reader.GetString(0) != RecordImportStates.Checked || !reader.IsDBNull(1))
             {
                 return RecordImportCommitQueued.WrongState;
+            }
+
+            if (reader.GetBoolean(2))
+            {
+                return RecordImportCommitQueued.FileDeleted;
             }
         }
 

@@ -439,6 +439,86 @@ public sealed class RecordImportEndpointTests(RecordApiFixture fixture) : IClass
         Assert.Equal(1L, await TicketCountAsync());
     }
 
+    [Fact]
+    public async Task The_cleanup_clears_the_file_of_a_checked_import_older_than_24_hours_and_its_commit_is_a_409()
+    {
+        await ResetAsync();
+        var old = await UploadAsync(fixture.Client, Tickets, "title,code\nPrinter,p1\n");
+        var fresh = await UploadAsync(fixture.Client, Tickets, "title,code\nScanner,s1\n");
+        await RunChecksAsync();
+        await BackdateAsync(old.Id);
+
+        Assert.Equal(1, await ClearExpiredFilesAsync());
+
+        Assert.True(await FileClearedAsync(old.Id));
+        Assert.Equal("checked", await StateAsync(old.Id, Tickets));
+        Assert.False(await FileClearedAsync(fresh.Id));
+        using var refused = await CommitAsync(fixture.Client, Tickets, old.Id);
+        using var accepted = await CommitAsync(fixture.Client, Tickets, fresh.Id);
+
+        using var problem = await ReadProblemAsync(refused, HttpStatusCode.Conflict);
+        Assert.Equal("The file of this import was deleted.", problem.RootElement.GetProperty("title").GetString());
+        Assert.Equal(HttpStatusCode.Accepted, accepted.StatusCode);
+        Assert.Equal(1L, (long)(await fixture.ScalarAsync(TenantA, $"SELECT count(*) FROM axis.process_work_items WHERE kind = '{RecordImports.CommitWorkItemKind}'"))!);
+        Assert.Equal(1, await RunCommitsAsync());
+        Assert.Equal(1L, await TicketCountAsync());
+    }
+
+    [Fact]
+    public async Task The_cleanup_fails_a_pending_import_older_than_24_hours_with_an_error_at_the_empty_pointer()
+    {
+        await ResetAsync();
+        var upload = await UploadAsync(fixture.Client, Tickets, "title,code\nPrinter,p1\n");
+        await BackdateAsync(upload.Id);
+
+        Assert.Equal(1, await ClearExpiredFilesAsync());
+
+        using var failed = await GetAsync(fixture.Client, Tickets, upload.Id);
+        Assert.Equal("failed", failed.RootElement.GetProperty("state").GetString());
+        var error = Assert.Single(failed.RootElement.GetProperty("errors").EnumerateObject());
+        Assert.Equal("", error.Name);
+        Assert.Equal(RecordImports.FileDeletedError, error.Value[0].GetString());
+        Assert.True(await FileClearedAsync(upload.Id));
+        Assert.Equal(1, await RunChecksAsync());
+        Assert.Equal("failed", await StateAsync(upload.Id, Tickets));
+        Assert.Equal(0L, (long)(await fixture.ScalarAsync(TenantA, $"SELECT count(*) FROM axis.process_work_items WHERE kind = '{RecordImports.CheckWorkItemKind}'"))!);
+    }
+
+    [Fact]
+    public async Task Another_user_committing_a_cleared_import_gets_a_404_not_a_409()
+    {
+        await ResetAsync();
+        var upload = await UploadAsync(fixture.Client, Tickets, "title,code\nPrinter,p1\n");
+        await RunChecksAsync();
+        await BackdateAsync(upload.Id);
+        await ClearExpiredFilesAsync();
+        using var fia = fixture.CreateClient().SignedInAs("fia");
+
+        using var other = await CommitAsync(fia, Tickets, upload.Id);
+
+        await ReadProblemAsync(other, HttpStatusCode.NotFound);
+    }
+
+    [Fact]
+    public async Task A_commit_queued_before_the_cleanup_ends_failed_at_the_empty_pointer_and_writes_no_record()
+    {
+        await ResetAsync();
+        var upload = await UploadAsync(fixture.Client, Tickets, "title,code\nPrinter,p1\n");
+        await RunChecksAsync();
+        using var accepted = await CommitAsync(fixture.Client, Tickets, upload.Id);
+        Assert.Equal(HttpStatusCode.Accepted, accepted.StatusCode);
+        await BackdateAsync(upload.Id);
+
+        Assert.Equal(1, await ClearExpiredFilesAsync());
+        Assert.Equal(1, await RunCommitsAsync());
+
+        using var failed = await GetAsync(fixture.Client, Tickets, upload.Id);
+        Assert.Equal("failed", failed.RootElement.GetProperty("state").GetString());
+        Assert.Equal([""], failed.RootElement.GetProperty("errors").EnumerateObject().Select(error => error.Name));
+        Assert.Equal(0L, await TicketCountAsync());
+        Assert.Equal(0L, (long)(await fixture.ScalarAsync(TenantA, $"SELECT count(*) FROM axis.process_work_items WHERE kind = '{RecordImports.CommitWorkItemKind}'"))!);
+    }
+
     private static async Task<(HttpResponseMessage Response, JsonDocument Body, Guid Id)> UploadAsync(HttpClient client, string path, string csv)
     {
         var response = await SendAsync(client, HttpMethod.Post, $"{path}/imports", csv);
@@ -485,6 +565,17 @@ public sealed class RecordImportEndpointTests(RecordApiFixture fixture) : IClass
         await fixture.ResetAsync();
         await fixture.ExecuteAsync(TenantA, "DELETE FROM axis.record_imports");
         await fixture.ExecuteAsync(TenantA, $"DELETE FROM axis.process_work_items WHERE kind IN ('{RecordImports.CheckWorkItemKind}', '{RecordImports.CommitWorkItemKind}')");
+    }
+
+    private Task BackdateAsync(Guid id) =>
+        fixture.ExecuteAsync(TenantA, $"UPDATE axis.record_imports SET created_at = now() - interval '25 hours' WHERE id = '{id:D}'");
+
+    /// <summary>Runs the worker's clean-up of expired import files for the tenant and returns how many imports it changed.</summary>
+    private async Task<int> ClearExpiredFilesAsync()
+    {
+        await using var connection = new NpgsqlConnection(fixture.ConnectionString(TenantA));
+        await connection.OpenAsync(CancellationToken);
+        return await RecordImports.ClearExpiredFilesAsync(connection, DateTimeOffset.UtcNow, CancellationToken);
     }
 
     private async Task<string> StateAsync(Guid id, string path = Items)

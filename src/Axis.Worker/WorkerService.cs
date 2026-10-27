@@ -2,6 +2,7 @@ using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Packages;
 using Axis.Core.Tenancy;
 using Axis.Data.Files;
+using Axis.Data.Records;
 using Axis.Data.Storage;
 using Axis.Processes.Instances;
 using Axis.Processes.Storage;
@@ -25,7 +26,8 @@ namespace Axis.Worker;
 /// the schema, a pinned version that is not installed, or a release that no longer compiles records
 /// the failure in <see cref="StartupCheckState"/> and stops the host before any work of that tenant runs.
 /// Once a tenant is ready, the worker also deletes its expired sessions and sweeps its deleted and abandoned files,
-/// each at most every five minutes by its own clock, and deletes its old in-app notifications every 24 hours.
+/// and clears the files of its imports uploaded more than 24 hours ago, each at most every five minutes by its own clock,
+/// and deletes its old in-app notifications every 24 hours.
 /// </summary>
 internal sealed partial class WorkerService(
     WorkerTenantCatalog tenants,
@@ -60,6 +62,9 @@ internal sealed partial class WorkerService(
     // The time of the last sweep of deleted and abandoned files of each ready tenant. It has its own timer, so neither clean-up delays the other.
     private static readonly TimeSpan _fileSweepInterval = TimeSpan.FromMinutes(5);
     private readonly Dictionary<string, DateTimeOffset> _filesSweptAt = new(StringComparer.Ordinal);
+
+    // The files of imports uploaded more than 24 hours ago are cleared at most every five minutes. It has its own timer, so no other clean-up delays it.
+    private readonly TenantSchedule _importFilesCleared = new(TimeSpan.FromMinutes(5), time);
 
     // The old in-app notifications of each ready tenant are deleted once a day. It has its own timer, so no other clean-up delays it.
     private readonly TenantSchedule _notificationsCleaned = new(NotificationRetention.Interval, time);
@@ -181,6 +186,7 @@ internal sealed partial class WorkerService(
                 _schemaWaiting.Remove(tenantId);
                 _sessionsCleanedAt.Remove(tenantId);
                 _filesSweptAt.Remove(tenantId);
+                _importFilesCleared.Forget(tenantId);
                 _notificationsCleaned.Forget(tenantId);
                 health.TenantDropped(tenantId);
             }
@@ -262,6 +268,7 @@ internal sealed partial class WorkerService(
 
             await RemoveExpiredSessionsAsync(tenantId, stoppingToken);
             await SweepFilesAsync(tenantId, stoppingToken);
+            await ClearExpiredImportFilesAsync(tenantId, stoppingToken);
             await RemoveOldNotificationsAsync(tenantId, stoppingToken);
 
             // A refresh between two items can end the service of the tenant. The item already claimed has finished.
@@ -353,6 +360,40 @@ internal sealed partial class WorkerService(
         catch (NpgsqlException exception)
         {
             LogFileSweepFailed(exception, tenantId);
+        }
+        finally
+        {
+            accessor.Current = previous;
+        }
+    }
+
+    /// <summary>
+    /// Clears the files of the tenant's imports uploaded more than 24 hours ago and keeps the imports, at most once per
+    /// five minutes. The time comes from the worker's clock. A database without the table yet is skipped.
+    /// Any other database failure is logged and does not hold back the work items.
+    /// </summary>
+    private async Task ClearExpiredImportFilesAsync(string tenantId, CancellationToken cancellationToken)
+    {
+        if (!_importFilesCleared.TryStart(tenantId, out var now))
+        {
+            return;
+        }
+
+        var previous = accessor.Current;
+        accessor.Current = new TenantContext(tenantId);
+        try
+        {
+            await using var connection = await connections.OpenConnectionAsync(cancellationToken);
+            var cleared = await RecordImports.ClearExpiredFilesAsync(connection, now, cancellationToken);
+            LogImportFilesCleared(cleared, tenantId);
+        }
+        catch (PostgresException exception) when (exception.SqlState == PostgresErrorCodes.UndefinedTable)
+        {
+            // The data migrations have not created the table yet.
+        }
+        catch (NpgsqlException exception)
+        {
+            LogImportFileClearFailed(exception, tenantId);
         }
         finally
         {
@@ -501,6 +542,12 @@ internal sealed partial class WorkerService(
 
     [LoggerMessage(LogLevel.Debug, "Purged {Count} file(s) of tenant {TenantId}.")]
     private partial void LogFilesPurged(int count, string tenantId);
+
+    [LoggerMessage(LogLevel.Warning, "Clearing the expired import files of tenant {TenantId} failed.")]
+    private partial void LogImportFileClearFailed(Exception exception, string tenantId);
+
+    [LoggerMessage(LogLevel.Debug, "Cleared {Count} expired import file(s) of tenant {TenantId}.")]
+    private partial void LogImportFilesCleared(int count, string tenantId);
 
     [LoggerMessage(LogLevel.Warning, "Removing the old notifications of tenant {TenantId} failed.")]
     private partial void LogNotificationCleanupFailed(Exception exception, string tenantId);

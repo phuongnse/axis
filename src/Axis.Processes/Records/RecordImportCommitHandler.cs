@@ -24,7 +24,8 @@ namespace Axis.Processes.Records;
 /// and its errors are those of the first row that failed, keyed <c>/rows/{n}</c> followed by the pointer into the
 /// create body, <c>n</c> counting data rows from 1, as the errors of the dry run. The file is cleared when the
 /// commit ends. An import that is gone or is no longer <c>checked</c> has nothing left to do, and neither has one
-/// whose entity the active release no longer has, which fails at the empty pointer. A commit only creates records:
+/// whose entity the active release no longer has, which fails at the empty pointer, and so has one whose file the 24-hour cleanup deleted after the commit was queued,
+/// which fails at the empty pointer and writes nothing. A commit only creates records:
 /// the key of the import is not used yet.
 /// </summary>
 internal sealed partial class RecordImportCommitHandler(
@@ -51,6 +52,18 @@ internal sealed partial class RecordImportCommitHandler(
 
         if (await RecordImports.LockForWorkItemAsync(connection, transaction, item.Id, cancellationToken) is not { State: RecordImportStates.Checked } import)
         {
+            return await CompleteAsync(item, connection, transaction, cancellationToken);
+        }
+
+        if (import.File is null)
+        {
+            await RecordImports.FinishCommitAsync(
+                connection,
+                transaction,
+                import.Id,
+                RecordImportStates.Failed,
+                new Dictionary<string, string[]> { [""] = [RecordImports.FileDeletedError] },
+                cancellationToken);
             return await CompleteAsync(item, connection, transaction, cancellationToken);
         }
 

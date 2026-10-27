@@ -28,7 +28,7 @@ namespace Axis.Server.Records;
 /// any other user, or an unknown id, gets a 404. The commit checks the session (401), the path (404), the user's
 /// current <c>import</c> and <c>create</c> grants (403), then the import (404 for another user's or an unknown
 /// one) and its state: only a <c>checked</c> import with no commit queued is committed, and any other state is a
-/// 409. It queues the work item that writes the rows and answers 202 with the import, still <c>checked</c>.
+/// 409. A <c>checked</c> import whose file was deleted after 24 hours is a 409 too. It queues the work item that writes the rows and answers 202 with the import, still <c>checked</c>.
 /// An entity of a module has the same routes as in <see cref="RecordEndpoints"/>.
 /// </summary>
 internal static class RecordImportEndpoints
@@ -202,6 +202,11 @@ internal static class RecordImportEndpoints
         if (queued == RecordImportCommitQueued.WrongState)
         {
             return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: "Only a checked import with no commit queued can be committed.");
+        }
+
+        if (queued == RecordImportCommitQueued.FileDeleted)
+        {
+            return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: "The file of this import was deleted.");
         }
 
         var import = await RecordImports.FindAsync(connection, importId, application.Manifest.Id, model.Id, user.Id, cancellationToken)
