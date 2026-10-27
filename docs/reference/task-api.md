@@ -3,7 +3,7 @@
 Detailed reference for the task API: the routes that list a user's tasks, read one task and
 complete it, and their errors. The task states are in [processes.md](processes.md#task-states).
 Claim, release and reassign are in [task-deadlines.md](task-deadlines.md#claim-and-release), as are
-overdue tasks, escalations and deadlines, where sending an escalation's `notify` is _(planned for M14)_.
+overdue tasks, escalations and deadlines.
 The conventions of [architecture.md](../architecture.md) apply: sections marked
 _(planned for Mx)_ are not built yet, and Dn refers to [decisions.md](../decisions.md).
 

@@ -50,15 +50,6 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
     /// <summary>The decision recorded when no branch was true.</summary>
     internal const string Otherwise = "otherwise";
 
-    private const string InAppChannel = "inApp";
-
-    private const string EmailChannel = "email";
-
-    private const string DateFormat = "yyyy-MM-dd";
-
-    // PostgreSQL stores microseconds, so six fraction digits show every stored value exactly.
-    private const string DateTimeFormat = "yyyy-MM-dd'T'HH:mm:ss.ffffff'Z'";
-
     public string Kind => ProcessStarts.StepWorkItemKind;
 
     public async Task HandleAsync(WorkItemContext context, CancellationToken cancellationToken)
@@ -398,7 +389,13 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
                     throw Failure($"The process '{process.Name}' has no step '{notifyStep.Next}'.", instance, input);
                 }
 
-                notification = await NotificationAsync(evaluate, notifyStep, instance, input);
+                notification = await ProcessNotifications.EvaluateAsync(
+                    notifyStep,
+                    evaluate,
+                    instance.ApplicationId,
+                    instance.ReleaseId,
+                    (part, error) => ExpressionFailure(part, notifyStep, error, instance, input),
+                    (value, name) => ToJson(value, name, notifyStep, instance, input));
                 state = ProcessStarts.Running;
                 nextStep = afterNotify.Name;
                 decision = null;
@@ -469,7 +466,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
                 output = new JsonObject
                 {
                     ["state"] = ProcessStarts.Waiting,
-                    ["dueAt"] = due.UtcDateTime.ToString(DateTimeFormat, CultureInfo.InvariantCulture),
+                    ["dueAt"] = due.UtcDateTime.ToString(ProcessNotifications.DateTimeFormat, CultureInfo.InvariantCulture),
                 };
 
                 // Waiting for a time is not an audit action. The resume writes the step's completion.
@@ -646,12 +643,12 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
         }
 
         // A notification with no recipient has no in-app row.
-        if (notification is { Recipients.Count: > 0 } && step is NotifyStepModel { Channels: var channels } && channels.Contains(InAppChannel, StringComparer.Ordinal))
+        if (notification is not null && step is NotifyStepModel { Channels: var channels } && ProcessNotifications.ShouldStore(notification, channels))
         {
             await ProcessNotifications.InsertAsync(context.Transaction, notification, cancellationToken);
         }
 
-        if (notification is not null && step is NotifyStepModel emailStep && emailStep.Channels.Contains(EmailChannel, StringComparer.Ordinal))
+        if (notification is not null && step is NotifyStepModel emailStep && emailStep.Channels.Contains(ProcessNotifications.EmailChannel, StringComparer.Ordinal))
         {
             await StageEmailsAsync(context, instance, model, emailStep, notification, cancellationToken);
         }
@@ -1108,104 +1105,6 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
     }
 
     /// <summary>
-    /// Evaluates a <c>notify</c> step into the notification it stores: its recipients first, then its
-    /// placeholder values and the parameters of the page it opens, in the raw JSON form of an event
-    /// payload. A <c>user</c> recipient that gives no non-blank text has no row, and two recipients of one
-    /// kind and name are one. An <c>email</c> recipient is evaluated when the step has the <c>email</c> channel,
-    /// and one that gives no non-blank text adds no address. An expression that fails
-    /// at run time fails the step, whatever the channels.
-    /// </summary>
-    private static async Task<NewNotification> NotificationAsync(
-        Func<ExpressionModel, Task<ExpressionEvaluationResult>> evaluate,
-        NotifyStepModel step,
-        LoadedInstance instance,
-        JsonObject input)
-    {
-        var recipients = new List<(string Kind, string Recipient)>();
-        var addresses = new List<string>();
-        for (var index = 0; index < step.Recipients.Count; index++)
-        {
-            var recipient = step.Recipients[index];
-            if (recipient.User is { } user)
-            {
-                var result = await evaluate(user);
-                if (result.Error is { } error)
-                {
-                    throw ExpressionFailure($"user of recipient {index}", step, error, instance, input);
-                }
-
-                if (result.Value is string id && !string.IsNullOrWhiteSpace(id))
-                {
-                    recipients.Add((ProcessNotifications.UserRecipient, id));
-                }
-            }
-            else if (recipient.Role is { } role)
-            {
-                recipients.Add((ProcessNotifications.RoleRecipient, role));
-            }
-            else if (recipient.Email is { } email && step.Channels.Contains(EmailChannel, StringComparer.Ordinal))
-            {
-                var result = await evaluate(email);
-                if (result.Error is { } error)
-                {
-                    throw ExpressionFailure($"email of recipient {index}", step, error, instance, input);
-                }
-
-                if (result.Value is string address && !string.IsNullOrWhiteSpace(address))
-                {
-                    addresses.Add(address);
-                }
-            }
-        }
-
-        var values = new JsonObject();
-        var valueTypes = new JsonObject();
-        foreach (var value in step.Values)
-        {
-            var result = await evaluate(value.Value);
-            if (result.Error is { } error)
-            {
-                throw ExpressionFailure($"value '{value.Name}'", step, error, instance, input);
-            }
-
-            values[value.Name] = ToJson(result.Value, $"value '{value.Name}'", step, instance, input);
-            if (ValueTypeName(value.Value.Check.Type!.Kind) is { } typeName)
-            {
-                valueTypes[value.Name] = typeName;
-            }
-        }
-
-        JsonObject? openParameters = null;
-        if (step.Open is { } open)
-        {
-            openParameters = new JsonObject();
-            foreach (var parameter in open.Parameters)
-            {
-                var result = await evaluate(parameter.Value);
-                if (result.Error is { } error)
-                {
-                    throw ExpressionFailure($"open parameter '{parameter.Parameter}'", step, error, instance, input);
-                }
-
-                openParameters[parameter.Parameter] = ToJson(result.Value, $"open parameter '{parameter.Parameter}'", step, instance, input);
-            }
-        }
-
-        return new NewNotification(
-            Guid.CreateVersion7(),
-            instance.ApplicationId,
-            instance.ReleaseId,
-            step.Subject.TextKey,
-            step.Body.TextKey,
-            values,
-            valueTypes,
-            step.Open?.Page.Name,
-            openParameters,
-            [.. recipients.Distinct()],
-            addresses);
-    }
-
-    /// <summary>
     /// Stages the emails of a <c>notify</c> step with the <c>email</c> channel: one <c>pending</c> outbox row for each
     /// address and one queued <c>notification.email</c> item for each row. The addresses are those of the <c>user</c>
     /// recipients' profiles, then those of the <c>email</c> recipients. An address is used once, ignoring letter case,
@@ -1285,38 +1184,14 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
         }
     }
 
-    /// <summary>The name that a notification stores for a value of <paramref name="kind"/>, or null when it stores none.</summary>
-    private static string? ValueTypeName(ExpressionTypeKind kind) =>
-        kind switch
-        {
-            ExpressionTypeKind.Text => "text",
-            ExpressionTypeKind.Integer => "integer",
-            ExpressionTypeKind.Decimal => "decimal",
-            ExpressionTypeKind.Boolean => "boolean",
-            ExpressionTypeKind.Date => "date",
-            ExpressionTypeKind.DateTime => "date-time",
-            ExpressionTypeKind.Enum => "enum",
-            ExpressionTypeKind.Reference => "reference",
-            _ => null,
-        };
-
     /// <summary>
     /// A value an expression gave, in the record API's JSON form. <paramref name="name"/> names
     /// what gave it, such as <c>input 'amount'</c>, for the error of a value with no JSON form.
     /// </summary>
     private static JsonValue? ToJson(object? value, string name, ProcessStepModel step, LoadedInstance instance, JsonObject input) =>
-        value switch
-        {
-            null => null,
-            string text => JsonValue.Create(text),
-            long number => JsonValue.Create(number),
-            decimal number => JsonValue.Create(number),
-            bool flag => JsonValue.Create(flag),
-            DateOnly date => JsonValue.Create(date.ToString(DateFormat, CultureInfo.InvariantCulture)),
-            DateTimeOffset time => JsonValue.Create(time.UtcDateTime.ToString(DateTimeFormat, CultureInfo.InvariantCulture)),
-            Guid id => JsonValue.Create(id.ToString("D")),
-            var other => throw Failure($"The {name} of the step '{step.Name}' gave a value of type '{other.GetType().Name}'.", instance, input),
-        };
+        ProcessNotifications.TryToJson(value, out var json)
+            ? json
+            : throw Failure($"The {name} of the step '{step.Name}' gave a value of type '{value!.GetType().Name}'.", instance, input);
 
     /// <summary>Each error of a rejected record write as its pointer and messages, such as <c>/values/amount: request.amountNegative</c>, or the outcome when it has none.</summary>
     internal static string Describe(RecordWriteResult result) =>

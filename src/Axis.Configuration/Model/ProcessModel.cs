@@ -110,7 +110,32 @@ public sealed record TaskEscalationNotifyModel(
     TextReference Subject,
     TextReference Body,
     IReadOnlyList<NotifyValueModel> Values,
-    NotifyOpenModel? Open);
+    NotifyOpenModel? Open) : INotificationModel;
+
+/// <summary>
+/// The shape that a <c>notify</c> step and a task escalation's <c>notify</c> share: who is notified,
+/// on which channels, the texts, the placeholder values and the page the notification opens.
+/// </summary>
+public interface INotificationModel
+{
+    /// <summary>The recipients.</summary>
+    IReadOnlyList<NotifyRecipientModel> Recipients { get; }
+
+    /// <summary>The channels the notification goes out on.</summary>
+    IReadOnlyList<string> Channels { get; }
+
+    /// <summary>The subject's text.</summary>
+    TextReference Subject { get; }
+
+    /// <summary>The body's text.</summary>
+    TextReference Body { get; }
+
+    /// <summary>The placeholder values, in ordinal order of their names.</summary>
+    IReadOnlyList<NotifyValueModel> Values { get; }
+
+    /// <summary>The page the notification opens, or null.</summary>
+    NotifyOpenModel? Open { get; }
+}
 
 /// <summary>
 /// A timer: the process waits for <see cref="Wait"/> from the time the step runs, or until the time
@@ -226,7 +251,7 @@ public sealed record NotifyStepModel(
     TextReference Body,
     IReadOnlyList<NotifyValueModel> Values,
     NotifyOpenModel? Open,
-    string Next) : ProcessStepModel(Name);
+    string Next) : ProcessStepModel(Name), INotificationModel;
 
 /// <summary>
 /// A recipient of a <c>notify</c> step: exactly one of <see cref="User"/>, a <c>text</c> expression

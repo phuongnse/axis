@@ -17,7 +17,7 @@ the `claimed_by` and `claimed_at` columns are built, and so are release by a
 are built: the inbox marks, and Claim, Release and the Reassign dialog on the
 task page. The shape of `escalations` and its checks are built, and the compiler
 holds them in the model. The `task.escalate` work item and the runs of
-`reassign` are built. Sending an escalation's `notify` is _(planned for M14)_.
+`reassign` and of `notify` are built. The `email` channel is _(planned for M14)_.
 
 ## Escalations and deadline
 
@@ -61,7 +61,7 @@ A task step may add `escalations` and a `deadline`:
   [`notify` operation](notifications.md#notify-operation), without `next`,
   reported under `.../notify`. The compiler keeps escalations in file order and
   does not require them to be in order of `after`. An escalation does not end the
-  task. The engine runs `reassign`. Sending `notify` is _(planned for M14)_.
+  task. The engine runs `reassign`, and runs `notify` as the notify operation does.
 - **Deadline.** `after` and `next`. `next` names a step of the process
   (`AXC0070` when it names none). It counts as a transition of the step graph,
   checked after the outcomes, so a step that only a deadline leads to is
@@ -78,17 +78,28 @@ A task step may add `escalations` and a `deadline`:
   `open`, it applies `reassign` as a [reassign](#reassign) by `system`: the task
   goes to the target and a claim is cleared. The task stays `open`, and its
   instance and its deadline do not change. The step history gets a row with
-  `{ "escalation": <index> }` and no decision. A `reassign` with a `user`
+  `{ "escalation": <index> }` and no decision. When the escalation has `notify`,
+  the row's output adds `notificationId`. A `reassign` with a `user`
   expression is evaluated over the subject record when the item runs, as a task
   step evaluates its assignee. If it gives null, blank text or an error, the
-  task is left as it is, the handler logs a warning and the item is deleted,
-  because a late reassign must not fail an instance that waits correctly. A
+  task is left as it is, the handler logs a warning and the escalation's `notify`
+  still runs, because a late reassign must not fail an instance that waits
+  correctly. A
   `role` target is not checked against the active release, and a `user` target
   is not checked against the user profiles, since the compiler checked the role
   against the pinned release and a step's `assignee` is not checked against
-  profiles either. An escalation that only has `notify` leaves the task alone,
-  and writes no history row, until sending it is built _(planned for M14)_. If
-  the handler fails, it logs the error type and does not fail the instance.
+  profiles either. The `notify` of an escalation is evaluated over the subject
+  record, with its pending computed fields and at the transaction's time, as a
+  `notify` step is, and the notification stores the task's pinned release. It
+  stores one in-app notification row for each user and role recipient when the
+  `inApp` channel is listed, and nothing for `email`. An escalation that only has
+  `notify` leaves the task, its assignee and its deadline as they are, and
+  writes the history row with the `notificationId`. An escalation with both
+  `reassign` and `notify` does both in one transaction. The notification adds no
+  audit record: only a `reassign` writes `task.reassigned`. If the handler fails,
+  for example because a `notify` expression fails at run time, the whole
+  escalation is rolled back, it logs the error type and does not fail the
+  instance.
 - **Deadline runs.** The item locks the task row. When the task is still
   `open`, the task becomes `expired` with `expired_at` set, the instance
   resumes at `next`, and the history row's `decision` is `deadline`. The audit

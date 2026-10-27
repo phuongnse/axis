@@ -6,13 +6,14 @@ notifications, user profiles and the mail settings. The conventions of
 are not built yet, and Dn refers to [decisions.md](../decisions.md).
 
 The [user profiles](#user-profiles) section, the compile checks of the notify
-operation and of placeholders, the run of the notify step, the storage of
-in-app notifications, the routes that list them and mark them read, their
-retention, the staging of emails in the outbox and their sending over SMTP are
-built, and so are the dead letter of a failed email and the bell in the site
-shell. The mail settings in the tenant directory and a mail server in Docker
-Compose and `scripts/dev.sh` are _(planned for M14)_, as is everything else in this
-file that says so. The design follows
+operation and of placeholders, the run of the notify step and of a task
+escalation's `notify`, the storage of in-app notifications, the routes that
+list them and mark them read, their retention, the staging of emails in the
+outbox and their sending over SMTP are built, and so are the dead letter of a
+failed email and the bell in the site shell. The mail settings in the tenant
+directory and a mail server in Docker Compose and `scripts/dev.sh` are
+_(planned for M14)_, as is everything else in this file that says so. The design
+follows
 [D73](../decisions/d73-in-app-and-email-notifications.md). Dates follow the
 application time zone of
 [D75](../decisions/d75-the-application-time-zone.md). New compile problems are
