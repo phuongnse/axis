@@ -81,7 +81,8 @@ A test that fails at times is fixed by its cause, for every test with that cause
 class. When that class has failed a test before, the change fixes or guards every test of the
 class, through a shared helper, a fixture or a lint rule. The classes seen so far and their guards:
 
-- An outside download or service: `scripts/setup.sh` and the CI install steps try again.
+- An outside download or service: `scripts/setup.sh`, the CI install steps and the Docker builds of the
+  smoke tests try again.
 - A click during an animation or a redraw: `waitForDialog`, `confirmDialog` and the drag helper
   wait until the element is ready.
 - The real clock: a test fixes the time with `axis.now` and runs schedules in UTC.

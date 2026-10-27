@@ -10,6 +10,7 @@ import { join, resolve as resolvePath } from 'node:path'
 import { after, before, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { describeNotReady, parsePs } from './lib/compose-status.mjs'
+import { runDocker } from './lib/docker-build.mjs'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
 const project = 'axis-smoke'
@@ -71,8 +72,7 @@ after(() => {
 
 test('the stack runs from source', { timeout }, async () => {
   // The build runs on its own, so a failed build is not reported as a failed start.
-  const build = compose(['build'], { stdio: 'inherit' })
-  if (build.status !== 0) assert.fail(`docker compose build exited with ${build.status}`)
+  await runDocker(['compose', '-p', project, 'build'], { env })
 
   const up = compose(['up', '-d', '--wait'], { stdio: 'inherit' })
   if (up.status !== 0) {
@@ -186,10 +186,9 @@ test('the stack runs from source', { timeout }, async () => {
   )
 })
 
-test('a broken application folder stops the server', { timeout }, () => {
+test('a broken application folder stops the server', { timeout }, async () => {
   // The run below must not build: a build log in its output hid the server's output.
-  const build = compose(['build', 'server'], { stdio: 'inherit' })
-  assert.equal(build.status, 0, `docker compose build server exited with ${build.status}`)
+  await runDocker(['compose', '-p', project, 'build', 'server'], { env })
 
   // No id and no name: the folder does not compile.
   const folder = mkdtempSync(join(tmpdir(), 'axis-broken-'))
