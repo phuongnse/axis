@@ -107,3 +107,4 @@ files agree, title and status included.
 | [D94](decisions/d94-purchase-requests-prove-the-extensibility-milestone.md) | Purchase requests prove the extensibility milestone | **Agreed** |
 | [D95](decisions/d95-widget-previews-show-the-states-a-design-change-touches.md) | Widget previews show the states a design change touches | **Agreed** |
 | [D96](decisions/d96-rules-from-the-design-system-review.md) | Rules from the design system review | **Agreed** |
+| [D97](decisions/d97-reliable-test-runs.md) | Reliable test runs | **Agreed** |

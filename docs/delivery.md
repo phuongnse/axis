@@ -98,9 +98,8 @@ with the reasons. What each one does is in NexKit's
   [`evidence`][nexkit-evidence] setting names the CI workflow's
   `test-results-e2e`, `test-results-integration` and `test-results-unit`
   artifacts, which hold the Playwright traces and `error-context.md` files.
-- **NexKit's checks skip suites that a change cannot affect.** A check round
-  takes about 25 minutes, of which the integration tests take about 7 and
-  Playwright about 10. So under NexKit's `NEXKIT_BASE_SHA`, a suite that no
+- **NexKit's checks skip suites that a change cannot affect.** NexKit runs the
+  checks one after another, so a check round takes 20 to 50 minutes. So under NexKit's `NEXKIT_BASE_SHA`, a suite that no
   changed file can affect is skipped, and any doubt runs it. The integration
   performance tests, whose class names end in `PerformanceTests`, never run
   there, because they depend on the runner's load. CI on `main` sets no base
