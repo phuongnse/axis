@@ -29,7 +29,7 @@ when an event is raised, when a record is created or updated, or when a
 schedule is due. Every start happens at most once for the
 same cause, even after a worker crash.
 
-_(Planned for M14)_ Event delivery also wakes the instances that wait for an
+Event delivery also wakes the instances that wait for an
 event ([D69](../decisions/d69-timer-wait-for-event-and-sub-process-steps-loops-and-create-record.md)).
 
 A delete starts a process without a subject through a delete trigger
@@ -213,10 +213,12 @@ start would be skipped, because `NoteClose` already runs for the note.
 An `event.deliver` work item delivers one occurrence to the `async` event
 triggers of the active release:
 
-1. The worker reads the triggers for the event's name, ignoring letter case.
-   With none, or when the application has no active release, the item is
-   deleted with no other write. An item that names a trigger, one queued by a
-   [redeliver](#dead-letters), keeps only that trigger. When the active release
+1. The worker takes the record's event lock, then reads the triggers for the
+   event's name, ignoring letter case, and the instances that wait for the event.
+   With no trigger, or when the application has no active release, and no
+   waiting instance, the item is deleted with no other write. An item that
+   names a trigger, one queued by a [redeliver](#dead-letters), keeps only that
+   trigger and wakes no instance. When the active release
    does not have it as an `async` trigger on the event, the item is deleted
    with no other write, and the worker logs a warning.
 2. For each trigger, one transaction does this:
@@ -250,15 +252,22 @@ A transaction that fails for another reason, the first read or the last
 completion, leaves the item claimed until its lease expires, and the delivery is
 then tried again. These failures are not counted.
 
-**Waking waiting instances** _(planned for M14)_. After the triggers, the
-item delivers the occurrence to each instance that waits in a `waitEvent` step
-for this event on the occurrence's record. Each instance gets its own
-transaction, which checks the item's claim, then matches and resumes the
-instance as [Wait for event step](process-flow.md#wait-for-event-step)
-describes. The unique key of `axis.process_event_matches` makes a repeat after
-a crash do nothing. Every occurrence already gets an `event.deliver` item, so
-an occurrence with no trigger still wakes its waiting instances. Step 1's early
-delete then happens only when there is no trigger and no waiting instance.
+**Waking waiting instances.** Step 1 takes the record's event lock, the same
+advisory lock a `waitEvent` step takes before it looks for an occurrence, and
+lists the instances that wait in a `waitEvent` step for this event on the
+occurrence's record. An instance counts only when it was created at or before
+the occurrence's `raised_at`. An item that names a trigger wakes no instance.
+After the triggers, the item delivers the occurrence to each of these
+instances. Each instance gets its own transaction, which checks the item's
+claim, then matches and resumes the instance as
+[Wait for event step](process-flow.md#wait-for-event-step) describes, on the
+release the instance is pinned to. The unique key of `axis.process_event_matches`
+makes a repeat after a crash do nothing. Every occurrence already gets an
+`event.deliver` item, so an occurrence with no trigger, or in an application
+with no active release, still wakes its waiting instances. Step 1's early
+delete then happens only when there is no trigger and no waiting instance. A
+failed wake is not counted and does not become a dead letter: the item stays
+claimed and is tried again after its lease expires.
 
 ## Event tables
 

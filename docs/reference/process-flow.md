@@ -12,7 +12,7 @@ Everything in this file is _(planned for M14)_, except the
 `waitEvent` and the calls in them, the [sub-process step](#sub-process-step),
 the [create record operation](#create-record-operation) and the compile checks
 of the [wait for event step](#wait-for-event-step), which are built. So are its
-_Which occurrence_, _When the step runs_, _One use_ and _Timeout_ parts. The design follows
+_Which occurrence_, _When the step runs_, _Waking_, _One use_ and _Timeout_ parts. The design follows
 [D69](../decisions/d69-timer-wait-for-event-and-sub-process-steps-loops-and-create-record.md)
 and
 [D70](../decisions/d70-processes-without-a-subject-scheduled-jobs-and-delete-triggers.md).
@@ -100,7 +100,7 @@ A `waitEvent` step waits until an event about the subject record is raised:
   one, it sets the instance `waiting` and writes no audit record. With a
   `timeout`, it queues a `process.timer` item due at the step's time plus
   `after`, with the revision the step left.
-- **Waking** _(planned for M14)_. [Event delivery](process-events.md#event-delivery) also delivers
+- **Waking**. [Event delivery](process-events.md#event-delivery) also delivers
   each occurrence to the instances that wait for its event on its record. Each
   instance gets its own transaction. It locks the instance, checks that it
   still waits in this step at the same revision, evaluates `when`, records the
