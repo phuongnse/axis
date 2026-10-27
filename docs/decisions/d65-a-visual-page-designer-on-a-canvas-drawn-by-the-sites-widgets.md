@@ -35,8 +35,8 @@ The owner confirmed these points on issue #1140 on 2026-10-24.
   - A widget that does not compile yet draws as a placeholder with its
     diagnostics. The rest of the page draws as usual.
 - **Width switch:** the canvas draws at desktop width, which fills the canvas
-  area, or at phone width, which is 375 px. Phone width is below the 768 px
-  breakpoint of D61.
+  area, or at phone width, which is 375 px. Phone width is narrow width, below
+  the 992 px breakpoint of [D96](d96-rules-from-the-design-system-review.md).
 - **Diagnostic marks:** a widget that a diagnostic of the draft names is marked
   on the canvas, as the process graph marks a step. The marks come from the
   route's latest answer, so they follow the unsaved draft.

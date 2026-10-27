@@ -16,7 +16,7 @@ import type {
 import { isSortableHeader } from '../test/antd'
 import { TableWidget } from './TableWidget'
 import { TextProvider } from './TextProvider'
-import { phoneWidthQuery } from './usePhoneWidth'
+import { narrowWidthQuery } from './useNarrowWidth'
 
 function field(name: string, type: FieldType, labelKey: string | null): FieldMetadata {
   return {
@@ -468,10 +468,10 @@ describe('TableWidget', () => {
       })
     })
 
-    describe('at phone width', () => {
+    describe('at narrow width', () => {
       beforeEach(() => {
         vi.stubGlobal('matchMedia', (query: string) => ({
-          matches: query === phoneWidthQuery,
+          matches: query === narrowWidthQuery,
           media: query,
           onchange: null,
           addListener() {},

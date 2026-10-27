@@ -60,6 +60,45 @@ test("a columns widget stacks its table and its section in file order at phone w
   ).toBeLessThanOrEqual(375);
 });
 
+// The narrow-width breakpoint is 992 px, breakpointTokens.narrowWidth in web/src/platform/designTokens.ts. The
+// numbers are repeated here because e2e does not import web code.
+test("a columns widget stacks its columns at 991 px and sits them side by side at 992 px", async ({
+  page,
+}) => {
+  const table = page
+    .getByTestId("column")
+    .filter({ has: page.getByRole("table") });
+  const section = page.getByRole("region", { name: "Totals", exact: true });
+  const sectionColumn = page.getByTestId("column").filter({ has: section });
+
+  await page.setViewportSize({ width: 991, height: 900 });
+  await page.goto("/e2e/noteoverview");
+  await expect(table.getByRole("table")).toBeVisible();
+  await expect(section.getByTestId("kpi-tile")).toBeVisible();
+  const stackedTable = await table.boundingBox();
+  const stackedSection = await sectionColumn.boundingBox();
+  expect(stackedTable).not.toBeNull();
+  expect(stackedSection).not.toBeNull();
+  expect(stackedSection!.y).toBeGreaterThanOrEqual(
+    stackedTable!.y + stackedTable!.height - 1,
+  );
+  expect(Math.abs(stackedSection!.x - stackedTable!.x)).toBeLessThan(2);
+
+  await page.setViewportSize({ width: 992, height: 900 });
+  await page.goto("/e2e/noteoverview");
+  await expect(table.getByRole("table")).toBeVisible();
+  await expect(section.getByTestId("kpi-tile")).toBeVisible();
+  const sideTable = await table.boundingBox();
+  const sideSection = await sectionColumn.boundingBox();
+  expect(sideTable).not.toBeNull();
+  expect(sideSection).not.toBeNull();
+  // The columns touch: the gutter is padding inside each column, so the section can start on the table's right edge.
+  expect(sideSection!.x).toBeGreaterThanOrEqual(
+    sideTable!.x + sideTable!.width - 1,
+  );
+  expect(Math.abs(sideSection!.y - sideTable!.y)).toBeLessThan(8);
+});
+
 test("a tabs widget keeps the selected tab in the URL, across a reload and the back button", async ({
   page,
 }) => {

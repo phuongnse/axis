@@ -8,7 +8,7 @@ import type { NavigationItem } from './site'
 import { useText } from './texts'
 import { useDesignTokens, useThemeMode } from './themeMode'
 import { UserMenu } from './UserMenu'
-import { usePhoneWidth } from './usePhoneWidth'
+import { useNarrowWidth } from './useNarrowWidth'
 
 interface ShellProps {
   titleKey: string
@@ -42,7 +42,7 @@ function activeNavigationKey(navigation: readonly NavigationItem[], pathname: st
 /**
  * The layout of every site, the platform site and application sites alike: site title and
  * navigation, notification bell, account button, locale switch and theme toggle. Ant Design components and dayjs follow the
- * locale. Below the phone breakpoint the navigation, locale switch and theme toggle sit in a panel that
+ * locale. At narrow width, below 992 px, the navigation, locale switch and theme toggle sit in a panel that
  * a Menu button opens and closes.
  */
 export function Shell({ titleKey, navigation, locales, locale, onLocaleChange, notifications, children }: ShellProps) {
@@ -51,10 +51,10 @@ export function Shell({ titleKey, navigation, locales, locale, onLocaleChange, n
   const { pathname } = useLocation()
   const { colour, spacing } = useDesignTokens()
   const activeKey = activeNavigationKey(navigation, pathname)
-  const phone = usePhoneWidth()
-  // The panel is open for the path it was opened on, so following a link or leaving the phone layout closes it.
-  const [openOn, setOpenOn] = useState<{ pathname: string; phone: boolean } | null>(null)
-  const open = phone && openOn?.pathname === pathname && openOn.phone
+  const narrow = useNarrowWidth()
+  // The panel is open for the path it was opened on, so following a link or leaving narrow width closes it.
+  const [openOn, setOpenOn] = useState<{ pathname: string; narrow: boolean } | null>(null)
+  const open = narrow && openOn?.pathname === pathname && openOn.narrow
   const toggle = useRef<HTMLButtonElement>(null)
   const items = navigation.map((item) => ({
     key: item.key,
@@ -89,7 +89,7 @@ export function Shell({ titleKey, navigation, locales, locale, onLocaleChange, n
     <NotificationBell path={notifications.path} sitePath={notifications.sitePath} locale={locale} />
   )
 
-  const setOpen = (next: boolean) => setOpenOn(next ? { pathname, phone } : null)
+  const setOpen = (next: boolean) => setOpenOn(next ? { pathname, narrow } : null)
 
   function closeOnEscape(event: KeyboardEvent) {
     if (event.key === 'Escape' && open) {
@@ -107,7 +107,7 @@ export function Shell({ titleKey, navigation, locales, locale, onLocaleChange, n
     <div data-theme-mode={mode}>
       <ConfigProvider locale={antLocaleFor(locale)}>
         <Layout style={{ minHeight: '100vh' }}>
-          {phone ? (
+          {narrow ? (
             <>
               <Layout.Header
                 style={{
