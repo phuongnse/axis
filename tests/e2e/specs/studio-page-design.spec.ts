@@ -3,7 +3,7 @@ import os from "node:os";
 import path from "node:path";
 import { expect, test } from "../test";
 import { startServer } from "../activate";
-import { dragTo } from "../design-drag";
+import { dragTo, waitForCanvas } from "../design-drag";
 import { waitForDialog } from "../dialogs";
 import { pickOption } from "../select";
 import { e2eApp, serviceDesk } from "../server-settings";
@@ -218,6 +218,7 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
     const dialog = await waitForDialog(page);
     await dialog.getByTestId("studio-binding-chart").click();
     await expect(page.getByTestId("studio-binding-choice")).toBeHidden();
+    await waitForCanvas(page);
     await expect(page.getByTestId("studio-palette-announcement")).toContainText(
       "Inserted chart",
     );
@@ -281,6 +282,45 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
     }
   });
 
+  test("the drag helper returns once the canvas has drawn the dropped section", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 1000 });
+    await useSession(page, "hoa");
+    // A slow answer keeps the canvas busy after the drop, as a loaded server does.
+    await page.route("**/page-metadata", async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      await route.continue();
+    });
+    await page.goto(
+      `${server.url}/studio?app=ServiceDesk&resource=${ticketDetailId}`,
+    );
+    await page.getByRole("tab", { name: "Design", exact: true }).click();
+
+    const detail = page.locator(
+      '[data-testid="studio-canvas-widget"][data-path="/widgets/0"]',
+    );
+    await expect(detail).toBeVisible();
+    await dragTo(
+      page,
+      "studio-page-design",
+      page.getByTestId("studio-palette-section"),
+      detail,
+      0.75,
+    );
+    // Nothing is saved, so the shared folder stays as it is.
+    expect(
+      await page.getByTestId("studio-page-canvas").getAttribute("aria-busy"),
+    ).toBe("false");
+    expect(
+      await page
+        .locator(
+          '[data-testid="studio-canvas-widget"][data-path="/widgets/1"]',
+        )
+        .count(),
+    ).toBe(1);
+  });
+
   test("an author drops a section, saves, undoes the drop and saves again", async ({
     page,
   }) => {
@@ -301,6 +341,9 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
       page.getByTestId("studio-palette-section"),
       detail,
       0.75,
+    );
+    await expect(page.getByTestId("studio-palette-announcement")).toContainText(
+      "Inserted section",
     );
     const save = page.getByRole("button", { name: "Save", exact: true });
     await save.click();

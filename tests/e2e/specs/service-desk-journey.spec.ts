@@ -3,7 +3,7 @@ import path from 'node:path'
 import { expect, test } from '../test'
 import type { Locator, Page } from '@playwright/test'
 import { confirmDialog, waitForDialog } from '../dialogs'
-import { dragTo } from '../design-drag'
+import { dragTo, waitForCanvas } from '../design-drag'
 import { fieldLabel } from '../fields'
 import { compareApplicationFolders } from '../folder-comparison'
 import { expectChosen, pickAction, pickOption, pickOptions } from '../select'
@@ -73,11 +73,13 @@ test.describe('the author builds the service desk with Studio only', () => {
     await expect(page.getByTestId('studio-page-editor').getByRole('textbox', { name: 'Name', exact: true })).toHaveValue(name)
   }
 
-  // The dialog fades out after a choice, and a drag that starts under it does not reach the canvas.
+  // The dialog fades out after a choice, and a drag that starts under it does not reach the canvas. The canvas then
+  // redraws, and a click during the redraw can miss.
   async function chooseBinding(page: Page, type: string) {
     await waitForDialog(page)
     await page.getByTestId(`studio-binding-${type}`).click()
     await expect(page.getByTestId('studio-binding-choice')).toBeHidden()
+    await waitForCanvas(page)
   }
 
   async function pick(scope: Page | Locator, testId: string, option: string, filter?: string) {
