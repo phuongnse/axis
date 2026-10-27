@@ -265,6 +265,8 @@ a tenant only when this value is the one the host was built for, see
   else:
   - the runtime and schema database passwords, in `platform.tenants`;
   - the OIDC client secret, in `platform.tenants`;
+  - the SMTP password of a tenant's own mail settings, in `platform.tenants`,
+    see [mail settings](notifications.md#mail-settings);
   - the value of a `secret` binding, in `platform.tenant_bindings`;
   - the client keys of a tenant under the `fapi2` sign-in profile, in
     `platform.tenants`, with the field name `oidc_client_key` and the key id,
@@ -276,7 +278,7 @@ a tenant only when this value is the one the host was built for, see
   is the tenant id and the field name, so a value copied to another tenant or
   field does not decrypt. The associated data is the UTF-8 bytes of the tenant
   id, one zero byte, and the UTF-8 bytes of the field name. The field names are
-  `runtime_password`, `schema_password`, `oidc_client_secret`, `oidc_client_key`, and `binding:`
+  `runtime_password`, `schema_password`, `oidc_client_secret`, `oidc_client_key`, `smtp_password`, and `binding:`
   followed by the binding name in lower case. Every writer must use these
   exact bytes and names. A data protection key uses an
   empty tenant id, so the associated data is one zero byte and the field name
@@ -722,8 +724,8 @@ schema of the tenant database.
     when they succeed and when they fail, see
     [publish requests and release history](#publish-requests-and-release-history).
   - **Import actions.** The commit of a [record import](import-export.md#import)
-    writes `records.imported`, after the `record.created` audit record of each
-    row, in the transaction that writes the rows. The actor is the uploader
+    writes `records.imported`, after the `record.created` or `record.updated` audit
+    record of each row, in the transaction that writes the rows. The actor is the uploader
     with their display name. `entity_id` is set, and `record_id` and
     `process_instance_id` are null. `details` is
     `{ "created", "updated" }`, the counts of records, and it holds no value.

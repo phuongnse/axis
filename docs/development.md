@@ -31,11 +31,12 @@ built from commit `ad13bd4`, the last commit before any M12 code. It may grow by
 The chart library loads in its own lazy chunk, the file `assets/ChartDrawing-*.js`. The page
 designer's canvas and palette load in another, `assets/StudioPageDesign-*.js`, when the Design tab
 opens. The form designer's Design tab loads as `assets/StudioFormDesign-*.js`, when it first opens.
-Both designers share the drag and drop library, `@dnd-kit`, in `assets/DragAndDrop-*.js`. It measures
-15.4 KB gzipped. `scripts/build.sh` runs [`scripts/check-bundle.mjs`](../scripts/check-bundle.mjs)
-after the SPA build. It prints the four sizes and fails when the main bundle is over budget, when
-there is no chart chunk, page design chunk or drag and drop chunk or when any of them is among the
-main bundle files. Do not raise the budget to make the check pass: find what grew.
+The process designer's Design tab loads as `assets/StudioProcessDesign-*.js`, when it first opens.
+All three designers share the drag and drop library, `@dnd-kit`, in `assets/DragAndDrop-*.js`. It
+measures 15.4 KB gzipped. `scripts/build.sh` runs [`scripts/check-bundle.mjs`](../scripts/check-bundle.mjs)
+after the SPA build. It prints the five sizes and fails when the main bundle is over budget, when
+there is no chart chunk, page design chunk, process design chunk or drag and drop chunk or when any of
+them is among the main bundle files. Do not raise the budget to make the check pass: find what grew.
 
 `scripts/build.sh` then runs [`scripts/check-fonts.mjs`](../scripts/check-fonts.mjs) on the same
 output. It lists the font files in `assets/` and fails when a file is not IBM Plex Sans or IBM Plex
@@ -311,7 +312,10 @@ fixtures, only for the API paths of the fixture application. It needs no server,
   buttons and no history, which only the `form` preview shows. Its input works as on a form, and nothing is saved. A mounted widget follows
   `data-theme` on the root element of the page.
   `dark` is dark mode, and any other value or none is light mode. A mounted widget also follows the token custom
-  properties of the root element, such as `--primary`, see [frontend](reference/frontend.md).
+  properties of the root element, such as `--primary`, see [frontend](reference/frontend.md). The Design System
+  artifact draws each card in a frame sandboxed without `allow-forms`, where the browser blocks a form's own
+  submission before its submit event fires. The bundle therefore fires a form's submit event itself, for a click on
+  a submit button, Enter in an input and `requestSubmit()`, and cancels the browser's submission.
 - `web/design-system.html` is the harness. After `scripts/design-system.sh`, open it from disk. With no
   query it mounts every preview. `?preview=<name>&mode=light|dark` mounts one preview in that mode. The
   Vite dev server does not serve the previews.
@@ -324,7 +328,8 @@ checks that a field preview has no Save button and no history, and that the `sta
 the load error alert. For each field type except the child collection, it checks in both modes that the required,
 read-only and error states show. It checks the child collection's reference, computed, error, read-only and empty
 states, and the form's validation, read-only and wizard states. It opens the date-time picker and the reference lookup
-and adds a child collection row. It finds each data preview's empty text under its "Empty" caption, the table's row
+and adds a child collection row. It mounts the `form` preview in a frame sandboxed like the artifact's and checks its
+validation messages and a save. It finds each data preview's empty text under its "Empty" caption, the table's row
 and toolbar actions, the inbox's overdue and claimed tags, and the inspector's failed instance and dead letter actions.
 
 ## Formatting

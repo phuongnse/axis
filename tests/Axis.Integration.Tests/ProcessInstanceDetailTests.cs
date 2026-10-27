@@ -20,11 +20,12 @@ public sealed class ProcessInstanceDetailTests(TaskApiFixture fixture) : IClassF
 
         var root = body.RootElement;
         Assert.Equal(
-            ["id", "process", "subjectId", "releaseId", "state", "step", "createdAt", "endedAt", "parent", "subProcesses", "graph", "path", "tasks", "calls", "commands"],
+            ["id", "process", "subjectId", "releaseId", "state", "step", "createdAt", "endedAt", "timerDueAt", "parent", "subProcesses", "graph", "path", "tasks", "calls", "commands"],
             root.EnumerateObject().Select(property => property.Name));
         Assert.Equal(instance, root.GetProperty("id").GetGuid());
         Assert.Equal("Break", root.GetProperty("process").GetString());
         Assert.Equal("failed", root.GetProperty("state").GetString());
+        Assert.Equal(JsonValueKind.Null, root.GetProperty("timerDueAt").ValueKind);
         Assert.Equal(JsonValueKind.Null, root.GetProperty("parent").ValueKind);
         Assert.Empty(root.GetProperty("subProcesses").EnumerateArray());
         Assert.Equal(DateTimeKind.Utc, root.GetProperty("createdAt").GetDateTime().Kind);
@@ -51,6 +52,7 @@ public sealed class ProcessInstanceDetailTests(TaskApiFixture fixture) : IClassF
         var root = body.RootElement;
         Assert.Equal("waiting", root.GetProperty("state").GetString());
         Assert.Equal("approve", root.GetProperty("step").GetString());
+        Assert.Equal(JsonValueKind.Null, root.GetProperty("timerDueAt").ValueKind);
         var task = Assert.Single(root.GetProperty("tasks").EnumerateArray());
         Assert.Equal(
             ["id", "step", "assigneeKind", "assignee", "state", "outcome", "completedBy", "createdAt", "completedAt"],
@@ -80,6 +82,41 @@ public sealed class ProcessInstanceDetailTests(TaskApiFixture fixture) : IClassF
         Assert.Equal("end", steps[1].GetProperty("type").GetString());
         Assert.Equal(JsonValueKind.Null, steps[1].GetProperty("labelKey").ValueKind);
         Assert.Empty(steps[1].GetProperty("transitions").EnumerateArray());
+    }
+
+    [Fact]
+    public async Task A_waiting_timer_shows_its_due_time()
+    {
+        var instance = await StartAndRunAsync(TenantA, "TimerWait");
+        var dueAt = Assert.IsType<DateTime>(await fixture.ScalarAsync(
+            TenantA,
+            "SELECT due_at FROM axis.process_work_items WHERE process_instance_id = @id AND kind = 'process.timer'",
+            ("id", instance)));
+
+        using var body = await GetOkAsync(TenantA, "TimerWait", instance);
+
+        var root = body.RootElement;
+        Assert.Equal("waiting", root.GetProperty("state").GetString());
+        Assert.Equal("pause", root.GetProperty("step").GetString());
+        var timerDueAt = root.GetProperty("timerDueAt").GetDateTime();
+        Assert.Equal(DateTimeKind.Utc, timerDueAt.Kind);
+        Assert.Equal(dueAt.ToUniversalTime(), timerDueAt);
+    }
+
+    [Fact]
+    public async Task A_timer_item_from_an_older_revision_is_not_shown()
+    {
+        var instance = await StartAndRunAsync(TenantA, "TimerWait");
+        await fixture.ExecuteAsync(
+            TenantA,
+            "UPDATE axis.process_work_items SET revision = revision - 1 WHERE process_instance_id = @id AND kind = 'process.timer'",
+            ("id", instance));
+
+        using var body = await GetOkAsync(TenantA, "TimerWait", instance);
+
+        var root = body.RootElement;
+        Assert.Equal("waiting", root.GetProperty("state").GetString());
+        Assert.Equal(JsonValueKind.Null, root.GetProperty("timerDueAt").ValueKind);
     }
 
     [Fact]

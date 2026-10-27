@@ -85,6 +85,11 @@ by `createdAt`, then by `id`.
 - `dueAt` is `null` when the step has no `dueIn`.
 - `overdue` is `true` when `dueAt` has passed. It is worked out when read with
   database time. See [task-deadlines.md](task-deadlines.md#task-states).
+- **Speed.** The list answers within 300 ms for a holder of a role with 1,000
+  open role tasks, 300 of them claimed by others, and its count reads through
+  the task index. This is the Reads objective of
+  [performance](performance.md#objectives). `TaskInboxPerformanceTests` fails
+  when the best of three calls takes 300 ms or more.
 
 **Read one task.** `GET /api/apps/{app}/tasks/{id}` returns one task in any
 state:

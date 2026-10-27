@@ -44,7 +44,7 @@ public sealed class ImportPerformanceTests(ImportPerformanceTests.ImportFixture 
     public async Task An_import_of_ten_thousand_rows_with_a_reference_a_sequence_and_a_validation_checks_and_commits_within_the_time_limits_in_one_transaction()
     {
         var models = new ReleaseModelCache(PackageCatalog.Empty);
-        var check = new RecordImportCheckHandler(models, new RecordImportSettings(RowCount), NullLogger<RecordImportCheckHandler>.Instance);
+        var check = new RecordImportCheckHandler(models, new RecordImportSettings(RowCount), NullLoggerFactory.Instance, NullLogger<RecordImportCheckHandler>.Instance);
         var commit = new RecordImportCommitHandler(models, NullLoggerFactory.Instance, NullLogger<RecordImportCommitHandler>.Instance);
 
         // The first import compiles the model and warms the connections, so the timed steps measure the work.

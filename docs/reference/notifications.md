@@ -128,6 +128,11 @@ A text value may hold named placeholders, such as
   checked when read, as a role task is.
 - **Read state.** `axis.notification_reads` holds one row per notification
   and user who read it.
+- **Speed.** The list answers within 300 ms for a user with 1,000
+  notifications, to the user and to a role they hold, half of them read, and its
+  count reads through the notification index. This is the Reads objective of
+  [performance](performance.md#objectives). `TaskInboxPerformanceTests` fails
+  when the best of three calls takes 300 ms or more.
 - **Routes.**
   - `GET /api/apps/{app}/notifications?page=&pageSize=&unread=` lists the
     user's notifications, newest first. It answers `items`, `page`, `pageSize`,
@@ -257,9 +262,9 @@ A tenant may override `Email` in its `Tenants` block. The block replaces the
 host's settings as a whole, and keys are never merged one by one, so a tenant
 that sets only its own host never sends the host's user name and password to
 that server. A host with no `From` is refused at start, naming the setting.
-_(Planned for M14)_ A tenant may also override `Email` in the tenant directory
-under `Tenancy:Source=directory`, where the password is encrypted as the OIDC
-client secret is. Until then such a tenant uses the host's settings. MailKit
-sends the email. The integration tests run Mailpit as the mail server.
+Under `Tenancy:Source=directory` a tenant overrides `Email` in the tenant
+directory, where the password is encrypted as the OIDC client secret is. The
+[`tenant email set`](tenant-setting-commands.md#mail-settings) command sets it,
+and a tenant without it uses the host's settings. MailKit sends the email. The integration tests run Mailpit as the mail server.
 _(Planned for M14)_ Docker Compose and `scripts/dev.sh` run Mailpit too. Until
 then they have no mail server, see [development](../development.md).

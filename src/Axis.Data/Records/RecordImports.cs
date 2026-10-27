@@ -49,7 +49,7 @@ public sealed record RecordImport(
 /// <summary>An import as its uploader reads it. <see cref="Errors"/> is empty unless the import failed.</summary>
 public sealed record RecordImportStatus(Guid Id, string State, string? Key, IReadOnlyDictionary<string, string[]> Errors, DateTimeOffset CreatedAt);
 
-/// <summary>An import as the worker runs its dry run, with the file, its format and the uploader the checks run for.</summary>
+/// <summary>An import as the worker runs its dry run, with the file, its format, its key and the uploader the checks run for.</summary>
 public sealed record RecordImportJob(
     Guid Id,
     Guid ApplicationId,
@@ -57,6 +57,7 @@ public sealed record RecordImportJob(
     string UploaderId,
     string UploaderName,
     IReadOnlyList<string> UploaderRoles,
+    string? Key,
     string State,
     string Format,
     byte[]? File);
@@ -171,7 +172,7 @@ public static class RecordImports
 
         await using var command = new NpgsqlCommand(
             """
-            SELECT id, application_id, entity_id, uploader_id, uploader_name, uploader_roles, state, format, file
+            SELECT id, application_id, entity_id, uploader_id, uploader_name, uploader_roles, key, state, format, file
             FROM axis.record_imports
             WHERE work_item_id = @item
             FOR UPDATE
@@ -192,9 +193,10 @@ public static class RecordImports
             reader.GetString(3),
             reader.GetString(4),
             reader.GetFieldValue<string[]>(5),
-            reader.GetString(6),
+            reader.IsDBNull(6) ? null : reader.GetString(6),
             reader.GetString(7),
-            reader.IsDBNull(8) ? null : reader.GetFieldValue<byte[]>(8));
+            reader.GetString(8),
+            reader.IsDBNull(9) ? null : reader.GetFieldValue<byte[]>(9));
     }
 
     /// <summary>

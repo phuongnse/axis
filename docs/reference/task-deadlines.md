@@ -119,6 +119,10 @@ A task step may add `escalations` and a `deadline`:
 - **Test scenarios.** `advanceTime` runs due `task.escalate` and `task.deadline`
   items. A scenario action never runs one early, see
   [Test scenarios](test-scenarios.md).
+- **Speed.** A worker runs 500 due `task.escalate` items, each of which
+  reassigns its task and stores a notification, and then the 500
+  `task.deadline` items of the same tasks, within 2 minutes.
+  `TaskEscalationPerformanceTests` fails past that limit.
 
 ## Task states
 

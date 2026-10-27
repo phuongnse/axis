@@ -1,0 +1,9 @@
+{
+  "id": "72eda7a3-253e-4afc-a197-ba282a599a1a",
+  "kind": "entity",
+  "name": "Assignee",
+  "formatVersion": 1,
+  "fields": [
+    { "name": "userId", "type": "text", "maxLength": 100 }
+  ]
+}

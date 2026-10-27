@@ -457,6 +457,104 @@ public sealed class ProcessCompilerTests
     }
 
     [Fact]
+    public void A_cycle_through_a_wait_for_event_compiles_into_a_wait_event_step()
+    {
+        using var folder = Folder(Process("Order", """
+            [
+              { "name": "check", "type": "decision", "branches": [{ "when": "amount > 0", "next": "wait" }], "otherwise": "done" },
+              { "name": "wait", "type": "waitEvent", "event": "orderPLACED", "when": "amount > 10", "timeout": { "after": "P2D", "next": "DONE" }, "next": "check" },
+              { "name": "done", "type": "end" }
+            ]
+            """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+        var wait = Assert.IsType<WaitEventStepModel>(Assert.Single(result.Model.Processes).Steps[1]);
+        Assert.Equal(("wait", "OrderPlaced", "check"), (wait.Name, wait.Event, wait.Next));
+        Assert.Equal("amount > 10", wait.When!.Expression);
+        Assert.Equal("boolean", wait.When.Check.Type?.ToString());
+        Assert.Equal((TimeSpan.FromDays(2), "done"), (wait.Timeout!.After, wait.Timeout.Next));
+    }
+
+    [Fact]
+    public void A_wait_for_event_without_a_when_or_a_timeout_builds_with_neither()
+    {
+        using var folder = Folder(Process(
+            "Order",
+            """[{ "name": "wait", "type": "waitEvent", "event": "OrderPlaced", "next": "done" }, { "name": "done", "type": "end" }]""",
+            start: "wait"));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+        var wait = Assert.IsType<WaitEventStepModel>(Assert.Single(result.Model.Processes).Steps[0]);
+        Assert.Equal((null, null), (wait.When, wait.Timeout));
+    }
+
+    [Theory]
+    [InlineData("Nope", "", DiagnosticCodes.UnknownStepEvent, "/steps/0/event")]
+    [InlineData("CustomerJoined", "", DiagnosticCodes.WaitEventOverOtherEntity, "/steps/0/event")]
+    [InlineData("OrderPlaced", """ "when": "amount", """, ExpressionDiagnosticCodes.ResultTypeMismatch, "/steps/0/when")]
+    [InlineData("OrderPlaced", """ "when": "submittedAt", """, ExpressionDiagnosticCodes.UnknownName, "/steps/0/when")]
+    [InlineData("OrderPlaced", """ "when": "amount >", """, ExpressionDiagnosticCodes.SyntaxError, "/steps/0/when")]
+    [InlineData("OrderPlaced", """ "timeout": { "after": "P1M", "next": "done" }, """, DiagnosticCodes.InvalidTaskDueIn, "/steps/0/timeout/after")]
+    [InlineData("OrderPlaced", """ "timeout": { "after": "PT0S", "next": "done" }, """, DiagnosticCodes.InvalidTaskDueIn, "/steps/0/timeout/after")]
+    [InlineData("OrderPlaced", """ "timeout": { "after": "P1D", "next": "missing" }, """, DiagnosticCodes.UnknownStep, "/steps/0/timeout/next")]
+    public void A_wait_for_event_problem_is_reported_at_its_path_in_the_step_and_gives_no_model(
+        string @event, string properties, string code, string path)
+    {
+        using var folder = Folder(Process(
+            "Order",
+            $$"""[{ "name": "wait", "type": "waitEvent", "event": "{{@event}}", {{properties}} "next": "done" }, { "name": "done", "type": "end" }]""",
+            start: "wait"));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((code, "processes/order-review.json", path), (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void A_wait_for_event_about_another_entity_names_both_entities()
+    {
+        using var folder = Folder(Process(
+            "Order",
+            """[{ "name": "wait", "type": "waitEvent", "event": "CustomerJoined", "next": "done" }, { "name": "done", "type": "end" }]""",
+            start: "wait"));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            ("AXC0283", "The event 'CustomerJoined' is about the entity 'Customer'. A step can wait only for an event about the process's entity 'Order'."),
+            (diagnostic.Code, diagnostic.Message));
+    }
+
+    [Fact]
+    public void A_wait_for_event_in_a_process_without_a_subject_is_reported_at_its_type_and_not_checked_further()
+    {
+        using var folder = Folder(SubjectlessProcess(
+            """[{ "name": "limit", "type": "decimal" }]""",
+            """
+            [
+              { "name": "wait", "type": "waitEvent", "event": "Nope", "when": "nope", "timeout": { "after": "P1M", "next": "done" }, "next": "done" },
+              { "name": "done", "type": "end" }
+            ]
+            """,
+            start: "wait"));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.StepNeedsSubject, "/steps/0/type"), (diagnostic.Code, diagnostic.Path));
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
     public void A_cycle_of_decision_and_operation_steps_is_still_a_cycle()
     {
         using var folder = Folder(Process("Order", """
@@ -1250,6 +1348,17 @@ public sealed class ProcessCompilerTests
     [InlineData("""{ "name": "submit", "type": "timer", "wait": "PT1H", "set": { "status": "'x'" }, "next": "done" }""")]
     [InlineData("""{ "name": "submit", "type": "timer", "wait": "PT1H", "dueIn": "P3D", "next": "done" }""")]
     [InlineData("""{ "name": "submit", "type": "timer", "wait": "PT1H", "entity": "Order", "next": "done" }""")]
+    [InlineData("""{ "name": "submit", "type": "waitEvent", "next": "done" }""")]
+    [InlineData("""{ "name": "submit", "type": "waitEvent", "event": "OrderPlaced" }""")]
+    [InlineData("""{ "name": "submit", "type": "waitEvent", "event": "OrderPlaced", "when": "", "next": "done" }""")]
+    [InlineData("""{ "name": "submit", "type": "waitEvent", "event": "OrderPlaced", "timeout": { "after": "P1D" }, "next": "done" }""")]
+    [InlineData("""{ "name": "submit", "type": "waitEvent", "event": "OrderPlaced", "timeout": { "next": "done" }, "next": "done" }""")]
+    [InlineData("""{ "name": "submit", "type": "waitEvent", "event": "OrderPlaced", "timeout": { "after": "P1D", "next": "done", "extra": 1 }, "next": "done" }""")]
+    [InlineData("""{ "name": "submit", "type": "waitEvent", "event": "OrderPlaced", "wait": "PT1H", "next": "done" }""")]
+    [InlineData("""{ "name": "submit", "type": "waitEvent", "event": "OrderPlaced", "deadline": { "after": "P1D", "next": "done" }, "next": "done" }""")]
+    [InlineData("""{ "name": "submit", "type": "timer", "wait": "PT1H", "when": "true", "next": "done" }""")]
+    [InlineData("""{ "name": "submit", "type": "timer", "wait": "PT1H", "timeout": { "after": "P1D", "next": "done" }, "next": "done" }""")]
+    [InlineData("""{ "name": "submit", "type": "operation", "operation": "updateRecord", "set": { "status": "'x'" }, "when": "true", "next": "done" }""")]
     [InlineData("""{ "name": "submit", "type": "end", "deadline": { "after": "P1D", "next": "done" } }""")]
     [InlineData("""{ "name": "submit", "type": "decision", "branches": [{ "when": "true", "next": "done" }], "otherwise": "done", "deadline": { "after": "P1D", "next": "done" } }""")]
     [InlineData("""{ "name": "submit", "type": "task", "label": { "textKey": "order.review" }, "assignee": { "role": "finance" }, "form": "OrderReview", "outcomes": [{ "name": "ok", "label": { "textKey": "task.approve" }, "next": "done" }], "deadline": { "after": "P1D" } }""")]

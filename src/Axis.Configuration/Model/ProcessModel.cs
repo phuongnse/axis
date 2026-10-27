@@ -145,6 +145,17 @@ public interface INotificationModel
 public sealed record TimerStepModel(string Name, TimeSpan? Wait, ExpressionModel? Until, string Next) : ProcessStepModel(Name);
 
 /// <summary>
+/// A <c>waitEvent</c> step: the process waits for an event of the declared name <see cref="Event"/>
+/// about the subject record, one that <see cref="When"/> accepts when it is set, then goes on at
+/// <see cref="Next"/>. When <see cref="Timeout"/> is set and no such event arrives in time, it goes
+/// on at the timeout's step instead.
+/// </summary>
+public sealed record WaitEventStepModel(string Name, string Event, ExpressionModel? When, WaitTimeoutModel? Timeout, string Next) : ProcessStepModel(Name);
+
+/// <summary>The timeout of a <see cref="WaitEventStepModel"/>: how long the wait lasts and the step taken when it runs out.</summary>
+public sealed record WaitTimeoutModel(TimeSpan After, string Next);
+
+/// <summary>
 /// An <c>updateRecord</c> operation step: it sets each field in
 /// <see cref="Set"/> on the subject record through the record update rules, then moves to
 /// <see cref="Next"/>.

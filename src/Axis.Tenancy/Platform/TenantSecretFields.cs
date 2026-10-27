@@ -15,6 +15,9 @@ public static class TenantSecretFields
     /// <summary>The field of a client key for <c>private_key_jwt</c>. The current and the previous key share it.</summary>
     public const string OidcClientKey = "oidc_client_key";
 
+    /// <summary>The field of a tenant's own SMTP password.</summary>
+    public const string SmtpPassword = "smtp_password";
+
     /// <summary>The field of a data protection key. It is bound with an empty tenant id.</summary>
     public static string DataProtectionKey(Guid id) => "data_protection_key:" + id.ToString("D");
 

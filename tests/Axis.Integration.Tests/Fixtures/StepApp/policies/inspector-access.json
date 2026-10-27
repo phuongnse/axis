@@ -11,6 +11,7 @@
     { "process": "Break", "actions": ["inspect"] },
     { "process": "Submit", "actions": ["inspect"] },
     { "process": "Divide", "actions": ["inspect"] },
-    { "process": "DepartmentOrder", "actions": ["inspect"] }
+    { "process": "DepartmentOrder", "actions": ["inspect"] },
+    { "process": "TimerWait", "actions": ["inspect"] }
   ]
 }

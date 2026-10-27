@@ -559,7 +559,11 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
         page.getByTestId("studio-form-palette-category"),
       ).toBeVisible();
 
-      await page.getByRole("button", { name: "Save", exact: true }).click();
+      // The form canvas draws its own Save button on the last step, before the editor's Save.
+      await page
+        .getByRole("button", { name: "Save", exact: true })
+        .last()
+        .click();
       await expect(page.getByTestId("studio-saved")).toBeVisible();
 
       const problem = JSON.parse(original).sections[0];
@@ -593,7 +597,9 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
     await page.getByRole("tab", { name: "Design", exact: true }).click();
 
     await page
-      .locator('[data-testid="studio-outline-section"][data-path="/sections/0"]')
+      .locator(
+        '[data-testid="studio-outline-section"][data-path="/sections/0"]',
+      )
       .locator("> span")
       .first()
       .click();

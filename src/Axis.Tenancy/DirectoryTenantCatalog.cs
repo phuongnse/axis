@@ -7,7 +7,7 @@ namespace Axis.Tenancy;
 /// <summary>
 /// The tenant catalog read from the tenant directory, the <c>directory</c> source. It holds the active tenants
 /// read at one moment, and the hosts of the other tenants, which resolve no tenant but are known. Each password and secret stays encrypted in memory and is decrypted only when a
-/// connection opens, the sign-in client is set up or a binding is resolved.
+/// connection opens, the sign-in client is set up, a binding is resolved or an email is sent.
 /// </summary>
 public sealed class DirectoryTenantCatalog : ITenantCatalog
 {
@@ -300,7 +300,26 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
             signIn.OidcProfile,
             ClientKeys(signIn, cipher));
 
-        return new TenantEntry(id, hosts, connectionString, SchemaConnectionString: null, oidc, bindings, row.PreviewOf);
+        return new TenantEntry(id, hosts, connectionString, SchemaConnectionString: null, oidc, bindings, row.PreviewOf, Email(row, cipher));
+    }
+
+    // A tenant has its own mail settings exactly when its SMTP host is set. A preview tenant's are its own, bound to its own id.
+    private static EmailSettings? Email(TenantRow row, TenantSecretCipher cipher)
+    {
+        if (Blank(row.SmtpHost) is not { } host)
+        {
+            return null;
+        }
+
+        var id = row.Id;
+        var stored = row.SmtpPassword;
+        return new EmailSettings(
+            host,
+            row.SmtpPort ?? EmailSettings.DefaultPort,
+            row.SmtpUseTls ?? true,
+            Blank(row.SmtpUserName),
+            stored is { Length: > 0 } ? SecretValue.Deferred(() => cipher.Decrypt(id, TenantSecretFields.SmtpPassword, stored).Reveal()) : null,
+            Blank(row.EmailFrom));
     }
 
     // The current key comes first, then the previous one. Each is decrypted only at the moment of use.

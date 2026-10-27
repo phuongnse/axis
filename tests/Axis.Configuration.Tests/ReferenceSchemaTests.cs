@@ -53,6 +53,7 @@ public sealed class ReferenceSchemaTests
         (ReferenceRelations.TaskRole, "process", "properties/steps/items/properties/assignee/properties/role", "role"),
         (ReferenceRelations.ConnectorCall, "process", "properties/steps/items/properties/connector/properties/name", "connector"),
         (ReferenceRelations.RaisedEvent, "process", "properties/steps/items/properties/event", "event"),
+        (ReferenceRelations.AwaitedEvent, "process", "properties/steps/items/properties/event", "event"),
         (ReferenceRelations.CreatedEntity, "process", "properties/steps/items/properties/entity", "entity"),
         (ReferenceRelations.NavigatePage, "process", "$defs/notifyOpen/properties/page", "page"),
         (ReferenceRelations.PolicyRole, "policy", "properties/roles/items", "role"),
@@ -90,6 +91,7 @@ public sealed class ReferenceSchemaTests
         ("process", "$defs/branch/properties/next", "step", "/name"),
         ("process", "$defs/outcome/properties/next", "step", "/name"),
         ("process", "$defs/step/properties/deadline/properties/next", "step", "/name"),
+        ("process", "$defs/step/properties/timeout/properties/next", "step", "/name"),
         ("scenario", "properties/steps/items/properties/step", "step", "1/process"),
         ("page", "$defs/widget/properties/measure", "column", "1/dataSource"),
         ("page", "$defs/widget/properties/comparison/properties/measure", "column", "2/dataSource"),
@@ -192,7 +194,9 @@ public sealed class ReferenceSchemaTests
             }
         }
 
-        Assert.Equal(_pickers.Length + _unindexedPickers.Length + _partMarks.Length + textKeys, marks);
+        // Two relations can share one mark, as a raised and an awaited event share a step's event.
+        var pickerMarks = _pickers.Select(picker => (picker.Schema, picker.Path)).Distinct().Count();
+        Assert.Equal(pickerMarks + _unindexedPickers.Length + _partMarks.Length + textKeys, marks);
     }
 
     private static bool IsValidMark(JsonElement mark) => mark.ValueKind switch
