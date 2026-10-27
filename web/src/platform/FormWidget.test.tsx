@@ -94,6 +94,31 @@ const linesWidget: EntityWidgetMetadata = {
   },
 }
 
+// A note whose lines each name a category, a reference cell in a child collection.
+const lineCategoryWidget: EntityWidgetMetadata = {
+  ...noteWidget,
+  entity: {
+    ...noteWidget.entity,
+    fields: [
+      { ...field('title', 'text', 'note.title'), required: true, maxLength: 200 },
+      {
+        ...field('lines', 'child-collection', 'note.lines'),
+        fields: [
+          { ...field('description', 'text', 'noteLine.description'), required: true, maxLength: 100 },
+          {
+            ...field('category', 'reference', 'note.category'),
+            target: {
+              entity: 'Category',
+              displayField: 'name',
+              recordsPath: '/api/apps/E2eApp/entities/Category/records',
+            },
+          },
+        ],
+      },
+    ],
+  },
+}
+
 // A note whose total and each line's code the server computes.
 const computedWidget: EntityWidgetMetadata = {
   ...noteWidget,
@@ -491,6 +516,19 @@ describe('FormWidget', () => {
     const group = await screen.findByTestId('reference-category')
     expect(within(group).getByLabelText('Category')).toHaveValue('Office')
     expect(within(group).getByRole('button', { name: 'Choose' })).toBeInTheDocument()
+  })
+
+  it('shows Choose and Clear as icon buttons with no visible text', async () => {
+    stubFetch({ status: 200, body: noteJson('Buy paper', 1) })
+    renderForm(noteId)
+    await screen.findByLabelText('Category')
+
+    const choose = screen.getByRole('button', { name: 'Choose' })
+    const clear = screen.getByRole('button', { name: 'Clear' })
+    expect(choose.textContent).toBe('')
+    expect(clear.textContent).toBe('')
+    expect(choose.querySelector('.anticon-search')).not.toBeNull()
+    expect(clear.querySelector('.anticon-close')).not.toBeNull()
   })
 
   it('shows the history of a saved record below the form', async () => {
@@ -931,6 +969,26 @@ describe('FormWidget', () => {
 
     await waitFor(() => expect(requests()).toHaveLength(2))
     expect(requests()[1].body).toBe('{"version":1,"values":{"title":"Buy paper!"}}')
+  })
+
+  it('shows a child collection reference cell as a search icon button with no visible text', async () => {
+    stubFetch()
+    renderForm(null, lineCategoryWidget)
+    await userEvent.click(screen.getByRole('button', { name: 'Add row' }))
+
+    const choose = screen.getByRole('button', { name: 'Choose Category 1' })
+    expect(choose.textContent).toBe('')
+    expect(choose.querySelector('.anticon-search')).not.toBeNull()
+  })
+
+  it('shows each child collection row remove button as a danger button with a trash icon', async () => {
+    stubFetch()
+    renderForm(null, linesWidget)
+    await userEvent.click(screen.getByRole('button', { name: 'Add row' }))
+
+    const remove = screen.getByRole('button', { name: 'Remove' })
+    expect(remove).toHaveClass('ant-btn-dangerous')
+    expect(remove.querySelector('.anticon-delete')).not.toBeNull()
   })
 
   it('shows a row error on its cell, and clears cell errors when a row is added', async () => {
