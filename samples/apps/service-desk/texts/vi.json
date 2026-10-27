@@ -60,6 +60,10 @@
     "notifications.overdue.subject": "Có yêu cầu hỗ trợ quá hạn",
     "notifications.overdue.body": "Một số yêu cầu hỗ trợ đã quá hạn hơn {days} ngày. Mở Tất cả yêu cầu để xem.",
     "notifications.ticketDeleted.subject": "Yêu cầu {number} đã bị xóa",
-    "notifications.ticketDeleted.body": "Người yêu cầu đã xóa bản nháp {number}: {title}."
+    "notifications.ticketDeleted.body": "Người yêu cầu đã xóa bản nháp {number}: {title}.",
+    "ticket.late.subject": "Yêu cầu {number} đã quá hạn",
+    "ticket.late.body": "Yêu cầu {number} đã quá hạn mà chưa được xử lý.",
+    "ticket.resolved.subject": "Yêu cầu {number} đã được giải quyết",
+    "ticket.resolved.body": "Yêu cầu {number} đã được giải quyết: {resolution}"
   }
 }

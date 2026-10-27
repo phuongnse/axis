@@ -184,7 +184,7 @@ The server activates this sample next to purchase requests under
 A third application, of a different shape from the first
 two, is a sample that a Playwright journey builds only through Studio. It lives as
 configuration in `samples/apps/service-desk/`. It is not platform code. It is
-thin on purpose: SLAs, escalation and notifications wait for M14. See
+thin on purpose: it has no SLA calendars or business hours. See
 [D56](decisions/d56-a-service-desk-as-the-third-sample-application.md) and, for
 the parts built in M12,
 [D60](decisions/d60-the-service-desk-dashboard-ticket-detail-page-and-guided-form.md).
@@ -214,8 +214,12 @@ the parts built in M12,
    delete trigger notifies the lead in-app with the ticket's number and title
    ([D70](decisions/d70-processes-without-a-subject-scheduled-jobs-and-delete-triggers.md),
    [D73](decisions/d73-in-app-and-email-notifications.md)).
-   _(Planned for M14)_ The agent's task escalates to the service desk lead when
-   it is late, and the requester is notified when the ticket is resolved
+   The agent's resolve task escalates to the service desk lead when it is late:
+   when it is due, three days after it starts, the lead is notified in-app with
+   the ticket's number. One day later the task is reassigned to the
+   `service-desk-lead` role. When the agent resolves the ticket, the requester is
+   notified in-app and by email with the ticket's number and the resolution, and
+   the notification opens the ticket detail page
    ([D71](decisions/d71-task-deadlines-escalation-claim-and-reassign.md),
    [D73](decisions/d73-in-app-and-email-notifications.md)).
 
@@ -259,6 +263,8 @@ tickets and the dashboard for the lead, in a site at path `service-desk`. Texts 
 - A requester deletes a draft ticket. An agent's delete is refused.
 - The next weekday morning reminds the lead of overdue tickets, and a deleted
   draft ticket is reported to the lead.
+- A late ticket notifies the lead and is then reassigned to the lead's role. A
+  resolved ticket notifies the requester in-app and by email.
 
 ### Built through Studio
 
@@ -286,6 +292,10 @@ Studio, publishes it and takes one ticket through the process on the site.
   their schedule and delete triggers. It creates a temporary event to clear
   the `event` of each new trigger, because Studio removes that key only when
   the author picks an event and clears it, and it deletes the event again.
+- The main journey also builds the escalations of the resolve task, the notify
+  step that tells the requester and its open page, and their texts. On the
+  site, the requester opens the ticket from the bell after the agent resolves
+  it, and the lead's bell shows nothing for that ticket.
 - Another Playwright journey uses the sample at phone
   width.
 - A second, smaller journey creates an application from the

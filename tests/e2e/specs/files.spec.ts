@@ -55,7 +55,7 @@ test('a PDF is attached on an asset form, linked in the table and the detail, do
   const asset = await createAsset(request, name)
 
   await page.goto(`/e2e/assetform/${asset.id}`)
-  await expect(page.getByRole('textbox', { name: '* Name', exact: true })).toHaveValue(name)
+  await expect(page.getByRole('textbox', { name: 'Name', exact: true })).toHaveValue(name)
   await upload(page, 'Upload Receipt', pdf(first))
   await expect(page.getByTestId('file-receipt-announcement')).toHaveText(`Uploaded ${first}`)
   await save(page)

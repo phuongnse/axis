@@ -387,8 +387,8 @@ Paths in validations and computed fields are not built. There a path is
   compares with a reference field that points to the subject entity, and a
   path cannot start at it: `id.name` is `AXC0047`. `id` comes first, so it
   wins over a field named `id`. A data change trigger's `when` has the same
-  scope. See [processes](processes.md#steps). _(Planned for M14)_ A process
-  without a subject sees its parameters and the named rules instead. See
+  scope. See [processes](processes.md#steps). A process without a subject sees
+  its parameters and the named rules instead. See
   [process flow](process-flow.md) and
   [D70](../decisions/d70-processes-without-a-subject-scheduled-jobs-and-delete-triggers.md).
 

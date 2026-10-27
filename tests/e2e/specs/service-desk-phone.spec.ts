@@ -29,7 +29,7 @@ test('anna creates a draft ticket at phone width and opens it from the folded ro
 
   await page.getByRole('button', { name: 'New', exact: true }).click()
   await expect(page).toHaveURL(/\/service-desk\/ticketform\/new$/)
-  await page.getByRole('textbox', { name: '* Title', exact: true }).fill(title)
+  await page.getByRole('textbox', { name: 'Title', exact: true }).fill(title)
   await page.getByRole('textbox', { name: 'Description', exact: true }).fill('It shows a black screen.')
   await noSideways(page)
   await page.getByRole('button', { name: 'Next', exact: true }).click()

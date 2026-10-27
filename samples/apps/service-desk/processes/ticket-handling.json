@@ -70,6 +70,38 @@
       },
       "form": "TicketResolution",
       "dueIn": "P3D",
+      "escalations": [
+        {
+          "after": "P3D",
+          "notify": {
+            "to": [
+              {
+                "role": "service-desk-lead"
+              }
+            ],
+            "channels": [
+              "inApp"
+            ],
+            "message": {
+              "subject": {
+                "textKey": "ticket.late.subject"
+              },
+              "body": {
+                "textKey": "ticket.late.body"
+              },
+              "values": {
+                "number": "number"
+              }
+            }
+          }
+        },
+        {
+          "after": "P4D",
+          "reassign": {
+            "role": "service-desk-lead"
+          }
+        }
+      ],
       "outcomes": [
         {
           "name": "resolve",
@@ -86,6 +118,39 @@
       "operation": "updateRecord",
       "set": {
         "status": "'resolved'"
+      },
+      "next": "tellRequester"
+    },
+    {
+      "name": "tellRequester",
+      "type": "operation",
+      "operation": "notify",
+      "to": [
+        {
+          "user": "requester"
+        }
+      ],
+      "channels": [
+        "inApp",
+        "email"
+      ],
+      "message": {
+        "subject": {
+          "textKey": "ticket.resolved.subject"
+        },
+        "body": {
+          "textKey": "ticket.resolved.body"
+        },
+        "values": {
+          "number": "number",
+          "resolution": "resolution"
+        }
+      },
+      "open": {
+        "page": "TicketDetail",
+        "parameters": {
+          "ticket": "id"
+        }
       },
       "next": "confirm"
     },

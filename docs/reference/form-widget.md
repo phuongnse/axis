@@ -80,29 +80,32 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
     shows only the fields its form lists, in its order, under the section
     titles (see **Form binding**). A required field's label is
     marked, but the mark blocks nothing: the server still decides.
-  - **Field look** _(planned)_. These rules are agreed in
+  - **Field look**. These rules are agreed in
     [D96](../decisions/d96-rules-from-the-design-system-review.md).
-    - **Label.** A field label is weight 500 in `textMuted`, wherever a field
-      is labelled: on a form, on a detail and as a KPI's label.
+    - **Label.** On a form, a field label is weight 500 in `textMuted`.
+      _(planned)_ The same on a detail and as a KPI's label.
     - **Required mark.** A required field has a `*` after its label, in
-      `dangerText`, and its input carries `aria-required`.
+      `dangerText`. The mark is hidden from screen readers. An editable input
+      of a required field carries `aria-required`, and a read-only value does
+      not. Required means the form state answer's `required`, or else the
+      field's `required`.
     - **Help text.** A field whose entity field has
       [`help`](resource-files.md#resource-file-shape) shows it between the
       label and the input, at 12px with a 20px line height in `textMuted`,
-      tied to the input with `aria-describedby`. A message under the input
-      never replaces it. It is one or two short lines: longer guidance belongs
-      on the page or the section. Only a form shows it, not a table or a
-      detail.
+      tied to the input with `aria-describedby`. A file input shows it but is
+      not tied to it. A message under the input never replaces it. It is one
+      or two short lines: longer guidance belongs on the page or the section.
+      Only a form shows it, not a table or a detail.
     - **Validation messages.** A message is 14px at a 20px line height, 4px
       under its input, followed by a whole field gap (`spacing-lg`, 24px)
       before the next field, so the layout grows when a message appears.
-    - **Read-only values.** A field the form makes read-only, by `readOnly` or
+    - _(planned)_ **Read-only values.** A field the form makes read-only, by `readOnly` or
       `readOnlyWhen`, and a `computed`, `sequence` or `creator` field show
       plain text, not an input. A boolean shows Yes or No. The value starts
       about 6px under its label, and the field keeps the height of an editable
       field. An empty value shows "Not set", see
       [shown values](frontend.md).
-    - **Values.** Dates, date-times and numbers follow the **Shown values**
+    - _(planned)_ **Values.** Dates, date-times and numbers follow the **Shown values**
       rules of [frontend.md](frontend.md). A date picker fills its column, as
       every other input does.
 
@@ -116,7 +119,7 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
     | `date-time` | a date and time picker to the minute, with no seconds column, that shows and accepts the date and the time on the locale's clock, such as `03/04/2026 4:30 PM` in `en` and `04/03/2026 16:30` in `vi`, in the browser's time zone. It sends the instant in UTC with zero seconds and no fraction. With `min` or `max` it disables the dates outside them and its placeholder shows the range |
     | `enum` | a choice of the declared values, as written in the entity file, or their labels with `valueLabels` |
     | `file` | the [file input](file-fields.md#in-the-spa): the current file's name as a download link, an Upload button and, when the field is not required, a Remove button. A read-only file shows its link only |
-    | `reference` | the label of the chosen record, read-only, with a choose button that opens the lookup. A field that is not required and is set also has a clear button. Choose and Clear are icon buttons, a search and a close icon, with their names as tooltips _(planned)_ |
+    | `reference` | the label of the chosen record, read-only, with a choose button that opens the lookup. A field that is not required and is set also has a clear button. Choose and Clear are icon buttons, a search and a close icon, with their names as tooltips |
     | `references` | a list of the chosen records' labels in their order, each with a remove button, and an add button that opens the lookup, described under **Set of references** |
     | `child-collection` | a table of its rows, described under **Child collections** |
     | any type with `computed`, `sequence` or `creator`, and any field but a child collection that the form makes read-only | the value the server returned, formatted as a table cell shows it, in a read-only text input today and as plain text _(planned)_, see **Field look**. An empty value shows "Not set" in muted italics, the value of the input today. It changes only when the record is saved and loaded again |
@@ -183,12 +186,12 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
     - _(planned)_ A read-only or computed cell shows plain text, not an
       input, and keeps an input's 32px height, so it lines up with the inputs
       beside it. A reference column is 240px wide.
-    - Each row has a remove button. An add button below the table appends a
-      row with every child field `null`. Rows cannot be reordered.
-      _(planned)_ Remove row is a red trash icon button. Add row sits above
-      the table on the right, outlined at the *main* level of
-      [buttons](frontend.md). When a row is added, focus moves to its first
-      input.
+    - Each row has a remove row button: a red trash icon button with its
+      name as a tooltip. An add button below the table appends a row with
+      every child field `null`. Rows cannot be reordered.
+      _(planned)_ Add row sits above the table on the right, outlined at the
+      *main* level of [buttons](frontend.md). When a row is added, focus moves
+      to its first input.
     - When rows were added, removed or edited, the form sends the whole row
       list, as [record-api.md](record-api.md#child-rows-computed-fields-and-validations) describes. Each row holds its
       non-null child fields in declaration order, without its computed fields. Rows are compared by value

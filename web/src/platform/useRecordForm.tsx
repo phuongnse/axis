@@ -1,4 +1,5 @@
-import { Button, Col, Form, Input, Row, Space, Typography } from 'antd'
+import { CloseOutlined, SearchOutlined } from '@ant-design/icons'
+import { Button, Col, Form, Input, Row, Space, Tooltip, Typography } from 'antd'
 import { Fragment, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { ChildCollectionTable } from './ChildCollectionTable'
 import { FieldInput } from './FieldInput'
@@ -174,7 +175,7 @@ export function useRecordForm(
   const emptyStyle = useEmptyStyle()
   const notSet = t('shell.value.notSet')
   const canvas = useContext(FormCanvasContext)
-  const { spacing } = useDesignTokens()
+  const { spacing, colour } = useDesignTokens()
   const narrow = useNarrowWidth()
   const shown = useMemo(() => sections.flatMap((section) => section.fields), [sections])
   const [snapshot, setSnapshot] = useState<Snapshot>(() => emptySnapshot(entity.fields))
@@ -416,28 +417,41 @@ export function useRecordForm(
     })
   }
 
-  const input = (field: FieldMetadata, readOnly: boolean): ReactNode => {
+  const input = (field: FieldMetadata, readOnly: boolean, required: boolean, helpId: string | undefined): ReactNode => {
     const value = values[field.name] ?? null
     const id = field.name
     if (field.type !== 'child-collection' && (readOnly || field.computed || field.sequence || field.creator)) {
       if (field.type === 'references') {
         const joined = referencesLabels(value, labels[field.name]).join(', ')
-        return <Input id={id} readOnly value={joined || notSet} style={joined ? undefined : emptyStyle} />
+        return (
+          <Input
+            id={id}
+            readOnly
+            aria-describedby={helpId}
+            value={joined || notSet}
+            style={joined ? undefined : emptyStyle}
+          />
+        )
       }
       if (field.type === 'file') {
         return isFileValue(value) ? (
           <FileLink field={field} value={value} />
         ) : (
-          <Input id={id} readOnly value={notSet} style={emptyStyle} />
+          <Input id={id} readOnly aria-describedby={helpId} value={notSet} style={emptyStyle} />
         )
       }
       // An empty value shows the words, because fields are read one by one.
       if (value === null) {
-        return <Input id={id} readOnly value={notSet} style={emptyStyle} />
+        return <Input id={id} readOnly aria-describedby={helpId} value={notSet} style={emptyStyle} />
       }
       // The server sets the value on save, so it is shown as a table cell shows it.
       return (
-        <Input id={id} readOnly value={formatValue(field, value as RecordValue, labels, { locale, text: t }, values)} />
+        <Input
+          id={id}
+          readOnly
+          aria-describedby={helpId}
+          value={formatValue(field, value as RecordValue, labels, { locale, text: t }, values)}
+        />
       )
     }
     switch (field.type) {
@@ -446,9 +460,25 @@ export function useRecordForm(
         // The label cannot be typed. The record is chosen in the lookup, and its id is sent.
         return (
           <Space.Compact block data-testid={`reference-${field.name}`}>
-            <Input id={id} readOnly value={typeof label === 'string' ? label : ''} />
-            <Button onClick={() => setLookup(field.name)}>{t('shell.form.choose')}</Button>
-            {!field.required && value !== null && <Button onClick={() => clear(field)}>{t('shell.form.clear')}</Button>}
+            <Input
+              id={id}
+              readOnly
+              aria-required={required || undefined}
+              aria-describedby={helpId}
+              value={typeof label === 'string' ? label : ''}
+            />
+            <Tooltip title={t('shell.form.choose')}>
+              <Button
+                aria-label={t('shell.form.choose')}
+                icon={<SearchOutlined />}
+                onClick={() => setLookup(field.name)}
+              />
+            </Tooltip>
+            {!field.required && value !== null && (
+              <Tooltip title={t('shell.form.clear')}>
+                <Button aria-label={t('shell.form.clear')} icon={<CloseOutlined />} onClick={() => clear(field)} />
+              </Tooltip>
+            )}
           </Space.Compact>
         )
       }
@@ -459,6 +489,7 @@ export function useRecordForm(
             title={labelOf(field)}
             ids={Array.isArray(value) ? (value as string[]) : []}
             labels={Array.isArray(labels[field.name]) ? (labels[field.name] as (string | null)[]) : []}
+            ariaDescribedBy={helpId}
             onChange={(ids, idLabels) => {
               set(field.name, ids)
               setLabels((previous) => ({ ...previous, [field.name]: idLabels }))
@@ -495,6 +526,8 @@ export function useRecordForm(
             value={value as RecordValue}
             currency={moneyCurrency(field, values)}
             locale={locale}
+            ariaRequired={required}
+            ariaDescribedBy={helpId}
             onChange={(next) => set(field.name, next)}
           />
         )
@@ -526,23 +559,35 @@ export function useRecordForm(
                 .map((entry) => {
                   const { field } = entry
                   const errors = errorsOf(field.name)
-                  const control = input(field, lockedOf(entry))
+                  const required = stateOf(field.name)?.required ?? field.required
+                  const helpId = field.helpKey ? `${field.name}-help` : undefined
+                  const control = input(field, lockedOf(entry), required, helpId)
                   const item = (
                     <Form.Item
                       key={field.name}
-                      label={labelOf(field)}
+                      label={<span style={{ fontWeight: 500, color: colour.textMuted }}>{labelOf(field)}</span>}
                       // A child collection is a table, with no single input for the label to point to.
                       htmlFor={field.type === 'child-collection' ? undefined : field.name}
-                      required={stateOf(field.name)?.required ?? field.required}
+                      required={required}
                       validateStatus={errors ? 'error' : undefined}
+                      // Ant Design cancels the item's bottom margin under a message, so this one sets the gap below.
                       help={
                         errors && (
-                          <span role="alert" data-testid={`field-error-${field.name}`}>
+                          <div
+                            role="alert"
+                            data-testid={`field-error-${field.name}`}
+                            style={{ marginTop: 4, marginBottom: spacing.lg, fontSize: 14, lineHeight: '20px' }}
+                          >
                             {errors.join(' ')}
-                          </span>
+                          </div>
                         )
                       }
                     >
+                      {field.helpKey && (
+                        <div id={helpId} style={{ fontSize: 12, lineHeight: '20px', color: colour.textMuted }}>
+                          {t(field.helpKey)}
+                        </div>
+                      )}
                       {asking ? <div onBlur={() => leave(field.name)}>{control}</div> : control}
                     </Form.Item>
                   )

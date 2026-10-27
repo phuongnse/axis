@@ -1,4 +1,5 @@
-import { Button, ConfigProvider, Flex, Form, Input, Space, Table, type TableColumnsType } from 'antd'
+import { CloseOutlined, DeleteOutlined, SearchOutlined } from '@ant-design/icons'
+import { Button, ConfigProvider, Flex, Form, Input, Space, Table, Tooltip, type TableColumnsType } from 'antd'
 import { useMemo, useRef, useState, type CSSProperties } from 'react'
 import { compactFormTheme } from './antTheme'
 import { EmptyDash } from './EmptyValue'
@@ -49,8 +50,8 @@ interface OpenLookup {
 /**
  * Edits the rows of a child collection as a table: one column per child field, each cell the same
  * input the form uses for that field type, a remove button per row and an add button below. A
- * reference cell shows the label of the record it points to, with a button that opens the reference
- * lookup. A computed cell is read-only and shows the value the server returned. A read-only
+ * reference cell shows the label of the record it points to, with a search icon button that opens the
+ * reference lookup. A computed cell is read-only and shows the value the server returned. A read-only
  * collection shows every cell that way, and has no add or remove buttons.
  */
 export function ChildCollectionTable({
@@ -144,19 +145,21 @@ export function ChildCollectionTable({
                 // The label cannot be typed. The record is chosen in the lookup, and its id is sent.
                 <Space.Compact block data-testid={`reference-${field.name}-${index}-${child.name}`}>
                   <Input readOnly aria-label={`${label} ${index + 1}`} value={aligned[index]?.[child.name] ?? ''} />
-                  <Button
-                    aria-label={`${t('shell.form.choose')} ${label} ${index + 1}`}
-                    onClick={() => setLookup({ index, field: child })}
-                  >
-                    {t('shell.form.choose')}
-                  </Button>
-                  {!child.required && row[child.name] != null && (
+                  <Tooltip title={t('shell.form.choose')}>
                     <Button
-                      aria-label={`${t('shell.form.clear')} ${label} ${index + 1}`}
-                      onClick={() => edit(index, child.name, null)}
-                    >
-                      {t('shell.form.clear')}
-                    </Button>
+                      aria-label={`${t('shell.form.choose')} ${label} ${index + 1}`}
+                      icon={<SearchOutlined />}
+                      onClick={() => setLookup({ index, field: child })}
+                    />
+                  </Tooltip>
+                  {!child.required && row[child.name] != null && (
+                    <Tooltip title={t('shell.form.clear')}>
+                      <Button
+                        aria-label={`${t('shell.form.clear')} ${label} ${index + 1}`}
+                        icon={<CloseOutlined />}
+                        onClick={() => edit(index, child.name, null)}
+                      />
+                    </Tooltip>
                   )}
                 </Space.Compact>
               ) : (
@@ -180,7 +183,14 @@ export function ChildCollectionTable({
     columns.push({
       key: removeColumnKey,
       render: (_value: unknown, _row: RecordRow, index: number) => (
-        <Button onClick={() => remove(index)}>{t('shell.form.removeRow')}</Button>
+        <Tooltip title={t('shell.form.removeRow')}>
+          <Button
+            danger
+            aria-label={t('shell.form.removeRow')}
+            icon={<DeleteOutlined />}
+            onClick={() => remove(index)}
+          />
+        </Tooltip>
       ),
     })
   }
