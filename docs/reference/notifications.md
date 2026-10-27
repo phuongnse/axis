@@ -183,7 +183,9 @@ A text value may hold named placeholders, such as
   `Message-ID` is `<{row id}@{host}>`, with the tenant's first host, or
   `<{row id}@axis.invalid>` when the tenant has no host. A step run stages at
   most one email per address, ignoring letter case, with the locale of the
-  first recipient that gave it. The worker runs the items, as Sending says.
+  first recipient that gave it. The row also keeps the raw placeholder values
+  of the step run in `values`, so a test scenario can check them. The worker
+  runs the items, as Sending says.
 - **Sending.** The worker sends each email as plain text over SMTP, outside any
   transaction, with the stored subject, body and `Message-ID`. It uses the
   [mail settings](#mail-settings) of the tenant. One transaction then marks the
@@ -214,9 +216,12 @@ A text value may hold named placeholders, such as
   The step logs it at Information level with the step and the user id,
   never the address.
 - **Scenarios.** In a test scenario, `advanceTime` runs the `notification.email`
-  items with no mail host, so each stays queued and nothing is sent. An
-  `expectNotification` step checks the recipient, the channel and the values of
-  a notification.
+  items with no mail host, so each stays queued and nothing is sent. Each
+  scenario user has a profile with the address `<user>@scenario.invalid`, so a
+  `user` recipient gets an email. An `expectNotification` step checks the
+  recipient, the channel and the values of a notification. It reads in-app
+  notifications from `axis.notifications` and emails from `axis.email_outbox`,
+  pending or not. See [test scenarios](test-scenarios.md).
 
 ## User profiles
 

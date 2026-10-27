@@ -11,9 +11,9 @@ A `scenario` resource is a configuration-level test. See
 out of the release and its content hash. A file is a scenario because its `kind`
 is `scenario`, wherever it is in the folder. The resource kind and its compile
 checks exist. The runner runs record actions, process starts and task
-completions, with or without `expect`, and the `expectRecord`, `expectInstance`
-and `expectTask` steps. It sets `now`. It answers connector and package calls
-from `stubs`. Studio runs scenarios through the publisher, see
+completions, with or without `expect`, and the `expectRecord`, `expectInstance`,
+`expectTask` and `expectNotification` steps. It sets `now`. It answers
+connector and package calls from `stubs`. Studio runs scenarios through the publisher, see
 [D55](../decisions/d55-running-test-scenarios-from-studio.md). The runner is a library that runs a scenario from a folder
 or from files held in memory, such as a snapshot, and the `Axis.Scenarios`
 command is one caller of it.
@@ -125,6 +125,7 @@ Every step has a `type`. These are the step kinds:
 | `expectRecord` | `record`, `values` | Asserts that the saved record holds these values. |
 | `expectInstance` | `process`, `record`, `state`, optional `step` | Asserts the state of the process instance on the record, and the step it waits at. |
 | `expectTask` | `record`, `step`, `assignee` or `state` | Asserts who the task is assigned to, or its state. |
+| `expectNotification` | `recipient`, optional `channel`, optional `values` | Asserts that the process notified the user, role or email address, on the channel, with these values. |
 | `advanceTime` | `by` | Moves the scenario's `now` forward by `by`, then runs the work items that are due. |
 
 - `createRecord`, `updateRecord`, `deleteRecord`, `startProcess` and
@@ -158,6 +159,39 @@ Every step has a `type`. These are the step kinds:
 - Every reference to an entity, field, process, step, outcome, role, user or
   alias is checked at compile. See the **Scenarios** bullet of the
   [Resolve step](configuration.md#configuration-pipeline) for the checks and their codes.
+
+`expectNotification`:
+
+- `recipient` is exactly one of `{ "user": … }`, `{ "role": … }` and
+  `{ "email": … }`. The user is a user of the scenario and the role is a
+  declared role. `channel` is `inApp` or `email`. Without it the step reads
+  both channels. `values` are the raw placeholder values of the `notify` step.
+  The step takes no `as` and no `expect`, and it is not an action.
+- In-app notifications are read from `axis.notifications`, for a `user` or a
+  `role` recipient. Emails are read from `axis.email_outbox`, for a `user` or an
+  `email` recipient, whether they are still `pending` or not. The address of a
+  `user` is `<user>@scenario.invalid`. Addresses match ignoring letter case. A
+  `role` with `channel: email`, or an `email` with `channel: inApp`, compiles and
+  fails at run time, because no such notification exists.
+- The step checks the newest notification of the recipient on the channel, as
+  `expectTask` checks the newest task. Without `channel` it takes the newest of
+  both channels.
+- Numbers in `values` compare by value, so 5000 equals 5000.00. Every other
+  value compares by exact JSON equality, because a notification stores its
+  values raw, with dates as ISO text. A key the notification does not hold
+  fails the step. An email keeps the raw values of its step run in the outbox,
+  so an email-only `notify` step can be checked too.
+- A failure names the recipient and channel. It names the differing value with
+  the expected and actual values, for example
+  `Step 4 (expectNotification): notification to user 'anna' by email expected value 'title' "Chairs" but was "Desks"`.
+  When nothing matches it says
+  `no email notification to user 'anna' was found`.
+- Emails stay stubbed. The scenario tenant has no mail host, so nothing is
+  sent. The `notification.email` item runs in an `advanceTime` step, which
+  makes it due once, after the other work is done, even when the scenario's
+  `now` is before the time the application clock queued it. It logs the
+  no-mail-host warning, and the email stays `pending`. `expectNotification`
+  still finds it.
 
 `advanceTime`:
 
@@ -264,7 +298,9 @@ application against them. It prints the problems it finds with a package and car
 on. Without the option no package is installed, so an application that declares a
 package does not compile. `--modules` names the folder of installed modules,
 which plays the role of `Modules:Path`, and works the same way for modules. A
-missing folder is a setup error. A user's display name is their id.
+missing folder is a setup error. A user's display name is their id,
+and each user has a profile with the address `<user>@scenario.invalid`, so a
+`notify` step stages an email for a `user` recipient.
 
 `scripts/integration.sh` runs the scenarios of every application under
 `samples/apps/` and of every sample template under `samples/templates/` from the
@@ -298,6 +334,9 @@ What runs now:
   or `instance of process 'PurchaseRequestApproval' expected state completed but
   was waiting at step 'managerApproval'`. `step` on `expectInstance` is compared
   ignoring letter case.
+- `expectNotification`. It reads the newest notification of the recipient from
+  `axis.notifications` or `axis.email_outbox`, as the **expectNotification**
+  bullets above say.
 - **Process steps.** After each action, the runner runs the `process.step` work
   items of the scenario's tenant in-process, until none is due. So the process
   reaches its next wait: an open task, or its end. The runner runs the due items

@@ -71,6 +71,7 @@ public sealed class ReferenceSchemaTests
         (ReferenceRelations.ScenarioProcess, "scenario", "properties/steps/items/properties/process", "process"),
         (ReferenceRelations.ScenarioRole, "scenario", "properties/users/additionalProperties/items", "role"),
         (ReferenceRelations.ScenarioRole, "scenario", "properties/steps/items/properties/assignee/properties/role", "role"),
+        (ReferenceRelations.ScenarioRole, "scenario", "properties/steps/items/properties/recipient/properties/role", "role"),
         (ReferenceRelations.StubConnector, "scenario", "properties/stubs/items/properties/connector/properties/name", "connector"),
     ];
 

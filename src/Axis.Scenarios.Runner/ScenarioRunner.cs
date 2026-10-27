@@ -8,6 +8,7 @@ using Axis.Configuration.Releases;
 using Axis.Configuration.Resources;
 using Axis.Configuration.Storage;
 using Axis.Data;
+using Axis.Data.Profiles;
 using Axis.Data.Seeding;
 using Axis.Data.Storage;
 using Axis.Processes.Instances;
@@ -34,11 +35,16 @@ namespace Axis.Scenarios.Runner;
 /// <c>now</c> reaches every connection as the PostgreSQL setting <c>axis.now</c>, which the
 /// transaction time and the SQL of <c>now()</c> read. The work queue compares due times with it too.
 /// Times that PostgreSQL writes itself, such as <c>created_at</c>, and lease times keep the real clock.
+/// Each scenario user has a profile with the address <c>{user}@scenario.invalid</c>, so a <c>notify</c> step
+/// stages an email for the user. Emails stay in the outbox and are never sent.
 /// </summary>
 public static class ScenarioRunner
 {
     /// <summary>The tenant id every scenario runs under.</summary>
     public const string TenantId = "scenario";
+
+    /// <summary>The domain of the address of every scenario user's profile, <c>{user}@scenario.invalid</c>. It is a reserved name that never resolves.</summary>
+    public const string EmailDomain = "scenario.invalid";
 
     /// <summary>The most work items that may run after one action.</summary>
     public const int WorkItemLimit = 1000;
@@ -252,6 +258,12 @@ public static class ScenarioRunner
             {
                 return Setup("could not be seeded", seeded.Diagnostics);
             }
+        }
+
+        // Every scenario user has a profile, so an email to the user is staged. No email is ever sent.
+        foreach (var user in scenario.Users.Keys)
+        {
+            await UserProfiles.UpsertAsync(connection, user, user, $"{user}@{EmailDomain}", null, cancellationToken);
         }
 
         var steps = new ScenarioSteps(connection, model, compiled.Release.Id, scenario, loggerFactory);

@@ -958,7 +958,7 @@ database, with history in `axis.__processes_migrations` (see
   | `id` | `uuid` | A version 7 UUID. The row's `notification.email` item names it in `email_id`, without a foreign key |
   | `application_id`, `release_id`, `notification_id`, `step` | `uuid`, `uuid`, `uuid`, `text` | The application, the release the notifying instance is pinned to, which gave the texts, the step run's notification id, which all its emails share, and the name of the `notify` step |
   | `address`, `locale` | `text`, `text` null | The address the email goes to, not validated when staged, and the locale of the texts. The locale is null when the release has none |
-  | `subject`, `body`, `message_id` | `text` | The rendered subject, the plain text body with the page link if any, and the `Message-ID` header, which a unique index keeps once |
+  | `subject`, `body`, `message_id`, `values` | `text`, `text`, `text`, `jsonb` | The rendered subject, the plain text body with the page link if any, the `Message-ID` header, which a unique index keeps once, and the raw placeholder values of the step run as in `axis.notifications`, `{}` before the column existed |
   | `state`, `created_at`, `sent_at` | `text`, `timestamptz`, `timestamptz` null | `pending` or `sent`, `pending` at first. The start of the step's transaction, `now()`. When the email was sent, null while it is pending |
 - `axis.trigger_schedules`: the schedule state, one row per
   schedule trigger of the tenant, see [Schedules](process-events.md#schedules). Activation

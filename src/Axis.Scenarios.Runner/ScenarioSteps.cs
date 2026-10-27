@@ -1,4 +1,6 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Axis.Configuration.Model;
 using Axis.Configuration.Resources;
 using Axis.Data.Records;
@@ -54,6 +56,9 @@ internal sealed class ScenarioSteps(
                 break;
             case ScenarioStepDefinition.ExpectTask:
                 await ExpectTaskAsync(step, cancellationToken);
+                break;
+            case ScenarioStepDefinition.ExpectNotification:
+                await ExpectNotificationAsync(step, cancellationToken);
                 break;
             default:
                 throw new StepFailedException($"step type '{step.Type}' is not supported yet");
@@ -248,6 +253,59 @@ internal sealed class ScenarioSteps(
                 throw new StepFailedException(
                     $"task '{task.Step}' expected assignee {kind} '{value}' but was {task.AssigneeKind} '{task.Assignee}'");
             }
+        }
+    }
+
+    // The newest notification of the recipient on the step's channel, or on either channel when it names none.
+    // An in-app notification is addressed to a user or a role, an email to a user's profile address or to an
+    // address. Pending and sent emails count alike, because the scenario never sends one.
+    [SuppressMessage("Performance", "CA1862:Use the 'StringComparison' method overloads", Justification = "The query must translate to lower(address), as the outbox compares addresses.")]
+    private async Task ExpectNotificationAsync(ScenarioStepDefinition step, CancellationToken cancellationToken)
+    {
+        var recipient = step.Recipient ?? throw new StepFailedException("the step needs a recipient");
+        var (kind, name) = recipient.User is { } user
+            ? (ProcessNotifications.UserRecipient, user)
+            : recipient.Role is { } role ? (ProcessNotifications.RoleRecipient, role) : ("email", recipient.Email!);
+        var address = kind == ProcessNotifications.UserRecipient ? $"{name}@{ScenarioRunner.EmailDomain}" : name;
+        var inApp = (step.Channel is null or "inApp") && kind != "email";
+        var email = (step.Channel is null or "email") && kind != ProcessNotifications.RoleRecipient;
+
+        var lowered = address.ToLowerInvariant();
+        await using var context = Processes();
+        var candidates = new List<(DateTimeOffset CreatedAt, Guid Id, string Values)>();
+        if (inApp)
+        {
+            var rows = await context.Notifications.AsNoTracking()
+                .Where(row => row.RecipientKind == kind && row.Recipient == name)
+                .OrderByDescending(row => row.CreatedAt)
+                .ThenByDescending(row => row.Id)
+                .Take(1)
+                .ToListAsync(cancellationToken);
+            candidates.AddRange(rows.Select(row => (row.CreatedAt, row.Id, row.Values)));
+        }
+
+        if (email)
+        {
+            var rows = await context.EmailOutbox.AsNoTracking()
+                .Where(row => row.Address.ToLower() == lowered)
+                .OrderByDescending(row => row.CreatedAt)
+                .ThenByDescending(row => row.Id)
+                .Take(1)
+                .ToListAsync(cancellationToken);
+            candidates.AddRange(rows.Select(row => (row.CreatedAt, row.Id, row.Values)));
+        }
+
+        var described = $"{kind} '{name}'" + (step.Channel switch { "inApp" => " in-app", "email" => " by email", _ => "" });
+        if (candidates.Count == 0)
+        {
+            throw new StepFailedException($"no {step.Channel ?? "inApp or email"} notification to {kind} '{name}' was found");
+        }
+
+        var newest = candidates.OrderByDescending(candidate => candidate.CreatedAt).ThenByDescending(candidate => candidate.Id).First();
+        if (step.Values is { Count: > 0 } expected
+            && NotificationExpectation.FirstDifference(JsonNode.Parse(newest.Values) as JsonObject ?? [], expected) is { } difference)
+        {
+            throw new StepFailedException($"notification to {described} {difference}");
         }
     }
 
