@@ -19,8 +19,17 @@ public sealed class MailpitFixture : IAsyncDisposable
     private const int SmtpContainerPort = 1025;
     private const int ApiContainerPort = 8025;
 
+    /// <summary>The user name that the second server, the one that requires a password, accepts.</summary>
+    public const string AuthUserName = "axis";
+
+    /// <summary>The password that the second server accepts.</summary>
+    public const string AuthPassword = "mailpit-smtp-password";
+
+    private const string AuthSmtp = $"{AuthUserName}:{AuthPassword}";
+
     // The start takes no test's cancellation token, so cancelling one test does not fail the other.
-    private readonly Lazy<Task<IContainer>> _container = new(StartContainerAsync);
+    private readonly Lazy<Task<IContainer>> _container = new(() => StartContainerAsync(null));
+    private readonly Lazy<Task<IContainer>> _authContainer = new(() => StartContainerAsync(AuthSmtp));
     private readonly HttpClient _client = new();
 
     /// <summary>Starts the container if no test has yet, and returns the host that the SMTP port is published on.</summary>
@@ -30,12 +39,22 @@ public sealed class MailpitFixture : IAsyncDisposable
     public async Task<int> SmtpPortAsync() => (await _container.Value).GetMappedPublicPort(SmtpContainerPort);
 
     /// <summary>
-    /// Every email sent to an address that contains <paramref name="addressPart"/>, with its plain text, <c>Message-ID</c>
-    /// without angle brackets, subject and <c>Content-Type</c> header, oldest first.
+    /// Starts the second container if no test has yet, and returns its host. This server accepts a message only from a client
+    /// that signs in as <see cref="AuthUserName"/> with <see cref="AuthPassword"/>.
     /// </summary>
-    public async Task<IReadOnlyList<MailpitMessage>> MessagesToAsync(string addressPart, CancellationToken cancellationToken)
+    public async Task<string> AuthSmtpHostAsync() => (await _authContainer.Value).Hostname;
+
+    /// <summary>Starts the second container if no test has yet, and returns its published SMTP port.</summary>
+    public async Task<int> AuthSmtpPortAsync() => (await _authContainer.Value).GetMappedPublicPort(SmtpContainerPort);
+
+    /// <summary>
+    /// Every email sent to an address that contains <paramref name="addressPart"/>, with its plain text, <c>Message-ID</c>
+    /// without angle brackets, subject and <c>Content-Type</c> header, oldest first. It reads the second server when
+    /// <paramref name="authenticated"/> is set, otherwise the first.
+    /// </summary>
+    public async Task<IReadOnlyList<MailpitMessage>> MessagesToAsync(string addressPart, CancellationToken cancellationToken, bool authenticated = false)
     {
-        var container = await _container.Value;
+        var container = await (authenticated ? _authContainer : _container).Value;
         var api = new Uri($"http://{container.Hostname}:{container.GetMappedPublicPort(ApiContainerPort)}/");
         var list = await _client.GetFromJsonAsync<JsonObject>(new Uri(api, "api/v1/messages?limit=1000"), cancellationToken);
         var messages = new List<MailpitMessage>();
@@ -66,19 +85,28 @@ public sealed class MailpitFixture : IAsyncDisposable
         _client.Dispose();
 
         // A failed start already removed its container.
-        if (_container.IsValueCreated && _container.Value.IsCompletedSuccessfully)
+        foreach (var lazy in new[] { _container, _authContainer })
         {
-            await _container.Value.Result.DisposeAsync();
+            if (lazy.IsValueCreated && lazy.Value.IsCompletedSuccessfully)
+            {
+                await lazy.Value.Result.DisposeAsync();
+            }
         }
     }
 
-    private static async Task<IContainer> StartContainerAsync()
+    // With smtpAuth, the server rejects a client that does not sign in, and accepts the sign-in without TLS.
+    private static async Task<IContainer> StartContainerAsync(string? smtpAuth)
     {
-        var container = new ContainerBuilder(Image)
+        var builder = new ContainerBuilder(Image)
             .WithPortBinding(SmtpContainerPort, assignRandomHostPort: true)
             .WithPortBinding(ApiContainerPort, assignRandomHostPort: true)
-            .WithWaitStrategy(Wait.ForUnixContainer().UntilHttpRequestIsSucceeded(request => request.ForPort(ApiContainerPort).ForPath("/api/v1/messages")))
-            .Build();
+            .WithWaitStrategy(Wait.ForUnixContainer().UntilHttpRequestIsSucceeded(request => request.ForPort(ApiContainerPort).ForPath("/api/v1/messages")));
+        if (smtpAuth is not null)
+        {
+            builder = builder.WithEnvironment("MP_SMTP_AUTH", smtpAuth).WithEnvironment("MP_SMTP_AUTH_ALLOW_INSECURE", "true");
+        }
+
+        var container = builder.Build();
         try
         {
             await container.StartAsync();

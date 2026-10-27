@@ -262,9 +262,9 @@ A tenant may override `Email` in its `Tenants` block. The block replaces the
 host's settings as a whole, and keys are never merged one by one, so a tenant
 that sets only its own host never sends the host's user name and password to
 that server. A host with no `From` is refused at start, naming the setting.
-_(Planned for M14)_ A tenant may also override `Email` in the tenant directory
-under `Tenancy:Source=directory`, where the password is encrypted as the OIDC
-client secret is. Until then such a tenant uses the host's settings. MailKit
-sends the email. The integration tests run Mailpit as the mail server.
+Under `Tenancy:Source=directory` a tenant overrides `Email` in the tenant
+directory, where the password is encrypted as the OIDC client secret is. The
+[`tenant email set`](tenant-setting-commands.md#mail-settings) command sets it,
+and a tenant without it uses the host's settings. MailKit sends the email. The integration tests run Mailpit as the mail server.
 _(Planned for M14)_ Docker Compose and `scripts/dev.sh` run Mailpit too. Until
 then they have no mail server, see [development](../development.md).

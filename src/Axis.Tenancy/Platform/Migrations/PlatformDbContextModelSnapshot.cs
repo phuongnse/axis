@@ -177,6 +177,10 @@ namespace Axis.Tenancy.Platform.Migrations
                         .HasColumnType("integer")
                         .HasColumnName("database_port");
 
+                    b.Property<string>("EmailFrom")
+                        .HasColumnType("text")
+                        .HasColumnName("email_from");
+
                     b.Property<string>("EndpointAudience")
                         .HasColumnType("text")
                         .HasColumnName("endpoint_audience");
@@ -254,6 +258,26 @@ namespace Axis.Tenancy.Platform.Migrations
                         .HasColumnType("text")
                         .HasColumnName("service_audience");
 
+                    b.Property<string>("SmtpHost")
+                        .HasColumnType("text")
+                        .HasColumnName("smtp_host");
+
+                    b.Property<byte[]>("SmtpPassword")
+                        .HasColumnType("bytea")
+                        .HasColumnName("smtp_password");
+
+                    b.Property<int?>("SmtpPort")
+                        .HasColumnType("integer")
+                        .HasColumnName("smtp_port");
+
+                    b.Property<bool?>("SmtpUseTls")
+                        .HasColumnType("boolean")
+                        .HasColumnName("smtp_use_tls");
+
+                    b.Property<string>("SmtpUserName")
+                        .HasColumnType("text")
+                        .HasColumnName("smtp_user_name");
+
                     b.Property<string>("Status")
                         .IsRequired()
                         .HasColumnType("text")
@@ -281,6 +305,10 @@ namespace Axis.Tenancy.Platform.Migrations
                             t.HasCheckConstraint("ck_tenants_oidc_previous_needs_current", "oidc_previous_client_key IS NULL OR oidc_client_key IS NOT NULL");
 
                             t.HasCheckConstraint("ck_tenants_oidc_profile", "oidc_profile IN ('standard', 'fapi2')");
+
+                            t.HasCheckConstraint("ck_tenants_smtp_from", "(smtp_host IS NULL) = (email_from IS NULL)");
+
+                            t.HasCheckConstraint("ck_tenants_smtp_host", "smtp_host IS NOT NULL OR (smtp_port IS NULL AND smtp_use_tls IS NULL AND smtp_user_name IS NULL AND smtp_password IS NULL)");
 
                             t.HasCheckConstraint("ck_tenants_status", "status IN ('provisioning', 'active', 'suspended')");
                         });

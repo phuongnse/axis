@@ -57,6 +57,7 @@ public static class PlatformRekey
                 Plan(steps, versions, row.Id, row.OidcClientSecret, TenantSecretFields.OidcClientSecret, value => row.OidcClientSecret = value);
                 Plan(steps, versions, row.Id, row.OidcClientKey, TenantSecretFields.OidcClientKey, value => row.OidcClientKey = value);
                 Plan(steps, versions, row.Id, row.OidcPreviousClientKey, TenantSecretFields.OidcClientKey, value => row.OidcPreviousClientKey = value);
+                Plan(steps, versions, row.Id, row.SmtpPassword, TenantSecretFields.SmtpPassword, value => row.SmtpPassword = value);
             }
 
             foreach (var binding in bindings)
