@@ -36,7 +36,7 @@ namespace Axis.Server.DataSources;
 /// source parameters are read by <see cref="DataSourceParameterReader"/>. A database error while evaluating the filter or the
 /// read filters is a 400 problem with a fixed title, and each read filter is logged by its policy
 /// and grant. The problem titles never contain text from the request, SQL or storage names.
-/// A data source of a module is written <c>{module id}/{data source name}</c>, as two path segments,
+/// The export route takes the same <c>search</c> and checks it the same way. A data source of a module is written <c>{module id}/{data source name}</c>, as two path segments,
 /// for example <c>data-sources/departments/Departments/rows</c>. It has the same checks as any
 /// other data source, and only that form reaches it.
 /// </summary>
@@ -130,21 +130,7 @@ internal static class DataSourceEndpoints
             errors["sort"] = ["Must be a projected field name that is not a reference, or a group field or measure name when the data source is grouped, optionally preceded by '-'."];
         }
 
-        // Without the option, only a given search is refused, and an empty one is no search.
-        var searching = !string.IsNullOrEmpty(search);
-        if (SearchQuery.IsRepeated(context.Request))
-        {
-            errors["search"] = model.Search ? SearchQuery.RepeatedError : ["The data source does not take a search."];
-        }
-        else if (searching && !model.Search)
-        {
-            errors["search"] = ["The data source does not take a search."];
-        }
-        else if (searching && SearchQuery.InvalidError(search!) is { } invalid)
-        {
-            errors["search"] = invalid;
-        }
-
+        var searching = ReadSearch(context, model, search, errors);
         var parameters = DataSourceParameterReader.Read(context.Request.QueryString, model, errors);
 
         if (errors.Count > 0)
@@ -184,7 +170,7 @@ internal static class DataSourceEndpoints
         return Results.Ok(new DataSourceRowsResponse([.. result.Items.Select(fields.Visible)], pageNumber, size, result.TotalCount));
     }
 
-    // An export takes the query of the rows route without its paging. The grants, the filters and the
+    // An export takes the query of the rows route, its search included, without its paging. The grants, the filters and the
     // field checks are the rows route's, and the export grant is checked in place of the read grant.
     // The rows are written to a temporary file, so the file is complete before the audit record and
     // before any byte is sent. A grouped data source writes its group fields, then its measures.
@@ -193,6 +179,7 @@ internal static class DataSourceEndpoints
         string app,
         string dataSource,
         string? sort,
+        string? search,
         string? format,
         ActiveApplicationResolver resolver,
         TenantDatabase database,
@@ -238,6 +225,7 @@ internal static class DataSourceEndpoints
             errors["sort"] = ["Must be a projected field name that is not a reference, or a group field or measure name when the data source is grouped, optionally preceded by '-'."];
         }
 
+        var searching = ReadSearch(context, model, search, errors);
         var parameters = DataSourceParameterReader.Read(context.Request.QueryString, model, errors);
         ExportFile.TryParseFormat(format, errors, out var exportFormat);
         if (errors.Count > 0)
@@ -245,8 +233,8 @@ internal static class DataSourceEndpoints
             return Results.ValidationProblem(errors);
         }
 
-        // A sort, a group field, a measure or a filter on a field that is being recomputed would decide from a stale stored value.
-        var pending = await DataSourcePendingFields.ReadAsync(connection, database.ReadTransaction, application, model, order, search: false, cancellationToken);
+        // A sort, a group field, a measure, a filter or a search on a field that is being recomputed would decide from a stale stored value.
+        var pending = await DataSourcePendingFields.ReadAsync(connection, database.ReadTransaction, application, model, order, searching, cancellationToken);
         if (pending.Count > 0)
         {
             return Results.ValidationProblem(pending.ToDictionary(), statusCode: StatusCodes.Status409Conflict, title: "A field is being recomputed.");
@@ -274,7 +262,7 @@ internal static class DataSourceEndpoints
                 exportFormat,
                 model.Name,
                 columns,
-                DataSourceQueries.ReadAllAsync(connection, application, model, order, parameters, condition, export.MaxRows + 1, cancellationToken),
+                DataSourceQueries.ReadAllAsync(connection, application, model, order, parameters, condition, search, export.MaxRows + 1, cancellationToken),
                 Cells,
                 export.MaxRows,
                 (rows, truncated) => new AuditEntry(
@@ -310,6 +298,27 @@ internal static class DataSourceEndpoints
                 statusCode: StatusCodes.Status400BadRequest,
                 title: "The data source filter could not be evaluated for these rows.");
         }
+    }
+
+    // Without the option, only a given search is refused, and an empty one is no search. Returns
+    // whether the request searches, and adds what is wrong with the search to errors.
+    private static bool ReadSearch(HttpContext context, DataSourceModel model, string? search, SortedDictionary<string, string[]> errors)
+    {
+        var searching = !string.IsNullOrEmpty(search);
+        if (SearchQuery.IsRepeated(context.Request))
+        {
+            errors["search"] = model.Search ? SearchQuery.RepeatedError : ["The data source does not take a search."];
+        }
+        else if (searching && !model.Search)
+        {
+            errors["search"] = ["The data source does not take a search."];
+        }
+        else if (searching && SearchQuery.InvalidError(search!) is { } invalid)
+        {
+            errors["search"] = invalid;
+        }
+
+        return searching;
     }
 
     // The columns of a row in the order the row holds them. A count or a count of distinct values is an

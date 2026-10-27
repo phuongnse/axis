@@ -406,10 +406,14 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
 
       - `actions` lists the entity actions of the user's grants on the
         widget's entity, in the order `read`, `create`, `update`, `delete`.
+        A `table` adds `export` after them, when the user may export its
+        data source, or its entity when it has no data source
+        (`PolicyEvaluator.AllowsExport`). A form and a detail never list it.
         A `table` over an entity adds `import` last, when the user holds
         `import` and `create` on the entity. A form, a detail and a table over
         a data source never list it. Without a user, as in Studio's draft
-        metadata, every table over an entity lists it.
+        metadata, every table lists `export` and every table over an entity
+        lists `import`.
         On a data source widget it is about the root entity. Record filters
         are not evaluated here, so `update` means that some record may be
         updated, not this one.
@@ -750,6 +754,22 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
       `413` or `415` on the upload each shows its own message, and any other
       failure shows the generic one. The progress and the errors sit in an
       `aria-live` region, and the picker and every button take the keyboard.
+    - **Export.** A table has an Export dropdown button next to its toolbar
+      actions only when `access.actions` holds `export`. Without it there is
+      no button. The canvas draws it and exports nothing. The dropdown offers
+      CSV and Excel, and it opens and selects with the keyboard. A choice
+      sends `GET` to the export route: the entity's `recordsPath` with
+      `/export` added, or the data source's `rowsPath` with its last `/rows`
+      swapped for `/export`. The address holds the table's data source
+      parameter values, bound and filter, its `search` and its `sort`, as the
+      rows request has them, and `format` as `csv` or `xlsx`. It holds no
+      `page` or `pageSize`, so the file has every matching row. The SPA saves
+      the file under the name in the response's `Content-Disposition`, through
+      a temporary download link. A success shows no message. When the response
+      carries `Axis-Export-Truncated: true`, a notice above the table says the
+      file stops at the row limit. A `403`, `409` or `503` each shows its own
+      message above the table, and any other failure, a network error
+      included, shows the generic one.
     - **Start process.** A row `startProcess` follows the rules of the form
       widget's **Start process action**, with the row as the subject and
       the same `Idempotency-Key` and `409` text. On `201` it loads the

@@ -7,6 +7,8 @@
   "grants": [
     { "entity": "Item", "actions": ["read", "export"], "filter": "status is not null", "fields": ["name", "quantity", "status", "department"] },
     { "entity": "Department", "actions": ["read"] },
-    { "dataSource": "ItemCountsByDepartment", "actions": ["read", "export"] }
+    { "dataSource": "ItemCountsByDepartment", "actions": ["read", "export"] },
+    { "dataSource": "ItemsByDepartment", "actions": ["read", "export"] },
+    { "dataSource": "SearchableItems", "actions": ["read", "export"] }
   ]
 }

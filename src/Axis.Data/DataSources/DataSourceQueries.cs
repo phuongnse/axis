@@ -140,7 +140,7 @@ public static class DataSourceQueries
     }
 
     /// <summary>
-    /// Streams up to <paramref name="limit"/> rows in the order, filter and condition of
+    /// Streams up to <paramref name="limit"/> rows in the order, filter, condition and search of
     /// <see cref="ListAsync"/>, one at a time, so a caller never holds them all. A grouped data source
     /// streams its groups. It does not count. A database error is thrown as it is, including a data
     /// exception (SQLSTATE class 22) that the filter or the condition raises for some row, which the
@@ -153,6 +153,7 @@ public static class DataSourceQueries
         DataSourceSort? sort,
         IReadOnlyList<DataSourceParameterValue> parameters,
         RecordCondition? condition,
+        string? search,
         int limit,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
@@ -162,12 +163,18 @@ public static class DataSourceQueries
         ArgumentNullException.ThrowIfNull(parameters);
         ArgumentOutOfRangeException.ThrowIfLessThan(limit, 1);
 
-        var statement = Statement(application, dataSource, sort, condition);
+        var searching = !string.IsNullOrEmpty(search) && dataSource.SearchFields.Count > 0;
+        var statement = Statement(application, dataSource, sort, condition, searching);
         await using var command = new NpgsqlCommand(statement.PageSql, connection);
         AddValues(command, statement.Values);
         AddParameters(command, parameters);
         AddTimeZone(command, statement);
         condition?.AddTo(command);
+        if (searching)
+        {
+            command.Parameters.Add(RecordQueries.SearchParameter(search!));
+        }
+
         command.Parameters.AddWithValue("limit", limit);
         command.Parameters.AddWithValue("offset", 0L);
 
