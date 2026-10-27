@@ -618,10 +618,12 @@ flowchart LR
      fields, processes, steps, outcomes, connectors and operations are matched
      ignoring letter case. Roles, user ids and record aliases are matched
      exactly.
-     - A role in `users`, or an `assignee.role`, that names no declared role is
-       `AXC0180` at `/users/{user}/{j}` or `/steps/{i}/assignee/role`. An `as`
-       or an `assignee.user` that names no user of the scenario is `AXC0181` at
-       `/steps/{i}/as` or `/steps/{i}/assignee/user`.
+     - A role in `users`, an `assignee.role` or a `recipient.role` that names no
+       declared role is `AXC0180` at `/users/{user}/{j}`,
+       `/steps/{i}/assignee/role` or `/steps/{i}/recipient/role`. An `as`, an
+       `assignee.user` or a `recipient.user` that names no user of the scenario
+       is `AXC0181` at `/steps/{i}/as`, `/steps/{i}/assignee/user` or
+       `/steps/{i}/recipient/user`.
      - A `createRecord` `entity` that names no loaded entity, or names a child
        entity, is `AXC0182` at `/steps/{i}/entity`.
      - A key in `values` that names no field of the record's entity is
@@ -656,7 +658,10 @@ flowchart LR
      - A malformed file, such as an unknown step `type`, a missing or forbidden
        step property, `save` together with `expect`, `expect` on an
        expectation step, or a `now` that is not a real date and time, such as
-       `2026-02-30T09:00:00Z`, is `AXC0004`.
+       `2026-02-30T09:00:00Z`, is `AXC0004`. So is an `expectNotification`
+       step with an unknown `channel`, a missing `recipient` or one that does
+       not hold exactly one of `user`, `role` and `email`, or with `as`, and a
+       `recipient` or `channel` on any other step.
      - An `advanceTime` step whose `by` is not a positive
        duration in the form of a task's `dueIn` is `AXC0193` at
        `/steps/{i}/by`. An `advanceTime` step in a scenario without `now` is

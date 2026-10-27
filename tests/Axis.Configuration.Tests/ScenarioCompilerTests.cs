@@ -97,6 +97,50 @@ public sealed class ScenarioCompilerTests
     }
 
     [Fact]
+    public void An_expectNotification_recipient_that_is_not_declared_is_AXC0180_or_AXC0181_at_its_path()
+    {
+        using var folder = SampleCopy().With(ScenarioFile, Scenario("""
+            "users": { "anna": ["employee"] },
+            "steps": [
+              { "type": "expectNotification", "recipient": { "role": "ghost-role" } },
+              { "type": "expectNotification", "recipient": { "user": "zed" }, "channel": "email" },
+              { "type": "expectNotification", "recipient": { "user": "anna" }, "channel": "inApp", "values": { "title": "Chairs" } },
+              { "type": "expectNotification", "recipient": { "role": "employee" } },
+              { "type": "expectNotification", "recipient": { "email": "who@example.com" }, "channel": "email" }
+            ]
+            """));
+
+        var result = ApplicationCompiler.Compile(folder.Path, SamplePackages.Versions);
+
+        Assert.Equal(
+            [("AXC0180", "/steps/0/recipient/role"), ("AXC0181", "/steps/1/recipient/user")],
+            result.Diagnostics.Select(diagnostic => (diagnostic.Code, diagnostic.Path)));
+    }
+
+    [Theory]
+    [InlineData("""{ "type": "expectNotification", "recipient": { "user": "anna" }, "channel": "sms" }""")]
+    [InlineData("""{ "type": "expectNotification", "recipient": { "user": "anna" }, "as": "anna" }""")]
+    [InlineData("""{ "type": "expectNotification", "recipient": { "user": "anna", "role": "employee" } }""")]
+    [InlineData("""{ "type": "expectNotification", "recipient": {} }""")]
+    [InlineData("""{ "type": "expectNotification", "channel": "email" }""")]
+    [InlineData("""{ "type": "expectNotification", "recipient": { "user": "anna" }, "by": "P1D" }""")]
+    [InlineData("""{ "type": "advanceTime", "by": "P1D", "recipient": { "user": "anna" } }""")]
+    [InlineData("""{ "type": "expectRecord", "record": "request", "values": {}, "channel": "email" }""")]
+    public void A_malformed_expectNotification_step_is_AXC0004_inside_the_step(string step)
+    {
+        using var folder = SampleCopy().With(ScenarioFile, Scenario($$"""
+            "users": { "anna": ["employee"] },
+            "steps": [{{step}}]
+            """));
+
+        var result = ApplicationCompiler.Compile(folder.Path, SamplePackages.Versions);
+
+        Assert.Null(result.Model);
+        Assert.All(result.Diagnostics, diagnostic => Assert.Equal(DiagnosticCodes.SchemaViolation, diagnostic.Code));
+        Assert.Contains(result.Diagnostics, diagnostic => diagnostic.File == ScenarioFile && diagnostic.Path.StartsWith("/steps/0", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void A_scenario_step_that_names_a_process_without_a_subject_is_AXC0184_at_its_process()
     {
         using var folder = SampleCopy()

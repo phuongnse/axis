@@ -1165,7 +1165,8 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
                 texts?.Locale,
                 NotificationTexts.Render(texts, step.Subject.TextKey, values),
                 link is null ? body : $"{body}\n\n{link}",
-                ProcessEmails.MessageId(id, host)));
+                ProcessEmails.MessageId(id, host),
+                notification.Values.ToJsonString()));
         }
 
         await ProcessEmails.InsertAsync(context.Transaction, emails, cancellationToken);

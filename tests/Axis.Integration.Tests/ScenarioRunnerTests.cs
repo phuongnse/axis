@@ -10,6 +10,7 @@ using Axis.Processes.Work;
 using Axis.Scenarios;
 using Axis.Scenarios.Runner;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Npgsql;
 
@@ -505,6 +506,93 @@ public sealed class ScenarioRunnerTests
     }
 
     private const string ScheduleNow = "2026-10-01T09:00:00Z";
+
+    [Fact]
+    public async Task A_user_notified_in_app_and_by_email_passes_expectNotification_on_each_channel_and_with_no_channel()
+    {
+        using var folder = NotifyApplication(Scenario("NotifyUser", Purchasing, ApproveBelowThreshold + """
+            { "type": "expectNotification", "recipient": { "user": "anna" }, "channel": "inApp", "values": { "title": "Chairs" } },
+            { "type": "expectNotification", "recipient": { "user": "anna" }, "channel": "email", "values": { "title": "Chairs" } },
+            { "type": "expectNotification", "recipient": { "user": "anna" }, "values": { "title": "Chairs" } },
+            { "type": "expectNotification", "recipient": { "email": "ANNA@scenario.invalid" }, "channel": "email", "values": { "title": "Chairs" } },
+            { "type": "expectNotification", "recipient": { "user": "anna" } }
+            """));
+
+        var result = await RunAsync(folder, "NotifyUser");
+
+        Assert.True(result.Passed, result.Failure);
+    }
+
+    [Theory]
+    [InlineData("inApp")]
+    [InlineData("email")]
+    public async Task A_different_expected_value_fails_expectNotification_naming_the_value_and_both_values(string channel)
+    {
+        using var folder = NotifyApplication(Scenario("NotifyMismatch", Purchasing, ApproveBelowThreshold + $$"""
+            { "type": "expectNotification", "recipient": { "user": "anna" }, "channel": "{{channel}}", "values": { "title": "Desks" } }
+            """));
+
+        var result = await RunAsync(folder, "NotifyMismatch");
+
+        Assert.False(result.Passed);
+        Assert.Equal(3, result.Step);
+        Assert.Equal("expectNotification", result.StepType);
+        Assert.Contains("user 'anna'", result.Message);
+        Assert.Contains("'title'", result.Message);
+        Assert.Contains("\"Desks\"", result.Message);
+        Assert.Contains("\"Chairs\"", result.Message);
+    }
+
+    [Fact]
+    public async Task An_expected_value_the_notification_does_not_hold_fails_expectNotification_naming_the_value()
+    {
+        using var folder = NotifyApplication(Scenario("NotifyMissingValue", Purchasing, ApproveBelowThreshold + """
+            { "type": "expectNotification", "recipient": { "user": "anna" }, "channel": "email", "values": { "amount": 5000 } }
+            """));
+
+        var result = await RunAsync(folder, "NotifyMissingValue");
+
+        Assert.False(result.Passed);
+        Assert.Contains("has no value 'amount'", result.Message);
+    }
+
+    [Theory]
+    [InlineData("""{ "role": "finance-reviewer" }""", "inApp")]
+    [InlineData("""{ "role": "employee" }""", "email")]
+    [InlineData("""{ "user": "binh" }""", "inApp")]
+    [InlineData("""{ "user": "binh" }""", "email")]
+    [InlineData("""{ "email": "binh@scenario.invalid" }""", "email")]
+    [InlineData("""{ "email": "anna@scenario.invalid" }""", "inApp")]
+    public async Task A_recipient_that_was_not_notified_on_the_channel_fails_expectNotification_with_no_notification_found(string recipient, string channel)
+    {
+        using var folder = NotifyApplication(Scenario("NotifyNobody", Purchasing, ApproveBelowThreshold + $$"""
+            { "type": "expectNotification", "recipient": {{recipient}}, "channel": "{{channel}}" }
+            """));
+
+        var result = await RunAsync(folder, "NotifyNobody");
+
+        Assert.False(result.Passed);
+        Assert.Equal("expectNotification", result.StepType);
+        Assert.Contains($"no {channel} notification to", result.Message);
+        Assert.Contains("was found", result.Message);
+    }
+
+    [Fact]
+    public async Task An_email_still_passes_expectNotification_after_advance_time_runs_its_item_and_the_missing_mail_host_is_logged()
+    {
+        using var logs = new LogCollector();
+        using var loggers = LoggerFactory.Create(builder => builder.AddProvider(logs));
+        using var folder = NotifyApplication(Scenario("NotifyAfterTime", Purchasing, ApproveBelowThreshold + """
+            { "type": "expectNotification", "recipient": { "user": "anna" }, "channel": "email", "values": { "title": "Chairs" } },
+            { "type": "advanceTime", "by": "PT1H" },
+            { "type": "expectNotification", "recipient": { "user": "anna" }, "channel": "email", "values": { "title": "Chairs" } }
+            """, now: ScheduleNow));
+
+        var result = await RunAsync(folder, "NotifyAfterTime", loggerFactory: loggers);
+
+        Assert.True(result.Passed, result.Failure);
+        Assert.Contains(logs.Entries, entry => entry.Contains("has no Email:Smtp:Host", StringComparison.Ordinal));
+    }
 
     [Fact]
     public async Task A_daily_schedule_fires_once_after_advance_time_and_expect_instance_sees_it()
@@ -1046,11 +1134,15 @@ public sealed class ScenarioRunnerTests
     }
 
     private static async Task<ScenarioResult> RunAsync(
-        TemporaryFolder folder, string name, int workItemLimit = ScenarioRunner.WorkItemLimit, PackageCatalog? packages = null)
+        TemporaryFolder folder,
+        string name,
+        int workItemLimit = ScenarioRunner.WorkItemLimit,
+        PackageCatalog? packages = null,
+        ILoggerFactory? loggerFactory = null)
     {
         var scenario = Axis.Configuration.Loading.ApplicationLoader.Load(folder.Path).Scenarios.Single(candidate => candidate.Name == name);
         return await ScenarioRunner.RunAsync(
-            folder.Path, scenario, await PostgreSqlServer.AdminConnectionStringAsync(), NullLoggerFactory.Instance, CancellationToken, workItemLimit, packages);
+            folder.Path, scenario, await PostgreSqlServer.AdminConnectionStringAsync(), loggerFactory ?? NullLoggerFactory.Instance, CancellationToken, workItemLimit, packages);
     }
 
     /// <summary>The <c>*.json</c> files of a folder as resources, with relative paths that use <c>/</c>.</summary>
@@ -1111,6 +1203,13 @@ public sealed class ScenarioRunnerTests
     /// </summary>
     private static TemporaryFolder DeadlineApplication((string Name, string Json) scenario) =>
         Application("ScenarioPurchaseApp", [scenario], overlay: "ScenarioDeadlineApp");
+
+    /// <summary>
+    /// A copy of the ScenarioPurchaseApp fixture with the ScenarioNotifyApp files over it: after approval the process notifies
+    /// the requester in-app and by email.
+    /// </summary>
+    private static TemporaryFolder NotifyApplication((string Name, string Json) scenario) =>
+        Application("ScenarioPurchaseApp", [scenario], overlay: "ScenarioNotifyApp");
 
     private static TemporaryFolder Application(string fixture, (string Name, string Json)[] scenarios, string? overlay = null)
     {

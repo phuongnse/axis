@@ -17,6 +17,7 @@ public sealed record ScenarioStepDefinition
     public const string ExpectRecord = "expectRecord";
     public const string ExpectInstance = "expectInstance";
     public const string ExpectTask = "expectTask";
+    public const string ExpectNotification = "expectNotification";
     public const string AdvanceTime = "advanceTime";
 
     /// <summary>The step type, one of the constants of this record.</summary>
@@ -48,6 +49,12 @@ public sealed record ScenarioStepDefinition
 
     /// <summary>Who an <c>expectTask</c> step asserts the task is assigned to: a scenario user or a role.</summary>
     public TaskAssigneeDefinition? Assignee { get; init; }
+
+    /// <summary>Who an <c>expectNotification</c> step asserts was notified: a scenario user, a role or an email address.</summary>
+    public ScenarioRecipientDefinition? Recipient { get; init; }
+
+    /// <summary>The channel an <c>expectNotification</c> step reads, <c>inApp</c> or <c>email</c>. Null reads both.</summary>
+    public string? Channel { get; init; }
 
     /// <summary>The field values the step writes or asserts, by field name, in file order.</summary>
     public IReadOnlyDictionary<string, JsonElement>? Values { get; init; }

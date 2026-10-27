@@ -21,7 +21,8 @@ namespace Axis.Scenarios.Runner;
 /// after the scenario's <c>now</c> moved, so a task is escalated and expires only when the scenario's time reaches the escalation or the deadline. The items run over
 /// the scenario's connection string, so they read the scenario's <c>now</c> too, and a due time is
 /// compared with it. Leases keep the database clock. <see cref="AdvanceAsync"/> also runs the <c>notification.email</c> items
-/// with no mail host, so each stays queued and nothing is sent.
+/// with no mail host, so each stays queued and nothing is sent. The application clock queues an email item, so when the
+/// scenario's <c>now</c> is before it, <see cref="AdvanceAsync"/> makes the email items due once, after the other work is done.
 /// </summary>
 internal sealed class ScenarioWork : IDisposable
 {
@@ -97,7 +98,7 @@ internal sealed class ScenarioWork : IDisposable
     /// loop ends when the process waits or ends.
     /// </summary>
     /// <exception cref="StepFailedException">More items than the limit ran, or a due call has no stub.</exception>
-    public Task RunDueAsync(CancellationToken cancellationToken) => RunAsync(_runner, cancellationToken);
+    public Task RunDueAsync(CancellationToken cancellationToken) => RunAsync(_runner, withEmails: false, cancellationToken);
 
     /// <summary>
     /// Moves the work to <paramref name="connectionString"/>, whose <c>axis.now</c> is the new time of
@@ -108,12 +109,13 @@ internal sealed class ScenarioWork : IDisposable
     public Task AdvanceAsync(string connectionString, CancellationToken cancellationToken)
     {
         _connectionString = connectionString;
-        return RunAsync(_timeRunner, cancellationToken);
+        return RunAsync(_timeRunner, withEmails: true, cancellationToken);
     }
 
-    private async Task RunAsync(WorkItemRunner runner, CancellationToken cancellationToken)
+    private async Task RunAsync(WorkItemRunner runner, bool withEmails, CancellationToken cancellationToken)
     {
         var ran = 0;
+        var emailsMadeDue = false;
         while (true)
         {
             await CheckStubsAsync(cancellationToken);
@@ -127,10 +129,20 @@ internal sealed class ScenarioWork : IDisposable
                 continue;
             }
 
-            if (!await MakeDueAsync(cancellationToken))
+            if (await MakeDueAsync(cancellationToken))
             {
-                return;
+                continue;
             }
+
+            // The emails run once the other work is done, once for each advanceTime step. With no mail host a run makes the
+            // email due again after a lease, and a second run would only repeat it.
+            if (withEmails && !emailsMadeDue && await MakeEmailsDueAsync(cancellationToken))
+            {
+                emailsMadeDue = true;
+                continue;
+            }
+
+            return;
         }
     }
 
@@ -205,6 +217,20 @@ internal sealed class ScenarioWork : IDisposable
                 ProcessStarts.PackageCallWorkItemKind,
                 ProcessStarts.EventDeliverWorkItemKind,
             });
+        return await command.ExecuteNonQueryAsync(cancellationToken) > 0;
+    }
+
+    // The application clock queued an email item, so the scenario's time may be before it. An advanceTime step runs
+    // the items of the emails it finds, as the point of the step is that the email is tried.
+    private async Task<bool> MakeEmailsDueAsync(CancellationToken cancellationToken)
+    {
+        await using var connection = new NpgsqlConnection(_connectionString);
+        await connection.OpenAsync(cancellationToken);
+        await using var command = new NpgsqlCommand(
+            $"UPDATE axis.process_work_items SET due_at = {SqlTranslator.NowSql} WHERE tenant_id = @tenant AND kind = @kind AND due_at > {SqlTranslator.NowSql}",
+            connection);
+        command.Parameters.AddWithValue("tenant", ScenarioRunner.TenantId);
+        command.Parameters.AddWithValue("kind", ProcessStarts.NotificationEmailWorkItemKind);
         return await command.ExecuteNonQueryAsync(cancellationToken) > 0;
     }
 
