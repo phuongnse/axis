@@ -97,6 +97,7 @@ public sealed class StudioNamesTests : IAsyncLifetime
         var names = await NamesAsync("PurchaseRequests");
 
         var process = Named(names, "processes", "PurchaseRequestApproval");
+        Assert.Equal("PurchaseRequest", process.GetProperty("entity").GetString());
         var step = Named(process, "steps", "managerApproval");
         Assert.Equal("task", step.GetProperty("type").GetString());
         Assert.Equal(["approve", "return", "reject"], step.GetProperty("outcomes").EnumerateArray().Select(outcome => outcome.GetString()));
@@ -109,6 +110,7 @@ public sealed class StudioNamesTests : IAsyncLifetime
         var names = await NamesAsync("LeaveRequests");
 
         var process = Named(names, "processes", "DailyReminder");
+        Assert.Equal(JsonValueKind.Null, process.GetProperty("entity").ValueKind);
         var parameter = Assert.Single(process.GetProperty("parameters").EnumerateArray());
         Assert.Equal("daysOverdue", parameter.GetProperty("name").GetString());
         Assert.Equal("integer", parameter.GetProperty("type").GetString());
