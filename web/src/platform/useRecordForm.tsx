@@ -175,7 +175,7 @@ export function useRecordForm(
   const emptyStyle = useEmptyStyle()
   const notSet = t('shell.value.notSet')
   const canvas = useContext(FormCanvasContext)
-  const { spacing } = useDesignTokens()
+  const { spacing, colour } = useDesignTokens()
   const narrow = useNarrowWidth()
   const shown = useMemo(() => sections.flatMap((section) => section.fields), [sections])
   const [snapshot, setSnapshot] = useState<Snapshot>(() => emptySnapshot(entity.fields))
@@ -417,7 +417,7 @@ export function useRecordForm(
     })
   }
 
-  const input = (field: FieldMetadata, readOnly: boolean): ReactNode => {
+  const input = (field: FieldMetadata, readOnly: boolean, required: boolean): ReactNode => {
     const value = values[field.name] ?? null
     const id = field.name
     if (field.type !== 'child-collection' && (readOnly || field.computed || field.sequence || field.creator)) {
@@ -447,7 +447,12 @@ export function useRecordForm(
         // The label cannot be typed. The record is chosen in the lookup, and its id is sent.
         return (
           <Space.Compact block data-testid={`reference-${field.name}`}>
-            <Input id={id} readOnly value={typeof label === 'string' ? label : ''} />
+            <Input
+              id={id}
+              readOnly
+              aria-required={required || undefined}
+              value={typeof label === 'string' ? label : ''}
+            />
             <Tooltip title={t('shell.form.choose')}>
               <Button
                 aria-label={t('shell.form.choose')}
@@ -506,6 +511,7 @@ export function useRecordForm(
             value={value as RecordValue}
             currency={moneyCurrency(field, values)}
             locale={locale}
+            ariaRequired={required}
             onChange={(next) => set(field.name, next)}
           />
         )
@@ -537,14 +543,15 @@ export function useRecordForm(
                 .map((entry) => {
                   const { field } = entry
                   const errors = errorsOf(field.name)
-                  const control = input(field, lockedOf(entry))
+                  const required = stateOf(field.name)?.required ?? field.required
+                  const control = input(field, lockedOf(entry), required)
                   const item = (
                     <Form.Item
                       key={field.name}
-                      label={labelOf(field)}
+                      label={<span style={{ fontWeight: 500, color: colour.textMuted }}>{labelOf(field)}</span>}
                       // A child collection is a table, with no single input for the label to point to.
                       htmlFor={field.type === 'child-collection' ? undefined : field.name}
-                      required={stateOf(field.name)?.required ?? field.required}
+                      required={required}
                       validateStatus={errors ? 'error' : undefined}
                       help={
                         errors && (

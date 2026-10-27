@@ -1,6 +1,7 @@
 import { expect, test } from '../test'
 import type { Page } from '@playwright/test'
 import { waitForDialog } from '../dialogs'
+import { fieldLabel } from '../fields'
 import { noSideways, phoneWidth } from '../phone'
 import { pickOption } from '../select'
 import { sessionFile } from '../sessions'
@@ -14,7 +15,7 @@ async function choose(page: Page, field: string, label: string, name: string) {
   const dialog = await waitForDialog(page)
   await dialog.getByRole('row', { name: new RegExp(name) }).click()
   await expect(dialog).toBeHidden()
-  await expect(page.getByLabel(label, { exact: true })).toHaveValue(name)
+  await expect(page.getByLabel(fieldLabel(label))).toHaveValue(name)
 }
 
 /** Opens a select and picks the option with the given value. */
@@ -26,7 +27,7 @@ test('a purchase request is created and reopened at phone width, without the pag
   page,
 }) => {
   const title = `Phone ${Date.now()}-${test.info().retry}`
-  const cell = (label: string) => page.getByLabel(label, { exact: true })
+  const cell = (label: string) => page.getByLabel(fieldLabel(label))
   await page.goto('/purchasing/purchaserequests?pageSize=100&sort=-title')
 
   // The table is wider than the window, so it scrolls inside its widget and not the page.
@@ -50,7 +51,7 @@ test('a purchase request is created and reopened at phone width, without the pag
 
   await page.getByRole('button', { name: 'New', exact: true }).click()
   await expect(page).toHaveURL(/\/purchasing\/purchaserequestform\/new$/)
-  await page.getByRole('textbox', { name: '* Title', exact: true }).fill(title)
+  await page.getByRole('textbox', { name: 'Title', exact: true }).fill(title)
   await choose(page, 'department', 'Department', 'Finance')
   await select(page, 'Status', 'draft')
   await page.getByRole('button', { name: 'Add row', exact: true }).click()
@@ -65,7 +66,7 @@ test('a purchase request is created and reopened at phone width, without the pag
   const row = page.getByRole('row', { name: new RegExp(`${title} `) })
   await row.getByRole('button', { name: 'Actions', exact: true }).click()
   await page.getByRole('menuitem', { name: 'Open', exact: true }).click()
-  await expect(page.getByRole('textbox', { name: '* Title', exact: true })).toHaveValue(title)
+  await expect(page.getByRole('textbox', { name: 'Title', exact: true })).toHaveValue(title)
   await expect(cell('Total amount')).toHaveValue('20.00')
   await noSideways(page)
 })

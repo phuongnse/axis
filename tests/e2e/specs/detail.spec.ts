@@ -38,7 +38,7 @@ test('a detail page shows a note read-only, its start button closes the note and
 
   await page.getByRole('button', { name: 'Edit note', exact: true }).click()
   await expect(page).toHaveURL(new RegExp(`/e2e/noteactions/${note.id}$`))
-  await expect(page.getByRole('textbox', { name: '* Title', exact: true })).toHaveValue(`Detail ${run}`)
+  await expect(page.getByRole('textbox', { name: 'Title', exact: true })).toHaveValue(`Detail ${run}`)
 })
 
 test('a detail page for a note that does not exist shows the not-found page', async ({ page }) => {
