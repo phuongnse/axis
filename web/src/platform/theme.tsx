@@ -1,6 +1,7 @@
 import { ConfigProvider } from 'antd'
 import { useCallback, useMemo, useState, type ReactNode } from 'react'
 import { antThemeFor } from './antTheme'
+import { formConfig } from './requiredMark'
 import { ThemeModeContext, type ThemeMode } from './themeMode'
 
 const storageKey = 'axis.themeMode'
@@ -43,7 +44,9 @@ export function ThemeModeProvider({ initialMode, children }: ThemeModeProviderPr
 
   return (
     <ThemeModeContext.Provider value={value}>
-      <ConfigProvider theme={config}>{children}</ConfigProvider>
+      <ConfigProvider theme={config} form={formConfig}>
+        {children}
+      </ConfigProvider>
     </ThemeModeContext.Provider>
   )
 }

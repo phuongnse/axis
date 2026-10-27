@@ -5,6 +5,18 @@ import type { FormMetadata } from './site'
 import { useText } from './texts'
 import type { Section, useRecordForm } from './useRecordForm'
 
+const connector = 48
+const compactFrom = 7
+// Every flex level of a step may shrink below its content, so a long title can give way.
+const shrinkable = { minWidth: 0 } as const
+const ellipsis = {
+  display: 'block',
+  maxWidth: 160,
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  whiteSpace: 'nowrap',
+} as const
+
 const focusable = 'input:not([type=hidden]), textarea, [role=combobox], button'
 
 /**
@@ -88,11 +100,38 @@ export function useFormSteps(
     }
   }
 
+  // Proposed: each step is as wide as its title, joined to the next by a short line, so the bar sits on the left
+  // and never stretches across the form. With seven or more only the current step shows its title. A long title
+  // ends in an ellipsis and shows whole on hover.
+  const shown = Math.max(position, 0)
+  const compact = visible.length >= compactFrom
   const progress: ReactNode = active && (
     <Steps
       data-testid="form-steps"
-      current={Math.max(position, 0)}
-      items={visible.map((step) => ({ title: t(steps[step].titleKey) }))}
+      current={shown}
+      items={visible.map((step, at) => {
+        const title = t(steps[step].titleKey)
+        return {
+          // A step shrinks when the bar runs out of room, so its title ends in an ellipsis instead of overflowing.
+          // The current step keeps its title whole.
+          style: at === shown ? { flex: 'none' } : { flex: '0 1 auto', minWidth: 0 },
+          styles: {
+            wrapper: shrinkable,
+            section: shrinkable,
+            header: shrinkable,
+            title: shrinkable,
+            rail: at === visible.length - 1 ? undefined : { flex: `0 0 ${connector}px` },
+          },
+          title:
+            compact && at !== shown ? (
+              ''
+            ) : (
+              <span title={title} style={ellipsis}>
+                {title}
+              </span>
+            ),
+        }
+      })}
     />
   )
 

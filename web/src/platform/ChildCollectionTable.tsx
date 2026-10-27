@@ -1,9 +1,15 @@
-import { Button, ConfigProvider, Flex, Form, Input, Space, Table, type TableColumnsType } from 'antd'
+import { CloseOutlined, DeleteOutlined, SearchOutlined } from '@ant-design/icons'
+import { Button, ConfigProvider, Flex, Form, Input, Space, Table, Tooltip, type TableColumnsType } from 'antd'
 import { useMemo, useRef, useState } from 'react'
 import { compactFormTheme } from './antTheme'
 import { FieldInput } from './FieldInput'
 import { FileLink } from './FileInput'
 import { formatValue, moneyCurrency } from './formatValue'
+import { ReadOnlyValue } from './ReadOnlyValue'
+import { useDesignTokens } from './themeMode'
+
+/** Proposed: digits of equal width, so the numbers of a column line up. */
+const numberStyle = { fontVariantNumeric: 'tabular-nums' } as const
 import {
   isFileValue,
   type FileValue,
@@ -99,14 +105,22 @@ export function ChildCollectionTable({
     setLookup(null)
   }
 
+  const { colour } = useDesignTokens()
+  const numeric = (child: FieldMetadata) =>
+    child.type === 'integer' || child.type === 'decimal' || child.type === 'money'
   const columns: TableColumnsType<RecordRow> = [
     ...childFields.map((child) => {
       const label = child.labelKey ? t(child.labelKey) : child.name
       return {
         key: child.name,
         title: label,
-        // The inputs keep a usable width when the table scrolls sideways.
-        width: 160,
+        // The inputs keep a usable width when the table scrolls sideways. Proposed: a reference cell is wider, as its
+        // buttons sit beside the chosen record's label.
+        width: child.type === 'reference' ? 240 : 160,
+        // Proposed: numbers sit on the right in tabular figures, so their digits line up down the column.
+        align: numeric(child) ? ('right' as const) : undefined,
+        // Proposed: cells line up at the top, so a message under one input never moves the inputs beside it.
+        onCell: () => ({ style: { verticalAlign: 'top', ...(numeric(child) && numberStyle) } }),
         render: (_value: unknown, row: RecordRow, index: number) => {
           const cellErrors = errors[`${index}/${child.name}`]
           return (
@@ -114,7 +128,14 @@ export function ChildCollectionTable({
               validateStatus={cellErrors ? 'error' : undefined}
               help={
                 cellErrors && (
-                  <span data-testid={`field-error-${field.name}-${index}-${child.name}`}>{cellErrors.join(' ')}</span>
+                  // Proposed: 4px under the input at a 20px line height, so a second line sits as close as the first.
+                  <span
+                    role="alert"
+                    data-testid={`field-error-${field.name}-${index}-${child.name}`}
+                    style={{ display: 'block', lineHeight: '20px', paddingTop: 4, textAlign: 'start' }}
+                  >
+                    {cellErrors.join(' ')}
+                  </span>
                 )
               }
             >
@@ -123,34 +144,37 @@ export function ChildCollectionTable({
                   <FileLink field={child} value={row[child.name] as FileValue} />
                 ) : null
               ) : readOnly || child.computed ? (
-                <Input
-                  readOnly
-                  aria-label={`${label} ${index + 1}`}
-                  value={formatValue(child, row[child.name] ?? null, aligned[index] ?? {}, { locale, text: t }, row)}
-                />
+                // Proposed: a read-only or computed cell is plain text, as a read-only field on a form is.
+                <ReadOnlyValue cell>
+                  {formatValue(child, row[child.name] ?? null, aligned[index] ?? {}, { locale, text: t }, row)}
+                </ReadOnlyValue>
               ) : child.type === 'reference' ? (
                 // The label cannot be typed. The record is chosen in the lookup, and its id is sent.
                 <Space.Compact block data-testid={`reference-${field.name}-${index}-${child.name}`}>
                   <Input readOnly aria-label={`${label} ${index + 1}`} value={aligned[index]?.[child.name] ?? ''} />
-                  <Button
-                    aria-label={`${t('shell.form.choose')} ${label} ${index + 1}`}
-                    onClick={() => setLookup({ index, field: child })}
-                  >
-                    {t('shell.form.choose')}
-                  </Button>
-                  {!child.required && row[child.name] != null && (
+                  <Tooltip title={t('shell.form.choose')} trigger={['hover', 'focus']}>
                     <Button
-                      aria-label={`${t('shell.form.clear')} ${label} ${index + 1}`}
-                      onClick={() => edit(index, child.name, null)}
-                    >
-                      {t('shell.form.clear')}
-                    </Button>
+                      aria-label={`${t('shell.form.choose')} ${label} ${index + 1}`}
+                      icon={<SearchOutlined aria-hidden />}
+                      onClick={() => setLookup({ index, field: child })}
+                    />
+                  </Tooltip>
+                  {!child.required && row[child.name] != null && (
+                    <Tooltip title={t('shell.form.clear')} trigger={['hover', 'focus']}>
+                      <Button
+                        aria-label={`${t('shell.form.clear')} ${label} ${index + 1}`}
+                        icon={<CloseOutlined aria-hidden />}
+                        onClick={() => edit(index, child.name, null)}
+                      />
+                    </Tooltip>
                   )}
                 </Space.Compact>
               ) : (
                 <FieldInput
                   field={child}
+                  style={numeric(child) ? { textAlign: 'right', ...numberStyle } : undefined}
                   value={row[child.name] ?? null}
+                  locale={locale}
                   currency={moneyCurrency(child, row)}
                   onChange={(value) => edit(index, child.name, value)}
                   ariaLabel={`${label} ${index + 1}`}
@@ -165,14 +189,39 @@ export function ChildCollectionTable({
   if (!readOnly) {
     columns.push({
       key: removeColumnKey,
+      onCell: () => ({ style: { verticalAlign: 'top' } }),
       render: (_value: unknown, _row: RecordRow, index: number) => (
-        <Button onClick={() => remove(index)}>{t('shell.form.removeRow')}</Button>
+        <Tooltip title={t('shell.form.removeRow')} trigger={['hover', 'focus']}>
+          <Button
+            type="text"
+            danger
+            // Proposed: Ant Design colours a danger text button with the danger fill, too dark on a dark surface.
+            style={{ color: colour.dangerText }}
+            aria-label={t('shell.form.removeRow')}
+            icon={<DeleteOutlined aria-hidden />}
+            onClick={() => remove(index)}
+          />
+        </Tooltip>
       ),
     })
   }
 
   return (
     <Flex vertical gap="small">
+      {/* Proposed: Add row sits above the table on the right, where a table keeps its main action. */}
+      {!readOnly && (
+        <Flex justify="end">
+          <Button
+            color="primary"
+            variant="outlined"
+            // Proposed: the second level of button, outlined in primaryText, which reads on either theme.
+            style={{ color: colour.primaryText, borderColor: colour.primaryText }}
+            onClick={add}
+          >
+            {t('shell.form.addRow')}
+          </Button>
+        </Flex>
+      )}
       {/* A cell's item needs no space below it, as the table rows already space the inputs. */}
       <ConfigProvider theme={compactFormTheme}>
         <Table<RecordRow>
@@ -183,11 +232,6 @@ export function ChildCollectionTable({
           pagination={false}
         />
       </ConfigProvider>
-      {!readOnly && (
-        <Flex>
-          <Button onClick={add}>{t('shell.form.addRow')}</Button>
-        </Flex>
-      )}
       {lookup?.field.target && (
         <ReferenceLookup
           field={lookup.field}

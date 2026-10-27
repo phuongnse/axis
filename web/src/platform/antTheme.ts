@@ -76,7 +76,24 @@ export function antThemeFor(mode: ThemeMode, page?: PageTokenValues): ThemeConfi
         itemHoverColor: colour.primaryText,
         itemActiveColor: colour.primaryText,
       },
-      Menu: { itemSelectedColor: colour.primaryText, horizontalItemSelectedColor: colour.primaryText },
+      Menu: {
+        itemSelectedColor: colour.primaryText,
+        horizontalItemSelectedColor: colour.primaryText,
+        // Proposed: a destructive entry's text is dangerText, as the fill is too dark on a dark surface.
+        dangerItemColor: colour.dangerText,
+        dangerItemHoverColor: colour.dangerText,
+        dangerItemSelectedColor: colour.dangerText,
+      },
+      // Proposed: the same for a destructive entry of a dropdown menu, such as a row's Delete.
+      Dropdown: { colorError: colour.dangerText },
+      // Proposed: the current page is a selected state, written in primaryText like the selected tab. Ant Design
+      // draws its number and border in the primary fill, which is too dark on a dark surface.
+      Pagination: {
+        itemActiveColor: colour.primaryText,
+        itemActiveColorHover: colour.primaryText,
+        colorPrimary: colour.primaryText,
+        colorPrimaryHover: colour.primaryText,
+      },
       Button: { defaultShadow: 'none', primaryShadow: 'none', dangerShadow: 'none' },
     },
   }

@@ -1,4 +1,5 @@
-import { Button, Form, Input, Space, Typography } from 'antd'
+import { CloseOutlined, SearchOutlined } from '@ant-design/icons'
+import { Button, Form, Input, Space, Tooltip, Typography } from 'antd'
 import { Fragment, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { ChildCollectionTable } from './ChildCollectionTable'
 import { FieldInput } from './FieldInput'
@@ -19,6 +20,8 @@ import {
 } from './records'
 import { ReferenceLookup } from './ReferenceLookup'
 import { ReferencesInput } from './ReferencesInput'
+import { FieldCell, FieldError, FieldGrid, FieldHelp } from './FieldGrid'
+import { ReadOnlyValue } from './ReadOnlyValue'
 import type { EntityMetadata, FieldMetadata, FormMetadata } from './site'
 import { useText } from './texts'
 
@@ -33,6 +36,8 @@ interface Snapshot {
 interface ShownField {
   field: FieldMetadata
   readOnly: boolean
+  /** Proposed: the field's width in twelfths of its section. */
+  width: number
 }
 
 /** A titled group of shown fields. The entity shorthand has one section without a title. */
@@ -57,14 +62,20 @@ export function sectionsOf(
   const fixed = (field: FieldMetadata) =>
     field.computed || field.sequence || field.creator || (writable !== undefined && !writable.has(field.name))
   if (form === null) {
-    return [{ name: null, titleKey: null, fields: entity.fields.map((field) => ({ field, readOnly: fixed(field) })) }]
+    return [
+      {
+        name: null,
+        titleKey: null,
+        fields: entity.fields.map((field) => ({ field, readOnly: fixed(field), width: 12 })),
+      },
+    ]
   }
   return form.sections.map((section) => ({
     name: section.name,
     titleKey: section.titleKey,
     fields: section.fields.flatMap((entry) => {
       const field = entity.fields.find((candidate) => candidate.name === entry.name)
-      return field ? [{ field, readOnly: entry.readOnly || fixed(field) }] : []
+      return field ? [{ field, readOnly: entry.readOnly || fixed(field), width: entry.width ?? 12 }] : []
     }),
   }))
 }
@@ -407,14 +418,16 @@ export function useRecordForm(
     const id = field.name
     if (field.type !== 'child-collection' && (readOnly || field.computed || field.sequence || field.creator)) {
       if (field.type === 'references') {
-        return <Input id={id} readOnly value={referencesLabels(value, labels[field.name]).join(', ')} />
+        return <ReadOnlyValue id={id}>{referencesLabels(value, labels[field.name]).join(', ')}</ReadOnlyValue>
       }
       if (field.type === 'file') {
         return isFileValue(value) ? <FileLink field={field} value={value} /> : null
       }
       // The server sets the value on save, so it is shown as a table cell shows it.
       return (
-        <Input id={id} readOnly value={formatValue(field, value as RecordValue, labels, { locale, text: t }, values)} />
+        <ReadOnlyValue id={id}>
+          {formatValue(field, value as RecordValue, labels, { locale, text: t }, values)}
+        </ReadOnlyValue>
       )
     }
     switch (field.type) {
@@ -424,8 +437,23 @@ export function useRecordForm(
         return (
           <Space.Compact block data-testid={`reference-${field.name}`}>
             <Input id={id} readOnly value={typeof label === 'string' ? label : ''} />
-            <Button onClick={() => setLookup(field.name)}>{t('shell.form.choose')}</Button>
-            {!field.required && value !== null && <Button onClick={() => clear(field)}>{t('shell.form.clear')}</Button>}
+            {/* Proposed: icon buttons named by their text, with the text as a tooltip. */}
+            <Tooltip title={t('shell.form.choose')} trigger={['hover', 'focus']}>
+              <Button
+                aria-label={t('shell.form.choose')}
+                icon={<SearchOutlined aria-hidden />}
+                onClick={() => setLookup(field.name)}
+              />
+            </Tooltip>
+            {!field.required && value !== null && (
+              <Tooltip title={t('shell.form.clear')} trigger={['hover', 'focus']}>
+                <Button
+                  aria-label={t('shell.form.clear')}
+                  icon={<CloseOutlined aria-hidden />}
+                  onClick={() => clear(field)}
+                />
+              </Tooltip>
+            )}
           </Space.Compact>
         )
       }
@@ -470,6 +498,7 @@ export function useRecordForm(
             field={field}
             id={id}
             value={value as RecordValue}
+            locale={locale}
             currency={moneyCurrency(field, values)}
             onChange={(next) => set(field.name, next)}
           />
@@ -496,33 +525,34 @@ export function useRecordForm(
               !(section.fields.length > 0 && section.fields.every(({ field }) => hiddenOf(field))) && (
                 <Typography.Title level={5}>{t(section.titleKey)}</Typography.Title>
               )}
-            {section.fields
-              .filter(({ field }) => !hiddenOf(field))
-              .map((entry) => {
-                const { field } = entry
-                const errors = errorsOf(field.name)
-                const control = input(field, lockedOf(entry))
-                const item = (
-                  <Form.Item
-                    key={field.name}
-                    label={labelOf(field)}
-                    // A child collection is a table, with no single input for the label to point to.
-                    htmlFor={field.type === 'child-collection' ? undefined : field.name}
-                    required={stateOf(field.name)?.required ?? field.required}
-                    validateStatus={errors ? 'error' : undefined}
-                    help={
-                      errors && (
-                        <span role="alert" data-testid={`field-error-${field.name}`}>
-                          {errors.join(' ')}
-                        </span>
-                      )
-                    }
-                  >
-                    {asking ? <div onBlur={() => leave(field.name)}>{control}</div> : control}
-                  </Form.Item>
-                )
-                return canvas ? <Fragment key={field.name}>{canvas.field(field.name, item)}</Fragment> : item
-              })}
+            <FieldGrid>
+              {section.fields
+                .filter(({ field }) => !hiddenOf(field))
+                .map((entry) => {
+                  const { field } = entry
+                  const errors = errorsOf(field.name)
+                  const control = input(field, lockedOf(entry))
+                  const item = (
+                    <Form.Item
+                      key={field.name}
+                      label={labelOf(field)}
+                      // A child collection is a table, with no single input for the label to point to.
+                      htmlFor={field.type === 'child-collection' ? undefined : field.name}
+                      required={stateOf(field.name)?.required ?? field.required}
+                      validateStatus={errors ? 'error' : undefined}
+                      help={errors && <FieldError name={field.name}>{errors.join(' ')}</FieldError>}
+                    >
+                      {field.helpKey && <FieldHelp id={`${field.name}-help`}>{t(field.helpKey)}</FieldHelp>}
+                      {asking ? <div onBlur={() => leave(field.name)}>{control}</div> : control}
+                    </Form.Item>
+                  )
+                  return (
+                    <FieldCell key={field.name} width={entry.width}>
+                      {canvas ? canvas.field(field.name, item) : item}
+                    </FieldCell>
+                  )
+                })}
+            </FieldGrid>
           </>
         )
         return <Fragment key={index}>{canvas ? canvas.section(index, content) : content}</Fragment>

@@ -1,9 +1,23 @@
-import { Alert, Button, Dropdown, Flex, Input, Modal, Table, type TableColumnsType, type TableProps } from 'antd'
+import { DeleteOutlined, EllipsisOutlined, ReloadOutlined } from '@ant-design/icons'
+import {
+  Alert,
+  Button,
+  Dropdown,
+  Flex,
+  Input,
+  Modal,
+  Table,
+  Tooltip,
+  type TableColumnsType,
+  type TableProps,
+} from 'antd'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router'
 import { useCanvasActions } from './canvasActions'
 import { FileLink } from './FileInput'
 import { FilterBar } from './FilterBar'
+import { IconAction } from './IconAction'
+import { EmptyValue } from './ReadOnlyValue'
 import { formatValue } from './formatValue'
 import { ImportDialog } from './ImportDialog'
 import { importsPath } from './imports'
@@ -24,6 +38,7 @@ import type {
   DataSourceParameter,
   DeleteAction,
   FieldMetadata,
+  NavigateAction,
   RowAction,
   StartProcessAction,
   WidgetMetadata,
@@ -38,6 +53,7 @@ import {
   type TableSort,
 } from './tableQuery'
 import { useText } from './texts'
+import { useDesignTokens } from './themeMode'
 import { usePhoneWidth } from './usePhoneWidth'
 import { isVisible } from './visibleWhen'
 
@@ -64,6 +80,11 @@ interface LoadState {
 /** A table row: a record, a data source row, or a group of a grouped data source, which has no id. */
 type TableRow = Omit<RecordItem, 'id'> & { id: string | null }
 
+/** Proposed: the columns whose text can run long, so they wrap at a width. Numbers and dates are short. */
+function wraps(field: FieldMetadata | DataSourceColumn): boolean {
+  return field.type === 'text' || field.type === 'enum' || field.type === 'reference' || field.type === 'references'
+}
+
 // Field names start with a letter, so this key never names a field column.
 const actionsColumnKey = '$actions'
 
@@ -83,6 +104,8 @@ interface TableSource {
   defaultPageSize: number
   /** Whether the rows route takes `search`, so the table shows a search box. */
   searchable: boolean
+  /** Proposed: the column that names a row, which opens it when the table has a navigate row action. */
+  identifier: string | null
 }
 
 function tableSource({ entity, dataSource }: WidgetMetadata): TableSource {
@@ -94,6 +117,8 @@ function tableSource({ entity, dataSource }: WidgetMetadata): TableSource {
       parameters: dataSource.parameters,
       defaultPageSize: dataSource.pageSize,
       searchable: dataSource.search,
+      // Proposed: a data source's first column names its rows.
+      identifier: dataSource.columns[0]?.name ?? null,
     }
   }
   // The server sets exactly one of the two.
@@ -107,6 +132,11 @@ function tableSource({ entity, dataSource }: WidgetMetadata): TableSource {
     defaultPageSize: recordPageSize,
     // The record API searches the display field, so the user must be able to read it.
     searchable: displayField !== null && fields.some((field) => field.name === displayField),
+    // Proposed: the display field names a record, or else the first column does.
+    identifier:
+      displayField !== null && fields.some((field) => field.name === displayField)
+        ? displayField
+        : (fields[0]?.name ?? null),
   }
 }
 
@@ -138,6 +168,7 @@ function tableSource({ entity, dataSource }: WidgetMetadata): TableSource {
  */
 export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidgetProps) {
   const t = useText()
+  const { colour } = useDesignTokens()
   const phone = usePhoneWidth()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -154,7 +185,10 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
     parameters: allParameters,
     defaultPageSize,
     searchable,
+    identifier,
   } = useMemo(() => tableSource(widget), [widget])
+  // Proposed: the first navigate row action opens a row from its identifying column, which comes first and is a link.
+  const openIndex = rowActions.findIndex((action) => action.type === 'navigate')
   // The filter bar, the URL and the server's errors cover only the parameters that no page parameter binds.
   const parameters = useMemo(
     () => allParameters.filter((parameter) => !Object.hasOwn(widget.parameters, parameter.name)),
@@ -355,17 +389,62 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
       sorter: field.type !== 'reference' && field.type !== 'file',
       sortOrder: field.type === 'reference' || field.type === 'file' ? undefined : sortOrder(field.name),
       align: field.type === 'integer' || field.type === 'decimal' || field.type === 'money' ? 'right' : undefined,
-      render: (value: RecordValue, record: TableRow) =>
-        field.type === 'file' && 'downloadPath' in field && isFileValue(value) ? (
-          <FileLink field={field} value={value} />
-        ) : (
-          formatValue(field, value, record.labels, { locale, text: t }, record.values)
-        ),
+      // Proposed: cells line up at the top, so a row with wrapped text reads along its first line. Numbers are in
+      // tabular figures, so their digits line up down the column.
+      onCell: () => ({
+        style: {
+          verticalAlign: 'top',
+          ...((field.type === 'integer' || field.type === 'decimal' || field.type === 'money') && {
+            fontVariantNumeric: 'tabular-nums',
+          }),
+        },
+      }),
+      render: (value: RecordValue, record: TableRow) => {
+        if (field.type === 'file' && 'downloadPath' in field && isFileValue(value)) {
+          return <FileLink field={field} value={value} />
+        }
+        // Proposed: an empty cell of a record shows a muted dash. A group row has no record, so it stays blank.
+        const text = formatValue(field, value, record.labels, { locale, text: t }, record.values)
+        const empty = text || (record.id === null ? '' : <EmptyValue cell />)
+        // Proposed: a text column is at most 320px wide, and longer text wraps.
+        const content = wraps(field) ? <div style={{ maxWidth: 320, overflowWrap: 'anywhere' }}>{empty}</div> : empty
+        if (field.name !== identifier || openIndex < 0 || record.id === null) {
+          return content
+        }
+        const action = rowActions[openIndex] as NavigateAction
+        const scope = { id: record.id, values: record.values }
+        if (canvas.active) {
+          return <a {...canvas.props(`rowActions/${openIndex}`)}>{content}</a>
+        }
+        const open = isVisible(action.visibleWhen, scope) ? navigateTarget(sitePath, action, scope) : null
+        if (!open) {
+          return content
+        }
+        // The address is known at once unless the action looks a record up, so the link has an href when it can.
+        const href = navigatePath(sitePath, action, scope) ?? undefined
+        return (
+          <a
+            href={href}
+            onClick={(event) => {
+              if (!event.metaKey && !event.ctrlKey && !event.shiftKey) {
+                event.preventDefault()
+                void runNavigate(open)
+              }
+            }}
+          >
+            {content}
+          </a>
+        )
+      },
     }))
-    const result = [...fieldColumns]
-    if (rowActions.length > 0) {
+    // Proposed: the identifying column comes first.
+    const at = fieldColumns.findIndex((column) => column.key === identifier)
+    const result =
+      at > 0 ? [fieldColumns[at], ...fieldColumns.filter((_column, index) => index !== at)] : [...fieldColumns]
+    if (rowActions.some((_action, index) => index !== openIndex || identifier === null)) {
       result.push({
         key: actionsColumnKey,
+        onCell: () => ({ style: { verticalAlign: 'top' } }),
         render: (_value: unknown, record: TableRow) => {
           // A group row has no id and no buttons.
           if (record.id === null) {
@@ -375,6 +454,10 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
           // A start action runs for the row. A delete action asks for confirmation first. A navigate action opens its page, or is dropped when its path is unknown.
           // An action whose visibleWhen is not plainly true is dropped.
           const list = rowActions.flatMap((action, index): { action: RowAction; index: number; run: () => void }[] => {
+            // Proposed: the open action is the identifying column's link, not a button.
+            if (index === openIndex && identifier !== null) {
+              return []
+            }
             // The canvas draws every action, also one that the site would hide.
             if (canvas.active) {
               return [{ action, index, run: () => {} }]
@@ -394,7 +477,8 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
           if (list.length === 0) {
             return null
           }
-          if (phone) {
+          // Proposed: three or more actions, or any at phone width, fold into one "…" menu, where each reads as text.
+          if (phone || list.length >= 3) {
             return (
               <Dropdown
                 trigger={['click']}
@@ -403,36 +487,72 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
                   items: list.map(({ action, index, run }) => ({
                     key: String(index),
                     label: t(action.labelKey),
+                    danger: action.type === 'delete',
                     disabled: action.type !== 'navigate' && (starting || deleting),
                     onClick: run,
                   })),
                   'aria-label': t('shell.table.rowActions'),
                 }}
               >
-                <Button size="small">{t('shell.table.rowActions')}</Button>
+                <Tooltip title={t('shell.table.rowActions')} trigger={['hover', 'focus']}>
+                  <Button
+                    type="text"
+                    aria-label={t('shell.table.rowActions')}
+                    icon={<EllipsisOutlined aria-hidden />}
+                  />
+                </Tooltip>
               </Dropdown>
             )
           }
           return (
             <Flex gap="small">
-              {list.map(({ action, index, run }) => (
-                <Button
-                  key={index}
-                  size="small"
-                  disabled={action.type !== 'navigate' && (starting || deleting)}
-                  onClick={run}
-                  {...canvas.props(`rowActions/${index}`)}
-                >
-                  {t(action.labelKey)}
-                </Button>
-              ))}
+              {list.map(({ action, index, run }) =>
+                // Proposed: a delete is a red trash icon named by its label. The platform knows no icon for an
+                // action an author names, so those stay text buttons.
+                action.type === 'delete' ? (
+                  <IconAction
+                    key={index}
+                    label={t(action.labelKey)}
+                    icon={<DeleteOutlined aria-hidden />}
+                    danger
+                    disabled={starting || deleting}
+                    onClick={run}
+                    {...canvas.props(`rowActions/${index}`)}
+                  />
+                ) : (
+                  <Button
+                    key={index}
+                    size="small"
+                    disabled={action.type !== 'navigate' && (starting || deleting)}
+                    onClick={run}
+                    {...canvas.props(`rowActions/${index}`)}
+                  >
+                    {t(action.labelKey)}
+                  </Button>
+                ),
+              )}
             </Flex>
           )
         },
       })
     }
     return result
-  }, [fields, locale, phone, query.sort, rowActions, runNavigate, runStart, sitePath, starting, deleting, t, canvas])
+  }, [
+    fields,
+    locale,
+    phone,
+    query.sort,
+    rowActions,
+    runNavigate,
+    runStart,
+    sitePath,
+    starting,
+    deleting,
+    t,
+    canvas,
+    identifier,
+    openIndex,
+  ])
 
   // A new sort or page size starts again at page 1. Paging and sorting add history entries.
   const onChange: TableProps<TableRow>['onChange'] = (pagination, _filters, sorter) => {
@@ -506,19 +626,36 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
               onSearch={onSearch}
             />
           )}
+          {/* Proposed: what changes the view on the left; on the right Refresh, then the other actions, and the
+              first toolbar action last, as the table's main action. */}
           <Flex gap="small" style={{ marginInlineStart: 'auto' }}>
-            {toolbarButtons.map(({ action, path, index }) => (
+            <Tooltip title={t('shell.table.refresh')} trigger={['hover', 'focus']}>
+              <Button
+                type="text"
+                aria-label={t('shell.table.refresh')}
+                icon={<ReloadOutlined aria-hidden />}
+                onClick={() => setReloads((n) => n + 1)}
+              />
+            </Tooltip>
+            {canImport && (
+              <Button onClick={() => !canvas.active && setImporting(true)}>{t('shell.table.import')}</Button>
+            )}
+            {[...toolbarButtons.slice(1), ...toolbarButtons.slice(0, 1)].map(({ action, path, index }) => (
               <Button
                 key={index}
+                // Proposed: the first toolbar action is the table's main action, outlined in primaryText like Add row. A solid
+                // button is only for finishing a task, such as Save.
+                {...(index === toolbarButtons[0].index && {
+                  color: 'primary' as const,
+                  variant: 'outlined' as const,
+                  style: { color: colour.primaryText, borderColor: colour.primaryText },
+                })}
                 onClick={() => navigate(path, { state: { from } })}
                 {...canvas.props(`toolbarActions/${index}`)}
               >
                 {t(action.labelKey)}
               </Button>
             ))}
-            {canImport && (
-              <Button onClick={() => !canvas.active && setImporting(true)}>{t('shell.table.import')}</Button>
-            )}
           </Flex>
         </Flex>
       )}

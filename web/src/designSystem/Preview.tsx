@@ -8,7 +8,17 @@ import { catalogs, type PreviewState } from './previews'
 function Canvas({ children }: { children: ReactNode }) {
   const { colour, spacing } = useDesignTokens()
   return (
-    <div style={{ padding: spacing.lg, background: colour.canvas, display: 'grid', gap: spacing.md }}>{children}</div>
+    <div
+      style={{
+        padding: spacing.lg,
+        background: colour.canvas,
+        display: 'grid',
+        gridTemplateColumns: 'minmax(0, 1fr)',
+        gap: spacing.md,
+      }}
+    >
+      {children}
+    </div>
   )
 }
 

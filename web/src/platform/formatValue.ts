@@ -2,6 +2,52 @@ import { isFileValue, type FieldLabel, type FieldValue, type RecordValue } from 
 import { isJsonNumber } from './recordBody'
 import type { FieldMetadata } from './site'
 
+/** Proposed: a date in the locale's short numeric form, such as 18/03/2026, the same in an input and as text. */
+export const dateParts: Intl.DateTimeFormatOptions = { year: 'numeric', month: '2-digit', day: '2-digit' }
+/** `Intl` may put a no-break space before AM or PM. A plain one types the same and reads the same everywhere. */
+function plainSpaces(text: string): string {
+  return text.replace(/[\u00a0\u202f]/g, ' ')
+}
+
+/** Proposed: the time of a date-time, to the minute, in the locale's clock: 9:05 AM in English, 09:05 in Vietnamese. */
+export function timeParts(locale: string): Intl.DateTimeFormatOptions {
+  const twelveHours = ['h11', 'h12'].includes(
+    new Intl.DateTimeFormat(locale, { hour: 'numeric' }).resolvedOptions().hourCycle ?? '',
+  )
+  return { hour: twelveHours ? 'numeric' : '2-digit', minute: '2-digit' }
+}
+
+/** Proposed: a date-time as its date, then its time, in every locale, such as 04/03/2026 09:05. */
+export function formatDateTime(locale: string, date: Date, timeZone?: string): string {
+  const part = (parts: Intl.DateTimeFormatOptions) =>
+    new Intl.DateTimeFormat(locale, { ...parts, timeZone }).format(date)
+  return plainSpaces(`${part(dateParts)} ${part(timeParts(locale))}`)
+}
+
+/** Proposed: the picker format that writes a value exactly as `Intl` does in the locale with these parts. */
+export function pickerFormat(locale: string, parts: Intl.DateTimeFormatOptions): string {
+  const format = new Intl.DateTimeFormat(locale, parts)
+  const twelveHours = ['h11', 'h12'].includes(format.resolvedOptions().hourCycle ?? '')
+  const hour = parts.hour === 'numeric' ? 'h' : 'hh'
+  const tokens: Partial<Record<Intl.DateTimeFormatPartTypes, string>> = {
+    year: 'YYYY',
+    month: 'MM',
+    day: 'DD',
+    hour: twelveHours ? hour : hour.toUpperCase(),
+    minute: 'mm',
+    dayPeriod: 'A',
+  }
+  return format
+    .formatToParts(new Date(Date.UTC(2026, 0, 2, 15, 4)))
+    .map((part) => (part.type === 'literal' ? `[${plainSpaces(part.value)}]` : (tokens[part.type] ?? '')))
+    .join('')
+}
+
+/** Proposed: the picker format of a date-time, its date then its time, as {@link formatDateTime} writes it. */
+export function dateTimePickerFormat(locale: string): string {
+  return `${pickerFormat(locale, dateParts)} ${pickerFormat(locale, timeParts(locale))}`
+}
+
 export interface FormatOptions {
   /** The UI locale, such as `en`. */
   locale: string
@@ -44,6 +90,21 @@ export function moneyCurrency(field: Formatted, row?: Record<string, unknown>): 
 
 // The text keeps every digit, so it is formatted as text. The digits are the field's scale or the
 // digits the API wrote when they are more, so formatting never rounds.
+/**
+ * Proposed: an integer or a decimal in the locale's digit grouping, such as 16,945.75 in English and 16.945,75 in
+ * Vietnamese, with a decimal's scale of digits. It is formatted from its text, so no digit is lost.
+ */
+function numberText(field: Formatted, text: string, locale: string): string {
+  if (!isJsonNumber(text)) {
+    return text
+  }
+  const written = /\.(\d+)/.exec(text)?.[1].length ?? 0
+  const digits = field.type === 'decimal' ? Math.max(field.scale ?? 0, written) : 0
+  return new Intl.NumberFormat(locale, { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(
+    text as Intl.StringNumericLiteral,
+  )
+}
+
 function moneyText(field: Formatted, text: string, locale: string, row?: Record<string, unknown>): string {
   const currency = moneyCurrency(field, row)
   if (currency === null || !isJsonNumber(text)) {
@@ -90,6 +151,9 @@ export function formatValue(
       return text(value === true ? 'shell.table.yes' : 'shell.table.no')
     case 'money':
       return moneyText(field, String(value), locale, row)
+    case 'integer':
+    case 'decimal':
+      return numberText(field, String(value), locale)
     case 'enum':
       return enumLabel(field, String(value), text)
     case 'file':
@@ -101,14 +165,14 @@ export function formatValue(
     case 'date': {
       // A date has no time zone. It is built and formatted in UTC, so it never shifts a day.
       const [year, month, day] = String(value).split('-').map(Number)
-      return new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeZone: 'UTC' }).format(
+      return new Intl.DateTimeFormat(locale, { ...dateParts, timeZone: 'UTC' }).format(
         new Date(Date.UTC(year, month - 1, day)),
       )
     }
     case 'date-time': {
-      // Shown to the second, so the microseconds are dropped before parsing.
+      // Proposed: shown to the minute. The microseconds are dropped before parsing.
       const date = new Date(String(value).replace(/\.\d+(?=Z$)/, ''))
-      return new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'medium', timeZone }).format(date)
+      return formatDateTime(locale, date, timeZone)
     }
     default:
       return String(value)

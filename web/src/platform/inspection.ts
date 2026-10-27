@@ -25,10 +25,14 @@ export const forbidden = 'forbidden'
 export interface InstanceListItem {
   id: string
   subjectId: string
+  /** Proposed: the subject record's display field value, which names the instance. */
+  subjectLabel?: string | null
   state: string
   /** The step the instance runs next, or waits on. */
   step: string
   releaseId: string
+  /** Proposed: the release's number, such as Release 3. */
+  releaseLabel?: string | null
   createdAt: string
   endedAt: string | null
 }

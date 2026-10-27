@@ -1,6 +1,8 @@
-import { Alert, Button, Flex, Table, Typography, type TableColumnsType } from 'antd'
+import { DeleteOutlined, SendOutlined } from '@ant-design/icons'
+import { Alert, Flex, Table, Typography, type TableColumnsType } from 'antd'
 import { useEffect, useMemo, useState } from 'react'
 import { formatValue } from './formatValue'
+import { IconAction } from './IconAction'
 import {
   deadLetterCommands,
   fetchDeadLetters,
@@ -102,13 +104,15 @@ export function DeadLetterList({ deadLettersPath, locale }: DeadLetterListProps)
             {deadLetterCommands
               .filter((command) => item.commands.includes(command))
               .map((command) => (
-                <Button
+                // Proposed: an icon with its name as a tooltip. Discard is destructive, so it is red.
+                <IconAction
                   key={command}
+                  label={t(`shell.inspector.commands.${command}`)}
+                  icon={command === 'discard' ? <DeleteOutlined aria-hidden /> : <SendOutlined aria-hidden />}
+                  danger={command === 'discard'}
                   data-testid={`inspector-dead-letter-${command}-${item.id}`}
                   onClick={() => setOpen({ command, item })}
-                >
-                  {t(`shell.inspector.commands.${command}`)}
-                </Button>
+                />
               ))}
           </Flex>
         ),

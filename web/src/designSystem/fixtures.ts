@@ -102,8 +102,9 @@ export const entity: EntityMetadata = {
 }
 
 /** The entity cut down to one field, so a preview shows only that field's input. */
-export function entityWithField(type: PreviewFieldType, required = false): EntityMetadata {
-  return { ...entity, fields: [{ ...fields[type], required }] }
+export function entityWithField(type: PreviewFieldType, required = false, help = false): EntityMetadata {
+  const helpKey = help ? `${fields[type].labelKey}.help` : null
+  return { ...entity, fields: [{ ...fields[type], required, helpKey }] }
 }
 
 const widgetBase: WidgetMetadata = {
@@ -160,6 +161,26 @@ export const tableWidget: WidgetMetadata = {
       visibleWhen: null,
     },
     { type: 'delete', labelKey: 'request.delete', recordsPath: requestsPath, visibleWhen: null },
+  ],
+}
+
+/** Proposed: the request table with four row actions: Open is the title's link, and the other three fold into "…". */
+export const manyActionsTableWidget: WidgetMetadata = {
+  ...tableWidget,
+  rowActions: [
+    ...tableWidget.rowActions.slice(0, 1),
+    { type: 'startProcess', process: 'Approve', labelKey: 'request.submit', instancesPath, visibleWhen: null },
+    {
+      type: 'navigate',
+      page: 'Request',
+      labelKey: 'request.copy',
+      parameters: {},
+      record: 'id',
+      opensForm: true,
+      paths: {},
+      visibleWhen: null,
+    },
+    ...tableWidget.rowActions.slice(1),
   ],
 }
 
@@ -244,6 +265,52 @@ export const wizardRequestForm = namedForm('WizardRequestForm', [
   { titleKey: 'request.section.details', sections: ['details'] },
 ])
 
+/** Proposed: a form with seven wizard steps, so the step bar shows only the current step's title. */
+export const manyStepsRequestForm = namedForm(
+  'ManyStepsRequestForm',
+  ['general', 'requester', 'items', 'budget', 'delivery', 'approval', 'review'].map((name, at) => ({
+    titleKey: `request.step.${name}`,
+    sections: [at % 2 === 0 ? 'general' : 'details'],
+  })),
+)
+
+/** Proposed: a form whose sections lay their fields out in rows of twelfths. */
+function columnsForm(name: string): EntityWidgetMetadata {
+  return {
+    ...formWidget,
+    form: {
+      name,
+      steps: [],
+      sections: [
+        {
+          name: 'general',
+          titleKey: 'request.section.general',
+          fields: [
+            { name: 'title', readOnly: false, width: 8 },
+            { name: 'status', readOnly: false, width: 4 },
+            { name: 'category', readOnly: false, width: 8 },
+            { name: 'urgent', readOnly: false, width: 4 },
+          ],
+        },
+        {
+          name: 'details',
+          titleKey: 'request.section.details',
+          fields: [
+            { name: 'quantity', readOnly: false, width: 4 },
+            { name: 'amount', readOnly: false, width: 4 },
+            { name: 'neededOn', readOnly: false, width: 4 },
+            { name: 'submittedAt', readOnly: false, width: 6 },
+            { name: 'lines', readOnly: false, width: 12 },
+          ],
+        },
+      ],
+    },
+  }
+}
+
+/** The columns form whose save fails on a field in each of two rows. */
+export const invalidColumnsRequestForm = columnsForm('InvalidColumnsRequestForm')
+
 const noStateAnswer = () => ({ sections: [], fields: {}, errors: {}, defaults: {} })
 
 /** The answers only the validation errors state uses: no state, and a save that fails on two fields. */
@@ -254,6 +321,19 @@ export const invalidFormRoutes: Record<string, () => unknown> = {
       JSON.stringify({
         title: 'Validation failed',
         errors: { '/values/title': ['preview.error.title'], '/values/quantity': ['preview.error.field'] },
+      }),
+      { status: 400, headers: { 'Content-Type': 'application/json' } },
+    ),
+}
+
+/** The answers only the columns state uses: no state, and a save that fails on the title and the amount. */
+export const columnsFormRoutes: Record<string, () => unknown> = {
+  [formStatePath('InvalidColumnsRequestForm')]: noStateAnswer,
+  [`${requestsPath}?form=InvalidColumnsRequestForm`]: () =>
+    new Response(
+      JSON.stringify({
+        title: 'Validation failed',
+        errors: { '/values/title': ['preview.error.title'], '/values/amount': ['preview.error.field'] },
       }),
       { status: 400, headers: { 'Content-Type': 'application/json' } },
     ),
@@ -272,6 +352,7 @@ export const lockedFormRoutes: Record<string, () => unknown> = {
 /** The answers only the wizard state uses: no state, as the steps are the only difference. */
 export const wizardFormRoutes: Record<string, () => unknown> = {
   [formStatePath('WizardRequestForm')]: noStateAnswer,
+  [formStatePath('ManyStepsRequestForm')]: noStateAnswer,
 }
 
 /** The detail widget over a record whose values are all empty, so the Lines table has no rows. */
@@ -339,10 +420,11 @@ const requestTotals: DataSourceMetadata = {
   columns: [
     { name: 'requests', type: 'integer', labelKey: null, values: null, target: null },
     { name: 'amountSum', type: 'decimal', labelKey: null, values: null, target: null },
+    { name: 'lastMonthAmountSum', type: 'decimal', labelKey: null, values: null, target: null },
   ],
 }
 
-/** A kpi tile of the total amount, with the request count as its comparison and no navigate action. */
+/** A kpi tile of the total amount, with last month's total as its comparison and no navigate action. */
 export const kpiWidget: WidgetMetadata = {
   ...widgetBase,
   type: 'kpi',
@@ -350,7 +432,8 @@ export const kpiWidget: WidgetMetadata = {
   kpi: {
     measure: 'amountSum',
     labelKey: 'kpi.amount',
-    comparison: { measure: 'requests', labelKey: 'kpi.requests' },
+    // Proposed: a comparison is a reference for the measure itself, here last month's total.
+    comparison: { measure: 'lastMonthAmountSum', labelKey: 'kpi.lastMonth' },
     navigate: null,
   },
 }
@@ -426,7 +509,11 @@ const recordPage: RecordPage = {
   items: [
     savedRecord,
     savedRequest('7a2d3b4c-5e6f-4a71-9b82-a3c4d5e6f708', 'Replacement laptop chargers', 'approved'),
-    savedRequest('8b3e4c5d-6f70-4b82-8c93-b4d5e6f70819', 'Whiteboard markers', 'draft'),
+    // Proposed: a draft that is not yet submitted and needs no date, so the table shows how an empty cell reads.
+    (() => {
+      const draft = savedRequest('8b3e4c5d-6f70-4b82-8c93-b4d5e6f70819', 'Whiteboard markers', 'draft')
+      return { ...draft, values: { ...draft.values, neededOn: null, submittedAt: null } }
+    })(),
     savedRequest(
       '5e6f7a8b-9c0d-4e1f-8a2b-3c4d5e6f7a8b',
       'Replace the worn carpet tiles on the third floor, the meeting room chairs and the kitchen lights before the April safety audit and the board visit',
@@ -498,27 +585,33 @@ const instancePage: InstancePage = {
     {
       id: '0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d',
       subjectId: '5e6f7a8b-9c0d-4e1f-8a2b-3c4d5e6f7a8b',
+      subjectLabel: 'Replace the worn carpet tiles',
       state: 'failed',
       step: 'Notify',
       releaseId,
+      releaseLabel: 'Release 3',
       createdAt: '2026-03-05T10:00:00.000000Z',
       endedAt: '2026-03-05T10:20:00.000000Z',
     },
     {
       id: 'be6b7f80-92a3-4eb5-bfc6-e708192a3b4c',
       subjectId: requestId,
+      subjectLabel: 'Standing desks for the new office',
       state: 'waiting',
       step: 'Review',
       releaseId,
+      releaseLabel: 'Release 3',
       createdAt: '2026-03-04T09:31:00.000000Z',
       endedAt: null,
     },
     {
       id: 'cf7c8091-a3b4-4fc6-80d7-f8192a3b4c5d',
       subjectId: '7a2d3b4c-5e6f-4a71-9b82-a3c4d5e6f708',
+      subjectLabel: 'Replacement laptop chargers',
       state: 'completed',
       step: 'Done',
       releaseId,
+      releaseLabel: 'Release 3',
       createdAt: '2026-03-02T11:15:00.000000Z',
       endedAt: '2026-03-03T08:40:00.000000Z',
     },
@@ -583,7 +676,7 @@ const requestTotalsPage: RecordPage = {
     {
       id: '4d5e6f70-8b9c-4d0e-8f2a-3b4c5d6e7f80',
       version: 1,
-      values: { requests: '23', amountSum: '16945.75' },
+      values: { requests: '23', amountSum: '16945.75', lastMonthAmountSum: '15210.00' },
       labels: {},
     },
   ],
@@ -604,6 +697,15 @@ export const siteTexts: Record<string, string> = {
   'request.status': 'Status',
   'request.category': 'Category',
   'request.lines': 'Lines',
+  'request.title.help': 'A short name the approver sees in their inbox.',
+  'request.quantity.help': 'Whole units, such as 3 boxes.',
+  'request.amount.help': 'In the request currency, before tax.',
+  'request.urgent.help': 'Approvers see urgent requests first.',
+  'request.neededOn.help': 'The last date the items are still useful.',
+  'request.submittedAt.help': 'When the request was sent for approval.',
+  'request.status.help': 'Changes as the request moves through approval.',
+  'request.category.help': 'The category decides who approves the request.',
+  'request.lines.help': 'One row for each item you need.',
   'requestLine.description': 'Description',
   'requestLine.quantity': 'Quantity',
   'requestLine.unitPrice': 'Unit price',
@@ -611,9 +713,17 @@ export const siteTexts: Record<string, string> = {
   'requestLine.category': 'Category',
   'request.section.general': 'General',
   'request.section.details': 'Details',
+  'request.step.general': 'General',
+  'request.step.requester': 'Requester',
+  'request.step.items': 'Items',
+  'request.step.budget': 'Budget',
+  'request.step.delivery': 'Delivery',
+  'request.step.approval': 'Approval',
+  'request.step.review': 'Review and submit',
   'request.new': 'New request',
   'request.open': 'Open',
   'request.delete': 'Delete',
+  'request.copy': 'Copy',
   'request.submit': 'Submit for approval',
   'request.task.review': 'Review the request',
   'chart.requestsByStatus': 'Requests by status',
@@ -621,6 +731,7 @@ export const siteTexts: Record<string, string> = {
   'chart.urgentRequests': 'Urgent requests',
   'kpi.amount': 'Total amount',
   'kpi.requests': 'Requests',
+  'kpi.lastMonth': 'Last month',
   'preview.requests': 'Requests',
   'preview.tasks': 'Tasks',
   'preview.error.field': 'This value is not valid.',

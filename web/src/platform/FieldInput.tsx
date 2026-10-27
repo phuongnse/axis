@@ -2,7 +2,7 @@ import { Checkbox, DatePicker, Input, Select, Space } from 'antd'
 import dayjs from 'dayjs'
 import type { CSSProperties, KeyboardEvent } from 'react'
 import { FileInput } from './FileInput'
-import { enumLabel } from './formatValue'
+import { enumLabel, dateParts, dateTimePickerFormat, pickerFormat, timeParts } from './formatValue'
 import { isFileValue, type RecordValue } from './records'
 import type { FieldMetadata } from './site'
 import { useText } from './texts'
@@ -17,6 +17,8 @@ interface FieldInputProps {
   ariaLabel?: string
   /** The input's style, such as a fixed width where the layout gives it none. */
   style?: CSSProperties
+  /** Proposed: the locale whose short numeric form a date or date-time picker shows. Left out, the browser's. */
+  locale?: string
   /** The currency code of a money field, shown beside the box. Left out, nothing is shown. */
   currency?: string | null
 }
@@ -52,7 +54,16 @@ function outsideRange(value: RecordValue, field: FieldMetadata) {
 }
 
 /** The input for one value of a field, the same in the form and in a child collection's cells. */
-export function FieldInput({ field, value, onChange, id, ariaLabel, style, currency }: FieldInputProps) {
+export function FieldInput({
+  field,
+  value,
+  onChange,
+  id,
+  ariaLabel,
+  style,
+  locale = navigator.language,
+  currency,
+}: FieldInputProps) {
   const t = useText()
   const text = (event: { target: { value: string } }) => onChange(event.target.value || null)
   switch (field.type) {
@@ -119,7 +130,9 @@ export function FieldInput({ field, value, onChange, id, ariaLabel, style, curre
         <DatePicker
           id={id}
           aria-label={ariaLabel}
-          style={style}
+          // Proposed: a picker fills its column, as every other input does.
+          style={{ width: '100%', ...style }}
+          format={pickerFormat(locale, dateParts)}
           minDate={field.min === null ? undefined : dayjs(field.min)}
           maxDate={field.max === null ? undefined : dayjs(field.max)}
           placeholder={rangeText(field.min, field.max)}
@@ -133,9 +146,10 @@ export function FieldInput({ field, value, onChange, id, ariaLabel, style, curre
         <DatePicker
           id={id}
           aria-label={ariaLabel}
-          style={style}
-          showTime
-          format="YYYY-MM-DD HH:mm:ss"
+          // Proposed: a picker fills its column, as every other input does.
+          style={{ width: '100%', ...style }}
+          showTime={{ format: pickerFormat(locale, timeParts(locale)) }}
+          format={dateTimePickerFormat(locale)}
           minDate={field.min === null ? undefined : dateTimeValue(field.min)!}
           maxDate={field.max === null ? undefined : dateTimeValue(field.max)!}
           placeholder={rangeText(field.min, field.max)}

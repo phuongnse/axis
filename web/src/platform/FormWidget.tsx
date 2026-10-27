@@ -12,6 +12,7 @@ import { newIdempotencyKey, startProcess } from './processes'
 import { fetchRecord, saveRecord, type RecordItem, type RecordProblem } from './records'
 import type { EntityWidgetMetadata, NavigateAction, StartProcessAction } from './site'
 import { useText } from './texts'
+import { useDesignTokens } from './themeMode'
 import { useFormSteps } from './useFormSteps'
 import { sectionsOf, useRecordForm } from './useRecordForm'
 
@@ -60,6 +61,7 @@ type LoadState = 'loading' | 'ready' | 'missing' | 'failed'
  */
 export function FormWidget({ widget, sitePath, pages, recordId, returnTo, locale }: FormWidgetProps) {
   const t = useText()
+  const { colour } = useDesignTokens()
   const navigate = useNavigate()
   const location = useLocation()
   const canvas = useCanvasActions()
@@ -315,6 +317,11 @@ export function FormWidget({ widget, sitePath, pages, recordId, returnTo, locale
                 .map((action) => (
                   <Button
                     key={action.instancesPath}
+                    // Proposed: a process action is tinted, next to Save, the one primary button.
+                    color="primary"
+                    variant="outlined"
+                    // Proposed: the second level of button, outlined in primaryText, which reads on either theme.
+                    style={{ color: colour.primaryText, borderColor: colour.primaryText }}
                     htmlType="button"
                     disabled={saving || starting}
                     onClick={() => void runAction(action)}

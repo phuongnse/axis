@@ -70,6 +70,8 @@ export interface FieldMetadata {
   name: string
   type: FieldType
   labelKey: string | null
+  /** Proposed: the text key of a short hint shown between the label and the input. */
+  helpKey?: string | null
   required: boolean
   unique: boolean
   /** The server computes the value on every write. The form shows it read-only and never sends it. */
@@ -164,6 +166,8 @@ export interface DataSourceMetadata {
 export interface FormFieldMetadata {
   name: string
   readOnly: boolean
+  /** Proposed: the field's width in twelfths of its section, 12 when left out. */
+  width?: number
   /** The element's JSON Pointer in the draft. Only the draft page metadata route sets it. */
   path?: string
 }

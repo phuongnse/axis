@@ -1,6 +1,7 @@
 import { ConfigProvider } from 'antd'
 import { useMemo, useSyncExternalStore, type ReactNode } from 'react'
 import { antThemeFor } from '../platform/antTheme'
+import { formConfig } from '../platform/requiredMark'
 import { designTokensFor, pageTokenPropertyNames, type PageTokenValues } from '../platform/designTokens'
 import { ThemeModeContext, type ThemeMode } from '../platform/themeMode'
 
@@ -48,7 +49,9 @@ export function PageTheme({ children }: { children: ReactNode }) {
 
   return (
     <ThemeModeContext.Provider value={value}>
-      <ConfigProvider theme={config}>{children}</ConfigProvider>
+      <ConfigProvider theme={config} form={formConfig}>
+        {children}
+      </ConfigProvider>
     </ThemeModeContext.Provider>
   )
 }

@@ -1,4 +1,4 @@
-import { Alert, Button, Descriptions, Flex, Tag, Typography } from 'antd'
+import { Alert, Button, Flex, Tag, Typography } from 'antd'
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import { NotFoundPage } from '../pages/NotFoundPage'
@@ -19,6 +19,10 @@ import {
 } from './records'
 import type { EntityWidgetMetadata, NavigateAction, StartProcessAction } from './site'
 import { useText } from './texts'
+import { ReadOnlyValue } from './ReadOnlyValue'
+import { FieldLabel as LabelText } from './FieldGrid'
+import { useDesignTokens } from './themeMode'
+import { FieldCell, FieldGrid } from './FieldGrid'
 import { sectionsOf } from './useRecordForm'
 
 interface DetailWidgetProps {
@@ -53,6 +57,7 @@ const rowLabelsOf = (label: FieldLabel | undefined) => (Array.isArray(label) ? (
  */
 export function DetailWidget({ widget, sitePath, recordId, locale }: DetailWidgetProps) {
   const t = useText()
+  const { colour, spacing } = useDesignTokens()
   const navigate = useNavigate()
   const location = useLocation()
   const canvas = useCanvasActions()
@@ -161,6 +166,10 @@ export function DetailWidget({ widget, sitePath, recordId, locale }: DetailWidge
     ...startActions.map((action) => (
       <Button
         key={action.instancesPath}
+        // Proposed: a process action is the region's main action, outlined in primaryText as on a form.
+        color="primary"
+        variant="outlined"
+        style={{ color: colour.primaryText, borderColor: colour.primaryText }}
         disabled={starting}
         onClick={() => void runAction(action)}
         {...canvas.props(`actions/${widget.actions.indexOf(action)}`)}
@@ -196,38 +205,45 @@ export function DetailWidget({ widget, sitePath, recordId, locale }: DetailWidge
       {sections.map((section, index) => (
         <Fragment key={index}>
           {section.titleKey !== null && <Typography.Title level={5}>{t(section.titleKey)}</Typography.Title>}
-          <Descriptions
-            column={1}
-            items={section.fields.map(({ field }) => {
+          {/* Proposed: a description list, each label above its value as on a read-only form, spacing-md apart. The
+              label's 5px keeps its value 6px below it, as on a form. */}
+          <FieldGrid as="dl" rowGap={spacing.md}>
+            {section.fields.map(({ field, width }) => {
               const value = record.values[field.name] ?? null
-              return {
-                key: field.name,
-                label: field.labelKey ? t(field.labelKey) : field.name,
-                children:
-                  field.type === 'child-collection' ? (
-                    <ChildCollectionTable
-                      readOnly
-                      field={field}
-                      rows={Array.isArray(value) ? (value as RecordRow[]) : noRows}
-                      labels={rowLabelsOf(record.labels[field.name])}
-                      onChange={() => {}}
-                      errors={{}}
-                      locale={locale}
-                    />
-                  ) : field.type === 'references' ? (
-                    <Flex wrap gap="small" data-testid={`detail-references-${field.name}`}>
-                      {referencesLabels(record.values[field.name], record.labels[field.name]).map((label, index) => (
-                        <Tag key={index}>{label}</Tag>
-                      ))}
-                    </Flex>
-                  ) : field.type === 'file' && isFileValue(value) ? (
-                    <FileLink field={field} value={value} />
-                  ) : (
-                    formatValue(field, value as RecordValue, record.labels, { locale, text: t }, record.values)
-                  ),
-              }
+              return (
+                <FieldCell key={field.name} width={width}>
+                  <dt style={{ marginBottom: 5 }}>
+                    <LabelText label={field.labelKey ? t(field.labelKey) : field.name} required={false} />
+                  </dt>
+                  <dd style={{ margin: 0 }}>
+                    {field.type === 'child-collection' ? (
+                      <ChildCollectionTable
+                        readOnly
+                        field={field}
+                        rows={Array.isArray(value) ? (value as RecordRow[]) : noRows}
+                        labels={rowLabelsOf(record.labels[field.name])}
+                        onChange={() => {}}
+                        errors={{}}
+                        locale={locale}
+                      />
+                    ) : field.type === 'references' ? (
+                      <Flex wrap gap="small" data-testid={`detail-references-${field.name}`}>
+                        {referencesLabels(record.values[field.name], record.labels[field.name]).map((label, index) => (
+                          <Tag key={index}>{label}</Tag>
+                        ))}
+                      </Flex>
+                    ) : field.type === 'file' && isFileValue(value) ? (
+                      <FileLink field={field} value={value} />
+                    ) : (
+                      <ReadOnlyValue compact>
+                        {formatValue(field, value as RecordValue, record.labels, { locale, text: t }, record.values)}
+                      </ReadOnlyValue>
+                    )}
+                  </dd>
+                </FieldCell>
+              )
             })}
-          />
+          </FieldGrid>
         </Fragment>
       ))}
       {buttons.length > 0 && <Flex gap="small">{buttons}</Flex>}

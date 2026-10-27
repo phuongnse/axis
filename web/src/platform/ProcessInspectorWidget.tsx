@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { DeadLetterList } from './DeadLetterList'
 import { formatValue } from './formatValue'
+import { EmptyValue } from './ReadOnlyValue'
 import {
   fetchInstances,
   forbidden,
@@ -117,6 +118,14 @@ export function ProcessInspectorWidget({ sitePath, pageName, widget, locale }: P
 
   const columns = useMemo<TableColumnsType<InstanceListItem>>(
     () => [
+      // Proposed: the instance's record names it and opens it, first, instead of an Open link and a record id.
+      {
+        key: 'subject',
+        title: t('shell.inspector.subject'),
+        render: (_value: unknown, instance: InstanceListItem) => (
+          <Link to={`${instancePath}/${instance.id}`}>{instance.subjectLabel ?? t('shell.inspector.open')}</Link>
+        ),
+      },
       {
         key: 'state',
         title: t('shell.inspector.state'),
@@ -124,14 +133,10 @@ export function ProcessInspectorWidget({ sitePath, pageName, widget, locale }: P
       },
       { key: 'step', title: t('shell.inspector.step'), render: (_value: unknown, instance) => instance.step },
       {
-        key: 'subject',
-        title: t('shell.inspector.subject'),
-        render: (_value: unknown, instance) => instance.subjectId,
-      },
-      {
         key: 'release',
         title: t('shell.inspector.release'),
-        render: (_value: unknown, instance) => instance.releaseId,
+        // Proposed: the release's number, never its id.
+        render: (_value: unknown, instance) => instance.releaseLabel ?? '',
       },
       {
         key: 'createdAt',
@@ -141,13 +146,9 @@ export function ProcessInspectorWidget({ sitePath, pageName, widget, locale }: P
       {
         key: 'endedAt',
         title: t('shell.inspector.endedAt'),
-        render: (_value: unknown, instance) => formatValue(endedAtField, instance.endedAt, {}, { locale, text: t }),
-      },
-      {
-        key: 'open',
-        render: (_value: unknown, instance) => (
-          <Link to={`${instancePath}/${instance.id}`}>{t('shell.inspector.open')}</Link>
-        ),
+        // Proposed: a running instance has no end, which reads as a muted dash.
+        render: (_value: unknown, instance) =>
+          formatValue(endedAtField, instance.endedAt, {}, { locale, text: t }) || <EmptyValue cell />,
       },
     ],
     [locale, t, instancePath],

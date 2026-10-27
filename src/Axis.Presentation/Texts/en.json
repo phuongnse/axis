@@ -35,6 +35,8 @@
   "shell.notFound.home": "Go to the home page",
   "shell.table.yes": "Yes",
   "shell.table.no": "No",
+  "shell.table.refresh": "Refresh",
+  "shell.value.notSet": "Not set",
   "shell.table.empty": "No records yet.",
   "shell.table.loadFailed": "The records could not be loaded.",
   "shell.table.search": "Search",

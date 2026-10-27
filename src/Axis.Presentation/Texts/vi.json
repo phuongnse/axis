@@ -35,6 +35,8 @@
   "shell.notFound.home": "Về trang chủ",
   "shell.table.yes": "Có",
   "shell.table.no": "Không",
+  "shell.table.refresh": "Làm mới",
+  "shell.value.notSet": "Chưa có",
   "shell.table.empty": "Chưa có bản ghi nào.",
   "shell.table.loadFailed": "Không thể tải bản ghi.",
   "shell.table.search": "Tìm kiếm",

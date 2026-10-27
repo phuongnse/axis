@@ -23,11 +23,14 @@ import {
   failingRoutes,
   failingTableWidget,
   fields,
+  columnsFormRoutes,
+  invalidColumnsRequestForm,
   invalidFormRoutes,
   invalidRequestForm,
   kpiWidget,
   lockedFormRoutes,
   lockedRequestForm,
+  manyActionsTableWidget,
   loadingRoutes,
   loadingTableWidget,
   noRowsPath,
@@ -41,6 +44,7 @@ import {
   tableWidget,
   tabsWidget,
   taskInboxWidget,
+  manyStepsRequestForm,
   wizardFormRoutes,
   wizardRequestForm,
 } from './fixtures'
@@ -108,14 +112,16 @@ function requestForm(widget: EntityWidgetMetadata, recordId: string | null): Rea
   )
 }
 
-/** The states of a field's preview: typical, required, read-only, and a validation error under the input. */
+/** The states of a field's preview: editable, read-only, and every part around the input at once. */
 function fieldStates(type: PreviewFieldType): readonly PreviewState[] {
   const problem = { [`/values/${fields[type].name}`]: ['preview.error.field'] }
   return [
-    { caption: 'Typical', draw: () => <FieldPreview type={type} /> },
-    { caption: 'Required', draw: () => <FieldPreview type={type} required /> },
+    { caption: 'Editable', draw: () => <FieldPreview type={type} /> },
     { caption: 'Read-only', draw: () => <FieldPreview type={type} readOnly /> },
-    { caption: 'Validation error', draw: () => <FieldPreview type={type} problem={problem} /> },
+    {
+      caption: 'Required, help text and error',
+      draw: () => <FieldPreview type={type} required help problem={problem} />,
+    },
   ]
 }
 
@@ -131,10 +137,13 @@ const childCollectionStates: readonly PreviewState[] = [
 
 /** What a preview draws: its states, each the shared widget component over fixture metadata. */
 export const previews: Record<string, readonly PreviewState[]> = {
-  table: withAndWithoutData(
-    () => requestTable(tableWidget),
-    () => requestTable(emptyTableWidget),
-  ),
+  table: [
+    ...withAndWithoutData(
+      () => requestTable(tableWidget),
+      () => requestTable(emptyTableWidget),
+    ),
+    { caption: 'Many row actions', draw: () => requestTable(manyActionsTableWidget) },
+  ],
   form: [
     {
       caption: 'Validation errors',
@@ -146,7 +155,13 @@ export const previews: Record<string, readonly PreviewState[]> = {
       draw: () => requestForm(lockedRequestForm, requestId),
       routes: lockedFormRoutes,
     },
+    {
+      caption: 'Fields in columns, with errors',
+      draw: () => <SubmittedOnMount>{requestForm(invalidColumnsRequestForm, null)}</SubmittedOnMount>,
+      routes: columnsFormRoutes,
+    },
     { caption: 'Wizard steps', draw: () => requestForm(wizardRequestForm, requestId), routes: wizardFormRoutes },
+    { caption: 'Many steps', draw: () => requestForm(manyStepsRequestForm, requestId) },
   ],
   taskInbox: withAndWithoutData(
     () => inbox(taskInboxWidget),
