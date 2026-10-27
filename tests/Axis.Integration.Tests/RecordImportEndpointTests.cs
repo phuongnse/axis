@@ -532,7 +532,9 @@ public sealed class RecordImportEndpointTests(RecordApiFixture fixture) : IClass
         await ResetAsync();
         var old = await UploadAsync(fixture.Client, Tickets, "title,code\nPrinter,p1\n");
         var fresh = await UploadAsync(fixture.Client, Tickets, "title,code\nScanner,s1\n");
-        await RunChecksAsync();
+        Assert.Equal(2, await RunChecksAsync());
+        Assert.Equal("checked", await StateAsync(old.Id, Tickets));
+        Assert.Equal("checked", await StateAsync(fresh.Id, Tickets));
         await BackdateAsync(old.Id);
 
         Assert.Equal(1, await ClearExpiredFilesAsync());
