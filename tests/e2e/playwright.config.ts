@@ -8,6 +8,7 @@ import {
   purchaseRequests,
   serverEnv,
   serviceDesk,
+  subprocessApp,
 } from './server-settings'
 
 const port = Number(process.env.AXIS_E2E_PORT ?? 5280)
@@ -27,6 +28,7 @@ const environment = {
   ActivateOnStartup__2: leaveRequests,
   ActivateOnStartup__3: serviceDesk,
   ActivateOnStartup__4: assetManagement,
+  ActivateOnStartup__5: subprocessApp,
 }
 const isShellName = (name: string) => /^[A-Za-z_][A-Za-z0-9_]*$/.test(name)
 const hyphenated = Object.entries(environment).filter(([name]) => !isShellName(name))

@@ -24,7 +24,8 @@ export const forbidden = 'forbidden'
 /** An instance in the list of a process's instances. `endedAt` is `null` until it is completed or failed. */
 export interface InstanceListItem {
   id: string
-  subjectId: string
+  /** The subject the instance runs for, or `null` when its process has no subject. */
+  subjectId: string | null
   state: string
   /** The step the instance runs next, or waits on. */
   step: string
@@ -121,11 +122,33 @@ export interface InstanceCall {
   outputs?: CallOutput[]
 }
 
-/** One instance of a process, the graph of the release it is pinned to, its path, its tasks and its calls. */
+/** The instance that started this one, with the sub-process step of the parent that did so. */
+export interface InstanceParent {
+  id: string
+  process: string
+  step: string
+}
+
+/** An instance that a sub-process step of this instance started. `endedAt` is `null` until it ends. */
+export interface SubProcess {
+  id: string
+  process: string
+  /** The sub-process step of this instance that started the child. */
+  step: string
+  state: string
+  createdAt: string
+  endedAt: string | null
+}
+
+/**
+ * One instance of a process, the graph of the release it is pinned to, its path, its tasks and its calls.
+ * `parent` and `subProcesses` name only the instances whose process the user may inspect.
+ */
 export interface InstanceDetail {
   id: string
   process: string
-  subjectId: string
+  /** The subject the instance runs for, or `null` when its process has no subject. */
+  subjectId: string | null
   releaseId: string
   state: string
   step: string
@@ -135,8 +158,29 @@ export interface InstanceDetail {
   path: PathEntry[]
   tasks: InstanceTask[]
   calls: InstanceCall[]
+  parent: InstanceParent | null
+  subProcesses: SubProcess[]
   /** The operator commands the signed-in user may take on the instance now, such as `cancel` and `retry`. */
   commands: string[]
+}
+
+/**
+ * When the timer the instance waits at fires, or `null` when the instance is not waiting at a timer
+ * step. The time is the `dueAt` of the step's latest history entry.
+ */
+export function timerDueAt(instance: InstanceDetail): string | null {
+  if (
+    instance.state !== 'waiting' ||
+    instance.graph.steps.find((step) => step.name === instance.step)?.type !== 'timer'
+  ) {
+    return null
+  }
+  const entry = instance.path.findLast((candidate) => candidate.step === instance.step)
+  const output = entry?.output
+  if (typeof output !== 'object' || output === null || !('dueAt' in output)) {
+    return null
+  }
+  return typeof output.dueAt === 'string' ? output.dueAt : null
 }
 
 /** The operator commands the instance page offers. */

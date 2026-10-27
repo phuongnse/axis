@@ -3,12 +3,12 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { historySummary } from './historySummary'
 import { inspectTarget } from './inspection'
+import { inspectorPath, useInspectorPages } from './inspectorPages'
 import { markCurrentPage } from './pagination'
 import { fetchHistory, historyPageSize, type HistoryItem, type HistoryPage } from './records'
-import { fetchPage, type FieldMetadata } from './site'
+import type { FieldMetadata } from './site'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
-import { leafWidgets } from './widgetTree'
 
 interface RecordHistoryProps {
   /** The path of the application site the form is on, for the links to its inspector pages. */
@@ -61,8 +61,6 @@ export function RecordHistory({ sitePath, pages, recordsPath, recordId, fields, 
   const { colour, spacing } = useDesignTokens()
   const [page, setPage] = useState(1)
   const [state, setState] = useState<LoadState>({ failed: false })
-  // The inspector page of each process, once loaded.
-  const [inspectors, setInspectors] = useState<ReadonlyMap<string, string>>()
   const loading = state.page !== page
   const failed = state.failed && !loading
 
@@ -80,32 +78,7 @@ export function RecordHistory({ sitePath, pages, recordsPath, recordId, fields, 
   }, [recordsPath, recordId, page])
 
   const wantsLinks = state.result?.items.some((item) => typeof item.inspectPath === 'string') ?? false
-  const inspectorsLoaded = inspectors !== undefined
-
-  useEffect(() => {
-    if (!wantsLinks || inspectorsLoaded) {
-      return
-    }
-    const controller = new AbortController()
-    void Promise.allSettled(pages.map((name) => fetchPage(sitePath, name, controller.signal))).then((results) => {
-      if (controller.signal.aborted) {
-        return
-      }
-      const found = new Map<string, string>()
-      results.forEach((result, index) => {
-        if (result.status === 'rejected') {
-          console.warn(`Loading the page '${pages[index]}' for the history links failed`, result.reason)
-          return
-        }
-        const widget = leafWidgets(result.value?.widgets ?? []).find((leaf) => leaf.type === 'processInspector')
-        if (widget?.process && !found.has(widget.process)) {
-          found.set(widget.process, pages[index])
-        }
-      })
-      setInspectors(found)
-    })
-    return () => controller.abort()
-  }, [wantsLinks, inspectorsLoaded, sitePath, pages])
+  const inspectors = useInspectorPages(sitePath, pages, wantsLinks)
 
   const time = new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'medium' })
   const items = state.result?.items ?? []
@@ -143,7 +116,7 @@ export function RecordHistory({ sitePath, pages, recordsPath, recordId, fields, 
                       </Typography.Text>
                       {target !== null && inspectorPage !== undefined && (
                         <Link
-                          to={`/${sitePath}/${inspectorPage.toLowerCase()}/${target.instanceId}`}
+                          to={inspectorPath(sitePath, inspectorPage, target.instanceId)}
                           data-testid="history-inspect-link"
                         >
                           {t('shell.history.openInstance')}

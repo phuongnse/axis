@@ -1,0 +1,12 @@
+{
+  "id": "20af9dbd-ddf2-472b-8952-6514b8be0b65",
+  "kind": "process",
+  "name": "ChildJob",
+  "formatVersion": 1,
+  "parameters": [{ "name": "label", "type": "text" }],
+  "start": "wait",
+  "steps": [
+    { "name": "wait", "type": "timer", "wait": "PT24H", "next": "done" },
+    { "name": "done", "type": "end" }
+  ]
+}

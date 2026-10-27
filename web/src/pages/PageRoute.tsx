@@ -125,6 +125,7 @@ function SitePage({ sitePath, pages, name, locale, fallbackLocale, form, recordI
       <PageLayout title={t(page.titleKey)}>
         <ProcessInstancePage
           sitePath={sitePath}
+          pages={pages}
           widget={processInspector}
           instanceId={recordId}
           locale={locale}

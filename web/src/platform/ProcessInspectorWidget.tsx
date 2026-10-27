@@ -126,7 +126,7 @@ export function ProcessInspectorWidget({ sitePath, pageName, widget, locale }: P
       {
         key: 'subject',
         title: t('shell.inspector.subject'),
-        render: (_value: unknown, instance) => instance.subjectId,
+        render: (_value: unknown, instance) => instance.subjectId ?? t('shell.inspector.noSubject'),
       },
       {
         key: 'release',

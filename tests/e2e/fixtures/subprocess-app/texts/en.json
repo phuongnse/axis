@@ -1,0 +1,15 @@
+{
+  "id": "2511c7cb-6962-4db0-b2e7-13401c9d2f77",
+  "kind": "text",
+  "name": "TextsEn",
+  "formatVersion": 1,
+  "locale": "en",
+  "texts": {
+    "site.title": "Sub-process app",
+    "nav.parents": "Parents",
+    "nav.children": "Children",
+    "pages.parents.title": "Parent jobs",
+    "pages.children.title": "Child jobs",
+    "role.operator": "Operator"
+  }
+}

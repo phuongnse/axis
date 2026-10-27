@@ -1,5 +1,6 @@
 import { Alert, Button, Descriptions, Empty, Flex, Table, Tag, Typography, type TableColumnsType } from 'antd'
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router'
 import { formatValue } from './formatValue'
 import {
   fetchInstance,
@@ -8,13 +9,16 @@ import {
   retryWarns,
   sendCommand,
   stateText,
+  timerDueAt,
   type CallAttempt,
   type InstanceCommand,
   type InstanceCall,
   type InstanceDetail,
   type InstanceTask,
   type PathEntry,
+  type SubProcess,
 } from './inspection'
+import { inspectorPath, useInspectorPages } from './inspectorPages'
 import { ReasonDialog } from './ReasonDialog'
 import { ResolveDialog } from './ResolveDialog'
 import type { WidgetMetadata } from './site'
@@ -25,6 +29,8 @@ import { useReleaseTexts } from './useReleaseTexts'
 
 interface ProcessInstancePageProps {
   sitePath: string
+  /** The names of the site's navigation pages, in navigation order, for the links to other inspector pages. */
+  pages: readonly string[]
   /** The process inspector widget of the page the instance's address is under. */
   widget: WidgetMetadata
   instanceId: string
@@ -41,8 +47,10 @@ const dateTime = (name: string) => ({ name, type: 'date-time' }) as const
 
 /**
  * Shows one instance under the page of its process inspector: its state and step, the steps of
- * the release it is pinned to with the path marked, the history, the tasks, and the calls with their
- * attempts. A step the path holds is marked as taken, and the step the instance is at is marked as
+ * the release it is pinned to with the path marked, the history, the tasks, the calls with their
+ * attempts and the sub-processes. An instance that waits at a timer shows when it is due. The parent
+ * and each sub-process link to their instance on the first navigation page whose process inspector
+ * names their process, and show without a link when there is none. A step the path holds is marked as taken, and the step the instance is at is marked as
  * current. A call whose input is hidden shows the fixed "hidden" text and no value.
  *
  * Step labels come from the texts of the instance's release, then the site texts and the platform
@@ -51,6 +59,7 @@ const dateTime = (name: string) => ({ name, type: 'date-time' }) as const
  */
 export function ProcessInstancePage({
   sitePath,
+  pages,
   widget,
   instanceId,
   locale,
@@ -68,6 +77,9 @@ export function ProcessInstancePage({
     () => (releaseCatalog ? [releaseCatalog, ...outer.catalogs] : outer.catalogs),
     [releaseCatalog, outer.catalogs],
   )
+
+  const hasRelatives = isInstanceDetail(instance) && (instance.parent !== null || instance.subProcesses.length > 0)
+  const inspectors = useInspectorPages(sitePath, pages, hasRelatives)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -111,7 +123,14 @@ export function ProcessInstancePage({
 
   return (
     <TextProvider catalogs={catalogs} development={outer.development}>
-      <InstanceBody instance={instance} instancesPath={instancesPath} locale={locale} onChanged={reload} />
+      <InstanceBody
+        instance={instance}
+        instancesPath={instancesPath}
+        sitePath={sitePath}
+        inspectors={inspectors}
+        locale={locale}
+        onChanged={reload}
+      />
     </TextProvider>
   )
 }
@@ -134,13 +153,16 @@ function inputEntries(input: unknown): [string, string][] {
 interface InstanceBodyProps {
   instance: InstanceDetail
   instancesPath: string
+  sitePath: string
+  /** The inspector page of each process, once loaded. */
+  inspectors: ReadonlyMap<string, string> | undefined
   locale: string
   /** Called after a command was accepted, so the page reads the instance again. */
   onChanged: () => void
 }
 
 /** The sections of an instance. It reads the release texts. */
-function InstanceBody({ instance, instancesPath, locale, onChanged }: InstanceBodyProps) {
+function InstanceBody({ instance, instancesPath, sitePath, inspectors, locale, onChanged }: InstanceBodyProps) {
   const t = useText()
   const { colour, spacing } = useDesignTokens()
   const rowStyle = { paddingBlock: spacing.sm, borderBlockEnd: `1px solid ${colour.divider}` }
@@ -153,6 +175,9 @@ function InstanceBody({ instance, instancesPath, locale, onChanged }: InstanceBo
     return labelKey ? t(labelKey) : name
   }
   const time = (name: string, value: string | null) => formatValue(dateTime(name), value, {}, { locale, text: t })
+
+  const due = timerDueAt(instance)
+  const parentPage = instance.parent === null ? undefined : inspectors?.get(instance.parent.process)
 
   const historyColumns: TableColumnsType<PathEntry> = [
     { key: 'step', title: t('shell.inspector.step'), render: (_v: unknown, row) => stepLabel(row.step) },
@@ -212,6 +237,33 @@ function InstanceBody({ instance, instancesPath, locale, onChanged }: InstanceBo
     { key: 'error', title: t('shell.inspector.error'), render: (_v: unknown, row) => row.error ?? '' },
   ]
 
+  const subProcessColumns: TableColumnsType<SubProcess> = [
+    { key: 'process', title: t('shell.inspector.process'), render: (_v: unknown, row) => row.process },
+    { key: 'step', title: t('shell.inspector.step'), render: (_v: unknown, row) => stepLabel(row.step) },
+    { key: 'state', title: t('shell.inspector.state'), render: (_v: unknown, row) => stateText(t, row.state) },
+    {
+      key: 'createdAt',
+      title: t('shell.inspector.createdAt'),
+      render: (_v: unknown, row) => time('createdAt', row.createdAt),
+    },
+    {
+      key: 'endedAt',
+      title: t('shell.inspector.endedAt'),
+      render: (_v: unknown, row) => time('endedAt', row.endedAt),
+    },
+    {
+      key: 'open',
+      render: (_v: unknown, row) => {
+        const page = inspectors?.get(row.process)
+        return page === undefined ? null : (
+          <Link to={inspectorPath(sitePath, page, row.id)} data-testid={`inspector-subprocess-${row.id}`}>
+            {t('shell.inspector.open')}
+          </Link>
+        )
+      },
+    },
+  ]
+
   const taken = new Set(instance.path.map((entry) => entry.step))
   return (
     <Flex vertical gap="large" data-testid="inspector-instance">
@@ -221,10 +273,34 @@ function InstanceBody({ instance, instancesPath, locale, onChanged }: InstanceBo
         items={[
           { key: 'state', label: t('shell.inspector.state'), children: stateText(t, instance.state) },
           { key: 'step', label: t('shell.inspector.step'), children: stepLabel(instance.step) },
-          { key: 'subject', label: t('shell.inspector.subject'), children: instance.subjectId },
+          {
+            key: 'subject',
+            label: t('shell.inspector.subject'),
+            children: instance.subjectId ?? t('shell.inspector.noSubject'),
+          },
+          ...(instance.parent === null
+            ? []
+            : [
+                {
+                  key: 'parent',
+                  label: t('shell.inspector.parent'),
+                  children:
+                    parentPage === undefined ? (
+                      instance.parent.process
+                    ) : (
+                      <Link
+                        to={inspectorPath(sitePath, parentPage, instance.parent.id)}
+                        data-testid="inspector-parent-link"
+                      >
+                        {instance.parent.process}
+                      </Link>
+                    ),
+                },
+              ]),
           { key: 'release', label: t('shell.inspector.release'), children: instance.releaseId },
           { key: 'createdAt', label: t('shell.inspector.createdAt'), children: time('createdAt', instance.createdAt) },
           { key: 'endedAt', label: t('shell.inspector.endedAt'), children: time('endedAt', instance.endedAt) },
+          ...(due === null ? [] : [{ key: 'dueAt', label: t('shell.inspector.dueAt'), children: time('dueAt', due) }]),
         ]}
       />
       <section>
@@ -288,6 +364,17 @@ function InstanceBody({ instance, instancesPath, locale, onChanged }: InstanceBo
             ))}
           </Flex>
         )}
+      </section>
+      <section>
+        <Typography.Title level={5}>{t('shell.inspector.subProcesses')}</Typography.Title>
+        <Table<SubProcess>
+          rowKey="id"
+          columns={subProcessColumns}
+          scroll={{ x: 'max-content' }}
+          dataSource={instance.subProcesses}
+          pagination={false}
+          locale={{ emptyText: t('shell.inspector.noSubProcesses') }}
+        />
       </section>
     </Flex>
   )
