@@ -4,6 +4,7 @@ import path from "node:path";
 import { expect, test } from "../test";
 import { startServer } from "../activate";
 import { dragTo } from "../design-drag";
+import { waitForDialog } from "../dialogs";
 import { pickOption } from "../select";
 import { e2eApp, serviceDesk } from "../server-settings";
 import { useSession } from "../sessions";
@@ -174,8 +175,9 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
 
     await page.getByTestId("studio-data-entity-Ticket").focus();
     await page.keyboard.press("Enter");
-    const choice = page.getByTestId("studio-binding-choice");
-    await expect(choice).toBeVisible();
+    const choice = (await waitForDialog(page)).getByTestId(
+      "studio-binding-choice",
+    );
     await choice.getByTestId("studio-binding-table").focus();
     await page.keyboard.press("Enter");
 
@@ -212,7 +214,10 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
       detail,
       0.75,
     );
-    await page.getByTestId("studio-binding-chart").click();
+    // A click during the dialog's zoom-in is lost.
+    const dialog = await waitForDialog(page);
+    await dialog.getByTestId("studio-binding-chart").click();
+    await expect(page.getByTestId("studio-binding-choice")).toBeHidden();
     await expect(page.getByTestId("studio-palette-announcement")).toContainText(
       "Inserted chart",
     );
