@@ -290,25 +290,13 @@ exit 0
   })
 
   test('integration.sh leaves the performance tests out without NexKit', () => {
-    // The dev script's smoke test runs here too, so a node shim passes its node --test call.
-    const shims = mkdtempSync(path.join(tmpdir(), 'check-scripts-node-'))
-    try {
-      writeFileSync(
-        path.join(shims, 'node'),
-        `#!/bin/sh\n[ "$1" = --test ] && exit 0\nexec "${process.execPath}" "$@"\n`,
-      )
-      chmodSync(path.join(shims, 'node'), 0o755)
-      run('scripts/integration.sh', 'src/Axis.Engine/Foo.cs', {
-        NEXKIT_BASE_SHA: '',
-        PATH: `${shims}${path.delimiter}${env.PATH}`,
-      })
-    } finally {
-      rmSync(shims, { recursive: true, force: true })
-    }
+    const result = run('scripts/integration.sh', 'src/Axis.Engine/Foo.cs', { NEXKIT_BASE_SHA: '' })
 
     const call = integrationCall(dotnetCalls())
     assert.ok(call.includes('--filter-not-class *PerformanceTests'), call)
     assert.ok(!call.includes('--filter-class'), call)
+    // The dev script's smoke test runs in scripts/smoke.sh.
+    assert.doesNotMatch(result.stdout, /dev-script/)
   })
 
   test('performance.sh runs only the performance tests and reports them', () => {

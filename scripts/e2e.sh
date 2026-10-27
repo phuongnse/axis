@@ -46,23 +46,16 @@
 # shares the platform database. The worker and the publisher serve the journey tenant too, and the run fails if
 # either log never reports it ready. The setup step signs the author, the requester, the service desk lead,
 # the agent, the approver, the asset manager, the employee and the auditor in on its host.
-# A Compose smoke test then builds the image and runs the stack on free ports. An images smoke test
-# then builds the production images axis-server, axis-worker and axis-admin, each up to three times
-# with a wait of 15 and 30 seconds, and runs them read-only against a throwaway PostgreSQL. An on-premises smoke test then installs deploy/compose/compose.yaml
-# from the production images as docs/reference/installation.md says, against a test PostgreSQL and Keycloak over
-# HTTPS. It creates two tenants, activates the leave request sample, checks each tenant's site and
-# sign-in, suspend and resume, and an unknown host. Each is skipped when $NEXKIT_BASE_SHA shows that
-# nothing it covers changed. Playwright and the services it starts are skipped when every changed path
-# is under docs/ or is a Markdown file. The sample modules are still installed then, for the on-premises
-# smoke test.
+# Playwright and the services it starts are skipped when $NEXKIT_BASE_SHA shows that every changed path
+# is under docs/ or is a Markdown file. The smoke tests run in scripts/smoke.sh.
 # The design-system bundle is built and checked into artifacts/design-system before Playwright runs. Its spec
 # serves the harness page and the bundle from disk and needs no server.
 # Arguments go to Playwright, for example tests/e2e/specs/studio.spec.ts or --grep 'publishes'. A spec path
-# is relative to the repository root. With arguments only the matching specs run, after the setup project,
-# and the three smoke tests do not run. A change is checked in minutes, and the full run stays the check.
+# is relative to the repository root. With arguments only the matching specs run, after the setup project.
+# A change is checked in minutes, and the full run stays the check.
 # AXIS_E2E_SHARD, such as 2/3, runs that shard of Playwright, so CI can split the suite over several
-# machines. Only shard 1 runs the three smoke tests, and a shard's Playwright results go to
-# playwright-<n>.xml, so no two shards share a file. Without it the whole suite runs.
+# machines. A shard's Playwright results go to playwright-<n>.xml, so no two shards share a file. Without it
+# the whole suite runs.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 source scripts/lib/test-results.sh
@@ -76,16 +69,14 @@ for argument in "$@"; do
   esac
 done
 
-# AXIS_E2E_SHARD, such as 2/3, runs one shard of Playwright. Only shard 1 runs the smoke tests.
+# AXIS_E2E_SHARD, such as 2/3, runs one shard of Playwright.
 playwright_suite=playwright
-smoke=1
 if [ -n "${AXIS_E2E_SHARD:-}" ]; then
   if ! [[ "$AXIS_E2E_SHARD" =~ ^([1-9][0-9]*)/([1-9][0-9]*)$ ]] || [ "${BASH_REMATCH[1]}" -gt "${BASH_REMATCH[2]}" ]; then
     echo "AXIS_E2E_SHARD must be a shard such as 1/3, not '$AXIS_E2E_SHARD'." >&2
     exit 2
   fi
   playwright_suite="playwright-${BASH_REMATCH[1]}"
-  if [ "${BASH_REMATCH[1]}" -ne 1 ]; then smoke=0; fi
   playwright_args=("--shard=$AXIS_E2E_SHARD" ${playwright_args[@]+"${playwright_args[@]}"})
 fi
 
@@ -390,21 +381,7 @@ if affected playwright; then
     print_log "Axis publisher log" "$publisher_log"
   fi
 else
-  bash scripts/lib/install-sample-modules.sh
   skip_suite "$playwright_suite" tests/e2e
 fi
-
-if [ "$#" -gt 0 ] || [ "$smoke" -eq 0 ]; then
-  finish_report
-fi
-
-run_suite_if_affected compose . node --test --test-reporter=spec --test-reporter-destination=stdout \
-  --test-reporter=junit --test-reporter-destination="$results_dir/compose.xml" scripts/compose.test.mjs
-
-run_suite_if_affected images . node --test --test-reporter=spec --test-reporter-destination=stdout \
-  --test-reporter=junit --test-reporter-destination="$results_dir/images.xml" scripts/images.test.mjs
-
-run_suite_if_affected onprem . node --test --test-reporter=spec --test-reporter-destination=stdout \
-  --test-reporter=junit --test-reporter-destination="$results_dir/onprem.xml" scripts/onprem.test.mjs
 
 finish_report

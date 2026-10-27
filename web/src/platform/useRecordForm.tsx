@@ -1,4 +1,5 @@
-import { Button, Col, Form, Input, Row, Space, Typography } from 'antd'
+import { CloseOutlined, SearchOutlined } from '@ant-design/icons'
+import { Button, Col, Form, Input, Row, Space, Tooltip, Typography } from 'antd'
 import { Fragment, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { ChildCollectionTable } from './ChildCollectionTable'
 import { FieldInput } from './FieldInput'
@@ -447,8 +448,18 @@ export function useRecordForm(
         return (
           <Space.Compact block data-testid={`reference-${field.name}`}>
             <Input id={id} readOnly value={typeof label === 'string' ? label : ''} />
-            <Button onClick={() => setLookup(field.name)}>{t('shell.form.choose')}</Button>
-            {!field.required && value !== null && <Button onClick={() => clear(field)}>{t('shell.form.clear')}</Button>}
+            <Tooltip title={t('shell.form.choose')}>
+              <Button
+                aria-label={t('shell.form.choose')}
+                icon={<SearchOutlined />}
+                onClick={() => setLookup(field.name)}
+              />
+            </Tooltip>
+            {!field.required && value !== null && (
+              <Tooltip title={t('shell.form.clear')}>
+                <Button aria-label={t('shell.form.clear')} icon={<CloseOutlined />} onClick={() => clear(field)} />
+              </Tooltip>
+            )}
           </Space.Compact>
         )
       }
