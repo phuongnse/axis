@@ -10,6 +10,7 @@ export const stepTypes = [
   'expectRecord',
   'expectInstance',
   'expectTask',
+  'expectNotification',
   'advanceTime',
 ] as const
 
@@ -29,6 +30,8 @@ export const stepPropertyNames = [
   'values',
   'expect',
   'by',
+  'recipient',
+  'channel',
 ] as const
 
 export type StepProperty = (typeof stepPropertyNames)[number]
@@ -82,6 +85,11 @@ export const stepProperties: Record<StepType, { name: StepProperty; required: bo
     { name: 'step', required: true },
     { name: 'assignee', required: false },
     { name: 'state', required: false },
+  ],
+  expectNotification: [
+    { name: 'recipient', required: true },
+    { name: 'channel', required: false },
+    { name: 'values', required: false },
   ],
   advanceTime: [{ name: 'by', required: true }],
 }
