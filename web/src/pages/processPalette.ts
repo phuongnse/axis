@@ -10,6 +10,7 @@ export const requiredStepKeys: Record<string, Content> = {
   operation: { operation: '', next: '' },
   subProcess: { process: '', next: '' },
   timer: { wait: '', next: '' },
+  waitEvent: { event: '', next: '' },
   end: {},
 }
 
@@ -28,6 +29,7 @@ export const paletteEntries: PaletteEntry[] = [
   { key: packageChoice, type: 'operation', operation: '' },
   { key: 'subProcess', type: 'subProcess' },
   { key: 'timer', type: 'timer' },
+  { key: 'waitEvent', type: 'waitEvent' },
   { key: 'end', type: 'end' },
 ]
 

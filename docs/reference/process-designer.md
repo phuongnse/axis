@@ -30,11 +30,10 @@ _(planned for M14)_.
   lists the step types and operations that `process.schema.json` defines today:
   `decision`, `task`, the operations `updateRecord`, `callConnector`,
   `raiseEvent` and `createRecord`, one "Package operation" entry, `subProcess`,
-  `timer` and `end`. A new `createRecord` step starts with an empty `entity` and an
-  empty `set`. A Vitest test reads the schema and fails when a step type or a
-  built-in operation is missing from the palette. `waitEvent` and
-  `notify` join when the schema defines them, because their steps would
-  always be invalid before that.
+  `timer`, `waitEvent` and `end`. A new `createRecord` step starts with an empty `entity` and an
+  empty `set`, and a new `waitEvent` step with an empty `event` and `next`. A Vitest test reads the schema and fails when a step type or a
+  built-in operation is missing from the palette. `notify` joins when the schema
+  defines it, because its steps would always be invalid before that.
   - The package entry adds an operation step with an empty `operation`, which
     the author types as `<package>/<operation>` in the panel, as the operation
     picker does. One entry per package operation of the application _(planned)_

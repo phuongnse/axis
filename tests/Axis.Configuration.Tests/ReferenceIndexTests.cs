@@ -259,6 +259,7 @@ public sealed class ReferenceIndexTests
                 (ReferenceRelations.TaskForm, "/steps/5/form", "OrderEntry"),
                 (ReferenceRelations.TaskForm, "/steps/6/form", "OrderEntry"),
                 (ReferenceRelations.CreatedEntity, "/steps/7/entity", "Order"),
+                (ReferenceRelations.AwaitedEvent, "/steps/8/event", "OrderChecked"),
             },
             ProcessEdges(result).Where(edge => edge.Relation != ReferenceRelations.RuleCall && edge.Relation != ReferenceRelations.LabelText));
     }
@@ -577,7 +578,7 @@ public sealed class ReferenceIndexTests
             .Where(field => field.IsLiteral)
             .Select(field => (string)field.GetRawConstantValue()!)
             .ToList();
-        Assert.Equal(40, expected.Count);
+        Assert.Equal(41, expected.Count);
 
         var relations = new HashSet<string>();
         using (var packages = new TemporaryFolder().Install("1.0.0"))
@@ -768,7 +769,8 @@ public sealed class ReferenceIndexTests
                       "outcomes": [ { "name": "ok", "label": { "textKey": "task.ok" }, "next": "confirm" } ] },
                     { "name": "confirm", "type": "task", "label": { "textKey": "task.review" }, "assignee": { "user": "Assignee(quantity)" }, "form": "OrderEntry",
                       "outcomes": [ { "name": "ok", "label": { "textKey": "task.ok" }, "next": "log" } ] },
-                    { "name": "log", "type": "operation", "operation": "createRecord", "entity": "Order", "set": { "quantity": "2" }, "next": "done" },
+                    { "name": "log", "type": "operation", "operation": "createRecord", "entity": "Order", "set": { "quantity": "2" }, "next": "await" },
+                    { "name": "await", "type": "waitEvent", "event": "OrderChecked", "next": "done" },
                     { "name": "done", "type": "end" } ] }
                 """)
             .With("endpoints/import-order.json", """
