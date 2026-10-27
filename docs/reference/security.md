@@ -266,8 +266,8 @@ sample reuses a user that holds the role it needs before it adds a user.
 | `linh`  | `service-desk-lead`     | Service desk sample; E2E journeys                                                                                                             |
 | `minh`  | `approver`              | Request approval template journey; E2E journeys                                                                                               |
 | `nam`   | `service-desk-lead`     | Service desk sample; E2E claim and reassign journey                                                                                           |
-| `quan` | `asset-manager`         | Asset management sample                                                                                                                           |
-| `thao` | `auditor`               | Asset management sample                                                                                                                           |
+| `quan`  | `asset-manager`         | Asset management sample; E2E asset management journey                                                                                         |
+| `thao`  | `auditor`               | Asset management sample; E2E asset management journey                                                                                         |
 
 ## Machine callers
 

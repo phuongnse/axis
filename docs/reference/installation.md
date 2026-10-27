@@ -288,7 +288,7 @@ proxy that ends TLS. The `replicas` profile starts `server-2`, configured like
   replica. See [Studio](host-settings.md#studio-settings).
 
 **The smoke test.** `scripts/onprem.test.mjs` installs the example as the five
-steps say, and `scripts/e2e.sh` runs it. It builds the three production images
+steps say, and `scripts/smoke.sh` runs it. It builds the three production images
 and starts a test PostgreSQL and a Keycloak over HTTPS, with a certificate
 authority it makes for the run, and imports a copy of the development realm that
 adds the tenants' `https://` redirect addresses. A static check of the rendered configuration shows that

@@ -1,6 +1,6 @@
 // Smoke test for the production images: builds axis-server, axis-worker and axis-admin, checks what they
 // hold, and runs them read-only with their settings in /run/secrets files. Requires Docker.
-// Run from scripts/e2e.sh.
+// Run from scripts/smoke.sh.
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'

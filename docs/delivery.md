@@ -64,47 +64,64 @@ with the reasons. What each one does is in NexKit's
 - **Issues run in parallel unless one needs another.** Marks follow the rules
   of NexKit's [`request` skill][nexkit-request]. The milestone's docs sweep is
   marked *blocked by* every other issue of the milestone, with no reason line
-  for each. There is no limit on how many issues run at once: `max_parallel`
-  is left unset.
+  for each. At most six issues run at once, with `max_parallel` at 6. Each
+  issue's check round takes three runner jobs, CI on `main` takes more after
+  each merge, and pull requests that must be up to date merge one at a time,
+  so more issues at once mostly wait for runners, usage limits and each other.
 - **NexKit merges a pull request once it passes,** with
   [`merge.auto`][nexkit-auto-merge] on, because the AI review and the checks
   are the gate Axis relies on. The owner turns the setting off to decide each
   merge again, and then only the owner merges. The switch is in `.nexkit/`, so
   changing it is a hand-made pull request.
-- **NexKit resolves conflicts with `main` by itself,** with
-  `conflicts.auto_resolve` on.
+- **NexKit resolves conflicts with `main` by itself, and brings a pull
+  request up to date before it merges,** with `conflicts.auto_resolve` on.
+  The rules on `main` want a branch to be up to date, so a pull request's
+  checks always ran on the `main` it merges into, and two pull requests that
+  pass alone cannot break `main` together. When the update merges cleanly and
+  the pull request's own change is the one the review approved, only the
+  checks run again, not the AI review. `conflicts.max_rounds` is 6 instead of
+  3, so a pull request that falls behind several merges in a row still
+  merges by itself.
 - **A second Claude subscription takes over at the usage limit.** NexKit
   pauses only when both are at their limit.
 - **A parent issue closes when its last part does,** with
   `close_parent_issues` on.
 - **The rules on `main` let NexKit merge.** They require NexKit's own checks
-  and no approval from a person. They do not require the CI workflow, which
+  on a branch that is up to date, and no approval from a person. They do not require the CI workflow, which
   runs on pushes to `main` and to hand-made branches but not on NexKit's
   branches. NexKit's checks run the same scripts there.
 - **There is no push token.** NexKit pushes with the Actions token, so it
   cannot push a merge that brings changes to `.github/workflows/`. The hourly
   driver merges those by hand.
-- **CI runs on `main` after every merge.** NexKit starts the CI and CodeQL
-  workflows on `main` through its `merge.after_workflows` setting, because a
+- **CI runs on `main` after every merge.** NexKit starts the CI, CodeQL and
+  performance workflows on `main` through its `merge.after_workflows` setting, because a
   merge by NexKit starts no `push` workflow. A run on `main` always finishes:
   a newer merge replaces only a run that is still waiting to start, so the
   next run tests both merges. On any other branch a newer push stops the older
-  run. CI runs the lint and unit tests, the integration tests and the E2E
-  tests as three parallel jobs, so a run takes as long as its slowest job.
-- **The slow checks run in full only in NexKit's checks.** The integration and
-  E2E checks are marked `slow`. The test, integration and E2E checks name
+  run. CI runs the lint and unit tests, the smoke tests, the integration
+  tests and three shards of the E2E tests as six parallel jobs, so a run takes
+  as long as its slowest job.
+- **The slow checks run in full only in NexKit's checks.** The smoke, integration
+  and E2E checks are marked `slow`. The test, smoke, integration and E2E checks name
   their `results`: `artifacts/test-results`, and for E2E also `artifacts/logs`
   and the Playwright traces in `tests/e2e/test-results`. NexKit's
   [`evidence`][nexkit-evidence] setting names the CI workflow's
-  `test-results-e2e`, `test-results-integration` and `test-results-unit`
-  artifacts, which hold the Playwright traces and `error-context.md` files.
-- **NexKit's checks skip suites that a change cannot affect.** A check round
-  takes about 25 minutes, of which the integration tests take about 7 and
-  Playwright about 10. So under NexKit's `NEXKIT_BASE_SHA`, a suite that no
-  changed file can affect is skipped, and any doubt runs it. The integration
-  performance tests, whose class names end in `PerformanceTests`, never run
-  there, because they depend on the runner's load. CI on `main` sets no base
-  and runs every suite, so a slowdown shows after the merge. Which suite skips
+  `test-results-e2e-1` to `test-results-e2e-3`, `test-results-integration`,
+  `test-results-smoke` and `test-results-unit` artifacts, which hold the Playwright traces and
+  `error-context.md` files, and the performance workflow's
+  `test-results-performance`.
+- **NexKit's checks skip suites that a change cannot affect.** NexKit runs the
+  checks in three jobs at once, with `parallel_checks` on: the build, lint, unit
+  and smoke tests in one job, the group `fast`, and the integration and E2E tests
+  each in their own. A check round then takes about as long as its slowest
+  job, instead of all of them in a row, which took 20 to 50 minutes. Under
+  NexKit's `NEXKIT_BASE_SHA`, a suite that no changed file can affect is
+  skipped, and any doubt runs it. CI on `main` sets no base and runs every
+  suite, so a slowdown shows after the merge. The integration performance
+  tests, whose class names end in `PerformanceTests`, run neither in NexKit's
+  checks nor in CI's integration job, because they depend on the runner's
+  load. The performance workflow runs them on `main`, as
+  [D97](decisions/d97-reliable-test-runs.md) says. Which suite skips
   when is in [test runs and reports](development.md#test-runs-and-reports).
 - **NexKit restores the dependency caches that CI on `main` saves:** NuGet,
   npm and the Playwright browsers. The entries are in NexKit's
@@ -227,10 +244,14 @@ owner.
   `section`. The docs stay the source of behaviour.
 - **Several changes are a design review.** When the owner reviews the design
   in words, one change at a time, the session runs a design review. Each
-  change is prototyped in the real widget code on a `design/<topic>` branch
+  change is prototyped in the real widget code on a
+  `design/<yyyy-mm-dd>-<topic>` branch
   and published to the artifact, so the owner sees the real widgets. The
-  branch is pushed before the review's issue, with CI skipped because the
-  prototype does not update the tests, and it is never merged.
+  branch stays local and is never merged. Before the review's issue its last
+  commit gets a `design-review/<yyyy-mm-dd>-<topic>` tag with the same date
+  and topic, and only the tag is pushed:
+  a tag starts no CI run, and it is never deleted, so the links to the
+  prototype never break.
 - **The design runs ahead of the repository only by open issues and an open
   review.** While a design issue is open, the artifact holds its change and its
   last change note names the issue. While a review is open, the artifact may
@@ -241,7 +262,7 @@ owner.
   agreed the changes, one hand-made docs pull request records the rules and
   any decision, including every change to configuration, an API or a decision.
   One NexKit issue then builds all of it and links the docs, the artifact and
-  the prototype branch. NexKit splits it if it needs to: the owner does not.
+  the prototype's tag. NexKit splits it if it needs to: the owner does not.
 - **A sync follows the repository.** After a merged change to the tokens or a
   widget, or whenever the owner asks, the session renders the previews again
   with `scripts/design-system.sh`, reads the tokens from
@@ -343,6 +364,24 @@ issues, pull requests and sub-issues.
 - Name the role that acts, in the terms of [concepts.md](domain/concepts.md), never a development
   user. This covers doc text that describes behaviour, and titles too. User names appear only in test
   code, test scenarios, the realm file and the [development users table](reference/security.md#development-users).
+- Name a branch or a tag by what it holds. NexKit names its own branches
+  `nexkit/issue-<number>`, and a Claude session in the cloud names its own,
+  such as `claude/<words>`: nobody names a branch like those by hand. A
+  hand-made pull request comes from `docs/<topic>` for a docs change, or from
+  `ops/<topic>` for a change in a path NexKit may not change, such as a NexKit
+  upgrade. A design review's prototype is a local
+  `design/<yyyy-mm-dd>-<topic>` branch, and its pushed tag is
+  `design-review/<yyyy-mm-dd>-<topic>`, with the same date and topic.
+  `<topic>` is a few lower-case English words joined by hyphens, such as
+  `widget-review`. Release tags, once Axis has them, start with `v`, so no
+  other tag does.
+- Keep branches from piling up. GitHub's automatic deletion of head branches
+  is on, but it deletes neither the branches of the pull requests NexKit
+  merges nor those of cloud sessions that push nothing. When the owner asks,
+  the local session lists every `nexkit/` branch whose pull request is merged
+  and every `claude/` branch with no pull request and no commit that `main`
+  lacks, and the owner deletes them. A branch with an open pull request, or a
+  closed one that was not merged, stays.
 
 [nexkit-how]: https://github.com/phuongnse/nexkit/blob/main/docs/how-it-works.md
 [nexkit-config]: https://github.com/phuongnse/nexkit/blob/main/docs/configuration.md
