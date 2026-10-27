@@ -41,6 +41,8 @@
     "asset.sections.software": "Phần mềm",
     "asset.sections.attachments": "Tệp đính kèm",
     "asset.sections.maintenance": "Bảo trì",
+    "asset.warrantyReminder.subject": "Sắp hết bảo hành: {name}",
+    "asset.warrantyReminder.body": "Bảo hành của {name} hết hạn vào ngày {warrantyEnd}.",
     "attachment.label": "Tệp đính kèm",
     "attachment.file": "Tệp",
     "attachment.note": "Ghi chú",

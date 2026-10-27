@@ -1,0 +1,46 @@
+{
+  "id": "72e33524-dddd-48ae-ae9a-7a11e48c010e",
+  "kind": "process",
+  "name": "WarrantyReminder",
+  "formatVersion": 1,
+  "entity": "Asset",
+  "start": "remind",
+  "steps": [
+    {
+      "name": "remind",
+      "type": "operation",
+      "operation": "notify",
+      "to": [
+        {
+          "role": "asset-manager"
+        }
+      ],
+      "channels": [
+        "inApp"
+      ],
+      "message": {
+        "subject": {
+          "textKey": "asset.warrantyReminder.subject"
+        },
+        "body": {
+          "textKey": "asset.warrantyReminder.body"
+        },
+        "values": {
+          "name": "name",
+          "warrantyEnd": "warrantyEnd"
+        }
+      },
+      "open": {
+        "page": "AssetDetail",
+        "parameters": {
+          "asset": "id"
+        }
+      },
+      "next": "done"
+    },
+    {
+      "name": "done",
+      "type": "end"
+    }
+  ]
+}

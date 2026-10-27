@@ -1,0 +1,11 @@
+{
+  "id": "6883324d-e9a6-4c59-8700-fe61cbc327ad",
+  "kind": "trigger",
+  "name": "WarrantyReminderWeekdays",
+  "formatVersion": 1,
+  "type": "schedule",
+  "schedule": "0 8 * * 1-5",
+  "timeZone": "Asia/Ho_Chi_Minh",
+  "dataSource": "AssetsWithWarrantyEndingSoon",
+  "process": "WarrantyReminder"
+}
