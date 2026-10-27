@@ -140,6 +140,38 @@ internal static class DeliveryFailures
         return id;
     }
 
+    /// <summary>Writes an <c>open</c> dead letter for one staged email and returns its id.</summary>
+    internal static async Task<Guid> InsertEmailDeadLetterAsync(
+        NpgsqlTransaction transaction,
+        Guid applicationId,
+        Guid processId,
+        Guid processInstanceId,
+        Guid emailId,
+        int attempts,
+        string error,
+        CancellationToken cancellationToken)
+    {
+        var id = Guid.CreateVersion7();
+        await using var command = new NpgsqlCommand(
+            """
+            INSERT INTO axis.dead_letters (id, kind, application_id, process_id, process_instance_id, email_id, attempts, last_error, state, created_at)
+            VALUES (@id, @kind, @application, @process, @instance, @email, @attempts, @error, @state, now())
+            """,
+            Connection(transaction),
+            transaction);
+        command.Parameters.AddWithValue("id", id);
+        command.Parameters.AddWithValue("kind", NotificationEmailKind);
+        command.Parameters.AddWithValue("application", applicationId);
+        command.Parameters.AddWithValue("process", processId);
+        command.Parameters.AddWithValue("instance", processInstanceId);
+        command.Parameters.AddWithValue("email", emailId);
+        command.Parameters.AddWithValue("attempts", attempts);
+        command.Parameters.AddWithValue("error", error);
+        command.Parameters.AddWithValue("state", Open);
+        await command.ExecuteNonQueryAsync(cancellationToken);
+        return id;
+    }
+
     private static NpgsqlConnection Connection(NpgsqlTransaction transaction) =>
         transaction.Connection ?? throw new ArgumentException("The transaction is completed.", nameof(transaction));
 }

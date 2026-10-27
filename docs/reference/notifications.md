@@ -9,8 +9,8 @@ The [user profiles](#user-profiles) section, the compile checks of the notify
 operation and of placeholders, the run of the notify step and of a task
 escalation's `notify`, the storage of in-app notifications, the routes that
 list them and mark them read, their retention, the staging of emails in the
-outbox and their sending over SMTP are built, and so is the bell in the site
-shell. The dead letter of a failed email, the mail settings in the tenant
+outbox and their sending over SMTP are built, and so are the dead letter of a
+failed email and the bell in the site shell. The mail settings in the tenant
 directory and a mail server in Docker Compose and `scripts/dev.sh` are
 _(planned for M14)_, as is everything else in this file that says so. The design
 follows
@@ -195,9 +195,10 @@ A text value may hold named placeholders, such as
   one lease and no failure is counted. A failed send is counted in
   `axis.delivery_failures` with the exception type only, and the item is tried
   again with the backoff of [dead letters](process-events.md#dead-letters).
-  _(Planned for M14)_ After the limit of dead letters, the failure becomes a
-  dead letter of kind `notification.email`. Until then an address that can
-  never be delivered is tried again at most once an hour.
+  After `Worker:DeliveryAttempts` failures, default 5, the item is deleted, the
+  row stays `pending` and an `open` dead letter of kind `notification.email` is
+  written. Nothing more is sent until an operator redelivers it, which queues
+  the same row again.
 - **At least once.** A crash after the send and before the mark sends again.
   The same `Message-ID` lets a receiver drop the repeat.
 - **Locale.** The recipient's profile locale when the release has texts for

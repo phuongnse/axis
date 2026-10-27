@@ -67,7 +67,7 @@ internal sealed class ScenarioWork : IDisposable
                 .. externalHandlers,
                 new TriggerScheduleHandler(models, loggerFactory.CreateLogger<TriggerScheduleHandler>()),
                 new TriggerFanOutHandler(models, new DeliverySettings(5), loggerFactory.CreateLogger<TriggerFanOutHandler>()),
-                new NotificationEmailHandler(new EmailDefaults(null), null, loggerFactory.CreateLogger<NotificationEmailHandler>()),
+                new NotificationEmailHandler(new EmailDefaults(null), null, new DeliverySettings(5), loggerFactory.CreateLogger<NotificationEmailHandler>()),
             ],
             loggerFactory);
     }
