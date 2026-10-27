@@ -53,6 +53,9 @@ export const spacingTokens = { xs: 8, sm: 12, md: 16, lg: 24, xl: 32 }
 
 export const radiusTokens = { base: 6 }
 
+/** The one layout breakpoint (D96). Below it is narrow width. A page cannot change it: media queries read no CSS property. */
+export const breakpointTokens = { narrowWidth: 992 }
+
 export type ColourName = keyof typeof colourTokens
 
 export interface DesignTokens {

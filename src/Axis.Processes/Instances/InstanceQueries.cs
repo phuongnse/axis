@@ -21,12 +21,18 @@ public static class InstanceQueries
     private const string Columns =
         "i.id, i.application_id, i.process_id, i.subject_entity_id, i.subject_id, i.release_id, i.state, i.revision, i.step, i.created_at, i.ended_at";
 
+    // The release number comes from the release history. Every row of one release has the same number,
+    // so one row is enough. An old release from before the history table has no row and no number.
+    private const string ReleaseNumberJoin =
+        "LEFT JOIN LATERAL (SELECT h.number FROM axis.release_activations AS h WHERE h.application_id = i.application_id AND h.release_id = i.release_id LIMIT 1) AS h ON true";
+
     /// <summary>
     /// Reads page <paramref name="page"/> of <paramref name="pageSize"/> instances of the process,
     /// whatever release they are pinned to, newest first, and counts them. <paramref name="state"/>
     /// and <paramref name="subjectId"/> narrow the list when set. An instance is kept only when its
     /// subject record exists in <paramref name="subjectEntity"/> and matches
-    /// <paramref name="condition"/>, or has no condition to match. A page past the last one has no
+    /// <paramref name="condition"/>, or has no condition to match. Each item carries the subject
+    /// record's display field value, whoever reads it, and the release's number. A page past the last one has no
     /// items. Returns <see langword="null"/> when the database rejects the condition for these
     /// records with a data exception (SQLSTATE class 22). Any other database error is thrown.
     /// </summary>
@@ -62,11 +68,11 @@ public static class InstanceQueries
             command.Parameters.AddWithValue("limit", pageSize);
             command.Parameters.AddWithValue("offset", (long)(page - 1) * pageSize);
 
-            var items = new List<ProcessInstanceRow>();
+            var items = new List<InstanceListItem>();
             await using var reader = await command.ExecuteReaderAsync(cancellationToken);
             while (await reader.ReadAsync(cancellationToken))
             {
-                items.Add(ReadInstance(reader));
+                items.Add(ReadListItem(reader));
             }
 
             return new InstanceListPage(items, totalCount);
@@ -113,7 +119,7 @@ public static class InstanceQueries
 
     /// <summary>
     /// Reads page <paramref name="page"/> of <paramref name="pageSize"/> instances of a process without
-    /// a subject, newest first, and counts them. <paramref name="state"/> narrows the list when set.
+    /// a subject, newest first, and counts them. Each item has no subject label. <paramref name="state"/> narrows the list when set.
     /// <paramref name="subjectId"/> matches no instance when set, because these instances have no
     /// subject record. There is no record to read, so no read filter applies.
     /// </summary>
@@ -152,17 +158,17 @@ public static class InstanceQueries
         }
 
         await using var command = new NpgsqlCommand(
-            $"SELECT {Columns} FROM axis.process_instances AS {InstanceAlias} {where} ORDER BY i.created_at DESC, i.id DESC LIMIT @limit OFFSET @offset",
+            $"SELECT {Columns}, NULL::text, h.number FROM axis.process_instances AS {InstanceAlias} {ReleaseNumberJoin} {where} ORDER BY i.created_at DESC, i.id DESC LIMIT @limit OFFSET @offset",
             connection);
         AddParameters(command);
         command.Parameters.AddWithValue("limit", pageSize);
         command.Parameters.AddWithValue("offset", (long)(page - 1) * pageSize);
 
-        var items = new List<ProcessInstanceRow>();
+        var items = new List<InstanceListItem>();
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
         {
-            items.Add(ReadInstance(reader));
+            items.Add(ReadListItem(reader));
         }
 
         return new InstanceListPage(items, totalCount);
@@ -358,8 +364,19 @@ public static class InstanceQueries
     /// The query that reads one page of the list. <c>@limit</c> and <c>@offset</c> are bound by the caller,
     /// next to the parameters of <see cref="AddListParameters"/>.
     /// </summary>
-    internal static string ListPageSql(EntityModel subjectEntity, RecordCondition? condition) =>
-        $"SELECT {Columns} FROM axis.process_instances AS {InstanceAlias} {Where(subjectEntity, condition)} ORDER BY i.created_at DESC, i.id DESC LIMIT @limit OFFSET @offset";
+    internal static string ListPageSql(EntityModel subjectEntity, RecordCondition? condition)
+    {
+        // The subject record joins as s, because the condition refers to its record as r inside the EXISTS.
+        var label = subjectEntity.DisplayField is { } displayField
+            ? $"s.{EntityNaming.Quote(EntityNaming.Column(displayField))}"
+            : "NULL::text";
+        return $"""
+            SELECT {Columns}, {label}, h.number FROM axis.process_instances AS {InstanceAlias}
+            LEFT JOIN {RecordQueries.Table(subjectEntity)} AS s ON s.{EntityNaming.Quote(EntityNaming.IdColumn)} = i.subject_id
+            {ReleaseNumberJoin}
+            {Where(subjectEntity, condition)} ORDER BY i.created_at DESC, i.id DESC LIMIT @limit OFFSET @offset
+            """;
+    }
 
     internal static void AddListParameters(
         NpgsqlCommand command,
@@ -387,6 +404,13 @@ public static class InstanceQueries
             reader.GetFieldValue<DateTimeOffset>(4),
             reader.IsDBNull(5) ? null : reader.GetFieldValue<DateTimeOffset>(5));
 
+    // Columns 0 to 10 are the instance, 11 is the subject label and 12 is the release number.
+    private static InstanceListItem ReadListItem(NpgsqlDataReader reader) =>
+        new(
+            ReadInstance(reader),
+            reader.IsDBNull(11) ? null : reader.GetString(11),
+            reader.IsDBNull(12) ? null : reader.GetInt32(12));
+
     private static ProcessInstanceRow ReadInstance(NpgsqlDataReader reader) =>
         new()
         {
@@ -405,7 +429,14 @@ public static class InstanceQueries
 }
 
 /// <summary>One page of the instances of a process, and the number of them on every page.</summary>
-public sealed record InstanceListPage(IReadOnlyList<ProcessInstanceRow> Items, long TotalCount);
+public sealed record InstanceListPage(IReadOnlyList<InstanceListItem> Items, long TotalCount);
+
+/// <summary>
+/// An instance in a list, with the display field value of its subject record and the number of its
+/// release in the release history. <paramref name="SubjectLabel"/> is null without a subject record or a
+/// display field. <paramref name="ReleaseNumber"/> is null when the release has no history row.
+/// </summary>
+public sealed record InstanceListItem(ProcessInstanceRow Instance, string? SubjectLabel, int? ReleaseNumber);
 
 /// <summary>
 /// An instance related to another through a sub-process step. <paramref name="Step"/> is the sub-process step in the

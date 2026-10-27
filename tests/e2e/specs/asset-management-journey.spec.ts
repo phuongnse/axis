@@ -347,6 +347,7 @@ test.describe('the author builds the asset management application with Studio on
     await addField(page, 9, 'warrantyEnd')
     await pick(page, 'studio-field-/fields/9/type', 'date')
     await pick(page, 'studio-field-/fields/9/label', 'asset.warrantyEnd', 'asset.warrantyEnd')
+    await pick(page, 'studio-field-/fields/9/help', 'asset.warrantyEnd.help', 'asset.warrantyEnd.help')
 
     await addField(page, 10, 'attachments')
     await pick(page, 'studio-field-/fields/10/type', 'child-collection')

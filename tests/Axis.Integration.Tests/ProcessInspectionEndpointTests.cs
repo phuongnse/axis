@@ -41,9 +41,13 @@ public sealed class ProcessInspectionEndpointTests(ProcessStartFixture fixture) 
 
         var item1 = items.Single(item => item.GetProperty("id").GetGuid() == first.Id);
         Assert.Equal(
-            ["id", "subjectId", "state", "step", "releaseId", "createdAt", "endedAt"],
+            ["id", "subjectId", "subjectLabel", "state", "step", "releaseId", "releaseNumber", "createdAt", "endedAt"],
             item1.EnumerateObject().Select(property => property.Name));
         Assert.Equal(first.SubjectId, item1.GetProperty("subjectId").GetGuid());
+        Assert.Equal($"Request {first.SubjectId:N}", item1.GetProperty("subjectLabel").GetString());
+        Assert.Equal(
+            await fixture.CountAsync("SELECT number::bigint FROM axis.release_activations WHERE release_id = @release LIMIT 1", ("release", activeRelease)),
+            item1.GetProperty("releaseNumber").GetInt64());
         Assert.Equal("completed", item1.GetProperty("state").GetString());
         Assert.Equal("done", item1.GetProperty("step").GetString());
         Assert.Equal(activeRelease, item1.GetProperty("releaseId").GetGuid());
@@ -159,12 +163,29 @@ public sealed class ProcessInspectionEndpointTests(ProcessStartFixture fixture) 
         using var body = await ReadJsonAsync(response);
         var item = body.RootElement.GetProperty("items").EnumerateArray().Single(candidate => candidate.GetProperty("id").GetGuid() == id);
         Assert.Equal(JsonValueKind.Null, item.GetProperty("subjectId").ValueKind);
+        Assert.Equal(JsonValueKind.Null, item.GetProperty("subjectLabel").ValueKind);
+        Assert.Equal(JsonValueKind.Number, item.GetProperty("releaseNumber").ValueKind);
         Assert.Equal("running", item.GetProperty("state").GetString());
 
         using var other = await GetAsync($"{JobInstances}?subject={Guid.NewGuid():D}");
         using var otherBody = await ReadJsonAsync(other);
         Assert.Equal(HttpStatusCode.OK, other.StatusCode);
         Assert.Equal(0, otherBody.RootElement.GetProperty("totalCount").GetInt64());
+    }
+
+    [Fact]
+    public async Task A_user_who_may_not_read_the_display_field_lists_the_instance_with_a_null_subject_label()
+    {
+        var (id, _) = await StartAsync();
+        using var sam = fixture.CreateClient().SignedInAs("sam");
+
+        using var response = await GetAsync($"{Instances}?pageSize=100", sam);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var body = await ReadJsonAsync(response);
+        var item = body.RootElement.GetProperty("items").EnumerateArray().Single(candidate => candidate.GetProperty("id").GetGuid() == id);
+        Assert.Equal(JsonValueKind.Null, item.GetProperty("subjectLabel").ValueKind);
+        Assert.Equal(JsonValueKind.Number, item.GetProperty("releaseNumber").ValueKind);
     }
 
     [Fact]

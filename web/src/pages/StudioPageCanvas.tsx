@@ -31,7 +31,7 @@ import { StudioNamesContext } from '../platform/studioNames'
 import { useText, useTextCatalogs } from '../platform/texts'
 import { TextProvider } from '../platform/TextProvider'
 import { useDesignTokens } from '../platform/themeMode'
-import { PhoneWidthOverride } from '../platform/usePhoneWidth'
+import { NarrowWidthOverride } from '../platform/useNarrowWidth'
 import { WidgetTree } from '../platform/WidgetTree'
 import { PlatformContext } from './context'
 import { CanvasAlert } from './CanvasAlert'
@@ -58,7 +58,7 @@ const CanvasLeaf = memo(PageLeaf)
  * edit or on a drag over the same target. While it is mounted, the widgets' `/api/apps/`
  * calls get placeholder data in the browser and none goes to the server. A click or a submit on the canvas does
  * nothing. A widget that does not compile draws as a placeholder with its diagnostics. A widget that a diagnostic
- * names is marked. The width switch draws the page at phone width, 375 px, with the phone layout. A click selects the
+ * names is marked. The width switch draws the page at phone width, 375 px, with the narrow layout. A click selects the
  * innermost widget under the pointer. Each widget is a Tab stop, which Enter or Space selects, and its name is its
  * type and summary from the draft. The widget at `selected` is outlined and has `aria-current`. Inside a drag context
  * every widget with a path is a drag source and a drop target, every widget list is a drop target, and a placeholder
@@ -223,7 +223,7 @@ export function StudioPageCanvas({
         )}
         {answer === 'failed' && <CanvasAlert testId="studio-canvas-failed" textKey="shell.studio.design.loadFailed" />}
         {page && (
-          <PhoneWidthOverride.Provider value={phone ? true : undefined}>
+          <NarrowWidthOverride.Provider value={phone ? true : undefined}>
             <div data-testid="studio-canvas-frame" style={{ width: phone ? phoneWidth : '100%' }}>
               <CanvasPage title={page.titleKey}>
                 <WidgetTree
@@ -253,7 +253,7 @@ export function StudioPageCanvas({
                 />
               </CanvasPage>
             </div>
-          </PhoneWidthOverride.Provider>
+          </NarrowWidthOverride.Provider>
         )}
       </div>
     </TextProvider>

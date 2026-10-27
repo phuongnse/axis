@@ -934,8 +934,8 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
 - **Narrow width.** Axis has one layout breakpoint, at 992 px, Ant Design's `lg`, the smallest desktop
   ([D96](../decisions/d96-rules-from-the-design-system-review.md)). Below it is narrow width: columns stack in file order, tab
   headers scroll, a row's actions fold into one menu and the shell navigation collapses. Its value is one token in
-  `web/src/platform/designTokens.ts`, which the narrow-width hook and the design system read. Today the breakpoint is 768 px,
-  Ant Design's `md`, and the 992 px token is _(planned)_. Studio's page designer previews the narrow layout at 375 px, see
+  `web/src/platform/designTokens.ts` as `breakpointTokens.narrowWidth`. The narrow-width hook reads it, and the
+  design-system bundle reads it too _(planned)_. Studio's page designer previews the narrow layout at 375 px, see
   [Studio](studio.md). Every platform table, including form line items and the reference lookup,
   scrolls sideways inside its widget, so the page never does. The shell header keeps the site title, the
   account button and a **Menu** button (`shell.navigation.menu`) with `aria-expanded`. It opens a panel with
