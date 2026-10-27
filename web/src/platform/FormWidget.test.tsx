@@ -10,6 +10,7 @@ import { formItem, hasFieldError, isRequiredLabel } from '../test/antd'
 import { FormWidget } from './FormWidget'
 import type { EntityWidgetMetadata, FieldMetadata, FieldType } from './site'
 import { TextProvider } from './TextProvider'
+import { hostileMarkup } from '../test/hostile'
 
 function field(name: string, type: FieldType, labelKey: string | null): FieldMetadata {
   return {
@@ -504,6 +505,31 @@ describe('FormWidget', () => {
 
   afterEach(() => {
     vi.useRealTimers()
+  })
+
+  it('shows a value that holds markup as text', async () => {
+    const record = {
+      id: noteId,
+      version: 1,
+      values: {
+        title: hostileMarkup,
+        code: null,
+        priority: 7,
+        amount: 12.5,
+        done: false,
+        dueOn: null,
+        dueAt: null,
+        status: null,
+        category: categoryId,
+      },
+      labels: { category: 'Office' },
+    }
+    stubFetch({ status: 200, body: JSON.stringify(record) })
+
+    renderForm(noteId)
+
+    expect(await screen.findByDisplayValue(hostileMarkup)).toBeInTheDocument()
+    expect(document.querySelector('img, [onerror]')).toBeNull()
   })
 
   it('shows one input per field with its label, and the reference label read-only', async () => {

@@ -6,6 +6,7 @@ import { DetailWidget } from './DetailWidget'
 import type { EntityWidgetMetadata, FieldMetadata, FieldType } from './site'
 import { descriptionItem } from '../test/antd'
 import { TextProvider } from './TextProvider'
+import { hostileMarkup } from '../test/hostile'
 
 function field(name: string, type: FieldType, labelKey: string | null): FieldMetadata {
   return {
@@ -210,6 +211,21 @@ const receiptWidget: EntityWidgetMetadata = {
 }
 
 describe('DetailWidget', () => {
+  it('shows a value that holds markup as text', async () => {
+    const record = {
+      id: noteId,
+      version: 1,
+      values: { title: hostileMarkup, done: true, priority: 7, category: categoryId, lines: [] },
+      labels: { category: 'Office' },
+    }
+    stubFetch({ status: 200, body: JSON.stringify(record) })
+
+    renderDetail()
+
+    expect(await screen.findByText(hostileMarkup)).toBeInTheDocument()
+    expect(document.querySelector('img, [onerror]')).toBeNull()
+  })
+
   it('shows a file as a download link, also in a child row', async () => {
     const file = (id: string, name: string) =>
       `{"id":"${id}","name":"${name}","mediaType":"application/pdf","size":2048}`
