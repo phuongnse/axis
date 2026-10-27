@@ -1,4 +1,5 @@
-import { Alert, Button, Flex, Table, Typography, type TableColumnsType } from 'antd'
+import { DeleteOutlined, SendOutlined } from '@ant-design/icons'
+import { Alert, Button, Flex, Table, Tooltip, Typography, type TableColumnsType } from 'antd'
 import { useEffect, useMemo, useState } from 'react'
 import { formatValue } from './formatValue'
 import {
@@ -101,15 +102,21 @@ export function DeadLetterList({ deadLettersPath, locale }: DeadLetterListProps)
           <Flex gap="small">
             {deadLetterCommands
               .filter((command) => item.commands.includes(command))
-              .map((command) => (
-                <Button
-                  key={command}
-                  data-testid={`inspector-dead-letter-${command}-${item.id}`}
-                  onClick={() => setOpen({ command, item })}
-                >
-                  {t(`shell.inspector.commands.${command}`)}
-                </Button>
-              ))}
+              .map((command) => {
+                const name = t(`shell.inspector.commands.${command}`)
+                return (
+                  <Tooltip key={command} title={name}>
+                    <Button
+                      type="text"
+                      danger={command === 'discard'}
+                      aria-label={name}
+                      icon={command === 'redeliver' ? <SendOutlined /> : <DeleteOutlined />}
+                      data-testid={`inspector-dead-letter-${command}-${item.id}`}
+                      onClick={() => setOpen({ command, item })}
+                    />
+                  </Tooltip>
+                )
+              })}
           </Flex>
         ),
       },

@@ -1,4 +1,4 @@
-import { Alert, Flex, Select, Table, type TableColumnsType, type TableProps } from 'antd'
+import { Alert, Flex, Select, Table, Typography, type TableColumnsType, type TableProps } from 'antd'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { DeadLetterList } from './DeadLetterList'
@@ -39,13 +39,18 @@ const pageSizes = tablePageSizes()
 const parameterNames = ['state']
 const createdAtField = { name: 'createdAt', type: 'date-time' } as const
 const endedAtField = { name: 'endedAt', type: 'date-time' } as const
+const emptyDash = (
+  <Typography.Text type="secondary" italic>
+    —
+  </Typography.Text>
+)
 
 /**
  * Lists the instances of the widget's process, newest first, as the inspection API orders them. A
  * clearable select filters them by state. `state`, `page` and `pageSize` live in the URL, and a
- * state change goes back to page 1. Each row links to the instance's address under the inspector
- * page. A `403` shows that the user may not inspect the process. With nobody signed in, the
- * inspection API's 401 starts sign-in.
+ * state change goes back to page 1. The first column links each row to the instance's address
+ * under the inspector page. A `403` shows that the user may not inspect the process. With nobody
+ * signed in, the inspection API's 401 starts sign-in.
  *
  * The step column shows the step's name, because a list row carries no label key. Under the list, the
  * process's open dead letters have their own list, which has its own page number.
@@ -118,20 +123,25 @@ export function ProcessInspectorWidget({ sitePath, pageName, widget, locale }: P
   const columns = useMemo<TableColumnsType<InstanceListItem>>(
     () => [
       {
+        key: 'record',
+        title: t('shell.inspector.subject'),
+        render: (_value: unknown, instance: InstanceListItem) => (
+          <Link to={`${instancePath}/${instance.id}`}>
+            {instance.subjectLabel ??
+              (instance.subjectId === null ? t('shell.inspector.noSubject') : t('shell.inspector.open'))}
+          </Link>
+        ),
+      },
+      {
         key: 'state',
         title: t('shell.inspector.state'),
         render: (_value: unknown, instance: InstanceListItem) => stateText(t, instance.state),
       },
       { key: 'step', title: t('shell.inspector.step'), render: (_value: unknown, instance) => instance.step },
       {
-        key: 'subject',
-        title: t('shell.inspector.subject'),
-        render: (_value: unknown, instance) => instance.subjectId ?? t('shell.inspector.noSubject'),
-      },
-      {
         key: 'release',
         title: t('shell.inspector.release'),
-        render: (_value: unknown, instance) => instance.releaseId,
+        render: (_value: unknown, instance) => instance.releaseNumber ?? emptyDash,
       },
       {
         key: 'createdAt',
@@ -141,13 +151,8 @@ export function ProcessInspectorWidget({ sitePath, pageName, widget, locale }: P
       {
         key: 'endedAt',
         title: t('shell.inspector.endedAt'),
-        render: (_value: unknown, instance) => formatValue(endedAtField, instance.endedAt, {}, { locale, text: t }),
-      },
-      {
-        key: 'open',
-        render: (_value: unknown, instance) => (
-          <Link to={`${instancePath}/${instance.id}`}>{t('shell.inspector.open')}</Link>
-        ),
+        render: (_value: unknown, instance) =>
+          instance.endedAt === null ? emptyDash : formatValue(endedAtField, instance.endedAt, {}, { locale, text: t }),
       },
     ],
     [locale, t, instancePath],
