@@ -1,5 +1,5 @@
 import { expect, test } from '../test'
-import type { Locator, Page } from '@playwright/test'
+import type { FrameLocator, Locator, Page } from '@playwright/test'
 import { readdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { waitForDialog } from '../dialogs'
@@ -21,7 +21,7 @@ const fixtureMarker = 'DesignSystemSample'
 const modes = ['light', 'dark'] as const
 
 /** The figure of one state of a preview, found by its caption. */
-const figure = (page: Page, caption: string) => page.getByRole('figure', { name: caption, exact: true })
+const figure = (page: Page | FrameLocator, caption: string) => page.getByRole('figure', { name: caption, exact: true })
 
 // Each preview and a locator for its widget. The table and the kpi also draw an empty state, so they are looked up in
 // the "With data" figure. A field preview's first state is its typical one.
@@ -89,8 +89,12 @@ interface Recording {
   requests: string[]
 }
 
-/** Opens the harness from disk with the bundle next to it, and records errors and requests. */
-async function openHarness(page: Page, query: string): Promise<Recording> {
+/**
+ * Opens the harness from disk with the bundle next to it, and records errors and requests. When `sandboxed`, it opens
+ * a page that holds the harness in an iframe sandboxed as the Design System artifact's card frames are, without
+ * `allow-forms`.
+ */
+async function openHarness(page: Page, query: string, sandboxed = false): Promise<Recording> {
   const recording: Recording = { errors: [], requests: [] }
   page.on('console', (message) => {
     if (message.type() === 'error') {
@@ -103,6 +107,11 @@ async function openHarness(page: Page, query: string): Promise<Recording> {
     const { pathname } = new URL(route.request().url())
     if (pathname === '/design-system.html') {
       await route.fulfill({ path: harnessFile })
+    } else if (pathname === '/sandboxed.html') {
+      await route.fulfill({
+        contentType: 'text/html',
+        body: `<iframe sandbox="allow-scripts allow-same-origin" src="/design-system.html${query}" style="width:100%;height:100vh;border:0"></iframe>`,
+      })
     } else if (pathname.startsWith('/artifacts/design-system/')) {
       const file = path.join(bundleFolder, path.basename(pathname))
       await route.fulfill({ path: file }).catch(() => route.fulfill({ status: 404 }))
@@ -110,7 +119,7 @@ async function openHarness(page: Page, query: string): Promise<Recording> {
       await route.fulfill({ status: 404 })
     }
   })
-  await page.goto(`${harnessUrl}${query}`)
+  await page.goto(sandboxed ? `${origin}/sandboxed.html` : `${harnessUrl}${query}`)
   return recording
 }
 
@@ -226,6 +235,39 @@ for (const mode of modes) {
     expect(recording.errors).toEqual([])
   })
 }
+
+test('the form preview validates and saves inside a frame sandboxed without allow-forms', async ({ page }) => {
+  const messages: string[] = []
+  page.on('console', (message) => messages.push(message.text()))
+  const recording = await openHarness(page, '?preview=form&mode=light', true)
+  const frame = page.frameLocator('iframe')
+
+  const validation = figure(frame, 'Validation errors')
+  await expect(validation.getByRole('alert').filter({ hasText: 'Enter a title.' })).toBeVisible()
+  await expect(validation.getByRole('alert').filter({ hasText: 'This value is not valid.' })).toBeVisible()
+
+  // The fixtures answer inside the bundle, so no request reaches the network. The test wraps fetch to see the save.
+  const preview = page.frame({ url: (url) => url.pathname === '/design-system.html' })!
+  await preview.evaluate(() => {
+    const saves: string[] = []
+    const holder = window as unknown as { saves: string[] }
+    holder.saves = saves
+    const original = window.fetch
+    window.fetch = (input: RequestInfo | URL, init?: RequestInit) => {
+      if (init?.method === 'PATCH') {
+        saves.push(String(input))
+      }
+      return original.call(window, input, init)
+    }
+  })
+  await figure(frame, 'Read-only by a condition').getByRole('button', { name: 'Save', exact: true }).click()
+
+  await expect
+    .poll(() => preview.evaluate(() => (window as unknown as { saves: string[] }).saves))
+    .toEqual([expect.stringContaining('?form=LockedRequestForm')])
+  expect(messages.filter((text) => text.includes('Blocked form submission'))).toEqual([])
+  expect(recording.errors).toEqual([])
+})
 
 test('the field-date-time preview opens its date picker', async ({ page }) => {
   const recording = await openHarness(page, '?preview=field-date-time&mode=light')
