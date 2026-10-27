@@ -2,10 +2,11 @@ import { Alert, Button, Dropdown, Flex, Input, Modal, Table, type TableColumnsTy
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useSearchParams } from 'react-router'
 import { useCanvasActions } from './canvasActions'
+import { EmptyDash } from './EmptyValue'
 import { downloadExport, exportAddress, exportPath, saveFile, type ExportFormat } from './exports'
 import { FileLink } from './FileInput'
 import { FilterBar } from './FilterBar'
-import { formatValue } from './formatValue'
+import { formatValue, isNumeric } from './formatValue'
 import { ImportDialog } from './ImportDialog'
 import { importsPath } from './imports'
 import { navigatePath, navigateTarget, type NavigateOpen } from './navigateAction'
@@ -406,13 +407,20 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
       // The record API sorts a reference by its id, which is not the label people see, and cannot sort a file.
       sorter: field.type !== 'reference' && field.type !== 'file',
       sortOrder: field.type === 'reference' || field.type === 'file' ? undefined : sortOrder(field.name),
-      align: field.type === 'integer' || field.type === 'decimal' || field.type === 'money' ? 'right' : undefined,
-      render: (value: RecordValue, record: TableRow) =>
-        field.type === 'file' && 'downloadPath' in field && isFileValue(value) ? (
+      align: isNumeric(field.type) ? 'right' : undefined,
+      // Digits of equal width line up in a column.
+      onCell: isNumeric(field.type) ? () => ({ style: { fontVariantNumeric: 'tabular-nums' } }) : undefined,
+      render: (value: RecordValue, record: TableRow) => {
+        // A group row of a data source has no id and stays blank.
+        if (value === null || value === undefined) {
+          return record.id === null ? null : <EmptyDash />
+        }
+        return field.type === 'file' && 'downloadPath' in field && isFileValue(value) ? (
           <FileLink field={field} value={value} />
         ) : (
           formatValue(field, value, record.labels, { locale, text: t }, record.values)
-        ),
+        )
+      },
     }))
     const result = [...fieldColumns]
     if (rowActions.length > 0) {
@@ -596,6 +604,7 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
           values={query.parameters ?? {}}
           errors={parameterErrors ?? {}}
           onChange={onFilter}
+          locale={locale}
         />
       )}
       {actionError !== null && <Alert data-testid="table-action-error" type="error" title={actionError} />}

@@ -294,6 +294,7 @@ const texts = {
   'shell.form.removed': 'Removed',
   'shell.lookup.search': 'Search',
   'shell.table.empty': 'No records yet.',
+  'shell.value.notSet': 'Not set',
   'shell.table.loadFailed': 'The records could not be loaded.',
   'shell.notFound.title': 'Page not found',
   'shell.history.title': 'History',
@@ -457,8 +458,8 @@ describe('FormWidget', () => {
     expect(screen.getByLabelText('Amount')).toHaveValue('12.50')
     expect(screen.getByLabelText('Amount')).toHaveAttribute('inputmode', 'decimal')
     expect(screen.getByLabelText('Done')).not.toBeChecked()
-    // The picker shows the instant in the browser's time zone, to the second.
-    expect(screen.getByLabelText('Due at')).toHaveValue(dayjs('2026-10-06T02:00:00Z').format('YYYY-MM-DD HH:mm:ss'))
+    // The picker shows the instant in the browser's time zone, to the minute, in the pattern of the locale.
+    expect(screen.getByLabelText('Due at')).toHaveValue(dayjs('2026-10-06T02:00:00Z').format('MM/DD/YYYY h:mm A'))
     expect(screen.getByLabelText('Category')).toHaveValue('Office')
     expect(screen.getByLabelText('Category')).toHaveAttribute('readonly')
   })
@@ -527,9 +528,9 @@ describe('FormWidget', () => {
     const requests = stubFetch()
     renderForm()
 
-    await userEvent.type(screen.getByLabelText('Due on'), '2026-10-07{Enter}')
+    await userEvent.type(screen.getByLabelText('Due on'), '10/07/2026{Enter}')
 
-    expect(screen.getByLabelText('Due on')).toHaveValue('2026-10-07')
+    expect(screen.getByLabelText('Due on')).toHaveValue('10/07/2026')
     expect(requests()).toEqual([])
     expect(screen.getByTestId('location')).toHaveTextContent('/e2e/noteform/new')
   })
@@ -1013,7 +1014,7 @@ describe('FormWidget', () => {
     const requests = stubFetch({ status: 201, body: computedJson(1) })
     renderForm(null, computedWidget)
 
-    expect(screen.getByLabelText('Total')).toHaveValue('')
+    expect(screen.getByLabelText('Total')).toHaveValue('Not set')
     await userEvent.type(screen.getByLabelText('Title'), 'Buy paper')
     await userEvent.type(screen.getByLabelText('Amount'), '1.50')
     await userEvent.click(screen.getByRole('button', { name: 'Add row' }))
@@ -1033,11 +1034,11 @@ describe('FormWidget', () => {
     renderForm(null, sequenceWidget)
 
     const number = screen.getByLabelText('Number')
-    expect(number).toHaveValue('')
+    expect(number).toHaveValue('Not set')
     expect(number).toHaveAttribute('readonly')
     await userEvent.type(screen.getByLabelText('Title'), 'Buy paper')
     await userEvent.type(number, 'PR-1')
-    expect(number).toHaveValue('')
+    expect(number).toHaveValue('Not set')
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     await waitFor(() => expect(requests()).toHaveLength(1))

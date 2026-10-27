@@ -1,9 +1,10 @@
 import { Button, ConfigProvider, Flex, Form, Input, Space, Table, type TableColumnsType } from 'antd'
-import { useMemo, useRef, useState } from 'react'
+import { useMemo, useRef, useState, type CSSProperties } from 'react'
 import { compactFormTheme } from './antTheme'
+import { EmptyDash } from './EmptyValue'
 import { FieldInput } from './FieldInput'
 import { FileLink } from './FileInput'
-import { formatValue, moneyCurrency } from './formatValue'
+import { formatValue, isNumeric, moneyCurrency } from './formatValue'
 import {
   isFileValue,
   type FileValue,
@@ -15,6 +16,7 @@ import {
 import { ReferenceLookup } from './ReferenceLookup'
 import type { FieldMetadata } from './site'
 import { useText } from './texts'
+import { useEmptyStyle } from './useEmptyStyle'
 
 interface ChildCollectionTableProps {
   /** A child collection field. Its `fields` are the child entity's fields. */
@@ -34,6 +36,9 @@ interface ChildCollectionTableProps {
 
 // Field names start with a letter, so this key never names a field column.
 const removeColumnKey = '$remove'
+
+// Digits of equal width, on the right.
+const numberStyle: CSSProperties = { textAlign: 'right', fontVariantNumeric: 'tabular-nums' }
 
 /** The reference cell whose lookup is open. */
 interface OpenLookup {
@@ -58,6 +63,7 @@ export function ChildCollectionTable({
   readOnly = false,
 }: ChildCollectionTableProps) {
   const t = useText()
+  const emptyStyle = useEmptyStyle()
   const childFields = useMemo(() => field.fields ?? [], [field.fields])
   // A client key per row object, carried over when a row is edited, so React keeps each row's inputs.
   const keys = useRef(new WeakMap<RecordRow, number>())
@@ -107,8 +113,11 @@ export function ChildCollectionTable({
         title: label,
         // The inputs keep a usable width when the table scrolls sideways.
         width: 160,
+        // Numbers sit on the right, in the header and the cells.
+        align: isNumeric(child.type) ? ('right' as const) : undefined,
         render: (_value: unknown, row: RecordRow, index: number) => {
           const cellErrors = errors[`${index}/${child.name}`]
+          const shown = formatValue(child, row[child.name] ?? null, aligned[index] ?? {}, { locale, text: t }, row)
           return (
             <Form.Item
               validateStatus={cellErrors ? 'error' : undefined}
@@ -121,12 +130,15 @@ export function ChildCollectionTable({
               {(readOnly || child.computed) && child.type === 'file' ? (
                 isFileValue(row[child.name]) ? (
                   <FileLink field={child} value={row[child.name] as FileValue} />
-                ) : null
+                ) : (
+                  <EmptyDash />
+                )
               ) : readOnly || child.computed ? (
                 <Input
                   readOnly
                   aria-label={`${label} ${index + 1}`}
-                  value={formatValue(child, row[child.name] ?? null, aligned[index] ?? {}, { locale, text: t }, row)}
+                  value={shown || '—'}
+                  style={{ ...(shown ? undefined : emptyStyle), ...(isNumeric(child.type) ? numberStyle : undefined) }}
                 />
               ) : child.type === 'reference' ? (
                 // The label cannot be typed. The record is chosen in the lookup, and its id is sent.
@@ -154,6 +166,8 @@ export function ChildCollectionTable({
                   currency={moneyCurrency(child, row)}
                   onChange={(value) => edit(index, child.name, value)}
                   ariaLabel={`${label} ${index + 1}`}
+                  locale={locale}
+                  alignEnd={isNumeric(child.type)}
                 />
               )}
             </Form.Item>

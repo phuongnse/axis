@@ -1,5 +1,5 @@
 import { Alert, Button, Card, Flex } from 'antd'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import { boundParameterQuery } from './boundParameters'
 import { useCanvasActions } from './canvasActions'
@@ -8,6 +8,8 @@ import { navigatePath } from './navigateAction'
 import { fetchRecords, type RecordItem, type RecordValue } from './records'
 import type { WidgetMetadata } from './site'
 import { useText } from './texts'
+import { useEmptyStyle } from './useEmptyStyle'
+import { visuallyHidden } from './visuallyHidden'
 
 interface KpiWidgetProps {
   sitePath: string
@@ -31,8 +33,8 @@ interface LoadState {
 /**
  * Shows the one total row of a kpi widget's data source as a tile: `<label>: <value>` and, with a
  * comparison, `<comparison label>: <comparison value>`. A value looks as it does in a table cell, the
- * SPA computes no difference or percentage, and a `null` measure shows the platform text for an empty
- * value. The tile asks for the row with the value of each page parameter the widget binds, under the data
+ * SPA computes no difference or percentage, and a `null` measure shows a muted dash with the platform text for an empty
+ * value hidden for assistive technology. The tile asks for the row with the value of each page parameter the widget binds, under the data
  * source parameter's name, and asks again when one changes. The compiler makes every parameter that the
  * widget leaves unbound optional. With a navigate action the whole tile is a link to the
  * target page, ending in the action's label, and the action reads only the page's parameter values.
@@ -42,6 +44,7 @@ interface LoadState {
 export function KpiWidget({ sitePath, widget, locale, pageValues }: KpiWidgetProps) {
   const t = useText()
   const canvas = useCanvasActions()
+  const emptyStyle = useEmptyStyle()
   const { dataSource, kpi } = widget
   // The server sets both on a kpi widget.
   const { name, rowsPath, columns } = dataSource!
@@ -66,10 +69,16 @@ export function KpiWidget({ sitePath, widget, locale, pageValues }: KpiWidgetPro
   }, [rowsPath, query, requestUrl, name])
 
   const row = loading ? null : state.row
-  const display = (measure: string): string => {
+  const display = (measure: string): ReactNode => {
     const value = row?.values[measure] as RecordValue | undefined
     if (value === null || value === undefined) {
-      return t('shell.kpi.empty')
+      // The dash is for the eye and the platform text is for assistive technology.
+      return (
+        <span style={emptyStyle}>
+          <span aria-hidden="true">—</span>
+          <span style={visuallyHidden}>{t('shell.kpi.empty')}</span>
+        </span>
+      )
     }
     const column = columns.find((candidate) => candidate.name === measure)
     return column ? formatValue(column, value, row!.labels, { locale, text: t }, row!.values) : String(value)

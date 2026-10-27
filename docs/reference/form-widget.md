@@ -112,14 +112,14 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
     | `integer`, `decimal` | a plain text input with a numeric keyboard hint. It keeps the typed text as it is. With `min` or `max` its placeholder shows the range, such as `1 – 10`, `≥ 1` or `≤ 10`, and a typed number outside the range is marked invalid. It is never blocked, because the server decides. A number input that takes the locale's decimal comma is not decided yet |
     | `money` | the input of a decimal with the currency code beside the box. The code is `currency`, or the current value of `currencyField` in the form, or in the row of a child collection. Without a code of three letters nothing is shown beside the box. It sends the typed text as a plain JSON number |
     | `boolean` | a checkbox |
-    | `date` | a date picker. With `min` or `max` it disables the dates outside them and its placeholder shows the range. It writes the locale's short numeric date _(planned)_ |
-    | `date-time` | a date and time picker, to the second today and to the minute on the locale's clock _(planned)_, in the browser's time zone. It sends the instant in UTC with no fraction. With `min` or `max` it disables the dates outside them and its placeholder shows the range |
+    | `date` | a date picker. With `min` or `max` it disables the dates outside them and its placeholder shows the range. It shows and accepts the locale's short numeric date, such as `03/18/2026` in `en` and `18/03/2026` in `vi` |
+    | `date-time` | a date and time picker to the minute, with no seconds column, that shows and accepts the date and the time on the locale's clock, such as `03/04/2026 4:30 PM` in `en` and `04/03/2026 16:30` in `vi`, in the browser's time zone. It sends the instant in UTC with zero seconds and no fraction. With `min` or `max` it disables the dates outside them and its placeholder shows the range |
     | `enum` | a choice of the declared values, as written in the entity file, or their labels with `valueLabels` |
     | `file` | the [file input](file-fields.md#in-the-spa): the current file's name as a download link, an Upload button and, when the field is not required, a Remove button. A read-only file shows its link only |
     | `reference` | the label of the chosen record, read-only, with a choose button that opens the lookup. A field that is not required and is set also has a clear button. Choose and Clear are icon buttons, a search and a close icon, with their names as tooltips _(planned)_ |
     | `references` | a list of the chosen records' labels in their order, each with a remove button, and an add button that opens the lookup, described under **Set of references** |
     | `child-collection` | a table of its rows, described under **Child collections** |
-    | any type with `computed`, `sequence` or `creator`, and any field but a child collection that the form makes read-only | the value the server returned, formatted as a table cell shows it, in a read-only text input today and as plain text _(planned)_, see **Field look**. It changes only when the record is saved and loaded again |
+    | any type with `computed`, `sequence` or `creator`, and any field but a child collection that the form makes read-only | the value the server returned, formatted as a table cell shows it, in a read-only text input today and as plain text _(planned)_, see **Field look**. An empty value shows "Not set" in muted italics, the value of the input today. It changes only when the record is saved and loaded again |
 
   - **Lookup.** The choose button opens a dialog titled with the field's
     label. It lists the target entity's records through their record API,
@@ -176,12 +176,13 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
       number, such as `Quantity 2`. A file cell is the file input, and its
       Upload button is named like `Upload File 2`. A computed child field's cell is a
       read-only text input with the row's value, formatted as a table cell
-      shows it.
+      shows it. An empty read-only or computed cell shows a muted italic "—".
+      Integer, decimal and money columns sit on the right, in the header and
+      in the text and input cells, in tabular figures, see **Shown values** in
+      [frontend.md](frontend.md).
     - _(planned)_ A read-only or computed cell shows plain text, not an
       input, and keeps an input's 32px height, so it lines up with the inputs
-      beside it. An empty one shows a muted "—". A reference column is 240px
-      wide. Number cells sit on the right, see **Shown values** in
-      [frontend.md](frontend.md).
+      beside it. A reference column is 240px wide.
     - Each row has a remove button. An add button below the table appends a
       row with every child field `null`. Rows cannot be reordered.
       _(planned)_ Remove row is a red trash icon button. Add row sits above

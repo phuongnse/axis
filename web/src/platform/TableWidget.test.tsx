@@ -14,6 +14,7 @@ import type {
   WidgetMetadata,
 } from './site'
 import { isSortableHeader } from '../test/antd'
+import { designTokensFor } from './designTokens'
 import { TableWidget } from './TableWidget'
 import { TextProvider } from './TextProvider'
 import { narrowWidthQuery } from './useNarrowWidth'
@@ -727,7 +728,7 @@ describe('TableWidget', () => {
     expect(screen.queryByRole('columnheader', { name: 'Software' })).not.toBeInTheDocument()
   })
 
-  it('right-aligns numbers and shows them as the API wrote them', async () => {
+  it('right-aligns numbers in tabular figures and groups them without losing a digit', async () => {
     stubRecords(
       `{"items":[{"id":"${noteId}","version":3,"values":{"price":1250.50},"labels":{}}],"page":1,"pageSize":20,"totalCount":1}`,
     )
@@ -751,9 +752,46 @@ describe('TableWidget', () => {
       chart: null,
     })
 
-    const cell = await screen.findByRole('cell', { name: '1250.50' })
-    expect(cell).toHaveStyle({ textAlign: 'right' })
-    expect(screen.getByRole('columnheader', { name: 'price' })).toBeInTheDocument()
+    const cell = await screen.findByRole('cell', { name: '1,250.50' })
+    expect(cell).toHaveStyle({ textAlign: 'right', fontVariantNumeric: 'tabular-nums' })
+    expect(screen.getByRole('columnheader', { name: 'price' })).toHaveStyle({ textAlign: 'right' })
+  })
+
+  it('shows a null cell as a muted italic dash', async () => {
+    stubRecords(
+      `{"items":[{"id":"${noteId}","version":3,"values":{"title":null},"labels":{}}],"page":1,"pageSize":20,"totalCount":1}`,
+    )
+
+    renderWidget('', {
+      ...noteWidget,
+      entity: { ...noteWidget.entity!, fields: [field('title', 'text', null)] },
+    })
+
+    const dash = await screen.findByText('—')
+    expect(dash).toHaveStyle({ fontStyle: 'italic' })
+    // The colour is the muted text token, not the plain text colour.
+    expect(dash).toHaveStyle({ color: designTokensFor('light').colour.textMuted })
+  })
+
+  it('leaves a null cell of a group row blank', async () => {
+    stubRecords(
+      `{"items":[{"id":null,"values":{"department":null,"requests":2},"labels":{}}],"page":1,"pageSize":10,"totalCount":1}`,
+    )
+
+    renderWidget('', {
+      ...noteListWidget,
+      dataSource: {
+        ...noteListWidget.dataSource!,
+        columns: [
+          { name: 'department', type: 'text', labelKey: null, values: null, target: null },
+          { name: 'requests', type: 'integer', labelKey: null, values: null, target: null },
+        ],
+      },
+    })
+
+    const row = (await screen.findByText('2')).closest('tr')!
+    expect(within(row).queryByText('—')).not.toBeInTheDocument()
+    expect(within(row).getAllByRole('cell')[0]).toHaveTextContent(/^$/)
   })
 
   it('heads a data source table with its column labels or names and requests its rows path', async () => {

@@ -22,7 +22,8 @@ import { ReferencesInput } from './ReferencesInput'
 import type { EntityMetadata, FieldMetadata, FormMetadata } from './site'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
-import { usePhoneWidth } from './usePhoneWidth'
+import { useEmptyStyle } from './useEmptyStyle'
+import { useNarrowWidth } from './useNarrowWidth'
 
 /** The values the form started from, which decide what changed, with the record's labels and version. */
 interface Snapshot {
@@ -170,9 +171,11 @@ export function useRecordForm(
   conditions?: FormConditions,
 ) {
   const t = useText()
+  const emptyStyle = useEmptyStyle()
+  const notSet = t('shell.value.notSet')
   const canvas = useContext(FormCanvasContext)
   const { spacing } = useDesignTokens()
-  const phone = usePhoneWidth()
+  const narrow = useNarrowWidth()
   const shown = useMemo(() => sections.flatMap((section) => section.fields), [sections])
   const [snapshot, setSnapshot] = useState<Snapshot>(() => emptySnapshot(entity.fields))
   const [values, setValues] = useState<Record<string, FieldValue>>(snapshot.initial)
@@ -418,10 +421,19 @@ export function useRecordForm(
     const id = field.name
     if (field.type !== 'child-collection' && (readOnly || field.computed || field.sequence || field.creator)) {
       if (field.type === 'references') {
-        return <Input id={id} readOnly value={referencesLabels(value, labels[field.name]).join(', ')} />
+        const joined = referencesLabels(value, labels[field.name]).join(', ')
+        return <Input id={id} readOnly value={joined || notSet} style={joined ? undefined : emptyStyle} />
       }
       if (field.type === 'file') {
-        return isFileValue(value) ? <FileLink field={field} value={value} /> : null
+        return isFileValue(value) ? (
+          <FileLink field={field} value={value} />
+        ) : (
+          <Input id={id} readOnly value={notSet} style={emptyStyle} />
+        )
+      }
+      // An empty value shows the words, because fields are read one by one.
+      if (value === null) {
+        return <Input id={id} readOnly value={notSet} style={emptyStyle} />
       }
       // The server sets the value on save, so it is shown as a table cell shows it.
       return (
@@ -482,6 +494,7 @@ export function useRecordForm(
             id={id}
             value={value as RecordValue}
             currency={moneyCurrency(field, values)}
+            locale={locale}
             onChange={(next) => set(field.name, next)}
           />
         )
@@ -534,7 +547,7 @@ export function useRecordForm(
                     </Form.Item>
                   )
                   return (
-                    <Col key={field.name} xs={24} lg={phone ? 24 : entry.width * 2}>
+                    <Col key={field.name} xs={24} lg={narrow ? 24 : entry.width * 2}>
                       {canvas ? canvas.field(field.name, item) : item}
                     </Col>
                   )

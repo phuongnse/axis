@@ -239,7 +239,7 @@ describe('the Design tab of a page', () => {
     expect(screen.queryByTestId('studio-page-editor')).not.toBeInTheDocument()
     expect(await within(canvas).findByTestId('kpi-tile', {}, slow)).toBeInTheDocument()
     await waitFor(
-      () => expect(within(canvas).getByTestId('kpi-value')).toHaveTextContent('Total amount: 1250.50'),
+      () => expect(within(canvas).getByTestId('kpi-value')).toHaveTextContent('Total amount: 1,250.50'),
       slow,
     )
     expect(within(canvas).getByRole('heading', { name: 'Dashboard' })).toBeInTheDocument()
