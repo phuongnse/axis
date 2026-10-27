@@ -86,10 +86,9 @@ seen this one.
    artifact type's limit, that names the review and its branch, such as
    `Design review field-look (design/field-look): required mark and help
    text`.
-7. Commit the change on the branch with a message that says what it shows
-   and ends its first line with `[skip ci]`, so the branch history lists the
-   review's changes in order. The prototype does not update the tests, so CI
-   would only fail on it.
+7. Commit the change on the branch with a message that says what it shows,
+   so the branch history lists the review's changes in order. The branch
+   stays local: only its tag is pushed, at the end.
 8. Show the owner the card and ask for a verdict. Keep, change or drop the
    change as they say. Write down each rule they agree, in their words, for
    the docs change at the end.
@@ -119,15 +118,20 @@ A check passes only when the card behaves as it will in the artifact.
    [keeping the docs current](../../../docs/delivery.md#keeping-the-docs-current),
    and mark what is not built yet. Open it as a hand-made pull request for
    the owner to merge.
-2. Before the issue, push the prototype branch, `git push -u origin
-   design/<topic>`, so NexKit's agents can read it. Its commits carry
-   `[skip ci]`, so the push starts no run; check with
-   `gh run list --branch design/<topic>`. The issue links its comparison with
-   `main`. The branch is never merged, and it is deleted once the issue's work
-   is merged.
+2. Before the issue, tag the prototype's last commit and push only the tag,
+   so NexKit's agents can read it and no link to it ever breaks:
+   `git tag -a design-review/<date>-<topic> -m "<what it shows>"` and
+   `git push origin design-review/<date>-<topic>`. CI and CodeQL start only on
+   branch pushes, so the tag starts no run; check with `gh run list`. Never
+   push the branch: the prototype does not update the tests, so CI would only
+   fail on it. The issue links the tag's comparison with the commit the branch
+   started from, `compare/<base>...design-review/<date>-<topic>`, where
+   `<base>` is `git merge-base design/<topic> main`, so the diff stays the
+   same as `main` moves on. The tag is never deleted. Delete the local branch
+   once it is tagged.
 3. Write one NexKit issue that builds the whole review, as
    [Writing an issue](../axis-nexkit/SKILL.md#writing-an-issue) says. It
-   links the docs sections, the artifact and the prototype branch, and names
+   links the docs sections, the artifact and the prototype tag, and names
    the tokens, widgets and previews it changes. Open it once the docs pull
    request is merged, so its links point at `main`. Do not split it: NexKit
    splits it if it needs to.
@@ -168,3 +172,4 @@ asks.
 | A dash shows as garbled characters, such as "â€”"  | The page lacks `<meta charset="utf-8">`. Add it and check the card again.                  |
 | A card is cut off or ends in an empty band        | Measure its content height again at 992 px and set the marker's height to it.               |
 | A change note is refused                          | It is over 280 characters. Shorten it and keep the review's name and branch.                 |
+| A link to the prototype gives a 404              | It points at a branch, which was deleted. Link the review's `design-review/` tag instead.    |

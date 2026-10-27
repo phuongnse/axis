@@ -229,8 +229,10 @@ owner.
   in words, one change at a time, the session runs a design review. Each
   change is prototyped in the real widget code on a `design/<topic>` branch
   and published to the artifact, so the owner sees the real widgets. The
-  branch is pushed before the review's issue, with CI skipped because the
-  prototype does not update the tests, and it is never merged.
+  branch stays local and is never merged. Before the review's issue its last
+  commit gets a `design-review/<date>-<topic>` tag, and only the tag is pushed:
+  a tag starts no CI run, and it is never deleted, so the links to the
+  prototype never break.
 - **The design runs ahead of the repository only by open issues and an open
   review.** While a design issue is open, the artifact holds its change and its
   last change note names the issue. While a review is open, the artifact may
@@ -241,7 +243,7 @@ owner.
   agreed the changes, one hand-made docs pull request records the rules and
   any decision, including every change to configuration, an API or a decision.
   One NexKit issue then builds all of it and links the docs, the artifact and
-  the prototype branch. NexKit splits it if it needs to: the owner does not.
+  the prototype's tag. NexKit splits it if it needs to: the owner does not.
 - **A sync follows the repository.** After a merged change to the tokens or a
   widget, or whenever the owner asks, the session renders the previews again
   with `scripts/design-system.sh`, reads the tokens from
