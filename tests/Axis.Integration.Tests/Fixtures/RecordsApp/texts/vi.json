@@ -42,6 +42,7 @@
     "orderSummary.lines": "Dòng",
     "departments.title": "Phòng ban",
     "myTasks.title": "Công việc của tôi",
+    "item.name.help": "Tên mà mọi người tìm kiếm.",
     "item.department": "Phòng ban",
     "item.quantityPositive": "Số lượng phải lớn hơn không.",
     "item.priceNotNegative": "Giá không được âm.",

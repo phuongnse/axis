@@ -168,6 +168,40 @@ public sealed class FormCompilerTests
     }
 
     [Theory]
+    [InlineData("0")]
+    [InlineData("13")]
+    [InlineData("1.5")]
+    public void Form_field_width_that_is_not_a_whole_number_from_1_to_12_is_reported_and_a_widget_naming_it_is_not(string width)
+    {
+        using var folder = Folder(Form("Order", $$"""[ { "title": { "textKey": "orderLayout.main" }, "fields": [ { "field": "number", "width": {{width}} } ] } ]"""))
+            .With("pages/order-form.json", FormPage("""{ "type": "form", "form": "OrderLayout" }"""));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.SchemaViolation, FormFile, "/sections/0/fields/0/width"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Null(result.Model);
+    }
+
+    [Theory]
+    [InlineData("""{ "field": "number", "width": 1 }""", 1)]
+    [InlineData("""{ "field": "number", "width": 12 }""", 12)]
+    [InlineData("""{ "field": "number" }""", 12)]
+    public void Form_field_width_from_1_to_12_compiles_and_defaults_to_the_whole_row(string field, int width)
+    {
+        using var folder = Folder(Form("Order", $$"""[ { "title": { "textKey": "orderLayout.main" }, "fields": [ {{field}} ] } ]"""));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+        Assert.True(result.Model.TryGetForm("OrderLayout", out var form));
+        Assert.Equal(width, Assert.Single(Assert.Single(form.Sections).Fields).Width);
+    }
+
+    [Theory]
     [InlineData("""{ "type": "form", "form": "OrderLayout", "entity": "Order" }""", "/widgets/0")]
     [InlineData("""{ "type": "form" }""", "/widgets/0")]
     [InlineData("""{ "type": "table", "entity": "Order", "form": "OrderLayout" }""", "/widgets/0/form")]

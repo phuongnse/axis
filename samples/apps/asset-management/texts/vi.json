@@ -29,6 +29,7 @@
     "asset.purchaseCost": "Giá mua",
     "asset.purchaseDate": "Ngày mua",
     "asset.warrantyEnd": "Hết hạn bảo hành",
+    "asset.warrantyEnd.help": "Ngày hết hạn bảo hành của nhà cung cấp. Bảng điều khiển báo sắp hết hạn trước 30 ngày.",
     "asset.attachments": "Tệp đính kèm",
     "asset.maintenance": "Bảo trì",
     "asset.software": "Phần mềm",

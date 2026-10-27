@@ -87,6 +87,7 @@ export const fieldKeysEditedElsewhere: Record<string, string> = {
   name: 'the name column',
   type: 'the type column',
   label: 'the label column',
+  help: 'the settings column',
 }
 
 /** The settings a field type takes. An unknown type takes none. */

@@ -18,7 +18,7 @@ _(planned for Mx)_ are not built yet, and Dn refers to [decisions.md](../decisio
     `values`, `target`, `expression`, `default`, `sequence`, `creator`,
     `searchable` and `sensitive`. The settings follow the
     [field types](resource-files.md#entity-field-types-and-constraints), so a
-    setting a type does not take cannot be edited. _(planned)_ The settings
+    setting a type does not take cannot be edited. The settings
     column also has a field's [`help`](resource-files.md#resource-file-shape)
     on every type, a picker of the existing text keys like the label.
   - The type picker also offers `money`, `file` and `references`, and a child

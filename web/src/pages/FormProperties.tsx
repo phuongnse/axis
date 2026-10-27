@@ -1,4 +1,4 @@
-import { Button, Checkbox, Flex, Input, Select, Typography } from 'antd'
+import { Button, Checkbox, Flex, Input, InputNumber, Select, Typography } from 'antd'
 import { lazy, Suspense, useContext, useState } from 'react'
 import { renameSection } from '../platform/formLayout'
 import { getAt } from '../platform/jsonPatch'
@@ -145,6 +145,19 @@ function FieldProperties({
           </div>
         )}
       </div>
+      <Flex vertical gap={4}>
+        <Typography.Text>{t('shell.studio.design.fieldWidth')}</Typography.Text>
+        <InputNumber
+          aria-label={t('shell.studio.design.fieldWidth')}
+          min={1}
+          max={12}
+          precision={0}
+          placeholder="12"
+          style={{ width: '100%' }}
+          value={typeof field.width === 'number' ? field.width : null}
+          onChange={(next) => onChange(`${pointer}/width`, typeof next === 'number' ? next : undefined)}
+        />
+      </Flex>
       {conditions.map((condition) => (
         <ConditionBox
           key={condition}

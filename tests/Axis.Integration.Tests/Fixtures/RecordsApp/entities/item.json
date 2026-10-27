@@ -4,7 +4,7 @@
   "name": "Item",
   "formatVersion": 1,
   "fields": [
-    { "name": "name", "type": "text", "required": true, "maxLength": 100 },
+    { "name": "name", "type": "text", "required": true, "maxLength": 100, "help": { "textKey": "item.name.help" } },
     { "name": "quantity", "type": "integer" },
     { "name": "price", "type": "decimal", "precision": 20, "scale": 2 },
     { "name": "active", "type": "boolean" },

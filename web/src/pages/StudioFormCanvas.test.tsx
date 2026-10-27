@@ -410,6 +410,84 @@ describe('the Design tab of a form', () => {
     )
   })
 
+  it('draws the fields side by side in columns of their width and a field without width on the whole row', async () => {
+    const form = widget.form!
+    const withWidths: EntityWidgetMetadata = {
+      ...widget,
+      form: {
+        ...form,
+        sections: [
+          {
+            ...form.sections[0],
+            fields: [{ ...form.sections[0].fields[0], width: 4 }],
+          },
+          form.sections[1],
+        ],
+      },
+    }
+    stub(() => respond(withWidths))
+    renderEditor()
+
+    const canvas = await openDesign()
+    const title = await within(canvas).findByRole('group', { name: 'title' }, slow)
+
+    expect(title.closest('.ant-col')).toHaveClass('ant-col-xs-24', 'ant-col-lg-8')
+    await userEvent.click(within(await screen.findByTestId('studio-form-steps', {}, slow)).getByText('Add details'))
+    const status = await within(canvas).findByRole('group', { name: 'status' }, slow)
+    expect(status.closest('.ant-col')).toHaveClass('ant-col-lg-24')
+  })
+
+  it('writes the width of the selected field into the draft and posts it', async () => {
+    const fetchMock = stub()
+    renderEditor()
+
+    const canvas = await openDesign()
+    await userEvent.click(await within(canvas).findByRole('group', { name: 'title' }, slow))
+    const width = within(screen.getByTestId('studio-design-panel')).getByRole('spinbutton', {
+      name: 'Width in twelfths of the row',
+    })
+    await userEvent.type(width, '8')
+
+    await waitFor(
+      () => expect(metadataPosts(fetchMock).some((body) => body.sections[0].fields[0].width === 8)).toBe(true),
+      slow,
+    )
+  })
+
+  it('warns above the canvas when the draft has seven steps and still lets the form be saved', async () => {
+    const steps = (count: number) =>
+      Array.from({ length: count }, (_, index) => ({
+        title: { textKey: 'ticket.steps.problem' },
+        sections: index === 0 ? ['problem', 'details'] : [],
+      }))
+    stub(() => respond(widget), { ...draft, steps: steps(7) })
+    renderEditor()
+
+    const canvas = await openDesign()
+
+    expect(await screen.findByTestId('studio-form-many-steps')).toHaveTextContent('more than six steps')
+    await userEvent.click(await within(canvas).findByRole('group', { name: 'title' }, slow))
+    await userEvent.type(
+      within(screen.getByTestId('studio-design-panel')).getByRole('spinbutton', {
+        name: 'Width in twelfths of the row',
+      }),
+      '8',
+    )
+    expect(screen.getByRole('button', { name: 'Save' })).toBeEnabled()
+  })
+
+  it('does not warn when the draft has six steps', async () => {
+    stub(() => respond(widget), {
+      ...draft,
+      steps: Array.from({ length: 6 }, () => ({ title: { textKey: 'ticket.steps.problem' }, sections: [] })),
+    })
+    renderEditor()
+
+    await openDesign()
+
+    expect(screen.queryByTestId('studio-form-many-steps')).not.toBeInTheDocument()
+  })
+
   it('selects a field with Enter', async () => {
     stub()
     renderEditor()
