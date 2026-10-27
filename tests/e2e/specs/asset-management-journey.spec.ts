@@ -31,7 +31,7 @@ interface SampleScenario {
 
 interface SampleForm {
   entity: string
-  sections: { name: string; title: { textKey: string }; fields: { field: string }[] }[]
+  sections: { name: string; title: { textKey: string }; fields: { field: string; width?: number }[] }[]
 }
 
 const policies = [
@@ -634,7 +634,8 @@ test.describe('the author builds the asset management application with Studio on
       panel.locator(`[data-testid="${testId}"][data-path="${pointer}"]`)
 
     // A section gets its name and title, then its fields. The first field is dragged from the palette onto the section's
-    // line in the outline. The others are clicked, and each lands after the field selected before it.
+    // line in the outline. The others are clicked, and each lands after the field selected before it. Each field gets
+    // its width once it is selected.
     async function layOutSection(index: number) {
       const section = form.sections[index]
       await sectionTitle(index).click()
@@ -655,6 +656,12 @@ test.describe('the author builds the asset management application with Studio on
           'aria-current',
           'true',
         )
+        // The new field is selected, so the property panel sets its width.
+        if (field.width !== undefined) {
+          await panel
+            .getByRole('spinbutton', { name: 'Width in twelfths of the row', exact: true })
+            .fill(String(field.width))
+        }
       }
     }
 
