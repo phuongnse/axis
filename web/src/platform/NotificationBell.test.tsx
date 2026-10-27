@@ -97,6 +97,7 @@ describe('NotificationBell', () => {
 
     const bell = await screen.findByRole('button', { name: 'Notifications, 2 unread' })
     expect(bell).toHaveTextContent('2')
+    expect(within(bell).queryByRole('img')).toBeNull()
     expect(screen.getByRole('status')).toHaveTextContent('Notifications, 2 unread')
   })
 

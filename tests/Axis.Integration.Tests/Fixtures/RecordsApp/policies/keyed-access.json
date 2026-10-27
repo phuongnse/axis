@@ -1,0 +1,11 @@
+{
+  "id": "e3b1c2a4-5d6f-4a7b-8c9d-0e1f2a3b4c5d",
+  "kind": "policy",
+  "name": "KeyedAccess",
+  "formatVersion": 1,
+  "roles": ["keyed"],
+  "grants": [
+    { "entity": "Ticket", "actions": ["read", "create", "import"] },
+    { "entity": "Ticket", "actions": ["update"], "filter": "priority == 1", "fields": ["title"] }
+  ]
+}

@@ -287,6 +287,93 @@ public sealed class RecordImportEndpointTests(RecordApiFixture fixture) : IClass
     }
 
     [Fact]
+    public async Task A_keyed_commit_updates_the_records_whose_key_matches_creates_the_others_and_audits_both()
+    {
+        await ResetAsync();
+        await CreateTicketAsync("a1", "Printer", 2);
+        await CreateTicketAsync("b1", "Scanner", 1);
+        var upload = await UploadAsync(fixture.Client, Tickets, "code,title,priority\na1,Renamed,\nb1,Other,3\nn1,New,\n,Blank,\n", key: "code");
+        await RunChecksAsync();
+        Assert.Equal("checked", await StateAsync(upload.Id, Tickets));
+        var updates = (long)(await fixture.ScalarAsync(TenantA, "SELECT count(*) FROM axis.audit_records WHERE action = 'record.updated'"))!;
+
+        using var accepted = await CommitAsync(fixture.Client, Tickets, upload.Id);
+        Assert.Equal(HttpStatusCode.Accepted, accepted.StatusCode);
+        Assert.Equal(1, await RunCommitsAsync());
+
+        Assert.Equal("committed", await StateAsync(upload.Id, Tickets));
+        Assert.Equal(4L, await TicketCountAsync());
+        Assert.Equal("Renamed", await TicketFieldAsync("a1", "f_title"));
+        Assert.Equal(2L, await TicketFieldAsync("a1", "f_priority"));
+        Assert.Equal("Other", await TicketFieldAsync("b1", "f_title"));
+        Assert.Equal(3L, await TicketFieldAsync("b1", "f_priority"));
+        Assert.Equal("New", await TicketFieldAsync("n1", "f_title"));
+        Assert.Equal(1L, await TicketCountAsync("f_title = 'Blank' AND f_code IS NULL"));
+        Assert.Equal(
+            2L,
+            (long)(await fixture.ScalarAsync(
+                TenantA,
+                $"SELECT count(*) FROM axis.audit_records WHERE action = 'record.updated' AND actor = 'anna' AND actor_name = 'Anna Employee' AND record_id IN (SELECT id FROM {TicketTable} WHERE f_code IN ('a1', 'b1'))"))!);
+        Assert.Equal(updates + 2, (long)(await fixture.ScalarAsync(TenantA, "SELECT count(*) FROM axis.audit_records WHERE action = 'record.updated'"))!);
+        Assert.Equal(
+            1L,
+            await ImportedAuditCountAsync("actor = 'anna' AND details = '{\"created\": 2, \"updated\": 2}'::jsonb"));
+    }
+
+    [Fact]
+    public async Task A_keyed_row_outside_the_uploaders_update_filter_or_field_list_fails_the_dry_run_and_writes_nothing()
+    {
+        await ResetAsync();
+        await CreateTicketAsync("p1", "First", 1);
+        await CreateTicketAsync("p2", "Second", 2);
+        using var kai = fixture.CreateClient().SignedInAs("kai");
+        var refused = await UploadAsync(kai, Tickets, "code,title,priority\np2,X,\np1,Y,5\n", key: "code");
+        await RunChecksAsync();
+
+        using var failed = await GetAsync(kai, Tickets, refused.Id);
+
+        Assert.Equal("failed", failed.RootElement.GetProperty("state").GetString());
+        var errors = failed.RootElement.GetProperty("errors");
+        Assert.Equal(["/rows/1", "/rows/2/values/priority"], errors.EnumerateObject().Select(error => error.Name));
+        Assert.Equal("The record is outside the uploader's update filters.", errors.GetProperty("/rows/1")[0].GetString());
+        Assert.Equal(2L, await TicketCountAsync());
+        Assert.Equal("Second", await TicketFieldAsync("p2", "f_title"));
+        Assert.Equal("First", await TicketFieldAsync("p1", "f_title"));
+
+        var allowed = await UploadAsync(kai, Tickets, "code,title\np1,Y\n", key: "code");
+        await RunChecksAsync();
+        using (var checkedImport = await GetAsync(kai, Tickets, allowed.Id))
+        {
+            Assert.Equal("checked", checkedImport.RootElement.GetProperty("state").GetString());
+        }
+
+        using var accepted = await CommitAsync(kai, Tickets, allowed.Id);
+        Assert.Equal(HttpStatusCode.Accepted, accepted.StatusCode);
+        Assert.Equal(1, await RunCommitsAsync());
+        using (var committedImport = await GetAsync(kai, Tickets, allowed.Id))
+        {
+            Assert.Equal("committed", committedImport.RootElement.GetProperty("state").GetString());
+        }
+
+        Assert.Equal("Y", await TicketFieldAsync("p1", "f_title"));
+        Assert.Equal(2L, await TicketCountAsync());
+    }
+
+    [Fact]
+    public async Task A_keyed_file_with_no_column_for_the_key_fails_the_dry_run_at_the_columns()
+    {
+        await ResetAsync();
+        var upload = await UploadAsync(fixture.Client, Tickets, "title\nA\n", key: "code");
+        await RunChecksAsync();
+
+        using var failed = await GetAsync(fixture.Client, Tickets, upload.Id);
+
+        Assert.Equal("failed", failed.RootElement.GetProperty("state").GetString());
+        Assert.Equal(["/columns"], failed.RootElement.GetProperty("errors").EnumerateObject().Select(error => error.Name));
+        Assert.Equal(0L, await TicketCountAsync());
+    }
+
+    [Fact]
     public async Task A_reference_cell_may_hold_the_targets_display_value_and_the_commit_links_the_records()
     {
         await ResetAsync();
@@ -519,9 +606,9 @@ public sealed class RecordImportEndpointTests(RecordApiFixture fixture) : IClass
         Assert.Equal(0L, (long)(await fixture.ScalarAsync(TenantA, $"SELECT count(*) FROM axis.process_work_items WHERE kind = '{RecordImports.CommitWorkItemKind}'"))!);
     }
 
-    private static async Task<(HttpResponseMessage Response, JsonDocument Body, Guid Id)> UploadAsync(HttpClient client, string path, string csv)
+    private static async Task<(HttpResponseMessage Response, JsonDocument Body, Guid Id)> UploadAsync(HttpClient client, string path, string csv, string? key = null)
     {
-        var response = await SendAsync(client, HttpMethod.Post, $"{path}/imports", csv);
+        var response = await SendAsync(client, HttpMethod.Post, $"{path}/imports{(key is null ? "" : $"?key={key}")}", csv);
         Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
         var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
         return (response, body, body.RootElement.GetProperty("id").GetGuid());
@@ -587,7 +674,7 @@ public sealed class RecordImportEndpointTests(RecordApiFixture fixture) : IClass
     /// <summary>Claims and runs every dry run the tenant has queued, and returns how many ran.</summary>
     private async Task<int> RunChecksAsync(int maxRows = 10000)
     {
-        var handler = new RecordImportCheckHandler(new ReleaseModelCache(PackageCatalog.Empty), new RecordImportSettings(maxRows), NullLogger<RecordImportCheckHandler>.Instance);
+        var handler = new RecordImportCheckHandler(new ReleaseModelCache(PackageCatalog.Empty), new RecordImportSettings(maxRows), NullLoggerFactory.Instance, NullLogger<RecordImportCheckHandler>.Instance);
         await using var connection = new NpgsqlConnection(fixture.ConnectionString(TenantA));
         await connection.OpenAsync(CancellationToken);
         var ran = 0;
@@ -635,6 +722,16 @@ public sealed class RecordImportEndpointTests(RecordApiFixture fixture) : IClass
         using var created = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
         return created.RootElement.GetProperty("id").GetGuid();
     }
+
+    private async Task CreateTicketAsync(string code, string title, int? priority)
+    {
+        var values = priority is { } number ? $$"""{ "title": "{{title}}", "code": "{{code}}", "priority": {{number}} }""" : $$"""{ "title": "{{title}}", "code": "{{code}}" }""";
+        using var response = await SendAsync(fixture.Client, HttpMethod.Post, $"{Tickets}/records", $$"""{ "values": {{values}} }""", "application/json");
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+    }
+
+    private async Task<object?> TicketFieldAsync(string code, string column) =>
+        await fixture.ScalarAsync(TenantA, $"SELECT {column} FROM {TicketTable} WHERE f_code = '{code}'");
 
     private async Task<Guid?> ProductOfAsync(string code) =>
         await fixture.ScalarAsync(TenantA, $"SELECT f_product FROM {TicketTable} WHERE f_code = '{code}'") as Guid?;

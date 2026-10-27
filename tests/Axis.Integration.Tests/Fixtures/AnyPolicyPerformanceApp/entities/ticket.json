@@ -1,0 +1,11 @@
+{
+  "id": "4069cb41-41c9-49c2-b2aa-36d8323c7f7b",
+  "kind": "entity",
+  "name": "Ticket",
+  "formatVersion": 1,
+  "displayField": "title",
+  "fields": [
+    { "name": "title", "type": "text", "required": true, "maxLength": 100 },
+    { "name": "assignees", "type": "child-collection", "target": "Assignee" }
+  ]
+}

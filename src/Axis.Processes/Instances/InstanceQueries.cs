@@ -280,6 +280,30 @@ public static class InstanceQueries
         return new InstanceRelatives(parent, children);
     }
 
+    /// <summary>
+    /// Reads the due time of the pending timer item of the instance <paramref name="instanceId"/> that belongs to
+    /// <paramref name="revision"/>, the instance's current revision, or returns <see langword="null"/> when there is none.
+    /// A timer item of another revision is left over from an earlier wait and no longer resumes the instance.
+    /// </summary>
+    public static async Task<DateTimeOffset?> TimerDueAtAsync(
+        NpgsqlConnection connection,
+        Guid instanceId,
+        long revision,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+
+        await using var command = new NpgsqlCommand(
+            "SELECT due_at FROM axis.process_work_items WHERE process_instance_id = @id AND kind = @kind AND revision = @revision ORDER BY due_at LIMIT 1",
+            connection);
+        command.Parameters.AddWithValue("id", instanceId);
+        command.Parameters.AddWithValue("kind", ProcessStarts.TimerWorkItemKind);
+        command.Parameters.AddWithValue("revision", revision);
+        return await command.ExecuteScalarAsync(cancellationToken) is DateTime dueAt
+            ? new DateTimeOffset(dueAt)
+            : null;
+    }
+
     /// <summary>Reads the step history rows of the instance <paramref name="instanceId"/>, oldest first.</summary>
     public static async Task<IReadOnlyList<ProcessStepHistoryRow>> HistoryAsync(
         NpgsqlConnection connection,

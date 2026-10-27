@@ -72,7 +72,13 @@ internal sealed class RecordImportColumns
     internal IReadOnlyList<FieldModel> Fields => _fields!;
 
     /// <summary>The body of a create, <c>{"values":{…}}</c> as UTF-8, for a row of <paramref name="cells"/>.</summary>
-    public byte[] Body(IReadOnlyList<string> cells)
+    public byte[] Body(IReadOnlyList<string> cells) => Body(cells, leaveOut: null, version: null);
+
+    /// <summary>
+    /// The body of a create, or of an update when <paramref name="version"/> is set, which it names as <c>version</c>.
+    /// The column at index <paramref name="leaveOut"/> is left out, so an update never sends the key.
+    /// </summary>
+    public byte[] Body(IReadOnlyList<string> cells, int? leaveOut, long? version)
     {
         ArgumentNullException.ThrowIfNull(cells);
 
@@ -80,32 +86,17 @@ internal sealed class RecordImportColumns
         using (var writer = new Utf8JsonWriter(stream))
         {
             writer.WriteStartObject();
+            if (version is { } stored)
+            {
+                writer.WriteNumber("version", stored);
+            }
+
             writer.WriteStartObject("values");
             for (var index = 0; index < _fields.Length; index++)
             {
-                var field = _fields[index]!;
-                var cell = cells[index];
-                if (cell.Length == 0)
+                if (index != leaveOut)
                 {
-                    continue;
-                }
-
-                writer.WritePropertyName(field.Name);
-                if (field.Type is FieldType.Integer or FieldType.Decimal or FieldType.Money && RecordImportFiles.IsJsonNumber(cell))
-                {
-                    writer.WriteRawValue(cell);
-                }
-                else if (field.Type == FieldType.Boolean && cell.Equals("true", StringComparison.OrdinalIgnoreCase))
-                {
-                    writer.WriteBooleanValue(true);
-                }
-                else if (field.Type == FieldType.Boolean && cell.Equals("false", StringComparison.OrdinalIgnoreCase))
-                {
-                    writer.WriteBooleanValue(false);
-                }
-                else
-                {
-                    writer.WriteStringValue(cell);
+                    WriteCell(writer, _fields[index]!, cells[index]);
                 }
             }
 
@@ -114,5 +105,63 @@ internal sealed class RecordImportColumns
         }
 
         return stream.ToArray();
+    }
+
+    /// <summary>
+    /// The typed value of the cell at <paramref name="index"/>, written and parsed as <see cref="Body(IReadOnlyList{string})"/>
+    /// reads it. <see langword="null"/> for an empty cell or a value the record parser refuses.
+    /// </summary>
+    public RecordValue? Value(ApplicationModel application, EntityModel entity, IReadOnlyList<string> cells, int index)
+    {
+        ArgumentNullException.ThrowIfNull(application);
+        ArgumentNullException.ThrowIfNull(entity);
+        ArgumentNullException.ThrowIfNull(cells);
+
+        if (cells[index].Length == 0)
+        {
+            return null;
+        }
+
+        using var stream = new MemoryStream();
+        using (var writer = new Utf8JsonWriter(stream))
+        {
+            writer.WriteStartObject();
+            WriteCell(writer, _fields[index]!, cells[index]);
+            writer.WriteEndObject();
+        }
+
+        using var document = JsonDocument.Parse(stream.ToArray());
+        if (RecordInputParser.ParseDraft(document.RootElement, entity, application) is not { } draft || draft.Errors.Count > 0)
+        {
+            return null;
+        }
+
+        return draft.Input.Values.Count == 1 ? draft.Input.Values[0] : null;
+    }
+
+    private static void WriteCell(Utf8JsonWriter writer, FieldModel field, string cell)
+    {
+        if (cell.Length == 0)
+        {
+            return;
+        }
+
+        writer.WritePropertyName(field.Name);
+        if (field.Type is FieldType.Integer or FieldType.Decimal or FieldType.Money && RecordImportFiles.IsJsonNumber(cell))
+        {
+            writer.WriteRawValue(cell);
+        }
+        else if (field.Type == FieldType.Boolean && cell.Equals("true", StringComparison.OrdinalIgnoreCase))
+        {
+            writer.WriteBooleanValue(true);
+        }
+        else if (field.Type == FieldType.Boolean && cell.Equals("false", StringComparison.OrdinalIgnoreCase))
+        {
+            writer.WriteBooleanValue(false);
+        }
+        else
+        {
+            writer.WriteStringValue(cell);
+        }
     }
 }

@@ -22,6 +22,12 @@ internal sealed record RecordImportSettings(int MaxRows);
 /// see a reference to a record id that does not exist or a unique value that is taken. The work runs in one
 /// transaction that holds the application's start lock shared, with the application's active release, the way
 /// a create resolves its release.
+/// An import that names a <c>key</c> also reads the record that each row's key cell matches, see <see cref="RecordImportKey"/>.
+/// A row that matches a record the uploader may read is checked as an update of it instead, as the record command
+/// checks an update: the uploader's <c>update</c> grant, its record filters and its field lists, then the parsing,
+/// the computed fields and the validations, with the key column and the empty cells left out of the body. It
+/// writes nothing for it either, and a row refused as an update is keyed <c>/rows/{n}</c>, or followed by the pointer
+/// into the update body. A file with no column for the key is one error at <c>/columns</c>.
 /// The import ends <c>checked</c> when no row has an error, and <c>failed</c> with every error otherwise. A row
 /// error is keyed <c>/rows/{n}</c> followed by the pointer into the create body, <c>n</c> counting data rows
 /// from 1. A problem of the header is keyed <c>/columns/{n}</c> and stops the check. More rows than
@@ -29,7 +35,11 @@ internal sealed record RecordImportSettings(int MaxRows);
 /// no longer pending has nothing left to do, and neither has one whose entity the active release no longer has,
 /// which fails at the empty pointer.
 /// </summary>
-internal sealed partial class RecordImportCheckHandler(ReleaseModelCache models, RecordImportSettings settings, ILogger<RecordImportCheckHandler> logger) : IExternalWorkItemHandler
+internal sealed partial class RecordImportCheckHandler(
+    ReleaseModelCache models,
+    RecordImportSettings settings,
+    ILoggerFactory loggerFactory,
+    ILogger<RecordImportCheckHandler> logger) : IExternalWorkItemHandler
 {
     public string Kind => RecordImports.CheckWorkItemKind;
 
@@ -64,7 +74,7 @@ internal sealed partial class RecordImportCheckHandler(ReleaseModelCache models,
         else
         {
             var now = await RecordQueries.TransactionTimeAsync(connection, cancellationToken);
-            await CheckAsync(connection, application, entity, new RecordActor(import.UploaderId, import.UploaderName, import.UploaderRoles), import.Format, import.File ?? [], now, errors, cancellationToken);
+            await CheckAsync(connection, transaction, application, entity, new RecordActor(import.UploaderId, import.UploaderName, import.UploaderRoles), import.Key, import.Format, import.File ?? [], now, errors, cancellationToken);
         }
 
         await RecordImports.FinishCheckAsync(
@@ -80,9 +90,11 @@ internal sealed partial class RecordImportCheckHandler(ReleaseModelCache models,
     // Adds the errors of every row to errors, in the order of the file.
     private async Task CheckAsync(
         NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
         ApplicationModel application,
         EntityModel entity,
         RecordActor actor,
+        string? importKey,
         string format,
         byte[] file,
         DateTimeOffset now,
@@ -113,6 +125,13 @@ internal sealed partial class RecordImportCheckHandler(ReleaseModelCache models,
             return;
         }
 
+        var key = importKey is null ? null : RecordImportKey.Create(importKey, columns);
+        if (importKey is not null && key is null)
+        {
+            errors["/columns"] = ["Has no column for the key."];
+            return;
+        }
+
         var references = RecordImportReferences.Create(application, actor.Roles, columns);
         foreach (var row in reader.Rows())
         {
@@ -130,6 +149,42 @@ internal sealed partial class RecordImportCheckHandler(ReleaseModelCache models,
             }
 
             var (resolved, lookupErrors) = await references.ResolveAsync(connection, cells, cancellationToken);
+            var (match, keyFailure) = key is null
+                ? (null, null)
+                : await key.FindAsync(connection, transaction, application, entity, actor, resolved, loggerFactory, cancellationToken);
+            if (keyFailure is not null)
+            {
+                errors[prefix] = [RecordImportRefusals.Message(keyFailure, update: true)];
+                Add(errors, prefix, lookupErrors);
+                continue;
+            }
+
+            if (match is not null)
+            {
+                var update = await RecordCommand.CheckUpdateAsync(
+                    connection,
+                    transaction,
+                    application,
+                    entity,
+                    match.Id,
+                    actor,
+                    columns.Body(resolved, key!.Index, match.Version),
+                    now,
+                    loggerFactory,
+                    cancellationToken);
+                if (update?.Errors is { } updateErrors)
+                {
+                    Add(errors, prefix, updateErrors);
+                }
+                else if (update is not null)
+                {
+                    errors[prefix] = [RecordImportRefusals.Message(update, update: true)];
+                }
+
+                Add(errors, prefix, lookupErrors);
+                continue;
+            }
+
             var parse = RecordCommand.ParseCreate(application, entity, actor, columns.Body(resolved));
             if (parse.Failure is { } failure)
             {
