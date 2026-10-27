@@ -64,21 +64,30 @@ with the reasons. What each one does is in NexKit's
 - **Issues run in parallel unless one needs another.** Marks follow the rules
   of NexKit's [`request` skill][nexkit-request]. The milestone's docs sweep is
   marked *blocked by* every other issue of the milestone, with no reason line
-  for each. There is no limit on how many issues run at once: `max_parallel`
-  is left unset.
+  for each. At most six issues run at once, with `max_parallel` at 6. Each
+  issue's check round takes three runner jobs, CI on `main` takes more after
+  each merge, and pull requests that must be up to date merge one at a time,
+  so more issues at once mostly wait for runners, usage limits and each other.
 - **NexKit merges a pull request once it passes,** with
   [`merge.auto`][nexkit-auto-merge] on, because the AI review and the checks
   are the gate Axis relies on. The owner turns the setting off to decide each
   merge again, and then only the owner merges. The switch is in `.nexkit/`, so
   changing it is a hand-made pull request.
-- **NexKit resolves conflicts with `main` by itself,** with
-  `conflicts.auto_resolve` on.
+- **NexKit resolves conflicts with `main` by itself, and brings a pull
+  request up to date before it merges,** with `conflicts.auto_resolve` on.
+  The rules on `main` want a branch to be up to date, so a pull request's
+  checks always ran on the `main` it merges into, and two pull requests that
+  pass alone cannot break `main` together. When the update merges cleanly and
+  the pull request's own change is the one the review approved, only the
+  checks run again, not the AI review. `conflicts.max_rounds` is 6 instead of
+  3, so a pull request that falls behind several merges in a row still
+  merges by itself.
 - **A second Claude subscription takes over at the usage limit.** NexKit
   pauses only when both are at their limit.
 - **A parent issue closes when its last part does,** with
   `close_parent_issues` on.
 - **The rules on `main` let NexKit merge.** They require NexKit's own checks
-  and no approval from a person. They do not require the CI workflow, which
+  on a branch that is up to date, and no approval from a person. They do not require the CI workflow, which
   runs on pushes to `main` and to hand-made branches but not on NexKit's
   branches. NexKit's checks run the same scripts there.
 - **There is no push token.** NexKit pushes with the Actions token, so it
@@ -102,7 +111,10 @@ with the reasons. What each one does is in NexKit's
   `error-context.md` files, and the performance workflow's
   `test-results-performance`.
 - **NexKit's checks skip suites that a change cannot affect.** NexKit runs the
-  checks one after another, so a check round takes 20 to 50 minutes. Under
+  checks in three jobs at once, with `parallel_checks` on: the build, lint and
+  unit tests in one job, the group `fast`, and the integration and E2E tests
+  each in their own. A check round then takes about as long as its slowest
+  job, instead of all of them in a row, which took 20 to 50 minutes. Under
   NexKit's `NEXKIT_BASE_SHA`, a suite that no changed file can affect is
   skipped, and any doubt runs it. CI on `main` sets no base and runs every
   suite, so a slowdown shows after the merge. The integration performance

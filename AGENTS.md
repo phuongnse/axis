@@ -72,6 +72,6 @@ While you work, run only the tests that cover your change:
 Run `scripts/build.sh` and `scripts/lint.sh` before you finish. Run `scripts/test.sh`,
 `scripts/integration.sh` or `scripts/e2e.sh` without arguments at most once, at the end, and only
 when the change can reach tests you did not run. NexKit's checks run every suite in full after the
-session, which takes 20 to 50 minutes.
+session, in parallel jobs.
 
 Formatting fixes: `dotnet format Axis.slnx` and `npm run format --prefix web`.
