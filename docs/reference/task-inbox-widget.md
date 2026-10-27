@@ -45,7 +45,7 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
   - **Links.** Each row opens the task page at
     `/{site}/{inboxpage}/{taskId}`, with the inbox page name in lower case.
   - **Signed out.** With nobody signed in, the task API answers `401`, and
-    the widget starts sign-in like any other call. The platform texts
+    the widget shows the sign-in prompt like any other call. The platform texts
     `shell.tasks.*` hold the column headers, the empty text, the load error
     and the two tags.
 - **Task page**. The address `/{site}/{inboxpage}/{taskId}`

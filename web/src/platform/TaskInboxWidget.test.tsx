@@ -2,6 +2,7 @@ import { render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, useLocation } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
 import { formatValue } from './formatValue'
+import { isSignInNeeded } from './signInNeeded'
 import { assignLocation } from './navigation'
 import type { WidgetMetadata } from './site'
 import { TaskInboxWidget } from './TaskInboxWidget'
@@ -193,7 +194,7 @@ describe('TaskInboxWidget', () => {
     expect(screen.queryByRole('table')).not.toBeInTheDocument()
   })
 
-  it('starts sign-in with the current path and query string when nobody is signed in', async () => {
+  it('asks to sign in when nobody is signed in', async () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {})
     vi.mocked(assignLocation).mockReset()
     history.pushState(null, '', '/e2e/tasks?pageSize=100')
@@ -201,11 +202,8 @@ describe('TaskInboxWidget', () => {
 
     renderWidget('?pageSize=100')
 
-    await waitFor(() =>
-      expect(assignLocation).toHaveBeenCalledExactlyOnceWith(
-        '/api/auth/sign-in?returnUrl=%2Fe2e%2Ftasks%3FpageSize%3D100',
-      ),
-    )
+    await waitFor(() => expect(isSignInNeeded()).toBe(true))
+    expect(assignLocation).not.toHaveBeenCalled()
     expect(screen.queryByTestId('tasks-sign-in')).not.toBeInTheDocument()
   })
 

@@ -406,8 +406,8 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     site active only in another tenant does not exist for the request.
   - The endpoints need a session. Without one they answer a `401` problem,
     before any `404`, so a signed-out caller cannot learn which sites or
-    pages exist. So every application page starts sign-in when nobody is
-    signed in. The record API and the data source endpoint also need a
+    pages exist. So every application page shows the sign-in prompt when
+    nobody is signed in, and the browser stays on the page. The record API and the data source endpoint also need a
     grant, so a page's data fails to load for a user without one.
   - **Policies**. Policies shape the site and page metadata, as
     [Authorization](security.md#authorization) describes.
@@ -907,13 +907,25 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   - With someone signed in, it shows their display name. Its menu holds
     **Sign out**, which ends the session and then sends the browser to the
     identity provider's sign-out page.
-  - A `401` from any API call starts the same sign-in, with the current path
-    and query string as `returnUrl`. Two calls are exempt. `GET /api/me`
-    answers `401` when nobody is signed in, so the header shows the button.
-    The home page's `GET /api/sites` answers `401` too, so the home page
-    shows a sign-in prompt and stays open to a signed-out person.
+  - A `401` from any API call shows the **sign-in prompt**, a dialog with a
+    short message and a **Sign in** button. It shows when a signed-out person
+    opens an application page, and over the current page when a session ends
+    during use. The button starts the same sign-in, with the current path and
+    query string as `returnUrl`. Only the click starts it, so a live session at
+    the identity provider never signs the person in without their action. The
+    dialog cannot be dismissed, and once shown it stays until the browser
+    leaves the page. It sits at the root of the platform, above every route, so
+    it shows even when the site itself fails to load with a `401`. Then nothing
+    shows behind it, instead of the error that the site could not be loaded.
+    Four calls are exempt and never show it. `GET /api/me` answers `401` when
+    nobody is signed in, so the header shows the button. The home page's
+    `GET /api/sites` answers `401` too, so the home page shows a sign-in prompt
+    in place of the sites and stays open to a signed-out person. The
+    notification bell's calls and Studio's readiness checks stay quiet as well.
   - Its texts are the platform texts `shell.account.signIn`,
-    `shell.account.signOut` and `shell.account.label`, the menu's label.
+    `shell.account.signOut` and `shell.account.label`, the menu's label, and
+    `shell.signInPrompt.message`, the prompt's message. The prompt's button
+    reuses `shell.account.signIn`.
 - **Text resolution.** The SPA resolves each key through catalogs in order.
   On the platform site the only catalog is the platform texts. Inside an
   application site, the site texts come first and the platform texts second,
