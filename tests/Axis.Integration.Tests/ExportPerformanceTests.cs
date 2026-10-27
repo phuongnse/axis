@@ -12,8 +12,8 @@ using static Axis.Integration.Tests.RecordApiFixture;
 namespace Axis.Integration.Tests;
 
 /// <summary>
-/// An export of 100,000 records streams to the client within its time limit and grows the managed heap by less
-/// than 64 MB. The rows are written to a temporary file as they are read, so the heap must not hold them. The
+/// An export of 100,000 records streams to the client within its time limit and grows the live managed heap by
+/// less than 64 MB. The rows are written to a temporary file as they are read, so the heap must not hold them. The
 /// class runs alone, so no other test competes for CPU with the timed exports.
 /// </summary>
 [Collection(PerformanceTiming.Name)]
@@ -41,30 +41,31 @@ public sealed class ExportPerformanceTests(ExportPerformanceTests.ExportFixture 
     public async Task An_export_of_a_hundred_thousand_records_finishes_within_its_time_limit_and_grows_the_heap_by_less_than_64_mb(string format)
     {
         // The first export warms up the query plan and the code paths, so it is not timed.
-        await ExportAsync(format);
+        await ExportAsync(format, withSampler: false);
 
-        var best = await ExportAsync(format);
-        var smallestGrowth = best.HeapGrowth;
-        for (var attempt = 1; attempt < Attempts; attempt++)
+        var best = TimeSpan.MaxValue;
+        for (var attempt = 0; attempt < Attempts; attempt++)
         {
-            var next = await ExportAsync(format);
-            best = next.Elapsed < best.Elapsed ? next : best;
-            smallestGrowth = Math.Min(smallestGrowth, next.HeapGrowth);
+            var export = await ExportAsync(format, withSampler: false);
+            best = export.Elapsed < best ? export.Elapsed : best;
         }
 
-        TestContext.Current.TestOutputHelper?.WriteLine($"The best of {Attempts} {format} exports took {best.Elapsed}, and the smallest heap growth was {smallestGrowth:N0} bytes.");
+        // The sampler collects garbage often, which slows an export, so the heap is measured in an export of its own.
+        var growth = (await ExportAsync(format, withSampler: true)).HeapGrowth;
+
+        TestContext.Current.TestOutputHelper?.WriteLine($"The best of {Attempts} {format} exports took {best}, and the live heap grew by {growth:N0} bytes.");
         var limit = format == "csv" ? _csvTime : _xlsxTime;
-        Assert.True(best.Elapsed < limit, $"The {format} export took {best.Elapsed} at best of {Attempts} exports.");
-        Assert.True(smallestGrowth < HeapGrowthLimit, $"The {format} export grew the heap by {smallestGrowth:N0} bytes at least.");
+        Assert.True(best < limit, $"The {format} export took {best} at best of {Attempts} exports.");
+        Assert.True(growth < HeapGrowthLimit, $"The {format} export grew the heap by {growth:N0} bytes.");
     }
 
-    /// <summary>Exports the records once and checks the file. The file is read only after the measurement.</summary>
-    private async Task<Export> ExportAsync(string format)
+    /// <summary>
+    /// Exports the records once and checks the file. The file is read only after the measurement. The live heap is
+    /// sampled only when asked, and the time of an export with a sampler is not meant to be used.
+    /// </summary>
+    private async Task<Export> ExportAsync(string format, bool withSampler)
     {
-        GC.Collect();
-        GC.WaitForPendingFinalizers();
-        GC.Collect();
-        var baseline = GC.GetTotalMemory(true);
+        var baseline = withSampler ? LiveHeapSampler.Measure() : 0;
 
         var options = new FileStreamOptions
         {
@@ -75,11 +76,11 @@ public sealed class ExportPerformanceTests(ExportPerformanceTests.ExportFixture 
         };
         await using var file = new FileStream(Path.Combine(Path.GetTempPath(), $"axis-export-performance-{Guid.NewGuid():N}.tmp"), options);
 
-        var sampler = new HeapSampler(baseline);
+        var sampler = withSampler ? new LiveHeapSampler(baseline) : null;
         TimeSpan elapsed;
         HttpStatusCode status;
         bool truncated;
-        long peak;
+        long peak = baseline;
         try
         {
             using var request = Request($"{ExportPath}?format={format}", Host);
@@ -97,7 +98,10 @@ public sealed class ExportPerformanceTests(ExportPerformanceTests.ExportFixture 
         }
         finally
         {
-            peak = sampler.Stop();
+            if (sampler is not null)
+            {
+                peak = sampler.Stop();
+            }
         }
 
         Assert.Equal(HttpStatusCode.OK, status);
@@ -157,37 +161,6 @@ public sealed class ExportPerformanceTests(ExportPerformanceTests.ExportFixture 
         }
 
         Assert.Equal(RequestCount + 1, rows);
-    }
-
-    /// <summary>Samples the managed heap on a thread of its own until stopped, and keeps the highest reading.</summary>
-    private sealed class HeapSampler
-    {
-        private readonly Thread _thread;
-        private volatile bool _running = true;
-        private long _peak;
-
-        public HeapSampler(long baseline)
-        {
-            _peak = baseline;
-            _thread = new Thread(Sample) { IsBackground = true };
-            _thread.Start();
-        }
-
-        public long Stop()
-        {
-            _running = false;
-            _thread.Join();
-            return _peak;
-        }
-
-        private void Sample()
-        {
-            while (_running)
-            {
-                _peak = Math.Max(_peak, GC.GetTotalMemory(false));
-                Thread.Sleep(1);
-            }
-        }
     }
 
     private sealed record Export(TimeSpan Elapsed, long HeapGrowth);
