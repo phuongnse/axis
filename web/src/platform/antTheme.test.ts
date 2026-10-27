@@ -85,6 +85,17 @@ describe.each(['light', 'dark'] as const)('the accessible colours of the Ant Des
   })
 })
 
+describe('the Ant Design theme and reduced motion', () => {
+  it('turns motion off when the browser asks for reduced motion', () => {
+    expect(theme.getDesignToken(antThemeFor('light', undefined, true)).motion).toBe(false)
+  })
+
+  it('leaves the motion token unset otherwise, so an outer provider can still turn it off', () => {
+    expect(antThemeFor('light').token?.motion).toBeUndefined()
+    expect(theme.getDesignToken(antThemeFor('light')).motion).toBe(true)
+  })
+})
+
 describe('the Ant Design theme with page values', () => {
   const token = (config: ReturnType<typeof antThemeFor>) => theme.getDesignToken(config)
 

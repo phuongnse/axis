@@ -72,8 +72,9 @@ class. When that class has failed a test before, the change fixes or guards ever
 class, through a shared helper, a fixture or a lint rule. The classes seen so far and their guards:
 
 - An outside download or service: `scripts/setup.sh` and the CI install steps try again.
-- A click during an animation or a redraw: `waitForDialog`, `confirmDialog` and the drag helper
-  wait until the element is ready.
+- A click during an animation or a redraw: Playwright asks for reduced motion, so the SPA shows
+  dialogs and overlays without animation. `waitForDialog`, `confirmDialog` and the drag helper wait
+  until the element is ready.
 - The real clock: a test fixes the time with `axis.now` and runs schedules in UTC.
 - State left by another test: a test counts from its own baseline.
 - Planner statistics: a seed that a plan depends on runs `ANALYZE` over every row.
@@ -81,8 +82,10 @@ class, through a shared helper, a fixture or a lint rule. The classes seen so fa
 _(planned for M16)_ The `*PerformanceTests` classes run in `.github/workflows/performance.yml` on
 every push to `main` and on demand, and no longer in CI's integration job. CI splits Playwright
 into shards that run on several machines at once, while NexKit's `e2e` check runs the whole suite.
+
 The SPA turns off its animations when the browser asks for reduced motion, and Playwright asks for
-it.
+it, so `waitForDialog` and `confirmDialog` return at once. A spec that slows animations on purpose
+to prove a wait asks for motion again with `test.use({ reducedMotion: 'no-preference' })`.
 
 Each application's test scenarios are a suite of their own, named `scenarios-<application name>`.
 The integration tests run them and write `artifacts/test-results/scenarios-<application name>.xml`.

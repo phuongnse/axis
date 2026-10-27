@@ -83,6 +83,15 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   and the custom widget API never name an icon, as the UI library bullet says
   ([D58](../decisions/d58-ant-design-is-a-detail-of-the-spa-without-procomponents.md)).
   A Vitest test fails on an `<svg>` element in a `.tsx` file under `web/src`.
+- **Reduced motion.** When the browser or the operating system asks for reduced
+  motion (`prefers-reduced-motion: reduce`), the theme turns Ant Design's motion
+  off, so dialogs, drawers, menus, messages and overlays show and hide at once.
+  The SPA follows a change of the setting while a page is open, without a
+  reload, and the design-system previews follow it too. Without the preference,
+  motion stays on. Playwright asks for reduced motion in every project, so no
+  end-to-end step clicks during an opening animation, and a spec that proves a
+  wait asks for motion again
+  ([D97](../decisions/d97-reliable-test-runs.md)).
 - **Buttons** _(planned)_. A button's level follows its role, so the same kind
   of action always has the same style
   ([D96](../decisions/d96-rules-from-the-design-system-review.md)).

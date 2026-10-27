@@ -2,6 +2,7 @@ import { ConfigProvider } from 'antd'
 import { useCallback, useMemo, useState, type ReactNode } from 'react'
 import { antThemeFor } from './antTheme'
 import { ThemeModeContext, type ThemeMode } from './themeMode'
+import { useReducedMotion } from './useReducedMotion'
 
 const storageKey = 'axis.themeMode'
 
@@ -39,7 +40,8 @@ export function ThemeModeProvider({ initialMode, children }: ThemeModeProviderPr
   }, [])
 
   const value = useMemo(() => ({ mode, toggleMode }), [mode, toggleMode])
-  const config = useMemo(() => antThemeFor(mode), [mode])
+  const reducedMotion = useReducedMotion()
+  const config = useMemo(() => antThemeFor(mode, undefined, reducedMotion), [mode, reducedMotion])
 
   return (
     <ThemeModeContext.Provider value={value}>
