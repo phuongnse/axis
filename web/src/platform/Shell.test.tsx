@@ -11,7 +11,7 @@ import { antLocaleFor, dayjsLocaleFor } from './antLocale'
 import { Shell } from './Shell'
 import { TextProvider } from './TextProvider'
 import { ThemeModeProvider } from './theme'
-import { phoneWidthQuery } from './usePhoneWidth'
+import { narrowWidthQuery } from './useNarrowWidth'
 
 const catalogs = [{ texts: {}, fallbackTexts: {} }]
 
@@ -145,10 +145,10 @@ describe('Shell navigation', () => {
   })
 })
 
-describe('Shell at phone width', () => {
+describe('Shell at narrow width', () => {
   beforeEach(() => {
     vi.stubGlobal('matchMedia', (query: string) => ({
-      matches: query === phoneWidthQuery,
+      matches: query === narrowWidthQuery,
       media: query,
       onchange: null,
       addListener() {},
@@ -217,7 +217,7 @@ describe('Shell at phone width', () => {
   })
 })
 
-describe('Shell above phone width', () => {
+describe('Shell above narrow width', () => {
   it('shows the navigation in the header without a Menu button', () => {
     renderShell('en', ['/'], notesNavigation)
 

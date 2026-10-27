@@ -148,8 +148,8 @@ describe('WidgetTree', () => {
 
     const columns = container.querySelectorAll('.ant-col')
     expect(columns).toHaveLength(2)
-    expect(columns[0]).toHaveClass('ant-col-md-16', 'ant-col-xs-24')
-    expect(columns[1]).toHaveClass('ant-col-md-8', 'ant-col-xs-24')
+    expect(columns[0]).toHaveClass('ant-col-16')
+    expect(columns[1]).toHaveClass('ant-col-8')
     expect(within(columns[0] as HTMLElement).getByTestId('leaf')).toHaveTextContent('wide')
     expect(within(columns[1] as HTMLElement).getByTestId('leaf')).toHaveTextContent('narrow')
   })

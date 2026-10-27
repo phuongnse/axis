@@ -12,7 +12,7 @@ not built yet, and Dn refers to [decisions.md](../decisions.md). The rest of the
   affect the widgets next to it.
 - **Columns.** A `columns` widget shows its columns side by side. Each column is as wide as its
   `width` in twelfths. At narrow width, below the platform's one breakpoint, the columns stack in
-  file order. The breakpoint is 768 px today and 992 px _(planned)_, see
+  file order. The breakpoint is 992 px, see
   [frontend](frontend.md) and [D96](../decisions/d96-rules-from-the-design-system-review.md).
 - **Tabs.** A `tabs` widget shows one header per tab with its label.
   - The selected tab is kept in the URL as `?tab=<n>`, counted from 1.

@@ -12,7 +12,7 @@ import {
 } from './site'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
-import { usePhoneWidth } from './usePhoneWidth'
+import { useNarrowWidth } from './useNarrowWidth'
 import { tabParameters } from './widgetTree'
 
 type RenderLeaf = (widget: WidgetMetadata) => ReactNode
@@ -119,17 +119,17 @@ function drawWidget(
   }
 }
 
-// Ant Design's grid has 24 parts and an Axis column width is in twelfths. Below `md`, 768 px, the columns stack.
-// The grid reads the window width, so a page designer's phone width is passed through `usePhoneWidth` instead.
+// Ant Design's grid has 24 parts and an Axis column width is in twelfths. Below narrow width, 992 px, the columns
+// stack. The hook decides, not the grid's own breakpoints, so a page designer can force the stack.
 // A widget wider than its column, such as a table with many fields, scrolls inside the column instead of
 // running under the next one.
 function Columns({ widget, renderLeaf }: { widget: ColumnsWidgetMetadata; renderLeaf: RenderLeaf }) {
   const { spacing } = useDesignTokens()
-  const phone = usePhoneWidth()
+  const narrow = useNarrowWidth()
   return (
     <Row gutter={[spacing.md, spacing.md]}>
       {widget.columns.map((column, index) => (
-        <Col key={index} xs={24} md={phone ? 24 : column.width * 2} style={{ overflowX: 'auto' }} data-testid="column">
+        <Col key={index} span={narrow ? 24 : column.width * 2} style={{ overflowX: 'auto' }} data-testid="column">
           <WidgetList
             widgets={column.widgets}
             renderLeaf={renderLeaf}

@@ -39,7 +39,7 @@ import {
   type TableSort,
 } from './tableQuery'
 import { useText } from './texts'
-import { usePhoneWidth } from './usePhoneWidth'
+import { useNarrowWidth } from './useNarrowWidth'
 import { isVisible } from './visibleWhen'
 
 interface TableWidgetProps {
@@ -131,7 +131,7 @@ function tableSource({ entity, dataSource }: WidgetMetadata): TableSource {
  * at the row limit shows a notice above the table. A `403`, `409` or `503` shows its own message, and any
  * other failure a generic one. The canvas draws the button and exports nothing. A toolbar action to a form page
  * without `record` needs the user's `create` grant on the entity, as the widget's access says, and
- * a button whose expressions the SPA cannot work out is hidden. Below 768 px, a row's actions fold
+ * a button whose expressions the SPA cannot work out is hidden. At narrow width, below 992 px, a row's actions fold
  * into one "Actions" menu.
  * Paging and sorting live in the URL as the API's `page`, `pageSize` and `sort`, so reload, sharing
  * and the back button keep them. A data source table also has a filter bar, whose values live in the
@@ -143,7 +143,7 @@ function tableSource({ entity, dataSource }: WidgetMetadata): TableSource {
  */
 export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidgetProps) {
   const t = useText()
-  const phone = usePhoneWidth()
+  const narrow = useNarrowWidth()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const { rowActions, toolbarActions } = widget
@@ -446,7 +446,7 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
           if (list.length === 0) {
             return null
           }
-          if (phone) {
+          if (narrow) {
             return (
               <Dropdown
                 trigger={['click']}
@@ -484,7 +484,7 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
       })
     }
     return result
-  }, [fields, locale, phone, query.sort, rowActions, runNavigate, runStart, sitePath, starting, deleting, t, canvas])
+  }, [fields, locale, narrow, query.sort, rowActions, runNavigate, runStart, sitePath, starting, deleting, t, canvas])
 
   // A new sort or page size starts again at page 1. Paging and sorting add history entries.
   const onChange: TableProps<TableRow>['onChange'] = (pagination, _filters, sorter) => {
