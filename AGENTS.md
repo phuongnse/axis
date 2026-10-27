@@ -59,6 +59,7 @@ and `e2e` as their checks. What each script starts and writes is in
 | `scripts/test.sh`        | .NET unit tests, Vitest and the scripts' own tests                         |         |
 | `scripts/integration.sh` | .NET tests and sample scenarios on real PostgreSQL and Keycloak            | Docker  |
 | `scripts/e2e.sh`         | Playwright against the full stack, then the smoke tests                    | Docker  |
+| `scripts/performance.sh` | The `*PerformanceTests` classes alone, as the performance workflow runs    | Docker  |
 | `scripts/dev.sh`         | The local stack with hot reload                                            | Docker  |
 
 While you work, run only the tests that cover your change:

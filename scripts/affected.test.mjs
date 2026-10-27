@@ -210,24 +210,59 @@ describe('check scripts', () => {
         .map((manifest) => `scenarios-${JSON.parse(readFileSync(manifest, 'utf8')).name}`),
     )
 
-  const run = (script, changed) =>
+  const run = (script, changed, extra = {}) =>
     spawnSync('bash', [script], {
       cwd: root,
       encoding: 'utf8',
       timeout: 60_000,
-      env: { ...env, FAKE_CHANGED: changed },
+      env: { ...env, FAKE_CHANGED: changed, ...extra },
     })
+
+  const dotnetCalls = () => {
+    const log = env.FAKE_DOTNET_LOG
+    const calls = existsSync(log) ? readFileSync(log, 'utf8').split('\n').filter(Boolean) : []
+    rmSync(log, { force: true })
+    return calls
+  }
+
+  const integrationCall = (calls) => {
+    const matching = calls.filter((call) => call.includes('--project tests/Axis.Integration.Tests'))
+    assert.equal(matching.length, 1, calls.join('\n'))
+    return matching[0]
+  }
 
   before(() => {
     dir = mkdtempSync(path.join(tmpdir(), 'check-scripts-'))
     writeExecutable('git', `[ "$1" = diff ] && printf '%s\\n' "$FAKE_CHANGED"\nexit 0\n`)
     writeExecutable('docker', `printf '%s\\n' "$*" >>"$FAKE_DOCKER_LOG"\nexit 1\n`)
+    // Logs each call and writes a passing JUnit file where the call asks for one.
+    writeExecutable(
+      'dotnet',
+      `printf '%s\\n' "$*" >>"$FAKE_DOTNET_LOG"
+dir=
+file=
+prev=
+for arg in "$@"; do
+  case "$prev" in
+    --results-directory) dir="$arg" ;;
+    --report-xunit-junit-filename) file="$arg" ;;
+  esac
+  prev="$arg"
+done
+if [ -n "$dir" ] && [ -n "$file" ]; then
+  mkdir -p "$dir"
+  printf '%s' '<testsuites><testsuite name="t" tests="1" failures="0"><testcase classname="SearchPerformanceTests" name="t" time="0.1"/></testsuite></testsuites>' >"$dir/$file"
+fi
+exit 0
+`,
+    )
     env = {
       ...process.env,
       PATH: `${dir}${path.delimiter}${process.env.PATH}`,
       NEXKIT_BASE_SHA: 'abc',
       AXIS_TEST_RESULTS_DIR: path.join(dir, 'results'),
       FAKE_DOCKER_LOG: path.join(dir, 'docker-calls'),
+      FAKE_DOTNET_LOG: path.join(dir, 'dotnet-calls'),
     }
     delete env.GITHUB_ACTIONS
     delete env.GITHUB_STEP_SUMMARY
@@ -244,6 +279,46 @@ describe('check scripts', () => {
     for (const suite of suites) {
       assert.ok(result.stdout.includes(`${suite} (skipped: not affected by this change)`), suite)
     }
+  })
+
+  test('integration.sh leaves the performance tests out under NexKit', () => {
+    run('scripts/integration.sh', 'src/Axis.Engine/Foo.cs')
+
+    const call = integrationCall(dotnetCalls())
+    assert.ok(call.includes('--filter-not-class *PerformanceTests'), call)
+    assert.ok(!call.includes('--filter-class'), call)
+  })
+
+  test('integration.sh leaves the performance tests out without NexKit', () => {
+    // The dev script's smoke test runs here too, so a node shim passes its node --test call.
+    const shims = mkdtempSync(path.join(tmpdir(), 'check-scripts-node-'))
+    try {
+      writeFileSync(
+        path.join(shims, 'node'),
+        `#!/bin/sh\n[ "$1" = --test ] && exit 0\nexec "${process.execPath}" "$@"\n`,
+      )
+      chmodSync(path.join(shims, 'node'), 0o755)
+      run('scripts/integration.sh', 'src/Axis.Engine/Foo.cs', {
+        NEXKIT_BASE_SHA: '',
+        PATH: `${shims}${path.delimiter}${env.PATH}`,
+      })
+    } finally {
+      rmSync(shims, { recursive: true, force: true })
+    }
+
+    const call = integrationCall(dotnetCalls())
+    assert.ok(call.includes('--filter-not-class *PerformanceTests'), call)
+    assert.ok(!call.includes('--filter-class'), call)
+  })
+
+  test('performance.sh runs only the performance tests and reports them', () => {
+    const result = run('scripts/performance.sh', 'src/Axis.Engine/Foo.cs')
+
+    assert.equal(result.status, 0, result.stdout + result.stderr)
+    const call = integrationCall(dotnetCalls())
+    assert.ok(call.includes('--filter-class *PerformanceTests'), call)
+    assert.ok(call.includes('--report-xunit-junit-filename performance.xml'), call)
+    assert.match(result.stdout, /^\| performance \| 1 \| 0 \| 0 \| /m)
   })
 
   test('e2e.sh skips Playwright and starts no container for a docs change', () => {
