@@ -54,8 +54,18 @@ internal static class SearchApp
             await insert.ExecuteNonQueryAsync(cancellationToken);
         }
 
-        // Updates the planner's statistics and flushes the pending list of each GIN index, as
-        // autovacuum does in production. VACUUM cannot run in a transaction.
+        // A statistics target of 1000 makes ANALYZE sample 300,000 rows, so it reads every article and
+        // the statistics and the plan are the same on every run. A random sample of the default 30,000
+        // rows sometimes made the planner walk the primary key for the page. ANALYZE then updates the
+        // statistics and VACUUM flushes the pending list of each GIN index, as autovacuum does in
+        // production. VACUUM cannot run in a transaction.
+        foreach (var index in TrigramIndexes(article))
+        {
+            await using var target = dataSource.CreateCommand(
+                $"ALTER INDEX {EntityNaming.Quote(EntityNaming.Schema)}.{EntityNaming.Quote(index)} ALTER COLUMN 1 SET STATISTICS 1000");
+            await target.ExecuteNonQueryAsync(cancellationToken);
+        }
+
         await using (var vacuum = dataSource.CreateCommand($"VACUUM ANALYZE {table}"))
         {
             await vacuum.ExecuteNonQueryAsync(cancellationToken);

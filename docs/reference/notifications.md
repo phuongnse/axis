@@ -251,8 +251,8 @@ sign-in and the last sign-in. A later sign-in updates it.
 | Setting | Default | Meaning |
 | --- | --- | --- |
 | `Email:Smtp:Host` | none | The SMTP server. Without it, no email is sent, the items stay queued and the worker logs a warning once per tenant. |
-| `Email:Smtp:Port` | `587` | The SMTP port. |
-| `Email:Smtp:UseTls` | `true` | Use STARTTLS, or TLS on port 465. |
+| `Email:Smtp:Port` | `587` | The SMTP port. A value that is not a whole number from 1 to 65535 stops the worker at start. |
+| `Email:Smtp:UseTls` | `true` | Use STARTTLS, or TLS on port 465. A value other than `true` or `false` stops the worker at start. |
 | `Email:Smtp:UserName` | none | The SMTP user. |
 | `Email:Smtp:Password` | none | The SMTP password, from the environment. |
 | `Email:From` | none | The sender address. Required when a host is set. |

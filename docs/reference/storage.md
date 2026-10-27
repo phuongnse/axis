@@ -44,7 +44,7 @@ apply: sections marked _(planned for Mx)_ are not built yet, and Dn refers to
     [recompute of computed fields](migrations.md#recomputing-computed-fields). It also owns
     `axis.pending_computed_fields`, the entities whose recompute the worker
     finishes in batches. It also owns `axis.record_imports`, the uploads of
-    [record imports](import-export.md#import) with their file, its format
+    [record imports](import-export.md#import) with their file until it is deleted, its format
     (`csv` or `xlsx`), their state and the errors of their dry run or commit.
   - `Axis.Processes` owns `axis.process_instances` (one row per process
     instance), `axis.process_step_history` (one row per step occurrence),
@@ -54,6 +54,8 @@ apply: sections marked _(planned for Mx)_ are not built yet, and Dn refers to
     `axis.process_call_attempts` (one row per attempt and per lookup of a
     connector or package call),
     `axis.events` (one row per event occurrence that a step raised),
+    `axis.process_event_matches` (one row per use of an occurrence by a
+    `waitEvent` step),
     `axis.notifications` (one row per in-app notification and recipient),
     `axis.notification_reads` (one row per notification and user who read it),
     `axis.email_outbox` (one row per staged email),

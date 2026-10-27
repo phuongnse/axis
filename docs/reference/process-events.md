@@ -260,6 +260,40 @@ a crash do nothing. Every occurrence already gets an `event.deliver` item, so
 an occurrence with no trigger still wakes its waiting instances. Step 1's early
 delete then happens only when there is no trigger and no waiting instance.
 
+## Event tables
+
+`axis.events` holds one row per event occurrence, see
+[Raise event step](#raise-event-step). Rows are append-only and kept, even
+when no trigger listens. An index on `process_instance_id` finds the
+events an instance raised, and one on (`subject_id`, `raised_at`) finds the
+events about a record for a `waitEvent` step.
+
+| Column | Type | Meaning |
+| --- | --- | --- |
+| `id` | `uuid` | A version 7 UUID, the event's id |
+| `application_id` | `uuid` | The application |
+| `event` | `text` | The event's name |
+| `release_id` | `uuid` | The release the raising instance is pinned to |
+| `entity_id` | `uuid` | The event's entity |
+| `subject_id` | `uuid` | The record the occurrence names |
+| `payload` | `jsonb` | The evaluated payload fields |
+| `process_instance_id` | `uuid` | The instance that raised the event |
+| `raised_at` | `timestamptz` | The start of the step's transaction, `now()` |
+
+`axis.process_event_matches` holds one row for each use of an event occurrence by
+a `waitEvent` step, see
+[Wait for event step](process-flow.md#wait-for-event-step). The key is
+(`process_instance_id`, `event_id`), so an instance uses an occurrence at
+most once. An index on `event_id` finds the instances that used an
+occurrence.
+
+| Column | Type | Meaning |
+| --- | --- | --- |
+| `process_instance_id` | `uuid` | The instance that used the occurrence |
+| `event_id` | `uuid` | The occurrence, a row of `axis.events` |
+| `step` | `text` | The `waitEvent` step that used it |
+| `matched_at` | `timestamptz` | The start of the step's transaction, `now()` |
+
 ## Schedules
 
 **Schedule state.** Activating a release writes the schedule state of each
