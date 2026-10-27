@@ -159,8 +159,7 @@ outcomes. Operators inspect the approvals and change nothing:
     `read` grant on the same target in the same policy, or it is `AXC0265`.
     `import` writes through the user's `create` grants, and needs a `create`
     grant on the same entity in the same policy, or it is `AXC0265`. The
-    import checks `update` as well for an import with a key
-    _(planned for M15)_. See [import and export](import-export.md#grants) and
+    import checks `update` as well for an import with a key. See [import and export](import-export.md#grants) and
     [D79](../decisions/d79-import-and-export-under-policies.md).
 - **Filter.** An entity grant may have a `filter`, a boolean
   [expression](expressions.md#names-and-references) over the record. It sees
