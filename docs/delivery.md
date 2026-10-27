@@ -227,9 +227,10 @@ owner.
   `section`. The docs stay the source of behaviour.
 - **Several changes are a design review.** When the owner reviews the design
   in words, one change at a time, the session runs a design review. Each
-  change is prototyped in the real widget code on a local `design/<topic>`
-  branch and published to the artifact, so the owner sees the real widgets.
-  The branch is never merged.
+  change is prototyped in the real widget code on a `design/<topic>` branch
+  and published to the artifact, so the owner sees the real widgets. The
+  branch is pushed before the review's issue, with CI skipped because the
+  prototype does not update the tests, and it is never merged.
 - **The design runs ahead of the repository only by open issues and an open
   review.** While a design issue is open, the artifact holds its change and its
   last change note names the issue. While a review is open, the artifact may

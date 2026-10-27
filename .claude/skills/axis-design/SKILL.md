@@ -60,8 +60,8 @@ are under "Several changes are a design review" in Design changes.
    difference the owner sees comes from the review.
 2. Agree a short topic with the owner, such as `field-look`. Create the
    prototype branch from `main`: `git switch -c design/<topic> main`. Work
-   only on that branch, never only in a temporary folder, and never push it
-   to a NexKit branch name or open a pull request from it.
+   only on that branch, never only in a temporary folder. Never open a pull
+   request from it, and never give it a NexKit branch name.
 
 ### Each change
 
@@ -86,8 +86,10 @@ seen this one.
    artifact type's limit, that names the review and its branch, such as
    `Design review field-look (design/field-look): required mark and help
    text`.
-7. Commit the change on the branch with a message that says what it shows,
-   so the branch history lists the review's changes in order.
+7. Commit the change on the branch with a message that says what it shows
+   and ends its first line with `[skip ci]`, so the branch history lists the
+   review's changes in order. The prototype does not update the tests, so CI
+   would only fail on it.
 8. Show the owner the card and ask for a verdict. Keep, change or drop the
    change as they say. Write down each rule they agree, in their words, for
    the docs change at the end.
@@ -117,14 +119,18 @@ A check passes only when the card behaves as it will in the artifact.
    [keeping the docs current](../../../docs/delivery.md#keeping-the-docs-current),
    and mark what is not built yet. Open it as a hand-made pull request for
    the owner to merge.
-2. Write one NexKit issue that builds the whole review, as
+2. Before the issue, push the prototype branch, `git push -u origin
+   design/<topic>`, so NexKit's agents can read it. Its commits carry
+   `[skip ci]`, so the push starts no run; check with
+   `gh run list --branch design/<topic>`. The issue links its comparison with
+   `main`. The branch is never merged, and it is deleted once the issue's work
+   is merged.
+3. Write one NexKit issue that builds the whole review, as
    [Writing an issue](../axis-nexkit/SKILL.md#writing-an-issue) says. It
    links the docs sections, the artifact and the prototype branch, and names
    the tokens, widgets and previews it changes. Open it once the docs pull
    request is merged, so its links point at `main`. Do not split it: NexKit
    splits it if it needs to.
-3. Push the prototype branch only when the owner agrees, so the issue can
-   link it. It is never merged.
 4. Add a change note to the artifact that names the issue, as for a requested
    change.
 5. After the issue is merged, sync the artifact again. The sync keeps the
