@@ -137,7 +137,7 @@ public sealed class EventWakePerformanceTests(ProcessStepFixture fixture) : ICla
                 command.Parameters.AddWithValue("event", eventId);
             },
             CancellationToken);
-        QueryPlans.AssertUsesIndex(plan, "ix_process_instances_subject_id", "axis.process_instances");
+        QueryPlans.AssertUsesIndex(plan, "ix_process_instances_subject_id", "process_instances");
     }
 
     private async Task RunStepsAsync()
