@@ -40,8 +40,8 @@
 | **M12** | Pages, layouts and more widgets | Done | A page holds a tree of widgets in columns, tabs and sections, and works at phone width. Navigate actions with page parameters exist. New widgets: detail, chart and KPI. Tables get row and toolbar actions, delete included. Forms get conditional visible, required and read-only states, validation as you type, and wizard steps. |
 | **M13** | Visual page and form designer | Done | An author builds pages and forms by drag and drop on a canvas that uses the runtime renderers, with a palette, a property panel, data and action binding, and undo. Carried over from M11 and M12 and built: Development and Compose set `Studio:ApplicationsPath` to `artifacts/studio-apps`, a second Playwright journey from the `request-approval` template, the parameter, column, outcome and operation reference marks, the task API refusal of a value for a hidden or read-only field, the `409` for a delete of a record in a running process, navigate expressions that resolve paths, design system previews of the detail, chart and KPI widgets, and delete row actions in the page editor. |
 | **M14** | Workflow, automation and notifications | Next | Processes get timer, wait for event and sub-process steps, loops that hold a task, task escalation and deadlines, claim and reassign, and a create record operation. There are scheduled jobs without a subject, delete triggers, and a limit plus dead letters for event delivery. In-app and email notifications exist. Processes are edited in a visual designer. Carried over from M13: a page and a form open on the Design tab, a section moves to another step by a drop on the step switch, and the form designer removes a section or a step. |
-| **M15** | Data modeling and data management | Planned | New field types: file (with storage bindings), money and enum labels. Indexes, defaults and ranges. References from child rows, and many-to-many. CSV and spreadsheet import and export under policies. Full-text search, more aggregates and query timeouts. |
-| **M16** | Hardening | Planned | Performance SLOs and load tests, the FAPI 2.0 profile, verification against an agreed ASVS level, rate limits and security headers, service accounts for the record and process APIs, tenant binding commands and key rotation. Carried over from M10: CI runs the dependency scan on its triggers and once a week, and restoring a preview tenant's archive is refused. |
+| **M15** | Data modeling and data management | Done | New field types: file (with storage bindings), money and enum labels. Indexes, defaults and ranges. References from child rows, and many-to-many. CSV and spreadsheet import and export under policies. Full-text search, more aggregates and query timeouts. |
+| **M16** | Hardening | Next | Performance SLOs and load tests, the FAPI 2.0 profile, verification against an agreed ASVS level, rate limits and security headers, service accounts for the record and process APIs, tenant binding commands and key rotation. Carried over from M10: CI runs the dependency scan on its triggers and once a week, and restoring a preview tenant's archive is refused. Carried over from M15: the asset management scenarios for import, attachments, maintenance and software, and the denied cases for an employee's reads, downloads and exports and for an auditor's imports; the warranty reminder in the Studio journey; and running the asset management scenarios from Studio. |
 | **M17** | Extensibility and operator console | Planned | Custom widgets in the designer palette, a published SDK, modules that hold processes, pages and policies and depend on other modules, packages run out of process, connector OAuth2 and structured payloads, outbound webhooks, and an operator web console. |
 
 M3 is complete. See the closed
@@ -88,7 +88,11 @@ M13 is complete. See the closed
 [M13 milestone](https://github.com/phuongnse/axis/milestone/13?closed=1) on
 GitHub.
 
-M14 is next. See the [milestones](https://github.com/phuongnse/axis/milestones) on GitHub.
+M15 is complete. See the closed
+[M15 milestone](https://github.com/phuongnse/axis/milestone/15?closed=1) on
+GitHub.
+
+M14 and M16 are next. See the [milestones](https://github.com/phuongnse/axis/milestones) on GitHub.
 
 Milestones after M4 may be reordered when business needs require it. M0–M4
 stay in this order.

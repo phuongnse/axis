@@ -3,8 +3,7 @@
 Detailed reference for exporting records to CSV and spreadsheet files and
 importing records from them. The design follows
 [D79](../decisions/d79-import-and-export-under-policies.md). The conventions
-of [architecture.md](../architecture.md) apply: sections marked
-_(planned for M15)_ are not built yet, and Dn refers to
+of [architecture.md](../architecture.md) apply, and Dn refers to
 [decisions.md](../decisions.md).
 
 Everything on this page is built: the grants, the policy matrix, the export

@@ -4,7 +4,7 @@ Status: **Agreed**
 
 M15 lets users export records to CSV and spreadsheet files, and import records
 from them, under the same policies as the record API. The owner agreed these
-points on 2026-10-25. All of it is _(planned for M15)_. See
+points on 2026-10-25. It is built in M15. See
 [import and export](../reference/import-export.md). It adds two grant actions
 to the entity grants of [D24](d24-roles-and-policies.md), and one to data
 source grants.
