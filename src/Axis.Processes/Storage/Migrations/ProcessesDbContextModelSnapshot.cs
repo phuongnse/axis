@@ -386,6 +386,9 @@ namespace Axis.Processes.Storage.Migrations
                     b.HasIndex("ProcessInstanceId")
                         .HasDatabaseName("ix_events_process_instance_id");
 
+                    b.HasIndex("SubjectId", "RaisedAt")
+                        .HasDatabaseName("ix_events_subject_id_raised_at");
+
                     b.ToTable("events", "axis");
                 });
 
@@ -628,6 +631,36 @@ namespace Axis.Processes.Storage.Migrations
                         .HasDatabaseName("ux_process_call_attempts_call_id_kind_number");
 
                     b.ToTable("process_call_attempts", "axis");
+                });
+
+            modelBuilder.Entity("Axis.Processes.Storage.ProcessEventMatchRow", b =>
+                {
+                    b.Property<Guid>("ProcessInstanceId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("process_instance_id");
+
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("event_id");
+
+                    b.Property<DateTimeOffset>("MatchedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("matched_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("Step")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("step");
+
+                    b.HasKey("ProcessInstanceId", "EventId")
+                        .HasName("pk_process_event_matches");
+
+                    b.HasIndex("EventId")
+                        .HasDatabaseName("ix_process_event_matches_event_id");
+
+                    b.ToTable("process_event_matches", "axis");
                 });
 
             modelBuilder.Entity("Axis.Processes.Storage.ProcessInstanceRow", b =>
@@ -1145,6 +1178,23 @@ namespace Axis.Processes.Storage.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired()
                         .HasConstraintName("fk_package_calls_process_instances_process_instance_id");
+                });
+
+            modelBuilder.Entity("Axis.Processes.Storage.ProcessEventMatchRow", b =>
+                {
+                    b.HasOne("Axis.Processes.Storage.EventRow", null)
+                        .WithMany()
+                        .HasForeignKey("EventId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_process_event_matches_events_event_id");
+
+                    b.HasOne("Axis.Processes.Storage.ProcessInstanceRow", null)
+                        .WithMany()
+                        .HasForeignKey("ProcessInstanceId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_process_event_matches_process_instances_process_instance_id");
                 });
 
             modelBuilder.Entity("Axis.Processes.Storage.ProcessStepHistoryRow", b =>

@@ -8,9 +8,10 @@ namespace Axis.Processes.Instances;
 
 /// <summary>
 /// Runs a <c>process.timer</c> work item: it resumes an instance that waits on a <c>timer</c> step once
-/// the item is due. The item names the revision the timer step left, and the instance goes on to the
-/// step's <c>next</c> only while it still waits at that revision on a timer step. The resume writes the
-/// step's history row with <c>{ "next" }</c>, the <c>process.stepCompleted</c> audit record and the
+/// the item is due, or on a <c>waitEvent</c> step once its timeout is due. The item names the revision the
+/// step left, and the instance goes on only while it still waits at that revision on such a step: to the
+/// timer's <c>next</c>, or to the <c>waitEvent</c> step's <c>timeout.next</c>. The resume writes the
+/// step's history row with <c>{ "next" }</c>, or <c>{ "next", "timeout": true }</c> for a timeout, the <c>process.stepCompleted</c> audit record and the
 /// instance's next <c>process.step</c> item in one transaction. An item whose instance moved on, was
 /// cancelled or is gone is deleted with no other write. A handler that throws is rolled back, and the
 /// failure callback then marks the waiting instance <c>failed</c> with a history error, so the deleted
@@ -38,13 +39,25 @@ internal sealed partial class ProcessTimerHandler(ReleaseModelCache models, ILog
 
         var model = await models.GetAsync(context, instance.ReleaseId, cancellationToken);
         var process = model.Processes.Single(candidate => candidate.Id == instance.ProcessId);
-        if (!process.TryGetStep(instance.Step, out var step) || step is not TimerStepModel timer)
+        if (!process.TryGetStep(instance.Step, out var step))
         {
             LogNotTimer(instanceId, instance.Step);
             return;
         }
 
-        if (!await ProcessSteps.TryResumeCallAsync(context.Transaction, instanceId, instance.Step, revision, timer.Next, cancellationToken))
+        var (next, output) = step switch
+        {
+            TimerStepModel timer => (timer.Next, new JsonObject { ["next"] = timer.Next }),
+            WaitEventStepModel { Timeout: { } timeout } => (timeout.Next, new JsonObject { ["next"] = timeout.Next, ["timeout"] = true }),
+            _ => (null, null),
+        };
+        if (next is null || output is null)
+        {
+            LogNotTimer(instanceId, instance.Step);
+            return;
+        }
+
+        if (!await ProcessSteps.TryResumeCallAsync(context.Transaction, instanceId, instance.Step, revision, next, cancellationToken))
         {
             LogStale(instanceId, revision, instance.State, instance.Revision);
             return;
@@ -53,7 +66,7 @@ internal sealed partial class ProcessTimerHandler(ReleaseModelCache models, ILog
         var input = new JsonObject { ["subjectId"] = instance.SubjectId, ["subjectVersion"] = null };
         await ProcessSteps.InsertHistoryAsync(
             context.Transaction,
-            new StepOccurrence(instanceId, instance.Step, revision, input, new JsonObject { ["next"] = timer.Next }, null, null, instance.Now),
+            new StepOccurrence(instanceId, instance.Step, revision, input, output, null, null, instance.Now),
             cancellationToken);
         await AuditRecords.AppendAsync(
             context.Transaction,
@@ -64,7 +77,7 @@ internal sealed partial class ProcessTimerHandler(ReleaseModelCache models, ILog
                 instance.SubjectEntityId,
                 instance.SubjectId,
                 instanceId,
-                new JsonObject { ["step"] = instance.Step, ["next"] = timer.Next }),
+                new JsonObject { ["step"] = instance.Step, ["next"] = next }),
             cancellationToken);
         await WorkItemQueue.EnqueueAsync(
             context.Connection,
@@ -130,7 +143,7 @@ internal sealed partial class ProcessTimerHandler(ReleaseModelCache models, ILog
     [LoggerMessage(LogLevel.Information, "Timer of process instance {InstanceId} was set at revision {Revision}, but the instance is {State} at revision {CurrentRevision}, so the item was discarded.")]
     private partial void LogStale(Guid instanceId, long revision, string? state, long? currentRevision);
 
-    [LoggerMessage(LogLevel.Warning, "Process instance {InstanceId} waits on step {Step}, which is not a timer step, so its timer work item was discarded.")]
+    [LoggerMessage(LogLevel.Warning, "Process instance {InstanceId} waits on step {Step}, which is not a timer step or a waitEvent step with a timeout, so its timer work item was discarded.")]
     private partial void LogNotTimer(Guid instanceId, string step);
 
     [LoggerMessage(LogLevel.Warning, "Timer step {Step} of process instance {InstanceId} failed: {Error}")]

@@ -54,6 +54,8 @@ apply: sections marked _(planned for Mx)_ are not built yet, and Dn refers to
     `axis.process_call_attempts` (one row per attempt and per lookup of a
     connector or package call),
     `axis.events` (one row per event occurrence that a step raised),
+    `axis.process_event_matches` (one row per use of an occurrence by a
+    `waitEvent` step),
     `axis.notifications` (one row per in-app notification and recipient),
     `axis.notification_reads` (one row per notification and user who read it),
     `axis.email_outbox` (one row per staged email),

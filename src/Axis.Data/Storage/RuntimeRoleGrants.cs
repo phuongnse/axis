@@ -32,6 +32,7 @@ public static class RuntimeRoleGrants
         "package_calls",
         "process_call_attempts",
         "events",
+        "process_event_matches",
         "notifications",
         "notification_reads",
         "email_outbox",
