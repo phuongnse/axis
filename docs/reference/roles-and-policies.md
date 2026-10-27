@@ -168,7 +168,11 @@ outcomes. Operators inspect the approvals and change nothing:
   named rules and [`currentUser()`](expressions.md#current-user). `any` and
   `count` test a child collection or a `references` field of the entity, so
   `any(assignees, userId == currentUser())` reads only the records that list
-  the user. Without it,
+  the user. A list under an `any` filter over a child collection finds each
+  record's rows through the child table's owner index
+  ([D77](../decisions/d77-indexes-defaults-and-ranges.md)).
+  `AnyPolicyPerformanceTests` fails when a list read over 100,000 records
+  with 500,000 child rows takes 2 s or more. Without it,
   the grant covers every record. On `read`, `update` and
   `delete` the stored record must match it. On `create` and `update` the new
   record must match it too. The employee's write grant above keeps a request
