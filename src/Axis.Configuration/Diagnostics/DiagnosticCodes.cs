@@ -268,4 +268,5 @@ public static class DiagnosticCodes
     public const string EscalationWithoutAction = "AXC0280";
     public const string EscalationNotBeforeDeadline = "AXC0281";
     public const string SensitiveNotifyValue = "AXC0282";
+    public const string WaitEventOverOtherEntity = "AXC0283";
 }

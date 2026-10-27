@@ -8,9 +8,10 @@ subject. The process resource and the first four step types are in
 are not built yet, and Dn refers to [decisions.md](../decisions.md).
 
 Everything in this file is _(planned for M14)_, except the
-[Timer step](#timer-step), [Loops](#loops) through a `task` or a `timer` and the
-calls in them, the [sub-process step](#sub-process-step) and the
-[create record operation](#create-record-operation), which are built. The design follows
+[Timer step](#timer-step), [Loops](#loops) through a `task`, a `timer` or a
+`waitEvent` and the calls in them, the [sub-process step](#sub-process-step),
+the [create record operation](#create-record-operation) and the compile checks
+of the [wait for event step](#wait-for-event-step), which are built. The design follows
 [D69](../decisions/d69-timer-wait-for-event-and-sub-process-steps-loops-and-create-record.md)
 and
 [D70](../decisions/d70-processes-without-a-subject-scheduled-jobs-and-delete-triggers.md).
@@ -68,12 +69,21 @@ A `waitEvent` step waits until an event about the subject record is raised:
 }
 ```
 
-- `event` names an `event` whose entity is the subject entity. Another entity
-  is a new diagnostic.
+- **Built.** The compiler checks and builds the step, and the instance graph
+  shows it as `waitEvent`, with a transition to `next` and one marked
+  `timeout`. A published process that reaches the step fails it with the
+  engine's "cannot run" error until the engine runs the step. Studio's palette
+  offers it, and a new step starts with an empty `event` and `next`.
+- `event` names an `event` whose entity is the subject entity. An unknown
+  event is `AXC0125` and an event about another entity is `AXC0283`, both at
+  `/steps/{i}/event`.
 - `when` is optional. It is a boolean expression over the event's payload
-  fields, as an event trigger's `when` is.
+  fields, as an event trigger's `when` is. Its problems have the usual
+  expression codes at `/steps/{i}/when`.
 - `timeout` is optional. `after` is a fixed-length duration, by the rule of
-  `dueIn`. `next` names the step taken when no event came in time.
+  `dueIn`, and a bad one is `AXC0084` at `/steps/{i}/timeout/after`. `next`
+  names the step taken when no event came in time, and a name that is no step
+  is `AXC0070` at `/steps/{i}/timeout/next`.
 - **Which occurrence.** The step matches an occurrence in `axis.events` that
   names the instance's subject record, was raised at or after the instance's
   `created_at`, has not been used by this instance, and whose `when` is true.
@@ -165,8 +175,8 @@ A `subProcess` step starts another process and waits until it ends:
 ## Loops
 
 A process may loop back to an earlier step when every cycle passes through a
-waiting step. A `task` and a `timer` are built as waiting steps. _(Planned for M14)_ A
-`waitEvent` is a waiting step too. `AXC0073` reports only a
+waiting step. A `task`, a `timer` and a `waitEvent` are waiting steps for the
+compiler. `AXC0073` reports only a
 cycle with no waiting step, which would run for ever. A cycle of `decision` and
 `operation` steps is reported, and so is a cycle through a call step with no
 task in it. See [Compile checks](processes.md#compile-checks).
@@ -281,7 +291,8 @@ M14)_.
   `raiseEvent`, `task` and `waitEvent` need a subject and are `AXC0246`. So is
   the `output` of a `callConnector` or package operation step, because it
   writes the subject. Only the step types that exist today are checked: `task`,
-  `updateRecord`, `raiseEvent` and the outputs. The compiler reports no other
+  `waitEvent`, `updateRecord`, `raiseEvent` and the outputs. A `waitEvent` is
+  reported at `/steps/{i}/type`, as a `task` is. The compiler reports no other
   problem in such a step.
 - **Triggers and other starts by name.** An event, data change or schedule
   trigger that names a process without a subject is `AXC0247`, except a

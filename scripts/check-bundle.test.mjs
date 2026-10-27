@@ -47,6 +47,7 @@ const budget = {
   allowedGrowthBytes: 2_000,
   chartChunk: "ChartDrawing-",
   designChunk: "StudioPageDesign-",
+  processDesignChunk: "StudioProcessDesign-",
   dragChunk: "DragAndDrop-",
 };
 
@@ -63,6 +64,7 @@ describe("checkBundle", () => {
     write("assets/vendor-BBB.js", 4_000);
     write("assets/ChartDrawing-CCC.js", 20_000);
     write("assets/StudioPageDesign-EEE.js", 30_000);
+    write("assets/StudioProcessDesign-GGG.js", 20_000);
     write("assets/DragAndDrop-FFF.js", 10_000);
 
     const { mainBytes, chartBytes, problems } = checkBundle(root, budget);
@@ -84,6 +86,7 @@ describe("checkBundle", () => {
     write("assets/index-AAA.js", "axis ".repeat(100_000));
     write("assets/ChartDrawing-CCC.js", "chart");
     write("assets/StudioPageDesign-EEE.js", "design");
+    write("assets/StudioProcessDesign-GGG.js", "process");
     write("assets/DragAndDrop-FFF.js", 10_000);
 
     const { mainBytes, problems } = checkBundle(root, budget);
@@ -98,6 +101,7 @@ describe("checkBundle", () => {
     write("assets/vendor-BBB.js", 6_500);
     write("assets/ChartDrawing-CCC.js", 20_000);
     write("assets/StudioPageDesign-EEE.js", 30_000);
+    write("assets/StudioProcessDesign-GGG.js", 20_000);
     write("assets/DragAndDrop-FFF.js", 10_000);
 
     const { problems } = checkBundle(root, budget);
@@ -111,6 +115,7 @@ describe("checkBundle", () => {
     write("assets/index-AAA.js", 7_000);
     write("assets/other-DDD.js", 20_000);
     write("assets/StudioPageDesign-EEE.js", 30_000);
+    write("assets/StudioProcessDesign-GGG.js", 20_000);
     write("assets/DragAndDrop-FFF.js", 10_000);
 
     const { chartBytes, problems } = checkBundle(root, budget);
@@ -125,6 +130,7 @@ describe("checkBundle", () => {
     write("assets/index-AAA.js", 3_000);
     write("assets/ChartDrawing-CCC.js", 4_000);
     write("assets/StudioPageDesign-EEE.js", 30_000);
+    write("assets/StudioProcessDesign-GGG.js", 20_000);
     write("assets/DragAndDrop-FFF.js", 10_000);
 
     const { problems } = checkBundle(root, budget);
@@ -141,6 +147,7 @@ describe("checkBundle", () => {
     write("assets/index-AAA.js", 7_000);
     write("assets/ChartDrawing-CCC.js", 20_000);
     write("assets/other-DDD.js", 30_000);
+    write("assets/StudioProcessDesign-GGG.js", 20_000);
     write("assets/DragAndDrop-FFF.js", 10_000);
 
     const { designBytes, problems } = checkBundle(root, budget);
@@ -155,6 +162,7 @@ describe("checkBundle", () => {
     write("assets/index-AAA.js", 3_000);
     write("assets/ChartDrawing-CCC.js", 20_000);
     write("assets/StudioPageDesign-EEE.js", 4_000);
+    write("assets/StudioProcessDesign-GGG.js", 20_000);
     write("assets/DragAndDrop-FFF.js", 10_000);
 
     const { problems } = checkBundle(root, budget);
@@ -166,11 +174,44 @@ describe("checkBundle", () => {
     );
   });
 
+  test("fails when there is no separate process design chunk", () => {
+    write("index.html", index());
+    write("assets/index-AAA.js", 7_000);
+    write("assets/ChartDrawing-CCC.js", 20_000);
+    write("assets/StudioPageDesign-EEE.js", 30_000);
+    write("assets/other-DDD.js", 20_000);
+    write("assets/DragAndDrop-FFF.js", 10_000);
+
+    const { processDesignBytes, problems } = checkBundle(root, budget);
+
+    assert.equal(processDesignBytes, 0);
+    assert.equal(problems.length, 1);
+    assert.match(problems[0], /no process design chunk/);
+  });
+
+  test("fails when the process designer is among the main bundle files", () => {
+    write("index.html", index({ preload: ["StudioProcessDesign-GGG.js"] }));
+    write("assets/index-AAA.js", 3_000);
+    write("assets/ChartDrawing-CCC.js", 20_000);
+    write("assets/StudioPageDesign-EEE.js", 30_000);
+    write("assets/StudioProcessDesign-GGG.js", 4_000);
+    write("assets/DragAndDrop-FFF.js", 10_000);
+
+    const { problems } = checkBundle(root, budget);
+
+    assert.equal(problems.length, 1);
+    assert.match(
+      problems[0],
+      /StudioProcessDesign-GGG\.js is part of the main bundle/,
+    );
+  });
+
   test("fails when there is no separate drag and drop chunk", () => {
     write("index.html", index());
     write("assets/index-AAA.js", 7_000);
     write("assets/ChartDrawing-CCC.js", 20_000);
     write("assets/StudioPageDesign-EEE.js", 30_000);
+    write("assets/StudioProcessDesign-GGG.js", 20_000);
     write("assets/other-DDD.js", 10_000);
 
     const { dragBytes, problems } = checkBundle(root, budget);
@@ -185,6 +226,7 @@ describe("checkBundle", () => {
     write("assets/index-AAA.js", 3_000);
     write("assets/ChartDrawing-CCC.js", 20_000);
     write("assets/StudioPageDesign-EEE.js", 30_000);
+    write("assets/StudioProcessDesign-GGG.js", 20_000);
     write("assets/DragAndDrop-FFF.js", 4_000);
 
     const { problems } = checkBundle(root, budget);
@@ -201,11 +243,12 @@ describe("check-bundle.mjs", () => {
   const run = (...args) =>
     spawnSync(process.execPath, [script, ...args], { encoding: "utf8" });
 
-  test("prints all four sizes and exits 0 for a bundle within budget", () => {
+  test("prints all five sizes and exits 0 for a bundle within budget", () => {
     write("index.html", index());
     write("assets/index-AAA.js", 7_000);
     write("assets/ChartDrawing-CCC.js", 20_000);
     write("assets/StudioPageDesign-EEE.js", 30_000);
+    write("assets/StudioProcessDesign-GGG.js", 20_000);
     write("assets/DragAndDrop-FFF.js", 10_000);
     write("budget.json", JSON.stringify(budget));
 
@@ -218,6 +261,7 @@ describe("check-bundle.mjs", () => {
     );
     assert.match(result.stdout, /Chart chunk: \d+\.\d KB gzipped\./);
     assert.match(result.stdout, /Page design chunk: \d+\.\d KB gzipped\./);
+    assert.match(result.stdout, /Process design chunk: \d+\.\d KB gzipped\./);
     assert.match(result.stdout, /Drag and drop chunk: \d+\.\d KB gzipped\./);
   });
 
@@ -226,6 +270,7 @@ describe("check-bundle.mjs", () => {
     write("assets/index-AAA.js", 13_000);
     write("assets/ChartDrawing-CCC.js", 20_000);
     write("assets/StudioPageDesign-EEE.js", 30_000);
+    write("assets/StudioProcessDesign-GGG.js", 20_000);
     write("assets/DragAndDrop-FFF.js", 10_000);
     write("budget.json", JSON.stringify(budget));
 
@@ -235,11 +280,12 @@ describe("check-bundle.mjs", () => {
     assert.match(result.stderr, /main bundle is .* over its budget/);
   });
 
-  test("the committed budget file names the lazy chart, page design and drag and drop modules", () => {
+  test("the committed budget file names the lazy chart, page design, process design and drag and drop modules", () => {
     const committed = JSON.parse(readFileSync(budgetFile, "utf8"));
 
     assert.equal(committed.chartChunk, "ChartDrawing-");
     assert.equal(committed.designChunk, "StudioPageDesign-");
+    assert.equal(committed.processDesignChunk, "StudioProcessDesign-");
     assert.equal(committed.dragChunk, "DragAndDrop-");
     assert.ok(committed.mainBaselineBytes > 0);
     assert.equal(committed.allowedGrowthBytes, 50 * 1024);

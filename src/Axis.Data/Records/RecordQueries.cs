@@ -294,6 +294,30 @@ public static class RecordQueries
     }
 
     /// <summary>
+    /// Finds the id and version of the record of <paramref name="entity"/> whose field equals
+    /// <paramref name="value"/>, or <see langword="null"/> when none does. The field is unique, so there is at most
+    /// one. The records' filters are not applied. The command joins the transaction that
+    /// <paramref name="connection"/> has open.
+    /// </summary>
+    public static async Task<(Guid Id, long Version)?> FindByValueAsync(
+        NpgsqlConnection connection,
+        EntityModel entity,
+        RecordValue value,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+        ArgumentNullException.ThrowIfNull(entity);
+        ArgumentNullException.ThrowIfNull(value);
+
+        var id = EntityNaming.Quote(EntityNaming.IdColumn);
+        var version = EntityNaming.Quote(EntityNaming.VersionColumn);
+        await using var command = new NpgsqlCommand { Connection = connection };
+        command.CommandText = $"SELECT {id}, {version} FROM {Table(entity)} WHERE {EntityNaming.Quote(EntityNaming.Column(value.Field.Name))} = {RecordCommands.AddValue(command, 0, value)} LIMIT 1";
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        return await reader.ReadAsync(cancellationToken) ? (reader.GetGuid(0), reader.GetInt64(1)) : null;
+    }
+
+    /// <summary>
     /// Reads the row of the record with <paramref name="id"/>, with its labels but without the rows
     /// of its child collections, in one command. <see langword="null"/> when there is none.
     /// </summary>

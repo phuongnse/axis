@@ -23,6 +23,9 @@ public sealed record ProcessStepDefinition
     /// <summary>The <c>timer</c> step type: the process waits for a fixed time (<see cref="Wait"/>) or until a date-time (<see cref="Until"/>), then goes on at <see cref="Next"/>.</summary>
     public const string Timer = "timer";
 
+    /// <summary>The <c>waitEvent</c> step type: the process waits for an event about the subject record (<see cref="Event"/>), then goes on at <see cref="Next"/>, or at the step of <see cref="Timeout"/> when none arrives in time.</summary>
+    public const string WaitEvent = "waitEvent";
+
     /// <summary>The built-in operation that sets fields of the subject record.</summary>
     public const string UpdateRecord = "updateRecord";
 
@@ -40,7 +43,7 @@ public sealed record ProcessStepDefinition
 
     public required string Name { get; init; }
 
-    /// <summary>The step type: <c>decision</c>, <c>task</c>, <c>operation</c>, <c>subProcess</c>, <c>end</c> or <c>timer</c>.</summary>
+    /// <summary>The step type: <c>decision</c>, <c>task</c>, <c>operation</c>, <c>subProcess</c>, <c>end</c>, <c>timer</c> or <c>waitEvent</c>.</summary>
     public required string Type { get; init; }
 
     /// <summary>The ordered branches of a decision, or null for any other step.</summary>
@@ -76,7 +79,7 @@ public sealed record ProcessStepDefinition
     /// <summary>The retry policy of a <c>callConnector</c> step, or null for the defaults or for any other step.</summary>
     public RetryDefinition? Retry { get; init; }
 
-    /// <summary>The event a <c>raiseEvent</c> step raises, or null for any other step.</summary>
+    /// <summary>The event a <c>raiseEvent</c> step raises or a <c>waitEvent</c> step waits for, or null for any other step.</summary>
     public string? Event { get; init; }
 
     /// <summary>
@@ -115,7 +118,7 @@ public sealed record ProcessStepDefinition
     /// </summary>
     public IReadOnlyDictionary<string, string>? Parameters { get; init; }
 
-    /// <summary>The step an operation, <c>subProcess</c> or <c>timer</c> step leads to, or null for any other step.</summary>
+    /// <summary>The step an operation, <c>subProcess</c>, <c>timer</c> or <c>waitEvent</c> step leads to, or null for any other step.</summary>
     public string? Next { get; init; }
 
     /// <summary>The label of a task, shown in the task inbox and on the task page, or null for any other step.</summary>
@@ -153,4 +156,13 @@ public sealed record ProcessStepDefinition
 
     /// <summary>What happens to a task before its deadline, in file order, or null when the task has none or for any other step.</summary>
     public IReadOnlyList<TaskEscalationDefinition>? Escalations { get; init; }
+
+    /// <summary>
+    /// The expression of type <c>boolean</c> over the payload of the event a <c>waitEvent</c> step
+    /// waits for, or null when any such event ends the wait or for any other step.
+    /// </summary>
+    public string? When { get; init; }
+
+    /// <summary>How long a <c>waitEvent</c> step waits and the step it then leads to, or null when it waits for as long as it takes or for any other step.</summary>
+    public WaitTimeoutDefinition? Timeout { get; init; }
 }

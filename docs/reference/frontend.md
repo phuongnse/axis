@@ -72,6 +72,15 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   [D67](../decisions/d67-live-widget-previews-in-the-design-system.md),
   [D57](../decisions/d57-a-design-system-published-from-the-repository.md) and
   [Design changes](../delivery.md#design-changes).
+- **Icons.** Every icon comes from `@ant-design/icons`, and nothing in the SPA
+  draws one by hand. Only the outlined style is used, so icons look alike. An
+  icon takes the text colour and size of its control, so its colour comes from
+  theme tokens and is never hard-coded. An icon next to its text, or inside a
+  control with its own accessible name, is `aria-hidden`. An icon-only control
+  takes its accessible name from a text resource. Configuration, page metadata
+  and the custom widget API never name an icon, as the UI library bullet says
+  ([D58](../decisions/d58-ant-design-is-a-detail-of-the-spa-without-procomponents.md)).
+  A Vitest test fails on an `<svg>` element in a `.tsx` file under `web/src`.
 - **How pages and widgets grow.** A page draws its whole tree of widgets.
   Containers show their widgets in file order and can nest. A form binds an entity
   or a `form` resource, which lays the entity's fields out in sections, and a

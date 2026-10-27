@@ -31,7 +31,8 @@ public static class NotificationQueries
         )
         """;
 
-    private const string CountsSql =
+    /// <summary>Counts the notifications a user sees and the unread ones among them.</summary>
+    internal const string CountsSql =
         $"""
         {VisibleCte}
         SELECT count(*) FILTER (WHERE NOT @unread OR NOT is_read), count(*) FILTER (WHERE NOT is_read) FROM visible

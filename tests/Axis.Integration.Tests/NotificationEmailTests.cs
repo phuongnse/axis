@@ -2,8 +2,12 @@ using System.Net;
 using System.Net.Sockets;
 using Axis.Configuration.Model;
 using Axis.Processes.Instances;
+using Axis.Processes.Storage;
 using Axis.Processes.Work;
+using Axis.Tenancy;
+using Axis.Tenancy.Platform;
 using Axis.Worker;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting.Internal;
@@ -219,6 +223,65 @@ public sealed class NotificationEmailTests(ProcessStepFixture fixture, MailpitFi
         Assert.Equal(0L, await ItemCountAsync([email.Id]));
     }
 
+    [Fact]
+    public async Task Directory_tenant_SMTP_override_sends_through_the_tenant_server()
+    {
+        var address = UniqueAddress();
+        var (releaseId, model) = await NotifyMailApp.ActivateAsync(fixture, CancellationToken, address);
+        var (title, _, _) = await StageAsync(releaseId, model, viProfile: false);
+        var catalog = await DirectoryCatalogAsync();
+        var settings = new List<(string, string)>
+        {
+            ("Email:Smtp:Host", "smtp.invalid"),
+            ("Email:Smtp:Port", "25"),
+            ("Email:Smtp:UseTls", "false"),
+            ("Email:From", "host@example.test"),
+        };
+        await using var worker = Worker(new LogCollector(), settings, catalog);
+
+        await RunUntilIdleAsync(worker);
+
+        // The server accepts a message only after a sign-in, so the delivery proves that the stored password was decrypted and used.
+        var message = Assert.Single(await mailpit.MessagesToAsync(address, CancellationToken, authenticated: true));
+        Assert.Equal($"Request {title}", message.Subject);
+        Assert.Equal("sent", Assert.Single(await EmailsAsync(title)).State);
+    }
+
+    /// <summary>
+    /// A directory catalog loaded from a platform database whose tenant has its own mail settings, which point at the Mailpit
+    /// server that needs a password. The tenant's database is the fixture's.
+    /// </summary>
+    private async Task<DirectoryTenantCatalog> DirectoryCatalogAsync()
+    {
+        var platform = await fixture.CreateDatabaseAsync("platform");
+        var cipher = AdminScenario.Cipher;
+        var database = new NpgsqlConnectionStringBuilder(PostgreSqlServer.RuntimeConnectionString(fixture.ConnectionString));
+        await using (var context = new PlatformDbContext(new DbContextOptionsBuilder<PlatformDbContext>().UseNpgsql(platform).Options))
+        {
+            await context.Database.MigrateAsync(CancellationToken);
+            context.Tenants.Add(new TenantRow
+            {
+                Id = fixture.Tenant,
+                Status = "active",
+                SchemaVersion = TenantSchemaVersion.Current,
+                DatabaseHost = database.Host!,
+                DatabasePort = database.Port,
+                DatabaseName = database.Database!,
+                RuntimeUser = database.Username!,
+                RuntimePassword = cipher.Encrypt(fixture.Tenant, TenantSecretFields.RuntimePassword, database.Password!),
+                SmtpHost = await mailpit.AuthSmtpHostAsync(),
+                SmtpPort = await mailpit.AuthSmtpPortAsync(),
+                SmtpUseTls = false,
+                SmtpUserName = MailpitFixture.AuthUserName,
+                SmtpPassword = cipher.Encrypt(fixture.Tenant, TenantSecretFields.SmtpPassword, MailpitFixture.AuthPassword),
+                EmailFrom = Sender,
+            });
+            await context.SaveChangesAsync(CancellationToken);
+        }
+
+        return await DirectoryTenantCatalog.LoadAsync(platform, cipher, CancellationToken);
+    }
+
     private static string UniqueAddress() => $"ops+{Guid.NewGuid():N}@example.test";
 
     private static int UnusedPort()
@@ -259,7 +322,7 @@ public sealed class NotificationEmailTests(ProcessStepFixture fixture, MailpitFi
     }
 
     /// <summary>A worker over the fixture's tenant database that has the given settings, with the host never started.</summary>
-    private ServiceProvider Worker(LogCollector logs, IEnumerable<(string Key, string Value)> settings)
+    private ServiceProvider Worker(LogCollector logs, IEnumerable<(string Key, string Value)> settings, ITenantCatalog? catalog = null)
     {
         var values = new Dictionary<string, string?>
         {
@@ -272,10 +335,16 @@ public sealed class NotificationEmailTests(ProcessStepFixture fixture, MailpitFi
         }
 
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(values).Build();
-        return new ServiceCollection()
+        var services = new ServiceCollection()
             .AddLogging(logging => logging.AddProvider(logs))
-            .AddAxisWorker(configuration, new HostingEnvironment { EnvironmentName = "Testing" })
-            .BuildServiceProvider();
+            .AddAxisWorker(configuration, new HostingEnvironment { EnvironmentName = "Testing" });
+        if (catalog is not null)
+        {
+            // The last registration wins, so the handler finds the tenant in this catalog.
+            services.AddSingleton(catalog);
+        }
+
+        return services.BuildServiceProvider();
     }
 
     private async Task RunUntilIdleAsync(ServiceProvider worker)

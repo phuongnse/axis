@@ -62,6 +62,7 @@
     "role.falseOnly": "Chỉ sai",
     "role.failing": "Lỗi bộ lọc",
     "role.exporter": "Người xuất dữ liệu",
-    "role.assigned": "Được giao việc"
+    "role.assigned": "Được giao việc",
+    "role.keyed": "Cập nhật theo khóa"
   }
 }

@@ -32,7 +32,8 @@ namespace Axis.Server.Processes;
 /// <para>
 /// The detail at <c>GET /api/apps/{app}/processes/{process}/instances/{id}</c> shows one instance:
 /// its properties, the graph of the release it is pinned to, its path (the history rows in order),
-/// its tasks, its calls and the operator <c>commands</c> the user may take on it. A call lists its attempts and lookups, and its stored input only when
+/// its tasks, its calls and the operator <c>commands</c> the user may take on it. While the instance waits on a timer step, the
+/// detail also has <c>timerDueAt</c>, the due time of the timer's work item. A call lists its attempts and lookups, and its stored input only when
 /// the user may read every field that the step's input and output mapping reads or writes, on any
 /// entity, and none of them is sensitive in the pinned or the active release. Otherwise the input is
 /// null and marked hidden. The commands come from the user's <c>retry</c> and <c>cancel</c> grants and the states, and a call is
@@ -274,6 +275,11 @@ internal static class ProcessInspectionEndpoints
             return InstanceNotFound();
         }
 
+        // The due time shows only while the instance waits, from the timer item of its current revision.
+        var timerDueAt = row.State == ProcessStarts.Waiting
+            ? await InstanceQueries.TimerDueAtAsync(connection, row.Id, row.Revision, cancellationToken)
+            : null;
+
         // A parent or sub-process is named only when the user may inspect its process in the active release.
         // The subject record's read filters do not apply, and no subject id is shown.
         var relatives = await InstanceQueries.RelativesAsync(connection, application.Manifest.Id, row.Id, cancellationToken);
@@ -332,6 +338,7 @@ internal static class ProcessInspectionEndpoints
             row.Step,
             row.CreatedAt.UtcDateTime,
             row.EndedAt?.UtcDateTime,
+            timerDueAt?.UtcDateTime,
             parent,
             subProcesses,
             graph,
@@ -523,6 +530,13 @@ internal static class ProcessInspectionEndpoints
             PackageOperationStepModel package => Operation(package.Name, package.Next),
             RaiseEventStepModel raise => Operation(raise.Name, raise.Next),
             TimerStepModel timer => new(timer.Name, "timer", null, [new ProcessGraphTransition(timer.Next, null)]),
+            WaitEventStepModel wait => new(
+                wait.Name,
+                "waitEvent",
+                null,
+                wait.Timeout is { } timeout
+                    ? [new ProcessGraphTransition(wait.Next, null), new ProcessGraphTransition(timeout.Next, "timeout")]
+                    : [new ProcessGraphTransition(wait.Next, null)]),
             CreateRecordStepModel create => Operation(create.Name, create.Next),
             NotifyStepModel notify => Operation(notify.Name, notify.Next),
             SubProcessStepModel sub => Operation(sub.Name, sub.Next),
@@ -556,7 +570,8 @@ internal sealed record ProcessInstanceListItem(
 /// <summary>
 /// One instance of a process, the graph of the release it is pinned to, its path, its tasks and its calls.
 /// <paramref name="Commands"/> lists the operator commands (<c>retry</c>, <c>cancel</c>) that the user holds the grant for and
-/// that the instance's state and calls allow. The detail names the parent and the sub-processes whose process the user may
+/// that the instance's state and calls allow. <paramref name="TimerDueAt"/> is the time the timer step that the instance waits on
+/// fires, or null when the instance is not waiting on a timer. The detail names the parent and the sub-processes whose process the user may
 /// inspect in the active release, with no subject id.
 /// </summary>
 internal sealed record ProcessInstanceDetailResponse(
@@ -568,6 +583,7 @@ internal sealed record ProcessInstanceDetailResponse(
     string Step,
     DateTime CreatedAt,
     DateTime? EndedAt,
+    DateTime? TimerDueAt,
     ProcessInstanceParent? Parent,
     IReadOnlyList<ProcessSubProcess> SubProcesses,
     ProcessGraph Graph,

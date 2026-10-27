@@ -1,5 +1,6 @@
 using System.Formats.Tar;
 using System.Net;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -122,6 +123,35 @@ public sealed class AdminTenantRestoreTests(AdminBackupFixture fixture) : IClass
         Assert.Equal(originalHosts, await scenario.HostsAsync(fixture.TenantId));
 
         await scenario.AssertNoSecretsAsync();
+    }
+
+    [Fact]
+    public async Task A_backup_restored_under_a_new_id_holds_the_same_file_bytes_and_sha256()
+    {
+        var bytes = Enumerable.Range(0, 4096).Select(i => (byte)(i % 256)).ToArray();
+        var hash = Convert.ToHexStringLower(SHA256.HashData(bytes));
+        var fileId = Guid.NewGuid();
+        await fixture.ExecuteAsync(
+            "INSERT INTO axis.files (id, application_id, entity_id, field_path, owner_record_id, name, media_type, size, sha256, storage_kind, state, uploaded_by, uploaded_at) "
+            + $"VALUES ('{fileId:D}', '{Guid.NewGuid():D}', '{Guid.NewGuid():D}', 'receipt', NULL, 'invoice.pdf', 'application/pdf', {bytes.Length}, decode('{hash}', 'hex'), 'database', 'attached', 'anna', now()); "
+            + $"INSERT INTO axis.file_contents (file_id, content) VALUES ('{fileId:D}', decode('{Convert.ToHexStringLower(bytes)}', 'hex'))");
+        using var folder = new TemporaryFolder();
+        var file = Path.Combine(folder.Path, "backup.tar");
+        Assert.Equal(0, (await fixture.BackupAsync(file)).Exit);
+        var newId = fixture.Scenario.NewTenantId();
+
+        var result = await RestoreAsync(file, newId, $"{newId}.example.test");
+
+        Assert.Equal(0, result.Exit);
+        Assert.Equal(
+            Convert.ToHexStringLower(bytes),
+            await ScalarInRestoredAsync(newId, $"SELECT encode(content, 'hex') FROM axis.file_contents WHERE file_id = '{fileId:D}'"));
+        Assert.Equal(hash, await ScalarInRestoredAsync(newId, $"SELECT encode(sha256, 'hex') FROM axis.files WHERE id = '{fileId:D}'"));
+        Assert.Equal(
+            $"attached|{bytes.Length}|invoice.pdf",
+            await ScalarInRestoredAsync(newId, $"SELECT state || '|' || size || '|' || name FROM axis.files WHERE id = '{fileId:D}'"));
+
+        await fixture.Scenario.AssertNoSecretsAsync();
     }
 
     [Fact]
@@ -526,6 +556,17 @@ public sealed class AdminTenantRestoreTests(AdminBackupFixture fixture) : IClass
         await connection.OpenAsync(CancellationToken);
         await using var command = new NpgsqlCommand("SELECT count(*) FROM axis.sessions", connection);
         return (long)(await command.ExecuteScalarAsync(CancellationToken))!;
+    }
+
+    // Reads as the runtime role, the role the server uses, so it also proves that restore grants it the file tables.
+    private async Task<string?> ScalarInRestoredAsync(string id, string sql)
+    {
+        var row = await fixture.Scenario.RowAsync(id);
+        var runtime = AdminScenario.Cipher.Decrypt(id, TenantSecretFields.RuntimePassword, row.RuntimePassword).Reveal();
+        await using var connection = new NpgsqlConnection(fixture.Scenario.TenantConnectionString(id, row.RuntimeUser, runtime));
+        await connection.OpenAsync(CancellationToken);
+        await using var command = new NpgsqlCommand(sql, connection);
+        return (string?)await command.ExecuteScalarAsync(CancellationToken);
     }
 
     private async Task<string[]> BindingNamesAsync(string id)

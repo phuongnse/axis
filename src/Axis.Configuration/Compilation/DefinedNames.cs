@@ -47,12 +47,14 @@ public sealed record DefinedTyped(string Name, string Type);
 public sealed record DefinedColumn(string Name, string? Type);
 
 /// <summary>
-/// A process and its steps. <paramref name="Parameters"/> are the parameters of a process without a subject, in file
-/// order, and empty for a process with a subject.
+/// A process and its steps. <paramref name="Entity"/> is the subject entity, or null for a process without a subject.
+/// <paramref name="Parameters"/> are the parameters of a process without a subject, in file order, and empty for a
+/// process with a subject.
 /// </summary>
 public sealed record DefinedProcess(
     Guid Id,
     string Name,
+    string? Entity,
     IReadOnlyList<DefinedTyped> Parameters,
     IReadOnlyList<DefinedStep> Steps);
 

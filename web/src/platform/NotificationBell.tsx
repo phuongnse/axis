@@ -1,3 +1,4 @@
+import { BellOutlined } from '@ant-design/icons'
 import { Alert, Badge, Button, Drawer, Flex, Pagination, Typography } from 'antd'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
@@ -23,27 +24,6 @@ interface NotificationBellProps {
   /** The path of the site, which a notification's page opens in. */
   sitePath: string
   locale: string
-}
-
-function BellIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      focusable="false"
-      width="20"
-      height="20"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      style={{ display: 'block' }}
-    >
-      <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
-      <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
-    </svg>
-  )
 }
 
 /**
@@ -139,9 +119,7 @@ export function NotificationBell({ path, sitePath, locale }: NotificationBellPro
     <>
       <Button type="text" aria-label={named} aria-haspopup="dialog" onClick={openPanel}>
         <Badge count={unread} size="small" offset={[2, -2]}>
-          <span style={{ color: colour.text, display: 'block' }}>
-            <BellIcon />
-          </span>
+          <BellOutlined aria-hidden />
         </Badge>
       </Button>
       <span role="status" aria-live="polite" style={visuallyHidden}>
