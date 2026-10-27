@@ -7,12 +7,13 @@ work, and the tables. The rest of the process reference is in these files:
 - [task-api.md](task-api.md): the task API.
 - [process-flow.md](process-flow.md): timer, wait for event and sub-process
   steps, loops, the `createRecord` operation and processes without a subject.
-  The timer step and loops through a `task` or a `timer` are built, the rest
-  is _(planned for M14)_.
+  All are built.
 - [task-deadlines.md](task-deadlines.md): task escalations, deadlines, claim
-  and reassign. Claim and reassign are built, the rest is _(planned for M14)_.
+  and reassign. All are built, except the email channel of an escalation,
+  _(planned for M16)_.
 - [notifications.md](notifications.md): the `notify` operation and in-app and
-  email notifications _(planned for M14)_.
+  email notifications. All are built, except the escalation email and Mailpit
+  in Docker Compose and `scripts/dev.sh`, both _(planned for M16)_.
 - [process-execution.md](process-execution.md): execution, connector calls,
   package operations and the worker settings.
 - [process-events.md](process-events.md): raised events, triggers and
@@ -227,10 +228,10 @@ a payment reference from the sample extension package, see
 ## Steps
 
 M3 has four step types. The `timer` step is built too. The compiler builds a
-`waitEvent` step, and the engine runs it, but event delivery does not wake a waiting instance yet, see
-[Wait for event step](process-flow.md#wait-for-event-step). The engine runs a
+`waitEvent` step, the engine runs it, and event delivery wakes a waiting instance,
+see [Wait for event step](process-flow.md#wait-for-event-step). The engine runs a
 `subProcess` step, see [Sub-process step](process-flow.md#sub-process-step).
-Its failure handling and cancel rules are _(planned for M14)_, as is the email of the
+Its failure handling and cancel rules are built, and so is the email of the
 `notify` operation, see [process flow](process-flow.md) and
 [notifications](notifications.md#notify-operation). The engine runs a `notify`
 step and stores its in-app notification, see
@@ -249,8 +250,8 @@ operation is built, see
   - `assignee` has exactly one of `{ "user": "<expression>" }` and
     `{ "role": "<role name>" }`. A `user` expression gives `text`, a user id,
     such as `department.manager`. A `role` names a role the user must hold.
-    Queues come later. _(Planned for M14)_ A user who holds the role may
-    claim the task, see [Claim and release](task-deadlines.md#claim-and-release).
+    A user who holds the role may claim the task, see
+    [Claim and release](task-deadlines.md#claim-and-release).
   - `form` names a [form resource](form-widget.md) whose entity is the subject
     entity. The task page shows it over the subject record.
   - `dueIn` is optional. It is a positive ISO 8601 duration in whole
@@ -265,7 +266,7 @@ operation is built, see
     `expired` and the instance moves to `next`, see
     [Escalations and deadline](task-deadlines.md#escalations-and-deadline).
     `escalations` is optional and checked in the same section. The engine runs
-    the `reassign` and the `notify` of an escalation. Its `email` channel is _(planned for M14)_.
+    the `reassign` and the `notify` of an escalation. Its `email` channel is _(planned for M16)_.
   - `outcomes` is an array of `{ "name", "label": { "textKey" }, "next" }`,
     such as `approve`, `return` and `reject`. Each names the step taken when
     the task is completed with it.
@@ -573,7 +574,7 @@ these:
 | State | Meaning |
 | --- | --- |
 | `running` | The instance has work that is ready or claimed by a worker. |
-| `waiting` | The instance waits for a human task to be completed or for a connector call to settle, see [Connector calls](process-execution.md#connector-calls). It also waits for a package operation call, see [Package operations](process-execution.md#package-operations), for the child of a sub-process step, see [Sub-process step](process-flow.md#sub-process-step), and for a timer, see [Timer step](process-flow.md#timer-step). _(Planned for M14)_ It also waits for an event, see [process flow](process-flow.md). |
+| `waiting` | The instance waits for a human task to be completed or for a connector call to settle, see [Connector calls](process-execution.md#connector-calls). It also waits for a package operation call, see [Package operations](process-execution.md#package-operations), for the child of a sub-process step, see [Sub-process step](process-flow.md#sub-process-step), and for a timer, see [Timer step](process-flow.md#timer-step). It also waits for an event, see [process flow](process-flow.md). |
 | `completed` | The instance reached an `end` step. |
 | `failed` | A step failed. The error is in the history. |
 | `cancelled` | An operator cancelled the instance while it was `running` or `waiting`. It is an end state. See [Cancel](process-inspection.md#cancel). |
@@ -593,8 +594,8 @@ record. An operator can cancel a `running` or `waiting` instance, see
 | `expired` | The task's `deadline` passed while it was `open`, and the instance moved to the deadline's `next` step. The task has no decision and leaves every inbox. It cannot be completed. See [Escalations and deadline](task-deadlines.md#escalations-and-deadline). |
 
 A task has no other state. Its due date is only shown, so there is no overdue
-state. _(Planned for M14)_ The task API reports an open task past its due date
-as overdue, see [Task states](task-deadlines.md#task-states).
+state. The task API reports an open task past its due date as overdue, see
+[Task states](task-deadlines.md#task-states).
 
 ## Releases and running work
 
