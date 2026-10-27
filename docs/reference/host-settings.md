@@ -328,11 +328,9 @@ the operator sets it with
 
 ## Data settings
 
-`Data:QueryTimeout`, `Data:ExportQueryTimeout`, `Data:ExportMaxRows`,
-`Data:ImportMaxRows`, `Data:ImportMaxBytes` and `Files:MaxSize` are built. The
-rest are _(planned for M15)_. The server reads `Data:QueryTimeout`,
-`Data:ExportQueryTimeout`, `Data:ExportMaxRows`, `Data:ImportMaxBytes` and
-`Files:MaxSize`, and the worker reads `Data:ImportMaxRows`. See
+The server reads `Data:QueryTimeout`, `Data:ExportQueryTimeout`,
+`Data:ExportMaxRows`, `Data:ImportMaxBytes` and `Files:MaxSize`, and the worker
+reads `Data:ImportMaxRows`. See
 [D79](../decisions/d79-import-and-export-under-policies.md) and
 [D80](../decisions/d80-search-more-aggregates-and-query-timeouts.md).
 
