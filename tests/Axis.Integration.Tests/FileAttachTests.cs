@@ -148,7 +148,7 @@ public sealed class FileAttachTests(RecordApiFixture fixture) : IClassFixture<Re
             await FileStore.InsertPendingAsync(
                 connection,
                 new PendingFile(foreign, fixture.FilesModel.Manifest.Id, entity.Id, "receipt", "other.pdf", "application/pdf", 3, new byte[32], "binh", DateTimeOffset.UtcNow),
-                new byte[] { 1, 2, 3 },
+                new MemoryStream([1, 2, 3]),
                 CancellationToken);
         }
 

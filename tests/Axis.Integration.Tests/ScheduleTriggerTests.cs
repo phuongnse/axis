@@ -29,6 +29,9 @@ public sealed class ScheduleTriggerTests(ScheduleTriggerFixture fixture) : IClas
         ProcessStarts.TriggerScheduleWorkItemKind,
         ProcessStarts.TaskDeadlineWorkItemKind,
         ProcessStarts.ProcessResumeWorkItemKind,
+
+        // The handler counts a failed send but writes no dead letter yet, so it does not deliver in the marker's sense.
+        ProcessStarts.NotificationEmailWorkItemKind,
         ComputedBackfill.WorkItemKind,
         RecordImports.CommitWorkItemKind,
         RecordImports.CheckWorkItemKind,

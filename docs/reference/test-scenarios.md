@@ -168,7 +168,8 @@ Every step has a `type`. These are the step kinds:
   scenario, including the work item runner's. Every later step reads it.
 - The runner then runs every due work item (`process.step`, `process.timer`,
   `process.resume`, `connector.call`, `package.call`, `event.deliver`,
-  `trigger.schedule`, `trigger.fanOut`, `task.escalate` and `task.deadline`) until none is due. A
+  `trigger.schedule`, `trigger.fanOut`, `task.escalate`, `task.deadline` and
+  `notification.email`) until none is due. A
   `process.timer` item is due when the scenario's time reaches its time, so a
   timer resumes its instance in the `advanceTime` that passes it.
   If more than 1,000 items run in one step, the scenario fails at that step.

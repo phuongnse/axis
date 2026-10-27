@@ -266,6 +266,59 @@ public sealed class ConfigurationTenantCatalogTests
         Assert.Equal(BindingSecret, entry.Bindings["Token"].Secret?.Reveal());
     }
 
+    [Fact]
+    public void An_Email_block_is_read_into_the_tenant_entry_and_is_absent_when_not_given()
+    {
+        var catalog = Load(
+            [
+                .. Valid(),
+                "Tenants:default:Email:Smtp:Host=smtp.example.test",
+                "Tenants:default:Email:Smtp:Port=2525",
+                "Tenants:default:Email:Smtp:UseTls=false",
+                "Tenants:default:Email:Smtp:UserName=mailer",
+                "Tenants:default:Email:Smtp:Password=smtp-p4ssw0rd",
+                "Tenants:default:Email:From=axis@example.test",
+                "Tenants:other:Hosts:0=other.example.test",
+                $"Tenants:other:ConnectionString={Connection}",
+            ]);
+
+        var email = Assert.IsType<EmailSettings>(catalog.Find("default")!.Email);
+        Assert.Equal(("smtp.example.test", 2525, false, "mailer", "axis@example.test"), (email.Host, email.Port, email.UseTls, email.UserName, email.From));
+        Assert.Equal("smtp-p4ssw0rd", email.Password!.Reveal());
+        Assert.DoesNotContain("smtp-p4ssw0rd", email.ToString(), StringComparison.Ordinal);
+        Assert.Null(catalog.Find("other")!.Email);
+    }
+
+    [Fact]
+    public void An_Email_block_defaults_the_port_to_587_and_turns_TLS_on()
+    {
+        var catalog = Load([.. Valid(), "Tenants:default:Email:Smtp:Host=smtp.example.test", "Tenants:default:Email:From=axis@example.test"]);
+
+        var email = Assert.IsType<EmailSettings>(catalog.Find("default")!.Email);
+        Assert.Equal((587, true, null), (email.Port, email.UseTls, email.UserName));
+    }
+
+    [Fact]
+    public void An_Email_block_with_a_host_and_no_From_stops_the_load_and_names_the_setting()
+    {
+        var exception = Assert.Throws<InvalidOperationException>(() => Load([.. Valid(), "Tenants:default:Email:Smtp:Host=smtp.example.test"]));
+
+        Assert.Contains("Tenants:default:Email:From", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("Smtp:Port", "0", "Tenants:default:Email:Smtp:Port")]
+    [InlineData("Smtp:Port", "70000", "Tenants:default:Email:Smtp:Port")]
+    [InlineData("Smtp:Port", "smtp-port-value", "Tenants:default:Email:Smtp:Port")]
+    [InlineData("Smtp:UseTls", "maybe", "Tenants:default:Email:Smtp:UseTls")]
+    public void An_Email_block_with_a_bad_value_stops_the_load_and_never_quotes_the_value(string key, string value, string setting)
+    {
+        var exception = Assert.Throws<InvalidOperationException>(() => Load([.. Valid(), $"Tenants:default:Email:{key}={value}"]));
+
+        Assert.Contains(setting, exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(value, exception.Message.Replace(setting, "", StringComparison.Ordinal), StringComparison.Ordinal);
+    }
+
     private static string[] PreviewPair() =>
     [
         "Tenants:main:Hosts:0=main.example.test",

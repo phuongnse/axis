@@ -16,6 +16,9 @@ internal static class DeliveryFailures
     /// <summary>The kind of a schedule trigger's fan-out of one occurrence.</summary>
     internal const string TriggerFanOutKind = ProcessStarts.TriggerFanOutWorkItemKind;
 
+    /// <summary>The kind of the send of one staged email.</summary>
+    internal const string NotificationEmailKind = ProcessStarts.NotificationEmailWorkItemKind;
+
     /// <summary>The state of a dead letter that waits for an operator.</summary>
     internal const string Open = DeadLetters.Open;
 

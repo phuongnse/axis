@@ -52,6 +52,7 @@ public sealed class ConfigurationTenantCatalog : ITenantCatalog
         var problems = TenantOptionsValidator.Validate(options).ToList();
         foreach (var (id, settings) in options.Tenants.OrderBy(tenant => tenant.Key, StringComparer.Ordinal))
         {
+            EmailSettings.Read(section.GetSection(id).GetSection("Email"), $"{TenantOptions.SectionName}:{id}:Email", problems);
             if (!string.IsNullOrWhiteSpace(settings.PreviewOf) && section.GetSection(id).GetSection("Oidc").Exists())
             {
                 problems.Add(
@@ -111,7 +112,8 @@ public sealed class ConfigurationTenantCatalog : ITenantCatalog
                 Secret(tenantSection?["SchemaConnectionString"]),
                 oidc,
                 bindings,
-                main);
+                main,
+                tenantSection is null ? null : EmailSettings.Read(tenantSection.GetSection("Email"), $"{TenantOptions.SectionName}:{id}:Email", []));
         });
 
     private static TenantOidc? Oidc(IConfigurationSection? section) =>

@@ -8,9 +8,12 @@ are not built yet, and Dn refers to [decisions.md](../decisions.md).
 The [user profiles](#user-profiles) section, the compile checks of the notify
 operation and of placeholders, the run of the notify step and of a task
 escalation's `notify`, the storage of in-app notifications, the routes that
-list them and mark them read, their retention, and the staging of emails in the
-outbox are built, and so is the bell in the site shell. The sending of emails is
-_(planned for M14)_, as is everything else in this file that says so. The design follows
+list them and mark them read, their retention, the staging of emails in the
+outbox and their sending over SMTP are built, and so is the bell in the site
+shell. The dead letter of a failed email, the mail settings in the tenant
+directory and a mail server in Docker Compose and `scripts/dev.sh` are
+_(planned for M14)_, as is everything else in this file that says so. The design
+follows
 [D73](../decisions/d73-in-app-and-email-notifications.md). Dates follow the
 application time zone of
 [D75](../decisions/d75-the-application-time-zone.md). New compile problems are
@@ -181,13 +184,21 @@ A text value may hold named placeholders, such as
   `Message-ID` is `<{row id}@{host}>`, with the tenant's first host, or
   `<{row id}@axis.invalid>` when the tenant has no host. A step run stages at
   most one email per address, ignoring letter case, with the locale of the
-  first recipient that gave it. No worker runs the items yet, so they stay
-  queued until sending is built.
-- **Sending.** _(Planned for M14)_ The item sends the email over SMTP, outside any transaction,
-  then marks the row `sent`. A failure is counted and tried again with the
-  backoff and limit of [dead letters](process-events.md#dead-letters), then
-  becomes a dead letter of kind `notification.email`.
-- **At least once.** _(Planned for M14)_ A crash after the send and before the mark sends again.
+  first recipient that gave it. The worker runs the items, as Sending says.
+- **Sending.** The worker sends each email as plain text over SMTP, outside any
+  transaction, with the stored subject, body and `Message-ID`. It uses the
+  [mail settings](#mail-settings) of the tenant. One transaction then marks the
+  row `sent` and deletes the item, and checks the claim. A row that is already
+  `sent` has its item deleted and nothing is sent. The SMTP client gives up
+  after half of the item's lease, so a send ends before another worker can
+  claim the item. With no `Email:Smtp:Host`, the item is made due again after
+  one lease and no failure is counted. A failed send is counted in
+  `axis.delivery_failures` with the exception type only, and the item is tried
+  again with the backoff of [dead letters](process-events.md#dead-letters).
+  _(Planned for M14)_ After the limit of dead letters, the failure becomes a
+  dead letter of kind `notification.email`. Until then an address that can
+  never be delivered is tried again at most once an hour.
+- **At least once.** A crash after the send and before the mark sends again.
   The same `Message-ID` lets a receiver drop the repeat.
 - **Locale.** The recipient's profile locale when the release has texts for
   it, otherwise the first locale of the release in ordinal order.
@@ -202,8 +213,10 @@ A text value may hold named placeholders, such as
 - **Logs.** A `user` recipient without a profile or an email gets no email.
   The step logs it at Information level with the step and the user id,
   never the address.
-- **Scenarios.** In a test scenario, email is stubbed. An `expectNotification`
-  step checks the recipient, the channel and the values of a notification.
+- **Scenarios.** In a test scenario, `advanceTime` runs the `notification.email`
+  items with no mail host, so each stays queued and nothing is sent. An
+  `expectNotification` step checks the recipient, the channel and the values of
+  a notification.
 
 ## User profiles
 
@@ -226,7 +239,7 @@ sign-in and the last sign-in. A later sign-in updates it.
 
 | Setting | Default | Meaning |
 | --- | --- | --- |
-| `Email:Smtp:Host` | none | The SMTP server. Without it, no email is sent and the worker logs a warning once per tenant. |
+| `Email:Smtp:Host` | none | The SMTP server. Without it, no email is sent, the items stay queued and the worker logs a warning once per tenant. |
 | `Email:Smtp:Port` | `587` | The SMTP port. |
 | `Email:Smtp:UseTls` | `true` | Use STARTTLS, or TLS on port 465. |
 | `Email:Smtp:UserName` | none | The SMTP user. |
@@ -234,7 +247,13 @@ sign-in and the last sign-in. A later sign-in updates it.
 | `Email:From` | none | The sender address. Required when a host is set. |
 | `Notifications:RetentionDays` | `90` | How long in-app notifications are kept. A value that is not a whole number of at least 1 stops the worker at start. |
 
-A tenant may override `Email` in its `Tenants` block, or in the tenant
-directory under `Tenancy:Source=directory`, where the password is encrypted as
-the OIDC client secret is. MailKit sends the email. Docker Compose,
-`scripts/dev.sh` and the integration tests run Mailpit as the mail server.
+A tenant may override `Email` in its `Tenants` block. The block replaces the
+host's settings as a whole, and keys are never merged one by one, so a tenant
+that sets only its own host never sends the host's user name and password to
+that server. A host with no `From` is refused at start, naming the setting.
+_(Planned for M14)_ A tenant may also override `Email` in the tenant directory
+under `Tenancy:Source=directory`, where the password is encrypted as the OIDC
+client secret is. Until then such a tenant uses the host's settings. MailKit
+sends the email. The integration tests run Mailpit as the mail server.
+_(Planned for M14)_ Docker Compose and `scripts/dev.sh` run Mailpit too. Until
+then they have no mail server, see [development](../development.md).

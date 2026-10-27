@@ -1,4 +1,5 @@
 using Axis.Data.Audit;
+using Axis.Server.Files;
 using Axis.Server.Tenancy;
 using Npgsql;
 
@@ -27,22 +28,7 @@ internal static class ExportFile
     }
 
     /// <summary>A new temporary file that is deleted when it is closed. Only its owner can read it.</summary>
-    public static FileStream CreateTemp()
-    {
-        var options = new FileStreamOptions
-        {
-            Mode = FileMode.CreateNew,
-            Access = FileAccess.ReadWrite,
-            Share = FileShare.None,
-            Options = FileOptions.DeleteOnClose,
-        };
-        if (!OperatingSystem.IsWindows())
-        {
-            options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
-        }
-
-        return new FileStream(Path.Combine(Path.GetTempPath(), $"axis-export-{Guid.NewGuid():N}.tmp"), options);
-    }
+    public static FileStream CreateTemp() => TemporaryFile.Create("axis-export");
 
     /// <summary>
     /// Writes the header and up to <paramref name="maxRows"/> rows of <paramref name="items"/> to a temporary

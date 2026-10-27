@@ -1,3 +1,4 @@
+using System.Data;
 using Npgsql;
 using NpgsqlTypes;
 
@@ -42,24 +43,27 @@ public static class FileStore
     // Joined to the file, so a file that was deleted after it was found gives no bytes.
     private const string ReadContentSql =
         """
-        SELECT c."content" FROM "axis"."file_contents" c JOIN "axis"."files" f ON f."id" = c."file_id"
+        SELECT f."size", c."content" FROM "axis"."file_contents" c JOIN "axis"."files" f ON f."id" = c."file_id"
         WHERE c."file_id" = @id AND f."state" = 'attached'
         """;
 
-    private const string InsertContentSql = """INSERT INTO "axis"."file_contents" ("file_id", "content") VALUES (@id, @content)""";
+    private const string InsertContentCopy = """COPY "axis"."file_contents" ("file_id", "content") FROM STDIN (FORMAT BINARY)""";
 
     /// <summary>
     /// Stores <paramref name="file"/> as <c>pending</c> with no owner record, and its bytes, in one
-    /// transaction of <paramref name="connection"/>, which must have none open.
+    /// transaction of <paramref name="connection"/>, which must have none open. The bytes are read from
+    /// <paramref name="content"/> at its current position and sent as a stream, so they are never held whole in memory.
+    /// <paramref name="content"/> must hold <see cref="PendingFile.Size"/> bytes from there.
     /// </summary>
     public static async Task InsertPendingAsync(
         NpgsqlConnection connection,
         PendingFile file,
-        ReadOnlyMemory<byte> content,
+        Stream content,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(connection);
         ArgumentNullException.ThrowIfNull(file);
+        ArgumentNullException.ThrowIfNull(content);
 
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
 
@@ -78,11 +82,13 @@ public static class FileStore
             await command.ExecuteNonQueryAsync(cancellationToken);
         }
 
-        await using (var command = new NpgsqlCommand(InsertContentSql, connection, transaction))
+        // A bytea parameter is buffered whole by Npgsql, but a binary COPY writes the stream in chunks.
+        await using (var import = await connection.BeginBinaryImportAsync(InsertContentCopy, cancellationToken))
         {
-            command.Parameters.AddWithValue("id", file.Id);
-            command.Parameters.Add(new NpgsqlParameter("content", NpgsqlDbType.Bytea) { Value = content });
-            await command.ExecuteNonQueryAsync(cancellationToken);
+            await import.StartRowAsync(cancellationToken);
+            await import.WriteAsync(file.Id, NpgsqlDbType.Uuid, cancellationToken);
+            await import.WriteAsync(content, NpgsqlDbType.Bytea, cancellationToken);
+            await import.CompleteAsync(cancellationToken);
         }
 
         await transaction.CommitAsync(cancellationToken);
@@ -180,19 +186,39 @@ public static class FileStore
     }
 
     /// <summary>
-    /// The bytes of the <c>attached</c> file with <paramref name="id"/>, or <see langword="null"/> when it is
-    /// unknown or no longer attached. Runs in <paramref name="transaction"/> when it is not <see langword="null"/>.
+    /// Streams the bytes of the <c>attached</c> file with <paramref name="id"/> to <paramref name="send"/>, which is
+    /// given the size and a stream of the bytes that is valid only during the call, and returns <see langword="false"/>
+    /// without calling it when the file is unknown or no longer attached. Runs in <paramref name="transaction"/> when
+    /// it is not <see langword="null"/>. The statement that reads the bytes has no timeout, because it stays open until
+    /// <paramref name="send"/> has taken every byte, which depends on the client.
     /// </summary>
-    public static async Task<byte[]?> ReadContentAsync(
+    public static async Task<bool> CopyContentAsync(
         NpgsqlConnection connection,
         NpgsqlTransaction? transaction,
         Guid id,
+        Func<long, Stream, Task> send,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(connection);
+        ArgumentNullException.ThrowIfNull(send);
 
-        await using var command = new NpgsqlCommand(ReadContentSql, connection, transaction);
+        // The setting lasts to the end of the transaction. The checks before this keep the interactive limit.
+        await using (var unlimit = new NpgsqlCommand("SELECT set_config('statement_timeout', '0', true)", connection, transaction))
+        {
+            await unlimit.ExecuteNonQueryAsync(cancellationToken);
+        }
+
+        await using var command = new NpgsqlCommand(ReadContentSql, connection, transaction) { CommandTimeout = 0 };
         command.Parameters.AddWithValue("id", id);
-        return await command.ExecuteScalarAsync(cancellationToken) as byte[];
+        await using var reader = await command.ExecuteReaderAsync(CommandBehavior.SequentialAccess, cancellationToken);
+        if (!await reader.ReadAsync(cancellationToken))
+        {
+            return false;
+        }
+
+        var size = reader.GetInt64(0);
+        await using var content = reader.GetStream(1);
+        await send(size, content);
+        return true;
     }
 }

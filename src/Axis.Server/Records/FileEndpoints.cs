@@ -41,8 +41,9 @@ namespace Axis.Server.Records;
 /// one 404: no read grant on the owner, a record filter that excludes it or reads a computed field that is being
 /// recomputed, a field the user may not read, a file that is not <c>attached</c>, a file of another application,
 /// an unknown id and a malformed id. The answer is an attachment with the stored media type and file name, and the
-/// security headers of every API answer add <c>nosniff</c>. The bytes are read into memory under the interactive
-/// query timeout before they are sent.
+/// security headers of every API answer add <c>nosniff</c>. The checks run under the interactive query timeout, then
+/// the bytes stream from the database to the client, which sets <c>Content-Length</c>. An upload is written to a
+/// temporary file as it arrives, and streamed from there into the database, so no file is held whole in memory.
 /// </summary>
 internal static class FileEndpoints
 {
@@ -122,13 +123,27 @@ internal static class FileEndpoints
             return FileNotFound();
         }
 
-        if (await FileStore.ReadContentAsync(connection, database.ReadTransaction, file.Id, cancellationToken) is not { } content)
-        {
-            return FileNotFound();
-        }
+        // The response is written here, not by a result, because the query timeout filter ends the read transaction
+        // when this handler returns, and the bytes still come from it.
+        var response = httpContext.Response;
+        var found = await FileStore.CopyContentAsync(
+            connection,
+            database.ReadTransaction,
+            file.Id,
+            async (size, content) =>
+            {
+                response.StatusCode = StatusCodes.Status200OK;
+                response.ContentType = file.MediaType;
+                response.ContentLength = size;
 
-        // The file name goes in Content-Disposition: attachment, so a browser never shows the file in the application's origin.
-        return Results.File(content, file.MediaType, file.Name);
+                // The file name goes in Content-Disposition: attachment, so a browser never shows the file in the application's origin.
+                var disposition = new ContentDispositionHeaderValue("attachment");
+                disposition.SetHttpFileName(file.Name);
+                response.Headers.ContentDisposition = disposition.ToString();
+                await content.CopyToAsync(response.Body, cancellationToken);
+            },
+            cancellationToken);
+        return found ? Results.Empty : FileNotFound();
     }
 
     private static IResult FileNotFound() =>
@@ -220,6 +235,8 @@ internal static class FileEndpoints
             return failure;
         }
 
+        await using var content = upload.Content!;
+        content.Position = 0;
         var id = Guid.CreateVersion7();
         var file = new PendingFile(
             id,
@@ -228,12 +245,12 @@ internal static class FileEndpoints
             target.Path,
             upload.Name!,
             upload.MediaType!,
-            upload.Content.Length,
+            upload.Size,
             upload.Sha256!,
             user.Id,
             DateTimeOffset.UtcNow);
         var connection = await database.GetConnectionAsync(cancellationToken);
-        await FileStore.InsertPendingAsync(connection, file, upload.Content, cancellationToken);
+        await FileStore.InsertPendingAsync(connection, file, content, cancellationToken);
         return Results.Json(new FileUploadResponse(id, file.Name, file.MediaType, file.Size), statusCode: StatusCodes.Status201Created);
     }
 
@@ -288,39 +305,60 @@ internal static class FileEndpoints
                 return UploadedPart.Fail(Results.Problem(statusCode: StatusCodes.Status415UnsupportedMediaType, title: "The file's media type is not accepted."));
             }
 
-            using var content = new MemoryStream();
-            using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
-            var buffer = new byte[ChunkSize];
-            int read;
-            while ((read = await section.Body.ReadAsync(buffer, cancellationToken)) > 0)
+            var content = TemporaryFile.Create("axis-upload");
+            try
             {
-                if (content.Length + read > limit)
+                using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+                var buffer = new byte[ChunkSize];
+                var head = new byte[FileSignatures.HeadLength];
+                var size = 0L;
+                int read;
+                while ((read = await section.Body.ReadAsync(buffer, cancellationToken)) > 0)
                 {
-                    return UploadedPart.Fail(TooLarge());
+                    if (size + read > limit)
+                    {
+                        await content.DisposeAsync();
+                        return UploadedPart.Fail(TooLarge());
+                    }
+
+                    // The first read can be shorter than the head, so the head fills over more reads.
+                    if (size < head.Length)
+                    {
+                        var take = (int)Math.Min(read, head.Length - size);
+                        buffer.AsSpan(0, take).CopyTo(head.AsSpan((int)size));
+                    }
+
+                    await content.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
+                    hash.AppendData(buffer, 0, read);
+                    size += read;
                 }
 
-                content.Write(buffer, 0, read);
-                hash.AppendData(buffer, 0, read);
-            }
+                if (size == 0)
+                {
+                    await content.DisposeAsync();
+                    return UploadedPart.Fail(BadPart("The file is empty."));
+                }
 
-            if (content.Length == 0)
+                var start = head.AsSpan(0, (int)Math.Min(size, head.Length));
+                if (FileSignatures.IsExecutable(start) || !FileSignatures.Matches(mediaType, start))
+                {
+                    await content.DisposeAsync();
+                    return UploadedPart.Fail(Results.Problem(statusCode: StatusCodes.Status415UnsupportedMediaType, title: "The file's content does not match an allowed type."));
+                }
+
+                if (await reader.ReadNextSectionAsync(cancellationToken) is not null)
+                {
+                    await content.DisposeAsync();
+                    return UploadedPart.Fail(BadPart("The request must hold one part named file, with a file name."));
+                }
+
+                return new UploadedPart(null, name, mediaType, content, size, hash.GetHashAndReset());
+            }
+            catch
             {
-                return UploadedPart.Fail(BadPart("The file is empty."));
+                await content.DisposeAsync();
+                throw;
             }
-
-            content.TryGetBuffer(out var bytes);
-            var head = bytes.AsSpan(0, (int)Math.Min(content.Length, FileSignatures.HeadLength));
-            if (FileSignatures.IsExecutable(head) || !FileSignatures.Matches(mediaType, head))
-            {
-                return UploadedPart.Fail(Results.Problem(statusCode: StatusCodes.Status415UnsupportedMediaType, title: "The file's content does not match an allowed type."));
-            }
-
-            if (await reader.ReadNextSectionAsync(cancellationToken) is not null)
-            {
-                return UploadedPart.Fail(BadPart("The request must hold one part named file, with a file name."));
-            }
-
-            return new UploadedPart(null, name, mediaType, bytes.AsMemory(0, (int)content.Length), hash.GetHashAndReset());
         }
         catch (BadHttpRequestException exception) when (exception.StatusCode == StatusCodes.Status413PayloadTooLarge)
         {
@@ -379,9 +417,10 @@ internal static class FileEndpoints
             ? mediaType.StartsWith(entry[..^1], StringComparison.OrdinalIgnoreCase)
             : mediaType.Equals(entry, StringComparison.OrdinalIgnoreCase));
 
-    private sealed record UploadedPart(IResult? Failure, string? Name, string? MediaType, ReadOnlyMemory<byte> Content, byte[]? Sha256)
+    // Content is a temporary file that the caller disposes, which deletes it.
+    private sealed record UploadedPart(IResult? Failure, string? Name, string? MediaType, FileStream? Content, long Size, byte[]? Sha256)
     {
-        public static UploadedPart Fail(IResult failure) => new(failure, null, null, default, null);
+        public static UploadedPart Fail(IResult failure) => new(failure, null, null, null, 0, null);
     }
 }
 

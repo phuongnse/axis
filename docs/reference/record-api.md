@@ -168,7 +168,9 @@ covers reads the whole entity table.
   when it contains U+0000. A searchable field the user may not read is skipped
   without an error, and only an unreadable display field makes `search`
   invalid. A text shorter than three characters has no trigrams, so the index
-  does not speed it up. See
+  does not speed it up. A search over 100,000 records with two searched fields
+  answers a page within 2 s, and `SearchPerformanceTests` fails when it takes
+  2 s or more. See
   [D80](../decisions/d80-search-more-aggregates-and-query-timeouts.md).
 - **Order.** Records are ordered by the sort column and then by `id`
   ascending, also for descending sorts. Without `sort`, they are ordered by

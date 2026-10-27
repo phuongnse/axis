@@ -194,4 +194,36 @@ public sealed class FileDownloadTests(RecordApiFixture fixture) : IClassFixture<
 
         await AssertAttachmentAsync(response, Html, "text/html", "page.html");
     }
+
+    [Fact]
+    public async Task A_file_of_several_chunks_downloads_with_the_same_bytes_and_a_matching_content_length()
+    {
+        var data = new byte[1_048_576];
+        new Random(76).NextBytes(data);
+        "AXIS"u8.CopyTo(data);
+        using var anna = fixture.CreateClient().SignedInAs("anna");
+        var claim = await CreateClaimAsync(anna, "Shared");
+
+        var request = Request(HttpMethod.Post, Attachment, HostA);
+        var form = new MultipartFormDataContent();
+        var part = new ByteArrayContent(data);
+        part.Headers.TryAddWithoutValidation("Content-Type", "application/octet-stream");
+        form.Add(part, "file", "large.bin");
+        request.Content = form;
+        Guid file;
+        using (var uploaded = await anna.SendAsync(request, CancellationToken))
+        {
+            Assert.Equal(HttpStatusCode.Created, uploaded.StatusCode);
+            using var body = JsonDocument.Parse(await uploaded.Content.ReadAsStringAsync(CancellationToken));
+            file = body.RootElement.GetProperty("id").GetGuid();
+        }
+
+        await UpdateAsync(anna, claim, 1, $$"""{ "attachments": [{ "file": "{{file:D}}" }] }""");
+
+        using var response = await DownloadAsync(anna, file.ToString("D"));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(data.Length, response.Content.Headers.ContentLength);
+        Assert.Equal(data, await response.Content.ReadAsByteArrayAsync(CancellationToken));
+    }
 }

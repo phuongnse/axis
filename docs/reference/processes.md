@@ -786,7 +786,7 @@ database, with history in `axis.__processes_migrations` (see
     order. Its `due_at` is the step's time plus the escalation's `after`. See
     [Escalations and deadline](task-deadlines.md#escalations-and-deadline).
   - `notification.email` sends one email of `axis.email_outbox`. Its item also
-    has the `email_id` of the row. No handler runs it yet _(planned for M14)_.
+    has the `email_id` of the row.
   - `computed.backfill` recomputes the out-of-date rows of
     one entity. Its item also has the `entity_id`, and each claim runs one
     batch of up to 500 rows. See
