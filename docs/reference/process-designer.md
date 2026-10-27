@@ -13,7 +13,7 @@ the diagnostic marks and the live region for removals are _(built)_. The
 palette, the transitions and the live region for adds and transitions are
 _(built)_. The schema-driven type picker, the timer panel, the sub-process panel, the
 `notify` panel, the deadline and escalations of a task and the wait for event
-panel are _(built)_. The live region for moves is _(planned for M14)_.
+panel are _(built)_. The live region for moves is _(planned for M16)_.
 
 - **Design tab** _(built)_. A process opens on a Design tab, next to its Form
   and JSON tabs. The three tabs edit one draft.
@@ -172,11 +172,11 @@ panel are _(built)_. The live region for moves is _(planned for M14)_.
   resolve" (or "Step remind added" for an unconnected step), "An end step cannot
   be inserted into a transition" or "submit now goes to done". A choice from the
   transition menu names its branch or outcome, such as "managerApproval ·
-  approve now goes to done". Moves are _(planned for M14)_.
+  approve now goes to done". Moves are _(planned for M16)_.
 - **Diagnostics** _(built)_. Marks work as on the graph: a marked node has an
   error-coloured border, "has diagnostics" in its text label, and
   `data-marked`.
 - **Carried over from M13.** Pages and forms open on their Design tabs _(built)_.
   A form section moves to another step by a drop on the step switch, and the
-  form designer removes a section or a step _(planned for M14)_. See
+  form designer removes a section or a step _(built)_. See
   [studio.md](studio.md) and [form-designer.md](form-designer.md).

@@ -4,7 +4,7 @@ Status: **Agreed**
 
 M14 lets a process run without a subject record, so a schedule can run a job
 and a delete can start a process. The owner agreed this on 2026-10-25. It is
-_(planned for M14)_. See [process flow](../reference/process-flow.md#processes-without-a-subject)
+built in M14. See [process flow](../reference/process-flow.md#processes-without-a-subject)
 and [process events](../reference/process-events.md). It replaces two points of
 [D26](d26-events-and-triggers.md): "processes without a subject come later" and
 "`delete` comes later, because a deleted record cannot be a subject".

@@ -44,9 +44,9 @@ flowchart LR
   retries and reconciliation, and package operations. `raiseEvent` steps raise
   events. Sub-process steps start a child and resume the parent when it
   completes. A `timer` step waits for a time and a `process.timer` item resumes
-  it. Wait for event steps come later. _(Planned
-  for M14)_ It runs them, task escalations and deadlines, and email sending,
-  see [process flow](reference/process-flow.md). It
+  it. It runs wait for event steps, which event delivery wakes, task
+  escalations and deadlines, and email sending, see
+  [process flow](reference/process-flow.md). It
   delivers raised events to async event triggers, see
   [events and triggers](reference/process-events.md). It also
   runs the backfill of pending computed fields, see

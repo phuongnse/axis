@@ -3,8 +3,8 @@
 Status: **Agreed**
 
 M14 gives each application a time zone. The owner agreed this on 2026-10-25.
-The manifest key, `today()`, `toDate` and the local year of sequences are
-built. Notification dates are still _(planned for M14)_. See
+The manifest key, `today()`, `toDate`, the local year of sequences and
+notification dates are built. See
 [application time zone](../reference/resource-files.md#application-time-zone).
 It settles the time zone rule that
 [D22](d22-current-time-and-time-zones.md) waits for.

@@ -16,8 +16,8 @@ too. A Playwright journey builds, tests and publishes it with Studio only. See
 
 ## Status
 
-Milestone **M13, Visual page and form designer**, is complete. The current milestone is
-**M14, Workflow, automation and notifications**.
+Milestones **M14, Workflow, automation and notifications**, and **M15, Data modeling and data management**, are complete. The current milestone is
+**M16, Hardening**.
 The [roadmap](docs/roadmap.md) says what each milestone delivers and its status. See [AGENTS.md](AGENTS.md#commands) for
 the commands.
 
