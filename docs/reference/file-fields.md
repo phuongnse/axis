@@ -9,7 +9,7 @@ marked _(planned for M15)_ are not built yet, and Dn refers to
 
 Upload up to the `pending` state, the storage of a file's details and bytes,
 attach by a record write, the file value in a read, replace and remove, and
-audit, download, the sweep and the SPA are _(built)_. Inbound
+audit, download, the sweep, backup and the SPA are _(built)_. Inbound
 endpoints, task completion and process steps attach nothing for now, so a file
 id they send that the record does not already hold fails.
 
@@ -148,7 +148,7 @@ service account may download, as they may read records.
   every 5 minutes for each tenant, see
   [process execution](process-execution.md#worker-settings). An `attached` file is never
   purged. It is internal, so it needs no scheduled job.
-- **Backup.** Files in the tenant database are in the tenant's `pg_dump`, so
+- **Backup** _(built)_. Files in the tenant database are in the tenant's `pg_dump`, so
   [tenant backup](administration.md) archives hold them.
 - **Audit** _(built)_. An audit record names the file field that changed,
   never the file's name or bytes. A `sensitive` file field also hides its name
