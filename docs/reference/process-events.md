@@ -30,7 +30,7 @@ schedule is due. Every start happens at most once for the
 same cause, even after a worker crash.
 
 Event delivery also wakes the instances that wait for an
-event ([D69](../decisions/d69-timer-wait-for-event-and-sub-process-steps-loops-and-create-record.md)).
+event, which is built ([D69](../decisions/d69-timer-wait-for-event-and-sub-process-steps-loops-and-create-record.md)).
 
 A delete starts a process without a subject through a delete trigger
 ([D70](../decisions/d70-processes-without-a-subject-scheduled-jobs-and-delete-triggers.md)).
@@ -496,7 +496,7 @@ Deliveries that keep failing stop after a limit and are kept as dead letters, se
 backoff, the limit, the two tables, the log, the metric and the
 [routes](#routes) are built for the start of an `async` trigger from
 `event.deliver`, for `trigger.fanOut` and for `notification.email`.
-_(Planned for M14)_ The waiting-instance target is not built yet.
+_(Planned for M16)_ The waiting-instance target is not built yet.
 
 **What counts.** Three kinds of work item deliver something, and each
 failure is counted for its own target:

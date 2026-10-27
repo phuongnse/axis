@@ -3,7 +3,7 @@
 Status: **Agreed**
 
 M14 gives processes three new step types, loops and a `createRecord`
-operation. The owner agreed this on 2026-10-25. It is _(planned for M14)_. See
+operation. The owner agreed this on 2026-10-25. It is built in M14. See
 [process flow](../reference/process-flow.md). It replaces the "Wait for
 event, timer and sub-process come later" point of
 [D19](d19-process-resource-and-worker-host.md), and the "Reopen without a

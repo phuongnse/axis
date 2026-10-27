@@ -771,11 +771,11 @@ Run and the Test results list, the read-only view of a module entity, and the re
   graph of its steps and transitions, see
   [D53](../decisions/d53-typed-editors-and-the-process-graph-in-studio.md).
   The step card of the selected step is beside it. The author edits steps in
-  the card, the Form tab or the JSON view. _(Planned for M14)_ The graph becomes
-  the process designer, see [process designer](process-designer.md).
+  the card, the Form tab or the JSON view. The graph is the process designer,
+  see [process designer](process-designer.md).
   - Dagre, `@dagrejs/dagre`, lays out the graph, and React Flow,
     `@xyflow/react`, draws it. Their sizes are about 30 KB and 50 KB min+gzip.
-    The SPA loads them in their own chunk when the Design tab opens. M14's
+    The SPA loads them in their own chunk when the Design tab opens. The
     process designer builds on both.
   - The graph and the step editor stay in step. Both read the same unsaved
     draft, so an edit in the card, the Form tab or the JSON view redraws the
@@ -810,10 +810,9 @@ Run and the Test results list, the read-only view of a module entity, and the re
   [D65](../decisions/d65-a-visual-page-designer-on-a-canvas-drawn-by-the-sites-widgets.md).
   The form designer is built, see
   [D66](../decisions/d66-a-visual-form-designer-for-form-resources.md), and the
-  process designer for M14, see
+  process designer is built, see
   [D74](../decisions/d74-a-visual-process-designer.md) and
   [process designer](process-designer.md).
-  The process graph is not a designer yet.
   - **Design tab.** It sits next to the Form and JSON tabs. The three tabs edit
     one draft. _Built:_ the tab is there, and a page opens on it. The canvas is
     mounted only while the Design tab is active, so it asks again when the
