@@ -34,14 +34,16 @@ const inspectorWidget: WidgetMetadata = {
 
 const waitingId = '0192f4a9-2d3e-7f40-8a1b-2c3d4e5f6a7b'
 const completedId = '0192f4a9-2d3e-7f40-8a1b-2c3d4e5f6a7c'
+const waitingSubjectId = '0192f4a7-3b1c-7e2d-9a4f-1c2d3e4f5a6b'
+const completedSubjectId = '0192f4a7-3b1c-7e2d-9a4f-1c2d3e4f5a6d'
 
 // In the inspection API's order: newest first.
 const instancePage = JSON.stringify({
   items: [
     {
       id: waitingId,
-      subjectId: '0192f4a7-3b1c-7e2d-9a4f-1c2d3e4f5a6b',
-      subjectLabel: null,
+      subjectId: waitingSubjectId,
+      subjectLabel: 'Replace the worn carpet tiles',
       state: 'waiting',
       step: 'managerApproval',
       releaseId: '0192f49a-1b2c-7d3e-8f40-5b6c7d8e9f01',
@@ -51,7 +53,7 @@ const instancePage = JSON.stringify({
     },
     {
       id: completedId,
-      subjectId: '0192f4a7-3b1c-7e2d-9a4f-1c2d3e4f5a6d',
+      subjectId: completedSubjectId,
       subjectLabel: null,
       state: 'completed',
       step: 'done',
@@ -150,32 +152,40 @@ function renderWidget(search = '') {
 }
 
 describe('ProcessInspectorWidget', () => {
-  it('lists the instances in the order of the inspection API, each linking to its address under the page', async () => {
+  it('lists the instances in the order of the inspection API, each named by its record and linking to its address', async () => {
     stubInstances()
 
     renderWidget()
 
     await screen.findByRole('row', { name: /managerApproval/ })
-    for (const title of ['State', 'Step', 'Record', 'Release', 'Started', 'Ended']) {
+    for (const title of ['Record', 'State', 'Step', 'Release', 'Started', 'Ended']) {
       expect(screen.getByRole('columnheader', { name: title })).toBeInTheDocument()
     }
+    expect(screen.queryByRole('columnheader', { name: 'Open' })).not.toBeInTheDocument()
     const [waiting, completed] = screen.getAllByRole('row').slice(1)
     expect(within(waiting).getByText('Waiting')).toBeInTheDocument()
-    expect(within(waiting).getByRole('link', { name: 'Open' })).toHaveAttribute('href', `/e2e/inspector/${waitingId}`)
+    expect(within(waiting).getByRole('link', { name: 'Replace the worn carpet tiles' })).toHaveAttribute(
+      'href',
+      `/e2e/inspector/${waitingId}`,
+    )
+    expect(waiting).not.toHaveTextContent(waitingSubjectId)
+    expect(within(waiting).getAllByRole('cell')[3]).toHaveTextContent(/^1$/)
+    // An instance that has not ended shows a muted dash in its end cell.
+    expect(within(waiting).getAllByRole('cell')[5]).toHaveTextContent('—')
     expect(within(completed).getByText('Completed')).toBeInTheDocument()
     expect(within(completed).getByText('done')).toBeInTheDocument()
     expect(within(completed).getByRole('link', { name: 'Open' })).toHaveAttribute(
       'href',
       `/e2e/inspector/${completedId}`,
     )
-    // An instance that has not ended has an empty end cell.
-    expect(within(waiting).getAllByRole('cell')[5]).toHaveTextContent(/^$/)
+    expect(completed).not.toHaveTextContent(completedSubjectId)
+    expect(within(completed).getAllByRole('cell')[5]).not.toHaveTextContent('—')
   })
 
-  it('shows "No subject" in the subject cell of an instance without a subject', async () => {
+  it('shows "No subject" as the record link of an instance without a subject', async () => {
     stubInstances(
       JSON.stringify({
-        items: [{ ...JSON.parse(instancePage).items[0], subjectId: null }],
+        items: [{ ...JSON.parse(instancePage).items[0], subjectId: null, subjectLabel: null }],
         page: 1,
         pageSize: 20,
         totalCount: 1,
@@ -185,7 +195,24 @@ describe('ProcessInspectorWidget', () => {
     renderWidget()
 
     const row = await screen.findByRole('row', { name: /managerApproval/ })
-    expect(within(row).getByText('No subject')).toBeInTheDocument()
+    expect(within(row).getByRole('link', { name: 'No subject' })).toHaveAttribute('href', `/e2e/inspector/${waitingId}`)
+  })
+
+  it('shows a dash in the release cell when the release has no number', async () => {
+    stubInstances(
+      JSON.stringify({
+        items: [{ ...JSON.parse(instancePage).items[0], releaseNumber: null }],
+        page: 1,
+        pageSize: 20,
+        totalCount: 1,
+      }),
+    )
+
+    renderWidget()
+
+    const row = await screen.findByRole('row', { name: /managerApproval/ })
+    expect(within(row).getAllByRole('cell')[3]).toHaveTextContent('—')
+    expect(row).not.toHaveTextContent('0192f49a-1b2c-7d3e-8f40-5b6c7d8e9f01')
   })
 
   it('sends the state in the URL to the instance list', async () => {
@@ -290,11 +317,25 @@ describe('ProcessInspectorWidget', () => {
       expect(screen.getByRole('columnheader', { name: title })).toBeInTheDocument()
     }
     expect(within(row).getByText('System.InvalidOperationException')).toBeInTheDocument()
-    expect(within(row).getByTestId(`inspector-dead-letter-redeliver-${retryableId}`)).toHaveTextContent('Redeliver')
-    expect(within(row).getByTestId(`inspector-dead-letter-discard-${retryableId}`)).toHaveTextContent('Discard')
+    expect(within(row).getByRole('button', { name: 'Redeliver' })).toBeInTheDocument()
+    expect(within(row).getByRole('button', { name: 'Discard' })).toBeInTheDocument()
     const other = screen.getByRole('row', { name: /trigger\.fanOut/ })
     expect(within(other).queryByRole('button')).not.toBeInTheDocument()
     expect(screen.getAllByTestId(/^inspector-dead-letter-/)).toHaveLength(2)
+  })
+
+  it('shows the name of each dead letter button as a tooltip and opens its reason dialog', async () => {
+    stubInstances()
+    const user = userEvent.setup()
+
+    renderWidget()
+
+    const row = await screen.findByRole('row', { name: /event\.deliver/ })
+    await user.hover(within(row).getByRole('button', { name: 'Redeliver' }))
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Redeliver')
+    await user.click(within(row).getByRole('button', { name: 'Discard' }))
+    const dialog = await screen.findByRole('dialog')
+    expect(within(dialog).getByText('Discard', { selector: '.ant-modal-title' })).toBeInTheDocument()
   })
 
   it('shows the empty text when no dead letter is open', async () => {

@@ -26,22 +26,23 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
     **History** under the [form widget](form-widget.md). The widget has `"access": null` and
     `"actions": []`. The page endpoint answers `403` to a user without an
     `inspect` grant on the process, and site navigation leaves the page out.
-  - **List.** The page lists the instances with their state, step, subject id,
-    release and times. An instance without a subject shows "No subject" in the
-    subject column, until the columns below are built. Rows keep the API's order, newest first. A clearable
+  - **List.** The page lists the instances with their record, state, step,
+    release and times. Rows keep the API's order, newest first. A clearable
     select above the list filters by state, and offers the five states with
     platform texts. `state`, `page` and `pageSize` live in the URL, as for a
     table. Changing the state goes back to page 1. A `state` in the URL that is
     not one of the five is dropped. The step column shows the step's name,
-    because a list row carries no label key. Each row has an Open link.
-  - **List columns** _(planned)_. The first column is the instance's record,
-    named by `subjectLabel`, and is the link that opens the instance. When
-    `subjectLabel` is `null` the link reads `shell.inspector.noSubject` for an
-    instance without a subject, and `shell.inspector.open` when the user may not
-    read the display field. There is no Open
-    column and no record id. The Release column shows `releaseNumber`, the
-    release's number such as 3 under the Release header, never its id. An instance still
-    running shows a muted "—" under Ended
+    because a list row carries no label key. The record column links each row
+    to its instance, as **List columns** below describes.
+  - **List columns.** The first column, headed Record, is the instance's
+    record, named by `subjectLabel`, and is the link that opens the instance.
+    When `subjectLabel` is `null` the link reads `shell.inspector.noSubject` for
+    an instance without a subject, and `shell.inspector.open` when the user may
+    not read the display field. There is no Open column and no record id. The
+    Release column shows `releaseNumber`, the release's number such as 3 under
+    the Release header, never its id. A `null` `releaseNumber`, for a release
+    with no history row, shows the same muted dash as a running instance. An
+    instance still running shows a muted "—" under Ended
     ([D96](../decisions/d96-rules-from-the-design-system-review.md)). A
     process without a subject has no record to name its instances, so each
     instance gets a number within its process, such as #1042. That is agreed,
@@ -113,10 +114,9 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
     `retry` grant. A user with only `inspect` sees no button, and a command name
     this build does not know is left out. A button opens the same reason dialog
     as Cancel and Retry, with the same rules for the reason, and posts it to
-    `{deadLettersPath}/{id}/redeliver` or `…/discard`. _(planned)_ Redeliver,
-    with a send icon, and Discard, with a red trash icon, are icon buttons
-    with their names as tooltips, and both still open the reason dialog. On
-    success, the dialog
+    `{deadLettersPath}/{id}/redeliver` or `…/discard`. Redeliver, with a send
+    icon, and Discard, with a red trash icon, are icon buttons with their names
+    as tooltips, and both still open the reason dialog. On success, the dialog
     closes and the list is requested again, so a settled dead letter leaves
     it. On a `400`, `403`, `404` or `409`, the dialog shows the problem's title,
     such as the `409` for a trigger that is not in the active release. Any other
