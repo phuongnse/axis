@@ -4,7 +4,7 @@ Status: **Agreed**
 
 M15 makes search use an index and reach more fields, adds aggregates to data
 sources, and bounds every interactive query by a timeout. The owner agreed
-these points on 2026-10-25. All of it is _(planned for M15)_. See
+these points on 2026-10-25. It is built in M15. See
 [paging and sorting](../reference/record-api.md#paging-and-sorting),
 [data source aggregates](../reference/data-sources.md#aggregates) and
 [data settings](../reference/host-settings.md#data-settings).

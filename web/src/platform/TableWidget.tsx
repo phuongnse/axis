@@ -13,6 +13,7 @@ import {
 } from 'antd'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router'
+import { AxisButton } from './AxisButton'
 import { useCanvasActions } from './canvasActions'
 import { EmptyDash } from './EmptyValue'
 import { downloadExport, exportAddress, exportPath, saveFile, type ExportFormat } from './exports'
@@ -721,7 +722,11 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
               }}
             />
           </Tooltip>
-          {canImport && <Button onClick={() => !canvas.active && setImporting(true)}>{t('shell.table.import')}</Button>}
+          {canImport && (
+            <AxisButton role="secondary" onClick={() => !canvas.active && setImporting(true)}>
+              {t('shell.table.import')}
+            </AxisButton>
+          )}
           {canExport && (
             <Dropdown
               trigger={['click']}

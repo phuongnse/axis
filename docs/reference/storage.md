@@ -175,7 +175,7 @@ apply: sections marked _(planned for Mx)_ are not built yet, and Dn refers to
   | `reference`                      | `uuid` with a foreign key to the target table's `id`                                                                     |
   | `child-collection`               | No column on the owner table. See [Child tables and computed columns](#child-tables-and-computed-columns)                |
   | `money`                          | `numeric(p,s)`, as `decimal` with its defaults. The currency is the field's or the `currencyField` column's              |
-  | `file` _(planned for M15)_       | `uuid` with a foreign key to `axis.files`. See [file fields](file-fields.md#storage-and-clean-up)                        |
+  | `file`                           | `uuid` with a foreign key to `axis.files`. See [file fields](file-fields.md#storage-and-clean-up)                        |
   | `references`                     | No column on the owner table. A junction table holds `owner_id`, `target_id` and `position`, see [Schema planning](#schema-planning) |
 
 - **SQL safety.** Every SQL statement for entity data is built by the data

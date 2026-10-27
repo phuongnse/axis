@@ -6,8 +6,9 @@ Asset management is the fourth sample application. It proves M15 the way the
 service desk of
 [D56](d56-a-service-desk-as-the-third-sample-application.md) proved M11 to
 M13, as [D46](d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9.md)
-planned. The owner agreed these points on 2026-10-25. All of it is
-_(planned for M15)_. See the
+planned. The owner agreed these points on 2026-10-25. The data, security, pages,
+dashboard, and import and export are built in M15. The import, attachment and
+maintenance scenarios, and the denied cases they lack, are _(planned for M16)_. See the
 [Fourth application section](../product-brief.md#fourth-application-asset-management)
 of the product brief for the data, security, pages and scenarios.
 
@@ -34,10 +35,11 @@ of the product brief for the data, security, pages and scenarios.
   nothing.
 - **Warranty reminders:** a scheduled job reminds the asset manager of
   warranties that end soon, with the notifications of
-  [D73](d73-in-app-and-email-notifications.md). That part waits for
-  them, so its issue is blocked by theirs.
-- **Built through Studio:** a Playwright journey builds the whole application
-  through Studio only, compares it with the committed folder, runs its
+  [D73](d73-in-app-and-email-notifications.md). The process and its weekday
+  trigger exist, and the reminder is sent in the site. Its email channel is
+  planned for M14.
+- **Built through Studio:** a Playwright journey builds the application through
+  Studio only, compares its six parts with the committed folder, runs its
   scenarios from Studio, publishes it, imports assets and exports the register
   on the site, as the service desk journey does.
 
