@@ -12,8 +12,8 @@ Design tab, the canvas, the existing step panels, remove, undo, Tab and Enter,
 the diagnostic marks and the live region for removals are _(built)_. The
 palette, the transitions and the live region for adds and transitions are
 _(built)_. The schema-driven type picker, the timer panel, the sub-process panel, the
-`notify` panel and the deadline and escalations of a task are _(built)_. The other
-panels of the new step types and the live region for moves are _(planned for M14)_.
+`notify` panel, the deadline and escalations of a task and the wait for event
+panel are _(built)_. The live region for moves is _(planned for M14)_.
 
 - **Design tab** _(built)_. A process opens on a Design tab, next to its Form
   and JSON tabs. The three tabs edit one draft.
@@ -148,8 +148,14 @@ panels of the new step types and the live region for moves are _(planned for M14
   the same edit, so one Undo restores it. Picking a child without a subject
   writes every child parameter, keeping a value the draft already holds for
   that name. A child that is not in the names list changes only `process`.
-- **Property panel (other new step types)** _(planned for M14)_. The other new
-  step type gets a panel too: wait for event.
+- **Property panel (wait for event)** _(built)_. A wait for event card has an
+  event picker that lists only the events whose entity is the process's subject
+  entity, an optional `when` expression editor, an optional timeout and a Next
+  step picker. The `when` editor suggests the payload fields of the picked event,
+  plus rules and functions, and not the subject record's fields. Clearing it
+  removes the key. Add timeout adds a `timeout` with an After duration and a
+  Next step on timeout picker, both empty until filled. Remove timeout takes the
+  whole `timeout` out, and one Undo brings it back.
 - **Undo** _(built)_. The undo and redo of
   [D65](../decisions/d65-a-visual-page-designer-on-a-canvas-drawn-by-the-sites-widgets.md)
   cover every edit of a process on all three tabs, with 100 steps, cleared by

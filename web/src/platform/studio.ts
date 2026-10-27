@@ -309,7 +309,7 @@ export interface StudioNames {
     resultType: string
   }[]
   connectors: { id: string; name: string; operations: { name: string }[] }[]
-  events: { id: string; name: string; fields: { name: string; type: string }[] }[]
+  events: { id: string; name: string; entity: string; fields: { name: string; type: string }[] }[]
   roles: StudioNameResource[]
   sequences: StudioNameResource[]
   forms: StudioNameResource[]

@@ -14,6 +14,16 @@ const names = {
     },
     { name: 'Department', module: null, fields: [{ name: 'code', type: 'text' }] },
   ],
+  events: [
+    {
+      name: 'PaymentReceived',
+      entity: 'PurchaseRequest',
+      fields: [
+        { name: 'amount', type: 'decimal' },
+        { name: 'reference', type: 'text' },
+      ],
+    },
+  ],
   rules: [{ name: 'departments:IsManager', module: 'departments', parameters: [], resultType: 'boolean' }],
 } as unknown as StudioNames
 
@@ -127,6 +137,33 @@ describe('expressionScope', () => {
     const draft = { entity: 'PurchaseRequest', parameters: [{ name: 'daysOverdue', type: 'integer' }] }
 
     expect(labelsOf(expressionScope('process', draft, '/steps/0/branches/0/when', names))).not.toContain('daysOverdue')
+  })
+
+  it('offers the when of a wait for event step the payload fields of its event, and not the subject fields', () => {
+    const draft = {
+      entity: 'PurchaseRequest',
+      steps: [{ name: 'wait', type: 'waitEvent', event: 'paymentreceived', next: 'wait' }],
+    }
+    const labels = labelsOf(expressionScope('process', draft, '/steps/0/when', names))
+
+    expect(labels).toContain('amount')
+    expect(labels).toContain('reference')
+    expect(labels).toContain('departments:IsManager()')
+    expect(labels).toContain('length()')
+    expect(labels).not.toContain('title')
+    expect(labels).not.toContain('id')
+  })
+
+  it('offers the when of a wait for event step no field when its event is unknown', () => {
+    const draft = {
+      entity: 'PurchaseRequest',
+      steps: [{ name: 'wait', type: 'waitEvent', event: 'Missing', next: 'wait' }],
+    }
+    const labels = labelsOf(expressionScope('process', draft, '/steps/0/when', names))
+
+    expect(labels).not.toContain('amount')
+    expect(labels).not.toContain('title')
+    expect(labels).toContain('length()')
   })
 
   it('offers a data change trigger the fields and id of its entity', () => {

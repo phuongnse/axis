@@ -395,6 +395,17 @@ public sealed class ModuleCompilerTests
     }
 
     [Fact]
+    public void The_names_list_a_module_event_with_its_own_module_entity_qualified()
+    {
+        using var modules = Modules("1.0.0").With("departments/1.0.0/DepartmentRenamed.json", DepartmentRenamed);
+        using var folder = Folder("""[{ "id": "departments", "version": "1.0.0" }]""");
+
+        var result = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        Assert.Equal(DepartmentName, Assert.Single(result.Names.Events).Entity);
+    }
+
+    [Fact]
     public void A_module_event_whose_entity_names_another_module_with_a_slash_is_reported_once()
     {
         using var modules = Modules("1.0.0").With(
