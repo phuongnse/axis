@@ -16,6 +16,8 @@ interface ReferencesInputProps {
   /** The label of each id at the same index, or `null` where the user may not read it. */
   labels: readonly (string | null)[]
   onChange: (ids: string[], labels: (string | null)[]) => void
+  /** The id of the element that describes the Add button, such as the field's help text. */
+  ariaDescribedBy?: string
 }
 
 /**
@@ -24,7 +26,7 @@ interface ReferencesInputProps {
  * appends the record and closes the lookup, and a record that is in the set already is left out. A
  * polite live region announces each addition and removal. A label that is missing shows the id.
  */
-export function ReferencesInput({ field, title, ids, labels, onChange }: ReferencesInputProps) {
+export function ReferencesInput({ field, title, ids, labels, onChange, ariaDescribedBy }: ReferencesInputProps) {
   const t = useText()
   const [open, setOpen] = useState(false)
   const [announcement, setAnnouncement] = useState('')
@@ -73,7 +75,13 @@ export function ReferencesInput({ field, title, ids, labels, onChange }: Referen
         </ul>
       )}
       {/* The field's label points at this button, so its own name says what it adds to. */}
-      <Button id={field.name} ref={add} aria-label={`${t('shell.form.add')} ${title}`} onClick={() => setOpen(true)}>
+      <Button
+        id={field.name}
+        ref={add}
+        aria-label={`${t('shell.form.add')} ${title}`}
+        aria-describedby={ariaDescribedBy}
+        onClick={() => setOpen(true)}
+      >
         {t('shell.form.add')}
       </Button>
       <ReferenceLookup field={field} title={title} open={open} onPick={pick} onClose={() => setOpen(false)} />

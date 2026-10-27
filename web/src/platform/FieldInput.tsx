@@ -23,6 +23,10 @@ interface FieldInputProps {
   locale: string
   /** Puts a number input's digits on the right, in tabular figures, as in a table. */
   alignEnd?: boolean
+  /** Marks the input `aria-required`, for a field that must have a value. */
+  ariaRequired?: boolean
+  /** The id of the element that describes the input, such as its help text. */
+  ariaDescribedBy?: string
 }
 
 // Enter in a picker only confirms the picked value. The picker handles it first, so stopping the
@@ -66,6 +70,8 @@ export function FieldInput({
   currency,
   locale,
   alignEnd = false,
+  ariaRequired,
+  ariaDescribedBy,
 }: FieldInputProps) {
   const t = useText()
   const text = (event: { target: { value: string } }) => onChange(event.target.value || null)
@@ -75,6 +81,8 @@ export function FieldInput({
         <Input
           id={id}
           aria-label={ariaLabel}
+          aria-required={ariaRequired || undefined}
+          aria-describedby={ariaDescribedBy}
           style={style}
           value={value === null ? '' : String(value)}
           maxLength={field.maxLength ?? undefined}
@@ -101,6 +109,8 @@ export function FieldInput({
           id={id}
           aria-label={ariaLabel}
           aria-invalid={invalid || undefined}
+          aria-required={ariaRequired || undefined}
+          aria-describedby={ariaDescribedBy}
           status={invalid ? 'error' : undefined}
           placeholder={rangeText(field.min, field.max)}
           style={currency ? undefined : style}
@@ -124,6 +134,8 @@ export function FieldInput({
         <Checkbox
           id={id}
           aria-label={ariaLabel}
+          aria-required={ariaRequired || undefined}
+          aria-describedby={ariaDescribedBy}
           style={style}
           checked={value === true}
           onChange={(event) => onChange(event.target.checked)}
@@ -134,6 +146,8 @@ export function FieldInput({
         <DatePicker
           id={id}
           aria-label={ariaLabel}
+          aria-required={ariaRequired || undefined}
+          aria-describedby={ariaDescribedBy}
           style={{ width: '100%', ...style }}
           minDate={field.min === null ? undefined : dayjs(field.min)}
           maxDate={field.max === null ? undefined : dayjs(field.max)}
@@ -149,6 +163,8 @@ export function FieldInput({
         <DatePicker
           id={id}
           aria-label={ariaLabel}
+          aria-required={ariaRequired || undefined}
+          aria-describedby={ariaDescribedBy}
           style={{ width: '100%', ...style }}
           // The time part has no seconds column.
           showTime={{ format: timePattern(locale) }}
@@ -169,6 +185,8 @@ export function FieldInput({
         <Select
           id={id}
           aria-label={ariaLabel}
+          aria-required={ariaRequired || undefined}
+          aria-describedby={ariaDescribedBy}
           style={style}
           allowClear
           // Without a virtual list, each shown option is an `option` with `aria-selected`.

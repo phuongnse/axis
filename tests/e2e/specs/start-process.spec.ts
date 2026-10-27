@@ -21,7 +21,7 @@ test('a saved note closes through the action, which saves the edited title first
   const note = await createNote(request, { title: `Close ${run}`, status: 'open' })
 
   await page.goto(`/e2e/noteactions/${note.id}`)
-  const title = page.getByRole('textbox', { name: '* Title', exact: true })
+  const title = page.getByRole('textbox', { name: 'Title', exact: true })
   await expect(title).toHaveValue(`Close ${run}`)
   await title.fill(`Close ${run} edited`)
   await page.getByRole('button', { name: 'Close note', exact: true }).click()
@@ -46,7 +46,7 @@ test('a note that fails the start condition shows its message, and no instance s
   const note = await createNote(request, { title: `Closed ${run}`, status: 'closed' })
 
   await page.goto(`/e2e/noteactions/${note.id}`)
-  await expect(page.getByRole('textbox', { name: '* Title', exact: true })).toHaveValue(`Closed ${run}`)
+  await expect(page.getByRole('textbox', { name: 'Title', exact: true })).toHaveValue(`Closed ${run}`)
   const start = page.waitForResponse((response) => response.url().endsWith('/processes/NoteClose/instances'))
   await page.getByRole('button', { name: 'Close note', exact: true }).click()
 

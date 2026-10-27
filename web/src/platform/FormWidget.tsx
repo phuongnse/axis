@@ -10,6 +10,7 @@ import { navigateTarget, type NavigateOpen } from './navigateAction'
 import { buildRecordBody } from './recordBody'
 import { RecordHistory } from './RecordHistory'
 import { newIdempotencyKey, startProcess } from './processes'
+import { requiredMark } from './requiredMark'
 import { fetchRecord, saveRecord, type RecordItem, type RecordProblem } from './records'
 import type { EntityWidgetMetadata, NavigateAction, StartProcessAction } from './site'
 import { useText } from './texts'
@@ -294,7 +295,7 @@ export function FormWidget({ widget, sitePath, pages, recordId, returnTo, locale
         )}
         {steps.progress}
         {/* Enter acts as Next on a step before the last, and saves on the last. */}
-        <Form layout="vertical" onFinish={steps.last ? save : steps.next}>
+        <Form layout="vertical" requiredMark={requiredMark} onFinish={steps.last ? save : steps.next}>
           {steps.fields}
           <Flex gap="small">
             {!steps.first && (

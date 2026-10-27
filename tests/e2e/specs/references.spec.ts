@@ -47,7 +47,7 @@ test('two software records are picked on an asset form, shown on its detail, and
   const asset = await createRecord(request, 'Asset', { name: `Laptop ${run}` })
 
   await page.goto(`/e2e/assetform/${asset.id}`)
-  await expect(page.getByRole('textbox', { name: '* Name', exact: true })).toHaveValue(`Laptop ${run}`)
+  await expect(page.getByRole('textbox', { name: 'Name', exact: true })).toHaveValue(`Laptop ${run}`)
   await addSoftware(page, word, run)
   await expect(page.getByTestId('references-software-announcement')).toHaveText(`Added ${word}`)
   await addSoftware(page, excel, run)

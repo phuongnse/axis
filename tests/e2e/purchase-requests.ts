@@ -1,6 +1,7 @@
 import { expect, test } from './test'
 import type { Page } from '@playwright/test'
 import { csrfHeaders } from './csrf'
+import { fieldLabel } from './fields'
 
 // Specs run in parallel against one database, so each test looks only for the request and the tasks
 // it creates. They use Operations, whose manager is chau, so that the per-department test keeps the
@@ -39,7 +40,7 @@ export async function createRequest(page: Page, prefix: string, unitPrice: numbe
 /** Opens the request form and submits the request. */
 export async function submit(page: Page, id: string, title: string) {
   await page.goto(`/purchasing/purchaserequestform/${id}`)
-  await expect(page.getByRole('textbox', { name: '* Title', exact: true })).toHaveValue(title)
+  await expect(page.getByRole('textbox', { name: 'Title', exact: true })).toHaveValue(title)
   await page.getByRole('button', { name: 'Submit', exact: true }).click()
   await expect(page.getByTestId('form-started')).toBeVisible()
 }
@@ -68,9 +69,9 @@ export async function decide(
 ) {
   const row = await waitForTask(page, title)
   await row.getByRole('link', { name: task, exact: true }).click()
-  await expect(page.getByLabel('Title', { exact: true })).toHaveValue(title)
+  await expect(page.getByLabel(fieldLabel('Title'))).toHaveValue(title)
   if (comment !== undefined) {
-    await page.getByLabel('Decision comments', { exact: true }).fill(comment)
+    await page.getByLabel(fieldLabel('Decision comments')).fill(comment)
   }
   await page.getByRole('button', { name: outcome, exact: true }).click()
   await expect(page).toHaveURL(/\/purchasing\/mytasks$/)
@@ -81,7 +82,7 @@ export async function decide(
  * it read-only.
  */
 export function statusValue(page: Page) {
-  return page.getByLabel('Status', { exact: true })
+  return page.getByLabel(fieldLabel('Status'))
 }
 
 /** Opens the request form until it shows `status`, since the worker ends the process later. */

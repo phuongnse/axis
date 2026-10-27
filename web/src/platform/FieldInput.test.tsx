@@ -144,3 +144,63 @@ describe('FieldInput dates', () => {
     expect(document.querySelectorAll('.ant-picker-time-panel-column')).toHaveLength(3)
   })
 })
+
+describe('FieldInput required', () => {
+  const inputs: [string, Partial<FieldMetadata>, string][] = [
+    ['text', {}, 'textbox'],
+    ['enum', { values: ['open', 'closed'] }, 'combobox'],
+    ['date', {}, 'textbox'],
+  ]
+
+  function renderInput(type: string, limits: Partial<FieldMetadata>, ariaRequired?: boolean) {
+    render(
+      <TextProvider catalogs={catalogs} development={false}>
+        <FieldInput
+          field={field(type as FieldType, limits)}
+          value={null}
+          onChange={() => undefined}
+          ariaLabel="limited"
+          locale="en"
+          ariaRequired={ariaRequired}
+        />
+      </TextProvider>,
+    )
+  }
+
+  it.each(inputs)('marks a required %s input aria-required', (type, limits, role) => {
+    renderInput(type, limits, true)
+
+    expect(screen.getByRole(role, { name: 'limited' })).toHaveAttribute('aria-required', 'true')
+  })
+
+  it.each(inputs)('leaves aria-required off a %s input that is not required', (type, limits, role) => {
+    renderInput(type, limits)
+
+    expect(screen.getByRole(role, { name: 'limited' })).not.toHaveAttribute('aria-required')
+  })
+})
+
+describe('FieldInput description', () => {
+  const inputs: [string, Partial<FieldMetadata>, string][] = [
+    ['text', {}, 'textbox'],
+    ['enum', { values: ['open', 'closed'] }, 'combobox'],
+    ['date', {}, 'textbox'],
+  ]
+
+  it.each(inputs)('names the describing element on a %s input', (type, limits, role) => {
+    render(
+      <TextProvider catalogs={catalogs} development={false}>
+        <FieldInput
+          field={field(type as FieldType, limits)}
+          value={null}
+          onChange={() => undefined}
+          ariaLabel="limited"
+          locale="en"
+          ariaDescribedBy="limited-help"
+        />
+      </TextProvider>,
+    )
+
+    expect(screen.getByRole(role, { name: 'limited' })).toHaveAttribute('aria-describedby', 'limited-help')
+  })
+})
