@@ -632,11 +632,11 @@ Run and the Test results list, the read-only view of a module entity, and the re
       label, assignee, form, `dueIn` or outcomes opens the Form tab at that
       field.
     - **Operation panel** _(built)_. An `operation` step shows an operation
-      choice, `updateRecord`, `callConnector`, `raiseEvent`, `createRecord` or
-      **Package operation**, above its transition. Changing the operation removes only
-      the keys the new one forbids. It adds no empty key, so the compiler
-      reports what is still missing. Every other key, including unknown keys,
-      stays.
+      choice, `updateRecord`, `callConnector`, `raiseEvent`, `createRecord`,
+      `notify` or **Package operation**, above its transition. Changing the
+      operation removes only the keys the new one forbids. It adds no empty
+      key, so the compiler reports what is still missing. Every other key,
+      including unknown keys, stays.
       - `updateRecord` shows `set` as rows of a field of the process's entity
         and an expression. `callConnector` shows the connector and its
         operation as pickers, `input` as rows of a typed input name and an
@@ -647,6 +647,12 @@ Run and the Test results list, the read-only view of a module entity, and the re
         which lists every entity, child entities included, because the names
         do not say which are child entities and the compiler reports one. It
         shows `set` as rows of a field of that entity and an expression.
+      - `notify` shows `to` as rows of a user expression, a role or an email
+        expression, the `inApp` and `email` channels as checkboxes, the subject
+        and body through the label editor, `values` as rows of a typed
+        placeholder name and an expression, and an optional page to open with
+        its parameters. Switching away removes `to`, `channels`, `message` and
+        `open`. See [process designer](process-designer.md).
       - A package operation is typed in a text box as
         `<package>/<operation>`, because no route lists the installed
         operations. It shows `input`, `output` and `retry` as `callConnector`

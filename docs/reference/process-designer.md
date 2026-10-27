@@ -11,9 +11,9 @@ The design follows [D74](../decisions/d74-a-visual-process-designer.md). The
 Design tab, the canvas, the existing step panels, remove, undo, Tab and Enter,
 the diagnostic marks and the live region for removals are _(built)_. The
 palette, the transitions and the live region for adds and transitions are
-_(built)_. The schema-driven type picker and the timer panel are _(built)_. The
-other panels of the new step types and the live region for moves are
-_(planned for M14)_.
+_(built)_. The schema-driven type picker, the timer panel and the `notify`
+panel are _(built)_. The other panels of the new step types and the live region
+for moves are _(planned for M14)_.
 
 - **Design tab** _(built)_. A process opens on a Design tab, next to its Form
   and JSON tabs. The three tabs edit one draft.
@@ -29,12 +29,13 @@ _(planned for M14)_.
 - **Palette** _(built)_. It sits at the top of the panel beside the canvas and
   lists the step types and operations that `process.schema.json` defines today:
   `decision`, `task`, the operations `updateRecord`, `callConnector`,
-  `raiseEvent` and `createRecord`, one "Package operation" entry, `subProcess`,
-  `timer` and `end`. A new `createRecord` step starts with an empty `entity` and an
-  empty `set`. A Vitest test reads the schema and fails when a step type or a
-  built-in operation is missing from the palette. `waitEvent` and
-  `notify` join when the schema defines them, because their steps would
-  always be invalid before that.
+  `raiseEvent`, `createRecord` and `notify`, one "Package operation" entry,
+  `subProcess`, `timer` and `end`. A new `createRecord` step starts with an
+  empty `entity` and an empty `set`. A new `notify` step starts with an empty
+  `to`, an empty `channels` and a `message` with an empty subject and body
+  key. A Vitest test reads the schema and fails when a step type or a
+  built-in operation is missing from the palette. `waitEvent` joins when the
+  schema defines it, because its step would always be invalid before that.
   - The package entry adds an operation step with an empty `operation`, which
     the author types as `<package>/<operation>` in the panel, as the operation
     picker does. One entry per package operation of the application _(planned)_
@@ -97,6 +98,18 @@ _(planned for M14)_.
   `createRecord`. Its panel has an entity picker and one `set` row for each
   field of the picked entity, as the `updateRecord` panel has for the subject
   entity.
+- **Property panel (`notify`)** _(built)_. The operation picker offers
+  `notify`. Its panel has the recipients as rows of a user expression, a role
+  picker or an email expression, with Add recipient and Remove. It has the
+  `inApp` and `email` channels as two checkboxes, and the subject and body
+  through the label editor, so the author writes the texts in every locale.
+  `values` are rows of a typed placeholder name and an expression. An Open a
+  page checkbox adds `open` with a page picker and the page's parameters as
+  rows, keyed by the parameters of the picked page. Switching a step from
+  `notify` to another operation removes `to`, `channels`, `message` and `open`,
+  and adds no empty key. The editor takes the pointer of the object that holds
+  these keys and never shows `next`, so the escalations of a task can use it
+  _(planned for M14)_.
 - **Step type picker** _(built)_. The picker in the card and the Add step
   choice list every type in `$defs.step.properties.type.enum` of the process
   schema, including `timer` and `subProcess`. Changing a step's type removes the
@@ -110,8 +123,8 @@ _(planned for M14)_.
   empty, in its place, and one Undo brings the old key back. A timer with
   neither key or both opens in Wait.
 - **Property panel (other new step types)** _(planned for M14)_. The other new
-  step types and keys get panels too: wait for event, sub-process, `notify`,
-  and the escalations and deadline of a task.
+  step types and keys get panels too: wait for event, sub-process, and the
+  escalations and deadline of a task.
 - **Undo** _(built)_. The undo and redo of
   [D65](../decisions/d65-a-visual-page-designer-on-a-canvas-drawn-by-the-sites-widgets.md)
   cover every edit of a process on all three tabs, with 100 steps, cleared by

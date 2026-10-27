@@ -4,6 +4,7 @@ import type { StudioNames } from '../platform/studio'
 import { useText } from '../platform/texts'
 import { ExpressionCheckContext } from './expressionCheckContext'
 import { MappingRows } from './MappingRows'
+import { NotifyFields } from './NotifyFields'
 import { builtInOperations, forbiddenByOperation, packageChoice, withOperation, without } from './operationKeys'
 import { ReferencePicker } from './ReferencePicker'
 import type { ChangeHandler } from './SchemaForm'
@@ -19,7 +20,7 @@ function text(value: unknown): string {
 }
 
 /**
- * The panel of an `operation` step: the operation to run and its properties. An operation is one of the four built
+ * The panel of an `operation` step: the operation to run and its properties. An operation is one of the five built
  * in, or a package's operation that is typed as `<package>/<operation>`. A key the operation forbids is not shown,
  * and the step keeps it until the author removes it in the JSON view.
  */
@@ -101,6 +102,7 @@ export function OperationPanel({
       {operation === 'createRecord' && (
         <CreateEntityChoice pointer={pointer} step={step} names={names} onChange={onChange} />
       )}
+      {operation === 'notify' && <NotifyFields pointer={pointer} value={step} onChange={onChange} />}
       {isPackage && <ConnectorMappings pointer={pointer} step={step} fields={fields} onChange={onChange} />}
     </>
   )

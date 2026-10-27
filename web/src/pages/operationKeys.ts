@@ -5,15 +5,40 @@ export const builtInOperations = ['updateRecord', 'callConnector', 'raiseEvent',
 export const packageChoice = 'package'
 
 /** Every key that an operation step can have besides its name, type and `next`. */
-const operationKeys = ['set', 'connector', 'input', 'output', 'retry', 'event', 'entity', 'fields']
+const operationKeys = [
+  'set',
+  'connector',
+  'input',
+  'output',
+  'retry',
+  'event',
+  'entity',
+  'fields',
+  'to',
+  'channels',
+  'message',
+  'open',
+]
 
 export const forbiddenByOperation: Record<string, string[]> = {
-  updateRecord: ['connector', 'input', 'output', 'retry', 'event', 'entity', 'fields'],
-  callConnector: ['set', 'event', 'entity', 'fields'],
-  raiseEvent: ['set', 'connector', 'input', 'output', 'retry', 'entity'],
-  createRecord: ['connector', 'input', 'output', 'retry', 'event', 'fields'],
+  updateRecord: [
+    'connector',
+    'input',
+    'output',
+    'retry',
+    'event',
+    'entity',
+    'fields',
+    'to',
+    'channels',
+    'message',
+    'open',
+  ],
+  callConnector: ['set', 'event', 'entity', 'fields', 'to', 'channels', 'message', 'open'],
+  raiseEvent: ['set', 'connector', 'input', 'output', 'retry', 'entity', 'to', 'channels', 'message', 'open'],
+  createRecord: ['connector', 'input', 'output', 'retry', 'event', 'fields', 'to', 'channels', 'message', 'open'],
   notify: ['set', 'connector', 'input', 'output', 'retry', 'event', 'entity', 'fields'],
-  [packageChoice]: ['set', 'connector', 'event', 'entity', 'fields'],
+  [packageChoice]: ['set', 'connector', 'event', 'entity', 'fields', 'to', 'channels', 'message', 'open'],
 }
 
 function text(value: unknown): string {
