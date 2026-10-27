@@ -34,6 +34,9 @@ public sealed class EmailOutboxRow
     /// <summary>The email's <c>Message-ID</c> header, unique among the rows.</summary>
     public required string MessageId { get; init; }
 
+    /// <summary>The raw evaluated placeholder values of the step run, as a JSON object keyed by the placeholders' names.</summary>
+    public string Values { get; init; } = "{}";
+
     /// <summary>The state of the email: <c>pending</c> or <c>sent</c>.</summary>
     public string State { get; init; } = "pending";
 

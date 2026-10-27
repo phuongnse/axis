@@ -6,8 +6,9 @@ using Axis.Configuration.Resources;
 namespace Axis.Configuration.Compilation;
 
 /// <summary>
-/// Checks the scenarios of an application. Every role of a user is a declared role, every <c>as</c>
-/// and user assignee is a user of the scenario, and an assignee role is a declared role. A
+/// Checks the scenarios of an application. Every role of a user is a declared role, every <c>as</c>,
+/// user assignee and user recipient is a user of the scenario, and an assignee or recipient role is
+/// a declared role. A
 /// <c>createRecord</c> step names a loaded root entity. A record alias is saved by one step and
 /// used only by later steps. The record's entity is the one its <c>createRecord</c> step names, and
 /// it resolves the rest of a step: a process of <c>startProcess</c> or <c>expectInstance</c> is a
@@ -120,6 +121,26 @@ internal static class ScenarioChecker
                         DiagnosticCodes.UnknownScenarioRole,
                         $"The role '{unknownRole}' was not found. No loaded role has that name.",
                         $"{path}/assignee/role");
+                }
+
+                if (step.Recipient?.User is { } recipientUser && !scenario.Users.ContainsKey(recipientUser))
+                {
+                    Report(
+                        DiagnosticCodes.UnknownScenarioUser,
+                        $"The user '{recipientUser}' was not found. The scenario has no user with that id.",
+                        $"{path}/recipient/user");
+                }
+
+                if (step.Recipient?.Role is { } recipientRole && findRole(recipientRole) is { } recipientRoleResource)
+                {
+                    references.Add(scenario, $"{path}/recipient/role", ReferenceRelations.ScenarioRole, ResourceNode.Of(recipientRoleResource));
+                }
+                else if (step.Recipient?.Role is { } unknownRecipientRole && !KnownRole(unknownRecipientRole))
+                {
+                    Report(
+                        DiagnosticCodes.UnknownScenarioRole,
+                        $"The role '{unknownRecipientRole}' was not found. No loaded role has that name.",
+                        $"{path}/recipient/role");
                 }
 
                 if (step.Type == ScenarioStepDefinition.AdvanceTime)

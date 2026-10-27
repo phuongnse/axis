@@ -22,11 +22,11 @@ internal static class ProcessEmails
         await using var command = new NpgsqlCommand(
             """
             INSERT INTO axis.email_outbox
-                (id, application_id, release_id, notification_id, step, address, locale, subject, body, message_id, state, created_at)
+                (id, application_id, release_id, notification_id, step, address, locale, subject, body, message_id, "values", state, created_at)
             SELECT email.id, email.application_id, email.release_id, email.notification_id, email.step, email.address,
-                   email.locale, email.subject, email.body, email.message_id, 'pending', now()
-            FROM unnest(@ids, @applications, @releases, @notifications, @steps, @addresses, @locales, @subjects, @bodies, @messageIds)
-                AS email(id, application_id, release_id, notification_id, step, address, locale, subject, body, message_id)
+                   email.locale, email.subject, email.body, email.message_id, email.raw_values::jsonb, 'pending', now()
+            FROM unnest(@ids, @applications, @releases, @notifications, @steps, @addresses, @locales, @subjects, @bodies, @messageIds, @values)
+                AS email(id, application_id, release_id, notification_id, step, address, locale, subject, body, message_id, raw_values)
             """,
             transaction.Connection ?? throw new ArgumentException("The transaction is completed.", nameof(transaction)),
             transaction);
@@ -40,6 +40,7 @@ internal static class ProcessEmails
         command.Parameters.Add(new NpgsqlParameter("subjects", NpgsqlDbType.Array | NpgsqlDbType.Text) { Value = emails.Select(e => e.Subject).ToArray() });
         command.Parameters.Add(new NpgsqlParameter("bodies", NpgsqlDbType.Array | NpgsqlDbType.Text) { Value = emails.Select(e => e.Body).ToArray() });
         command.Parameters.Add(new NpgsqlParameter("messageIds", NpgsqlDbType.Array | NpgsqlDbType.Text) { Value = emails.Select(e => e.MessageId).ToArray() });
+        command.Parameters.Add(new NpgsqlParameter("values", NpgsqlDbType.Array | NpgsqlDbType.Text) { Value = emails.Select(e => e.Values).ToArray() });
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
@@ -88,6 +89,7 @@ internal static class ProcessEmails
 /// <param name="Step">The name of the <c>notify</c> step.</param>
 /// <param name="Locale">The locale of the texts the email is rendered in, or null when the release has no texts.</param>
 /// <param name="MessageId">The email's <c>Message-ID</c> header.</param>
+/// <param name="Values">The raw placeholder values of the step run, as JSON text.</param>
 internal sealed record NewEmail(
     Guid Id,
     Guid ApplicationId,
@@ -98,4 +100,5 @@ internal sealed record NewEmail(
     string? Locale,
     string Subject,
     string Body,
-    string MessageId);
+    string MessageId,
+    string Values);

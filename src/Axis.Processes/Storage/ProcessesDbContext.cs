@@ -310,6 +310,7 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
             email.Property(e => e.Subject).HasColumnName("subject");
             email.Property(e => e.Body).HasColumnName("body");
             email.Property(e => e.MessageId).HasColumnName("message_id");
+            email.Property(e => e.Values).HasColumnName("values").HasColumnType("jsonb").HasDefaultValueSql("'{}'::jsonb");
             email.Property(e => e.State).HasColumnName("state").HasDefaultValue("pending");
             email.Property(e => e.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
             email.Property(e => e.SentAt).HasColumnName("sent_at");

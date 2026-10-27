@@ -278,6 +278,13 @@ namespace Axis.Processes.Storage.Migrations
                         .HasColumnType("text")
                         .HasColumnName("subject");
 
+                    b.Property<string>("Values")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("values")
+                        .HasDefaultValueSql("'{}'::jsonb");
+
                     b.HasKey("Id")
                         .HasName("pk_email_outbox");
 

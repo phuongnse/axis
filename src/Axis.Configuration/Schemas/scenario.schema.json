@@ -86,6 +86,16 @@
       },
       "oneOf": [{ "required": ["user"] }, { "required": ["role"] }]
     },
+    "recipient": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "user": { "$ref": "#/$defs/reference" },
+        "role": { "$ref": "#/$defs/roleName", "x-axis-reference": "role" },
+        "email": { "type": "string", "minLength": 1 }
+      },
+      "oneOf": [{ "required": ["user"] }, { "required": ["role"] }, { "required": ["email"] }]
+    },
     "expect": {
       "oneOf": [
         { "enum": ["denied", "notFound", "conflict"] },
@@ -112,6 +122,7 @@
             "expectRecord",
             "expectInstance",
             "expectTask",
+            "expectNotification",
             "advanceTime"
           ]
         },
@@ -124,6 +135,8 @@
         "outcome": { "$ref": "#/$defs/name", "x-axis-reference": { "part": "outcome", "of": "1/step" } },
         "state": { "enum": ["running", "waiting", "completed", "failed", "open"] },
         "assignee": { "$ref": "#/$defs/assignee" },
+        "recipient": { "$ref": "#/$defs/recipient" },
+        "channel": { "enum": ["inApp", "email"] },
         "values": { "type": "object" },
         "expect": { "$ref": "#/$defs/expect" },
         "by": { "type": "string", "minLength": 1 }
@@ -143,11 +156,17 @@
               "outcome": false,
               "state": false,
               "assignee": false,
+              "recipient": false,
+              "channel": false,
               "values": false,
               "expect": false
             }
           },
           "else": { "properties": { "by": false } }
+        },
+        {
+          "if": { "required": ["type"], "properties": { "type": { "not": { "const": "expectNotification" } } } },
+          "then": { "properties": { "recipient": false, "channel": false } }
         },
         {
           "if": { "required": ["type"], "properties": { "type": { "const": "createRecord" } } },
@@ -233,6 +252,24 @@
               "state": { "enum": ["open", "completed"] }
             },
             "oneOf": [{ "required": ["assignee"] }, { "required": ["state"] }]
+          }
+        },
+        {
+          "if": { "required": ["type"], "properties": { "type": { "const": "expectNotification" } } },
+          "then": {
+            "required": ["recipient"],
+            "properties": {
+              "entity": false,
+              "record": false,
+              "save": false,
+              "as": false,
+              "process": false,
+              "step": false,
+              "outcome": false,
+              "state": false,
+              "assignee": false,
+              "expect": false
+            }
           }
         }
       ]
