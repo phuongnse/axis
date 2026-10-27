@@ -102,11 +102,11 @@ public sealed class StudioPageMetadataTests : IAsyncLifetime
         // The site's page route and the task routes share these types, and their answers must stay as they were.
         var form = new FormMetadata(
             "Review",
-            [new FormSectionMetadata("request", "review.request", false, [new FormFieldMetadata("title", false, false)])],
+            [new FormSectionMetadata("request", "review.request", false, [new FormFieldMetadata("title", false, false, 12)])],
             [new FormStepMetadata("review.step", ["request"])]);
 
         Assert.Equal(
-            """{"name":"Review","sections":[{"name":"request","titleKey":"review.request","visibleWhen":false,"fields":[{"name":"title","readOnly":false,"visibleWhen":false}]}],"steps":[{"titleKey":"review.step","sections":["request"]}]}""",
+            """{"name":"Review","sections":[{"name":"request","titleKey":"review.request","visibleWhen":false,"fields":[{"name":"title","readOnly":false,"visibleWhen":false,"width":12}]}],"steps":[{"titleKey":"review.step","sections":["request"]}]}""",
             JsonSerializer.Serialize(form, JsonSerializerOptions.Web));
 
         var withPaths = form with

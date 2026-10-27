@@ -82,7 +82,8 @@
         "readOnly": { "type": "boolean" },
         "visibleWhen": { "$ref": "#/$defs/condition" },
         "requiredWhen": { "$ref": "#/$defs/condition" },
-        "readOnlyWhen": { "$ref": "#/$defs/condition" }
+        "readOnlyWhen": { "$ref": "#/$defs/condition" },
+        "width": { "type": "integer", "minimum": 1, "maximum": 12 }
       }
     }
   }

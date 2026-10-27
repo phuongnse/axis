@@ -108,33 +108,35 @@ public sealed class SiteEndpointTests(RecordApiFixture fixture) : IClassFixture<
             ["text", "integer", "decimal", "boolean", "date", "date-time", "enum", "child-collection", "reference", "decimal"],
             fieldList.Select(field => field.GetProperty("type").GetString()));
         Assert.All(fieldList, field => Assert.Equal(
-            ["name", "type", "labelKey", "required", "unique", "computed", "sequence", "creator", "maxLength", "precision", "scale", "currency", "currencyField", "min", "max", "minLength", "values", "valueLabelKeys", "maxSize", "accept", "uploadPath", "downloadPath", "target", "fields"],
+            ["name", "type", "labelKey", "helpKey", "required", "unique", "computed", "sequence", "creator", "maxLength", "precision", "scale", "currency", "currencyField", "min", "max", "minLength", "values", "valueLabelKeys", "maxSize", "accept", "uploadPath", "downloadPath", "target", "fields"],
             field.EnumerateObject().Select(property => property.Name)));
 
         var fields = fieldList.ToDictionary(field => field.GetProperty("name").GetString()!);
 
         Assert.Equal(
-            """{"name":"name","type":"text","labelKey":null,"required":true,"unique":false,"computed":false,"sequence":false,"creator":false,"maxLength":100,"precision":null,"scale":null,"currency":null,"currencyField":null,"min":null,"max":null,"minLength":null,"values":null,"valueLabelKeys":null,"maxSize":null,"accept":null,"uploadPath":null,"downloadPath":null,"target":null,"fields":null}""",
+            """{"name":"name","type":"text","labelKey":null,"helpKey":"item.name.help","required":true,"unique":false,"computed":false,"sequence":false,"creator":false,"maxLength":100,"precision":null,"scale":null,"currency":null,"currencyField":null,"min":null,"max":null,"minLength":null,"values":null,"valueLabelKeys":null,"maxSize":null,"accept":null,"uploadPath":null,"downloadPath":null,"target":null,"fields":null}""",
             fields["name"].GetRawText());
         Assert.Equal(20, fields["price"].GetProperty("precision").GetInt32());
         Assert.Equal(2, fields["price"].GetProperty("scale").GetInt32());
         Assert.Equal(JsonValueKind.Null, fields["price"].GetProperty("maxLength").ValueKind);
         Assert.Equal(["open", "closed"], fields["status"].GetProperty("values").EnumerateArray().Select(value => value.GetString()));
         Assert.Equal("item.department", fields["department"].GetProperty("labelKey").GetString());
+        Assert.Equal("item.name.help", fields["name"].GetProperty("helpKey").GetString());
+        Assert.Equal(JsonValueKind.Null, fields["department"].GetProperty("helpKey").ValueKind);
         Assert.Equal(
             """{"entity":"Department","displayField":"name","recordsPath":"/api/apps/RecordsApp/entities/Department/records"}""",
             fields["department"].GetProperty("target").GetRawText());
 
         // A computed field is marked, so the form shows it read-only and never sends it.
         Assert.Equal(
-            """{"name":"total","type":"decimal","labelKey":null,"required":false,"unique":false,"computed":true,"sequence":false,"creator":false,"maxLength":null,"precision":20,"scale":2,"currency":null,"currencyField":null,"min":null,"max":null,"minLength":null,"values":null,"valueLabelKeys":null,"maxSize":null,"accept":null,"uploadPath":null,"downloadPath":null,"target":null,"fields":null}""",
+            """{"name":"total","type":"decimal","labelKey":null,"helpKey":null,"required":false,"unique":false,"computed":true,"sequence":false,"creator":false,"maxLength":null,"precision":20,"scale":2,"currency":null,"currencyField":null,"min":null,"max":null,"minLength":null,"values":null,"valueLabelKeys":null,"maxSize":null,"accept":null,"uploadPath":null,"downloadPath":null,"target":null,"fields":null}""",
             fields["total"].GetRawText());
         Assert.All(fieldList.Where(field => field.GetProperty("name").GetString() != "total"), field =>
             Assert.False(field.GetProperty("computed").GetBoolean()));
 
         // A child collection carries its child entity's fields, and no target: a child has no record API.
         Assert.Equal(
-            """{"name":"parts","type":"child-collection","labelKey":null,"required":false,"unique":false,"computed":false,"sequence":false,"creator":false,"maxLength":null,"precision":null,"scale":null,"currency":null,"currencyField":null,"min":null,"max":null,"minLength":null,"values":null,"valueLabelKeys":null,"maxSize":null,"accept":null,"uploadPath":null,"downloadPath":null,"target":null,"fields":[{"name":"name","type":"text","labelKey":null,"required":false,"unique":true,"computed":false,"sequence":false,"creator":false,"maxLength":100,"precision":null,"scale":null,"currency":null,"currencyField":null,"min":null,"max":null,"minLength":null,"values":null,"valueLabelKeys":null,"maxSize":null,"accept":null,"uploadPath":null,"downloadPath":null,"target":null,"fields":null},{"name":"code","type":"text","labelKey":null,"required":false,"unique":false,"computed":true,"sequence":false,"creator":false,"maxLength":100,"precision":null,"scale":null,"currency":null,"currencyField":null,"min":null,"max":null,"minLength":null,"values":null,"valueLabelKeys":null,"maxSize":null,"accept":null,"uploadPath":null,"downloadPath":null,"target":null,"fields":null}]}""",
+            """{"name":"parts","type":"child-collection","labelKey":null,"helpKey":null,"required":false,"unique":false,"computed":false,"sequence":false,"creator":false,"maxLength":null,"precision":null,"scale":null,"currency":null,"currencyField":null,"min":null,"max":null,"minLength":null,"values":null,"valueLabelKeys":null,"maxSize":null,"accept":null,"uploadPath":null,"downloadPath":null,"target":null,"fields":[{"name":"name","type":"text","labelKey":null,"helpKey":null,"required":false,"unique":true,"computed":false,"sequence":false,"creator":false,"maxLength":100,"precision":null,"scale":null,"currency":null,"currencyField":null,"min":null,"max":null,"minLength":null,"values":null,"valueLabelKeys":null,"maxSize":null,"accept":null,"uploadPath":null,"downloadPath":null,"target":null,"fields":null},{"name":"code","type":"text","labelKey":null,"helpKey":null,"required":false,"unique":false,"computed":true,"sequence":false,"creator":false,"maxLength":100,"precision":null,"scale":null,"currency":null,"currencyField":null,"min":null,"max":null,"minLength":null,"values":null,"valueLabelKeys":null,"maxSize":null,"accept":null,"uploadPath":null,"downloadPath":null,"target":null,"fields":null}]}""",
             fields["parts"].GetRawText());
         Assert.All(fieldList.Where(field => field.GetProperty("name").GetString() != "parts"), field =>
             Assert.Equal(JsonValueKind.Null, field.GetProperty("fields").ValueKind));
@@ -205,7 +207,7 @@ public sealed class SiteEndpointTests(RecordApiFixture fixture) : IClassFixture<
 
         // The total is computed, so it is read-only though the form does not say so.
         Assert.Equal(
-            """{"name":"ItemSections","sections":[{"name":"main","titleKey":"itemSections.main","visibleWhen":false,"fields":[{"name":"name","readOnly":false,"visibleWhen":false},{"name":"quantity","readOnly":true,"visibleWhen":false}]},{"name":"pricing","titleKey":"itemSections.pricing","visibleWhen":true,"fields":[{"name":"price","readOnly":false,"visibleWhen":true},{"name":"total","readOnly":true,"visibleWhen":false}]}],"steps":[{"titleKey":"itemSections.stepMain","sections":["main"]},{"titleKey":"itemSections.stepPricing","sections":["pricing"]}]}""",
+            """{"name":"ItemSections","sections":[{"name":"main","titleKey":"itemSections.main","visibleWhen":false,"fields":[{"name":"name","readOnly":false,"visibleWhen":false,"width":8},{"name":"quantity","readOnly":true,"visibleWhen":false,"width":4}]},{"name":"pricing","titleKey":"itemSections.pricing","visibleWhen":true,"fields":[{"name":"price","readOnly":false,"visibleWhen":true,"width":12},{"name":"total","readOnly":true,"visibleWhen":false,"width":12}]}],"steps":[{"titleKey":"itemSections.stepMain","sections":["main"]},{"titleKey":"itemSections.stepPricing","sections":["pricing"]}]}""",
             widget.GetProperty("form").GetRawText());
 
         // The entity keeps every field, so the SPA knows the type of each field the form shows.
@@ -391,7 +393,7 @@ public sealed class SiteEndpointTests(RecordApiFixture fixture) : IClassFixture<
         using var page = await GetJsonAsync(client, "/api/sites/records/pages/itemsections", HostA);
 
         Assert.Equal(
-            """{"name":"ItemSections","sections":[{"name":"main","titleKey":"itemSections.main","visibleWhen":false,"fields":[{"name":"name","readOnly":false,"visibleWhen":false}]}],"steps":[{"titleKey":"itemSections.stepMain","sections":["main"]}]}""",
+            """{"name":"ItemSections","sections":[{"name":"main","titleKey":"itemSections.main","visibleWhen":false,"fields":[{"name":"name","readOnly":false,"visibleWhen":false,"width":8}]}],"steps":[{"titleKey":"itemSections.stepMain","sections":["main"]}]}""",
             Assert.Single(page.RootElement.GetProperty("widgets").EnumerateArray().ToList()).GetProperty("form").GetRawText());
     }
 
@@ -410,7 +412,7 @@ public sealed class SiteEndpointTests(RecordApiFixture fixture) : IClassFixture<
         Assert.Equal(["name", "code"], parts.GetProperty("fields").EnumerateArray().Select(field => field.GetProperty("name").GetString()));
         Assert.Equal(10, EntityFieldNames(sections).Count);
         Assert.Equal(
-            """{"name":"ItemSections","sections":[{"name":"main","titleKey":"itemSections.main","visibleWhen":false,"fields":[{"name":"name","readOnly":false,"visibleWhen":false},{"name":"quantity","readOnly":true,"visibleWhen":false}]},{"name":"pricing","titleKey":"itemSections.pricing","visibleWhen":true,"fields":[{"name":"price","readOnly":false,"visibleWhen":true},{"name":"total","readOnly":true,"visibleWhen":false}]}],"steps":[{"titleKey":"itemSections.stepMain","sections":["main"]},{"titleKey":"itemSections.stepPricing","sections":["pricing"]}]}""",
+            """{"name":"ItemSections","sections":[{"name":"main","titleKey":"itemSections.main","visibleWhen":false,"fields":[{"name":"name","readOnly":false,"visibleWhen":false,"width":8},{"name":"quantity","readOnly":true,"visibleWhen":false,"width":4}]},{"name":"pricing","titleKey":"itemSections.pricing","visibleWhen":true,"fields":[{"name":"price","readOnly":false,"visibleWhen":true,"width":12},{"name":"total","readOnly":true,"visibleWhen":false,"width":12}]}],"steps":[{"titleKey":"itemSections.stepMain","sections":["main"]},{"titleKey":"itemSections.stepPricing","sections":["pricing"]}]}""",
             Assert.Single(sections.RootElement.GetProperty("widgets").EnumerateArray().ToList()).GetProperty("form").GetRawText());
     }
 

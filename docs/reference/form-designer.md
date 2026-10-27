@@ -123,11 +123,11 @@ Dn refers to [decisions.md](../decisions.md).
     a Remove field button below its conditions, described in the field palette
     bullet. A section shows its name, title and `visibleWhen`, and a Remove
     section button, described in the sections and steps bullet. A step shows
-    its title and a Remove step button, also described there. _(planned)_ A
+    its title and a Remove step button, also described there. A
     field also shows its `width`, a whole number from 1 to 12, and the canvas
     draws the fields in their columns, see
-    [fields in columns](form-widget.md). A form with more than six steps may
-    show a warning, which never blocks a save.
+    [fields in columns](form-widget.md). A form with more than six steps
+    shows a warning above the canvas, which never blocks a save.
     _Built:_ a click, Enter or Space selects a field or a section. A
     click on a step selects it and shows its sections. The selected element has
     `aria-current` and an outline in the primary colour. The panel asks the

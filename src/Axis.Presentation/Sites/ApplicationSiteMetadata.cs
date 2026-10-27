@@ -289,7 +289,8 @@ public sealed record FormSectionMetadata(string? Name, string TitleKey, bool Vis
 /// numbered or creator field is always read-only.
 /// </param>
 /// <param name="VisibleWhen">Whether the field has a <c>visibleWhen</c> condition, which stays on the server.</param>
-public sealed record FormFieldMetadata(string Name, bool ReadOnly, bool VisibleWhen)
+/// <param name="Width">The field's width in twelfths of the row, from 1 to 12. It is 12 when the form leaves it out.</param>
+public sealed record FormFieldMetadata(string Name, bool ReadOnly, bool VisibleWhen, int Width)
 {
     /// <summary>
     /// The JSON Pointer of the field in the draft form, such as <c>/sections/0/fields/1</c>. Only the draft page metadata route of
@@ -377,6 +378,7 @@ public sealed record DataSourceColumnMetadata(
 /// </summary>
 /// <param name="Type">The type name as written in entity files, such as <c>date-time</c>.</param>
 /// <param name="Computed">Whether the server computes the value. A client shows it and never sends it.</param>
+/// <param name="HelpKey">The text key of the field's help text, or null when the field has none.</param>
 /// <param name="Sequence">Whether a sequence numbers the field on create. A client shows it and never sends it.</param>
 /// <param name="Creator">Whether the server sets the field to the creating user's id. A client shows it and never sends it.</param>
 /// <param name="Min">The lowest accepted value as the literal was written, such as <c>10</c>, <c>0.5</c> or <c>2026-01-01</c>, or null when there is none.</param>
@@ -393,6 +395,7 @@ public sealed record FieldMetadata(
     string Name,
     string Type,
     string? LabelKey,
+    string? HelpKey,
     bool Required,
     bool Unique,
     bool Computed,

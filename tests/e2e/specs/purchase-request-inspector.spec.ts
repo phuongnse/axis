@@ -56,14 +56,14 @@ function seedDeadLetter(): string {
 
 /**
  * Starts the approval of a new Operations request as anna, then signs in as the inspecting user,
- * giang unless the test names another. It returns the
- * request id and the id of the instance once the instance waits at manager approval. Specs run in
+ * giang unless the test names another. It returns the request's title and id, and the id of the
+ * instance once the instance waits at manager approval. Specs run in
  * parallel against one database, so the list holds many instances. The newest come first, and the
  * test looks only for its own by subject id.
  */
 async function startWaitingInstance(page: Page, inspector: SampleUser = 'giang') {
   await useSession(page, 'anna')
-  const { id } = await createRequest(page, 'Zz Inspect', 500)
+  const { title, id } = await createRequest(page, 'Zz Inspect', 500)
   const started = await page.request.post(instancesPath, { data: { subjectId: id }, headers: csrfHeaders })
   expect(started.status()).toBe(201)
 
@@ -78,19 +78,19 @@ async function startWaitingInstance(page: Page, inspector: SampleUser = 'giang')
     expect(item).toBeDefined()
     instanceId = item!.id
   }).toPass({ timeout: 30_000 })
-  return { requestId: id, instanceId }
+  return { title, requestId: id, instanceId }
 }
 
 test('the operator opens an instance waiting for the manager and sees the path and the open task in light and dark mode', async ({
   page,
 }) => {
-  const { requestId, instanceId } = await startWaitingInstance(page)
+  const { title, instanceId } = await startWaitingInstance(page)
 
   await page.goto('/purchasing/approvals?state=waiting&pageSize=100')
   await expect(page.getByRole('banner').getByRole('button', { name: 'Giang Operator', exact: true })).toBeVisible()
   await page
-    .getByRole('row', { name: new RegExp(requestId) })
-    .getByRole('link', { name: 'Open', exact: true })
+    .locator(`tr[data-row-key="${instanceId}"]`)
+    .getByRole('link', { name: title, exact: true })
     .click()
   await expect(page).toHaveURL(new RegExp(`/purchasing/approvals/${instanceId}$`))
 

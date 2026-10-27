@@ -844,6 +844,7 @@ public static partial class ApplicationCompiler
             }
 
             CheckTextKey(field.Label, entity, $"{path}/label", references, diagnostics);
+            CheckTextKey(field.Help, entity, $"{path}/help", references, diagnostics);
             CheckValueLabels(field, entity, path, references, diagnostics);
             CheckField(field, path, findEntity, ownersByChildName, unloadedEntityNames, moduleReferences, maxFileSize, Report);
             AddFieldTarget(entity, field, path, findEntity, references);
@@ -2328,6 +2329,7 @@ public static partial class ApplicationCompiler
             Name = field.Name,
             Type = type,
             Label = field.Label,
+            Help = field.Help,
             Required = field.Required ?? false,
             Unique = field.Unique ?? false,
             MaxLength = field.MaxLength,
@@ -2587,7 +2589,8 @@ public static partial class ApplicationCompiler
                             field.ReadOnly ?? false,
                             Compile(field.VisibleWhen),
                             Compile(field.RequiredWhen),
-                            Compile(field.ReadOnlyWhen)))
+                            Compile(field.ReadOnlyWhen),
+                            field.Width ?? 12))
                         .ToList(),
                     section.Name,
                     Compile(section.VisibleWhen)))

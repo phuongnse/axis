@@ -101,6 +101,8 @@ test.describe('the author builds the service desk with Studio only', () => {
     )
     await page.getByRole('button', { name: 'Save', exact: true }).click()
     for (const [field, choice, expression] of answers) {
+      // A click while the dialog zooms in is lost, so wait until it has finished opening.
+      await waitForDialog(page)
       await expect(page.getByTestId('studio-migration-field')).toHaveText(field)
       if (expression !== undefined) {
         await page.getByRole('textbox', { name: 'Convert expression', exact: true }).fill(expression)

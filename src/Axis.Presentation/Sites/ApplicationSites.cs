@@ -251,7 +251,8 @@ public static class ApplicationSites
                     return new FormFieldMetadata(
                         field!.Name,
                         entry.ReadOnly || field.IsComputed || field.Sequence is not null || field.Creator,
-                        entry.VisibleWhen is not null);
+                        entry.VisibleWhen is not null,
+                        entry.Width);
                 })]))],
             [.. form.Steps.Select(step => new FormStepMetadata(step.Title.TextKey, step.Sections))]);
     }
@@ -412,6 +413,7 @@ public static class ApplicationSites
             field.Name,
             FieldTypes.Name(field.Type),
             field.Label?.TextKey,
+            field.Help?.TextKey,
             field.Required,
             field.Unique,
             field.IsComputed,

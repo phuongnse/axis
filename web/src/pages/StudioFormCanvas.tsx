@@ -29,6 +29,9 @@ type Answer = StudioFormMetadataAnswer | 'failed' | undefined
 
 type ConditionKey = 'visibleWhen' | 'requiredWhen' | 'readOnlyWhen'
 
+/** A wizard with more steps than this gets a warning on the canvas. Saving is not blocked. */
+const maxSteps = 6
+
 const sectionConditions: ConditionKey[] = ['visibleWhen']
 const fieldConditions: ConditionKey[] = ['visibleWhen', 'requiredWhen', 'readOnlyWhen']
 
@@ -68,6 +71,7 @@ export function StudioFormCanvas({
   aside?: ReactNode
 }) {
   const outer = useTextCatalogs()
+  const { spacing } = useDesignTokens()
   const names = useContext(StudioNamesContext)
   const platformLocale = useContext(PlatformContext)?.current.locale
   const { pathname } = useLocation()
@@ -78,6 +82,8 @@ export function StudioFormCanvas({
   const widget = drawn?.widget ?? null
   const diagnostics = useMemo(() => drawn?.diagnostics ?? [], [drawn])
   const steps = widget?.form?.steps ?? []
+  // The draft is counted, not the drawn form, so the warning shows at once and whatever is selected.
+  const draftSteps = Array.isArray(draft.steps) ? draft.steps.length : 0
   const shownStep = Math.min(step, Math.max(steps.length - 1, 0))
 
   useEffect(() => {
@@ -176,6 +182,11 @@ export function StudioFormCanvas({
   return (
     <Flex gap="middle" align="flex-start">
       <div style={{ flex: 1, minWidth: 0 }}>
+        {draftSteps > maxSteps && (
+          <div style={{ marginBottom: spacing.sm }}>
+            <CanvasAlert testId="studio-form-many-steps" textKey="shell.studio.design.manySteps" />
+          </div>
+        )}
         <TextProvider catalogs={catalogs} development={outer.development}>
           {steps.length > 0 && (
             <StepSwitch

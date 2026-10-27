@@ -616,6 +616,43 @@ public sealed class ApplicationCompilerTests
     }
 
     [Fact]
+    public void Help_key_that_no_locale_has_is_reported_at_the_help()
+    {
+        using var folder = new TemporaryFolder()
+            .With("application.json", Manifest)
+            .With("order.json", $$"""{ "id": "{{OrderId}}", "kind": "entity", "name": "Order", "formatVersion": 1, "fields": [{ "name": "number", "type": "text", "help": { "textKey": "missing.help" } }] }""")
+            .With("texts/en.json", Texts("en", """ "a.label": "A" """, "33333333-3333-4333-8333-333333333333"));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.MissingTextKey, "order.json", "/fields/0/help/textKey", Guid.Parse(OrderId)),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.ResourceId));
+        Assert.Contains("'missing.help'", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void Help_key_that_a_locale_has_compiles_into_the_field_model_and_a_field_without_help_has_none()
+    {
+        using var folder = new TemporaryFolder()
+            .With("application.json", Manifest)
+            .With("order.json", $$"""{ "id": "{{OrderId}}", "kind": "entity", "name": "Order", "formatVersion": 1, "fields": [{ "name": "number", "type": "text", "help": { "textKey": "a.help" } }, { "name": "note", "type": "text" }] }""")
+            .With("texts/en.json", Texts("en", """ "a.help": "Help" """, "33333333-3333-4333-8333-333333333333"));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+        Assert.True(result.Model.TryGetEntity("Order", out var order));
+        Assert.True(order.TryGetField("number", out var number));
+        Assert.True(order.TryGetField("note", out var note));
+        Assert.Equal("a.help", number.Help?.TextKey);
+        Assert.Null(note.Help);
+    }
+
+    [Fact]
     public void Application_label_without_any_text_resource_is_a_missing_key()
     {
         using var folder = new TemporaryFolder()

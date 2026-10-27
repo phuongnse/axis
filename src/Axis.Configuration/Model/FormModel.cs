@@ -42,14 +42,16 @@ public sealed record FormSectionModel(
 /// <summary>
 /// A compiled form field: the entity field's declared name and whether the form shows it read-only.
 /// A computed or numbered field is read-only in any case; <see cref="ReadOnly"/> holds only what the
-/// form declares. The conditions are boolean expressions over the form's entity.
+/// form declares. The conditions are boolean expressions over the form's entity. <see cref="Width"/>
+/// is the field's width in twelfths of the row, 12 when the form leaves it out.
 /// </summary>
 public sealed record FormFieldModel(
     string Field,
     bool ReadOnly,
     ExpressionModel? VisibleWhen = null,
     ExpressionModel? RequiredWhen = null,
-    ExpressionModel? ReadOnlyWhen = null);
+    ExpressionModel? ReadOnlyWhen = null,
+    int Width = 12);
 
 /// <summary>A compiled wizard step: the text key of its title and the names of its sections as the sections declare them.</summary>
 public sealed record FormStepModel(TextReference Title, IReadOnlyList<string> Sections);

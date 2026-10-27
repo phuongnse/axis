@@ -185,6 +185,20 @@ describe('FormProperties field', () => {
     expect(screen.getByTestId('announcement')).toHaveTextContent('Removed p · Section 2')
   })
 
+  it('writes the width of the field under width and removes it when the box is cleared', async () => {
+    renderHarness({ sections: [{ name: 's', fields: [{ field: 'x' }] }] }, '/sections/0/fields/0')
+    const width = screen.getByRole('spinbutton', { name: 'Width in twelfths of the row' })
+
+    await userEvent.type(width, '8')
+    expect(JSON.parse(screen.getByTestId('draft').textContent ?? '').sections[0].fields[0]).toEqual({
+      field: 'x',
+      width: 8,
+    })
+
+    await userEvent.clear(width)
+    expect(JSON.parse(screen.getByTestId('draft').textContent ?? '').sections[0].fields[0]).toEqual({ field: 'x' })
+  })
+
   it('removes a field with an empty name and announces its pointer', async () => {
     renderHarness({ sections: [{ title: { textKey: '' }, fields: [{ field: '' }] }] }, '/sections/0/fields/0')
 

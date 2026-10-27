@@ -706,9 +706,9 @@ Run and the Test results list, the read-only view of a module entity, and the re
     field of the seed's `entity`. The JSON view stays as a second view of the
     same draft.
     - **Columns.** The input fits the field type: a text box for `text`,
-      `date`, `date-time` and `reference`, a text box for `integer` and
-      `decimal` that stores a number, a true/false choice for `boolean` and a
-      choice of `values` for `enum`. A `reference` is a text box that checks
+      `date`, `date-time` and `reference`, a text box for `integer`,
+      `decimal` and `money` that stores a number, a true/false choice for
+      `boolean` and a choice of `values` for `enum`. A `reference` is a text box that checks
       the UUID form, and the record picker is separate work. Each input follows
       the [record API's value rules](record-api.md#request-bodies-and-values).
     - **No column.** A computed field, a `sequence` field, a `creator` field

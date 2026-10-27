@@ -1104,6 +1104,33 @@ describe('FormWidget', () => {
     expect(screen.queryByLabelText('Amount')).not.toBeInTheDocument()
   })
 
+  it('puts each field in a column of its width, and a field without a width on the whole row', async () => {
+    stubFetch({ status: 200, body: sectionsJson(1) })
+    const form = sectionsWidget.form!
+    renderForm(noteId, {
+      ...sectionsWidget,
+      form: {
+        ...form,
+        sections: [
+          {
+            ...form.sections[0],
+            fields: [
+              { name: 'title', readOnly: false, width: 8 },
+              { name: 'status', readOnly: false, width: 4 },
+              { name: 'code', readOnly: true },
+            ],
+          },
+        ],
+      },
+    })
+
+    const column = async (label: string) =>
+      (await screen.findByLabelText(label)).closest('.ant-form-item')?.parentElement
+    expect(await column('Title')).toHaveClass('ant-col-xs-24', 'ant-col-lg-16')
+    expect(await column('Status')).toHaveClass('ant-col-lg-8')
+    expect(await column('Code')).toHaveClass('ant-col-lg-24')
+  })
+
   it('shows read-only fields and rows without letting them change, and never sends them', async () => {
     const requests = stubFetch({ status: 200, body: sectionsJson(1) }, { status: 200, body: sectionsJson(2) })
     renderForm(noteId, sectionsWidget)

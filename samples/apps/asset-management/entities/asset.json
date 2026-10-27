@@ -116,6 +116,9 @@
       "type": "date",
       "label": {
         "textKey": "asset.warrantyEnd"
+      },
+      "help": {
+        "textKey": "asset.warrantyEnd.help"
       }
     },
     {

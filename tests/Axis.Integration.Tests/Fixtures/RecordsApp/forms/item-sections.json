@@ -8,7 +8,7 @@
     {
       "name": "main",
       "title": { "textKey": "itemSections.main" },
-      "fields": [{ "field": "name" }, { "field": "quantity", "readOnly": true }]
+      "fields": [{ "field": "name", "width": 8 }, { "field": "quantity", "readOnly": true, "width": 4 }]
     },
     {
       "name": "pricing",
