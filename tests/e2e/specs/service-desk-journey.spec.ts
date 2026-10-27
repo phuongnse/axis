@@ -50,6 +50,8 @@ const scenarios = [
   ['AgentCannotDeleteATicket', 'scenarios/agent-cannot-delete-a-ticket.json'],
   ['LeadIsRemindedOnTheNextWeekdayMorning', 'scenarios/lead-is-reminded-on-the-next-weekday-morning.json'],
   ['LeadIsToldWhichTicketWasDeleted', 'scenarios/lead-is-told-which-ticket-was-deleted.json'],
+  ['LateTicketEscalatesToTheLead', 'scenarios/late-ticket-escalates-to-the-lead.json'],
+  ['RequesterIsNotifiedOfTheResolution', 'scenarios/requester-is-notified-of-the-resolution.json'],
 ] as const
 
 test.describe('the author builds the service desk with Studio only', () => {
@@ -216,9 +218,9 @@ test.describe('the author builds the service desk with Studio only', () => {
       await page.getByTestId(`${at}/save`).getByRole('textbox').fill(String(step.save))
     }
     if ('assignee' in step) {
-      const { user } = step.assignee as { user: string }
-      await pickNamed(page, `${at}/assignee`, 'assignee kind', 'User')
-      await pickNamed(page, `${at}/assignee`, 'user', user)
+      const [[kind, name]] = Object.entries(step.assignee as Record<string, string>)
+      await pickNamed(page, `${at}/assignee`, 'assignee kind', kind === 'role' ? 'Role' : 'User')
+      await pickNamed(page, `${at}/assignee`, kind, name)
     }
     if ('by' in step) {
       await page.getByTestId(`${at}/by`).getByRole('textbox').fill(String(step.by))
@@ -710,6 +712,7 @@ test.describe('the author builds the service desk with Studio only', () => {
       ['markAssigned', 'operation'],
       ['resolve', 'task'],
       ['markResolved', 'operation'],
+      ['tellRequester', 'operation'],
       ['confirm', 'task'],
       ['markClosed', 'operation'],
       ['markRejected', 'operation'],
@@ -719,6 +722,54 @@ test.describe('the author builds the service desk with Studio only', () => {
     for (const [index, [name, type]] of steps.entries()) {
       await pickAction(page.getByRole('combobox', { name: 'Add step', exact: true }), type, stepCard(index))
       await stepCard(index).getByRole('textbox', { name: 'Step name', exact: true }).fill(name)
+    }
+
+    // The notify fields of a notify step or of an escalation's notify, at the pointer of the notify. The open page is
+    // not part of it: the page picker offers only pages that exist, and the pages come after the process.
+    async function notify(
+      pointer: string,
+      spec: {
+        to: { role: string } | { user: string }
+        channels: string[]
+        subject: string
+        body: string
+        values: [placeholder: string, expression: string][]
+      },
+    ) {
+      await page
+        .getByTestId(`studio-field-${pointer}/to`)
+        .getByRole('button', { name: 'Add recipient', exact: true })
+        .click()
+      const recipient = `studio-field-${pointer}/to/0`
+      if ('role' in spec.to) {
+        // The radio input of a button group is not visible, so the click goes to its label.
+        await page
+          .getByTestId(recipient)
+          .locator('label')
+          .filter({ has: page.getByRole('radio', { name: 'Role', exact: true }) })
+          .click()
+        await pick(page, `${recipient}/role`, spec.to.role)
+      } else {
+        const user = page.getByTestId(`${recipient}/user`)
+        await expect(user.locator('.cm-editor')).toBeVisible()
+        await user.getByRole('textbox').fill(spec.to.user)
+      }
+      for (const channel of spec.channels) {
+        await page
+          .getByTestId(`studio-field-${pointer}/channels`)
+          .getByRole('checkbox', { name: channel, exact: true })
+          .check()
+      }
+      await writeLabel(page, `studio-field-${pointer}/message/subject`, spec.subject, en[spec.subject])
+      await writeLabel(page, `studio-field-${pointer}/message/body`, spec.body, en[spec.body])
+      const values = page.getByTestId(`studio-field-${pointer}/message/values`)
+      for (const [placeholder, expression] of spec.values) {
+        await values.getByRole('button', { name: 'Add mapping', exact: true }).click()
+        await values.getByRole('textbox', { name: 'Placeholder', exact: true }).last().fill(placeholder)
+        const value = page.getByTestId(`studio-field-${pointer}/message/values/${placeholder}`)
+        await expect(value.locator('.cm-editor')).toBeVisible()
+        await value.getByRole('textbox', { name: 'Expression', exact: true }).fill(expression)
+      }
     }
 
     async function operation(index: number, sets: [field: string, expression: string][], next: string) {
@@ -739,6 +790,7 @@ test.describe('the author builds the service desk with Studio only', () => {
         assignee: { role: string } | { user: string }
         form: string
         dueIn: string
+        escalations?: { after: string; notify?: Parameters<typeof notify>[1]; reassign?: { role: string } }[]
         outcomes: { name: string; label: string; next: string }[]
       },
     ) {
@@ -753,6 +805,25 @@ test.describe('the author builds the service desk with Studio only', () => {
       }
       await pick(page, `studio-field-/steps/${index}/form`, spec.form)
       await page.getByTestId(`studio-field-/steps/${index}/dueIn`).getByRole('textbox').fill(spec.dueIn)
+      for (const [position, escalation] of (spec.escalations ?? []).entries()) {
+        const row = `/steps/${index}/escalations/${position}`
+        await page
+          .getByTestId(`studio-field-/steps/${index}/escalations`)
+          .getByRole('button', { name: 'Add escalation', exact: true })
+          .click()
+        const fields = page.getByTestId(`studio-field-${row}`)
+        await fields.getByRole('textbox', { name: 'Escalate after', exact: true }).fill(escalation.after)
+        if (escalation.notify) {
+          await fields.getByRole('switch', { name: 'Notify', exact: true }).click()
+          await notify(`${row}/notify`, escalation.notify)
+        }
+        if (escalation.reassign) {
+          // A new reassign starts as a user, so the Role radio is picked before the role.
+          await fields.getByRole('switch', { name: 'Reassign', exact: true }).click()
+          await page.getByTestId(`studio-field-${row}/reassign`).getByText('Role', { exact: true }).click()
+          await pick(page, `studio-field-${row}/reassign/role`, escalation.reassign.role)
+        }
+      }
       for (const [position, outcome] of spec.outcomes.entries()) {
         await stepCard(index).getByRole('button', { name: 'Add outcome', exact: true }).click()
         await page
@@ -788,10 +859,36 @@ test.describe('the author builds the service desk with Studio only', () => {
       assignee: { user: 'assignedAgent' },
       form: 'TicketResolution',
       dueIn: 'P3D',
+      escalations: [
+        {
+          after: 'P3D',
+          notify: {
+            to: { role: 'service-desk-lead' },
+            channels: ['In-app'],
+            subject: 'ticket.late.subject',
+            body: 'ticket.late.body',
+            values: [['number', 'number']],
+          },
+        },
+        { after: 'P4D', reassign: { role: 'service-desk-lead' } },
+      ],
       outcomes: [{ name: 'resolve', label: 'task.resolve', next: 'markResolved' }],
     })
-    await operation(4, [['status', "'resolved'"]], 'confirm')
-    await task(5, {
+    await operation(4, [['status', "'resolved'"]], 'tellRequester')
+    // The open page of this step is added after the TicketDetail page exists.
+    await pick(page, 'studio-field-/steps/5/operation', 'notify')
+    await notify('/steps/5', {
+      to: { user: 'requester' },
+      channels: ['In-app', 'Email'],
+      subject: 'ticket.resolved.subject',
+      body: 'ticket.resolved.body',
+      values: [
+        ['number', 'number'],
+        ['resolution', 'resolution'],
+      ],
+    })
+    await pick(page, 'studio-field-/steps/5/next', 'confirm')
+    await task(6, {
       label: 'ticket.confirm',
       assignee: { user: 'requester' },
       form: 'TicketConfirmation',
@@ -801,8 +898,8 @@ test.describe('the author builds the service desk with Studio only', () => {
         { name: 'reopen', label: 'task.reopen', next: 'markAssigned' },
       ],
     })
-    await operation(6, [['status', "'closed'"]], 'done')
-    await operation(7, [['status', "'rejected'"]], 'done')
+    await operation(7, [['status', "'closed'"]], 'done')
+    await operation(8, [['status', "'rejected'"]], 'done')
 
     await pick(page, 'studio-field-/start', 'submit')
     const condition = page.getByTestId('studio-field-/startCondition/expression')
@@ -954,6 +1051,32 @@ test.describe('the author builds the service desk with Studio only', () => {
       .click()
     await expect(panel.getByTestId('studio-widget-/widgets/1')).toHaveCount(0)
     await save(page)
+  })
+
+  test('the author makes the resolved notification open the TicketDetail page', async ({ page }) => {
+    await useJourneySession(page, 'hoa')
+    await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
+
+    // The page picker offers only pages that exist, so this step waited for TicketDetail.
+    await page.getByTestId('studio-group-process').getByRole('button', { name: 'TicketHandling', exact: true }).click()
+    await openFormTab(page)
+    await expect(page.getByTestId('studio-step-5')).toContainText('tellRequester')
+    await page
+      .getByTestId('studio-field-/steps/5/open')
+      .getByRole('checkbox', { name: 'Open a page', exact: true })
+      .check()
+    await pick(page, 'studio-field-/steps/5/open/page', 'TicketDetail')
+    // The page has a ticket parameter, so the mapping key is picked from its parameters.
+    const row = page.getByTestId('studio-field-/steps/5/open/parameters/ticket')
+    await pickAction(
+      page.getByRole('combobox', { name: 'Add mapping Page parameters', exact: true }),
+      'ticket',
+      row,
+    )
+    await expect(row.locator('.cm-editor')).toBeVisible()
+    await row.getByRole('textbox', { name: 'Expression', exact: true }).fill('id')
+    await save(page)
+    await expectForm(page)
   })
 
   test('the author lays out the Dashboard on the Design tab with two tiles, a chart and the ticket table', async ({ page }) => {
@@ -1276,7 +1399,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     await checkBuilt(page)
   })
 
-  test('the author runs the ten test scenarios from Studio', async ({ page }) => {
+  test('the author runs the twelve test scenarios from Studio', async ({ page }) => {
     await useJourneySession(page, 'hoa')
     await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
     await page.getByTestId('studio-run-tests').click()
@@ -1317,10 +1440,14 @@ test.describe('the author builds the service desk with Studio only', () => {
     await row.getByRole('link', { name: label, exact: true }).click()
   }
 
-  test('anna submits a ticket on the published site, linh triages it to khoa, khoa resolves it, and anna confirms it closed', async ({
+  test('anna submits a ticket on the published site, linh triages it to khoa, khoa resolves it, anna opens it from the bell and confirms it closed', async ({
     page,
   }) => {
     const title = `Zz Journey ${Date.now()}`
+    // Shared journey users keep notifications from earlier runs, so the title makes the resolution, and the bell row, this run's.
+    const resolution = `Replaced the battery for ${title}.`
+    const bell = (page: Page) => page.getByRole('button', { name: /^Notifications(, \d+ unread)?$/ })
+    const resolvedRow = (dialog: Locator) => dialog.getByRole('button').filter({ hasText: resolution })
 
     await useJourneySession(page, 'anna')
     await page.goto(`${journeyURL}/service-desk/mytickets`)
@@ -1352,13 +1479,33 @@ test.describe('the author builds the service desk with Studio only', () => {
 
     await useJourneySession(page, 'khoa')
     await openTask(page, title, 'Resolve ticket')
-    await page.getByLabel('Resolution', { exact: true }).fill('Replaced the battery.')
+    await page.getByLabel('Resolution', { exact: true }).fill(resolution)
     await page.getByRole('button', { name: 'Resolve', exact: true }).click()
     await expect(page).toHaveURL(/\/service-desk\/mytasks$/)
 
+    // The worker notifies the requester some time after the decision. The bell opens the ticket on its detail page.
+    await useJourneySession(page, 'anna')
+    let dialog: Locator
+    await expect(async () => {
+      await page.goto(`${journeyURL}/service-desk/mytickets`)
+      await bell(page).click({ timeout: 1_000 })
+      dialog = await waitForDialog(page, 'Notifications')
+      await expect(resolvedRow(dialog)).toBeVisible({ timeout: 1_000 })
+    }).toPass({ timeout: 60_000 })
+    await resolvedRow(dialog!).click()
+    await expect(page).toHaveURL(new RegExp(`/service-desk/ticketdetail\\?ticket=${id}$`))
+    await expect(page.getByText(title, { exact: true }).first()).toBeVisible()
+
+    // The lead is not told about a ticket that is on time.
+    await useJourneySession(page, 'linh')
+    await page.goto(`${journeyURL}/service-desk/mytasks`)
+    await bell(page).click()
+    const leadDialog = await waitForDialog(page, 'Notifications')
+    await expect(resolvedRow(leadDialog)).toHaveCount(0)
+
     await useJourneySession(page, 'anna')
     await openTask(page, title, 'Confirm resolution')
-    await expect(page.getByLabel('Resolution', { exact: true })).toHaveValue('Replaced the battery.')
+    await expect(page.getByLabel('Resolution', { exact: true })).toHaveValue(resolution)
     await page.getByRole('button', { name: 'Confirm', exact: true }).click()
     await expect(page).toHaveURL(/\/service-desk\/mytasks$/)
 
