@@ -83,7 +83,8 @@ class, through a shared helper, a fixture or a lint rule. The classes seen so fa
 
 - An outside download or service: `scripts/setup.sh` and the CI install steps try again.
 - A click during an animation or a redraw: `waitForDialog`, `confirmDialog` and the drag helper
-  wait until the element is ready.
+  wait until the element is ready. The drag helper, and the binding choice in the journeys, also
+  wait until the page canvas has drawn the dropped draft (`waitForCanvas`).
 - The real clock: a test fixes the time with `axis.now` and runs schedules in UTC.
 - State left by another test: a test counts from its own baseline.
 - Planner statistics: a seed that a plan depends on runs `ANALYZE` over every row.
