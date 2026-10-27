@@ -47,8 +47,8 @@ the frontend React, TypeScript and Ant Design, and the storage PostgreSQL.
 
 ## Commands
 
-Run from the repository root. NexKit and CI run `setup`, then `build`, `lint`, `test`, `integration`
-and `e2e` as their checks. What each script starts and writes is in
+Run from the repository root. NexKit and CI run `setup`, then `build`, `lint`, `test`, `smoke`,
+`integration` and `e2e` as their checks. What each script starts and writes is in
 [development](docs/development.md#scripts).
 
 | Script                   | What it does                                                               | Needs   |
@@ -58,7 +58,8 @@ and `e2e` as their checks. What each script starts and writes is in
 | `scripts/lint.sh`        | Format, analyzer, type, Markdown link and docs structure checks, Helm lint |         |
 | `scripts/test.sh`        | .NET unit tests, Vitest and the scripts' own tests                         |         |
 | `scripts/integration.sh` | .NET tests and sample scenarios on real PostgreSQL and Keycloak            | Docker  |
-| `scripts/e2e.sh`         | Playwright against the full stack, then the smoke tests                    | Docker  |
+| `scripts/e2e.sh`         | Playwright against the full stack                                          | Docker  |
+| `scripts/smoke.sh`       | Smoke tests of `scripts/dev.sh`, Compose, the images and on-premises       | Docker  |
 | `scripts/performance.sh` | The `*PerformanceTests` classes alone, as the performance workflow runs    | Docker  |
 | `scripts/dev.sh`         | The local stack with hot reload                                            | Docker  |
 

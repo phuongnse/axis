@@ -7,7 +7,8 @@ import { describe, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 
 // Runs scripts/e2e.sh in a temporary copy of the files it needs, with docker, curl, dotnet and npm
-// replaced by stubs, and with stub build scripts and smoke tests. Each stub logs its call.
+// replaced by stubs, and with stub build scripts. Passing smoke tests sit beside it, so a run that
+// started one would write its results. Each stub logs its call.
 const root = fileURLToPath(new URL('..', import.meta.url))
 
 const log = (name) => `echo "${name} $*" >> "$STUB_LOG"\n`
@@ -69,7 +70,7 @@ function runE2e(shard) {
     }
 
     const env = { ...process.env, PATH: `${bin}:${process.env.PATH}`, STUB_LOG: join(dir, 'log') }
-    // NODE_TEST_CONTEXT would make the smoke suites' node --test skip their files.
+    // NODE_TEST_CONTEXT would make a smoke suite's node --test skip its file.
     for (const name of [
       'NODE_TEST_CONTEXT',
       'NEXKIT_BASE_SHA',
@@ -104,8 +105,8 @@ const playwrightCall = (run) => {
 
 const smokeSuites = ['compose', 'images', 'onprem']
 
-describe('scripts/e2e.sh runs one shard with AXIS_E2E_SHARD', () => {
-  test('a shard other than the first runs its shard of Playwright and no smoke test', () => {
+describe('scripts/e2e.sh runs Playwright, or one shard of it with AXIS_E2E_SHARD', () => {
+  test('a shard runs its shard of Playwright and no smoke test', () => {
     const run = runE2e('2/3')
 
     assert.equal(run.status, 0, run.stdout + run.stderr)
@@ -116,23 +117,23 @@ describe('scripts/e2e.sh runs one shard with AXIS_E2E_SHARD', () => {
     assert.match(run.stdout, /^\| playwright-2 \| 1 \| 0 \| 0 \| /m)
   })
 
-  test('the first shard runs its shard of Playwright and every smoke test', () => {
+  test('the first shard runs no smoke test either, because scripts/smoke.sh runs them', () => {
     const run = runE2e('1/3')
 
     assert.equal(run.status, 0, run.stdout + run.stderr)
     assert.match(playwrightCall(run), / -- --shard=1\/3$/)
     assert.ok(run.results('playwright-1'))
-    for (const suite of smokeSuites) assert.ok(run.results(suite), suite)
+    for (const suite of smokeSuites) assert.ok(!run.results(suite), suite)
     assert.match(run.stdout, /^\| playwright-1 \| 1 \| 0 \| 0 \| /m)
   })
 
-  test('without a shard the whole suite runs, with every smoke test', () => {
+  test('without a shard the whole of Playwright runs, and no smoke test', () => {
     const run = runE2e()
 
     assert.equal(run.status, 0, run.stdout + run.stderr)
     assert.doesNotMatch(playwrightCall(run), /--shard/)
     assert.ok(run.results('playwright'))
-    for (const suite of smokeSuites) assert.ok(run.results(suite), suite)
+    for (const suite of smokeSuites) assert.ok(!run.results(suite), suite)
   })
 
   for (const shard of ['4/3', '0/3', 'abc']) {

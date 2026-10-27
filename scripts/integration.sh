@@ -1,17 +1,14 @@
 #!/usr/bin/env bash
-# Integration tests against real PostgreSQL and Keycloak containers, and the smoke test of
-# scripts/dev.sh (requires Docker with the compose plugin, and network access for the first SPA
-# install).
+# Integration tests against real PostgreSQL and Keycloak containers (requires Docker).
 # The integration tests also run the test scenarios of every application under samples/apps/ and of
 # every sample template under samples/templates/.
 # Each application's scenarios are a suite named scenarios-NAME, written by that test.
 # The integration tests and the scenarios are skipped when $NEXKIT_BASE_SHA shows that every changed
-# path is on the safe list in scripts/lib/affected.mjs. The smoke test is skipped when nothing it
-# covers changed.
+# path is on the safe list in scripts/lib/affected.mjs. The smoke test of scripts/dev.sh runs in
+# scripts/smoke.sh.
 # Arguments go to dotnet test, for example --filter-class 'Axis.Integration.Tests.Studio*'. With
 # arguments only the matching integration tests run and the summary lists only them: the scenario suites
-# are not expected and the smoke test does not run. A change is checked in minutes, and the full run stays
-# the check.
+# are not expected. A change is checked in minutes, and the full run stays the check.
 # Without arguments the performance tests, whose classes end in PerformanceTests, never run here:
 # scripts/performance.sh runs them, in a workflow of its own on main.
 set -euo pipefail
@@ -43,8 +40,5 @@ else
   for suite in "${scenario_suites[@]}"; do skip_suite "$suite" .; done
   skip_suite Axis.Integration.Tests tests/Axis.Integration.Tests
 fi
-
-run_suite_if_affected dev-script . node --test --test-reporter=spec --test-reporter-destination=stdout \
-  --test-reporter=junit --test-reporter-destination="$results_dir/dev-script.xml" scripts/dev.test.mjs
 
 finish_report
