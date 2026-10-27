@@ -1,0 +1,30 @@
+{
+  "id": "591a1051-9a6f-476a-bdd7-007c9c016ffd",
+  "kind": "process",
+  "name": "WaitTwice",
+  "formatVersion": 1,
+  "entity": "Request",
+  "start": "await",
+  "steps": [
+    {
+      "name": "await",
+      "type": "waitEvent",
+      "event": "RequestWatched",
+      "next": "count"
+    },
+    {
+      "name": "count",
+      "type": "decision",
+      "branches": [{ "when": "comment is null", "next": "mark" }],
+      "otherwise": "done"
+    },
+    {
+      "name": "mark",
+      "type": "operation",
+      "operation": "updateRecord",
+      "set": { "comment": "'seen'" },
+      "next": "await"
+    },
+    { "name": "done", "type": "end" }
+  ]
+}

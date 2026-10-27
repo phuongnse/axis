@@ -121,6 +121,26 @@ internal static class ProcessEvents
         command.Parameters.AddWithValue("step", step);
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
+
+    /// <summary>
+    /// Records that the instance's <paramref name="step"/> used the occurrence <paramref name="eventId"/>, unless
+    /// the instance used it before. Returns <see langword="false"/> when it did.
+    /// </summary>
+    internal static async Task<bool> TryInsertMatchAsync(NpgsqlTransaction transaction, Guid instanceId, Guid eventId, string step, CancellationToken cancellationToken)
+    {
+        await using var command = new NpgsqlCommand(
+            """
+            INSERT INTO axis.process_event_matches (process_instance_id, event_id, step, matched_at)
+            VALUES (@instance, @event, @step, now())
+            ON CONFLICT (process_instance_id, event_id) DO NOTHING
+            """,
+            transaction.Connection ?? throw new ArgumentException("The transaction is completed.", nameof(transaction)),
+            transaction);
+        command.Parameters.AddWithValue("instance", instanceId);
+        command.Parameters.AddWithValue("event", eventId);
+        command.Parameters.AddWithValue("step", step);
+        return await command.ExecuteNonQueryAsync(cancellationToken) == 1;
+    }
 }
 
 /// <summary>An event occurrence that a <c>raiseEvent</c> step raises about its subject record.</summary>

@@ -1,0 +1,17 @@
+{
+  "id": "b9ba5aa1-be48-47d6-9e8c-ad5c37aa8bc2",
+  "kind": "process",
+  "name": "WaitWatched",
+  "formatVersion": 1,
+  "entity": "Request",
+  "start": "await",
+  "steps": [
+    {
+      "name": "await",
+      "type": "waitEvent",
+      "event": "RequestWatched",
+      "next": "done"
+    },
+    { "name": "done", "type": "end" }
+  ]
+}
