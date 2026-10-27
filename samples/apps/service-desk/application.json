@@ -2,5 +2,6 @@
   "id": "6ec71db1-5b21-43d9-95d2-dcc45055eb0e",
   "kind": "application",
   "name": "ServiceDesk",
-  "formatVersion": 1
+  "formatVersion": 1,
+  "timeZone": "Asia/Ho_Chi_Minh"
 }

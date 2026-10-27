@@ -70,6 +70,8 @@ listed as new diagnostics.
   history output is `{ "next", "notificationId" }`.
 - A process without a subject may notify too. A task escalation's `notify`
   has the same shape, without `next`.
+- Studio's operation panel edits the step without the JSON view. See the
+  [`notify` panel](process-designer.md).
 
 ## Placeholders
 

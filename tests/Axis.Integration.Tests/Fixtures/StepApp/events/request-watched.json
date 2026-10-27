@@ -1,0 +1,11 @@
+{
+  "id": "3326a0a4-2678-40ab-b3ef-9d2e58ec1a8f",
+  "kind": "event",
+  "name": "RequestWatched",
+  "formatVersion": 1,
+  "entity": "Request",
+  "fields": [
+    { "name": "title", "type": "text" },
+    { "name": "ratio", "type": "decimal" }
+  ]
+}

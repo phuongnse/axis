@@ -1,25 +1,24 @@
-import { Button, Card, Flex, Input, Radio, Select, Typography } from 'antd'
-import { lazy, Suspense, useContext } from 'react'
-import { referenceOptions, StudioNamesContext } from '../platform/studioNames'
+import { Button, Card, Flex, Input, Radio, Select, Switch, Typography } from 'antd'
+import { useContext } from 'react'
+import { StudioNamesContext } from '../platform/studioNames'
 import type { StudioNames } from '../platform/studio'
 import type { JsonSchema } from '../platform/studioSchemas'
 import { useText } from '../platform/texts'
-import { ExpressionCheckContext } from './expressionCheckContext'
-import { expressionScope } from './expressionScope'
+import { useDesignTokens } from '../platform/themeMode'
 import { MappingRows } from './MappingRows'
+import { NotifyFields } from './NotifyFields'
 import { OperationPanel } from './OperationPanel'
 import { operationJsonOnlyKeys } from './operationKeys'
+import { Expression, NamePicker } from './ProcessFields'
 import { requiredStepKeys } from './processPalette'
 import { stepTypes, withType } from './processStepSchema'
 import { ReferencePicker } from './ReferencePicker'
 import { SchemaForm, type ChangeHandler } from './SchemaForm'
 
-const LazyExpressionEditor = lazy(() => import('./ExpressionEditor'))
-
 type Content = Record<string, unknown>
 
 /** The step types that have a panel. The keys of any other type show as markers for the JSON view. */
-const panelTypes = new Set(['decision', 'task', 'operation', 'timer', 'subProcess', 'end'])
+const panelTypes = new Set(['decision', 'task', 'operation', 'timer', 'subProcess', 'waitEvent', 'end'])
 
 const parameterTypes = ['text', 'integer', 'decimal', 'boolean', 'date', 'date-time']
 
@@ -76,9 +75,8 @@ function moved(steps: unknown[], index: number, offset: number): unknown[] {
  * The editor of a process. It shows the process's name, entity and start condition with the generic form, the start
  * step, and the steps as cards in file order. A decision shows its branches and its `otherwise`, an end shows only
  * its name and type, and every transition is a picker over the step names of the draft. A task shows its full panel:
- * label, assignee, form, due time and outcomes. An operation shows its operation panel and its `next`. The editor
- * edits the draft through
- * `onChange`, so a key it does not show stays as it is, and removing a step leaves the transitions that name it for
+ * label, assignee, form, due time, deadline, escalations and outcomes. An operation shows its operation panel and its
+ * `next`. The editor edits the draft through `onChange`, so a key it does not show stays as it is, and removing a step leaves the transitions that name it for
  * the compiler to report.
  */
 export function ProcessEditor({
@@ -362,6 +360,9 @@ function Step({
           {type === 'task' && <Task pointer={pointer} step={step} names={names} onChange={onChange} />}
           {type === 'timer' && <Timer pointer={pointer} step={step} names={names} onChange={onChange} />}
           {type === 'subProcess' && <SubProcess pointer={pointer} step={step} names={names} onChange={onChange} />}
+          {type === 'waitEvent' && (
+            <WaitEvent pointer={pointer} step={step} entity={entity} names={names} onChange={onChange} />
+          )}
           {type !== undefined && !panelTypes.has(type) && (
             <JsonOnlyKeys
               pointer={pointer}
@@ -414,76 +415,73 @@ function JsonOnlyKeys({ pointer, keys }: { pointer: string; keys: string[] }) {
   ))
 }
 
-/** The editor of an expression: the expression editor when the draft can check expressions, a plain box otherwise. */
-function Expression({
+/**
+ * The editor of an assignee: a user expression or a role, and a switch replaces the object at `pointer` so that it holds
+ * only the chosen key. A task's `assignee` and an escalation's `reassign` both use it. The radios have a name of their
+ * own per pointer, so two editors in one panel never join one group.
+ */
+function AssigneeEditor({
   pointer,
-  name,
   value,
+  label,
   onChange,
 }: {
   pointer: string
-  name: string
-  value: string
+  value: unknown
+  label: string
   onChange: ChangeHandler
 }) {
-  const check = useContext(ExpressionCheckContext)
+  const t = useText()
+  const assignee = isContent(value) ? value : {}
+  const mode = assignee.role !== undefined && assignee.user === undefined ? 'role' : 'user'
 
-  return check ? (
-    <Suspense fallback={<Input aria-label={name} value={value} readOnly />}>
-      <LazyExpressionEditor
-        application={check.application}
-        resourceId={check.resourceId}
-        path={pointer}
-        name={name}
-        value={value}
-        required
-        options={expressionScope(check.kind, check.draft, pointer, check.names)}
-        onChange={onChange}
-      />
-    </Suspense>
-  ) : (
-    <Input aria-label={name} value={value} onChange={(event) => onChange(pointer, event.target.value)} />
-  )
-}
-
-/** A picker over the application's names of one kind, or a plain box while the names have not loaded. */
-function NamePicker({
-  pointer,
-  label,
-  kind,
-  value,
-  onPick,
-}: {
-  pointer: string
-  label: string
-  kind: string
-  value: unknown
-  onPick: (next: string) => void
-}) {
-  const names = useContext(StudioNamesContext)
+  function switchTo(next: 'user' | 'role') {
+    const { user: _user, role: _role, ...others } = assignee
+    onChange(pointer, { ...others, [next]: text(assignee[next]) })
+  }
 
   return (
     <div data-testid={`studio-field-${pointer}`}>
-      <div>{label}</div>
-      {names === undefined ? (
-        <Input aria-label={label} value={text(value)} onChange={(event) => onPick(event.target.value)} />
-      ) : (
-        <ReferencePicker
-          name={label}
-          value={text(value)}
-          required
-          options={referenceOptions(names, kind, undefined, pointer)}
-          onChange={(next) => onPick(next ?? '')}
+      <Flex vertical gap="small">
+        <Typography.Text strong>{label}</Typography.Text>
+        <Radio.Group
+          name={`assignee-mode-${pointer}`}
+          optionType="button"
+          aria-label={label}
+          value={mode}
+          options={[
+            { value: 'user', label: t('shell.studio.process.assigneeUser') },
+            { value: 'role', label: t('shell.studio.process.assigneeRole') },
+          ]}
+          onChange={(event) => switchTo(event.target.value)}
         />
-      )}
+        {mode === 'user' ? (
+          <div data-testid={`studio-field-${pointer}/user`}>
+            <Expression
+              pointer={`${pointer}/user`}
+              name={t('shell.studio.process.assigneeUser')}
+              value={text(assignee.user)}
+              onChange={onChange}
+            />
+          </div>
+        ) : (
+          <NamePicker
+            pointer={`${pointer}/role`}
+            label={t('shell.studio.process.assigneeRole')}
+            kind="role"
+            value={assignee.role}
+            onPick={(next) => onChange(`${pointer}/role`, next)}
+          />
+        )}
+      </Flex>
     </div>
   )
 }
 
 /**
- * The panel of a task: its label, assignee, form, due time and outcomes. Each value is edited through its own pointer,
- * so a key the panel does not show stays as it is. The assignee is a user expression or a role, and a switch replaces
- * the `assignee` object so that it holds only the chosen key.
+ * The panel of a task: its label, assignee, form, due time, deadline, escalations and outcomes. Each value is edited
+ * through its own pointer, so a key the panel does not show stays as it is. The assignee is a user expression or a
+ * role, and a switch replaces the `assignee` object so that it holds only the chosen key.
  */
 function Task({
   pointer,
@@ -498,14 +496,6 @@ function Task({
 }) {
   const t = useText()
   const label = isContent(step.label) ? step.label : {}
-  const assignee = isContent(step.assignee) ? step.assignee : {}
-  const mode = assignee.role !== undefined && assignee.user === undefined ? 'role' : 'user'
-  const assigneePointer = `${pointer}/assignee`
-
-  function switchTo(next: 'user' | 'role') {
-    const { user: _user, role: _role, ...others } = assignee
-    onChange(assigneePointer, { ...others, [next]: text(assignee[next]) })
-  }
 
   return (
     <>
@@ -516,39 +506,12 @@ function Task({
         value={label.textKey}
         onPick={(next) => onChange(`${pointer}/label/textKey`, next)}
       />
-      <div data-testid={`studio-field-${assigneePointer}`}>
-        <Flex vertical gap="small">
-          <Typography.Text strong>{t('shell.studio.process.assignee')}</Typography.Text>
-          <Radio.Group
-            optionType="button"
-            aria-label={t('shell.studio.process.assignee')}
-            value={mode}
-            options={[
-              { value: 'user', label: t('shell.studio.process.assigneeUser') },
-              { value: 'role', label: t('shell.studio.process.assigneeRole') },
-            ]}
-            onChange={(event) => switchTo(event.target.value)}
-          />
-          {mode === 'user' ? (
-            <div data-testid={`studio-field-${assigneePointer}/user`}>
-              <Expression
-                pointer={`${assigneePointer}/user`}
-                name={t('shell.studio.process.assigneeUser')}
-                value={text(assignee.user)}
-                onChange={onChange}
-              />
-            </div>
-          ) : (
-            <NamePicker
-              pointer={`${assigneePointer}/role`}
-              label={t('shell.studio.process.assigneeRole')}
-              kind="role"
-              value={assignee.role}
-              onPick={(next) => onChange(`${assigneePointer}/role`, next)}
-            />
-          )}
-        </Flex>
-      </div>
+      <AssigneeEditor
+        pointer={`${pointer}/assignee`}
+        value={step.assignee}
+        label={t('shell.studio.process.assignee')}
+        onChange={onChange}
+      />
       <NamePicker
         pointer={`${pointer}/form`}
         label={t('shell.studio.process.form')}
@@ -564,8 +527,162 @@ function Task({
           onChange={(event) => onChange(`${pointer}/dueIn`, event.target.value === '' ? undefined : event.target.value)}
         />
       </div>
+      <Deadline pointer={pointer} step={step} names={names} onChange={onChange} />
+      <Escalations pointer={pointer} step={step} onChange={onChange} />
       <Outcomes pointer={pointer} step={step} names={names} onChange={onChange} />
     </>
+  )
+}
+
+/**
+ * The optional deadline of a task: how long after the task opens it runs out, and the step it moves to. Adding it
+ * writes empty values for the diagnostics to mark, and removing it removes the key.
+ */
+function Deadline({
+  pointer,
+  step,
+  names,
+  onChange,
+}: {
+  pointer: string
+  step: Content
+  names: string[]
+  onChange: ChangeHandler
+}) {
+  const t = useText()
+  const deadlinePointer = `${pointer}/deadline`
+  if (step.deadline !== undefined && !isContent(step.deadline)) {
+    return <JsonOnlyKeys pointer={pointer} keys={['deadline']} />
+  }
+  const deadline = step.deadline
+
+  return (
+    <div data-testid={`studio-field-${deadlinePointer}`}>
+      <Flex vertical gap="small">
+        <Typography.Text strong>{t('shell.studio.process.deadline')}</Typography.Text>
+        {deadline === undefined ? (
+          <div>
+            <Button onClick={() => onChange(deadlinePointer, { after: '', next: '' })}>
+              {t('shell.studio.process.addDeadline')}
+            </Button>
+          </div>
+        ) : (
+          <Flex gap="small" align="flex-start" wrap>
+            <div data-testid={`studio-field-${deadlinePointer}/after`}>
+              <div>{t('shell.studio.process.deadlineAfter')}</div>
+              <Input
+                aria-label={t('shell.studio.process.deadlineAfter')}
+                value={text(deadline.after)}
+                onChange={(event) => onChange(`${deadlinePointer}/after`, event.target.value)}
+              />
+            </div>
+            <Transition
+              pointer={`${deadlinePointer}/next`}
+              label={t('shell.studio.process.next')}
+              value={deadline.next}
+              names={names}
+              onChange={onChange}
+            />
+            <Button onClick={() => onChange(deadlinePointer, undefined)}>
+              {t('shell.studio.process.removeDeadline')}
+            </Button>
+          </Flex>
+        )}
+      </Flex>
+    </div>
+  )
+}
+
+/** The notify an escalation starts with, the same as the palette's empty `notify` step. */
+const emptyNotify = { to: [], channels: [], message: { subject: { textKey: '' }, body: { textKey: '' } } }
+
+/**
+ * The escalations of a task as rows. Each has an `after` duration, and Reassign and Notify switches that add or remove
+ * its `reassign` and `notify`. A new escalation holds only an empty `after`, which the diagnostics mark until one of
+ * the switches is on. Removing the last escalation removes the `escalations` key.
+ */
+function Escalations({ pointer, step, onChange }: { pointer: string; step: Content; onChange: ChangeHandler }) {
+  const t = useText()
+  const { colour, radius, spacing } = useDesignTokens()
+  const escalationsPointer = `${pointer}/escalations`
+  if (step.escalations !== undefined && !Array.isArray(step.escalations)) {
+    return <JsonOnlyKeys pointer={pointer} keys={['escalations']} />
+  }
+  const escalations: unknown[] = step.escalations ?? []
+
+  return (
+    <div data-testid={`studio-field-${escalationsPointer}`}>
+      <Flex vertical gap="small">
+        <Typography.Text strong>{t('shell.studio.process.escalations')}</Typography.Text>
+        {escalations.map((escalation, index) => {
+          const rowPointer = `${escalationsPointer}/${index}`
+          const row = isContent(escalation) ? escalation : {}
+          return (
+            <Flex
+              key={index}
+              vertical
+              gap="small"
+              style={{ border: `1px solid ${colour.border}`, borderRadius: radius.base, padding: spacing.xs }}
+              data-testid={`studio-field-${rowPointer}`}
+            >
+              <Flex gap="small" align="flex-end" wrap>
+                <div data-testid={`studio-field-${rowPointer}/after`}>
+                  <div>{t('shell.studio.process.escalationAfter')}</div>
+                  <Input
+                    aria-label={t('shell.studio.process.escalationAfter')}
+                    value={text(row.after)}
+                    onChange={(event) => onChange(`${rowPointer}/after`, event.target.value)}
+                  />
+                </div>
+                <Button onClick={() => onChange(escalations.length === 1 ? escalationsPointer : rowPointer, undefined)}>
+                  {t('shell.studio.process.removeEscalation')}
+                </Button>
+              </Flex>
+              <Flex gap="small" align="center">
+                <Switch
+                  aria-label={t('shell.studio.process.reassign')}
+                  checked={row.reassign !== undefined}
+                  onChange={(checked) => onChange(`${rowPointer}/reassign`, checked ? { user: '' } : undefined)}
+                />
+                <span>{t('shell.studio.process.reassign')}</span>
+              </Flex>
+              {row.reassign !== undefined &&
+                (isContent(row.reassign) ? (
+                  <AssigneeEditor
+                    pointer={`${rowPointer}/reassign`}
+                    value={row.reassign}
+                    label={t('shell.studio.process.reassign')}
+                    onChange={onChange}
+                  />
+                ) : (
+                  <JsonOnlyKeys pointer={rowPointer} keys={['reassign']} />
+                ))}
+              <Flex gap="small" align="center">
+                <Switch
+                  aria-label={t('shell.studio.process.notify')}
+                  checked={row.notify !== undefined}
+                  onChange={(checked) =>
+                    onChange(`${rowPointer}/notify`, checked ? structuredClone(emptyNotify) : undefined)
+                  }
+                />
+                <span>{t('shell.studio.process.notify')}</span>
+              </Flex>
+              {row.notify !== undefined &&
+                (isContent(row.notify) ? (
+                  <NotifyFields pointer={`${rowPointer}/notify`} value={row.notify} onChange={onChange} />
+                ) : (
+                  <JsonOnlyKeys pointer={rowPointer} keys={['notify']} />
+                ))}
+            </Flex>
+          )
+        })}
+        <div>
+          <Button onClick={() => onChange(escalationsPointer, [...escalations, { after: '' }])}>
+            {t('shell.studio.process.addEscalation')}
+          </Button>
+        </div>
+      </Flex>
+    </div>
   )
 }
 
@@ -643,6 +760,103 @@ function Timer({
             </div>
           )}
         </Flex>
+      </div>
+      <Transition
+        pointer={`${pointer}/next`}
+        label={t('shell.studio.process.next')}
+        value={step.next}
+        names={names}
+        onChange={onChange}
+      />
+    </>
+  )
+}
+
+/**
+ * The panel of a wait for event step: the event, an optional `when` over its payload, an optional timeout and the next
+ * step. The event picker lists only the events about the process's subject entity. Remove timeout deletes the whole
+ * `timeout` key, and Add timeout starts one empty.
+ */
+function WaitEvent({
+  pointer,
+  step,
+  entity,
+  names,
+  onChange,
+}: {
+  pointer: string
+  step: Content
+  entity: string
+  names: string[]
+  onChange: ChangeHandler
+}) {
+  const t = useText()
+  const studioNames = useContext(StudioNamesContext)
+  const timeout = isContent(step.timeout) ? step.timeout : undefined
+  const timeoutPointer = `${pointer}/timeout`
+
+  return (
+    <>
+      <div data-testid={`studio-field-${pointer}/event`}>
+        <div>{t('shell.studio.process.event')}</div>
+        {studioNames === undefined ? (
+          <Input
+            aria-label={t('shell.studio.process.event')}
+            value={text(step.event)}
+            onChange={(event) => onChange(`${pointer}/event`, event.target.value)}
+          />
+        ) : (
+          <ReferencePicker
+            name={t('shell.studio.process.event')}
+            value={text(step.event)}
+            required
+            options={studioNames.events
+              .filter((event) => event.entity.toLowerCase() === entity.toLowerCase())
+              .map((event) => event.name)}
+            onChange={(next) => onChange(`${pointer}/event`, next ?? '')}
+          />
+        )}
+      </div>
+      <div data-testid={`studio-field-${pointer}/when`}>
+        <div>{t('shell.studio.process.when')}</div>
+        <Expression
+          pointer={`${pointer}/when`}
+          name={t('shell.studio.process.when')}
+          value={text(step.when)}
+          required={false}
+          onChange={onChange}
+        />
+      </div>
+      <div data-testid={`studio-field-${timeoutPointer}`}>
+        {timeout === undefined ? (
+          <Button onClick={() => onChange(timeoutPointer, { after: '', next: '' })}>
+            {t('shell.studio.process.addTimeout')}
+          </Button>
+        ) : (
+          <Flex vertical gap="small">
+            <Typography.Text strong>{t('shell.studio.process.timeout')}</Typography.Text>
+            <div data-testid={`studio-field-${timeoutPointer}/after`}>
+              <div>{t('shell.studio.process.timeoutAfter')}</div>
+              <Input
+                aria-label={t('shell.studio.process.timeoutAfter')}
+                value={text(timeout.after)}
+                onChange={(event) => onChange(`${timeoutPointer}/after`, event.target.value)}
+              />
+            </div>
+            <Transition
+              pointer={`${timeoutPointer}/next`}
+              label={t('shell.studio.process.timeoutNext')}
+              value={timeout.next}
+              names={names}
+              onChange={onChange}
+            />
+            <div>
+              <Button danger onClick={() => onChange(timeoutPointer, undefined)}>
+                {t('shell.studio.process.removeTimeout')}
+              </Button>
+            </div>
+          </Flex>
+        )}
       </div>
       <Transition
         pointer={`${pointer}/next`}

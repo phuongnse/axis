@@ -116,6 +116,7 @@ tests/
   e2e/                    Playwright journeys against the running server
     fixtures/e2e-app/     generic test application the E2E server activates
     fixtures/release-app/ application a spec activates during the run, to test releases
+    fixtures/subprocess-app/ parent and child sub-process the E2E server activates, for the inspector journey
 samples/
   apps/purchase-requests/ the first sample application, as configuration only
   keycloak/               the development Keycloak realm with the sample's users
@@ -814,7 +815,7 @@ kinds in the [configuration pipeline](reference/configuration.md#configuration-p
 `DiagnosticCodes`, `ResourceKinds` and the schema files. They find them by
 heading or table header, so the sections may move within `docs/`.
 
-The E2E server starts with five applications listed in `ActivateOnStartup` (see
+The E2E server starts with six applications listed in `ActivateOnStartup` (see
 [Startup activation](reference/host-settings.md#startup-activation)), so Playwright journeys run against
 real metadata and records:
 
@@ -827,7 +828,10 @@ real metadata and records:
 - the service desk sample in `samples/apps/service-desk`, for the service
   desk journeys;
 - the asset management sample in `samples/apps/asset-management`, which no
-  journey uses yet.
+  journey uses yet;
+- the sub-process fixture in `tests/e2e/fixtures/subprocess-app`, a parent
+  process that starts a child on a 24-hour timer, both without a subject, for
+  the process inspector's sub-process journey.
 
 The E2E server's `Studio:Folders` does not list that sample. It lists a copy
 that `scripts/e2e.sh` makes in a temporary folder for each run and deletes on
@@ -856,7 +860,7 @@ The Studio specs use these folders:
   `studio-page-parameters`: a temporary `Studio:ApplicationsPath`.
 - `studio-entity-migrations` and `purchase-request-release`: folders under the
   test's output path.
-- `service-desk-journey`, `request-approval-journey` and `journey-tenant`: each its own application under
+- `service-desk-journey`, `asset-management-journey`, `request-approval-journey` and `journey-tenant`: each its own application under
   the journey server's applications folder, `AXIS_E2E_JOURNEY_APPLICATIONS`.
 
 A spec can also activate another folder during the run, to test releases. The
@@ -906,7 +910,7 @@ worker and the publisher serve the journey tenant too, and the run fails when th
 
 `tests/e2e/specs/service-desk-journey.spec.ts` builds the service desk on the journey tenant with Studio only, and
 never opens the JSON view. It builds the whole data
-model: the application, its `en` and `vi` texts, the three roles, the `TicketNumber` sequence, the `Category` and
+model: the application and its `Asia/Ho_Chi_Minh` time zone, its `en` and `vi` texts, the three roles, the `TicketNumber` sequence, the `Category` and
 `Ticket` entities and the `Categories` seed. The entity designer asks a migration question even for a new entity,
 because the starter field `name` is renamed to `number`. The journey answers Drop data, then deletes the `Ticket`
 migration in Studio, because the sample has no migration and release 1 is the first release, so it needs none. The built
@@ -920,9 +924,11 @@ in the process editor. Every expression is typed in the expression editor. It th
 reference parameter, built with the parameter editor. The View row actions of
 the two table pages set `ticket` to `id`. The journey then finishes the site that the blank
 application already has: the `vi` locale and four navigation entries, the last one for `Dashboard`. It deletes the starter `Home` page, because the sample has
-none. The Design tab of a page draws nothing while any file has an error, and the starter `Home` page and its navigation entry have errors until this step, so the journey lays out the two pages afterwards. It builds `TicketDetail` on the page's Design tab: it drops the `Ticket` entity from the data panel onto the canvas, picks a detail widget, which binds itself to the `ticket` parameter, and removes the starter task inbox in the widget tree. It builds `Dashboard` there too: it drops a `columns` widget from the palette, the two `kpi` tiles in a column of 4 and the `chart` in a column of 8 from the three aggregate data sources in the data panel, and the `AllTicketList` table below the columns. It then drags the table into the chart's column by mistake and presses Undo once, which puts the table back below the columns, because a move is one edit. The journey saves the page with the table below the columns. It builds the three access policies in the policy matrix, with their record filters and the field list that keeps
-the requester from editing `resolution`, the read grants of the lead on the three aggregate data sources and the lead's `reassign` grant on `TicketHandling`. That list adds `category` and `priority`, so the requester fills step 2 too. It then writes the eight test scenarios in the scenario editor, each with its users, time and steps. Where a step names the Hardware category, the journey types the record id that the Categories seed grid shows. Each scenario must save with no error diagnostic. At the end the whole built folder must match `samples/apps/service-desk`, and it must have no error diagnostic. Only resource ids, seed record ids (paired by position) and key order may differ.
-The journey then runs the eight scenarios with Run tests, and every one must pass. It publishes release 1, and the release history must show that one row, active. On the `service-desk` site of the journey tenant, anna creates and submits a ticket, pressing Next to reach step 2, linh assigns it to khoa, khoa resolves it and anna confirms it, until the ticket's status is `closed`.
+none. The Design tab of a page draws nothing while any file has an error, and the starter `Home` page and its navigation entry have errors until this step, so the journey lays out the two pages afterwards. It builds `TicketDetail` on the page's Design tab: it drops the `Ticket` entity from the data panel onto the canvas, picks a detail widget, which binds itself to the `ticket` parameter, and removes the starter task inbox in the widget tree. It builds `Dashboard` there too: it drops a `columns` widget from the palette, the two `kpi` tiles in a column of 4 and the `chart` in a column of 8 from the three aggregate data sources in the data panel, and the `AllTicketList` table below the columns. It then drags the table into the chart's column by mistake and presses Undo once, which puts the table back below the columns, because a move is one edit. The journey saves the page with the table below the columns. It then builds the `DailyOverdueReminder` and `TellLeadTicketDeleted` processes in the process editor, each as a process with parameters whose one `notify` step goes in-app to the `service-desk-lead` role, and the `EveryMorning` schedule trigger and the `TicketDeleted` delete trigger. A new trigger starts with an empty `event`, and Studio removes that key only when the author picks an event and clears it. The sample has no event, so the journey creates a temporary `Placeholder` event first and deletes it after the two triggers, which leaves the built folder equal to the sample. It builds the three access policies in the policy matrix, with their record filters and the field list that keeps
+the requester from editing `resolution`, the read grants of the lead on the three aggregate data sources and the lead's `reassign` grant on `TicketHandling`. That list adds `category` and `priority`, so the requester fills step 2 too. It then writes the ten test scenarios in the scenario editor, each with its users, time and steps. A step that expects a notification names the recipient, the channel and the placeholder values, and an `advanceTime` step names its `by`. Where a step names the Hardware category, the journey types the record id that the Categories seed grid shows. Each scenario must save with no error diagnostic. At the end the whole built folder must match `samples/apps/service-desk`, and it must have no error diagnostic. Only resource ids, seed record ids (paired by position) and key order may differ.
+The journey then runs the ten scenarios with Run tests, and every one must pass. It publishes release 1, and the release history must show that one row, active. On the `service-desk` site of the journey tenant, anna creates and submits a ticket, pressing Next to reach step 2, linh assigns it to khoa, khoa resolves it and anna confirms it, until the ticket's status is `closed`.
+
+`tests/e2e/specs/asset-management-journey.spec.ts` builds the `AssetManagement` application on the journey tenant with Studio only, and never opens the JSON view. It creates the application's `Asia/Ho_Chi_Minh` time zone, its `en` and `vi` texts, the three roles, the `AssetNumber` sequence, the `Category`, `Location`, `Vendor` and `Software` entities, the `Attachment` and `MaintenanceEntry` child entities, the `Asset` entity with its enum status and currency fields, and the `Categories` and `Locations` seeds. Every migration that a save asks is answered, and the built `migrations` folder must be empty at the end, because the sample has none. The built folder must then match `samples/apps/asset-management` in its `application.json`, `roles`, `sequences`, `entities`, `seeds` and `texts` parts, and the Studio diagnostics must show no error for those files.
 
 `tests/e2e/specs/request-approval-journey.spec.ts` creates `EquipmentRequests` on the journey tenant from the `request-approval` template in the New application dialog, with no file edit. It runs the template's one test scenario from Studio, and the scenario must pass. It publishes release 1, and the release history must show that one row, active. On the `equipment-requests` site, anna creates and submits a request and minh approves its Approval task, until the request's status is `approved`. While the task waits for minh, it is not in anna's My tasks.
 

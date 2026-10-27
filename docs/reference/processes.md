@@ -28,7 +28,7 @@ model. The worker host, its claims (see [Execution](process-execution.md#executi
 the `axis.process_instances`, `axis.process_step_history`,
 `axis.process_tasks`, `axis.process_start_receipts`,
 `axis.endpoint_receipts`, `axis.process_work_items`, `axis.connector_calls`,
-`axis.package_calls`, `axis.events`, `axis.notifications`,
+`axis.package_calls`, `axis.events`, `axis.process_event_matches`, `axis.notifications`,
 `axis.notification_reads` and `axis.email_outbox` tables are built too. So is the engine that runs
 `decision`, `task`, `operation`, `end` and `timer` steps, see
 [Running a step](process-execution.md#running-a-step). The [task API](task-api.md) routes that
@@ -227,7 +227,7 @@ a payment reference from the sample extension package, see
 ## Steps
 
 M3 has four step types. The `timer` step is built too. The compiler builds a
-`waitEvent` step, but the engine does not run it yet, see
+`waitEvent` step, and the engine runs it, but event delivery does not wake a waiting instance yet, see
 [Wait for event step](process-flow.md#wait-for-event-step). The engine runs a
 `subProcess` step, see [Sub-process step](process-flow.md#sub-process-step).
 Its failure handling and cancel rules are _(planned for M14)_, as is the email of the
@@ -903,22 +903,8 @@ database, with history in `axis.__processes_migrations` (see
   | `last_error` | `text`, null | The error of the last attempt: an exception type or a fixed sentence. It holds no exception message and no value |
   | `created_at` | `timestamptz` | The start of the step's transaction, `now()` |
   | `settled_at` | `timestamptz`, null | When the call became `succeeded` or `failed`. Null before |
-- `axis.events`: one row per event occurrence, see
-  [Raise event step](process-events.md#raise-event-step). Rows are append-only and kept, even
-  when no trigger listens. An index on `process_instance_id` finds the
-  events an instance raised.
-
-  | Column | Type | Meaning |
-  | --- | --- | --- |
-  | `id` | `uuid` | A version 7 UUID, the event's id |
-  | `application_id` | `uuid` | The application |
-  | `event` | `text` | The event's name |
-  | `release_id` | `uuid` | The release the raising instance is pinned to |
-  | `entity_id` | `uuid` | The event's entity |
-  | `subject_id` | `uuid` | The record the occurrence names |
-  | `payload` | `jsonb` | The evaluated payload fields |
-  | `process_instance_id` | `uuid` | The instance that raised the event |
-  | `raised_at` | `timestamptz` | The start of the step's transaction, `now()` |
+- `axis.events` and `axis.process_event_matches`: the event occurrences and the
+  uses of them by `waitEvent` steps, see [Event tables](process-events.md#event-tables).
 - `axis.notifications`: one row per in-app notification and recipient, which a
   `notify` step stores, see
   [In-app notifications](notifications.md#in-app-notifications). The key is

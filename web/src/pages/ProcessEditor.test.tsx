@@ -86,7 +86,10 @@ const names = {
   ],
   rules: [],
   connectors: [],
-  events: [],
+  events: [
+    { id: 'ev1', name: 'PaymentReceived', entity: 'PurchaseRequest', fields: [{ name: 'amount', type: 'decimal' }] },
+    { id: 'ev2', name: 'LeaveApproved', entity: 'LeaveRequest', fields: [] },
+  ],
   roles: [{ id: 'r1', name: 'finance-reviewer' }],
   sequences: [],
   forms: [
@@ -286,6 +289,97 @@ describe.each(['light', 'dark'])('ProcessEditor in %s mode', (mode) => {
     expect(stepOf(latest, 1).assignee).toEqual({ user: 'a' })
   })
 
+  it('adds an escalation with a notify and writes to, channels and message without next', async () => {
+    const latest = renderEditor()
+    const field = (pointer: string) => within(screen.getByTestId(`studio-field-${pointer}`))
+
+    await userEvent.click(field('/steps/1/escalations').getByRole('button', { name: 'Add escalation' }))
+    expect(stepOf(latest, 1).escalations).toEqual([{ after: '' }])
+    await userEvent.type(field('/steps/1/escalations/0/after').getByRole('textbox'), 'P1D')
+    await userEvent.click(field('/steps/1/escalations/0').getByRole('switch', { name: 'Notify' }))
+    expect((stepOf(latest, 1).escalations as Record<string, unknown>[])[0].notify).toEqual({
+      to: [],
+      channels: [],
+      message: { subject: { textKey: '' }, body: { textKey: '' } },
+    })
+
+    const notify = '/steps/1/escalations/0/notify'
+    await userEvent.click(field(`${notify}/to`).getByRole('button', { name: 'Add recipient' }))
+    // The radio input of a button group has no pointer events, so the click goes to its label.
+    await userEvent.click(field(`${notify}/to/0`).getByRole('radio', { name: 'Role' }).closest('label')!)
+    await chooseOption('finance-reviewer', screen.getByTestId(`studio-field-${notify}/to/0/role`))
+    await userEvent.click(field(`${notify}/channels`).getByRole('checkbox', { name: 'In-app' }))
+    await userEvent.type(field(`${notify}/message/subject`).getByRole('textbox', { name: 'Text key' }), 'task.approve')
+    await userEvent.type(field(`${notify}/message/body`).getByRole('textbox', { name: 'Text key' }), 'task.reject')
+
+    expect(stepOf(latest, 1).escalations).toEqual([
+      {
+        after: 'P1D',
+        notify: {
+          to: [{ role: 'finance-reviewer' }],
+          channels: ['inApp'],
+          message: { subject: { textKey: 'task.approve' }, body: { textKey: 'task.reject' } },
+        },
+      },
+    ])
+    expect((stepOf(latest, 1).escalations as Record<string, unknown>[])[0].notify).not.toHaveProperty('next')
+
+    await userEvent.click(field('/steps/1/escalations/0').getByRole('switch', { name: 'Notify' }))
+    expect(stepOf(latest, 1).escalations).toEqual([{ after: 'P1D' }])
+  })
+
+  it('turns on reassign for an escalation with its own assignee editor and removes the key when off', async () => {
+    const latest = renderEditor()
+    const field = (pointer: string) => within(screen.getByTestId(`studio-field-${pointer}`))
+
+    await userEvent.click(field('/steps/1/escalations').getByRole('button', { name: 'Add escalation' }))
+    await userEvent.click(field('/steps/1/escalations/0').getByRole('switch', { name: 'Reassign' }))
+    expect((stepOf(latest, 1).escalations as Record<string, unknown>[])[0].reassign).toEqual({ user: '' })
+
+    // The task's own assignee stays a user while the escalation's group switches.
+    const reassign = field('/steps/1/escalations/0/reassign')
+    await userEvent.click(reassign.getByRole('radio', { name: 'Role' }).closest('label')!)
+    await chooseOption('finance-reviewer', screen.getByTestId('studio-field-/steps/1/escalations/0/reassign/role'))
+    expect((stepOf(latest, 1).escalations as Record<string, unknown>[])[0].reassign).toEqual({
+      role: 'finance-reviewer',
+    })
+    expect(stepOf(latest, 1).assignee).toEqual({ user: 'department.manager' })
+
+    await userEvent.click(field('/steps/1/escalations/0').getByRole('switch', { name: 'Reassign' }))
+    expect(stepOf(latest, 1).escalations).toEqual([{ after: '' }])
+  })
+
+  it('adds a deadline and removes the key when it is removed', async () => {
+    const latest = renderEditor()
+    const field = (pointer: string) => within(screen.getByTestId(`studio-field-${pointer}`))
+
+    await userEvent.click(field('/steps/1/deadline').getByRole('button', { name: 'Add deadline' }))
+    expect(stepOf(latest, 1).deadline).toEqual({ after: '', next: '' })
+    await userEvent.type(field('/steps/1/deadline/after').getByRole('textbox'), 'P5D')
+    await chooseOption('submit', screen.getByTestId('studio-field-/steps/1/deadline/next'))
+    expect(stepOf(latest, 1).deadline).toEqual({ after: 'P5D', next: 'submit' })
+
+    await userEvent.click(field('/steps/1/deadline').getByRole('button', { name: 'Remove deadline' }))
+    expect(stepOf(latest, 1)).not.toHaveProperty('deadline')
+    expect(field('/steps/1/deadline').getByRole('button', { name: 'Add deadline' })).toBeInTheDocument()
+  })
+
+  it('removes the escalations key when the only escalation is removed, and only the row otherwise', async () => {
+    const latest = renderEditor()
+    const field = (pointer: string) => within(screen.getByTestId(`studio-field-${pointer}`))
+    const add = () => userEvent.click(field('/steps/1/escalations').getByRole('button', { name: 'Add escalation' }))
+
+    await add()
+    await userEvent.click(field('/steps/1/escalations/0').getByRole('button', { name: 'Remove escalation' }))
+    expect(stepOf(latest, 1)).not.toHaveProperty('escalations')
+
+    await add()
+    await add()
+    await userEvent.type(field('/steps/1/escalations/1/after').getByRole('textbox'), 'P2D')
+    await userEvent.click(field('/steps/1/escalations/0').getByRole('button', { name: 'Remove escalation' }))
+    expect(stepOf(latest, 1).escalations).toEqual([{ after: 'P2D' }])
+  })
+
   it('switches the subject between an entity and parameters and keeps only the chosen key', async () => {
     const latest = renderEditor(process, true)
     const offered = async () =>
@@ -373,13 +467,112 @@ describe.each(['light', 'dark'])('ProcessEditor in %s mode', (mode) => {
   it('shows the keys of a step type without a panel as markers for the JSON view', async () => {
     renderEditor({
       ...process,
-      steps: [{ name: 'wait', type: 'waitEvent', event: 'PaymentReceived', next: 'wait' }],
+      steps: [{ name: 'later', type: 'futureStep', event: 'x', next: 'later' }],
     })
 
     const card = screen.getByTestId('studio-step-0')
     expect(within(card).getByTestId('studio-field-/steps/0/event')).toBeVisible()
     expect(within(card).getByTestId('studio-field-/steps/0/next')).toBeVisible()
     expect(within(card).getAllByTestId('studio-json-only')).toHaveLength(2)
+  })
+
+  it('lists only the events about the subject entity in the event picker of a wait for event step', async () => {
+    renderEditor({ ...process, steps: [{ name: 'wait', type: 'waitEvent', event: '', next: 'wait' }] })
+
+    await userEvent.click(within(screen.getByTestId('studio-field-/steps/0/event')).getByRole('combobox'))
+
+    expect(optionTexts(await openDropdown())).toEqual(['PaymentReceived'])
+  })
+
+  it('offers an event picker with no event to a process without a subject', async () => {
+    renderEditor({
+      ...process,
+      entity: undefined,
+      parameters: [],
+      steps: [{ name: 'wait', type: 'waitEvent', event: '', next: 'wait' }],
+    })
+
+    await userEvent.click(within(screen.getByTestId('studio-field-/steps/0/event')).getByRole('combobox'))
+
+    expect(optionTexts(await openDropdown())).toEqual([])
+  })
+
+  it('writes the event, when, timeout and next step of a wait for event step', async () => {
+    const latest = renderEditor({
+      ...process,
+      steps: [
+        { name: 'wait', type: 'waitEvent', event: '', next: '' },
+        { name: 'chase', type: 'timer', wait: 'PT1H', next: 'done' },
+        { name: 'done', type: 'end' },
+      ],
+    })
+    const card = screen.getByTestId('studio-step-0')
+
+    await chooseOption('PaymentReceived', screen.getByTestId('studio-field-/steps/0/event'))
+    await userEvent.type(within(screen.getByTestId('studio-field-/steps/0/when')).getByRole('textbox'), 'amount > 0')
+    await userEvent.click(within(card).getByRole('button', { name: 'Add timeout' }))
+    expect(stepOf(latest, 0).timeout).toEqual({ after: '', next: '' })
+    await userEvent.type(within(card).getByRole('textbox', { name: 'After' }), 'P2D')
+    await chooseOption('chase', screen.getByTestId('studio-field-/steps/0/timeout/next'))
+    await chooseOption('done', screen.getByTestId('studio-field-/steps/0/next'))
+
+    expect(stepOf(latest, 0)).toEqual({
+      name: 'wait',
+      type: 'waitEvent',
+      event: 'PaymentReceived',
+      when: 'amount > 0',
+      timeout: { after: 'P2D', next: 'chase' },
+      next: 'done',
+    })
+    expect(within(card).queryByTestId('studio-json-only')).toBeNull()
+  })
+
+  it('removes the whole timeout of a wait for event step and brings it back empty', async () => {
+    const latest = renderEditor({
+      ...process,
+      steps: [
+        {
+          name: 'wait',
+          type: 'waitEvent',
+          event: 'PaymentReceived',
+          timeout: { after: 'P2D', next: 'wait' },
+          next: 'wait',
+        },
+      ],
+    })
+    const card = screen.getByTestId('studio-step-0')
+    expect(within(card).getByRole('textbox', { name: 'After' })).toHaveValue('P2D')
+
+    await userEvent.click(within(card).getByRole('button', { name: 'Remove timeout' }))
+
+    expect(stepOf(latest, 0)).not.toHaveProperty('timeout')
+    expect(within(card).queryByRole('textbox', { name: 'After' })).toBeNull()
+    await userEvent.click(within(card).getByRole('button', { name: 'Add timeout' }))
+    expect(stepOf(latest, 0).timeout).toEqual({ after: '', next: '' })
+  })
+
+  it('removes the when of a wait for event step when its box is cleared', async () => {
+    const latest = renderEditor({
+      ...process,
+      steps: [{ name: 'wait', type: 'waitEvent', event: 'PaymentReceived', when: 'amount > 0', next: 'wait' }],
+    })
+
+    await userEvent.clear(within(screen.getByTestId('studio-field-/steps/0/when')).getByRole('textbox'))
+
+    expect(stepOf(latest, 0)).not.toHaveProperty('when')
+  })
+
+  it('offers the when of a wait for event step the payload fields of its event', async () => {
+    renderEditor(
+      { ...process, steps: [{ name: 'wait', type: 'waitEvent', event: 'PaymentReceived', next: 'wait' }] },
+      true,
+    )
+
+    const group = await within(screen.getByTestId('studio-field-/steps/0/when')).findByRole('group', { name: 'When' })
+
+    const offered = (group.getAttribute('data-options') ?? '').split(',')
+    expect(offered).toContain('amount')
+    expect(offered).not.toContain('totalAmount')
   })
 
   it('writes the process, subject and next step of a sub-process whose child has a subject', async () => {

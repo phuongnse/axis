@@ -6,7 +6,8 @@ namespace Axis.Processes.Instances;
 
 /// <summary>
 /// Writes the event occurrences that <c>raiseEvent</c> steps raise over a connection to a tenant
-/// database, and reads one back for its delivery. An occurrence is stored even when no trigger listens.
+/// database, reads one back for its delivery, and finds the occurrences a <c>waitEvent</c> step has
+/// not used yet. An occurrence is stored even when no trigger listens.
 /// </summary>
 internal static class ProcessEvents
 {
@@ -56,6 +57,89 @@ internal static class ProcessEvents
             reader.GetGuid(2),
             reader.GetGuid(3),
             JsonNode.Parse(reader.GetString(4)) as JsonObject ?? []);
+    }
+
+    /// <summary>
+    /// Returns the occurrences of the event about the record that the instance has not used, earliest
+    /// first. Only occurrences raised at or after the instance's creation count.
+    /// </summary>
+    internal static async Task<IReadOnlyList<StoredEvent>> FindUnmatchedAsync(
+        NpgsqlTransaction transaction,
+        Guid instanceId,
+        Guid applicationId,
+        Guid entityId,
+        Guid subjectId,
+        string eventName,
+        CancellationToken cancellationToken)
+    {
+        await using var command = new NpgsqlCommand(
+            """
+            SELECT e.id, e.application_id, e.event, e.entity_id, e.subject_id, e.payload::text
+            FROM axis.events e
+            WHERE e.application_id = @application
+              AND e.entity_id = @entity
+              AND e.subject_id = @subject
+              AND lower(e.event) = lower(@event)
+              AND e.raised_at >= (SELECT created_at FROM axis.process_instances WHERE id = @instance)
+              AND NOT EXISTS (
+                  SELECT 1 FROM axis.process_event_matches m
+                  WHERE m.process_instance_id = @instance AND m.event_id = e.id)
+            ORDER BY e.raised_at, e.id
+            """,
+            transaction.Connection ?? throw new ArgumentException("The transaction is completed.", nameof(transaction)),
+            transaction);
+        command.Parameters.AddWithValue("application", applicationId);
+        command.Parameters.AddWithValue("entity", entityId);
+        command.Parameters.AddWithValue("subject", subjectId);
+        command.Parameters.AddWithValue("event", eventName);
+        command.Parameters.AddWithValue("instance", instanceId);
+        List<StoredEvent> found = [];
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            found.Add(new StoredEvent(
+                reader.GetGuid(0),
+                reader.GetGuid(1),
+                reader.GetString(2),
+                reader.GetGuid(3),
+                reader.GetGuid(4),
+                JsonNode.Parse(reader.GetString(5)) as JsonObject ?? []));
+        }
+
+        return found;
+    }
+
+    /// <summary>Records that the instance's <paramref name="step"/> used the occurrence <paramref name="eventId"/>.</summary>
+    internal static async Task InsertMatchAsync(NpgsqlTransaction transaction, Guid instanceId, Guid eventId, string step, CancellationToken cancellationToken)
+    {
+        await using var command = new NpgsqlCommand(
+            "INSERT INTO axis.process_event_matches (process_instance_id, event_id, step, matched_at) VALUES (@instance, @event, @step, now())",
+            transaction.Connection ?? throw new ArgumentException("The transaction is completed.", nameof(transaction)),
+            transaction);
+        command.Parameters.AddWithValue("instance", instanceId);
+        command.Parameters.AddWithValue("event", eventId);
+        command.Parameters.AddWithValue("step", step);
+        await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Records that the instance's <paramref name="step"/> used the occurrence <paramref name="eventId"/>, unless
+    /// the instance used it before. Returns <see langword="false"/> when it did.
+    /// </summary>
+    internal static async Task<bool> TryInsertMatchAsync(NpgsqlTransaction transaction, Guid instanceId, Guid eventId, string step, CancellationToken cancellationToken)
+    {
+        await using var command = new NpgsqlCommand(
+            """
+            INSERT INTO axis.process_event_matches (process_instance_id, event_id, step, matched_at)
+            VALUES (@instance, @event, @step, now())
+            ON CONFLICT (process_instance_id, event_id) DO NOTHING
+            """,
+            transaction.Connection ?? throw new ArgumentException("The transaction is completed.", nameof(transaction)),
+            transaction);
+        command.Parameters.AddWithValue("instance", instanceId);
+        command.Parameters.AddWithValue("event", eventId);
+        command.Parameters.AddWithValue("step", step);
+        return await command.ExecuteNonQueryAsync(cancellationToken) == 1;
     }
 }
 

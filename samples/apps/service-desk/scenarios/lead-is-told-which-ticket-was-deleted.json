@@ -1,0 +1,41 @@
+{
+  "id": "8e8d0cb8-c6ce-4053-9d52-78a34da63979",
+  "kind": "scenario",
+  "name": "LeadIsToldWhichTicketWasDeleted",
+  "formatVersion": 1,
+  "now": "2026-10-01T09:00:00Z",
+  "users": {
+    "anna": [
+      "requester"
+    ]
+  },
+  "steps": [
+    {
+      "type": "createRecord",
+      "entity": "Ticket",
+      "as": "anna",
+      "save": "draft",
+      "values": {
+        "title": "Laptop will not start",
+        "description": "It shows a black screen.",
+        "status": "draft"
+      }
+    },
+    {
+      "type": "deleteRecord",
+      "record": "draft",
+      "as": "anna"
+    },
+    {
+      "type": "expectNotification",
+      "recipient": {
+        "role": "service-desk-lead"
+      },
+      "channel": "inApp",
+      "values": {
+        "number": "SD-2026-00001",
+        "title": "Laptop will not start"
+      }
+    }
+  ]
+}

@@ -46,7 +46,10 @@ internal static class DefinedNamesBuilder
             [.. loaded.Connectors.Select(connector => new DefinedConnector(
                 connector.Id, connector.Name, [.. connector.Operations.Select(operation => new DefinedOperation(operation.Name))]))],
             [.. events.Select(@event => new DefinedEvent(
-                @event.Id, @event.Name, [.. @event.Fields.Select(field => new DefinedTyped(field.Name, field.Type))]))],
+                @event.Id,
+                @event.Name,
+                ModuleOf(@event) is { } module && !@event.Entity.Contains('/') ? $"{module}/{@event.Entity}" : @event.Entity,
+                [.. @event.Fields.Select(field => new DefinedTyped(field.Name, field.Type))]))],
             [.. loaded.Roles.Select(role => new DefinedResource(role.Id, role.Name))],
             [.. sequences.Select(sequence => new DefinedResource(sequence.Id, sequence.Name))],
             [.. loaded.Forms.Select(form => new DefinedResource(form.Id, form.Name))],

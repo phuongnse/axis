@@ -11,7 +11,8 @@ Everything in this file is _(planned for M14)_, except the
 [Timer step](#timer-step), [Loops](#loops) through a `task`, a `timer` or a
 `waitEvent` and the calls in them, the [sub-process step](#sub-process-step),
 the [create record operation](#create-record-operation) and the compile checks
-of the [wait for event step](#wait-for-event-step), which are built. The design follows
+of the [wait for event step](#wait-for-event-step), which are built. So are its
+_Which occurrence_, _When the step runs_, _Waking_, _One use_ and _Timeout_ parts. The design follows
 [D69](../decisions/d69-timer-wait-for-event-and-sub-process-steps-loops-and-create-record.md)
 and
 [D70](../decisions/d70-processes-without-a-subject-scheduled-jobs-and-delete-triggers.md).
@@ -71,9 +72,11 @@ A `waitEvent` step waits until an event about the subject record is raised:
 
 - **Built.** The compiler checks and builds the step, and the instance graph
   shows it as `waitEvent`, with a transition to `next` and one marked
-  `timeout`. A published process that reaches the step fails it with the
-  engine's "cannot run" error until the engine runs the step. Studio's palette
-  offers it, and a new step starts with an empty `event` and `next`.
+  `timeout`. The worker runs the step: it goes on with an earlier
+  occurrence or waits, and a `process.timer` item resumes it at its timeout.
+  The waking of a waiting instance by event delivery is not built yet. Studio's
+  palette offers the step, and a new step starts with an empty `event` and
+  `next`.
 - `event` names an `event` whose entity is the subject entity. An unknown
   event is `AXC0125` and an event about another entity is `AXC0283`, both at
   `/steps/{i}/event`.
@@ -87,12 +90,17 @@ A `waitEvent` step waits until an event about the subject record is raised:
 - **Which occurrence.** The step matches an occurrence in `axis.events` that
   names the instance's subject record, was raised at or after the instance's
   `created_at`, has not been used by this instance, and whose `when` is true.
-  It takes the earliest one.
-- **When the step runs.** Its transaction looks for a match first. With one,
-  it records the match and goes to `next` at once. Without one, it sets the
-  instance `waiting`. With a `timeout`, it queues a `process.timer` item due
-  at the step's time plus `after`.
-- **Waking.** [Event delivery](process-events.md#event-delivery) also delivers
+  It takes the earliest one. A `when` that is false, or that fails on the
+  occurrence's payload, is no match, as an event trigger skips such an
+  occurrence, and it does not fail the step.
+- **When the step runs.** Its transaction first takes an advisory lock on the
+  subject record, so an occurrence cannot arrive between the search and the
+  wait. It then looks for a match. With one, it records the match, writes
+  the `process.stepCompleted` audit record and goes to `next` at once. Without
+  one, it sets the instance `waiting` and writes no audit record. With a
+  `timeout`, it queues a `process.timer` item due at the step's time plus
+  `after`, with the revision the step left.
+- **Waking**. [Event delivery](process-events.md#event-delivery) also delivers
   each occurrence to the instances that wait for its event on its record. Each
   instance gets its own transaction. It locks the instance, checks that it
   still waits in this step at the same revision, evaluates `when`, records the
@@ -101,7 +109,9 @@ A `waitEvent` step waits until an event about the subject record is raised:
   occurrence, with a unique key on both. So an occurrence wakes an instance
   once, also in a later pass of a loop.
 - **Timeout.** The `process.timer` item resumes the instance at
-  `timeout.next`, by the same revision check. The event and the timeout race,
+  `timeout.next`, by the same revision check, and writes the
+  `process.stepCompleted` audit record as a timer resume does. An item that
+  finds the instance moved on changes nothing. The event and the timeout race,
   and the first to commit wins.
 - History output: `{ "state": "waiting" }` when it waits, `{ "next",
   "eventId" }` for a match and `{ "next", "timeout": true }` for a timeout.
@@ -158,7 +168,7 @@ A `subProcess` step starts another process and waits until it ends:
   parent that is not waiting on that child is logged and discarded.
 - **Failure.** A child that fails leaves the parent `waiting`, and an operator
   retries the child. When the retried child completes, the `process.resume`
-  item resumes the parent at `next`. _(Planned for M14)_ The inspector shows
+  item resumes the parent at `next`. The inspector shows
   the failed child under the parent. A cancelled child fails the parent's step
   when the parent is `waiting` on that step for this child. The error is
   fixed, `The sub-process of the step '{step}' was cancelled.`, and the

@@ -27,15 +27,18 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
     `"actions": []`. The page endpoint answers `403` to a user without an
     `inspect` grant on the process, and site navigation leaves the page out.
   - **List.** The page lists the instances with their state, step, subject id,
-    release and times, until the columns below are built. Rows keep the API's order, newest first. A clearable
+    release and times. An instance without a subject shows "No subject" in the
+    subject column, until the columns below are built. Rows keep the API's order, newest first. A clearable
     select above the list filters by state, and offers the five states with
     platform texts. `state`, `page` and `pageSize` live in the URL, as for a
     table. Changing the state goes back to page 1. A `state` in the URL that is
     not one of the five is dropped. The step column shows the step's name,
     because a list row carries no label key. Each row has an Open link.
   - **List columns** _(planned)_. The first column is the instance's record,
-    named by `subjectLabel`, and is the link that opens the instance, or reads
-    `shell.inspector.open` when `subjectLabel` is `null`. There is no Open
+    named by `subjectLabel`, and is the link that opens the instance. When
+    `subjectLabel` is `null` the link reads `shell.inspector.noSubject` for an
+    instance without a subject, and `shell.inspector.open` when the user may not
+    read the display field. There is no Open
     column and no record id. The Release column shows `releaseNumber`, the
     release's number such as 3 under the Release header, never its id. An instance still
     running shows a muted "—" under Ended
@@ -54,6 +57,22 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
     their attempts. A call whose `inputHidden` is `true` shows "hidden" in
     place of its input. A shown input is a list of its top-level properties,
     where a number keeps its source digits.
+  - **Subject, timer and parent.** An instance without a subject shows "No
+    subject" in place of the subject id. An instance that is `waiting` at a
+    `timer` step shows a Due row with the `dueAt` of that step's latest history
+    row. The row is left out in any other case. An instance that a sub-process
+    step started shows a Parent row with the parent's process name.
+  - **Sub-processes.** After the calls, a Sub-processes section lists the
+    instances that this instance started, from the detail's `subProcesses`.
+    Each row shows the child's process, the step of this instance that started
+    it, its state, and its start and end times. With none, the section shows
+    an empty text, as the tasks and the calls do. The detail names only the
+    parent and the children whose process the user may inspect.
+  - **Links to relatives.** A child's Open link and the Parent row open the
+    instance on the first navigation page whose process inspector names its
+    process, as the record history links do, with the same lookup. A relative
+    whose process no navigation page inspects shows without a link. The page
+    loads the pages' metadata only when the instance has a parent or a child.
   - **Commands.** The page has a Cancel instance and a Retry button for each
     of those commands that the instance detail's `commands` lists. With none
     listed, it has no button, and a command name this build does not know is
@@ -115,12 +134,16 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
     a generic load error. The server checks every request, so the page never
     decides who may inspect.
   - The platform texts `shell.inspector.*` hold the column headers, the
-    section titles, the instance states, the "hidden" text, the empty texts
+    section titles, the instance states, the "hidden" text, the "No subject"
+    text, the Due, Parent, Process and Sub-processes labels, the empty texts
     and the messages. The texts `shell.inspector.deadLetters.*` hold the
     dead letter section's title, column headers, empty text and load error. The
     texts `shell.inspector.commands.*` hold the command buttons, the dialog's
     labels, the reason errors, the retry warning and the resolve labels and
     errors.
-- **Timers and sub-processes** _(planned for M14)_. The instance detail shows a
-  waiting timer's due time and an instance's sub-processes, and an instance
-  without a subject shows "no subject".
+- **Timers and sub-processes.** The instance page shows a waiting timer's due
+  time and the instance's sub-processes and parent, and an instance without a
+  subject shows "No subject", as described under **Instance page** above. The
+  E2E fixture `tests/e2e/fixtures/subprocess-app` has a parent process that
+  starts a child on a 24-hour timer, both without a subject, for the
+  Playwright journey.

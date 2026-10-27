@@ -9,7 +9,8 @@ _(planned for M15)_ are not built yet, and Dn refers to
 
 Everything on this page is built: the grants, the policy matrix, the export
 routes, the upload, dry run and commit of a CSV or `xlsx` import with its `key`
-matching, the file cleanup of an import, and the Import button in the SPA.
+matching, the file cleanup of an import, and the Export and Import buttons in
+the SPA.
 
 ## Grants
 
@@ -50,9 +51,11 @@ matching, the file cleanup of an import, and the Import button in the SPA.
   `Axis-Export-Truncated: true`. A file is sent with `Cache-Control: no-store`
   and no record id column.
 - **Size.** At typical size, an export of 100,000 records finishes in under 2 s
-  as CSV and under 6 s as `xlsx`, and grows the managed heap by less than 64 MB.
-  `ExportPerformanceTests` fails when the best of three exports takes 2 s or more
-  as CSV or 6 s or more as `xlsx`, or when the heap grows by 64 MB or more.
+  as CSV and under 6 s as `xlsx`, and grows the live managed heap, the memory
+  still in use during the export, by less than 64 MB. `ExportPerformanceTests`
+  fails when the best of three exports takes 2 s or more as CSV or 6 s or more
+  as `xlsx`, or when the live heap grows by 64 MB or more. It measures the heap
+  on exports that are not timed.
 - **Columns.** The first row holds the field names. An entity export writes
   the fields the user may read, in declaration order, and leaves out child
   collections and `references` fields. A `references` field has no storage
@@ -217,7 +220,7 @@ matching, the file cleanup of an import, and the Import button in the SPA.
 
 ## In the SPA
 
-- A table whose user holds `export` shows an Export button with CSV and Excel.
+- _(built)_ A table whose user holds `export` shows an Export button with CSV and Excel.
   It exports the table's data source or entity with the table's current
   parameters, sort and search.
 - _(built)_ An entity table whose user holds `import` shows an Import button. It

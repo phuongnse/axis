@@ -72,7 +72,11 @@ public sealed record DefinedConnector(Guid Id, string Name, IReadOnlyList<Define
 
 public sealed record DefinedOperation(string Name);
 
-public sealed record DefinedEvent(Guid Id, string Name, IReadOnlyList<DefinedTyped> Fields);
+/// <summary>
+/// An event with the entity it is about and its payload fields. <paramref name="Entity"/> is written as a process
+/// writes it, so a module event's own-module entity is <c>&lt;module id&gt;/&lt;name&gt;</c>.
+/// </summary>
+public sealed record DefinedEvent(Guid Id, string Name, string Entity, IReadOnlyList<DefinedTyped> Fields);
 
 /// <summary>A role, sequence or form.</summary>
 public sealed record DefinedResource(Guid Id, string Name);

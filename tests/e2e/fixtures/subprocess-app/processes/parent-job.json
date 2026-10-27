@@ -1,0 +1,12 @@
+{
+  "id": "276920a1-7729-4830-af22-9df497d42312",
+  "kind": "process",
+  "name": "ParentJob",
+  "formatVersion": 1,
+  "parameters": [{ "name": "label", "type": "text" }],
+  "start": "runChild",
+  "steps": [
+    { "name": "runChild", "type": "subProcess", "process": "ChildJob", "parameters": { "label": "label" }, "next": "done" },
+    { "name": "done", "type": "end" }
+  ]
+}

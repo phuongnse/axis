@@ -1,0 +1,8 @@
+{
+  "id": "64753c3e-9e69-4b72-a830-9cd44513b80f",
+  "kind": "page",
+  "name": "Parents",
+  "formatVersion": 1,
+  "title": { "textKey": "pages.parents.title" },
+  "widgets": [{ "type": "processInspector", "process": "ParentJob" }]
+}

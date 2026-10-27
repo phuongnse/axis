@@ -41,6 +41,7 @@ const zeroArgumentFunctions = ['now', 'today', 'currentUser']
 const fieldDefault = /^\/fields\/\d+\/default$/
 const grantFilter = /^\/grants\/\d+\/filter$/
 const grantIndex = /^\/grants\/(\d+)\//
+const waitEventWhen = /^\/steps\/(\d+)\/when$/
 
 /**
  * The names an expression can use at a JSON Pointer of a resource of the given kind. With no names loaded, only
@@ -56,12 +57,43 @@ export function expressionScope(
   if (names === null) {
     return functions
   }
+  const payload = waitEventPayload(kind, draft, pointer, names)
+  if (payload !== undefined) {
+    return [
+      ...payload.map((name) => option(name, 'field', false)),
+      ...names.rules.map((rule) => option(`${rule.name}()`, 'rule', true)),
+      ...functions,
+    ]
+  }
   return [
     ...parameterOptions(kind, draft, pointer),
     ...fieldOptions(kind, draft, pointer, names),
     ...names.rules.map((rule) => option(`${rule.name}()`, 'rule', true)),
     ...functions,
   ]
+}
+
+/**
+ * The payload fields of the event a wait for event step waits for, when the pointer is that step's `when`. The
+ * `when` reads the payload, as an event trigger's does, so the subject's fields, `id` and parameters are not in
+ * scope. An unknown event has no fields. Undefined when the pointer is not a wait for event step's `when`.
+ */
+function waitEventPayload(
+  kind: string,
+  draft: Record<string, unknown>,
+  pointer: string,
+  names: StudioNames,
+): string[] | undefined {
+  const match = kind === 'process' ? waitEventWhen.exec(pointer) : null
+  if (match === null || !Array.isArray(draft.steps)) {
+    return undefined
+  }
+  const step: unknown = draft.steps[Number(match[1])]
+  if (stringProperty(step, 'type') !== 'waitEvent') {
+    return undefined
+  }
+  const event = stringProperty(step, 'event')?.toLowerCase()
+  return names.events.find((item) => item.name.toLowerCase() === event)?.fields.map((field) => field.name) ?? []
 }
 
 function parameterOptions(kind: string, draft: Record<string, unknown>, pointer: string): ScopeOption[] {

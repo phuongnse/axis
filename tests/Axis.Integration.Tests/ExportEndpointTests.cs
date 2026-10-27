@@ -21,6 +21,7 @@ public sealed class ExportEndpointTests(RecordApiFixture fixture) : IClassFixtur
 {
     private const string Items = "/api/apps/RecordsApp/entities/Item/records";
     private const string CountsByDepartment = "/api/apps/RecordsApp/data-sources/ItemCountsByDepartment";
+    private const string Searchable = "/api/apps/RecordsApp/data-sources/SearchableItems";
     private const string XlsxContentType = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
@@ -210,6 +211,28 @@ public sealed class ExportEndpointTests(RecordApiFixture fixture) : IClassFixtur
         Assert.Equal(HttpStatusCode.OK, sorted.StatusCode);
         Assert.Equal(["Alpha", "Beta", "-minus"], (await ReadAsync(sorted, "csv")).Rows.Skip(1).Select(row => row[0]!.TrimStart('\'')).Select(name => name.TrimStart('=')));
         Assert.Equal(HttpStatusCode.BadRequest, hidden.StatusCode);
+    }
+
+    [Fact]
+    public async Task A_data_source_export_with_search_writes_only_the_matching_rows_and_a_search_without_the_option_is_a_400_at_search()
+    {
+        await SeedAsync();
+        using var client = fixture.CreateClient().SignedInAs("eve");
+
+        using var all = await GetAsync(client, $"{Searchable}/export?format=csv");
+        using var searched = await GetAsync(client, $"{Searchable}/export?format=csv&search=sal");
+        using var none = await GetAsync(client, $"{Searchable}/export?format=csv&search=nothing");
+        using var unsupported = await GetAsync(client, $"{CountsByDepartment}/export?format=csv&search=x");
+        using var repeated = await GetAsync(client, $"{Searchable}/export?format=csv&search=a&search=b");
+
+        // Gamma has no status, so eve's read filter hides it. Alpha is the only item of Sales that eve reads, so the header and three rows are left.
+        Assert.Equal(4, (await ReadAsync(all, "csv")).Rows.Count);
+        Assert.Equal([["Alpha", "Sales", "3"]], (await ReadAsync(searched, "csv")).Rows.Skip(1));
+        Assert.Single((await ReadAsync(none, "csv")).Rows);
+        Assert.Equal(HttpStatusCode.BadRequest, unsupported.StatusCode);
+        using var problem = JsonDocument.Parse(await unsupported.Content.ReadAsStringAsync(CancellationToken));
+        Assert.Equal(["search"], problem.RootElement.GetProperty("errors").EnumerateObject().Select(property => property.Name));
+        Assert.Equal(HttpStatusCode.BadRequest, repeated.StatusCode);
     }
 
     // Departments Sales and Ops, and four items. Gamma has no status, so eve's read filter hides it.
