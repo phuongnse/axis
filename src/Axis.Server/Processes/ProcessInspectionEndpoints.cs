@@ -28,7 +28,9 @@ namespace Axis.Server.Processes;
 /// entity is needed for it, so without one the list is empty. A hidden instance is in neither the
 /// page nor the total. A read filter that fails at run time is a 400. A <c>read</c> filter that
 /// reads a computed field that is being recomputed is a 409 that names no field or policy, after the
-/// parameters and before the instances are read. The list writes no audit record. The problem titles never contain text from the request.
+/// parameters and before the instances are read. Each item has the <c>subjectLabel</c>, the subject record's display field
+/// value, unless the user's read grant does not cover the field or either release marks it sensitive, and the pinned release's
+/// <c>releaseNumber</c>. The list writes no audit record. The problem titles never contain text from the request.
 /// <para>
 /// The detail at <c>GET /api/apps/{app}/processes/{process}/instances/{id}</c> shows one instance:
 /// its properties, the graph of the release it is pinned to, its path (the history rows in order),
@@ -143,7 +145,7 @@ internal static class ProcessInspectionEndpoints
                 size,
                 cancellationToken);
             return Results.Ok(new ProcessInstanceListResponse(
-                withoutSubject.Items.Select(ListItem).ToList(), pageNumber, size, withoutSubject.TotalCount));
+                withoutSubject.Items.Select(item => ListItem(item, showsLabel: false)).ToList(), pageNumber, size, withoutSubject.TotalCount));
         }
 
         if (!application.TryGetEntity(subjectEntity.Name, out var entity))
@@ -181,18 +183,57 @@ internal static class ProcessInspectionEndpoints
             return Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: "A record filter could not be evaluated for these records.");
         }
 
-        return Results.Ok(new ProcessInstanceListResponse(result.Items.Select(ListItem).ToList(), pageNumber, size, result.TotalCount));
+        // The query reads the display field of every listed instance. The label shows only when the user may
+        // read the field and neither the active nor the pinned release marks it sensitive.
+        var readable = PolicyEvaluator.Fields(application, user.Roles, entity, PolicyAction.Read);
+        var pinnedEntities = new Dictionary<Guid, EntityModel?>();
+        var items = new List<ProcessInstanceListItem>(result.Items.Count);
+        foreach (var item in result.Items)
+        {
+            var releaseId = item.Instance.ReleaseId;
+            if (!pinnedEntities.TryGetValue(releaseId, out var pinned))
+            {
+                pinned = (await resolver.GetReleaseModelAsync(releaseId, cancellationToken)).FindEntity(entity.Id);
+                pinnedEntities[releaseId] = pinned;
+            }
+
+            items.Add(ListItem(item, ShowsSubjectLabel(entity, pinned, readable)));
+        }
+
+        return Results.Ok(new ProcessInstanceListResponse(items, pageNumber, size, result.TotalCount));
     }
 
-    private static ProcessInstanceListItem ListItem(ProcessInstanceRow instance) =>
+    private static ProcessInstanceListItem ListItem(InstanceListItem item, bool showsLabel) =>
         new(
-            instance.Id,
-            instance.SubjectId,
-            instance.State,
-            instance.Step,
-            instance.ReleaseId,
-            instance.CreatedAt.UtcDateTime,
-            instance.EndedAt?.UtcDateTime);
+            item.Instance.Id,
+            item.Instance.SubjectId,
+            showsLabel ? item.SubjectLabel : null,
+            item.Instance.State,
+            item.Instance.Step,
+            item.Instance.ReleaseId,
+            item.ReleaseNumber,
+            item.Instance.CreatedAt.UtcDateTime,
+            item.Instance.EndedAt?.UtcDateTime);
+
+    // The subject label shows when the entity has a display field that the user's read grant covers
+    // and that neither release marks sensitive.
+    internal static bool ShowsSubjectLabel(EntityModel active, EntityModel? pinned, IReadOnlySet<string>? readable)
+    {
+        if (active.DisplayField is not { } displayField || (readable is not null && !readable.Contains(displayField)))
+        {
+            return false;
+        }
+
+        foreach (var release in new[] { active, pinned })
+        {
+            if (release is not null && release.TryGetField(displayField, out var field) && field.Sensitive)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
 
     private static async Task<IResult> GetAsync(
         string app,
@@ -557,13 +598,19 @@ internal static class ProcessInspectionEndpoints
 /// <summary>One page of the instances of a process, and the number of them on every page.</summary>
 internal sealed record ProcessInstanceListResponse(IReadOnlyList<ProcessInstanceListItem> Items, int Page, int PageSize, long TotalCount);
 
-/// <summary>An instance in the list of a process's instances.</summary>
+/// <summary>
+/// An instance in the list of a process's instances. <paramref name="SubjectLabel"/> is the subject record's display
+/// field value, or null without a subject, without a display field, when the user may not read the field or when it is
+/// sensitive. <paramref name="ReleaseNumber"/> is the pinned release's number in the release history, or null when it has no row.
+/// </summary>
 internal sealed record ProcessInstanceListItem(
     Guid Id,
     Guid? SubjectId,
+    string? SubjectLabel,
     string State,
     string Step,
     Guid ReleaseId,
+    int? ReleaseNumber,
     DateTime CreatedAt,
     DateTime? EndedAt);
 

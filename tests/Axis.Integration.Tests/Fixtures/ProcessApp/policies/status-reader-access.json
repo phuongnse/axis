@@ -1,0 +1,11 @@
+{
+  "id": "4d9c6e2a-8b13-47f5-a0c7-1e5f3b9d7a82",
+  "kind": "policy",
+  "name": "StatusReaderAccess",
+  "formatVersion": 1,
+  "roles": ["status-reader"],
+  "grants": [
+    { "entity": "Request", "actions": ["read"], "fields": ["status"] },
+    { "process": "Submit", "actions": ["inspect"] }
+  ]
+}
