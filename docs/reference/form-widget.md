@@ -89,14 +89,14 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
       of a required field carries `aria-required`, and a read-only value does
       not. Required means the form state answer's `required`, or else the
       field's `required`.
-    - _(planned)_ **Help text.** A field whose entity field has
+    - **Help text.** A field whose entity field has
       [`help`](resource-files.md#resource-file-shape) shows it between the
       label and the input, at 12px with a 20px line height in `textMuted`,
-      tied to the input with `aria-describedby`. A message under the input
-      never replaces it. It is one or two short lines: longer guidance belongs
-      on the page or the section. Only a form shows it, not a table or a
-      detail.
-    - _(planned)_ **Validation messages.** A message is 14px at a 20px line height, 4px
+      tied to the input with `aria-describedby`. A file input shows it but is
+      not tied to it. A message under the input never replaces it. It is one
+      or two short lines: longer guidance belongs on the page or the section.
+      Only a form shows it, not a table or a detail.
+    - **Validation messages.** A message is 14px at a 20px line height, 4px
       under its input, followed by a whole field gap (`spacing-lg`, 24px)
       before the next field, so the layout grows when a message appears.
     - _(planned)_ **Read-only values.** A field the form makes read-only, by `readOnly` or
