@@ -41,9 +41,12 @@ const journeyRoles = [
   "service-desk-lead",
   "agent",
   "approver",
+  "asset-manager",
+  "auditor",
+  "employee",
 ];
 
-/** The users who sign in on the journey host: those who hold the author, requester, service desk lead, agent or approver role. */
+/** The users who sign in on the journey host: those who hold the author, requester, service desk lead, agent, approver, asset manager, auditor or employee role. */
 export const journeyUsers = (Object.keys(sampleUsers) as SampleUser[]).filter(
   (user) => sampleUsers[user].some((role) => journeyRoles.includes(role)),
 );

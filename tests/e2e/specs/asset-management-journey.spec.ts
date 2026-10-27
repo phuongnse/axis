@@ -7,6 +7,7 @@ import { dragTo } from '../design-drag'
 import { compareApplicationFolders } from '../folder-comparison'
 import { pickAction, pickOption, pickOptions } from '../select'
 import { assetManagement, journeyApplications, journeyURL } from '../server-settings'
+import { csrfHeaders } from '../csrf'
 import { useJourneySession } from '../sessions'
 import { createResource, openFormTab } from '../studio-resources'
 
@@ -31,7 +32,7 @@ interface SampleScenario {
 
 interface SampleForm {
   entity: string
-  sections: { name: string; title: { textKey: string }; fields: { field: string }[] }[]
+  sections: { name: string; title: { textKey: string }; fields: { field: string; width?: number }[] }[]
 }
 
 const policies = [
@@ -655,6 +656,10 @@ test.describe('the author builds the asset management application with Studio on
           'aria-current',
           'true',
         )
+        // The new field is the selected one, and the property panel sets its width on the row.
+        if (field.width !== undefined) {
+          await panel.getByRole('spinbutton', { name: 'Width in twelfths of the row', exact: true }).fill(String(field.width))
+        }
       }
     }
 
@@ -991,5 +996,204 @@ test.describe('the author builds the asset management application with Studio on
     compareApplicationFolders(assetManagement, built, {
       files: [...policies, ...scenarios.map(([, file]) => file)],
     })
+  })
+
+  // The tests on the published site share one run suffix and the asset the register test creates. A retry runs the
+  // whole serial group again in a new worker, so it gets a new suffix, and it adds records. So no test counts an
+  // exact number of them.
+  const run = `${Date.now()}`
+  const apiRecords = (entity: string) => `${journeyURL}/api/apps/AssetManagement/entities/${entity}/records`
+  const registered = `Laptop ${run}`
+  const imported = ['Imported ThinkPad X1', 'Imported Dell U2723']
+
+  /** Opens the register searched for `name`, so its row is on the first page. */
+  async function searchRegister(page: Page, name: string) {
+    await page.goto(`${journeyURL}/asset-management/assets?search=${encodeURIComponent(name)}`)
+    await expect(page.getByRole('searchbox', { name: 'Search', exact: true })).toHaveValue(name)
+  }
+
+  test('the author publishes AssetManagement, and release 1 is active', async ({ page }) => {
+    await useJourneySession(page, 'hoa')
+    await page.goto(`${journeyURL}/studio?app=AssetManagement`)
+
+    await page.getByRole('button', { name: 'Publish', exact: true }).click()
+    await confirmDialog(page, 'Publish')
+    await expect(page.getByTestId('studio-request-status')).toHaveAttribute('data-status', 'succeeded', {
+      timeout: 120_000,
+    })
+    const rows = page.getByTestId('studio-release-row')
+    await expect(rows).toHaveCount(1)
+    await expect(rows).toHaveAttribute('data-number', '1')
+    await expect(rows).toHaveAttribute('data-active', 'true')
+  })
+
+  test('quan registers an asset with an invoice, two software records and a maintenance entry, and sees them on its detail page', async ({
+    page,
+  }) => {
+    await useJourneySession(page, 'quan')
+    // The sample has no page for Software or Vendor records, and neither entity is seeded.
+    const software = [`Word ${run}`, `Excel ${run}`]
+    const vendor = `Vendor ${run}`
+    for (const [entity, name] of [
+      ['Software', software[0]],
+      ['Software', software[1]],
+      ['Vendor', vendor],
+    ]) {
+      const response = await page.request.post(apiRecords(entity), { data: { values: { name } }, headers: csrfHeaders })
+      expect(response.status()).toBe(201)
+    }
+
+    await page.goto(`${journeyURL}/asset-management/assets`)
+    await page.getByRole('button', { name: 'New', exact: true }).click()
+    await expect(page).toHaveURL(/\/asset-management\/assetform\/new$/)
+    await page.getByRole('textbox', { name: '* Name', exact: true }).fill(registered)
+    await page.getByRole('textbox', { name: 'Holder', exact: true }).fill('lan')
+    await pickOption(page.getByRole('combobox', { name: /^(\* )?Currency$/ }), 'USD')
+    await page.getByLabel('Purchase cost', { exact: true }).fill('1500')
+
+    for (const name of software) {
+      await page.getByRole('button', { name: 'Add Software', exact: true }).click()
+      const dialog = await waitForDialog(page)
+      await dialog.getByTestId('reference-lookup-search').fill(name)
+      await dialog.getByRole('row', { name: new RegExp(name) }).click()
+      await expect(dialog).toBeHidden()
+    }
+
+    // The form has two child tables, the attachments and then the maintenance, and each has an Add row button.
+    const addRow = page.getByRole('button', { name: 'Add row', exact: true })
+    await addRow.nth(0).click()
+    const invoice = `invoice-${run}.pdf`
+    const chooser = page.waitForEvent('filechooser')
+    await page.getByRole('button', { name: 'Upload File 1', exact: true }).click()
+    await (await chooser).setFiles({
+      name: invoice,
+      mimeType: 'application/pdf',
+      buffer: Buffer.from('%PDF-1.4\n%test\n'),
+    })
+    await expect(page.getByRole('link', { name: invoice, exact: true })).toBeVisible()
+
+    await addRow.nth(1).click()
+    const date = page.getByLabel('Date 1', { exact: true })
+    await date.click()
+    await date.fill('10/01/2026')
+    await date.press('Enter')
+    await expect(date).toHaveValue('10/01/2026')
+    await page.getByRole('button', { name: 'Choose Vendor 1', exact: true }).click()
+    const lookup = await waitForDialog(page)
+    await lookup.getByTestId('reference-lookup-search').fill(vendor)
+    await lookup.getByRole('row', { name: new RegExp(vendor) }).click()
+    await expect(lookup).toBeHidden()
+    await pickOption(page.getByRole('combobox', { name: 'Currency 1', exact: true }), 'USD')
+    await page.getByLabel('Cost 1', { exact: true }).fill('200')
+
+    const saved = page.waitForResponse(
+      (response) => response.request().method() === 'POST' && new URL(response.url()).pathname.endsWith('/entities/Asset/records'),
+    )
+    await page.getByRole('button', { name: 'Save', exact: true }).click()
+    expect((await saved).status()).toBe(201)
+    await expect(page).not.toHaveURL(/assetform/)
+
+    await searchRegister(page, registered)
+    const row = page.getByRole('row', { name: new RegExp(registered) })
+    await row.getByRole('button', { name: 'View', exact: true }).click()
+    await expect(page).toHaveURL(/\/asset-management\/assetdetail\?asset=/)
+
+    const detail = page.getByTestId('detail')
+    await expect(detail).toContainText(registered)
+    // Retries add assets, so the number is not exact.
+    await expect(detail).toContainText(/AS-\d{6}/)
+    await expect(detail).toContainText('In stock')
+    await expect(detail).toContainText('$1,500')
+    await expect(page.getByRole('link', { name: invoice, exact: true })).toBeVisible()
+    const labels = page.getByTestId('detail-references-software')
+    for (const name of software) {
+      await expect(labels).toContainText(name)
+    }
+    await expect(page.getByLabel('Vendor 1', { exact: true })).toHaveValue(vendor)
+    await expect(page.getByLabel('Cost 1', { exact: true })).toHaveValue(/200/)
+  })
+
+  test('quan imports the asset CSV after a clean dry run and finds the imported assets in the register', async ({
+    page,
+  }) => {
+    await useJourneySession(page, 'quan')
+    await page.goto(`${journeyURL}/asset-management/assets`)
+
+    await page.getByRole('button', { name: 'Import', exact: true }).click()
+    const dialog = await waitForDialog(page)
+    await dialog
+      .locator('input[type=file]')
+      .setInputFiles(path.join(import.meta.dirname, '..', 'fixtures', 'asset-management-import.csv'))
+    await dialog.getByRole('button', { name: 'Check', exact: true }).click()
+    const commit = dialog.getByRole('button', { name: 'Commit', exact: true })
+    await expect(commit).toBeVisible()
+    await expect(dialog.getByTestId('import-status')).not.toContainText('Row')
+    await commit.click()
+
+    await expect(dialog).toBeHidden()
+    await expect(page.getByTestId('table-action-done')).toHaveText('The records were imported.')
+    for (const name of imported) {
+      await searchRegister(page, name)
+      await expect(page.getByRole('row', { name: new RegExp(name) }).first()).toBeVisible()
+    }
+  })
+
+  test('thao exports the register to CSV and Excel, sees the dashboard and has no New or Import button', async ({
+    page,
+  }) => {
+    await useJourneySession(page, 'thao')
+    await page.goto(`${journeyURL}/asset-management/assets`)
+    await expect(page.getByRole('table')).toBeVisible()
+    await expect(page.getByRole('button', { name: 'New', exact: true })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Import', exact: true })).toHaveCount(0)
+
+    // While a file is being made the button names its spinner too, 'loading Export', so the name ends with Export.
+    const exportAs = async (format: string) => {
+      const downloading = page.waitForEvent('download')
+      await page.getByRole('button', { name: /Export$/ }).click()
+      await page.getByRole('menuitem', { name: format, exact: true }).click()
+      return downloading
+    }
+
+    const csv = await exportAs('CSV')
+    expect(csv.suggestedFilename()).toBe('Asset.csv')
+    const text = await readFile((await csv.path())!, 'utf8')
+    const lines = text
+      .replace(/^﻿/, '')
+      .split('\r\n')
+      .filter((line) => line !== '')
+    // The record API gives the auditor's own view of the register, so the file holds every asset the auditor reads.
+    const listed = await page.request.get(`${apiRecords('Asset')}?pageSize=1`)
+    expect(listed.status()).toBe(200)
+    const { totalCount } = (await listed.json()) as { totalCount: number | string }
+    expect(lines.length - 1).toBe(Number(totalCount))
+    expect(text).toContain(registered)
+    for (const name of imported) {
+      expect(text).toContain(name)
+    }
+
+    const excel = await exportAs('Excel')
+    expect(excel.suggestedFilename()).toMatch(/\.xlsx$/)
+    const workbook = await readFile((await excel.path())!)
+    // A workbook is a zip file, and a zip file starts with PK. The CSV check covers the contents.
+    expect(workbook.subarray(0, 2).toString('latin1')).toBe('PK')
+
+    await page.goto(`${journeyURL}/asset-management/dashboard`)
+    await expect(page.getByTestId('kpi-tile')).toContainText('Warranties ending within 30 days')
+    await expect(page.getByRole('img', { name: 'Assets by status', exact: true }).first()).toBeVisible()
+  })
+
+  test('lan sees only the asset held and no Export, Import or New button', async ({ page }) => {
+    await useJourneySession(page, 'lan')
+    await page.goto(`${journeyURL}/asset-management/assets`)
+
+    await expect(page.getByRole('table')).toBeVisible()
+    await expect(page.getByRole('row', { name: new RegExp(registered) })).toBeVisible()
+    for (const name of imported) {
+      await expect(page.getByRole('row', { name: new RegExp(name) })).toHaveCount(0)
+    }
+    for (const name of ['Export', 'Import', 'New']) {
+      await expect(page.getByRole('button', { name, exact: true })).toHaveCount(0)
+    }
   })
 })

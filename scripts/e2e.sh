@@ -44,8 +44,8 @@
 # temporary folder. Only the empty application tests/e2e/fixtures/journey-base is active at start, because only
 # startup activation migrates a tenant database. Playwright starts that server after the main one, which
 # shares the platform database. The worker and the publisher serve the journey tenant too, and the run fails if
-# either log never reports it ready. The setup step signs the author, the requester, the service desk lead and
-# the agent in on its host.
+# either log never reports it ready. The setup step signs the author, the requester, the service desk lead,
+# the agent, the approver, the asset manager, the employee and the auditor in on its host.
 # A Compose smoke test then builds the image and runs the stack on free ports. An images smoke test
 # then builds the production images axis-server, axis-worker and axis-admin, each up to three times
 # with a wait of 15 and 30 seconds, and runs them read-only against a throwaway PostgreSQL. An on-premises smoke test then installs deploy/compose/compose.yaml
