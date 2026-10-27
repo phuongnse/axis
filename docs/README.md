@@ -39,7 +39,7 @@ Detailed behaviour, one topic per file. Sections marked _(planned for Mx)_ are n
 | [Processes](reference/processes.md)                                    | The `process` resource, steps, compile checks, start endpoint, states, process tables |
 | [Task API](reference/task-api.md)                                      | Listing, reading and completing tasks                                                 |
 | [Process execution](reference/process-execution.md)                    | How the worker runs steps, connector calls, package operations, worker settings       |
-| [Process events and triggers](reference/process-events.md)             | Raised events, starts from triggers, event delivery, schedules                        |
+| [Process events and triggers](reference/process-events.md)             | Events, triggers, delivery, schedules, scheduled jobs, delete triggers, dead letters  |
 | [Process flow](reference/process-flow.md)                              | Timer, wait for event and sub-process steps, loops, create record, no-subject processes |
 | [Task deadlines and claims](reference/task-deadlines.md)               | Task escalations and deadlines, overdue tasks, claim, release and reassign            |
 | [Notifications](reference/notifications.md)                            | The `notify` operation, in-app and email notifications, user profiles, mail settings  |

@@ -3,8 +3,9 @@
 Status: **Agreed**
 
 M14 adds a visual process designer to Studio. An author builds a process by
-drag and drop on its graph. The owner agreed this on 2026-10-25. It is
-_(planned for M14)_. See [process designer](../reference/process-designer.md).
+drag and drop on its graph. The owner agreed this on 2026-10-25. It is built in
+M14, except the live region for moves, which is _(planned for M16)_. See
+[process designer](../reference/process-designer.md).
 It builds on the process graph of
 [D53](d53-typed-editors-and-the-process-graph-in-studio.md) and the designers
 of [D65](d65-a-visual-page-designer-on-a-canvas-drawn-by-the-sites-widgets.md)

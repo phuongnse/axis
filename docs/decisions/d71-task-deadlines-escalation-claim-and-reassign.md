@@ -3,7 +3,8 @@
 Status: **Agreed**
 
 M14 makes a task's time count and lets people take and hand on tasks. The
-owner agreed this on 2026-10-25. It is _(planned for M14)_. See
+owner agreed this on 2026-10-25. It is built in M14, except the email channel of
+an escalation's `notify`, which is _(planned for M16)_. See
 [task deadlines and claims](../reference/task-deadlines.md). It replaces the
 "Escalation needs timers, so it comes later" and "Queues come later" points of
 [D20](d20-human-tasks-task-inbox-and-forms.md), and adds the `reassign` action

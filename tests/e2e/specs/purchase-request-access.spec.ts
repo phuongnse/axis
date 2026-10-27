@@ -279,7 +279,7 @@ test("a finance reviewer sees a submitted request read-only, and an update throu
   await useSession(page, "dung");
 
   await page.goto(`/purchasing/purchaserequestform/${id}`);
-  const titleInput = page.getByRole("textbox", { name: "* Title", exact: true });
+  const titleInput = page.getByRole("textbox", { name: "Title", exact: true });
   await expect(titleInput).toHaveValue(title);
   await expect(titleInput).toHaveAttribute("readonly");
   await expect(page.getByRole("button", { name: "Cancel", exact: true })).toBeVisible();
@@ -325,7 +325,7 @@ const signedOutPages: {
     user: "anna",
     api: (id) => `${recordsPath}/${id}`,
     expectation: (page, title) =>
-      expect(page.getByRole("textbox", { name: "* Title", exact: true })).toHaveValue(title),
+      expect(page.getByRole("textbox", { name: "Title", exact: true })).toHaveValue(title),
   },
   {
     // An employee may not read this data source, so its department manager signs in.

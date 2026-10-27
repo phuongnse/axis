@@ -3,8 +3,8 @@
 // Usage: node scripts/check-locators.mjs [--root DIR]
 //
 // getByRole, getByLabel, getByText and getByTitle must pass `exact: true` with a string name or
-// text, because a partial match can pick the wrong element. A regular expression literal or
-// new RegExp(...) states on purpose how much it matches and is allowed. The check reads the
+// text, because a partial match can pick the wrong element. A regular expression literal,
+// new RegExp(...) or fieldLabel(...) states on purpose how much it matches and is allowed. The check reads the
 // source as text, so a name it cannot see, such as one inside an options variable, is reported.
 // A spec under tests/e2e/specs/ must not look up a dialog with getByRole('dialog') itself, because a click
 // during the dialog's opening is lost. It reaches the dialog through waitForDialog or confirmDialog in dialogs.ts.
@@ -191,7 +191,7 @@ function propertiesOf(source, masked, [start, end]) {
 }
 
 function isPattern(raw) {
-  return raw.startsWith('/') || /^new\s+RegExp\s*\(/.test(raw)
+  return raw.startsWith('/') || /^new\s+RegExp\s*\(/.test(raw) || /^fieldLabel\s*\(/.test(raw)
 }
 
 function looseReason(method, source, masked, args) {

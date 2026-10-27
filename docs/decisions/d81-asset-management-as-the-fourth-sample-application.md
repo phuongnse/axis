@@ -36,8 +36,9 @@ of the product brief for the data, security, pages and scenarios.
 - **Warranty reminders:** a scheduled job reminds the asset manager of
   warranties that end soon, with the notifications of
   [D73](d73-in-app-and-email-notifications.md). The process and its weekday
-  trigger exist, and the reminder is sent in the site. Its email channel is
-  planned for M14.
+  trigger exist, and the reminder is sent in the site. It goes to the
+  `asset-manager` role, so it is in-app only, because email to a role is a
+  compile error under [D73](d73-in-app-and-email-notifications.md).
 - **Built through Studio:** a Playwright journey builds the application through
   Studio only, compares its six parts with the committed folder, runs its
   scenarios from Studio, publishes it, imports assets and exports the register
