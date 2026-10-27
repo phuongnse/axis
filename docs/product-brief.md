@@ -304,8 +304,10 @@ from child rows, import and export. All of it is _(planned for M15)_. See
 
 The folder exists now, with its data, security, pages, dashboard and the
 scenarios of its access rules. It is active in development, Compose and E2E.
-The import, attachment and maintenance scenarios and the Studio journey stay
-planned.
+The import, attachment and maintenance scenarios and the last parts of the Studio
+journey stay planned: the sample's warranty reminder process and trigger, and the run of
+its scenarios from Studio. The journey already publishes the built application and uses
+its site to register, import and export assets.
 
 ### Data
 
