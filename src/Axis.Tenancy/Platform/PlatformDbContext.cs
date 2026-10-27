@@ -39,6 +39,10 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
                 table.HasCheckConstraint("ck_tenants_oidc_client_key", "(oidc_client_key IS NULL) = (oidc_client_key_id IS NULL)");
                 table.HasCheckConstraint("ck_tenants_oidc_previous_client_key", "(oidc_previous_client_key IS NULL) = (oidc_previous_client_key_id IS NULL)");
                 table.HasCheckConstraint("ck_tenants_oidc_previous_needs_current", "oidc_previous_client_key IS NULL OR oidc_client_key IS NOT NULL");
+                table.HasCheckConstraint("ck_tenants_smtp_from", "(smtp_host IS NULL) = (email_from IS NULL)");
+                table.HasCheckConstraint(
+                    "ck_tenants_smtp_host",
+                    "smtp_host IS NOT NULL OR (smtp_port IS NULL AND smtp_use_tls IS NULL AND smtp_user_name IS NULL AND smtp_password IS NULL)");
             });
             tenant.HasKey(t => t.Id).HasName("pk_tenants");
             tenant.Property(t => t.Id).HasColumnName("id").ValueGeneratedNever();
@@ -66,6 +70,12 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
             tenant.Property(t => t.ClaimLocale).HasColumnName("claim_locale");
             tenant.Property(t => t.EndpointAudience).HasColumnName("endpoint_audience");
             tenant.Property(t => t.ServiceAudience).HasColumnName("service_audience");
+            tenant.Property(t => t.SmtpHost).HasColumnName("smtp_host");
+            tenant.Property(t => t.SmtpPort).HasColumnName("smtp_port");
+            tenant.Property(t => t.SmtpUseTls).HasColumnName("smtp_use_tls");
+            tenant.Property(t => t.SmtpUserName).HasColumnName("smtp_user_name");
+            tenant.Property(t => t.SmtpPassword).HasColumnName("smtp_password").HasColumnType("bytea");
+            tenant.Property(t => t.EmailFrom).HasColumnName("email_from");
             tenant.Property(t => t.SchemaVersion).HasColumnName("schema_version").HasDefaultValue("");
             tenant.Property(t => t.PreviewOf).HasColumnName("preview_of");
             tenant.HasIndex(t => t.PreviewOf).IsUnique().HasDatabaseName("ix_tenants_preview_of");

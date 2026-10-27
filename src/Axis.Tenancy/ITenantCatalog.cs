@@ -34,7 +34,7 @@ public interface ITenantCatalog
 /// <param name="Oidc">How the tenant signs people in, or <c>null</c> when the source has none. Only the server uses it.</param>
 /// <param name="Bindings">The tenant's deployment bindings keyed by name, matched ignoring letter case.</param>
 /// <param name="PreviewOf">The id of the main tenant when this is a preview tenant, otherwise <c>null</c>.</param>
-/// <param name="Email">The tenant's own mail settings, which replace the host's whole, or <c>null</c> when the tenant uses the host's. Only the <c>configuration</c> source has them.</param>
+/// <param name="Email">The tenant's own mail settings, which replace the host's whole, or <c>null</c> when the tenant uses the host's. Both sources have them.</param>
 public sealed record TenantEntry(
     string Id,
     IReadOnlyList<string> Hosts,

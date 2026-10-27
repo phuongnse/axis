@@ -8,7 +8,7 @@ and
 [D45](../decisions/d45-tenant-backup-and-restore.md).
 The commands are `tenant create`, `tenant suspend`, `tenant resume`, `tenant rotate-passwords`,
 `tenant list`, `tenant backup`, `tenant restore`, `tenant oidc set`, `tenant binding list|set|remove`,
-`tenant host add|remove|move`, `migrate`, `activate`, `platform rekey`, `publisher` and `version`.
+`tenant host add|remove|move`, `tenant email set|clear`, `migrate`, `activate`, `platform rekey`, `publisher` and `version`.
 `platform rekey` is in [installation key](tenant-setting-commands.md#installation-key). The
 commands that change a tenant after it is created are in
 [tenant setting commands](tenant-setting-commands.md). That page also has the client key options
@@ -45,6 +45,7 @@ which host holds which connection. There is no HTTP API for provisioning.
 | `Modules:Path` | `Modules__Path` | The installed modules. Only `activate` and `publisher` read it. `tenant restore` never reads it, because a missing module refuses nothing. |
 | `Tenancy:Source` | `Tenancy__Source` | `directory` for the tenant setting commands, which exit with code 2 under any other value. `publisher` reads it too, see [publisher](#publisher). |
 | none | `AXIS_BINDING_SECRET` | The value of the `secret` binding that `tenant binding set --secret` sets. When it is unset, the value comes from standard input. It is never a command-line option. Only that command reads it. |
+| none | `AXIS_SMTP_PASSWORD` | The SMTP password that `tenant email set --password` stores for the tenant. When it is unset, the password comes from the first line of standard input. It is never a command-line option. Only that command reads it. |
 | none | `AXIS_OIDC_CLIENT_SECRET` | The OIDC client secret of the new tenant. `tenant create` and `tenant restore` read it, and so does `tenant oidc set --client-secret`, which reads the first line of standard input when the variable is not set. It is never a command-line option, so it does not appear in a process list. |
 | none | `PATH` | `tenant backup` and `tenant restore` run `pg_dump` and `pg_restore`, so both must be on `PATH`. Their version must match the database server. A missing tool exits with code 2. |
 
@@ -59,9 +60,9 @@ nor `AXIS_OIDC_CLIENT_SECRET`.
 `platform rekey` reads only `ConnectionStrings:PlatformSchema`, `Platform:SecretKey` and
 `Platform:PreviousSecretKey`. It needs no admin role, no client secret and no `Tenancy:Source`.
 
-The `tenant binding` and `tenant host` commands read `ConnectionStrings:PlatformSchema` and
-need `Tenancy:Source=directory`. Only `tenant binding set --secret` also reads
-`Platform:SecretKey`, because it encrypts. See
+The `tenant binding`, `tenant host` and `tenant email` commands read `ConnectionStrings:PlatformSchema` and
+need `Tenancy:Source=directory`. Only `tenant binding set --secret` and `tenant email set --password`
+also read `Platform:SecretKey`, because they encrypt. See
 [tenant setting commands](tenant-setting-commands.md).
 
 `tenant backup` reads only `ConnectionStrings:PlatformSchema`,

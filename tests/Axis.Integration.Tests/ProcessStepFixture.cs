@@ -92,6 +92,9 @@ public sealed class ProcessStepFixture : IAsyncLifetime
     /// <summary>The connection string of the tenant database, for a test that builds its own worker hosts.</summary>
     public string ConnectionString => _connectionString ?? throw new InvalidOperationException("The fixture is not initialized.");
 
+    /// <summary>Creates another database on the shared server, named after the prefix. The fixture drops it when it is disposed.</summary>
+    internal Task<string> CreateDatabaseAsync(string prefix) => _database.CreateDatabaseAsync(prefix);
+
     public NpgsqlDataSource DataSource => _dataSource ?? throw new InvalidOperationException("The fixture is not initialized.");
 
     public async ValueTask InitializeAsync()

@@ -265,6 +265,8 @@ a tenant only when this value is the one the host was built for, see
   else:
   - the runtime and schema database passwords, in `platform.tenants`;
   - the OIDC client secret, in `platform.tenants`;
+  - the SMTP password of a tenant's own mail settings, in `platform.tenants`,
+    see [mail settings](notifications.md#mail-settings);
   - the value of a `secret` binding, in `platform.tenant_bindings`;
   - the client keys of a tenant under the `fapi2` sign-in profile, in
     `platform.tenants`, with the field name `oidc_client_key` and the key id,
@@ -276,7 +278,7 @@ a tenant only when this value is the one the host was built for, see
   is the tenant id and the field name, so a value copied to another tenant or
   field does not decrypt. The associated data is the UTF-8 bytes of the tenant
   id, one zero byte, and the UTF-8 bytes of the field name. The field names are
-  `runtime_password`, `schema_password`, `oidc_client_secret`, `oidc_client_key`, and `binding:`
+  `runtime_password`, `schema_password`, `oidc_client_secret`, `oidc_client_key`, `smtp_password`, and `binding:`
   followed by the binding name in lower case. Every writer must use these
   exact bytes and names. A data protection key uses an
   empty tenant id, so the associated data is one zero byte and the field name
