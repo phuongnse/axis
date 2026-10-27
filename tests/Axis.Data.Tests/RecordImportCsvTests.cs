@@ -145,6 +145,34 @@ public sealed class RecordImportCsvTests
             Encoding.UTF8.GetString(columns.Body(["", "01", "", "False"])));
     }
 
+    [Fact]
+    public void An_update_body_names_the_version_and_leaves_out_the_key_column()
+    {
+        var (columns, _) = RecordImportColumns.Map(["name", "count", "price"], _entity);
+
+        Assert.Equal(
+            """{"version":7,"values":{"Count":3}}""",
+            Encoding.UTF8.GetString(columns!.Body(["Desk", "3", ""], leaveOut: 0, version: 7)));
+        Assert.Equal(
+            """{"values":{"name":"Desk","Count":3}}""",
+            Encoding.UTF8.GetString(columns.Body(["Desk", "3", ""], leaveOut: null, version: null)));
+    }
+
+    [Fact]
+    public void A_cell_value_is_typed_by_its_field_and_an_empty_or_invalid_cell_has_none()
+    {
+        var (columns, _) = RecordImportColumns.Map(["name", "count"], _entity);
+        var application = Application(_entity);
+
+        var name = columns!.Value(application, _entity, ["Desk", "3"], 0);
+        var count = columns.Value(application, _entity, ["Desk", "3"], 1);
+
+        Assert.Equal("Desk", name!.Value);
+        Assert.Equal(3L, count!.Value);
+        Assert.Null(columns.Value(application, _entity, ["", "3"], 0));
+        Assert.Null(columns.Value(application, _entity, ["Desk", "abc"], 1));
+    }
+
     private static RecordImportCsv Open(string text, bool withBom = false) =>
         RecordImportCsv.Open(withBom ? Encoding.UTF8.GetBytes(text.TrimStart('﻿')).Prepend((byte)0xEF).Prepend((byte)0xBB).Prepend((byte)0xBF).Reverse().ToArray() : Encoding.UTF8.GetBytes(text));
 }

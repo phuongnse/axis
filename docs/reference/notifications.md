@@ -130,6 +130,11 @@ A text value may hold named placeholders, such as
   checked when read, as a role task is.
 - **Read state.** `axis.notification_reads` holds one row per notification
   and user who read it.
+- **Speed.** The list answers within 300 ms for a user with 1,000
+  notifications, to the user and to a role they hold, half of them read, and its
+  count reads through the notification index. This is the Reads objective of
+  [performance](performance.md#objectives). `TaskInboxPerformanceTests` fails
+  when the best of three calls takes 300 ms or more.
 - **Routes.**
   - `GET /api/apps/{app}/notifications?page=&pageSize=&unread=` lists the
     user's notifications, newest first. It answers `items`, `page`, `pageSize`,

@@ -722,8 +722,8 @@ schema of the tenant database.
     when they succeed and when they fail, see
     [publish requests and release history](#publish-requests-and-release-history).
   - **Import actions.** The commit of a [record import](import-export.md#import)
-    writes `records.imported`, after the `record.created` audit record of each
-    row, in the transaction that writes the rows. The actor is the uploader
+    writes `records.imported`, after the `record.created` or `record.updated` audit
+    record of each row, in the transaction that writes the rows. The actor is the uploader
     with their display name. `entity_id` is set, and `record_id` and
     `process_instance_id` are null. `details` is
     `{ "created", "updated" }`, the counts of records, and it holds no value.

@@ -942,11 +942,11 @@ Run and the Test results list, the read-only view of a module entity, and the re
   - **Library.** Drag and drop uses `@dnd-kit/core`, `@dnd-kit/sortable` and
     `@dnd-kit/utilities`. The four `@dnd-kit` packages,
     `@dnd-kit/accessibility` among them, measure 15.4 KB gzipped together, in the lazy
-    chunk `assets/DragAndDrop-*.js` that both designers share. Each designer's
+    chunk `assets/DragAndDrop-*.js` that the designers share. Each designer's
     canvas, palette and, for a page, data panel are a lazy chunk of their own,
-    `StudioPageDesign` and `StudioFormDesign`. All of them load when the Design
-    tab opens. The build fails when the drag and drop chunk or the page chunk is
-    missing, or is part of the main bundle. The pointer moves of existing widgets use the core package and the
+    `StudioPageDesign`, `StudioFormDesign` and `StudioProcessDesign`. All of them load when the Design
+    tab opens. The build fails when the drag and drop chunk, the page chunk or the process design chunk
+    is missing, or is part of the main bundle. The pointer moves of existing widgets use the core package and the
     palette's drop targets. The form outline's field and section moves use
     `@dnd-kit/sortable`.
   - **Format.** The designer writes only the order of the widget tree and the

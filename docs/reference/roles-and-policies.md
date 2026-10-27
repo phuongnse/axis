@@ -159,8 +159,7 @@ outcomes. Operators inspect the approvals and change nothing:
     `read` grant on the same target in the same policy, or it is `AXC0265`.
     `import` writes through the user's `create` grants, and needs a `create`
     grant on the same entity in the same policy, or it is `AXC0265`. The
-    import checks `update` as well for an import with a key
-    _(planned for M15)_. See [import and export](import-export.md#grants) and
+    import checks `update` as well for an import with a key. See [import and export](import-export.md#grants) and
     [D79](../decisions/d79-import-and-export-under-policies.md).
 - **Filter.** An entity grant may have a `filter`, a boolean
   [expression](expressions.md#names-and-references) over the record. It sees
@@ -168,7 +167,11 @@ outcomes. Operators inspect the approvals and change nothing:
   named rules and [`currentUser()`](expressions.md#current-user). `any` and
   `count` test a child collection or a `references` field of the entity, so
   `any(assignees, userId == currentUser())` reads only the records that list
-  the user. Without it,
+  the user. A list under an `any` filter over a child collection finds each
+  record's rows through the child table's owner index
+  ([D77](../decisions/d77-indexes-defaults-and-ranges.md)).
+  `AnyPolicyPerformanceTests` fails when a list read over 100,000 records
+  with 500,000 child rows takes 2 s or more. Without it,
   the grant covers every record. On `read`, `update` and
   `delete` the stored record must match it. On `create` and `update` the new
   record must match it too. The employee's write grant above keeps a request

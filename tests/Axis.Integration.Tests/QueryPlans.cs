@@ -14,6 +14,15 @@ internal static class QueryPlans
         Assert.DoesNotContain("Seq Scan", plan, StringComparison.Ordinal);
     }
 
+    /// <summary>The plan contains a scan using <paramref name="index"/> and no full read of <paramref name="table"/>.</summary>
+    /// <remarks>Other tables in the plan may be read in full. A small one rightly is.</remarks>
+    public static void AssertUsesIndex(string plan, string index, string table)
+    {
+        var escaped = Regex.Escape(index);
+        Assert.Matches($@"(Index Scan|Index Only Scan)( Backward)? using {escaped} |Bitmap Index Scan on {escaped}\b", plan);
+        Assert.DoesNotMatch($@"Seq Scan on {Regex.Escape(table)}\b", plan);
+    }
+
     /// <summary>Plans <paramref name="sql"/> with its parameters, writes the plan to the test output and returns it.</summary>
     public static async Task<string> ExplainAsync(NpgsqlDataSource dataSource, string sql, Action<NpgsqlCommand> bind, CancellationToken cancellationToken)
     {
