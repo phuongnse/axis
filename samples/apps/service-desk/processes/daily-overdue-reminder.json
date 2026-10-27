@@ -1,0 +1,47 @@
+{
+  "id": "add7baab-4a82-4f21-a4f0-5936a6862c9c",
+  "kind": "process",
+  "name": "DailyOverdueReminder",
+  "formatVersion": 1,
+  "parameters": [
+    {
+      "name": "daysOverdue",
+      "type": "integer"
+    }
+  ],
+  "start": "remind",
+  "steps": [
+    {
+      "name": "remind",
+      "type": "operation",
+      "operation": "notify",
+      "to": [
+        {
+          "role": "service-desk-lead"
+        }
+      ],
+      "channels": [
+        "inApp"
+      ],
+      "message": {
+        "subject": {
+          "textKey": "notifications.overdue.subject"
+        },
+        "body": {
+          "textKey": "notifications.overdue.body"
+        },
+        "values": {
+          "days": "daysOverdue"
+        }
+      },
+      "open": {
+        "page": "AllTickets"
+      },
+      "next": "done"
+    },
+    {
+      "name": "done",
+      "type": "end"
+    }
+  ]
+}

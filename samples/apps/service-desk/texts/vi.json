@@ -56,6 +56,10 @@
     "task.reopen": "Mở lại",
     "role.requester": "Người yêu cầu",
     "role.agent": "Nhân viên hỗ trợ",
-    "role.serviceDeskLead": "Trưởng bộ phận hỗ trợ"
+    "role.serviceDeskLead": "Trưởng bộ phận hỗ trợ",
+    "notifications.overdue.subject": "Có yêu cầu hỗ trợ quá hạn",
+    "notifications.overdue.body": "Một số yêu cầu hỗ trợ đã quá hạn hơn {days} ngày. Mở Tất cả yêu cầu để xem.",
+    "notifications.ticketDeleted.subject": "Yêu cầu {number} đã bị xóa",
+    "notifications.ticketDeleted.body": "Người yêu cầu đã xóa bản nháp {number}: {title}."
   }
 }

@@ -1,0 +1,49 @@
+{
+  "id": "8f8e84f2-40ea-4dd7-b8ef-426d42a4150d",
+  "kind": "process",
+  "name": "TellLeadTicketDeleted",
+  "formatVersion": 1,
+  "parameters": [
+    {
+      "name": "number",
+      "type": "text"
+    },
+    {
+      "name": "title",
+      "type": "text"
+    }
+  ],
+  "start": "tellLead",
+  "steps": [
+    {
+      "name": "tellLead",
+      "type": "operation",
+      "operation": "notify",
+      "to": [
+        {
+          "role": "service-desk-lead"
+        }
+      ],
+      "channels": [
+        "inApp"
+      ],
+      "message": {
+        "subject": {
+          "textKey": "notifications.ticketDeleted.subject"
+        },
+        "body": {
+          "textKey": "notifications.ticketDeleted.body"
+        },
+        "values": {
+          "number": "number",
+          "title": "title"
+        }
+      },
+      "next": "done"
+    },
+    {
+      "name": "done",
+      "type": "end"
+    }
+  ]
+}
