@@ -3,8 +3,7 @@
 Detailed reference for the `file` field type: its values, the upload and
 download routes, where the bytes are stored and how they are cleaned up. The
 design follows [D76](../decisions/d76-file-money-and-enum-label-field-types.md).
-The conventions of [architecture.md](../architecture.md) apply: sections
-marked _(planned for M15)_ are not built yet, and Dn refers to
+The conventions of [architecture.md](../architecture.md) apply, and Dn refers to
 [decisions.md](../decisions.md).
 
 Upload up to the `pending` state, the storage of a file's details and bytes,

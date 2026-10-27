@@ -4,7 +4,7 @@ Status: **Agreed**
 
 M15 lets a child row point to a record, adds a field that holds a set of
 records, and lets filters test child rows and sets. The owner agreed these
-points on 2026-10-25. All of it is _(planned for M15)_. See
+points on 2026-10-25. It is built in M15. See
 [entity logic](../reference/resource-files.md#entity-logic) and the
 [SQL subset](../reference/expressions.md#sql-subset). It lifts one of the M2
 limits on a child entity, and extends the SQL subset of

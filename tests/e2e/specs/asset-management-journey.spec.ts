@@ -77,7 +77,9 @@ test.describe('the author builds the asset management application with Studio on
     await page.getByRole('button', { name: 'Save', exact: true }).click()
     for (const [field, choice] of answers) {
       await expect(page.getByTestId('studio-migration-field')).toHaveText(field)
-      await page.getByRole('button', { name: choice, exact: true }).click()
+      // A click during the dialog's zoom-in is lost, so each answer waits for its dialog to open.
+      const dialog = await waitForDialog(page)
+      await dialog.getByRole('button', { name: choice, exact: true }).click()
     }
     await expect(page.getByTestId('studio-saved')).toBeVisible()
     const { diagnostics } = (await (await answer).json()) as {
@@ -248,6 +250,52 @@ test.describe('the author builds the asset management application with Studio on
       await confirmDialog(page, 'Delete')
       await expect(migrations.getByRole('button')).toHaveCount(before - 1)
     }
+  }
+
+  async function buildDataSource(page: Page, name: string, file: string) {
+    const list = await sample<SampleDataSource>(file)
+    await createResource(page, 'dataSource', name)
+    await expectForm(page)
+    await pick(page, 'studio-field-/entity', list.entity)
+    // The starter has the first row, so only the later rows are added.
+    for (const [index, field] of list.fields.entries()) {
+      if (index > 0) {
+        await page.getByTestId('studio-field-/fields').getByRole('button', { name: 'Add', exact: true }).click()
+      }
+      await page.getByTestId(`studio-field-/fields/${index}/name`).getByRole('textbox').fill(field.name)
+      await page.getByTestId(`studio-field-/fields/${index}/path`).getByRole('textbox').fill(field.path)
+    }
+    if (list.filter !== undefined) {
+      const filter = page.getByTestId('studio-field-/filter')
+      await expect(filter.locator('.cm-editor')).toBeVisible()
+      await filter.getByRole('textbox').fill(list.filter)
+    }
+    if (list.aggregate !== undefined) {
+      const groupBy = page.getByTestId('studio-field-/aggregate/groupBy')
+      for (const [index, column] of list.aggregate.groupBy.entries()) {
+        await groupBy.getByRole('button', { name: 'Add', exact: true }).click()
+        await page.getByTestId(`studio-field-/aggregate/groupBy/${index}`).getByRole('textbox').fill(column)
+      }
+      if (list.aggregate.groupBy.length === 0) {
+        // The form has no empty array to start from, so the author adds an entry and removes it to write `[]`.
+        await groupBy.getByRole('button', { name: 'Add', exact: true }).click()
+        await groupBy.getByRole('button', { name: 'Remove', exact: true }).click()
+      }
+      for (const [index, measure] of list.aggregate.measures.entries()) {
+        const at = `studio-field-/aggregate/measures/${index}`
+        await page
+          .getByTestId('studio-field-/aggregate/measures')
+          .getByRole('button', { name: 'Add', exact: true })
+          .click()
+        await page.getByTestId(`${at}/name`).getByRole('textbox').fill(measure.name)
+        await pick(page, `${at}/function`, measure.function)
+        if (measure.field !== undefined) {
+          await page.getByTestId(`${at}/field`).getByRole('textbox').fill(measure.field)
+        }
+      }
+    }
+    await save(page)
+    await expectForm(page)
   }
 
   test('the author creates AssetManagement as a blank application', async ({ page }) => {
@@ -567,49 +615,7 @@ test.describe('the author builds the asset management application with Studio on
       ['AssetsByStatus', 'data-sources/assets-by-status.json'],
       ['WarrantiesEndingSoon', 'data-sources/warranties-ending-soon.json'],
     ]) {
-      const list = await sample<SampleDataSource>(file)
-      await createResource(page, 'dataSource', name)
-      await expectForm(page)
-      await pick(page, 'studio-field-/entity', list.entity)
-      // The starter has the first row, so only the later rows are added.
-      for (const [index, field] of list.fields.entries()) {
-        if (index > 0) {
-          await page.getByTestId('studio-field-/fields').getByRole('button', { name: 'Add', exact: true }).click()
-        }
-        await page.getByTestId(`studio-field-/fields/${index}/name`).getByRole('textbox').fill(field.name)
-        await page.getByTestId(`studio-field-/fields/${index}/path`).getByRole('textbox').fill(field.path)
-      }
-      if (list.filter !== undefined) {
-        const filter = page.getByTestId('studio-field-/filter')
-        await expect(filter.locator('.cm-editor')).toBeVisible()
-        await filter.getByRole('textbox').fill(list.filter)
-      }
-      if (list.aggregate !== undefined) {
-        const groupBy = page.getByTestId('studio-field-/aggregate/groupBy')
-        for (const [index, column] of list.aggregate.groupBy.entries()) {
-          await groupBy.getByRole('button', { name: 'Add', exact: true }).click()
-          await page.getByTestId(`studio-field-/aggregate/groupBy/${index}`).getByRole('textbox').fill(column)
-        }
-        if (list.aggregate.groupBy.length === 0) {
-          // The form has no empty array to start from, so the author adds an entry and removes it to write `[]`.
-          await groupBy.getByRole('button', { name: 'Add', exact: true }).click()
-          await groupBy.getByRole('button', { name: 'Remove', exact: true }).click()
-        }
-        for (const [index, measure] of list.aggregate.measures.entries()) {
-          const at = `studio-field-/aggregate/measures/${index}`
-          await page
-            .getByTestId('studio-field-/aggregate/measures')
-            .getByRole('button', { name: 'Add', exact: true })
-            .click()
-          await page.getByTestId(`${at}/name`).getByRole('textbox').fill(measure.name)
-          await pick(page, `${at}/function`, measure.function)
-          if (measure.field !== undefined) {
-            await page.getByTestId(`${at}/field`).getByRole('textbox').fill(measure.field)
-          }
-        }
-      }
-      await save(page)
-      await expectForm(page)
+      await buildDataSource(page, name, file)
     }
   })
 
@@ -996,6 +1002,143 @@ test.describe('the author builds the asset management application with Studio on
     compareApplicationFolders(assetManagement, built, {
       files: [...policies, ...scenarios.map(([, file]) => file)],
     })
+  })
+
+  test("the author builds the warranty reminder's data source, process and schedule trigger", async ({ page }) => {
+    await useJourneySession(page, 'hoa')
+    await page.goto(`${journeyURL}/studio?app=AssetManagement`)
+
+    const en = await texts('en')
+    const stepCard = (index: number) => page.getByTestId(`studio-step-${index}`)
+
+    await buildDataSource(page, 'AssetsWithWarrantyEndingSoon', 'data-sources/assets-with-warranty-ending-soon.json')
+
+    // A new trigger starts as an event trigger, and only picking an event and clearing it removes the key. The sample
+    // has no event, so one exists until the trigger is built.
+    await createResource(page, 'event', 'Placeholder')
+    await openFormTab(page)
+    await pick(page, 'studio-field-/entity', 'Asset')
+    await save(page)
+
+    async function dropEvent() {
+      await pick(page, 'studio-field-/event', 'Placeholder')
+      const field = page.getByTestId('studio-field-/event')
+      await field.hover()
+      await field.getByRole('img', { name: 'close-circle', exact: true }).click()
+      await expect(field.getByTitle('Placeholder', { exact: true })).toHaveCount(0)
+    }
+
+    await createResource(page, 'process', 'WarrantyReminder')
+    await openFormTab(page)
+    // The subject of a new process is an entity, so only the entity is picked.
+    await pick(page, 'studio-field-/entity', 'Asset')
+    await stepCard(0).getByRole('button', { name: 'Remove step', exact: true }).click()
+    for (const [index, [stepName, type]] of [
+      ['remind', 'operation'],
+      ['done', 'end'],
+    ].entries()) {
+      await pickAction(page.getByRole('combobox', { name: 'Add step', exact: true }), type, stepCard(index))
+      await stepCard(index).getByRole('textbox', { name: 'Step name', exact: true }).fill(stepName)
+    }
+
+    await pick(page, 'studio-field-/steps/0/operation', 'notify')
+    await page
+      .getByTestId('studio-field-/steps/0/to')
+      .getByRole('button', { name: 'Add recipient', exact: true })
+      .click()
+    await page
+      .getByTestId('studio-field-/steps/0/to/0')
+      .locator('label')
+      .filter({ has: page.getByRole('radio', { name: 'Role', exact: true }) })
+      .click()
+    await pick(page, 'studio-field-/steps/0/to/0/role', 'asset-manager')
+    await page
+      .getByTestId('studio-field-/steps/0/channels')
+      .getByRole('checkbox', { name: 'In-app', exact: true })
+      .check()
+    for (const [field, key] of [
+      ['subject', 'asset.warrantyReminder.subject'],
+      ['body', 'asset.warrantyReminder.body'],
+    ]) {
+      await writeLabel(page, `studio-field-/steps/0/message/${field}`, key, en[key])
+    }
+    const values = page.getByTestId('studio-field-/steps/0/message/values')
+    for (const [placeholder, expression] of [
+      ['name', 'name'],
+      ['warrantyEnd', 'warrantyEnd'],
+    ]) {
+      await values.getByRole('button', { name: 'Add mapping', exact: true }).click()
+      await values.getByRole('textbox', { name: 'Placeholder', exact: true }).last().fill(placeholder)
+      const value = page.getByTestId(`studio-field-/steps/0/message/values/${placeholder}`)
+      await expect(value.locator('.cm-editor')).toBeVisible()
+      await value.getByRole('textbox', { name: 'Expression', exact: true }).fill(expression)
+    }
+    await page
+      .getByTestId('studio-field-/steps/0/open')
+      .getByRole('checkbox', { name: 'Open a page', exact: true })
+      .check()
+    await pick(page, 'studio-field-/steps/0/open/page', 'AssetDetail')
+    // The page's parameters are offered by name, so the author picks `asset` and writes the expression.
+    await pickAction(
+      page
+        .getByTestId('studio-field-/steps/0/open/parameters')
+        .getByRole('combobox', { name: 'Add mapping Page parameters', exact: true }),
+      'asset',
+      page.getByTestId('studio-field-/steps/0/open/parameters/asset'),
+    )
+    const parameter = page.getByTestId('studio-field-/steps/0/open/parameters/asset')
+    await expect(parameter.locator('.cm-editor')).toBeVisible()
+    await parameter.getByRole('textbox', { name: 'Expression', exact: true }).fill('id')
+    await pick(page, 'studio-field-/steps/0/next', 'done')
+    await pick(page, 'studio-field-/start', 'remind')
+    const diagnostics = await save(page)
+    await expectForm(page)
+    expect(
+      diagnostics.filter(
+        (diagnostic) => diagnostic.file === 'processes/warranty-reminder.json' && diagnostic.severity === 'error',
+      ),
+    ).toEqual([])
+
+    await createResource(page, 'trigger', 'WarrantyReminderWeekdays')
+    await openFormTab(page)
+    await pick(page, 'studio-field-/type', 'schedule')
+    await dropEvent()
+    await page.getByTestId('studio-field-/schedule').getByRole('textbox').fill('0 8 * * 1-5')
+    await page.getByTestId('studio-field-/timeZone').getByRole('textbox').fill('Asia/Ho_Chi_Minh')
+    await pick(page, 'studio-field-/dataSource', 'AssetsWithWarrantyEndingSoon')
+    await pick(page, 'studio-field-/process', 'WarrantyReminder')
+    await save(page)
+
+    await page.getByTestId('studio-group-event').getByRole('button', { name: 'Placeholder', exact: true }).click()
+    await page.getByRole('button', { name: 'Delete', exact: true }).click()
+    await confirmDialog(page, 'Delete')
+    await expect(page.getByTestId('studio-group-event')).toHaveCount(0)
+  })
+
+  test('the whole built folder matches the sample', async ({ page }) => {
+    await useJourneySession(page, 'hoa')
+    await page.goto(`${journeyURL}/studio?app=AssetManagement`)
+
+    compareApplicationFolders(assetManagement, built)
+    const response = await page.request.get(`${journeyURL}/api/studio/apps/AssetManagement/diagnostics`)
+    expect(response.status()).toBe(200)
+    const { diagnostics } = (await response.json()) as { diagnostics: { severity: string }[] }
+    expect(diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([])
+  })
+
+  test('the author runs the five test scenarios from Studio', async ({ page }) => {
+    await useJourneySession(page, 'hoa')
+    await page.goto(`${journeyURL}/studio?app=AssetManagement`)
+    await page.getByTestId('studio-run-tests').click()
+
+    // Each scenario creates and drops a database, and the publisher queue is shared with other specs.
+    await expect(page.getByTestId('studio-request-status')).toHaveAttribute('data-status', 'succeeded', {
+      timeout: 240_000,
+    })
+    await expect(page.getByTestId('studio-test-result')).toHaveCount(scenarios.length)
+    await expect(page.locator('[data-testid="studio-test-result"][data-outcome="passed"]')).toHaveCount(
+      scenarios.length,
+    )
   })
 
   // The tests on the published site share one run suffix and the asset the register test creates. A retry runs the

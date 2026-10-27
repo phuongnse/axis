@@ -1,6 +1,6 @@
 // Smoke test for `docker compose up`: builds the image from source, runs the stack on free ports
 // and calls it. It uses its own Compose project, so it never touches a developer's stack or data.
-// Requires Docker. Run from scripts/e2e.sh.
+// Requires Docker. Run from scripts/smoke.sh.
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'

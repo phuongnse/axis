@@ -76,7 +76,14 @@ export function antThemeFor(mode: ThemeMode, page?: PageTokenValues): ThemeConfi
         itemHoverColor: colour.primaryText,
         itemActiveColor: colour.primaryText,
       },
-      Menu: { itemSelectedColor: colour.primaryText, horizontalItemSelectedColor: colour.primaryText },
+      Menu: {
+        itemSelectedColor: colour.primaryText,
+        horizontalItemSelectedColor: colour.primaryText,
+        dangerItemColor: colour.dangerText,
+        dangerItemHoverColor: colour.dangerText,
+        dangerItemSelectedColor: colour.dangerText,
+      },
+      Pagination: { itemActiveColor: colour.primaryText, itemActiveColorHover: colour.primaryText },
       Button: { defaultShadow: 'none', primaryShadow: 'none', dangerShadow: 'none' },
     },
   }

@@ -94,6 +94,31 @@ const linesWidget: EntityWidgetMetadata = {
   },
 }
 
+// A note whose lines each name a category, a reference cell in a child collection.
+const lineCategoryWidget: EntityWidgetMetadata = {
+  ...noteWidget,
+  entity: {
+    ...noteWidget.entity,
+    fields: [
+      { ...field('title', 'text', 'note.title'), required: true, maxLength: 200 },
+      {
+        ...field('lines', 'child-collection', 'note.lines'),
+        fields: [
+          { ...field('description', 'text', 'noteLine.description'), required: true, maxLength: 100 },
+          {
+            ...field('category', 'reference', 'note.category'),
+            target: {
+              entity: 'Category',
+              displayField: 'name',
+              recordsPath: '/api/apps/E2eApp/entities/Category/records',
+            },
+          },
+        ],
+      },
+    ],
+  },
+}
+
 // A note whose total and each line's code the server computes.
 const computedWidget: EntityWidgetMetadata = {
   ...noteWidget,
@@ -452,8 +477,8 @@ describe('FormWidget', () => {
 
     renderForm(noteId)
 
-    expect(await screen.findByLabelText('Title')).toHaveValue('Buy paper')
-    expect(screen.getByLabelText('Title')).toHaveAttribute('maxlength', '200')
+    expect(await screen.findByRole('textbox', { name: 'Title' })).toHaveValue('Buy paper')
+    expect(screen.getByRole('textbox', { name: 'Title' })).toHaveAttribute('maxlength', '200')
     expect(screen.getByLabelText('Priority')).toHaveValue('7')
     expect(screen.getByLabelText('Amount')).toHaveValue('12.50')
     expect(screen.getByLabelText('Amount')).toHaveAttribute('inputmode', 'decimal')
@@ -493,6 +518,19 @@ describe('FormWidget', () => {
     expect(within(group).getByRole('button', { name: 'Choose' })).toBeInTheDocument()
   })
 
+  it('shows Choose and Clear as icon buttons with no visible text', async () => {
+    stubFetch({ status: 200, body: noteJson('Buy paper', 1) })
+    renderForm(noteId)
+    await screen.findByLabelText('Category')
+
+    const choose = screen.getByRole('button', { name: 'Choose' })
+    const clear = screen.getByRole('button', { name: 'Clear' })
+    expect(choose.textContent).toBe('')
+    expect(clear.textContent).toBe('')
+    expect(choose.querySelector('.anticon-search')).not.toBeNull()
+    expect(clear.querySelector('.anticon-close')).not.toBeNull()
+  })
+
   it('shows the history of a saved record below the form', async () => {
     stubFetch({ status: 200, body: noteJson('Buy paper', 1) })
 
@@ -510,7 +548,7 @@ describe('FormWidget', () => {
     stubFetch()
     renderForm()
 
-    expect(await screen.findByLabelText('Title')).toHaveValue('')
+    expect(await screen.findByRole('textbox', { name: 'Title' })).toHaveValue('')
     expect(screen.queryByTestId('record-history')).toBeNull()
     expect(historyRequests()).toEqual([])
   })
@@ -520,8 +558,8 @@ describe('FormWidget', () => {
     renderForm()
 
     // Ant Design marks a required item by a class on its label; the server still decides.
-    expect(isRequiredLabel(screen.getByText('Title', { selector: 'label' }))).toBe(true)
-    expect(isRequiredLabel(screen.getByText('Code', { selector: 'label' }))).toBe(false)
+    expect(isRequiredLabel(screen.getByText('Title'))).toBe(true)
+    expect(isRequiredLabel(screen.getByText('Code'))).toBe(false)
   })
 
   it('confirms a picker value on Enter without sending the form', async () => {
@@ -539,7 +577,7 @@ describe('FormWidget', () => {
     const requests = stubFetch({ status: 201, body: noteJson('Buy paper', 1) })
     renderForm()
 
-    await userEvent.type(screen.getByLabelText('Title'), 'Buy paper')
+    await userEvent.type(screen.getByRole('textbox', { name: 'Title' }), 'Buy paper')
     await userEvent.type(screen.getByLabelText('Priority'), '7')
     await userEvent.type(screen.getByLabelText('Amount'), '12.50')
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
@@ -556,7 +594,7 @@ describe('FormWidget', () => {
       { status: 200, body: noteJson('New', 2) },
     )
     renderForm(noteId)
-    const title = await screen.findByLabelText('Title')
+    const title = await screen.findByRole('textbox', { name: 'Title' })
 
     await userEvent.clear(title)
     await userEvent.type(title, 'New')
@@ -604,14 +642,14 @@ describe('FormWidget', () => {
       { status: 200, body: noteJson('Changed elsewhere', 2) },
     )
     renderForm(noteId)
-    const title = await screen.findByLabelText('Title')
+    const title = await screen.findByRole('textbox', { name: 'Title' })
     await userEvent.type(title, '!')
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     expect(await screen.findByTestId('form-conflict')).toHaveTextContent('This record was changed since you opened it.')
     await userEvent.click(screen.getByRole('button', { name: 'Reload' }))
 
-    await waitFor(() => expect(screen.getByLabelText('Title')).toHaveValue('Changed elsewhere'))
+    await waitFor(() => expect(screen.getByRole('textbox', { name: 'Title' })).toHaveValue('Changed elsewhere'))
     expect(screen.queryByTestId('form-conflict')).not.toBeInTheDocument()
     expect(requests()[2]).toEqual({ url: `${recordsPath}/${noteId}`, method: 'GET', body: undefined })
   })
@@ -647,7 +685,7 @@ describe('FormWidget', () => {
       body: undefined,
     })
 
-    await userEvent.type(screen.getByLabelText('Title'), 'Buy paper')
+    await userEvent.type(screen.getByRole('textbox', { name: 'Title' }), 'Buy paper')
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     await waitFor(() => expect(requests()).toHaveLength(2))
@@ -665,7 +703,7 @@ describe('FormWidget', () => {
       { status: 200, body: noteJson('New', 2) },
     )
     renderForm(noteId)
-    const title = await screen.findByLabelText('Title')
+    const title = await screen.findByRole('textbox', { name: 'Title' })
 
     await userEvent.click(screen.getByRole('button', { name: 'Choose' }))
     await userEvent.click(await within(await screen.findByRole('dialog')).findByText('Office'))
@@ -742,7 +780,7 @@ describe('FormWidget', () => {
       },
     }
     const { unmount } = renderForm(noteId, requiredWidget)
-    expect(await screen.findByLabelText('Category')).toHaveValue('Office')
+    expect(await screen.findByRole('textbox', { name: 'Category' })).toHaveValue('Office')
     expect(screen.getByRole('button', { name: 'Choose' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Clear' })).not.toBeInTheDocument()
     unmount()
@@ -789,7 +827,7 @@ describe('FormWidget', () => {
     await userEvent.click(await within(await screen.findByRole('dialog')).findByText('Visio'))
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
 
-    await userEvent.type(screen.getByLabelText('Title'), 'Laptop')
+    await userEvent.type(screen.getByRole('textbox', { name: 'Title' }), 'Laptop')
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     await waitFor(() => expect(requests()).toHaveLength(4))
@@ -816,7 +854,7 @@ describe('FormWidget', () => {
   it('sends an unchanged set of references only when it changes', async () => {
     const requests = stubFetch({ status: 200, body: softwareJson(1) }, { status: 200, body: softwareJson(2) })
     renderForm(noteId, softwareWidget)
-    const title = await screen.findByLabelText('Title')
+    const title = await screen.findByRole('textbox', { name: 'Title' })
 
     await userEvent.type(title, '!')
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
@@ -883,12 +921,12 @@ describe('FormWidget', () => {
     const requests = stubFetch({ status: 201, body: linesJson(1) })
     renderForm(null, linesWidget)
 
-    await userEvent.type(screen.getByLabelText('Title'), 'Buy paper')
+    await userEvent.type(screen.getByRole('textbox', { name: 'Title' }), 'Buy paper')
     await userEvent.click(screen.getByRole('button', { name: 'Add row' }))
     await userEvent.click(screen.getByRole('button', { name: 'Add row' }))
-    await userEvent.type(screen.getByLabelText('Description 1'), 'Pens')
+    await userEvent.type(screen.getByRole('textbox', { name: 'Description 1' }), 'Pens')
     await userEvent.type(screen.getByLabelText('Quantity 1'), '12')
-    await userEvent.type(screen.getByLabelText('Description 2'), 'Ink')
+    await userEvent.type(screen.getByRole('textbox', { name: 'Description 2' }), 'Ink')
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     await waitFor(() => expect(requests()).toHaveLength(1))
@@ -904,12 +942,12 @@ describe('FormWidget', () => {
     renderForm(noteId, linesWidget)
     const quantity = await screen.findByLabelText('Quantity 1')
     expect(quantity).toHaveValue('2')
-    expect(screen.getByLabelText('Description 2')).toHaveValue('Ink')
+    expect(screen.getByRole('textbox', { name: 'Description 2' })).toHaveValue('Ink')
 
     await userEvent.clear(quantity)
     await userEvent.type(quantity, '3')
     await userEvent.click(screen.getAllByRole('button', { name: 'Remove' })[1])
-    expect(screen.queryByLabelText('Description 2')).not.toBeInTheDocument()
+    expect(screen.queryByRole('textbox', { name: 'Description 2' })).not.toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     await waitFor(() => expect(requests()).toHaveLength(2))
@@ -926,11 +964,31 @@ describe('FormWidget', () => {
     const quantity = await screen.findByLabelText('Quantity 1')
 
     await userEvent.type(quantity, '5{Backspace}')
-    await userEvent.type(screen.getByLabelText('Title'), '!')
+    await userEvent.type(screen.getByRole('textbox', { name: 'Title' }), '!')
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     await waitFor(() => expect(requests()).toHaveLength(2))
     expect(requests()[1].body).toBe('{"version":1,"values":{"title":"Buy paper!"}}')
+  })
+
+  it('shows a child collection reference cell as a search icon button with no visible text', async () => {
+    stubFetch()
+    renderForm(null, lineCategoryWidget)
+    await userEvent.click(screen.getByRole('button', { name: 'Add row' }))
+
+    const choose = screen.getByRole('button', { name: 'Choose Category 1' })
+    expect(choose.textContent).toBe('')
+    expect(choose.querySelector('.anticon-search')).not.toBeNull()
+  })
+
+  it('shows each child collection row remove button as a danger button with a trash icon', async () => {
+    stubFetch()
+    renderForm(null, linesWidget)
+    await userEvent.click(screen.getByRole('button', { name: 'Add row' }))
+
+    const remove = screen.getByRole('button', { name: 'Remove' })
+    expect(remove).toHaveClass('ant-btn-dangerous')
+    expect(remove.querySelector('.anticon-delete')).not.toBeNull()
   })
 
   it('shows a row error on its cell, and clears cell errors when a row is added', async () => {
@@ -1015,7 +1073,7 @@ describe('FormWidget', () => {
     renderForm(null, computedWidget)
 
     expect(screen.getByLabelText('Total')).toHaveValue('Not set')
-    await userEvent.type(screen.getByLabelText('Title'), 'Buy paper')
+    await userEvent.type(screen.getByRole('textbox', { name: 'Title' }), 'Buy paper')
     await userEvent.type(screen.getByLabelText('Amount'), '1.50')
     await userEvent.click(screen.getByRole('button', { name: 'Add row' }))
     await userEvent.type(screen.getByLabelText('Description 1'), 'Pens')
@@ -1036,7 +1094,7 @@ describe('FormWidget', () => {
     const number = screen.getByLabelText('Number')
     expect(number).toHaveValue('Not set')
     expect(number).toHaveAttribute('readonly')
-    await userEvent.type(screen.getByLabelText('Title'), 'Buy paper')
+    await userEvent.type(screen.getByRole('textbox', { name: 'Title' }), 'Buy paper')
     await userEvent.type(number, 'PR-1')
     expect(number).toHaveValue('Not set')
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
@@ -1096,7 +1154,7 @@ describe('FormWidget', () => {
     stubFetch({ status: 200, body: sectionsJson(1) })
     renderForm(noteId, sectionsWidget)
 
-    expect(await screen.findByLabelText('Title')).toHaveValue('Buy paper')
+    expect(await screen.findByRole('textbox', { name: 'Title' })).toHaveValue('Buy paper')
     expect(screen.getAllByRole('heading').map((heading) => heading.textContent)).toEqual(['Main', 'Details'])
     expect(screen.getByLabelText('Code')).toHaveValue('N-1')
     expect(screen.getByLabelText('Priority')).toHaveValue('7')
@@ -1124,11 +1182,10 @@ describe('FormWidget', () => {
       },
     })
 
-    const column = async (label: string) =>
-      (await screen.findByLabelText(label)).closest('.ant-form-item')?.parentElement
-    expect(await column('Title')).toHaveClass('ant-col-xs-24', 'ant-col-lg-16')
-    expect(await column('Status')).toHaveClass('ant-col-lg-8')
-    expect(await column('Code')).toHaveClass('ant-col-lg-24')
+    const column = (field: HTMLElement) => field.closest('.ant-form-item')?.parentElement
+    expect(column(await screen.findByRole('textbox', { name: 'Title' }))).toHaveClass('ant-col-xs-24', 'ant-col-lg-16')
+    expect(column(await screen.findByLabelText('Status'))).toHaveClass('ant-col-lg-8')
+    expect(column(await screen.findByLabelText('Code'))).toHaveClass('ant-col-lg-24')
   })
 
   it('shows read-only fields and rows without letting them change, and never sends them', async () => {
@@ -1139,13 +1196,13 @@ describe('FormWidget', () => {
     expect(code).toHaveAttribute('readonly')
     expect(screen.getByLabelText('Category')).toHaveValue('Office')
     expect(screen.queryByRole('button', { name: 'Choose' })).not.toBeInTheDocument()
-    expect(screen.getByLabelText('Description 1')).toHaveValue('Pens')
-    expect(screen.getByLabelText('Description 1')).toHaveAttribute('readonly')
+    expect(screen.getByRole('textbox', { name: 'Description 1' })).toHaveValue('Pens')
+    expect(screen.getByRole('textbox', { name: 'Description 1' })).toHaveAttribute('readonly')
     expect(screen.queryByRole('button', { name: 'Add row' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Remove' })).not.toBeInTheDocument()
 
     await userEvent.type(code, '9')
-    await userEvent.type(screen.getByLabelText('Description 1'), '!')
+    await userEvent.type(screen.getByRole('textbox', { name: 'Description 1' }), '!')
     const priority = screen.getByLabelText('Priority')
     await userEvent.clear(priority)
     await userEvent.type(priority, '3')
@@ -1174,7 +1231,7 @@ describe('FormWidget', () => {
     unmount()
 
     renderForm(noteId, fieldedWidget)
-    const title = await screen.findByLabelText('Title')
+    const title = await screen.findByRole('textbox', { name: 'Title' })
     const priority = screen.getByLabelText('Priority')
     expect(priority).toHaveAttribute('readonly')
     expect(screen.queryByRole('button', { name: 'Choose' })).not.toBeInTheDocument()
@@ -1199,13 +1256,13 @@ describe('FormWidget', () => {
     }
     stubFetch({ status: 200, body: noteJson('Buy paper', 1) })
     const { unmount } = renderForm(null, readerWidget)
-    expect(screen.getByLabelText('Title')).toHaveAttribute('readonly')
+    expect(screen.getByRole('textbox', { name: 'Title' })).toHaveAttribute('readonly')
     expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument()
     unmount()
 
     renderForm(noteId, readerWidget)
-    expect(await screen.findByLabelText('Title')).not.toHaveAttribute('readonly')
+    expect(await screen.findByRole('textbox', { name: 'Title' })).not.toHaveAttribute('readonly')
     expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument()
   })
 
@@ -1282,7 +1339,7 @@ describe('FormWidget', () => {
       await waitFor(() => expect(stateRequests()).toHaveLength(1))
       expect(screen.getByLabelText('Priority')).toBeInTheDocument()
       expect(isRequiredLabel(screen.getByText('Status'))).toBe(false)
-      expect(screen.getByLabelText('Title')).not.toHaveAttribute('readonly')
+      expect(screen.getByRole('textbox', { name: 'Title' })).not.toHaveAttribute('readonly')
 
       await chooseStatus(user, 'closed')
       await waitFor(() => expect(stateRequests()).toHaveLength(2))
@@ -1292,7 +1349,7 @@ describe('FormWidget', () => {
       await chooseStatus(user, 'open')
       await waitFor(() => expect(screen.queryByLabelText('Priority')).not.toBeInTheDocument())
       expect(isRequiredLabel(screen.getByText('Status'))).toBe(true)
-      expect(screen.getByLabelText('Title')).toHaveAttribute('readonly')
+      expect(screen.getByRole('textbox', { name: 'Title' })).toHaveAttribute('readonly')
 
       await act(async () => {
         answerLate('{"sections":[],"fields":{"status":{"visible":true,"required":false,"readOnly":false}},"errors":{}}')
@@ -1300,7 +1357,7 @@ describe('FormWidget', () => {
       })
       expect(screen.queryByLabelText('Priority')).not.toBeInTheDocument()
       expect(isRequiredLabel(screen.getByText('Status'))).toBe(true)
-      expect(screen.getByLabelText('Title')).toHaveAttribute('readonly')
+      expect(screen.getByRole('textbox', { name: 'Title' })).toHaveAttribute('readonly')
     })
 
     it('never sends a hidden field, and names the form on save', async () => {
@@ -1314,7 +1371,7 @@ describe('FormWidget', () => {
       await waitFor(() => expect(screen.queryByLabelText('Priority')).not.toBeInTheDocument())
       expect(stateRequests()[1].body).toMatchObject({ values: { priority: 5 } })
 
-      await user.type(screen.getByLabelText('Title'), 'Pen')
+      await user.type(screen.getByRole('textbox', { name: 'Title' }), 'Pen')
       await act(() => vi.advanceTimersByTimeAsync(300))
       await waitFor(() => expect(stateRequests()).toHaveLength(3))
       expect(stateRequests()[2].body).toEqual({
@@ -1343,12 +1400,12 @@ describe('FormWidget', () => {
         const user = renderWithTimers()
         await waitFor(() => expect(stateRequests()).toHaveLength(1))
 
-        await user.type(screen.getByLabelText('Title'), 'Pen')
+        await user.type(screen.getByRole('textbox', { name: 'Title' }), 'Pen')
         await act(async () => {
           answerFirst(withDefaults('{"title":"Untitled","priority":3}'))
           await vi.advanceTimersByTimeAsync(50)
         })
-        expect(screen.getByLabelText('Title')).toHaveValue('Pen')
+        expect(screen.getByRole('textbox', { name: 'Title' })).toHaveValue('Pen')
         await waitFor(() => expect(screen.getByLabelText('Priority')).toHaveValue('3'))
 
         await act(() => vi.advanceTimersByTimeAsync(300))
@@ -1367,7 +1424,7 @@ describe('FormWidget', () => {
         await waitFor(() => expect(screen.getByLabelText('Priority')).toHaveValue('3'))
 
         await user.clear(screen.getByLabelText('Priority'))
-        await user.type(screen.getByLabelText('Title'), 'Pen')
+        await user.type(screen.getByRole('textbox', { name: 'Title' }), 'Pen')
         await user.click(screen.getByRole('button', { name: 'Save' }))
         await waitFor(() => expect(requests()).toHaveLength(1))
         expect(requests()[0].body).toBe('{"values":{"title":"Pen","priority":null}}')
@@ -1407,18 +1464,18 @@ describe('FormWidget', () => {
       expect(screen.getAllByRole('alert')).toHaveLength(1)
 
       // Leaving a field touches it, and asks at once.
-      await user.click(screen.getByLabelText('Title'))
+      await user.click(screen.getByRole('textbox', { name: 'Title' }))
       await user.tab()
       await waitFor(() => expect(stateRequests()).toHaveLength(3))
       expect(stateRequests()[2].body).toMatchObject({ touched: ['priority', 'title'] })
       expect(await screen.findByText('Required.')).toBeInTheDocument()
-      expect(formItem(screen.getByLabelText('Title'))).toContainElement(screen.getByText('Required.'))
+      expect(formItem(screen.getByRole('textbox', { name: 'Title' }))).toContainElement(screen.getByText('Required.'))
     })
 
     it('asks when a saved record is loaded', async () => {
       stubFetch({ status: 200, body: sectionsJson(1) })
       renderForm(noteId, sectionsWidget)
-      await screen.findByLabelText('Title')
+      await screen.findByRole('textbox', { name: 'Title' })
       await waitFor(() => expect(stateRequests()).toHaveLength(1))
       expect(stateRequests()[0].body).toEqual({ recordId: noteId, values: {}, touched: [] })
     })
@@ -1426,7 +1483,7 @@ describe('FormWidget', () => {
     it('makes no state call for a widget that names an entity, or when the user cannot save', async () => {
       stubFetch()
       renderForm(null, noteWidget)
-      await userEvent.type(screen.getByLabelText('Title'), 'Pen')
+      await userEvent.type(screen.getByRole('textbox', { name: 'Title' }), 'Pen')
       await act(() => new Promise((resolve) => setTimeout(resolve, 400)))
       expect(stateRequests()).toEqual([])
       cleanup()
@@ -1435,7 +1492,7 @@ describe('FormWidget', () => {
         ...sectionsWidget,
         access: { actions: ['read', 'update'], createFields: [], updateFields: ['title'] },
       })
-      await userEvent.click(screen.getByLabelText('Title'))
+      await userEvent.click(screen.getByRole('textbox', { name: 'Title' }))
       await userEvent.tab()
       await act(() => new Promise((resolve) => setTimeout(resolve, 400)))
       expect(stateRequests()).toEqual([])
@@ -1471,7 +1528,7 @@ describe('FormWidget', () => {
     const requests = stubFetch()
     renderForm()
 
-    await userEvent.type(screen.getByLabelText('Title'), 'Draft')
+    await userEvent.type(screen.getByRole('textbox', { name: 'Title' }), 'Draft')
     await userEvent.click(screen.getByRole('button', { name: 'Cancel' }))
 
     expect(screen.getByTestId('location')).toHaveTextContent('/e2e/notes?pageSize=10')
@@ -1514,7 +1571,7 @@ describe('FormWidget', () => {
       stubFetch()
       await renderSteps()
 
-      expect(screen.getByLabelText('Title')).toBeInTheDocument()
+      expect(screen.getByRole('textbox', { name: 'Title' })).toBeInTheDocument()
       expect(screen.getByLabelText('Code')).toBeInTheDocument()
       expect(screen.queryByLabelText('Priority')).not.toBeInTheDocument()
       const progress = screen.getByTestId('form-steps')
@@ -1535,7 +1592,7 @@ describe('FormWidget', () => {
       await user.click(screen.getByRole('button', { name: 'Next' }))
 
       expect(await screen.findByLabelText('Priority')).toBeInTheDocument()
-      expect(screen.queryByLabelText('Title')).not.toBeInTheDocument()
+      expect(screen.queryByRole('textbox', { name: 'Title' })).not.toBeInTheDocument()
       expect(screen.getByTestId('form-steps').querySelector('.ant-steps-item-active')).toHaveTextContent('Step two')
       expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument()
       expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument()
@@ -1553,12 +1610,12 @@ describe('FormWidget', () => {
       expect(await screen.findByTestId('field-error-title')).toHaveTextContent('Required.')
       expect(screen.queryByLabelText('Priority')).not.toBeInTheDocument()
 
-      await user.type(screen.getByLabelText('Title'), 'Pen')
+      await user.type(screen.getByRole('textbox', { name: 'Title' }), 'Pen')
       await user.click(screen.getByRole('button', { name: 'Next' }))
       await user.type(await screen.findByLabelText('Priority'), '5')
       await user.click(screen.getByRole('button', { name: 'Back' }))
 
-      expect(await screen.findByLabelText('Title')).toHaveValue('Pen')
+      expect(await screen.findByRole('textbox', { name: 'Title' })).toHaveValue('Pen')
       expect(screen.queryByLabelText('Priority')).not.toBeInTheDocument()
       await user.click(screen.getByRole('button', { name: 'Next' }))
       expect(await screen.findByLabelText('Priority')).toHaveValue('5')
@@ -1569,7 +1626,7 @@ describe('FormWidget', () => {
       stubFetch()
       const user = await renderSteps()
 
-      await user.type(screen.getByLabelText('Title'), 'Pen{Enter}')
+      await user.type(screen.getByRole('textbox', { name: 'Title' }), 'Pen{Enter}')
 
       expect(await screen.findByLabelText('Priority')).toBeInTheDocument()
     })
@@ -1598,7 +1655,7 @@ describe('FormWidget', () => {
       const requests = stubFetch({ status: 201, body: noteJson('Pen', 1) })
       const user = await renderSteps()
 
-      await user.type(screen.getByLabelText('Title'), 'Pen')
+      await user.type(screen.getByRole('textbox', { name: 'Title' }), 'Pen')
       await user.click(screen.getByRole('button', { name: 'Next' }))
       await user.type(await screen.findByLabelText('Priority'), '5')
       await user.click(screen.getByRole('button', { name: 'Save' }))
@@ -1648,7 +1705,7 @@ describe('FormWidget', () => {
 
       stubFetch()
       renderForm(null, actionWidget)
-      expect(await screen.findByLabelText('Title')).toHaveValue('')
+      expect(await screen.findByRole('textbox', { name: 'Title' })).toHaveValue('')
       expect(screen.queryByRole('button', { name: 'Close note' })).toBeNull()
     })
 
@@ -1727,7 +1784,7 @@ describe('FormWidget', () => {
       }
       stubFetch({ status: 200, body: noteJson('Buy paper', 1) })
       const { unmount } = renderForm(null, { ...actionWidget, actions: [navigateAction] })
-      expect(await screen.findByLabelText('Title')).toHaveValue('')
+      expect(await screen.findByRole('textbox', { name: 'Title' })).toHaveValue('')
       expect(screen.queryByRole('button', { name: 'note.open' })).toBeNull()
       unmount()
 
@@ -1746,7 +1803,7 @@ describe('FormWidget', () => {
       renderForm(noteId, { ...actionWidget, access: { actions: ['read'], createFields: [], updateFields: [] } })
 
       expect(await screen.findByRole('button', { name: 'Close note' })).toBeEnabled()
-      expect(screen.getByLabelText('Title')).toHaveAttribute('readonly')
+      expect(screen.getByRole('textbox', { name: 'Title' })).toHaveAttribute('readonly')
       expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument()
     })
 
@@ -1761,7 +1818,7 @@ describe('FormWidget', () => {
       await userEvent.click(await screen.findByRole('button', { name: 'Close note' }))
 
       expect(await screen.findByTestId('form-started')).toHaveTextContent('The process has started.')
-      await waitFor(() => expect(screen.getByLabelText('Title')).toHaveValue('Closed by the process'))
+      await waitFor(() => expect(screen.getByRole('textbox', { name: 'Title' })).toHaveValue('Closed by the process'))
       expect(requests()).toEqual([
         { url: `${recordsPath}/${noteId}`, method: 'GET', body: undefined },
         { url: instancesPath, method: 'POST', body: `{"subjectId":"${noteId}"}` },
@@ -1778,7 +1835,7 @@ describe('FormWidget', () => {
         { status: 200, body: noteJson('New', 3) },
       )
       renderForm(noteId, actionWidget)
-      const title = await screen.findByLabelText('Title')
+      const title = await screen.findByRole('textbox', { name: 'Title' })
       await userEvent.clear(title)
       await userEvent.type(title, 'New')
 
@@ -1798,7 +1855,7 @@ describe('FormWidget', () => {
         { status: 400, body: '{"title":"Invalid","status":400,"errors":{"/values/title":["Required."]}}' },
       )
       renderForm(noteId, actionWidget)
-      await userEvent.clear(await screen.findByLabelText('Title'))
+      await userEvent.clear(await screen.findByRole('textbox', { name: 'Title' }))
 
       await userEvent.click(screen.getByRole('button', { name: 'Close note' }))
 

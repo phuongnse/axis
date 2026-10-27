@@ -134,7 +134,7 @@ export function FieldInput({
         <DatePicker
           id={id}
           aria-label={ariaLabel}
-          style={style}
+          style={{ width: '100%', ...style }}
           minDate={field.min === null ? undefined : dayjs(field.min)}
           maxDate={field.max === null ? undefined : dayjs(field.max)}
           placeholder={rangeText(field.min, field.max)}
@@ -149,7 +149,7 @@ export function FieldInput({
         <DatePicker
           id={id}
           aria-label={ariaLabel}
-          style={style}
+          style={{ width: '100%', ...style }}
           // The time part has no seconds column.
           showTime={{ format: timePattern(locale) }}
           format={datePattern(locale, true)}

@@ -43,7 +43,7 @@ change with a NexKit release or a settings change.
   default, from its configuration doc at the pinned ref.
 
   ```bash
-  python3 -c "import json; c = json.load(open('.nexkit/config.json')); print(json.dumps({k: c.get(k) for k in ('fix', 'merge', 'conflicts', 'usage_limit', 'close_parent_issues', 'autopilot', 'notify')}, indent=1))"
+  python3 -c "import json; c = json.load(open('.nexkit/config.json')); print(json.dumps({k: c.get(k) for k in ('parallel_checks', 'fix', 'merge', 'conflicts', 'usage_limit', 'close_parent_issues', 'autopilot', 'notify')}, indent=1))"
   python3 -c "import json; c = json.load(open('.nexkit/config.json')); print(json.dumps({k: c.get(k) for k in ('default_profile', 'profiles', 'cache')}, indent=1))"
   ```
 

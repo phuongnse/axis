@@ -51,7 +51,7 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
     ([D96](../decisions/d96-rules-from-the-design-system-review.md)).
   - **Actions.** A `startProcess` button follows the form widget's **Start
     process action**, without a save first. It is the region's main action,
-    outlined at the *main* level of [buttons](frontend.md) _(planned)_. A `navigate` action sees the
+    outlined at the *main* level of [buttons](frontend.md). A `navigate` action sees the
     record's fields and `id`, as on a form
     ([D63](../decisions/d63-navigate-actions-and-page-parameters.md)).
 - **Chart widget**. A page whose widget is a `chart` draws
