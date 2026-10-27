@@ -2,6 +2,7 @@ import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import type { ReactNode } from 'react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import raw from '../../../src/Axis.Configuration/Schemas/process.schema.json'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import type { StudioNames } from '../platform/studio'
 import { TextProvider } from '../platform/TextProvider'
@@ -159,6 +160,50 @@ function step(index: number) {
   return within(screen.getByTestId(`studio-step-${index}`))
 }
 
+type Conditional = {
+  if: { properties?: { type?: { const?: string }; operation?: { const?: string; pattern?: string } } }
+  then: { properties?: Record<string, unknown> }
+}
+
+const stepSchema = raw.$defs.step as unknown as { properties: Record<string, unknown>; allOf: Conditional[] }
+
+const falseKeys = (conditional: Conditional) =>
+  Object.entries(conditional.then.properties ?? {})
+    .filter(([, value]) => value === false)
+    .map(([key]) => key)
+
+/** The operations of the process schema, a built-in one by its name and the package ones by a name with a slash. */
+const schemaOperations = stepSchema.allOf.flatMap((conditional) => {
+  const operation = conditional.if.properties?.operation
+  if (operation === undefined) {
+    return []
+  }
+  const name = operation.const ?? (operation.pattern === '/' ? 'package/operation' : undefined)
+  return name === undefined
+    ? []
+    : [{ operation: name, builtIn: operation.const !== undefined, forbids: falseKeys(conditional).sort() }]
+})
+
+/** The keys a step of the operation type forbids, whatever its operation. */
+const forbiddenForType = falseKeys(
+  stepSchema.allOf.find((conditional) => conditional.if.properties?.type?.const === 'operation')!,
+)
+
+const sampleValues: Record<string, unknown> = {
+  set: { status: "'x'" },
+  connector: { name: 'C', operation: 'o' },
+  input: { a: 'b' },
+  output: { a: 'b' },
+  retry: { attempts: 1 },
+  event: 'E',
+  entity: 'N',
+  fields: { a: 'b' },
+  to: [{ user: 'requester' }],
+  channels: ['inApp'],
+  message: { subject: { textKey: 's' }, body: { textKey: 'b' }, values: { n: 'number' } },
+  open: { page: 'P' },
+}
+
 beforeAll(async () => {
   const full = (await loadKindSchema('process'))!
   const { start: _start, steps: _steps, ...properties } = full.properties ?? {}
@@ -196,6 +241,179 @@ describe.each(['light', 'dark'])('The operation panel in %s mode', (mode) => {
     expect(step(1).getByRole('textbox', { name: 'Backoff' })).toBeVisible()
     expect(selectRoot(step(2).getByRole('combobox', { name: 'Event' }))).toBeVisible()
     expect(step(3).getByRole('textbox', { name: 'Package operation' })).toBeVisible()
+  })
+})
+
+describe('The operations of the process schema', () => {
+  const builtIn = schemaOperations.filter((item) => item.builtIn)
+
+  it('reads the operations and the operation keys from the schema', () => {
+    expect(builtIn.map((item) => item.operation)).toEqual(expect.arrayContaining(['notify', 'updateRecord']))
+    expect(schemaOperations.length).toBe(builtIn.length + 1)
+  })
+
+  it.each(schemaOperations)('offers $operation and shows every key it allows', async ({ operation, forbids }) => {
+    const allowed = Object.keys(stepSchema.properties).filter(
+      (key) =>
+        !['name', 'type', 'operation', 'next'].includes(key) &&
+        !forbiddenForType.includes(key) &&
+        !forbids.includes(key),
+    )
+    expect(allowed.length).toBeGreaterThan(0)
+    renderEditor(false, {
+      ...process,
+      steps: [
+        {
+          name: 'tell',
+          type: 'operation',
+          operation,
+          ...Object.fromEntries(allowed.map((key) => [key, sampleValues[key]])),
+          next: 'done',
+        },
+      ],
+    })
+
+    if (builtIn.some((item) => item.operation === operation)) {
+      await userEvent.click(step(0).getByRole('combobox', { name: 'Operation' }))
+      expect(optionTexts()).toContain(operation)
+    }
+    for (const key of allowed) {
+      const fields = document.querySelectorAll(`[data-testid^="studio-field-/steps/0/${key}"]`)
+      expect(fields.length, key).toBeGreaterThan(0)
+      for (const field of fields) {
+        expect(within(field as HTMLElement).queryByTestId('studio-json-only'), key).toBeNull()
+      }
+    }
+  })
+})
+
+describe('A notify step', () => {
+  const notify = {
+    name: 'tell',
+    type: 'operation',
+    operation: 'notify',
+    to: [{ user: 'requester' }],
+    channels: ['inApp'],
+    message: { subject: { textKey: 's' }, body: { textKey: 'b' }, values: { n: 'number' } },
+    open: { page: 'P' },
+    next: 'done',
+  }
+  const render = (value: Record<string, unknown> = notify) =>
+    renderEditor(false, { ...process, steps: [value, { name: 'done', type: 'end' }] })
+  const field = (pointer: string) => within(screen.getByTestId(`studio-field-${pointer}`))
+
+  it('writes a recipient to its pointer and switches its kind', async () => {
+    const onChange = render()
+
+    await userEvent.type(field('/steps/0/to/0/user').getByRole('textbox', { name: 'User' }), 'X')
+    expect(onChange).toHaveBeenLastCalledWith('/steps/0/to/0/user', 'requesterX')
+
+    // The radio input of a button group has no pointer events, so the click goes to its label.
+    const switchTo = (name: string) =>
+      userEvent.click(field('/steps/0/to/0').getByRole('radio', { name }).closest('label')!)
+    await switchTo('Role')
+    expect(onChange).toHaveBeenLastCalledWith('/steps/0/to/0', { role: '' })
+    await switchTo('Email')
+    expect(onChange).toHaveBeenLastCalledWith('/steps/0/to/0', { email: '' })
+  })
+
+  it('types a role while the names are unknown, and shows an email recipient', async () => {
+    const onChange = render({ ...notify, to: [{ role: 'manager' }, { email: 'a@b.c' }] })
+
+    await userEvent.type(field('/steps/0/to/0/role').getByRole('textbox', { name: 'Role' }), 'X')
+    expect(onChange).toHaveBeenLastCalledWith('/steps/0/to/0/role', 'managerX')
+    expect(field('/steps/0/to/1/email').getByRole('textbox', { name: 'Email' })).toHaveValue('a@b.c')
+  })
+
+  it('adds a recipient to the array and removes one', async () => {
+    const onChange = render()
+
+    await userEvent.click(field('/steps/0/to').getByRole('button', { name: 'Add recipient' }))
+    expect(onChange).toHaveBeenLastCalledWith('/steps/0/to', [{ user: 'requester' }, { user: '' }])
+    await userEvent.click(field('/steps/0/to').getByRole('button', { name: 'Remove recipient' }))
+    expect(onChange).toHaveBeenLastCalledWith('/steps/0/to/0', undefined)
+  })
+
+  it('adds the first recipient to a step that has none', async () => {
+    const onChange = render({ ...notify, to: [] })
+
+    await userEvent.click(field('/steps/0/to').getByRole('button', { name: 'Add recipient' }))
+    expect(onChange).toHaveBeenLastCalledWith('/steps/0/to', [{ user: '' }])
+  })
+
+  it('writes the channels in a fixed order and keeps an empty list', async () => {
+    const onChange = render()
+
+    await userEvent.click(field('/steps/0/channels').getByRole('checkbox', { name: 'Email' }))
+    expect(onChange).toHaveBeenLastCalledWith('/steps/0/channels', ['inApp', 'email'])
+    await userEvent.click(field('/steps/0/channels').getByRole('checkbox', { name: 'In-app' }))
+    expect(onChange).toHaveBeenLastCalledWith('/steps/0/channels', [])
+  })
+
+  it('writes the subject and body keys, and the placeholder values', async () => {
+    const onChange = render()
+
+    await userEvent.type(field('/steps/0/message/subject').getByRole('textbox', { name: 'Text key' }), 'X')
+    expect(onChange).toHaveBeenLastCalledWith('/steps/0/message/subject/textKey', 'sX')
+    await userEvent.type(field('/steps/0/message/body').getByRole('textbox', { name: 'Text key' }), 'X')
+    expect(onChange).toHaveBeenLastCalledWith('/steps/0/message/body/textKey', 'bX')
+
+    await userEvent.type(field('/steps/0/message/values/n').getByRole('textbox', { name: 'Expression' }), 'X')
+    expect(onChange).toHaveBeenLastCalledWith('/steps/0/message/values/n', 'numberX')
+    await userEvent.type(field('/steps/0/message/values/n').getByRole('textbox', { name: 'Placeholder' }), 'X')
+    expect(onChange).toHaveBeenLastCalledWith('/steps/0/message/values', { nX: 'number' })
+    await userEvent.click(field('/steps/0/message/values').getByRole('button', { name: 'Add mapping' }))
+    expect(onChange).toHaveBeenLastCalledWith('/steps/0/message/values/', '')
+  })
+
+  it('opens a page and writes its name and parameters', async () => {
+    const onChange = render()
+
+    await userEvent.type(field('/steps/0/open/page').getByRole('textbox', { name: 'Page' }), 'X')
+    expect(onChange).toHaveBeenLastCalledWith('/steps/0/open/page', 'PX')
+    await userEvent.click(field('/steps/0/open/parameters').getByRole('button', { name: 'Add mapping' }))
+    expect(onChange).toHaveBeenLastCalledWith('/steps/0/open/parameters/', '')
+    await userEvent.click(field('/steps/0/open').getByRole('checkbox', { name: 'Open a page' }))
+    expect(onChange).toHaveBeenLastCalledWith('/steps/0/open', undefined)
+  })
+
+  it('adds an open page with an empty name', async () => {
+    const onChange = render({ ...notify, open: undefined })
+
+    expect(screen.queryByTestId('studio-field-/steps/0/open/page')).toBeNull()
+    await userEvent.click(field('/steps/0/open').getByRole('checkbox', { name: 'Open a page' }))
+    expect(onChange).toHaveBeenLastCalledWith('/steps/0/open', { page: '' })
+  })
+
+  it('points to the JSON view for a value of the wrong shape', () => {
+    render({ ...notify, to: 'x', channels: 'x', message: 'x', open: 'x' })
+
+    for (const key of ['to', 'channels', 'message', 'open']) {
+      expect(field(`/steps/0/${key}`).getByTestId('studio-json-only')).toBeVisible()
+    }
+  })
+
+  it('shows no next control among its fields', () => {
+    render()
+
+    expect(screen.getByTestId('studio-field-/steps/0/next')).toBeVisible()
+    for (const key of ['to', 'channels', 'message', 'open']) {
+      expect(screen.getByTestId(`studio-field-/steps/0/${key}`).querySelector('[data-testid$="/next"]')).toBeNull()
+    }
+  })
+
+  it('removes the notify keys and keeps next when the operation is changed to updateRecord', async () => {
+    const onChange = render()
+
+    await userEvent.click(step(0).getByRole('combobox', { name: 'Operation' }))
+    await chooseOption('updateRecord')
+
+    const [pointer, next] = onChange.mock.lastCall as [string, Record<string, unknown>]
+    expect(pointer).toBe('/steps/0')
+    for (const key of ['to', 'channels', 'message', 'open']) {
+      expect(next).not.toHaveProperty(key)
+    }
+    expect(next).toEqual({ name: 'tell', type: 'operation', operation: 'updateRecord', next: 'done' })
   })
 })
 
@@ -536,10 +754,14 @@ describe('withOperation', () => {
     event: 'E',
     entity: 'N',
     fields: { a: 'b' },
+    to: [{ user: 'requester' }],
+    channels: ['inApp'],
+    message: { subject: { textKey: 's' }, body: { textKey: 'b' } },
+    open: { page: 'P' },
     next: 'done',
     x: 1,
   }
-  const operations = ['updateRecord', 'callConnector', 'raiseEvent', 'createRecord', 'package/operation']
+  const operations = ['updateRecord', 'callConnector', 'raiseEvent', 'createRecord', 'notify', 'package/operation']
 
   it.each(operations)('removes exactly the keys that %s forbids', (operation) => {
     const next = withOperation(full, operation)
@@ -554,19 +776,30 @@ describe('withOperation', () => {
   })
 
   it('removes the keys the schema forbids for each operation', () => {
-    expect(forbiddenOperationKeys('updateRecord')).toEqual([
-      'connector',
-      'input',
-      'output',
-      'retry',
-      'event',
-      'entity',
-      'fields',
-    ])
-    expect(forbiddenOperationKeys('callConnector')).toEqual(['set', 'event', 'entity', 'fields'])
-    expect(forbiddenOperationKeys('raiseEvent')).toEqual(['set', 'connector', 'input', 'output', 'retry', 'entity'])
-    expect(forbiddenOperationKeys('createRecord')).toEqual(['connector', 'input', 'output', 'retry', 'event', 'fields'])
-    expect(forbiddenOperationKeys('package/operation')).toEqual(['set', 'connector', 'event', 'entity', 'fields'])
+    const forbidden = schemaOperations.map(({ operation, forbids }) => [operation, forbids])
+
+    expect(forbidden.length).toBeGreaterThan(0)
+    for (const [operation, forbids] of forbidden) {
+      expect([...forbiddenOperationKeys(operation as string)].sort()).toEqual(forbids)
+    }
+    expect(forbiddenOperationKeys('updateRecord')).toEqual(
+      expect.arrayContaining(['to', 'channels', 'message', 'open']),
+    )
+    expect(forbiddenOperationKeys('package/operation')).toEqual(
+      expect.arrayContaining(['to', 'channels', 'message', 'open']),
+    )
+    expect(forbiddenOperationKeys('notify')).not.toEqual(expect.arrayContaining(['to']))
+  })
+
+  it('removes the notify keys when a notify step switches to another operation and keeps next', () => {
+    for (const operation of ['updateRecord', 'callConnector', 'raiseEvent', 'createRecord', 'package/operation']) {
+      const next = withOperation({ ...full, operation: 'notify' }, operation)
+
+      for (const key of ['to', 'channels', 'message', 'open']) {
+        expect(next).not.toHaveProperty(key)
+      }
+      expect(next.next).toBe('done')
+    }
   })
 
   it('removes nothing for an operation the schema has no rule for and adds no key', () => {
@@ -583,5 +816,7 @@ describe('withOperation', () => {
     expect(operationJsonOnlyKeys({ operation: 'callConnector', set: {}, input: {} })).toEqual(['set'])
     expect(operationJsonOnlyKeys({ operation: 'nope', set: {}, event: 'E' })).toEqual(['set', 'event'])
     expect(operationJsonOnlyKeys({ operation: 'updateRecord', set: {} })).toEqual([])
+    expect(operationJsonOnlyKeys({ operation: 'updateRecord', set: {}, to: [] })).toEqual(['to'])
+    expect(operationJsonOnlyKeys({ operation: 'notify', to: [], open: {} })).toEqual([])
   })
 })

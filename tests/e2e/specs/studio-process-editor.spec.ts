@@ -384,4 +384,103 @@ test.describe('Studio edits a process in the process editor', () => {
       await writeFile(target, original)
     }
   })
+
+  test('an author adds a notify step on the Form tab without the JSON view, writes its texts and saves without a new diagnostic', async ({
+    page,
+  }) => {
+    await useSession(page, 'hoa')
+    const id = await processId(page)
+    const target = path.join(copy, file)
+    const texts = ['en', 'vi'].map((locale) => path.join(copy, 'texts', `${locale}.json`))
+    const originals = await Promise.all([target, ...texts].map((name) => readFile(name, 'utf8')))
+
+    // The label editor writes the texts files at once, outside the save, so the journey restores them too.
+    async function writeTexts(field: string, en: string, vi: string) {
+      const label = page.getByTestId(field)
+      await label.getByRole('textbox', { name: 'en', exact: true }).fill(en)
+      await label.getByRole('textbox', { name: 'vi', exact: true }).fill(vi)
+      await label.getByRole('button', { name: 'Write texts', exact: true }).click()
+      await expect(label.getByTestId('studio-label-written')).toBeVisible()
+    }
+
+    try {
+      const content = JSON.parse(originals[0]) as { steps: { name: string }[] }
+      const added = content.steps.length
+      const rejected = content.steps.findIndex((step) => step.name === 'markRejected')
+      expect(rejected).toBeGreaterThanOrEqual(0)
+      const before = await diagnostics(page)
+
+      await page.goto(`${server.url}/studio?app=PurchaseRequests&resource=${id}`)
+      await openFormTab(page)
+      await pickAction(
+        page.getByRole('combobox', { name: 'Add step', exact: true }),
+        'operation',
+        page.getByTestId(`studio-step-${added}`),
+      )
+      const card = page.getByTestId(`studio-step-${added}`)
+      await card.getByRole('textbox', { name: 'Step name', exact: true }).fill('tellRequester')
+      await pick(page, `/steps/${added}/operation`, 'notify')
+
+      const to = page.getByTestId(`studio-field-/steps/${added}/to`)
+      await to.getByRole('button', { name: 'Add recipient', exact: true }).click()
+      const user = page.getByTestId(`studio-field-/steps/${added}/to/0/user`)
+      await expect(user.locator('.cm-editor')).toBeVisible()
+      await user.getByRole('textbox').fill('requester')
+      await page
+        .getByTestId(`studio-field-/steps/${added}/channels`)
+        .getByRole('checkbox', { name: 'In-app', exact: true })
+        .check()
+
+      await writeTexts(
+        `studio-field-/steps/${added}/message/subject`,
+        'Request {number} was rejected',
+        'Yêu cầu {number} bị từ chối',
+      )
+      await writeTexts(
+        `studio-field-/steps/${added}/message/body`,
+        'Request {number} was rejected by a manager',
+        'Yêu cầu {number} bị quản lý từ chối',
+      )
+      const values = page.getByTestId(`studio-field-/steps/${added}/message/values`)
+      await values.getByRole('button', { name: 'Add mapping', exact: true }).click()
+      await values.getByRole('textbox', { name: 'Placeholder', exact: true }).fill('number')
+      const value = page.getByTestId(`studio-field-/steps/${added}/message/values/number`)
+      await expect(value.locator('.cm-editor')).toBeVisible()
+      await value.getByRole('textbox', { name: 'Expression', exact: true }).fill('number')
+
+      await pick(page, `/steps/${added}/next`, 'done')
+      await pick(page, `/steps/${rejected}/next`, 'tellRequester')
+      await page.getByRole('button', { name: 'Save', exact: true }).click()
+
+      await expect(page.getByTestId('studio-saved')).toBeVisible()
+      expect(await diagnostics(page)).toEqual(before)
+      const saved = JSON.parse(await readFile(target, 'utf8')) as {
+        steps: {
+          name: string
+          next?: string
+          to?: unknown
+          channels?: unknown
+          message?: {
+            subject: { textKey: string }
+            body: { textKey: string }
+            values: unknown
+          }
+        }[]
+      }
+      expect(saved.steps.find((step) => step.name === 'markRejected')?.next).toBe('tellRequester')
+      const notify = saved.steps.find((step) => step.name === 'tellRequester')!
+      expect(notify).toMatchObject({
+        type: 'operation',
+        operation: 'notify',
+        to: [{ user: 'requester' }],
+        channels: ['inApp'],
+        message: { values: { number: 'number' } },
+        next: 'done',
+      })
+      expect(notify.message?.subject.textKey).not.toBe('')
+      expect(notify.message?.body.textKey).not.toBe('')
+    } finally {
+      await Promise.all([target, ...texts].map((name, index) => writeFile(name, originals[index])))
+    }
+  })
 })
