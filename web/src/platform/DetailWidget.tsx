@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from 'react-router'
 import { NotFoundPage } from '../pages/NotFoundPage'
 import { ChildCollectionTable } from './ChildCollectionTable'
 import { useCanvasActions } from './canvasActions'
+import { NotSet } from './EmptyValue'
 import { FileLink } from './FileInput'
 import { formatValue, referencesLabels } from './formatValue'
 import { navigateTarget, type NavigateOpen } from './navigateAction'
@@ -219,9 +220,12 @@ export function DetailWidget({ widget, sitePath, recordId, locale }: DetailWidge
                       {referencesLabels(record.values[field.name], record.labels[field.name]).map((label, index) => (
                         <Tag key={index}>{label}</Tag>
                       ))}
+                      {!Array.isArray(value) || value.length === 0 ? <NotSet /> : null}
                     </Flex>
                   ) : field.type === 'file' && isFileValue(value) ? (
                     <FileLink field={field} value={value} />
+                  ) : value === null ? (
+                    <NotSet />
                   ) : (
                     formatValue(field, value as RecordValue, record.labels, { locale, text: t }, record.values)
                   ),

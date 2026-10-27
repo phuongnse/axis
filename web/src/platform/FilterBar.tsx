@@ -15,6 +15,8 @@ interface FilterBarProps {
   errors: Record<string, string[]>
   /** Sets a parameter's value, or clears it with `null`. */
   onChange: (name: string, value: string | null) => void
+  /** The UI locale, for the pattern of a date input. */
+  locale: string
 }
 
 interface FilterInputProps {
@@ -22,6 +24,7 @@ interface FilterInputProps {
   id: string
   value: string | null
   onChange: (value: string | null) => void
+  locale: string
 }
 
 // A record id in the hyphenated 8-4-4-4-12 hex form, as the record API accepts it.
@@ -57,7 +60,7 @@ function asField(parameter: DataSourceParameter): FieldMetadata {
  * label or its name. The bar adds no rules of its own: the server checks every value, and its
  * messages show under the input they name.
  */
-export function FilterBar({ parameters, values, errors, onChange }: FilterBarProps) {
+export function FilterBar({ parameters, values, errors, onChange, locale }: FilterBarProps) {
   const t = useText()
   return (
     <Form layout="inline" data-testid="filter-bar">
@@ -82,6 +85,7 @@ export function FilterBar({ parameters, values, errors, onChange }: FilterBarPro
               id={id}
               value={values[name] ?? null}
               onChange={(value) => onChange(name, value)}
+              locale={locale}
             />
           </Form.Item>
         )
@@ -92,7 +96,7 @@ export function FilterBar({ parameters, values, errors, onChange }: FilterBarPro
 
 function FilterInput(props: FilterInputProps) {
   const t = useText()
-  const { parameter, id, value, onChange } = props
+  const { parameter, id, value, onChange, locale } = props
   switch (parameter.type) {
     case 'text':
     case 'integer':
@@ -124,6 +128,7 @@ function FilterInput(props: FilterInputProps) {
           id={id}
           style={{ width: inputWidth }}
           value={value}
+          locale={locale}
           onChange={(next: RecordValue) => onChange(next === null ? null : String(next))}
         />
       )
@@ -134,7 +139,7 @@ function FilterInput(props: FilterInputProps) {
  * A text or number input. The value applies on Enter or when the input loses focus, so typing does
  * not request rows and add a history entry for every key.
  */
-function TypedFilter({ parameter, id, value, onChange }: FilterInputProps) {
+function TypedFilter({ parameter, id, value, onChange, locale }: FilterInputProps) {
   const [draft, setDraft] = useState<RecordValue>(value)
   const [shown, setShown] = useState(value)
   // A value from the URL, such as after the back button, replaces the draft.
@@ -157,7 +162,14 @@ function TypedFilter({ parameter, id, value, onChange }: FilterInputProps) {
         }
       }}
     >
-      <FieldInput field={asField(parameter)} id={id} style={{ width: inputWidth }} value={draft} onChange={setDraft} />
+      <FieldInput
+        field={asField(parameter)}
+        id={id}
+        style={{ width: inputWidth }}
+        value={draft}
+        locale={locale}
+        onChange={setDraft}
+      />
     </div>
   )
 }

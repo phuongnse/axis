@@ -2,7 +2,7 @@ import { Checkbox, DatePicker, Input, Select, Space } from 'antd'
 import dayjs from 'dayjs'
 import type { CSSProperties, KeyboardEvent } from 'react'
 import { FileInput } from './FileInput'
-import { enumLabel } from './formatValue'
+import { datePattern, enumLabel, timePattern } from './formatValue'
 import { isFileValue, type RecordValue } from './records'
 import type { FieldMetadata } from './site'
 import { useText } from './texts'
@@ -19,6 +19,10 @@ interface FieldInputProps {
   style?: CSSProperties
   /** The currency code of a money field, shown beside the box. Left out, nothing is shown. */
   currency?: string | null
+  /** The UI locale. A date input shows and accepts the pattern that `formatValue` shows. */
+  locale: string
+  /** Puts a number input's digits on the right, in tabular figures, as in a table. */
+  alignEnd?: boolean
 }
 
 // Enter in a picker only confirms the picked value. The picker handles it first, so stopping the
@@ -29,7 +33,7 @@ function confirmOnly(event: KeyboardEvent) {
   }
 }
 
-// The record API writes six fraction digits, and the picker works to the second.
+// The record API writes six fraction digits, and the picker works to the minute.
 function dateTimeValue(value: RecordValue) {
   return value === null ? null : dayjs(String(value).replace(/\.\d+(?=Z$)/, ''))
 }
@@ -52,7 +56,17 @@ function outsideRange(value: RecordValue, field: FieldMetadata) {
 }
 
 /** The input for one value of a field, the same in the form and in a child collection's cells. */
-export function FieldInput({ field, value, onChange, id, ariaLabel, style, currency }: FieldInputProps) {
+export function FieldInput({
+  field,
+  value,
+  onChange,
+  id,
+  ariaLabel,
+  style,
+  currency,
+  locale,
+  alignEnd = false,
+}: FieldInputProps) {
   const t = useText()
   const text = (event: { target: { value: string } }) => onChange(event.target.value || null)
   switch (field.type) {
@@ -91,6 +105,7 @@ export function FieldInput({ field, value, onChange, id, ariaLabel, style, curre
           placeholder={rangeText(field.min, field.max)}
           style={currency ? undefined : style}
           inputMode={field.type === 'integer' ? 'numeric' : 'decimal'}
+          styles={alignEnd ? { input: { textAlign: 'right', fontVariantNumeric: 'tabular-nums' } } : undefined}
           value={value === null ? '' : String(value)}
           onChange={text}
         />
@@ -123,6 +138,7 @@ export function FieldInput({ field, value, onChange, id, ariaLabel, style, curre
           minDate={field.min === null ? undefined : dayjs(field.min)}
           maxDate={field.max === null ? undefined : dayjs(field.max)}
           placeholder={rangeText(field.min, field.max)}
+          format={datePattern(locale, false)}
           value={value === null ? null : dayjs(String(value))}
           onChange={(date) => onChange(date ? date.format('YYYY-MM-DD') : null)}
           onKeyDown={confirmOnly}
@@ -134,14 +150,17 @@ export function FieldInput({ field, value, onChange, id, ariaLabel, style, curre
           id={id}
           aria-label={ariaLabel}
           style={style}
-          showTime
-          format="YYYY-MM-DD HH:mm:ss"
+          // The time part has no seconds column.
+          showTime={{ format: timePattern(locale) }}
+          format={datePattern(locale, true)}
           minDate={field.min === null ? undefined : dateTimeValue(field.min)!}
           maxDate={field.max === null ? undefined : dateTimeValue(field.max)!}
           placeholder={rangeText(field.min, field.max)}
           value={dateTimeValue(value)}
-          // UTC to the second, as an RFC 3339 string the record API accepts.
-          onChange={(date) => onChange(date ? new Date(date.valueOf()).toISOString().replace(/\.\d{3}Z$/, 'Z') : null)}
+          // UTC to the minute, with zero seconds, as an RFC 3339 string the record API accepts.
+          onChange={(date) =>
+            onChange(date ? new Date(date.startOf('minute').valueOf()).toISOString().replace(/\.\d{3}Z$/, 'Z') : null)
+          }
           onKeyDown={confirmOnly}
         />
       )

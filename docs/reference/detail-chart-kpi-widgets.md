@@ -38,7 +38,9 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
     their titles. Without one, it shows every readable field in declaration
     order. Every value is read-only and formatted as a table cell shows it. A
     `references` field shows its labels in order as tags, or a record's id where
-    it has no label. The widget ignores `visibleWhen`, `requiredWhen`, `readOnlyWhen` and `steps`.
+    it has no label. An empty value, also an empty set of references and a
+    file that is not set, shows "Not set" in muted italics. The widget ignores
+    `visibleWhen`, `requiredWhen`, `readOnlyWhen` and `steps`.
   - **Layout** _(planned)_. The fields are a description list (`dl`, `dt`,
     `dd`). Each label sits above its value, as a read-only form field reads,
     with about 6px between them and `spacing-md` (16px) between fields. The
@@ -158,7 +160,8 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
     parameter's name, and the tile reads again when a page parameter changes.
     The value
     is formatted as a table cell shows it, and a `null` measure shows a
-    platform text for an empty value. The comparison is a second labelled
+    muted dash with the platform text `shell.kpi.empty` hidden for assistive
+    technology. The comparison is a second labelled
     value. The SPA computes no difference and no percentage.
   - **Comparison.** A `comparison` is a reference for the same measure, such
     as last month's total or a target. Two different metrics are two tiles

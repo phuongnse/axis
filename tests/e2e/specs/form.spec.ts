@@ -63,8 +63,8 @@ test('a note is created and edited in the form, in light and dark mode', async (
   await page.getByLabel('Priority', { exact: true }).fill('7')
   await page.getByLabel('Amount', { exact: true }).fill('12.50')
   await page.getByLabel('Done', { exact: true }).check()
-  await pick(page, 'Due on', '2026-10-07')
-  await pick(page, 'Due at', '2026-10-07 10:30:00')
+  await pick(page, 'Due on', '10/07/2026')
+  await pick(page, 'Due at', '10/07/2026 10:30 AM')
   // Enter in a picker confirms the value and does not send the form.
   await expect(page).toHaveURL(/\/e2e\/noteform\/new$/)
   await pickOption(page.getByRole('combobox', { name: 'Status', exact: true }), 'In progress')
@@ -72,7 +72,7 @@ test('a note is created and edited in the form, in light and dark mode', async (
 
   await expect(page).toHaveURL(tablePath)
   const row = page.getByRole('row', { name: new RegExp(`${title} `) })
-  for (const text of [`C-${run}`, '7', '12.50', 'Yes', 'In progress', 'Oct 7, 2026', '10:30:00']) {
+  for (const text of [`C-${run}`, '7', '12.50', 'Yes', 'In progress', '10/07/2026', '10:30 AM']) {
     await expect(row).toContainText(text)
   }
 
@@ -112,7 +112,7 @@ test('a note saved by a signed-in user shows its creator read-only', async ({ pa
   )
   await openForm(page, page.getByRole('button', { name: 'New', exact: true }))
   await expect(page).toHaveURL(/\/e2e\/noteform\/new$/)
-  await expect(page.getByLabel('Created by', { exact: true })).toHaveValue('')
+  await expect(page.getByLabel('Created by', { exact: true })).toHaveValue('Not set')
   await page.getByRole('textbox', { name: '* Title', exact: true }).fill(title)
   await page.getByRole('button', { name: 'Save', exact: true }).click()
 

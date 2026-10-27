@@ -129,6 +129,7 @@ const instanceJson = `{"id":"01926b3e-5f40-7c8a-9b1d-2e3f4a5b6c7e","process":"No
 const texts = {
   'shell.table.yes': 'Yes',
   'shell.table.no': 'No',
+  'shell.value.notSet': 'Not set',
   'shell.notFound.title': 'Page not found',
   'shell.form.loadFailed': 'The record could not be loaded.',
   'shell.form.processStarted': 'The process has started.',
@@ -257,6 +258,20 @@ describe('DetailWidget', () => {
     expect(screen.queryByText('Main')).toBeNull()
   })
 
+  it('shows an empty field as "Not set" in muted italics', async () => {
+    const body = `{"id":"${noteId}","version":1,"values":{"title":null,"done":true,"priority":null,"category":null,"lines":[]},"labels":{}}`
+    stubFetch({ status: 200, body })
+
+    renderDetail()
+
+    expect(await screen.findByText('Title')).toBeInTheDocument()
+    expect(descriptionItem('Title')).toHaveTextContent(/^TitleNot set$/)
+    expect(within(descriptionItem('Title')!).getByText('Not set')).toHaveStyle({ fontStyle: 'italic' })
+    expect(descriptionItem('priority')).toHaveTextContent(/^priorityNot set$/)
+    expect(descriptionItem('Category')).toHaveTextContent(/^CategoryNot set$/)
+    expect(descriptionItem('Done')).toHaveTextContent('Yes')
+  })
+
   it('shows the rows of a child collection in a read-only table', async () => {
     stubFetch({ status: 200, body: noteJson('Buy paper') })
 
@@ -329,7 +344,7 @@ describe('DetailWidget', () => {
     renderDetail(widget)
 
     expect(await screen.findByLabelText('product 1')).toHaveValue('Desk')
-    expect(screen.getByLabelText('product 2')).toHaveValue('')
+    expect(screen.getByLabelText('product 2')).toHaveValue('—')
   })
 
   it('shows the not-found page when the record API answers 404', async () => {

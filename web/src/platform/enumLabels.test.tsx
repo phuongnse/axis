@@ -207,7 +207,13 @@ describe('a data source filter over an enum parameter', () => {
     const onChange = vi.fn()
     render(
       <TextProvider catalogs={catalogs} development={false}>
-        <FilterBar parameters={[parameter]} values={{ status: 'approved' }} errors={{}} onChange={onChange} />
+        <FilterBar
+          parameters={[parameter]}
+          values={{ status: 'approved' }}
+          errors={{}}
+          onChange={onChange}
+          locale="vi"
+        />
       </TextProvider>,
     )
 

@@ -1,5 +1,7 @@
 import { render, screen } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import userEvent from '@testing-library/user-event'
+import dayjs from 'dayjs'
+import { describe, expect, it, vi } from 'vitest'
 import { FieldInput } from './FieldInput'
 import type { FieldMetadata, FieldType } from './site'
 import { TextProvider } from './TextProvider'
@@ -29,10 +31,15 @@ function field(type: FieldType, limits: Partial<FieldMetadata>): FieldMetadata {
   }
 }
 
-function show(metadata: FieldMetadata, value: string | null) {
+function show(
+  metadata: FieldMetadata,
+  value: string | null,
+  locale = 'en',
+  onChange: (value: unknown) => void = () => undefined,
+) {
   render(
     <TextProvider catalogs={catalogs} development={false}>
-      <FieldInput field={metadata} value={value} onChange={() => undefined} ariaLabel="limited" />
+      <FieldInput field={metadata} value={value} onChange={onChange} ariaLabel="limited" locale={locale} />
     </TextProvider>,
   )
   return screen.getByRole('textbox', { name: 'limited' })
@@ -89,5 +96,43 @@ describe('FieldInput limits', () => {
 
     expect(input).not.toHaveAttribute('minlength')
     expect(screen.queryByText(/ \/ /)).not.toBeInTheDocument()
+  })
+})
+
+describe('FieldInput dates', () => {
+  // The picker shows the instant in the browser's time zone.
+  const instant = '2026-03-04T16:30:45.123456Z'
+
+  it('shows a date in the pattern of the locale', () => {
+    expect(show(field('date', {}), '2026-03-18')).toHaveValue('03/18/2026')
+  })
+
+  it('shows a date in the day-first pattern of vi', () => {
+    expect(show(field('date', {}), '2026-03-18', 'vi')).toHaveValue('18/03/2026')
+  })
+
+  it('shows a date-time to the minute, with no seconds, in the pattern of the locale', () => {
+    expect(show(field('date-time', {}), instant)).toHaveValue(dayjs(instant).format('MM/DD/YYYY h:mm A'))
+  })
+
+  it('shows a date-time on the 24-hour clock of vi', () => {
+    expect(show(field('date-time', {}), instant, 'vi')).toHaveValue(dayjs(instant).format('DD/MM/YYYY HH:mm'))
+  })
+
+  it('sends a picked date-time in UTC with zero seconds', async () => {
+    const onChange = vi.fn()
+    const input = show(field('date-time', {}), null, 'en', onChange)
+
+    await userEvent.type(input, '03/04/2026 4:30 PM{Enter}')
+
+    expect(onChange).toHaveBeenLastCalledWith(dayjs('2026-03-04T16:30:00').toDate().toISOString().replace('.000Z', 'Z'))
+  })
+
+  it('has no seconds column in the time panel', async () => {
+    const input = show(field('date-time', {}), instant)
+
+    await userEvent.click(input)
+
+    expect(document.querySelectorAll('.ant-picker-time-panel-column')).toHaveLength(3)
   })
 })

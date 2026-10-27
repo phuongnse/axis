@@ -291,7 +291,7 @@ describe('ProcessInstancePage', () => {
     expect(within(page).getByText('No subject')).toBeInTheDocument()
     const due = within(page).getByText('Due').closest('.ant-descriptions-item')
     expect(due).toHaveTextContent(/2026/)
-    expect(due).toHaveTextContent(/02:05:00|2:05:00/)
+    expect(due).toHaveTextContent(/0?2:05/)
     const childLink = await screen.findByTestId(`inspector-subprocess-${childId}`)
     expect(childLink).toHaveAttribute('href', `/e2e/children/${childId}`)
     expect(within(childLink.closest('tr')!).getByText('ChildJob')).toBeInTheDocument()
