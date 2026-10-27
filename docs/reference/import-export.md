@@ -51,9 +51,11 @@ an import is not built.
   `Axis-Export-Truncated: true`. A file is sent with `Cache-Control: no-store`
   and no record id column.
 - **Size.** At typical size, an export of 100,000 records finishes in under 2 s
-  as CSV and under 6 s as `xlsx`, and grows the managed heap by less than 64 MB.
-  `ExportPerformanceTests` fails when the best of three exports takes 2 s or more
-  as CSV or 6 s or more as `xlsx`, or when the heap grows by 64 MB or more.
+  as CSV and under 6 s as `xlsx`, and grows the live managed heap, the memory
+  still in use during the export, by less than 64 MB. `ExportPerformanceTests`
+  fails when the best of three exports takes 2 s or more as CSV or 6 s or more
+  as `xlsx`, or when the live heap grows by 64 MB or more. It measures the heap
+  on exports that are not timed.
 - **Columns.** The first row holds the field names. An entity export writes
   the fields the user may read, in declaration order, and leaves out child
   collections and `references` fields. A `references` field has no storage
