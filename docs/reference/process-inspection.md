@@ -12,7 +12,7 @@ This section follows
 where an instance is, what it did and why it failed or waits. Two routes list
 the instances of a process and read one of them. The `inspect` grant and the
 [instance list](#instance-list) and the [instance detail](#instance-detail)
-are built, with the detail's `calls`. The `sensitive` flag, which hides more
+are built, with the detail's `calls` and `timerDueAt`. The `sensitive` flag, which hides more
 values, is built too. The widget is built, and so is the record history link to an
 instance.
 The user is the user of the
@@ -108,6 +108,12 @@ in any state. The body has these parts:
 - `id`, `process`, `subjectId`, `releaseId`, `state`, `step`, `createdAt` and
   `endedAt`, as in the list. `process` is the process name. `subjectId` is
   `null` for an instance of a process without a subject.
+- `timerDueAt` is the due time of the instance's `process.timer` work item while
+  the instance is `waiting` on a timer step, as a UTC time like `createdAt`. It
+  reads only the item of the instance's current revision, so a stale item from
+  an earlier pass of a loop is not shown. It is `null` in every other case. It
+  is the same for every user who may inspect the instance, see
+  [D69](../decisions/d69-timer-wait-for-event-and-sub-process-steps-loops-and-create-record.md).
 - `parent` is `{ "id", "process", "step" }` for an instance that a `subProcess`
   step started, and `null` for any other instance. `step` is the name of the
   `subProcess` step in the parent that started this instance. It is not the step
@@ -200,6 +206,7 @@ in any state. The body has these parts:
   "step": "registerPurchase",
   "createdAt": "2026-10-10T02:05:00.123456Z",
   "endedAt": null,
+  "timerDueAt": null,
   "parent": null,
   "subProcesses": [],
   "graph": {
@@ -274,7 +281,7 @@ in any state. The body has these parts:
 }
 ```
 
-The example shortens the lists. The graph, the path and the tasks are the
+The example shortens the lists. The graph, the path, the tasks and `timerDueAt` are the
 same for every user who may inspect the instance. Only a call's `input`,
 `commands`, `parent` and `subProcesses`, and each call's `resolvable` and `outputs` differ between users.
 

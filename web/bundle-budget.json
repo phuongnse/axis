@@ -3,5 +3,6 @@
   "allowedGrowthBytes": 51200,
   "chartChunk": "ChartDrawing-",
   "designChunk": "StudioPageDesign-",
+  "processDesignChunk": "StudioProcessDesign-",
   "dragChunk": "DragAndDrop-"
 }
