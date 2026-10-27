@@ -59,7 +59,9 @@ are under "Several changes are a design review" in Design changes.
 1. Sync the artifact to `main` first, as [A sync](#a-sync) says, so every
    difference the owner sees comes from the review.
 2. Agree a short topic with the owner, such as `field-look`. Create the
-   prototype branch from `main`: `git switch -c design/<topic> main`. Work
+   prototype branch from `main`, named as
+   [writing on GitHub](../../../docs/delivery.md#writing-on-github) says:
+   `git switch -c design/<yyyy-mm-dd>-<topic> main`. Work
    only on that branch, never only in a temporary folder. Never open a pull
    request from it, and never give it a NexKit branch name.
 
@@ -84,8 +86,7 @@ seen this one.
 6. Publish the bundle to the artifact, as the Design System type's
    instructions say. Add a change note of at most 280 characters, the
    artifact type's limit, that names the review and its branch, such as
-   `Design review field-look (design/field-look): required mark and help
-   text`.
+   `Design review 2026-11-02-field-look: required mark and help text`.
 7. Commit the change on the branch with a message that says what it shows,
    so the branch history lists the review's changes in order. The branch
    stays local: only its tag is pushed, at the end.
@@ -120,13 +121,13 @@ A check passes only when the card behaves as it will in the artifact.
    the owner to merge.
 2. Before the issue, tag the prototype's last commit and push only the tag,
    so NexKit's agents can read it and no link to it ever breaks:
-   `git tag -a design-review/<date>-<topic> -m "<what it shows>"` and
-   `git push origin design-review/<date>-<topic>`. CI and CodeQL start only on
+   `git tag -a design-review/<yyyy-mm-dd>-<topic> -m "<what it shows>"` and
+   `git push origin design-review/<yyyy-mm-dd>-<topic>`. CI and CodeQL start only on
    branch pushes, so the tag starts no run; check with `gh run list`. Never
    push the branch: the prototype does not update the tests, so CI would only
    fail on it. The issue links the tag's comparison with the commit the branch
-   started from, `compare/<base>...design-review/<date>-<topic>`, where
-   `<base>` is `git merge-base design/<topic> main`, so the diff stays the
+   started from, `compare/<base>...design-review/<yyyy-mm-dd>-<topic>`, where
+   `<base>` is `git merge-base design/<yyyy-mm-dd>-<topic> main`, so the diff stays the
    same as `main` moves on. The tag is never deleted. Delete the local branch
    once it is tagged.
 3. Write one NexKit issue that builds the whole review, as

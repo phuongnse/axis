@@ -227,10 +227,12 @@ owner.
   `section`. The docs stay the source of behaviour.
 - **Several changes are a design review.** When the owner reviews the design
   in words, one change at a time, the session runs a design review. Each
-  change is prototyped in the real widget code on a `design/<topic>` branch
+  change is prototyped in the real widget code on a
+  `design/<yyyy-mm-dd>-<topic>` branch
   and published to the artifact, so the owner sees the real widgets. The
   branch stays local and is never merged. Before the review's issue its last
-  commit gets a `design-review/<date>-<topic>` tag, and only the tag is pushed:
+  commit gets a `design-review/<yyyy-mm-dd>-<topic>` tag with the same date
+  and topic, and only the tag is pushed:
   a tag starts no CI run, and it is never deleted, so the links to the
   prototype never break.
 - **The design runs ahead of the repository only by open issues and an open
@@ -345,6 +347,24 @@ issues, pull requests and sub-issues.
 - Name the role that acts, in the terms of [concepts.md](domain/concepts.md), never a development
   user. This covers doc text that describes behaviour, and titles too. User names appear only in test
   code, test scenarios, the realm file and the [development users table](reference/security.md#development-users).
+- Name a branch or a tag by what it holds. NexKit names its own branches
+  `nexkit/issue-<number>`, and a Claude session in the cloud names its own,
+  such as `claude/<words>`: nobody names a branch like those by hand. A
+  hand-made pull request comes from `docs/<topic>` for a docs change, or from
+  `ops/<topic>` for a change in a path NexKit may not change, such as a NexKit
+  upgrade. A design review's prototype is a local
+  `design/<yyyy-mm-dd>-<topic>` branch, and its pushed tag is
+  `design-review/<yyyy-mm-dd>-<topic>`, with the same date and topic.
+  `<topic>` is a few lower-case English words joined by hyphens, such as
+  `widget-review`. Release tags, once Axis has them, start with `v`, so no
+  other tag does.
+- Keep branches from piling up. GitHub's automatic deletion of head branches
+  is on, but it deletes neither the branches of the pull requests NexKit
+  merges nor those of cloud sessions that push nothing. When the owner asks,
+  the local session lists every `nexkit/` branch whose pull request is merged
+  and every `claude/` branch with no pull request and no commit that `main`
+  lacks, and the owner deletes them. A branch with an open pull request, or a
+  closed one that was not merged, stays.
 
 [nexkit-how]: https://github.com/phuongnse/nexkit/blob/main/docs/how-it-works.md
 [nexkit-config]: https://github.com/phuongnse/nexkit/blob/main/docs/configuration.md
