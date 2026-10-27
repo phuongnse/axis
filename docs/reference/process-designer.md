@@ -17,6 +17,13 @@ _(planned for M14)_.
 
 - **Design tab** _(built)_. A process opens on a Design tab, next to its Form
   and JSON tabs. The three tabs edit one draft.
+- **Loading and redraw** _(built)_. The Design tab is the lazy chunk
+  `assets/StudioProcessDesign-*.js`, which loads when the tab first opens. The
+  build fails when that chunk is missing or is part of the main bundle, as the
+  [bundle budget](../development.md#scripts) describes. On a 40-step process the
+  canvas shows a panel edit within 2 s.
+  [`studio-process-redraw.spec.ts`](../../tests/e2e/specs/studio-process-redraw.spec.ts)
+  fails at 2 s or more.
 - **Canvas** _(built)_. The [process graph](studio.md) of
   [D53](../decisions/d53-typed-editors-and-the-process-graph-in-studio.md),
   drawn by React Flow and laid out by dagre, is the Design tab's canvas. The
