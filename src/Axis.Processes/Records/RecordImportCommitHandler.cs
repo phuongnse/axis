@@ -12,20 +12,23 @@ namespace Axis.Processes.Records;
 
 /// <summary>
 /// Runs a <c>records.importCommit</c> work item: the commit of one checked import. It reads the file in the format
-/// the import stored, as the dry run does, and creates every row of the file as the uploader, with the roles stored at upload, through <see cref="RecordCommand.CreateInTransactionAsync"/>,
-/// so a row passes the same checks as a record API create: the grants, the record filters, the defaults, the
-/// sequences, the creator fields, the computed fields, the validations and the <c>record.created</c> audit record,
-/// and it starts the data change triggers that match it. A reference cell that holds a display value is turned into a record id
-/// before the row is created, as in the dry run, see <see cref="RecordImportReferences"/>. Every row is written in one transaction that holds the
+/// the import stored, as the dry run does, and writes every row of the file as the uploader, with the roles stored at upload.
+/// A row creates a record through <see cref="RecordCommand.CreateInTransactionAsync"/>, unless the import names a
+/// <c>key</c> and the row's key cell matches a record the uploader may read, see <see cref="RecordImportKey"/>: the row
+/// then updates that record through <see cref="RecordCommand.UpdateInTransactionAsync"/>, at the version the commit's
+/// transaction reads, and the body leaves out the key column and the empty cells. A row passes the same checks as the record API
+/// create or update: the grants, the record filters, the field lists, the defaults of a create, the
+/// sequences, the creator fields, the computed fields, the validations and the <c>record.created</c> or
+/// <c>record.updated</c> audit record, and it starts the data change triggers that match it. A reference cell that holds a display value is turned into a record id
+/// before the row is written, as in the dry run, see <see cref="RecordImportReferences"/>. Every row is written in one transaction that holds the
 /// application's start lock shared, with the application's active release, or no row is written.
 /// The import ends <c>committed</c> when every row is written, with one <c>records.imported</c> audit record
-/// that holds the entity and the counts, and <c>failed</c> when a row is refused at write time, for example on
+/// that holds the entity and the counts of created and updated records, and <c>failed</c> when a row is refused at write time, for example on
 /// a unique value that is taken or a reference to a record that does not exist. A failed commit writes nothing,
 /// and its errors are those of the first row that failed, keyed <c>/rows/{n}</c> followed by the pointer into the
-/// create body, <c>n</c> counting data rows from 1, as the errors of the dry run. The file is cleared when the
+/// create or update body, <c>n</c> counting data rows from 1, as the errors of the dry run. The file is cleared when the
 /// commit ends. An import that is gone or is no longer <c>checked</c> has nothing left to do, and neither has one
-/// whose entity the active release no longer has, which fails at the empty pointer. A commit only creates records:
-/// the key of the import is not used yet.
+/// whose entity the active release no longer has, which fails at the empty pointer. A file with no column for the key fails at <c>/columns</c>.
 /// </summary>
 internal sealed partial class RecordImportCommitHandler(
     ReleaseModelCache models,
@@ -55,7 +58,7 @@ internal sealed partial class RecordImportCommitHandler(
         }
 
         var errors = new Dictionary<string, string[]>(StringComparer.Ordinal);
-        var created = 0;
+        var (created, updated) = (0, 0);
         var release = await StartLock.TakeSharedAsync(transaction, import.ApplicationId, cancellationToken);
         var application = release is { } releaseId
             ? await models.GetAsync(new WorkItemContext(item, connection, transaction), releaseId, cancellationToken)
@@ -69,7 +72,7 @@ internal sealed partial class RecordImportCommitHandler(
         {
             var now = await RecordQueries.TransactionTimeAsync(connection, cancellationToken);
             var actor = new RecordActor(import.UploaderId, import.UploaderName, import.UploaderRoles);
-            created = await WriteRowsAsync(item, connection, transaction, application, release!.Value, entity, actor, import.Format, import.File ?? [], now, errors, cancellationToken);
+            (created, updated) = await WriteRowsAsync(item, connection, transaction, application, release!.Value, entity, actor, import.Key, import.Format, import.File ?? [], now, errors, cancellationToken);
             if (errors.Count == 0)
             {
                 await AuditRecords.AppendAsync(
@@ -81,7 +84,7 @@ internal sealed partial class RecordImportCommitHandler(
                         entity.Id,
                         RecordId: null,
                         ProcessInstanceId: null,
-                        new JsonObject { ["created"] = created, ["updated"] = 0 },
+                        new JsonObject { ["created"] = created, ["updated"] = updated },
                         import.UploaderName),
                     cancellationToken);
             }
@@ -97,10 +100,10 @@ internal sealed partial class RecordImportCommitHandler(
         return await CompleteAsync(item, connection, transaction, cancellationToken);
     }
 
-    // Creates every row of the file and returns how many it created. The first row that is refused stops the
-    // work: its errors go to errors and every row written so far is rolled back to the savepoint, which also
-    // leaves the transaction usable after a statement that failed.
-    private async Task<int> WriteRowsAsync(
+    // Writes every row of the file and returns how many records it created and updated. The first row that is
+    // refused stops the work: its errors go to errors and every row written so far is rolled back to the savepoint,
+    // which also leaves the transaction usable after a statement that failed.
+    private async Task<(int Created, int Updated)> WriteRowsAsync(
         ClaimedWorkItem item,
         NpgsqlConnection connection,
         NpgsqlTransaction transaction,
@@ -108,6 +111,7 @@ internal sealed partial class RecordImportCommitHandler(
         Guid releaseId,
         EntityModel entity,
         RecordActor actor,
+        string? importKey,
         string format,
         byte[] file,
         DateTimeOffset now,
@@ -118,13 +122,13 @@ internal sealed partial class RecordImportCommitHandler(
         if (reader.HeaderError is { } headerError)
         {
             errors["/columns"] = [headerError];
-            return 0;
+            return (0, 0);
         }
 
         if (reader.Header is not { } header)
         {
             errors["/columns"] = ["The file has no header row."];
-            return 0;
+            return (0, 0);
         }
 
         var (columns, headerErrors) = RecordImportColumns.Map(header, entity);
@@ -135,12 +139,19 @@ internal sealed partial class RecordImportCommitHandler(
                 errors[pointer] = messages;
             }
 
-            return 0;
+            return (0, 0);
+        }
+
+        var key = importKey is null ? null : RecordImportKey.Create(importKey, columns);
+        if (importKey is not null && key is null)
+        {
+            errors["/columns"] = ["Has no column for the key."];
+            return (0, 0);
         }
 
         var references = RecordImportReferences.Create(application, actor.Roles, columns);
         await transaction.SaveAsync(RowsSavepoint, cancellationToken);
-        var created = 0;
+        var (created, updated) = (0, 0);
         foreach (var row in reader.Rows())
         {
             var prefix = $"/rows/{row.Number}";
@@ -158,21 +169,48 @@ internal sealed partial class RecordImportCommitHandler(
             }
             else
             {
-                var result = await RecordCommand.CreateInTransactionAsync(
-                    connection,
-                    transaction,
-                    item.TenantId,
-                    application,
-                    releaseId,
-                    entity,
-                    actor,
-                    columns.Body(resolved),
-                    now,
-                    loggerFactory,
-                    cancellationToken);
+                var (match, keyFailure) = key is null
+                    ? (null, null)
+                    : await key.FindAsync(connection, transaction, application, entity, actor, resolved, loggerFactory, cancellationToken);
+                var update = match is not null;
+                var result = keyFailure
+                    ?? (match is null
+                        ? await RecordCommand.CreateInTransactionAsync(
+                            connection,
+                            transaction,
+                            item.TenantId,
+                            application,
+                            releaseId,
+                            entity,
+                            actor,
+                            columns.Body(resolved),
+                            now,
+                            loggerFactory,
+                            cancellationToken)
+                        : await RecordCommand.UpdateInTransactionAsync(
+                            connection,
+                            transaction,
+                            item.TenantId,
+                            application,
+                            releaseId,
+                            entity,
+                            match.Id,
+                            actor,
+                            columns.Body(resolved, key!.Index, match.Version),
+                            now,
+                            loggerFactory,
+                            cancellationToken));
                 if (result.Outcome == RecordCommandOutcome.Written)
                 {
-                    created++;
+                    if (update)
+                    {
+                        updated++;
+                    }
+                    else
+                    {
+                        created++;
+                    }
+
                     continue;
                 }
 
@@ -186,27 +224,17 @@ internal sealed partial class RecordImportCommitHandler(
                 }
                 else
                 {
-                    errors[prefix] = [Refusal(result)];
+                    errors[prefix] = [RecordImportRefusals.Message(result, update)];
                 }
             }
 
             await transaction.RollbackAsync(RowsSavepoint, cancellationToken);
-            return 0;
+            return (0, 0);
         }
 
         await transaction.ReleaseAsync(RowsSavepoint, cancellationToken);
-        return created;
+        return (created, updated);
     }
-
-    // The message of a refusal that has no errors by pointer. It never holds a value.
-    private static string Refusal(RecordCommandResult result) =>
-        result.Outcome switch
-        {
-            RecordCommandOutcome.Denied => "The uploader may not create records of this entity.",
-            RecordCommandOutcome.OutsideFilters => "The record is outside the uploader's create filters.",
-            RecordCommandOutcome.Conflict when result.Conflict == RecordConflict.Schema => "The stored schema does not match the active release.",
-            _ => "The row could not be written.",
-        };
 
     private async Task<WorkItemOutcome> CompleteAsync(
         ClaimedWorkItem item,

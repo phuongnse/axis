@@ -129,8 +129,8 @@ public delegate Task<byte[]?> RecordBodyReader(CancellationToken cancellationTok
 /// new release. A delete takes the record's row lock after the start lock. It is refused as a conflict when
 /// a running or waiting process instance has the record as its subject, checked after the record filters.
 /// A caller that owns the write transaction and has taken the start lock itself, such as the commit of an import,
-/// creates through <see cref="CreateInTransactionAsync"/>. It takes the same steps after the lock and never commits
-/// or rolls back.
+/// creates through <see cref="CreateInTransactionAsync"/> and updates through <see cref="UpdateInTransactionAsync"/>.
+/// It takes the same steps after the lock and never commits or rolls back.
 /// A create or update may name a form of the entity. The form is checked after the grant and the
 /// record checks and before the content type: a name that is no form of the entity is invalid.
 /// A body is checked in order: content type, then body, then a field that no grant for the action
@@ -380,57 +380,13 @@ public static class RecordCommand
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
-        var access = PolicyEvaluator.Access(application, actor.Roles, model, PolicyAction.Update);
-        if (!access.Granted)
-        {
-            return new RecordCommandResult(RecordCommandOutcome.Denied);
-        }
-
         // An update needs the stored record to be readable, then to match an update filter. Each
         // check gives the version it saw, which the body must name, so a write in between cannot
         // carry the record past them.
-        var read = PolicyEvaluator.Access(application, actor.Roles, model, PolicyAction.Read);
-        if (!read.Granted)
+        var (access, checkedVersions, denied) = await CheckUpdateAccessAsync(connection, null, application, model, recordId, actor, loggerFactory, cancellationToken);
+        if (denied is not null)
         {
-            return new RecordCommandResult(RecordCommandOutcome.NotFound);
-        }
-
-        var checkedVersions = new List<long>();
-        if (read.Filters is { } readFilters)
-        {
-            if (await ReadsPendingAsync(connection, null, application, model, readFilters, loggerFactory, cancellationToken))
-            {
-                return new RecordCommandResult(RecordCommandOutcome.PendingFilter);
-            }
-
-            var match = await MatchAsync(connection, null, application, model, recordId, readFilters, actor.Id, loggerFactory, cancellationToken);
-            if (match is not { Found: true, Matched: true })
-            {
-                return new RecordCommandResult(RecordCommandOutcome.NotFound);
-            }
-
-            checkedVersions.Add(match.Version);
-        }
-
-        if (access.Filters is { } updateFilters)
-        {
-            var match = await MatchAsync(connection, null, application, model, recordId, updateFilters, actor.Id, loggerFactory, cancellationToken);
-            if (!match.Found)
-            {
-                return new RecordCommandResult(RecordCommandOutcome.NotFound);
-            }
-
-            if (await ReadsPendingAsync(connection, null, application, model, updateFilters, loggerFactory, cancellationToken))
-            {
-                return new RecordCommandResult(RecordCommandOutcome.PendingFilter);
-            }
-
-            if (!match.Matched)
-            {
-                return new RecordCommandResult(RecordCommandOutcome.OutsideFilters);
-            }
-
-            checkedVersions.Add(match.Version);
+            return denied;
         }
 
         FormModel? formModel = null;
@@ -444,18 +400,13 @@ public static class RecordCommand
             return new RecordCommandResult(RecordCommandOutcome.UnsupportedContent);
         }
 
-        var parsed = RecordInputParser.Parse(body, model, application, RecordOperation.Update);
-        if (parsed.Errors is { } errors)
+        var parse = ParseUpdate(application, model, actor, body);
+        if (parse.Failure is { } parseFailure)
         {
-            return Invalid(errors);
+            return parseFailure;
         }
 
-        if (RecordFieldAccess.Unwritable(parsed.Input!, PolicyEvaluator.Fields(application, actor.Roles, model, PolicyAction.Update)) is { } unwritable)
-        {
-            return new RecordCommandResult(RecordCommandOutcome.UnwritableFields, Errors: unwritable);
-        }
-
-        var input = parsed.Input!;
+        var input = parse.Input!;
         if (checkedVersions.Any(version => version != input.Version))
         {
             return new RecordCommandResult(RecordCommandOutcome.StaleVersion);
@@ -480,7 +431,7 @@ public static class RecordCommand
             return Invalid(computeErrors);
         }
 
-        RecordWriteResult result;
+        RecordCommandResult result;
         await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))
         {
             // The start lock comes first, before any entity table is touched in this transaction, so a
@@ -506,53 +457,292 @@ public static class RecordCommand
                 return Invalid(failures);
             }
 
-            // A trigger with fields compares the record before and after the write. The row lock
-            // makes this read the version the update replaces.
-            Record? before = null;
-            if (DataChangeTriggerStarts.NeedsPreviousRecord(application, model)
-                && await RecordCommands.LockAsync(connection, model, recordId, cancellationToken))
+            result = await WriteUpdateAsync(connection, transaction, tenantId, application, releaseId, model, recordId, actor, access!, input, computed, loggerFactory, cancellationToken);
+            if (result.Outcome == RecordCommandOutcome.Written)
             {
-                before = await RecordQueries.GetAsync(connection, application, model, recordId, cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
             }
-
-            result = await RecordCommands.UpdateAsync(connection, application, model, releaseId, recordId, input.Version!.Value, computed.Values, computed.Rows, input.Links, uploader: actor.Id, cancellationToken: cancellationToken);
-            var written = result is { Outcome: RecordWriteOutcome.Written, Record: { } record } ? record : null;
-            var outside = written is not null
-                && !await WithinFiltersAsync(connection, transaction, application, model, written.Id, access, actor.Id, loggerFactory, cancellationToken);
-            await CompleteAsync(
-                transaction,
-                written is not null && !outside
-                    ? RecordAudit(actor, AuditActions.RecordUpdated, application, model, written.Id, written.Version, SetFields(model, input))
-                    : null,
-                () => DataChangeTriggerStarts.StartAsync(
-                    transaction,
-                    tenantId,
-                    application,
-                    releaseId,
-                    model,
-                    DataChangeKinds.Update,
-                    written!,
-                    before is null
-                        ? null
-                        : DataChangeTriggerStarts.ChangedFields(model, before, written!, input.Rows.Select(rows => rows.Collection.Name).Concat(input.Links.Select(links => links.Field.Name))),
-                    loggerFactory.CreateLogger(typeof(DataChangeTriggerStarts)),
-                    cancellationToken),
-                cancellationToken);
-            if (outside)
+            else
             {
-                return new RecordCommandResult(RecordCommandOutcome.OutsideFilters);
+                await transaction.RollbackAsync(cancellationToken);
             }
         }
 
         // The response shows a pending computed field as the active release computes it. A write that leaves
         // out the rows of a collection with computed fields stamps nothing, so the row can still be out of date.
-        if (result is { Outcome: RecordWriteOutcome.Written, Record: { } updated })
+        if (result is { Outcome: RecordCommandOutcome.Written, Record: { } updated })
         {
             result = result with { Record = await PendingComputedReads.ApplyAsync(connection, null, application, model, updated, cancellationToken) };
         }
 
+        return result;
+    }
+
+    /// <summary>
+    /// Parses the body of an update and checks that the actor's <c>update</c> grants cover every field it sets.
+    /// Nothing is read from storage. The result holds the input, or the failure an update answers with:
+    /// <see cref="RecordCommandOutcome.Invalid"/> or <see cref="RecordCommandOutcome.UnwritableFields"/>.
+    /// </summary>
+    public static RecordCreateParse ParseUpdate(ApplicationModel application, EntityModel model, RecordActor actor, ReadOnlyMemory<byte> body)
+    {
+        ArgumentNullException.ThrowIfNull(application);
+        ArgumentNullException.ThrowIfNull(model);
+        ArgumentNullException.ThrowIfNull(actor);
+
+        var parsed = RecordInputParser.Parse(body, model, application, RecordOperation.Update);
+        if (parsed.Errors is { } errors)
+        {
+            return new RecordCreateParse(null, Invalid(errors));
+        }
+
+        return RecordFieldAccess.Unwritable(parsed.Input!, PolicyEvaluator.Fields(application, actor.Roles, model, PolicyAction.Update)) is { } unwritable
+            ? new RecordCreateParse(null, new RecordCommandResult(RecordCommandOutcome.UnwritableFields, Errors: unwritable))
+            : new RecordCreateParse(parsed.Input, null);
+    }
+
+    /// <summary>
+    /// Checks an update of the record with <paramref name="recordId"/> as <see cref="UpdateInTransactionAsync"/>
+    /// checks it, up to and including the entity's validations, and writes nothing. It runs in
+    /// <paramref name="transaction"/>, a transaction the caller owns. The result is <see langword="null"/> when the
+    /// update would pass these checks, and the failure otherwise. Storage can still refuse the write, for example on a
+    /// unique value that is taken.
+    /// </summary>
+    public static async Task<RecordCommandResult?> CheckUpdateAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        ApplicationModel application,
+        EntityModel model,
+        Guid recordId,
+        RecordActor actor,
+        ReadOnlyMemory<byte> body,
+        DateTimeOffset now,
+        ILoggerFactory loggerFactory,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+        ArgumentNullException.ThrowIfNull(transaction);
+        ArgumentNullException.ThrowIfNull(application);
+        ArgumentNullException.ThrowIfNull(model);
+        ArgumentNullException.ThrowIfNull(actor);
+        ArgumentNullException.ThrowIfNull(loggerFactory);
+
+        return (await PrepareUpdateInTransactionAsync(connection, transaction, application, model, recordId, actor, body, now, loggerFactory, cancellationToken)).Failure;
+    }
+
+    /// <summary>
+    /// Updates the record with <paramref name="recordId"/> from <paramref name="body"/> inside
+    /// <paramref name="transaction"/>, a transaction the caller owns and that already holds the application's start
+    /// lock for <paramref name="releaseId"/>, which the caller has checked is the active release. It takes the
+    /// steps of a record API update: the actor's <c>update</c> and <c>read</c> grants, the record filters, the
+    /// body, the version, the computed fields, the validations, storage, the record filters on the record as stored,
+    /// the <c>record.updated</c> audit record and the starts of the data change triggers. It names no form. It never
+    /// commits or rolls back, and the caller handles a result that is not <see cref="RecordCommandOutcome.Written"/>
+    /// as it does for <see cref="CreateInTransactionAsync"/>. <paramref name="now"/> is the start time of the
+    /// transaction.
+    /// </summary>
+    public static async Task<RecordCommandResult> UpdateInTransactionAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        string tenantId,
+        ApplicationModel application,
+        Guid releaseId,
+        EntityModel model,
+        Guid recordId,
+        RecordActor actor,
+        ReadOnlyMemory<byte> body,
+        DateTimeOffset now,
+        ILoggerFactory loggerFactory,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+        ArgumentNullException.ThrowIfNull(transaction);
+        ArgumentNullException.ThrowIfNull(application);
+        ArgumentNullException.ThrowIfNull(model);
+        ArgumentNullException.ThrowIfNull(actor);
+        ArgumentNullException.ThrowIfNull(loggerFactory);
+
+        var prepared = await PrepareUpdateInTransactionAsync(connection, transaction, application, model, recordId, actor, body, now, loggerFactory, cancellationToken);
+        return prepared.Failure
+            ?? await WriteUpdateAsync(connection, transaction, tenantId, application, releaseId, model, recordId, actor, prepared.Access!, prepared.Input!, prepared.Computed!, loggerFactory, cancellationToken);
+    }
+
+    // The checks of an update before storage, in the transaction of the caller: the access, the body, the version,
+    // the computed fields and the validations.
+    private static async Task<UpdatePrepared> PrepareUpdateInTransactionAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        ApplicationModel application,
+        EntityModel model,
+        Guid recordId,
+        RecordActor actor,
+        ReadOnlyMemory<byte> body,
+        DateTimeOffset now,
+        ILoggerFactory loggerFactory,
+        CancellationToken cancellationToken)
+    {
+        var (access, checkedVersions, denied) = await CheckUpdateAccessAsync(connection, transaction, application, model, recordId, actor, loggerFactory, cancellationToken);
+        if (denied is not null)
+        {
+            return new UpdatePrepared(null, null, null, denied);
+        }
+
+        var parse = ParseUpdate(application, model, actor, body);
+        if (parse.Failure is { } parseFailure)
+        {
+            return new UpdatePrepared(null, null, null, parseFailure);
+        }
+
+        var input = parse.Input!;
+        if (checkedVersions.Any(version => version != input.Version))
+        {
+            return new UpdatePrepared(null, null, null, new RecordCommandResult(RecordCommandOutcome.StaleVersion));
+        }
+
+        Record? stored = null;
+        if (model.Validations.Count > 0 || model.HasComputedFields)
+        {
+            stored = await RecordQueries.GetAsync(connection, application, model, recordId, cancellationToken);
+            if (stored is null)
+            {
+                return new UpdatePrepared(null, null, null, new RecordCommandResult(RecordCommandOutcome.NotFound));
+            }
+        }
+
+        var computed = RecordComputer.ComputeUpdate(application, model, stored, input.Values, input.Rows);
+        if (computed.Errors is { } computeErrors)
+        {
+            return new UpdatePrepared(null, null, null, Invalid(computeErrors));
+        }
+
+        var sets = model.Validations.Count > 0
+            ? await RecordSets.ReadAsync(connection, application, model, stored, input.Links, cancellationToken)
+            : RecordSets.Empty;
+        return RecordValidator.ValidateUpdate(application, model, stored, computed.Values, computed.Rows, now, sets) is { } failures
+            ? new UpdatePrepared(null, null, null, Invalid(failures))
+            : new UpdatePrepared(access, input, computed, null);
+    }
+
+    // The access steps of an update, in order: the update grant (denied), the read grant (not found), the read
+    // filters (pending filter, not found) and the update filters (not found, pending filter, outside the filters).
+    // The versions are those the filter checks saw, which the body must name. The failure is null when the checks pass.
+    private static async Task<(RecordAccess? Access, List<long> Versions, RecordCommandResult? Failure)> CheckUpdateAccessAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction? transaction,
+        ApplicationModel application,
+        EntityModel model,
+        Guid recordId,
+        RecordActor actor,
+        ILoggerFactory loggerFactory,
+        CancellationToken cancellationToken)
+    {
+        var checkedVersions = new List<long>();
+        var access = PolicyEvaluator.Access(application, actor.Roles, model, PolicyAction.Update);
+        if (!access.Granted)
+        {
+            return (null, checkedVersions, new RecordCommandResult(RecordCommandOutcome.Denied));
+        }
+
+        var read = PolicyEvaluator.Access(application, actor.Roles, model, PolicyAction.Read);
+        if (!read.Granted)
+        {
+            return (null, checkedVersions, new RecordCommandResult(RecordCommandOutcome.NotFound));
+        }
+
+        if (read.Filters is { } readFilters)
+        {
+            if (await ReadsPendingAsync(connection, transaction, application, model, readFilters, loggerFactory, cancellationToken))
+            {
+                return (null, checkedVersions, new RecordCommandResult(RecordCommandOutcome.PendingFilter));
+            }
+
+            var match = await MatchAsync(connection, transaction, application, model, recordId, readFilters, actor.Id, loggerFactory, cancellationToken);
+            if (match is not { Found: true, Matched: true })
+            {
+                return (null, checkedVersions, new RecordCommandResult(RecordCommandOutcome.NotFound));
+            }
+
+            checkedVersions.Add(match.Version);
+        }
+
+        if (access.Filters is { } updateFilters)
+        {
+            var match = await MatchAsync(connection, transaction, application, model, recordId, updateFilters, actor.Id, loggerFactory, cancellationToken);
+            if (!match.Found)
+            {
+                return (null, checkedVersions, new RecordCommandResult(RecordCommandOutcome.NotFound));
+            }
+
+            if (await ReadsPendingAsync(connection, transaction, application, model, updateFilters, loggerFactory, cancellationToken))
+            {
+                return (null, checkedVersions, new RecordCommandResult(RecordCommandOutcome.PendingFilter));
+            }
+
+            if (!match.Matched)
+            {
+                return (null, checkedVersions, new RecordCommandResult(RecordCommandOutcome.OutsideFilters));
+            }
+
+            checkedVersions.Add(match.Version);
+        }
+
+        return (access, checkedVersions, null);
+    }
+
+    // The write steps of an update after the checks, in the transaction of the caller, which commits on a written
+    // result and rolls back otherwise.
+    private static async Task<RecordCommandResult> WriteUpdateAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        string tenantId,
+        ApplicationModel application,
+        Guid releaseId,
+        EntityModel model,
+        Guid recordId,
+        RecordActor actor,
+        RecordAccess access,
+        RecordInput input,
+        RecordComputeResult computed,
+        ILoggerFactory loggerFactory,
+        CancellationToken cancellationToken)
+    {
+        // A trigger with fields compares the record before and after the write. The row lock
+        // makes this read the version the update replaces.
+        Record? before = null;
+        if (DataChangeTriggerStarts.NeedsPreviousRecord(application, model)
+            && await RecordCommands.LockAsync(connection, model, recordId, cancellationToken))
+        {
+            before = await RecordQueries.GetAsync(connection, application, model, recordId, cancellationToken);
+        }
+
+        var result = await RecordCommands.UpdateAsync(connection, application, model, releaseId, recordId, input.Version!.Value, computed.Values, computed.Rows, input.Links, uploader: actor.Id, cancellationToken: cancellationToken);
+        if (result is not { Outcome: RecordWriteOutcome.Written, Record: { } written })
+        {
+            return WriteResult(result);
+        }
+
+        if (!await WithinFiltersAsync(connection, transaction, application, model, written.Id, access, actor.Id, loggerFactory, cancellationToken))
+        {
+            return new RecordCommandResult(RecordCommandOutcome.OutsideFilters);
+        }
+
+        await AuditRecords.AppendAsync(transaction, RecordAudit(actor, AuditActions.RecordUpdated, application, model, written.Id, written.Version, SetFields(model, input)), cancellationToken);
+        await DataChangeTriggerStarts.StartAsync(
+            transaction,
+            tenantId,
+            application,
+            releaseId,
+            model,
+            DataChangeKinds.Update,
+            written,
+            before is null
+                ? null
+                : DataChangeTriggerStarts.ChangedFields(model, before, written, input.Rows.Select(rows => rows.Collection.Name).Concat(input.Links.Select(links => links.Field.Name))),
+            loggerFactory.CreateLogger(typeof(DataChangeTriggerStarts)),
+            cancellationToken);
         return WriteResult(result);
     }
+
+    private sealed record UpdatePrepared(RecordAccess? Access, RecordInput? Input, RecordComputeResult? Computed, RecordCommandResult? Failure);
 
     /// <summary>Deletes the record with <paramref name="recordId"/>.</summary>
     public static async Task<RecordCommandResult> DeleteAsync(

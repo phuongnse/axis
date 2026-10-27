@@ -59,6 +59,24 @@ public sealed class TenantRow
 
     public string? ServiceAudience { get; set; }
 
+    /// <summary>The tenant's own SMTP server. The tenant has its own mail settings exactly when this is set, and then <see cref="EmailFrom"/> is set too.</summary>
+    public string? SmtpHost { get; set; }
+
+    /// <summary>The SMTP port, or <c>null</c> for the default. Only a tenant with an <see cref="SmtpHost"/> has one.</summary>
+    public int? SmtpPort { get; set; }
+
+    /// <summary>Whether to encrypt the SMTP connection, or <c>null</c> for the default. Only a tenant with an <see cref="SmtpHost"/> has one.</summary>
+    public bool? SmtpUseTls { get; set; }
+
+    /// <summary>The user to sign in to the SMTP server as, or <c>null</c> to send without signing in.</summary>
+    public string? SmtpUserName { get; set; }
+
+    /// <summary>The SMTP password, stored encrypted. <c>null</c> when the tenant has none.</summary>
+    public byte[]? SmtpPassword { get; set; }
+
+    /// <summary>The sender address of the tenant's emails. It is set exactly when <see cref="SmtpHost"/> is.</summary>
+    public string? EmailFrom { get; set; }
+
     /// <summary>
     /// The id of the main tenant when this is a preview tenant, otherwise <c>null</c>. A tenant has at most one preview
     /// tenant. A preview tenant has no sign-in settings of its own, and the catalog takes those of its main tenant.

@@ -40,13 +40,20 @@ const names: StudioNames = {
     {
       id: 'p1',
       name: 'Approval',
+      entity: 'Order',
       parameters: [],
       steps: [
         { name: 'review', type: 'task', outcomes: ['approve', 'reject'] },
         { name: 'notify', type: 'service', outcomes: [] },
       ],
     },
-    { id: 'p2', name: 'Shipping', parameters: [], steps: [{ name: 'dispatch', type: 'task', outcomes: ['ship'] }] },
+    {
+      id: 'p2',
+      name: 'Shipping',
+      entity: 'Order',
+      parameters: [],
+      steps: [{ name: 'dispatch', type: 'task', outcomes: ['ship'] }],
+    },
   ],
   rules: [],
   connectors: [{ id: 'c1', name: 'Payments', operations: [{ name: 'charge' }] }],

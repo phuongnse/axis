@@ -42,6 +42,8 @@ internal static partial class AdminCommands
 
     public const string BindingSecretSetting = "AXIS_BINDING_SECRET";
 
+    public const string SmtpPasswordSetting = "AXIS_SMTP_PASSWORD";
+
     public const string PathSetting = "PATH";
 
     internal const string Usage =
@@ -56,6 +58,8 @@ internal static partial class AdminCommands
                tenant resume <id>
                tenant rotate-passwords <id>
                tenant oidc set <id> [--authority <url>] [--client-id <id>] [--client-secret] [--claim <name>=<claim>]... [--endpoint-audience <value>] [--service-audience <value>] [--profile standard|fapi2] [--client-key] [--retire-client-key <kid>]
+               tenant email set <id> --host <host> --from <address> [--port <n>] [--tls true|false] [--user-name <name>] [--password]
+               tenant email clear <id>
                tenant list
                tenant binding list <id>
                tenant binding set <id> <name> --url <value>
@@ -127,6 +131,8 @@ internal static partial class AdminCommands
         new("tenant resume", AuditMark.OnePerTenant, run => StatusAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.CancellationToken)),
         new("tenant rotate-passwords", AuditMark.OnePerTenant, run => RotatePasswordsAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.CancellationToken)),
         new("tenant oidc set", AuditMark.OnePerTenant, run => OidcSetAsync(run.Command.Name, run.Args, run.Configuration, run.Input, run.Output, run.Error, run.CancellationToken)),
+        new("tenant email set", AuditMark.OnePerTenant, TenantSettings.EmailSetAsync),
+        new("tenant email clear", AuditMark.OnePerTenant, TenantSettings.EmailClearAsync),
         new("tenant list", AuditMark.None, run => StatusAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.CancellationToken)),
         new("tenant binding list", AuditMark.None, TenantSettings.BindingListAsync),
         new("tenant binding set", AuditMark.OnePerTenant, TenantSettings.BindingSetAsync),

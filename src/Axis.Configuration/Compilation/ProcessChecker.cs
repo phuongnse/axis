@@ -13,7 +13,7 @@ namespace Axis.Configuration.Compilation;
 /// Checks the processes of an application and builds the checked ones. A process names a loaded
 /// entity that is not a child entity. Its step names are unique ignoring letter case, and every
 /// transition names one of them. Every step is reachable from <c>start</c>, has a path to an
-/// <c>end</c> step and is in no cycle without a waiting step, a <c>task</c> or a <c>timer</c>. The start condition and each decision <c>when</c> parse and
+/// <c>end</c> step and is in no cycle without a waiting step, a <c>task</c>, a <c>timer</c> or a <c>waitEvent</c>. The start condition and each decision <c>when</c> parse and
 /// type-check as a boolean over the subject entity's fields, computed ones included, its child
 /// collections, which only aggregates accept, the named rules, and paths through reference fields
 /// of at most 3 hops. An operation step runs <c>updateRecord</c>, <c>callConnector</c>,
@@ -38,6 +38,9 @@ namespace Axis.Configuration.Compilation;
 /// transition. Its <c>deadline</c>'s <c>after</c> is a positive fixed duration too, and its <c>next</c> is a
 /// transition that comes after the outcomes. A timer step has exactly one of <c>wait</c>, a positive
 /// fixed duration, and <c>until</c>, a <c>date-time</c> expression over the same scope.
+/// A <c>waitEvent</c> step names a loaded event about the subject entity, its <c>when</c> is a boolean
+/// over the event's payload fields, its <c>timeout.after</c> is a positive fixed duration and its
+/// <c>timeout.next</c> is a transition.
 /// A <c>notify</c> step is checked by <see cref="CheckNotify"/>. A task's <c>escalations</c> are checked by
 /// <see cref="CheckEscalations"/>.
 /// Every problem of a process is
@@ -203,6 +206,8 @@ internal static class ProcessChecker
 
             CheckTimers(process, scope, references, Report);
 
+            CheckWaitEvents(process, entity, findEntity, findEvent, unloadedEventNames, references, Report);
+
             CheckTextKeys(process, references, diagnostics);
         }
 
@@ -303,10 +308,10 @@ internal static class ProcessChecker
     }
 
     /// <summary>
-    /// Reports each step of a process without a subject that needs a subject record: a task, at its
-    /// <c>type</c>, an <c>updateRecord</c> or <c>raiseEvent</c>, at its <c>operation</c>, and a
+    /// Reports each step of a process without a subject that needs a subject record: a task or a
+    /// <c>waitEvent</c> step, at its <c>type</c>, an <c>updateRecord</c> or <c>raiseEvent</c>, at its <c>operation</c>, and a
     /// connector or package call that writes outputs, at its <c>output</c>. An output is written to
-    /// a field of the subject, and a task, an update and a raised event are about its record.
+    /// a field of the subject, and a task, an update, a raised event and a waited-for event are about its record.
     /// </summary>
     private static void CheckSubjectSteps(ProcessResource process, Action<string, string, string> report)
     {
@@ -318,6 +323,15 @@ internal static class ProcessChecker
                 report(
                     DiagnosticCodes.StepNeedsSubject,
                     "A task is about a subject record, so a process without a subject cannot have one. Give the process an 'entity' instead of 'parameters', or remove the task.",
+                    $"/steps/{index}/type");
+                continue;
+            }
+
+            if (step.Type == ProcessStepDefinition.WaitEvent)
+            {
+                report(
+                    DiagnosticCodes.StepNeedsSubject,
+                    "A wait for event step waits for an event about the subject record, so a process without a subject cannot have one. Give the process an 'entity' instead of 'parameters', or remove the step.",
                     $"/steps/{index}/type");
                 continue;
             }
@@ -690,6 +704,20 @@ internal static class ProcessChecker
                 Resolve(step.Next!));
         }
 
+        // A checked wait for event step has a loaded event, and a valid timeout.
+        WaitEventStepModel BuildWaitEvent(ProcessStepDefinition step)
+        {
+            var @event = findEvent(step.Event!)!;
+            return new WaitEventStepModel(
+                step.Name,
+                @event.Name,
+                step.When is { } when ? ExpressionModel.Compile(when, ExpressionScopes.ForEventPayload(@event.Fields), ExpressionType.Boolean) : null,
+                step.Timeout is { } timeout && IsoDuration.TryParse(timeout.After, out var after)
+                    ? new WaitTimeoutModel(after, Resolve(timeout.Next))
+                    : null,
+                Resolve(step.Next!));
+        }
+
         // A checked assignee has exactly one of user and role.
         TaskAssigneeModel BuildAssignee(TaskAssigneeDefinition assignee) =>
             new(assignee.User is { } user ? ExpressionModel.Compile(user, scope, ExpressionType.Text) : null, assignee.Role);
@@ -922,9 +950,10 @@ internal static class ProcessChecker
                         Assign(entity!, step.Set!),
                         Resolve(step.Next!)),
                     ProcessStepDefinition.Timer => BuildTimer(step),
+                    ProcessStepDefinition.WaitEvent => BuildWaitEvent(step),
                     ProcessStepDefinition.SubProcess => BuildSubProcess(step),
                     ProcessStepDefinition.End => new EndStepModel(step.Name),
-                    _ => throw new ArgumentOutOfRangeException(nameof(process), step.Type, "The JSON Schema allows only decision, task, operation, subProcess, end and timer steps."),
+                    _ => throw new ArgumentOutOfRangeException(nameof(process), step.Type, "The JSON Schema allows only decision, task, operation, subProcess, end, timer and waitEvent steps."),
                 })
                 .ToList(),
         };
@@ -999,6 +1028,12 @@ internal static class ProcessChecker
             {
                 var deadlinePath = $"{path}/deadline/next";
                 transitions[index].Add(new Transition(Resolve(deadline.Next, deadlinePath), deadlinePath));
+            }
+
+            if (step.Timeout is { } timeout)
+            {
+                var timeoutPath = $"{path}/timeout/next";
+                transitions[index].Add(new Transition(Resolve(timeout.Next, timeoutPath), timeoutPath));
             }
         }
 
@@ -1081,8 +1116,8 @@ internal static class ProcessChecker
 
     /// <summary>
     /// Reports each transition that closes a cycle with no waiting step, at that transition, naming
-    /// the steps in the cycle. A <c>task</c> step waits for a person and a <c>timer</c> step waits for
-    /// a time, so their transitions are not followed and a loop through one is allowed. The steps are walked depth-first in file order,
+    /// the steps in the cycle. A <c>task</c> step waits for a person, a <c>timer</c> step waits for
+    /// a time and a <c>waitEvent</c> step waits for an event, so their transitions are not followed and a loop through one is allowed. The steps are walked depth-first in file order,
     /// each step's transitions in order: the branches, then <c>otherwise</c>, then <c>next</c>, then
     /// the outcomes. A step with two transitions to the same step is reported once.
     /// </summary>
@@ -1098,7 +1133,7 @@ internal static class ProcessChecker
         {
             onPath[index] = true;
             path.Add(index);
-            foreach (var transition in steps[index].Type is ProcessStepDefinition.TaskStep or ProcessStepDefinition.Timer ? [] : (IEnumerable<Transition>)transitions[index])
+            foreach (var transition in steps[index].Type is ProcessStepDefinition.TaskStep or ProcessStepDefinition.Timer or ProcessStepDefinition.WaitEvent ? [] : (IEnumerable<Transition>)transitions[index])
             {
                 if (transition.Target is not { } target)
                 {
@@ -2032,6 +2067,75 @@ internal static class ProcessChecker
                 if (problem is not null)
                 {
                     report(problem.Code, problem.Message, $"{path}/until");
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Checks each <c>waitEvent</c> step. A <c>timeout.after</c> is a positive fixed duration, as a
+    /// timer's <c>wait</c> is. Its <c>event</c> is loaded, unless its file was not loaded because of
+    /// its own errors, ignoring letter case, and the step then stops. The event is about
+    /// <paramref name="entity"/>, unless the subject entity or the event's own entity is unknown. A
+    /// <c>when</c> type-checks as a <c>boolean</c> over the payload fields of the event.
+    /// </summary>
+    private static void CheckWaitEvents(
+        ProcessResource process,
+        EntityResource? entity,
+        Func<string, EntityResource?> findEntity,
+        Func<string, EventResource?> findEvent,
+        IReadOnlySet<string> unloadedEventNames,
+        ReferenceIndexBuilder references,
+        Action<string, string, string> report)
+    {
+        for (var index = 0; index < process.Steps.Count; index++)
+        {
+            var step = process.Steps[index];
+            if (step.Type != ProcessStepDefinition.WaitEvent)
+            {
+                continue;
+            }
+
+            var path = $"/steps/{index}";
+            if (step.Timeout is { } timeout && !IsoDuration.TryParse(timeout.After, out _))
+            {
+                report(
+                    DiagnosticCodes.InvalidTaskDueIn,
+                    $"The duration '{timeout.After}' is not valid. 'after' is a positive ISO 8601 duration in whole numbers: weeks, such as 'P2W', or days with an optional time part, such as 'P3D', 'PT4H' or 'P1DT12H'. Years and months are not allowed.",
+                    $"{path}/timeout/after");
+            }
+
+            var eventName = step.Event!;
+            if (findEvent(eventName) is not { } @event)
+            {
+                // An event file that was not loaded because of its own errors is not reported again.
+                if (!unloadedEventNames.Contains(eventName))
+                {
+                    report(
+                        DiagnosticCodes.UnknownStepEvent,
+                        $"The event '{eventName}' was not found. No loaded event has that name.",
+                        $"{path}/event");
+                }
+
+                continue;
+            }
+
+            references.Add(process, $"{path}/event", ReferenceRelations.AwaitedEvent, ResourceNode.Of(@event));
+
+            if (entity is not null && findEntity(@event.Entity) is { } eventEntity && !ReferenceEquals(eventEntity, entity))
+            {
+                report(
+                    DiagnosticCodes.WaitEventOverOtherEntity,
+                    $"The event '{@event.Name}' is about the entity '{eventEntity.Name}'. A step can wait only for an event about the process's entity '{entity.Name}'.",
+                    $"{path}/event");
+            }
+
+            if (step.When is { } when)
+            {
+                var problem = CheckExpression(process, when, ExpressionScopes.ForEventPayload(@event.Fields), ExpressionType.Boolean, $"{path}/when", references);
+                if (problem is not null)
+                {
+                    report(problem.Code, problem.Message, $"{path}/when");
                 }
             }
         }

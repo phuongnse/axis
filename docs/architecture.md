@@ -852,7 +852,7 @@ that the main server offers no New application button.
 The Studio specs use these folders:
 
 - `studio`, `studio-form-editor`, `studio-page-editor`, `studio-process-editor`,
-  `studio-scenario`, `studio-new-resource` (without `texts/vi.json`) and
+  `studio-process-redraw`, `studio-scenario`, `studio-new-resource` (without `texts/vi.json`) and
   `studio-tests`: a temporary copy of `samples/apps/purchase-requests`.
   `studio-tests` also copies it again for its server with `Studio:Tests` off.
 - `studio-module-entity`: a temporary copy of `samples/apps/leave-requests`.

@@ -81,6 +81,7 @@ describe('the palette', () => {
     expect(newStep(entry('package'), 'p')).toMatchObject({ operation: '', input: {}, next: '' })
     expect(newStep(entry('subProcess'), 's')).toEqual({ name: 's', type: 'subProcess', process: '', next: '' })
     expect(newStep(entry('timer'), 't')).toEqual({ name: 't', type: 'timer', wait: '', next: '' })
+    expect(newStep(entry('waitEvent'), 'w')).toEqual({ name: 'w', type: 'waitEvent', event: '', next: '' })
     expect(newStep(entry('end'), 'e')).toEqual({ name: 'e', type: 'end' })
   })
 

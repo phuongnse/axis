@@ -68,7 +68,7 @@ public sealed class PlatformRekeyTests(PostgreSqlFixture database) : IClassFixtu
         }
 
         Assert.Equal(versionBefore + 1, await VersionAsync(scenario.Platform, id));
-        Assert.Equal(["platform rekey ok: 6 tenant secrets, 2 data protection keys"], result.Output);
+        Assert.Equal(["platform rekey ok: 7 tenant secrets, 2 data protection keys"], result.Output);
         await scenario.AssertNoSecretsAsync(CipherFor(_newKey, TestPlatform.SecretKey));
     }
 
@@ -171,7 +171,7 @@ public sealed class PlatformRekeyTests(PostgreSqlFixture database) : IClassFixtu
         Assert.True(reader.IsDBNull(1));
         Assert.Equal(Environment.UserName, reader.GetString(2));
         Assert.Equal(Environment.MachineName, reader.GetString(3));
-        Assert.Equal(["tenant secrets: 6", "data protection keys: 2"], (string[])reader[4]);
+        Assert.Equal(["tenant secrets: 7", "data protection keys: 2"], (string[])reader[4]);
         Assert.False(await reader.ReadAsync(CancellationToken));
     }
 
@@ -256,6 +256,10 @@ public sealed class PlatformRekeyTests(PostgreSqlFixture database) : IClassFixtu
         tenant.OidcClientKey = cipher.Encrypt(id, TenantSecretFields.OidcClientKey, "pem-of-the-current-key");
         tenant.OidcPreviousClientKeyId = "key-previous";
         tenant.OidcPreviousClientKey = cipher.Encrypt(id, TenantSecretFields.OidcClientKey, "pem-of-the-previous-key");
+        tenant.SmtpHost = "smtp.example.test";
+        tenant.EmailFrom = "noreply@example.test";
+        tenant.SmtpUserName = "mailer";
+        tenant.SmtpPassword = cipher.Encrypt(id, TenantSecretFields.SmtpPassword, "smtp-password-value");
         context.TenantBindings.Add(new TenantBindingRow
         {
             TenantId = id,
@@ -342,6 +346,7 @@ public sealed class PlatformRekeyTests(PostgreSqlFixture database) : IClassFixtu
             "tenants.runtime_password" => cipher.Decrypt(row, TenantSecretFields.RuntimePassword, stored).Reveal(),
             "tenants.schema_password" => cipher.Decrypt(row, TenantSecretFields.SchemaPassword, stored).Reveal(),
             "tenants.oidc_client_secret" => cipher.Decrypt(row, TenantSecretFields.OidcClientSecret, stored).Reveal(),
+            "tenants.smtp_password" => cipher.Decrypt(row, TenantSecretFields.SmtpPassword, stored).Reveal(),
             "tenants.oidc_client_key" or "tenants.oidc_previous_client_key" => cipher.Decrypt(row, TenantSecretFields.OidcClientKey, stored).Reveal(),
             "tenant_bindings.secret_value" => cipher.Decrypt(row.Split('|')[0], TenantSecretFields.Binding(row.Split('|')[1]), stored).Reveal(),
             "data_protection_keys.xml" => cipher.DecryptDataProtectionKey(Guid.Parse(row), stored).Reveal(),

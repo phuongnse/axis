@@ -294,7 +294,13 @@ export interface StudioNames {
   locales: string[]
   entities: StudioNameEntity[]
   dataSources: StudioNameDataSource[]
-  processes: { id: string; name: string; parameters: { name: string; type: string }[]; steps: StudioNameStep[] }[]
+  processes: {
+    id: string
+    name: string
+    entity: string | null
+    parameters: { name: string; type: string }[]
+    steps: StudioNameStep[]
+  }[]
   rules: {
     id: string
     name: string

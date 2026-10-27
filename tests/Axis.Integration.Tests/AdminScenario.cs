@@ -260,7 +260,8 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
                 Convert.ToHexString(t.RuntimePassword), Convert.ToHexString(t.SchemaPassword), t.OidcAuthority, t.OidcClientId,
                 Convert.ToHexString(t.OidcClientSecret), t.OidcProfile, t.ClaimUserId, t.ClaimDisplayName, t.ClaimRoles, t.ClaimEmail, t.ClaimLocale,
                 t.EndpointAudience, t.ServiceAudience, t.OidcClientKeyId, Convert.ToHexString(t.OidcClientKey ?? []), t.OidcPreviousClientKeyId,
-                Convert.ToHexString(t.OidcPreviousClientKey ?? []), t.SchemaVersion, t.PreviewOf))
+                Convert.ToHexString(t.OidcPreviousClientKey ?? []), t.SchemaVersion, t.PreviewOf, t.SmtpHost, t.SmtpPort, t.SmtpUseTls, t.SmtpUserName,
+                Convert.ToHexString(t.SmtpPassword ?? []), t.EmailFrom))
             .Concat(hosts.Select(host => $"{host.TenantId}|{host.Host}"))
             .Concat(bindings.Select(binding => $"{binding.TenantId}|{binding.Name}|{binding.Kind}|{binding.Url}")));
     }
@@ -303,6 +304,11 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
                 if (tenant.RuntimePassword.Length > 0)
                 {
                     secrets.Add(cipher.Decrypt(tenant.Id, TenantSecretFields.RuntimePassword, tenant.RuntimePassword).Reveal());
+                }
+
+                if (tenant.SmtpPassword is { Length: > 0 })
+                {
+                    secrets.Add(cipher.Decrypt(tenant.Id, TenantSecretFields.SmtpPassword, tenant.SmtpPassword).Reveal());
                 }
 
                 foreach (var encrypted in new[] { tenant.OidcClientKey, tenant.OidcPreviousClientKey })

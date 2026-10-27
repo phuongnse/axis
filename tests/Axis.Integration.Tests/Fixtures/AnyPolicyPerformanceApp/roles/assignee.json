@@ -1,0 +1,7 @@
+{
+  "id": "02648bac-4556-4e64-aaa2-5a40061ab3cc",
+  "kind": "role",
+  "name": "assignee",
+  "formatVersion": 1,
+  "label": { "textKey": "role.assignee" }
+}

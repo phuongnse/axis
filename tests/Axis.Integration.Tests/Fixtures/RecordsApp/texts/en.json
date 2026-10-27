@@ -62,6 +62,7 @@
     "role.falseOnly": "False only",
     "role.failing": "Failing",
     "role.exporter": "Exporter",
-    "role.assigned": "Assigned"
+    "role.assigned": "Assigned",
+    "role.keyed": "Keyed"
   }
 }

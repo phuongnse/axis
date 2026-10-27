@@ -11,7 +11,8 @@ that already exist are built, see [platform audit records](#platform-audit-recor
 password rotation, [`tenant rotate-passwords`](#database-passwords), is built. The key rotation is
 built, see [installation key](#installation-key). The
 [deployment binding](#deployment-bindings) and [host](#hosts) commands are built too. So is
-[`tenant oidc set`](#sign-in-settings), with its client key options. The rest is _(planned for M16)_.
+[`tenant oidc set`](#sign-in-settings), with its client key options, and the
+[mail settings](#mail-settings) commands. The rest is _(planned for M16)_.
 
 ## Common rules
 
@@ -130,6 +131,51 @@ and the public key as a PEM.
   client key, the key is already held, the key id to retire is unknown or blank, or both the secret
   and the key would read standard input. The `version` stays and no audit record is written.
 
+## Mail settings
+
+`tenant email set <id>` gives a tenant its own mail server. The worker sends the tenant's emails
+through it, and the settings replace the host's `Email` settings as a whole, see
+[mail settings](notifications.md#mail-settings).
+
+| Option                  | Meaning                                                                          |
+| ----------------------- | -------------------------------------------------------------------------------- |
+| `--host <host>`         | The SMTP server. Required                                                        |
+| `--from <address>`      | The sender address of every email. Required                                      |
+| `--port <n>`            | The SMTP port, 1 to 65535. The default is 587                                    |
+| `--tls true\|false`     | Whether to encrypt the connection. The default is `true`                         |
+| `--user-name <name>`    | The user to sign in as. Without it the worker sends without signing in           |
+| `--password`            | The password of the user, from `AXIS_SMTP_PASSWORD` or standard input            |
+
+`tenant email clear <id>` removes the tenant's own settings, so the tenant uses the host's again. A
+successful run of either command prints `<id> email ok`.
+
+- **The whole block.** Each `set` replaces the tenant's whole mail block. An option left out is
+  reset to its default or to empty, so a changed host never inherits an old user name or password.
+  This is why `--host` and `--from` are required.
+- **The password.** `--password` takes no value. The password comes from `AXIS_SMTP_PASSWORD`, or
+  from the first line of standard input when the variable is not set, as in
+  `printf %s "$PASSWORD" | tenant email set <id> --host <host> --from <address> --user-name <name> --password`.
+  It is stored encrypted, bound to the tenant, and never printed. An empty password exits with
+  code 2, and so does a password without `--user-name`.
+- **Own settings.** A tenant has its own mail settings exactly when its SMTP host is set. A tenant
+  without them uses the host's `Email` settings. Under the `directory` source the tenant directory
+  holds them, and under `configuration` the tenant's `Email` block does.
+- **Which tenants.** The commands work on an `active`, `suspended` or preview tenant. A preview
+  tenant has its own mail settings, as it has its own bindings. A tenant that is still
+  `provisioning` exits with code 2, as the binding commands do.
+- **Settings.** Only `--password` needs `Platform:SecretKey`. Both commands need
+  `ConnectionStrings:PlatformSchema` and `Tenancy:Source=directory`.
+- **Audit.** One [platform audit record](#platform-audit-records) is written with the change, in one
+  transaction. For `set` it names the settings that were given, in this order: `smtpHost`,
+  `smtpPort`, `smtpUseTls`, `smtpUserName`, `smtpPassword` and `from`. For `clear` it names `email`.
+  A name is never a value.
+- **After a restore.** `tenant backup` and `tenant restore` do not carry the mail settings, so a
+  restored tenant needs `tenant email set` again, as it needs its secret bindings.
+- **Exit code 2, nothing changes.** `Tenancy:Source` is not `directory`, the tenant is unknown or
+  still `provisioning`, `--host` or `--from` is missing or blank, the port is not a number from 1 to
+  65535, the user name is blank, the password is empty, the password has no user name, or an option
+  is given twice or is unknown. The `version` stays and no audit record is written.
+
 ## Hosts
 
 - `tenant host add <id> <host>` adds a host. A host already used by any tenant exits with code 2.
@@ -220,7 +266,8 @@ keys. It can be rotated without signing anyone out.
   `tenant suspend`, `tenant resume`, `tenant rotate-passwords`, `tenant oidc set`, `tenant backup`,
   `tenant restore`, `migrate` and `activate` are built. `tenant backup` writes one because an
   archive holds a tenant's data. `tenant binding set`, `tenant binding remove`, `tenant host add`,
-  `tenant host remove` and `tenant host move` are built and write one each. `platform rekey` is
+  `tenant host remove` and `tenant host move` are built and write one each. So are `tenant email set`
+  and `tenant email clear`, which name the [mail settings](#mail-settings) they changed. `platform rekey` is
   built and writes one record for the whole run, with no tenant. The other setting commands on this
   page are _(planned for M16)_. `tenant list`, `tenant binding list`, `version` and `publisher`
   write none. The dispatcher of `Axis.Admin` reads a table of commands, and each is marked as

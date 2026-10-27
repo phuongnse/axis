@@ -1,0 +1,10 @@
+{
+  "id": "f05ca1bf-a625-4528-bcd0-7e4ab8ee3009",
+  "kind": "text",
+  "name": "TextsEn",
+  "formatVersion": 1,
+  "locale": "en",
+  "texts": {
+    "role.assignee": "Assignee"
+  }
+}

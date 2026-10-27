@@ -226,11 +226,11 @@ a payment reference from the sample extension package, see
 
 ## Steps
 
-M3 has four step types. The `timer` step is built too. Wait for event comes
-later. The engine runs a `subProcess` step, see
-[Sub-process step](process-flow.md#sub-process-step).
-Its failure handling and cancel rules are _(planned for M14)_, as are `waitEvent`
-steps and the email of the
+M3 has four step types. The `timer` step is built too. The compiler builds a
+`waitEvent` step, but the engine does not run it yet, see
+[Wait for event step](process-flow.md#wait-for-event-step). The engine runs a
+`subProcess` step, see [Sub-process step](process-flow.md#sub-process-step).
+Its failure handling and cancel rules are _(planned for M14)_, as is the email of the
 `notify` operation, see [process flow](process-flow.md) and
 [notifications](notifications.md#notify-operation). The engine runs a `notify`
 step and stores its in-app notification, see
@@ -306,8 +306,8 @@ reported in one pass. See
   (`AXC0068`).
 - A process has `entity` or `parameters`, not both and not neither
   (`AXC0244`). Parameter names are unique, ignoring letter case (`AXC0245`).
-  A process without a subject has no `task`, `updateRecord` or `raiseEvent`
-  step and no `output` on a connector or package step (`AXC0246`). Its start
+  A process without a subject has no `task`, `waitEvent`, `updateRecord` or
+  `raiseEvent` step and no `output` on a connector or package step (`AXC0246`). Its start
   condition and each `when` see its parameters and the named rules, and no
   field, path or `id`. A trigger that names such a process is `AXC0247`, except a schedule trigger
   without a data source, see [Scheduled
@@ -317,16 +317,14 @@ reported in one pass. See
   subject](process-flow.md#processes-without-a-subject).
 - Step names are unique within the process, ignoring letter case
   (`AXC0069`).
-- `start`, every branch `next`, `otherwise`, the `next` of an operation or a
-  timer and every outcome `next` of a task name a step of the process, ignoring letter
-  case (`AXC0070`).
+- `start`, every `next`, `otherwise`, outcome `next`, `deadline.next` and
+  `timeout.next` name a step of the process, ignoring letter case (`AXC0070`).
 - Every step is reachable from `start` (`AXC0071`).
 - Every step has a path to an `end` step (`AXC0072`).
 - The steps form no cycle that has no waiting step (`AXC0073`). A cycle that
-  passes through a `task` or a `timer` step is allowed, see
+  passes through a `task`, a `timer` or a `waitEvent` step is allowed, see
   [Loops](process-flow.md#loops). A cycle of steps that never wait, such as
   `decision` and `operation` steps, would run for ever and is reported.
-  _(Planned for M14)_ A `waitEvent` step is a waiting step too.
 - A decision has at least one branch (`AXC0004`).
 - Each `when` and the `startCondition` expression give a boolean. They see
   the subject entity's fields, computed ones included, `id`, the subject
@@ -387,6 +385,8 @@ reported in one pass. See
   task's `dueIn` (`AXC0084` at `/steps/{i}/wait`). An `until` gives a
   `date-time`, with the same scope as a `when`. A problem is reported at
   `/steps/{i}/until` with its expression code, such as `AXC0048` for text.
+- A `waitEvent` has `event` and `next`, and no other property but `when` and `timeout`
+  (`AXC0004`). Its checks are in [Wait for event step](process-flow.md#wait-for-event-step).
 - A task's `assignee` has exactly one of `user` and `role` (`AXC0081` at
   `/steps/{i}/assignee`). A `role` is a non-empty name (`AXC0004`). It must
   name a declared [role](roles-and-policies.md), compared
@@ -990,9 +990,9 @@ database, with history in `axis.__processes_migrations` (see
 ## Limits in M3
 
 - **Loops only through a waiting step.** A process may not contain a cycle that
-  has no `task` or `timer` step, because it would run for ever. A cycle through
-  a `task` or a `timer` step is allowed, see [Loops](process-flow.md#loops).
-  _(Planned for M14)_ A cycle through a `waitEvent` step is allowed too.
+  has no `task`, `timer` or `waitEvent` step, because it would run for ever. A
+  cycle through a `task`, a `timer` or a `waitEvent` step is allowed, see
+  [Loops](process-flow.md#loops).
 - **No user check.** The user id that a `user` assignee gives is not checked
   against any list of users. A wrong id creates a task that nobody sees. A
   [reassign](task-deadlines.md#reassign) checks its target against the

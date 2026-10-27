@@ -184,6 +184,7 @@ public sealed class RecordApiFixture : IAsyncLifetime
                 new TestIdentity("eve", "Eve Exporter", "exporter"),
                 new TestIdentity("ada", "Ada Assigned", "assigned"),
                 new TestIdentity("abe", "Abe Assigned", "assigned"),
+                new TestIdentity("kai", "Kai Keyed", "keyed"),
                 new TestIdentity(SqlTextUser, "Mallory", "filtered"));
         });
         _client = _factory.CreateClient().SignedInAs("anna");
