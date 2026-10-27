@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using Axis.Configuration.Model;
 using Axis.Data.DataSources;
+using Axis.Data.Naming;
 using Axis.Data.Records;
 using Npgsql;
 
@@ -95,6 +96,42 @@ public sealed class SearchPerformanceTests(DataDatabaseFixture fixture) : IClass
         AssertUsesTrigramIndexes(indexes, await QueryPlans.ExplainAsync(dataSource, statement.CountSql, Bind, CancellationToken));
         AssertUsesTrigramIndexes(indexes, await QueryPlans.ExplainAsync(
             dataSource, statement.PageSql, command => BindPage(Bind, command), CancellationToken));
+    }
+
+    [Fact]
+    public async Task The_seeded_articles_have_statistics_from_every_row_so_another_analyze_leaves_the_search_histograms_unchanged()
+    {
+        var model = await SeedAsync();
+        Assert.True(model.TryGetEntity("Article", out var article));
+        var indexes = SearchApp.TrigramIndexes(article);
+        await using var dataSource = NpgsqlDataSource.Create(fixture.ConnectionString);
+
+        var before = await HistogramsAsync(dataSource, indexes);
+        Assert.Equal(indexes.Length, before.Count);
+        await using (var analyze = dataSource.CreateCommand($"ANALYZE {EntityNaming.QualifiedTable(EntityNaming.Table(article.Id))}"))
+        {
+            await analyze.ExecuteNonQueryAsync(CancellationToken);
+        }
+
+        Assert.Equal(before, await HistogramsAsync(dataSource, indexes));
+    }
+
+    /// <summary>The histogram bounds that ANALYZE stored for each index expression, in the order of the index names.</summary>
+    private static async Task<List<string>> HistogramsAsync(NpgsqlDataSource dataSource, string[] indexes)
+    {
+        await using var command = dataSource.CreateCommand(
+            "SELECT tablename, histogram_bounds::text FROM pg_stats WHERE schemaname = @schema AND tablename = ANY(@indexes) ORDER BY tablename");
+        command.Parameters.AddWithValue("schema", EntityNaming.Schema);
+        command.Parameters.AddWithValue("indexes", indexes);
+        var histograms = new List<string>();
+        await using var reader = await command.ExecuteReaderAsync(CancellationToken);
+        while (await reader.ReadAsync(CancellationToken))
+        {
+            Assert.False(reader.IsDBNull(1));
+            histograms.Add($"{reader.GetString(0)}: {reader.GetString(1)}");
+        }
+
+        return histograms;
     }
 
     /// <summary>Activates the SearchPerformanceApp fixture and inserts the articles, once for every test of the class.</summary>
