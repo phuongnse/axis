@@ -766,6 +766,12 @@ uploaded more than 24 hours ago, see
 the files table yet is skipped. Any other failure is logged as a warning and
 does not hold back the tenant's work items.
 
+The worker also clears the files of the imports of each ready tenant that were
+uploaded more than 24 hours ago, on the same cadence with its own timer and its
+own clock, and keeps the imports, see [import](import-export.md#import). A
+database without the table yet is skipped. Any other failure is logged as a
+warning and does not hold back the tenant's work items.
+
 The worker also deletes the in-app notifications of each ready tenant that are
 older than `Notifications:RetentionDays`, with their read rows in one
 transaction, see [in-app notifications](notifications.md#in-app-notifications).

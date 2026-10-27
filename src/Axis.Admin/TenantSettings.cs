@@ -1,3 +1,4 @@
+using System.Globalization;
 using Axis.Administration;
 using Axis.Tenancy;
 using Axis.Tenancy.Platform;
@@ -7,9 +8,9 @@ using Npgsql;
 namespace Axis.Admin;
 
 /// <summary>
-/// <c>tenant binding list</c>, <c>set</c> and <c>remove</c> and <c>tenant host add</c>, <c>remove</c> and <c>move</c>. The rules
-/// are in <c>Axis.Administration</c>. This class parses the arguments, reads the settings and prints. A message never holds a
-/// secret value, and the usage text never echoes an argument.
+/// <c>tenant binding list</c>, <c>set</c> and <c>remove</c> and <c>tenant host add</c>, <c>remove</c> and <c>move</c>, and
+/// <c>tenant email set</c> and <c>clear</c>. The rules are in <c>Axis.Administration</c>. This class parses the arguments, reads
+/// the settings and prints. A message never holds a secret value, and the usage text never echoes an argument.
 /// </summary>
 internal static class TenantSettings
 {
@@ -123,6 +124,75 @@ internal static class TenantSettings
             run.Args[3],
             "binding",
             (platform, command) => TenantBindingCommands.RemoveAsync(platform, command, run.Args[3], run.Args[4], run.CancellationToken));
+    }
+
+    public static async Task<int> EmailSetAsync(AdminRun run)
+    {
+        var request = ParseEmailSet(run.Args);
+        if (request is null)
+        {
+            return Usage(run);
+        }
+
+        var (setup, exit) = await PrepareAsync(run, needsCipher: request.WithPassword);
+        if (setup is null)
+        {
+            return exit;
+        }
+
+        var id = run.Args[3];
+        TenantSettingResult result;
+        try
+        {
+            // The password is wrapped at once, so that no later line can print it.
+            SecretValue? password = null;
+            if (request.WithPassword)
+            {
+                var plain = run.Configuration[AdminCommands.SmtpPasswordSetting];
+                if (string.IsNullOrEmpty(plain))
+                {
+                    plain = (await run.Input.ReadLineAsync(run.CancellationToken))?.TrimEnd('\r');
+                }
+
+                if (string.IsNullOrEmpty(plain))
+                {
+                    run.Error.WriteLine($"The SMTP password is required, in the environment variable {AdminCommands.SmtpPasswordSetting} or on standard input.");
+                    return 2;
+                }
+
+                password = new SecretValue(plain);
+            }
+
+            await using var platform = NewContext(setup.Connection);
+            result = await TenantEmailSettings.SetAsync(
+                platform,
+                setup.Cipher,
+                run.Command.Name,
+                id,
+                request.Change with { Password = password },
+                run.CancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            run.Error.WriteLine("The command was canceled before any tenant work.");
+            return 1;
+        }
+
+        return Print(run, id, "email", result);
+    }
+
+    public static async Task<int> EmailClearAsync(AdminRun run)
+    {
+        if (run.Args.Length != 4 || !IsName(run.Args[3]))
+        {
+            return Usage(run);
+        }
+
+        return await ChangeAsync(
+            run,
+            run.Args[3],
+            "email",
+            (platform, command) => TenantEmailSettings.ClearAsync(platform, command, run.Args[3], run.CancellationToken));
     }
 
     public static Task<int> HostAddAsync(AdminRun run) => HostAsync(run, TenantHostCommands.AddAsync);
@@ -261,6 +331,78 @@ internal static class TenantSettings
         }
 
         return value.Length == 0 ? null : new SecretValue(value);
+    }
+
+    private sealed record EmailSetRequest(bool WithPassword, TenantEmailChange Change);
+
+    // Duplicates, unknown options and a missing value are all usage errors. The usage text never echoes an argument.
+    private static EmailSetRequest? ParseEmailSet(string[] args)
+    {
+        if (args.Length < 4 || !IsName(args[3]))
+        {
+            return null;
+        }
+
+        string? host = null;
+        string? from = null;
+        string? userName = null;
+        int? port = null;
+        bool? useTls = null;
+        var withPassword = false;
+        for (var i = 4; i < args.Length; i++)
+        {
+            if (args[i] == "--password")
+            {
+                if (withPassword)
+                {
+                    return null;
+                }
+
+                withPassword = true;
+                continue;
+            }
+
+            if (i + 1 >= args.Length || !IsName(args[i + 1]))
+            {
+                return null;
+            }
+
+            var value = args[++i];
+            switch (args[i - 1])
+            {
+                case "--host" when host is null:
+                    host = value;
+                    break;
+                case "--from" when from is null:
+                    from = value;
+                    break;
+                case "--user-name" when userName is null:
+                    userName = value;
+                    break;
+                case "--port" when port is null:
+                    if (!int.TryParse(value, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out var parsed))
+                    {
+                        return null;
+                    }
+
+                    port = parsed;
+                    break;
+                case "--tls" when useTls is null:
+                    if (!bool.TryParse(value, out var tls))
+                    {
+                        return null;
+                    }
+
+                    useTls = tls;
+                    break;
+                default:
+                    return null;
+            }
+        }
+
+        return host is null || from is null
+            ? null
+            : new EmailSetRequest(withPassword, new TenantEmailChange(host, port, useTls, userName, null, from));
     }
 
     private static int Print(AdminRun run, string id, string what, TenantSettingResult result)

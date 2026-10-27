@@ -38,6 +38,7 @@ internal static class DefinedNamesBuilder
             [.. loaded.Processes.Select(process => new DefinedProcess(
                 process.Id,
                 process.Name,
+                process.Entity,
                 [.. process.Parameters?.Select(parameter => new DefinedTyped(parameter.Name, parameter.Type)) ?? []],
                 [.. process.Steps.Select(step => new DefinedStep(
                     step.Name, step.Type, [.. step.Outcomes?.Select(outcome => outcome.Name) ?? []]))]))],

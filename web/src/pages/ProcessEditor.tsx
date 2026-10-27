@@ -1,6 +1,10 @@
 import { Button, Card, Flex, Input, Radio, Select, Typography } from 'antd'
+import { useContext } from 'react'
+import { StudioNamesContext } from '../platform/studioNames'
+import type { StudioNames } from '../platform/studio'
 import type { JsonSchema } from '../platform/studioSchemas'
 import { useText } from '../platform/texts'
+import { MappingRows } from './MappingRows'
 import { OperationPanel } from './OperationPanel'
 import { operationJsonOnlyKeys } from './operationKeys'
 import { Expression, NamePicker } from './ProcessFields'
@@ -12,7 +16,7 @@ import { SchemaForm, type ChangeHandler } from './SchemaForm'
 type Content = Record<string, unknown>
 
 /** The step types that have a panel. The keys of any other type show as markers for the JSON view. */
-const panelTypes = new Set(['decision', 'task', 'operation', 'timer', 'end'])
+const panelTypes = new Set(['decision', 'task', 'operation', 'timer', 'subProcess', 'end'])
 
 const parameterTypes = ['text', 'integer', 'decimal', 'boolean', 'date', 'date-time']
 
@@ -354,6 +358,7 @@ function Step({
           )}
           {type === 'task' && <Task pointer={pointer} step={step} names={names} onChange={onChange} />}
           {type === 'timer' && <Timer pointer={pointer} step={step} names={names} onChange={onChange} />}
+          {type === 'subProcess' && <SubProcess pointer={pointer} step={step} names={names} onChange={onChange} />}
           {type !== undefined && !panelTypes.has(type) && (
             <JsonOnlyKeys
               pointer={pointer}
@@ -570,6 +575,116 @@ function Timer({
           )}
         </Flex>
       </div>
+      <Transition
+        pointer={`${pointer}/next`}
+        label={t('shell.studio.process.next')}
+        value={step.next}
+        names={names}
+        onChange={onChange}
+      />
+    </>
+  )
+}
+
+type ChildProcess = NonNullable<StudioNames['processes']>[number]
+
+/**
+ * The step with `process` set to the chosen child. A child with a subject entity drops `parameters`. A child without
+ * one drops `subject` and gets one parameter per child parameter, in the child's order, each keeping a value the step
+ * already holds for that name. The keys swap in place. An unknown child changes only `process`.
+ */
+function withChild(step: Content, process: string, child: ChildProcess | undefined): Content {
+  if (child === undefined) {
+    return { ...step, process }
+  }
+  const held = isContent(step.parameters) ? Object.entries(step.parameters) : []
+  const parameters = Object.fromEntries(
+    child.parameters.map((parameter) => {
+      const value = held.find(([key]) => key.toLowerCase() === parameter.name.toLowerCase())?.[1]
+      return [parameter.name, typeof value === 'string' ? value : '']
+    }),
+  )
+  if (child.entity !== null) {
+    return { ...Object.fromEntries(Object.entries(step).filter(([key]) => key !== 'parameters')), process }
+  }
+  const next: [string, unknown][] = []
+  let placed = false
+  for (const [key, value] of Object.entries({ ...step, process })) {
+    if (key === 'subject' || key === 'parameters') {
+      if (!placed) {
+        next.push(['parameters', parameters])
+        placed = true
+      }
+    } else {
+      next.push([key, value])
+    }
+  }
+  if (!placed) {
+    const at = next.findIndex(([key]) => key === 'process') + 1
+    next.splice(at, 0, ['parameters', parameters])
+  }
+  return Object.fromEntries(next)
+}
+
+/**
+ * The panel of a sub-process step: the child process, then its inputs and the next step. A child with a subject entity
+ * takes a `subject` expression, and a child without one takes an expression for each of its parameters. When the child
+ * is not in the names list, the keys the draft already holds decide which inputs show.
+ */
+function SubProcess({
+  pointer,
+  step,
+  names,
+  onChange,
+}: {
+  pointer: string
+  step: Content
+  names: string[]
+  onChange: ChangeHandler
+}) {
+  const t = useText()
+  const studioNames = useContext(StudioNamesContext)
+  const childOf = (name: string) =>
+    studioNames?.processes.find((process) => process.name.toLowerCase() === name.toLowerCase())
+  const child = childOf(text(step.process))
+  const mode = child
+    ? child.entity === null
+      ? 'parameters'
+      : 'subject'
+    : step.parameters !== undefined && step.subject === undefined
+      ? 'parameters'
+      : 'subject'
+
+  return (
+    <>
+      <NamePicker
+        pointer={`${pointer}/process`}
+        label={t('shell.studio.process.childProcess')}
+        kind="process"
+        value={step.process}
+        onPick={(next) => onChange(pointer, withChild(step, next, childOf(next)))}
+      />
+      {mode === 'subject' ? (
+        <div data-testid={`studio-field-${pointer}/subject`}>
+          <div>{t('shell.studio.process.subjectExpression')}</div>
+          <Expression
+            pointer={`${pointer}/subject`}
+            name={t('shell.studio.process.subjectExpression')}
+            value={text(step.subject)}
+            onChange={(changed, value) => onChange(changed, value === '' ? undefined : value)}
+          />
+        </div>
+      ) : (
+        <MappingRows
+          pointer={`${pointer}/parameters`}
+          title={t('shell.studio.process.childParameters')}
+          value={step.parameters}
+          keyLabel={t('shell.studio.process.parameterName')}
+          keyOptions={child?.parameters.map((parameter) => parameter.name)}
+          target={{ kind: 'expression' }}
+          onChange={onChange}
+        />
+      )}
       <Transition
         pointer={`${pointer}/next`}
         label={t('shell.studio.process.next')}

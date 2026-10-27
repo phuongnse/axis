@@ -253,8 +253,8 @@ sign-in and the last sign-in. A later sign-in updates it.
 | Setting | Default | Meaning |
 | --- | --- | --- |
 | `Email:Smtp:Host` | none | The SMTP server. Without it, no email is sent, the items stay queued and the worker logs a warning once per tenant. |
-| `Email:Smtp:Port` | `587` | The SMTP port. |
-| `Email:Smtp:UseTls` | `true` | Use STARTTLS, or TLS on port 465. |
+| `Email:Smtp:Port` | `587` | The SMTP port. A value that is not a whole number from 1 to 65535 stops the worker at start. |
+| `Email:Smtp:UseTls` | `true` | Use STARTTLS, or TLS on port 465. A value other than `true` or `false` stops the worker at start. |
 | `Email:Smtp:UserName` | none | The SMTP user. |
 | `Email:Smtp:Password` | none | The SMTP password, from the environment. |
 | `Email:From` | none | The sender address. Required when a host is set. |
@@ -264,9 +264,9 @@ A tenant may override `Email` in its `Tenants` block. The block replaces the
 host's settings as a whole, and keys are never merged one by one, so a tenant
 that sets only its own host never sends the host's user name and password to
 that server. A host with no `From` is refused at start, naming the setting.
-_(Planned for M14)_ A tenant may also override `Email` in the tenant directory
-under `Tenancy:Source=directory`, where the password is encrypted as the OIDC
-client secret is. Until then such a tenant uses the host's settings. MailKit
-sends the email. The integration tests run Mailpit as the mail server.
+Under `Tenancy:Source=directory` a tenant overrides `Email` in the tenant
+directory, where the password is encrypted as the OIDC client secret is. The
+[`tenant email set`](tenant-setting-commands.md#mail-settings) command sets it,
+and a tenant without it uses the host's settings. MailKit sends the email. The integration tests run Mailpit as the mail server.
 _(Planned for M14)_ Docker Compose and `scripts/dev.sh` run Mailpit too. Until
 then they have no mail server, see [development](../development.md).

@@ -71,7 +71,19 @@ const names = {
     },
   ],
   dataSources: [],
-  processes: [],
+  processes: [
+    { id: 'p1', name: 'OrderFulfilment', entity: 'PurchaseRequest', parameters: [], steps: [] },
+    {
+      id: 'p2',
+      name: 'DailyReminder',
+      entity: null,
+      parameters: [
+        { name: 'daysOverdue', type: 'integer' },
+        { name: 'region', type: 'text' },
+      ],
+      steps: [],
+    },
+  ],
   rules: [],
   connectors: [],
   events: [],
@@ -359,15 +371,80 @@ describe.each(['light', 'dark'])('ProcessEditor in %s mode', (mode) => {
   })
 
   it('shows the keys of a step type without a panel as markers for the JSON view', async () => {
-    const latest = renderEditor()
+    renderEditor({
+      ...process,
+      steps: [{ name: 'wait', type: 'waitEvent', event: 'PaymentReceived', next: 'wait' }],
+    })
 
-    await chooseOption('subProcess', screen.getByTestId('studio-field-/steps/3/type'))
-
-    expect(stepOf(latest, 3)).toEqual({ name: 'done', type: 'subProcess', process: '', next: '' })
-    const card = screen.getByTestId('studio-step-3')
-    expect(within(card).getByTestId('studio-field-/steps/3/process')).toBeVisible()
-    expect(within(card).getByTestId('studio-field-/steps/3/next')).toBeVisible()
+    const card = screen.getByTestId('studio-step-0')
+    expect(within(card).getByTestId('studio-field-/steps/0/event')).toBeVisible()
+    expect(within(card).getByTestId('studio-field-/steps/0/next')).toBeVisible()
     expect(within(card).getAllByTestId('studio-json-only')).toHaveLength(2)
+  })
+
+  it('writes the process, subject and next step of a sub-process whose child has a subject', async () => {
+    const latest = renderEditor({
+      ...process,
+      steps: [
+        { name: 'fulfil', type: 'subProcess', process: '', next: '' },
+        { name: 'done', type: 'end' },
+      ],
+    })
+    const card = screen.getByTestId('studio-step-0')
+
+    await chooseOption('OrderFulfilment', screen.getByTestId('studio-field-/steps/0/process'))
+    await userEvent.type(within(screen.getByTestId('studio-field-/steps/0/subject')).getByRole('textbox'), 'request')
+    await chooseOption('done', screen.getByTestId('studio-field-/steps/0/next'))
+
+    expect(stepOf(latest, 0)).toEqual({
+      name: 'fulfil',
+      type: 'subProcess',
+      process: 'OrderFulfilment',
+      subject: 'request',
+      next: 'done',
+    })
+    expect(within(card).queryByTestId('studio-json-only')).toBeNull()
+    await userEvent.clear(within(screen.getByTestId('studio-field-/steps/0/subject')).getByRole('textbox'))
+    expect(stepOf(latest, 0)).not.toHaveProperty('subject')
+  })
+
+  it('shows one row per parameter of a sub-process whose child has no subject and removes the subject', async () => {
+    const latest = renderEditor({
+      ...process,
+      steps: [
+        { name: 'fulfil', type: 'subProcess', process: 'OrderFulfilment', subject: 'x', next: 'done' },
+        { name: 'done', type: 'end' },
+      ],
+    })
+
+    await chooseOption('DailyReminder', screen.getByTestId('studio-field-/steps/0/process'))
+
+    expect(stepOf(latest, 0)).toEqual({
+      name: 'fulfil',
+      type: 'subProcess',
+      process: 'DailyReminder',
+      parameters: { daysOverdue: '', region: '' },
+      next: 'done',
+    })
+    expect(Object.keys(stepOf(latest, 0))).toEqual(['name', 'type', 'process', 'parameters', 'next'])
+    expect(screen.getByTestId('studio-field-/steps/0/parameters/daysOverdue')).toBeVisible()
+    expect(screen.getByTestId('studio-field-/steps/0/parameters/region')).toBeVisible()
+    expect(screen.queryByTestId('studio-field-/steps/0/subject')).toBeNull()
+    expect(within(screen.getByTestId('studio-step-0')).queryByTestId('studio-json-only')).toBeNull()
+
+    await chooseOption('OrderFulfilment', screen.getByTestId('studio-field-/steps/0/process'))
+    expect(stepOf(latest, 0)).toEqual({ name: 'fulfil', type: 'subProcess', process: 'OrderFulfilment', next: 'done' })
+  })
+
+  it('changes only the process of a sub-process whose child is not in the names list', async () => {
+    const latest = renderEditor({
+      ...process,
+      steps: [{ name: 'fulfil', type: 'subProcess', process: 'Gone', parameters: { a: 'x' }, next: 'fulfil' }],
+    })
+
+    expect(screen.getByTestId('studio-field-/steps/0/parameters/a')).toBeVisible()
+    await userEvent.clear(within(screen.getByTestId('studio-field-/steps/0/process')).getByRole('combobox'))
+    expect(stepOf(latest, 0).parameters).toEqual({ a: 'x' })
   })
 
   it('edits a timer through its own fields and switches between Wait and Until', async () => {
