@@ -5,8 +5,9 @@ test that measures them. The conventions of [architecture.md](../architecture.md
 marked _(planned for Mx)_ are not built yet, and Dn refers to [decisions.md](../decisions.md).
 
 The design follows [D82](../decisions/d82-performance-slos-and-load-tests.md). All of this page is
-_(planned for M16)_. The per-request budgets of the `*PerformanceTests` classes are built, and stay
-as they are. See [testing](../architecture.md#testing).
+_(planned for M16)_. The per-request budgets of the `*PerformanceTests` classes are built. They
+move to a workflow of their own, as [D97](../decisions/d97-reliable-test-runs.md) says. See
+[testing](../architecture.md#testing).
 
 ## Objectives
 
