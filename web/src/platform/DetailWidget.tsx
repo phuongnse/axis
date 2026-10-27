@@ -1,7 +1,8 @@
-import { Alert, Button, Descriptions, Flex, Tag, Typography } from 'antd'
+import { Alert, Descriptions, Flex, Tag, Typography } from 'antd'
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import { NotFoundPage } from '../pages/NotFoundPage'
+import { AxisButton } from './AxisButton'
 import { ChildCollectionTable } from './ChildCollectionTable'
 import { useCanvasActions } from './canvasActions'
 import { NotSet } from './EmptyValue'
@@ -160,20 +161,22 @@ export function DetailWidget({ widget, sitePath, recordId, locale }: DetailWidge
   const navigateActions = widget.actions.filter((action): action is NavigateAction => action.type === 'navigate')
   const buttons = [
     ...startActions.map((action) => (
-      <Button
+      <AxisButton
+        role="main"
         key={action.instancesPath}
         disabled={starting}
         onClick={() => void runAction(action)}
         {...canvas.props(`actions/${widget.actions.indexOf(action)}`)}
       >
         {t(action.labelKey)}
-      </Button>
+      </AxisButton>
     )),
     ...navigateActions.flatMap((action, index) => {
       const open = navigateTarget(sitePath, action, { id: recordId, values: record.values })
       return open || canvas.active
         ? [
-            <Button
+            <AxisButton
+              role="secondary"
               key={`navigate-${index}`}
               disabled={starting}
               onClick={() => {
@@ -184,7 +187,7 @@ export function DetailWidget({ widget, sitePath, recordId, locale }: DetailWidge
               {...canvas.props(`actions/${widget.actions.indexOf(action)}`)}
             >
               {t(action.labelKey)}
-            </Button>,
+            </AxisButton>,
           ]
         : []
     }),

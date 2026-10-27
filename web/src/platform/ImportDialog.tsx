@@ -1,5 +1,6 @@
 import { Alert, Button, Flex, Modal, Typography, Upload } from 'antd'
 import { useEffect, useRef, useState } from 'react'
+import { AxisButton } from './AxisButton'
 import {
   commitImport,
   fetchImport,
@@ -198,22 +199,22 @@ export function ImportDialog({ importsPath, fields, onClose, onCommitted }: Impo
       onCancel={onClose}
       destroyOnHidden
       footer={[
-        <Button key="close" onClick={onClose}>
+        <AxisButton key="close" role="secondary" onClick={onClose}>
           {t('shell.table.importClose')}
-        </Button>,
-        <Button
+        </AxisButton>,
+        <AxisButton
           key="check"
-          type={phase === 'checked' || phase === 'committing' ? 'default' : 'primary'}
+          role={phase === 'checked' || phase === 'committing' ? 'secondary' : 'finish'}
           disabled={file === null || busy || phase === 'checked'}
           loading={phase === 'uploading' || phase === 'checking'}
           onClick={() => void upload()}
         >
           {t('shell.table.importCheck')}
-        </Button>,
+        </AxisButton>,
         (phase === 'checked' || phase === 'committing') && (
-          <Button key="commit" type="primary" loading={phase === 'committing'} onClick={() => void commit()}>
+          <AxisButton key="commit" role="finish" loading={phase === 'committing'} onClick={() => void commit()}>
             {t('shell.table.importCommit')}
-          </Button>
+          </AxisButton>
         ),
       ]}
     >
