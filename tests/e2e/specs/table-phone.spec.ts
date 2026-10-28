@@ -8,7 +8,7 @@ test.use({
   viewport: { width: 390, height: 844 },
 });
 
-test("at phone width, a row's Actions menu opens by keyboard and runs an action", async ({
+test("at phone width, the title link opens the row and the Actions menu opens by keyboard and runs an action", async ({
   page,
   request,
 }) => {
@@ -25,15 +25,15 @@ test("at phone width, a row's Actions menu opens by keyboard and runs an action"
   const row = page.getByRole("row", { name: new RegExp(title) });
   await expect(row.getByRole("button")).toHaveCount(1);
 
-  // Clicking the title cell makes the next Tab start from that cell.
-  await row.getByRole("cell", { name: title, exact: true }).click();
+  // The title link opens the row, so focus it and let the next Tab reach the Actions button.
+  await row.getByRole("link", { name: title, exact: true }).focus();
   await page.keyboard.press("Tab");
   await expect(row.getByRole("button", { name: "Actions", exact: true })).toBeFocused();
 
   await page.keyboard.press("Enter");
   // The menu moves focus to its first entry once it has opened.
-  const open = page.getByRole("menuitem", { name: "Open", exact: true });
-  await expect(open).toBeFocused();
+  const edit = page.getByRole("menuitem", { name: "Edit", exact: true });
+  await expect(edit).toBeFocused();
   await page.keyboard.press("ArrowDown");
   await page.keyboard.press("Enter");
 

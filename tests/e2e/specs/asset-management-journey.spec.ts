@@ -77,6 +77,8 @@ test.describe('the author builds the asset management application with Studio on
     )
     await page.getByRole('button', { name: 'Save', exact: true }).click()
     for (const [field, choice] of answers) {
+      // A click while the dialog zooms in is lost, so wait until it has finished opening.
+      await waitForDialog(page)
       await expect(page.getByTestId('studio-migration-field')).toHaveText(field)
       // A click during the dialog's zoom-in is lost, so each answer waits for its dialog to open.
       const dialog = await waitForDialog(page)

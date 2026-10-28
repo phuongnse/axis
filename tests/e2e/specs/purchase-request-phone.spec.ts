@@ -61,11 +61,10 @@ test('a purchase request is created and reopened at phone width, without the pag
   await noSideways(page)
   await page.getByRole('button', { name: 'Save', exact: true }).click()
 
-  // The row actions fold into one Actions menu on a phone.
+  // The title is the link that opens the row. This table has no other row actions, so there is no Actions menu.
   await expect(page).toHaveURL(/\/purchasing\/purchaserequests\?pageSize=100&sort=-title$/)
   const row = page.getByRole('row', { name: new RegExp(`${title} `) })
-  await row.getByRole('button', { name: 'Actions', exact: true }).click()
-  await page.getByRole('menuitem', { name: 'Open', exact: true }).click()
+  await row.getByRole('link', { name: title, exact: true }).click()
   await expect(page.getByRole('textbox', { name: 'Title', exact: true })).toHaveValue(title)
   await expectShown(fieldValue(page, 'totalAmount'), '20.00')
   await noSideways(page)

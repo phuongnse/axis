@@ -74,6 +74,7 @@ export function antThemeFor(mode: ThemeMode, page?: PageTokenValues, reducedMoti
     },
     components: {
       Form: { colorError: colour.dangerText },
+      Dropdown: { colorError: colour.dangerText },
       Tabs: {
         itemSelectedColor: colour.primaryText,
         itemHoverColor: colour.primaryText,

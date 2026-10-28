@@ -14,6 +14,12 @@
           "page": "NoteForm",
           "label": { "textKey": "noteRows.open" },
           "record": "id"
+        },
+        {
+          "type": "navigate",
+          "page": "NoteForm",
+          "label": { "textKey": "noteRows.edit" },
+          "record": "id"
         }
       ]
     }
