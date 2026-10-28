@@ -113,6 +113,7 @@ cards, which is _(planned)_.
   - `shell`: Application site, Navigation collapsed, Form page and Platform site.
   - `signIn`: Signed out, Sign-in refused and Session ended.
   - `identitySignIn`: the sign-in page of [Axis's identity provider](identity-provider.md#theme), in Sign in, Wrong
-    password, Organization sign-in only and Two-step verification. It is drawn from fixtures until M17 builds the theme.
+    password, Organization sign-in only and Two-step verification. It is built from fixtures through the shared sign-in components in `web/src/identitySignIn/`, and Two-step
+    verification stays a preview-only state.
 - A shell preview draws the shell in a frame of its own height, so several states fit one card.
 - See [widget previews](../development.md#widget-previews).

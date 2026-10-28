@@ -1,94 +1,46 @@
-import { Alert, Button, Card, Checkbox, Divider, Flex, Form, Input, Typography } from 'antd'
-import { useId, useState } from 'react'
-import { SiteMark } from '../platform/SiteMark'
-import { useDesignTokens } from '../platform/themeMode'
-import { identityTexts } from './fixtures'
+import { Button, Flex, Form, Input, Typography } from 'antd'
+import { useId } from 'react'
+import { IdentityFrame } from '../identitySignIn/IdentityFrame'
+import { SignInPage } from '../identitySignIn/SignInPage'
+import { identityInvalid, identitySignInContext, identityTwoStepTexts } from './fixtures'
 
 export type IdentitySignInPage = 'signIn' | 'wrongPassword' | 'organizationOnly' | 'twoStep'
 
-/** The identity provider's sign-in page in one of its states, drawn from fixtures until M17 builds the theme. */
+/** The identity provider's sign-in page in one of its states, built from fixtures through the shared sign-in components. */
 export function IdentitySignIn({ page }: { page: IdentitySignInPage }) {
-  const { spacing } = useDesignTokens()
-  const formId = useId()
-  const [year] = useState(() => new Date().getFullYear())
-  return (
-    <Flex vertical align="center" gap={spacing.md} style={{ paddingBlock: spacing.lg }}>
-      <SiteMark title="Axis" size={40} />
-      <Card style={{ width: '100%', maxWidth: 400 }}>
-        <Flex vertical gap={spacing.md}>
-          <Typography.Title level={4} style={{ margin: 0 }}>
-            {page === 'twoStep' ? identityTexts.twoStepTitle : identityTexts.title}
-          </Typography.Title>
-          {page === 'twoStep' ? <TwoStepForm formId={formId} /> : <SignInForm page={page} formId={formId} />}
-        </Flex>
-      </Card>
-      <Flex gap={spacing.sm}>
-        <Button type="link">{identityTexts.english}</Button>
-        <Button type="link">{identityTexts.vietnamese}</Button>
-      </Flex>
-      <Typography.Text type="secondary">{`© ${year} Axis`}</Typography.Text>
-    </Flex>
-  )
-}
-
-function SignInForm({ page, formId }: { page: Exclude<IdentitySignInPage, 'twoStep'>; formId: string }) {
-  if (page === 'organizationOnly') {
-    return (
-      <>
-        <Typography.Paragraph style={{ margin: 0 }}>{identityTexts.providerOnly}</Typography.Paragraph>
-        <Button type="primary" block>
-          {identityTexts.provider}
-        </Button>
-      </>
-    )
+  switch (page) {
+    case 'signIn':
+      return <SignInPage context={identitySignInContext} />
+    case 'wrongPassword':
+      return <SignInPage context={{ ...identitySignInContext, error: identityInvalid }} />
+    case 'organizationOnly':
+      return <SignInPage context={{ ...identitySignInContext, accounts: false }} />
+    case 'twoStep':
+      return (
+        <IdentityFrame title={identityTwoStepTexts.twoStepTitle} locales={identitySignInContext.locales}>
+          <TwoStepForm />
+        </IdentityFrame>
+      )
   }
-  const wrongPassword = page === 'wrongPassword'
-  return (
-    <>
-      <Button block>{identityTexts.provider}</Button>
-      <Divider plain>{identityTexts.or}</Divider>
-      {wrongPassword && <Alert type="error" showIcon title={identityTexts.invalid} />}
-      <Form
-        name={formId}
-        layout="vertical"
-        requiredMark={false}
-        initialValues={{ username: identityTexts.usernameValue }}
-      >
-        <Form.Item name="username" label={identityTexts.username}>
-          <Input autoComplete="username" />
-        </Form.Item>
-        <Form.Item name="password" label={identityTexts.password} validateStatus={wrongPassword ? 'error' : undefined}>
-          <Input.Password autoComplete="current-password" />
-        </Form.Item>
-        <Flex justify="flex-end">
-          <Button type="link">{identityTexts.forgotPassword}</Button>
-        </Flex>
-        <Form.Item name="keep" valuePropName="checked">
-          <Checkbox>{identityTexts.keepSignedIn}</Checkbox>
-        </Form.Item>
-        <Button type="primary" htmlType="submit" block>
-          {identityTexts.signIn}
-        </Button>
-      </Form>
-    </>
-  )
 }
 
-function TwoStepForm({ formId }: { formId: string }) {
+/** Two-step verification is a preview-only state until the theme draws it. */
+function TwoStepForm() {
+  const formId = useId()
   return (
     <>
-      <Typography.Paragraph style={{ margin: 0 }}>{identityTexts.twoStepMessage}</Typography.Paragraph>
+      <Typography.Paragraph style={{ margin: 0 }}>{identityTwoStepTexts.twoStepMessage}</Typography.Paragraph>
       <Form name={formId} layout="vertical" requiredMark={false}>
-        <Form.Item name="code" label={identityTexts.code}>
+        <Form.Item name="code" label={identityTwoStepTexts.code}>
           <Input maxLength={6} inputMode="numeric" autoComplete="one-time-code" />
         </Form.Item>
         <Button type="primary" htmlType="submit" block>
-          {identityTexts.verify}
+          {identityTwoStepTexts.verify}
         </Button>
       </Form>
       <Flex justify="space-between">
-        <Button type="link">{identityTexts.tryAnotherWay}</Button>
-        <Button type="link">{identityTexts.backToSignIn}</Button>
+        <Button type="link">{identityTwoStepTexts.tryAnotherWay}</Button>
+        <Button type="link">{identityTwoStepTexts.backToSignIn}</Button>
       </Flex>
     </>
   )
