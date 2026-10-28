@@ -12,6 +12,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Axis.Tenancy.Tests" />
+    <InternalsVisibleTo Include="Axis.Integration.Tests" />
   </ItemGroup>
 
   <ItemGroup>
