@@ -209,7 +209,8 @@ export function Shell({
               alignItems: 'center',
               gap: spacing.sm,
               height: headerHeight,
-              lineHeight: `${headerHeight}px`,
+              // The items are centred by the flex row, so the header's own line height cannot shift the title.
+              lineHeight: 'normal',
               paddingInline: spacing.md,
               background: colour.surface,
               borderBottom: `1px solid ${colour.borderSubtle}`,
@@ -217,7 +218,7 @@ export function Shell({
           >
             {navigationToggle}
             <SiteMark title={title} />
-            <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center' }}>
               <Typography.Text strong ellipsis>
                 {title}
               </Typography.Text>
