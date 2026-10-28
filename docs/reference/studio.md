@@ -37,8 +37,9 @@ Run and the Test results list, the read-only view of a module entity, and the re
 - **New resource.** A **New resource** button above the search box opens a
   dialog that asks for the kind and the name, or the locale for a `text`
   resource. The kind picker lists the 18 kinds that the create route accepts,
-  which is every kind except the manifest. The author can type to narrow it.
-  _(planned for M17)_ `identityProvider` joins them, with a starter of type `accounts`.
+  which is every kind except the manifest and `identityProvider`. The author can
+  type to narrow it. _(planned for M17)_ `identityProvider` joins them, with a
+  starter of type `accounts`.
   - It sends the kind's starter with an id from `crypto.randomUUID()`. A starter
     is the smallest content that passes the kind's schema. A reference the
     author must still choose is an empty string, so it shows up as a diagnostic.
@@ -46,8 +47,8 @@ Run and the Test results list, the read-only view of a module entity, and the re
     file names, because a path is a value and not a reference.
   - The starters live in the SPA, in `web/src/platform/studioStarters.json`.
     Each lists the pointers of its empty references. A Vitest test checks each
-    one against its bundled schema, so a schema file without a starter fails,
-    and every error must be at a listed pointer. A server test reads the same
+    one against its bundled schema, so a schema file without a starter fails
+    (the manifest and `identityProvider` are exempt), and every error must be at a listed pointer. A server test reads the same
     file, sends each starter through the create route, and checks that its
     diagnostics are at the listed pointers only.
   - A new text resource copies every key and text of the default locale of the

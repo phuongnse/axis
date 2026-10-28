@@ -16,6 +16,7 @@ public static class ResourceKinds
     public const string Role = "role";
     public const string Policy = "policy";
     public const string Connector = "connector";
+    public const string IdentityProvider = "identityProvider";
     public const string Event = "event";
     public const string Endpoint = "endpoint";
     public const string Trigger = "trigger";

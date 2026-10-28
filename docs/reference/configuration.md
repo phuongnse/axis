@@ -29,8 +29,7 @@ flowchart LR
 1. **Load.** Every `*.json` file in the folder and its subfolders is one
    resource. Each is validated against the JSON Schema for its `kind`
    (`application`, `entity`, `site`, `page`, `text`, `seed`, `dataSource`,
-   `rule`, `sequence`, `process`, `form`, `role`, `policy`, `connector`, `event`, `endpoint`, `trigger`, `migration` or `scenario`).
-   _(planned for M17)_ `identityProvider` joins them, see
+   `rule`, `sequence`, `process`, `form`, `role`, `policy`, `connector`, `identityProvider`, `event`, `endpoint`, `trigger`, `migration` or `scenario`), see
    [identity provider resource](identity-provider.md#identity-provider-resource). The manifest is the
    single `application` resource, stored as `application.json` at the
    folder root; an `application` resource in any other file is not used as
@@ -60,7 +59,8 @@ flowchart LR
      Each release carries its own texts, so a newer release can remove a key
      that older running work still shows.
    - **Labels.** The text key of the application label, an entity label, a
-     field label or an enum value label (`valueLabels`) must be in some locale, otherwise it is `AXC0028` at that
+     field label, an enum value label (`valueLabels`) or the `label` of an
+     [identity provider](identity-provider.md#identity-provider-resource) must be in some locale, otherwise it is `AXC0028` at that
      label's `/textKey`. This applies also when the application has no text
      resource. Unused keys are allowed.
    - **Display field.** An entity's `displayField` must name one of its own
@@ -684,7 +684,9 @@ flowchart LR
    policies in path order, with each grant's target resolved and its filter
    checked, and the connectors in path order, with their timeout, operations,
    typed input and output fields, and each lookup resolved to the declared
-   name of its operation, and the events in path order, with their entity
+   name of its operation, the identity providers in path order, with their
+   bindings, their claims with the defaults filled in and their roles
+   mapping, and the events in path order, with their entity
    resolved, and their typed fields. It also holds the endpoints in path
    order, with their entity, process and input targets resolved, their
    typed input fields, their mapped fields in the entity's order with each
@@ -926,7 +928,7 @@ to show where a resource is used and what it uses.
 - **Label paths.** A `label text` edge sits at the `/textKey` of each label the
   `AXC0028` check covers: the application label, entity and
   field labels, enum value labels, the site title, navigation labels, page titles, action labels,
-  form section titles, role labels, data source parameter labels, task and
+  form section titles, role labels, identity provider labels, data source parameter labels, task and
   outcome labels, the `startCondition` message and validation messages.
 - **Direct calls only.** A `rule call` edge goes from the expression that
   calls a rule to that rule. A rule that calls another rule gives its own
