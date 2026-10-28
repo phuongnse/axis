@@ -210,6 +210,12 @@ describe('the Axis Helm chart', () => {
     assert.doesNotMatch(output, /\/studio|Studio__|- name: studio\n/)
   })
 
+  test('the chart renders no Ingress and the server Service is ClusterIP', () => {
+    const output = renderOk()
+    assert.doesNotMatch(output, /^kind: Ingress$/m)
+    assert.match(find(output, 'Service', 'axis-server'), /^  type: ClusterIP$/m)
+  })
+
   test('forwarded headers render on the server only', () => {
     const output = renderOk()
     const server = find(output, 'Deployment', 'axis-server')

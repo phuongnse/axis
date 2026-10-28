@@ -22,6 +22,7 @@ import net from 'node:net'
 import { tmpdir } from 'node:os'
 import { join, relative, sep } from 'node:path'
 import { after, before, describe, test } from 'node:test'
+import { connect as tlsConnect } from 'node:tls'
 import { fileURLToPath } from 'node:url'
 import { buildImage } from './lib/docker-build.mjs'
 
@@ -174,6 +175,10 @@ describe('the example holds no secret', () => {
     assert.equal(certs[0].read_only, true)
     assert.equal(certs[0].source, join(root, 'deploy/compose/tls'))
     assert.deepEqual(proxy.secrets ?? [], [])
+    assert.deepEqual(
+      proxy.ports.map((port) => port.target),
+      [443],
+    )
 
     // Both servers trust the forwarded headers of the proxy's fixed address and of no other.
     const address = proxy.networks.default.ipv4_address
@@ -183,6 +188,31 @@ describe('the example holds no secret', () => {
       assert.equal(service.environment.ForwardedHeaders__KnownProxies__1, undefined)
       assert.equal(service.environment.ForwardedHeaders__KnownNetworks__0, undefined)
     }
+  })
+})
+
+describe('the TLS proxy', () => {
+  // The Caddyfile without its comments, one trimmed line each.
+  const lines = readFileSync(join(root, 'deploy/compose/Caddyfile'), 'utf8')
+    .split('\n')
+    .map((line) => line.replace(/#.*$/, ''))
+    .filter((line) => line.trim() !== '')
+
+  test('the Caddyfile accepts only TLS 1.2 and 1.3, and on 1.2 only ECDHE ciphers with AEAD', () => {
+    assert.ok(lines.some((line) => line.trim() === 'protocols tls1.2 tls1.3'), 'protocols is not tls1.2 tls1.3')
+    const ciphers = lines.filter((line) => /^\s*ciphers\s/.test(line))
+    assert.equal(ciphers.length, 1, 'the Caddyfile does not set ciphers exactly once')
+    const names = ciphers[0].trim().split(/\s+/).slice(1)
+    assert.ok(names.length > 0, 'the cipher list is empty')
+    for (const name of names) {
+      assert.match(name, /^TLS_ECDHE_(ECDSA|RSA)_WITH_(AES_128_GCM_SHA256|AES_256_GCM_SHA384|CHACHA20_POLY1305_SHA256)$/, `${name} is not an ECDHE AEAD cipher`)
+    }
+  })
+
+  test(':443 is the only site address and nothing serves plain HTTP', () => {
+    const sites = lines.filter((line) => /^\S/.test(line) && line.trimEnd().endsWith('{') && line.trim() !== '{').map((line) => line.trim())
+    assert.deepEqual(sites, [':443 {'])
+    assert.ok(!lines.some((line) => line.includes('http://')), 'the Caddyfile names an http:// address')
   })
 })
 
@@ -300,6 +330,22 @@ describe('the on-premises installation', () => {
       req.setTimeout(10000, () => req.destroy())
       req.on('error', () => resolve({ status: 0, headers: {}, setCookie: [], body: '' }))
       req.end(body)
+    })
+
+  // handshake: opens a TLS connection to the proxy with the given options and reports the protocol and cipher it
+  // negotiated, or the error that refused it.
+  const handshake = (options) =>
+    new Promise((resolve) => {
+      const socket = tlsConnect({ host: '127.0.0.1', port: httpsPort, servername: hosts.one, ca: caCertificate, ...options })
+      socket.setTimeout(10000, () => {
+        socket.destroy()
+        resolve({ error: new Error('timeout') })
+      })
+      socket.on('secureConnect', () => {
+        resolve({ protocol: socket.getProtocol(), cipher: socket.getCipher().name })
+        socket.end()
+      })
+      socket.on('error', (error) => resolve({ error }))
     })
 
   // A cookie jar is a map from a cookie's name to its value.
@@ -692,6 +738,20 @@ RETURNING id;`,
       run(['up', '-d', 'proxy'])
       const proxied = await waitFor(() => viaProxy('/leave', new Map()), 200, 60)
       assert.equal(proxied.status, 200, 'the proxy did not serve /leave')
+
+      // A default handshake negotiates TLS 1.3. TLS 1.2 works with an ECDHE AEAD cipher, and is refused when the
+      // client offers only CBC ciphers.
+      assert.equal((await handshake({})).protocol, 'TLSv1.3')
+      const tls12 = await handshake({ maxVersion: 'TLSv1.2' })
+      assert.equal(tls12.protocol, 'TLSv1.2', `TLS 1.2 handshake: ${tls12.error}`)
+      assert.match(tls12.cipher, /^ECDHE-.*(GCM|CHACHA20)/)
+      const cbc = await handshake({
+        minVersion: 'TLSv1.2',
+        maxVersion: 'TLSv1.2',
+        ciphers: 'ECDHE-RSA-AES128-SHA:ECDHE-RSA-AES256-SHA:ECDHE-RSA-AES128-SHA256',
+      })
+      assert.ok(cbc.error, 'the proxy accepted a CBC cipher on TLS 1.2')
+      assert.equal(cbc.protocol, undefined)
 
       // The sign-in redirect names the tenant host over https, even when the client sends its own
       // forwarded headers, which the proxy replaces.
