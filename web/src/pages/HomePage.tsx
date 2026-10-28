@@ -1,4 +1,4 @@
-import { DashboardOutlined, LinkOutlined, ToolOutlined } from '@ant-design/icons'
+import { DashboardOutlined, ToolOutlined } from '@ant-design/icons'
 import { Alert, Avatar, Empty, Flex, Spin, Typography } from 'antd'
 import type { ReactNode } from 'react'
 import { Link, useSearchParams } from 'react-router'
@@ -119,7 +119,7 @@ function WelcomeBand({ user }: { user: CurrentUser | null | undefined }) {
   )
 }
 
-/** One site of an application: a row with its mark and title that opens the site. */
+/** Proposed: one site of an application, a row with its mark and title that opens the site, with no icon after it. */
 function SiteRow({ site, locale }: { site: SiteListItem; locale: string }) {
   const { colour, spacing, radius } = useDesignTokens()
   const title = localizedTitle(site.titles, locale, site.path)
@@ -139,10 +139,6 @@ function SiteRow({ site, locale }: { site: SiteListItem; locale: string }) {
     >
       <TitleMark title={title} size={24} />
       <Typography.Text ellipsis>{title}</Typography.Text>
-      {/* Proposed: a link icon right after the title says the row opens the site, in the same tab. */}
-      <span aria-hidden style={{ color: colour.textMuted }}>
-        <LinkOutlined />
-      </span>
     </Link>
   )
 }

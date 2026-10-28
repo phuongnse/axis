@@ -320,12 +320,11 @@ export function Shell({
                   {menu}
                 </nav>
               </Layout.Sider>
-              <Layout style={{ minWidth: 0 }}>
-                <Layout.Content style={{ padding: spacing.lg, minWidth: 0 }}>{children}</Layout.Content>
-                <ShellFooter />
-              </Layout>
+              <Layout.Content style={{ padding: spacing.lg, minWidth: 0 }}>{children}</Layout.Content>
             </Layout>
           )}
+          {/* Proposed: the footer runs the full width under the sidebar and the page, as the header does above them. */}
+          {sidebar && !narrow && <ShellFooter />}
         </Layout>
       </ConfigProvider>
     </div>
