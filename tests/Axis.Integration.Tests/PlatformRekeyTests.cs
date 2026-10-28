@@ -68,8 +68,26 @@ public sealed class PlatformRekeyTests(PostgreSqlFixture database) : IClassFixtu
         }
 
         Assert.Equal(versionBefore + 1, await VersionAsync(scenario.Platform, id));
-        Assert.Equal(["platform rekey ok: 7 tenant secrets, 2 data protection keys"], result.Output);
+        Assert.Equal(["platform rekey ok: 9 tenant secrets, 2 data protection keys"], result.Output);
         await scenario.AssertNoSecretsAsync(CipherFor(_newKey, TestPlatform.SecretKey));
+    }
+
+    [Fact]
+    public async Task Each_realm_client_secret_is_bound_to_its_own_field_name()
+    {
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        var id = await SeedAsync(scenario);
+
+        var result = await scenario.RunAsync(["platform", "rekey"], extra: Rotation);
+
+        Assert.Equal(0, result.Exit);
+        await using var context = NewContext(scenario.Platform);
+        var tenant = await context.Tenants.AsNoTracking().SingleAsync(row => row.Id == id, CancellationToken);
+        var newCipher = CipherFor(_newKey);
+        Assert.Equal("realm-activation-secret-value", newCipher.Decrypt(id, TenantSecretFields.RealmActivationClientSecret, tenant.RealmActivationClientSecret!).Reveal());
+        Assert.Equal("realm-users-secret-value", newCipher.Decrypt(id, TenantSecretFields.RealmUsersClientSecret, tenant.RealmUsersClientSecret!).Reveal());
+        Assert.Throws<InvalidOperationException>(() => newCipher.Decrypt(id, TenantSecretFields.RealmUsersClientSecret, tenant.RealmActivationClientSecret!));
+        Assert.Throws<InvalidOperationException>(() => newCipher.Decrypt(id, TenantSecretFields.RealmActivationClientSecret, tenant.RealmUsersClientSecret!));
     }
 
     [Fact]
@@ -171,7 +189,7 @@ public sealed class PlatformRekeyTests(PostgreSqlFixture database) : IClassFixtu
         Assert.True(reader.IsDBNull(1));
         Assert.Equal(Environment.UserName, reader.GetString(2));
         Assert.Equal(Environment.MachineName, reader.GetString(3));
-        Assert.Equal(["tenant secrets: 7", "data protection keys: 2"], (string[])reader[4]);
+        Assert.Equal(["tenant secrets: 9", "data protection keys: 2"], (string[])reader[4]);
         Assert.False(await reader.ReadAsync(CancellationToken));
     }
 
@@ -260,6 +278,8 @@ public sealed class PlatformRekeyTests(PostgreSqlFixture database) : IClassFixtu
         tenant.EmailFrom = "noreply@example.test";
         tenant.SmtpUserName = "mailer";
         tenant.SmtpPassword = cipher.Encrypt(id, TenantSecretFields.SmtpPassword, "smtp-password-value");
+        tenant.RealmActivationClientSecret = cipher.Encrypt(id, TenantSecretFields.RealmActivationClientSecret, "realm-activation-secret-value");
+        tenant.RealmUsersClientSecret = cipher.Encrypt(id, TenantSecretFields.RealmUsersClientSecret, "realm-users-secret-value");
         context.TenantBindings.Add(new TenantBindingRow
         {
             TenantId = id,
@@ -347,6 +367,8 @@ public sealed class PlatformRekeyTests(PostgreSqlFixture database) : IClassFixtu
             "tenants.schema_password" => cipher.Decrypt(row, TenantSecretFields.SchemaPassword, stored).Reveal(),
             "tenants.oidc_client_secret" => cipher.Decrypt(row, TenantSecretFields.OidcClientSecret, stored).Reveal(),
             "tenants.smtp_password" => cipher.Decrypt(row, TenantSecretFields.SmtpPassword, stored).Reveal(),
+            "tenants.realm_activation_client_secret" => cipher.Decrypt(row, TenantSecretFields.RealmActivationClientSecret, stored).Reveal(),
+            "tenants.realm_users_client_secret" => cipher.Decrypt(row, TenantSecretFields.RealmUsersClientSecret, stored).Reveal(),
             "tenants.oidc_client_key" or "tenants.oidc_previous_client_key" => cipher.Decrypt(row, TenantSecretFields.OidcClientKey, stored).Reveal(),
             "tenant_bindings.secret_value" => cipher.Decrypt(row.Split('|')[0], TenantSecretFields.Binding(row.Split('|')[1]), stored).Reveal(),
             "data_protection_keys.xml" => cipher.DecryptDataProtectionKey(Guid.Parse(row), stored).Reveal(),

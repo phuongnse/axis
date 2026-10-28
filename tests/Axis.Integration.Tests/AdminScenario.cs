@@ -313,6 +313,16 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
                     secrets.Add(cipher.Decrypt(tenant.Id, TenantSecretFields.SmtpPassword, tenant.SmtpPassword).Reveal());
                 }
 
+                if (tenant.RealmActivationClientSecret is { Length: > 0 })
+                {
+                    secrets.Add(cipher.Decrypt(tenant.Id, TenantSecretFields.RealmActivationClientSecret, tenant.RealmActivationClientSecret).Reveal());
+                }
+
+                if (tenant.RealmUsersClientSecret is { Length: > 0 })
+                {
+                    secrets.Add(cipher.Decrypt(tenant.Id, TenantSecretFields.RealmUsersClientSecret, tenant.RealmUsersClientSecret).Reveal());
+                }
+
                 foreach (var encrypted in new[] { tenant.OidcClientKey, tenant.OidcPreviousClientKey })
                 {
                     if (encrypted is { Length: > 0 })
