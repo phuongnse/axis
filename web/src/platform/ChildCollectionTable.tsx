@@ -17,7 +17,6 @@ import {
 import { ReferenceLookup } from './ReferenceLookup'
 import type { FieldMetadata } from './site'
 import { useText } from './texts'
-import { useEmptyStyle } from './useEmptyStyle'
 
 interface ChildCollectionTableProps {
   /** A child collection field. Its `fields` are the child entity's fields. */
@@ -40,6 +39,9 @@ const removeColumnKey = '$remove'
 
 // Digits of equal width, on the right.
 const numberStyle: CSSProperties = { textAlign: 'right', fontVariantNumeric: 'tabular-nums' }
+// The height of an input, with the text centred in it, so a plain cell lines up with the inputs in its row.
+const plainCellStyle: CSSProperties = { minHeight: 32, display: 'flex', alignItems: 'center' }
+const plainNumberStyle: CSSProperties = { ...plainCellStyle, justifyContent: 'flex-end', ...numberStyle }
 
 /** The reference cell whose lookup is open. */
 interface OpenLookup {
@@ -48,11 +50,11 @@ interface OpenLookup {
 }
 
 /**
- * Edits the rows of a child collection as a table: one column per child field, each cell the same
- * input the form uses for that field type, a remove button per row and an add button below. A
+ * Edits the rows of a child collection as a table: one column per child field, each editable cell the
+ * same input the form uses for that field type, a remove button per row and an add button below. A
  * reference cell shows the label of the record it points to, with a search icon button that opens the
- * reference lookup. A computed cell is read-only and shows the value the server returned. A read-only
- * collection shows every cell that way, and has no add or remove buttons.
+ * reference lookup. A computed cell and every cell of a read-only collection show their value as plain
+ * text, with no input. A read-only collection has no add or remove buttons.
  */
 export function ChildCollectionTable({
   field,
@@ -64,7 +66,6 @@ export function ChildCollectionTable({
   readOnly = false,
 }: ChildCollectionTableProps) {
   const t = useText()
-  const emptyStyle = useEmptyStyle()
   const childFields = useMemo(() => field.fields ?? [], [field.fields])
   // A client key per row object, carried over when a row is edited, so React keeps each row's inputs.
   const keys = useRef(new WeakMap<RecordRow, number>())
@@ -128,22 +129,23 @@ export function ChildCollectionTable({
                 )
               }
             >
-              {(readOnly || child.computed) && child.type === 'file' ? (
-                <div data-testid={`cell-${field.name}-${index}-${child.name}`}>
-                  {isFileValue(row[child.name]) ? (
-                    <FileLink field={child} value={row[child.name] as FileValue} />
+              {readOnly || child.computed ? (
+                <div
+                  data-testid={`cell-${field.name}-${index}-${child.name}`}
+                  style={isNumeric(child.type) ? plainNumberStyle : plainCellStyle}
+                >
+                  {child.type === 'file' ? (
+                    isFileValue(row[child.name]) ? (
+                      <FileLink field={child} value={row[child.name] as FileValue} />
+                    ) : (
+                      <EmptyDash />
+                    )
+                  ) : shown ? (
+                    shown
                   ) : (
                     <EmptyDash />
                   )}
                 </div>
-              ) : readOnly || child.computed ? (
-                <Input
-                  readOnly
-                  data-testid={`cell-${field.name}-${index}-${child.name}`}
-                  aria-label={`${label} ${index + 1}`}
-                  value={shown || '—'}
-                  style={{ ...(shown ? undefined : emptyStyle), ...(isNumeric(child.type) ? numberStyle : undefined) }}
-                />
               ) : child.type === 'reference' ? (
                 // The label cannot be typed. The record is chosen in the lookup, and its id is sent.
                 <Space.Compact block data-testid={`reference-${field.name}-${index}-${child.name}`}>
