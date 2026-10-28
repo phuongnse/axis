@@ -2373,7 +2373,7 @@ public static partial class ApplicationCompiler
             Locales = site.Locales,
             File = site.File,
             Navigation = site.Navigation
-                .Select(entry => new NavigationModel(PageReferenceTo(pagesByName[entry.Page]), entry.Label))
+                .Select(entry => new NavigationModel(PageReferenceTo(pagesByName[entry.Page]), entry.Label, entry.Icon))
                 .ToList(),
         };
 

@@ -81,8 +81,8 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   takes its accessible name from a text resource. Configuration, page metadata
   and the custom widget API never name an icon, as the UI library bullet says
   ([D58](../decisions/d58-ant-design-is-a-detail-of-the-spa-without-procomponents.md)).
-  _(planned for M16)_ A site's navigation entry names an icon from Axis's own list, see
-  [navigation icons](shell.md#navigation-icons).
+  The exception is a site's navigation entry, which names an icon from Axis's own list, see
+  [navigation icons](shell.md#navigation-icons). `web/src/platform/navigationIcons.ts` maps each name to an icon.
   A Vitest test fails on an `<svg>` element in a `.tsx` file under `web/src`.
 - **Reduced motion.** When the browser or the operating system asks for reduced
   motion (`prefers-reduced-motion: reduce`), the theme turns Ant Design's motion
@@ -187,7 +187,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   the home page shows a sign-in prompt in place of the list.
   - `GET /api/site` returns the site name, its title key, the locales
     (default, fallback and available) and the navigation items. Navigation
-    labels are text keys, never literal text.
+    labels are text keys, never literal text. Each navigation item has an `icon`.
   - `GET /api/texts/{locale}` returns a flat map from text key to text for
     one locale. A locale without texts gets a 404 problem response.
   - The platform site offers English (`en`, default and fallback) and
@@ -202,7 +202,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   | Method and path | Response |
   | --- | --- |
   | `GET /api/sites` | `{ "sites": [ { "path", "titleKey", "titles" } ] }`, every site of every active application, in path order |
-  | `GET /api/sites/{path}` | `{ "path", "titleKey", "locales": { "default", "fallback", "available" }, "navigation": [ { "page", "labelKey" } ], "notificationsPath" }` |
+  | `GET /api/sites/{path}` | `{ "path", "titleKey", "locales": { "default", "fallback", "available" }, "navigation": [ { "page", "labelKey", "icon" } ], "notificationsPath" }`. `icon` is an Axis icon name, or `null` for an entry with none |
   | `GET /api/sites/{path}/texts/{locale}` | `{ "locale", "texts" }`, the active release's texts for one locale, in the shape of the platform texts. Optional `?release={releaseId}` serves any stored release of the site's application. An unknown id, a non-UUID or another application's release answers `404`. |
   | `GET /api/sites/{path}/pages/{page}` | the page metadata shown below |
 

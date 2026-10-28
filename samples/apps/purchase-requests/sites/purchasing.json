@@ -7,11 +7,11 @@
   "title": { "textKey": "site.title" },
   "locales": { "default": "en", "fallback": "en", "available": ["en", "vi"] },
   "navigation": [
-    { "page": "PurchaseRequests", "label": { "textKey": "nav.purchaseRequests" } },
-    { "page": "MyTasks", "label": { "textKey": "nav.myTasks" } },
-    { "page": "RequestsByDepartment", "label": { "textKey": "nav.requestsByDepartment" } },
-    { "page": "Departments", "label": { "textKey": "nav.departments" } },
+    { "page": "PurchaseRequests", "label": { "textKey": "nav.purchaseRequests" }, "icon": "cart" },
+    { "page": "MyTasks", "label": { "textKey": "nav.myTasks" }, "icon": "tasks" },
+    { "page": "RequestsByDepartment", "label": { "textKey": "nav.requestsByDepartment" }, "icon": "chart" },
+    { "page": "Departments", "label": { "textKey": "nav.departments" }, "icon": "people" },
     { "page": "Suppliers", "label": { "textKey": "nav.suppliers" } },
-    { "page": "Approvals", "label": { "textKey": "nav.approvals" } }
+    { "page": "Approvals", "label": { "textKey": "nav.approvals" }, "icon": "process" }
   ]
 }

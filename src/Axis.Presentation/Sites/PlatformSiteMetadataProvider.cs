@@ -9,7 +9,7 @@ public sealed class PlatformSiteMetadataProvider : ISiteMetadataProvider
         Name: "platform",
         TitleKey: "shell.title",
         Locales: new SiteLocales(Default: "en", Fallback: "en", Available: ["en", "vi"]),
-        Navigation: [new NavigationItem(Key: "home", Path: "/", LabelKey: "shell.nav.home")]);
+        Navigation: [new NavigationItem(Key: "home", Path: "/", LabelKey: "shell.nav.home", Icon: "home")]);
 
     public SiteMetadata GetSite() => _site;
 }
