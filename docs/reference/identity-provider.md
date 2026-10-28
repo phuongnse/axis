@@ -4,9 +4,10 @@ Axis ships an identity provider of its own, so people sign in on one standard Ax
 their organization uses. [D99](../decisions/d99-axis-ships-its-own-identity-provider.md) agrees it, and
 [D100](../decisions/d100-identity-providers-per-application-and-sign-in-per-site.md) lets each application declare how
 its people sign in and each site pick from that. M17 builds it, and each section says whether it is built. The
-`identityProvider` resource, a site's `signIn` and their compile checks are built. Sign-in and activation do not read them yet, so
-until they do, each tenant's `Oidc` block points at an identity provider that runs outside
-Axis, as [security](security.md#sign-in-and-the-session) describes. Accounts, roles given by an administrator and the
+`identityProvider` resource, a site's `signIn` and their compile checks are built, and so is the tenant's realm that
+`tenant create` makes. Sign-in and activation do not read them yet, and a new realm has no accounts, no redirect addresses and
+no role mappings, so until they do, a tenant signs in through an identity provider that runs outside
+Axis, which `tenant oidc set` points its `Oidc` block at, as [security](security.md#sign-in-and-the-session) describes. Accounts, roles given by an administrator and the
 users page are in [user administration](user-administration.md).
 
 ## What it is
@@ -24,13 +25,15 @@ _(planned for M17)_
 
 ## Realms
 
-_(planned for M17)_
-
-- Each tenant has one realm of its own, with its people, its brokered identity providers, a client for its platform
-  sign-in and one for each site, and the Axis theme. Tenants share nothing in it, as they share no database.
-- The realm's display name is the organization's name, which every sign-in page shows under its title.
+- Each tenant has one realm of its own, named after the tenant id, with a client for its platform sign-in. Tenants
+  share nothing in it, as they share no database. `tenant create` makes it, see
+  [keeping the realm in step](#keeping-the-realm-in-step).
 - The realm's sessions last at most 8 hours, the lifetime of Axis's session, see
   [session lifetimes](security.md#session-lifetimes-and-re-authentication).
+- _(planned for M17)_ The realm also has its people, its brokered identity providers, a client for each site and the
+  Axis theme.
+- _(planned for M17)_ The realm's display name is the organization's name, which every sign-in page shows under its
+  title. Until `tenant create` takes that name, the display name is the tenant id.
 - A preview tenant has no realm. It signs people in through its main tenant's realm, see
   [preview tenants](#preview-tenants).
 
@@ -165,11 +168,14 @@ _(planned for M17)_
 
 _(planned for M17)_
 
-- **Created by `Axis.Admin`:** `tenant create` creates the tenant's realm, its platform client, and two clients that
-  Axis's hosts use to change the realm: one with rights over the realm's providers and clients, for activation, and
-  one with rights over its users only, for the users page. It stores their secrets encrypted in the tenant directory.
-  Only `Axis.Admin` holds the identity provider's admin rights over every realm, from its own settings, see
-  [administration](administration.md).
+- **Created by `Axis.Admin`:** `tenant create` creates the tenant's realm, its platform client `axis`, and two clients
+  that Axis's hosts use to change the realm: `axis-activation`, with rights over the realm's providers and clients, for
+  activation, and `axis-users`, with rights over its users only, for the users page. It stores their secrets and the
+  platform client's secret encrypted in the tenant directory and points the tenant's `Oidc` block at the realm. A
+  second run updates the realm. Only `Axis.Admin` holds the identity provider's admin rights over every realm, from the
+  `IdentityProvider` settings of its own, see [administration](administration.md#settings).
+- _(planned for M17)_ **Kept in step later:** `tenant host add`, `remove` and `move` do not change the realm yet, so the
+  platform client has no redirect addresses until a later part of M17 adds them.
 - **Brought in step by activation:** activating a release adds, changes and removes the realm's brokered providers,
   their claim mappers and the site clients to match the active releases of the tenant and its platform sign-in. A
   provider that nothing names any more is removed. Its users stay, but cannot sign in through it.

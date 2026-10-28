@@ -338,7 +338,7 @@ sign-out address. This holds under both
   `tenant restore` empties the table.
 - **The identity provider's session.** Its lifetimes are set at the identity
   provider. The development realm sets none, so it keeps Keycloak's defaults.
-  _(planned for M17)_ Axis sets them in every realm it creates: at most 8 hours, the lifetime of Axis's session.
+  Axis sets them in every realm that `tenant create` makes: at most 8 hours, the lifetime of Axis's session.
   Sign-out from Axis ends both sessions: it deletes the row and sends the
   browser to the `signOutUrl`, which ends the identity provider's session.
 - **When a person signs in again.** When Axis's session ends, the next request

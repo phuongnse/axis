@@ -31,7 +31,9 @@
 #
 # Profiles. `proxy` starts the TLS proxy. `replicas` starts the second server, server-2. `admin` is for
 # `docker compose run --rm admin`.
-# AXIS_OIDC_CLIENT_SECRET  Passes through from the shell to `tenant create`. It is never stored here.
+# AXIS_OIDC_CLIENT_SECRET  Passes through from the shell to `tenant restore` and `tenant oidc set`. It is never stored here.
+# IdentityProvider__Url, IdentityProvider__AdminClientId  Pass through from the shell to `tenant create`, which creates the
+#                       tenant's realm there. The URL must be https. The admin client secret is a secret file.
 # Studio__Folders__0, Studio__AuthorRole, Studio__PublisherRole  Pass through from the shell to both servers.
 #                       Studio stays off without them.
 x-host: &host
@@ -151,8 +153,10 @@ services:
       - admin
     environment:
       <<: *host-environment
-      # No value: it passes through from the shell.
+      # No value: these pass through from the shell.
       AXIS_OIDC_CLIENT_SECRET:
+      IdentityProvider__Url:
+      IdentityProvider__AdminClientId:
     volumes:
       - ${AXIS_EXTENSIONS_DIR:-./extensions}:/extensions:ro
       - ${AXIS_MODULES_DIR:-./modules}:/modules:ro
@@ -160,6 +164,7 @@ services:
     secrets:
       - Admin__ConnectionString
       - ConnectionStrings__PlatformSchema
+      - IdentityProvider__AdminClientSecret
       - Platform__SecretKey
 
 # A fixed subnet gives the proxy a fixed address. Docker hands out the other addresses from the ip_range only,
@@ -179,5 +184,7 @@ secrets:
     file: ${AXIS_SECRETS_DIR:-./secrets}/ConnectionStrings__Platform
   ConnectionStrings__PlatformSchema:
     file: ${AXIS_SECRETS_DIR:-./secrets}/ConnectionStrings__PlatformSchema
+  IdentityProvider__AdminClientSecret:
+    file: ${AXIS_SECRETS_DIR:-./secrets}/IdentityProvider__AdminClientSecret
   Platform__SecretKey:
     file: ${AXIS_SECRETS_DIR:-./secrets}/Platform__SecretKey

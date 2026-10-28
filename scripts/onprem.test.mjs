@@ -1,6 +1,6 @@
 // Smoke test for the on-premises installation: installs deploy/compose/compose.yaml from the three
 // production images exactly as docs/reference/installation.md says. It runs against a test PostgreSQL
-// and Keycloak, creates two tenants, activates the leave request sample and checks each tenant's
+// and Keycloak, creates two tenants and their realms in Keycloak, activates the leave request sample and checks each tenant's
 // site and sign-in, suspend and resume, an unknown host, and a publish request that the installed
 // publisher runs in each tenant. It then starts a second server replica and a TLS proxy, signs anna in
 // through the proxy, and restarts the first replica. The servers listen on HTTPS only, with a certificate of the
@@ -15,7 +15,9 @@
 // The production hosts refuse a connection string with a weaker mode.
 // Keycloak imports a copy of the development realm that adds the https redirect addresses of the tenants.
 // The production server refuses an identity provider over plain http, so Keycloak serves https and only
-// the server in this test trusts the certificate authority, through SSL_CERT_FILE.
+// the server and the admin tool in this test trust the certificate authority, through SSL_CERT_FILE.
+// Keycloak starts with an admin client, which `tenant create` signs in as to create each tenant's realm. A new realm has
+// no users, so the test points tenant one back at the development realm before the proxy signs anna in.
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import { createHash, randomBytes } from 'node:crypto'
@@ -38,6 +40,8 @@ const timeout = 30 * 60 * 1000
 const targets = ['axis-server', 'axis-worker', 'axis-admin']
 const keycloakAuthority = 'https://keycloak:8443/realms/axis'
 const clientSecret = 'axis-development-secret'
+const adminClientId = 'axis-admin'
+const passThrough = ['AXIS_OIDC_CLIENT_SECRET', 'IdentityProvider__Url', 'IdentityProvider__AdminClientId']
 const hosts = { one: 'one.axis.test', two: 'two.axis.test' }
 
 const secretFiles = {
@@ -45,7 +49,7 @@ const secretFiles = {
   'server-2': ['ConnectionStrings__Platform', 'ConnectionStrings__PlatformSchema', 'Platform__SecretKey'],
   proxy: [],
   worker: ['ConnectionStrings__Platform', 'Platform__SecretKey'],
-  admin: ['Admin__ConnectionString', 'ConnectionStrings__PlatformSchema', 'Platform__SecretKey'],
+  admin: ['Admin__ConnectionString', 'ConnectionStrings__PlatformSchema', 'IdentityProvider__AdminClientSecret', 'Platform__SecretKey'],
   publisher: ['ConnectionStrings__PlatformSchema', 'Platform__SecretKey'],
 }
 
@@ -81,7 +85,7 @@ const openToAll = (dir) => {
 // render: the config of the example with every profile on and no variable set but the version. `extraFiles` are
 // added after compose.yaml with -f.
 const render = (extraFiles = []) => {
-  const env = { ...process.env, AXIS_VERSION: 'x', AXIS_OIDC_CLIENT_SECRET: '' }
+  const env = { ...process.env, AXIS_VERSION: 'x', ...Object.fromEntries(passThrough.map((name) => [name, ''])) }
   for (const name of Object.keys(env)) if (name.startsWith('AXIS_') && !['AXIS_VERSION', 'AXIS_OIDC_CLIENT_SECRET'].includes(name)) delete env[name]
   for (const name of Object.keys(env)) if (name.startsWith('Studio__')) delete env[name]
   const rendered = spawnSync(
@@ -111,7 +115,7 @@ describe('the example holds no secret', () => {
 
     for (const [name, service] of Object.entries(config.services)) {
       for (const [key, value] of Object.entries(service.environment ?? {})) {
-        if (key === 'AXIS_OIDC_CLIENT_SECRET') {
+        if (passThrough.includes(key)) {
           assert.ok(value === null || value === undefined || value === '', `${name} sets ${key}`)
         } else {
           assert.doesNotMatch(key, /ConnectionString|SecretKey|Password/, `${name} sets ${key} in its environment`)
@@ -312,6 +316,7 @@ describe('the on-premises installation', () => {
   let server2Port
   let overrideFile
   let caCertificate
+  let adminClientSecret
 
   const docker = (args, options = {}) => spawnSync('docker', args, { cwd: root, encoding: 'utf8', ...options })
 
@@ -513,6 +518,8 @@ describe('the on-premises installation', () => {
         `Host=postgres;Port=5432;Database=postgres;Username=axis_admin;Password=${passwords.admin}${trust}`,
       )
       writeFile(join(secrets, 'Platform__SecretKey'), randomBytes(32).toString('base64'))
+      adminClientSecret = password()
+      writeFile(join(secrets, 'IdentityProvider__AdminClientSecret'), adminClientSecret)
 
       // Step 3, the database roles. This is the SQL of the installation guide.
       const initSql = join(folder, 'init-roles.sql')
@@ -621,6 +628,7 @@ describe('the on-premises installation', () => {
                 '--https-certificate-file=/certs/tls.crt',
                 '--https-certificate-key-file=/certs/tls.key',
               ],
+              environment: { KC_BOOTSTRAP_ADMIN_CLIENT_ID: adminClientId, KC_BOOTSTRAP_ADMIN_CLIENT_SECRET: adminClientSecret },
               volumes: [`${realm}:/opt/keycloak/data/import:ro`, `${certs}:/certs:ro`],
               ports: ['127.0.0.1::8443'],
             },
@@ -628,7 +636,7 @@ describe('the on-premises installation', () => {
             'server-2': serverOverride,
             worker: { environment: refresh, ...trustOverride },
             publisher: { environment: refresh, ...trustOverride },
-            admin: trustOverride,
+            admin: { environment: { SSL_CERT_FILE: '/run/test-ca/ca.crt' }, ...trustOverride },
           },
         }),
       )
@@ -648,6 +656,8 @@ describe('the on-premises installation', () => {
         AXIS_STUDIO_DIR: studio,
         Studio__Folders__0: '/studio/leave-requests',
         Studio__AuthorRole: 'author',
+        IdentityProvider__Url: 'https://keycloak:8443/',
+        IdentityProvider__AdminClientId: adminClientId,
       }
       delete env.AXIS_OIDC_CLIENT_SECRET
       assert.ok(statSync(env.AXIS_MODULES_DIR).isDirectory(), 'run scripts/smoke.sh, which installs the sample modules: artifacts/modules is missing')
@@ -710,15 +720,14 @@ describe('the on-premises installation', () => {
       // The publisher exits until the server has created the platform tables, so it starts now.
       run(['up', '-d', 'publisher'])
 
-      // Step 4, create two tenants. The client secret passes through from the shell.
+      // Step 4, create two tenants. Each gets a realm of its own in Keycloak. The identity provider address and
+      // admin client id pass through from the shell and the admin client secret is a secret file.
       for (const [id, host] of Object.entries(hosts)) {
-        const create = admin(
-          ['tenant', 'create', id, '--host', host, '--oidc-authority', keycloakAuthority, '--oidc-client-id', 'axis'],
-          { AXIS_OIDC_CLIENT_SECRET: clientSecret },
-        )
+        const create = admin(['tenant', 'create', id, '--host', host])
         assert.equal(create.status, 0, `tenant create ${id}\n${create.stdout}${create.stderr}`)
+        assert.match(create.stdout, new RegExp(`^${id} realm ok$`, 'm'))
         assert.match(create.stdout, new RegExp(`^${id} version ok$`, 'm'))
-        assert.doesNotMatch(create.stdout + create.stderr, new RegExp(clientSecret))
+        assert.doesNotMatch(create.stdout + create.stderr, new RegExp(adminClientSecret))
       }
 
       // Step 5, activate the leave request sample for every active tenant.
@@ -758,8 +767,8 @@ describe('the on-premises installation', () => {
         assert.equal(sites.stdout.trim(), 'leave', `axis_${id} active sites`)
       }
 
-      // Each tenant has its own sign-in: a redirect to the identity provider that returns to its own host.
-      for (const host of Object.values(hosts)) {
+      // Each tenant has its own sign-in: a redirect to the authorization endpoint of its own realm that returns to its own host.
+      for (const [id, host] of Object.entries(hosts)) {
         let signIn
         // The server fetches the OIDC metadata when it first needs it, so the first try can fail.
         for (let i = 0; i < 15; i++) {
@@ -769,7 +778,7 @@ describe('the on-premises installation', () => {
         }
         assert.equal(signIn.status, 302, `${host} sign-in: ${signIn.body}`)
         const location = new URL(signIn.headers.location)
-        assert.equal(`${location.origin}${location.pathname}`, `${keycloakAuthority}/protocol/openid-connect/auth`)
+        assert.equal(`${location.origin}${location.pathname}`, `https://keycloak:8443/realms/${id}/protocol/openid-connect/auth`)
         assert.equal(location.searchParams.get('client_id'), 'axis')
         assert.equal(location.searchParams.get('redirect_uri'), `https://${host}/api/auth/callback`)
       }
@@ -837,6 +846,19 @@ RETURNING id;`,
       const publisherLog = compose(['logs', '--no-color', '--no-log-prefix', 'publisher']).stdout
       for (const id of Object.keys(hosts)) assert.match(publisherLog, new RegExp(`^${id} claim ok$`, 'm'))
       assert.match(run(['ps', '--status', 'running', '--services']), /^publisher$/m)
+
+      // A new realm has no users, so tenant one goes back to the development realm, where anna and hoa can sign in.
+      const point = admin(
+        ['tenant', 'oidc', 'set', 'one', '--authority', keycloakAuthority, '--client-id', 'axis', '--client-secret'],
+        { AXIS_OIDC_CLIENT_SECRET: clientSecret },
+      )
+      assert.equal(point.status, 0, `tenant oidc set one\n${point.stdout}${point.stderr}`)
+      assert.doesNotMatch(point.stdout + point.stderr, new RegExp(clientSecret))
+      for (let i = 0; i < 30; i++) {
+        if (i > 0) await sleep(1000)
+        const pointed = await server(hosts.one, '/api/auth/sign-in?returnUrl=%2Fleave')
+        if (pointed.status === 302 && pointed.headers.location.startsWith(`${keycloakAuthority}/`)) break
+      }
 
       // Step 8, a second replica and the TLS proxy. The second replica starts once the first is ready.
       run(['up', '-d', 'server-2'])
