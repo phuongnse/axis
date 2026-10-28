@@ -16,7 +16,7 @@ namespace Axis.Configuration.Compilation;
 /// application has at most one <c>accounts</c> provider. The schema already refuses the properties
 /// that a type does not take. A site's <c>signIn</c> names providers of the application, compared
 /// ignoring letter case, and an application with sites needs at least one provider. Every problem of a provider is reported in one pass. Its bindings are
-/// not checked against the tenant's yet.
+/// not checked against the tenant's here, activation does that.
 /// </summary>
 internal static class IdentityProviderChecker
 {
