@@ -19,11 +19,21 @@ internal static class WorkerTelemetry
     /// set, logs only when <c>OTEL_EXPORTER_OTLP_ENDPOINT</c> or <c>OTEL_EXPORTER_OTLP_LOGS_ENDPOINT</c> is
     /// set, and metrics only when <c>OTEL_EXPORTER_OTLP_ENDPOINT</c> or
     /// <c>OTEL_EXPORTER_OTLP_METRICS_ENDPOINT</c> is set.
-    /// <c>OTEL_SERVICE_NAME</c> overrides the service name.
+    /// <c>OTEL_SERVICE_NAME</c> overrides the service name. Outside Development every OTLP endpoint that is set must be
+    /// an absolute <c>https</c> URL.
     /// </summary>
-    public static IServiceCollection AddWorkerTelemetry(this IServiceCollection services, IConfiguration configuration)
+    /// <exception cref="InvalidOperationException">
+    /// Outside Development, an OTLP endpoint setting is not an absolute <c>https</c> URL. The message names the setting and never its value.
+    /// </exception>
+    public static IServiceCollection AddWorkerTelemetry(this IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
     {
         ArgumentNullException.ThrowIfNull(configuration);
+        ArgumentNullException.ThrowIfNull(environment);
+        if (!environment.IsDevelopment() && AxisTelemetry.InsecureOtlpEndpoint(setting => configuration[setting]) is { } insecure)
+        {
+            throw new InvalidOperationException($"'{insecure}' must be an https URL outside Development.");
+        }
+
         var exportTraces = !string.IsNullOrEmpty(configuration["OTEL_EXPORTER_OTLP_ENDPOINT"])
             || !string.IsNullOrEmpty(configuration["OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"]);
         var exportMetrics = !string.IsNullOrEmpty(configuration["OTEL_EXPORTER_OTLP_ENDPOINT"])

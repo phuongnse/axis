@@ -4,6 +4,7 @@ using Axis.Data.Storage;
 using Axis.Tenancy;
 using Axis.Tenancy.Platform;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Hosting;
 using Npgsql;
 
 namespace Axis.Admin;
@@ -171,6 +172,7 @@ internal static class TenantSettings
                 run.Command.Name,
                 id,
                 request.Change with { Password = password },
+                (run.Configuration[AdminCommands.DotnetEnvironmentSetting] ?? Environments.Production) == Environments.Development,
                 run.CancellationToken);
         }
         catch (OperationCanceledException)

@@ -173,8 +173,8 @@ successful run of either command prints `<id> email ok`.
   restored tenant needs `tenant email set` again, as it needs its secret bindings.
 - **Exit code 2, nothing changes.** `Tenancy:Source` is not `directory`, the tenant is unknown or
   still `provisioning`, `--host` or `--from` is missing or blank, the port is not a number from 1 to
-  65535, the user name is blank, the password is empty, the password has no user name, or an option
-  is given twice or is unknown. The `version` stays and no audit record is written.
+  65535, the user name is blank, the password is empty, the password has no user name, `--tls false` is
+  given outside Development, or an option is given twice or is unknown. The `version` stays and no audit record is written.
 
 ## Hosts
 

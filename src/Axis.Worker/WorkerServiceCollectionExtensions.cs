@@ -22,11 +22,12 @@ public static class WorkerServiceCollectionExtensions
     /// <c>Notifications:RetentionDays</c>, which defaults to 90. Only a worker
     /// that runs in Development sends connector calls to an <c>http</c> base URL. The worker sends the emails that
     /// <c>notify</c> steps staged over the SMTP server of the <c>Email</c> section, which a tenant's own <c>Email</c> block
-    /// replaces whole. With no <c>Email:Smtp:Host</c> it sends none.
+    /// replaces whole. With no <c>Email:Smtp:Host</c> it sends none, and only a worker that runs in Development sends email
+    /// with <c>Email:Smtp:UseTls</c> off. Only a worker that runs in Development exports telemetry to an endpoint that is not <c>https</c>.
     /// </summary>
     /// <exception cref="InvalidOperationException">
     /// The tenant, worker or health configuration is invalid, <c>Data:ImportMaxRows</c> or <c>Notifications:RetentionDays</c> is not an integer of at least 1, <c>Tenancy:Source</c> is unknown, <c>ConnectionStrings:Platform</c>, <c>Platform:SecretKey</c> or <c>Tenancy:RefreshInterval</c> is missing or invalid under
-    /// <c>directory</c>, <c>Extensions:Path</c> or <c>Modules:Path</c> names a folder that does not exist, or the <c>Email</c> section is invalid.
+    /// <c>directory</c>, <c>Extensions:Path</c> or <c>Modules:Path</c> names a folder that does not exist, the <c>Email</c> section is invalid, or outside Development an OTLP endpoint variable is set and is not an absolute <c>https</c> URL.
     /// </exception>
     public static IServiceCollection AddAxisWorker(this IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
     {
@@ -89,12 +90,12 @@ public static class WorkerServiceCollectionExtensions
             catalog = WorkerTenantCatalog.Loaded(ConfigurationTenantCatalog.Load(configuration, environment));
         }
 
-        services.AddWorkerTelemetry(configuration);
+        services.AddWorkerTelemetry(configuration, environment);
         services.AddTenancy(catalog);
         services.AddSingleton(catalog);
         services.AddExtensionPackages(configuration, environment);
         services.AddModules(configuration, environment);
-        services.AddProcesses(environment.IsDevelopment(), options.DeliveryAttempts, ImportMaxRows(configuration), EmailDefaults.Load(configuration));
+        services.AddProcesses(environment.IsDevelopment(), environment.IsDevelopment(), options.DeliveryAttempts, ImportMaxRows(configuration), EmailDefaults.Load(configuration));
         services.AddSingleton(options);
         services.AddSingleton(new NotificationOptions { RetentionDays = RetentionDays(configuration) });
         services.AddSingleton(health);

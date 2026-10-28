@@ -450,7 +450,7 @@ public sealed class ScheduleTriggerTests(ScheduleTriggerFixture fixture) : IClas
             {
                 ["Email:Smtp:Host"] = "127.0.0.1",
                 ["Email:Smtp:Port"] = UnusedPort().ToString(CultureInfo.InvariantCulture),
-                ["Email:Smtp:UseTls"] = "false",
+                ["Email:Smtp:UseTls"] = "true",
                 ["Email:From"] = "axis@example.test",
             });
         var runner = services.GetRequiredService<WorkItemRunner>();
