@@ -44,7 +44,7 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
     starts a new row. A row is as tall as its tallest field and its fields line
     up at the top, so a message under one field never shifts the rows below.
     Below 992 px every field takes the whole row, in file order. A detail
-    lays out the same sections with the same widths _(planned)_. A `width` that is not a
+    lays out the same sections with the same widths. A `width` that is not a
     whole number from 1 to 12 breaks the schema (`AXC0004`). Studio's
     [form designer](form-designer.md) edits it
     ([D96](../decisions/d96-rules-from-the-design-system-review.md)).
@@ -83,7 +83,7 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
   - **Field look**. These rules are agreed in
     [D96](../decisions/d96-rules-from-the-design-system-review.md).
     - **Label.** On a form, a field label is weight 500 in `textMuted`.
-      _(planned)_ The same on a detail and as a KPI's label.
+      The same on a detail and as a KPI's label.
     - **Required mark.** A required field has a `*` after its label, in
       `dangerText`. The mark is hidden from screen readers. An editable input
       of a required field carries `aria-required`, and a read-only value does
