@@ -131,6 +131,17 @@ and the public key as a PEM.
   client key, the key is already held, the key id to retire is unknown or blank, or both the secret
   and the key would read standard input. The `version` stays and no audit record is written.
 
+- _(planned for M17)_ Every tenant signs in through its realm in
+  [Axis's identity provider](identity-provider.md), which `tenant create` sets up. `--authority`, `--client-id`,
+  `--client-secret` and `--claim` go, because the realm gives the authority and the clients, and each
+  `identityProvider` resource names its own claims. The audiences, the profile and the client keys stay, and Axis
+  registers a client key in the realm itself.
+- _(planned for M17)_ `tenant sign-in set <id>` sets the tenant's
+  [platform sign-in](identity-provider.md#platform-sign-in): `--accounts true|false`, and one
+  `--provider <name>` for each brokered provider, with its type, its bindings, its claims and its role mapping, as an
+  `identityProvider` resource gives them. A run replaces the whole platform sign-in, brings the realm in step, and
+  writes one platform audit record. A platform sign-in with no provider and no accounts exits with code 2.
+
 ## Mail settings
 
 `tenant email set <id>` gives a tenant its own mail server. The worker sends the tenant's emails
@@ -187,6 +198,10 @@ successful run of either command prints `<id> email ok`.
 - Every host command exits with code 2 for a tenant that is still `provisioning`, as the binding
   commands do.
 - A move raises the `version` of both tenants.
+- _(planned for M17)_ `tenant host add <id> <host> --site <path>` gives the host to one site of the tenant. The host
+  then serves only that site, and the tenant's other hosts send the site's path to it, see
+  [sites and sign-in](identity-provider.md#sites-and-sign-in). A tenant keeps at least one host that is no site's,
+  so `tenant host remove` refuses to remove the last of those.
 
 ## Sessions
 

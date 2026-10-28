@@ -220,7 +220,9 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place. _(planned f
   cookie taken to another tenant's host signs nobody in there.
 - **Roles.** The roles come from the roles claim at sign-in and are kept in
   the session row. A role change at the identity provider applies at the next
-  sign-in.
+  sign-in. _(planned for M17)_ Each application's roles come from its identity provider's `roles` mapping and the
+  roles the users page gives, and a change on the users page applies to live sessions at once, see
+  [users](identity-provider.md#users) and [roles](user-administration.md#roles).
 - **Current user.** `GET /api/me` keeps its shape,
   `{ "id", "displayName", "roles" }`, and reads the session. It adds a boolean `console`, true when the user holds
   the role that `Console:OperatorRole` names. With no value set it is false for everyone. See the
@@ -336,6 +338,7 @@ sign-out address. This holds under both
   `tenant restore` empties the table.
 - **The identity provider's session.** Its lifetimes are set at the identity
   provider. The development realm sets none, so it keeps Keycloak's defaults.
+  _(planned for M17)_ Axis sets them in every realm it creates: at most 8 hours, the lifetime of Axis's session.
   Sign-out from Axis ends both sessions: it deletes the row and sends the
   browser to the `signOutUrl`, which ends the identity provider's session.
 - **When a person signs in again.** When Axis's session ends, the next request
