@@ -1,4 +1,4 @@
-import { ArrowRightOutlined, DashboardOutlined, ToolOutlined } from '@ant-design/icons'
+import { DashboardOutlined, LinkOutlined, ToolOutlined } from '@ant-design/icons'
 import { Alert, Avatar, Empty, Flex, Spin, Typography } from 'antd'
 import type { ReactNode } from 'react'
 import { Link, useSearchParams } from 'react-router'
@@ -68,7 +68,7 @@ function Tools({ user }: { user: CurrentUser }) {
             mark={icon(<ToolOutlined />)}
             title={t('shell.studio.link')}
             description={t('shell.home.studio.description')}
-            stacked
+            alignTop
           />
         )}
         {user.console && (
@@ -77,7 +77,7 @@ function Tools({ user }: { user: CurrentUser }) {
             mark={icon(<DashboardOutlined />)}
             title={t('shell.console.link')}
             description={t('shell.home.console.description')}
-            stacked
+            alignTop
           />
         )}
       </ThreeColumns>
@@ -139,9 +139,9 @@ function SiteRow({ site, locale }: { site: SiteListItem; locale: string }) {
     >
       <TitleMark title={title} size={24} />
       <Typography.Text ellipsis>{title}</Typography.Text>
-      {/* Proposed: an arrow right after the title says the row goes to the site. */}
+      {/* Proposed: a link icon right after the title says the row opens the site, in the same tab. */}
       <span aria-hidden style={{ color: colour.textMuted }}>
-        <ArrowRightOutlined />
+        <LinkOutlined />
       </span>
     </Link>
   )
