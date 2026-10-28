@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using Axis.Admin;
 using Axis.Tenancy.Realms;
@@ -63,14 +64,15 @@ public sealed partial class TenantRealmAccountRulesTests(KeycloakFixture keycloa
     {
         var realm = await NewRealmAsync();
         await AddClientAsync(realm);
+        await EnableEventsAsync(realm);
         var userId = await CreateUserAsync(realm, "pat");
         Assert.Equal(HttpStatusCode.NoContent, await SetPasswordAsync(realm, userId, Password));
 
         var (action, jar) = await OpenLoginPageAsync(realm);
-        var (status, _, _, location) = await PostLoginAsync(action, jar, "pat", Password);
+        var (status, loginHtml, _, location) = await PostLoginAsync(action, jar, "pat", Password);
 
         // Keycloak sends the browser on to its required action page, not back to the client.
-        Assert.Equal(HttpStatusCode.Found, status);
+        Assert.True(status == HttpStatusCode.Found, $"{status}\n{await LoginErrorsAsync(realm)}\n{loginHtml}");
         Assert.NotNull(location);
         Assert.False(location.AbsoluteUri.StartsWith(RedirectUri, StringComparison.Ordinal), location.AbsoluteUri);
         using var request = new HttpRequestMessage(HttpMethod.Get, location);
@@ -161,6 +163,7 @@ public sealed partial class TenantRealmAccountRulesTests(KeycloakFixture keycloa
     {
         var realm = await NewRealmAsync();
         await AddClientAsync(realm);
+        await EnableEventsAsync(realm);
         const string email = "kim@example.test";
         using var created = await SendAsync(HttpMethod.Post, $"admin/realms/{realm}/users", new
         {
@@ -179,8 +182,8 @@ public sealed partial class TenantRealmAccountRulesTests(KeycloakFixture keycloa
         Assert.Contains(InvalidCredentials, wrong, StringComparison.Ordinal);
 
         // The password step passes: Keycloak moves on to the authenticator step instead of the callback.
-        var (status, _, _, location) = await PostLoginAsync(next, jar, email, Password);
-        Assert.Equal(HttpStatusCode.Found, status);
+        var (status, html, _, location) = await PostLoginAsync(next, jar, email, Password);
+        Assert.True(status == HttpStatusCode.Found, $"{status}\n{await LoginErrorsAsync(realm)}\n{html}");
         Assert.NotNull(location);
         Assert.False(location.AbsoluteUri.StartsWith(RedirectUri, StringComparison.Ordinal), location.AbsoluteUri);
     }
@@ -207,6 +210,34 @@ public sealed partial class TenantRealmAccountRulesTests(KeycloakFixture keycloa
             redirectUris = new[] { RedirectUri },
         });
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+    }
+
+    /// <summary>Makes the realm record its sign-in events, so that a failed sign-in can be explained by <see cref="LoginErrorsAsync"/>.</summary>
+    private async Task EnableEventsAsync(string realm)
+    {
+        var path = $"admin/realms/{realm}/events/config";
+        using var read = await SendAsync(HttpMethod.Get, path);
+        Assert.Equal(HttpStatusCode.OK, read.StatusCode);
+        var config = (await read.Content.ReadFromJsonAsync<JsonNode>(TestContext.Current.CancellationToken))!.AsObject();
+        config["eventsEnabled"] = true;
+        using var write = await SendAsync(HttpMethod.Put, path, config);
+        Assert.Equal(HttpStatusCode.NoContent, write.StatusCode);
+    }
+
+    /// <summary>Lists the failed sign-ins that the realm recorded, each with its error and details, one per line.</summary>
+    private async Task<string> LoginErrorsAsync(string realm)
+    {
+        using var response = await SendAsync(HttpMethod.Get, $"admin/realms/{realm}/events?type=LOGIN_ERROR");
+        if (response.StatusCode != HttpStatusCode.OK)
+        {
+            return $"LOGIN_ERROR events: {(int)response.StatusCode}";
+        }
+
+        var events = await response.Content.ReadFromJsonAsync<JsonElement>(TestContext.Current.CancellationToken);
+        var lines = events.EnumerateArray().Select(entry =>
+            $"LOGIN_ERROR {(entry.TryGetProperty("error", out var error) ? error.GetString() : "")} " +
+            $"{(entry.TryGetProperty("details", out var details) ? details.GetRawText() : "{}")}").ToList();
+        return lines.Count == 0 ? "LOGIN_ERROR events: none" : string.Join('\n', lines);
     }
 
     private async Task<string> CreateUserAsync(string realm, string username)
