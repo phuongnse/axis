@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Outlet, Route, Routes } from 'react-router'
+import { AccountPage } from './pages/AccountPage'
 import { HomePage } from './pages/HomePage'
 import { ShellError } from './pages/LocaleLoadFailed'
 import { NotFoundPage } from './pages/NotFoundPage'
@@ -94,6 +95,14 @@ export function App({ development }: { development: boolean }) {
           element={
             <PlatformShellRoute>
               <StudioPage />
+            </PlatformShellRoute>
+          }
+        />
+        <Route
+          path="account"
+          element={
+            <PlatformShellRoute>
+              <AccountPage />
             </PlatformShellRoute>
           }
         />
