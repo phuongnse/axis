@@ -45,8 +45,14 @@ archives of [D45](d45-tenant-backup-and-restore.md) hold.
     tenant database. An application without `fileStorage` stores files there
     too. They share the tenant's isolation, transactions and backups, and need
     nothing more under several replicas.
-  - S3-compatible storage and malware scanning come later. The binding exists
-    now so that moving to them changes a tenant's binding, not the release.
+  - S3-compatible storage comes later. The binding exists now so that moving
+    to it changes a tenant's binding, not the release.
+- **No malware scanning:** the owner agreed on 2026-10-28 that Axis does not
+  scan uploads for malware.
+  - Type checks refuse executables and SVG, and a download is always an
+    attachment with `nosniff`.
+  - An operator that needs scanning puts a scanning proxy in front of the
+    upload route.
 - **Backups:** files stored in the tenant database are part of its `pg_dump`,
   so a tenant archive holds them and a restore brings them back. A later
   storage outside the database must say how its files are backed up.
@@ -83,6 +89,8 @@ owner record keep files under the same policies as the record. The tenant
 database is the only storage that keeps one transaction, one isolation and
 one backup for records and their files, so it is the M15 default. The
 `storage` binding keeps a later move to object storage out of the release.
+Scanning signatures need constant updates that an on-premises install cannot
+promise, so the operator who runs the install owns them.
 Money as a typed decimal with a currency gives correct display without a new
 expression type, and refusing a sum across currencies avoids a silently wrong
 total. Labels kept apart from values let a value's wording change without a
