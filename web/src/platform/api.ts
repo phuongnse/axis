@@ -1,11 +1,12 @@
 import { assignLocation } from './navigation'
+import { requireSignIn } from './signInNeeded'
 
 const unsafeMethods = new Set(['POST', 'PUT', 'PATCH', 'DELETE'])
 
 /** Options of {@link apiFetch}. */
 export interface ApiFetchOptions {
-  /** Whether a 401 sends the browser to sign in. Defaults to `true`. */
-  signInOnUnauthorized?: boolean
+  /** Whether a 401 shows the sign-in prompt. Defaults to `true`. */
+  promptSignInOnUnauthorized?: boolean
 }
 
 /** Answers a request in the browser. See {@link setApiGuard}. */
@@ -43,21 +44,22 @@ export function startSignIn(): void {
 /**
  * `fetch` for `/api`. Unsafe requests carry the CSRF header from D23, which a page on another site
  * cannot set without a CORS preflight. Other requests pass through unchanged. A 401 means the
- * session is missing or expired, so it starts sign-in unless `signInOnUnauthorized` is `false`.
- * The response comes back either way. While a guard from {@link setApiGuard} is set, an
- * `/api/apps/` request gets the guard's answer instead, without the CSRF header or the sign-in.
+ * session is missing or expired, so it shows the sign-in prompt unless `promptSignInOnUnauthorized`
+ * is `false`. Only the person's click on the prompt starts sign-in. The response comes back either
+ * way. While a guard from {@link setApiGuard} is set, an `/api/apps/` request gets the guard's
+ * answer instead, without the CSRF header or the prompt.
  */
 export async function apiFetch(
   input: string,
   init?: RequestInit,
-  { signInOnUnauthorized = true }: ApiFetchOptions = {},
+  { promptSignInOnUnauthorized = true }: ApiFetchOptions = {},
 ): Promise<Response> {
   if (guard && input.startsWith(guardedPrefix)) {
     return guard(input, init)
   }
   const response = await send(input, init)
-  if (response.status === 401 && signInOnUnauthorized) {
-    startSignIn()
+  if (response.status === 401 && promptSignInOnUnauthorized) {
+    requireSignIn()
   }
   return response
 }
