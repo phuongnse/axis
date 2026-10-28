@@ -2,23 +2,23 @@
 
 Status: **Agreed**
 
-The owner agreed this on 2026-10-25. M17's end-to-end journey extends the
+The owner agreed this on 2026-10-25. M18's end-to-end journey extends the
 purchase request sample. It needs no new sample. Everything here is
-_(planned for M17)_. See
+_(planned for M18)_. See
 [extensibility](../product-brief.md#extensibility) in the product brief.
 
 - **Why this sample:** purchase requests already have a connector, an
-  extension package, line items and an approval process, which M17 extends.
+  extension package, line items and an approval process, which M18 extends.
   The service desk ([D56](d56-a-service-desk-as-the-third-sample-application.md))
   and asset management
   ([D81](d81-asset-management-as-the-fourth-sample-application.md)) are built
-  through Studio only. M17's packages are installed by the operator and its
+  through Studio only. M18's packages are installed by the operator and its
   modules are not edited in Studio
   ([D89](d89-modules-that-hold-processes-pages-and-policies-and-depend-on-other-modules.md)),
   so a Studio-only journey cannot hold them. A new sample would add a journey
   that proves nothing more. This is the exception to
   [D46](d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9.md)'s
-  rule that each milestone extends a sample of a new shape: M17 extends the
+  rule that each milestone extends a sample of a new shape: M18 extends the
   platform's reach into code and operations, not into a new kind of
   application.
 - **A module with a dependency:** a new sample module, `department-budgets`,

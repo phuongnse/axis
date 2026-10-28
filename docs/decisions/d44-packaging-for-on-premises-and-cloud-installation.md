@@ -46,6 +46,7 @@ The owner confirmed these points on issue #641 on 2026-10-19.
     and one for the worker, with their health probes. A pre-upgrade Job runs
     `migrate`.
   - PostgreSQL, the OIDC provider and the source of secrets are external.
+    [D99](d99-axis-ships-its-own-identity-provider.md) brings the identity provider into the installation.
   - `helm lint` and `helm template`, validated against the Kubernetes schemas,
     check the chart. Axis has no test against a live cluster.
 - **Upgrades:**

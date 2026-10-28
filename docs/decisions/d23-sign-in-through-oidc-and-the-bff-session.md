@@ -13,6 +13,8 @@ removed. Everything in this decision is in place. See
   confidential client (D9).
 - **Identity provider per tenant:** each tenant in the `Tenants` section has
   an `Oidc` block with an authority, a client id and a client secret.
+  - [D99](d99-axis-ships-its-own-identity-provider.md) changes where it points: at the tenant's realm in Axis's own
+    identity provider.
   - It names the claims that give the user id (default `sub`), the display
     name (default `name`) and the roles (default `roles`).
   - Startup fails, naming each problem, when a tenant has no `Oidc` block or

@@ -42,7 +42,8 @@
 | **M14** | Workflow, automation and notifications | Done | Processes get timer, wait for event and sub-process steps, loops that hold a task, task escalation and deadlines, claim and reassign, and a create record operation. There are scheduled jobs without a subject, delete triggers, and a limit plus dead letters for event delivery. In-app and email notifications exist. Processes are edited in a visual designer. Carried over from M13 and built: a page and a form open on the Design tab, a section moves to another step by a drop on the step switch, and the form designer removes a section or a step. |
 | **M15** | Data modeling and data management | Done | New field types: file (with storage bindings), money and enum labels. Indexes, defaults and ranges. References from child rows, and many-to-many. CSV and spreadsheet import and export under policies. Full-text search, more aggregates and query timeouts. |
 | **M16** | Hardening | Next | Performance SLOs and load tests, the FAPI 2.0 profile, verification against an agreed ASVS level, rate limits and security headers, service accounts for the record and process APIs, tenant binding commands and key rotation. Carried over from M10: CI runs the dependency scan on its triggers and once a week, and restoring a preview tenant's archive is refused. Carried over from M14: the email channel of a task escalation's `notify`, Mailpit in Docker Compose and `scripts/dev.sh`, dead letters for waking a waiting instance, and the process designer's live region for moves. Carried over from M15: the asset management scenarios for import, attachments, maintenance and software, and the denied cases for an employee's reads, downloads and exports and for an auditor's imports. |
-| **M17** | Extensibility and operator console | Planned | Custom widgets in the designer palette, a published SDK, modules that hold processes, pages and policies and depend on other modules, packages run out of process, connector OAuth2 and structured payloads, outbound webhooks, and an operator web console. |
+| **M17** | Axis's identity provider | Planned | Every installation runs Keycloak with the Axis theme as Axis's identity provider. Each tenant has a realm of its own, which brokers to the identity providers of its organization and may hold accounts of its own with a required second step. A tenant that signs in straight at its organization's identity provider moves to Axis's. The end-to-end journey signs a person in through a brokered identity provider, and another with an account and a code from an authenticator app. See [D99](decisions/d99-axis-ships-its-own-identity-provider.md). |
+| **M18** | Extensibility and operator console | Planned | Custom widgets in the designer palette, a published SDK, modules that hold processes, pages and policies and depend on other modules, packages run out of process, connector OAuth2 and structured payloads, outbound webhooks, and an operator web console. |
 
 M3 is complete. See the closed
 [M3 milestone](https://github.com/phuongnse/axis/milestone/3?closed=1) on
@@ -109,9 +110,12 @@ stay in this order.
   publishes and runs an application through Studio, without editing JSON or
   code.
 - **No domain gets platform code.** Samples only prove the platform.
-- **Order.** M10 to M17 follow the vertical slice: create an application, then
-  its data and UI, logic and workflow, permissions, try it out, validate and
-  test, publish and operate. Each ends with an end-to-end journey.
+- **Order.** M10 to M16 and M18 follow the vertical slice: create an
+  application, then its data and UI, logic and workflow, permissions, try it
+  out, validate and test, publish and operate. Each ends with an end-to-end
+  journey. M17 gives every tenant Axis's own identity provider before
+  extensibility, so every sign-in looks and works the same, see
+  [D99](decisions/d99-axis-ships-its-own-identity-provider.md).
 - **Parallel work.** M11 and M12 can run in parallel, and so can M14 and M15.
 - **Proving it is general.** From M11 on, each milestone extends a sample of a
   new shape: a service desk, then asset management. Neither needs platform

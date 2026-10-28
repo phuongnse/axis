@@ -202,7 +202,7 @@ and a JSON view, and shows the diagnostics.
 
 ## Console settings
 
-_(planned for M17)_ One server setting controls the
+_(planned for M18)_ One server setting controls the
 [operator console](operator-console.md), as
 [D93](../decisions/d93-an-operator-web-console.md) agrees.
 

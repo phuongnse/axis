@@ -242,7 +242,7 @@ and upgrades all break at those points.
   - file upload
   - read-only summaries
 - **Custom widgets later.** Custom widgets come later as packaged React
-  components (D8), planned for M17
+  components (D8), planned for M18
   ([D88](../decisions/d88-custom-widgets-in-the-designer-palette-and-a-published-sdk.md)).
   Each one is reviewed as a sign of a missing standard capability.
 - **Display is formatting only.** The UI formats a value for the locale and
