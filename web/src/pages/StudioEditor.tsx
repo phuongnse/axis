@@ -975,6 +975,7 @@ export function StudioEditor({
         )}
         <Button
           type="primary"
+          data-testid="studio-save"
           disabled={patch.length === 0 || jsonInvalid || problems.size > 0 || conflict || saving || reconnecting}
           onClick={save}
         >
