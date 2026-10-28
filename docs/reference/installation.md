@@ -242,13 +242,14 @@ sets it, 30 seconds by default.
   guide activates the leave request sample.
 
 **TLS proxy and a second replica.** The `proxy` profile starts a pinned Caddy
-proxy that ends TLS. The `replicas` profile starts `server-2`, configured like
+proxy that ends TLS. It accepts only the versions and ciphers that [TLS](#tls)
+states. The `replicas` profile starts `server-2`, configured like
 `server`. Use either profile alone or both.
 
 - **The certificate.** Put `tls.crt` and `tls.key` in `AXIS_TLS_DIR`, which
   defaults to `./tls`. Compose mounts the folder read-only at `/certs`, so no
   compose file holds a certificate or a key. The files must be readable by the
-  proxy. The certificate must cover every tenant host.
+  proxy. The certificate must cover every tenant host, see [TLS](#tls).
 - **The ports.** The proxy publishes `AXIS_HTTPS_PORT`, 443 by default.
   `server-2` publishes `127.0.0.1:${AXIS_SERVER_2_PORT}`, 8081 by default, for
   health probes.
@@ -324,7 +325,9 @@ operator uses it. The test then:
    that every `__Host-Axis.Session` cookie is `Secure` with `Path=/` and no domain, and that `GET /api/me`
    answers `200`. Then restarts `server` and checks that `GET /api/me` with the
    same cookie answers `200` through the proxy and on the ports of `server` and
-   `server-2`.
+   `server-2`. Also checks that a default handshake with the proxy negotiates
+   TLS 1.3, that a TLS 1.2 handshake with an ECDHE GCM cipher succeeds and that
+   a TLS 1.2 handshake offering only CBC ciphers is refused.
 9. Turns Studio on for the author over a copy of the leave request sample in a
    temporary folder that every user may write. Signs the author in through the proxy
    and saves a text through `server`. Checks that the read of the same
@@ -338,7 +341,10 @@ only from `secrets:` files, that every published port of both servers is on
 `127.0.0.1`, that the proxy mounts its certificate folder read-only, that
 both servers trust the proxy's fixed address only, and that both servers mount
 the same Studio folder read-write at `/studio` while the worker, the
-publisher, the admin host and the proxy do not.
+publisher, the admin host and the proxy do not. They also check that the
+Caddyfile sets `protocols tls1.2 tls1.3`, lists only ECDHE AEAD ciphers and has
+`:443` as its only site address, and that the proxy publishes only container
+port 443.
 
 ## In the cloud
 
@@ -417,7 +423,7 @@ The values schema rejects any field in a reference other than `name` and `key`.
 | `studio.persistence` | none | A Kubernetes volume source for the Studio folders, mounted read-write at `/studio` on every server replica. It is required when `studio.folders` is set, and rendering fails with a message that names it when it is missing. On its own it does nothing. The chart creates no claim. With several replicas it needs a `ReadWriteMany` storage class. |
 | `forwardedHeaders.knownProxies`, `forwardedHeaders.knownNetworks` | none | Server only. IP addresses and CIDR ranges of your proxies, rendered as `ForwardedHeaders__KnownProxies__N` and `ForwardedHeaders__KnownNetworks__N`. Empty trusts no proxy. |
 | `server.resources`, `worker.resources`, `migrate.resources` | none | Kubernetes resource requests and limits. |
-| `server.service.type`, `server.service.port` | `ClusterIP`, 80 | The Service of the server. Put your own Ingress in front of it. |
+| `server.service.type`, `server.service.port` | `ClusterIP`, 80 | The Service of the server. Put your own Ingress in front of it, see [TLS](#tls). |
 | `publisher.resources` | none | Kubernetes resource requests and limits of the publisher. |
 | `secrets.scenarioServerConnection` | empty | Publisher only. Secret `name` and `key` of `Scenarios:ServerConnectionString`. The chart mounts it only when it is set. Create the role as in [On premises](#on-premises). |
 | `studio.tests` | `false` | Server only. `true` renders `Studio__Tests`, which turns on `studioTest`. Set it together with `secrets.scenarioServerConnection`. |
@@ -446,7 +452,7 @@ The chart has no Job for them.
 **Checks.** `scripts/lint.sh` runs `helm lint --strict` and validates the
 rendered manifests against the Kubernetes schemas with kubeconform.
 `scripts/helm.test.mjs` renders the chart and checks the probes, the migrate
-Job, the publisher Deployment, the secret references, the Studio volume and the forwarded headers. `scripts/setup.sh` installs the pinned Helm,
+Job, the publisher Deployment, the secret references, the Studio volume, the forwarded headers, and that the chart renders no Ingress and a `ClusterIP` server Service. `scripts/setup.sh` installs the pinned Helm,
 kubeconform and Kubernetes schemas into `~/.cache/axis-tools`. Axis has no test
 against a live cluster.
 
@@ -492,11 +498,57 @@ Studio folder, with its smoke test, are built.
   it. The volume must be writable by the non-root user of the image, UID 1654,
   and the chart sets no `fsGroup`. See [Studio](host-settings.md#studio-settings).
 - **On premises.** The Compose example runs two server replicas behind a TLS
-  proxy. See "TLS proxy and a second replica" in [on premises](#on-premises).
+  proxy. See "TLS proxy and a second replica" in [on premises](#on-premises)
+  and [TLS](#tls).
 - **Platform settings under both tenant sources.** The server needs
   `ConnectionStrings:PlatformSchema` and `Platform:SecretKey` also under
   `Tenancy:Source=configuration`, because it creates the platform tables there
   too. A missing one stops the start. See [tenancy settings](host-settings.md#tenancy-settings).
+
+## TLS
+
+The rule for traffic that comes in, and for every connection Axis makes.
+
+**Incoming traffic.**
+
+- **Versions.** Only TLS 1.2 and TLS 1.3. TLS 1.3 is preferred, and a normal
+  client gets it.
+- **Ciphers.** On TLS 1.2 only ECDHE ciphers with AES-GCM or
+  ChaCha20-Poly1305, so every session has forward secrecy. All TLS 1.3 suites
+  are AEAD and forward-secret.
+- **The certificate.** Use a publicly trusted certificate that covers every
+  tenant host.
+- **No plain HTTP.** The hosts publish only on `127.0.0.1`, and only the TLS
+  endpoint faces clients. The server sends HSTS on https, see
+  [security headers](headers-and-rate-limits.md#security-headers).
+- **No client certificate.** Mutual TLS is not offered.
+
+**Connections Axis makes.**
+
+- **The identity provider.** Outside Development and Testing the server
+  accepts an identity provider over `https` only (`RequireHttpsMetadata`). It
+  validates the certificate against the system trust store. Add a private
+  authority to that store. Do not replace the store with `SSL_CERT_FILE`, which
+  makes the server trust only that file, see [on premises](#on-premises).
+- **PostgreSQL.** _(planned for M16)_ Connections use TLS and check the
+  server's certificate.
+- **URL bindings.** A `url` binding must be `https` outside Development.
+  Activation refuses an `http` binding, and the worker never sends a call to
+  one, see [deployment bindings](integration-resources.md#deployment-bindings).
+- **Proxy to server.** _(planned for M16)_ Traffic between the proxy and the
+  server uses TLS. Inside the Compose network or the cluster it is plain HTTP
+  today.
+
+**What the Compose example sets.** The Caddyfile sets `protocols tls1.2 tls1.3`
+and the `ciphers` list above. The proxy publishes container port 443 only.
+
+**What the Helm chart leaves to you.** The chart has no Ingress, and the
+server Service is `ClusterIP`. Your own Ingress or load balancer ends TLS, so
+it must meet the rules for incoming traffic above. The chart cannot enforce
+versions or ciphers there.
+
+The proxy follows
+[D49](../decisions/d49-several-server-replicas-behind-a-tls-proxy.md).
 
 ## Upgrade
 
