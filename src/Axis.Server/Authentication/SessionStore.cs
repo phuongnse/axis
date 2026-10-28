@@ -5,6 +5,7 @@ using Axis.Server.Tenancy;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Npgsql;
+using NpgsqlTypes;
 
 namespace Axis.Server.Authentication;
 
@@ -35,8 +36,8 @@ internal sealed class SessionStore : ITicketStore
         var connection = await httpContext.RequestServices.GetRequiredService<TenantDatabase>().GetConnectionAsync(cancellationToken);
         await using var command = new NpgsqlCommand(
             """
-            INSERT INTO axis.sessions (id_hash, user_id, display_name, roles, signed_in_at, last_request_at)
-            VALUES (@hash, @user, @name, @roles, @now, @now)
+            INSERT INTO axis.sessions (id_hash, user_id, display_name, roles, signed_in_at, last_request_at, authenticated_at)
+            VALUES (@hash, @user, @name, @roles, @now, @now, @authenticatedAt)
             """,
             connection);
         command.Parameters.AddWithValue("hash", SHA256.HashData(id));
@@ -44,6 +45,10 @@ internal sealed class SessionStore : ITicketStore
         command.Parameters.AddWithValue("name", user.DisplayName);
         command.Parameters.AddWithValue("roles", user.Roles.ToArray());
         command.Parameters.AddWithValue("now", now);
+        command.Parameters.Add(new NpgsqlParameter("authenticatedAt", NpgsqlDbType.TimestampTz)
+        {
+            Value = Session.ReadAuthenticatedAt(ticket.Principal) is { } authenticatedAt ? authenticatedAt : DBNull.Value,
+        });
         await command.ExecuteNonQueryAsync(cancellationToken);
         return Base64Url.EncodeToString(id);
     }
@@ -74,7 +79,7 @@ internal sealed class SessionStore : ITicketStore
             """
             UPDATE axis.sessions SET last_request_at = @now
             WHERE id_hash = @hash AND signed_in_at > @signedInAfter AND last_request_at > @activeAfter
-            RETURNING user_id, display_name, roles
+            RETURNING user_id, display_name, roles, authenticated_at
             """,
             connection))
         {
@@ -89,7 +94,9 @@ internal sealed class SessionStore : ITicketStore
                     tenant.TenantId,
                     reader.GetString(0),
                     reader.GetString(1),
-                    reader.GetFieldValue<string[]>(2));
+                    reader.GetFieldValue<string[]>(2),
+                    await reader.IsDBNullAsync(3, cancellationToken) ? null : reader.GetFieldValue<DateTimeOffset>(3),
+                    Base64Url.EncodeToString(hash));
                 // The handler renews a cookie only for a ticket that carries both times.
                 var properties = new AuthenticationProperties { IssuedUtc = now, ExpiresUtc = now + Session.IdleTimeout };
                 return new AuthenticationTicket(principal, properties, Session.Scheme);

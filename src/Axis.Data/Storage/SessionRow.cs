@@ -19,4 +19,10 @@ public sealed class SessionRow
 
     /// <summary>The time of the last request that carried the session.</summary>
     public required DateTimeOffset LastRequestAt { get; init; }
+
+    /// <summary>
+    /// The time of the person's last login at the identity provider, from the ID token's <c>auth_time</c>. It is null for a
+    /// session created before the column existed.
+    /// </summary>
+    public DateTimeOffset? AuthenticatedAt { get; init; }
 }

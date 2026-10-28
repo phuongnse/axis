@@ -91,6 +91,20 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
     }
 
     [Fact]
+    public async Task Sign_in_that_asks_to_reauthenticate_makes_the_identity_provider_ask_for_credentials_again()
+    {
+        using var client = CreateClient();
+
+        var challenge = await SendAsync(client, HttpMethod.Get, "/api/auth/sign-in?reauthenticate=true");
+
+        Assert.Equal(HttpStatusCode.Found, challenge.StatusCode);
+        var query = challenge.Headers.Location!.Query;
+        Assert.Contains("prompt=login", query, StringComparison.Ordinal);
+        Assert.Contains("max_age=0", query, StringComparison.Ordinal);
+        Assert.DoesNotContain("max_age=28800", query, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Sign_in_without_a_return_address_returns_to_the_root()
     {
         using var client = CreateClient();
@@ -128,6 +142,7 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
         Assert.Equal("anna", row.UserId);
         Assert.Equal("Anna Employee", row.DisplayName);
         Assert.Equal(["employee", "requester"], row.Roles.Order(StringComparer.Ordinal));
+        Assert.NotNull(row.AuthenticatedAt);
         Assert.Empty(await ReadSessionsAsync("b"));
     }
 
@@ -682,12 +697,12 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
     {
         await using var connection = new NpgsqlConnection(_databases[tenant]);
         await connection.OpenAsync(CancellationToken);
-        await using var command = new NpgsqlCommand("SELECT id_hash, user_id, display_name, roles FROM axis.sessions", connection);
+        await using var command = new NpgsqlCommand("SELECT id_hash, user_id, display_name, roles, authenticated_at FROM axis.sessions", connection);
         var rows = new List<SessionRow>();
         await using var reader = await command.ExecuteReaderAsync(CancellationToken);
         while (await reader.ReadAsync(CancellationToken))
         {
-            rows.Add(new SessionRow(reader.GetFieldValue<byte[]>(0), reader.GetString(1), reader.GetString(2), reader.GetFieldValue<string[]>(3)));
+            rows.Add(new SessionRow(reader.GetFieldValue<byte[]>(0), reader.GetString(1), reader.GetString(2), reader.GetFieldValue<string[]>(3), await reader.IsDBNullAsync(4, CancellationToken) ? null : reader.GetFieldValue<DateTimeOffset>(4)));
         }
 
         return rows;
@@ -702,7 +717,7 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
 
     private sealed record SignInResult(string ReturnedTo, string SessionCookie);
 
-    private sealed record SessionRow(byte[] IdHash, string UserId, string DisplayName, string[] Roles);
+    private sealed record SessionRow(byte[] IdHash, string UserId, string DisplayName, string[] Roles, DateTimeOffset? AuthenticatedAt);
 
     private sealed record ProfileRow(string UserId, string DisplayName, string? Email, string? Locale, DateTimeOffset FirstSignedInAt, DateTimeOffset LastSignedInAt);
 

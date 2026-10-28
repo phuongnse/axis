@@ -69,7 +69,8 @@ apply: sections marked _(planned for Mx)_ are not built yet, and Dn refers to
   - `Axis.Data` also owns `axis.sessions`, with history in
     `axis.__data_migrations`. A row is one signed-in session: `id_hash`
     (`bytea`, the primary key, the SHA-256 hash of the session id), `user_id`,
-    `display_name`, `roles` (`text[]`), `signed_in_at` and `last_request_at`.
+    `display_name`, `roles` (`text[]`), `signed_in_at`, `last_request_at` and
+    `authenticated_at` (nullable, the ID token's `auth_time`).
     The table never holds the session id or a token. The server reads, inserts,
     updates and deletes its rows. The worker deletes the expired rows, and
     `tenant restore` empties the table, see
