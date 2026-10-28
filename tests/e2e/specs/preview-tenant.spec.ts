@@ -2,6 +2,7 @@ import { expect, test } from '../test'
 import { createRequest, recordsPath } from '../purchase-requests'
 import { previewURL } from '../server-settings'
 import { expectSessionUser, sessionFile } from '../sessions'
+import { logInAtKeycloak } from '../keycloak'
 
 // The record API needs a session with a grant, so the journey starts signed in as the employee requester.
 test.use({ storageState: sessionFile('requester') })
@@ -24,9 +25,7 @@ test('requester signs in on the preview host and sees the purchase request site 
   try {
     const preview = await context.newPage()
     await preview.goto('/api/auth/sign-in?returnUrl=/')
-    await preview.locator('#username').fill('requester')
-    await preview.locator('#password').fill('axis')
-    await preview.locator('#kc-login').click()
+    await logInAtKeycloak(preview, 'requester')
     await preview.waitForURL(`${previewURL(baseURL!)}/`)
     await expectSessionUser(preview, 'requester')
 

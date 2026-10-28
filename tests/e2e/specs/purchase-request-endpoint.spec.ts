@@ -1,6 +1,7 @@
 import { expect, test } from '../test'
 import type { APIRequestContext, Page } from '@playwright/test'
 import { useSession } from '../sessions'
+import { totp, totpSecret } from '../totp'
 
 // The purchasing system submits purchase requests through the sample's SubmitPurchaseRequest
 // endpoint with a bearer token. Specs run in parallel against one database, so each test looks only
@@ -33,6 +34,7 @@ function annaToken(request: APIRequestContext) {
     ...purchasingClient,
     username: 'requester',
     password: 'axis',
+    otp: totp(totpSecret('requester')),
   })
 }
 

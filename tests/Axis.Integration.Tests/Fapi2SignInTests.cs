@@ -442,8 +442,10 @@ public sealed partial class Fapi2SignInTests(KeycloakFixture keycloak, PostgreSq
                 ["credentialId"] = "",
             }),
         };
-        loginRequest.Headers.Add("Cookie", string.Join("; ", cookies.Select(cookie => $"{cookie.Key}={cookie.Value}")));
-        var login = await browser.SendAsync(loginRequest, CancellationToken);
+        var cookieHeader = string.Join("; ", cookies.Select(cookie => $"{cookie.Key}={cookie.Value}"));
+        loginRequest.Headers.Add("Cookie", cookieHeader);
+        var password = await browser.SendAsync(loginRequest, CancellationToken);
+        var login = await KeycloakSignIn.SubmitCodeAsync(browser, password, cookieHeader, username);
         Assert.True(login.StatusCode == HttpStatusCode.Found, await login.Content.ReadAsStringAsync(CancellationToken));
         var callback = login.Headers.Location!;
         Assert.Equal($"{expectedBase.GetLeftPart(UriPartial.Authority)}/api/auth/callback", callback.GetLeftPart(UriPartial.Path));
