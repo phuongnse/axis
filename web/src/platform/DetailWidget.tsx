@@ -72,10 +72,10 @@ export function DetailWidget({ widget, sitePath, recordId, locale }: DetailWidge
   const [errors, setErrors] = useState<string[]>([])
   // The Idempotency-Key of each action's start that got no final answer, by start endpoint, so a
   // retry cannot start a second instance.
-  const startKeys = useRef<Record<string, string>>({})
+  const startKeys = useRef(new Map<string, string>())
 
   useEffect(() => {
-    startKeys.current = {}
+    startKeys.current = new Map()
     const controller = new AbortController()
     fetchRecord(entity.recordsPath, recordId, controller.signal)
       .then((loaded) => {
@@ -111,7 +111,8 @@ export function DetailWidget({ widget, sitePath, recordId, locale }: DetailWidge
     setErrors([])
     try {
       // A key is kept only while its start has no final answer: a network error or a 5xx.
-      const key = (startKeys.current[action.instancesPath] ??= newIdempotencyKey())
+      const key = startKeys.current.get(action.instancesPath) ?? newIdempotencyKey()
+      startKeys.current.set(action.instancesPath, key)
       let result
       try {
         result = await startProcess(action.instancesPath, recordId, key)
@@ -120,7 +121,7 @@ export function DetailWidget({ widget, sitePath, recordId, locale }: DetailWidge
         setErrors([t('shell.form.startFailed')])
         return
       }
-      delete startKeys.current[action.instancesPath]
+      startKeys.current.delete(action.instancesPath)
       if (result.ok) {
         setStarted(true)
         await reload()

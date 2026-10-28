@@ -1,6 +1,7 @@
 import type { SyntheticEvent } from 'react'
 import type { StudioDiagnostic, StudioNames } from '../platform/studio'
 import type { TextCatalog } from '../platform/texts'
+import { setOwn } from '../platform/ownProperty'
 
 /** How long after the last edit a canvas asks for the draft's metadata. */
 export const debounceMs = 300
@@ -25,10 +26,10 @@ export function canvasTexts(names: StudioNames | undefined, platformLocale: stri
   const catalog: TextCatalog = { texts: {}, fallbackTexts: {} }
   for (const item of names.texts) {
     if (Object.hasOwn(item.texts, locale)) {
-      catalog.texts[item.key] = item.texts[locale]
+      setOwn(catalog.texts, item.key, item.texts[locale])
     }
     if (Object.hasOwn(item.texts, fallbackLocale)) {
-      catalog.fallbackTexts[item.key] = item.texts[fallbackLocale]
+      setOwn(catalog.fallbackTexts, item.key, item.texts[fallbackLocale])
     }
   }
   return { catalog, locale, fallbackLocale }

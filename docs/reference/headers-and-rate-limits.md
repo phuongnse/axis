@@ -21,6 +21,7 @@ and the Helm chart, and behind any proxy.
 | `Cross-Origin-Opener-Policy` | `same-origin`                                                                                                                                                                                            | Every response                                |
 | `Permissions-Policy`        | `camera=(), microphone=(), geolocation=(), payment=(), usb=()`                                                                                                                                            | Every response                                |
 | `Cache-Control`             | `no-store`                                                                                                                                                                                                | Every response under `/api`                   |
+| `Clear-Site-Data`           | `"cache", "storage"`                                                                                                                                                                                       | A successful `POST /api/auth/sign-out`        |
 
 - **Scripts stay strict.** The SPA has no inline script and calls no `eval`. Scripts come only from
   the server's own origin. The one exception is the import map for
@@ -34,6 +35,9 @@ and the Helm chart, and behind any proxy.
   header in `Development`, so a developer's browser does not remember it for `localhost`.
   `includeSubDomains` meets ASVS Level 2 and tells browsers to refuse plain http on every subdomain
   of a tenant's host, so an operator must serve those subdomains over https.
+- **Clear-Site-Data.** A successful sign-out tells the browser to drop the site's HTTP cache,
+  `localStorage`, `sessionStorage` and IndexedDB (ASVS V14.3.1). A refused sign-out, such as one
+  without the CSRF header, sends no such header. See [security](security.md).
 - **Base URI.** `base-uri 'none'` meets ASVS V3.4.3. The SPA has no `<base>` element.
 - **Content-Type.** Text, JSON and XML answers name `charset=utf-8`, including problem details, the
   SPA page and static files. An answer that already names a charset keeps it. An attachment keeps

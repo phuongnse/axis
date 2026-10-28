@@ -1,3 +1,5 @@
+import { setOwn } from './ownProperty'
+
 /** The field types of an entity, as `entity.schema.json` lists them. */
 export const fieldTypes = [
   'text',
@@ -136,7 +138,7 @@ export function changeFieldType(field: Record<string, unknown>, type: string): R
     } else if ((key === 'min' || key === 'max') && !sameLimit) {
       continue
     } else if (!isFieldSetting(key) || allowed.includes(key)) {
-      next[key] = value
+      setOwn(next, key, value)
     }
   }
   if (!Object.hasOwn(next, 'type')) {

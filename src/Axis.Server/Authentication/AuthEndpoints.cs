@@ -16,7 +16,8 @@ namespace Axis.Server.Authentication;
 /// <c>returnUrl</c>. A callback that fails creates no session and redirects to
 /// <see cref="TenantSignIn.FailedPath"/>.
 /// <c>POST /api/auth/sign-out</c> ends the session and answers the identity provider's sign-out
-/// address, for the SPA to send the browser to.
+/// address, for the SPA to send the browser to. The answer carries <c>Clear-Site-Data</c>, so the
+/// browser drops the site's cache and storage.
 /// </summary>
 internal static class AuthEndpoints
 {
@@ -64,6 +65,9 @@ internal static class AuthEndpoints
         }
 
         await httpContext.SignOutAsync(Session.Scheme);
+
+        // The browser drops the site's HTTP cache and storage once it receives this answer (ASVS V14.3.1).
+        httpContext.Response.Headers["Clear-Site-Data"] = "\"cache\", \"storage\"";
 
         var tenant = tenants.Current ?? throw new InvalidOperationException("No tenant context is set.");
         var options = oidcOptions.Get(TenantSignIn.SchemeName(tenant.TenantId));

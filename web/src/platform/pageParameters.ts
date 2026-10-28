@@ -1,4 +1,5 @@
 import type { PageParameter, WidgetMetadata } from './site'
+import { setOwn } from './ownProperty'
 
 const int64Min = -(2n ** 63n)
 const int64Max = 2n ** 63n - 1n
@@ -94,7 +95,7 @@ export function readPageParameters(
     const [value] = given
     const usable = given.length === 1 && value !== '' && isWellFormed(parameter, value)
     if (usable) {
-      values[parameter.name] = value
+      setOwn(values, parameter.name, value)
     } else if (parameter.required) {
       return null
     }
