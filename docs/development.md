@@ -145,7 +145,8 @@ writable by that UID. Docker creates a missing folder as root.
 
 Compose runs no mail server, so the worker logs one warning per tenant and sends no email, and the
 emails of `notify` steps stay queued. Set `Email__Smtp__Host`, `Email__Smtp__Port`,
-`Email__Smtp__UseTls` and `Email__From` on the worker to turn sending on. See
+`Email__Smtp__UseTls` and `Email__From` on the worker to turn sending on. Only the Development
+environment, which Compose runs, sends email with `Email__Smtp__UseTls` off. See
 [mail settings](reference/notifications.md#mail-settings).
 
 ## Database roles
@@ -230,7 +231,8 @@ works on a fresh clone:
   to the server.
 - It starts no mail server, so the worker logs one warning per tenant and sends no email, and the
   emails of `notify` steps stay queued. Export `Email__Smtp__Host`, `Email__Smtp__Port`,
-  `Email__Smtp__UseTls` and `Email__From` to turn sending on. See
+  `Email__Smtp__UseTls` and `Email__From` to turn sending on. The script runs Development, the only
+  environment that sends email with `Email__Smtp__UseTls` off. See
   [mail settings](reference/notifications.md#mail-settings).
 - It also runs one publisher, `axis-admin publisher`, with
   its lines starting with `[publisher]`. It starts once the server has

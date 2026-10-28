@@ -50,8 +50,38 @@ public static class AxisTelemetry
     /// </summary>
     public const string UrlTemplateProperty = "axis.url_template";
 
+    /// <summary>The settings that name an OTLP endpoint, which a host exports telemetry to.</summary>
+    public static IReadOnlyList<string> OtlpEndpointVariables { get; } =
+    [
+        "OTEL_EXPORTER_OTLP_ENDPOINT",
+        "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT",
+        "OTEL_EXPORTER_OTLP_METRICS_ENDPOINT",
+        "OTEL_EXPORTER_OTLP_LOGS_ENDPOINT",
+    ];
+
     /// <summary>The source of the Axis spans.</summary>
     public static ActivitySource Source { get; } = new(SourceName);
+
+    /// <summary>
+    /// Returns the name of the first of <see cref="OtlpEndpointVariables"/> that is set and is not an absolute <c>https</c>
+    /// URL, or <see langword="null"/> when there is none. An unset or empty setting means nothing is exported there. The
+    /// value is never returned, since it can hold a credential.
+    /// </summary>
+    /// <param name="setting">Reads a setting by name.</param>
+    public static string? InsecureOtlpEndpoint(Func<string, string?> setting)
+    {
+        ArgumentNullException.ThrowIfNull(setting);
+        foreach (var name in OtlpEndpointVariables)
+        {
+            if (setting(name) is { Length: > 0 } value
+                && !(Uri.TryCreate(value, UriKind.Absolute, out var uri) && uri.Scheme == Uri.UriSchemeHttps))
+            {
+                return name;
+            }
+        }
+
+        return null;
+    }
 
     /// <summary>The trace id of the current span in hex, or <see langword="null"/> when there is no current span.</summary>
     public static string? CurrentTraceId() => Activity.Current?.TraceId.ToHexString();
