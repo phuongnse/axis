@@ -146,6 +146,8 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
     own clock, runs once when the tenant becomes ready and then at most every
     5 minutes, and never touches a tenant it does not serve. `tenant restore`
     empties the table, so no session comes back with an archive.
+  - An operator ends one user's sessions or all sessions of a tenant with
+    [`tenant session end`](tenant-setting-commands.md#sessions).
   - In `Development` and `Testing`, which run over plain http, the session
     cookie and the OIDC helper cookies are Secure only on https requests.
   - Behind a named proxy, the callback and sign-out addresses and the cookie's
@@ -265,14 +267,16 @@ The two are coordinated only through `max_age` and `auth_time`, and the
 sign-out address. This holds under both
 [sign-in profiles](#fapi-20-profile).
 
-| Under either profile | Axis's session                                      | The identity provider's session                             |
-| -------------------- | --------------------------------------------------- | ----------------------------------------------------------- |
-| What starts it       | The callback creates the row in `axis.sessions`     | A login on the identity provider's page                     |
-| How long it lasts    | 8 hours after sign-in, or 1 hour without requests   | Set at the identity provider                                |
-| What ends it         | Sign-out, expiry, a new sign-in or a tenant restore | Its own expiry, or the `signOutUrl` that Axis sign-out uses |
+| Under either profile | Axis's session                                                   | The identity provider's session                             |
+| -------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------- |
+| What starts it       | The callback creates the row in `axis.sessions`                  | A login on the identity provider's page                     |
+| How long it lasts    | 8 hours after sign-in, or 1 hour without requests                | Set at the identity provider                                |
+| What ends it         | Sign-out, expiry, a new sign-in, an operator or a tenant restore | Its own expiry, or the `signOutUrl` that Axis sign-out uses |
 
 - **Axis's session.** The lifetimes are those of the
-  [session](#sign-in-and-the-session). A new sign-in ends the old session, and
+  [session](#sign-in-and-the-session). A new sign-in ends the old session, an
+  operator can end it with
+  [`tenant session end`](tenant-setting-commands.md#sessions), and
   `tenant restore` empties the table.
 - **The identity provider's session.** Its lifetimes are set at the identity
   provider. The development realm sets none, so it keeps Keycloak's defaults.
