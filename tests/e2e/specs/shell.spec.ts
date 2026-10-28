@@ -40,13 +40,13 @@ test('the shell renders in light and dark mode', async ({ page }) => {
       await page.getByRole('switch', { name: 'Dark mode', exact: true }).click()
     }
     const shell = page.locator(`[data-theme-mode="${mode}"]`)
-    await expect(shell.getByRole('menuitem', { name: 'Home', exact: true })).toBeVisible()
+    await expect(shell.getByRole('banner').getByRole('link', { name: 'Axis', exact: true })).toBeVisible()
     await expect(shell.getByRole('main').getByText('Welcome to Axis', { exact: true })).toBeVisible()
   }
 })
 
-// The selected navigation entry is drawn in primaryText. The other colours were recorded before the theme moved to
-// the Axis token file and are unchanged.
+// The colours were recorded before the theme moved to the Axis token file and are unchanged. The selected sidebar
+// entry is drawn in primaryText.
 const shellColours = {
   light: {
     header: 'rgb(255, 255, 255)',
@@ -62,6 +62,10 @@ const shellColours = {
   },
 }
 
+// The page function runs in the browser, so the CSS property goes in as its argument.
+const style = (target: Locator, property: string) =>
+  target.evaluate((element, name) => getComputedStyle(element).getPropertyValue(name), property)
+
 test('the shell keeps its colours in light and dark mode', async ({ page }) => {
   await page.goto('/')
 
@@ -71,19 +75,32 @@ test('the shell keeps its colours in light and dark mode', async ({ page }) => {
     }
     const shell = page.locator(`[data-theme-mode="${mode}"]`)
     const banner = shell.getByRole('banner')
-    const selectedItem = banner.getByRole('menuitem', { name: 'Home', exact: true })
-    await expect(selectedItem).toBeVisible()
+    await expect(banner.getByText('Axis', { exact: true })).toBeVisible()
 
-    // The page function runs in the browser, so the CSS property goes in as its argument.
-    const style = (target: Locator, property: string) =>
-      target.evaluate((element, name) => getComputedStyle(element).getPropertyValue(name), property)
     const expected = shellColours[mode]
     expect(await style(banner, 'background-color')).toBe(expected.header)
     expect(await shell.getByRole('main').evaluate((main) => getComputedStyle(main.parentElement!).backgroundColor)).toBe(
       expected.page,
     )
     expect(await style(banner.getByText('Axis', { exact: true }), 'color')).toBe(expected.title)
-    expect(await style(selectedItem, 'color')).toBe(expected.selectedItem)
+  }
+})
+
+test('the sidebar draws the current entry in the selected colour in light and dark mode', async ({ page }) => {
+  await useSession(page, 'anna')
+  await page.goto('/e2e/notes')
+
+  for (const mode of ['light', 'dark'] as const) {
+    if (mode === 'dark') {
+      await page.getByRole('switch', { name: 'Dark mode', exact: true }).click()
+    }
+    const selectedItem = page
+      .locator(`[data-theme-mode="${mode}"]`)
+      .getByRole('navigation', { name: 'Menu', exact: true })
+      .getByRole('menuitem', { name: 'Notes', exact: true })
+    await expect(selectedItem).toBeVisible()
+
+    expect(await style(selectedItem, 'color')).toBe(shellColours[mode].selectedItem)
   }
 })
 
@@ -95,10 +112,10 @@ test('switching the locale changes the texts and survives a reload', async ({ pa
   await page.getByRole('radiogroup', { name: 'Language', exact: true }).getByText('Tiếng Việt', { exact: true }).click()
 
   await expect(page.getByRole('main').getByText('Chào mừng đến với Axis', { exact: true })).toBeVisible()
-  await expect(page.getByRole('menuitem', { name: 'Trang chủ', exact: true })).toBeVisible()
+  await expect(page.getByRole('contentinfo').getByText('Trạng thái máy chủ', { exact: true })).toBeVisible()
   await page.reload()
   await expect(page.getByRole('main').getByText('Chào mừng đến với Axis', { exact: true })).toBeVisible()
-  await expect(page.getByRole('menuitem', { name: 'Trang chủ', exact: true })).toBeVisible()
+  await expect(page.getByRole('contentinfo').getByText('Trạng thái máy chủ', { exact: true })).toBeVisible()
   await expect(page.getByRole('radio', { name: 'Tiếng Việt', exact: true })).toBeChecked()
 })
 
@@ -128,7 +145,7 @@ test('an unknown site is not found inside the platform shell', async ({ page }) 
 
   expect(response?.status()).toBe(200)
   await expect(page.getByTestId('not-found')).toBeVisible()
-  await expect(page.getByRole('menuitem', { name: 'Home', exact: true })).toBeVisible()
+  await expect(page.getByRole('banner').getByRole('link', { name: 'Axis', exact: true })).toBeVisible()
 })
 
 test('an unknown page is not found inside the site shell', async ({ page }) => {
@@ -138,6 +155,48 @@ test('an unknown page is not found inside the site shell', async ({ page }) => {
   expect(response?.status()).toBe(200)
   await expect(page.getByTestId('not-found')).toBeVisible()
   await expect(page.getByRole('menuitem', { name: 'Notes', exact: true })).toBeVisible()
+})
+
+test('a site collapses its sidebar to icons and keeps it collapsed on the next page', async ({ page }) => {
+  await useSession(page, 'anna')
+  await page.goto('/e2e/notes')
+  const sidebar = page.locator('#shell-sidebar')
+  await expect(sidebar).toBeVisible()
+  expect((await sidebar.boundingBox())?.width).toBe(224)
+
+  await page.getByRole('button', { name: 'Collapse navigation', exact: true }).click()
+
+  await expect(page.getByRole('button', { name: 'Expand navigation', exact: true })).toHaveAttribute(
+    'aria-expanded',
+    'false',
+  )
+  await expect.poll(async () => (await sidebar.boundingBox())?.width).toBe(64)
+  await page.getByRole('menuitem', { name: 'Categories', exact: true }).click()
+  await expect(page).toHaveURL(/\/e2e\/categories$/)
+  await expect(page.getByRole('button', { name: 'Expand navigation', exact: true })).toBeVisible()
+  expect((await sidebar.boundingBox())?.width).toBe(64)
+})
+
+test('the platform site has no sidebar and no collapse button', async ({ page }) => {
+  await page.goto('/')
+
+  await expect(page.getByRole('main')).toBeVisible()
+  await expect(page.locator('#shell-sidebar')).toHaveCount(0)
+  await expect(page.getByRole('button', { name: /navigation$/ })).toHaveCount(0)
+})
+
+test('the footer shows the version only to a signed-in person', async ({ page }) => {
+  const year = new Date().getFullYear()
+  await page.goto('/')
+  const footer = page.getByRole('contentinfo')
+  await expect(footer).toContainText(`© ${year} Axis`)
+  await expect(footer.getByTestId('footer-server-status')).toContainText('Ready')
+  await expect(footer).not.toContainText(' · v')
+
+  await useSession(page, 'anna')
+  await page.goto('/')
+
+  await expect(page.getByRole('contentinfo')).toContainText(new RegExp(`© ${year} Axis · v\\S+`))
 })
 
 test('the readiness endpoint reports healthy', async ({ request }) => {

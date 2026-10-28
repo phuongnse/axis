@@ -547,8 +547,8 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     site shell. A task id in the wrong form is not requested. A well-formed
     task id that the task API answers `404` for shows the not-found page
     inside the site shell, as for a record.
-  - Inside a site, the shell shows the site's title, navigation and locales.
-    _(planned for M16)_ [Shell and home page](shell.md) holds the shell's new layout.
+  - Inside a site, the shell shows the site's title, navigation and locales in the
+    [layout](shell.md#layout) of [Shell and home page](shell.md).
     The theme toggle and the locale switch work as they do on the platform
     site.
 - **Table widget.** A page whose widget is a `table` lists the records of its
