@@ -7,7 +7,8 @@ namespace Axis.Integration.Tests;
 /// <summary>
 /// One real Keycloak container with the development realm, shared by the whole run. It starts the
 /// first time a test needs it, so a run that needs no Keycloak never starts one. The fixture removes
-/// the container when the run ends. A test that changes realm state must not use it.
+/// the container when the run ends. A test may create and delete a realm of its own, but must not change the
+/// <c>axis</c> realm.
 /// </summary>
 public sealed class KeycloakFixture : IAsyncDisposable
 {
@@ -15,6 +16,11 @@ public sealed class KeycloakFixture : IAsyncDisposable
     public const string ClientId = "axis";
     public const string ClientSecret = "axis-development-secret";
     public const string Password = "axis";
+
+    /// <summary>The bootstrap admin client of the master realm, for tests that call the admin API.</summary>
+    public const string AdminClientId = "axis-admin";
+
+    public const string AdminClientSecret = "axis-admin-development-secret";
     public const string PurchasingClientId = "purchasing-system";
     public const string PurchasingClientSecret = "purchasing-system-development-secret";
     public const string ReportingClientId = "reporting-system";
@@ -41,6 +47,13 @@ public sealed class KeycloakFixture : IAsyncDisposable
         return new Uri(new Uri(container.GetBaseAddress()), "realms/axis");
     }
 
+    /// <summary>Starts the container if no test has yet, and returns its base address, which serves every realm and the admin API.</summary>
+    public async Task<Uri> BaseAddressAsync()
+    {
+        var container = await _container.Value;
+        return new Uri(container.GetBaseAddress());
+    }
+
     public async ValueTask DisposeAsync()
     {
         // A failed start already removed its container.
@@ -56,6 +69,8 @@ public sealed class KeycloakFixture : IAsyncDisposable
         var container = new KeycloakBuilder(Image)
             .WithResourceMapping(new FileInfo(Path.Combine(AppContext.BaseDirectory, "Keycloak", "axis-realm.json")), "/opt/keycloak/data/import/")
             .WithCommand("--import-realm")
+            .WithEnvironment("KC_BOOTSTRAP_ADMIN_CLIENT_ID", AdminClientId)
+            .WithEnvironment("KC_BOOTSTRAP_ADMIN_CLIENT_SECRET", AdminClientSecret)
             .Build();
         try
         {
