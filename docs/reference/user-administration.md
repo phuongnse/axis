@@ -49,6 +49,10 @@ keeps Keycloak's defaults.
   [mail settings](tenant-setting-commands.md#mail-settings), with a link that lasts 72 hours. Following it, the person
   sets a password and adds an authenticator app, and the account becomes `active`. An administrator can resend an
   invitation, which ends the old link.
+- **Username:** an account's username is its email, and it signs in with its email. The realm allows two users to
+  share an email, because a person who signs in through two brokered providers becomes two users, and Keycloak then
+  looks accounts up by username only. The sign-in form asks for a "Username". A brokered user's username is the
+  provider's alias, a dot and the subject, see [users](identity-provider.md#users).
 - **No self-registration:** the realm shows no registration link, and nobody creates an account without an invitation.
 - **A second step:** every sign-in with an account asks for a 6-digit code from the authenticator app, and an account
   with no authenticator yet must add one before it gets in. The realm requires the OTP form of its browser flow. A person who

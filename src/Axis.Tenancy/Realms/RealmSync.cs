@@ -9,7 +9,9 @@ namespace Axis.Tenancy.Realms;
 /// signs in to the realm as <c>axis-activation</c> with the client credentials grant, so it needs no rights in the
 /// master realm. Each site gets a confidential client <c>site-</c> and its path, whose ID token carries the alias of the
 /// provider that signed the person in as the <c>identity_provider</c> claim. Each provider gets claim mappers for the
-/// display name, the email, the locale and each roles claim. The sync adds, changes and removes only clients whose id
+/// display name, the email, the locale and each roles claim, and a <c>username</c> mapper that names a new user after the
+/// provider's alias and the person's subject. Each provider also names the realm's own first-login flow
+/// (<see cref="FirstLoginFlowAlias"/>), which always creates a new user and never offers to link one. The sync adds, changes and removes only clients whose id
 /// starts with <see cref="SiteClientPrefix"/> and providers whose alias starts with <see cref="ProviderAliasPrefix"/>,
 /// so <c>axis</c>, <c>axis-activation</c>, <c>axis-users</c> and anything an operator added stay. A removed provider
 /// keeps its users in the realm. An error names the step and the status code, never a response body or a secret.
@@ -20,8 +22,13 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
     public const string ProviderAliasPrefix = "oidc-";
     public const string IdentityProviderClaim = "identity_provider";
 
+    /// <summary>The alias of the first-login flow that <c>TenantRealm</c> makes and every provider names.</summary>
+    public const string FirstLoginFlowAlias = "axis first login";
+
     private const string ActivationClientId = "axis-activation";
     private const string UserAttributeMapper = "oidc-user-attribute-idp-mapper";
+    private const string UsernameMapper = "oidc-username-idp-mapper";
+    private const string UsernameMapperName = "username";
     private const string SessionNoteMapper = "oidc-usersessionmodel-note-mapper";
     private const string SessionNoteMapperName = "identity provider";
 
@@ -312,22 +319,30 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
             ["enabled"] = true,
             ["trustEmail"] = false,
             ["storeToken"] = false,
+            ["firstBrokerLoginFlowAlias"] = FirstLoginFlowAlias,
             ["config"] = config,
         };
     }
 
-    /// <summary>Adds or updates the provider's claim mappers by name and removes every other mapper of the provider.</summary>
+    /// <summary>Adds or updates the provider's mappers by name and removes every other mapper of the provider.</summary>
     private async Task SyncMappersAsync(string token, string instancePath, RealmBrokeredProvider provider, CancellationToken cancellationToken)
     {
-        var desired = new Dictionary<string, (string Claim, string Attribute)>(StringComparer.Ordinal)
+        var desired = new Dictionary<string, (string Type, Dictionary<string, string> Config)>(StringComparer.Ordinal)
         {
-            ["display name"] = (provider.DisplayNameClaim, "firstName"),
-            ["email"] = (provider.EmailClaim, "email"),
-            ["locale"] = (provider.LocaleClaim, "locale"),
+            ["display name"] = AttributeMapper(provider.DisplayNameClaim, "firstName"),
+            ["email"] = AttributeMapper(provider.EmailClaim, "email"),
+            ["locale"] = AttributeMapper(provider.LocaleClaim, "locale"),
+            // Set once, when the user is created. Keycloak lowercases the username.
+            [UsernameMapperName] = (UsernameMapper, new Dictionary<string, string>
+            {
+                ["syncMode"] = "IMPORT",
+                ["template"] = "${ALIAS}.${CLAIM.sub}",
+                ["target"] = "LOCAL",
+            }),
         };
         foreach (var claim in provider.RolesClaims)
         {
-            desired[$"roles {claim}"] = (claim, $"axis_roles_{claim}");
+            desired[$"roles {claim}"] = AttributeMapper(claim, $"axis_roles_{claim}");
         }
 
         using var listed = await SendAsync(token, HttpMethod.Get, $"{instancePath}/mappers", null, cancellationToken);
@@ -348,19 +363,14 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
             }
         }
 
-        foreach (var (name, (claim, attribute)) in desired)
+        foreach (var (name, (type, config)) in desired)
         {
             var representation = new Dictionary<string, object?>
             {
                 ["name"] = name,
                 ["identityProviderAlias"] = provider.Alias,
-                ["identityProviderMapper"] = UserAttributeMapper,
-                ["config"] = new Dictionary<string, string>
-                {
-                    ["syncMode"] = "FORCE",
-                    ["claim"] = claim,
-                    ["user.attribute"] = attribute,
-                },
+                ["identityProviderMapper"] = type,
+                ["config"] = config,
             };
             if (existing.TryGetValue(name, out var id))
             {
@@ -381,6 +391,14 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
             EnsureSuccess(deleted, $"delete the mapper '{name}' of '{provider.Alias}'");
         }
     }
+
+    private static (string Type, Dictionary<string, string> Config) AttributeMapper(string claim, string attribute) =>
+        (UserAttributeMapper, new Dictionary<string, string>
+        {
+            ["syncMode"] = "FORCE",
+            ["claim"] = claim,
+            ["user.attribute"] = attribute,
+        });
 
     private async Task<HttpResponseMessage> SendAsync(string token, HttpMethod method, string path, object? body, CancellationToken cancellationToken)
     {

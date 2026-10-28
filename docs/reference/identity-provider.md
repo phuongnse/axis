@@ -168,7 +168,11 @@ _(planned for M17)_
   lower-case issuer binding.
 - **No automatic linking:** a person who signs in through two providers is two users, even when both give the same
   email. The realm never links them by email, because another provider's email is not proof of who signed in.
-  Linking that the person proves on both sides comes later.
+  Built by the realm sync: every `oidc-` provider uses the realm's own first-login flow `axis first login`, whose only
+  step creates a new user, so the realm never shows an "account already exists, link it?" page. A brokered user's
+  username is the provider's alias, a dot and the person's subject, such as `oidc-companyissuer.<sub>`, so two providers
+  never clash on a username. The realm allows two users to share an email. Linking that the person proves on both sides
+  comes later.
 - **Roles:** at sign-in the session gets, for each application, the roles that the provider's `roles` mapping gives
   and the roles the [users page](user-administration.md#roles) gives. Platform roles come the same way from the
   platform sign-in.
@@ -181,7 +185,9 @@ _(planned for M17)_
   that Axis's hosts use to change the realm: `axis-activation`, with rights over the realm's providers and clients, for
   activation, and `axis-users`, with rights over its users only, for the users page. It stores their secrets and the
   platform client's secret encrypted in the tenant directory and points the tenant's `Oidc` block at the realm. A
-  second run updates the realm and brings it up to the account rules. Only `Axis.Admin` holds the identity provider's admin rights over every realm, from the
+  second run updates the realm and brings it up to the account rules. It also creates the first-login flow
+  `axis first login` for brokered users and allows two users to share an email, which turns sign-in by email off: an
+  account's username is its email, see [accounts](user-administration.md#accounts). Only `Axis.Admin` holds the identity provider's admin rights over every realm, from the
   `IdentityProvider` settings of its own, see [administration](administration.md#settings).
 - **The breached-password list:** the realm's password policy names the file `axis-breached-passwords.txt`, which every
   identity provider that `tenant create` targets must hold in its `data/password-blacklists` folder. The repository
@@ -192,8 +198,9 @@ _(planned for M17)_
 - **Realm sync:** the realm sync is built. It signs in to the realm as `axis-activation` and makes the realm's
   `site-<path>` clients and `oidc-` providers match a desired state. Each site client puts the alias of the provider that
   signed the person in into its ID token as the `identity_provider` claim, and each provider gets claim mappers for the
-  display name, the email, the locale and each roles claim. It touches no other client or provider, so `axis`,
-  `axis-activation`, `axis-users` and anything an operator added stay. Activation does not call it yet.
+  display name, the email, the locale and each roles claim, and a `username` mapper that names a new user
+  `<provider alias>.<subject>`. Each provider names the realm's first-login flow. It touches no other client or
+  provider, so `axis`, `axis-activation`, `axis-users` and anything an operator added stay. Activation does not call it yet.
 - **Brought in step by activation:** activating a release adds, changes and removes the realm's brokered providers,
   their claim mappers and the site clients to match the active releases of the tenant and its platform sign-in. A
   provider that nothing names any more is removed. Its users stay, but cannot sign in through it.

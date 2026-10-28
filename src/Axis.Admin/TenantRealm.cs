@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Axis.Tenancy.Realms;
 
 namespace Axis.Admin;
 
@@ -15,7 +16,9 @@ internal sealed record TenantRealmSecrets(string Platform, string Activation, st
 /// Creates a tenant's realm in Axis's identity provider through its admin API, or brings an existing one up to date.
 /// The realm gets its display name, sessions of at most 8 hours and the account rules: an authenticator code at every
 /// sign-in, passwords of 12 to 128 characters that are not on the breached-password list, a wait after 5 failed sign-ins,
-/// a password reset link that lasts 30 minutes and no self-registration. It also gets three clients: the platform client
+/// a password reset link that lasts 30 minutes and no self-registration. It allows two users to share an email, which
+/// turns sign-in by email off, so an account's username is its email. It gets a first-login flow of its own for brokered
+/// users, <see cref="RealmSync.FirstLoginFlowAlias"/>, whose only step creates a new user. It also gets three clients: the platform client
 /// <c>axis</c>, <c>axis-activation</c> with rights over the realm's providers and clients, and <c>axis-users</c> with
 /// rights over its users only. The identity provider must hold the breached-password list file. A second run updates
 /// what the first made. An error names the step and the status code,
@@ -35,6 +38,7 @@ internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
     public const int PasswordResetLifespanSeconds = 1800;
 
     private const string ManagementClientId = "realm-management";
+    private const string CreateUserIfUnique = "idp-create-user-if-unique";
 
     private static readonly string[] _activationRoles =
     [
@@ -50,6 +54,7 @@ internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
 
         await EnsureRealmAsync(token, realm, realmPath, displayName, cancellationToken);
         await EnsureSecondStepAsync(token, realmPath, cancellationToken);
+        await EnsureFirstLoginFlowAsync(token, realmPath, cancellationToken);
         await EnsureClientAsync(token, realmPath, PlatformClient(secrets.Platform), cancellationToken);
         var activation = await EnsureClientAsync(token, realmPath, ServiceClient(ActivationClientId, secrets.Activation), cancellationToken);
         var users = await EnsureClientAsync(token, realmPath, ServiceClient(UsersClientId, secrets.Users), cancellationToken);
@@ -105,6 +110,10 @@ internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
             ["ssoSessionMaxLifespan"] = SessionMaxLifespanSeconds,
             ["ssoSessionMaxLifespanRememberMe"] = SessionMaxLifespanSeconds,
             ["registrationAllowed"] = false,
+            // Keycloak cannot allow duplicate emails together with sign-in by email, so an account's username is its email.
+            ["duplicateEmailsAllowed"] = true,
+            ["loginWithEmailAllowed"] = false,
+            ["registrationEmailAsUsername"] = false,
             ["resetPasswordAllowed"] = true,
             ["actionTokenGeneratedByUserLifespan"] = PasswordResetLifespanSeconds,
             ["passwordPolicy"] = PasswordPolicy,
@@ -165,6 +174,74 @@ internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
             EnsureSuccess(updated, "require the second step");
         }
     }
+
+    /// <summary>
+    /// Makes the flow that brokered providers use at a person's first sign-in. Its one required step creates a new user if
+    /// none has the username. It has no step that reviews the profile, offers to link an existing user or asks for an email.
+    /// </summary>
+    private async Task EnsureFirstLoginFlowAsync(string token, string realmPath, CancellationToken cancellationToken)
+    {
+        using var listed = await SendAsync(token, HttpMethod.Get, $"{realmPath}/authentication/flows", null, cancellationToken);
+        EnsureSuccess(listed, "list the authentication flows");
+        var exists = (await listed.Content.ReadFromJsonAsync<JsonElement>(cancellationToken)).EnumerateArray()
+            .Any(flow => flow.GetProperty("alias").GetString() == RealmSync.FirstLoginFlowAlias);
+        if (!exists)
+        {
+            var flow = new Dictionary<string, object?>
+            {
+                ["alias"] = RealmSync.FirstLoginFlowAlias,
+                ["description"] = "Creates a new user at a person's first sign-in through a brokered provider and never links one.",
+                ["providerId"] = "basic-flow",
+                ["topLevel"] = true,
+                ["builtIn"] = false,
+            };
+            using var created = await SendAsync(token, HttpMethod.Post, $"{realmPath}/authentication/flows", flow, cancellationToken);
+            EnsureSuccess(created, "create the first-login flow");
+        }
+
+        var path = $"{realmPath}/authentication/flows/{Uri.EscapeDataString(RealmSync.FirstLoginFlowAlias)}/executions";
+        var executions = await ReadExecutionsAsync(token, path, cancellationToken);
+        if (!executions.Any(execution => ProviderOf(execution) == CreateUserIfUnique))
+        {
+            using var added = await SendAsync(
+                token, HttpMethod.Post, $"{path}/execution", new Dictionary<string, object?> { ["provider"] = CreateUserIfUnique }, cancellationToken);
+            EnsureSuccess(added, "add the create-user step");
+            executions = await ReadExecutionsAsync(token, path, cancellationToken);
+        }
+
+        var keptCreate = false;
+        foreach (var execution in executions)
+        {
+            if (ProviderOf(execution) == CreateUserIfUnique && !keptCreate)
+            {
+                keptCreate = true;
+                continue;
+            }
+
+            using var deleted = await SendAsync(
+                token, HttpMethod.Delete, $"{realmPath}/authentication/executions/{execution.GetProperty("id").GetString()}", null, cancellationToken);
+            EnsureSuccess(deleted, "remove another step of the first-login flow");
+        }
+
+        var create = executions.First(execution => ProviderOf(execution) == CreateUserIfUnique);
+        if (create.GetProperty("requirement").GetString() != "REQUIRED")
+        {
+            var body = create.Deserialize<Dictionary<string, JsonElement>>()!;
+            body["requirement"] = JsonSerializer.SerializeToElement("REQUIRED");
+            using var updated = await SendAsync(token, HttpMethod.Put, path, body, cancellationToken);
+            EnsureSuccess(updated, "require the create-user step");
+        }
+    }
+
+    private async Task<List<JsonElement>> ReadExecutionsAsync(string token, string path, CancellationToken cancellationToken)
+    {
+        using var response = await SendAsync(token, HttpMethod.Get, path, null, cancellationToken);
+        EnsureSuccess(response, "read the first-login flow");
+        return (await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken)).EnumerateArray().ToList();
+    }
+
+    private static string? ProviderOf(JsonElement execution) =>
+        execution.TryGetProperty("providerId", out var provider) ? provider.GetString() : null;
 
     private static Dictionary<string, object?> PlatformClient(string secret) => new()
     {
