@@ -21,7 +21,8 @@ server:
   resources: {}
   service:
     type: ClusterIP
-    port: 80
+    # The port of the Service. It forwards to the HTTPS port of the server, 8443.
+    port: 443
 
 worker:
   repository: axis-worker
@@ -106,6 +107,11 @@ secrets:
   platformSecretKey:
     name: ""
     key: Platform__SecretKey
+  # The server's HTTPS endpoint: a Kubernetes TLS Secret with tls.crt and tls.key, issued for the
+  # DNS name of the server Service. Required, because the server listens on HTTPS only. The keys
+  # are fixed, so the reference holds only the name. Your Ingress must connect over HTTPS and verify it.
+  serverCertificate:
+    name: ""
   # Scenarios:ServerConnectionString, the connection of a role with CREATEDB that owns no
   # database, which the publisher uses to run test scenarios. Optional, and used by the
   # publisher only. The Secret is mounted only when name is set. Set studio.tests with it.

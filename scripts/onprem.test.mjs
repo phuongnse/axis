@@ -3,7 +3,8 @@
 // and Keycloak, creates two tenants, activates the leave request sample and checks each tenant's
 // site and sign-in, suspend and resume, an unknown host, and a publish request that the installed
 // publisher runs in each tenant. It then starts a second server replica and a TLS proxy, signs anna in
-// through the proxy, and restarts the first replica. With Studio on, it saves a resource through one replica,
+// through the proxy, and restarts the first replica. The servers listen on HTTPS only, with a certificate of the
+// test authority for the name servers, and the proxy trusts that authority only. With Studio on, it saves a resource through one replica,
 // reads it back through the other, and checks that a stale save answers 409. Requires Docker and openssl, and the
 // sample modules in artifacts/modules, which scripts/smoke.sh installs. Run from scripts/smoke.sh.
 //
@@ -183,6 +184,13 @@ describe('the example holds no secret', () => {
       proxy.ports.map((port) => port.target),
       [443],
     )
+    for (const [name, service] of Object.entries({ server, 'server-2': second })) {
+      assert.deepEqual(
+        service.ports.map((port) => port.target),
+        [8443],
+        `${name} publishes a port other than 8443`,
+      )
+    }
 
     // Both servers trust the forwarded headers of the proxy's fixed address and of no other.
     const address = proxy.networks.default.ipv4_address
@@ -191,6 +199,41 @@ describe('the example holds no secret', () => {
       assert.equal(service.environment.ForwardedHeaders__KnownProxies__0, address, `${name} proxy address`)
       assert.equal(service.environment.ForwardedHeaders__KnownProxies__1, undefined)
       assert.equal(service.environment.ForwardedHeaders__KnownNetworks__0, undefined)
+    }
+  })
+})
+
+describe('the server certificate', () => {
+  test('both servers listen on HTTPS only, and only they mount the certificate folder, read-only', () => {
+    const { services } = render()
+    for (const name of ['server', 'server-2']) {
+      const environment = services[name].environment
+      assert.match(environment.Kestrel__Endpoints__Https__Url, /^https:\/\/\+:8443$/, `${name} endpoint URL`)
+      assert.equal(environment.Kestrel__Endpoints__Https__Certificate__Path, '/server-tls/tls.crt')
+      assert.equal(environment.Kestrel__Endpoints__Https__Certificate__KeyPath, '/server-tls/tls.key')
+      assert.equal(
+        Object.keys(environment).some((key) => /^Kestrel__Endpoints__(?!Https__)/.test(key)),
+        false,
+        `${name} sets another Kestrel endpoint`,
+      )
+      const mounts = services[name].volumes.filter((volume) => volume.target === '/server-tls')
+      assert.equal(mounts.length, 1, `${name} mounts /server-tls ${mounts.length} times`)
+      assert.equal(mounts[0].type, 'bind')
+      assert.equal(mounts[0].read_only, true, `${name} mounts /server-tls read-write`)
+      assert.equal(mounts[0].source, join(root, 'deploy/compose/server-tls'))
+    }
+    for (const name of ['proxy', 'worker', 'publisher', 'admin']) {
+      const service = services[name]
+      assert.equal(
+        (service.volumes ?? []).some((volume) => volume.target === '/server-tls' || volume.source === join(root, 'deploy/compose/server-tls')),
+        false,
+        `${name} mounts the server certificate folder`,
+      )
+      assert.equal(
+        Object.keys(service.environment ?? {}).some((key) => key.startsWith('Kestrel__')),
+        false,
+        `${name} sets a Kestrel setting`,
+      )
     }
   })
 })
@@ -211,6 +254,16 @@ describe('the TLS proxy', () => {
     for (const name of names) {
       assert.match(name, /^TLS_ECDHE_(ECDSA|RSA)_WITH_(AES_128_GCM_SHA256|AES_256_GCM_SHA384|CHACHA20_POLY1305_SHA256)$/, `${name} is not an ECDHE AEAD cipher`)
     }
+  })
+
+  test('the proxy forwards to the servers on port 8443 over TLS, checks the name servers and trusts only the server authority', () => {
+    assert.ok(lines.some((line) => line.trim() === 'dynamic a servers 8443 {'), 'the upstream is not servers on port 8443')
+    assert.ok(lines.some((line) => line.trim() === 'transport http {'), 'the Caddyfile has no transport http block')
+    for (const directive of ['tls', 'tls_server_name servers', 'tls_trust_pool file /certs/server-ca.crt']) {
+      assert.equal(lines.filter((line) => line.trim() === directive).length, 1, `the Caddyfile does not hold "${directive}" exactly once`)
+    }
+    assert.ok(!lines.some((line) => /tls_insecure_skip_verify/.test(line)), 'the Caddyfile skips the verification of the server certificate')
+    assert.ok(!lines.some((line) => line.includes('8080')), 'the Caddyfile names port 8080')
   })
 
   test(':443 is the only site address and nothing serves plain HTTP', () => {
@@ -310,14 +363,13 @@ describe('the on-premises installation', () => {
       req.end(body)
     })
 
-  const server = (host, path) => request(serverPort, host, path)
-
   // tlsRequest: sends a request over HTTPS to a port on this machine. It sets the Host header and the name
-  // the certificate is checked against, and trusts only the test certificate authority.
-  const tlsRequest = (port, host, path, { method = 'GET', headers = {}, body } = {}) =>
+  // the certificate is checked against, which is the host unless `servername` says otherwise, and trusts only
+  // the test certificate authority.
+  const tlsRequest = (port, host, path, { method = 'GET', headers = {}, body, servername = host.split(':')[0] } = {}) =>
     new Promise((resolve) => {
       const req = https.request(
-        { host: '127.0.0.1', port, path, method, servername: host.split(':')[0], ca: caCertificate, headers: { host, ...headers } },
+        { host: '127.0.0.1', port, path, method, servername, ca: caCertificate, headers: { host, ...headers } },
         (response) => {
           const chunks = []
           response.on('data', (chunk) => chunks.push(chunk))
@@ -335,6 +387,13 @@ describe('the on-premises installation', () => {
       req.on('error', () => resolve({ status: 0, headers: {}, setCookie: [], body: '' }))
       req.end(body)
     })
+
+  // serverRequest: sends a request to a server replica's own port over HTTPS. The servers' certificate is for
+  // the name servers, whatever the Host header says.
+  const serverRequest = (port, host, path, headers = {}, { method = 'GET', body } = {}) =>
+    tlsRequest(port, host, path, { method, headers, body, servername: 'servers' })
+
+  const server = (host, path) => serverRequest(serverPort, host, path)
 
   // handshake: opens a TLS connection to the proxy with the given options and reports the protocol and cipher it
   // negotiated, or the error that refused it.
@@ -496,6 +555,18 @@ describe('the on-premises installation', () => {
       openssl('x509', '-req', '-in', join('certs', 'proxy.csr'), '-CA', at('ca.crt'), '-CAkey', at('ca.key'), '-CAcreateserial', '-days', '2', '-extfile', 'proxy.ext', '-out', join('tls', 'tls.crt'))
       for (const name of readdirSync(tls)) chmodSync(join(tls, name), 0o644)
 
+      // The servers' folder holds tls.crt and tls.key for the name servers, which is what AXIS_SERVER_TLS_DIR names.
+      // The proxy's folder also holds the authority certificate that is the only one it trusts for the servers.
+      const serverTls = join(folder, 'server-tls')
+      mkdirSync(serverTls)
+      chmodSync(serverTls, 0o755)
+      writeFile(join(folder, 'server.ext'), 'subjectAltName=DNS:servers\nbasicConstraints=CA:FALSE\n')
+      openssl('req', '-newkey', 'rsa:2048', '-nodes', '-subj', '/CN=servers', '-keyout', join('server-tls', 'tls.key'), '-out', join('certs', 'server.csr'))
+      openssl('x509', '-req', '-in', join('certs', 'server.csr'), '-CA', at('ca.crt'), '-CAkey', at('ca.key'), '-CAcreateserial', '-days', '2', '-extfile', 'server.ext', '-out', join('server-tls', 'tls.crt'))
+      for (const name of readdirSync(serverTls)) chmodSync(join(serverTls, name), 0o644)
+      cpSync(join(certs, 'ca.crt'), join(tls, 'server-ca.crt'))
+      chmodSync(join(tls, 'server-ca.crt'), 0o644)
+
       // A copy of the development realm that also accepts the https addresses of the two tenants.
       const realm = join(folder, 'realm')
       mkdirSync(realm)
@@ -572,6 +643,7 @@ describe('the on-premises installation', () => {
         AXIS_SERVER_2_PORT: String(server2Port),
         AXIS_HTTPS_PORT: String(httpsPort),
         AXIS_TLS_DIR: tls,
+        AXIS_SERVER_TLS_DIR: serverTls,
         AXIS_WORKER_HEALTH_PORT: String(workerPort),
         AXIS_STUDIO_DIR: studio,
         Studio__Folders__0: '/studio/leave-requests',
@@ -630,6 +702,10 @@ describe('the on-premises installation', () => {
       run(['up', '-d', 'server', 'worker'])
       const ready200 = await waitFor(() => server('localhost', '/health/ready'), 200, 120)
       assert.equal(ready200.status, 200, 'the server never answered /health/ready with 200')
+
+      // The server listens on HTTPS only: a plain HTTP request to its port gets no HTTP response.
+      const plain = await request(serverPort, 'localhost', '/health/ready')
+      assert.equal(plain.status, 0, `the server answered plain HTTP on its port with ${plain.status}`)
 
       // The publisher exits until the server has created the platform tables, so it starts now.
       run(['up', '-d', 'publisher'])
@@ -695,7 +771,7 @@ describe('the on-premises installation', () => {
         const location = new URL(signIn.headers.location)
         assert.equal(`${location.origin}${location.pathname}`, `${keycloakAuthority}/protocol/openid-connect/auth`)
         assert.equal(location.searchParams.get('client_id'), 'axis')
-        assert.equal(location.searchParams.get('redirect_uri'), `http://${host}/api/auth/callback`)
+        assert.equal(location.searchParams.get('redirect_uri'), `https://${host}/api/auth/callback`)
       }
 
       // A host that no tenant holds answers 404.
@@ -764,9 +840,9 @@ RETURNING id;`,
 
       // Step 8, a second replica and the TLS proxy. The second replica starts once the first is ready.
       run(['up', '-d', 'server-2'])
-      const ready2 = await waitFor(() => request(server2Port, 'localhost', '/health/ready'), 200, 120)
+      const ready2 = await waitFor(() => serverRequest(server2Port, 'localhost', '/health/ready'), 200, 120)
       assert.equal(ready2.status, 200, 'the second server never answered /health/ready with 200')
-      const site2 = await waitFor(() => request(server2Port, hosts.one, '/leave'), 200, 60)
+      const site2 = await waitFor(() => serverRequest(server2Port, hosts.one, '/leave'), 200, 60)
       assert.equal(site2.status, 200, 'the second server did not serve /leave')
 
       run(['up', '-d', 'proxy'])
@@ -816,7 +892,7 @@ RETURNING id;`,
       const meAfter = await waitFor(() => viaProxy('/api/me', proxyJar), 200, 30)
       assert.equal(meAfter.status, 200, `GET /api/me through the proxy after the restart: ${meAfter.body}`)
       for (const port of [serverPort, server2Port]) {
-        const direct = await request(port, hosts.one, '/api/me', cookieHeader(proxyJar))
+        const direct = await serverRequest(port, hosts.one, '/api/me', cookieHeader(proxyJar))
         assert.equal(direct.status, 200, `GET /api/me on port ${port} after the restart: ${direct.body}`)
       }
 
@@ -825,7 +901,7 @@ RETURNING id;`,
       const { jar: hoaJar } = await signInViaProxy('hoa')
       const resource = '/api/studio/apps/LeaveRequests/resources/bb5c622e-a7f8-41d4-8a6f-15fe463455b8'
       const patch = (port, version, value) =>
-        request(
+        serverRequest(
           port,
           hosts.one,
           resource,
@@ -837,7 +913,7 @@ RETURNING id;`,
           },
           { method: 'PATCH', body: JSON.stringify([{ op: 'replace', path: '/texts/site.title', value }]) },
         )
-      const original = await request(serverPort, hosts.one, resource, cookieHeader(hoaJar))
+      const original = await serverRequest(serverPort, hosts.one, resource, cookieHeader(hoaJar))
       assert.equal(original.status, 200, `GET the resource through server: ${original.body}`)
       const etag0 = original.headers.etag
       assert.ok(etag0, 'the resource has no ETag')
@@ -847,7 +923,7 @@ RETURNING id;`,
       const etag1 = saved.headers.etag
       assert.ok(etag1 && etag1 !== etag0, 'the save did not change the ETag')
 
-      const read = await request(server2Port, hosts.one, resource, cookieHeader(hoaJar))
+      const read = await serverRequest(server2Port, hosts.one, resource, cookieHeader(hoaJar))
       assert.equal(read.status, 200, `GET through server-2: ${read.body}`)
       assert.equal(read.headers.etag, etag1)
       assert.equal(JSON.parse(read.body).content.texts['site.title'], 'Leave (on premises)')
