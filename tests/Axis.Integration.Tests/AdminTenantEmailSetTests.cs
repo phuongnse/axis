@@ -28,7 +28,7 @@ public sealed class AdminTenantEmailSetTests(PostgreSqlFixture database) : IClas
 
         var result = await scenario.RunAsync(
             ["tenant", "email", "set", id, "--host", "smtp.tenant.test", "--from", "noreply@tenant.test", "--port", "2525", "--tls", "false", "--user-name", "mailer", "--password"],
-            extra: Directory(password));
+            extra: Directory(password, development: true));
 
         Assert.Equal(0, result.Exit);
         Assert.Equal([$"{id} email ok"], result.Output);
@@ -106,6 +106,7 @@ public sealed class AdminTenantEmailSetTests(PostgreSqlFixture database) : IClas
             await scenario.RunAsync(["tenant", "email", "set", id, .. set, "--password"], extra: Directory("a-password")),
             await scenario.RunAsync(["tenant", "email", "set", id, .. set, "--port", "0"], extra: _directory),
             await scenario.RunAsync(["tenant", "email", "set", id, .. set, "--port", "65536"], extra: _directory),
+            await scenario.RunAsync(["tenant", "email", "set", id, .. set, "--tls", "false"], extra: _directory),
             await scenario.RunAsync(["tenant", "email", "set", id, .. set, "--user-name", "mailer", "--password"], extra: _directory, input: "\n"),
             await scenario.RunAsync(["tenant", "email", "set", id, .. set]),
             await scenario.RunAsync(["tenant", "email", "clear", id]),
@@ -120,6 +121,7 @@ public sealed class AdminTenantEmailSetTests(PostgreSqlFixture database) : IClas
             Assert.Empty(refusal.Output);
             Assert.NotEmpty(refusal.Error);
         });
+        Assert.Contains("--tls", Assert.Single(refusals, refusal => refusal.Error.Any(line => line.Contains("only in Development", StringComparison.Ordinal))).Error[0], StringComparison.Ordinal);
         Assert.Equal(snapshot, await scenario.SnapshotAsync());
         Assert.Equal(records, (await scenario.AuditRecordsAsync()).Count);
         await scenario.AssertNoSecretsAsync();
@@ -161,6 +163,19 @@ public sealed class AdminTenantEmailSetTests(PostgreSqlFixture database) : IClas
         await scenario.AssertNoSecretsAsync();
     }
 
-    private static Dictionary<string, string?> Directory(string password) =>
-        new() { ["Tenancy:Source"] = "directory", [AdminCommands.SmtpPasswordSetting] = password };
+    private static Dictionary<string, string?> Directory(string password, bool development = false)
+    {
+        var settings = new Dictionary<string, string?>
+        {
+            ["Tenancy:Source"] = "directory",
+            [AdminCommands.SmtpPasswordSetting] = password,
+        };
+        if (development)
+        {
+            // Without this entry the scenario's default environment, Testing, applies.
+            settings[AdminCommands.DotnetEnvironmentSetting] = "Development";
+        }
+
+        return settings;
+    }
 }

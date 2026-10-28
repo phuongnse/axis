@@ -41,7 +41,7 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
     it has no label. An empty value, also an empty set of references and a
     file that is not set, shows "Not set" in muted italics. The widget ignores
     `visibleWhen`, `requiredWhen`, `readOnlyWhen` and `steps`.
-  - **Layout** _(planned)_. The fields are a description list (`dl`, `dt`,
+  - **Layout**. The fields are a description list (`dl`, `dt`,
     `dd`). Each label sits above its value, as a read-only form field reads,
     with about 6px between them and `spacing-md` (16px) between fields. The
     labels and the values follow the form widget's **Field look**, and an
@@ -166,7 +166,7 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
   - **Comparison.** A `comparison` is a reference for the same measure, such
     as last month's total or a target. Two different metrics are two tiles
     side by side in `columns`, at the same size.
-  - **Look** _(planned)_. The label sits above, in the field label style of
+  - **Look**. The label sits above, in the field label style of
     the form widget's **Field look**. The measure is below it, large: 24px at
     a 32px line height, weight 600, in tabular figures. The comparison sits
     under it at body size, with its label muted. An empty measure is a muted

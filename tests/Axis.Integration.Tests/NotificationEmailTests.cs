@@ -115,6 +115,39 @@ public sealed class NotificationEmailTests(ProcessStepFixture fixture, MailpitFi
     }
 
     [Fact]
+    public async Task Worker_outside_Development_does_not_send_with_TLS_off_keeps_the_item_queued_counts_no_failure_and_warns_once_and_Development_sends_it()
+    {
+        var address = UniqueAddress();
+        var (releaseId, model) = await NotifyMailApp.ActivateAsync(fixture, CancellationToken, address);
+        var (title, _, _) = await StageAsync(releaseId, model, viProfile: false);
+        var email = Assert.Single(await EmailsAsync(title));
+        var logs = new LogCollector();
+        await using (var worker = Worker(logs, await MailpitSettingsAsync("Email"), environment: "Testing"))
+        {
+            await RunUntilIdleAsync(worker);
+            await RunUntilIdleAsync(worker);
+        }
+
+        Assert.Empty(await mailpit.MessagesToAsync(address, CancellationToken));
+        Assert.Equal(1L, await ItemCountAsync([email.Id], "AND due_at > now() AND claim_token IS NULL"));
+        Assert.Equal("pending", Assert.Single(await EmailsAsync(title)).State);
+        Assert.Equal(
+            0L,
+            await fixture.CountAsync("SELECT count(*) FROM axis.delivery_failures WHERE kind = 'notification.email' AND target = @id", ("id", email.Id.ToString("D"))));
+        var warning = Assert.Single(logs.Entries, entry => entry.Contains("Email:Smtp:UseTls", StringComparison.Ordinal));
+        Assert.Equal(
+            $"{LogLevel.Warning}: Tenant {fixture.Tenant} has Email:Smtp:UseTls off, and only Development sends email without TLS, so its emails are not sent and stay queued. This is logged once for the tenant.",
+            warning);
+
+        await fixture.ScalarAsync("UPDATE axis.process_work_items SET due_at = now() WHERE kind = 'notification.email' AND email_id = @id", ("id", email.Id));
+        await using var development = Worker(new LogCollector(), await MailpitSettingsAsync("Email"));
+        await RunUntilIdleAsync(development);
+
+        Assert.Single(await mailpit.MessagesToAsync(address, CancellationToken));
+        Assert.Equal("sent", Assert.Single(await EmailsAsync(title)).State);
+    }
+
+    [Fact]
     public async Task Email_row_already_marked_sent_has_its_item_deleted_and_sends_no_email()
     {
         var address = UniqueAddress();
@@ -321,8 +354,12 @@ public sealed class NotificationEmailTests(ProcessStepFixture fixture, MailpitFi
         return (title, subjectId, instanceId);
     }
 
-    /// <summary>A worker over the fixture's tenant database that has the given settings, with the host never started.</summary>
-    private ServiceProvider Worker(LogCollector logs, IEnumerable<(string Key, string Value)> settings, ITenantCatalog? catalog = null)
+    /// <summary>A worker over the fixture's tenant database that has the given settings, with the host never started. It runs in Development unless told otherwise, since Mailpit has no TLS.</summary>
+    private ServiceProvider Worker(
+        LogCollector logs,
+        IEnumerable<(string Key, string Value)> settings,
+        ITenantCatalog? catalog = null,
+        string environment = "Development")
     {
         var values = new Dictionary<string, string?>
         {
@@ -337,7 +374,7 @@ public sealed class NotificationEmailTests(ProcessStepFixture fixture, MailpitFi
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(values).Build();
         var services = new ServiceCollection()
             .AddLogging(logging => logging.AddProvider(logs))
-            .AddAxisWorker(configuration, new HostingEnvironment { EnvironmentName = "Testing" });
+            .AddAxisWorker(configuration, new HostingEnvironment { EnvironmentName = environment });
         if (catalog is not null)
         {
             // The last registration wins, so the handler finds the tenant in this catalog.

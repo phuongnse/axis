@@ -14,8 +14,9 @@ namespace Axis.Processes.Instances;
 /// Sends the email a <c>notification.email</c> work item names, which a <c>notify</c> step staged in
 /// <c>axis.email_outbox</c>, as plain text over SMTP. The mail settings are the tenant's own <c>Email</c> block when it
 /// has one, otherwise the host's, never a mix of both. With no <c>Smtp:Host</c> nothing is sent: one transaction makes
-/// the item due again after one lease, writes no failure, and the first such item of a tenant logs one warning.
-/// Otherwise a read with no transaction loads the row. An item with no row is deleted and logged, and a row already
+/// the item due again after one lease, writes no failure, and the first such item of a tenant logs one warning. The
+/// same happens when the settings turn <c>UseTls</c> off and the worker does not run in Development, since only
+/// Development sends email without TLS. Otherwise a read with no transaction loads the row. An item with no row is deleted and logged, and a row already
 /// <c>sent</c> deletes its item with nothing sent. The send itself takes no transaction. It uses the stored subject,
 /// body and <c>Message-ID</c>, and gives up after half the item's lease, so it ends before another worker can claim
 /// the item. After a send, one transaction deletes the item, which checks the claim, and marks the row <c>sent</c>. A
@@ -26,9 +27,15 @@ namespace Axis.Processes.Instances;
 /// application, the process of the sending instance, the instance and the email, and deletes the item. The row stays
 /// <c>pending</c>, and nothing more is sent until an operator redelivers the dead letter.
 /// </summary>
-internal sealed partial class NotificationEmailHandler(EmailDefaults defaults, ITenantCatalog? tenants, DeliverySettings deliverySettings, ILogger<NotificationEmailHandler> logger) : IDeliveryWorkItemHandler
+internal sealed partial class NotificationEmailHandler(
+    EmailDefaults defaults,
+    ITenantCatalog? tenants,
+    DeliverySettings deliverySettings,
+    EmailSecuritySettings security,
+    ILogger<NotificationEmailHandler> logger) : IDeliveryWorkItemHandler
 {
     private readonly ConcurrentDictionary<string, byte> _warned = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, byte> _warnedPlain = new(StringComparer.Ordinal);
 
     public string Kind => ProcessStarts.NotificationEmailWorkItemKind;
 
@@ -43,6 +50,18 @@ internal sealed partial class NotificationEmailHandler(EmailDefaults defaults, I
             if (_warned.TryAdd(item.TenantId, 0))
             {
                 LogNoHost(item.TenantId);
+            }
+
+            return await RescheduleAsync(item, connection, item.Lease, cancellationToken)
+                ? WorkItemOutcome.Rescheduled
+                : WorkItemOutcome.LostClaim;
+        }
+
+        if (!settings.UseTls && !security.AllowPlainSmtp)
+        {
+            if (_warnedPlain.TryAdd(item.TenantId, 0))
+            {
+                LogPlainSmtp(item.TenantId);
             }
 
             return await RescheduleAsync(item, connection, item.Lease, cancellationToken)
@@ -240,6 +259,9 @@ internal sealed partial class NotificationEmailHandler(EmailDefaults defaults, I
 
     [LoggerMessage(LogLevel.Warning, "Tenant {TenantId} has no Email:Smtp:Host, so its emails are not sent and stay queued. This is logged once for the tenant.")]
     private partial void LogNoHost(string tenantId);
+
+    [LoggerMessage(LogLevel.Warning, "Tenant {TenantId} has Email:Smtp:UseTls off, and only Development sends email without TLS, so its emails are not sent and stay queued. This is logged once for the tenant.")]
+    private partial void LogPlainSmtp(string tenantId);
 
     [LoggerMessage(LogLevel.Warning, "Email work item {ItemId} names no stored email {EmailId}, so it was discarded.")]
     private partial void LogNoEmail(Guid itemId, Guid? emailId);

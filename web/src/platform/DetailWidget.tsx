@@ -1,4 +1,4 @@
-import { Alert, Descriptions, Flex, Tag, Typography } from 'antd'
+import { Alert, Flex, Tag, Typography } from 'antd'
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 import { NotFoundPage } from '../pages/NotFoundPage'
@@ -19,9 +19,11 @@ import {
   type RecordValue,
   type RowLabels,
 } from './records'
-import type { EntityWidgetMetadata, NavigateAction, StartProcessAction } from './site'
+import type { EntityWidgetMetadata, FieldMetadata, NavigateAction, StartProcessAction } from './site'
 import { useText } from './texts'
+import { useDesignTokens } from './themeMode'
 import { sectionsOf } from './useRecordForm'
+import { useNarrowWidth } from './useNarrowWidth'
 
 interface DetailWidgetProps {
   /** A detail widget: it has an entity, maybe a form, and its `detail` metadata. */
@@ -44,7 +46,8 @@ const rowLabelsOf = (label: FieldLabel | undefined) => (Array.isArray(label) ? (
 /**
  * Shows one record of the widget's entity, read-only. A widget that names a form shows the form's
  * sections under their titles, with only the fields they list. Otherwise it shows every field in one
- * section without a title. A value looks as it does in a table cell, and a child collection shows its
+ * section without a title. Each section's fields form a description list in the sections' column widths.
+ * A value looks as it does in a table cell, and a child collection shows its
  * rows in a read-only table. The server leaves out the fields the user may not read. A record that is
  * missing or unreadable shows the not-found page.
  *
@@ -58,6 +61,8 @@ export function DetailWidget({ widget, sitePath, recordId, locale }: DetailWidge
   const navigate = useNavigate()
   const location = useLocation()
   const canvas = useCanvasActions()
+  const { spacing, colour } = useDesignTokens()
+  const narrow = useNarrowWidth()
   const { entity } = widget
   const sections = useMemo(() => sectionsOf(entity, widget.form), [entity, widget.form])
   const [load, setLoad] = useState<LoadState>('loading')
@@ -193,6 +198,34 @@ export function DetailWidget({ widget, sitePath, recordId, locale }: DetailWidge
     }),
   ]
 
+  const valueOf = (field: FieldMetadata) => {
+    const value = record.values[field.name] ?? null
+    return field.type === 'child-collection' ? (
+      <ChildCollectionTable
+        readOnly
+        field={field}
+        rows={Array.isArray(value) ? (value as RecordRow[]) : noRows}
+        labels={rowLabelsOf(record.labels[field.name])}
+        onChange={() => {}}
+        errors={{}}
+        locale={locale}
+      />
+    ) : field.type === 'references' ? (
+      <Flex wrap gap="small" data-testid={`detail-references-${field.name}`}>
+        {referencesLabels(record.values[field.name], record.labels[field.name]).map((label, index) => (
+          <Tag key={index}>{label}</Tag>
+        ))}
+        {!Array.isArray(value) || value.length === 0 ? <NotSet /> : null}
+      </Flex>
+    ) : field.type === 'file' && isFileValue(value) ? (
+      <FileLink field={field} value={value} />
+    ) : value === null ? (
+      <NotSet />
+    ) : (
+      formatValue(field, value as RecordValue, record.labels, { locale, text: t }, record.values)
+    )
+  }
+
   return (
     <Flex vertical gap="middle" data-testid="detail" aria-busy="false">
       {started && <Alert data-testid="detail-started" type="success" title={t('shell.form.processStarted')} />}
@@ -200,41 +233,28 @@ export function DetailWidget({ widget, sitePath, recordId, locale }: DetailWidge
       {sections.map((section, index) => (
         <Fragment key={index}>
           {section.titleKey !== null && <Typography.Title level={5}>{t(section.titleKey)}</Typography.Title>}
-          <Descriptions
-            column={1}
-            items={section.fields.map(({ field }) => {
-              const value = record.values[field.name] ?? null
-              return {
-                key: field.name,
-                label: field.labelKey ? t(field.labelKey) : field.name,
-                children:
-                  field.type === 'child-collection' ? (
-                    <ChildCollectionTable
-                      readOnly
-                      field={field}
-                      rows={Array.isArray(value) ? (value as RecordRow[]) : noRows}
-                      labels={rowLabelsOf(record.labels[field.name])}
-                      onChange={() => {}}
-                      errors={{}}
-                      locale={locale}
-                    />
-                  ) : field.type === 'references' ? (
-                    <Flex wrap gap="small" data-testid={`detail-references-${field.name}`}>
-                      {referencesLabels(record.values[field.name], record.labels[field.name]).map((label, index) => (
-                        <Tag key={index}>{label}</Tag>
-                      ))}
-                      {!Array.isArray(value) || value.length === 0 ? <NotSet /> : null}
-                    </Flex>
-                  ) : field.type === 'file' && isFileValue(value) ? (
-                    <FileLink field={field} value={value} />
-                  ) : value === null ? (
-                    <NotSet />
-                  ) : (
-                    formatValue(field, value as RecordValue, record.labels, { locale, text: t }, record.values)
-                  ),
-              }
-            })}
-          />
+          <dl
+            style={{
+              margin: 0,
+              display: 'grid',
+              gridTemplateColumns: 'repeat(12, minmax(0, 1fr))',
+              columnGap: spacing.md,
+              rowGap: spacing.md,
+              alignItems: 'start',
+            }}
+          >
+            {section.fields.map(({ field, width }) => (
+              <div
+                key={field.name}
+                style={{ gridColumn: `span ${narrow || width < 1 || width > 12 ? 12 : width}`, minWidth: 0 }}
+              >
+                <dt style={{ fontWeight: 500, color: colour.textMuted }}>
+                  {field.labelKey ? t(field.labelKey) : field.name}
+                </dt>
+                <dd style={{ margin: '6px 0 0' }}>{valueOf(field)}</dd>
+              </div>
+            ))}
+          </dl>
         </Fragment>
       ))}
       {buttons.length > 0 && <Flex gap="small">{buttons}</Flex>}
