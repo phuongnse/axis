@@ -5,9 +5,33 @@ test that measures them. The conventions of [architecture.md](../architecture.md
 marked _(planned for Mx)_ are not built yet, and Dn refers to [decisions.md](../decisions.md).
 
 The design follows [D82](../decisions/d82-performance-slos-and-load-tests.md). All of this page is
-_(planned for M16)_. The per-request budgets of the `*PerformanceTests` classes are built. They
+_(planned for M16)_, except [resource-demanding routes](#resource-demanding-routes), which is built. The per-request budgets of the `*PerformanceTests` classes are built. They
 move to a workflow of their own, as [D97](../decisions/d97-reliable-test-runs.md) says. See
 [testing](../architecture.md#testing).
+
+## Resource-demanding routes
+
+_(Built.)_ These routes take much time, memory or database work. Each is limited so that
+one caller cannot use up the server, and none builds a response that takes longer than a
+caller's or a proxy's timeout, because long work is asynchronous: the route answers `202` and the
+caller polls.
+
+| Route | Why it is heavy | What limits it |
+| --- | --- | --- |
+| Exports of [records and data source rows](import-export.md#export) | One query reads up to every matching row | `Data:ExportQueryTimeout` (a `503` past it), `Data:ExportMaxRows` (the file stops there), rows streamed to a temporary file, so memory stays low, and `RateLimits:Session` |
+| [Imports](import-export.md#import) | A large file is parsed, checked and written | `Data:ImportMaxBytes` (a `413`), `202` and then a status poll, the worker's dry run and commit, `Data:ImportMaxRows`, a cap of 1,000 entries and 100 MiB when an `xlsx` workbook unpacks, and `RateLimits:Session` |
+| [File uploads](file-fields.md#upload) | Large request bodies | `Files:MaxSize` and the field's `maxSize` (a `413`) and `RateLimits:Session` |
+| Record lists, data source rows, search and lookups | Filters and sorts over large tables | `Data:QueryTimeout` (a `503`), a `pageSize` of at most 100 and `RateLimits:Session` |
+| [Inbound endpoint](inbound-endpoints.md#the-call) calls with `wait` | The call holds a connection to the caller while it waits | `wait` of at most `PT30S`, no database connection held while waiting, a `202` when the instance is not done, and `RateLimits:Bearer` |
+| Studio validate, publish, preview, test and rollback, see [publishing](authoring.md#publishing) | A request checks and builds a whole application, and may run migrations | A `202` and a status poll, one request at a time for a tenant and application, see [the publisher](administration.md#publisher), a time limit of 10 minutes for `test`, and `RateLimits:Publishing` |
+
+- **Settings.** The `Data:*` and `Files:MaxSize` settings are in
+  [data settings](host-settings.md#data-settings). The rate limits are per replica, see
+  [rate limits](headers-and-rate-limits.md#rate-limits).
+- **Limits per caller.** A rate limit counts a tenant and a user, or a tenant and a caller id for a
+  bearer token, so one caller's burst never uses another's allowance.
+- **Work queues.** Imports and publish requests wait in a table until the worker or the publisher
+  takes them, so a burst of requests adds to the queue and not to the load of the server.
 
 ## Objectives
 

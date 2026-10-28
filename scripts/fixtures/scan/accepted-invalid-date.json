@@ -1,0 +1,5 @@
+{
+  "accepted": [
+    { "advisory": "GHSA-5crp-9r3c-p9vr", "package": "Newtonsoft.Json", "found": "2026-13-45", "reason": "Waiting for the upstream fix" }
+  ]
+}
