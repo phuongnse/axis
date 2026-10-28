@@ -530,8 +530,17 @@ The rule for traffic that comes in, and for every connection Axis makes.
   validates the certificate against the system trust store. Add a private
   authority to that store. Do not replace the store with `SSL_CERT_FILE`, which
   makes the server trust only that file, see [on premises](#on-premises).
-- **PostgreSQL.** _(planned for M16)_ Connections use TLS and check the
-  server's certificate.
+- **PostgreSQL.** Set `SSL Mode=VerifyFull` in the host's own connection
+  string, plus `Root Certificate` for a private authority. Every tenant
+  connection copies `SSL Mode`, `Root Certificate` and
+  `Check Certificate Revocation` from `ConnectionStrings:Platform` (the server
+  and the worker), `Admin:ConnectionString` (`tenant create` and
+  `tenant restore`) or `ConnectionStrings:PlatformSchema` (the other admin
+  commands and the publisher). `pg_dump` and `pg_restore` get `PGSSLMODE` and
+  `PGSSLROOTCERT`, with `system` under `verify-full` when no root certificate
+  is named. The default `Prefer` falls back to plain text, so TLS is enforced
+  only when you set the mode. Tenants under `Tenancy:Source=configuration`
+  carry their own settings in their connection strings.
 - **URL bindings.** A `url` binding must be `https` outside Development.
   Activation refuses an `http` binding, and the worker never sends a call to
   one, see [deployment bindings](integration-resources.md#deployment-bindings).

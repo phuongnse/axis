@@ -1,3 +1,4 @@
+using Axis.Tenancy;
 using Axis.Tenancy.Platform;
 using Microsoft.EntityFrameworkCore;
 
@@ -51,7 +52,7 @@ internal sealed class TenantMigrate(
             return false;
         }
 
-        await using var steps = new TenantDatabaseSteps(settings.Cipher, row, row.DatabaseHost, row.DatabasePort, cancellationToken);
+        await using var steps = new TenantDatabaseSteps(settings.Cipher, row, row.DatabaseHost, row.DatabasePort, TenantDatabaseTls.From(settings.PlatformConnectionString), cancellationToken);
         return await Step(row.Id, "grants", steps.GrantAsync)
             && await Step(row.Id, "migrations", steps.MigrateAsync)
             && await Step(row.Id, "grants", steps.GrantAsync)
