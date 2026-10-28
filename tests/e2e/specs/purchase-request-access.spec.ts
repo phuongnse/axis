@@ -2,6 +2,7 @@ import { expect, test } from "../test";
 import type { APIRequest, APIRequestContext, Page } from "@playwright/test";
 import { csrfHeaders } from "../csrf";
 import { sessionFile, useSession, type SampleUser } from "../sessions";
+import { expectShown, fieldValue } from "../fields";
 
 // Each journey checks what a user sees in the browser, then sends the same request straight to the
 // API, so a hidden button never stands in for the server's check. No session is set for the whole
@@ -279,9 +280,8 @@ test("a finance reviewer sees a submitted request read-only, and an update throu
   await useSession(page, "dung");
 
   await page.goto(`/purchasing/purchaserequestform/${id}`);
-  const titleInput = page.getByRole("textbox", { name: "Title", exact: true });
-  await expect(titleInput).toHaveValue(title);
-  await expect(titleInput).toHaveAttribute("readonly");
+  await expectShown(fieldValue(page, "title"), title);
+  await expect(page.getByRole("textbox", { name: "Title", exact: true })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Cancel", exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: /Save/ })).toHaveCount(0);
   await expect(page.getByRole("button", { name: /Submit/ })).toHaveCount(0);

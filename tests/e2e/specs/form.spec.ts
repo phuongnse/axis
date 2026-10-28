@@ -125,7 +125,7 @@ test('a note saved by a signed-in user shows its creator read-only', async ({ pa
   await expect(page.getByRole('textbox', { name: 'Title', exact: true })).toHaveValue(title)
   const createdBy = fieldValue(page, 'createdBy')
   await expectShown(createdBy, me.id)
-  await expect(createdBy).not.toBeEditable()
+  await expect(createdBy.locator('input')).toHaveCount(0)
 })
 
 test('line items are added, edited and removed in the form, in light and dark mode', async ({ page, request }) => {
@@ -331,7 +331,7 @@ test('a form in two sections shows both titles, and saving keeps its read-only f
   await expect(page.getByRole('textbox', { name: 'Title', exact: true })).toHaveValue(`Sections ${run}`)
   const code = fieldValue(page, 'code')
   await expectShown(code, `S-${run}`)
-  await expect(code).not.toBeEditable()
+  await expect(code.locator('input')).toHaveCount(0)
   // A field the form does not list is not shown.
   await expect(page.getByLabel(/Done/)).toBeHidden()
 
