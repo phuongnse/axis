@@ -53,7 +53,8 @@ test('a purchase request is created with line items, shows the computed total, i
   await expect(page).toHaveURL(/\/purchasing\/purchaserequestform\/new$/)
   await page.getByRole('textbox', { name: 'Title', exact: true }).fill(title)
   // The server sets the requester to the signed-in user, so the form shows it read-only.
-  await expect(page.getByLabel(fieldLabel('Requester'))).toHaveAttribute('readonly')
+  await expect(fieldValue(page, 'requester')).toBeVisible()
+  await expect(fieldValue(page, 'requester').locator('input')).toHaveCount(0)
   await choose(page, 'department', 'Department', 'Finance')
   await choose(page, 'supplier', 'Supplier', 'Acme Supplies')
   await select(page, 'Currency', 'VND')
@@ -113,7 +114,7 @@ test('a new purchase request gets a number from the sequence on save, and the fo
   await page.getByRole('button', { name: 'New', exact: true }).click()
   await expect(page).toHaveURL(/\/purchasing\/purchaserequestform\/new$/)
   await expectShown(number, 'Not set')
-  await expect(number).toHaveAttribute('readonly')
+  await expect(number.locator('input')).toHaveCount(0)
   await page.getByRole('textbox', { name: 'Title', exact: true }).fill(title)
   await choose(page, 'department', 'Department', 'Finance')
   await page.getByRole('button', { name: 'Add row', exact: true }).click()
@@ -129,7 +130,7 @@ test('a new purchase request gets a number from the sequence on save, and the fo
     .getByRole('link', { name: title, exact: true })
     .click()
   await expect(page.getByRole('textbox', { name: 'Title', exact: true })).toHaveValue(title)
-  await expect(number).toHaveAttribute('readonly')
+  await expect(number.locator('input')).toHaveCount(0)
   await expectShown(number, new RegExp(`^PR-${new Date().getUTCFullYear()}-\\d{5}$`))
 })
 

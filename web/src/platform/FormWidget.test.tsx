@@ -350,6 +350,8 @@ const texts = {
   'shell.lookup.search': 'Search',
   'shell.table.empty': 'No records yet.',
   'shell.value.notSet': 'Not set',
+  'shell.table.yes': 'Yes',
+  'shell.table.no': 'No',
   'shell.table.loadFailed': 'The records could not be loaded.',
   'shell.notFound.title': 'Page not found',
   'shell.history.title': 'History',
@@ -717,12 +719,12 @@ describe('FormWidget', () => {
     expect(screen.getByLabelText('Priority')).not.toHaveAttribute('aria-describedby')
   })
 
-  it('names a read-only input and the references Add button with their help text', async () => {
+  it('names the references Add button with its help text, and a read-only value with no help link', async () => {
     stubFetch()
     renderForm(null, helpWidget)
 
     expect(await screen.findByText('Worked out by the server.')).toHaveAttribute('id', 'total-help')
-    expect(screen.getByLabelText('Total')).toHaveAttribute('aria-describedby', 'total-help')
+    expect(screen.getByTestId('field-value-total')).not.toHaveAttribute('aria-describedby')
     expect(screen.getByRole('button', { name: 'Add Software' })).toHaveAttribute('aria-describedby', 'software-help')
   })
 
@@ -1010,9 +1012,58 @@ describe('FormWidget', () => {
     stubFetch({ status: 200, body: softwareJson(1) })
     renderForm(noteId, readOnlyWidget)
 
-    expect(await screen.findByLabelText('Software')).toHaveValue('Word, Excel')
+    expect(await screen.findByTestId('field-value-software')).toHaveTextContent('Word, Excel')
+    expect(screen.queryByRole('textbox', { name: 'Software' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Add Software' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /^Remove / })).not.toBeInTheDocument()
+  })
+
+  describe('read-only values as plain text', () => {
+    const fileId = '44444444-4444-4444-8444-444444444444'
+    const downloadPath = '/api/apps/E2eApp/entities/Note/files'
+    const readOnlyWidget: EntityWidgetMetadata = {
+      ...softwareWidget,
+      entity: {
+        ...softwareWidget.entity,
+        fields: [
+          ...softwareWidget.entity.fields,
+          field('done', 'boolean', 'note.done'),
+          field('priority', 'integer', 'note.priority'),
+          { ...field('attachment', 'file', 'note.attachment'), downloadPath },
+        ],
+      },
+      access: { actions: ['read', 'update'], createFields: [], updateFields: [] },
+    }
+
+    it('shows each read-only value as its text, with Yes or No, joined labels and a file link', async () => {
+      const values = `{"title":"Laptop","software":["${wordId}","${excelId}"],"done":true,"priority":7,"attachment":{"id":"${fileId}","name":"brief.pdf","mediaType":"application/pdf","size":"1024"}}`
+      stubFetch({
+        status: 200,
+        body: `{"id":"${noteId}","version":1,"values":${values},"labels":{"software":["Word","Excel"]}}`,
+      })
+      renderForm(noteId, readOnlyWidget)
+
+      expect(await screen.findByTestId('field-value-title')).toHaveTextContent('Laptop')
+      expect(screen.getByTestId('field-value-software')).toHaveTextContent('Word, Excel')
+      expect(screen.getByTestId('field-value-done')).toHaveTextContent('Yes')
+      expect(screen.getByTestId('field-value-priority')).toHaveTextContent('7')
+      expect(screen.getByRole('link', { name: 'brief.pdf' })).toHaveAttribute('href', `${downloadPath}/${fileId}`)
+      expect(screen.getByTestId('field-value-title')).toHaveStyle({ minHeight: '32px' })
+      expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
+    })
+
+    it('shows an empty read-only value, set of references and file as Not set in italics', async () => {
+      const values = `{"title":"Laptop","software":[],"done":false,"priority":null,"attachment":null}`
+      stubFetch({ status: 200, body: `{"id":"${noteId}","version":1,"values":${values},"labels":{}}` })
+      renderForm(noteId, readOnlyWidget)
+
+      expect(await screen.findByTestId('field-value-done')).toHaveTextContent('No')
+      for (const name of ['software', 'priority', 'attachment']) {
+        const value = screen.getByTestId(`field-value-${name}`)
+        expect(within(value).getByText('Not set')).toHaveStyle({ fontStyle: 'italic' })
+      }
+      expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
+    })
   })
 
   it('has the choose, clear, add, added, removed and lookup search texts in every platform locale', () => {
@@ -1128,13 +1179,11 @@ describe('FormWidget', () => {
     const requests = stubFetch({ status: 200, body: computedJson(1) }, { status: 200, body: computedJson(2) })
     renderForm(noteId, computedWidget)
 
-    const total = await screen.findByLabelText('Total')
-    expect(total).toHaveValue('3.00')
-    expect(total).toHaveAttribute('readonly')
+    expect(await screen.findByTestId('field-value-total')).toHaveTextContent('3.00')
+    expect(screen.queryByRole('textbox', { name: 'Total' })).not.toBeInTheDocument()
     expect(screen.getByTestId('cell-lines-0-code')).toHaveTextContent('PENS')
     expect(screen.queryByRole('textbox', { name: 'Line code 1' })).toBeNull()
 
-    await userEvent.type(total, '9')
     const priority = screen.getByLabelText('Priority')
     await userEvent.clear(priority)
     await userEvent.type(priority, '3')
@@ -1154,7 +1203,7 @@ describe('FormWidget', () => {
     renderForm(noteId, computedWidget)
 
     await screen.findByTestId('field-value-total')
-    expect(screen.getByTestId('field-value-total')).toHaveValue('3.00')
+    expect(screen.getByTestId('field-value-total')).toHaveTextContent('3.00')
     expect(screen.getByTestId('cell-lines-0-code')).toHaveTextContent('PENS')
   })
 
@@ -1203,7 +1252,7 @@ describe('FormWidget', () => {
     const requests = stubFetch({ status: 201, body: computedJson(1) })
     renderForm(null, computedWidget)
 
-    expect(screen.getByLabelText('Total')).toHaveValue('Not set')
+    expect(screen.getByTestId('field-value-total')).toHaveTextContent('Not set')
     await userEvent.type(screen.getByRole('textbox', { name: 'Title' }), 'Buy paper')
     await userEvent.type(screen.getByLabelText('Amount'), '1.50')
     await userEvent.click(screen.getByRole('button', { name: 'Add row' }))
@@ -1222,12 +1271,10 @@ describe('FormWidget', () => {
     const requests = stubFetch({ status: 201, body: sequenceJson(1) })
     renderForm(null, sequenceWidget)
 
-    const number = screen.getByLabelText('Number')
-    expect(number).toHaveValue('Not set')
-    expect(number).toHaveAttribute('readonly')
+    const number = screen.getByTestId('field-value-number')
+    expect(number).toHaveTextContent('Not set')
+    expect(screen.queryByRole('textbox', { name: 'Number' })).not.toBeInTheDocument()
     await userEvent.type(screen.getByRole('textbox', { name: 'Title' }), 'Buy paper')
-    await userEvent.type(number, 'PR-1')
-    expect(number).toHaveValue('Not set')
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
 
     await waitFor(() => expect(requests()).toHaveLength(1))
@@ -1242,10 +1289,9 @@ describe('FormWidget', () => {
     const requests = stubFetch({ status: 200, body: sequenceJson(1) }, { status: 200, body: sequenceJson(2) })
     renderForm(noteId, sequenceWidget)
 
-    const number = await screen.findByLabelText('Number')
-    await waitFor(() => expect(number).toHaveValue('PR-2026-00042'))
-    expect(number).toHaveAttribute('readonly')
-    await userEvent.type(number, '9')
+    const number = await screen.findByTestId('field-value-number')
+    await waitFor(() => expect(number).toHaveTextContent('PR-2026-00042'))
+    expect(screen.queryByRole('textbox', { name: 'Number' })).not.toBeInTheDocument()
     const priority = screen.getByLabelText('Priority')
     await userEvent.clear(priority)
     await userEvent.type(priority, '3')
@@ -1263,11 +1309,9 @@ describe('FormWidget', () => {
     const requests = stubFetch({ status: 200, body: creatorJson(1) }, { status: 200, body: creatorJson(2) })
     renderForm(noteId, creatorWidget)
 
-    const createdBy = await screen.findByLabelText('Created by')
-    await waitFor(() => expect(createdBy).toHaveValue('anna'))
-    expect(createdBy).toHaveAttribute('readonly')
-    await userEvent.type(createdBy, 'x')
-    expect(createdBy).toHaveValue('anna')
+    const createdBy = await screen.findByTestId('field-value-createdBy')
+    await waitFor(() => expect(createdBy).toHaveTextContent('anna'))
+    expect(screen.queryByRole('textbox', { name: 'Created by' })).not.toBeInTheDocument()
     const priority = screen.getByLabelText('Priority')
     await userEvent.clear(priority)
     await userEvent.type(priority, '3')
@@ -1287,7 +1331,7 @@ describe('FormWidget', () => {
 
     expect(await screen.findByRole('textbox', { name: 'Title' })).toHaveValue('Buy paper')
     expect(screen.getAllByRole('heading').map((heading) => heading.textContent)).toEqual(['Main', 'Details'])
-    expect(screen.getByLabelText('Code')).toHaveValue('N-1')
+    expect(screen.getByTestId('field-value-code')).toHaveTextContent('N-1')
     expect(screen.getByLabelText('Priority')).toHaveValue('7')
     expect(screen.queryByLabelText('Done')).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Amount')).not.toBeInTheDocument()
@@ -1316,23 +1360,22 @@ describe('FormWidget', () => {
     const column = (field: HTMLElement) => field.closest('.ant-form-item')?.parentElement
     expect(column(await screen.findByRole('textbox', { name: 'Title' }))).toHaveClass('ant-col-xs-24', 'ant-col-lg-16')
     expect(column(await screen.findByLabelText('Status'))).toHaveClass('ant-col-lg-8')
-    expect(column(await screen.findByLabelText('Code'))).toHaveClass('ant-col-lg-24')
+    expect(column(await screen.findByTestId('field-value-code'))).toHaveClass('ant-col-lg-24')
   })
 
   it('shows read-only fields and rows without letting them change, and never sends them', async () => {
     const requests = stubFetch({ status: 200, body: sectionsJson(1) }, { status: 200, body: sectionsJson(2) })
     renderForm(noteId, sectionsWidget)
 
-    const code = await screen.findByLabelText('Code')
-    expect(code).toHaveAttribute('readonly')
-    expect(screen.getByLabelText('Category')).toHaveValue('Office')
+    await screen.findByTestId('field-value-code')
+    expect(screen.queryByRole('textbox', { name: 'Code' })).not.toBeInTheDocument()
+    expect(screen.getByTestId('field-value-category')).toHaveTextContent('Office')
     expect(screen.queryByRole('button', { name: 'Choose' })).not.toBeInTheDocument()
     expect(screen.getByTestId('cell-lines-0-description')).toHaveTextContent('Pens')
     expect(screen.queryByRole('textbox', { name: 'Description 1' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Add row' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Remove' })).not.toBeInTheDocument()
 
-    await userEvent.type(code, '9')
     const priority = screen.getByLabelText('Priority')
     await userEvent.clear(priority)
     await userEvent.type(priority, '3')
@@ -1357,16 +1400,15 @@ describe('FormWidget', () => {
     )
     const { unmount } = renderForm(null, fieldedWidget)
     expect(screen.getByLabelText('Priority')).not.toHaveAttribute('readonly')
-    expect(screen.getByLabelText('Code')).toHaveAttribute('readonly')
+    expect(screen.queryByRole('textbox', { name: 'Code' })).not.toBeInTheDocument()
     unmount()
 
     renderForm(noteId, fieldedWidget)
     const title = await screen.findByRole('textbox', { name: 'Title' })
-    const priority = screen.getByLabelText('Priority')
-    expect(priority).toHaveAttribute('readonly')
+    expect(screen.getByTestId('field-value-priority')).toHaveTextContent('7')
+    expect(screen.queryByRole('textbox', { name: 'Priority' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Choose' })).not.toBeInTheDocument()
 
-    await userEvent.type(priority, '3')
     await userEvent.clear(title)
     await userEvent.type(title, 'New')
     await userEvent.click(screen.getByRole('button', { name: 'Save' }))
@@ -1386,7 +1428,7 @@ describe('FormWidget', () => {
     }
     stubFetch({ status: 200, body: noteJson('Buy paper', 1) })
     const { unmount } = renderForm(null, readerWidget)
-    expect(screen.getByRole('textbox', { name: 'Title' })).toHaveAttribute('readonly')
+    expect(screen.queryByRole('textbox', { name: 'Title' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument()
     unmount()
@@ -1479,7 +1521,7 @@ describe('FormWidget', () => {
       await chooseStatus(user, 'open')
       await waitFor(() => expect(screen.queryByLabelText('Priority')).not.toBeInTheDocument())
       expect(isRequiredLabel(screen.getByText('Status'))).toBe(true)
-      expect(screen.getByRole('textbox', { name: 'Title' })).toHaveAttribute('readonly')
+      expect(screen.queryByRole('textbox', { name: 'Title' })).not.toBeInTheDocument()
 
       await act(async () => {
         answerLate('{"sections":[],"fields":{"status":{"visible":true,"required":false,"readOnly":false}},"errors":{}}')
@@ -1487,7 +1529,7 @@ describe('FormWidget', () => {
       })
       expect(screen.queryByLabelText('Priority')).not.toBeInTheDocument()
       expect(isRequiredLabel(screen.getByText('Status'))).toBe(true)
-      expect(screen.getByRole('textbox', { name: 'Title' })).toHaveAttribute('readonly')
+      expect(screen.queryByRole('textbox', { name: 'Title' })).not.toBeInTheDocument()
     })
 
     it('never sends a hidden field, and names the form on save', async () => {
@@ -1622,8 +1664,7 @@ describe('FormWidget', () => {
         ...sectionsWidget,
         access: { actions: ['read', 'update'], createFields: [], updateFields: ['title'] },
       })
-      await userEvent.click(screen.getByRole('textbox', { name: 'Title' }))
-      await userEvent.tab()
+      expect(screen.getByTestId('field-value-title')).toHaveTextContent('Not set')
       await act(() => new Promise((resolve) => setTimeout(resolve, 400)))
       expect(stateRequests()).toEqual([])
     })
@@ -1933,7 +1974,7 @@ describe('FormWidget', () => {
       renderForm(noteId, { ...actionWidget, access: { actions: ['read'], createFields: [], updateFields: [] } })
 
       expect(await screen.findByRole('button', { name: 'Close note' })).toBeEnabled()
-      expect(screen.getByRole('textbox', { name: 'Title' })).toHaveAttribute('readonly')
+      expect(screen.queryByRole('textbox', { name: 'Title' })).not.toBeInTheDocument()
       expect(screen.queryByRole('button', { name: 'Save' })).not.toBeInTheDocument()
     })
 
