@@ -1,9 +1,10 @@
 import { Button, ConfigProvider, Flex, Layout, Menu, Segmented, Space, Switch, Typography } from 'antd'
 import dayjs from 'dayjs'
-import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
+import { useContext, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { Link, useLocation } from 'react-router'
 import { antLocaleFor, dayjsLocaleFor } from './antLocale'
 import { NotificationBell } from './NotificationBell'
+import { ShellHeightContext } from './shellHeight'
 import type { NavigationItem } from './site'
 import { useText } from './texts'
 import { useDesignTokens, useThemeMode } from './themeMode'
@@ -52,6 +53,7 @@ export function Shell({ titleKey, navigation, locales, locale, onLocaleChange, n
   const { colour, spacing } = useDesignTokens()
   const activeKey = activeNavigationKey(navigation, pathname)
   const narrow = useNarrowWidth()
+  const minHeight = useContext(ShellHeightContext)
   // The panel is open for the path it was opened on, so following a link or leaving narrow width closes it.
   const [openOn, setOpenOn] = useState<{ pathname: string; narrow: boolean } | null>(null)
   const open = narrow && openOn?.pathname === pathname && openOn.narrow
@@ -106,7 +108,7 @@ export function Shell({ titleKey, navigation, locales, locale, onLocaleChange, n
   return (
     <div data-theme-mode={mode}>
       <ConfigProvider locale={antLocaleFor(locale)}>
-        <Layout style={{ minHeight: '100vh' }}>
+        <Layout style={{ minHeight }}>
           {narrow ? (
             <>
               <Layout.Header

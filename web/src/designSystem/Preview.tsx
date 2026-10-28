@@ -12,13 +12,16 @@ function Canvas({ children }: { children: ReactNode }) {
   )
 }
 
-/** One state under its caption. It has its own router, as the table keeps its paging in the URL query. */
+/**
+ * One state under its caption. It has its own router, as the table keeps its paging in the URL query. It may be
+ * narrower than its content, so a wide table scrolls inside its widget, as on a page, and the card never does.
+ */
 function Figure({ state }: { state: PreviewState }) {
   const { colour, spacing } = useDesignTokens()
   return (
-    <figure style={{ margin: 0 }}>
+    <figure style={{ margin: 0, minWidth: 0 }}>
       <figcaption style={{ marginBottom: spacing.xs, color: colour.textMuted }}>{state.caption}</figcaption>
-      <MemoryRouter initialEntries={['/ds/page']}>{state.draw()}</MemoryRouter>
+      <MemoryRouter initialEntries={[state.at ?? '/ds/page']}>{state.draw()}</MemoryRouter>
     </figure>
   )
 }

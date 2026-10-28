@@ -10,6 +10,8 @@ import { TableWidget } from '../platform/TableWidget'
 import { TaskInboxWidget } from '../platform/TaskInboxWidget'
 import { WidgetTree } from '../platform/WidgetTree'
 import { FieldPreview } from './FieldPreview'
+import { PlatformShellPreview, SiteShellPreview } from './ShellPreview'
+import type { PreviewSession } from './shellFixtures'
 import { SubmittedOnMount } from './SubmittedOnMount'
 import {
   blankDetailWidget,
@@ -71,6 +73,8 @@ export interface PreviewState {
   caption: string
   draw: () => ReactNode
   routes?: Record<string, () => unknown>
+  /** The address the state opens at, for a state that reads its path or query. */
+  at?: string
 }
 
 /** A preview with one state, the typical one. */
@@ -186,7 +190,18 @@ export const previews: Record<string, readonly PreviewState[]> = {
       type === 'child-collection' ? childCollectionStates : fieldStates(type),
     ]),
   ),
+  shell: [
+    { caption: 'Application site', draw: () => <SiteShellPreview />, at: `/${sitePath}/requests` },
+    { caption: 'Platform site', draw: () => <PlatformShellPreview />, at: '/' },
+  ],
+  signIn: [
+    { caption: 'Signed out', draw: () => <PlatformShellPreview />, at: '/' },
+    { caption: 'Sign-in refused', draw: () => <PlatformShellPreview />, at: '/?signIn=failed' },
+  ],
 }
+
+/** The previews that draw nobody signed in. Every other preview draws a signed-in user. */
+export const previewSessions: Partial<Record<string, PreviewSession>> = { signIn: 'signedOut' }
 
 /** The fixture answers that the states of the previews bring, in one record. */
 export function stateRoutes(all: Record<string, readonly PreviewState[]>): Record<string, () => unknown> {
