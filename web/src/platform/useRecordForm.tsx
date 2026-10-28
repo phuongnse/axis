@@ -6,6 +6,7 @@ import { NotSet } from './EmptyValue'
 import { FieldInput } from './FieldInput'
 import { FileInput, FileLink } from './FileInput'
 import { FormCanvasContext } from './formCanvas'
+import { fieldRows } from './formLayout'
 import { fetchFormState, type FormStateAnswer } from './formState'
 import { formatValue, moneyCurrency, referencesLabels } from './formatValue'
 import { buildFormStateBody } from './recordBody'
@@ -543,16 +544,20 @@ export function useRecordForm(
         if (names !== null && !(section.name !== null && names.includes(section.name))) {
           return null
         }
+        const visible = section.fields.filter(({ field }) => !hiddenOf(field))
         const content = (
           <>
             {section.titleKey !== null &&
               !(section.fields.length > 0 && section.fields.every(({ field }) => hiddenOf(field))) && (
                 <Typography.Title level={5}>{t(section.titleKey)}</Typography.Title>
               )}
-            <Row gutter={[spacing.md, 0]} align="top">
-              {section.fields
-                .filter(({ field }) => !hiddenOf(field))
-                .map((entry) => {
+            {fieldRows(
+              visible.map((entry) => entry.width),
+              narrow,
+            ).map((row) => (
+              <Row key={row[0]} gutter={[spacing.md, 0]} align="top">
+                {row.map((position) => {
+                  const entry = visible[position]
                   const { field } = entry
                   const errors = errorsOf(field.name)
                   const required = stateOf(field.name)?.required ?? field.required
@@ -595,7 +600,8 @@ export function useRecordForm(
                     </Col>
                   )
                 })}
-            </Row>
+              </Row>
+            ))}
           </>
         )
         return <Fragment key={index}>{canvas ? canvas.section(index, content) : content}</Fragment>

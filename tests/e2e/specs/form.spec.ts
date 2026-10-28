@@ -346,6 +346,24 @@ test('a form in two sections shows both titles, and saving keeps its read-only f
   expect(record.values.priority).toBe(4)
 })
 
+test('fields in columns sit side by side at desktop width, with their tops aligned', async ({ page, request }) => {
+  const run = `${Date.now()}-${test.info().retry}`
+  const note = await createRecord(request, 'Note', { title: `Columns ${run}`, code: `C-${run}` })
+
+  await page.goto(`/e2e/notesections/${note.id}`)
+  const title = page.getByRole('textbox', { name: 'Title', exact: true })
+  const code = fieldValue(page, 'code')
+  await expect(title).toHaveValue(`Columns ${run}`)
+  await expect(code).toBeVisible()
+  const titleBox = await title.boundingBox()
+  const codeBox = await code.boundingBox()
+  if (titleBox === null || codeBox === null) {
+    throw new Error('A field has no box')
+  }
+  expect(Math.abs(codeBox.y - titleBox.y)).toBeLessThanOrEqual(1)
+  expect(codeBox.x).toBeGreaterThan(titleBox.x + titleBox.width)
+})
+
 test('a wizard is filled with the keyboard only: Next checks the step, Back keeps the values', async ({ page }) => {
   const run = `${Date.now()}-${test.info().retry}`
   const title = page.getByRole('textbox', { name: 'Title', exact: true })
