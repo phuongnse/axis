@@ -1,6 +1,7 @@
 import { expect, test } from '../test'
 import type { Page } from '@playwright/test'
 import { chooseTheme } from '../shell'
+import { logInAtKeycloak } from '../keycloak'
 
 // The platform home page stays open while nobody is signed in, and is then the sign-in card. Every application page
 // needs a session and shows the sign-in prompt, and only a click on a Sign in button starts sign-in.
@@ -9,9 +10,7 @@ import { chooseTheme } from '../shell'
 async function signInAsAnna(page: Page) {
   await page.goto('/')
   await page.getByRole('main').getByRole('button', { name: 'Sign in', exact: true }).click()
-  await page.locator('#username').fill('requester')
-  await page.locator('#password').fill('axis')
-  await page.locator('#kc-login').click()
+  await logInAtKeycloak(page, 'requester')
 }
 
 // Each test has its own browser context, so the session cookie does not reach other specs.
@@ -71,9 +70,7 @@ test('a person who cancels at the Keycloak login page lands on the home page wit
   await expect(signIn).toBeVisible()
 
   await signIn.click()
-  await page.locator('#username').fill('requester')
-  await page.locator('#password').fill('axis')
-  await page.locator('#kc-login').click()
+  await logInAtKeycloak(page, 'requester')
 
   await expect(page).toHaveURL(`${baseURL}/`)
   await expect(banner.getByRole('button', { name: 'Requester User', exact: true })).toBeVisible()

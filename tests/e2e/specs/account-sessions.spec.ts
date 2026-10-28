@@ -1,5 +1,6 @@
 import { expect, test } from '../test'
 import type { Page } from '@playwright/test'
+import { logInAtKeycloak } from '../keycloak'
 
 // The account menu opens the sessions screen, where a person ends another of their own sessions. The test
 // signs in as the employee in two fresh browser contexts, because the saved sessions of the other specs must stay alive.
@@ -9,9 +10,7 @@ import type { Page } from '@playwright/test'
 async function signInAsEmployee(page: Page) {
   await page.goto('/')
   await page.getByRole('main').getByRole('button', { name: 'Sign in', exact: true }).click()
-  await page.locator('#username').fill('employee')
-  await page.locator('#password').fill('axis')
-  await page.locator('#kc-login').click()
+  await logInAtKeycloak(page, 'employee')
   await expect(page.getByRole('banner').getByRole('button', { name: 'Employee User', exact: true })).toBeVisible()
 }
 

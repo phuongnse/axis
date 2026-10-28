@@ -211,7 +211,12 @@ the server stops at start, because it cannot reach `axis_preview`. See
 
 Docker Compose, `scripts/dev.sh` and `scripts/e2e.sh` start Keycloak with the development
 realm imported from `samples/keycloak/axis-realm.json`. The development password is `axis`
-for every user. The [development users table](reference/security.md#development-users) lists each
+for every user. After the password, the Keycloak login page asks for a 6-digit code, as D99 requires of every account.
+Each user has a fixed secret in the realm file, the `secretData` value of the user's `otp` credential. It is Base32, and it is test data like
+the password. To get a code, add the secret to an authenticator app as a time-based account (SHA-1, 6 digits, 30 seconds), or run
+`oathtool --totp -b <secret>`. The realm accepts a code more than once, so tests can sign in the same user several times within 30 seconds.
+Service accounts need no code. A Keycloak container that already runs keeps the old realm, because the import skips a realm that exists,
+so recreate it to get the codes. The [development users table](reference/security.md#development-users) lists each
 user and the roles they hold. The `operator` role opens the purchase request sample's Approvals
 inspector page. The leave request sample, `samples/apps/leave-requests`, reuses the `employee` and
 `department-manager` users, in a site at `/leave`. The service desk sample, `samples/apps/service-desk`,

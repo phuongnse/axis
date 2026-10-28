@@ -246,9 +246,10 @@ public sealed partial class AdminPreviewTenantTests(PostgreSqlFixture database, 
                 ["credentialId"] = "",
             }),
         };
-        loginRequest.Headers.Add("Cookie", string.Join("; ", loginPage.Headers.GetValues("Set-Cookie")
-            .Select(cookie => cookie.Split(';')[0])));
-        var login = await browser.SendAsync(loginRequest, CancellationToken);
+        var cookieHeader = string.Join("; ", loginPage.Headers.GetValues("Set-Cookie").Select(cookie => cookie.Split(';')[0]));
+        loginRequest.Headers.Add("Cookie", cookieHeader);
+        var password = await browser.SendAsync(loginRequest, CancellationToken);
+        var login = await KeycloakSignIn.SubmitCodeAsync(browser, password, cookieHeader, username);
         Assert.True(login.StatusCode == HttpStatusCode.Found, await login.Content.ReadAsStringAsync(CancellationToken));
         var callback = login.Headers.Location!;
         Assert.Equal("http://localhost:5206/api/auth/callback", callback.GetLeftPart(UriPartial.Path));
