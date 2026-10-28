@@ -4,8 +4,8 @@ Status: **Agreed**
 
 M16 gives `Axis.Admin` the commands that change a tenant after it is created,
 and the commands that rotate keys and passwords. Each command leaves a record
-in a new platform audit table. The installation key rotation and the binding and host commands
-are built. The rest is _(planned for M16)_. See
+in a new platform audit table. The installation key rotation, the tenant setting commands and their
+platform audit records are all built. See
 [tenant setting commands](../reference/tenant-setting-commands.md) for the
 detail. The owner agreed these points on 2026-10-25.
 

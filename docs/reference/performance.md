@@ -5,8 +5,8 @@ test that measures them. The conventions of [architecture.md](../architecture.md
 marked _(planned for Mx)_ are not built yet, and Dn refers to [decisions.md](../decisions.md).
 
 The design follows [D82](../decisions/d82-performance-slos-and-load-tests.md). All of this page is
-_(planned for M16)_, except [resource-demanding routes](#resource-demanding-routes), which is built. The per-request budgets of the `*PerformanceTests` classes are built. They
-move to a workflow of their own, as [D97](../decisions/d97-reliable-test-runs.md) says. See
+_(planned for M18)_, except [resource-demanding routes](#resource-demanding-routes), which is built. The per-request budgets of the `*PerformanceTests` classes are built. They
+run in the performance workflow, as [D97](../decisions/d97-reliable-test-runs.md) says. See
 [testing](../architecture.md#testing).
 
 ## Resource-demanding routes

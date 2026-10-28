@@ -12,7 +12,7 @@ password rotation, [`tenant rotate-passwords`](#database-passwords), is built. T
 built, see [installation key](#installation-key). The
 [deployment binding](#deployment-bindings) and [host](#hosts) commands are built too. So is
 [`tenant oidc set`](#sign-in-settings), with its client key options, and the
-[mail settings](#mail-settings) commands. So is ending [sessions](#sessions). The rest is _(planned for M16)_.
+[mail settings](#mail-settings) commands. So is ending [sessions](#sessions).
 
 ## Common rules
 
@@ -308,8 +308,7 @@ keys. It can be rotated without signing anyone out.
   archive holds a tenant's data. `tenant binding set`, `tenant binding remove`, `tenant host add`,
   `tenant host remove` and `tenant host move` are built and write one each. So are `tenant email set`
   and `tenant email clear`, which name the [mail settings](#mail-settings) they changed. `platform rekey` is
-  built and writes one record for the whole run, with no tenant. The other setting commands on this
-  page are _(planned for M16)_. `tenant list`, `tenant binding list`, `version` and `publisher`
+  built and writes one record for the whole run, with no tenant. `tenant list`, `tenant binding list`, `version` and `publisher`
   write none. The dispatcher of `Axis.Admin` reads a table of commands, and each is marked as
   writing one record per tenant, one per run or none. A command without a mark fails a test.
 - **When.** One record per tenant, when tenant work starts: after the checks of the command and

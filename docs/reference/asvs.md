@@ -4,8 +4,7 @@ How Axis tracks its verification against OWASP ASVS 5.0, Level 2. The convention
 [architecture.md](../architecture.md) apply: sections marked _(planned for Mx)_ are not built yet,
 and Dn refers to [decisions.md](../decisions.md).
 
-The design follows [D84](../decisions/d84-asvs-level-2-and-a-server-side-session.md). This page is
-_(planned for M16)_: its structure is agreed, and the requirements are filled in by the M16 issues.
+The design follows [D84](../decisions/d84-asvs-level-2-and-a-server-side-session.md). The requirements are filled in. The final sign-off, when every row is met, delegated or not applicable, is _(planned for M18)_.
 
 ## How it is filled
 
@@ -36,8 +35,8 @@ _(planned for M16)_: its structure is agreed, and the requirements are filled in
     open or closes the requirement. A reviewer does.
 - **Kept current.** A change that adds a route, a setting or a stored secret checks the rows it
   touches, in the same change.
-- **Sign-off.** The final pass comes last in M16, after M14 and M15 have added their routes. Every
-  row is then met, delegated or not applicable.
+- **Sign-off.** The final pass is _(planned for M18)_, after M14 and M15 have added their routes.
+  Every row is then met, delegated or not applicable.
 
 ## Other evidence
 

@@ -461,7 +461,7 @@ systems.
   `/api/apps/{app}/endpoints/`, and the session everywhere else.
   [Service accounts](#service-accounts) send bearer tokens with another
   audience to the record API, to data source rows, and to process start and
-  inspection. The operator commands follow _(planned for M16)_. The task API
+  inspection. The operator commands follow _(planned for M18)_. The task API
   stays closed to bearer tokens.
 - **Clock.** The expiry is checked against the server's clock service, with
   the usual 5 minutes of clock skew, so tests can replace the clock.
@@ -499,7 +499,7 @@ A service account lets another system read and write records, read data
 source rows, and start and inspect processes, under the same policies as a
 user. It replaces the point of D27 that accepts bearer tokens only on endpoint
 routes. The record API, data source rows, process start and process inspection
-take service accounts now. The operator commands are _(planned for M16)_ and
+take service accounts now. The operator commands are _(planned for M18)_ and
 stay session-only until then.
 
 - **What it is.** A client of the tenant's identity provider that gets
@@ -524,7 +524,7 @@ stay session-only until then.
   - `POST /api/apps/{app}/processes/{process}/instances`;
   - the instance list and one instance of
     [process inspection](process-inspection.md);
-  - the operator commands retry, cancel and resolve _(planned for M16)_.
+  - the operator commands retry, cancel and resolve _(planned for M18)_.
 
   The server marks each of these routes, so the choice of scheme, the CSRF
   exemption and the test of every route read the same mark and no path is
@@ -565,7 +565,7 @@ stay session-only until then.
   name falls back to the client id, `azp`.
 - **Rate limits.** Service account requests count in the bearer partition,
   by tenant and caller id, see
-  [rate limits](headers-and-rate-limits.md#rate-limits) _(planned for M16)_.
+  [rate limits](headers-and-rate-limits.md#rate-limits).
 - **Keycloak.** The development realm has a confidential client
   `reporting-system` with a service account, a role in the roles claim and an
   audience mapper that adds `axis-services`. The service account holds the
@@ -580,7 +580,7 @@ It follows [D83](../decisions/d83-the-fapi-20-profile-per-tenant.md). A tenant
 can turn on the FAPI 2.0 Security Profile for sign-in and for machine callers.
 The tenant setting, the client key, the startup check, the machine callers, and
 PAR, `private_key_jwt`, the `iss` check, DPoP at sign-in and the client key rotation are built. The
-verification bullet below is _(planned for M16)_.
+verification bullet below is _(planned for M18)_.
 
 - **Tenant setting.** `Oidc:Profile` is `standard` or `fapi2`, and
   `standard` when unset. Any other value stops the server's start, naming the
@@ -664,7 +664,7 @@ verification bullet below is _(planned for M16)_.
   operator registers the public keys at the identity provider, and the server signs with the
   newest key after its next refresh. `tenant oidc set --client-key` and `--retire-client-key`
   change the keys, see [tenant setting commands](tenant-setting-commands.md#sign-in-settings).
-- **Verification** _(planned for M16)_. The OpenID Foundation's conformance suite runs by hand
+- **Verification** _(planned for M18)_. The OpenID Foundation's conformance suite runs by hand
   against the development realm under `fapi2`. Its result is recorded in
   [ASVS](asvs.md). Axis seeks no certification.
 - **Keycloak.** The development realm has a second client, `axis-fapi`, so

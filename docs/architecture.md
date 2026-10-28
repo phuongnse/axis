@@ -443,19 +443,18 @@ bindings work. Status rules and publishing are built too.
   - Service accounts call the record API, data source rows, process start and
     process inspection with a bearer token (D86). See
     [service accounts](reference/security.md#service-accounts).
-  - _(Planned for M16.)_ The session state moves to the tenant database, so
-    sign-out revokes it at once (D84). Service accounts also run the operator
-    commands (D86). A tenant
-    can turn on the FAPI 2.0 profile (D83). See
+  - The session state is in the tenant database, so sign-out revokes it at once
+    (D84). A tenant can turn on the FAPI 2.0 profile (D83). Service accounts also
+    run the operator commands (D86), _(planned for M18)_. See
     [service accounts](reference/security.md#service-accounts) and
     [FAPI 2.0 profile](reference/security.md#fapi-20-profile).
 - **Hardening (D82, D84, D85).**
   - The server sets security headers on every response and rate limits the routes a caller can
     repeat. See [security headers](reference/headers-and-rate-limits.md#security-headers) and
     [rate limits](reference/headers-and-rate-limits.md#rate-limits).
-  - _(Planned for M16.)_ Axis is verified against ASVS 5.0 Level 2, tracked in
-    [ASVS](reference/asvs.md).
-  - _(Planned for M16.)_ Performance objectives and the weekly load test are in
+  - Axis is checked against ASVS 5.0 Level 2, tracked in [ASVS](reference/asvs.md).
+    The final sign-off is _(planned for M18)_.
+  - _(Planned for M18.)_ Performance objectives and the weekly load test are in
     [performance](reference/performance.md).
 - **Authorization (D12, D24).**
   - The record API, the data source endpoint and the process start endpoint
