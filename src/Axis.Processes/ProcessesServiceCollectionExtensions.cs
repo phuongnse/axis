@@ -24,12 +24,16 @@ public static class ProcessesServiceCollectionExtensions
     /// Whether a connector call, or a package operation through a <c>url</c> binding, may go to an
     /// <c>http</c> URL. Pass <see langword="true"/> only in Development.
     /// </param>
+    /// <param name="allowPlainSmtp">
+    /// Whether the worker may send email with <c>UseTls</c> off. Pass <see langword="true"/> only in Development.
+    /// </param>
     /// <param name="deliveryAttempts">The failures of a delivery that make it a dead letter. At least 1.</param>
     /// <param name="importMaxRows">The most data rows an import file may hold before its dry run fails. At least 1.</param>
     /// <param name="email">The host's mail settings. A tenant's own settings replace them whole.</param>
     public static IServiceCollection AddProcesses(
         this IServiceCollection services,
         bool allowHttpConnectorUrls,
+        bool allowPlainSmtp,
         int deliveryAttempts,
         int importMaxRows,
         EmailDefaults email)
@@ -57,6 +61,7 @@ public static class ProcessesServiceCollectionExtensions
         services.AddSingleton<IExternalWorkItemHandler, RecordImportCheckHandler>();
         services.AddSingleton<IExternalWorkItemHandler, RecordImportCommitHandler>();
         services.AddSingleton(email);
+        services.AddSingleton(new EmailSecuritySettings(allowPlainSmtp));
         services.AddSingleton<IExternalWorkItemHandler, NotificationEmailHandler>();
         return services;
     }
