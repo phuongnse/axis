@@ -2,6 +2,7 @@ import { CloseOutlined, SearchOutlined } from '@ant-design/icons'
 import { Button, Col, Form, Input, Row, Space, Tooltip, Typography } from 'antd'
 import { Fragment, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { ChildCollectionTable } from './ChildCollectionTable'
+import { NotSet } from './EmptyValue'
 import { FieldInput } from './FieldInput'
 import { FileInput, FileLink } from './FileInput'
 import { FormCanvasContext } from './formCanvas'
@@ -18,12 +19,12 @@ import {
   type RecordValue,
   type RowLabels,
 } from './records'
+import { ReadOnlyValue } from './ReadOnlyValue'
 import { ReferenceLookup } from './ReferenceLookup'
 import { ReferencesInput } from './ReferencesInput'
 import type { EntityMetadata, FieldMetadata, FormMetadata } from './site'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
-import { useEmptyStyle } from './useEmptyStyle'
 import { useNarrowWidth } from './useNarrowWidth'
 
 /** The values the form started from, which decide what changed, with the record's labels and version. */
@@ -129,6 +130,10 @@ function rowLabelsOf(label: FieldLabel | undefined): RowLabels[] {
   return Array.isArray(label) ? (label as RowLabels[]) : []
 }
 
+// A computed, sequence or creator field is set by the server, so the form never takes its input.
+const asText = (field: FieldMetadata, readOnly: boolean) =>
+  field.type !== 'child-collection' && (readOnly || field.computed || field.sequence || field.creator)
+
 // Rows and ids are compared by value, so an edit that is typed and then undone sends nothing. A set of
 // references is the same only with the same ids in the same order.
 function sameValue(field: FieldMetadata, a: FieldValue | undefined, b: FieldValue | undefined): boolean {
@@ -172,8 +177,6 @@ export function useRecordForm(
   conditions?: FormConditions,
 ) {
   const t = useText()
-  const emptyStyle = useEmptyStyle()
-  const notSet = t('shell.value.notSet')
   const canvas = useContext(FormCanvasContext)
   const { spacing, colour } = useDesignTokens()
   const narrow = useNarrowWidth()
@@ -420,47 +423,31 @@ export function useRecordForm(
   const input = (field: FieldMetadata, readOnly: boolean, required: boolean, helpId: string | undefined): ReactNode => {
     const value = values[field.name] ?? null
     const id = field.name
-    if (field.type !== 'child-collection' && (readOnly || field.computed || field.sequence || field.creator)) {
-      const testId = `field-value-${field.name}`
+    if (asText(field, readOnly)) {
       if (field.type === 'references') {
         const joined = referencesLabels(value, labels[field.name]).join(', ')
-        return (
-          <Input
-            id={id}
-            readOnly
-            data-testid={testId}
-            aria-describedby={helpId}
-            value={joined || notSet}
-            style={joined ? undefined : emptyStyle}
-          />
-        )
+        return <ReadOnlyValue field={id}>{joined || <NotSet />}</ReadOnlyValue>
       }
       if (field.type === 'file') {
         return (
-          <div data-testid={testId}>
-            {isFileValue(value) ? (
-              <FileLink field={field} value={value} />
-            ) : (
-              <Input id={id} readOnly aria-describedby={helpId} value={notSet} style={emptyStyle} />
-            )}
-          </div>
+          <ReadOnlyValue field={id}>
+            {isFileValue(value) ? <FileLink field={field} value={value} /> : <NotSet />}
+          </ReadOnlyValue>
         )
       }
       // An empty value shows the words, because fields are read one by one.
       if (value === null) {
         return (
-          <Input id={id} readOnly data-testid={testId} aria-describedby={helpId} value={notSet} style={emptyStyle} />
+          <ReadOnlyValue field={id}>
+            <NotSet />
+          </ReadOnlyValue>
         )
       }
       // The server sets the value on save, so it is shown as a table cell shows it.
       return (
-        <Input
-          id={id}
-          readOnly
-          data-testid={testId}
-          aria-describedby={helpId}
-          value={formatValue(field, value as RecordValue, labels, { locale, text: t }, values)}
-        />
+        <ReadOnlyValue field={id}>
+          {formatValue(field, value as RecordValue, labels, { locale, text: t }, values)}
+        </ReadOnlyValue>
       )
     }
     switch (field.type) {
@@ -575,8 +562,10 @@ export function useRecordForm(
                     <Form.Item
                       key={field.name}
                       label={<span style={{ fontWeight: 500, color: colour.textMuted }}>{labelOf(field)}</span>}
-                      // A child collection is a table, with no single input for the label to point to.
-                      htmlFor={field.type === 'child-collection' ? undefined : field.name}
+                      // A child collection and a read-only value have no input for the label to point to.
+                      htmlFor={
+                        field.type === 'child-collection' || asText(field, lockedOf(entry)) ? undefined : field.name
+                      }
                       required={required}
                       validateStatus={errors ? 'error' : undefined}
                       // Ant Design cancels the item's bottom margin under a message, so this one sets the gap below.

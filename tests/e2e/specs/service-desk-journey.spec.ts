@@ -1477,7 +1477,7 @@ test.describe('the author builds the service desk with Studio only', () => {
 
     await useJourneySession(page, 'linh')
     await openTask(page, title, 'Triage ticket')
-    await expect(page.getByRole('textbox', { name: 'Title', exact: true })).toHaveValue(title)
+    await expectShown(fieldValue(page, 'title'), title)
     await page.getByLabel(fieldLabel('Assigned agent')).fill('khoa')
     await page.getByRole('button', { name: 'Assign', exact: true }).click()
     await expect(page).toHaveURL(/\/service-desk\/mytasks$/)
