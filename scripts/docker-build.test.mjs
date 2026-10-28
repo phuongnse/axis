@@ -6,12 +6,12 @@ import { join } from 'node:path'
 import { after, before, describe, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 
-// Runs buildImage from scripts/lib/docker-build.mjs with docker replaced by a stub. The stub fails the first
-// STUB_FAIL_TIMES calls with STUB_FAIL_STATUS.
+// Runs buildImage and runDocker from scripts/lib/docker-build.mjs with docker replaced by a stub. The stub fails the
+// first STUB_FAIL_TIMES calls with STUB_FAIL_STATUS and logs STUB_EXTRA after the arguments when it is set.
 const helper = fileURLToPath(new URL('./lib/docker-build.mjs', import.meta.url))
 
 const stub = `#!/usr/bin/env bash
-echo "$*" >> "$STUB_LOG"
+echo "$*\${STUB_EXTRA:+ $STUB_EXTRA}" >> "$STUB_LOG"
 count=$(( $(cat "$STUB_COUNT" 2>/dev/null || echo 0) + 1 ))
 echo "$count" > "$STUB_COUNT"
 if [ "$count" -le "$STUB_FAIL_TIMES" ]; then exit "$STUB_FAIL_STATUS"; fi
@@ -29,11 +29,9 @@ before(() => {
 
 after(() => rmSync(folder, { recursive: true, force: true }))
 
-const build = (failTimes, status = 1) => {
+const run = (failTimes, status, script) => {
   rmSync(join(folder, 'count'), { force: true })
   rmSync(join(folder, 'log'), { force: true })
-  const script = `import { buildImage } from ${JSON.stringify(helper)}
-await buildImage({ target: 'axis-server', version: '1.2.3', tag: 'axis-server:test' })`
   const result = spawnSync('node', ['--input-type=module', '-e', script], {
     encoding: 'utf8',
     env: {
@@ -49,6 +47,22 @@ await buildImage({ target: 'axis-server', version: '1.2.3', tag: 'axis-server:te
   const calls = readFileSync(join(folder, 'log'), 'utf8').split('\n').filter(Boolean)
   return { ...result, calls }
 }
+
+const build = (failTimes, status = 1) =>
+  run(
+    failTimes,
+    status,
+    `import { buildImage } from ${JSON.stringify(helper)}
+await buildImage({ target: 'axis-server', version: '1.2.3', tag: 'axis-server:test' })`,
+  )
+
+const compose = (failTimes, status = 1) =>
+  run(
+    failTimes,
+    status,
+    `import { runDocker } from ${JSON.stringify(helper)}
+await runDocker(['compose', '-p', 'axis-smoke', 'build', 'server'], { env: { ...process.env, STUB_EXTRA: 'from-env' } })`,
+  )
 
 describe('buildImage', () => {
   test('builds the image on the second attempt and logs the failed one', () => {
@@ -73,5 +87,22 @@ describe('buildImage', () => {
     assert.equal(result.status, 0, result.stderr)
     assert.equal(result.calls.length, 1)
     assert.doesNotMatch(result.stderr, /Attempt/)
+  })
+})
+
+describe('runDocker', () => {
+  test('runs a compose command again with its arguments and environment', () => {
+    const result = compose(1)
+    assert.equal(result.status, 0, result.stderr)
+    assert.equal(result.calls.length, 2)
+    assert.equal(result.calls[0], 'compose -p axis-smoke build server from-env')
+    assert.match(result.stderr, /Attempt 1 of 3 failed with status 1: docker compose -p axis-smoke build server/)
+  })
+
+  test('stops after three attempts and names the command and the last status', () => {
+    const result = compose(99, 7)
+    assert.notEqual(result.status, 0)
+    assert.equal(result.calls.length, 3)
+    assert.match(result.stderr, /docker compose -p axis-smoke build server failed after 3 attempts with status 7/)
   })
 })
