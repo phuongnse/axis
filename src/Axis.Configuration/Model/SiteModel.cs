@@ -19,4 +19,10 @@ public sealed record SiteModel
     public required string File { get; init; }
 
     public required IReadOnlyList<NavigationModel> Navigation { get; init; }
+
+    /// <summary>
+    /// The names of the identity providers that people may sign in with: the site's <c>signIn</c> list,
+    /// or every identity provider of the application when the site has none. Sign-in does not read it yet.
+    /// </summary>
+    public required IReadOnlyList<string> SignIn { get; init; }
 }

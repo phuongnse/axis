@@ -62,8 +62,8 @@ text:
 - Texts are never shared across applications.
 
 A `site` is an entry point of the application. A `page` is a route in a
-site, and its widgets are its content. _(planned for M17)_ A site's `signIn`
-lists the identity providers it allows, see
+site, and its widgets are its content. A site's `signIn` lists the identity
+providers it allows, see
 [sites and sign-in](identity-provider.md#sites-and-sign-in):
 
 ```json
@@ -75,6 +75,7 @@ lists the identity providers it allows, see
   "path": "purchasing",
   "title": { "textKey": "purchasing.title" },
   "locales": { "default": "en", "fallback": "en", "available": ["en", "vi"] },
+  "signIn": ["accounts"],
   "navigation": [{ "page": "PurchaseRequests", "label": { "textKey": "purchasing.nav.requests" } }]
 }
 ```

@@ -284,3 +284,5 @@ sorted by file and then path.
 | `AXC0286` | An `oidc` provider lacks `issuer`, `clientId`, or both `clientSecret` and `clientKey`, or a `saml` provider lacks `metadata`. Reported at `/type`, once for each missing binding. |
 | `AXC0287` | A role in an `identityProvider`'s `roles.values` is not declared by the application. Reported at `/roles/values/{claim value}`, with `~` written `~0` and `/` written `~1`. |
 | `AXC0288` | An application has a second `identityProvider` of type `accounts`. Reported at `/type` of every one after the first in path order, naming the first. |
+| `AXC0289` | A name in a site's `signIn` is not an `identityProvider` of the application. Reported at `/signIn/{i}` of the site file. |
+| `AXC0290` | An application has sites and no `identityProvider`. Reported at the root of each site file. |

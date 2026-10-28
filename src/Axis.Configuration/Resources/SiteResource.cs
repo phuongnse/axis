@@ -14,4 +14,10 @@ public sealed record SiteResource : Resource
     public required SiteLocales Locales { get; init; }
 
     public required IReadOnlyList<NavigationEntry> Navigation { get; init; }
+
+    /// <summary>
+    /// The names of the identity providers that people may sign in with. Null allows every identity
+    /// provider of the application.
+    /// </summary>
+    public IReadOnlyList<string>? SignIn { get; init; }
 }

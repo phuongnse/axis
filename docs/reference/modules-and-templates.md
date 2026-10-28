@@ -313,7 +313,7 @@ The manifest is `template.json` at the root of the folder:
     because template metadata does not belong in an application.
 - **Sample.** `samples/templates/request-approval` is the sample template. It
   holds one entity with a sequence number, a form page, a table page, a two-step
-  approval process, two roles and their policies, texts in `en` and `vi`, and one
+  approval process, two roles and their policies, an `accounts` identity provider, texts in `en` and `vi`, and one
   test scenario. `scripts/build.sh` installs it into `artifacts/templates`. The
   production images hold no template, and the Compose image holds the samples in
   `/templates`.
@@ -331,6 +331,10 @@ form or data source. For the name `PurchaseRequests`, it holds:
   `path` set to the kebab-case name, the title key `site.title`, the locales
   `{ "default": "en", "fallback": "en", "available": ["en"] }` and one navigation
   entry to `Home` with the label key `nav.home`.
+- `identity-providers/accounts.json`: a new UUID `id`, `kind: identityProvider`,
+  `name: accounts`, `formatVersion: 1` and `type: accounts`. An application with a
+  site needs at least one identity provider, and the site allows it because it
+  has no `signIn`.
 - `pages/home.json`: the page `Home` with the title key `pages.home.title` and
   `widgets` of one `taskInbox`.
 - `texts/en.json`: the `en` text resource, with three keys: `site.title`, which

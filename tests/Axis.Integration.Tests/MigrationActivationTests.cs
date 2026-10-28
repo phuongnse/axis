@@ -903,6 +903,9 @@ public sealed class MigrationActivationTests(DataDatabaseFixture database) : ICl
                 { "id": "{{Guid.NewGuid()}}", "kind": "site", "name": "Main", "formatVersion": 1, "path": "{{path}}",
                   "title": { "textKey": "site.title" }, "locales": { "default": "en", "fallback": "en", "available": ["en"] },
                   "navigation": [ { "page": "Orders", "label": { "textKey": "nav.orders" } } ] }
+                """)
+            .With("identity-providers/accounts.json", $$"""
+                { "id": "{{Guid.NewGuid()}}", "kind": "identityProvider", "name": "accounts", "formatVersion": 1, "type": "accounts" }
                 """);
 
     private async Task<ReleaseCompilationResult> CompileAsync(TemporaryFolder folder)

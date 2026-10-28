@@ -218,15 +218,15 @@ public sealed class StudioAuthoringPerformanceTests(PostgreSqlFixture database) 
         return await client.SendAsync(request, CancellationToken);
     }
 
-    // Copies a template of 300 files from the typical application: the manifest, both texts, 30 entities, 178 rules and
-    // 87 data sources, plus the site and its page that a template must hold. Each data source reads Entity(d % 89 + 1),
+    // Copies a template of 300 files from the typical application: the manifest, both texts, 30 entities, 177 rules and
+    // 87 data sources, plus the site, its identity provider and its page that a template must hold. Each data source reads Entity(d % 89 + 1),
     // so the 87 kept read Entity01 to Entity29, and the rules and entities kept reference only lower or kept resources.
     private static int WriteTemplate(string source, string templates)
     {
         var folder = Path.Combine(templates, TemplateId, TemplateVersion);
         var files = new List<string> { "application.json", "texts/en.json", "texts/vi.json" };
         files.AddRange(Enumerable.Range(0, 30).Select(i => $"entities/entity-{i:D2}.json"));
-        files.AddRange(Enumerable.Range(0, 178).Select(k => $"rules/rule-{k:D3}.json"));
+        files.AddRange(Enumerable.Range(0, 177).Select(k => $"rules/rule-{k:D3}.json"));
         files.AddRange(Enumerable.Range(0, TypicalApplication.DataSources)
             .Where(d => d % 89 <= 28)
             .Select(d => $"data-sources/data-source-{d:D3}.json"));
@@ -253,6 +253,14 @@ public sealed class StudioAuthoringPerformanceTests(PostgreSqlFixture database) 
             }
             """);
         files.Add("sites/typical.json");
+
+        Directory.CreateDirectory(Path.Combine(folder, "identity-providers"));
+        File.WriteAllText(
+            Path.Combine(folder, "identity-providers", "accounts.json"),
+            $$"""
+            { "id": "{{Guid.NewGuid()}}", "kind": "identityProvider", "name": "accounts", "formatVersion": 1, "type": "accounts" }
+            """);
+        files.Add("identity-providers/accounts.json");
 
         Directory.CreateDirectory(Path.Combine(folder, "pages"));
         File.WriteAllText(
