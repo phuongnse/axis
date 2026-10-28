@@ -6,7 +6,8 @@ namespace Axis.Integration.Tests;
 
 /// <summary>
 /// One real Keycloak container with the development realm, shared by the whole run. It starts the
-/// first time a test needs it, so a run that needs no Keycloak never starts one. The fixture removes
+/// first time a test needs it, so a run that needs no Keycloak never starts one. It also holds the breached-password
+/// list that the realms made by <c>TenantRealm</c> name in their password policy. The fixture removes
 /// the container when the run ends. A test may create and delete a realm of its own, but must not change the
 /// <c>axis</c> realm.
 /// </summary>
@@ -68,6 +69,7 @@ public sealed class KeycloakFixture : IAsyncDisposable
         // The builder already runs start-dev, and the command adds --import-realm to it.
         var container = new KeycloakBuilder(Image)
             .WithResourceMapping(new FileInfo(Path.Combine(AppContext.BaseDirectory, "Keycloak", "axis-realm.json")), "/opt/keycloak/data/import/")
+            .WithResourceMapping(new FileInfo(Path.Combine(AppContext.BaseDirectory, "Keycloak", "axis-breached-passwords.txt")), "/opt/keycloak/data/password-blacklists/")
             .WithCommand("--import-realm")
             .WithEnvironment("KC_BOOTSTRAP_ADMIN_CLIENT_ID", AdminClientId)
             .WithEnvironment("KC_BOOTSTRAP_ADMIN_CLIENT_SECRET", AdminClientSecret)

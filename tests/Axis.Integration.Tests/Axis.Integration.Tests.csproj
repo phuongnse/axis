@@ -58,6 +58,7 @@
     <None Include="..\..\samples\modules\departments\**\*" Link="SampleModules\departments\1.0.0\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\samples\templates\request-approval\**\*" Link="SampleTemplates\request-approval\1.0.0\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\samples\keycloak\axis-realm.json" Link="Keycloak\axis-realm.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\deploy\keycloak\password-blacklists\axis-breached-passwords.txt" Link="Keycloak\axis-breached-passwords.txt" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\samples\keycloak\axis-fapi-key-1.pem" Link="Keycloak\axis-fapi-key-1.pem" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\samples\keycloak\axis-fapi-key-2.pem" Link="Keycloak\axis-fapi-key-2.pem" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
