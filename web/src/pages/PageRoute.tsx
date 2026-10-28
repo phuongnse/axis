@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useParams, useSearchParams } from 'react-router'
-import { PageLayout } from '../platform/PageLayout'
+import { PageLayout, type BreadcrumbStep } from '../platform/PageLayout'
 import { PageLeaf, type PageLeafProps } from '../platform/PageLeaf'
 import { detailRecordId, readPageParameters } from '../platform/pageParameters'
 import { ProcessInstancePage } from '../platform/ProcessInstancePage'
@@ -30,6 +30,17 @@ export function PageRoute({ form }: { form?: FormMode }) {
   const from: unknown = (location.state as { from?: unknown } | null)?.from
   const returnTo = typeof from === 'string' && from.startsWith(`/${site.path}/`) ? from : `/${site.path}`
   const pages = useMemo(() => site.navigation.map((entry) => entry.page), [site.navigation])
+  const t = useText()
+  // Proposed: the breadcrumb starts at the site, then names the navigation page a form was opened from.
+  const origin = site.navigation.find(
+    (entry) =>
+      entry.page.toLowerCase() !== page.toLowerCase() &&
+      returnTo.split('?')[0].toLowerCase() === `/${site.path}/${entry.page}`.toLowerCase(),
+  )
+  const trail: BreadcrumbStep[] = [
+    { label: t(site.titleKey), to: `/${site.path}` },
+    ...(origin ? [{ label: t(origin.labelKey), to: returnTo }] : []),
+  ]
   // A new page or record starts from a clean state rather than showing the previous one meanwhile.
   return (
     <SitePage
@@ -42,6 +53,7 @@ export function PageRoute({ form }: { form?: FormMode }) {
       form={form}
       recordId={form === 'edit' ? id : null}
       returnTo={returnTo}
+      trail={trail}
     />
   )
 }
@@ -56,9 +68,11 @@ interface SitePageProps {
   form?: FormMode
   recordId: string | null
   returnTo: string
+  /** The breadcrumb steps above the page. */
+  trail: readonly BreadcrumbStep[]
 }
 
-function SitePage({ sitePath, pages, name, locale, fallbackLocale, form, recordId, returnTo }: SitePageProps) {
+function SitePage({ sitePath, pages, name, locale, fallbackLocale, form, recordId, returnTo, trail }: SitePageProps) {
   const t = useText()
   const [searchParams] = useSearchParams()
   const [page, setPage] = useState<PageMetadata | null | 'failed'>()
@@ -104,7 +118,7 @@ function SitePage({ sitePath, pages, name, locale, fallbackLocale, form, recordI
       return <NotFoundPage />
     }
     return (
-      <PageLayout title={t(page.titleKey)}>
+      <PageLayout title={t(page.titleKey)} breadcrumb={[...trail, { label: t(page.titleKey) }]}>
         <TaskPage
           sitePath={sitePath}
           pageName={page.name}
@@ -122,7 +136,7 @@ function SitePage({ sitePath, pages, name, locale, fallbackLocale, form, recordI
       return <NotFoundPage />
     }
     return (
-      <PageLayout title={t(page.titleKey)}>
+      <PageLayout title={t(page.titleKey)} breadcrumb={[...trail, { label: t(page.titleKey) }]}>
         <ProcessInstancePage
           sitePath={sitePath}
           pages={pages}
@@ -156,7 +170,7 @@ function SitePage({ sitePath, pages, name, locale, fallbackLocale, form, recordI
   }
 
   return (
-    <PageLayout title={t(page.titleKey)}>
+    <PageLayout title={t(page.titleKey)} breadcrumb={[...trail, { label: t(page.titleKey) }]}>
       <WidgetTree widgets={page.widgets} renderLeaf={(widget) => <PageLeaf widget={widget} {...leafProps} />} />
     </PageLayout>
   )

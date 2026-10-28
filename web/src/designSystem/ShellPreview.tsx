@@ -4,8 +4,9 @@ import { HomePage } from '../pages/HomePage'
 import { PageLayout } from '../platform/PageLayout'
 import { Shell } from '../platform/Shell'
 import { ShellHeightContext } from '../platform/shellHeight'
+import { FormWidget } from '../platform/FormWidget'
 import { TableWidget } from '../platform/TableWidget'
-import { locale, siteTexts, sitePath, tableWidget } from './fixtures'
+import { formWidget, locale, siteTexts, sitePath, tableWidget } from './fixtures'
 import { notificationsPath, platformSite, siteNavigation } from './shellFixtures'
 
 /** The height of the frame a shell preview draws in: a short desktop window. */
@@ -23,8 +24,8 @@ function Frame({ children }: { children: ReactNode }) {
   return <ShellHeightContext.Provider value={frameHeight}>{children}</ShellHeightContext.Provider>
 }
 
-/** An application site's shell around its Requests page, which holds the request table. */
-export function SiteShellPreview({ collapsed = false }: { collapsed?: boolean }) {
+/** An application site's shell around a page: its Requests page, which holds the request table, unless one is given. */
+export function SiteShellPreview({ collapsed = false, children }: { collapsed?: boolean; children?: ReactNode }) {
   return (
     <Frame>
       <Shell
@@ -36,9 +37,17 @@ export function SiteShellPreview({ collapsed = false }: { collapsed?: boolean })
         notifications={{ path: notificationsPath, sitePath }}
         initiallyCollapsed={collapsed}
       >
-        <PageLayout title={siteTexts['preview.requests']}>
-          <TableWidget sitePath={sitePath} widget={tableWidget} locale={locale} pageValues={{}} />
-        </PageLayout>
+        {children ?? (
+          <PageLayout
+            title={siteTexts['preview.requests']}
+            breadcrumb={[
+              { label: siteTexts['preview.site.title'], to: `/${sitePath}` },
+              { label: siteTexts['preview.requests'] },
+            ]}
+          >
+            <TableWidget sitePath={sitePath} widget={tableWidget} locale={locale} pageValues={{}} />
+          </PageLayout>
+        )}
       </Shell>
     </Frame>
   )
@@ -60,5 +69,23 @@ export function PlatformShellPreview() {
         </Shell>
       </PlatformContext.Provider>
     </Frame>
+  )
+}
+
+/** The shell around the form page that the Requests table's New request action opens. */
+export function FormPageShellPreview() {
+  return (
+    <SiteShellPreview>
+      <PageLayout
+        title={siteTexts['request.new']}
+        breadcrumb={[
+          { label: siteTexts['preview.site.title'], to: `/${sitePath}` },
+          { label: siteTexts['preview.requests'], to: `/${sitePath}/requests` },
+          { label: siteTexts['request.new'] },
+        ]}
+      >
+        <FormWidget widget={formWidget} sitePath={sitePath} pages={[]} recordId={null} returnTo="/ds" locale={locale} />
+      </PageLayout>
+    </SiteShellPreview>
   )
 }

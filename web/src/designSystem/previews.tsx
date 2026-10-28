@@ -10,7 +10,7 @@ import { TableWidget } from '../platform/TableWidget'
 import { TaskInboxWidget } from '../platform/TaskInboxWidget'
 import { WidgetTree } from '../platform/WidgetTree'
 import { FieldPreview } from './FieldPreview'
-import { PlatformShellPreview, SiteShellPreview } from './ShellPreview'
+import { FormPageShellPreview, PlatformShellPreview, SiteShellPreview } from './ShellPreview'
 import type { PreviewSession } from './shellFixtures'
 import { SubmittedOnMount } from './SubmittedOnMount'
 import {
@@ -197,6 +197,7 @@ export const previews: Record<string, readonly PreviewState[]> = {
       draw: () => <SiteShellPreview collapsed />,
       at: `/${sitePath}/requests`,
     },
+    { caption: 'Form page', draw: () => <FormPageShellPreview />, at: `/${sitePath}/requests/new` },
     { caption: 'Platform site', draw: () => <PlatformShellPreview />, at: '/' },
   ],
   signIn: [

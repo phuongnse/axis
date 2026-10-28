@@ -69,6 +69,8 @@ export const shellRoutes: Record<string, () => unknown> = {
   '/api/about': () => (session === 'signedIn' ? { version: '0.1.0' } : unauthorized()),
   '/health/ready': () => new Response('Healthy', { status: 200 }),
   [notificationsPath]: () => notifications,
+  // The form page state draws the request form, whose state changes nothing.
+  [`/api/apps/${application}/forms/RequestForm/state`]: () => ({ sections: [], fields: {}, errors: {}, defaults: {} }),
 }
 
 /** The platform site, as `GET /api/site` serves it. */
