@@ -708,6 +708,8 @@ public sealed class AdminPublisherTests(PostgreSqlFixture database) : IClassFixt
 
     private static async Task<AdminResult> RunConfiguredAsync(Dictionary<string, string?> settings, SynchronizedWriter output, CancellationToken stop)
     {
+        // The databases run without TLS, which only Development and Testing allow.
+        settings.TryAdd("DOTNET_ENVIRONMENT", "Testing");
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(settings).Build();
         using var error = new StringWriter();
         var exit = await AdminCommands.RunAsync(["publisher"], configuration, output, error, stop);
