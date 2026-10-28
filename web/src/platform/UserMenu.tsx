@@ -9,9 +9,10 @@ import { useText } from './texts'
 /**
  * The account button in the shell header. With nobody signed in, it is a sign-in button that goes
  * to the identity provider and back to the current page. With someone signed in, it shows their
- * name, with a menu to sign out: that ends the session, then sends the browser to the identity
- * provider's sign-out page. When the user may use Studio, a link to it sits beside the button. It
- * renders nothing while the user loads, or when loading fails.
+ * name, with a menu. Its Sessions entry opens the account screen. Its sign-out entry ends the
+ * session, then sends the browser to the identity provider's sign-out page. When the user may use
+ * Studio, a link to it sits beside the button. It renders nothing while the user loads, or when
+ * loading fails.
  */
 export function UserMenu() {
   const t = useText()
@@ -42,7 +43,10 @@ export function UserMenu() {
   const signOut = () => {
     signOutSession().then(assignLocation, (error: unknown) => console.warn('Signing out failed', error))
   }
-  const items: MenuProps['items'] = [{ key: 'signOut', label: t('shell.account.signOut'), onClick: signOut }]
+  const items: MenuProps['items'] = [
+    { key: 'sessions', label: <Link to="/account">{t('shell.account.sessions')}</Link> },
+    { key: 'signOut', label: t('shell.account.signOut'), onClick: signOut },
+  ]
 
   return (
     <Space>

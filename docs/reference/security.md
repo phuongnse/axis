@@ -108,7 +108,8 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
     without an action of the person.
   - `GET /api/me/sessions`, `DELETE /api/me/sessions/{id}` and
     `DELETE /api/me/sessions` let a person see and end their own sessions.
-    They need a session, not a service account's bearer token.
+    They need a session, not a service account's bearer token. The shell's
+    [sessions screen](frontend.md) at `/account` calls them.
     - The list answers `{ "endAllowed", "sessions": [{ "id", "signedInAt",
       "lastRequestAt", "current" }] }`. It holds only the caller's live
       sessions, newest sign-in first. `current` marks the session that made
@@ -318,8 +319,9 @@ sign-out address. This holds under both
   when the session's stored `auth_time` is no more than 5 minutes old, with
   no clock skew allowed. Otherwise the shell sends the person to
   `GET /api/auth/sign-in?reauthenticate=true`, which makes the identity
-  provider ask for credentials again. A person who signed in before the column
-  existed has no stored time and must sign in again first.
+  provider ask for credentials again. The [sessions screen](frontend.md)
+  offers this as its **Sign in again** button and returns to `/account`. A person who
+  signed in before the column existed has no stored time and must sign in again first.
 - **The check at the callback.** The callback refuses an ID token whose
   `auth_time`, the time of the last login at the identity provider, is missing,
   unreadable or older than 8 hours. The check allows the clock skew of the token

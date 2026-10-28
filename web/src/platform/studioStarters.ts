@@ -30,7 +30,7 @@ export function kebabName(name: string): string {
   return result.toLowerCase()
 }
 
-const reservedApplicationNames = new Set(['api', 'health', 'assets', 'studio'])
+const reservedApplicationNames = new Set(['api', 'health', 'assets', 'studio', 'account'])
 
 /** Whether `name` may name a new application, as the create route checks it: letters and digits, and short enough in both forms. */
 export function isApplicationName(name: string): boolean {
