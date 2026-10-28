@@ -49,7 +49,9 @@ export function UserMenu() {
 
   return (
     <Dropdown trigger={['click']} menu={{ items, 'aria-label': t('shell.account.label') }}>
-      <Button type="text">{user.displayName}</Button>
+      <Button type="text" style={{ minWidth: 0, maxWidth: 160 }}>
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.displayName}</span>
+      </Button>
     </Dropdown>
   )
 }
