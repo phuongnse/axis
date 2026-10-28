@@ -266,6 +266,7 @@ public sealed class EndpointCallerTests(KeycloakFixture keycloak) : IAsyncLifeti
                 ["client_secret"] = KeycloakFixture.PurchasingClientSecret,
                 ["username"] = "requester",
                 ["password"] = KeycloakFixture.Password,
+                ["otp"] = DevelopmentTotp.Code("requester"),
                 ["scope"] = "openid",
             },
             "id_token");
@@ -282,6 +283,7 @@ public sealed class EndpointCallerTests(KeycloakFixture keycloak) : IAsyncLifeti
             ["client_secret"] = KeycloakFixture.ClientSecret,
             ["username"] = "requester",
             ["password"] = KeycloakFixture.Password,
+            ["otp"] = DevelopmentTotp.Code("requester"),
             ["scope"] = "openid",
         });
 

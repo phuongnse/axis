@@ -20,7 +20,7 @@
 // no users, so the test points tenant one back at the development realm before the proxy signs the requester in.
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { createHash, randomBytes } from 'node:crypto'
+import { createHash, createHmac, randomBytes } from 'node:crypto'
 import { chmodSync, cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import http from 'node:http'
 import https from 'node:https'
@@ -66,6 +66,22 @@ const freePort = () =>
   })
 
 const password = () => randomBytes(18).toString('hex')
+
+// developmentCode: the 6-digit time-based one-time password (RFC 6238, SHA-1, 30 seconds) of a development user, from the
+// Base32 secret of the user's otp credential in the realm file. scripts/ cannot import tests/e2e/totp.ts.
+const developmentCode = (username) => {
+  const realm = JSON.parse(readFileSync(join(root, 'samples/keycloak/axis-realm.json'), 'utf8'))
+  const credential = realm.users.find((user) => user.username === username)?.credentials.find((item) => item.type === 'otp')
+  assert.ok(credential, `the development realm has no authenticator for ${username}`)
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'
+  const bits = [...JSON.parse(credential.secretData).value].map((c) => alphabet.indexOf(c).toString(2).padStart(5, '0')).join('')
+  const key = Buffer.from(bits.match(/.{8}/g).map((byte) => parseInt(byte, 2)))
+  const counter = Buffer.alloc(8)
+  counter.writeBigUInt64BE(BigInt(Math.floor(Date.now() / 30000)))
+  const hash = createHmac('sha1', key).update(counter).digest()
+  const offset = hash[hash.length - 1] & 0x0f
+  return String((hash.readUInt32BE(offset) & 0x7fffffff) % 1000000).padStart(6, '0')
+}
 
 const files = (dir) =>
   readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
@@ -469,7 +485,15 @@ describe('the on-premises installation', () => {
     const form = loginPage.body.match(/<form[^>]*id="kc-form-login"[^>]*>/)
     assert.ok(form, 'the Keycloak login page has no kc-form-login form')
     const action = form[0].match(/action="([^"]+)"/)[1].replaceAll('&amp;', '&')
-    const login = await keycloak(action, keycloakJar, { method: 'POST', form: { username, password: 'axis' } })
+    const passwordStep = await keycloak(action, keycloakJar, { method: 'POST', form: { username, password: 'axis' } })
+    assert.equal(passwordStep.status, 200, `the Keycloak password step: ${passwordStep.body}`)
+    remember(keycloakJar, passwordStep)
+
+    // The password is followed by the code form.
+    const codeForm = passwordStep.body.match(/<form[^>]*id="kc-otp-login-form"[^>]*>/)
+    assert.ok(codeForm, 'the Keycloak password step has no kc-otp-login-form form')
+    const codeAction = codeForm[0].match(/action="([^"]+)"/)[1].replaceAll('&amp;', '&')
+    const login = await keycloak(codeAction, keycloakJar, { method: 'POST', form: { otp: developmentCode(username) } })
     assert.equal(login.status, 302, `the Keycloak login: ${login.body}`)
     const callback = new URL(login.headers.location)
     assert.equal(`${callback.origin}${callback.pathname}`, `https://${hosts.one}/api/auth/callback`)

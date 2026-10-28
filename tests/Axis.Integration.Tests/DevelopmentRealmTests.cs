@@ -128,6 +128,7 @@ public sealed class DevelopmentRealmTests(KeycloakFixture keycloak) : IAsyncLife
             ["client_secret"] = KeycloakFixture.PurchasingClientSecret,
             ["username"] = "requester",
             ["password"] = KeycloakFixture.Password,
+            ["otp"] = DevelopmentTotp.Code("requester"),
         });
         using var response = await client.PostAsync(new Uri($"{_authority}/protocol/openid-connect/token"), form, TestContext.Current.CancellationToken);
         var body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
@@ -142,7 +143,7 @@ public sealed class DevelopmentRealmTests(KeycloakFixture keycloak) : IAsyncLife
         Assert.Equal(["employee", "requester"], claims.GetProperty("roles").EnumerateArray().Select(role => role.GetString()).Order(StringComparer.Ordinal));
     }
 
-    // The password grant gets a token without a login page.
+    // The password grant gets a token without a login page. Keycloak asks it for the code of a user who has an authenticator.
     private async Task<HttpResponseMessage> RequestTokenAsync(string username, string password)
     {
         using var client = new HttpClient();
@@ -153,6 +154,7 @@ public sealed class DevelopmentRealmTests(KeycloakFixture keycloak) : IAsyncLife
             ["client_secret"] = KeycloakFixture.ClientSecret,
             ["username"] = username,
             ["password"] = password,
+            ["otp"] = DevelopmentTotp.Code(username),
             ["scope"] = "openid",
         });
         return await client.PostAsync(new Uri($"{_authority}/protocol/openid-connect/token"), form, TestContext.Current.CancellationToken);

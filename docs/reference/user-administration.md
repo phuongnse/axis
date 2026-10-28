@@ -42,7 +42,7 @@ _(planned for M17)_
 
 Every realm that `tenant create` makes holds the rules for a second step, passwords, failed sign-ins, the reset link and
 no self-registration, and a second run of the command brings an existing realm in step. The development `axis` realm
-keeps Keycloak's defaults.
+asks its development users for a code, because each one has an authenticator, and it keeps Keycloak's other defaults.
 
 - _(planned for M17)_ **Invitation:** an administrator invites a person by email and display name, and may give roles at once. The realm
   creates the account as `invited` and sends an email through the tenant's
