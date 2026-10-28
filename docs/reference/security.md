@@ -373,6 +373,7 @@ sign-out address. This holds under both
 
 These are test fixtures. Docs and GitHub text name roles instead. A new
 sample reuses a user that holds the role it needs before it adds a user.
+`scripts/lint.sh` checks this table against `samples/keycloak/axis-realm.json`.
 
 | User    | Roles                   | Used by                                                                                                                                       |
 | ------- | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
