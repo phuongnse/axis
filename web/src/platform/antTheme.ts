@@ -83,6 +83,7 @@ export function antThemeFor(mode: ThemeMode, page?: PageTokenValues, reducedMoti
       Menu: {
         itemSelectedColor: colour.primaryText,
         horizontalItemSelectedColor: colour.primaryText,
+        collapsedWidth: 64,
         dangerItemColor: colour.dangerText,
         dangerItemHoverColor: colour.dangerText,
         dangerItemSelectedColor: colour.dangerText,

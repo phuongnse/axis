@@ -2,6 +2,13 @@ import { useEffect, useState } from 'react'
 
 export type ServerStatus = 'checking' | 'ready' | 'unavailable'
 
+/** The Ant Design badge status that draws each server status. */
+export const statusBadge: Record<ServerStatus, 'processing' | 'success' | 'error'> = {
+  checking: 'processing',
+  ready: 'success',
+  unavailable: 'error',
+}
+
 /** Reads the server readiness endpoint once, when the component mounts. */
 export function useServerStatus(): ServerStatus {
   const [status, setStatus] = useState<ServerStatus>('checking')
