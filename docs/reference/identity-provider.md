@@ -251,8 +251,11 @@ _(planned for M17)_
   title, providers, accounts, username, error, login address, remember-me, forgot-password address, locales and
   texts. The account form is a real `<form method="post">` to the login address. The design system's
   `identitySignIn` preview feeds the components fixtures, see
-  [shell design system previews](shell.md#design-system-previews). The Keycloak theme that feeds them a real
-  context is not built yet.
+  [shell design system previews](shell.md#design-system-previews). The Keycloak theme `axis` feeds them a real
+  context: its `login.ftl` writes Keycloak's sign-in data as JSON and a React bundle draws the page. `scripts/build.sh`
+  builds the theme from `web/keycloak-theme/` into `artifacts/keycloak-theme/axis/login/` and checks its files and
+  fonts. Keycloak's other pages still come from its `keycloak` parent theme, and nothing mounts the theme into
+  Keycloak yet.
 
 ## Installation
 
