@@ -3,7 +3,7 @@ import type { FrameLocator, Locator, Page } from '@playwright/test'
 import { readdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { waitForDialog } from '../dialogs'
-import { fieldLabel } from '../fields'
+import { fieldLabel, fieldValue } from '../fields'
 
 // The design-system bundle is a separate build, which scripts/e2e.sh makes with scripts/design-system.sh. The page
 // web/design-system.html is its harness. The bundle answers every API call of the fixture application from fixtures,
@@ -190,7 +190,8 @@ for (const name of Object.keys(previews).filter((key) => key.startsWith('field-'
       await expect(
         figure(page, 'Required').locator('label').first().locator('span[aria-hidden="true"]').last(),
       ).toHaveText('*')
-      await expect(figure(page, 'Read-only').getByRole('textbox').first()).toHaveAttribute('readonly')
+      await expect(figure(page, 'Read-only').getByTestId(/^field-value-/)).toBeVisible()
+      await expect(figure(page, 'Read-only').getByRole('textbox')).toHaveCount(0)
       await expect(figure(page, 'Validation error').getByRole('alert')).toHaveText('This value is not valid.')
       expect(recording.errors).toEqual([])
     })
@@ -224,7 +225,9 @@ for (const mode of modes) {
     const recording = await openHarness(page, `?preview=form&mode=${mode}`)
 
     await expect(figure(page, 'Validation errors').getByTestId('field-error-title')).toHaveText('Enter a title.')
-    await expect(figure(page, 'Read-only by a condition').locator('#amount')).toHaveAttribute('readonly')
+    const locked = figure(page, 'Read-only by a condition')
+    await expect(fieldValue(locked, 'amount')).toBeVisible()
+    await expect(locked.locator('input#amount')).toHaveCount(0)
     const wizard = figure(page, 'Wizard steps')
     await expect(wizard.getByTestId('form-steps')).toBeVisible()
     await wizard.getByRole('button', { name: 'Next', exact: true }).click()

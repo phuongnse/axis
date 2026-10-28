@@ -2,6 +2,7 @@ import { expect, test } from '../test'
 import type { Page } from '@playwright/test'
 import { csrfHeaders } from '../csrf'
 import { sessionFile, useSession } from '../sessions'
+import { expectShown, fieldValue } from '../fields'
 
 // The employee anna may create, update and submit purchase requests. The department manager chau
 // may only read them and holds no start grant, so the pages hide what chau may not do.
@@ -56,7 +57,8 @@ test('a user without a create grant sees no New button, and one without a start 
   await expect(page.getByRole('table').getByRole('link').first()).toBeVisible()
   await expect(page.getByRole('button', { name: /New/i })).toHaveCount(0)
   await page.goto(`/purchasing/purchaserequestform/${id}`)
-  await expect(page.getByRole('textbox', { name: 'Title', exact: true })).toHaveValue(title)
+  await expectShown(fieldValue(page, 'title'), title)
+  await expect(page.getByRole('textbox', { name: 'Title', exact: true })).toHaveCount(0)
   await expect(page.getByRole('button', { name: /Submit/i })).toHaveCount(0)
 })
 
@@ -71,8 +73,8 @@ test('a user without an update grant sees the form read-only and no Save button'
 
   await useSession(page, 'chau')
   await page.goto(`/purchasing/purchaserequestform/${id}`)
-  await expect(titleInput).toHaveValue(title)
-  await expect(titleInput).toHaveAttribute('readonly')
+  await expectShown(fieldValue(page, 'title'), title)
+  await expect(titleInput).toHaveCount(0)
   await expect(page.getByRole('button', { name: /Save/i })).toHaveCount(0)
   await expect(page.getByRole('button', { name: 'Cancel', exact: true })).toBeVisible()
 })
