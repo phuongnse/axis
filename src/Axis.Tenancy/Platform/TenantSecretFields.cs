@@ -18,6 +18,12 @@ public static class TenantSecretFields
     /// <summary>The field of a tenant's own SMTP password.</summary>
     public const string SmtpPassword = "smtp_password";
 
+    /// <summary>The field of the secret of the tenant realm's client that activation uses to change providers and clients.</summary>
+    public const string RealmActivationClientSecret = "realm_activation_client_secret";
+
+    /// <summary>The field of the secret of the tenant realm's client that the users page uses to change users.</summary>
+    public const string RealmUsersClientSecret = "realm_users_client_secret";
+
     /// <summary>The field of a data protection key. It is bound with an empty tenant id.</summary>
     public static string DataProtectionKey(Guid id) => "data_protection_key:" + id.ToString("D");
 

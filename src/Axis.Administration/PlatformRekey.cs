@@ -58,6 +58,8 @@ public static class PlatformRekey
                 Plan(steps, versions, row.Id, row.OidcClientKey, TenantSecretFields.OidcClientKey, value => row.OidcClientKey = value);
                 Plan(steps, versions, row.Id, row.OidcPreviousClientKey, TenantSecretFields.OidcClientKey, value => row.OidcPreviousClientKey = value);
                 Plan(steps, versions, row.Id, row.SmtpPassword, TenantSecretFields.SmtpPassword, value => row.SmtpPassword = value);
+                Plan(steps, versions, row.Id, row.RealmActivationClientSecret, TenantSecretFields.RealmActivationClientSecret, value => row.RealmActivationClientSecret = value);
+                Plan(steps, versions, row.Id, row.RealmUsersClientSecret, TenantSecretFields.RealmUsersClientSecret, value => row.RealmUsersClientSecret = value);
             }
 
             foreach (var binding in bindings)
