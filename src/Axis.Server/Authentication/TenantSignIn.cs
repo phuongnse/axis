@@ -30,7 +30,10 @@ internal static class TenantSignIn
 
     public const string SchemePrefix = "oidc-";
 
-    /// <summary>The request item that <c>OnTokenValidated</c> sets when it rejects the ID token.</summary>
+    /// <summary>
+    /// The request item that <c>OnTokenValidated</c> sets when it rejects the ID token for a missing user id, or for an
+    /// <c>auth_time</c> that is missing or older than the session's lifetime.
+    /// </summary>
     public const string TokenRejectedItem = "axis:sign_in_token_rejected";
 
     /// <summary>The request item that <c>OnAuthorizationCodeReceived</c> sets when it rejects the callback's <c>iss</c>.</summary>
@@ -103,6 +106,8 @@ internal sealed partial class TenantSignInOptions(TenantSignInSettings settings,
         // the SameSite=Lax correlation and nonce cookies.
         options.ResponseMode = OpenIdConnectResponseMode.Query;
         options.UsePkce = true;
+        // The identity provider must ask a person whose login there is older than the session's absolute lifetime to log in again.
+        options.MaxAge = Session.MaxLifetime;
         // Providers other than Keycloak put the email in the ID token only when this scope is requested.
         if (!options.Scope.Contains("email"))
         {
@@ -144,6 +149,15 @@ internal sealed partial class TenantSignInOptions(TenantSignInSettings settings,
             {
                 context.HttpContext.Items[TenantSignIn.TokenRejectedItem] = true;
                 context.Fail("The ID token has no user id claim.");
+                return Task.CompletedTask;
+            }
+
+            // MapInboundClaims is false, so the claim keeps the name that the token gives it.
+            var now = context.HttpContext.RequestServices.GetRequiredService<TimeProvider>().GetUtcNow();
+            if (!SignInRecency.IsRecent(principal.FindFirst("auth_time")?.Value, now, context.Options.TokenValidationParameters.ClockSkew))
+            {
+                context.HttpContext.Items[TenantSignIn.TokenRejectedItem] = true;
+                context.Fail("The ID token's auth_time is missing or older than the session's lifetime.");
                 return Task.CompletedTask;
             }
 
