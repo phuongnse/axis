@@ -1,134 +1,58 @@
-import { DashboardOutlined, ToolOutlined } from '@ant-design/icons'
+import { DashboardOutlined, RightOutlined, ToolOutlined } from '@ant-design/icons'
 import { Alert, Avatar, Empty, Flex, Spin, Typography } from 'antd'
 import type { ReactNode } from 'react'
-import { useSearchParams } from 'react-router'
+import { Link, useSearchParams } from 'react-router'
 import { startSignIn } from '../platform/api'
 import { AxisButton } from '../platform/AxisButton'
 import type { CurrentUser } from '../platform/currentUser'
 import { localizedTitle, useCurrentUser, useSites } from '../platform/launcher'
 import { LaunchTile, TitleMark } from '../platform/LaunchTile'
-import { PageLayout } from '../platform/PageLayout'
 import type { SiteListItem } from '../platform/site'
 import { useText } from '../platform/texts'
-import { useNarrowWidth } from '../platform/useNarrowWidth'
 import { useDesignTokens } from '../platform/themeMode'
+import { useNarrowWidth } from '../platform/useNarrowWidth'
 import { usePlatform } from './context'
 
-/** Proposed: the tiles of a section fill a grid of columns at least 220 px wide. */
-function TileGrid({ children }: { children: ReactNode }) {
-  const { spacing } = useDesignTokens()
+/** A panel on `surface` with a quiet border, the frame of every block of the home page. */
+function Panel({ children, padding }: { children: ReactNode; padding: number }) {
+  const { colour, radius } = useDesignTokens()
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: spacing.md }}>
-      {children}
-    </div>
-  )
-}
-
-/** Proposed: a section of the home page is a panel on `surface`, titled, with the number of its tiles. */
-function Section({ id, title, count, children }: { id: string; title: string; count?: number; children: ReactNode }) {
-  const { colour, spacing, radius } = useDesignTokens()
-  return (
-    <section
-      aria-labelledby={id}
+    <div
       style={{
-        padding: spacing.lg,
+        padding,
         background: colour.surface,
         border: `1px solid ${colour.borderSubtle}`,
         borderRadius: radius.base,
         minWidth: 0,
       }}
     >
-      <Flex align="baseline" gap={spacing.xs} style={{ marginBottom: spacing.md }}>
-        <Typography.Title id={id} level={5} style={{ margin: 0 }}>
-          {title}
-        </Typography.Title>
-        {count !== undefined && <Typography.Text type="secondary">{count}</Typography.Text>}
-      </Flex>
       {children}
-    </section>
+    </div>
   )
 }
 
-/** Proposed: with nobody signed in, the sites give way to one panel that asks the person to sign in. */
-function SignInPanel() {
-  const t = useText()
-  const { colour, spacing, radius } = useDesignTokens()
-  return (
-    <Flex
-      vertical
-      align="center"
-      gap={spacing.md}
-      style={{
-        padding: spacing.xl,
-        background: colour.surface,
-        border: `1px solid ${colour.borderSubtle}`,
-        borderRadius: radius.base,
-      }}
-    >
-      <Typography.Text data-testid="sites-sign-in">{t('shell.home.sites.signIn')}</Typography.Text>
-      <AxisButton role="finish" onClick={startSignIn}>
-        {t('shell.account.signIn')}
-      </AxisButton>
-    </Flex>
-  )
-}
-
-/** Proposed: the sites, ordered by their application, each tile naming its application under the site's title. */
-function SiteTiles({ sites, locale }: { sites: SiteListItem[]; locale: string }) {
-  const application = (site: SiteListItem) =>
-    site.application ? localizedTitle(site.application.titles, locale, site.application.name) : ''
-  const ordered = [...sites].sort((a, b) => application(a).localeCompare(application(b), locale))
-  return (
-    <TileGrid>
-      {ordered.map((site) => {
-        const title = localizedTitle(site.titles, locale, site.path)
-        return (
-          <LaunchTile
-            key={site.path}
-            to={`/${site.path}`}
-            mark={<TitleMark title={title} size={32} />}
-            title={title}
-            description={application(site) || undefined}
-          />
-        )
-      })}
-    </TileGrid>
-  )
-}
-
-function SitesSection() {
-  const t = useText()
-  const { locale } = usePlatform().current
-  const { sites, failed } = useSites()
-
-  if (sites === null) {
-    return <SignInPanel />
-  }
-  return (
-    <Section id="home-sites" title={t('shell.home.sites.title')} count={sites?.length}>
-      {failed ? (
-        <Alert data-testid="sites-error" type="error" title={t('shell.home.sites.loadFailed')} />
-      ) : sites === undefined ? (
-        <Spin />
-      ) : sites.length === 0 ? (
-        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('shell.home.sites.empty')} />
-      ) : (
-        <SiteTiles sites={sites} locale={locale} />
-      )}
-    </Section>
-  )
-}
-
-/** Proposed: the tools of the platform, each only for the users who may open it: Studio for authors, the console for operators. */
-function ToolsSection({ user }: { user: CurrentUser }) {
+/**
+ * Proposed: the tools of the platform, each only for the users who may open it: Studio for authors, the console for
+ * operators. They sit in the welcome band, as they work across every application.
+ */
+function Tools({ user }: { user: CurrentUser }) {
   const t = useText()
   const { colour, spacing } = useDesignTokens()
+  const narrow = useNarrowWidth()
+  const count = Number(user.studio) + Number(user.console)
   const icon = (glyph: ReactNode) => (
     <Avatar aria-hidden shape="square" size={32} icon={glyph} style={{ flex: 'none', background: colour.primary }} />
   )
   return (
-    <Section id="home-tools" title={t('shell.home.tools.title')}>
-      <Flex vertical gap={spacing.md}>
+    // Proposed: the tools sit side by side in columns of one width, 240 px, and stack at narrow width.
+    <nav aria-label={t('shell.home.tools.title')}>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: narrow ? 'minmax(0, 1fr)' : `repeat(${count}, 240px)`,
+          gap: spacing.md,
+        }}
+      >
         {user.studio && (
           <LaunchTile
             to="/studio"
@@ -145,42 +69,187 @@ function ToolsSection({ user }: { user: CurrentUser }) {
             description={t('shell.home.console.description')}
           />
         )}
-      </Flex>
-    </Section>
+      </div>
+    </nav>
   )
 }
 
 /**
- * Proposed: the platform home page launches what the signed-in user may open: their sites, grouped by application,
- * beside the tools of their roles. With nobody signed in it asks them to sign in.
+ * Proposed: the welcome band, the platform level of the page. It greets the user, and holds the tools of their roles,
+ * or the Sign in button when nobody is signed in.
+ */
+function WelcomeBand({ user }: { user: CurrentUser | null | undefined }) {
+  const t = useText()
+  const { spacing } = useDesignTokens()
+  const narrow = useNarrowWidth()
+  const hasTools = Boolean(user?.studio || user?.console)
+  return (
+    <Panel padding={spacing.lg}>
+      <Flex vertical={narrow} justify="space-between" align={narrow ? 'stretch' : 'center'} gap={spacing.lg}>
+        <Flex vertical gap={spacing.xs} align="flex-start" style={{ flex: 1, minWidth: 0 }}>
+          <Typography.Title level={4} style={{ margin: 0 }}>
+            {t('shell.home.title')}
+          </Typography.Title>
+          {user === null ? (
+            <>
+              <Typography.Text type="secondary" data-testid="sites-sign-in">
+                {t('shell.home.sites.signIn')}
+              </Typography.Text>
+              <AxisButton role="finish" onClick={startSignIn} style={{ marginTop: spacing.xs }}>
+                {t('shell.account.signIn')}
+              </AxisButton>
+            </>
+          ) : (
+            <Typography.Text type="secondary">{t('shell.home.subtitle')}</Typography.Text>
+          )}
+        </Flex>
+        {user && hasTools && <Tools user={user} />}
+      </Flex>
+    </Panel>
+  )
+}
+
+/** One site of an application: a row with its mark and title that opens the site. */
+function SiteRow({ site, locale }: { site: SiteListItem; locale: string }) {
+  const { colour, spacing, radius } = useDesignTokens()
+  const title = localizedTitle(site.titles, locale, site.path)
+  return (
+    <Link
+      to={`/${site.path}`}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: spacing.sm,
+        padding: spacing.xs,
+        borderRadius: radius.base,
+        color: colour.text,
+      }}
+    >
+      <TitleMark title={title} size={24} />
+      <Typography.Text ellipsis style={{ flex: 1 }}>
+        {title}
+      </Typography.Text>
+      <span aria-hidden style={{ color: colour.textMuted }}>
+        <RightOutlined />
+      </span>
+    </Link>
+  )
+}
+
+interface ApplicationGroup {
+  key: string
+  title: string
+  sites: SiteListItem[]
+}
+
+/** The sites under the application they belong to, the applications in title order. */
+function byApplication(sites: SiteListItem[], locale: string, fallbackTitle: string): ApplicationGroup[] {
+  const groups = new Map<string, ApplicationGroup>()
+  for (const site of sites) {
+    const key = site.application?.name ?? ''
+    const title = site.application
+      ? localizedTitle(site.application.titles, locale, site.application.name)
+      : fallbackTitle
+    const group = groups.get(key) ?? { key, title, sites: [] }
+    group.sites.push(site)
+    groups.set(key, group)
+  }
+  return [...groups.values()].sort((a, b) => a.title.localeCompare(b.title, locale))
+}
+
+/**
+ * Proposed: an application is a card, the application level of the page: its mark, its title and the number of its
+ * sites, over its sites, the site level.
+ */
+function ApplicationCard({ group, locale }: { group: ApplicationGroup; locale: string }) {
+  const { colour, spacing } = useDesignTokens()
+  const id = `home-application-${group.key || 'other'}`
+  return (
+    <Panel padding={spacing.md}>
+      <section aria-labelledby={id}>
+        <Flex
+          align="center"
+          gap={spacing.sm}
+          style={{ paddingBottom: spacing.sm, marginBottom: spacing.xs, borderBottom: `1px solid ${colour.divider}` }}
+        >
+          <TitleMark title={group.title} size={32} />
+          <Typography.Title id={id} level={5} style={{ margin: 0, flex: 1 }} ellipsis>
+            {group.title}
+          </Typography.Title>
+          <Typography.Text type="secondary">{group.sites.length}</Typography.Text>
+        </Flex>
+        <Flex vertical>
+          {group.sites.map((site) => (
+            <SiteRow key={site.path} site={site} locale={locale} />
+          ))}
+        </Flex>
+      </section>
+    </Panel>
+  )
+}
+
+function Applications() {
+  const t = useText()
+  const { spacing } = useDesignTokens()
+  const { locale } = usePlatform().current
+  const { sites, failed } = useSites()
+
+  if (sites === null) {
+    return null
+  }
+  const groups = sites ? byApplication(sites, locale, t('shell.home.sites.title')) : []
+  return (
+    <section aria-labelledby="home-applications">
+      <Flex align="baseline" gap={spacing.xs} style={{ marginBottom: spacing.md }}>
+        <Typography.Title id="home-applications" level={5} style={{ margin: 0 }}>
+          {t('shell.home.applications.title')}
+        </Typography.Title>
+        {sites && <Typography.Text type="secondary">{groups.length}</Typography.Text>}
+      </Flex>
+      {failed ? (
+        <Alert data-testid="sites-error" type="error" title={t('shell.home.sites.loadFailed')} />
+      ) : sites === undefined ? (
+        <Spin />
+      ) : sites.length === 0 ? (
+        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('shell.home.sites.empty')} />
+      ) : (
+        // Proposed: the application cards fill a grid of columns at least 260 px wide.
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+            gap: spacing.md,
+            alignItems: 'start',
+          }}
+        >
+          {groups.map((group) => (
+            <ApplicationCard key={group.key} group={group} locale={locale} />
+          ))}
+        </div>
+      )}
+    </section>
+  )
+}
+
+/**
+ * Proposed: the platform home page, from the highest level to the lowest: a welcome band with the tools of the user's
+ * roles, then the tenant's applications, each a card that lists its sites. With nobody signed in, the band asks the
+ * person to sign in and the applications are not shown.
  */
 export function HomePage() {
   const t = useText()
   const user = useCurrentUser()
-  const narrow = useNarrowWidth()
   const { spacing } = useDesignTokens()
-  const hasTools = Boolean(user?.studio || user?.console)
   const [searchParams] = useSearchParams()
   const signInFailed = searchParams.get('signIn') === 'failed'
 
   return (
-    <PageLayout title={t('shell.home.title')}>
-      <Typography.Text type="secondary">{t('shell.home.subtitle')}</Typography.Text>
+    <Flex vertical gap={spacing.lg}>
       {signInFailed && (
         <Alert data-testid="sign-in-failed" role="alert" type="warning" showIcon title={t('shell.home.signInFailed')} />
       )}
-      {/* Proposed: the sites fill the wider column and the tools the narrower one, stacked at narrow width. */}
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: narrow || !hasTools ? 'minmax(0, 1fr)' : 'minmax(0, 2fr) minmax(0, 1fr)',
-          gap: spacing.lg,
-          alignItems: 'start',
-        }}
-      >
-        <SitesSection />
-        {user && hasTools && <ToolsSection user={user} />}
-      </div>
-    </PageLayout>
+      <WelcomeBand user={user} />
+      <Applications />
+    </Flex>
   )
 }

@@ -37,6 +37,7 @@
   "shell.home.sites.signIn": "Đăng nhập để xem các trang ứng dụng.",
   "shell.home.signInFailed": "Đăng nhập chưa hoàn tất. Vui lòng thử lại.",
   "shell.home.tools.title": "Công cụ",
+  "shell.home.applications.title": "Ứng dụng",
   "shell.home.studio.description": "Xây dựng và phát hành ứng dụng.",
   "shell.console.link": "Bảng điều khiển vận hành",
   "shell.home.console.description": "Lỗi xử lý, dead letter và việc phát hành của mọi ứng dụng.",

@@ -3,6 +3,7 @@ import { Badge, ConfigProvider, Dropdown, Layout, Menu, Typography, type MenuPro
 import dayjs from 'dayjs'
 import { useContext, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { Link, useLocation } from 'react-router'
+import { useAxisVersion } from './about'
 import { antLocaleFor, dayjsLocaleFor } from './antLocale'
 import { AppSwitcher } from './AppSwitcher'
 import { AxisButton } from './AxisButton'
@@ -114,12 +115,14 @@ const statusBadge: Record<ServerStatus, 'processing' | 'success' | 'error'> = {
 }
 
 /**
- * Proposed: a slim footer under every page: the platform's name, and the server's readiness, which turns red for
+ * Proposed: a slim footer under every page: the platform's name with its version for a signed-in user, and the
+ * server's readiness, which turns red for
  * everyone when the server is unavailable.
  */
 function ShellFooter() {
   const t = useText()
   const serverStatus = useServerStatus()
+  const version = useAxisVersion()
   const { colour, spacing } = useDesignTokens()
   return (
     <Layout.Footer
@@ -134,7 +137,10 @@ function ShellFooter() {
         borderTop: `1px solid ${colour.borderSubtle}`,
       }}
     >
-      <Typography.Text type="secondary">{t('shell.title')}</Typography.Text>
+      <Typography.Text type="secondary">
+        {t('shell.title')}
+        {version && ` ${version}`}
+      </Typography.Text>
       <Typography.Text type="secondary">
         {t('shell.serverStatus.title')}:{' '}
         <Badge

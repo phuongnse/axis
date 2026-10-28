@@ -19,7 +19,7 @@ const unauthorized = () => new Response(null, { status: 401 })
 export const notificationsPath = `/api/apps/${application}/notifications`
 
 /** The platform paths the shell previews answer, besides the fixture application's own. */
-export const shellScopes = ['/api/me', '/api/sites', '/health/ready'] as const
+export const shellScopes = ['/api/me', '/api/sites', '/api/about', '/health/ready'] as const
 
 const user: CurrentUser = {
   id: 'f2a4c6e8-1b3d-4f5a-8c7e-9d0b2a4c6e8f',
@@ -66,6 +66,7 @@ const notifications: NotificationPage = {
 export const shellRoutes: Record<string, () => unknown> = {
   '/api/me': () => (session === 'signedIn' ? user : unauthorized()),
   '/api/sites': () => (session === 'signedIn' ? { sites } : unauthorized()),
+  '/api/about': () => (session === 'signedIn' ? { version: '0.1.0' } : unauthorized()),
   '/health/ready': () => new Response('Healthy', { status: 200 }),
   [notificationsPath]: () => notifications,
 }

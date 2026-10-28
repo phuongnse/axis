@@ -37,6 +37,7 @@
   "shell.home.sites.signIn": "Sign in to see the sites.",
   "shell.home.signInFailed": "Sign-in did not complete. Try again.",
   "shell.home.tools.title": "Tools",
+  "shell.home.applications.title": "Applications",
   "shell.home.studio.description": "Build and publish applications.",
   "shell.console.link": "Operator console",
   "shell.home.console.description": "Failed work, dead letters and publishing across applications.",
