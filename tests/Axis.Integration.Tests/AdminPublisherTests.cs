@@ -478,6 +478,26 @@ public sealed class AdminPublisherTests(PostgreSqlFixture database) : IClassFixt
     }
 
     [Fact]
+    public async Task Under_the_configuration_source_a_publish_of_a_tenant_with_a_realm_block_brings_its_realm_in_step()
+    {
+        var schema = await MigratedTenantDatabaseAsync();
+        var request = await QueueConfiguredAsync(schema, await SnapshotAsync(null));
+        var settings = ConfiguredSettings(schema);
+        settings["Tenants:default:Oidc:Authority"] = "http://127.0.0.1:1/realms/default";
+        settings["Tenants:default:Realm:Name"] = "default";
+        settings["Tenants:default:Realm:ActivationClientSecret"] = $"activation-{Guid.NewGuid():N}";
+        var identityProvider = new StubIdentityProvider();
+
+        var result = await RunConfiguredPublisherAsync(schema, request, settings, identityProvider);
+
+        Assert.Equal(0, result.Exit);
+        Assert.Empty(result.Error);
+        Assert.Equal("succeeded", await ConfiguredScalarAsync(schema, $"SELECT status FROM axis.publish_requests WHERE id = '{request}'"));
+        Assert.Contains("/realms/default/protocol/openid-connect/token", identityProvider.Paths);
+        Assert.All(result.Output.Concat(result.Error), line => Assert.DoesNotContain(settings["Tenants:default:Realm:ActivationClientSecret"]!, line, StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task Under_the_configuration_source_a_publisher_started_before_the_migration_waits_and_then_runs_the_request()
     {
         var schema = await database.CreateDatabaseAsync("publisher", CancellationToken);
@@ -706,22 +726,25 @@ public sealed class AdminPublisherTests(PostgreSqlFixture database) : IClassFixt
         ["Modules:Path"] = SampleModules.Path,
     };
 
-    private static async Task<AdminResult> RunConfiguredAsync(Dictionary<string, string?> settings, SynchronizedWriter output, CancellationToken stop)
+    private static async Task<AdminResult> RunConfiguredAsync(
+        Dictionary<string, string?> settings, SynchronizedWriter output, CancellationToken stop, HttpMessageHandler? identityProvider = null)
     {
         // The databases run without TLS, which only Development and Testing allow.
         settings.TryAdd("DOTNET_ENVIRONMENT", "Testing");
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(settings).Build();
         using var error = new StringWriter();
-        var exit = await AdminCommands.RunAsync(["publisher"], configuration, output, error, stop);
+        var exit = await AdminCommands.RunAsync(
+            ["publisher"], configuration, TextReader.Null, output, error, Publisher.DefaultLeaseDuration, Publisher.DefaultTestLimit, identityProvider, stop);
         return new AdminResult(exit, output.Lines(), error.ToString().Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
     }
 
     // Runs the publisher until the request is final, then stops it and returns its result.
-    private static async Task<AdminResult> RunConfiguredPublisherAsync(string schema, Guid request)
+    private static async Task<AdminResult> RunConfiguredPublisherAsync(
+        string schema, Guid request, Dictionary<string, string?>? settings = null, HttpMessageHandler? identityProvider = null)
     {
         using var stop = CancellationTokenSource.CreateLinkedTokenSource(CancellationToken);
         var output = new SynchronizedWriter();
-        var run = RunConfiguredAsync(ConfiguredSettings(schema), output, stop.Token);
+        var run = RunConfiguredAsync(settings ?? ConfiguredSettings(schema), output, stop.Token, identityProvider);
         try
         {
             await WaitForStatusAsync(schema, request, run);

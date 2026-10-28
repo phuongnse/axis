@@ -168,9 +168,9 @@ internal static partial class AdminCommands
         new("tenant host remove", AuditMark.OnePerTenant, TenantSettings.HostRemoveAsync),
         new("tenant host move", AuditMark.OnePerTenant, TenantSettings.HostMoveAsync),
         new("migrate", AuditMark.OnePerTenant, run => MigrateAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.CancellationToken)),
-        new("activate", AuditMark.OnePerTenant, run => ActivateAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.CancellationToken)),
+        new("activate", AuditMark.OnePerTenant, run => ActivateAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.IdentityProviderHandler, run.CancellationToken)),
         new("platform rekey", AuditMark.OnePerRun, run => RekeyAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.CancellationToken)),
-        new("publisher", AuditMark.None, run => PublisherAsync(run.Args, run.Configuration, run.Output, run.Error, run.PublisherLease, run.PublisherTestLimit, run.CancellationToken)),
+        new("publisher", AuditMark.None, run => PublisherAsync(run.Args, run.Configuration, run.Output, run.Error, run.PublisherLease, run.PublisherTestLimit, run.IdentityProviderHandler, run.CancellationToken)),
         new("version", AuditMark.None, VersionAsync),
     ];
 
@@ -244,12 +244,16 @@ internal static partial class AdminCommands
             return 1;
         }
 
-        using var http = identityProviderHandler is null
-            ? new HttpClient { Timeout = TimeSpan.FromSeconds(60) }
-            : new HttpClient(identityProviderHandler, disposeHandler: false);
+        using var http = IdentityProviderClient(identityProviderHandler);
         var realm = settings.IdentityProvider is null ? null : new TenantRealm(http, settings.IdentityProvider);
         return await new TenantCreate(settings, request, realm, new TenantAudit(command, settings.PlatformConnectionString), output, cancellationToken).RunAsync();
     }
+
+    // The client for the identity provider. A test passes its own handler, which the client does not dispose.
+    private static HttpClient IdentityProviderClient(HttpMessageHandler? handler) =>
+        handler is null
+            ? new HttpClient { Timeout = TimeSpan.FromSeconds(60) }
+            : new HttpClient(handler, disposeHandler: false);
 
     private static async Task<int> RekeyAsync(
         string command,
@@ -955,6 +959,7 @@ internal static partial class AdminCommands
         IConfiguration configuration,
         TextWriter output,
         TextWriter error,
+        HttpMessageHandler? identityProviderHandler,
         CancellationToken cancellationToken)
     {
         var request = ParseActivate(args);
@@ -980,6 +985,7 @@ internal static partial class AdminCommands
 
         IReadOnlyList<TenantRow> tenants;
         Dictionary<string, ActivationBindings> bindings;
+        Dictionary<string, IReadOnlyDictionary<string, TenantBinding>> realmBindings;
         try
         {
             var tablesProblem = await PlatformTablesProblemAsync(settings.Platform.PlatformConnectionString, cancellationToken);
@@ -1014,6 +1020,7 @@ internal static partial class AdminCommands
             }
 
             bindings = await ReadBindingsAsync(platform, [.. tenants.Select(row => row.Id)], cancellationToken);
+            realmBindings = await ReadRealmBindingsAsync(platform, [.. tenants.Select(row => row.Id)], settings.Platform.Cipher, cancellationToken);
         }
         catch (OperationCanceledException)
         {
@@ -1031,10 +1038,13 @@ internal static partial class AdminCommands
             return 2;
         }
 
+        using var http = IdentityProviderClient(identityProviderHandler);
         return await new TenantActivate(
             settings.Platform,
             tenants,
             bindings,
+            realmBindings,
+            http,
             folder,
             settings.Packages,
             settings.Modules,
@@ -1052,6 +1062,7 @@ internal static partial class AdminCommands
         TextWriter error,
         TimeSpan lease,
         TimeSpan testLimit,
+        HttpMessageHandler? identityProviderHandler,
         CancellationToken cancellationToken)
     {
         if (args.Length != 1)
@@ -1073,8 +1084,8 @@ internal static partial class AdminCommands
         }
 
         return source == TenancySource.Directory
-            ? await DirectoryPublisherAsync(configuration, output, error, lease, testLimit, cancellationToken)
-            : await ConfigurationPublisherAsync(configuration, output, error, lease, testLimit, cancellationToken);
+            ? await DirectoryPublisherAsync(configuration, output, error, lease, testLimit, identityProviderHandler, cancellationToken)
+            : await ConfigurationPublisherAsync(configuration, output, error, lease, testLimit, identityProviderHandler, cancellationToken);
     }
 
     private static async Task<int> DirectoryPublisherAsync(
@@ -1083,6 +1094,7 @@ internal static partial class AdminCommands
         TextWriter error,
         TimeSpan lease,
         TimeSpan testLimit,
+        HttpMessageHandler? identityProviderHandler,
         CancellationToken cancellationToken)
     {
         TimeSpan refreshInterval;
@@ -1108,10 +1120,11 @@ internal static partial class AdminCommands
             return 2;
         }
 
+        using var http = IdentityProviderClient(identityProviderHandler);
         return await new Publisher(
             new ReleaseSettings(settings.Packages, settings.Modules, settings.InlineRecomputeLimit),
             scenarioServer,
-            new DirectoryPublisherTenants(settings.Platform, refreshInterval),
+            new DirectoryPublisherTenants(settings.Platform, refreshInterval, http),
             lease,
             testLimit,
             output,
@@ -1125,6 +1138,7 @@ internal static partial class AdminCommands
         TextWriter error,
         TimeSpan lease,
         TimeSpan testLimit,
+        HttpMessageHandler? identityProviderHandler,
         CancellationToken cancellationToken)
     {
         ConfigurationTenantCatalog catalog;
@@ -1158,10 +1172,11 @@ internal static partial class AdminCommands
         }
 
         var allowHttp = (configuration[DotnetEnvironmentSetting] ?? Environments.Production) == Environments.Development;
+        using var http = IdentityProviderClient(identityProviderHandler);
         return await new Publisher(
             settings,
             scenarioServer,
-            new ConfigurationPublisherTenants(catalog.Tenants, allowHttp, output),
+            new ConfigurationPublisherTenants(catalog.Tenants, allowHttp, output, http),
             lease,
             testLimit,
             output,
@@ -1223,6 +1238,23 @@ internal static partial class AdminCommands
         }
 
         return bindings;
+    }
+
+    /// <summary>
+    /// Reads the deployment bindings of <paramref name="ids"/> from the directory, as the realm sync needs them. A secret's value
+    /// stays encrypted until the sync reveals it.
+    /// </summary>
+    internal static async Task<Dictionary<string, IReadOnlyDictionary<string, TenantBinding>>> ReadRealmBindingsAsync(
+        PlatformDbContext platform,
+        IReadOnlyCollection<string> ids,
+        TenantSecretCipher cipher,
+        CancellationToken cancellationToken)
+    {
+        var rows = await platform.TenantBindings.AsNoTracking().Where(binding => ids.Contains(binding.TenantId)).ToListAsync(cancellationToken);
+        return ids.ToDictionary(
+            id => id,
+            id => DirectoryTenantCatalog.Bindings(id, rows.Where(row => row.TenantId == id), cipher),
+            StringComparer.Ordinal);
     }
 
     private static ActivateRequest? ParseActivate(string[] args)
