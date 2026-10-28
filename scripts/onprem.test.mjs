@@ -629,7 +629,11 @@ describe('the on-premises installation', () => {
                 '--https-certificate-key-file=/certs/tls.key',
               ],
               environment: { KC_BOOTSTRAP_ADMIN_CLIENT_ID: adminClientId, KC_BOOTSTRAP_ADMIN_CLIENT_SECRET: adminClientSecret },
-              volumes: [`${realm}:/opt/keycloak/data/import:ro`, `${certs}:/certs:ro`],
+              volumes: [
+                `${realm}:/opt/keycloak/data/import:ro`,
+                `${certs}:/certs:ro`,
+                `${join(root, 'deploy/keycloak/password-blacklists')}:/opt/keycloak/data/password-blacklists:ro`,
+              ],
               ports: ['127.0.0.1::8443'],
             },
             server: serverOverride,

@@ -13,9 +13,12 @@ internal sealed record TenantRealmSecrets(string Platform, string Activation, st
 
 /// <summary>
 /// Creates a tenant's realm in Axis's identity provider through its admin API, or brings an existing one up to date.
-/// The realm gets its display name, sessions of at most 8 hours and three clients: the platform client
+/// The realm gets its display name, sessions of at most 8 hours and the account rules: an authenticator code at every
+/// sign-in, passwords of 12 to 128 characters that are not on the breached-password list, a wait after 5 failed sign-ins,
+/// a password reset link that lasts 30 minutes and no self-registration. It also gets three clients: the platform client
 /// <c>axis</c>, <c>axis-activation</c> with rights over the realm's providers and clients, and <c>axis-users</c> with
-/// rights over its users only. A second run updates what the first made. An error names the step and the status code,
+/// rights over its users only. The identity provider must hold the breached-password list file. A second run updates
+/// what the first made. An error names the step and the status code,
 /// never a response body or a secret.
 /// </summary>
 internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
@@ -24,6 +27,12 @@ internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
     public const string PlatformClientId = "axis";
     public const string ActivationClientId = "axis-activation";
     public const string UsersClientId = "axis-users";
+
+    /// <summary>The file in the identity provider's <c>data/password-blacklists</c> folder that the password policy names.</summary>
+    public const string BreachedPasswordList = "axis-breached-passwords.txt";
+
+    public const string PasswordPolicy = $"length(12) and maxLength(128) and passwordBlacklist({BreachedPasswordList})";
+    public const int PasswordResetLifespanSeconds = 1800;
 
     private const string ManagementClientId = "realm-management";
 
@@ -40,6 +49,7 @@ internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
         var realmPath = $"admin/realms/{Uri.EscapeDataString(realm)}";
 
         await EnsureRealmAsync(token, realm, realmPath, displayName, cancellationToken);
+        await EnsureSecondStepAsync(token, realmPath, cancellationToken);
         await EnsureClientAsync(token, realmPath, PlatformClient(secrets.Platform), cancellationToken);
         var activation = await EnsureClientAsync(token, realmPath, ServiceClient(ActivationClientId, secrets.Activation), cancellationToken);
         var users = await EnsureClientAsync(token, realmPath, ServiceClient(UsersClientId, secrets.Users), cancellationToken);
@@ -94,6 +104,23 @@ internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
             ["displayName"] = displayName,
             ["ssoSessionMaxLifespan"] = SessionMaxLifespanSeconds,
             ["ssoSessionMaxLifespanRememberMe"] = SessionMaxLifespanSeconds,
+            ["registrationAllowed"] = false,
+            ["resetPasswordAllowed"] = true,
+            ["actionTokenGeneratedByUserLifespan"] = PasswordResetLifespanSeconds,
+            ["passwordPolicy"] = PasswordPolicy,
+            // Keycloak's temporary lockout: 1 minute after 5 failures in a row, 1 minute more with each further 5, up to 15.
+            // The quick-login check would lock an account after 2 failures within a second, so it is off.
+            ["bruteForceProtected"] = true,
+            ["permanentLockout"] = false,
+            ["maxTemporaryLockouts"] = 0,
+            ["failureFactor"] = 5,
+            ["waitIncrementSeconds"] = 60,
+            ["maxFailureWaitSeconds"] = 900,
+            ["quickLoginCheckMilliSeconds"] = 0,
+            ["otpPolicyType"] = "totp",
+            ["otpPolicyDigits"] = 6,
+            ["otpPolicyPeriod"] = 30,
+            ["otpPolicyAlgorithm"] = "HmacSHA1",
         };
         if (realm is not null)
         {
@@ -101,6 +128,42 @@ internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
         }
 
         return representation;
+    }
+
+    /// <summary>
+    /// Makes the OTP form of the realm's browser flow, and the subflow that holds it, required. The built-in flow asks for a
+    /// code only from an account that already has an authenticator, so a new account would sign in with its password alone.
+    /// </summary>
+    private async Task EnsureSecondStepAsync(string token, string realmPath, CancellationToken cancellationToken)
+    {
+        var path = $"{realmPath}/authentication/flows/browser/executions";
+        using var response = await SendAsync(token, HttpMethod.Get, path, null, cancellationToken);
+        EnsureSuccess(response, "read the browser flow");
+        var executions = (await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken)).EnumerateArray().ToList();
+
+        var otp = executions.FindIndex(execution =>
+            execution.TryGetProperty("providerId", out var provider) && provider.GetString() == "auth-otp-form");
+        if (otp < 0)
+        {
+            throw new InvalidOperationException("The identity provider step 'find the OTP form' found no execution.");
+        }
+
+        var parent = executions.FindLastIndex(otp, execution =>
+            execution.TryGetProperty("authenticationFlow", out var isFlow) && isFlow.ValueKind == JsonValueKind.True
+            && execution.GetProperty("level").GetInt32() == executions[otp].GetProperty("level").GetInt32() - 1);
+        foreach (var index in parent < 0 ? new[] { otp } : new[] { parent, otp })
+        {
+            var execution = executions[index];
+            if (execution.GetProperty("requirement").GetString() == "REQUIRED")
+            {
+                continue;
+            }
+
+            var body = execution.Deserialize<Dictionary<string, JsonElement>>()!;
+            body["requirement"] = JsonSerializer.SerializeToElement("REQUIRED");
+            using var updated = await SendAsync(token, HttpMethod.Put, path, body, cancellationToken);
+            EnsureSuccess(updated, "require the second step");
+        }
     }
 
     private static Dictionary<string, object?> PlatformClient(string secret) => new()

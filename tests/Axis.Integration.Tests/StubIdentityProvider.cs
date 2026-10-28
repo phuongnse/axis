@@ -52,6 +52,14 @@ internal sealed class StubIdentityProvider : HttpMessageHandler
             return $$"""[{"id":"{{clientId}}","clientId":"{{clientId}}"}]""";
         }
 
+        if (uri.AbsolutePath.EndsWith("/authentication/flows/browser/executions", StringComparison.Ordinal))
+        {
+            return """
+                [{"id":"f","authenticationFlow":true,"level":1,"index":1,"requirement":"CONDITIONAL"},
+                {"id":"o","providerId":"auth-otp-form","level":2,"index":1,"requirement":"ALTERNATIVE"}]
+                """;
+        }
+
         return uri.AbsolutePath.EndsWith("/service-account-user", StringComparison.Ordinal)
             ? """{"id":"u"}"""
             : """{"name":"r","id":"r"}""";

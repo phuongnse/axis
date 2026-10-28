@@ -2,8 +2,9 @@
 
 Detailed reference for the accounts of [Axis's identity provider](identity-provider.md), the roles that an
 administrator gives, and the users page where both are managed.
-[D100](../decisions/d100-identity-providers-per-application-and-sign-in-per-site.md) agrees it. None of it is built
-yet: M17 builds it, so every section is _(planned for M17)_. The conventions of [architecture.md](../architecture.md)
+[D100](../decisions/d100-identity-providers-per-application-and-sign-in-per-site.md) agrees it. M17 builds it, so
+what is not built yet is marked _(planned for M17)_. The account rules are built: every realm that `tenant create` makes
+holds them. The invitations, the users page and the roles are not built yet. The conventions of [architecture.md](../architecture.md)
 apply.
 
 ## The administrator role
@@ -39,22 +40,30 @@ _(planned for M17)_
 
 ## Accounts
 
-_(planned for M17)_
+Every realm that `tenant create` makes holds the rules for a second step, passwords, failed sign-ins, the reset link and
+no self-registration, and a second run of the command brings an existing realm in step. The development `axis` realm
+keeps Keycloak's defaults.
 
-- **Invitation:** an administrator invites a person by email and display name, and may give roles at once. The realm
+- _(planned for M17)_ **Invitation:** an administrator invites a person by email and display name, and may give roles at once. The realm
   creates the account as `invited` and sends an email through the tenant's
   [mail settings](tenant-setting-commands.md#mail-settings), with a link that lasts 72 hours. Following it, the person
   sets a password and adds an authenticator app, and the account becomes `active`. An administrator can resend an
   invitation, which ends the old link.
-- **No self-registration:** nobody creates an account without an invitation.
-- **A second step:** every sign-in with an account asks for a 6-digit code from the authenticator app. A person who
+- **No self-registration:** the realm shows no registration link, and nobody creates an account without an invitation.
+- **A second step:** every sign-in with an account asks for a 6-digit code from the authenticator app, and an account
+  with no authenticator yet must add one before it gets in. The realm requires the OTP form of its browser flow. A person who
   signs in through a brokered provider follows that provider's MFA policy instead, as
   [D99](../decisions/d99-axis-ships-its-own-identity-provider.md) agrees.
 - **Passwords:** at least 12 and at most 128 characters, with no rules on which characters, and not on the realm's list
-  of breached passwords. "Forgot password?" sends a link by email that lasts 30 minutes.
+  of breached passwords, a file that the identity provider holds, see
+  [keeping the realm in step](identity-provider.md#keeping-the-realm-in-step). "Forgot password?" sends a link by email
+  that lasts 30 minutes. The 30 minutes apply to every link that a person requests, and password reset is the only one
+  today. Until the tenant's mail settings work, a reset request sends nothing.
 - **Failed sign-ins:** after 5 failed sign-ins in a row the account waits before the next try, starting at 1 minute
-  and doubling up to 15 minutes. The sign-in page never says whether the account exists.
-- **Reset authenticator:** removes the account's authenticator, so its next sign-in asks the person to add one again,
+  and growing by 1 minute with each further 5 failures, up to 15 minutes. This is Keycloak's own temporary lockout, which
+  cannot double the wait. The sign-in page shows the same message whether the account is locked, the password is wrong
+  or the account does not exist.
+- _(planned for M17)_ **Reset authenticator:** removes the account's authenticator, so its next sign-in asks the person to add one again,
   and ends the person's sessions.
 
 ## Disabled users
