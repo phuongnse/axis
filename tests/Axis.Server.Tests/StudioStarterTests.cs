@@ -108,7 +108,7 @@ public sealed class StudioStarterTests : IAsyncLifetime
         }
 
         await using var factory = CreateFactory();
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
         var before = await Diagnostics(client);
 
         var response = await Create(client, body.ToJsonString());
@@ -168,7 +168,7 @@ public sealed class StudioStarterTests : IAsyncLifetime
             builder.UseSetting("Studio:Folders:0", Folder);
             builder.UseSetting("Studio:AuthorRole", "author");
             builder.UseTestOidc("default");
-            builder.UseTestAuthentication(new TestIdentity("hoa", "Hoa Author", "author"));
+            builder.UseTestAuthentication(new TestIdentity("author", "Author User", "author"));
         });
 
     private static void CopyDirectory(string source, string target)

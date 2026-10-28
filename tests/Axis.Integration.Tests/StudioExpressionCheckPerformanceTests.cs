@@ -36,7 +36,7 @@ public sealed class StudioExpressionCheckPerformanceTests
     {
         using var folder = TypicalApplication.Write(Guid.NewGuid(), withErrors: false, out _);
         await using var factory = CreateFactory(folder.Path);
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
 
         // The first checks of a process run code that the JIT has not yet optimised, so they are not timed.
         for (var warmUp = 0; warmUp < WarmUpChecks; warmUp++)
@@ -87,7 +87,7 @@ public sealed class StudioExpressionCheckPerformanceTests
         var rulePath = Path.Combine(folder.Path, RuleFile);
         var ruleId = IdOf(rulePath);
         await using var factory = CreateFactory(folder.Path);
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
         var entity = EntityId(folder.Path, 1);
 
         using (var before = await CheckAsync(client, entity, "Rule000(quantity)"))
@@ -129,7 +129,7 @@ public sealed class StudioExpressionCheckPerformanceTests
             builder.UseSetting("Studio:Folders:0", folder);
             builder.UseSetting("Studio:AuthorRole", "author");
             builder.UseTestOidc("default");
-            builder.UseTestAuthentication(new TestIdentity("hoa", "Hoa Author", "author"));
+            builder.UseTestAuthentication(new TestIdentity("author", "Author User", "author"));
         });
 
     private static async Task<HttpResponseMessage> CheckAsync(HttpClient client, string resourceId, string expression)

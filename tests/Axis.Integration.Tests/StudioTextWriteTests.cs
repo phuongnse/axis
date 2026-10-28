@@ -25,7 +25,7 @@ public sealed class StudioTextWriteTests(PostgreSqlFixture database) : IClassFix
     {
         using var folder = StudioPublishTests.NewFolder();
         await using var factory = await CreateFactoryAsync(folder.Path);
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
 
         using var response = await PutAsync(client, "greeting.new", """{"texts":{"en":"Hello","vi":"Xin chào"}}""");
 
@@ -56,7 +56,7 @@ public sealed class StudioTextWriteTests(PostgreSqlFixture database) : IClassFix
     {
         using var folder = StudioPublishTests.NewFolder();
         await using var factory = await CreateFactoryAsync(folder.Path);
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
         var before = new Dictionary<string, JsonObject>();
         foreach (var locale in new[] { "en", "vi" })
         {
@@ -85,7 +85,7 @@ public sealed class StudioTextWriteTests(PostgreSqlFixture database) : IClassFix
     {
         using var folder = StudioPublishTests.NewFolder();
         await using var factory = await CreateFactoryAsync(folder.Path);
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
         var before = Snapshot(folder.Path);
 
         using var response = await PutAsync(client, "greeting.new", """{"texts":{"en":"Hello"}}""");
@@ -144,7 +144,7 @@ public sealed class StudioTextWriteTests(PostgreSqlFixture database) : IClassFix
             builder.UseSetting("Studio:AuthorRole", "author");
             builder.UseTestOidc("default");
             builder.UseTestAuthentication(
-                new TestIdentity("hoa", "Hoa Author", "author"),
+                new TestIdentity("author", "Author User", "author"),
                 new TestIdentity("requester", "Requester User", "employee"));
         });
     }

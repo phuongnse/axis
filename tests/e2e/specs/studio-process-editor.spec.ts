@@ -68,7 +68,7 @@ test.describe('Studio edits a process in the process editor', () => {
   test('an author adds a decision step, makes submit lead to it and saves without a new diagnostic', async ({
     page,
   }) => {
-    await useSession(page, 'hoa')
+    await useSession(page, 'author')
     const id = await processId(page)
     const before = await diagnostics(page)
 
@@ -103,7 +103,7 @@ test.describe('Studio edits a process in the process editor', () => {
   })
 
   test('an author edits the set expression of markRejected and the file changes only there', async ({ page }) => {
-    await useSession(page, 'hoa')
+    await useSession(page, 'author')
     const id = await processId(page)
     const before = await diagnostics(page)
     const original = await readFile(path.join(copy, file), 'utf8')
@@ -126,7 +126,7 @@ test.describe('Studio edits a process in the process editor', () => {
   test('an author changes the due time and an outcome target of a task and saves only those changes', async ({
     page,
   }) => {
-    await useSession(page, 'hoa')
+    await useSession(page, 'author')
     const id = await processId(page)
     const before = JSON.parse(await readFile(path.join(copy, file), 'utf8')) as {
       steps: { dueIn?: string; outcomes: { next: string }[] }[]
@@ -151,7 +151,7 @@ test.describe('Studio edits a process in the process editor', () => {
   test('an author removes a step, and the diagnostic of the transition that names it opens its picker', async ({
     page,
   }) => {
-    await useSession(page, 'hoa')
+    await useSession(page, 'author')
     const id = await processId(page)
 
     await page.goto(`${server.url}/studio?app=PurchaseRequests&resource=${id}`)
@@ -178,7 +178,7 @@ test.describe('Studio edits a process in the process editor', () => {
   test('a step whose transition names a missing step is marked on the graph, and the transition draws no edge', async ({
     page,
   }) => {
-    await useSession(page, 'hoa')
+    await useSession(page, 'author')
     const id = await processId(page)
     const target = path.join(copy, file)
     const original = await readFile(target, 'utf8')
@@ -211,7 +211,7 @@ test.describe('Studio edits a process in the process editor', () => {
   test('an author moves an edge in the panel, removes a step by keyboard, sees the diagnostic after a save and undoes it', async ({
     page,
   }) => {
-    await useSession(page, 'hoa')
+    await useSession(page, 'author')
     const id = await processId(page)
     const target = path.join(copy, file)
     const original = await readFile(target, 'utf8')
@@ -255,7 +255,7 @@ test.describe('Studio edits a process in the process editor', () => {
   test('an author drags a type onto an edge, inserts another after it by keyboard and finds both wired in the saved file', async ({
     page,
   }) => {
-    await useSession(page, 'hoa')
+    await useSession(page, 'author')
     const id = await processId(page)
     const target = path.join(copy, file)
     const original = await readFile(target, 'utf8')
@@ -303,7 +303,7 @@ test.describe('Studio edits a process in the process editor', () => {
   test('an author drags a task handle to a step, picks an outcome, undoes it and saves it after a redo', async ({
     page,
   }) => {
-    await useSession(page, 'hoa')
+    await useSession(page, 'author')
     const id = await processId(page)
     const target = path.join(copy, file)
     const original = await readFile(target, 'utf8')
@@ -355,7 +355,7 @@ test.describe('Studio edits a process in the process editor', () => {
   test('an author adds a timer on the Form tab without the JSON view, wires it and saves without a new diagnostic', async ({
     page,
   }) => {
-    await useSession(page, 'hoa')
+    await useSession(page, 'author')
     const id = await processId(page)
     const target = path.join(copy, file)
     const original = await readFile(target, 'utf8')
@@ -401,7 +401,7 @@ test.describe('Studio edits a process in the process editor', () => {
   test('an author adds a timer and a wait for event with a timeout on the Form tab without the JSON view and saves without a new diagnostic', async ({
     page,
   }) => {
-    await useSession(page, 'hoa')
+    await useSession(page, 'author')
     const id = await processId(page)
     const target = path.join(copy, file)
     const original = await readFile(target, 'utf8')
@@ -461,7 +461,7 @@ test.describe('Studio edits a process in the process editor', () => {
   test('an author adds a notify step on the Form tab without the JSON view, writes its texts and saves without a new diagnostic', async ({
     page,
   }) => {
-    await useSession(page, 'hoa')
+    await useSession(page, 'author')
     const id = await processId(page)
     const target = path.join(copy, file)
     const texts = ['en', 'vi'].map((locale) => path.join(copy, 'texts', `${locale}.json`))
@@ -560,7 +560,7 @@ test.describe('Studio edits a process in the process editor', () => {
   test('an author gives a task a deadline and a notify escalation to a role without the JSON view and saves without a new diagnostic', async ({
     page,
   }) => {
-    await useSession(page, 'hoa')
+    await useSession(page, 'author')
     const id = await processId(page)
     const target = path.join(copy, file)
     const texts = ['en', 'vi'].map((locale) => path.join(copy, 'texts', `${locale}.json`))

@@ -34,7 +34,7 @@ The owner confirmed these points on issue #569 on 2026-10-18.
     signed-in user whose roles claim holds it may use Studio. With no value,
     nobody may. Application policies play no part. It is the first
     permission outside application policies.
-  - The development realm gets an `author` role and a user `hoa` who holds it.
+  - The development realm gets an `author` role and a user `author` who holds it.
   - `GET /api/me` gains a `studio` boolean. It is true when `Studio:Folders`
     is not empty and the user holds the author role. It extends the current
     user shape of [D23](d23-sign-in-through-oidc-and-the-bff-session.md),

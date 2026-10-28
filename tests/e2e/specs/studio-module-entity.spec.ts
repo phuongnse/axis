@@ -34,7 +34,7 @@ test.describe("Studio opens a module entity read-only", () => {
   test("an author sees the fields of departments/Department with no way to change them", async ({
     page,
   }) => {
-    await useSession(page, "hoa");
+    await useSession(page, "author");
     await page.goto(`${server.url}/studio?app=LeaveRequests`);
 
     await page

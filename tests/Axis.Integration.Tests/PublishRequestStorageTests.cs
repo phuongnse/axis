@@ -109,7 +109,7 @@ public sealed class PublishRequestStorageTests(PostgreSqlFixture database) : ICl
             connectionString,
             $"""
             INSERT INTO axis.publish_requests (id, application_id, kind, status, snapshot, requested_by)
-            VALUES ('{id}', '{Guid.NewGuid()}', 'publish', 'queued', '[]'::jsonb, 'hoa')
+            VALUES ('{id}', '{Guid.NewGuid()}', 'publish', 'queued', '[]'::jsonb, 'author')
             """);
         return id;
     }

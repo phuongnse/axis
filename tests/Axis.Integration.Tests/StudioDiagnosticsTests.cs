@@ -52,11 +52,11 @@ public sealed class StudioDiagnosticsTests : IAsyncLifetime
             builder.UseSetting("ActivateOnStartup:0", folder.Path);
             builder.UseSetting("Studio:Folders:0", folder.Path);
             builder.UseSetting("Studio:AuthorRole", "author");
-            builder.UseTestAuthentication(new TestIdentity("hoa", "Hoa Author", "author"));
+            builder.UseTestAuthentication(new TestIdentity("author", "Author User", "author"));
         });
 
         // Creating a client starts the server, which migrates the database and activates the folder first.
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
         var releasesBefore = await CountReleasesAsync(connectionString);
         var activeBefore = await ActiveReleaseIdAsync(connectionString);
         Assert.Equal(1, releasesBefore);

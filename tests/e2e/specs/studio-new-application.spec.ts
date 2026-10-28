@@ -44,7 +44,7 @@ test.describe('Studio creates an application', () => {
   }
 
   test('an author creates a blank application, and Studio picks it', async ({ page }) => {
-    await useSession(page, 'hoa')
+    await useSession(page, 'author')
     await page.goto(`${server.url}/studio?app=PurchaseRequests`)
 
     await createApplication(page, 'Inventory')
@@ -56,7 +56,7 @@ test.describe('Studio creates an application', () => {
   })
 
   test('an author creates an application from the request-approval template', async ({ page }) => {
-    await useSession(page, 'hoa')
+    await useSession(page, 'author')
     await page.goto(`${server.url}/studio?app=PurchaseRequests`)
 
     await createApplication(page, 'Onboarding', 'Request approval')
@@ -68,7 +68,7 @@ test.describe('Studio creates an application', () => {
   })
 
   test('a taken name shows the conflict, and the folder and the picked application do not change', async ({ page }) => {
-    await useSession(page, 'hoa')
+    await useSession(page, 'author')
     const before = await readdir(applications)
     await page.goto(`${server.url}/studio?app=PurchaseRequests`)
 
@@ -84,7 +84,7 @@ test.describe('Studio creates an application', () => {
   })
 
   test('the main E2E server offers no New application button to an author', async ({ page }) => {
-    await useSession(page, 'hoa')
+    await useSession(page, 'author')
     const me = page.waitForResponse((response) => new URL(response.url()).pathname === '/api/me')
     await page.goto('/studio?app=PurchaseRequests')
     await me

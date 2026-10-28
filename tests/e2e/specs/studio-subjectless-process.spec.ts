@@ -62,7 +62,7 @@ test.describe('Studio builds a process without a subject and its triggers in the
   test('an author builds the process, a scheduled job and a delete trigger without the JSON view, and the diagnostics stay', async ({
     page,
   }) => {
-    await useSession(page, 'hoa')
+    await useSession(page, 'author')
     await page.goto(`${server.url}/studio?app=PurchaseRequests`)
     // The sample has no event. An event is only there so that a new trigger's `event` can be picked and cleared.
     await createResource(page, 'event', 'ReminderSent')

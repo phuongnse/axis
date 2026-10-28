@@ -259,8 +259,8 @@ public sealed class StudioWriteLockTests(PostgreSqlFixture database) : IClassFix
             _b = b;
             _first = first;
             _second = second;
-            First = first.CreateClient().SignedInAs("hoa");
-            Second = second.CreateClient().SignedInAs("hoa");
+            First = first.CreateClient().SignedInAs("author");
+            Second = second.CreateClient().SignedInAs("author");
         }
 
         public string Platform { get; }
@@ -313,7 +313,7 @@ public sealed class StudioWriteLockTests(PostgreSqlFixture database) : IClassFix
                 builder.UseSetting("Studio:Folders:1", folderB);
                 builder.UseSetting("Studio:AuthorRole", "author");
                 builder.UseTestOidc("default");
-                builder.UseTestAuthentication(new TestIdentity("hoa", "Hoa Author", "author"));
+                builder.UseTestAuthentication(new TestIdentity("author", "Author User", "author"));
             });
     }
 }

@@ -48,7 +48,7 @@ test.describe("Studio edits form conditions and steps", () => {
   test("an author checks a new requiredWhen before saving, then adds two reordered steps, with no new diagnostic", async ({
     page,
   }) => {
-    await useSession(page, "hoa");
+    await useSession(page, "author");
     const diagnostics = async () =>
       (await (
         await page.request.get(

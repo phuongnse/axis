@@ -27,7 +27,7 @@ public sealed class StudioCreateApplicationTests(PostgreSqlFixture database) : I
     public async Task A_blank_create_answers_201_with_no_diagnostics_and_the_application_is_listed()
     {
         using var setup = await Setup.StartAsync(database);
-        using var client = setup.Factory.CreateClient().SignedInAs("hoa");
+        using var client = setup.Factory.CreateClient().SignedInAs("author");
 
         using var response = await PostAsync(client, """{ "name": "PurchaseOrders" }""");
 
@@ -60,7 +60,7 @@ public sealed class StudioCreateApplicationTests(PostgreSqlFixture database) : I
     public async Task A_create_from_a_template_copies_every_file_with_new_ids_and_the_same_diagnostics()
     {
         using var setup = await Setup.StartAsync(database);
-        using var client = setup.Factory.CreateClient().SignedInAs("hoa");
+        using var client = setup.Factory.CreateClient().SignedInAs("author");
         var templateFolder = Path.Combine(setup.TemplatesPath, TemplateId, "1.0.0");
 
         using var response = await PostAsync(client, $$"""{ "name": "LeaveRequests", "template": "{{TemplateId}}" }""");
@@ -98,7 +98,7 @@ public sealed class StudioCreateApplicationTests(PostgreSqlFixture database) : I
     public async Task A_name_that_is_taken_or_whose_folder_exists_answers_409_and_writes_nothing()
     {
         using var setup = await Setup.StartAsync(database);
-        using var client = setup.Factory.CreateClient().SignedInAs("hoa");
+        using var client = setup.Factory.CreateClient().SignedInAs("author");
         Directory.CreateDirectory(Path.Combine(setup.ApplicationsPath, "taken-folder"));
         using var first = await PostAsync(client, """{ "name": "PurchaseOrders" }""");
         Assert.Equal(HttpStatusCode.Created, first.StatusCode);
@@ -118,7 +118,7 @@ public sealed class StudioCreateApplicationTests(PostgreSqlFixture database) : I
     public async Task A_bad_body_answers_400_or_415_or_404_and_writes_nothing()
     {
         using var setup = await Setup.StartAsync(database);
-        using var client = setup.Factory.CreateClient().SignedInAs("hoa");
+        using var client = setup.Factory.CreateClient().SignedInAs("author");
         var longName = "A" + string.Concat(Enumerable.Repeat("bC", 29));
 
         var cases = new (string Body, HttpStatusCode Status)[]
@@ -162,11 +162,11 @@ public sealed class StudioCreateApplicationTests(PostgreSqlFixture database) : I
         using var setup = await Setup.StartAsync(database);
         using var anonymous = setup.Factory.CreateClient();
         using var requester = setup.Factory.CreateClient().SignedInAs("requester");
-        using var hoa = setup.Factory.CreateClient().SignedInAs("hoa");
+        using var author = setup.Factory.CreateClient().SignedInAs("author");
 
         using var unauthorized = await PostAsync(anonymous, """{ "name": "Fine" }""");
         using var notAuthor = await PostAsync(requester, """{ "name": "Fine" }""");
-        using var noCsrf = await PostAsync(hoa, """{ "name": "Fine" }""", csrf: false);
+        using var noCsrf = await PostAsync(author, """{ "name": "Fine" }""", csrf: false);
 
         Assert.Equal(HttpStatusCode.Unauthorized, unauthorized.StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, notAuthor.StatusCode);
@@ -174,8 +174,8 @@ public sealed class StudioCreateApplicationTests(PostgreSqlFixture database) : I
         Assert.Empty(Directory.GetFileSystemEntries(setup.ApplicationsPath));
 
         using var withoutPath = await Setup.StartAsync(database, applicationsPath: false);
-        using var author = withoutPath.Factory.CreateClient().SignedInAs("hoa");
-        using var refused = await PostAsync(author, """{ "name": "Fine" }""");
+        using var withoutPathAuthor = withoutPath.Factory.CreateClient().SignedInAs("author");
+        using var refused = await PostAsync(withoutPathAuthor, """{ "name": "Fine" }""");
         Assert.Equal(HttpStatusCode.Forbidden, refused.StatusCode);
         Assert.Equal("Studio cannot create applications here.", (await ReadAsync(refused)).RootElement.GetProperty("title").GetString());
         Assert.Empty(Directory.GetFileSystemEntries(withoutPath.ApplicationsPath));
@@ -185,7 +185,7 @@ public sealed class StudioCreateApplicationTests(PostgreSqlFixture database) : I
     public async Task A_create_whose_second_file_fails_leaves_nothing_in_the_applications_path()
     {
         using var setup = await Setup.StartAsync(database, writer: new FailingOnSecondFileWriter());
-        using var client = setup.Factory.CreateClient().SignedInAs("hoa");
+        using var client = setup.Factory.CreateClient().SignedInAs("author");
 
         using var response = await PostAsync(client, """{ "name": "PurchaseOrders" }""");
 
@@ -296,7 +296,7 @@ public sealed class StudioCreateApplicationTests(PostgreSqlFixture database) : I
                 builder.UseSetting("Templates:Path", setup._templates.Path);
                 builder.UseTestOidc("default");
                 builder.UseTestAuthentication(
-                    new TestIdentity("hoa", "Hoa Author", "author"),
+                    new TestIdentity("author", "Author User", "author"),
                     new TestIdentity("requester", "Requester User", "employee"));
                 if (writer is not null)
                 {
