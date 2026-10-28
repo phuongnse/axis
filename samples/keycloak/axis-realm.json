@@ -56,6 +56,10 @@
           "clientRole": true
         },
         {
+          "name": "tenant-administrator",
+          "clientRole": true
+        },
+        {
           "name": "purchasing-system",
           "clientRole": true
         },
@@ -527,6 +531,28 @@
       "clientRoles": {
         "axis": [
           "auditor"
+        ]
+      }
+    },
+    {
+      "id": "administrator",
+      "username": "administrator",
+      "enabled": true,
+      "email": "administrator@axis.local",
+      "emailVerified": true,
+      "firstName": "Administrator",
+      "lastName": "User",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "axis",
+          "temporary": false
+        }
+      ],
+      "requiredActions": [],
+      "clientRoles": {
+        "axis": [
+          "tenant-administrator"
         ]
       }
     },
