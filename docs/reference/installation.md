@@ -89,7 +89,10 @@ file.
 | `ForwardedHeaders:KnownProxies` | `ForwardedHeaders__KnownProxies__0` | server | no | Optional. The IP addresses of your reverse proxies. See [several server replicas](#several-server-replicas). |
 | `ForwardedHeaders:KnownNetworks` | `ForwardedHeaders__KnownNetworks__0` | server | no | Optional. The CIDR ranges of your reverse proxies. |
 | `Admin:ConnectionString` | `Admin__ConnectionString` | admin | yes | A database role with `CREATEDB` and `CREATEROLE`, not a superuser. |
-| none | `AXIS_OIDC_CLIENT_SECRET` | admin | yes | The OIDC client secret of the new tenant. Only `tenant create` reads it. |
+| `IdentityProvider:Url` | `IdentityProvider__Url` | admin | no | The base address of Axis's identity provider. `tenant create` of a main tenant creates the tenant's realm there. It must be `https`. |
+| `IdentityProvider:AdminClientId` | `IdentityProvider__AdminClientId` | admin | no | The client of the identity provider's `master` realm that `tenant create` signs in as. |
+| `IdentityProvider:AdminClientSecret` | `IdentityProvider__AdminClientSecret` | admin | yes | The secret of that client. Only `tenant create` of a main tenant reads it. |
+| none | `AXIS_OIDC_CLIENT_SECRET` | admin | yes | The OIDC client secret of a restored tenant. `tenant restore` and `tenant oidc set --client-secret` read it. `tenant create` does not. |
 | `Scenarios:ServerConnectionString` | `Scenarios__ServerConnectionString` | publisher | yes | Optional. A database role with `CREATEDB`, not a superuser, that owns no tenant database. It lets the publisher run `test` requests. Empty by default, and a `test` request then fails with `AXC0217`, which names the setting. See [On premises](#on-premises). |
 | `Studio:Tests` | `Studio__Tests` | server | no | Optional. `true` turns on `studioTest`, which shows the test controls in Studio. Off by default. Turn it on together with the publisher's `Scenarios:ServerConnectionString`. |
 | `Extensions:Path` | `Extensions__Path` | server, worker, admin | no | Set to `/extensions`. |
@@ -130,10 +133,11 @@ names its address. The TLS rule of each is under [TLS](#tls).
 | worker | A package operation's service | A `url` binding that the operation declares in its `capabilities` | [URL bindings](#tls) |
 | worker | The mail server | `Email:Smtp:Host`, or the tenant's email settings, see [notifications](notifications.md) | [Mail](#tls) |
 
-The admin host and the publisher connect to PostgreSQL only: the admin host
-with `Admin:ConnectionString` and `ConnectionStrings:PlatformSchema`, and the
-publisher also with `Scenarios:ServerConnectionString`. Neither calls an
-HTTP address.
+The publisher connects to PostgreSQL only, with `ConnectionStrings:PlatformSchema` and
+`Scenarios:ServerConnectionString`. It calls no HTTP address. The admin host connects to PostgreSQL with
+`Admin:ConnectionString` and `ConnectionStrings:PlatformSchema`. Only `tenant create` of a main tenant also calls an
+HTTP address: the identity provider's admin API, at `IdentityProvider:Url`, over HTTPS outside `Development` and
+`Testing`. The address is an operator setting, so it is on the allowlist below.
 
 - **The allowlist.** Every address comes from an operator setting or from a
   deployment binding. The operator sets both, and a release holds only binding
@@ -218,8 +222,10 @@ scenario database after use. After a crash, drop the `axis_scenario_*`
 databases that the role owns, see [publisher](administration.md#publisher).
 
 The names are examples. Create the tenant database roles through
-`tenant create`, not by hand. Also create the OIDC client for each tenant in
-your identity provider.
+`tenant create`, not by hand. `tenant create` also creates each tenant's realm in
+[Axis's identity provider](identity-provider.md#keeping-the-realm-in-step), so give the admin host an admin
+client of that identity provider's `master` realm. Its client id is `IdentityProvider__AdminClientId` and its secret is
+the `IdentityProvider__AdminClientSecret` file.
 
 **The secret files.** Compose reads one file per secret from
 `AXIS_SECRETS_DIR`, which defaults to `./secrets` next to `compose.yaml`. Each
@@ -231,6 +237,7 @@ file is named after its setting, and its content is the value.
 | `ConnectionStrings__PlatformSchema` | server, admin, publisher |
 | `Platform__SecretKey` | server, worker, admin, publisher |
 | `Admin__ConnectionString` | admin |
+| `IdentityProvider__AdminClientSecret` | admin |
 | `Scenarios__ServerConnectionString` *(optional, only with `compose.scenarios.yaml`)* | publisher |
 
 Write each file with `printf '%s'`, so it has no trailing newline. Make the
@@ -260,9 +267,14 @@ the admin container only.
    publisher with `docker compose up -d publisher`. It exits with code 1 until
    the server has created those tables, so start it only after `/health/ready`.
 4. Create a tenant with
-   `docker compose run --rm admin tenant create <id> --host <host> --oidc-authority <url> --oidc-client-id <id>`.
-   Put the client secret in `AXIS_OIDC_CLIENT_SECRET`. It passes through from
-   your shell, so it is in no file and no command line.
+   `docker compose run --rm admin tenant create <id> --host <host>`.
+   The command creates the tenant's realm in the identity provider, so
+   `IdentityProvider__Url` and `IdentityProvider__AdminClientId` must pass through from
+   your shell. The admin client secret is the `IdentityProvider__AdminClientSecret` file, so it is in no
+   command line. Every `admin` run needs that file, because Compose refuses to start a service whose secret file is
+   missing. A new realm has no accounts and no redirect addresses yet, so until a later part of M17 adds them, point
+   the tenant at an identity provider that has its users with `tenant oidc set`, see
+   [sign-in settings](tenant-setting-commands.md#sign-in-settings).
 5. Activate an application with
    `docker compose run --rm admin activate /apps/<folder>`.
 
@@ -270,10 +282,10 @@ The hosts serve a tenant after their next refresh. `Tenancy__RefreshInterval`
 sets it, 30 seconds by default.
 
 - **The OIDC authority must be `https`.** The server runs in `Production`,
-  which refuses an identity provider over plain `http`.
+  which refuses an identity provider over plain `http`. So `tenant create` refuses a plain `http`
+  `IdentityProvider__Url` there too.
 - **A private certificate authority.** When the identity provider's certificate
-  comes from your own authority, add its certificate to the server's trust
-  store. Do not replace the store: pointing `SSL_CERT_FILE` at one file makes
+  comes from your own authority, add its certificate to the trust store of the server and of the admin host. Do not replace the store: pointing `SSL_CERT_FILE` at one file makes
   the server trust only that file.
 - **Ports.** The server listens on `127.0.0.1:8080` of the host, the second
   replica on `127.0.0.1:8081`, and the worker's health endpoints on
@@ -353,7 +365,8 @@ states. The `replicas` profile starts `server-2`, configured like
 steps say, and `scripts/smoke.sh` runs it. It builds the three production images
 and starts a test PostgreSQL over TLS and a Keycloak over HTTPS, with a certificate
 authority it makes for the run, and imports a copy of the development realm that
-adds the tenants' `https://` redirect addresses. PostgreSQL serves a certificate
+adds the tenants' `https://` redirect addresses. Keycloak starts with an admin client for `tenant create`, and the admin host
+trusts the authority too. PostgreSQL serves a certificate
 of the same authority for the name `postgres`, and every connection string sets
 `SSL Mode=VerifyFull` and that authority as `Root Certificate`. A static check of the rendered configuration shows that
 `compose.yaml` alone gives no service the scenario secret or `Studio__Tests`, and that adding
@@ -366,14 +379,15 @@ operator uses it. The test then:
    each connection string with `SSL Mode=VerifyFull`.
 2. Runs `migrate`, starts the server and the worker, waits for `/health/ready`,
    and then starts the publisher.
-3. Runs `tenant create` for two tenants, `one` and `two`, with their own hosts.
+3. Runs `tenant create` for two tenants, `one` and `two`, with their own hosts and no `--oidc-*` option. Each
+   command creates the tenant's realm in Keycloak.
 4. Activates the leave request sample, `samples/apps/leave-requests`, for both.
    The sample needs the `departments` module, so the test mounts it from
    `artifacts/modules` at `/modules` for the test only. The production images
    still hold no sample module.
 5. Checks that both hosts are ready, that each tenant's host serves `/leave`
    and holds the active site in its database, and that each tenant's sign-in
-   redirects to Keycloak and returns to that tenant's host. Checks in
+   redirects to the authorization endpoint of that tenant's realm and returns to that tenant's host. Checks in
    `pg_stat_ssl` that at least one Axis connection uses TLS and that none
    does not.
 6. Checks that a host no tenant holds answers `404`. Suspends tenant `two`,
@@ -383,7 +397,8 @@ operator uses it. The test then:
    `psql`, and checks that the installed publisher runs both to `succeeded`.
    The publisher's log shows `one claim ok` and `two claim ok`, and the
    `publisher` service is still running.
-8. Starts the second replica and the TLS proxy, with a proxy certificate and a
+8. Runs `tenant oidc set one` to point tenant `one` back at the development realm, because a new realm has no
+   users, and waits for the next refresh. Starts the second replica and the TLS proxy, with a proxy certificate and a
    server certificate from the test's authority, and that authority's certificate
    as `server-ca.crt`. Checks that a plain HTTP request to a server port gets no
    HTTP response, and that the servers answer on their own ports over HTTPS for the

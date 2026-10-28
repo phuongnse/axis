@@ -38,6 +38,9 @@ which host holds which connection. There is no HTTP API for provisioning.
 | `ConnectionStrings:PlatformSchema` | `ConnectionStrings__PlatformSchema` | The role that owns the `platform` schema. The tool writes the tenant directory over it. |
 | `Platform:SecretKey` | `Platform__SecretKey` | The installation key that encrypts the generated passwords and the OIDC client secret, see [platform database](storage.md#platform-database). |
 | `Platform:PreviousSecretKey` | `Platform__PreviousSecretKey` | Optional. The old installation key during a rotation. Every command decrypts with it when `Platform:SecretKey` does not match. `platform rekey` needs it. A malformed value exits with code 2, naming the setting. See [installation key](tenant-setting-commands.md#installation-key). |
+| `IdentityProvider:Url` | `IdentityProvider__Url` | The base address of [Axis's identity provider](identity-provider.md), such as `https://idp.example.com/`. Only `tenant create` of a main tenant reads it. It must be an absolute URL, and `https` outside `Development` and `Testing`. A path in it is kept. |
+| `IdentityProvider:AdminClientId` | `IdentityProvider__AdminClientId` | The client of the identity provider's `master` realm that `tenant create` signs in as, with the client credentials grant, to create a tenant's realm. Only `tenant create` of a main tenant reads it. |
+| `IdentityProvider:AdminClientSecret` | `IdentityProvider__AdminClientSecret` | The secret of that client. Only `tenant create` of a main tenant reads it. It is never stored and never printed. |
 | `Tenants` | `Tenants__<id>__...` | The tenants of `Tenancy:Source=configuration`, with each `SchemaConnectionString` and `ConnectionString` and its bindings. Only `publisher` reads them, and only under that source. See [publisher](#publisher). |
 | `DOTNET_ENVIRONMENT` | `DOTNET_ENVIRONMENT` | `Development` lets a `url` binding use `http` and a `secret` binding take its value from a configuration file, as on the server and the worker. Only `publisher` under the configuration source reads that. Every command reads it for the TLS check: outside `Development` and `Testing`, a command exits with code 2, naming the setting, when `Admin:ConnectionString`, `ConnectionStrings:PlatformSchema` or `Scenarios:ServerConnectionString` is set with an `SSL Mode` below `VerifyFull` or none. An unset value is `Production`. |
 | `Scenarios:ServerConnectionString` | `Scenarios__ServerConnectionString` | A database role with `CREATEDB`, not a superuser, that owns no tenant database. Only `publisher` reads it, to run `test` requests. It creates and drops the `axis_scenario_<uuid>` databases of the scenarios. Empty means a `test` request fails with `AXC0217`, which names this setting. A value that is not a connection string exits with code 2. See [database roles](storage.md#database-roles). |
@@ -46,7 +49,7 @@ which host holds which connection. There is no HTTP API for provisioning.
 | `Tenancy:Source` | `Tenancy__Source` | `directory` for the tenant setting commands, which exit with code 2 under any other value. `publisher` reads it too, see [publisher](#publisher). |
 | none | `AXIS_BINDING_SECRET` | The value of the `secret` binding that `tenant binding set --secret` sets. When it is unset, the value comes from standard input. It is never a command-line option. Only that command reads it. |
 | none | `AXIS_SMTP_PASSWORD` | The SMTP password that `tenant email set --password` stores for the tenant. When it is unset, the password comes from the first line of standard input. It is never a command-line option. Only that command reads it. |
-| none | `AXIS_OIDC_CLIENT_SECRET` | The OIDC client secret of the new tenant. `tenant create` and `tenant restore` read it, and so does `tenant oidc set --client-secret`, which reads the first line of standard input when the variable is not set. It is never a command-line option, so it does not appear in a process list. |
+| none | `AXIS_OIDC_CLIENT_SECRET` | The OIDC client secret of a restored tenant. `tenant restore` reads it, and so does `tenant oidc set --client-secret`, which reads the first line of standard input when the variable is not set. `tenant create` does not read it. It is never a command-line option, so it does not appear in a process list. |
 | none | `PATH` | `tenant backup` and `tenant restore` run `pg_dump` and `pg_restore`, so both must be on `PATH`. Their version must match the database server. A missing tool exits with code 2. |
 
 A missing or invalid setting exits with code 2 before any tenant work. The
@@ -54,8 +57,8 @@ message names the setting and never holds its value.
 
 `tenant suspend`, `tenant resume` and `tenant list` read only
 `ConnectionStrings:PlatformSchema`. They decrypt nothing and create no role or
-database, so they need neither `Platform:SecretKey`, `Admin:ConnectionString`
-nor `AXIS_OIDC_CLIENT_SECRET`.
+database, so they need none of `Platform:SecretKey`, `Admin:ConnectionString`,
+the `IdentityProvider` settings or `AXIS_OIDC_CLIENT_SECRET`.
 
 `platform rekey` reads only `ConnectionStrings:PlatformSchema`, `Platform:SecretKey` and
 `Platform:PreviousSecretKey`. It needs no admin role, no client secret and no `Tenancy:Source`.
@@ -72,7 +75,8 @@ to the tenant database as the schema role, and needs `Tenancy:Source=directory`.
 neither `Admin:ConnectionString` nor `AXIS_OIDC_CLIENT_SECRET`. The tool looks
 for `pg_dump` in the directories of the `PATH` setting.
 
-`tenant restore` reads the settings of `tenant create`, `PATH` to find
+`tenant restore` reads the settings of `tenant create` except the `IdentityProvider` ones, and
+`AXIS_OIDC_CLIENT_SECRET`, `PATH` to find
 `pg_restore`, and `Extensions:Path` to check the packages that the archive
 requires. It needs `Extensions:Path` only when the archive requires a package. It
 reads the OIDC authority and client id from the archive, so it takes no
@@ -91,7 +95,7 @@ Every command writes one line per tenant and step to standard output:
 <tenant> <step> failed: <message>
 ```
 
-The step names are `entry`, `roles`, `database`, `grants`, `migrations`,
+The step names are `entry`, `realm`, `roles`, `database`, `grants`, `migrations`,
 `work`, `sessions`, `role-check`, `version`, `compile`, `activate`, `seed`, `indexes`, `dump`, `archive`,
 `check`, `restore`, `status`, `runtime-password`, `schema-password` and `audit`. An `audit` step prints only when it fails, see
 [platform audit records](tenant-setting-commands.md#platform-audit-records). The [publisher](#publisher)
@@ -113,36 +117,40 @@ So a script can tell "some tenants failed" from "nothing ran".
 
 ## Tenant create
 
-`tenant create <id> --host <host>... --oidc-authority <url> --oidc-client-id <id>`
-creates one tenant.
+`tenant create <id> --host <host>...`
+creates one tenant and its realm.
 `tenant create <id> --preview-of <main> --host <host>... [--binding <name>=<value>]...`
 creates a [preview tenant](../architecture.md#preview-tenants) of a main tenant.
 
 | Option | Meaning |
 | --- | --- |
-| `<id>` | The tenant id. It follows the rule of the `Tenants` section: lowercase letters, digits and hyphens. It is at most 50 characters. |
+| `<id>` | The tenant id. It follows the rule of the `Tenants` section: lowercase letters, digits and hyphens. It is at most 50 characters. It is also the name of the tenant's realm, so `master`, the identity provider's own admin realm, is refused. |
 | `--host <host>` | A host of the tenant. Repeat it for more hosts. At least one is needed. |
-| `--oidc-authority <url>` | The authority of the tenant's identity provider. |
-| `--oidc-client-id <id>` | The OIDC client id. The client secret comes from `AXIS_OIDC_CLIENT_SECRET`. |
 | `--preview-of <main>` | Makes the tenant the preview tenant of the main tenant `<main>`. |
 | `--binding <name>=<value>` | A `url` binding of the new tenant. Repeat it for more. The value is an absolute `http` or `https` URL. It is accepted only together with `--preview-of`. |
 
-_(planned for M17)_ The command creates the tenant's realm in
-[Axis's identity provider](identity-provider.md#keeping-the-realm-in-step), with its clients, and sets the
-tenant's `Oidc` block to the realm itself, so it takes no `--oidc-*` option and does not read
-`AXIS_OIDC_CLIENT_SECRET`. It turns accounts on in the tenant's
+The command creates the tenant's realm in
+[Axis's identity provider](identity-provider.md#keeping-the-realm-in-step), with its three clients, and sets the
+tenant's `Oidc` block to the realm itself: the authority `<IdentityProvider:Url>/realms/<id>` and the client `axis`.
+The command takes no `--oidc-*` option, and either one is a usage error. It does not read `AXIS_OIDC_CLIENT_SECRET`.
+The admin host's `IdentityProvider` settings give it the identity provider's admin client. The realm has no
+redirect addresses and no accounts yet, so nobody can finish a sign-in there until a later part of the
+identity provider adds them.
+
+_(planned for M17)_ The command also turns accounts on in the tenant's
 [platform sign-in](identity-provider.md#platform-sign-in). `--administrator <email>` invites the first account with
-the administrator role, see [the first administrator](user-administration.md#the-first-administrator). The admin
-host's settings give it the identity provider's admin client. A preview tenant gets no realm.
+the administrator role, see [the first administrator](user-administration.md#the-first-administrator).
+`tenant host add`, `remove` and `move` do not yet change the realm, see
+[keeping the realm in step](identity-provider.md#keeping-the-realm-in-step). A preview tenant gets no realm.
 
 **Preview tenant.** With `--preview-of`, the command creates
 a [preview tenant](../architecture.md#preview-tenants) as
 [D48](../decisions/d48-preview-tenants.md) agrees. The steps below stay
 the same, and the entry also names its main tenant.
 
-- It takes no `--oidc-*` option and does not read `AXIS_OIDC_CLIENT_SECRET`,
+- It gets no realm and has no `realm` step. It needs none of the `IdentityProvider` settings,
   because the preview uses its main tenant's sign-in settings. An `--oidc-*`
-  option together with `--preview-of` is a usage error.
+  option is always a usage error, with or without `--preview-of`.
 - `--binding` without `--preview-of` is a usage error. A binding that is not
   `<name>=<value>`, or whose value is not an absolute `http` or `https` URL, is
   a usage error. A binding name that repeats, ignoring letter case, is a usage
@@ -167,17 +175,20 @@ the same, and the entry also names its main tenant.
 1. `entry`: validate the id and check that the hosts are unique across all
    tenants, ignoring letter case. Write the directory entry with status
    `provisioning`.
-2. `roles`: create `axis_<id>_schema` and `axis_<id>_runtime`. Each gets a
+2. `realm`: generate the secrets of the realm's three clients, store them encrypted in the
+   directory and point the entry's `Oidc` block at the realm. Then create the tenant's realm in the
+   identity provider, or bring an existing one up to date. A preview tenant has no such step.
+3. `roles`: create `axis_<id>_schema` and `axis_<id>_runtime`. Each gets a
    32-byte random password, stored encrypted in the directory as
    [D42](../decisions/d42-tenant-directory-in-the-platform-database.md)
    says.
-3. `database`: create `axis_<id>`, owned by the schema role.
-4. `grants`: run the grant step.
-5. `migrations`: run the configuration, data and processes EF Core migrations.
-6. `grants`: run the grant step again. Steps 4 to 6 run as the schema role, as
+4. `database`: create `axis_<id>`, owned by the schema role.
+5. `grants`: run the grant step.
+6. `migrations`: run the configuration, data and processes EF Core migrations.
+7. `grants`: run the grant step again. Steps 5 to 7 run as the schema role, as
    [D31](../decisions/d31-separate-database-roles.md) describes.
-7. `role-check`: run the runtime role check of D31 over the runtime role.
-8. `version`: record the schema version and set the entry `active`.
+8. `role-check`: run the runtime role check of D31 over the runtime role.
+9. `version`: record the schema version and set the entry `active`.
 
 Hosts serve the tenant after their next refresh, see
 [tenant directory](../architecture.md#tenant-directory). The server serves a
@@ -194,6 +205,14 @@ with code 2.
 
 **What the steps do.**
 
+- `realm` saves three random secrets, each 32 bytes written as 64 lowercase hex characters, encrypted, before it calls
+  the identity provider: the secret of the `axis` client, which is the entry's `OidcClientSecret`, and those
+  of `axis-activation` and `axis-users`. It saves the entry's `Oidc` authority and client id `axis` at the same
+  time. A stop between the save and the call never loses a secret. The realm's name is the tenant id, and its display
+  name is the tenant id too. The step signs in to the `master` realm with the admin client, creates the realm
+  with sessions of at most 8 hours and the three clients, and gives the activation and users clients their rights, see
+  [keeping the realm in step](identity-provider.md#keeping-the-realm-in-step). A failure names the step of the
+  identity provider and its status code, never a response body or a secret.
 - `roles` saves each generated password, encrypted, before it creates the role.
   It never alters a role that exists. A role that exists with no password
   stored for this tenant fails the step.
@@ -220,18 +239,19 @@ them in any SQL you run by hand.
 
 - On a `provisioning` entry, it skips every step already done and finishes the
   rest. The `roles` step does not generate new passwords for roles that exist.
-  The `entry` step replaces the entry's hosts and OIDC settings with the new
+  The `entry` step replaces the entry's hosts, main tenant and bindings with the new
   arguments, so an operator can fix a typo before the tenant goes live. A
   `provisioning` tenant is never served, so this is safe. It never changes the
-  stored passwords.
+  stored passwords, and the `realm` step never changes the stored client secrets. It updates the
+  realm that it made.
 - A stop, such as Ctrl+C, writes a `failed` line for the current step and exits
   with code 1. The entry stays `provisioning`, and a rerun finishes it.
 - On an `active` or `suspended` tenant, it fails with exit code 1 and changes
   nothing.
 
 **Exit codes.** `0` when the tenant is `active`. `1` when a step failed, and
-the entry stays `provisioning`. `2` for an invalid id, a missing option, a
-missing `AXIS_OIDC_CLIENT_SECRET`, a superuser admin role, missing `platform`
+the entry stays `provisioning`. `2` for an invalid id, the id `master`, a missing option, an
+`--oidc-*` option, a missing or invalid `IdentityProvider` setting of a main tenant, a superuser admin role, missing `platform`
 tables or a host that another tenant holds. For a preview tenant, `2` also covers
 a usage error of `--preview-of` or `--binding`, and a main tenant that is
 unknown, is itself a preview tenant, already has a preview tenant or is the

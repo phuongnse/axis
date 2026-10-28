@@ -4,6 +4,7 @@ using System.Text.RegularExpressions;
 using Axis.Configuration.Tests;
 using Axis.Server.Authentication;
 using Axis.Tenancy;
+using Axis.Tenancy.Platform;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 
@@ -34,10 +35,16 @@ public sealed partial class AdminPreviewTenantTests(PostgreSqlFixture database, 
         var authority = await keycloak.StartAsync();
         var main = scenario.NewTenantId();
         var preview = scenario.NewTenantId();
-        var extra = new Dictionary<string, string?> { ["AXIS_OIDC_CLIENT_SECRET"] = KeycloakFixture.ClientSecret };
+        Assert.Equal(0, (await scenario.CreateAsync(main, "main.example.test")).Exit);
+
+        // The tenant's own realm has no users, so it is pointed at the development realm.
         var created = await scenario.RunAsync(
-            ["tenant", "create", main, "--host", "main.example.test", "--oidc-authority", authority.ToString(), "--oidc-client-id", KeycloakFixture.ClientId],
-            extra: extra);
+            ["tenant", "oidc", "set", main, "--authority", authority.ToString(), "--client-id", KeycloakFixture.ClientId, "--client-secret"],
+            extra: new Dictionary<string, string?>
+            {
+                ["Tenancy:Source"] = "directory",
+                ["AXIS_OIDC_CLIENT_SECRET"] = KeycloakFixture.ClientSecret,
+            });
         Assert.Equal(0, created.Exit);
 
         var result = await scenario.RunAsync(
@@ -100,11 +107,12 @@ public sealed partial class AdminPreviewTenantTests(PostgreSqlFixture database, 
         Assert.Equal("axis-endpoints", mainEntry.Oidc!.EndpointAudience);
         Assert.Equal("axis-services", mainEntry.Oidc.ServiceAudience);
         Assert.Equal(main, previewEntry.PreviewOf);
-        Assert.Equal(AdminScenario.Authority, previewEntry.Oidc!.Authority);
+        Assert.Equal(AdminScenario.RealmAuthority(main), previewEntry.Oidc!.Authority);
         Assert.Equal("axis", previewEntry.Oidc.ClientId);
         Assert.Null(previewEntry.Oidc.EndpointAudience);
         Assert.Null(previewEntry.Oidc.ServiceAudience);
-        Assert.Equal(scenario.ClientSecret, previewEntry.Oidc.ClientSecret!.Reveal());
+        var mainRow = await scenario.RowAsync(main);
+        Assert.Equal(AdminScenario.Cipher.Decrypt(main, TenantSecretFields.OidcClientSecret, mainRow.OidcClientSecret).Reveal(), previewEntry.Oidc.ClientSecret!.Reveal());
     }
 
     [Fact]
