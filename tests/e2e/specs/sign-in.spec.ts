@@ -2,13 +2,13 @@ import { expect, test } from '../test'
 import type { Page } from '@playwright/test'
 import { chooseTheme } from '../shell'
 
-// The platform home page stays open while nobody is signed in. Every application page needs a
-// session and shows the sign-in prompt, and only a click on a Sign in button starts sign-in.
+// The platform home page stays open while nobody is signed in, and is then the sign-in card. Every application page
+// needs a session and shows the sign-in prompt, and only a click on a Sign in button starts sign-in.
 
-/** Signs in as Anna on the Keycloak login page from the header's sign-in button on the home page. */
+/** Signs in as Anna on the Keycloak login page from the sign-in card on the home page. */
 async function signInAsAnna(page: Page) {
   await page.goto('/')
-  await page.getByRole('banner').getByRole('button', { name: 'Sign in', exact: true }).click()
+  await page.getByRole('main').getByRole('button', { name: 'Sign in', exact: true }).click()
   await page.locator('#username').fill('anna')
   await page.locator('#password').fill('axis')
   await page.locator('#kc-login').click()
@@ -31,7 +31,7 @@ test('a person signs in on the Keycloak login page, returns to the home page, an
   }
 })
 
-test('after signing out from the header menu, the current user endpoint answers 401 and the header shows Sign in', async ({
+test('after signing out from the header menu, the current user endpoint answers 401 and the home page shows the sign-in card', async ({
   page,
   baseURL,
 }) => {
@@ -42,7 +42,7 @@ test('after signing out from the header menu, the current user endpoint answers 
 
   // The server keeps no ID token, so Keycloak may ask to confirm the sign-out.
   const confirm = page.locator('#kc-logout')
-  const signIn = banner.getByRole('button', { name: 'Sign in', exact: true })
+  const signIn = page.getByRole('main').getByRole('button', { name: 'Sign in', exact: true })
   await expect(confirm.or(signIn)).toBeVisible()
   if (await confirm.isVisible()) {
     await confirm.click()
@@ -58,7 +58,7 @@ test('a person who cancels at the Keycloak login page lands on the home page wit
   baseURL,
 }) => {
   const banner = page.getByRole('banner')
-  const signIn = banner.getByRole('button', { name: 'Sign in', exact: true })
+  const signIn = page.getByRole('main').getByRole('button', { name: 'Sign in', exact: true })
   await page.goto('/')
   await signIn.click()
   await page.locator('#username').waitFor()

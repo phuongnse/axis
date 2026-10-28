@@ -184,7 +184,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   the shell through two endpoints, `GET /api/site` and
   `GET /api/texts/{locale}`. The home page and the app switcher also use `GET /api/sites` (see
   Application sites below) to list the tenant's sites. When it answers `401`,
-  the home page shows a sign-in prompt in place of the list.
+  the home page shows the sign-in screen in place of the launcher.
   - `GET /api/site` returns the site name, its title key, the locales
     (default, fallback and available) and the navigation items. Navigation
     labels are text keys, never literal text. Each navigation item has an `icon`.
@@ -508,7 +508,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
 
   | Address | Shows |
   | --- | --- |
-  | `/` | the platform home page: the server status and the tenant's sites as links, each titled in the current locale, or in the site's first locale when it lacks the current one. With nobody signed in, a sign-in prompt shows in place of the sites, and the page does not start sign-in. The shell's sign-in page is `/?signIn=failed`, where the server sends the browser after a refused sign-in. It shows the same prompt and, above the page, an alert that screen readers announce, with the platform text `shell.home.signInFailed` and no reason. `/` without the marker shows no message _(planned for M16)_ It becomes the home page and sign-in screen of [shell](shell.md#platform-home-page). |
+  | `/` | the platform home page. Signed in, it is the launcher of [shell](shell.md#platform-home-page): the tools of the person's roles, then one card per application over its sites, each titled in the current locale, or in the site's first locale when it lacks the current one. With nobody signed in, it is the sign-in screen, one card with a Sign in button, and the page does not start sign-in. The shell's sign-in page is `/?signIn=failed`, where the server sends the browser after a refused sign-in. It shows the same card and, above its button, an alert that screen readers announce, with the platform text `shell.home.signInFailed` and no reason. |
   | `/{site}` | the site's first navigation entry, by redirect |
   | `/{site}/{page}` | the page inside the site shell, with the page title. A table page also takes `?search=&page=&pageSize=&sort=`. A table bound to a data source also takes its parameter values. A page with `tabs` widgets also takes `?tab=`, `?tab2=` and so on |
   | `/{site}/{page}?ticket=<id>` | a page with parameters: the values sit in the query under the parameter names |
@@ -922,9 +922,9 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   mounts, and shows nothing while it loads or when the load fails. See
   [sign-in and the session](security.md#sign-in-and-the-session).
   The [app switcher](shell.md#app-switcher-and-preferences) reads `studio` and `console` from it.
-  - With nobody signed in, it is a **Sign in** button. It sends the browser to
-    `/api/auth/sign-in` with the current path and query string as `returnUrl`, so
-    the person comes back there, but to `/` from the sign-in page `/?signIn=failed`.
+  - With nobody signed in, it is a **Sign in** button, except on the home page `/`, which is the sign-in screen and
+    has its own button. It sends the browser to `/api/auth/sign-in` with the current path and query string as
+    `returnUrl`, so the person comes back there, but to `/` from the sign-in page `/?signIn=failed`.
   - With someone signed in, it shows their display name. Its menu holds
     **Sessions**, which opens the sessions screen below, and **Sign out**, which
     ends the session and then sends the browser to the identity provider's sign-out page.
@@ -947,8 +947,8 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
       just closed, so the reloaded list shows this state.
     - Its texts are `shell.account.sessions`, the menu entry, and
       `shell.account.sessions.*` for the screen.
-  - A `401` from any API call shows the **sign-in prompt**, a dialog with a
-    short message and a **Sign in** button. It shows when a signed-out person
+  - A `401` from any API call shows the **sign-in prompt**, a dialog titled "Your session has ended"
+    with a short message and a **Sign in** button. It shows when a signed-out person
     opens an application page, and over the current page when a session ends
     during use. The button starts the same sign-in, with the current path and
     query string as `returnUrl`. Only the click starts it, so a live session at
@@ -959,12 +959,12 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     shows behind it, instead of the error that the site could not be loaded.
     Four calls are exempt and never show it. `GET /api/me` answers `401` when
     nobody is signed in, so the header shows the button and no app switcher. The home page's
-    `GET /api/sites` answers `401` too, so the home page shows a sign-in prompt
-    in place of the sites and stays open to a signed-out person. The
+    `GET /api/sites` answers `401` too. The home page shows the sign-in screen when either call does, and stays open
+    to a signed-out person. The
     notification bell's calls and Studio's readiness checks stay quiet as well.
   - Its texts are the platform texts `shell.account.signIn`,
     `shell.account.signOut` and `shell.account.label`, the menu's label, and
-    `shell.signInPrompt.message`, the prompt's message. The prompt's button
+    `shell.signInPrompt.title`, the prompt's title, and `shell.signInPrompt.message`, its message. The prompt's button
     reuses `shell.account.signIn`.
 - **Text resolution.** The SPA resolves each key through catalogs in order.
   On the platform site the only catalog is the platform texts. Inside an

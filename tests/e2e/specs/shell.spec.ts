@@ -7,17 +7,19 @@ test('the home page loads and reports a ready server', async ({ page }) => {
   await page.goto('/')
 
   await expect(page).toHaveTitle('Axis')
-  await expect(page.getByRole('main').getByText('Welcome to Axis', { exact: true })).toBeVisible()
-  await expect(page.getByTestId('server-status')).toContainText('Ready')
-  // Nobody is signed in, so a sign-in prompt shows in place of the site list.
-  await expect(page.getByTestId('sites-sign-in')).toHaveText('Sign in to see the sites.')
+  await expect(page.getByTestId('footer-server-status')).toContainText('Ready')
+  // Nobody is signed in, so the home page is the sign-in card.
+  await expect(page.getByRole('main').getByText('Sign in to Axis', { exact: true })).toBeVisible()
+  await expect(page.getByRole('main').getByRole('button', { name: 'Sign in', exact: true })).toBeVisible()
 })
 
-test('the shell header offers sign-in through the account button and no test user button', async ({ page }) => {
+test('the sign-in screen has one Sign in button, in the page and not in the header', async ({ page }) => {
   await page.goto('/')
 
+  await expect(page.getByRole('main').getByRole('button', { name: 'Sign in', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toHaveCount(1)
   const banner = page.getByRole('banner')
-  await expect(banner.getByRole('button', { name: 'Sign in', exact: true })).toBeVisible()
+  await expect(banner.getByRole('button', { name: 'Sign in', exact: true })).toHaveCount(0)
   await expect(banner.getByRole('button', { name: /Test user/i })).toHaveCount(0)
 })
 
@@ -42,7 +44,7 @@ test('the shell renders in light and dark mode', async ({ page }) => {
     }
     const shell = page.locator(`[data-theme-mode="${mode}"]`)
     await expect(shell.getByRole('banner').getByRole('link', { name: 'Axis', exact: true })).toBeVisible()
-    await expect(shell.getByRole('main').getByText('Welcome to Axis', { exact: true })).toBeVisible()
+    await expect(shell.getByRole('main').getByText('Sign in to Axis', { exact: true })).toBeVisible()
   }
 })
 
@@ -107,14 +109,14 @@ test('the sidebar draws the current entry in the selected colour in light and da
 
 test('switching the locale changes the texts and survives a reload', async ({ page }) => {
   await page.goto('/')
-  await expect(page.getByRole('main').getByText('Welcome to Axis', { exact: true })).toBeVisible()
+  await expect(page.getByRole('main').getByText('Sign in to Axis', { exact: true })).toBeVisible()
 
   await chooseLanguage(page, 'Tiếng Việt')
 
-  await expect(page.getByRole('main').getByText('Chào mừng đến với Axis', { exact: true })).toBeVisible()
+  await expect(page.getByRole('main').getByText('Đăng nhập vào Axis', { exact: true })).toBeVisible()
   await expect(page.getByRole('contentinfo').getByText('Trạng thái máy chủ', { exact: true })).toBeVisible()
   await page.reload()
-  await expect(page.getByRole('main').getByText('Chào mừng đến với Axis', { exact: true })).toBeVisible()
+  await expect(page.getByRole('main').getByText('Đăng nhập vào Axis', { exact: true })).toBeVisible()
   await expect(page.getByRole('contentinfo').getByText('Trạng thái máy chủ', { exact: true })).toBeVisible()
   await expectChosen(page, 'Tiếng Việt', 'Ngôn ngữ và giao diện')
 })
