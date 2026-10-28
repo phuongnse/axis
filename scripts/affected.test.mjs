@@ -5,40 +5,10 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { after, before, describe, test } from 'node:test'
-import { changedPaths, decide, decideSafe, matches, safeSuites, smokeSuites } from './lib/affected.mjs'
+import { changedPaths, decideSafe, matches, safeSuites } from './lib/affected.mjs'
 
 const unreachable = () => assert.fail('The changed paths should not be listed.')
-
-describe('decide', () => {
-  test('runs when the base is unset or empty', () => {
-    for (const base of [undefined, '']) {
-      assert.equal(decide({ base, matchers: smokeSuites.compose, listChanged: unreachable }).run, true)
-    }
-  })
-
-  test('runs when the changed paths cannot be listed', () => {
-    const listChanged = () => {
-      throw new Error('bad revision')
-    }
-    const decision = decide({ base: 'abc', matchers: smokeSuites['dev-script'], listChanged })
-
-    assert.equal(decision.run, true)
-    assert.match(decision.reason, /bad revision/)
-  })
-
-  test('runs both suites when a path they cover changed', () => {
-    for (const matchers of [smokeSuites.compose, smokeSuites['dev-script']]) {
-      assert.equal(decide({ base: 'abc', matchers, listChanged: () => ['compose.yaml'] }).run, true)
-    }
-  })
-
-  test('skips every suite when only unrelated paths changed', () => {
-    const listChanged = () => ['docs/roadmap.md', 'src/Axis.Engine/Foo.cs']
-    for (const matchers of Object.values(smokeSuites)) {
-      assert.equal(decide({ base: 'abc', matchers, listChanged }).run, false)
-    }
-  })
-})
+const smoke = ['dev-script', 'compose', 'images', 'onprem']
 
 describe('decideSafe', () => {
   const runs = (name, paths, base = 'abc') =>
@@ -82,10 +52,11 @@ describe('decideSafe', () => {
     assert.equal(runs('playwright', ['tests/e2e/specs/x.spec.ts']), true)
   })
 
-  test('runs both suites with no base, an empty base, a listing error or no changed path', () => {
+  test('runs every suite with no base, an empty base, a listing error or no changed path', () => {
     const listError = () => {
       throw new Error('bad revision')
     }
+    assert.ok(smoke.every((name) => Object.hasOwn(safeSuites, name)))
     for (const name of Object.keys(safeSuites)) {
       const matchers = safeSuites[name]
       assert.equal(decideSafe({ base: undefined, matchers, listChanged: unreachable }).run, true)
@@ -94,60 +65,40 @@ describe('decideSafe', () => {
       assert.equal(decideSafe({ base: 'abc', matchers, listChanged: () => [] }).run, true)
     }
   })
+
+  test('runs every smoke suite when a change is under the server, the data projects or the SPA', () => {
+    for (const paths of [
+      ['src/Axis.Server/Http/SecurityHeaders.cs'],
+      ['src/Axis.Data/EntityProvisioner.cs'],
+      ['web/src/App.tsx'],
+    ]) {
+      for (const name of smoke) assert.equal(runs(name, paths), true, `${name} ${paths}`)
+    }
+  })
+
+  test('skips every smoke suite when every change is under docs or a Markdown file', () => {
+    for (const paths of [['docs/delivery.md'], ['README.md'], ['docs/x.md', 'samples/apps/x/README.md']]) {
+      for (const name of smoke) assert.equal(runs(name, paths), false, `${name} ${paths}`)
+    }
+  })
+
+  test('runs every smoke suite when a docs change also touches another path', () => {
+    for (const name of smoke) assert.equal(runs(name, ['docs/x.md', 'compose.yaml']), true, name)
+  })
 })
 
 describe('matches', () => {
-  test('covers csproj files and appsettings.json files under src for compose', () => {
-    assert.equal(matches('src/Axis.Data/Axis.Data.csproj', smokeSuites.compose), true)
-    assert.equal(matches('src/Axis.Server/appsettings.json', smokeSuites.compose), true)
+  const matchers = ['docs/', 'Dockerfile', /\.md$/]
+
+  test('matches a directory prefix, an exact path and a RegExp', () => {
+    assert.equal(matches('docs/delivery.md', matchers), true)
+    assert.equal(matches('Dockerfile', matchers), true)
+    assert.equal(matches('samples/apps/x/README.md', matchers), true)
   })
 
-  test('covers appsettings.Development.json under src for both suites', () => {
-    for (const path of ['src/Axis.Server/appsettings.Development.json', 'src/Axis.Worker/appsettings.Development.json']) {
-      assert.equal(matches(path, smokeSuites['dev-script']), true)
-      assert.equal(matches(path, smokeSuites.compose), true)
-    }
-  })
-
-  test('covers the sample extension packages for both suites', () => {
-    for (const matchers of [smokeSuites.compose, smokeSuites['dev-script']]) {
-      assert.equal(matches('samples/packages/PaymentReferences/axis-package.json', matchers), true)
-    }
-  })
-
-  test('covers the sample modules for both suites', () => {
-    for (const matchers of [smokeSuites.compose, smokeSuites['dev-script']]) {
-      assert.equal(matches('samples/modules/departments/module.json', matchers), true)
-    }
-  })
-
-  test('covers the purchasing system stub for both suites', () => {
-    for (const matchers of [smokeSuites.compose, smokeSuites['dev-script']]) {
-      assert.equal(matches('tests/Axis.PurchasingStub/PurchasingStubApp.cs', matchers), true)
-    }
-  })
-
-  test('covers scripts/lib for both suites', () => {
-    for (const matchers of [smokeSuites.compose, smokeSuites['dev-script']]) {
-      assert.equal(matches('scripts/lib/x.mjs', matchers), true)
-    }
-  })
-})
-
-describe('images', () => {
-  test('covers the Dockerfile and the admin host, but not a sample application', () => {
-    assert.equal(matches('Dockerfile', smokeSuites.images), true)
-    assert.equal(matches('src/Axis.Admin/AdminCommands.cs', smokeSuites.images), true)
-    assert.equal(matches('samples/apps/leave-requests/application.json', smokeSuites.images), false)
-  })
-})
-
-describe('onprem', () => {
-  test('covers the Compose example and the admin host, but not a sample it does not activate', () => {
-    assert.equal(matches('deploy/compose/compose.yaml', smokeSuites.onprem), true)
-    assert.equal(matches('src/Axis.Admin/AdminCommands.cs', smokeSuites.onprem), true)
-    assert.equal(matches('samples/apps/leave-requests/application.json', smokeSuites.onprem), true)
-    assert.equal(matches('samples/apps/purchase-requests/application.json', smokeSuites.onprem), false)
+  test('does not match a path that only shares a prefix or an exact name', () => {
+    assert.equal(matches('docs-old/x.txt', matchers), false)
+    assert.equal(matches('Dockerfile.dev', matchers), false)
   })
 })
 
@@ -176,13 +127,13 @@ describe('changedPaths', () => {
 
   after(() => rmSync(dir, { recursive: true, force: true }))
 
-  test('lists untracked files, so a new matching file runs the suite', () => {
+  test('lists untracked files, so a new file outside the safe list runs the suite', () => {
     assert.deepEqual(changedPaths('HEAD', dir), [])
     writeFileSync(path.join(dir, 'compose.yaml'), 'services: {}\n')
 
     assert.deepEqual(changedPaths('HEAD', dir), ['compose.yaml'])
     assert.equal(
-      decide({ base: 'HEAD', matchers: smokeSuites.compose, listChanged: (base) => changedPaths(base, dir) }).run,
+      decideSafe({ base: 'HEAD', matchers: safeSuites.compose, listChanged: (base) => changedPaths(base, dir) }).run,
       true,
     )
   })

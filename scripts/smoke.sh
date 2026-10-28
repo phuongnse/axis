@@ -11,7 +11,7 @@
 #   connection string sets SSL Mode=VerifyFull, and the test checks that every Axis connection uses TLS. It
 #   creates two tenants, activates the leave request sample, checks each tenant's site and sign-in, suspend
 #   and resume, and an unknown host. It reads the sample modules, which this script installs in artifacts/modules.
-# Each is skipped when $NEXKIT_BASE_SHA shows that nothing it covers changed, by the path lists in
+# Each is skipped when $NEXKIT_BASE_SHA is set and every changed path is on its safe list in
 # scripts/lib/affected.mjs. CI runs this script as a job of its own, beside the integration tests and the
 # Playwright shards.
 set -euo pipefail
