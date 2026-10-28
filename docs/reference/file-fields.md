@@ -19,6 +19,20 @@ id they send that the record does not already hold fails.
   at most `Files:MaxSize`. `accept` lists media types, and `type/*` matches
   any subtype. Both are optional. See
   [entity field types](resource-files.md#entity-field-types-and-constraints).
+- **Extensions.** The extension of the file name is never checked. The stored
+  name keeps whatever extension it was sent with. The declared media type and
+  the file's first bytes decide what is accepted, see
+  [checks](#upload).
+- **Unpacking.** An upload is stored as sent and never unpacked, so `maxSize`
+  and `Files:MaxSize` also limit its unpacked size.
+- **Malicious files.** An upload is refused with a `415`, and nothing is
+  stored, when it starts like an executable, when it declares `image/svg+xml`,
+  or when its content does not start as its declared PDF, PNG, JPEG, GIF, WebP
+  or ZIP type. Every other file is only ever downloaded as an attachment with
+  `nosniff`, see [headers](#download-built). Axis does not scan uploads for
+  malware. An operator that needs scanning puts a scanning proxy in front of
+  the upload route, see
+  [D76](../decisions/d76-file-money-and-enum-label-field-types.md).
 - **Several files.** A child collection whose child entity has a `file` field,
   such as `attachments` with rows of `{ file, note }`.
 - **Read.** A record holds `{ "id", "name", "mediaType", "size" }` for a file
@@ -61,7 +75,8 @@ write records.
   `application/octet-stream`.
 - **Checks.** A file larger than the field's `maxSize`, or than
   `Files:MaxSize`, is a `413` as soon as the count passes the limit. A media
-  type that `accept` does not allow is a `415`. A file that starts like a
+  type that `accept` does not allow is a `415`. A declared `image/svg+xml` is a
+  `415` whatever `accept` allows, because an SVG can carry scripts. A file that starts like a
   Windows, Linux or macOS executable is a `415` whatever type it declares. A
   file declared as PDF, PNG, JPEG, GIF, WebP or ZIP must start as that type
   does, or it is a `415`. Other types are checked only for an executable start.
@@ -111,7 +126,7 @@ service account may download, as they may read records.
 - **Headers.** `Content-Type` is the stored media type,
   `Content-Disposition: attachment` with the file name, and
   `X-Content-Type-Options: nosniff`. A browser never shows a file inline, so
-  an uploaded HTML or SVG file cannot run in the application's origin.
+  an uploaded HTML file, or an SVG sent under another type, cannot run in the application's origin.
 - **Child rows.** A child row has no id of its own, so a download always goes
   by file id. It goes through the owner record, and the user's `read` grant
   must cover the owner's child collection field, such as `attachments`.
