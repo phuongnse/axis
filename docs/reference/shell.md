@@ -93,9 +93,9 @@ _(planned for M16)_
   The header shows no second Sign in button there. Nothing starts sign-in until the person clicks it.
 - **Refused sign-in.** `/?signIn=failed` shows the same card, with the warning "Sign-in did not complete. Try again."
   above the button, with no reason.
-- **Endpoints.**
+- **Endpoints.** These three are built, while the page that uses them stays planned.
   - `GET /api/sites` gives each site its `application`, `{ "name", "titles" }`, the application's name and its title
-    per available locale, so the home page can group the sites.
+    per locale it has texts for, from the `label` in its `application.json` or its name when it has none, so the home page can group the sites.
   - `GET /api/me` adds a boolean `console`, true when the person holds the role `Console:OperatorRole` names, see the
     [operator console](operator-console.md).
   - `GET /api/about` answers a signed-in person with `{ "version" }`, the server's informational version, the one the

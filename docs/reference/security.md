@@ -210,8 +210,10 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place. _(planned f
   the session row. A role change at the identity provider applies at the next
   sign-in.
 - **Current user.** `GET /api/me` keeps its shape,
-  `{ "id", "displayName", "roles" }`, and reads the session. _(planned for M16)_ It adds a boolean `console`, see the
-  [platform home page](shell.md#platform-home-page). It adds a boolean
+  `{ "id", "displayName", "roles" }`, and reads the session. It adds a boolean `console`, true when the user holds
+  the role that `Console:OperatorRole` names. With no value set it is false for everyone. See the
+  [platform home page](shell.md#platform-home-page) and the
+  [console settings](host-settings.md#console-settings). It adds a boolean
   `studio`, true when `Studio:Folders` is not empty or `Studio:ApplicationsPath` is set, and the user holds
   `Studio:AuthorRole`. See [D38](../decisions/d38-studio-edits-application-folders-through-an-authoring-api.md).
   It adds a boolean `studioPublisher`, true when
@@ -240,7 +242,7 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place. _(planned f
     application, so they count as application content. The session is checked
     before any `404`, so a caller without a session cannot learn which sites
     or pages exist;
-  - `GET /api/me`;
+  - `GET /api/me` and `GET /api/about`;
   - `GET /api/me/sessions`, `DELETE /api/me/sessions/{id}` and
     `DELETE /api/me/sessions`.
 
