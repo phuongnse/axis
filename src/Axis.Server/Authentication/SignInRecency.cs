@@ -15,8 +15,13 @@ internal static class SignInRecency
     /// <paramref name="now"/>. A missing or unreadable value is not recent.
     /// </summary>
     /// <param name="clockSkew">The slack for a clock difference between Axis and the identity provider.</param>
-    public static bool IsRecent(string? authTime, DateTimeOffset now, TimeSpan clockSkew)
+    public static bool IsRecent(string? authTime, DateTimeOffset now, TimeSpan clockSkew) =>
+        TryRead(authTime, out var at) && now - at <= SessionLifetime.MaxLifetime + clockSkew;
+
+    /// <summary>Reads <paramref name="authTime"/>, a NumericDate in seconds. A missing or unreadable value gives false.</summary>
+    public static bool TryRead(string? authTime, out DateTimeOffset at)
     {
+        at = default;
         if (string.IsNullOrWhiteSpace(authTime)
             || !long.TryParse(authTime, NumberStyles.Integer, CultureInfo.InvariantCulture, out var seconds)
             || seconds < DateTimeOffset.MinValue.ToUnixTimeSeconds()
@@ -25,6 +30,7 @@ internal static class SignInRecency
             return false;
         }
 
-        return now - DateTimeOffset.FromUnixTimeSeconds(seconds) <= SessionLifetime.MaxLifetime + clockSkew;
+        at = DateTimeOffset.FromUnixTimeSeconds(seconds);
+        return true;
     }
 }

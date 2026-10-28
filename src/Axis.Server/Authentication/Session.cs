@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Security.Claims;
 using Axis.Core.Tenancy;
 using Axis.Data.Storage;
@@ -35,16 +36,39 @@ internal static class Session
     private const string DisplayNameClaim = "axis:display_name";
     private const string RoleClaim = "axis:role";
     private const string TenantIdClaim = "axis:tenant_id";
+    private const string AuthenticatedAtClaim = "axis:authenticated_at";
+    private const string SessionIdClaim = "axis:session_id";
 
-    public static ClaimsPrincipal CreatePrincipal(string tenantId, string userId, string displayName, IEnumerable<string> roles)
+    /// <summary>How recent the person's last login at the identity provider must be for the session to end sessions.</summary>
+    public static readonly TimeSpan ReauthenticationWindow = TimeSpan.FromMinutes(5);
+
+    /// <param name="authenticatedAt">The person's last login at the identity provider, or null when it is not known.</param>
+    /// <param name="sessionId">The public id of the stored session, set only for a principal that the store read.</param>
+    public static ClaimsPrincipal CreatePrincipal(
+        string tenantId,
+        string userId,
+        string displayName,
+        IEnumerable<string> roles,
+        DateTimeOffset? authenticatedAt = null,
+        string? sessionId = null)
     {
-        Claim[] claims =
+        List<Claim> claims =
         [
             new(UserIdClaim, userId),
             new(DisplayNameClaim, displayName),
             .. roles.Select(role => new Claim(RoleClaim, role)),
             new(TenantIdClaim, tenantId),
         ];
+        if (authenticatedAt is { } at)
+        {
+            claims.Add(new Claim(AuthenticatedAtClaim, at.ToUnixTimeSeconds().ToString(CultureInfo.InvariantCulture)));
+        }
+
+        if (sessionId is not null)
+        {
+            claims.Add(new Claim(SessionIdClaim, sessionId));
+        }
+
         return new ClaimsPrincipal(new ClaimsIdentity(claims, Scheme, UserIdClaim, RoleClaim));
     }
 
@@ -59,6 +83,19 @@ internal static class Session
 
     /// <summary>The tenant id of a session principal, or null when the principal is not a session.</summary>
     public static string? ReadTenantId(ClaimsPrincipal principal) => principal.FindFirstValue(TenantIdClaim);
+
+    /// <summary>The person's last login at the identity provider, or null when the principal holds none.</summary>
+    public static DateTimeOffset? ReadAuthenticatedAt(ClaimsPrincipal principal) =>
+        long.TryParse(principal.FindFirstValue(AuthenticatedAtClaim), NumberStyles.Integer, CultureInfo.InvariantCulture, out var seconds)
+            ? DateTimeOffset.FromUnixTimeSeconds(seconds)
+            : null;
+
+    /// <summary>The public id of the stored session, or null when the principal did not come from the store.</summary>
+    public static string? ReadSessionId(ClaimsPrincipal principal) => principal.FindFirstValue(SessionIdClaim);
+
+    /// <summary>Whether the session's last login at the identity provider is within <see cref="ReauthenticationWindow"/> of <paramref name="now"/>. No clock skew is allowed.</summary>
+    public static bool MayEndSessions(ClaimsPrincipal principal, DateTimeOffset now) =>
+        ReadAuthenticatedAt(principal) is { } at && now - at <= ReauthenticationWindow;
 
     /// <summary>Whether the server may run over plain http: Development and Testing only.</summary>
     public static bool AllowsPlainHttp(IHostEnvironment environment) =>

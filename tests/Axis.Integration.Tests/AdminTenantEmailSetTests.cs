@@ -163,11 +163,19 @@ public sealed class AdminTenantEmailSetTests(PostgreSqlFixture database) : IClas
         await scenario.AssertNoSecretsAsync();
     }
 
-    private static Dictionary<string, string?> Directory(string password, bool development = false) =>
-        new()
+    private static Dictionary<string, string?> Directory(string password, bool development = false)
+    {
+        var settings = new Dictionary<string, string?>
         {
             ["Tenancy:Source"] = "directory",
             [AdminCommands.SmtpPasswordSetting] = password,
-            [AdminCommands.DotnetEnvironmentSetting] = development ? "Development" : null,
         };
+        if (development)
+        {
+            // Without this entry the scenario's default environment, Testing, applies.
+            settings[AdminCommands.DotnetEnvironmentSetting] = "Development";
+        }
+
+        return settings;
+    }
 }

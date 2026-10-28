@@ -278,6 +278,7 @@ sessions.MapTaskEndpoints();
 sessions.MapNotificationEndpoints();
 sessions.MapDataSourceEndpoints();
 sessions.MapUserEndpoints();
+sessions.MapSessionEndpoints();
 sessions.MapUserPickerEndpoints();
 sessions.MapStudioEndpoints();
 sessions.MapAuthEndpoints();
