@@ -53,6 +53,27 @@ public sealed class LiveHeapSamplerTests
         Assert.True(growth >= Limit, $"The sampler reported {growth:N0} bytes of growth for held memory.");
     }
 
+    [Fact]
+    public void Sampling_waits_at_least_100_ms_and_four_times_the_last_collection()
+    {
+        Assert.Equal(TimeSpan.FromMilliseconds(100), LiveHeapSampler.NextInterval(TimeSpan.FromMilliseconds(1)));
+        Assert.Equal(TimeSpan.FromSeconds(2), LiveHeapSampler.NextInterval(TimeSpan.FromMilliseconds(500)));
+    }
+
+    [Fact]
+    public void One_second_of_sampling_forces_only_a_few_collections()
+    {
+        var sampler = new LiveHeapSampler();
+
+        // The constructor's own collections are not counted.
+        var before = GC.CollectionCount(2);
+        Thread.Sleep(TimeSpan.FromSeconds(1));
+        sampler.Stop();
+        var collections = GC.CollectionCount(2) - before;
+
+        Assert.True(collections <= 15, $"One second of sampling forced {collections} full collections.");
+    }
+
     /// <summary>Allocates about 80 MB that nothing references afterwards.</summary>
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static void Discard()

@@ -3,7 +3,8 @@ import { expect, type Locator, type Page } from '@playwright/test'
 /**
  * Returns the dialog, named `name` when a name is given, once it has finished opening. A dialog zooms in from opacity 0,
  * and a click during the zoom is lost. So the dialog counts as open only when it is fully opaque and no finite animation
- * runs or is paused in it, on two frames in a row. A repeating animation, such as a spinner, is not waited for.
+ * runs or is paused in it, on two frames in a row. A repeating animation, such as a spinner, is not waited for. Under
+ * reduced motion, which the Playwright config asks for, the SPA has no zoom and this returns at once.
  */
 export async function waitForDialog(page: Page, name?: string): Promise<Locator> {
   const dialog = name === undefined ? page.getByRole('dialog') : page.getByRole('dialog', { name, exact: true })
@@ -12,6 +13,16 @@ export async function waitForDialog(page: Page, name?: string): Promise<Locator>
   await expect
     .poll(() => dialog.evaluate(hasOpened), { message: `${label} finished opening`, timeout: 15_000 })
     .toBe(true)
+  return dialog
+}
+
+/**
+ * Returns the dialog as soon as it is visible, without waiting for it to finish opening. Only the spec of reduced motion
+ * uses it, to see the dialog in its first frame. Every other spec uses {@link waitForDialog}.
+ */
+export async function visibleDialog(page: Page): Promise<Locator> {
+  const dialog = page.getByRole('dialog')
+  await expect(dialog).toBeVisible({ timeout: 15_000 })
   return dialog
 }
 

@@ -53,13 +53,15 @@ public sealed class ExportPerformanceTests(ExportPerformanceTests.ExportFixture 
         }
 
         var smallestGrowth = long.MaxValue;
+        var slowestMeasured = TimeSpan.Zero;
         for (var attempt = 0; attempt < Attempts; attempt++)
         {
             var measured = await ExportAsync(format, measureHeap: true);
             smallestGrowth = Math.Min(smallestGrowth, measured.HeapGrowth);
+            slowestMeasured = measured.Elapsed > slowestMeasured ? measured.Elapsed : slowestMeasured;
         }
 
-        TestContext.Current.TestOutputHelper?.WriteLine($"The best of {Attempts} {format} exports took {best.Elapsed}, and the smallest growth of the live heap was {smallestGrowth:N0} bytes.");
+        TestContext.Current.TestOutputHelper?.WriteLine($"The best of {Attempts} {format} exports took {best.Elapsed}, and the smallest growth of the live heap was {smallestGrowth:N0} bytes, and the slowest measured export took {slowestMeasured}.");
         var limit = format == "csv" ? _csvTime : _xlsxTime;
         Assert.True(best.Elapsed < limit, $"The {format} export took {best.Elapsed} at best of {Attempts} exports.");
         Assert.True(smallestGrowth < HeapGrowthLimit, $"The {format} export grew the live heap by {smallestGrowth:N0} bytes at least.");
