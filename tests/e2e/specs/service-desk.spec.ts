@@ -2,7 +2,7 @@ import { expect, test } from "../test";
 import type { APIRequest, APIRequestContext, Page } from "@playwright/test";
 import { csrfHeaders } from "../csrf";
 import { waitForDialog } from "../dialogs";
-import { fieldLabel } from "../fields";
+import { expectShown, fieldLabel, fieldValue } from "../fields";
 import { expectChosen, pickOption } from "../select";
 import { sessionFile, useSession, type SampleUser } from "../sessions";
 
@@ -118,7 +118,7 @@ test("anna submits a ticket, linh triages it to khoa, khoa resolves it, and anna
 
   await useSession(page, "linh");
   await openTask(page, title, "Triage ticket");
-  await expect(page.getByLabel(fieldLabel("Title"))).toHaveValue(title);
+  await expectShown(fieldValue(page, "title"), title);
   await page.getByLabel(fieldLabel("Assigned agent")).fill("khoa");
   await page.getByRole("button", { name: "Assign", exact: true }).click();
   await expect(page).toHaveURL(/\/service-desk\/mytasks$/);
@@ -131,9 +131,7 @@ test("anna submits a ticket, linh triages it to khoa, khoa resolves it, and anna
 
   await useSession(page, "anna");
   await openTask(page, title, "Confirm resolution");
-  await expect(page.getByLabel(fieldLabel("Resolution"))).toHaveValue(
-    "Replaced the battery.",
-  );
+  await expectShown(fieldValue(page, "resolution"), "Replaced the battery.");
   await page.getByRole("button", { name: "Confirm", exact: true }).click();
   await expect(page).toHaveURL(/\/service-desk\/mytasks$/);
 

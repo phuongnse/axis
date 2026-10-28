@@ -129,14 +129,17 @@ export function ChildCollectionTable({
               }
             >
               {(readOnly || child.computed) && child.type === 'file' ? (
-                isFileValue(row[child.name]) ? (
-                  <FileLink field={child} value={row[child.name] as FileValue} />
-                ) : (
-                  <EmptyDash />
-                )
+                <div data-testid={`cell-${field.name}-${index}-${child.name}`}>
+                  {isFileValue(row[child.name]) ? (
+                    <FileLink field={child} value={row[child.name] as FileValue} />
+                  ) : (
+                    <EmptyDash />
+                  )}
+                </div>
               ) : readOnly || child.computed ? (
                 <Input
                   readOnly
+                  data-testid={`cell-${field.name}-${index}-${child.name}`}
                   aria-label={`${label} ${index + 1}`}
                   value={shown || '—'}
                   style={{ ...(shown ? undefined : emptyStyle), ...(isNumeric(child.type) ? numberStyle : undefined) }}
