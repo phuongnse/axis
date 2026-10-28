@@ -12,9 +12,13 @@ namespace Axis.Tenancy.Platform;
 /// </summary>
 public static class PlatformRoleGrants
 {
+    /// <summary>The <c>pg_advisory_xact_lock</c> key that serializes the platform grant steps of concurrent servers.</summary>
+    public const long LockKey = 0x4158_4953_504C_4752; // "AXISPLGR" in ASCII.
+
     /// <summary>
     /// Applies the grants over <paramref name="connection"/>, which must be the platform schema role, in one
-    /// transaction. It can run any number of times. It throws <see cref="InvalidOperationException"/> when
+    /// transaction. The transaction holds the advisory lock <see cref="LockKey"/> until it ends, so servers
+    /// that start together run this step one after the other. It can run any number of times. It throws <see cref="InvalidOperationException"/> when
     /// <paramref name="readerRole"/> is the role the connection uses, because revoking rights from that role
     /// would remove the owner's own access.
     /// </summary>
@@ -25,6 +29,12 @@ public static class PlatformRoleGrants
 
         var role = Quote(readerRole);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+
+        // Concurrent servers run these grants at the same time, and their GRANT statements update the same catalog rows.
+        await using (var lockCommand = new NpgsqlCommand($"SELECT pg_advisory_xact_lock({LockKey})", connection, transaction))
+        {
+            await lockCommand.ExecuteNonQueryAsync(cancellationToken);
+        }
 
         await using (var check = new NpgsqlCommand("SELECT current_user = @role", connection, transaction))
         {
