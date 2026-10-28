@@ -389,6 +389,27 @@ export function outline(draft: Content): OutlineGroup[] {
   return rest.length > 0 || groups.length === 0 ? [...groups, { step: null, sections: rest }] : groups
 }
 
+/**
+ * The field indexes of each row of a section, given the widths of its fields in twelfths. A row fills left to right
+ * while its widths add up to 12 at most, and a field that does not fit starts the next row. At `narrow` width every
+ * field has its own row. A width outside 1 to 12 counts as 12.
+ */
+export function fieldRows(widths: readonly number[], narrow = false): number[][] {
+  const rows: number[][] = []
+  let used = 0
+  widths.forEach((width, index) => {
+    const part = width >= 1 && width <= 12 ? width : 12
+    if (narrow || rows.length === 0 || used + part > 12) {
+      rows.push([index])
+      used = part
+    } else {
+      rows[rows.length - 1].push(index)
+      used += part
+    }
+  })
+  return rows
+}
+
 /** What a new title key needs: the resource's file and name, and the keys that texts already own. */
 export interface TitleKeys {
   file: string
