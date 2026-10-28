@@ -421,7 +421,9 @@ systems.
 
 - **Token checks.** The server checks each token against the tenant
   [resolved from the host](../architecture.md#request-resolution). Any failure is a `401`
-  with `WWW-Authenticate: Bearer`, which never says which check failed. Under
+  with `WWW-Authenticate: Bearer`, which never says which check failed. The
+  server writes a warning with the tenant and the reason, see the
+  [log inventory](log-inventory.md#security-events). Under
   the `fapi2` profile the `401` says `WWW-Authenticate: DPoP algs="ES256 PS256"`
   and the token must also be DPoP-bound, see
   [machine callers under `fapi2`](#fapi-20-profile).

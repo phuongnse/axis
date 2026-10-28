@@ -94,7 +94,8 @@ internal static class EndpointCaller
     {
         builder.Services.TryAddSingleton(settings);
         builder.Services.TryAddEnumerable(ServiceDescriptor.Singleton<IConfigureOptions<JwtBearerOptions>, BearerCallerOptions>(
-            sp => new BearerCallerOptions(settings, allowHttp, sp.GetRequiredService<TimeProvider>())));
+            sp => new BearerCallerOptions(
+                settings, allowHttp, sp.GetRequiredService<TimeProvider>(), sp.GetRequiredService<ILogger<BearerCallerOptions>>())));
 
         // A tenant added at a refresh has no AddJwtBearer call, so the post-configuration is registered here.
         builder.Services.TryAddEnumerable(
@@ -139,8 +140,11 @@ internal static class EndpointCaller
 /// caller scheme expects <c>Oidc:EndpointAudience</c> and the service account scheme <c>Oidc:ServiceAudience</c>. The
 /// token checks and the claim mapping are the same for both. A token must be signed with an algorithm in
 /// <see cref="Algorithms"/> and must not be marked as another type than an access token, so an ID token is refused.
+/// A refused token writes a warning with the tenant and the reason. The reason is a fixed text, or the type name of the
+/// exception that the token library threw, and never the exception message or any part of the token. The client still gets
+/// a <c>401</c> that names no check.
 /// </summary>
-internal sealed class BearerCallerOptions(TenantSignInSettings settings, bool allowHttp, TimeProvider clock)
+internal sealed partial class BearerCallerOptions(TenantSignInSettings settings, bool allowHttp, TimeProvider clock, ILogger<BearerCallerOptions> logger)
     : IConfigureNamedOptions<JwtBearerOptions>
 {
     /// <summary>The signature algorithms a bearer token may use: RSA, RSA-PSS and ECDSA. <c>HS*</c> and <c>none</c> are refused.</summary>
@@ -148,6 +152,9 @@ internal sealed class BearerCallerOptions(TenantSignInSettings settings, bool al
         ["RS256", "RS384", "RS512", "PS256", "PS384", "PS512", "ES256", "ES384", "ES512"];
 
     private const string DpopScheme = "DPoP ";
+
+    [LoggerMessage(LogLevel.Warning, "A bearer token for tenant {TenantId} was refused on a {Caller} route: {Reason}.")]
+    private static partial void TokenRefused(ILogger logger, string tenantId, string caller, string reason);
 
     /// <summary>
     /// Whether the token is not marked as another type than an access token. The header <c>typ</c>, when present, must be
@@ -200,6 +207,7 @@ internal sealed class BearerCallerOptions(TenantSignInSettings settings, bool al
             return;
         }
 
+        var caller = prefix == ServiceAccount.SchemePrefix ? "service account" : "endpoint";
         var tenantId = name[prefix.Length..];
         if (settings.Find(tenantId) is not { } tenant)
         {
@@ -214,6 +222,12 @@ internal sealed class BearerCallerOptions(TenantSignInSettings settings, bool al
         options.MapInboundClaims = false;
         options.IncludeErrorDetails = false;
         options.SaveToken = false;
+        void Refuse(ResultContext<JwtBearerOptions> context, string reason)
+        {
+            TokenRefused(logger, tenantId, caller, reason);
+            context.Fail(reason);
+        }
+
         options.Events = new JwtBearerEvents
         {
             OnMessageReceived = context =>
@@ -236,17 +250,22 @@ internal sealed class BearerCallerOptions(TenantSignInSettings settings, bool al
                     }
                     else
                     {
-                        context.Fail("A DPoP-bound token is required.");
+                        Refuse(context, "A DPoP-bound token is required.");
                     }
                 }
 
+                return Task.CompletedTask;
+            },
+            OnAuthenticationFailed = context =>
+            {
+                TokenRefused(logger, tenantId, caller, context.Exception.GetType().Name);
                 return Task.CompletedTask;
             },
             OnTokenValidated = async context =>
             {
                 if (context.SecurityToken is not JsonWebToken token || !IsAccessToken(token))
                 {
-                    context.Fail("The token is not an access token.");
+                    Refuse(context, "The token is not an access token.");
                     return;
                 }
 
@@ -255,7 +274,7 @@ internal sealed class BearerCallerOptions(TenantSignInSettings settings, bool al
                     // The proof is made for the token as the caller sent it, and the token holds the key's thumbprint.
                     if (!await DpopProof.IsValidAsync(context.Request, token.EncodedToken, BoundThumbprint(token), clock.GetUtcNow()))
                     {
-                        context.Fail("The access token is not bound to a valid DPoP proof.");
+                        Refuse(context, "The access token is not bound to a valid DPoP proof.");
                         return;
                     }
                 }
@@ -264,7 +283,7 @@ internal sealed class BearerCallerOptions(TenantSignInSettings settings, bool al
                 var callerId = principal?.FindFirst(tenant.Claims.UserId)?.Value;
                 if (principal is null || string.IsNullOrWhiteSpace(callerId))
                 {
-                    context.Fail("The access token has no user id claim.");
+                    Refuse(context, "The access token has no user id claim.");
                     return;
                 }
 
