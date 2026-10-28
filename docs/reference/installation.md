@@ -40,7 +40,8 @@ service may need `pg_trgm` on its list of allowed extensions.
 
 There are three production images: `axis-server`, `axis-worker` and
 `axis-admin`. They hold no sample, no sample extension package, no sample
-module, no development realm and no credential. _(planned for M18)_ A fourth
+module, no development realm, no credential and no source control metadata
+such as `.git`. _(planned for M18)_ A fourth
 image, `axis-package-host`, runs the
 [package runners](extension-packages.md#package-runners) in the
 `package-host` container beside the worker. Compose and the Helm chart give
