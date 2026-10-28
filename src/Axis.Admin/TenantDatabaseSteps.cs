@@ -2,6 +2,7 @@ using Axis.Configuration.Storage;
 using Axis.Data.Naming;
 using Axis.Data.Storage;
 using Axis.Processes.Storage;
+using Axis.Tenancy;
 using Axis.Tenancy.Platform;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
@@ -19,6 +20,7 @@ internal sealed class TenantDatabaseSteps(
     TenantRow row,
     string host,
     int port,
+    TenantDatabaseTls tls,
     CancellationToken cancellationToken) : ITenantConnections
 {
     private NpgsqlConnection? _schemaConnection;
@@ -127,8 +129,9 @@ internal sealed class TenantDatabaseSteps(
         _ => exception.GetType().Name,
     };
 
-    private string ConnectionString(string user, string password) =>
-        new NpgsqlConnectionStringBuilder
+    private string ConnectionString(string user, string password)
+    {
+        var builder = new NpgsqlConnectionStringBuilder
         {
             Host = host,
             Port = port,
@@ -136,5 +139,8 @@ internal sealed class TenantDatabaseSteps(
             Username = user,
             Password = password,
             Pooling = false,
-        }.ConnectionString;
+        };
+        tls.ApplyTo(builder);
+        return builder.ConnectionString;
+    }
 }

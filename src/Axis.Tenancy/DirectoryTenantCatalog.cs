@@ -160,12 +160,25 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
     /// A binding is invalid, with the checks of the <c>configuration</c> source. The message names the tenant and the
     /// binding, never the value.
     /// </exception>
-    public static async Task<DirectoryTenantCatalog> LoadAsync(
+    public static Task<DirectoryTenantCatalog> LoadAsync(
         string platformConnectionString,
         TenantSecretCipher cipher,
         CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(platformConnectionString);
+        return LoadAsync(platformConnectionString, TenantDatabaseTls.From(platformConnectionString), cipher, cancellationToken);
+    }
+
+    // The tenant connections carry the TLS settings of the platform connection string, which the test PostgreSQL
+    // cannot serve, so a test passes them apart from the string that reads the directory.
+    internal static async Task<DirectoryTenantCatalog> LoadAsync(
+        string platformConnectionString,
+        TenantDatabaseTls tls,
+        TenantSecretCipher cipher,
+        CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(platformConnectionString);
+        ArgumentNullException.ThrowIfNull(tls);
         ArgumentNullException.ThrowIfNull(cipher);
 
         List<TenantRow> tenants;
@@ -216,6 +229,7 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
                 [.. hosts.Where(host => host.TenantId == row.Id).Select(host => host.Host)],
                 bindings.Where(binding => binding.TenantId == row.Id),
                 cipher,
+                tls,
                 row.PreviewOf is null ? null : byId[row.PreviewOf])),
             hosts.Where(host => !activeIds.Contains(host.TenantId)).Select(host => host.Host),
             active.ToDictionary(row => row.Id, DatabaseKey, StringComparer.Ordinal),
@@ -260,6 +274,7 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
         IReadOnlyList<string> hosts,
         IEnumerable<TenantBindingRow> bindingRows,
         TenantSecretCipher cipher,
+        TenantDatabaseTls tls,
         TenantRow? main)
     {
         var id = row.Id;
@@ -274,14 +289,19 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
                 : new TenantBinding(binding.Kind, binding.Url, null);
         }
 
-        var connectionString = SecretValue.Deferred(() => new NpgsqlConnectionStringBuilder
+        var connectionString = SecretValue.Deferred(() =>
         {
-            Host = row.DatabaseHost,
-            Port = row.DatabasePort,
-            Database = row.DatabaseName,
-            Username = row.RuntimeUser,
-            Password = cipher.Decrypt(id, TenantSecretFields.RuntimePassword, row.RuntimePassword).Reveal(),
-        }.ConnectionString);
+            var builder = new NpgsqlConnectionStringBuilder
+            {
+                Host = row.DatabaseHost,
+                Port = row.DatabasePort,
+                Database = row.DatabaseName,
+                Username = row.RuntimeUser,
+                Password = cipher.Decrypt(id, TenantSecretFields.RuntimePassword, row.RuntimePassword).Reveal(),
+            };
+            tls.ApplyTo(builder);
+            return builder.ConnectionString;
+        });
 
         var signIn = main ?? row;
         var oidc = new TenantOidc(
