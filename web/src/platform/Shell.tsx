@@ -149,6 +149,9 @@ export function Shell({
   // The Menu button's wrapper, so Escape can give the button its focus back.
   const toggle = useRef<HTMLSpanElement>(null)
   const title = t(titleKey)
+  // Proposed: a site with one page has no sidebar and no button to collapse it, as there is nowhere else to go.
+  const sidebar = navigation.length > 1
+  const home = navigation[0]?.path ?? '/'
   const items = navigation.map((item) => ({
     key: item.key,
     icon: navigationIcon(item.icon),
@@ -175,7 +178,7 @@ export function Shell({
     dayjs.locale(dayjsLocaleFor(locale))
   }, [locale])
 
-  const navigationToggle = narrow ? (
+  const navigationToggle = !sidebar ? null : narrow ? (
     <span ref={toggle} style={{ display: 'inline-flex' }}>
       <AxisButton
         role="icon"
@@ -217,19 +220,32 @@ export function Shell({
             }}
           >
             {navigationToggle}
-            <SiteMark title={title} />
-            <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center' }}>
+            {/* Proposed: the mark and the title open the site's first page. */}
+            <Link
+              to={home}
+              style={{
+                flex: 1,
+                minWidth: 0,
+                display: 'flex',
+                alignItems: 'center',
+                gap: spacing.sm,
+                color: colour.text,
+              }}
+            >
+              <SiteMark title={title} />
               <Typography.Text strong ellipsis>
                 {title}
               </Typography.Text>
-            </div>
+            </Link>
             {notifications && (
               <NotificationBell path={notifications.path} sitePath={notifications.sitePath} locale={locale} />
             )}
             <PreferencesMenu locales={locales} locale={locale} onLocaleChange={onLocaleChange} />
             <UserMenu />
           </Layout.Header>
-          {narrow ? (
+          {!sidebar ? (
+            <Layout.Content style={{ padding: spacing.lg }}>{children}</Layout.Content>
+          ) : narrow ? (
             <>
               <nav
                 id="shell-menu"
