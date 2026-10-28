@@ -118,7 +118,7 @@ const statusBadge: Record<ServerStatus, 'processing' | 'success' | 'error'> = {
 
 /**
  * Proposed: a slim footer under every page: the copyright line with the current year and the platform's name, the
- * platform version for a signed-in user only, and the server's readiness, which turns red for everyone when the
+ * platform version as `v<version>` for a signed-in user only, and the server's readiness, which turns red for everyone when the
  * server is unavailable.
  */
 function ShellFooter() {
@@ -141,7 +141,7 @@ function ShellFooter() {
     >
       <Typography.Text type="secondary">
         © {copyrightYear} {t('shell.title')}
-        {version && ` · ${t('shell.footer.platformVersion')} ${version}`}
+        {version && ` · v${version}`}
       </Typography.Text>
       <Typography.Text type="secondary">
         {t('shell.serverStatus.title')}:{' '}

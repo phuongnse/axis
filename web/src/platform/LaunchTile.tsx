@@ -27,11 +27,14 @@ export function LaunchTile({
   mark,
   title,
   description,
+  stacked = false,
 }: {
   to: string
   mark: ReactNode
   title: string
   description?: string
+  /** Proposed: puts the mark above the title, as the tools of the home page show it. */
+  stacked?: boolean
 }) {
   const { colour, spacing, radius } = useDesignTokens()
   return (
@@ -39,7 +42,8 @@ export function LaunchTile({
       to={to}
       style={{
         display: 'flex',
-        alignItems: 'center',
+        flexDirection: stacked ? 'column' : 'row',
+        alignItems: stacked ? 'flex-start' : 'center',
         gap: spacing.sm,
         padding: spacing.md,
         background: colour.surface,
