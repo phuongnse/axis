@@ -38,6 +38,7 @@ Run and the Test results list, the read-only view of a module entity, and the re
   dialog that asks for the kind and the name, or the locale for a `text`
   resource. The kind picker lists the 18 kinds that the create route accepts,
   which is every kind except the manifest. The author can type to narrow it.
+  _(planned for M17)_ `identityProvider` joins them, with a starter of type `accounts`.
   - It sends the kind's starter with an id from `crypto.randomUUID()`. A starter
     is the smallest content that passes the kind's schema. A reference the
     author must still choose is an empty string, so it shows up as a diagnostic.
@@ -454,7 +455,7 @@ Run and the Test results list, the read-only view of a module entity, and the re
   | `entity`      | Entity designer                                                 | Nothing                                                               |
   | `page`        | Typed editor, Design tab (see Page designer)                    | Nothing                                                               |
   | `form`        | Generic form, typed steps panel, Design tab (see Form designer) | Nothing                                                               |
-  | `site`        | Generic form                                                    | Nothing                                                               |
+  | `site`        | Generic form, `signIn` picker _(planned for M17)_               | Nothing                                                               |
   | `process`     | Typed editor, Design tab with the process graph                 | Nothing                                                               |
   | `rule`        | Generic form                                                    | Nothing                                                               |
   | `sequence`    | Generic form                                                    | Nothing                                                               |
@@ -469,6 +470,7 @@ Run and the Test results list, the read-only view of a module entity, and the re
   | `seed`        | Typed editor                                                    | Nothing                                                               |
   | `scenario`    | Typed editor                                                    | Nothing                                                               |
   | `text`        | Typed editor                                                    | Nothing                                                               |
+  | `identityProvider` | Typed editor _(planned for M17)_                           | Nothing                                                               |
 
   The generic form sends a part to the JSON view when it holds `oneOf` or
   `anyOf`, when it holds `allOf` with an item that has more than `if`, `then`
@@ -682,6 +684,32 @@ Run and the Test results list, the read-only view of a module entity, and the re
       shows a hint, and the compiler reports the error.
     - **Unknown keys.** A key the editor does not show, in the file, in an
       operation or in `auth`, is saved unchanged.
+  - **Identity provider editor** _(planned for M17)_. The Form tab shows the
+    provider's name and `type`, then the fields of that type. The JSON view
+    stays as a second view of the same draft. See
+    [identity provider resource](identity-provider.md#identity-provider-resource).
+    - **Type.** Choosing `accounts`, `oidc` or `saml` removes the keys the new
+      type forbids and adds the bindings it requires, with an empty name. An
+      `accounts` provider shows no label, bindings or claims.
+    - **Bindings.** As in the connector editor, a binding is a name box,
+      labelled as a URL or a secret binding, and no value is shown or stored.
+      `oidc` shows the issuer, the client id, and a choice of client credential:
+      a client secret, or a client key for `private_key_jwt`. `saml` shows the
+      metadata.
+    - **Label.** The "Continue with" label is a label with a text box for each
+      locale, as Label texts below describes.
+    - **Claims.** The display name, email and locale claims are name boxes that
+      show their defaults, `name`, `email` and `locale`, until the author types
+      another name.
+    - **Roles.** The roles claim is a name box that shows `roles` by default.
+      `values` are rows of a claim value and a role picked from the
+      application's roles, with add and remove. With no rows, a claim value gives
+      the role of the same name, and the editor says so.
+    - **Assurance.** `acr` is a list of text rows. With none, the key is removed.
+    - **Unknown keys.** A key the editor does not show is saved unchanged.
+    - **A site's sign-in.** On a `site`, `signIn` is a list of the application's
+      identity providers, picked by name, with add and remove. An empty list
+      removes `signIn`, so the site allows every provider, and the form says so.
   - **Scenario editor** _(built)_. The Form tab shows the scenario's name and
     `now`, then its users with their roles, its stubs, and its steps as a list
     with a panel per step type. The JSON view stays as a second view of the
