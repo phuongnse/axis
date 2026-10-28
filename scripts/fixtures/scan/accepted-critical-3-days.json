@@ -1,0 +1,5 @@
+{
+  "accepted": [
+    { "advisory": "GHSA-xvch-5gv4-984h", "package": "minimist", "found": "2026-10-25", "reason": "Waiting for the upstream fix" }
+  ]
+}
