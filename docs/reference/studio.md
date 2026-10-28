@@ -16,7 +16,7 @@ the request status and the preview links, the Releases list with Roll back, Run 
 Run and the Test results list, the read-only view of a module entity, and the reconnect message are built.
 
 - **Route.** `/studio` is a platform route, outside every site. The header
-  shows a Studio link only when `GET /api/me` answers `studio: true`. A person
+  lists Studio in the app switcher only when `GET /api/me` answers `studio: true`. A person
   who opens the route without the author role gets a `403` from the API and
   sees a forbidden page. A signed-out person is sent to sign in.
 - **Address.** The picked application and the selected resource are in the

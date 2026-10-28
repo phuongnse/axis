@@ -1,6 +1,7 @@
 import { expect, test } from '../test'
 import type { Locator } from '@playwright/test'
 import { useSession } from '../sessions'
+import { chooseLanguage, chooseTheme, expectChosen } from '../shell'
 
 test('the home page loads and reports a ready server', async ({ page }) => {
   await page.goto('/')
@@ -22,14 +23,14 @@ test('the shell header offers sign-in through the account button and no test use
 
 test('dark mode can be switched on and survives a reload', async ({ page }) => {
   await page.goto('/')
-  const toggle = page.getByRole('switch', { name: 'Dark mode', exact: true })
-  await expect(toggle).not.toBeChecked()
+  await expectChosen(page, 'Light')
 
-  await toggle.click()
-  await expect(toggle).toBeChecked()
+  await chooseTheme(page, 'Dark')
+  await expectChosen(page, 'Dark')
   await page.reload()
 
-  await expect(page.getByRole('switch', { name: 'Dark mode', exact: true })).toBeChecked()
+  await expect(page.locator('[data-theme-mode="dark"]')).toBeVisible()
+  await expectChosen(page, 'Dark')
 })
 
 test('the shell renders in light and dark mode', async ({ page }) => {
@@ -37,7 +38,7 @@ test('the shell renders in light and dark mode', async ({ page }) => {
 
   for (const mode of ['light', 'dark']) {
     if (mode === 'dark') {
-      await page.getByRole('switch', { name: 'Dark mode', exact: true }).click()
+      await chooseTheme(page, 'Dark')
     }
     const shell = page.locator(`[data-theme-mode="${mode}"]`)
     await expect(shell.getByRole('banner').getByRole('link', { name: 'Axis', exact: true })).toBeVisible()
@@ -71,7 +72,7 @@ test('the shell keeps its colours in light and dark mode', async ({ page }) => {
 
   for (const mode of ['light', 'dark'] as const) {
     if (mode === 'dark') {
-      await page.getByRole('switch', { name: 'Dark mode', exact: true }).click()
+      await chooseTheme(page, 'Dark')
     }
     const shell = page.locator(`[data-theme-mode="${mode}"]`)
     const banner = shell.getByRole('banner')
@@ -92,7 +93,7 @@ test('the sidebar draws the current entry in the selected colour in light and da
 
   for (const mode of ['light', 'dark'] as const) {
     if (mode === 'dark') {
-      await page.getByRole('switch', { name: 'Dark mode', exact: true }).click()
+      await chooseTheme(page, 'Dark')
     }
     const selectedItem = page
       .locator(`[data-theme-mode="${mode}"]`)
@@ -108,15 +109,14 @@ test('switching the locale changes the texts and survives a reload', async ({ pa
   await page.goto('/')
   await expect(page.getByRole('main').getByText('Welcome to Axis', { exact: true })).toBeVisible()
 
-  // The radio input itself takes no pointer events: people click its label.
-  await page.getByRole('radiogroup', { name: 'Language', exact: true }).getByText('Tiếng Việt', { exact: true }).click()
+  await chooseLanguage(page, 'Tiếng Việt')
 
   await expect(page.getByRole('main').getByText('Chào mừng đến với Axis', { exact: true })).toBeVisible()
   await expect(page.getByRole('contentinfo').getByText('Trạng thái máy chủ', { exact: true })).toBeVisible()
   await page.reload()
   await expect(page.getByRole('main').getByText('Chào mừng đến với Axis', { exact: true })).toBeVisible()
   await expect(page.getByRole('contentinfo').getByText('Trạng thái máy chủ', { exact: true })).toBeVisible()
-  await expect(page.getByRole('radio', { name: 'Tiếng Việt', exact: true })).toBeChecked()
+  await expectChosen(page, 'Tiếng Việt', 'Ngôn ngữ và giao diện')
 })
 
 test('the home page opens a site in its own shell, in light and dark mode', async ({ page }) => {
@@ -127,10 +127,10 @@ test('the home page opens a site in its own shell, in light and dark mode', asyn
   await page.getByRole('link', { name: 'E2E notes', exact: true }).click()
 
   await expect(page).toHaveURL(/\/e2e\/notes$/)
-  await expect(page.getByRole('main').getByText('Notes', { exact: true })).toBeVisible()
+  await expect(page.getByRole('main').getByRole('heading', { name: 'Notes', exact: true })).toBeVisible()
   for (const mode of ['light', 'dark']) {
     if (mode === 'dark') {
-      await page.getByRole('switch', { name: 'Dark mode', exact: true }).click()
+      await chooseTheme(page, 'Dark')
     }
     const shell = page.locator(`[data-theme-mode="${mode}"]`)
     await expect(shell.getByRole('menuitem', { name: 'Notes', exact: true })).toBeVisible()

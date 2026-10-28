@@ -7,9 +7,9 @@ endpoints and the widgets are in [frontend](frontend.md), and sign-in and the se
 [security](security.md#sign-in-and-the-session).
 
 [D98](../decisions/d98-rules-from-the-shell-review.md) agrees everything on this page. The [layout](#layout) and the
-[navigation icons](#navigation-icons) are built. M16 builds the rest, so every other section is _(planned for M16)_.
-Until the app switcher and the preferences menu are built, the header keeps the locale switch, the theme toggle and the
-Studio link beside the account button.
+[navigation icons](#navigation-icons), the [page header](#page-header) and the
+[app switcher and preferences](#app-switcher-and-preferences) are built. M16 builds the rest, so every other section is
+_(planned for M16)_.
 
 ## Layout
 
@@ -51,8 +51,6 @@ Studio link beside the account button.
 
 ## Page header
 
-_(planned for M16)_
-
 - Every page of a site starts with a header band on `surface` across the page area, with a `borderSubtle` rule below
   it, over the page's widgets on `canvas`.
 - The band holds the breadcrumb, then the page title in `heading4`. The breadcrumb starts at the site and ends at the
@@ -61,17 +59,18 @@ _(planned for M16)_
   Every step but the last is a link, and the last is marked `aria-current`.
 - A widget's actions stay in its own toolbar, because a page can hold several widgets and an action belongs to its
   widget, not to the page.
+- The platform home page has no band and no breadcrumb. It has its own welcome band, see the
+  [platform home page](#platform-home-page). The platform's Sessions page has the band, "Axis › Your sessions".
 
 ## App switcher and preferences
-
-_(planned for M16)_
 
 - **App switcher.** An icon button named "Switch to" opens a menu of the person's sites, by title, then the tools of
   their roles: Studio for an author and the operator console for an operator. It replaces the Studio link beside the
   account button. With nobody signed in it is not shown.
 - **Language and theme.** An icon button named "Language and theme" opens one menu with the site's languages and the
   light and dark themes, the current ones selected. It replaces the locale switch and the theme toggle in the header,
-  for signed-in people and for nobody signed in alike.
+  for signed-in people and for nobody signed in alike. At narrow width it sits in the Menu panel, while the app
+  switcher stays in the header.
 
 ## Platform home page
 

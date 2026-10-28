@@ -5,6 +5,7 @@ import { waitForDialog } from '../dialogs'
 import { expectShown, fieldLabel, fieldValue } from '../fields'
 import { pickOption } from '../select'
 import { sessionFile, useSession } from '../sessions'
+import { chooseTheme } from '../shell'
 
 // The record API needs a session with a grant, so these journeys start signed in as the employee anna.
 test.use({ storageState: sessionFile('anna') })
@@ -88,7 +89,7 @@ test('a note is created and edited in the form, in light and dark mode', async (
   await page.reload()
   await expect(edited).toContainText(`C-${run}`)
 
-  await page.getByRole('switch', { name: 'Dark mode', exact: true }).click()
+  await chooseTheme(page, 'Dark')
   await edited.getByRole('link', { name: `${title} edited`, exact: true }).click()
   const dark = page.locator('[data-theme-mode="dark"]')
   await expect(dark.getByRole('textbox', { name: 'Title', exact: true })).toHaveValue(`${title} edited`)
@@ -155,7 +156,7 @@ test('line items are added, edited and removed in the form, in light and dark mo
   await expect(cell('Quantity 2')).toHaveValue('1')
   const id = /\/e2e\/noteform\/([0-9a-f-]+)$/.exec(page.url())![1]
 
-  await page.getByRole('switch', { name: 'Dark mode', exact: true }).click()
+  await chooseTheme(page, 'Dark')
   const dark = page.locator('[data-theme-mode="dark"]')
   await dark.getByLabel(fieldLabel('Quantity 1')).fill('5')
   await dark.getByRole('button', { name: 'Remove', exact: true }).nth(1).click()
@@ -199,7 +200,7 @@ test('after a signed-in user edits a note, its history shows the update first, i
   const edited = page.getByRole('row', { name: new RegExp(`${title} edited`) })
   for (const mode of ['light', 'dark']) {
     if (mode === 'dark') {
-      await page.getByRole('switch', { name: 'Dark mode', exact: true }).click()
+      await chooseTheme(page, 'Dark')
     }
     await edited.getByRole('link', { name: `${title} edited`, exact: true }).click()
     const history = page.locator(`[data-theme-mode="${mode}"]`).getByTestId('record-history')

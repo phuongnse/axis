@@ -182,7 +182,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   host.
 - **Platform site.** The built-in platform site in `Axis.Presentation` serves
   the shell through two endpoints, `GET /api/site` and
-  `GET /api/texts/{locale}`. The home page also uses `GET /api/sites` (see
+  `GET /api/texts/{locale}`. The home page and the app switcher also use `GET /api/sites` (see
   Application sites below) to list the tenant's sites. When it answers `401`,
   the home page shows a sign-in prompt in place of the list.
   - `GET /api/site` returns the site name, its title key, the locales
@@ -549,8 +549,8 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     inside the site shell, as for a record.
   - Inside a site, the shell shows the site's title, navigation and locales in the
     [layout](shell.md#layout) of [Shell and home page](shell.md).
-    The theme toggle and the locale switch work as they do on the platform
-    site.
+    The page header, app switcher and language and theme menu work as they do on the platform site, see
+    [page header](shell.md#page-header) and [app switcher and preferences](shell.md#app-switcher-and-preferences).
 - **Table widget.** A page whose widget is a `table` lists the records of its
   entity through the record API, or the rows of its data source, in the
   shared Ant Design table.
@@ -905,12 +905,13 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   task inbox. See [task-inbox-widget.md](task-inbox-widget.md).
 - **Process inspector widget**. A page whose widget is a `processInspector` lists the instances of
   one process and opens one. See [process-inspector-widget.md](process-inspector-widget.md).
-- **Locale.** The shell header has a locale switch next to the light/dark toggle, in the Menu panel at narrow width. The
-  chosen locale is kept in `localStorage` under `axis.locale`, like the theme mode under `axis.themeMode`. These are the
-  only keys the SPA keeps in browser storage. Sign-out clears both through `Clear-Site-Data`, so the next sign-in starts
-  in the system theme and the site's default locale. One key serves every site: a site starts in the stored locale when
-  it offers it, and in its default locale otherwise. The shell keeps the current texts until the chosen locale's texts
-  have loaded. If they fail to load, it stays in the current locale and shows an error message.
+- **Locale.** The shell header has a language and theme menu, in the Menu panel at narrow width. It lists the
+  site's locales and Light and Dark. The chosen locale is kept in `localStorage` under `axis.locale`, like the
+  theme mode under `axis.themeMode`. These are the only keys the SPA keeps in browser storage. Sign-out clears
+  both through `Clear-Site-Data`, so the next sign-in starts in the system theme and the site's default locale.
+  One key serves every site: a site starts in the stored locale when it offers it, and in its default locale
+  otherwise. The shell keeps the current texts until the chosen locale's texts have loaded. If they fail to
+  load, it stays in the current locale and shows an error message.
   - Ant Design components, such as picker placeholders, follow the UI
     locale. `en` maps to Ant Design's `en_US` and `vi` to `vi_VN`, ignoring
     letter case, and any other locale uses `en_US`. dayjs, which the pickers
@@ -920,8 +921,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   button first among its actions. It loads `GET /api/me` each time a shell
   mounts, and shows nothing while it loads or when the load fails. See
   [sign-in and the session](security.md#sign-in-and-the-session).
-  The header also reads `studio` from it, and shows the [Studio](studio.md)
-  link beside the button when it is `true`.
+  The [app switcher](shell.md#app-switcher-and-preferences) reads `studio` and `console` from it.
   - With nobody signed in, it is a **Sign in** button. It sends the browser to
     `/api/auth/sign-in` with the current path and query string as `returnUrl`, so
     the person comes back there, but to `/` from the sign-in page `/?signIn=failed`.
@@ -958,7 +958,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     it shows even when the site itself fails to load with a `401`. Then nothing
     shows behind it, instead of the error that the site could not be loaded.
     Four calls are exempt and never show it. `GET /api/me` answers `401` when
-    nobody is signed in, so the header shows the button. The home page's
+    nobody is signed in, so the header shows the button and no app switcher. The home page's
     `GET /api/sites` answers `401` too, so the home page shows a sign-in prompt
     in place of the sites and stays open to a signed-out person. The
     notification bell's calls and Studio's readiness checks stay quiet as well.
@@ -969,7 +969,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
 - **Text resolution.** The SPA resolves each key through catalogs in order.
   On the platform site the only catalog is the platform texts. Inside an
   application site, the site texts come first and the platform texts second,
-  so shared shell texts such as the theme toggle keep working.
+  so shared shell texts such as the language and theme menu keep working.
   - Inside a site, the platform texts load in the site's current locale when
     the platform offers it. Otherwise only the platform fallback-locale texts
     serve the shell.
@@ -991,8 +991,8 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   [Studio](studio.md). Every platform table, including form line items and the reference lookup,
   scrolls sideways inside its widget, so the page never does. The shell header keeps the site title, the
   account button and a **Menu** button (`shell.navigation.menu`) with `aria-expanded`. It opens a panel with
-  the navigation, locale switch and theme toggle. Escape or following a link closes it, and Escape returns
-  focus to the button. There is no per-widget setting until a sample needs one, see
+  the navigation and the language and theme menu, while the app switcher stays in the header. Escape or
+  following a link closes it, and Escape returns focus to the button. There is no per-widget setting until a sample needs one, see
   [D61](../decisions/d61-widget-trees-in-columns-tabs-and-sections-and-pages-at-phone-width.md).
 
 ## Studio
