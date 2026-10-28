@@ -89,7 +89,7 @@ function Tools({ user }: { user: CurrentUser }) {
  * Proposed: the welcome band, the platform level of the page. It greets the user, with the tools of their roles
  * under the greeting, or the Sign in button when nobody is signed in.
  */
-function WelcomeBand({ user }: { user: CurrentUser | null | undefined }) {
+function WelcomeBand({ user }: { user: CurrentUser | undefined }) {
   const t = useText()
   const { spacing } = useDesignTokens()
   const hasTools = Boolean(user?.studio || user?.console)
@@ -100,22 +100,51 @@ function WelcomeBand({ user }: { user: CurrentUser | null | undefined }) {
           <Typography.Title level={4} style={{ margin: 0 }}>
             {t('shell.home.title')}
           </Typography.Title>
-          {user === null ? (
-            <>
-              <Typography.Text type="secondary" data-testid="sites-sign-in">
-                {t('shell.home.sites.signIn')}
-              </Typography.Text>
-              <AxisButton role="finish" onClick={startSignIn} style={{ marginTop: spacing.xs }}>
-                {t('shell.account.signIn')}
-              </AxisButton>
-            </>
-          ) : (
-            <Typography.Text type="secondary">{t('shell.home.subtitle')}</Typography.Text>
-          )}
+          <Typography.Text type="secondary">{t('shell.home.subtitle')}</Typography.Text>
         </Flex>
         {user && hasTools && <Tools user={user} />}
       </Flex>
     </Panel>
+  )
+}
+
+/**
+ * Proposed: the sign-in screen, what the home page shows with nobody signed in: one card in the middle of the page with
+ * the Axis mark, a title, a line that says sign-in happens at the organization's identity provider, and the Sign in
+ * button. After a refused sign-in the card shows a warning above the button.
+ */
+function SignInScreen({ failed }: { failed: boolean }) {
+  const t = useText()
+  const { spacing } = useDesignTokens()
+  return (
+    <Flex justify="center" style={{ paddingTop: spacing.xl }}>
+      <div style={{ width: '100%', maxWidth: 420 }}>
+        <Panel padding={spacing.xl}>
+          <Flex vertical gap={spacing.md} align="flex-start">
+            <TitleMark title={t('shell.title')} size={48} />
+            <Typography.Title level={4} style={{ margin: 0 }}>
+              {t('shell.signIn.title')}
+            </Typography.Title>
+            <Typography.Text type="secondary" data-testid="sites-sign-in">
+              {t('shell.signIn.hint')}
+            </Typography.Text>
+            {failed && (
+              <Alert
+                data-testid="sign-in-failed"
+                role="alert"
+                type="warning"
+                showIcon
+                title={t('shell.home.signInFailed')}
+                style={{ width: '100%' }}
+              />
+            )}
+            <AxisButton role="finish" block onClick={startSignIn}>
+              {t('shell.account.signIn')}
+            </AxisButton>
+          </Flex>
+        </Panel>
+      </div>
+    </Flex>
   )
 }
 
@@ -233,8 +262,8 @@ function Applications() {
 
 /**
  * Proposed: the platform home page, from the highest level to the lowest: a welcome band with the tools of the user's
- * roles, then the tenant's applications, each a card that lists its sites. With nobody signed in, the band asks the
- * person to sign in and the applications are not shown.
+ * roles, then the tenant's applications, each a card that lists its sites. With nobody signed in, it is the sign-in
+ * screen.
  */
 export function HomePage() {
   const t = useText()
@@ -243,6 +272,9 @@ export function HomePage() {
   const [searchParams] = useSearchParams()
   const signInFailed = searchParams.get('signIn') === 'failed'
 
+  if (user === null) {
+    return <SignInScreen failed={signInFailed} />
+  }
   return (
     <Flex vertical gap={spacing.lg}>
       {signInFailed && (

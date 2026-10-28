@@ -1,9 +1,10 @@
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { PlatformContext, type Platform } from '../pages/context'
 import { HomePage } from '../pages/HomePage'
 import { PageLayout } from '../platform/PageLayout'
 import { Shell } from '../platform/Shell'
 import { ShellHeightContext } from '../platform/shellHeight'
+import { SignInPrompt } from '../platform/SignInPrompt'
 import { FormWidget } from '../platform/FormWidget'
 import { TableWidget } from '../platform/TableWidget'
 import { formWidget, locale, siteTexts, sitePath, tableWidget } from './fixtures'
@@ -87,5 +88,19 @@ export function FormPageShellPreview() {
         <FormWidget widget={formWidget} sitePath={sitePath} pages={[]} recordId={null} returnTo="/ds" locale={locale} />
       </PageLayout>
     </SiteShellPreview>
+  )
+}
+
+/**
+ * An application site whose session has ended: the sign-in dialog over the Requests page. The dialog renders inside
+ * this state's own frame, which its transform makes the containing block of the dialog's fixed layers.
+ */
+export function SessionEndedPreview() {
+  const [frame, setFrame] = useState<HTMLDivElement | null>(null)
+  return (
+    <div ref={setFrame} style={{ position: 'relative', transform: 'translateZ(0)', overflow: 'hidden' }}>
+      <SiteShellPreview />
+      {frame && <SignInPrompt open getContainer={() => frame} />}
+    </div>
   )
 }

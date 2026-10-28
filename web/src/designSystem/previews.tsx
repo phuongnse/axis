@@ -10,7 +10,7 @@ import { TableWidget } from '../platform/TableWidget'
 import { TaskInboxWidget } from '../platform/TaskInboxWidget'
 import { WidgetTree } from '../platform/WidgetTree'
 import { FieldPreview } from './FieldPreview'
-import { FormPageShellPreview, PlatformShellPreview, SiteShellPreview } from './ShellPreview'
+import { FormPageShellPreview, PlatformShellPreview, SessionEndedPreview, SiteShellPreview } from './ShellPreview'
 import type { PreviewSession } from './shellFixtures'
 import { SubmittedOnMount } from './SubmittedOnMount'
 import {
@@ -203,6 +203,7 @@ export const previews: Record<string, readonly PreviewState[]> = {
   signIn: [
     { caption: 'Signed out', draw: () => <PlatformShellPreview />, at: '/' },
     { caption: 'Sign-in refused', draw: () => <PlatformShellPreview />, at: '/?signIn=failed' },
+    { caption: 'Session ended', draw: () => <SessionEndedPreview />, at: `/${sitePath}/requests` },
   ],
 }
 

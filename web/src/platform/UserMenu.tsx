@@ -1,5 +1,6 @@
 import { Button, Dropdown, type MenuProps } from 'antd'
 import { useEffect, useState } from 'react'
+import { useLocation } from 'react-router'
 import { startSignIn } from './api'
 import { fetchCurrentUser, signOutSession, type CurrentUser } from './currentUser'
 import { assignLocation } from './navigation'
@@ -15,6 +16,7 @@ import { useText } from './texts'
 export function UserMenu() {
   const t = useText()
   const [user, setUser] = useState<CurrentUser | null | undefined>(undefined)
+  const { pathname } = useLocation()
 
   useEffect(() => {
     const controller = new AbortController()
@@ -27,6 +29,11 @@ export function UserMenu() {
   }, [])
 
   if (user === undefined) {
+    return null
+  }
+
+  // Proposed: the platform home page is the sign-in screen with nobody signed in, so the header shows no second button.
+  if (user === null && pathname === '/') {
     return null
   }
 
