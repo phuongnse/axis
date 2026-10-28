@@ -53,9 +53,9 @@
 # Arguments go to Playwright, for example tests/e2e/specs/studio.spec.ts or --grep 'publishes'. A spec path
 # is relative to the repository root. With arguments only the matching specs run, after the setup project.
 # A change is checked in minutes, and the full run stays the check.
-# AXIS_E2E_SHARD, such as 2/3, runs that shard of Playwright, so CI can split the suite over several
-# machines. A shard's Playwright results go to playwright-<n>.xml, so no two shards share a file. Without it
-# the whole suite runs.
+# AXIS_E2E_SHARD, such as 2/3, runs that shard of Playwright, so CI and NexKit's checks can split the suite
+# over several machines. A shard's Playwright results go to playwright-<n>.xml, so no two shards share a
+# file. Without it the whole suite runs.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 source scripts/lib/test-results.sh

@@ -20,8 +20,9 @@ concurrency:
 
 jobs:
   # The checks run as six parallel jobs, so the run takes as long as its slowest job, not all of them.
-  # Playwright is split into three shards, each a job of its own. Each shard's step still runs exactly
-  # scripts/e2e.sh, so NexKit matches a pull request's failing e2e check with a failed shard here.
+  # Playwright is split into three shards, each a job of its own. Each shard's step runs the command of
+  # NexKit's check for that shard, such as AXIS_E2E_SHARD=2/3 scripts/e2e.sh, so NexKit matches a pull
+  # request's failing e2e-2 check with a failed shard 2/3 here.
   checks:
     name: ${{ matrix.name }}
     runs-on: ubuntu-24.04
@@ -117,9 +118,7 @@ jobs:
         run: scripts/smoke.sh
       - name: End-to-end tests
         if: ${{ !cancelled() && steps.build.outcome == 'success' && matrix.suite == 'e2e' }}
-        run: scripts/e2e.sh
-        env:
-          AXIS_E2E_SHARD: ${{ matrix.shard }}
+        run: AXIS_E2E_SHARD=${{ matrix.shard }} scripts/e2e.sh
       - name: Upload test results
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
