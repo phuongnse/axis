@@ -10,6 +10,10 @@ import { useSession } from "../sessions";
 // Each journey starts a second server and publishes once, which takes a while.
 test.setTimeout(240_000);
 
+// This spec asks for motion on purpose, so that slowAnimations makes a click that does not wait for the dialog land
+// during its zoom (D97).
+test.use({ reducedMotion: "no-preference" });
+
 /** Slows the page's animations, so a click that does not wait for a dialog to open always lands during its zoom. */
 async function slowAnimations(page: Page) {
   const cdp = await page.context().newCDPSession(page);

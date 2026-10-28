@@ -10,10 +10,14 @@ describe('installFormSubmission', () => {
 
   beforeEach(() => {
     uninstall = installFormSubmission()
-    document.body.innerHTML = '<form><input name="title" /><button type="submit">Save</button></form>'
-    form = document.querySelector('form')!
-    input = form.querySelector('input')!
-    button = form.querySelector('button')!
+    form = document.createElement('form')
+    input = document.createElement('input')
+    input.name = 'title'
+    button = document.createElement('button')
+    button.type = 'submit'
+    button.textContent = 'Save'
+    form.append(input, button)
+    document.body.append(form)
     submits = []
     form.addEventListener('submit', (event) => {
       event.preventDefault()
@@ -23,7 +27,7 @@ describe('installFormSubmission', () => {
 
   afterEach(() => {
     uninstall()
-    document.body.innerHTML = ''
+    document.body.replaceChildren()
   })
 
   test('a click on a submit button fires one submit event and cancels the native submission', () => {
@@ -50,7 +54,9 @@ describe('installFormSubmission', () => {
 
   test('Enter in a form with no submit button and two fields fires no submit event', () => {
     button.remove()
-    form.insertAdjacentHTML('beforeend', '<input name="other" />')
+    const other = document.createElement('input')
+    other.name = 'other'
+    form.append(other)
     input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }))
 
     expect(submits).toHaveLength(0)

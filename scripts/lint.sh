@@ -16,6 +16,9 @@ fi
 # Specs match accessible names and texts exactly. Only a regular expression matches part of one.
 node scripts/check-locators.mjs
 
+# The SPA shows every value as text and never writes one into the page as HTML (ASVS V1.2.1, V3.2.2).
+node scripts/check-raw-html.mjs
+
 # A test outside a *PerformanceTests class passes or fails the same way on any runner, so it measures
 # no elapsed time. A polling deadline built on DateTime.UtcNow only ends a wait and is allowed.
 if git grep -nE --untracked '(^|[^[:alnum:]_])(Stopwatch|GetElapsedTime)([^[:alnum:]_]|$)|\.Elapsed([^[:alnum:]_]|$)' -- 'tests/*.cs' ':(exclude)tests/*PerformanceTests.cs'; then

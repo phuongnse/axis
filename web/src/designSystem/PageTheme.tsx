@@ -3,6 +3,7 @@ import { useMemo, useSyncExternalStore, type ReactNode } from 'react'
 import { antThemeFor } from '../platform/antTheme'
 import { designTokensFor, pageTokenPropertyNames, type PageTokenValues } from '../platform/designTokens'
 import { ThemeModeContext, type ThemeMode } from '../platform/themeMode'
+import { useReducedMotion } from '../platform/useReducedMotion'
 
 function subscribe(onChange: () => void): () => void {
   const observer = new MutationObserver(onChange)
@@ -44,7 +45,8 @@ export function PageTheme({ children }: { children: ReactNode }) {
   )
   // The page owns the mode, so a widget's request to toggle it changes nothing.
   const value = useMemo(() => ({ mode, toggleMode: () => {}, tokens: designTokensFor(mode, values) }), [mode, values])
-  const config = useMemo(() => antThemeFor(mode, values), [mode, values])
+  const reducedMotion = useReducedMotion()
+  const config = useMemo(() => antThemeFor(mode, values, reducedMotion), [mode, values, reducedMotion])
 
   return (
     <ThemeModeContext.Provider value={value}>
