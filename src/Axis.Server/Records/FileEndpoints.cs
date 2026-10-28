@@ -28,7 +28,8 @@ namespace Axis.Server.Records;
 /// cover the field. For a child field it must cover the owner's child collection field. Record filters are not
 /// read, because an upload has no record yet.
 /// A body is checked in order: a missing, extra or malformed part, a part without a file name and an empty file
-/// are 400, a media type that the field's <c>accept</c> refuses is 415, a file over the field's <c>maxSize</c> or
+/// are 400, a media type that the field's <c>accept</c> refuses is 415, a declared <c>image/svg+xml</c> is 415
+/// whatever <c>accept</c> says because an SVG can carry scripts, a file over the field's <c>maxSize</c> or
 /// the host's <c>Files:MaxSize</c> is 413 as soon as the limit is passed, and a file that starts like an
 /// executable, or does not start as its declared PDF, PNG, JPEG, GIF, WebP or ZIP type does, is 415. A part
 /// without a content type is stored as <c>application/octet-stream</c>, and the parameters of a media type are dropped.
@@ -51,6 +52,7 @@ internal static class FileEndpoints
     private const int ChunkSize = 81920;
     private const long RequestSizeMargin = 1_048_576;
     private const string OctetStream = "application/octet-stream";
+    private const string Svg = "image/svg+xml";
 
     public static void MapFileEndpoints(this IEndpointRouteBuilder endpoints)
     {
@@ -300,7 +302,7 @@ internal static class FileEndpoints
                 return UploadedPart.Fail(BadPart("The request must hold one part named file, with a file name."));
             }
 
-            if (MediaType(section.ContentType) is not { } mediaType || !Accepts(field.Accept, mediaType))
+            if (MediaType(section.ContentType) is not { } mediaType || mediaType == Svg || !Accepts(field.Accept, mediaType))
             {
                 return UploadedPart.Fail(Results.Problem(statusCode: StatusCodes.Status415UnsupportedMediaType, title: "The file's media type is not accepted."));
             }
