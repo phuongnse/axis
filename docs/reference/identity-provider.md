@@ -4,7 +4,7 @@ Axis ships an identity provider of its own, so people sign in on one standard Ax
 their organization uses. [D99](../decisions/d99-axis-ships-its-own-identity-provider.md) agrees it, and
 [D100](../decisions/d100-identity-providers-per-application-and-sign-in-per-site.md) lets each application declare how
 its people sign in and each site pick from that. M17 builds it, and each section says whether it is built. The
-`identityProvider` resource and its compile checks are built. Sign-in and activation do not read the resource yet, so
+`identityProvider` resource, a site's `signIn` and their compile checks are built. Sign-in and activation do not read them yet, so
 until they do, each tenant's `Oidc` block points at an identity provider that runs outside
 Axis, as [security](security.md#sign-in-and-the-session) describes. Accounts, roles given by an administrator and the
 users page are in [user administration](user-administration.md).
@@ -93,25 +93,33 @@ so Studio edits it, with the identity provider editor of [Studio](studio.md), an
     `metadata` on `oidc`, an `issuer` or client binding on `saml`, and both `clientSecret` and `clientKey`. It also
     requires a `label` for `oidc` and `saml`.
   - A module holds no identity provider, because it holds no bindings, so a module file of this kind is `AXC0202`.
-  - A site's `signIn` entry that names no provider is a compile error with a new diagnostic code _(planned for M17)_.
+  - A site's `signIn` entry that names no provider is `AXC0289`, see
+    [sites and sign-in](#sites-and-sign-in).
 - **Not read yet:** sign-in and activation do not read the resource yet. Activation does not check the bindings
-  against the tenant's, and Studio does not create the kind, so an author adds the file by hand.
+  against the tenant's. Studio's blank application creates an `accounts` provider, but Studio has no other way to create
+  the kind yet, so an author adds any other provider by hand.
 
 ## Sites and sign-in
 
-_(planned for M17)_
-
 - **`signIn`:** a site lists the providers it allows, by name, as `"signIn": ["company"]`. A site with no `signIn`
-  allows its application's providers, all of them. An application with sites and no provider is a compile error.
-- **A client for each site:** activation gives each site a client of the tenant's realm. A sign-in starts for the site
+  allows its application's providers, all of them. Built, with the compile checks below. Sign-in does not read it yet.
+  - Names are compared ignoring letter case. The list has at least one entry and no repeated entry, or it is
+    `AXC0004`. To allow every provider, leave `signIn` out.
+  - An entry that names no provider of the application is `AXC0289`, at `/signIn/{i}` of the site file.
+  - An application with sites and no provider is `AXC0290`, at the root of each site file. The samples and the
+    application that Studio creates each declare an `accounts` provider for this.
+  - A name that matches a provider file that failed the schema is not reported again, and such a file also prevents
+    `AXC0290`.
+  - The compiled site carries the providers it allows.
+- _(planned for M17)_ **A client for each site:** activation gives each site a client of the tenant's realm. A sign-in starts for the site
   that `returnUrl` opens, through that site's client, and the realm's page shows only that site's providers. With one
   provider and no accounts, the server sends the person straight to it.
-- **The callback checks again:** the realm tells the server which provider signed the person in. The server refuses a
+- _(planned for M17)_ **The callback checks again:** the realm tells the server which provider signed the person in. The server refuses a
   callback whose provider is not in the site's `signIn`, or whose `acr` the provider does not accept, as any refused
   callback, see [security](security.md#sign-in-and-the-session). The realm's page is not the control.
-- **Sign-in once:** a person signed in through a provider at the realm opens another site that allows it without
+- _(planned for M17)_ **Sign-in once:** a person signed in through a provider at the realm opens another site that allows it without
   being asked again. A site that does not allow it asks the person to sign in with one it does.
-- **A host of its own:** `tenant host add <id> <host> --site <path>` gives a tenant host to one site, see
+- _(planned for M17)_ **A host of its own:** `tenant host add <id> <host> --site <path>` gives a tenant host to one site, see
   [hosts](tenant-setting-commands.md#hosts).
   - That host serves only the site, at `/`. Platform pages and other sites are `404` there, and its session cookie
     reaches nothing else.

@@ -14,7 +14,8 @@ namespace Axis.Configuration.Compilation;
 /// manifest's <c>fileStorage</c> a <c>storage</c>, and a provider's own bindings as the doc says.
 /// Names are compared ignoring letter case. A role in <c>roles.values</c> is a declared role. An
 /// application has at most one <c>accounts</c> provider. The schema already refuses the properties
-/// that a type does not take. Every problem of a provider is reported in one pass. Its bindings are
+/// that a type does not take. A site's <c>signIn</c> names providers of the application, compared
+/// ignoring letter case, and an application with sites needs at least one provider. Every problem of a provider is reported in one pass. Its bindings are
 /// not checked against the tenant's yet.
 /// </summary>
 internal static class IdentityProviderChecker
@@ -89,6 +90,49 @@ internal static class IdentityProviderChecker
                         DiagnosticCodes.SecondAccountsProvider,
                         $"An application has at most one '{Accounts}' provider, and '{firstAccounts.File}' is one already.",
                         "/type");
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Checks that each site has a provider to sign in with, and that each <c>signIn</c> entry names one.
+    /// A name in <paramref name="unloadedProviderNames"/> counts as a provider, so one broken file gives one error.
+    /// </summary>
+    public static void CheckSites(
+        IReadOnlyList<SiteResource> sites,
+        IReadOnlyList<IdentityProviderResource> providers,
+        IReadOnlySet<string> unloadedProviderNames,
+        List<Diagnostic> diagnostics)
+    {
+        if (providers.Count == 0 && unloadedProviderNames.Count == 0)
+        {
+            foreach (var site in sites)
+            {
+                diagnostics.Add(new Diagnostic(
+                    DiagnosticCodes.SiteWithoutIdentityProvider,
+                    $"An application with sites needs at least one identity provider, such as an '{Accounts}' provider.",
+                    site.File,
+                    string.Empty,
+                    site.Id));
+            }
+
+            return;
+        }
+
+        var names = new HashSet<string>(providers.Select(provider => provider.Name), StringComparer.OrdinalIgnoreCase);
+        foreach (var site in sites)
+        {
+            for (var i = 0; site.SignIn is { } signIn && i < signIn.Count; i++)
+            {
+                if (!names.Contains(signIn[i]) && !unloadedProviderNames.Contains(signIn[i]))
+                {
+                    diagnostics.Add(new Diagnostic(
+                        DiagnosticCodes.UnknownSignInProvider,
+                        $"The identity provider '{signIn[i]}' is not declared in this application.",
+                        site.File,
+                        $"/signIn/{i}",
+                        site.Id));
                 }
             }
         }

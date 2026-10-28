@@ -565,7 +565,8 @@ public sealed class ReleaseActivatorTests(DataDatabaseFixture database) : IClass
         folder
             .With("texts/en.json", Texts(Guid.NewGuid()))
             .With("pages/orders.json", OrdersPage(Guid.NewGuid()))
-            .With("sites/main.json", Site(siteId ?? Guid.NewGuid(), path));
+            .With("sites/main.json", Site(siteId ?? Guid.NewGuid(), path))
+            .With("identity-providers/accounts.json", AccountsProvider(Guid.NewGuid()));
 
     private static string Texts(Guid id) =>
         $$"""
@@ -578,6 +579,9 @@ public sealed class ReleaseActivatorTests(DataDatabaseFixture database) : IClass
         { "id": "{{id}}", "kind": "page", "name": "Orders", "formatVersion": 1,
           "title": { "textKey": "orders.title" }, "widgets": [ { "type": "table", "entity": "Order" } ] }
         """;
+
+    private static string AccountsProvider(Guid id) =>
+        $$"""{ "id": "{{id}}", "kind": "identityProvider", "name": "accounts", "formatVersion": 1, "type": "accounts" }""";
 
     private static string Site(Guid id, string path) =>
         $$"""
