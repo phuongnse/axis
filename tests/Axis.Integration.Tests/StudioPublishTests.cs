@@ -261,6 +261,8 @@ public sealed class StudioPublishTests : IAsyncLifetime
     {
         var settings = new Dictionary<string, string?>
         {
+            // The databases run without TLS, which only Development and Testing allow.
+            ["DOTNET_ENVIRONMENT"] = "Testing",
             ["Tenancy:Source"] = "configuration",
             [$"Tenants:{tenant}:Hosts:0"] = host,
             [$"Tenants:{tenant}:ConnectionString"] = PostgreSqlServer.RuntimeConnectionString(connectionString),

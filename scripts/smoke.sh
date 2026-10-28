@@ -5,11 +5,12 @@
 # - compose: scripts/compose.test.mjs builds the image and runs the Compose stack on free ports.
 # - images: scripts/images.test.mjs builds the production images axis-server, axis-worker and axis-admin,
 #   each up to three times with a wait of 15 and 30 seconds, and runs them read-only against a throwaway
-#   PostgreSQL.
+#   PostgreSQL that serves TLS, with SSL Mode=VerifyFull in their connection strings.
 # - onprem: scripts/onprem.test.mjs installs deploy/compose/compose.yaml from the production images as
-#   docs/reference/installation.md says, against a test PostgreSQL and Keycloak over HTTPS. It creates two
-#   tenants, activates the leave request sample, checks each tenant's site and sign-in, suspend and resume,
-#   and an unknown host. It reads the sample modules, which this script installs in artifacts/modules.
+#   docs/reference/installation.md says, against a test PostgreSQL over TLS and Keycloak over HTTPS. Every
+#   connection string sets SSL Mode=VerifyFull, and the test checks that every Axis connection uses TLS. It
+#   creates two tenants, activates the leave request sample, checks each tenant's site and sign-in, suspend
+#   and resume, and an unknown host. It reads the sample modules, which this script installs in artifacts/modules.
 # Each is skipped when $NEXKIT_BASE_SHA shows that nothing it covers changed, by the path lists in
 # scripts/lib/affected.mjs. CI runs this script as a job of its own, beside the integration tests and the
 # Playwright shards.

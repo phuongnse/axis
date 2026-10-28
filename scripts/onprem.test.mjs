@@ -7,8 +7,11 @@
 // reads it back through the other, and checks that a stale save answers 409. Requires Docker and openssl, and the
 // sample modules in artifacts/modules, which scripts/smoke.sh installs. Run from scripts/smoke.sh.
 //
-// Everything the test adds lives in an override file in a temporary folder: PostgreSQL, Keycloak over
+// Everything the test adds lives in an override file in a temporary folder: PostgreSQL over TLS, Keycloak over
 // HTTPS with a certificate authority made for the run, the modules folder and a short refresh interval.
+// PostgreSQL serves a certificate of the same authority, every connection string sets SSL Mode=VerifyFull with
+// that authority as Root Certificate, and the test checks in pg_stat_ssl that every Axis connection uses TLS.
+// The production hosts refuse a connection string with a weaker mode.
 // Keycloak imports a copy of the development realm that adds the https redirect addresses of the tenants.
 // The production server refuses an identity provider over plain http, so Keycloak serves https and only
 // the server in this test trusts the certificate authority, through SSL_CERT_FILE.
@@ -25,6 +28,7 @@ import { after, before, describe, test } from 'node:test'
 import { connect as tlsConnect } from 'node:tls'
 import { fileURLToPath } from 'node:url'
 import { buildImage } from './lib/docker-build.mjs'
+import { issuePostgresCertificate, postgresTlsScript, serverCertificateMount, verifyFull } from './lib/postgres-tls.mjs'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
 const composeFile = join(root, 'deploy/compose/compose.yaml')
@@ -440,12 +444,14 @@ describe('the on-premises installation', () => {
       mkdirSync(secrets)
       chmodSync(secrets, 0o755)
       const passwords = { schema: password(), platform: password(), admin: password(), postgres: password() }
-      const connection = (user, pass) => `Host=postgres;Port=5432;Database=axis_platform;Username=${user};Password=${pass}`
+      const trust = verifyFull('/run/test-ca/ca.crt')
+      const connection = (user, pass) =>
+        `Host=postgres;Port=5432;Database=axis_platform;Username=${user};Password=${pass}${trust}`
       writeFile(join(secrets, 'ConnectionStrings__PlatformSchema'), connection('axis_platform_schema', passwords.schema))
       writeFile(join(secrets, 'ConnectionStrings__Platform'), connection('axis_platform', passwords.platform))
       writeFile(
         join(secrets, 'Admin__ConnectionString'),
-        `Host=postgres;Port=5432;Database=postgres;Username=axis_admin;Password=${passwords.admin}`,
+        `Host=postgres;Port=5432;Database=postgres;Username=axis_admin;Password=${passwords.admin}${trust}`,
       )
       writeFile(join(secrets, 'Platform__SecretKey'), randomBytes(32).toString('base64'))
 
@@ -463,7 +469,7 @@ describe('the on-premises installation', () => {
       )
 
       // Step 4, the certificates: a certificate authority, a certificate of Keycloak for the name keycloak,
-      // and a certificate of the proxy for the two tenant hosts.
+      // a certificate of PostgreSQL for the name postgres and a certificate of the proxy for the two tenant hosts.
       const certs = join(folder, 'certs')
       mkdirSync(certs)
       chmodSync(certs, 0o755)
@@ -474,6 +480,12 @@ describe('the on-premises installation', () => {
       openssl('x509', '-req', '-in', at('tls.csr'), '-CA', at('ca.crt'), '-CAkey', at('ca.key'), '-CAcreateserial', '-days', '2', '-extfile', 'leaf.ext', '-out', at('tls.crt'))
       for (const name of readdirSync(certs)) chmodSync(join(certs, name), 0o644)
       caCertificate = readFileSync(join(certs, 'ca.crt'))
+      const { serverDir } = issuePostgresCertificate({
+        folder,
+        openssl,
+        name: 'postgres',
+        ca: { certificate: join(certs, 'ca.crt'), key: join(certs, 'ca.key') },
+      })
 
       // The proxy's folder holds tls.crt and tls.key, which is what AXIS_TLS_DIR names.
       const tls = join(folder, 'tls')
@@ -513,6 +525,8 @@ describe('the on-premises installation', () => {
         environment: { ...refresh, SSL_CERT_FILE: '/run/test-ca/ca.crt' },
         volumes: [`${certs}:/run/test-ca:ro`],
       }
+      // Every host reads the authority certificate that its connection strings name.
+      const trustOverride = { volumes: [`${certs}:/run/test-ca:ro`] }
       overrideFile = join(folder, 'override.json')
       writeFile(
         overrideFile,
@@ -521,7 +535,11 @@ describe('the on-premises installation', () => {
             postgres: {
               image: 'postgres:18-alpine',
               environment: { POSTGRES_USER: 'postgres', POSTGRES_PASSWORD: passwords.postgres },
-              volumes: [`${initSql}:/docker-entrypoint-initdb.d/init-roles.sql:ro`],
+              entrypoint: ['sh', '-c', postgresTlsScript],
+              volumes: [
+                `${initSql}:/docker-entrypoint-initdb.d/init-roles.sql:ro`,
+                `${serverDir}:${serverCertificateMount}:ro`,
+              ],
             },
             keycloak: {
               image: 'quay.io/keycloak/keycloak:26.4',
@@ -537,8 +555,9 @@ describe('the on-premises installation', () => {
             },
             server: serverOverride,
             'server-2': serverOverride,
-            worker: { environment: refresh },
-            publisher: { environment: refresh },
+            worker: { environment: refresh, ...trustOverride },
+            publisher: { environment: refresh, ...trustOverride },
+            admin: trustOverride,
           },
         }),
       )
@@ -640,6 +659,21 @@ describe('the on-premises installation', () => {
       // Both hosts are ready.
       assert.equal((await server('localhost', '/health/ready')).status, 200)
       assert.equal((await request(workerPort, 'localhost', '/health/ready')).status, 200)
+
+      // Every connection that an Axis host holds uses TLS. The check itself connects as postgres over the Unix socket,
+      // so it leaves out that user.
+      const connections = compose(
+        [
+          'exec', '-T', 'postgres', 'psql', '-U', 'postgres', '-tA', '-F', ',', '-c',
+          `select count(*) filter (where s.ssl), count(*) filter (where not s.ssl)
+             from pg_stat_activity a join pg_stat_ssl s using (pid)
+            where a.backend_type = 'client backend' and a.usename <> 'postgres'`,
+        ],
+      )
+      assert.equal(connections.status, 0, connections.stderr)
+      const [withTls, withoutTls] = connections.stdout.trim().split(',').map(Number)
+      assert.ok(withTls > 0, `no Axis connection uses TLS\n${connections.stdout}`)
+      assert.equal(withoutTls, 0, `${withoutTls} Axis connections do not use TLS`)
 
       // Each tenant's database holds the active site.
       for (const id of Object.keys(hosts)) {

@@ -193,8 +193,11 @@ file is named after its setting, and its content is the value.
 Write each file with `printf '%s'`, so it has no trailing newline. Make the
 folder and the files readable by UID 1654, the user the images run as. The
 worker never gets `ConnectionStrings__PlatformSchema`. Generate the key once
-with `openssl rand -base64 32`. The connection strings name the database server
-as the hosts reach it. The admin tool records the host and port of
+with `openssl rand -base64 32`. Each connection string sets `SSL Mode=VerifyFull`,
+and `Root Certificate` when your PostgreSQL certificate comes from a private
+authority, because the hosts refuse anything weaker, see [TLS](#tls). The
+connection strings name the database server as the hosts reach it, which is a
+name in the PostgreSQL certificate. The admin tool records the host and port of
 `Admin__ConnectionString` as the tenant database server, so the server and the
 worker must reach it there too.
 
@@ -290,16 +293,19 @@ states. The `replicas` profile starts `server-2`, configured like
 
 **The smoke test.** `scripts/onprem.test.mjs` installs the example as the five
 steps say, and `scripts/smoke.sh` runs it. It builds the three production images
-and starts a test PostgreSQL and a Keycloak over HTTPS, with a certificate
+and starts a test PostgreSQL over TLS and a Keycloak over HTTPS, with a certificate
 authority it makes for the run, and imports a copy of the development realm that
-adds the tenants' `https://` redirect addresses. A static check of the rendered configuration shows that
+adds the tenants' `https://` redirect addresses. PostgreSQL serves a certificate
+of the same authority for the name `postgres`, and every connection string sets
+`SSL Mode=VerifyFull` and that authority as `Root Certificate`. A static check of the rendered configuration shows that
 `compose.yaml` alone gives no service the scenario secret or `Studio__Tests`, and that adding
 `compose.scenarios.yaml` gives the secret to the publisher only and `Studio__Tests` to both servers only. The
 smoke test runs no `test` request against the installed images. An override file in a temporary folder holds
 everything the test adds, so `deploy/compose/compose.yaml` stays as an
 operator uses it. The test then:
 
-1. Creates the database roles with the SQL above and writes the secret files.
+1. Creates the database roles with the SQL above and writes the secret files,
+   each connection string with `SSL Mode=VerifyFull`.
 2. Runs `migrate`, starts the server and the worker, waits for `/health/ready`,
    and then starts the publisher.
 3. Runs `tenant create` for two tenants, `one` and `two`, with their own hosts.
@@ -309,7 +315,9 @@ operator uses it. The test then:
    still hold no sample module.
 5. Checks that both hosts are ready, that each tenant's host serves `/leave`
    and holds the active site in its database, and that each tenant's sign-in
-   redirects to Keycloak and returns to that tenant's host.
+   redirects to Keycloak and returns to that tenant's host. Checks in
+   `pg_stat_ssl` that at least one Axis connection uses TLS and that none
+   does not.
 6. Checks that a host no tenant holds answers `404`. Suspends tenant `two`,
    checks that it answers `503` while `one` still serves, then resumes it and
    checks that it serves again.
@@ -531,16 +539,25 @@ The rule for traffic that comes in, and for every connection Axis makes.
   authority to that store. Do not replace the store with `SSL_CERT_FILE`, which
   makes the server trust only that file, see [on premises](#on-premises).
 - **PostgreSQL.** Set `SSL Mode=VerifyFull` in the host's own connection
-  string, plus `Root Certificate` for a private authority. Every tenant
+  string, plus `Root Certificate` for a private authority. Outside Development
+  and Testing, the server, the worker, the publisher and the admin tool stop at
+  start when one of their own connection strings sets a lower mode or none, and
+  the error names the setting and never shows its value. The server checks
+  `ConnectionStrings:Platform` and `ConnectionStrings:PlatformSchema`. The
+  worker checks `ConnectionStrings:Platform` under
+  `Tenancy:Source=directory`. Every admin command, `publisher` included, checks
+  `Admin:ConnectionString`, `ConnectionStrings:PlatformSchema` and
+  `Scenarios:ServerConnectionString` when set, and exits with code 2. Every tenant
   connection copies `SSL Mode`, `Root Certificate` and
   `Check Certificate Revocation` from `ConnectionStrings:Platform` (the server
   and the worker), `Admin:ConnectionString` (`tenant create` and
   `tenant restore`) or `ConnectionStrings:PlatformSchema` (the other admin
   commands and the publisher). `pg_dump` and `pg_restore` get `PGSSLMODE` and
   `PGSSLROOTCERT`, with `system` under `verify-full` when no root certificate
-  is named. The default `Prefer` falls back to plain text, so TLS is enforced
-  only when you set the mode. Tenants under `Tenancy:Source=configuration`
-  carry their own settings in their connection strings.
+  is named. A connection string with no `SSL Mode` counts as `Prefer`, which
+  falls back to plain text, so it is refused. Tenants under
+  `Tenancy:Source=configuration` carry their own settings in their connection
+  strings, and the hosts do not check them.
 - **URL bindings.** A `url` binding must be `https` outside Development.
   Activation refuses an `http` binding, and the worker never sends a call to
   one, see [deployment bindings](integration-resources.md#deployment-bindings).
@@ -580,6 +597,15 @@ says. So migrate first and roll out the hosts second.
 Between steps 2 and 3, migrated tenants answer `503`. A tenant whose migration
 failed keeps its old version. See [migrate](administration.md#migrate) for the
 window and for failed tenants.
+
+**PostgreSQL over TLS.** A host outside Development and Testing stops at start
+when a connection string of its own sets `SSL Mode` below `VerifyFull`, or sets
+none, see [TLS](#tls). An existing install whose strings use the default
+`Prefer` stops at the next start. Before you roll out the hosts, make
+PostgreSQL serve TLS and set `SSL Mode=VerifyFull` in `ConnectionStrings__Platform`,
+`ConnectionStrings__PlatformSchema` and `Admin__ConnectionString`. Add
+`Root Certificate` when the certificate comes from a private authority. The admin
+image checks the same strings, so `migrate` in step 2 needs them too.
 
 **No downgrade.** Migrations are not reversed. To roll back, restore the backup
 from step 1 and run the old images.
