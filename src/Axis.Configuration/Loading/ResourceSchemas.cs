@@ -23,6 +23,7 @@ internal static class ResourceSchemas
         [ResourceKinds.Role] = Load("role.schema.json"),
         [ResourceKinds.Policy] = Load("policy.schema.json"),
         [ResourceKinds.Connector] = Load("connector.schema.json"),
+        [ResourceKinds.IdentityProvider] = Load("identityProvider.schema.json"),
         [ResourceKinds.Event] = Load("event.schema.json"),
         [ResourceKinds.Endpoint] = Load("endpoint.schema.json"),
         [ResourceKinds.Trigger] = Load("trigger.schema.json"),

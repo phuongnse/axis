@@ -269,4 +269,9 @@ public static class DiagnosticCodes
     public const string EscalationNotBeforeDeadline = "AXC0281";
     public const string SensitiveNotifyValue = "AXC0282";
     public const string WaitEventOverOtherEntity = "AXC0283";
+    public const string UnknownIdentityProviderType = "AXC0284";
+    public const string IdentityProviderBindingKind = "AXC0285";
+    public const string MissingIdentityProviderBinding = "AXC0286";
+    public const string UnknownIdentityProviderRole = "AXC0287";
+    public const string SecondAccountsProvider = "AXC0288";
 }

@@ -1,0 +1,109 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Axis identity provider",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "kind", "name", "formatVersion", "type"],
+  "properties": {
+    "id": { "$ref": "#/$defs/id" },
+    "kind": { "const": "identityProvider" },
+    "name": { "$ref": "#/$defs/name" },
+    "formatVersion": { "const": 1 },
+    "type": { "type": "string" },
+    "label": { "$ref": "#/$defs/textReference" },
+    "issuer": { "$ref": "#/$defs/binding" },
+    "clientId": { "$ref": "#/$defs/binding" },
+    "clientSecret": { "$ref": "#/$defs/binding" },
+    "clientKey": { "$ref": "#/$defs/binding" },
+    "metadata": { "$ref": "#/$defs/binding" },
+    "claims": { "$ref": "#/$defs/claims" },
+    "roles": { "$ref": "#/$defs/roles" },
+    "acr": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    }
+  },
+  "not": { "required": ["clientSecret", "clientKey"] },
+  "allOf": [
+    {
+      "if": { "required": ["type"], "properties": { "type": { "const": "accounts" } } },
+      "then": {
+        "properties": {
+          "label": false,
+          "issuer": false,
+          "clientId": false,
+          "clientSecret": false,
+          "clientKey": false,
+          "metadata": false,
+          "claims": false
+        }
+      }
+    },
+    {
+      "if": { "required": ["type"], "properties": { "type": { "const": "oidc" } } },
+      "then": { "required": ["label"], "properties": { "metadata": false } }
+    },
+    {
+      "if": { "required": ["type"], "properties": { "type": { "const": "saml" } } },
+      "then": {
+        "required": ["label"],
+        "properties": { "issuer": false, "clientId": false, "clientSecret": false, "clientKey": false }
+      }
+    }
+  ],
+  "$defs": {
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+    },
+    "name": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9]*$",
+      "maxLength": 60
+    },
+    "roleName": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "maxLength": 60
+    },
+    "textReference": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["textKey"],
+      "properties": {
+        "textKey": { "type": "string", "minLength": 1, "x-axis-reference": "text" }
+      }
+    },
+    "binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["binding"],
+      "properties": {
+        "binding": { "$ref": "#/$defs/name" }
+      }
+    },
+    "claims": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "displayName": { "type": "string", "minLength": 1 },
+        "email": { "type": "string", "minLength": 1 },
+        "locale": { "type": "string", "minLength": 1 }
+      }
+    },
+    "roles": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "claim": { "type": "string", "minLength": 1 },
+        "values": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/roleName" }
+        }
+      }
+    }
+  }
+}

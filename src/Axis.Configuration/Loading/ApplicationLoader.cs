@@ -110,6 +110,7 @@ public static class ApplicationLoader
         var roles = new List<RoleResource>();
         var policies = new List<PolicyResource>();
         var connectors = new List<ConnectorResource>();
+        var identityProviders = new List<IdentityProviderResource>();
         var events = new List<EventResource>();
         var endpoints = new List<EndpointResource>();
         var triggers = new List<TriggerResource>();
@@ -282,6 +283,9 @@ public static class ApplicationLoader
                     case ResourceKinds.Connector:
                         connectors.Add(root.Deserialize<ConnectorResource>(SerializerOptions)! with { File = file });
                         break;
+                    case ResourceKinds.IdentityProvider:
+                        identityProviders.Add(root.Deserialize<IdentityProviderResource>(SerializerOptions)! with { File = file });
+                        break;
                     case ResourceKinds.Event:
                         events.Add(root.Deserialize<EventResource>(SerializerOptions)! with { File = file });
                         break;
@@ -329,6 +333,7 @@ public static class ApplicationLoader
         {
             Connectors = connectors,
             UnloadedConnectorNames = unloadedConnectorNames,
+            IdentityProviders = identityProviders,
             Events = events,
             UnloadedEventNames = unloadedEventNames,
             Endpoints = endpoints,
@@ -499,7 +504,7 @@ public static class ApplicationLoader
         {
             diagnostics.Add(new Diagnostic(
                 DiagnosticCodes.UnknownKind,
-                $"Unknown resource kind '{kind}'. Expected '{ResourceKinds.Application}', '{ResourceKinds.Entity}', '{ResourceKinds.Site}', '{ResourceKinds.Page}', '{ResourceKinds.Text}', '{ResourceKinds.Seed}', '{ResourceKinds.DataSource}', '{ResourceKinds.Rule}', '{ResourceKinds.Sequence}', '{ResourceKinds.Process}', '{ResourceKinds.Form}', '{ResourceKinds.Role}', '{ResourceKinds.Policy}', '{ResourceKinds.Connector}', '{ResourceKinds.Event}', '{ResourceKinds.Endpoint}', '{ResourceKinds.Migration}', '{ResourceKinds.Scenario}' or '{ResourceKinds.Trigger}'.",
+                $"Unknown resource kind '{kind}'. Expected '{ResourceKinds.Application}', '{ResourceKinds.Entity}', '{ResourceKinds.Site}', '{ResourceKinds.Page}', '{ResourceKinds.Text}', '{ResourceKinds.Seed}', '{ResourceKinds.DataSource}', '{ResourceKinds.Rule}', '{ResourceKinds.Sequence}', '{ResourceKinds.Process}', '{ResourceKinds.Form}', '{ResourceKinds.Role}', '{ResourceKinds.Policy}', '{ResourceKinds.Connector}', '{ResourceKinds.IdentityProvider}', '{ResourceKinds.Event}', '{ResourceKinds.Endpoint}', '{ResourceKinds.Migration}', '{ResourceKinds.Scenario}' or '{ResourceKinds.Trigger}'.",
                 file,
                 "/kind",
                 resourceId));

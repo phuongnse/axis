@@ -47,6 +47,9 @@ public sealed record ApplicationModel
     /// <summary>The application's connectors, in path order.</summary>
     public IReadOnlyList<ConnectorModel> Connectors { get; init; } = [];
 
+    /// <summary>The application's identity providers, in path order.</summary>
+    public IReadOnlyList<IdentityProviderModel> IdentityProviders { get; init; } = [];
+
     /// <summary>The application's events, in path order.</summary>
     public IReadOnlyList<EventModel> Events { get; init; } = [];
 
