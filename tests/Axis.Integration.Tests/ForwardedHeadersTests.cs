@@ -56,7 +56,7 @@ public sealed class ForwardedHeadersTests(KeycloakFixture keycloak) : IAsyncLife
     {
         var context = await GetMeAsync("10.0.0.5", forwardedHost: HostB);
 
-        Assert.Equal("max-age=31536000", context.Response.Headers.StrictTransportSecurity.ToString());
+        Assert.Equal("max-age=31536000; includeSubDomains", context.Response.Headers.StrictTransportSecurity.ToString());
     }
 
     [Fact]
