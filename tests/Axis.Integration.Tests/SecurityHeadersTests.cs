@@ -8,7 +8,8 @@ namespace Axis.Integration.Tests;
 
 /// <summary>
 /// The security headers of D85 on the SPA page, a hashed static file, an API answer, a <c>401</c> and the tenant
-/// <c>404</c>, and <c>Strict-Transport-Security</c> only over <c>https</c> outside <c>Development</c>. The host
+/// <c>404</c>, the <c>Content-Type</c> with its charset on the same answers and a <c>403</c>, and
+/// <c>Strict-Transport-Security</c> only over <c>https</c> outside <c>Development</c>. The host
 /// serves a fake web root from a temporary content root, because the real one loads the Development settings.
 /// </summary>
 public sealed class SecurityHeadersTests : IAsyncLifetime
@@ -44,6 +45,26 @@ public sealed class SecurityHeadersTests : IAsyncLifetime
         }
     }
 
+    [Theory]
+    [InlineData("GET", "/", "localhost", 200, "text/html; charset=utf-8")]
+    [InlineData("GET", Asset, "localhost", 200, "text/javascript; charset=utf-8")]
+    [InlineData("GET", "/api/site", "localhost", 200, "application/json; charset=utf-8")]
+    [InlineData("POST", "/api/apps/x/records", "localhost", 403, "application/problem+json; charset=utf-8")]
+    [InlineData("GET", "/api/me", "localhost", 401, "application/problem+json; charset=utf-8")]
+    [InlineData("GET", "/", "unknown.example.test", 404, "application/problem+json; charset=utf-8")]
+    public async Task Every_answer_with_a_body_names_its_content_type_and_charset(
+        string method,
+        string path,
+        string host,
+        int status,
+        string contentType)
+    {
+        var context = await GetAsync(_testing, path, host: host, method: method);
+
+        Assert.Equal(status, context.Response.StatusCode);
+        Assert.Equal(contentType, context.Response.ContentType);
+    }
+
     [Fact]
     public async Task A_hashed_file_is_cached_for_a_year_and_the_page_is_not()
     {
@@ -60,7 +81,7 @@ public sealed class SecurityHeadersTests : IAsyncLifetime
     {
         var context = await GetAsync(_testing, "/", "https");
 
-        Assert.Equal("max-age=31536000", context.Response.Headers.StrictTransportSecurity.ToString());
+        Assert.Equal("max-age=31536000; includeSubDomains", context.Response.Headers.StrictTransportSecurity.ToString());
     }
 
     [Fact]
@@ -135,13 +156,14 @@ public sealed class SecurityHeadersTests : IAsyncLifetime
         WebApplicationFactory<Program>? factory,
         string path,
         string scheme = "http",
-        string host = "localhost")
+        string host = "localhost",
+        string method = "GET")
     {
         var server = (factory ?? throw new InvalidOperationException("The test host is not started.")).Server;
         return server.SendAsync(
             context =>
             {
-                context.Request.Method = HttpMethods.Get;
+                context.Request.Method = method;
                 context.Request.Path = path;
                 context.Request.Scheme = scheme;
                 context.Request.Host = new HostString(host);
@@ -154,7 +176,7 @@ public sealed class SecurityHeadersTests : IAsyncLifetime
         var headers = context.Response.Headers;
         Assert.Equal(
             "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; "
-            + "font-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'",
+            + "font-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
             headers.ContentSecurityPolicy.ToString());
         Assert.Equal("nosniff", headers.XContentTypeOptions.ToString());
         Assert.Equal("strict-origin-when-cross-origin", headers["Referrer-Policy"].ToString());
