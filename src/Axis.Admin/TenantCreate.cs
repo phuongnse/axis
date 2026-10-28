@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using Axis.Processes.Storage;
 using Axis.Tenancy;
 using Axis.Tenancy.Platform;
@@ -7,9 +8,11 @@ using Npgsql;
 namespace Axis.Admin;
 
 /// <summary>
-/// <c>tenant create</c>: writes the directory entry as <c>provisioning</c>, creates the database roles and the database,
-/// grants and migrates it as the schema role, checks the runtime role and sets the entry <c>active</c>. A rerun on a
-/// <c>provisioning</c> entry skips what is done. Each step writes one line that names the tenant and never a password,
+/// <c>tenant create</c>: writes the directory entry as <c>provisioning</c>, creates the tenant's realm in the identity provider
+/// (a main tenant only), creates the database roles and the database, grants and migrates it as the schema role, checks the
+/// runtime role and sets the entry <c>active</c>. The realm step saves the three generated client secrets, encrypted, and the
+/// tenant's <c>Oidc</c> block before it calls the identity provider. A rerun on a <c>provisioning</c> entry skips what is done
+/// and reuses the secrets. Each step writes one line that names the tenant and never a password,
 /// a host or a connection string.
 /// </summary>
 internal sealed class TenantCreate : IAsyncDisposable
@@ -18,6 +21,7 @@ internal sealed class TenantCreate : IAsyncDisposable
 
     private readonly CreateSettings _settings;
     private readonly TenantCreateRequest _request;
+    private readonly TenantRealm? _realm;
     private readonly TenantAudit _audit;
     private readonly TextWriter _output;
     private readonly CancellationToken _cancellationToken;
@@ -32,10 +36,11 @@ internal sealed class TenantCreate : IAsyncDisposable
     private TenantProvisioning? _provisioning;
     private TenantDatabaseSteps? _steps;
 
-    public TenantCreate(CreateSettings settings, TenantCreateRequest request, TenantAudit audit, TextWriter output, CancellationToken cancellationToken)
+    public TenantCreate(CreateSettings settings, TenantCreateRequest request, TenantRealm? realm, TenantAudit audit, TextWriter output, CancellationToken cancellationToken)
     {
         _settings = settings;
         _request = request;
+        _realm = realm;
         _audit = audit;
         _output = output;
         _cancellationToken = cancellationToken;
@@ -57,7 +62,8 @@ internal sealed class TenantCreate : IAsyncDisposable
                 return entry.Value;
             }
 
-            if (await Step("roles", () => Roles.EnsureRolesAsync())
+            if ((_request.PreviewOf is not null || await Step("realm", RealmAsync))
+                && await Step("roles", () => Roles.EnsureRolesAsync())
                 && await Step("database", () => Roles.EnsureDatabaseAsync())
                 && await Step("grants", () => Steps.GrantAsync())
                 && await Step("migrations", () => Steps.MigrateAsync())
@@ -127,18 +133,15 @@ internal sealed class TenantCreate : IAsyncDisposable
             }
 
             await using var transaction = await _platform.Database.BeginTransactionAsync(_cancellationToken);
-            // A preview tenant has no sign-in settings of its own, so it stores no client secret.
-            var secret = _request.PreviewOf is null
-                ? _settings.Cipher.Encrypt(_id, TenantSecretFields.OidcClientSecret, _settings.OidcClientSecret!)
-                : [];
             if (_row is null)
             {
-                _row = new TenantRow { Id = _id, Status = Provisioning };
+                // A preview tenant has no sign-in settings of its own. A main tenant gets them in the realm step.
+                _row = new TenantRow { Id = _id, Status = Provisioning, OidcAuthority = "", OidcClientId = "", OidcClientSecret = [] };
                 _platform.Tenants.Add(_row);
             }
             else
             {
-                // A provisioning tenant is never served, so an operator can fix the hosts, the OIDC settings, the main tenant and the bindings on a rerun.
+                // A provisioning tenant is never served, so an operator can fix the hosts, the main tenant and the bindings on a rerun.
                 _row.Version++;
                 _platform.TenantHosts.RemoveRange(_platform.TenantHosts.Where(host => host.TenantId == _id));
                 _platform.TenantBindings.RemoveRange(_platform.TenantBindings.Where(binding => binding.TenantId == _id));
@@ -150,9 +153,6 @@ internal sealed class TenantCreate : IAsyncDisposable
             _row.DatabaseName = _database;
             _row.SchemaUser = _schemaRole;
             _row.RuntimeUser = _runtimeRole;
-            _row.OidcAuthority = _request.OidcAuthority ?? "";
-            _row.OidcClientId = _request.OidcClientId ?? "";
-            _row.OidcClientSecret = secret;
             _row.PreviewOf = _request.PreviewOf;
             _platform.TenantHosts.AddRange(hosts.Select(host => new TenantHostRow { TenantId = _id, Host = host }));
             _platform.TenantBindings.AddRange(_request.Bindings.Select(binding => new TenantBindingRow
@@ -197,6 +197,53 @@ internal sealed class TenantCreate : IAsyncDisposable
 
     private TenantDatabaseSteps Steps =>
         _steps ??= new TenantDatabaseSteps(_settings.Cipher, _row!, _admin.Host!, _admin.Port, TenantDatabaseTls.From(_admin.ConnectionString), _cancellationToken);
+
+    // Saves the secrets and the Oidc block before the realm exists, so a stop between the two never loses a secret.
+    private async Task RealmAsync()
+    {
+        var row = _row!;
+        var admin = _settings.IdentityProvider!;
+        var cipher = _settings.Cipher;
+
+        var changed = false;
+        changed |= Ensure(row.OidcClientSecret, TenantSecretFields.OidcClientSecret, value => row.OidcClientSecret = value);
+        changed |= Ensure(row.RealmActivationClientSecret, TenantSecretFields.RealmActivationClientSecret, value => row.RealmActivationClientSecret = value);
+        changed |= Ensure(row.RealmUsersClientSecret, TenantSecretFields.RealmUsersClientSecret, value => row.RealmUsersClientSecret = value);
+
+        var authority = new Uri(admin.BaseAddress, $"realms/{Uri.EscapeDataString(_id)}").ToString();
+        if (row.OidcAuthority != authority || row.OidcClientId != TenantRealm.PlatformClientId)
+        {
+            row.OidcAuthority = authority;
+            row.OidcClientId = TenantRealm.PlatformClientId;
+            changed = true;
+        }
+
+        if (changed)
+        {
+            row.Version++;
+            await _platform.SaveChangesAsync(_cancellationToken);
+        }
+
+        var secrets = new TenantRealmSecrets(
+            cipher.Decrypt(_id, TenantSecretFields.OidcClientSecret, row.OidcClientSecret).Reveal(),
+            cipher.Decrypt(_id, TenantSecretFields.RealmActivationClientSecret, row.RealmActivationClientSecret!).Reveal(),
+            cipher.Decrypt(_id, TenantSecretFields.RealmUsersClientSecret, row.RealmUsersClientSecret!).Reveal());
+
+        // The display name is the tenant id until the command takes the organization's name.
+        await _realm!.EnsureAsync(_id, _id, secrets, _cancellationToken);
+
+        // A secret that is stored is kept, so a rerun never changes it.
+        bool Ensure(byte[]? stored, string field, Action<byte[]> write)
+        {
+            if (stored is { Length: > 0 })
+            {
+                return false;
+            }
+
+            write(cipher.Encrypt(_id, field, Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(32))));
+            return true;
+        }
+    }
 
     private async Task ActivateAsync()
     {

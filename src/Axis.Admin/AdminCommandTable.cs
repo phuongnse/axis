@@ -29,4 +29,5 @@ internal sealed record AdminRun(
     TextWriter Error,
     TimeSpan PublisherLease,
     TimeSpan PublisherTestLimit,
+    HttpMessageHandler? IdentityProviderHandler,
     CancellationToken CancellationToken);

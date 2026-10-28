@@ -423,6 +423,16 @@ for `tenant create` and `tenant restore`. `migrate`, `tenant suspend`, `tenant r
 
 As an environment variable it is `Admin__ConnectionString`.
 
+`tenant create` of a main tenant also reads three settings for the identity provider, see
+[administration](administration.md#settings) and [Axis's identity provider](identity-provider.md#keeping-the-realm-in-step).
+A preview tenant reads none of them.
+
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| `IdentityProvider:Url` | none | The base address of the identity provider, an absolute URL. Outside Development and Testing it must be `https`. The environment variable is `IdentityProvider__Url`. |
+| `IdentityProvider:AdminClientId` | none | The client of the `master` realm that the command signs in as. The environment variable is `IdentityProvider__AdminClientId`. |
+| `IdentityProvider:AdminClientSecret` | none | The secret of that client. The environment variable is `IdentityProvider__AdminClientSecret`. A message never holds it. |
+
 - **Not a superuser.** `Axis.Admin` refuses a superuser role and exits with
   code 2. The role only needs the right to create databases and roles.
 - **Only the admin host reads it.** The server and the worker never read

@@ -45,7 +45,7 @@ public sealed class AdminDatabaseTlsTests
     public async Task Tenant_create_names_the_admin_setting_when_only_that_one_is_weak()
     {
         var result = await RunAsync(
-            ["tenant", "create", "acme", "--host", "acme.example.test", "--oidc-authority", "https://idp.example.test", "--oidc-client-id", "axis"],
+            ["tenant", "create", "acme", "--host", "acme.example.test"],
             new Dictionary<string, string?>
             {
                 [AdminCommands.AdminSetting] = Prefer,
