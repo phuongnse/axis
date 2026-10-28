@@ -104,7 +104,7 @@ test('the stack runs from source', { timeout }, async () => {
   // answers the purchase request list with a 401 problem.
   const records = await fetch(`${baseUrl}/api/apps/PurchaseRequests/entities/PurchaseRequest/records`)
   assert.equal(records.status, 401)
-  assert.equal(records.headers.get('content-type'), 'application/problem+json')
+  assert.equal(records.headers.get('content-type'), 'application/problem+json; charset=utf-8')
   assert.equal((await records.json()).status, 401)
 
   // Keycloak serves the development realm. Sign-in through Compose is not wired yet.

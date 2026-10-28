@@ -77,7 +77,7 @@ test('a purchase request is created with line items, shows the computed total, i
   await expect(row).toContainText('2,550.90')
 
   // The server computes each line amount and the total on save, so the form shows them once reopened.
-  await row.getByRole('button', { name: 'Open', exact: true }).click()
+  await row.getByRole('link', { name: title, exact: true }).click()
   await expect(page.getByRole('textbox', { name: 'Title', exact: true })).toHaveValue(title)
   await expect(cell('Amount 1')).toHaveValue('2,500.90')
   await expect(cell('Amount 2')).toHaveValue('50.00')
@@ -93,7 +93,7 @@ test('a purchase request is created with line items, shows the computed total, i
   await expect(edited).toContainText('Acme Supplies')
 
   await page.getByRole('switch', { name: 'Dark mode', exact: true }).click()
-  await edited.getByRole('button', { name: 'Open', exact: true }).click()
+  await edited.getByRole('link', { name: `${title} edited`, exact: true }).click()
   const dark = page.locator('[data-theme-mode="dark"]')
   await expect(dark.getByRole('textbox', { name: 'Title', exact: true })).toHaveValue(`${title} edited`)
   await expect(dark.getByLabel(fieldLabel('Department'))).toHaveValue('Finance')
@@ -126,7 +126,7 @@ test('a new purchase request gets a number from the sequence on save, and the fo
   await expect(page).toHaveURL(tablePath)
   await page
     .getByRole('row', { name: new RegExp(`${title} `) })
-    .getByRole('button', { name: 'Open', exact: true })
+    .getByRole('link', { name: title, exact: true })
     .click()
   await expect(page.getByRole('textbox', { name: 'Title', exact: true })).toHaveValue(title)
   await expect(number).toHaveAttribute('readonly')
