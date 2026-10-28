@@ -49,7 +49,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     public async Task Author_lists_every_json_file_with_its_version()
     {
         await using var factory = CreateFactory();
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
 
         var response = await client.GetAsync(new Uri("/api/studio/apps/PurchaseRequests/resources", UriKind.Relative), CancellationToken);
 
@@ -76,7 +76,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     public async Task Author_lists_the_applications_of_the_folders()
     {
         await using var factory = CreateFactory();
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
 
         var response = await client.GetAsync(new Uri("/api/studio/apps", UriKind.Relative), CancellationToken);
 
@@ -107,7 +107,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     [Fact]
     public async Task Me_answers_studio_only_for_an_author_while_Studio_is_on()
     {
-        foreach (var (user, role, expected) in new[] { ("hoa", "author", true), ("requester", "author", false), ("hoa", "", false) })
+        foreach (var (user, role, expected) in new[] { ("author", "author", true), ("requester", "author", false), ("author", "", false) })
         {
             await using var factory = CreateFactory(authorRole: role);
             using var client = factory.CreateClient().SignedInAs(user);
@@ -124,7 +124,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     [Fact]
     public async Task Me_answers_studioTest_only_for_an_author_while_Studio_Tests_is_on()
     {
-        foreach (var (user, tests, expected) in new[] { ("hoa", true, true), ("hoa", false, false), ("requester", true, false) })
+        foreach (var (user, tests, expected) in new[] { ("author", true, true), ("author", false, false), ("requester", true, false) })
         {
             await using var factory = CreateFactory(tests: tests);
             using var client = factory.CreateClient().SignedInAs(user);
@@ -142,8 +142,8 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     {
         foreach (var (user, applicationsPath, expected) in new[]
         {
-            ("hoa", Path.Combine(_root, "created"), true),
-            ("hoa", null, false),
+            ("author", Path.Combine(_root, "created"), true),
+            ("author", null, false),
             ("requester", Path.Combine(_root, "created"), false),
         })
         {
@@ -173,9 +173,9 @@ public sealed class StudioEndpointTests : IAsyncLifetime
             builder.UseSetting("Studio:AuthorRole", "author");
             builder.UseSetting("Studio:ApplicationsPath", applicationsPath);
             builder.UseTestOidc("default");
-            builder.UseTestAuthentication(new TestIdentity("hoa", "Hoa Author", "author"));
+            builder.UseTestAuthentication(new TestIdentity("author", "Author User", "author"));
         });
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
 
         var response = await client.GetAsync(new Uri("/api/me", UriKind.Relative), CancellationToken);
 
@@ -189,7 +189,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     public async Task Author_reads_a_resource_by_id_in_either_letter_case()
     {
         await using var factory = CreateFactory();
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
         var path = Path.Combine(Folder, EntityFile);
         using var file = JsonDocument.Parse(File.ReadAllBytes(path));
         var id = file.RootElement.GetProperty("id").GetString()!;
@@ -250,7 +250,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
         foreach (var (folder, role) in new[] { (Folder, ""), ("", "author") })
         {
             await using var factory = CreateFactory(folder, role);
-            using var client = factory.CreateClient().SignedInAs("hoa");
+            using var client = factory.CreateClient().SignedInAs("author");
 
             var response = await client.GetAsync(new Uri(url, UriKind.Relative), CancellationToken);
 
@@ -277,7 +277,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     public async Task Unknown_application_or_resource_is_404(string url, HttpStatusCode expected)
     {
         await using var factory = CreateFactory();
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
 
         var response = await client.GetAsync(new Uri(url, UriKind.Relative), CancellationToken);
 
@@ -305,7 +305,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
         File.CreateSymbolicLink(Path.Combine(Folder, "entities", "outside.json"), outsideFile);
         Directory.CreateSymbolicLink(Path.Combine(Folder, "linked"), Path.Combine(Outside, "folder"));
         await using var factory = CreateFactory();
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
 
         var list = await client.GetAsync(new Uri("/api/studio/apps/PurchaseRequests/resources", UriKind.Relative), CancellationToken);
 
@@ -331,7 +331,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
         File.WriteAllText(Path.Combine(Folder, "entities", "no-id.json"), """{ "kind": "entity" }""");
         File.WriteAllText(Path.Combine(Folder, "entities", "broken.json"), "{ not json");
         await using var factory = CreateFactory();
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
 
         var response = await client.GetAsync(new Uri($"/api/studio/apps/PurchaseRequests/resources/{id}", UriKind.Relative), CancellationToken);
 
@@ -350,7 +350,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     {
         // The factory's databases are unreachable, so a 200 also shows that the route opens no connection.
         await using var factory = CreateFactory();
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
 
         var response = await client.GetAsync(new Uri("/api/studio/apps/PurchaseRequests/diagnostics", UriKind.Relative), CancellationToken);
 
@@ -364,7 +364,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     public async Task Author_gets_the_policy_matrix_of_the_application()
     {
         await using var factory = CreateFactory();
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
 
         var response = await client.GetAsync(new Uri("/api/studio/apps/PurchaseRequests/policy-matrix", UriKind.Relative), CancellationToken);
 
@@ -394,7 +394,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
         var scenarioPath = Path.Combine(Folder, scenarioFile);
         File.WriteAllText(scenarioPath, File.ReadAllText(scenarioPath).Replace("\"formatVersion\": 1,", "\"formatVersion\": 1,\n  \"noSuchProperty\": true,", StringComparison.Ordinal));
         await using var factory = CreateFactory();
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
 
         var response = await client.GetAsync(new Uri("/api/studio/apps/PurchaseRequests/diagnostics", UriKind.Relative), CancellationToken);
 
@@ -447,7 +447,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
         var withoutModules = ApplicationCompiler.Compile(Folder, SamplePackages.Versions).Diagnostics;
         Assert.Contains(withoutModules, diagnostic => diagnostic.Code == DiagnosticCodes.UnknownModule);
         await using var factory = CreateFactory(modulesPath: modules);
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
 
         var response = await client.GetAsync(new Uri("/api/studio/apps/PurchaseRequests/diagnostics", UriKind.Relative), CancellationToken);
 
@@ -467,7 +467,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     public async Task Patch_with_the_current_version_changes_only_the_patched_value_and_keeps_key_order()
     {
         await using var factory = CreateFactory();
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
         var path = Path.Combine(Folder, EntityFile);
         var before = File.ReadAllBytes(path);
         var version = Sha256(path);
@@ -509,7 +509,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
         var before = File.ReadAllBytes(path);
         await using var factory = CreateFactory().WithWebHostBuilder(builder =>
             builder.ConfigureTestServices(services => services.AddSingleton<IStudioWriteLock, PlatformStudioWriteLock>()));
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
 
         var response = await Patch(client, """[{"op":"replace","path":"/displayField","value":"number"}]""", $"\"{Sha256(path)}\"");
 
@@ -521,7 +521,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     public async Task Patch_with_a_stale_version_gets_409_and_leaves_the_file_unchanged()
     {
         await using var factory = CreateFactory();
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
         var path = Path.Combine(Folder, EntityFile);
         var old = Sha256(path);
         var first = await Patch(client, """[{"op":"replace","path":"/displayField","value":"number"}]""", old);
@@ -542,7 +542,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     public async Task Patch_with_a_wildcard_weak_or_listed_version_is_stale(string ifMatch)
     {
         await using var factory = CreateFactory();
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
         var path = Path.Combine(Folder, EntityFile);
         var before = File.ReadAllBytes(path);
 
@@ -556,7 +556,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     public async Task Patch_accepts_the_bare_version_and_either_letter_case_of_the_id()
     {
         await using var factory = CreateFactory();
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
 
         var response = await Patch(client, """[{"op":"replace","path":"/displayField","value":"number"}]""", Sha256(Path.Combine(Folder, EntityFile)), EntityId.ToUpperInvariant());
 
@@ -577,7 +577,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     public async Task Patch_that_changes_id_or_kind_or_is_not_a_valid_patch_gets_400_and_leaves_the_file_unchanged(string patch)
     {
         await using var factory = CreateFactory();
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
         var path = Path.Combine(Folder, EntityFile);
         var before = File.ReadAllBytes(path);
 
@@ -592,7 +592,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     public async Task Patch_that_breaks_a_reference_is_saved_and_the_answer_lists_the_diagnostic()
     {
         await using var factory = CreateFactory();
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
         var path = Path.Combine(Folder, EntityFile);
 
         var response = await Patch(client, """[{"op":"replace","path":"/fields/3/target","value":"Missing"}]""", Sha256(path));
@@ -615,7 +615,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     public async Task Patch_without_If_Match_gets_428_and_with_another_content_type_gets_415()
     {
         await using var factory = CreateFactory();
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
         var path = Path.Combine(Folder, EntityFile);
         var before = File.ReadAllBytes(path);
         const string patch = """[{"op":"replace","path":"/displayField","value":"number"}]""";
@@ -632,7 +632,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     public async Task Patch_without_the_CSRF_header_or_the_author_role_or_a_session_is_refused_and_the_file_is_unchanged()
     {
         await using var factory = CreateFactory();
-        using var hoa = factory.CreateClient().SignedInAs("hoa");
+        using var author = factory.CreateClient().SignedInAs("author");
         using var requester = factory.CreateClient().SignedInAs("requester");
         using var anonymous = factory.CreateClient();
         var path = Path.Combine(Folder, EntityFile);
@@ -640,7 +640,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
         const string patch = """[{"op":"replace","path":"/displayField","value":"number"}]""";
         var version = Sha256(path);
 
-        var noCsrf = await Patch(hoa, patch, version, csrf: false);
+        var noCsrf = await Patch(author, patch, version, csrf: false);
         var forbidden = await Patch(requester, patch, version);
         var unauthorized = await Patch(anonymous, patch, version);
 
@@ -657,7 +657,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     public async Task Patch_of_an_unknown_application_or_resource_gets_404(string application, string id)
     {
         await using var factory = CreateFactory();
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
 
         var response = await Patch(client, "[]", "x", id, application);
 
@@ -673,7 +673,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
         File.CreateSymbolicLink(path, outsideFile);
         var before = File.ReadAllBytes(outsideFile);
         await using var factory = CreateFactory();
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
 
         var response = await Patch(client, """[{"op":"replace","path":"/displayField","value":"number"}]""", Sha256(outsideFile));
 
@@ -686,7 +686,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     public async Task Two_patches_with_one_version_sent_together_save_only_one()
     {
         await using var factory = CreateFactory();
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
         var version = Sha256(Path.Combine(Folder, EntityFile));
 
         var responses = await Task.WhenAll(Enumerable.Range(0, 8).Select(index =>
@@ -700,7 +700,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     public async Task Create_writes_the_entity_in_its_kind_folder_in_the_canonical_format()
     {
         await using var factory = CreateFactory();
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
         var id = Guid.NewGuid();
         var body = $$"""{"id":"{{id}}","kind":"entity","name":"CostCentre","formatVersion":1,"fields":[{"name":"code","type":"string"}]}""";
 
@@ -743,7 +743,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     public async Task Create_puts_each_kind_in_its_plural_folder_and_names_a_text_after_its_locale(string kind, string name, string? locale, string expected)
     {
         await using var factory = CreateFactory();
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
         var content = new JsonObject { ["id"] = Guid.NewGuid().ToString(), ["kind"] = kind, ["name"] = name };
         if (locale is not null)
         {
@@ -765,7 +765,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     {
         Directory.Delete(Path.Combine(Folder, "policies"), recursive: true);
         await using var factory = CreateFactory();
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
 
         var response = await Create(client, $$"""{"id":"{{Guid.NewGuid()}}","kind":"policy","name":"Fresh"}""");
 
@@ -779,7 +779,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     public async Task Create_with_an_existing_id_or_target_file_gets_409_and_changes_no_file(string id, string name)
     {
         await using var factory = CreateFactory();
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
         var before = Snapshot();
         var body = $$"""{"id":"{{(id.Length == 0 ? Guid.NewGuid().ToString() : id)}}","kind":"entity","name":"{{name}}"}""";
 
@@ -822,7 +822,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     public async Task Create_with_a_bad_body_or_an_unsafe_name_gets_400_and_writes_nothing(string template)
     {
         await using var factory = CreateFactory();
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
         var before = Snapshot();
 
         var response = await Create(client, template.Replace("{0}", Guid.NewGuid().ToString(), StringComparison.Ordinal));
@@ -836,7 +836,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     public async Task Create_with_another_content_type_gets_415_and_writes_nothing()
     {
         await using var factory = CreateFactory();
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
         var before = Snapshot();
 
         var response = await Create(client, $$"""{"id":"{{Guid.NewGuid()}}","kind":"entity","name":"Fresh"}""", "application/json-patch+json");
@@ -851,7 +851,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
         Directory.Delete(Path.Combine(Folder, "policies"), recursive: true);
         Directory.CreateSymbolicLink(Path.Combine(Folder, "policies"), Outside);
         await using var factory = CreateFactory();
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
 
         var response = await Create(client, $$"""{"id":"{{Guid.NewGuid()}}","kind":"policy","name":"Fresh"}""");
 
@@ -863,7 +863,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     public async Task Create_and_delete_without_the_CSRF_header_or_the_author_role_or_a_session_are_refused_and_write_nothing()
     {
         await using var factory = CreateFactory();
-        using var hoa = factory.CreateClient().SignedInAs("hoa");
+        using var author = factory.CreateClient().SignedInAs("author");
         using var requester = factory.CreateClient().SignedInAs("requester");
         using var anonymous = factory.CreateClient();
         var before = Snapshot();
@@ -873,13 +873,13 @@ public sealed class StudioEndpointTests : IAsyncLifetime
 
         var created = new[]
         {
-            await Create(hoa, body, csrf: false),
+            await Create(author, body, csrf: false),
             await Create(requester, body),
             await Create(anonymous, body),
         };
         var deleted = new[]
         {
-            await Delete(hoa, supplier, version, csrf: false),
+            await Delete(author, supplier, version, csrf: false),
             await Delete(requester, supplier, version),
             await Delete(anonymous, supplier, version),
         };
@@ -900,7 +900,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     public async Task Changes_with_a_migration_create_and_an_entity_patch_writes_both_and_answers_each_version_in_request_order()
     {
         await using var factory = CreateFactory();
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
         var migrationId = Guid.NewGuid();
         var entityPath = Path.Combine(Folder, EntityFile);
         var body = $$$"""
@@ -927,7 +927,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     public async Task Changes_with_a_stale_second_patch_gets_409_and_writes_nothing()
     {
         await using var factory = CreateFactory();
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
         var before = Snapshot();
         var body = $$$"""
             {"changes":[
@@ -947,7 +947,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     public async Task Changes_with_a_create_whose_target_file_exists_gets_409_and_writes_nothing()
     {
         await using var factory = CreateFactory();
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
         var before = Snapshot();
         var body = $$$"""
             {"changes":[
@@ -985,7 +985,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     public async Task Changes_with_a_bad_body_gets_400_and_writes_nothing(string template)
     {
         await using var factory = CreateFactory();
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
         var before = Snapshot();
         var body = template
             .Replace("{0}", Guid.NewGuid().ToString(), StringComparison.Ordinal)
@@ -1003,7 +1003,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     public async Task Changes_with_21_changes_gets_400_and_writes_nothing()
     {
         await using var factory = CreateFactory();
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
         var before = Snapshot();
         var creates = Enumerable.Range(0, 21)
             .Select(index => $$$"""{"create":{"id":"{{{Guid.NewGuid()}}}","kind":"policy","name":"Fresh{{{(char)('A' + index)}}}"}}""");
@@ -1018,7 +1018,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     public async Task Changes_with_20_creates_writes_all_of_them()
     {
         await using var factory = CreateFactory();
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
         var creates = Enumerable.Range(0, 20)
             .Select(index => $$$"""{"create":{"id":"{{{Guid.NewGuid()}}}","kind":"policy","name":"Fresh{{{(char)('A' + index)}}}"}}""");
 
@@ -1032,7 +1032,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     public async Task Changes_with_another_content_type_gets_415_and_writes_nothing()
     {
         await using var factory = CreateFactory();
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
         var before = Snapshot();
 
         var response = await Changes(client, """{"changes":[]}""", contentType: "application/json-patch+json");
@@ -1045,7 +1045,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     public async Task Changes_answers_404_for_an_unknown_patch_id_and_428_for_a_patch_without_a_version()
     {
         await using var factory = CreateFactory();
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
         var before = Snapshot();
 
         var unknown = await Changes(client, $$$"""{"changes":[{"patch":[],"id":"{{{Guid.NewGuid()}}}","version":"x"}]}""");
@@ -1065,7 +1065,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     public async Task Changes_for_an_unknown_application_gets_404()
     {
         await using var factory = CreateFactory();
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
 
         var response = await Changes(client, """{"changes":[]}""", application: "Nope");
 
@@ -1077,7 +1077,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     {
         await using var factory = CreateFactory().WithWebHostBuilder(builder =>
             builder.ConfigureTestServices(services => services.AddSingleton<IStudioWriteLock, PlatformStudioWriteLock>()));
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
         var before = Snapshot();
         var body = $$$"""
             {"changes":[
@@ -1096,7 +1096,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     public async Task Changes_without_the_CSRF_header_or_the_author_role_or_a_session_are_refused_and_write_nothing()
     {
         await using var factory = CreateFactory();
-        using var hoa = factory.CreateClient().SignedInAs("hoa");
+        using var author = factory.CreateClient().SignedInAs("author");
         using var requester = factory.CreateClient().SignedInAs("requester");
         using var anonymous = factory.CreateClient();
         var before = Snapshot();
@@ -1104,7 +1104,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
 
         var responses = new[]
         {
-            await Changes(hoa, body, csrf: false),
+            await Changes(author, body, csrf: false),
             await Changes(requester, body),
             await Changes(anonymous, body),
         };
@@ -1119,7 +1119,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     public async Task Delete_with_the_current_version_removes_the_file_and_lists_the_references_it_broke()
     {
         await using var factory = CreateFactory();
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
         var path = Path.Combine(Folder, "entities", "supplier.json");
 
         var response = await Delete(client, SupplierId(), $"\"{Sha256(path)}\"");
@@ -1138,7 +1138,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     public async Task Delete_with_a_stale_or_wildcard_version_gets_409_and_keeps_the_file(string kind)
     {
         await using var factory = CreateFactory();
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
         var path = Path.Combine(Folder, "entities", "supplier.json");
         var old = Sha256(path);
         var supplier = SupplierId();
@@ -1157,7 +1157,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     public async Task Delete_without_If_Match_gets_428_and_of_the_manifest_gets_400_and_of_an_unknown_id_gets_404()
     {
         await using var factory = CreateFactory();
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
         var supplier = Path.Combine(Folder, "entities", "supplier.json");
         var manifest = Path.Combine(Folder, "application.json");
         var manifestId = JsonNode.Parse(File.ReadAllBytes(manifest))!["id"]!.GetValue<string>();
@@ -1184,7 +1184,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
         File.Move(path, outsideFile);
         File.CreateSymbolicLink(path, outsideFile);
         await using var factory = CreateFactory();
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
 
         var response = await Delete(client, supplier, Sha256(outsideFile));
 
@@ -1196,7 +1196,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     public async Task Department_lists_what_it_uses_and_every_entry_that_uses_it()
     {
         await using var factory = CreateFactory();
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
         var departmentId = IdOf("entities/department.json");
         var purchaseRequestId = IdOf(EntityFile);
         var fields = JsonNode.Parse(File.ReadAllBytes(Path.Combine(Folder, EntityFile)))!["fields"]!.AsArray();
@@ -1221,7 +1221,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     public async Task Resource_list_counts_the_entries_that_use_each_resource()
     {
         await using var factory = CreateFactory();
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
         var departmentId = IdOf("entities/department.json");
 
         using var list = await GetJson(client, "/api/studio/apps/PurchaseRequests/resources");
@@ -1238,7 +1238,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     public async Task Text_key_lists_the_labels_and_the_text_resources_that_define_it()
     {
         await using var factory = CreateFactory();
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
         var textsEn = IdOf("texts/en.json");
 
         using var body = await GetJson(client, "/api/studio/apps/PurchaseRequests/texts/nav.departments/references");
@@ -1263,7 +1263,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
         text["texts"]!.AsObject()["unused.key"] = "Unused";
         File.WriteAllText(en, text.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
         await using var factory = CreateFactory();
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
 
         using var body = await GetJson(client, "/api/studio/apps/PurchaseRequests/texts/unused.key/references");
 
@@ -1281,7 +1281,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
             .Single(field => field!["name"]!.GetValue<string>() == "department")!["target"] = "Missing";
         File.WriteAllText(file, purchaseRequest.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
         await using var factory = CreateFactory();
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
         var departmentId = IdOf("entities/department.json");
 
         using var body = await GetJson(client, $"/api/studio/apps/PurchaseRequests/resources/{departmentId}/references");
@@ -1297,7 +1297,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     public async Task Text_write_answers_415_for_another_content_type()
     {
         await using var factory = CreateFactory();
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
         var before = TextBytes();
 
         var response = await PutText(client, """{"texts":{"en":"A","vi":"B"}}""", contentType: "text/plain");
@@ -1320,7 +1320,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     public async Task Text_write_answers_400_for_a_bad_body_and_changes_no_file(string body)
     {
         await using var factory = CreateFactory();
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
         var before = TextBytes();
 
         var response = await PutText(client, body);
@@ -1334,7 +1334,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     public async Task Text_write_accepts_locale_keys_in_any_letter_case_and_keeps_the_order_of_keys()
     {
         await using var factory = CreateFactory();
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
 
         var added = await PutText(client, """{"texts":{"EN":"Hello","VI":"Xin chào"}}""", "greeting.new");
         var changed = await PutText(client, """{"texts":{"en":"Purchasing system","vi":"Mua hàng"}}""", "site.title");
@@ -1358,7 +1358,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     public async Task Text_write_answers_409_and_changes_no_file_when_texts_is_not_an_object()
     {
         await using var factory = CreateFactory();
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
         var path = Path.Combine(Folder, "texts", "vi.json");
         var root = (JsonObject)JsonNode.Parse(File.ReadAllBytes(path))!;
         root["texts"] = new JsonArray();
@@ -1376,16 +1376,16 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     public async Task Text_write_checks_the_session_the_role_the_csrf_header_and_the_application()
     {
         await using var factory = CreateFactory();
-        using var hoa = factory.CreateClient().SignedInAs("hoa");
+        using var author = factory.CreateClient().SignedInAs("author");
         using var requester = factory.CreateClient().SignedInAs("requester");
         using var anonymous = factory.CreateClient();
         var before = TextBytes();
         const string body = """{"texts":{"en":"A","vi":"B"}}""";
 
-        Assert.Equal(HttpStatusCode.Forbidden, (await PutText(hoa, body, csrf: false)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await PutText(author, body, csrf: false)).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await PutText(requester, body)).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await PutText(anonymous, body)).StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, (await PutText(hoa, body, application: "Unknown")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await PutText(author, body, application: "Unknown")).StatusCode);
         Assert.Equal(before, TextBytes());
     }
 
@@ -1544,7 +1544,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
 
             builder.UseTestOidc("default");
             builder.UseTestAuthentication(
-                new TestIdentity("hoa", "Hoa Author", "author"),
+                new TestIdentity("author", "Author User", "author"),
                 new TestIdentity("requester", "Requester User", "employee"));
         });
 

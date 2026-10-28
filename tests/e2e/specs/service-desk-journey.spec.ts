@@ -279,7 +279,7 @@ test.describe('the author builds the service desk with Studio only', () => {
   }
 
   test('the author creates ServiceDesk as a blank application', async ({ page }) => {
-    await useJourneySession(page, 'hoa')
+    await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio`)
 
     await page.getByRole('button', { name: 'New application', exact: true }).click()
@@ -290,7 +290,7 @@ test.describe('the author builds the service desk with Studio only', () => {
   })
 
   test('the author sets the application time zone', async ({ page }) => {
-    await useJourneySession(page, 'hoa')
+    await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
 
     await page.getByTestId('studio-group-application').getByRole('button').click()
@@ -300,7 +300,7 @@ test.describe('the author builds the service desk with Studio only', () => {
   })
 
   test('the author builds the en and vi texts in the text editor', async ({ page }) => {
-    await useJourneySession(page, 'hoa')
+    await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
 
     const starter = page.getByTestId('studio-group-text')
@@ -335,7 +335,7 @@ test.describe('the author builds the service desk with Studio only', () => {
   })
 
   test('the author adds the three roles', async ({ page }) => {
-    await useJourneySession(page, 'hoa')
+    await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
 
     const en = await texts('en')
@@ -355,7 +355,7 @@ test.describe('the author builds the service desk with Studio only', () => {
   })
 
   test('the author adds the TicketNumber sequence', async ({ page }) => {
-    await useJourneySession(page, 'hoa')
+    await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
 
     await createResource(page, 'sequence', 'TicketNumber')
@@ -366,7 +366,7 @@ test.describe('the author builds the service desk with Studio only', () => {
   })
 
   test('the author builds the Category entity in the entity designer', async ({ page }) => {
-    await useJourneySession(page, 'hoa')
+    await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
 
     const en = await texts('en')
@@ -393,7 +393,7 @@ test.describe('the author builds the service desk with Studio only', () => {
   })
 
   test('the author adds the Categories seed in the seed grid', async ({ page }) => {
-    await useJourneySession(page, 'hoa')
+    await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
 
     await createResource(page, 'seed', 'Categories')
@@ -423,7 +423,7 @@ test.describe('the author builds the service desk with Studio only', () => {
   })
 
   test('the author builds the Ticket entity in the entity designer', async ({ page }) => {
-    await useJourneySession(page, 'hoa')
+    await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
 
     const en = await texts('en')
@@ -502,7 +502,7 @@ test.describe('the author builds the service desk with Studio only', () => {
   test('the author removes the reopened status and converts the stored tickets to draft', async ({ page }) => {
     // Studio names the migration after the UTC time of the save, so a fixed clock gives the committed file name.
     await page.clock.setFixedTime(new Date('2026-10-25T12:00:00Z'))
-    await useJourneySession(page, 'hoa')
+    await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
 
     await page.getByTestId('studio-group-entity').getByRole('button', { name: 'Ticket', exact: true }).click()
@@ -518,7 +518,7 @@ test.describe('the author builds the service desk with Studio only', () => {
   })
 
   test('the author builds the ticket lists and the open ticket counts as data sources', async ({ page }) => {
-    await useJourneySession(page, 'hoa')
+    await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
 
     for (const [name, file] of [
@@ -577,7 +577,7 @@ test.describe('the author builds the service desk with Studio only', () => {
   test('the author lays out the TicketEdit form on the Design tab', async ({ page }) => {
     // A tall window keeps the palette and the outline in view together, away from the edges where a drag scrolls.
     await page.setViewportSize({ width: 1280, height: 1000 })
-    await useJourneySession(page, 'hoa')
+    await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
 
     const en = await texts('en')
@@ -655,7 +655,7 @@ test.describe('the author builds the service desk with Studio only', () => {
   })
 
   test('the author builds the three task forms', async ({ page }) => {
-    await useJourneySession(page, 'hoa')
+    await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
 
     const en = await texts('en')
@@ -701,7 +701,7 @@ test.describe('the author builds the service desk with Studio only', () => {
   })
 
   test('the author builds the TicketHandling process in the process editor', async ({ page }) => {
-    await useJourneySession(page, 'hoa')
+    await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
 
     const en = await texts('en')
@@ -916,7 +916,7 @@ test.describe('the author builds the service desk with Studio only', () => {
   })
 
   test('the author builds the ticket form, the task inbox and the ticket detail pages', async ({ page }) => {
-    await useJourneySession(page, 'hoa')
+    await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
 
     const en = await texts('en')
@@ -948,7 +948,7 @@ test.describe('the author builds the service desk with Studio only', () => {
   })
 
   test('the author builds the two ticket table pages', async ({ page }) => {
-    await useJourneySession(page, 'hoa')
+    await useJourneySession(page, 'author')
     // The page names load with the application, so TicketForm is offered below.
     await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
 
@@ -987,7 +987,7 @@ test.describe('the author builds the service desk with Studio only', () => {
   })
 
   test('the author creates the Dashboard page', async ({ page }) => {
-    await useJourneySession(page, 'hoa')
+    await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
 
     const en = await texts('en')
@@ -997,7 +997,7 @@ test.describe('the author builds the service desk with Studio only', () => {
   })
 
   test('the author finishes the site and deletes the Home page', async ({ page }) => {
-    await useJourneySession(page, 'hoa')
+    await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
 
     const en = await texts('en')
@@ -1038,7 +1038,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     // A tall, wide window keeps the data panel and the canvas in view together, away from the edges where a drag scrolls.
     // A table makes the canvas wider than a narrow window, which pushes the panel out of sight of the mouse.
     await page.setViewportSize({ width: 1920, height: 1000 })
-    await useJourneySession(page, 'hoa')
+    await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
 
     await openPage(page, 'TicketDetail')
@@ -1060,7 +1060,7 @@ test.describe('the author builds the service desk with Studio only', () => {
   })
 
   test('the author makes the resolved notification open the TicketDetail page', async ({ page }) => {
-    await useJourneySession(page, 'hoa')
+    await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
 
     // The page picker offers only pages that exist, so this step waited for TicketDetail.
@@ -1089,7 +1089,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     // A tall, wide window keeps the palette, the data panel and the canvas in view together, away from the edges where a
     // drag scrolls. A table makes the canvas wider than a narrow window, which pushes the panel out of sight of the mouse.
     await page.setViewportSize({ width: 1920, height: 1000 })
-    await useJourneySession(page, 'hoa')
+    await useJourneySession(page, 'author')
     // The names load with the application, so the new data sources and AllTickets are offered below.
     await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
 
@@ -1168,7 +1168,7 @@ test.describe('the author builds the service desk with Studio only', () => {
   })
 
   test('the author builds the two notify processes and the schedule and delete triggers', async ({ page }) => {
-    await useJourneySession(page, 'hoa')
+    await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
 
     const en = await texts('en')
@@ -1321,7 +1321,7 @@ test.describe('the author builds the service desk with Studio only', () => {
   })
 
   test('the author builds the three access policies in the policy matrix', async ({ page }) => {
-    await useJourneySession(page, 'hoa')
+    await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
     await page.getByText('Policy matrix', { exact: true }).click()
 
@@ -1354,7 +1354,7 @@ test.describe('the author builds the service desk with Studio only', () => {
 
   for (const [name, file] of scenarios) {
     test(`the author writes the ${name} scenario in the scenario editor`, async ({ page }) => {
-      await useJourneySession(page, 'hoa')
+      await useJourneySession(page, 'author')
       await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
       const ids = await shownCategoryIds(page)
 
@@ -1399,14 +1399,14 @@ test.describe('the author builds the service desk with Studio only', () => {
   }
 
   test('the whole built folder matches the sample', async ({ page }) => {
-    await useJourneySession(page, 'hoa')
+    await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
 
     await checkBuilt(page)
   })
 
   test('the author runs the twelve test scenarios from Studio', async ({ page }) => {
-    await useJourneySession(page, 'hoa')
+    await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
     await page.getByTestId('studio-run-tests').click()
 
@@ -1421,7 +1421,7 @@ test.describe('the author builds the service desk with Studio only', () => {
   })
 
   test('the author publishes ServiceDesk, and release 1 is active', async ({ page }) => {
-    await useJourneySession(page, 'hoa')
+    await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
 
     await page.getByRole('button', { name: 'Publish', exact: true }).click()

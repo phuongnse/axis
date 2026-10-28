@@ -45,7 +45,7 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
   test("an author sees the dashboard's widgets with the application's texts and no request goes to the application's API", async ({
     page,
   }) => {
-    await useSession(page, "hoa");
+    await useSession(page, "author");
     const applicationRequests: string[] = [];
     page.on("request", (request) => {
       const { pathname } = new URL(request.url());
@@ -72,7 +72,7 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
   test("a widget that does not compile draws as a marked placeholder with its diagnostic on the Design tab", async ({
     page,
   }) => {
-    await useSession(page, "hoa");
+    await useSession(page, "author");
     await page.goto(
       `${server.url}/studio?app=ServiceDesk&resource=${dashboardId}`,
     );
@@ -106,7 +106,7 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
   }) => {
     // A tall window keeps the palette and the drop areas in view together, away from the edges where a drag scrolls.
     await page.setViewportSize({ width: 1280, height: 1000 });
-    await useSession(page, "hoa");
+    await useSession(page, "author");
     await page.goto(
       `${server.url}/studio?app=ServiceDesk&resource=${ticketDetailId}`,
     );
@@ -163,7 +163,7 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
   test("an author binds a table to the Ticket entity with the keyboard, and the canvas draws its columns", async ({
     page,
   }) => {
-    await useSession(page, "hoa");
+    await useSession(page, "author");
     await page.goto(
       `${server.url}/studio?app=ServiceDesk&resource=${ticketDetailId}`,
     );
@@ -198,7 +198,7 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
   }) => {
     // A tall window keeps the data panel and the drop areas in view together, away from the edges where a drag scrolls.
     await page.setViewportSize({ width: 1280, height: 1000 });
-    await useSession(page, "hoa");
+    await useSession(page, "author");
     await page.goto(
       `${server.url}/studio?app=ServiceDesk&resource=${ticketDetailId}`,
     );
@@ -248,7 +248,7 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
     page,
   }) => {
     await page.setViewportSize({ width: 1280, height: 1000 });
-    await useSession(page, "hoa");
+    await useSession(page, "author");
     await page.goto(
       `${server.url}/studio?app=ServiceDesk&resource=${dashboardId}`,
     );
@@ -287,7 +287,7 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
     page,
   }) => {
     await page.setViewportSize({ width: 1280, height: 1000 });
-    await useSession(page, "hoa");
+    await useSession(page, "author");
     // A slow answer keeps the canvas busy after the drop, as a loaded server does.
     await page.route("**/page-metadata", async (route) => {
       await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -326,7 +326,7 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
     page,
   }) => {
     await page.setViewportSize({ width: 1280, height: 1000 });
-    await useSession(page, "hoa");
+    await useSession(page, "author");
     await page.goto(
       `${server.url}/studio?app=ServiceDesk&resource=${ticketDetailId}`,
     );
@@ -378,7 +378,7 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
   test("an author sees both steps of the ticket form, and the condition of the Resolution field after picking the second", async ({
     page,
   }) => {
-    await useSession(page, "hoa");
+    await useSession(page, "author");
     const applicationRequests: string[] = [];
     page.on("request", (request) => {
       const { pathname } = new URL(request.url());
@@ -415,7 +415,7 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
     page,
   }) => {
     await page.setViewportSize({ width: 1280, height: 1000 });
-    await useSession(page, "hoa");
+    await useSession(page, "author");
     await page.goto(
       `${server.url}/studio?app=ServiceDesk&resource=${ticketTriageId}`,
     );
@@ -455,7 +455,7 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
     page,
   }) => {
     await page.setViewportSize({ width: 1280, height: 1000 });
-    await useSession(page, "hoa");
+    await useSession(page, "author");
     await page.goto(
       `${server.url}/studio?app=ServiceDesk&resource=${ticketTriageId}`,
     );
@@ -509,7 +509,7 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
     page,
   }) => {
     await page.setViewportSize({ width: 1280, height: 1000 });
-    await useSession(page, "hoa");
+    await useSession(page, "author");
     await page.goto(
       `${server.url}/studio?app=ServiceDesk&resource=${ticketEditId}`,
     );
@@ -558,7 +558,7 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
     page,
   }) => {
     await page.setViewportSize({ width: 1280, height: 1000 });
-    await useSession(page, "hoa");
+    await useSession(page, "author");
     const file = path.join(copy, "forms", "ticket-edit.json");
     const original = await readFile(file, "utf8");
     try {
@@ -630,7 +630,7 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
     page,
   }) => {
     await page.setViewportSize({ width: 1280, height: 1000 });
-    await useSession(page, "hoa");
+    await useSession(page, "author");
     await page.goto(
       `${server.url}/studio?app=ServiceDesk&resource=${ticketEditId}`,
     );
@@ -658,7 +658,7 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
     page,
   }) => {
     await page.setViewportSize({ width: 1280, height: 1000 });
-    await useSession(page, "hoa");
+    await useSession(page, "author");
     await page.goto(
       `${server.url}/studio?app=ServiceDesk&resource=${ticketTriageId}`,
     );
@@ -697,7 +697,7 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
     page,
   }) => {
     await page.setViewportSize({ width: 1280, height: 1000 });
-    await useSession(page, "hoa");
+    await useSession(page, "author");
     await page.goto(
       `${server.url}/studio?app=ServiceDesk&resource=${ticketTriageId}`,
     );
@@ -740,7 +740,7 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
   test("an author selects a row action on the canvas and adds a navigate action that maps the record, and no request goes to the application's API", async ({
     page,
   }) => {
-    await useSession(page, "hoa");
+    await useSession(page, "author");
     const applicationRequests: string[] = [];
     page.on("request", (request) => {
       const { pathname } = new URL(request.url());
@@ -811,7 +811,7 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
     page,
   }) => {
     await page.setViewportSize({ width: 1280, height: 1000 });
-    await useSession(page, "hoa");
+    await useSession(page, "author");
     const file = path.join(copy, "forms", "ticket-resolution.json");
     const original = await readFile(file, "utf8");
     try {

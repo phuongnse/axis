@@ -217,7 +217,7 @@ public sealed class PublisherPreviewTests(PostgreSqlFixture database) : IClassFi
         await using var command = new NpgsqlCommand(
             """
             INSERT INTO axis.publish_requests (id, application_id, kind, target, status, snapshot, requested_by, requested_by_name, requested_at)
-            VALUES (@id, @application, @kind, @target, 'queued', @snapshot, 'hoa', 'Hoa Author', clock_timestamp())
+            VALUES (@id, @application, @kind, @target, 'queued', @snapshot, 'author', 'Author User', clock_timestamp())
             """,
             connection);
         command.Parameters.AddWithValue("id", id);

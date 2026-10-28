@@ -190,7 +190,7 @@ function stubServer(
       return new Response(null, { status: outage.down.status })
     }
     if (input === '/api/me') {
-      return json({ id: 'hoa', studio: true })
+      return json({ id: 'author', studio: true })
     }
     if (input === entityPath && init?.method === 'PATCH') {
       return json(patch.body, patch.status)
@@ -985,7 +985,7 @@ describe('StudioPage publishing', () => {
           number,
           contentHash: `hash-${number}`,
           activatedAt,
-          actor: 'hoa',
+          actor: 'author',
           actorName: null,
           label: null,
           note: null,
@@ -1002,17 +1002,17 @@ describe('StudioPage publishing', () => {
     return fetchMock
   }
 
-  const publisher = () => json({ id: 'hoa', studio: true, studioPublisher: true, studioPreviewHost: null })
+  const publisher = () => json({ id: 'author', studio: true, studioPublisher: true, studioPreviewHost: null })
   const previewer =
     (studioPublisher = true) =>
     () =>
-      json({ id: 'hoa', studio: true, studioPublisher, studioPreviewHost: 'preview.example.test' })
+      json({ id: 'author', studio: true, studioPublisher, studioPreviewHost: 'preview.example.test' })
 
   afterEach(() => vi.useRealTimers())
 
   it.each([
     ['studioPublisher is true', publisher, true],
-    ['studioPublisher is false', () => json({ id: 'hoa', studio: true, studioPublisher: false }), false],
+    ['studioPublisher is false', () => json({ id: 'author', studio: true, studioPublisher: false }), false],
     ['GET /api/me fails', () => new Response(null, { status: 500 }), false],
   ])('shows Publish only when it may: %s', async (_name, me, shown) => {
     stubPublishing(me)
@@ -1157,7 +1157,7 @@ describe('StudioPage publishing', () => {
       const fetchMock = stubServer(apps)
       const base = fetchMock.getMockImplementation()!
       fetchMock.mockImplementation(async (input: string, init?: RequestInit) =>
-        input === '/api/me' ? json({ id: 'hoa', studio: true, studioCreate }) : base(input, init),
+        input === '/api/me' ? json({ id: 'author', studio: true, studioCreate }) : base(input, init),
       )
       return fetchMock
     }

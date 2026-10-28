@@ -47,7 +47,7 @@ test.describe('Studio redraws a large process after a panel edit', () => {
   })
 
   test('a panel edit on a 40-step process shows on the canvas within 2 seconds', async ({ page }) => {
-    await useSession(page, 'hoa')
+    await useSession(page, 'author')
     const list = await page.request.get(`${server.url}${folder}/resources`)
     const { items } = (await list.json()) as { items: { id: string; file: string }[] }
     const id = items.find((item) => item.file === file)!.id

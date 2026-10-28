@@ -8,7 +8,7 @@ const pageId = '9b707fe9-a837-433e-8062-48a2a9b4d62a'
 // The test saves nothing, so the copy of the sample that the other specs use stays as it is.
 test.describe('the tab helper selects a tab when a click is lost', () => {
   test('the JSON tab opens although its first click is dropped', async ({ page }) => {
-    await useSession(page, 'hoa')
+    await useSession(page, 'author')
     await page.goto(`/studio?app=PurchaseRequests&resource=${pageId}`)
     await expect(page.getByRole('tab', { name: 'JSON', exact: true })).toBeVisible()
     await page.evaluate(() => {

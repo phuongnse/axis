@@ -90,7 +90,7 @@ public sealed class AuthoringPerformanceTests
     {
         using var folder = TypicalApplication.Write(Guid.NewGuid(), withErrors: false, out _);
         await using var factory = CreateFactory(folder.Path);
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
 
         var (status, body, elapsed) = await Answer(
             "The diagnostics",
@@ -109,7 +109,7 @@ public sealed class AuthoringPerformanceTests
         var path = Path.Combine(folder.Path, EntityFile);
         var url = $"/api/studio/apps/{Application}/resources/{EntityId(folder.Path)}";
         await using var factory = CreateFactory(folder.Path);
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
 
         // The version is read for each send, so the timed patch matches the file the warm-up patch left.
         var (status, _, elapsed) = await Answer(
@@ -126,7 +126,7 @@ public sealed class AuthoringPerformanceTests
         using var folder = TypicalApplication.Write(Guid.NewGuid(), withErrors: false, out _);
         var url = $"/api/studio/apps/{Application}/resources/{EntityId(folder.Path)}/references";
         await using var factory = CreateFactory(folder.Path);
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
 
         var (status, body, elapsed) = await Answer(
             "The where-used answer for the most used entity",
@@ -144,7 +144,7 @@ public sealed class AuthoringPerformanceTests
         using var folder = TypicalApplication.Write(Guid.NewGuid(), withErrors: false, out _);
         var url = $"/api/studio/apps/{Application}/texts/{TypicalApplication.SharedTextKey}/references";
         await using var factory = CreateFactory(folder.Path);
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
 
         var (status, body, elapsed) = await Answer(
             "The where-used answer for the shared text key",
@@ -221,7 +221,7 @@ public sealed class AuthoringPerformanceTests
             builder.UseSetting("Studio:Folders:0", folder);
             builder.UseSetting("Studio:AuthorRole", "author");
             builder.UseTestOidc("default");
-            builder.UseTestAuthentication(new TestIdentity("hoa", "Hoa Author", "author"));
+            builder.UseTestAuthentication(new TestIdentity("author", "Author User", "author"));
         });
 
     private static string EntityId(string folder)

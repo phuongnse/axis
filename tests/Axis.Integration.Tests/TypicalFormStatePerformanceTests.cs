@@ -137,7 +137,7 @@ public sealed class TypicalFormStatePerformanceTests(TypicalFormStatePerformance
                 "title": "Claim {{call}}", "kind": "special", "status": "submitted", "priority": "high", "urgent": true,
                 "amount": {{amount}}, "discount": 50, "costCenter": null, "project": "Axis", "reference": "REF-{{call}}",
                 "approver": "Binh", "approvalNote": null, "rejectionReason": null,
-                "contactName": "Hoa", "contactEmail": "hoa@example.test", "contactPhone": "0123456789",
+                "contactName": "Contact User", "contactEmail": "contact@example.test", "contactPhone": "0123456789",
                 "addressLine": "1 Main Street", "city": "Hanoi", "country": "VN", "postalCode": "100000",
                 "dueOn": "2026-12-31", "notes": "A typical claim.",
                 "lines": [{{lines}}]

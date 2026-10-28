@@ -29,50 +29,50 @@ public sealed class StudioRollbackTests : IAsyncLifetime
         using var folder = NewFolder();
         var connectionString = await _database.CreateDatabaseAsync("studio_rollback", CancellationToken);
         await using var factory = NewFactory(folder.Path, [("a", HostA, connectionString)]);
-        using var hoa = factory.CreateClient().SignedInAs("hoa");
+        using var author = factory.CreateClient().SignedInAs("author");
         using var requester = factory.CreateClient().SignedInAs("requester");
         await using var publisher = RunPublisher("a", HostA, connectionString);
 
         // Release 1 is the startup activation. Release 2 is published with another label.
-        using var startup = await GetJsonAsync(hoa, $"{ApplicationUrl}/releases", HostA);
+        using var startup = await GetJsonAsync(author, $"{ApplicationUrl}/releases", HostA);
         var first = startup.RootElement.GetProperty("active").GetProperty("releaseId").GetGuid();
         await EditTextsAsync(folder.Path, "Departments", "Teams");
-        var second = await PublishAsync(hoa);
+        var second = await PublishAsync(author);
         Assert.NotEqual(first, second);
-        await AssertNavigationAsync(hoa, "Teams");
+        await AssertNavigationAsync(author, "Teams");
 
         var subject = await SampleAppFixture.CreateRequestAsync(requester, 500m);
         var oldInstance = await SampleAppFixture.StartAsync(requester, subject);
         Assert.Equal(second, await InstanceReleaseAsync(connectionString, oldInstance));
-        using var published = await GetJsonAsync(hoa, $"{ApplicationUrl}/releases", HostA);
+        using var published = await GetJsonAsync(author, $"{ApplicationUrl}/releases", HostA);
         var folderHash = published.RootElement.GetProperty("folderContentHash").GetString();
 
-        using var accepted = await SendAsync(hoa, HttpMethod.Post, $"{ApplicationUrl}/releases/{first:D}/rollback", HostA);
+        using var accepted = await SendAsync(author, HttpMethod.Post, $"{ApplicationUrl}/releases/{first:D}/rollback", HostA);
 
         Assert.Equal(HttpStatusCode.Accepted, accepted.StatusCode);
         using var request = await ReadAsync(accepted);
         var requestId = request.RootElement.GetProperty("id").GetGuid();
         Assert.Equal($"{ApplicationUrl}/requests/{requestId:D}", accepted.Headers.Location?.OriginalString);
-        Assert.Equal(("rollback", "queued", "tenant", "hoa"), (
+        Assert.Equal(("rollback", "queued", "tenant", "author"), (
             request.RootElement.GetProperty("kind").GetString(),
             request.RootElement.GetProperty("status").GetString(),
             request.RootElement.GetProperty("target").GetString(),
             request.RootElement.GetProperty("requestedBy").GetString()));
         Assert.Equal(first.ToString("D"), request.RootElement.GetProperty("releaseId").GetString());
-        using var finished = await WaitForFinalAsync(hoa, accepted.Headers.Location!.OriginalString, HostA);
+        using var finished = await WaitForFinalAsync(author, accepted.Headers.Location!.OriginalString, HostA);
         Assert.Equal("succeeded", finished.RootElement.GetProperty("status").GetString());
         Assert.Equal(first.ToString("D"), finished.RootElement.GetProperty("releaseId").GetString());
 
         // The site shows release 1's labels, and the history shows release 1 active again under its old number.
-        await AssertNavigationAsync(hoa, "Departments");
-        using var history = await GetJsonAsync(hoa, $"{ApplicationUrl}/releases", HostA);
+        await AssertNavigationAsync(author, "Departments");
+        using var history = await GetJsonAsync(author, $"{ApplicationUrl}/releases", HostA);
         var active = history.RootElement.GetProperty("active");
         Assert.Equal((first, 1), (active.GetProperty("releaseId").GetGuid(), active.GetProperty("number").GetInt32()));
         var items = history.RootElement.GetProperty("items").EnumerateArray().ToList();
         Assert.Equal([1, 2, 1], items.Select(item => item.GetProperty("number").GetInt32()));
         var newest = items[0];
         Assert.Equal(
-            (first, "hoa", "Hoa Author", requestId, JsonValueKind.Null, JsonValueKind.Null),
+            (first, "author", "Author User", requestId, JsonValueKind.Null, JsonValueKind.Null),
             (newest.GetProperty("releaseId").GetGuid(), newest.GetProperty("actor").GetString(), newest.GetProperty("actorName").GetString(),
              newest.GetProperty("requestId").GetGuid(), newest.GetProperty("label").ValueKind, newest.GetProperty("note").ValueKind));
         Assert.NotEqual(active.GetProperty("contentHash").GetString(), history.RootElement.GetProperty("folderContentHash").GetString());
@@ -92,7 +92,7 @@ public sealed class StudioRollbackTests : IAsyncLifetime
         Assert.Equal(
             (requestId.ToString("D"), first.ToString("D"), 1),
             (details.RootElement.GetProperty("requestId").GetString(), details.RootElement.GetProperty("releaseId").GetString(), details.RootElement.GetProperty("number").GetInt32()));
-        Assert.Equal("hoa", await PostgreSqlServer.AdminScalarAsync(connectionString, "SELECT actor FROM axis.audit_records WHERE action = 'release.rolledBack'", CancellationToken));
+        Assert.Equal("author", await PostgreSqlServer.AdminScalarAsync(connectionString, "SELECT actor FROM axis.audit_records WHERE action = 'release.rolledBack'", CancellationToken));
     }
 
     [Fact]
@@ -101,22 +101,22 @@ public sealed class StudioRollbackTests : IAsyncLifetime
         using var folder = NewFolder();
         var connectionString = await _database.CreateDatabaseAsync("studio_rollback_refused", CancellationToken);
         await using var factory = NewFactory(folder.Path, [("a", HostA, connectionString)]);
-        using var hoa = factory.CreateClient().SignedInAs("hoa");
+        using var author = factory.CreateClient().SignedInAs("author");
         await using var publisher = RunPublisher("a", HostA, connectionString);
-        using var startup = await GetJsonAsync(hoa, $"{ApplicationUrl}/releases", HostA);
+        using var startup = await GetJsonAsync(author, $"{ApplicationUrl}/releases", HostA);
         var first = startup.RootElement.GetProperty("active").GetProperty("releaseId").GetGuid();
 
         // A new field has no column in release 1, so release 1 cannot run on the tables of release 2.
         await AddFieldAsync(folder.Path);
-        var second = await PublishAsync(hoa);
+        var second = await PublishAsync(author);
 
-        using var accepted = await SendAsync(hoa, HttpMethod.Post, $"{ApplicationUrl}/releases/{first:D}/rollback", HostA);
+        using var accepted = await SendAsync(author, HttpMethod.Post, $"{ApplicationUrl}/releases/{first:D}/rollback", HostA);
         Assert.Equal(HttpStatusCode.Accepted, accepted.StatusCode);
-        using var finished = await WaitForFinalAsync(hoa, accepted.Headers.Location!.OriginalString, HostA);
+        using var finished = await WaitForFinalAsync(author, accepted.Headers.Location!.OriginalString, HostA);
 
         Assert.Equal("failed", finished.RootElement.GetProperty("status").GetString());
         Assert.Contains(finished.RootElement.GetProperty("diagnostics").EnumerateArray(), diagnostic => diagnostic.GetProperty("code").GetString() == DiagnosticCodes.RemovedField);
-        using var history = await GetJsonAsync(hoa, $"{ApplicationUrl}/releases", HostA);
+        using var history = await GetJsonAsync(author, $"{ApplicationUrl}/releases", HostA);
         Assert.Equal(second, history.RootElement.GetProperty("active").GetProperty("releaseId").GetGuid());
         Assert.Equal(2, history.RootElement.GetProperty("items").GetArrayLength());
         Assert.Equal(1L, await CountAuditAsync(connectionString, "release.rollbackFailed"));
@@ -129,11 +129,11 @@ public sealed class StudioRollbackTests : IAsyncLifetime
         using var folder = NewFolder();
         var connectionString = await _database.CreateDatabaseAsync("studio_rollback_roles", CancellationToken);
         await using var factory = NewFactory(folder.Path, [("a", HostA, connectionString)]);
-        using var hoa = factory.CreateClient().SignedInAs("hoa");
+        using var author = factory.CreateClient().SignedInAs("author");
         using var lan = factory.CreateClient().SignedInAs("lan");
         using var requester = factory.CreateClient().SignedInAs("requester");
         using var nobody = factory.CreateClient();
-        using var startup = await GetJsonAsync(hoa, $"{ApplicationUrl}/releases", HostA);
+        using var startup = await GetJsonAsync(author, $"{ApplicationUrl}/releases", HostA);
         var release = startup.RootElement.GetProperty("active").GetProperty("releaseId").GetGuid();
         var url = $"{ApplicationUrl}/releases/{release:D}/rollback";
 
@@ -146,22 +146,22 @@ public sealed class StudioRollbackTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.Unauthorized, signedOut.StatusCode);
         using var withoutCsrf = new HttpRequestMessage(HttpMethod.Post, new Uri(url, UriKind.Relative));
         withoutCsrf.Headers.Host = HostA;
-        using var noHeader = await hoa.SendAsync(withoutCsrf, CancellationToken);
+        using var noHeader = await author.SendAsync(withoutCsrf, CancellationToken);
         Assert.Equal(HttpStatusCode.Forbidden, noHeader.StatusCode);
         Assert.Equal(0L, await CountRequestsAsync(connectionString));
 
         foreach (var missing in new[] { $"{ApplicationUrl}/releases/{Guid.NewGuid():D}/rollback", $"{ApplicationUrl}/releases/not-a-uuid/rollback" })
         {
-            using var unknown = await SendAsync(hoa, HttpMethod.Post, missing, HostA);
+            using var unknown = await SendAsync(author, HttpMethod.Post, missing, HostA);
             Assert.Equal(HttpStatusCode.NotFound, unknown.StatusCode);
         }
 
-        using var unknownApplication = await SendAsync(hoa, HttpMethod.Post, $"/api/studio/apps/NoSuchApplication/releases/{release:D}/rollback", HostA);
+        using var unknownApplication = await SendAsync(author, HttpMethod.Post, $"/api/studio/apps/NoSuchApplication/releases/{release:D}/rollback", HostA);
         Assert.Equal(HttpStatusCode.NotFound, unknownApplication.StatusCode);
         Assert.Equal(0L, await CountRequestsAsync(connectionString));
 
         // The body is ignored.
-        using var withBody = await SendAsync(hoa, HttpMethod.Post, url, HostA, "not json");
+        using var withBody = await SendAsync(author, HttpMethod.Post, url, HostA, "not json");
         Assert.Equal(HttpStatusCode.Accepted, withBody.StatusCode);
         Assert.Equal(1L, await CountRequestsAsync(connectionString));
     }

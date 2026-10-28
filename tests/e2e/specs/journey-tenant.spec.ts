@@ -46,7 +46,7 @@ test.describe('the journey tenant publishes a Studio application', () => {
   const name = `Journey${Date.now().toString(36)}`
 
   test('an author creates a blank application on the journey host and publishes release 1', async ({ page }) => {
-    await useJourneySession(page, 'hoa')
+    await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio`)
 
     await page.getByRole('button', { name: 'New application', exact: true }).click()

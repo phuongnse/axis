@@ -38,7 +38,7 @@ public sealed class StudioPageMetadataPerformanceTests
         AddDashboard(folder);
         var dashboard = JsonNode.Parse(File.ReadAllText(Path.Combine(folder.Path, "pages", "dashboard.json")))!;
         await using var factory = CreateFactory(folder.Path);
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
 
         // The first posts of a process run code that the JIT has not yet optimised, so they are not timed.
         for (var warmUp = 0; warmUp < WarmUpPosts; warmUp++)
@@ -176,7 +176,7 @@ public sealed class StudioPageMetadataPerformanceTests
             builder.UseSetting("Studio:Folders:0", folder);
             builder.UseSetting("Studio:AuthorRole", "author");
             builder.UseTestOidc("default");
-            builder.UseTestAuthentication(new TestIdentity("hoa", "Hoa Author", "author"));
+            builder.UseTestAuthentication(new TestIdentity("author", "Author User", "author"));
         });
 
     private static async Task<HttpResponseMessage> PostAsync(HttpClient client, string draft)

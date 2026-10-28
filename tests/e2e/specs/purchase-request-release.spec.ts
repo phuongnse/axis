@@ -207,7 +207,7 @@ test.describe('the active release of the purchase request sample changes', () =>
     const { server, folder } = await studioServer(testInfo)
     const heading = `Name ${Date.now().toString(36)}`
     try {
-      await useSession(page, 'hoa')
+      await useSession(page, 'author')
       const texts = JSON.parse(await readFile(path.join(folder, 'texts/en.json'), 'utf8'))
       expect(texts.texts['supplier.name']).toBe('Name')
       await writeInStudio(page, server.url, 'texts/en.json', '/texts/supplier.name', heading)
@@ -235,7 +235,7 @@ test.describe('the active release of the purchase request sample changes', () =>
     const { server, folder } = await studioServer(testInfo)
     const heading = `Name ${Date.now().toString(36)}`
     try {
-      await useSession(page, 'hoa')
+      await useSession(page, 'author')
       const texts = JSON.parse(await readFile(path.join(folder, 'texts/en.json'), 'utf8'))
       expect(texts.texts['supplier.name']).toBe('Name')
       await writeInStudio(page, server.url, 'texts/en.json', '/texts/supplier.name', heading)
@@ -279,7 +279,7 @@ test.describe('the active release of the purchase request sample changes', () =>
     const { server, folder } = await studioServer(testInfo)
     const heading = `Name ${Date.now().toString(36)}`
     try {
-      await useSession(page, 'hoa')
+      await useSession(page, 'author')
       const connector = JSON.parse(await readFile(path.join(folder, 'connectors/purchasing-system.json'), 'utf8'))
       expect(connector.baseUrl.binding).toBeDefined()
       await writeInStudio(page, server.url, 'texts/en.json', '/texts/supplier.name', heading)
@@ -312,7 +312,7 @@ test.describe('the active release of the purchase request sample changes', () =>
     const headingB = `Name B ${stamp}`
     const status = page.getByTestId('studio-request-status')
     try {
-      await useSession(page, 'hoa')
+      await useSession(page, 'author')
       await writeInStudio(page, server.url, 'texts/en.json', '/texts/supplier.name', headingA)
       await openStudio(page, server.url)
       await publishWithLabel(page, `First ${stamp}`)
@@ -397,7 +397,7 @@ test.describe('the active release of the purchase request sample changes', () =>
     const server = await startServer({ Studio__Folders__0: folder })
     const rows = page.getByTestId('studio-release-row')
     try {
-      await useSession(page, 'hoa')
+      await useSession(page, 'author')
       await page.goto(`${server.url}/studio?app=${name}`)
       await publishWithLabel(page, 'Before the rename')
       await expect(page.getByTestId('studio-request-status')).toHaveAttribute('data-status', 'succeeded', {
@@ -462,7 +462,7 @@ test.describe('the active release of the purchase request sample changes', () =>
       await waitForTask(page, request.title)
 
       // The release that is active now, which the request is pinned to, and the newest number so far.
-      await useSession(page, 'hoa')
+      await useSession(page, 'author')
       const history = await page.request.get(`${server.url}/api/studio/apps/PurchaseRequests/releases`)
       expect(history.status()).toBe(200)
       const body = (await history.json()) as {
@@ -497,7 +497,7 @@ test.describe('the active release of the purchase request sample changes', () =>
       await expect(page.getByText('Suppliers', { exact: true }).first()).toBeVisible()
       await expect(page.getByText(new RegExp(title))).toHaveCount(0)
 
-      await useSession(page, 'hoa')
+      await useSession(page, 'author')
       await page.goto(`${server.url}/studio?app=PurchaseRequests`)
       await publishWithLabel(page, label)
       await expect(status).toHaveAttribute('data-status', 'succeeded', { timeout: 60_000 })
@@ -524,7 +524,7 @@ test.describe('the active release of the purchase request sample changes', () =>
         expect(instance).toMatchObject({ state: 'completed', releaseId: before.releaseId })
       }).toPass({ timeout: 30_000 })
 
-      await useSession(page, 'hoa')
+      await useSession(page, 'author')
       await page.goto(`${server.url}/studio?app=PurchaseRequests`)
       await page
         .locator(`[data-testid="studio-release-row"][data-number="${before.number}"]`)

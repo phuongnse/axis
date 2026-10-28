@@ -228,7 +228,7 @@ function release(releaseId: string, number: number, activatedAt: string): Studio
     number,
     contentHash: `hash-${number}`,
     activatedAt,
-    actor: 'hoa',
+    actor: 'author',
     actorName: null,
     label: null,
     note: null,
