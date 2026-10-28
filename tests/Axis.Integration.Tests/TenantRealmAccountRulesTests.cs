@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Axis.Admin;
+using Axis.Tenancy.Realms;
 
 namespace Axis.Integration.Tests;
 
@@ -135,6 +136,53 @@ public sealed partial class TenantRealmAccountRulesTests(KeycloakFixture keycloa
         var otp = executions.EnumerateArray().Single(execution =>
             execution.TryGetProperty("providerId", out var provider) && provider.GetString() == "auth-otp-form");
         Assert.Equal("REQUIRED", otp.GetProperty("requirement").GetString());
+    }
+
+    [Fact]
+    public async Task A_second_run_leaves_a_first_login_flow_that_only_creates_a_user_and_the_realm_allows_duplicate_emails()
+    {
+        var realm = await NewRealmAsync();
+        await EnsureAsync(realm);
+
+        var flow = Uri.EscapeDataString(RealmSync.FirstLoginFlowAlias);
+        var executions = await GetJsonAsync($"admin/realms/{realm}/authentication/flows/{flow}/executions");
+        var only = Assert.Single(executions.EnumerateArray());
+        Assert.Equal("idp-create-user-if-unique", only.GetProperty("providerId").GetString());
+        Assert.Equal("REQUIRED", only.GetProperty("requirement").GetString());
+        var flows = await GetJsonAsync($"admin/realms/{realm}/authentication/flows");
+        Assert.Equal(1, flows.EnumerateArray().Count(f => f.GetProperty("alias").GetString() == RealmSync.FirstLoginFlowAlias));
+        var body = await GetJsonAsync($"admin/realms/{realm}");
+        Assert.True(body.GetProperty("duplicateEmailsAllowed").GetBoolean());
+        Assert.False(body.GetProperty("loginWithEmailAllowed").GetBoolean());
+    }
+
+    [Fact]
+    public async Task An_account_whose_username_is_its_email_signs_in_with_its_email_and_password()
+    {
+        var realm = await NewRealmAsync();
+        await AddClientAsync(realm);
+        const string email = "kim@example.test";
+        using var created = await SendAsync(HttpMethod.Post, $"admin/realms/{realm}/users", new
+        {
+            username = email,
+            email,
+            enabled = true,
+            emailVerified = true,
+            firstName = "Kim",
+            lastName = "Example",
+        });
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, await SetPasswordAsync(realm, created.Headers.Location!.Segments[^1], Password));
+
+        var (action, jar) = await OpenLoginPageAsync(realm);
+        var (_, wrong, next, _) = await PostLoginAsync(action, jar, email, "not-the-password-1");
+        Assert.Contains(InvalidCredentials, wrong, StringComparison.Ordinal);
+
+        // The password step passes: Keycloak moves on to the authenticator step instead of the callback.
+        var (status, _, _, location) = await PostLoginAsync(next, jar, email, Password);
+        Assert.Equal(HttpStatusCode.Found, status);
+        Assert.NotNull(location);
+        Assert.False(location.AbsoluteUri.StartsWith(RedirectUri, StringComparison.Ordinal), location.AbsoluteUri);
     }
 
     private async Task<string> NewRealmAsync()
