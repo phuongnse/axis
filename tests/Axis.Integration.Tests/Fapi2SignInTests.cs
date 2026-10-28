@@ -68,6 +68,7 @@ public sealed partial class Fapi2SignInTests(KeycloakFixture keycloak, PostgreSq
         var par = Assert.Single(fapi, call => call.Url.EndsWith(ParPath, StringComparison.Ordinal));
         Assert.Equal(HttpMethod.Post, par.Method);
         Assert.Null(par.Dpop);
+        Assert.Equal("28800", par.Form["max_age"]);
         Assert.Equal("S256", par.Form["code_challenge_method"]);
         Assert.Equal(KeycloakFixture.FapiClientId, par.Form["client_id"]);
         Assert.Equal(ClientAssertion.Type, par.Form["client_assertion_type"]);

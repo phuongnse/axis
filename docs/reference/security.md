@@ -16,7 +16,11 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
   server is the confidential client: it exchanges the code for tokens, reads
   the claims from the ID token and keeps no token after that (D9). The
   identity provider returns the code in the query string. The request asks
-  for the `openid`, `profile` and `email` scopes. Pushed authorization
+  for the `openid`, `profile` and `email` scopes. It carries `max_age` set to
+  8 hours, the session's absolute lifetime, so the identity provider asks a
+  person whose login there is older to log in again. The callback refuses an
+  ID token whose `auth_time` is missing or older than 8 hours, see
+  [session lifetimes and re-authentication](#session-lifetimes-and-re-authentication). Pushed authorization
   requests (PAR) stay off under the `standard` profile (D9). Under a tenant's
   `fapi2` profile they are required, see
   [FAPI 2.0 profile](#fapi-20-profile).
@@ -84,7 +88,8 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
   - `GET /api/auth/callback` is where the identity provider returns. It
     creates the session and redirects to `returnUrl`. A callback that fails
     creates no session and redirects to the shell's sign-in page, `/?signIn=failed`,
-    for example when the person cancels at the identity provider. The page says
+    for example when the person cancels at the identity provider, or when the
+    ID token has no recent `auth_time`. The page says
     that sign-in did not complete and shows no reason, and the address holds
     none. See the [home page](frontend.md) and
     [D84](../decisions/d84-asvs-level-2-and-a-server-side-session.md).
@@ -101,7 +106,9 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
   [D50](../decisions/d50-sign-in-audit-records-and-security-scanning-in-ci.md).
   - The callback writes `session.signedIn` when it creates a session. It writes
     `session.signInRefused`, with a reason code, when it refuses. A refused
-    callback still redirects to the sign-in page.
+    callback still redirects to the sign-in page. A token with no user id, or
+    with an `auth_time` that is missing or older than 8 hours, is refused with
+    the reason `invalidToken`.
   - `POST /api/auth/sign-out` writes `session.signedOut` only when a session
     existed.
   - An expired session writes nothing. A host that resolves to no tenant writes
@@ -247,6 +254,48 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
   - The confidential client `purchasing-system` stands in for the
     purchasing system as a [machine caller](#machine-callers). Its service
     account gets tokens through the client credentials grant.
+
+### Session lifetimes and re-authentication
+
+Two sessions exist after a sign-in: Axis's session and the identity
+provider's session. Axis does not control the identity provider's session.
+The two are coordinated only through `max_age` and `auth_time`, and the
+sign-out address. This holds under both
+[sign-in profiles](#fapi-20-profile).
+
+| Under either profile | Axis's session                                      | The identity provider's session                             |
+| -------------------- | --------------------------------------------------- | ----------------------------------------------------------- |
+| What starts it       | The callback creates the row in `axis.sessions`     | A login on the identity provider's page                     |
+| How long it lasts    | 8 hours after sign-in, or 1 hour without requests   | Set at the identity provider                                |
+| What ends it         | Sign-out, expiry, a new sign-in or a tenant restore | Its own expiry, or the `signOutUrl` that Axis sign-out uses |
+
+- **Axis's session.** The lifetimes are those of the
+  [session](#sign-in-and-the-session). A new sign-in ends the old session, and
+  `tenant restore` empties the table.
+- **The identity provider's session.** Its lifetimes are set at the identity
+  provider. The development realm sets none, so it keeps Keycloak's defaults.
+  Sign-out from Axis ends both sessions: it deletes the row and sends the
+  browser to the `signOutUrl`, which ends the identity provider's session.
+- **When a person signs in again.** When Axis's session ends, the next request
+  has no session, and the shell starts a sign-in. At the identity provider,
+  the person logs in again whenever the last login there is older than 8 hours.
+  This holds because every sign-in request carries `max_age=28800`. So a
+  still-open identity provider session cannot skip the login after Axis's
+  session has ended at its 8-hour limit.
+- **The check at the callback.** The callback refuses an ID token whose
+  `auth_time`, the time of the last login at the identity provider, is missing,
+  unreadable or older than 8 hours. The check allows the clock skew of the token
+  validation, 5 minutes by default, and uses the clock of the session store. The
+  identity provider must send `auth_time` in the ID token. If it leaves the
+  claim out, every sign-in of that tenant is refused. Keycloak sends it by
+  default.
+- **No back-channel logout.** Ending the identity provider's session does not
+  end Axis's session, because Axis has no back-channel logout. A person who
+  logs out only at the identity provider keeps the Axis session until it ends.
+  Sign-out from Axis ends both.
+- **Under `fapi2`.** The lifetimes and the rules are the same. The one
+  difference is where `max_age` goes: into the pushed authorization request
+  instead of the redirect, see [FAPI 2.0 profile](#fapi-20-profile).
 
 ### Development users
 

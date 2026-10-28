@@ -12,7 +12,7 @@ internal static class SignInRefusals
     /// <summary>The callback's state came from another tenant's sign-in.</summary>
     public const string OtherTenant = "otherTenant";
 
-    /// <summary>The ID token failed validation or has no user id.</summary>
+    /// <summary>The ID token failed validation, has no user id, or has an <c>auth_time</c> that is missing or too old.</summary>
     public const string InvalidToken = "invalidToken";
 
     /// <summary>The callback's state is missing, unreadable or fails the correlation check.</summary>
@@ -29,7 +29,7 @@ internal static class SignInRefusals
     /// <param name="otherTenantReadsState">Whether another tenant's sign-in client can read the state.</param>
     /// <param name="providerError">Whether the callback carries an <c>error</c> from the identity provider.</param>
     /// <param name="failure">The failure the OIDC handler reports.</param>
-    /// <param name="tokenRejected">Whether the ID token was rejected for a missing user id.</param>
+    /// <param name="tokenRejected">Whether the ID token was rejected for a missing user id or a missing or stale <c>auth_time</c>.</param>
     /// <param name="issuerRejected">Whether the callback's <c>iss</c> was rejected under <c>fapi2</c>.</param>
     public static string Classify(
         bool stateRead,
