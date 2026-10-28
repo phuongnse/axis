@@ -189,6 +189,11 @@ _(planned for M17)_
   fails at its realm step, also for a realm that exists.
 - _(planned for M17)_ **Kept in step later:** `tenant host add`, `remove` and `move` do not change the realm yet, so the
   platform client has no redirect addresses until a later part of M17 adds them.
+- **Realm sync:** the realm sync is built. It signs in to the realm as `axis-activation` and makes the realm's
+  `site-<path>` clients and `oidc-` providers match a desired state. Each site client puts the alias of the provider that
+  signed the person in into its ID token as the `identity_provider` claim, and each provider gets claim mappers for the
+  display name, the email, the locale and each roles claim. It touches no other client or provider, so `axis`,
+  `axis-activation`, `axis-users` and anything an operator added stay. Activation does not call it yet.
 - **Brought in step by activation:** activating a release adds, changes and removes the realm's brokered providers,
   their claim mappers and the site clients to match the active releases of the tenant and its platform sign-in. A
   provider that nothing names any more is removed. Its users stay, but cannot sign in through it.
