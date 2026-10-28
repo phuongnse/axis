@@ -1,5 +1,6 @@
 using Axis.Server.Authentication;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
@@ -7,6 +8,7 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Options;
 
 namespace Axis.Server.Tests;
 
@@ -47,6 +49,22 @@ public sealed class SessionCookieTests
         Assert.Contains("secure", cookie, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("path=/", cookie, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("domain=", cookie, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Theory]
+    [InlineData("Production", true)]
+    [InlineData("Testing", false)]
+    public async Task The_helper_cookies_have_the_secure_prefix_only_outside_development_and_testing(string environment, bool prefixed)
+    {
+        await using var factory = CreateFactory(environment);
+
+        var options = factory.Services.GetRequiredService<IOptionsMonitor<OpenIdConnectOptions>>().Get(TenantSignIn.SchemeName("default"));
+
+        Assert.Equal(prefixed, options.CorrelationCookie.Name?.StartsWith("__Secure-Axis.Correlation.", StringComparison.Ordinal));
+        Assert.Equal(prefixed, options.NonceCookie.Name?.StartsWith("__Secure-Axis.Nonce.", StringComparison.Ordinal));
+        var expected = prefixed ? CookieSecurePolicy.Always : CookieSecurePolicy.SameAsRequest;
+        Assert.Equal(expected, options.CorrelationCookie.SecurePolicy);
+        Assert.Equal(expected, options.NonceCookie.SecurePolicy);
     }
 
     [Fact]

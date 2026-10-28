@@ -157,6 +157,13 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place. _(planned f
   - Sign-in always creates a new session id, even when the browser already
     sends a valid session, and the old session ends. Sign-out deletes the row,
     so a copied cookie stops working at once, on every replica.
+  - A person may hold any number of sessions at once. Each sign-in from
+    another browser adds one. There is no limit, so nothing is refused or
+    ended when more are open. A sign-in from a browser that already holds a
+    session ends that session instead, as above. A person lists and ends
+    their sessions on the sessions screen, which uses `GET /api/me/sessions`.
+    An operator ends a person's sessions with
+    [`tenant session end --user`](tenant-setting-commands.md#sessions).
   - A request reads the row and updates the time of the last request. A row
     ends 8 hours after sign-in, or after 1 hour without requests, whichever
     comes first. A request past either limit counts as no session, and the
@@ -168,6 +175,12 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place. _(planned f
     domain, so the browser refuses it on plain http or from a subdomain. In
     `Development` and `Testing`, which run over plain http, it keeps the name
     `Axis.Session`. The name depends only on the environment.
+  - The OIDC correlation cookie and the nonce cookie last for one sign-in
+    round trip. Outside `Development` and `Testing` they are named
+    `__Secure-Axis.Correlation.*` and `__Secure-Axis.Nonce.*`, and they are
+    always Secure. Their path is the callback path, so the `__Host-` prefix is
+    not possible. In `Development` and `Testing` they keep the framework's
+    names.
   - The worker deletes the expired rows in each tenant it serves. It uses its
     own clock, runs once when the tenant becomes ready and then at most every
     5 minutes, and never touches a tenant it does not serve. `tenant restore`
