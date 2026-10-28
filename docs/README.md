@@ -55,10 +55,12 @@ Detailed behaviour, one topic per file. Sections marked _(planned for Mx)_ are n
 | [Storage](reference/storage.md)                                        | Physical names, column types, database roles, schema planning, audit, release history |
 | [Migrations](reference/migrations.md)                                  | `migration` resources and recomputing stored computed fields                          |
 | [Security](reference/security.md)                                      | Sign-in and the session, machine callers, service accounts, the FAPI 2.0 profile, authorization, development users |
+| [Axis's identity provider](reference/identity-provider.md)           | The identity provider Axis ships: realms, brokering, accounts and MFA, the Axis theme, installation |
 | [Security headers and rate limits](reference/headers-and-rate-limits.md) | The headers the server sets on every response, and the rate limits per partition      |
 | [ASVS](reference/asvs.md)                                              | The ASVS 5.0 Level 2 tracking: each requirement, its status and its evidence          |
 | [Performance](reference/performance.md)                                | The service level objectives, the reference environment and the load test             |
 | [Frontend](reference/frontend.md)                                      | The SPA, sites, pages and widgets                                                     |
+| [Shell and home page](reference/shell.md)                             | The shell around every page, navigation icons, the page header, the platform home page and the sign-in screen |
 | [Studio](reference/studio.md)                                          | The Studio page: editors, designers, publishing, tests                                |
 | [Entity designer](reference/entity-designer.md)                        | The Form tab of the entity editor: fields, settings, indexes, validations                 |
 | [Form designer](reference/form-designer.md)                            | The Design tab of the form editor: canvas, field palette, layout outline, moves       |

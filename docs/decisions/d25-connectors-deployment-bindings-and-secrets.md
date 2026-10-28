@@ -44,12 +44,12 @@ retries and reconciliation.
   each from a `secret` binding. `timeout` defaults to 30 seconds and is at
   most 120.
   - [D91](d91-connector-oauth2-and-structured-payloads.md) adds the `auth`
-    type `oauth2` in M17.
+    type `oauth2` in M18.
 - **Operations:** a connector has named `operations`. Each has a method, a
   path template, typed `input` fields sent as a JSON body and typed `output`
   fields read from the JSON response.
   - [D91](d91-connector-oauth2-and-structured-payloads.md) adds path, query
-    and header inputs, nested inputs and nested output sources in M17.
+    and header inputs, nested inputs and nested output sources in M18.
 - **Idempotency:** `idempotency` names the request header that carries the
   idempotency key, such as `Idempotency-Key`. It is absent when the system
   does not support one.

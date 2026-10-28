@@ -2,7 +2,7 @@
 
 Detailed reference for the operator console: the web page where the platform operator sees what
 failed in a tenant and runs the commands that fix it. Everything in this file is
-_(planned for M17)_. The design follows
+_(planned for M18)_. The design follows
 [D93](../decisions/d93-an-operator-web-console.md). Tenant provisioning stays in
 [`Axis.Admin`](administration.md), as
 [D43](../decisions/d43-tenant-provisioning-and-migrations-across-tenant-databases.md) agrees.

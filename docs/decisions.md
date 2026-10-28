@@ -108,3 +108,5 @@ files agree, title and status included.
 | [D95](decisions/d95-widget-previews-show-the-states-a-design-change-touches.md) | Widget previews show the states a design change touches | **Agreed** |
 | [D96](decisions/d96-rules-from-the-design-system-review.md) | Rules from the design system review | **Agreed** |
 | [D97](decisions/d97-reliable-test-runs.md) | Reliable test runs | **Agreed** |
+| [D98](decisions/d98-rules-from-the-shell-review.md) | Rules from the shell review | **Agreed** |
+| [D99](decisions/d99-axis-ships-its-own-identity-provider.md) | Axis ships its own identity provider | **Agreed** |

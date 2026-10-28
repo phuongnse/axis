@@ -9,7 +9,7 @@ points of [D28](d28-extension-packages.md) for every host outside
 Development. Hosted SaaS stays out of scope, as
 [D46](d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9.md)
 says, so isolation no longer waits for it. Everything here is _(planned for
-M17)_. See [package runners](../reference/extension-packages.md#package-runners).
+M18)_. See [package runners](../reference/extension-packages.md#package-runners).
 
 - **A package runner:**
   - A new host, `Axis.PackageHost`, runs package operations. The worker no

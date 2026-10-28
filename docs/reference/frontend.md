@@ -81,6 +81,8 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   takes its accessible name from a text resource. Configuration, page metadata
   and the custom widget API never name an icon, as the UI library bullet says
   ([D58](../decisions/d58-ant-design-is-a-detail-of-the-spa-without-procomponents.md)).
+  _(planned for M16)_ A site's navigation entry names an icon from Axis's own list, see
+  [navigation icons](shell.md#navigation-icons).
   A Vitest test fails on an `<svg>` element in a `.tsx` file under `web/src`.
 - **Reduced motion.** When the browser or the operating system asks for reduced
   motion (`prefers-reduced-motion: reduce`), the theme turns Ant Design's motion
@@ -506,7 +508,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
 
   | Address | Shows |
   | --- | --- |
-  | `/` | the platform home page: the server status and the tenant's sites as links, each titled in the current locale, or in the site's first locale when it lacks the current one. With nobody signed in, a sign-in prompt shows in place of the sites, and the page does not start sign-in. The shell's sign-in page is `/?signIn=failed`, where the server sends the browser after a refused sign-in. It shows the same prompt and, above the page, an alert that screen readers announce, with the platform text `shell.home.signInFailed` and no reason. `/` without the marker shows no message |
+  | `/` | the platform home page: the server status and the tenant's sites as links, each titled in the current locale, or in the site's first locale when it lacks the current one. With nobody signed in, a sign-in prompt shows in place of the sites, and the page does not start sign-in. The shell's sign-in page is `/?signIn=failed`, where the server sends the browser after a refused sign-in. It shows the same prompt and, above the page, an alert that screen readers announce, with the platform text `shell.home.signInFailed` and no reason. `/` without the marker shows no message _(planned for M16)_ It becomes the home page and sign-in screen of [shell](shell.md#platform-home-page). |
   | `/{site}` | the site's first navigation entry, by redirect |
   | `/{site}/{page}` | the page inside the site shell, with the page title. A table page also takes `?search=&page=&pageSize=&sort=`. A table bound to a data source also takes its parameter values. A page with `tabs` widgets also takes `?tab=`, `?tab2=` and so on |
   | `/{site}/{page}?ticket=<id>` | a page with parameters: the values sit in the query under the parameter names |
@@ -546,6 +548,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     task id that the task API answers `404` for shows the not-found page
     inside the site shell, as for a record.
   - Inside a site, the shell shows the site's title, navigation and locales.
+    _(planned for M16)_ [Shell and home page](shell.md) holds the shell's new layout.
     The theme toggle and the locale switch work as they do on the platform
     site.
 - **Table widget.** A page whose widget is a `table` lists the records of its
