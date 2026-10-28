@@ -40,7 +40,8 @@ services:
       timeout: 5s
       retries: 30
 
-  # Imports the axis realm from samples/keycloak on start. The admin console login is admin / admin.
+  # Imports the axis realm from samples/keycloak on start. The admin console login is admin / admin. It also holds the
+  # breached-password list that realms made by `tenant create` check passwords against.
   keycloak:
     image: quay.io/keycloak/keycloak:26.4
     command: ["start-dev", "--import-realm"]
@@ -49,6 +50,7 @@ services:
       KC_BOOTSTRAP_ADMIN_PASSWORD: admin
     volumes:
       - ./samples/keycloak:/opt/keycloak/data/import:ro
+      - ./deploy/keycloak/password-blacklists:/opt/keycloak/data/password-blacklists:ro
     ports:
       - "127.0.0.1:${AXIS_KEYCLOAK_PORT:-8080}:8080"
     # Healthy once the realm answers. The image has bash but no curl.
