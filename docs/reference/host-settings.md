@@ -211,7 +211,8 @@ _(planned for M18)_ One server setting controls the
   roles claim holds the value may use the console. It has no default, and with
   no value nobody may. The Development settings set it to `platform-operator`, apart from the `operator` role of the purchase request sample.
   Application policies play no part. `GET /api/me` answers `console: true` for
-  a user who holds it.
+  a user who holds it, and `console: false` for everyone when no value is set. That endpoint
+  already reads the setting. The console itself is planned for M18.
 
 ## Tenancy settings
 

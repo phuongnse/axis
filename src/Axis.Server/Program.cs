@@ -206,6 +206,7 @@ builder.Services.AddSingleton(ExportSettings.Load(builder.Configuration));
 builder.Services.AddSingleton(FileSettings.Load(builder.Configuration));
 builder.Services.AddSingleton(RecordImportSettings.Load(builder.Configuration));
 builder.Services.AddSingleton(StudioOptions.Load(builder.Configuration, builder.Environment.ContentRootPath));
+builder.Services.AddSingleton(ConsoleSettings.Load(builder.Configuration));
 
 builder.Services.AddScoped<TenantDatabase>();
 builder.Services.AddSingleton<ActiveModelCache>();
@@ -278,6 +279,7 @@ sessions.MapTaskEndpoints();
 sessions.MapNotificationEndpoints();
 sessions.MapDataSourceEndpoints();
 sessions.MapUserEndpoints();
+sessions.MapAboutEndpoints();
 sessions.MapSessionEndpoints();
 sessions.MapUserPickerEndpoints();
 sessions.MapStudioEndpoints();

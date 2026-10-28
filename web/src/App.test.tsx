@@ -66,7 +66,14 @@ const texts: Record<string, Record<string, string>> = {
   },
 }
 
-const sites: SiteListItem[] = [{ path: 'e2e', titleKey: 'site.title', titles: { en: 'E2E notes', vi: 'Ghi chú E2E' } }]
+const sites: SiteListItem[] = [
+  {
+    path: 'e2e',
+    titleKey: 'site.title',
+    titles: { en: 'E2E notes', vi: 'Ghi chú E2E' },
+    application: { name: 'E2eNotes', titles: { en: 'E2E notes', vi: 'Ghi chú E2E' } },
+  },
+]
 
 const e2eSite: ApplicationSite = {
   path: 'e2e',

@@ -5,6 +5,7 @@
   "formatVersion": 1,
   "locale": "en",
   "texts": {
+    "app.title": "Second application",
     "site.title": "Second",
     "nav.tasks": "Tasks",
     "tasks.title": "Tasks",

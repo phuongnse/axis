@@ -25,11 +25,18 @@ export interface SiteMetadata {
   navigation: NavigationItem[]
 }
 
+/** The application of a listed site, with its title per locale it has texts for. */
+export interface SiteApplication {
+  name: string
+  titles: Record<string, string>
+}
+
 /** One application site in the list served by `GET /api/sites`, with its title per available locale. */
 export interface SiteListItem {
   path: string
   titleKey: string
   titles: Record<string, string>
+  application: SiteApplication
 }
 
 /** An application site, as served by `GET /api/sites/{path}`. */

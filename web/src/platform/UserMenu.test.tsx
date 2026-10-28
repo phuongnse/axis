@@ -20,6 +20,7 @@ const anna: CurrentUser = {
   studioCreate: false,
   studioPreviewHost: null,
   studioTest: false,
+  console: false,
 }
 const hoa: CurrentUser = {
   id: 'hoa',
@@ -30,6 +31,7 @@ const hoa: CurrentUser = {
   studioCreate: false,
   studioPreviewHost: null,
   studioTest: false,
+  console: false,
 }
 const signOutUrl = 'http://127.0.0.1:8080/realms/axis/protocol/openid-connect/logout?client_id=axis'
 
