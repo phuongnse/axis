@@ -13,6 +13,9 @@
 //   (docs/reference/asvs-5.0.0.json), with no unknown or repeated id, a status from the list and some
 //   evidence. A Met row names only test classes that exist. A Gap row links the GitHub issue that
 //   closes it.
+// - docs/reference/security.md, when it exists with samples/keycloak/axis-realm.json, has a '### Development users'
+//   table that lists the same users with the same axis roles as the realm's users, except service accounts, and
+//   each realm user's id is its username.
 // - A doc under docs/ has at most 1,000 lines, AGENTS.md at most 100 and a SKILL.md under
 //   .claude/skills/ at most 250, so agents can read what they need without reading whole books.
 //
@@ -35,6 +38,9 @@ const decisionTitlePattern = /^# D(\d+)\. (.+)$/
 const statusPattern = /^Status: \*\*((?:Agreed|Proposed)\b[^*]*)\*\*$/
 const decisionRowPattern = /^\| \[D(\d+)\]\(decisions\/([^)]+)\) \| (.+?) \| \*\*(.+?)\*\* \|$/
 const asvsFile = 'docs/reference/asvs.md'
+const securityFile = 'docs/reference/security.md'
+export const realmFile = 'samples/keycloak/axis-realm.json'
+const developmentUsersHeading = '### Development users'
 const issueLinkPattern = /\]\(https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/issues\/\d+\)/
 const cellSeparator = /(?<!\\)\|/
 const testClassPattern = /`([A-Z]\w*Tests)`/g
@@ -119,6 +125,58 @@ function checkAsvs(root, asvs, report) {
   }
 }
 
+/** Checks the development users table of the security reference against the users of the development realm. */
+function checkDevelopmentUsers(root, report) {
+  const security = path.join(root, securityFile)
+  const realm = path.join(root, realmFile)
+  const text = lines(security)
+  const heading = text.findIndex((line) => line === developmentUsersHeading)
+  const header = heading < 0 ? -1 : text.findIndex((line, i) => i > heading && line.startsWith('|'))
+  const columns = header < 0 ? [] : text[header].split(cellSeparator).map((cell) => cell.trim())
+  const userColumn = columns.indexOf('User')
+  const rolesColumn = columns.indexOf('Roles')
+  if (userColumn < 0 || rolesColumn < 0) {
+    report(security, 1, `needs a ${developmentUsersHeading} section with a User and Roles table, checked against ${realmFile}`)
+    return
+  }
+
+  const table = new Map()
+  for (let i = header + 1; i < text.length && text[i].startsWith('|'); i++) {
+    const cells = text[i].split(cellSeparator)
+    const user = /`([^`]+)`/.exec(cells[userColumn] ?? '')?.[1]
+    if (!user) continue
+    const roles = [...(cells[rolesColumn] ?? '').matchAll(/`([^`]+)`/g)].map((match) => match[1])
+    table.set(user, { line: i + 1, roles })
+  }
+
+  const realmLines = lines(realm)
+  const realmLine = (username) => {
+    const index = realmLines.findIndex((line) => line.includes(`"username": "${username}"`))
+    return index < 0 ? 1 : index + 1
+  }
+  const users = (JSON.parse(readFileSync(realm, 'utf8')).users ?? []).filter((user) => !user.serviceAccountClientId)
+  const realmUsers = new Map(users.map((user) => [user.username, user]))
+
+  for (const [user, { line, roles }] of table) {
+    const realmUser = realmUsers.get(user)
+    if (!realmUser) {
+      report(security, line, `${user} is in the development users table but not in ${realmFile}`)
+      continue
+    }
+    const tableRoles = [...roles].sort().join(', ')
+    const realmRoles = [...(realmUser.clientRoles?.axis ?? [])].sort().join(', ')
+    if (tableRoles !== realmRoles) {
+      report(security, line, `${user} has the roles ${tableRoles || 'none'} in the table and ${realmRoles || 'none'} in ${realmFile}`)
+    }
+  }
+  for (const { username, id } of users) {
+    if (!table.has(username)) {
+      report(realm, realmLine(username), `${username} is in ${realmFile} but not in the development users table of ${securityFile}`)
+    }
+    if (id !== username) report(realm, realmLine(username), `${username} has the id '${id}': a development user's id is its username`)
+  }
+}
+
 /** Checks the docs under root and returns the problems as { file, line, message }. */
 export function checkDocs(root) {
   const problems = []
@@ -165,6 +223,10 @@ export function checkDocs(root) {
 
   const asvs = path.join(root, asvsFile)
   if (existsSync(asvs)) checkAsvs(root, asvs, report)
+
+  if (existsSync(path.join(root, securityFile)) && existsSync(path.join(root, realmFile))) {
+    checkDevelopmentUsers(root, report)
+  }
 
   // The decisions.
   const index = path.join(docs, 'decisions.md')
@@ -229,7 +291,7 @@ function main(args) {
   const problems = checkDocs(root).sort((a, b) => (a.file === b.file ? a.line - b.line : a.file < b.file ? -1 : 1))
   for (const { file, line, message } of problems) process.stderr.write(`${file}:${line}: ${message}\n`)
   if (problems.length > 0) return 1
-  console.log('The docs map, the decisions index, the ASVS table and the doc and skill sizes are in order.')
+  console.log('The docs map, the decisions index, the ASVS table, the development users and the doc and skill sizes are in order.')
   return 0
 }
 

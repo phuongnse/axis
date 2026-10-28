@@ -12,6 +12,7 @@ import {
   maxAgentsLines,
   maxDocLines,
   maxSkillLines,
+  realmFile,
 } from './check-docs.mjs'
 
 const script = fileURLToPath(new URL('./check-docs.mjs', import.meta.url))
@@ -302,6 +303,96 @@ describe('the repository ASVS table', () => {
   test('has exactly one row for each listed id', () => {
     assert.ok(list.requirements.length > 0)
     for (const { id } of list.requirements) assert.equal(rowIds.filter((rowId) => rowId === id).length, 1, `${id} has one row`)
+  })
+})
+
+describe('development users', () => {
+  const security = 'docs/reference/security.md'
+  const userRow = (user, roles) => `| \`${user}\` | ${roles.map((role) => `\`${role}\``).join(', ')} | Samples |`
+  const realmUser = (username, roles, id = username) => ({ id, username, enabled: true, clientRoles: { axis: roles } })
+  const serviceAccount = { id: 'x', username: 'service-account-x', serviceAccountClientId: 'x', clientRoles: { x: ['x'] } }
+  const lineOf = (text, needle) => text.split('\n').findIndex((line) => line.includes(needle)) + 1
+
+  const writeSecurity = (...rows) =>
+    write(security, ['# Security', '', '### Development users', '', 'Intro line.', '', '| User | Roles | Used by |', '| --- | --- | --- |', ...rows].join('\n') + '\n')
+  const writeRealm = (...users) => {
+    const text = JSON.stringify({ realm: 'axis', users: [...users, serviceAccount] }, null, 2) + '\n'
+    write(realmFile, text)
+    return text
+  }
+
+  beforeEach(() => {
+    write('docs/README.md', '# Documentation\n\n| [Decisions](decisions.md) | [Guide](reference/guide.md) | [Security](reference/security.md) |\n')
+    writeSecurity(userRow('anna', ['employee', 'requester']), userRow('binh', ['department-manager']))
+    writeRealm(realmUser('anna', ['employee', 'requester']), realmUser('binh', ['department-manager']))
+  })
+
+  test('passes on matching files', () => {
+    assert.deepEqual(messages(), [])
+  })
+
+  test('passes when the roles are in another order', () => {
+    writeSecurity(userRow('anna', ['requester', 'employee']), userRow('binh', ['department-manager']))
+
+    assert.deepEqual(messages(), [])
+  })
+
+  test('reports a table user who is not in the realm, on the table row', () => {
+    writeSecurity(userRow('anna', ['employee', 'requester']), userRow('binh', ['department-manager']), userRow('chau', ['department-manager']))
+
+    assert.deepEqual(messages(), [`${security}:11: chau is in the development users table but not in ${realmFile}`])
+  })
+
+  test('reports a realm user who is not in the table, on the username line', () => {
+    const text = writeRealm(
+      realmUser('anna', ['employee', 'requester']),
+      realmUser('binh', ['department-manager']),
+      realmUser('dung', ['finance-reviewer']),
+    )
+
+    assert.deepEqual(messages(), [
+      `${realmFile}:${lineOf(text, '"username": "dung"')}: dung is in ${realmFile} but not in the development users table of ${security}`,
+    ])
+  })
+
+  test('reports roles that differ, naming both lists on the table row', () => {
+    writeSecurity(userRow('anna', ['employee']), userRow('binh', ['department-manager']))
+
+    assert.deepEqual(messages(), [
+      `${security}:9: anna has the roles employee in the table and employee, requester in ${realmFile}`,
+    ])
+  })
+
+  test('reports an id that differs from the username on the username line', () => {
+    const text = writeRealm(realmUser('anna', ['employee', 'requester']), realmUser('binh', ['department-manager'], 'binh-id'))
+
+    assert.deepEqual(messages(), [
+      `${realmFile}:${lineOf(text, '"username": "binh"')}: binh has the id 'binh-id': a development user's id is its username`,
+    ])
+  })
+
+  test('reports a missing development users section on line 1', () => {
+    write(security, '# Security\n\nNo table.\n')
+
+    assert.deepEqual(messages(), [
+      `${security}:1: needs a ### Development users section with a User and Roles table, checked against ${realmFile}`,
+    ])
+  })
+
+  test('skips the check when the realm file is missing', () => {
+    rmSync(path.join(root, realmFile))
+
+    assert.deepEqual(messages(), [])
+  })
+})
+
+describe('the repository development users', () => {
+  test('finds no problem in the development users table or the development realm', () => {
+    const found = checkDocs(repositoryRoot).filter(
+      ({ file }) => file === 'docs/reference/security.md' || file === realmFile,
+    )
+
+    assert.deepEqual(found, [])
   })
 })
 
