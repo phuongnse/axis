@@ -34,7 +34,7 @@ public sealed class StudioTemplateEndpointTests : IDisposable
         AddTemplate("tpl-a", "1.2.0");
         AddTemplate("tpl-a", "1.0.0");
         await using var factory = CreateFactory(TemplatesFolder);
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
 
         var response = await client.GetAsync(new Uri("/api/studio/templates", UriKind.Relative), CancellationToken);
 
@@ -56,7 +56,7 @@ public sealed class StudioTemplateEndpointTests : IDisposable
     public async Task Without_Templates_Path_the_list_is_empty()
     {
         await using var factory = CreateFactory(null);
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
 
         var response = await client.GetAsync(new Uri("/api/studio/templates", UriKind.Relative), CancellationToken);
 
@@ -148,7 +148,7 @@ public sealed class StudioTemplateEndpointTests : IDisposable
             builder.UseSetting("Studio:AuthorRole", "author");
             builder.UseTestOidc("default");
             builder.UseTestAuthentication(
-                new TestIdentity("hoa", "Hoa Author", "author"),
+                new TestIdentity("author", "Author User", "author"),
                 new TestIdentity("requester", "Requester User", "employee"));
         });
 }

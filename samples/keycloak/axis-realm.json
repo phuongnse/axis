@@ -380,13 +380,13 @@
       }
     },
     {
-      "id": "hoa",
-      "username": "hoa",
+      "id": "author",
+      "username": "author",
       "enabled": true,
-      "email": "hoa@axis.local",
+      "email": "author@axis.local",
       "emailVerified": true,
-      "firstName": "Hoa",
-      "lastName": "Author",
+      "firstName": "Author",
+      "lastName": "User",
       "credentials": [
         {
           "type": "password",

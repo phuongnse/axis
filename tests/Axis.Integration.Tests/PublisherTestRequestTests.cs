@@ -361,7 +361,7 @@ public sealed class PublisherTestRequestTests(PostgreSqlFixture database) : ICla
         await using var command = new NpgsqlCommand(
             """
             INSERT INTO axis.publish_requests (id, application_id, kind, target, status, snapshot, requested_by, requested_by_name, requested_at, scenario_names)
-            VALUES (@id, @application, @kind, 'tenant', 'queued', @snapshot, 'hoa', 'Hoa Author', clock_timestamp(), @scenarios)
+            VALUES (@id, @application, @kind, 'tenant', 'queued', @snapshot, 'author', 'Author User', clock_timestamp(), @scenarios)
             """,
             connection);
         command.Parameters.AddWithValue("id", id);

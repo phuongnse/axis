@@ -94,7 +94,7 @@ test.describe('Studio builds a dashboard page with a KPI and a chart', () => {
   test('an author builds a dashboard with a KPI and a chart, publishes it and opens it on the site', async ({ page }) => {
     const name = `Dashboard${Date.now().toString(36)}`
     const stamp = Date.now().toString(36)
-    await useSession(page, 'hoa')
+    await useSession(page, 'author')
     await page.goto(`${server.url}/studio?app=PurchaseRequests`)
 
     await page.getByRole('button', { name: 'New application', exact: true }).click()

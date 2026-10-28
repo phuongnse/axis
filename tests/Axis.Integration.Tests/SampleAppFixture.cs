@@ -30,7 +30,7 @@ namespace Axis.Integration.Tests;
 /// server migrates it and activates the purchase request sample through <c>ActivateOnStartup</c>,
 /// so the sample's department seeds are applied as well. The test authentication scheme signs in
 /// <c>requester</c> and <c>lan</c>, two employees, <c>chau</c>, the Operations manager, <c>binh</c>, the
-/// Engineering manager, and <c>dung</c> and <c>hoa</c>, two finance reviewers. The fixture also holds the worker's services for the tenant, with the host never
+/// Engineering manager, and <c>dung</c> and <c>reviewer</c>, two finance reviewers. The fixture also holds the worker's services for the tenant, with the host never
 /// started, so a test runs the work items itself. A test can instead start real worker hosts with
 /// <see cref="StartWorkerAsync"/>, and stop them to stand for a worker that is down.
 /// The purchasing system stub runs in process over <c>http</c>. The workers run in Development, the
@@ -103,7 +103,7 @@ public sealed class SampleAppFixture : IAsyncLifetime
                 new TestIdentity("chau", "Chau Operations Manager", "department-manager"),
                 new TestIdentity("binh", "Binh Engineering Manager", "department-manager"),
                 new TestIdentity("dung", "Dung Finance Reviewer", "finance-reviewer"),
-                new TestIdentity("hoa", "Hoa Finance Reviewer", "finance-reviewer"),
+                new TestIdentity("reviewer", "Reviewer User", "finance-reviewer"),
                 new TestIdentity("giang", "Giang Operator", "operator"),
                 new TestIdentity("khanh", "Khanh Operator Reviewer", "operator", "finance-reviewer"));
         });

@@ -77,7 +77,7 @@ public sealed class StudioTestRequestTests : IAsyncLifetime
         await using var factory = StudioPublishTests.NewFactory(folder.Path, [("a", StudioPublishTests.HostA, connectionString)]);
         using var nobody = factory.CreateClient();
         using var requester = factory.CreateClient().SignedInAs("requester");
-        using var hoa = factory.CreateClient().SignedInAs("hoa");
+        using var author = factory.CreateClient().SignedInAs("author");
 
         using var signedOut = await StudioPublishTests.SendAsync(nobody, HttpMethod.Post, TestUrl, StudioPublishTests.HostA);
         Assert.Equal(HttpStatusCode.Unauthorized, signedOut.StatusCode);
@@ -87,11 +87,11 @@ public sealed class StudioTestRequestTests : IAsyncLifetime
 
         using var withoutCsrf = new HttpRequestMessage(HttpMethod.Post, new Uri(TestUrl, UriKind.Relative));
         withoutCsrf.Headers.Host = StudioPublishTests.HostA;
-        using var noHeader = await hoa.SendAsync(withoutCsrf, CancellationToken);
+        using var noHeader = await author.SendAsync(withoutCsrf, CancellationToken);
         Assert.Equal(HttpStatusCode.Forbidden, noHeader.StatusCode);
 
         using var unknown = await StudioPublishTests.SendAsync(
-            hoa, HttpMethod.Post, "/api/studio/apps/NoSuchApplication/test", StudioPublishTests.HostA);
+            author, HttpMethod.Post, "/api/studio/apps/NoSuchApplication/test", StudioPublishTests.HostA);
         Assert.Equal(HttpStatusCode.NotFound, unknown.StatusCode);
 
         Assert.Equal(0L, await StudioPublishTests.CountRequestsAsync(connectionString));
@@ -103,15 +103,15 @@ public sealed class StudioTestRequestTests : IAsyncLifetime
         using var folder = StudioPublishTests.NewFolder();
         var connectionString = await _database.CreateDatabaseAsync("studio_test_body", CancellationToken);
         await using var factory = StudioPublishTests.NewFactory(folder.Path, [("a", StudioPublishTests.HostA, connectionString)]);
-        using var hoa = factory.CreateClient().SignedInAs("hoa");
+        using var author = factory.CreateClient().SignedInAs("author");
 
         using var plain = await StudioPublishTests.SendAsync(
-            hoa, HttpMethod.Post, TestUrl, StudioPublishTests.HostA, """{ "scenarios": [] }""", contentType: "text/plain");
+            author, HttpMethod.Post, TestUrl, StudioPublishTests.HostA, """{ "scenarios": [] }""", contentType: "text/plain");
         Assert.Equal(HttpStatusCode.UnsupportedMediaType, plain.StatusCode);
 
         foreach (var body in new[] { "not json", """{"scenarios":1}""", """{"scenarios":[1]}""", """{"scenarios":null}""", """{"other":[]}""", "[]" })
         {
-            using var refused = await StudioPublishTests.SendAsync(hoa, HttpMethod.Post, TestUrl, StudioPublishTests.HostA, body);
+            using var refused = await StudioPublishTests.SendAsync(author, HttpMethod.Post, TestUrl, StudioPublishTests.HostA, body);
             Assert.True(HttpStatusCode.BadRequest == refused.StatusCode, $"{body} answered {(int)refused.StatusCode}.");
         }
 
@@ -124,17 +124,17 @@ public sealed class StudioTestRequestTests : IAsyncLifetime
         using var folder = StudioPublishTests.NewFolder();
         var connectionString = await _database.CreateDatabaseAsync("studio_test_status", CancellationToken);
         await using var factory = StudioPublishTests.NewFactory(folder.Path, [("a", StudioPublishTests.HostA, connectionString)]);
-        using var hoa = factory.CreateClient().SignedInAs("hoa");
+        using var author = factory.CreateClient().SignedInAs("author");
 
-        using var test = await StudioPublishTests.SendAsync(hoa, HttpMethod.Post, TestUrl, StudioPublishTests.HostA);
+        using var test = await StudioPublishTests.SendAsync(author, HttpMethod.Post, TestUrl, StudioPublishTests.HostA);
         Assert.Equal(HttpStatusCode.Accepted, test.StatusCode);
         using var validate = await StudioPublishTests.SendAsync(
-            hoa, HttpMethod.Post, "/api/studio/apps/PurchaseRequests/validate", StudioPublishTests.HostA);
+            author, HttpMethod.Post, "/api/studio/apps/PurchaseRequests/validate", StudioPublishTests.HostA);
         Assert.Equal(HttpStatusCode.Accepted, validate.StatusCode);
         using var validateAccepted = await StudioPublishTests.ReadAsync(validate);
         Assert.Equal(JsonValueKind.Null, validateAccepted.RootElement.GetProperty("scenarios").ValueKind);
 
-        using var queued = await StudioPublishTests.GetJsonAsync(hoa, test.Headers.Location!.OriginalString, StudioPublishTests.HostA);
+        using var queued = await StudioPublishTests.GetJsonAsync(author, test.Headers.Location!.OriginalString, StudioPublishTests.HostA);
         Assert.Equal("queued", queued.RootElement.GetProperty("status").GetString());
         Assert.Equal(JsonValueKind.Array, queued.RootElement.GetProperty("scenarios").ValueKind);
         Assert.Equal(0, queued.RootElement.GetProperty("scenarios").GetArrayLength());
@@ -142,12 +142,12 @@ public sealed class StudioTestRequestTests : IAsyncLifetime
         // This publisher has no scenario server, so the test ends failed, with no scenario result.
         await using var publisher = StudioPublishTests.RunPublisher("a", StudioPublishTests.HostA, connectionString);
         using var finished = await StudioPublishTests.WaitForFinalAsync(
-            hoa, validate.Headers.Location!.OriginalString, StudioPublishTests.HostA);
+            author, validate.Headers.Location!.OriginalString, StudioPublishTests.HostA);
         Assert.Equal("succeeded", finished.RootElement.GetProperty("status").GetString());
         Assert.Equal(JsonValueKind.Null, finished.RootElement.GetProperty("scenarios").ValueKind);
 
         using var ended = await StudioPublishTests.WaitForFinalAsync(
-            hoa, test.Headers.Location!.OriginalString, StudioPublishTests.HostA);
+            author, test.Headers.Location!.OriginalString, StudioPublishTests.HostA);
         Assert.Equal("failed", ended.RootElement.GetProperty("status").GetString());
         Assert.Equal(JsonValueKind.Array, ended.RootElement.GetProperty("scenarios").ValueKind);
         Assert.Equal(0, ended.RootElement.GetProperty("scenarios").GetArrayLength());

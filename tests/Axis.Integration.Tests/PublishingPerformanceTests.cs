@@ -144,12 +144,12 @@ public sealed class PublishingPerformanceTests(PostgreSqlFixture database) : ICl
         await using var factory = CreateHistoryFactory(connectionString, folder.Path);
 
         // Creating a client starts the server, which activates the folder as release 1.
-        using var author = factory.CreateClient().SignedInAs("hoa");
+        using var author = factory.CreateClient().SignedInAs("author");
         var textsPath = Path.Combine(folder.Path, "texts", "en.json");
         var texts = await File.ReadAllTextAsync(textsPath, CancellationToken);
         Assert.Contains("\"Departments\"", texts, StringComparison.Ordinal);
         await File.WriteAllTextAsync(textsPath, texts.Replace("\"Departments\"", "\"Teams\"", StringComparison.Ordinal), CancellationToken);
-        await StudioReleaseHistoryTests.ActivateAsync(connectionString, folder.Path, ActivationActor.User("hoa", "Hoa Author", "Spring", "Teams rename", Guid.NewGuid()));
+        await StudioReleaseHistoryTests.ActivateAsync(connectionString, folder.Path, ActivationActor.User("author", "Author User", "Spring", "Teams rename", Guid.NewGuid()));
 
         // The rows alternate between the two releases, as repeated rollbacks leave them. Each release keeps its number.
         await ScalarAsync(
@@ -158,7 +158,7 @@ public sealed class PublishingPerformanceTests(PostgreSqlFixture database) : ICl
             INSERT INTO axis.release_activations (id, release_id, application_id, number, content_hash, activated_at, actor, label, note)
             SELECT uuidv7(), r.release_id, r.application_id, r.number, r.content_hash,
                    (SELECT max(activated_at) FROM axis.release_activations) - g * interval '1 minute',
-                   'hoa', 'Label ' || g, repeat('x', 200)
+                   'author', 'Label ' || g, repeat('x', 200)
             FROM generate_series(1, {Activations - 2}) g
             JOIN axis.release_activations r ON r.number = CASE WHEN g % 2 = 0 THEN 2 ELSE 1 END
             """);
@@ -203,9 +203,9 @@ public sealed class PublishingPerformanceTests(PostgreSqlFixture database) : ICl
 
         // The instances start one after the other, because both run the platform migrations.
         await using var first = CreateStudioFactory(platform, folder.Path);
-        using var firstClient = first.CreateClient().SignedInAs("hoa");
+        using var firstClient = first.CreateClient().SignedInAs("author");
         await using var second = CreateStudioFactory(platform, folder.Path);
-        using var secondClient = second.CreateClient().SignedInAs("hoa");
+        using var secondClient = second.CreateClient().SignedInAs("author");
         HttpClient[] clients = [firstClient, secondClient];
 
         var versions = files.Select(file => Sha256(file.Path)).ToArray();
@@ -319,7 +319,7 @@ public sealed class PublishingPerformanceTests(PostgreSqlFixture database) : ICl
         await using var command = new NpgsqlCommand(
             """
             INSERT INTO axis.publish_requests (id, application_id, kind, status, snapshot, requested_by, requested_by_name, requested_at)
-            VALUES (@id, @application, 'publish', 'queued', @snapshot, 'hoa', 'Hoa Author', clock_timestamp())
+            VALUES (@id, @application, 'publish', 'queued', @snapshot, 'author', 'Author User', clock_timestamp())
             """,
             connection);
         command.Parameters.AddWithValue("id", id);
@@ -354,7 +354,7 @@ public sealed class PublishingPerformanceTests(PostgreSqlFixture database) : ICl
             builder.UseSetting("ActivateOnStartup:0", folder);
             builder.UseSetting("Studio:Folders:0", folder);
             builder.UseSetting("Studio:AuthorRole", "author");
-            builder.UseTestAuthentication(new TestIdentity("hoa", "Hoa Author", "author"));
+            builder.UseTestAuthentication(new TestIdentity("author", "Author User", "author"));
         });
 
     // One of two instances on a platform database. The tenant is the class database.
@@ -369,7 +369,7 @@ public sealed class PublishingPerformanceTests(PostgreSqlFixture database) : ICl
             builder.UseSetting("Studio:Folders:0", folder);
             builder.UseSetting("Studio:AuthorRole", "author");
             builder.UseTestOidc("default");
-            builder.UseTestAuthentication(new TestIdentity("hoa", "Hoa Author", "author"));
+            builder.UseTestAuthentication(new TestIdentity("author", "Author User", "author"));
         });
 
     private WebApplicationFactory<Program> CreateSessionFactory(string platform) =>

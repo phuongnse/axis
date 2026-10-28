@@ -851,7 +851,7 @@ RETURNING id;`,
       for (const id of Object.keys(hosts)) assert.match(publisherLog, new RegExp(`^${id} claim ok$`, 'm'))
       assert.match(run(['ps', '--status', 'running', '--services']), /^publisher$/m)
 
-      // A new realm has no users, so tenant one goes back to the development realm, where the requester and hoa can sign in.
+      // A new realm has no users, so tenant one goes back to the development realm, where the requester and author can sign in.
       const point = admin(
         ['tenant', 'oidc', 'set', 'one', '--authority', keycloakAuthority, '--client-id', 'axis', '--client-secret'],
         { AXIS_OIDC_CLIENT_SECRET: clientSecret },
@@ -922,9 +922,9 @@ RETURNING id;`,
         assert.equal(direct.status, 200, `GET /api/me on port ${port} after the restart: ${direct.body}`)
       }
 
-      // Step 9, Studio on a shared folder. hoa saves through server, reads through server-2 and a stale save
+      // Step 9, Studio on a shared folder. author saves through server, reads through server-2 and a stale save
       // through server-2 answers 409.
-      const { jar: hoaJar } = await signInViaProxy('hoa')
+      const { jar: authorJar } = await signInViaProxy('author')
       const resource = '/api/studio/apps/LeaveRequests/resources/bb5c622e-a7f8-41d4-8a6f-15fe463455b8'
       const patch = (port, version, value) =>
         serverRequest(
@@ -932,14 +932,14 @@ RETURNING id;`,
           hosts.one,
           resource,
           {
-            ...cookieHeader(hoaJar),
+            ...cookieHeader(authorJar),
             'x-axis-csrf': '1',
             'if-match': version,
             'content-type': 'application/json-patch+json',
           },
           { method: 'PATCH', body: JSON.stringify([{ op: 'replace', path: '/texts/site.title', value }]) },
         )
-      const original = await serverRequest(serverPort, hosts.one, resource, cookieHeader(hoaJar))
+      const original = await serverRequest(serverPort, hosts.one, resource, cookieHeader(authorJar))
       assert.equal(original.status, 200, `GET the resource through server: ${original.body}`)
       const etag0 = original.headers.etag
       assert.ok(etag0, 'the resource has no ETag')
@@ -949,7 +949,7 @@ RETURNING id;`,
       const etag1 = saved.headers.etag
       assert.ok(etag1 && etag1 !== etag0, 'the save did not change the ETag')
 
-      const read = await serverRequest(server2Port, hosts.one, resource, cookieHeader(hoaJar))
+      const read = await serverRequest(server2Port, hosts.one, resource, cookieHeader(authorJar))
       assert.equal(read.status, 200, `GET through server-2: ${read.body}`)
       assert.equal(read.headers.etag, etag1)
       assert.equal(JSON.parse(read.body).content.texts['site.title'], 'Leave (on premises)')

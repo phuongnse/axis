@@ -70,7 +70,7 @@ test.describe("Studio builds pages in the page editor", () => {
   test("an author builds a form page with an action and a table page that opens it with a row navigate, with no new diagnostic", async ({
     page,
   }) => {
-    await useSession(page, "hoa");
+    await useSession(page, "author");
     const diagnostics = async () =>
       (await (
         await page.request.get(

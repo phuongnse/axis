@@ -27,7 +27,7 @@ test.describe('the author builds an application from the request-approval templa
   }
 
   test('the author creates EquipmentRequests from the Request approval template', async ({ page }) => {
-    await useJourneySession(page, 'hoa')
+    await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio`)
 
     await page.getByRole('button', { name: 'New application', exact: true }).click()
@@ -44,7 +44,7 @@ test.describe('the author builds an application from the request-approval templa
   })
 
   test('the author runs the test scenario from Studio, and it passes', async ({ page }) => {
-    await useJourneySession(page, 'hoa')
+    await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio?app=EquipmentRequests`)
     await page.getByTestId('studio-run-tests').click()
 
@@ -56,7 +56,7 @@ test.describe('the author builds an application from the request-approval templa
   })
 
   test('the author publishes EquipmentRequests, and release 1 is active', async ({ page }) => {
-    await useJourneySession(page, 'hoa')
+    await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio?app=EquipmentRequests`)
 
     await page.getByRole('button', { name: 'Publish', exact: true }).click()

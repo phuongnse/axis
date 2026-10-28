@@ -74,18 +74,18 @@ public sealed class StudioPreviewTests : IAsyncLifetime
         using var folder = StudioPublishTests.NewFolder();
         var main = await _database.CreateDatabaseAsync("studio_preview_none", CancellationToken);
         await using var factory = StudioPublishTests.NewFactory(folder.Path, [("a", HostA, main)]);
-        using var hoa = factory.CreateClient().SignedInAs("hoa");
+        using var author = factory.CreateClient().SignedInAs("author");
 
-        using var refused = await StudioPublishTests.SendAsync(hoa, HttpMethod.Post, PreviewUrl, HostA);
+        using var refused = await StudioPublishTests.SendAsync(author, HttpMethod.Post, PreviewUrl, HostA);
 
         Assert.Equal(HttpStatusCode.Conflict, refused.StatusCode);
         Assert.Equal("This tenant has no preview tenant.", (await StudioPublishTests.ReadAsync(refused)).RootElement.GetProperty("title").GetString());
         Assert.Equal(0L, await StudioPublishTests.CountRequestsAsync(main));
 
-        using var unknown = await StudioPublishTests.SendAsync(hoa, HttpMethod.Post, "/api/studio/apps/NoSuchApplication/preview", HostA);
+        using var unknown = await StudioPublishTests.SendAsync(author, HttpMethod.Post, "/api/studio/apps/NoSuchApplication/preview", HostA);
         Assert.Equal(HttpStatusCode.NotFound, unknown.StatusCode);
 
-        using var me = await StudioPublishTests.GetJsonAsync(hoa, "/api/me", HostA);
+        using var me = await StudioPublishTests.GetJsonAsync(author, "/api/me", HostA);
         Assert.Equal(JsonValueKind.Null, me.RootElement.GetProperty("studioPreviewHost").ValueKind);
         Assert.Equal(0L, await StudioPublishTests.CountRequestsAsync(main));
     }
@@ -131,7 +131,7 @@ public sealed class StudioPreviewTests : IAsyncLifetime
         var preview = await _database.CreateDatabaseAsync("studio_preview_me_preview", CancellationToken);
         await using var factory = StudioPublishTests.NewFactory(folder.Path, [("a", HostA, main)], preview);
 
-        foreach (var author in new[] { "lan", "hoa" })
+        foreach (var author in new[] { "lan", "author" })
         {
             using var client = factory.CreateClient().SignedInAs(author);
             using var me = await StudioPublishTests.GetJsonAsync(client, "/api/me", HostA);

@@ -48,7 +48,7 @@ public sealed class StudioPageMetadataTests : IAsyncLifetime
     public async Task Valid_draft_answers_every_widget_with_its_path_and_full_access_for_an_author_with_no_application_role()
     {
         await using var factory = CreateFactory();
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
 
         var response = await Post(client, TwoColumns(ValidChart()).ToJsonString());
 
@@ -77,7 +77,7 @@ public sealed class StudioPageMetadataTests : IAsyncLifetime
     public async Task Unchanged_page_answers_its_widget_at_the_top_level()
     {
         await using var factory = CreateFactory();
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
 
         var response = await Post(client, SavedPage().ToJsonString());
 
@@ -124,7 +124,7 @@ public sealed class StudioPageMetadataTests : IAsyncLifetime
     public async Task Valid_draft_form_answers_a_form_widget_with_the_paths_of_its_sections_fields_and_steps()
     {
         await using var factory = CreateFactory();
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
         var form = SteppedForm();
 
         var response = await Post(client, form.ToJsonString(), id: FormId);
@@ -170,7 +170,7 @@ public sealed class StudioPageMetadataTests : IAsyncLifetime
     public async Task Draft_form_with_an_unknown_field_answers_no_widget_and_the_diagnostics_of_the_form()
     {
         await using var factory = CreateFactory();
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
         var form = SteppedForm();
         form["sections"]![1]!["fields"] = new JsonArray(new JsonObject { ["field"] = "noSuchField" });
 
@@ -190,7 +190,7 @@ public sealed class StudioPageMetadataTests : IAsyncLifetime
     {
         File.WriteAllText(Path.Combine(Folder, "pages", "suppliers.json"), """{ "id": "not-an-id" }""");
         await using var factory = CreateFactory();
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
 
         var response = await Post(client, SavedForm().ToJsonString(), id: FormId);
 
@@ -206,31 +206,31 @@ public sealed class StudioPageMetadataTests : IAsyncLifetime
         await using var factory = CreateFactory();
         using var anonymous = factory.CreateClient();
         using var requester = factory.CreateClient().SignedInAs("requester");
-        using var hoa = factory.CreateClient().SignedInAs("hoa");
+        using var author = factory.CreateClient().SignedInAs("author");
         var json = SavedForm().ToJsonString();
 
         Assert.Equal(HttpStatusCode.Unauthorized, (await Post(anonymous, json, id: FormId)).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await Post(requester, json, id: FormId)).StatusCode);
-        Assert.Equal(HttpStatusCode.Forbidden, (await Post(hoa, json, id: FormId, csrf: false)).StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, (await Post(hoa, json, id: EntityId)).StatusCode);
-        Assert.Equal(HttpStatusCode.UnsupportedMediaType, (await Post(hoa, json, id: FormId, contentType: "text/plain")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await Post(author, json, id: FormId, csrf: false)).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await Post(author, json, id: EntityId)).StatusCode);
+        Assert.Equal(HttpStatusCode.UnsupportedMediaType, (await Post(author, json, id: FormId, contentType: "text/plain")).StatusCode);
 
         var otherId = SavedForm();
         otherId["id"] = Guid.NewGuid().ToString("D");
-        Assert.Equal(HttpStatusCode.BadRequest, (await Post(hoa, otherId.ToJsonString(), id: FormId)).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await Post(author, otherId.ToJsonString(), id: FormId)).StatusCode);
 
         var otherKind = SavedForm();
         otherKind["kind"] = "page";
-        Assert.Equal(HttpStatusCode.BadRequest, (await Post(hoa, otherKind.ToJsonString(), id: FormId)).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await Post(author, otherKind.ToJsonString(), id: FormId)).StatusCode);
 
-        Assert.Equal(HttpStatusCode.BadRequest, (await Post(hoa, "[]", id: FormId)).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await Post(author, "[]", id: FormId)).StatusCode);
     }
 
     [Fact]
     public async Task Widget_that_does_not_compile_is_a_placeholder_and_the_rest_of_the_page_is_answered_in_full()
     {
         await using var factory = CreateFactory();
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
 
         var response = await Post(client, TwoColumns(BrokenChart()).ToJsonString());
 
@@ -258,7 +258,7 @@ public sealed class StudioPageMetadataTests : IAsyncLifetime
     public async Task Widget_with_a_schema_error_is_a_placeholder_and_the_rest_of_the_page_is_answered()
     {
         await using var factory = CreateFactory();
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
         var chart = ValidChart();
         chart["unknown"] = true;
 
@@ -278,7 +278,7 @@ public sealed class StudioPageMetadataTests : IAsyncLifetime
     public async Task Placeholder_type_is_null_when_the_draft_type_is_not_a_string()
     {
         await using var factory = CreateFactory();
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
         var broken = new JsonObject { ["type"] = 7 };
 
         var response = await Post(client, TwoColumns(broken).ToJsonString());
@@ -294,7 +294,7 @@ public sealed class StudioPageMetadataTests : IAsyncLifetime
     public async Task Container_whose_widgets_all_fail_is_one_placeholder()
     {
         await using var factory = CreateFactory();
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
         var page = SavedPage();
         page["widgets"] = new JsonArray(
             new JsonObject
@@ -321,7 +321,7 @@ public sealed class StudioPageMetadataTests : IAsyncLifetime
     public async Task Page_is_null_when_no_top_level_widget_compiles()
     {
         await using var factory = CreateFactory();
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
         var page = SavedPage();
         page["widgets"] = new JsonArray(BrokenChart());
 
@@ -337,7 +337,7 @@ public sealed class StudioPageMetadataTests : IAsyncLifetime
     public async Task Page_is_null_when_the_page_has_an_error_outside_its_widgets()
     {
         await using var factory = CreateFactory();
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
         var page = SavedPage();
         page.Remove("title");
 
@@ -354,7 +354,7 @@ public sealed class StudioPageMetadataTests : IAsyncLifetime
     {
         File.WriteAllText(Path.Combine(Folder, "pages", "suppliers.json"), """{ "id": "not-an-id" }""");
         await using var factory = CreateFactory();
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
 
         var response = await Post(client, SavedPage().ToJsonString());
 
@@ -370,39 +370,39 @@ public sealed class StudioPageMetadataTests : IAsyncLifetime
         await using var factory = CreateFactory();
         using var anonymous = factory.CreateClient();
         using var requester = factory.CreateClient().SignedInAs("requester");
-        using var hoa = factory.CreateClient().SignedInAs("hoa");
+        using var author = factory.CreateClient().SignedInAs("author");
         var json = SavedPage().ToJsonString();
 
         Assert.Equal(HttpStatusCode.Unauthorized, (await Post(anonymous, json)).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await Post(requester, json)).StatusCode);
-        Assert.Equal(HttpStatusCode.Forbidden, (await Post(hoa, json, csrf: false)).StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, (await Post(hoa, json, application: "Unknown")).StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, (await Post(hoa, json, id: Guid.NewGuid().ToString("D"))).StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, (await Post(hoa, json, id: "not-a-guid")).StatusCode);
-        Assert.Equal(HttpStatusCode.NotFound, (await Post(hoa, json, id: EntityId)).StatusCode);
-        Assert.Equal(HttpStatusCode.UnsupportedMediaType, (await Post(hoa, json, contentType: "text/plain")).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await Post(author, json, csrf: false)).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await Post(author, json, application: "Unknown")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await Post(author, json, id: Guid.NewGuid().ToString("D"))).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await Post(author, json, id: "not-a-guid")).StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, (await Post(author, json, id: EntityId)).StatusCode);
+        Assert.Equal(HttpStatusCode.UnsupportedMediaType, (await Post(author, json, contentType: "text/plain")).StatusCode);
 
         var otherId = SavedPage();
         otherId["id"] = Guid.NewGuid().ToString("D");
-        Assert.Equal(HttpStatusCode.BadRequest, (await Post(hoa, otherId.ToJsonString())).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await Post(author, otherId.ToJsonString())).StatusCode);
 
         var upperId = SavedPage();
         upperId["id"] = PageId.ToUpperInvariant();
-        Assert.Equal(HttpStatusCode.BadRequest, (await Post(hoa, upperId.ToJsonString())).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await Post(author, upperId.ToJsonString())).StatusCode);
 
         var otherKind = SavedPage();
         otherKind["kind"] = "entity";
-        Assert.Equal(HttpStatusCode.BadRequest, (await Post(hoa, otherKind.ToJsonString())).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await Post(author, otherKind.ToJsonString())).StatusCode);
 
-        Assert.Equal(HttpStatusCode.BadRequest, (await Post(hoa, "[]")).StatusCode);
-        Assert.Equal(HttpStatusCode.BadRequest, (await Post(hoa, "{")).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await Post(author, "[]")).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await Post(author, "{")).StatusCode);
     }
 
     [Fact]
     public async Task Route_writes_no_file_and_reads_no_record_while_the_tenant_database_is_unreachable()
     {
         await using var factory = CreateFactory();
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
         var before = Snapshot();
 
         // Every database connection is refused, so each 200 shows that no record was read.
@@ -506,7 +506,7 @@ public sealed class StudioPageMetadataTests : IAsyncLifetime
             builder.UseSetting("Studio:AuthorRole", "author");
             builder.UseTestOidc("default");
             builder.UseTestAuthentication(
-                new TestIdentity("hoa", "Hoa Author", "author"),
+                new TestIdentity("author", "Author User", "author"),
                 new TestIdentity("requester", "Requester User", "employee"));
         });
 

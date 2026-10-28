@@ -408,7 +408,7 @@ describe.each(['light', 'dark'])('ScenarioEditor in %s mode', (mode) => {
   it('keeps the unknown keys of the scenario, a stub and a step after edits to other properties', () => {
     const initial = {
       ...scenario([{ ...fixtures.advanceTime, note: 'kept' }]),
-      owner: 'hoa',
+      owner: 'author',
       stubs: [{ operation: 'billing/Charge', output: {}, comment: 'kept' }],
     }
     const { onChange } = renderEditor(initial)
@@ -423,7 +423,7 @@ describe.each(['light', 'dark'])('ScenarioEditor in %s mode', (mode) => {
     ) as Record<string, unknown>
     expect(saved).toMatchObject({
       name: 'Renamed',
-      owner: 'hoa',
+      owner: 'author',
       stubs: [{ operation: 'billing/Refund', comment: 'kept' }],
       steps: [{ type: 'advanceTime', by: 'PT2H', note: 'kept' }],
     })

@@ -56,7 +56,7 @@ async function publishedOrder(page: Page, testInfo: TestInfo, prefix: string) {
   );
   const server = await startServer({ Studio__Folders__0: folder });
   try {
-    await useSession(page, "hoa");
+    await useSession(page, "author");
     await slowAnimations(page);
     await page.goto(`${server.url}/studio?app=${name}`);
     await page.getByRole("button", { name: "Publish", exact: true }).click();

@@ -30,7 +30,7 @@ public sealed class DevelopmentStudioFoldersTests
     public async Task Author_lists_the_purchase_request_leave_request_service_desk_and_asset_management_applications_under_the_development_settings()
     {
         await using var factory = CreateFactory();
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
 
         var response = await client.GetAsync(new Uri("/api/studio/apps", UriKind.Relative), CancellationToken);
 
@@ -62,7 +62,7 @@ public sealed class DevelopmentStudioFoldersTests
         var url = new Uri($"/api/studio/apps/ServiceDesk/resources/{id}", UriKind.Relative);
         await using var factory = CreateFactory();
 
-        using var author = factory.CreateClient().SignedInAs("hoa");
+        using var author = factory.CreateClient().SignedInAs("author");
         Assert.Equal(HttpStatusCode.OK, (await author.GetAsync(url, CancellationToken)).StatusCode);
 
         using var employee = factory.CreateClient().SignedInAs("requester");
@@ -98,7 +98,7 @@ public sealed class DevelopmentStudioFoldersTests
             builder.UseSetting("Studio:AuthorRole", "author");
             builder.UseTestOidc("default");
             builder.UseTestAuthentication(
-                new TestIdentity("hoa", "Hoa Author", "author"),
+                new TestIdentity("author", "Author User", "author"),
                 new TestIdentity("requester", "Requester User", "employee"));
         });
     }

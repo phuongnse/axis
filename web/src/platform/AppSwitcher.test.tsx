@@ -20,7 +20,7 @@ const requester: CurrentUser = {
   studioTest: false,
   console: false,
 }
-const hoa: CurrentUser = { ...requester, id: 'hoa', displayName: 'Hoa Author', roles: ['author'], studio: true }
+const author: CurrentUser = { ...requester, id: 'author', displayName: 'Author User', roles: ['author'], studio: true }
 const olga: CurrentUser = { ...requester, id: 'olga', displayName: 'Olga Operator', roles: ['operator'], console: true }
 
 const sites: SiteListItem[] = [
@@ -102,7 +102,7 @@ describe('AppSwitcher', () => {
   })
 
   it('lists Studio after the sites for an author', async () => {
-    stubServer(hoa)
+    stubServer(author)
     renderSwitcher()
 
     const menu = await openSwitcher()
@@ -139,9 +139,9 @@ describe('AppSwitcher', () => {
 
   it('lists only the tools when loading the sites fails', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    const fetchMock = stubServer(hoa)
+    const fetchMock = stubServer(author)
     fetchMock.mockImplementation(async (input: string) =>
-      input === '/api/me' ? json(hoa) : new Response(null, { status: 500 }),
+      input === '/api/me' ? json(author) : new Response(null, { status: 500 }),
     )
     renderSwitcher()
 

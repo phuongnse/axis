@@ -37,7 +37,7 @@ public sealed class StudioReleaseHistoryTests : IAsyncLifetime
         await using var factory = CreateFactory(connectionString, folder.Path);
 
         // Creating a client starts the server, which migrates the database and activates the folder first.
-        using var author = factory.CreateClient().SignedInAs("hoa");
+        using var author = factory.CreateClient().SignedInAs("author");
         var startup = await GetAsync(author, ReleasesUrl);
         var startupItem = Assert.Single(startup.GetProperty("items").EnumerateArray());
         Assert.Equal(("startup", 1), (startupItem.GetProperty("actor").GetString(), startupItem.GetProperty("number").GetInt32()));
@@ -47,7 +47,7 @@ public sealed class StudioReleaseHistoryTests : IAsyncLifetime
 
         await EditTextAsync(folder.Path, "\"Departments\"", "\"Teams\"");
         var requestId = Guid.NewGuid();
-        await ActivateAsync(connectionString, folder.Path, ActivationActor.User("hoa", "Hoa Author", "Spring", "Teams rename", requestId));
+        await ActivateAsync(connectionString, folder.Path, ActivationActor.User("author", "Author User", "Spring", "Teams rename", requestId));
 
         var history = await GetAsync(author, ReleasesUrl);
 
@@ -56,7 +56,7 @@ public sealed class StudioReleaseHistoryTests : IAsyncLifetime
         Assert.Equal([2, 1], items.Select(item => item.GetProperty("number").GetInt32()));
         var newest = items[0];
         Assert.Equal(
-            ("hoa", "Hoa Author", "Spring", "Teams rename", requestId),
+            ("author", "Author User", "Spring", "Teams rename", requestId),
             (newest.GetProperty("actor").GetString(), newest.GetProperty("actorName").GetString(), newest.GetProperty("label").GetString(), newest.GetProperty("note").GetString(), newest.GetProperty("requestId").GetGuid()));
         Assert.True(newest.GetProperty("activatedAt").GetDateTimeOffset() >= items[1].GetProperty("activatedAt").GetDateTimeOffset());
         var active = history.GetProperty("active");
@@ -133,7 +133,7 @@ public sealed class StudioReleaseHistoryTests : IAsyncLifetime
             builder.UseSetting("ActivateOnStartup:0", folder);
             builder.UseSetting("Studio:Folders:0", folder);
             builder.UseSetting("Studio:AuthorRole", "author");
-            builder.UseTestAuthentication(new TestIdentity("hoa", "Hoa Author", "author"), new TestIdentity("requester", "Requester", "employee"));
+            builder.UseTestAuthentication(new TestIdentity("author", "Author User", "author"), new TestIdentity("requester", "Requester", "employee"));
         });
 
     private static void CopyDirectory(string source, string target)

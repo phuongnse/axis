@@ -34,7 +34,7 @@ async function moveOptionOnMouseDown(page: Page) {
 // Neither journey saves, so the copy of the sample that the other specs use stays as it is.
 test.describe('the select helpers pick from the keyboard', () => {
   test('a role is chosen in the Roles select of a user row although a click on its option would miss', async ({ page }) => {
-    await useSession(page, 'hoa')
+    await useSession(page, 'author')
     await page.goto(`/studio?app=PurchaseRequests&resource=${scenarioId}`)
     const row = page.getByTestId('studio-field-/users/binh')
     const roles = row.getByRole('combobox', { name: 'Roles', exact: true })
@@ -48,7 +48,7 @@ test.describe('the select helpers pick from the keyboard', () => {
   })
 
   test('a type is chosen in the Type select of a new parameter although a click on its option would miss', async ({ page }) => {
-    await useSession(page, 'hoa')
+    await useSession(page, 'author')
     await page.goto(`/studio?app=PurchaseRequests&resource=${pageId}`)
     await openFormTab(page)
     await page.getByRole('button', { name: 'Add parameter', exact: true }).click()

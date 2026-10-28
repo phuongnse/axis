@@ -304,7 +304,7 @@ test.describe('the author builds the asset management application with Studio on
   }
 
   test('the author creates AssetManagement as a blank application', async ({ page }) => {
-    await useJourneySession(page, 'hoa')
+    await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio`)
 
     await page.getByRole('button', { name: 'New application', exact: true }).click()
@@ -315,7 +315,7 @@ test.describe('the author builds the asset management application with Studio on
   })
 
   test('the author builds the en and vi texts in the text editor', async ({ page }) => {
-    await useJourneySession(page, 'hoa')
+    await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio?app=AssetManagement`)
 
     const starter = page.getByTestId('studio-group-text')
@@ -350,7 +350,7 @@ test.describe('the author builds the asset management application with Studio on
   })
 
   test('the author adds the three roles', async ({ page }) => {
-    await useJourneySession(page, 'hoa')
+    await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio?app=AssetManagement`)
 
     const en = await texts('en')
@@ -370,7 +370,7 @@ test.describe('the author builds the asset management application with Studio on
   })
 
   test('the author adds the AssetNumber sequence', async ({ page }) => {
-    await useJourneySession(page, 'hoa')
+    await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio?app=AssetManagement`)
 
     await createResource(page, 'sequence', 'AssetNumber')
@@ -389,7 +389,7 @@ test.describe('the author builds the asset management application with Studio on
     ['Software', 'software'],
   ] as const) {
     test(`the author builds the ${name} entity in the entity designer`, async ({ page }) => {
-      await useJourneySession(page, 'hoa')
+      await useJourneySession(page, 'author')
       await page.goto(`${journeyURL}/studio?app=AssetManagement`)
 
       const en = await texts('en')
@@ -411,7 +411,7 @@ test.describe('the author builds the asset management application with Studio on
   }
 
   test('the author builds the Attachment and MaintenanceEntry child entities', async ({ page }) => {
-    await useJourneySession(page, 'hoa')
+    await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio?app=AssetManagement`)
 
     const en = await texts('en')
@@ -472,7 +472,7 @@ test.describe('the author builds the asset management application with Studio on
   })
 
   test('the author builds the Asset entity in the entity designer', async ({ page }) => {
-    await useJourneySession(page, 'hoa')
+    await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio?app=AssetManagement`)
 
     const en = await texts('en')
@@ -571,7 +571,7 @@ test.describe('the author builds the asset management application with Studio on
   })
 
   test('the author adds the Categories and Locations seeds in the seed grid', async ({ page }) => {
-    await useJourneySession(page, 'hoa')
+    await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio?app=AssetManagement`)
 
     for (const [name, entity, records] of [
@@ -602,7 +602,7 @@ test.describe('the author builds the asset management application with Studio on
   })
 
   test('the author sets the application time zone', async ({ page }) => {
-    await useJourneySession(page, 'hoa')
+    await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio?app=AssetManagement`)
 
     await page.getByTestId('studio-group-application').getByRole('button').click()
@@ -612,7 +612,7 @@ test.describe('the author builds the asset management application with Studio on
   })
 
   test('the author builds the three aggregate data sources', async ({ page }) => {
-    await useJourneySession(page, 'hoa')
+    await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio?app=AssetManagement`)
 
     for (const [name, file] of [
@@ -627,7 +627,7 @@ test.describe('the author builds the asset management application with Studio on
   test('the author lays out the AssetEdit form on the Design tab', async ({ page }) => {
     // A tall window keeps the palette and the outline in view together, away from the edges where a drag scrolls.
     await page.setViewportSize({ width: 1280, height: 1000 })
-    await useJourneySession(page, 'hoa')
+    await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio?app=AssetManagement`)
 
     const en = await texts('en')
@@ -690,7 +690,7 @@ test.describe('the author builds the asset management application with Studio on
   })
 
   test('the author builds the AssetForm and AssetDetail pages', async ({ page }) => {
-    await useJourneySession(page, 'hoa')
+    await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio?app=AssetManagement`)
 
     const en = await texts('en')
@@ -714,7 +714,7 @@ test.describe('the author builds the asset management application with Studio on
   })
 
   test('the author builds the Assets and Dashboard pages', async ({ page }) => {
-    await useJourneySession(page, 'hoa')
+    await useJourneySession(page, 'author')
     // The page names load with the application, so AssetForm and AssetDetail are offered below.
     await page.goto(`${journeyURL}/studio?app=AssetManagement`)
 
@@ -751,7 +751,7 @@ test.describe('the author builds the asset management application with Studio on
   })
 
   test('the author finishes the site and deletes the Home page', async ({ page }) => {
-    await useJourneySession(page, 'hoa')
+    await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio?app=AssetManagement`)
 
     const en = await texts('en')
@@ -789,7 +789,7 @@ test.describe('the author builds the asset management application with Studio on
   test('the author lays out the AssetDetail page on the Design tab', async ({ page }) => {
     // A tall, wide window keeps the data panel and the canvas in view together, away from the edges where a drag scrolls.
     await page.setViewportSize({ width: 1920, height: 1000 })
-    await useJourneySession(page, 'hoa')
+    await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio?app=AssetManagement`)
 
     await openPage(page, 'AssetDetail')
@@ -814,7 +814,7 @@ test.describe('the author builds the asset management application with Studio on
     // A tall, wide window keeps the palette, the data panel and the canvas in view together, away from the edges where a
     // drag scrolls. A table makes the canvas wider than a narrow window, which pushes the panel out of sight of the mouse.
     await page.setViewportSize({ width: 1920, height: 1000 })
-    await useJourneySession(page, 'hoa')
+    await useJourneySession(page, 'author')
     // The names load with the application, so the new data sources are offered below.
     await page.goto(`${journeyURL}/studio?app=AssetManagement`)
 
@@ -877,7 +877,7 @@ test.describe('the author builds the asset management application with Studio on
   })
 
   test('the built folder matches the sample in its six parts', async ({ page }) => {
-    await useJourneySession(page, 'hoa')
+    await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio?app=AssetManagement`)
 
     const files = (await readdir(assetManagement, { recursive: true })).filter(sixParts).sort()
@@ -912,7 +912,7 @@ test.describe('the author builds the asset management application with Studio on
   })
 
   test('the author builds the three access policies in the policy matrix', async ({ page }) => {
-    await useJourneySession(page, 'hoa')
+    await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio?app=AssetManagement`)
     await page.getByText('Policy matrix', { exact: true }).click()
 
@@ -958,7 +958,7 @@ test.describe('the author builds the asset management application with Studio on
 
   for (const [name, file] of scenarios) {
     test(`the author writes the ${name} scenario in the scenario editor`, async ({ page }) => {
-      await useJourneySession(page, 'hoa')
+      await useJourneySession(page, 'author')
       await page.goto(`${journeyURL}/studio?app=AssetManagement`)
 
       await createResource(page, 'scenario', name)
@@ -1011,7 +1011,7 @@ test.describe('the author builds the asset management application with Studio on
   })
 
   test("the author builds the warranty reminder's data source, process and schedule trigger", async ({ page }) => {
-    await useJourneySession(page, 'hoa')
+    await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio?app=AssetManagement`)
 
     const en = await texts('en')
@@ -1122,7 +1122,7 @@ test.describe('the author builds the asset management application with Studio on
   })
 
   test('the whole built folder matches the sample', async ({ page }) => {
-    await useJourneySession(page, 'hoa')
+    await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio?app=AssetManagement`)
 
     compareApplicationFolders(assetManagement, built)
@@ -1133,7 +1133,7 @@ test.describe('the author builds the asset management application with Studio on
   })
 
   test('the author runs the five test scenarios from Studio', async ({ page }) => {
-    await useJourneySession(page, 'hoa')
+    await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio?app=AssetManagement`)
     await page.getByTestId('studio-run-tests').click()
 
@@ -1162,7 +1162,7 @@ test.describe('the author builds the asset management application with Studio on
   }
 
   test('the author publishes AssetManagement, and release 1 is active', async ({ page }) => {
-    await useJourneySession(page, 'hoa')
+    await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio?app=AssetManagement`)
 
     await page.getByRole('button', { name: 'Publish', exact: true }).click()
