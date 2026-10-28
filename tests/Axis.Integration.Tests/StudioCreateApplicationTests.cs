@@ -38,7 +38,7 @@ public sealed class StudioCreateApplicationTests(PostgreSqlFixture database) : I
         Assert.Empty(body.RootElement.GetProperty("diagnostics").EnumerateArray());
         var folder = Path.Combine(setup.ApplicationsPath, "purchase-orders");
         Assert.Equal(
-            ["application.json", "pages/home.json", "sites/purchase-orders.json", "texts/en.json"],
+            ["application.json", "identity-providers/accounts.json", "pages/home.json", "sites/purchase-orders.json", "texts/en.json"],
             Files(folder));
         Assert.Equal([Path.Combine(setup.ApplicationsPath, "purchase-orders")], Directory.GetFileSystemEntries(setup.ApplicationsPath));
 
@@ -53,7 +53,7 @@ public sealed class StudioCreateApplicationTests(PostgreSqlFixture database) : I
         Assert.Equal("purchase-orders", site.RootElement.GetProperty("path").GetString());
         using var texts = JsonDocument.Parse(await File.ReadAllTextAsync(Path.Combine(folder, "texts/en.json"), CancellationToken));
         Assert.Equal("PurchaseOrders", texts.RootElement.GetProperty("texts").GetProperty("site.title").GetString());
-        Assert.Equal(4, Files(folder).Select(file => IdOf(Path.Combine(folder, file))).Distinct().Count());
+        Assert.Equal(5, Files(folder).Select(file => IdOf(Path.Combine(folder, file))).Distinct().Count());
     }
 
     [Fact]
@@ -341,6 +341,15 @@ public sealed class StudioCreateApplicationTests(PostgreSqlFixture database) : I
                   "title": { "textKey": "site.title" },
                   "locales": { "default": "en", "fallback": "en", "available": ["en"] },
                   "navigation": [{ "page": "Home", "label": { "textKey": "nav.home" } }]
+                }
+                """);
+            Write(folder, "identity-providers/accounts.json", $$"""
+                {
+                  "id": "{{Guid.NewGuid()}}",
+                  "kind": "identityProvider",
+                  "name": "accounts",
+                  "formatVersion": 1,
+                  "type": "accounts"
                 }
                 """);
             Write(folder, "pages/home.json", $$"""

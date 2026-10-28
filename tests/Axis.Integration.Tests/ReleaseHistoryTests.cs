@@ -204,7 +204,8 @@ public sealed class ReleaseHistoryTests(DataDatabaseFixture database) : IClassFi
             .With("texts/en.json", Texts(title))
             .With("pages/orders.json", Page(Guid.NewGuid()))
             .With("entities/order.json", Order(Guid.NewGuid()))
-            .With("sites/main.json", Site(Guid.NewGuid(), _sitePath));
+            .With("sites/main.json", Site(Guid.NewGuid(), _sitePath))
+            .With("identity-providers/accounts.json", AccountsProvider(Guid.NewGuid()));
 
     private static string Manifest(Guid id, string name) =>
         $$"""{ "id": "{{id}}", "kind": "application", "name": "{{name}}", "formatVersion": 1 }""";
@@ -223,6 +224,9 @@ public sealed class ReleaseHistoryTests(DataDatabaseFixture database) : IClassFi
         { "id": "{{id}}", "kind": "page", "name": "Orders", "formatVersion": 1,
           "title": { "textKey": "orders.title" }, "widgets": [ { "type": "table", "entity": "Order" } ] }
         """;
+
+    private static string AccountsProvider(Guid id) =>
+        $$"""{ "id": "{{id}}", "kind": "identityProvider", "name": "accounts", "formatVersion": 1, "type": "accounts" }""";
 
     private static string Site(Guid id, string path) =>
         $$"""
