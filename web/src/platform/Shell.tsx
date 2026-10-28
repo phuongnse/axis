@@ -5,11 +5,11 @@ import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 
 import { Link, useLocation } from 'react-router'
 import { AppSwitcher } from './AppSwitcher'
 import { antLocaleFor, dayjsLocaleFor } from './antLocale'
-import { colourTokens } from './designTokens'
 import { navigationIcon } from './navigationIcons'
 import { NotificationBell } from './NotificationBell'
 import { PreferencesMenu } from './PreferencesMenu'
 import { ShellFooter } from './ShellFooter'
+import { SiteMark } from './SiteMark'
 import type { NavigationItem } from './site'
 import { useText } from './texts'
 import { useDesignTokens, useThemeMode } from './themeMode'
@@ -58,7 +58,7 @@ export function Shell({ titleKey, navigation, locales, locale, onLocaleChange, n
   const t = useText()
   const { mode } = useThemeMode()
   const { pathname } = useLocation()
-  const { colour, spacing, radius } = useDesignTokens()
+  const { colour, spacing } = useDesignTokens()
   const activeKey = activeNavigationKey(navigation, pathname)
   const narrow = useNarrowWidth()
   // The panel is open for the path it was opened on, so following a link or leaving narrow width closes it.
@@ -129,23 +129,7 @@ export function Shell({ titleKey, navigation, locales, locale, onLocaleChange, n
               />
             )}
             <Link to={home} style={{ display: 'flex', alignItems: 'center', gap: spacing.sm, minWidth: 0 }}>
-              <span
-                aria-hidden
-                style={{
-                  display: 'grid',
-                  placeItems: 'center',
-                  flex: 'none',
-                  width: 28,
-                  height: 28,
-                  background: colour.primary,
-                  // White in both modes, as the tile is the same purple family in both.
-                  color: colourTokens.surface.light,
-                  fontWeight: 600,
-                  borderRadius: radius.base,
-                }}
-              >
-                {Array.from(t(titleKey))[0]?.toUpperCase()}
-              </span>
+              <SiteMark title={t(titleKey)} />
               <Typography.Text strong ellipsis>
                 {t(titleKey)}
               </Typography.Text>
