@@ -113,6 +113,7 @@ describe('isApplicationName', () => {
     ['a-b', false],
     ['Api', false],
     ['STUDIO', false],
+    ['Account', false],
     ['a'.repeat(61), false],
     ['', false],
   ])('checks the name %j, which is valid: %s', (name, expected) => {
