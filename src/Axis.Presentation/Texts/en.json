@@ -39,6 +39,7 @@
   "shell.table.empty": "No records yet.",
   "shell.table.loadFailed": "The records could not be loaded.",
   "shell.table.search": "Search",
+  "shell.table.refresh": "Refresh",
   "shell.table.rowActions": "Actions",
   "shell.table.delete": "Delete",
   "shell.table.deleteConfirm": "Delete this record? This cannot be undone.",

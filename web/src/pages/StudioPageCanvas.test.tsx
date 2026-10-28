@@ -674,6 +674,22 @@ describe('the Design tab of a page', () => {
       expect(marked.map((element) => element.getAttribute('data-action'))).toEqual(marked.map(() => key))
     })
 
+    it('selects the first navigate row action when the identifying link is clicked, and does not navigate', async () => {
+      const { design } = await openActions()
+      const before = screen.getByTestId('location').textContent
+      const link = design.querySelector<HTMLElement>('[data-action="rowActions/0"]')!
+
+      expect(link).toHaveAttribute('role', 'link')
+      expect(link).not.toHaveAttribute('href')
+      await userEvent.click(link)
+
+      const list = within(design).getByTestId('studio-field-/widgets/0/rowActions')
+      expect(within(list).getByTestId('studio-action-0')).toHaveAttribute('aria-current', 'true')
+      expect(within(list).getByTestId('studio-action-1')).not.toHaveAttribute('aria-current')
+      expect(link).toHaveAttribute('aria-current', 'true')
+      expect(screen.getByTestId('location')).toHaveTextContent(before!)
+    })
+
     it('selects an action with Enter on its button', async () => {
       const { design } = await openActions()
 
@@ -700,7 +716,7 @@ describe('the Design tab of a page', () => {
 
       const rows = design.querySelectorAll('[data-action="rowActions/1"]')
       expect(rows).toHaveLength(3)
-      expect(rows[0]).toHaveTextContent('request.delete')
+      expect(rows[0]).toHaveAccessibleName('request.delete')
       expect(button(design, '/widgets/1', 'actions/0')).toHaveTextContent('request.submit')
       expect(button(design, '/widgets/1', 'actions/1')).toHaveTextContent('Show tickets')
     })

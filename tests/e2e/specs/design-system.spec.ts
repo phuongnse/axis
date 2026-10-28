@@ -149,7 +149,7 @@ for (const [name, widget] of Object.entries(previews)) {
       }
       const withData = page.getByRole('figure', { name: 'With data', exact: true })
       if (name === 'table') {
-        await expect(withData.getByRole('button', { name: 'Open', exact: true }).first()).toBeVisible()
+        await expect(withData.getByRole('link').first()).toBeVisible()
         await expect(withData.getByRole('button', { name: 'New request', exact: true })).toBeVisible()
       }
       if (name === 'taskInbox') {
