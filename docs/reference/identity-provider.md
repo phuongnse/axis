@@ -61,7 +61,7 @@ _(planned for M17)_
 - Two-step verification asks for the 6-digit code, with "Try another way" and "Back to sign in".
 - The theme is built from the SPA's own React components and tokens into a Keycloak theme, so the pages look like the
   rest of Axis. Its texts are message bundles in every locale the platform offers.
-- The design system's `identitySignIn` preview draws these pages, see
+- _(built)_ The design system's `identitySignIn` preview draws these pages from fixtures, see
   [shell design system previews](shell.md#design-system-previews).
 
 ## Installation

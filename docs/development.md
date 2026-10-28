@@ -376,7 +376,9 @@ fixtures, only for the API paths of the fixture application. It needs no server,
   Every preview has at least one state, and a preview with only one shows it as "Typical". A state can
   bring its own fixtures, on its own paths in the fixture application. The names are `table`, `form`,
   `taskInbox`, `processInspector`, `detail`, `chart-<kind>` for `bar`, `line` and `pie`, `kpi`, `columns`,
-  `tabs`, `section`, `states` and `field-<type>` for each field type. The `states` preview draws, once,
+  `tabs`, `section`, `states`, `field-<type>` for each field type, and `shell`, `signIn` and `identitySignIn`. The
+  `shell`, `signIn` and `identitySignIn` previews draw each state in a frame of its own height, so the state's menus
+  and dialogs open inside it. The `states` preview draws, once,
   the states every widget shares: a table while it loads and a table whose request fails. The `table`,
   `taskInbox`, `detail`, each `chart-<kind>` and `kpi` previews draw "With data" and "Empty". The table's data
   has row and toolbar actions and a long-text row, and the inbox's has an overdue and a claimed task.
@@ -404,7 +406,7 @@ fixtures, only for the API paths of the fixture application. It needs no server,
   desktop layout.
 - _(planned)_ The cards come in six groups, in this order: Field inputs (each `field-<type>`), Data widgets (`table`,
   `form`, `detail`), Charts and KPIs (each `chart-<kind>`, `kpi`), Process widgets (`taskInbox`,
-  `processInspector`), Containers (`columns`, `tabs`, `section`) and Shared states (`states`). _(planned for M16)_ A seventh
+  `processInspector`), Containers (`columns`, `tabs`, `section`) and Shared states (`states`). _(planned)_ A seventh
   group, Shell, comes last, see [shell](reference/shell.md#design-system-previews).
   `scripts/design-system.sh` writes the card order as the bundle's first line, `/* @ds-bundle: {...} */`, so a sync
   keeps it.
@@ -419,7 +421,8 @@ it changes, that a validation message follows `--dangerText`, and that no fixtur
 checks that a field preview has no Save button and no history, and that the `states` preview shows a busy widget and
 the load error alert. For each field type except the child collection, it checks in both modes that the required,
 read-only and error states show. It checks the child collection's reference, computed, error, read-only and empty
-states, and the form's validation, read-only and wizard states. It opens the date-time picker and the reference lookup
+states, and the form's validation, read-only and wizard states. It mounts the shell, sign-in and identity sign-in previews in a
+992 px frame sandboxed without `allow-forms`, and checks a key element of each state. It opens the date-time picker and the reference lookup
 and adds a child collection row. It mounts the `form` preview in a frame sandboxed like the artifact's and checks its
 validation messages and a save. It finds each data preview's empty text under its "Empty" caption, the table's row
 and toolbar actions, the inbox's overdue and claimed tags, and the inspector's failed instance and dead letter actions.

@@ -34,7 +34,7 @@ function useBandInset() {
   return `calc(${spacing.lg}px + 1px + ${spacing.lg}px)`
 }
 
-function SignInCard() {
+export function SignInCard() {
   const t = useText()
   const [searchParams] = useSearchParams()
   const { spacing } = useDesignTokens()

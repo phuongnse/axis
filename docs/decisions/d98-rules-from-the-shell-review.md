@@ -4,7 +4,7 @@ Status: **Agreed**
 
 The owner reviewed the shell, the platform home page and the sign-in screens in the Design System artifact, one
 change at a time, and agreed these rules on 2026-10-28. [Shell and home page](../reference/shell.md) holds the detail.
-Only the layout and the navigation icons are built. The rest comes in M16, and the reference docs mark it _(planned for M16)_.
+All of it is built, except the Shell group of cards, which comes with D96's card groups.
 
 - **Layout:** a 48 px header with the site's mark and title, the notification bell, an app switcher, a language and
   theme menu and the account button; the site's navigation in a sidebar that collapses to a strip of icons, and no

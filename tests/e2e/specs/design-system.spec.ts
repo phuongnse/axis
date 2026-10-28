@@ -50,6 +50,31 @@ const previews: Record<string, (page: Page) => Locator> = {
   'field-reference': (page) => figure(page, 'Typical').getByLabel(fieldLabel('Category')),
   'field-child-collection': (page) =>
     figure(page, 'Reference and computed cells').getByRole('columnheader', { name: 'Description', exact: true }),
+  shell: (page) => figure(page, 'Application site').getByRole('menu'),
+  signIn: (page) => figure(page, 'Signed out').getByRole('button', { name: 'Sign in', exact: true }),
+  identitySignIn: (page) => figure(page, 'Sign in').getByLabel('Email or username', { exact: true }),
+}
+
+/** A key element of each state of the shell, sign-in and identity sign-in previews, relative to the state's figure. */
+const stateKeys: Record<string, Record<string, (state: Locator) => Locator>> = {
+  shell: {
+    'Application site': (state) => state.getByRole('menu'),
+    'Navigation collapsed': (state) => state.locator('button[aria-controls="shell-sidebar"][aria-expanded="false"]'),
+    'Form page': (state) => state.getByRole('button', { name: 'Save', exact: true }).first(),
+    'Platform site': (state) => state.getByText('Purchase requests', { exact: true }).first(),
+  },
+  signIn: {
+    'Signed out': (state) => state.getByRole('button', { name: 'Sign in', exact: true }),
+    'Sign-in refused': (state) => state.getByTestId('sign-in-failed'),
+    'Session ended': (state) => state.getByTestId('sign-in-prompt'),
+  },
+  identitySignIn: {
+    'Sign in': (state) => state.getByLabel('Email or username', { exact: true }),
+    'Wrong password': (state) => state.getByText('Invalid email, username or password.', { exact: true }),
+    'Organization sign-in only': (state) =>
+      state.getByRole('button', { name: 'Sign in with Contoso ID', exact: true }),
+    'Two-step verification': (state) => state.getByLabel('Verification code', { exact: true }),
+  },
 }
 
 /** The text a preview's empty state shows, or none for a preview that draws no empty state. */
@@ -94,9 +119,14 @@ interface Recording {
 /**
  * Opens the harness from disk with the bundle next to it, and records errors and requests. When `sandboxed`, it opens
  * a page that holds the harness in an iframe sandboxed as the Design System artifact's card frames are, without
- * `allow-forms`.
+ * `allow-forms`. The iframe is `frameWidth` pixels wide, or the width of the page when none is given.
  */
-async function openHarness(page: Page, query: string, sandboxed = false): Promise<Recording> {
+async function openHarness(
+  page: Page,
+  query: string,
+  options: { sandboxed?: boolean; frameWidth?: number } = {},
+): Promise<Recording> {
+  const width = options.frameWidth === undefined ? '100%' : `${options.frameWidth}px`
   const recording: Recording = { errors: [], requests: [] }
   page.on('console', (message) => {
     if (message.type() === 'error') {
@@ -112,7 +142,7 @@ async function openHarness(page: Page, query: string, sandboxed = false): Promis
     } else if (pathname === '/sandboxed.html') {
       await route.fulfill({
         contentType: 'text/html',
-        body: `<iframe sandbox="allow-scripts allow-same-origin" src="/design-system.html${query}" style="width:100%;height:100vh;border:0"></iframe>`,
+        body: `<iframe sandbox="allow-scripts allow-same-origin" src="/design-system.html${query}" style="width:${width};height:100vh;border:0"></iframe>`,
       })
     } else if (pathname.startsWith('/artifacts/design-system/')) {
       const file = path.join(bundleFolder, path.basename(pathname))
@@ -121,7 +151,7 @@ async function openHarness(page: Page, query: string, sandboxed = false): Promis
       await route.fulfill({ status: 404 })
     }
   })
-  await page.goto(sandboxed ? `${origin}/sandboxed.html` : `${harnessUrl}${query}`)
+  await page.goto(options.sandboxed ? `${origin}/sandboxed.html` : `${harnessUrl}${query}`)
   return recording
 }
 
@@ -240,7 +270,7 @@ for (const mode of modes) {
 test('the form preview validates and saves inside a frame sandboxed without allow-forms', async ({ page }) => {
   const messages: string[] = []
   page.on('console', (message) => messages.push(message.text()))
-  const recording = await openHarness(page, '?preview=form&mode=light', true)
+  const recording = await openHarness(page, '?preview=form&mode=light', { sandboxed: true })
   const frame = page.frameLocator('iframe')
 
   const validation = figure(frame, 'Validation errors')
@@ -269,6 +299,25 @@ test('the form preview validates and saves inside a frame sandboxed without allo
   expect(messages.filter((text) => text.includes('Blocked form submission'))).toEqual([])
   expect(recording.errors).toEqual([])
 })
+
+for (const [name, keys] of Object.entries(stateKeys)) {
+  for (const mode of modes) {
+    test(`the ${name} preview draws every state in a 992px frame sandboxed without allow-forms in ${mode} mode`, async ({
+      page,
+    }) => {
+      const recording = await openHarness(page, `?preview=${name}&mode=${mode}`, {
+        sandboxed: true,
+        frameWidth: 992,
+      })
+      const frame = page.frameLocator('iframe')
+
+      for (const [caption, key] of Object.entries(keys)) {
+        await expect(key(figure(frame, caption))).toBeVisible()
+      }
+      expect(recording.errors).toEqual([])
+    })
+  }
+}
 
 test('the field-date-time preview opens its date picker', async ({ page }) => {
   const recording = await openHarness(page, '?preview=field-date-time&mode=light')
