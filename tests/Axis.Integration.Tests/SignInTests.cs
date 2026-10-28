@@ -64,6 +64,33 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
     }
 
     [Fact]
+    public async Task The_session_ends_eight_hours_after_sign_in_and_the_next_sign_in_asks_the_identity_provider_for_a_recent_login()
+    {
+        // Keycloak's auth_time is real time, so the clock moves only after sign-in.
+        var clock = new OffsetClock();
+        await using var factory = Factory.WithWebHostBuilder(builder =>
+            builder.ConfigureTestServices(services => services.AddSingleton<TimeProvider>(clock)));
+        using var client = CreateClient(factory);
+        await SignInAsync(client, "anna", "/");
+        Assert.Equal(HttpStatusCode.OK, (await SendAsync(client, HttpMethod.Get, "/api/me")).StatusCode);
+
+        // Every 30 minutes up to 7 hours 30 minutes after sign-in, so the idle limit never ends the session.
+        for (var request = 1; request <= 15; request++)
+        {
+            clock.Advance(TimeSpan.FromMinutes(30));
+            Assert.Equal(HttpStatusCode.OK, (await SendAsync(client, HttpMethod.Get, "/api/me")).StatusCode);
+        }
+
+        clock.Advance(TimeSpan.FromMinutes(31));
+        var me = await SendAsync(client, HttpMethod.Get, "/api/me");
+        var challenge = await SendAsync(client, HttpMethod.Get, "/api/auth/sign-in");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, me.StatusCode);
+        Assert.Equal(HttpStatusCode.Found, challenge.StatusCode);
+        Assert.Contains("max_age=28800", challenge.Headers.Location!.Query, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Sign_in_without_a_return_address_returns_to_the_root()
     {
         using var client = CreateClient();
@@ -532,6 +559,7 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
         Assert.StartsWith($"{Authority}/protocol/openid-connect/auth?", authorize.AbsoluteUri, StringComparison.Ordinal);
         Assert.Contains("code_challenge=", authorize.Query, StringComparison.Ordinal);
         Assert.Contains("code_challenge_method=S256", authorize.Query, StringComparison.Ordinal);
+        Assert.Contains("max_age=28800", authorize.Query, StringComparison.Ordinal);
 
         // A separate client plays the browser at Keycloak. Keycloak marks its cookies Secure, which a
         // browser sends to http://localhost but a CookieContainer does not, so the client carries
@@ -679,6 +707,16 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
     private sealed record ProfileRow(string UserId, string DisplayName, string? Email, string? Locale, DateTimeOffset FirstSignedInAt, DateTimeOffset LastSignedInAt);
 
     private sealed record AuditRow(string Actor, string? ActorName, string Action, Guid? ApplicationId, string Details);
+
+    /// <summary>The system clock moved forward by <see cref="Advance"/>, so real tokens are valid until it moves.</summary>
+    private sealed class OffsetClock : TimeProvider
+    {
+        private TimeSpan _offset;
+
+        public override DateTimeOffset GetUtcNow() => System.GetUtcNow() + _offset;
+
+        public void Advance(TimeSpan time) => _offset += time;
+    }
 
     /// <summary>Gives every request the address of the listed proxy, so the forwarded headers apply.</summary>
     private sealed class ProxyStartupFilter : IStartupFilter
