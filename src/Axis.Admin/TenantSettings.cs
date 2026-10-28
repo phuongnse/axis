@@ -1,5 +1,6 @@
 using System.Globalization;
 using Axis.Administration;
+using Axis.Data.Storage;
 using Axis.Tenancy;
 using Axis.Tenancy.Platform;
 using Microsoft.EntityFrameworkCore;
@@ -9,7 +10,7 @@ namespace Axis.Admin;
 
 /// <summary>
 /// <c>tenant binding list</c>, <c>set</c> and <c>remove</c> and <c>tenant host add</c>, <c>remove</c> and <c>move</c>, and
-/// <c>tenant email set</c> and <c>clear</c>. The rules are in <c>Axis.Administration</c>. This class parses the arguments, reads
+/// <c>tenant email set</c> and <c>clear</c>, and <c>tenant session end</c>. The rules are in <c>Axis.Administration</c>. This class parses the arguments, reads
 /// the settings and prints. A message never holds a secret value, and the usage text never echoes an argument.
 /// </summary>
 internal static class TenantSettings
@@ -193,6 +194,71 @@ internal static class TenantSettings
             run.Args[3],
             "email",
             (platform, command) => TenantEmailSettings.ClearAsync(platform, command, run.Args[3], run.CancellationToken));
+    }
+
+    public static async Task<int> SessionEndAsync(AdminRun run)
+    {
+        var args = run.Args;
+        var isUser = args.Length == 6 && args[4] == "--user" && !string.IsNullOrWhiteSpace(args[5]) && IsName(args[5]);
+        var isAll = args.Length == 5 && args[4] == "--all";
+        if (!(isUser || isAll) || !IsName(args[3]))
+        {
+            return Usage(run);
+        }
+
+        var (setup, exit) = await PrepareAsync(run, needsCipher: true);
+        if (setup is null)
+        {
+            return exit;
+        }
+
+        var id = args[3];
+        var user = isUser ? args[5] : null;
+        TenantRow? row;
+        try
+        {
+            await using var platform = NewContext(setup.Connection);
+            row = await platform.Tenants.AsNoTracking().SingleOrDefaultAsync(tenant => tenant.Id == id, run.CancellationToken);
+        }
+        catch (Exception exception) when (exception is NpgsqlException or InvalidOperationException or OperationCanceledException)
+        {
+            run.Error.WriteLine($"The setting {AdminCommands.PlatformSetting} could not be used to read the tenant directory.");
+            return 1;
+        }
+
+        if (row is null)
+        {
+            run.Error.WriteLine("The tenant does not exist.");
+            return 2;
+        }
+
+        if (row.Status == "provisioning")
+        {
+            run.Error.WriteLine($"The tenant '{id}' is still provisioning. Finish it with tenant create.");
+            return 2;
+        }
+
+        // The record comes first: it and the sessions are in different databases, so they cannot share a transaction.
+        if (!await new TenantAudit(run.Command.Name, setup.Connection).WriteAsync(id, run.Output, run.CancellationToken, [user is null ? "all" : $"user:{user}"]))
+        {
+            return 1;
+        }
+
+        try
+        {
+            await using var steps = new TenantDatabaseSteps(setup.Cipher!, row, row.DatabaseHost, row.DatabasePort, run.CancellationToken);
+            var connection = await steps.SchemaConnectionAsync();
+            var ended = user is null
+                ? await SessionRevocation.EndAllAsync(connection, run.CancellationToken)
+                : await SessionRevocation.EndForUserAsync(connection, user, run.CancellationToken);
+            run.Output.WriteLine($"{id} sessions ok: {ended} ended");
+            return 0;
+        }
+        catch (Exception exception) when (exception is NpgsqlException or InvalidOperationException or OperationCanceledException)
+        {
+            run.Output.WriteLine($"{id} sessions failed: {TenantDatabaseSteps.Safe(exception)}");
+            return 1;
+        }
     }
 
     public static Task<int> HostAddAsync(AdminRun run) => HostAsync(run, TenantHostCommands.AddAsync);
