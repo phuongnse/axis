@@ -6,8 +6,8 @@ their organization uses. [D99](../decisions/d99-axis-ships-its-own-identity-prov
 its people sign in and each site pick from that. M17 builds it, and each section says whether it is built. The
 `identityProvider` resource, a site's `signIn` and their compile checks are built, and so is the tenant's realm that
 `tenant create` makes. Activation checks the bindings of `oidc` providers and refuses providers that would split a person. Sign-in does
-not read them yet, activation does not change the realm yet, and a new realm has no accounts, no redirect addresses and
-no role mappings, so until they do, a tenant signs in through an identity provider that runs outside
+not read them yet, activation through `Axis.Admin` updates the realm but the server's startup activation does not yet,
+and a new realm has no accounts, no redirect addresses and no role mappings, so until they do, a tenant signs in through an identity provider that runs outside
 Axis, which `tenant oidc set` points its `Oidc` block at, as [security](security.md#sign-in-and-the-session) describes. Accounts, roles given by an administrator and the
 users page are in [user administration](user-administration.md).
 
@@ -103,8 +103,9 @@ so Studio edits it, with the identity provider editor of [Studio](studio.md), an
   - A site's `signIn` entry that names no provider is `AXC0289`, see
     [sites and sign-in](#sites-and-sign-in).
 - **Read only by activation:** activation checks the bindings of `oidc` providers against the tenant's, and refuses
-  providers that would split a person into two users, see [users](#users). It plans the realm it wants, but does
-  not change the realm yet. Sign-in does not read the resource yet. Studio's blank application creates an `accounts` provider, and New resource creates
+  providers that would split a person into two users, see [users](#users). It plans the realm it wants.
+  Activation through `Axis.Admin` updates the realm, and the server's startup activation does not yet, see
+  [keeping the realm in step](#keeping-the-realm-in-step). Sign-in does not read the resource yet. Studio's blank application creates an `accounts` provider, and New resource creates
   more from an `accounts` starter. Studio edits the kind with the identity provider editor, which does not show a
   binding's value, and a site's `signIn` with a picker of the application's providers.
 
