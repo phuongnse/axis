@@ -17,7 +17,7 @@
 // The production server refuses an identity provider over plain http, so Keycloak serves https and only
 // the server and the admin tool in this test trust the certificate authority, through SSL_CERT_FILE.
 // Keycloak starts with an admin client, which `tenant create` signs in as to create each tenant's realm. A new realm has
-// no users, so the test points tenant one back at the development realm before the proxy signs anna in.
+// no users, so the test points tenant one back at the development realm before the proxy signs the requester in.
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import { createHash, randomBytes } from 'node:crypto'
@@ -847,7 +847,7 @@ RETURNING id;`,
       for (const id of Object.keys(hosts)) assert.match(publisherLog, new RegExp(`^${id} claim ok$`, 'm'))
       assert.match(run(['ps', '--status', 'running', '--services']), /^publisher$/m)
 
-      // A new realm has no users, so tenant one goes back to the development realm, where anna and hoa can sign in.
+      // A new realm has no users, so tenant one goes back to the development realm, where the requester and hoa can sign in.
       const point = admin(
         ['tenant', 'oidc', 'set', 'one', '--authority', keycloakAuthority, '--client-id', 'axis', '--client-secret'],
         { AXIS_OIDC_CLIENT_SECRET: clientSecret },
