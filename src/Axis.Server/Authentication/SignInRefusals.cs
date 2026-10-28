@@ -12,13 +12,16 @@ internal static class SignInRefusals
     /// <summary>The callback's state came from another tenant's sign-in.</summary>
     public const string OtherTenant = "otherTenant";
 
-    /// <summary>The ID token failed validation, has no user id, or has an <c>auth_time</c> that is missing or too old.</summary>
+    /// <summary>The ID token failed validation, has no user id, or has an <c>auth_time</c> that is missing or too old, or carries a nonce that the sign-in did not send.</summary>
     public const string InvalidToken = "invalidToken";
 
     /// <summary>The callback's state is missing, unreadable or fails the correlation check.</summary>
     public const string InvalidState = "invalidState";
 
-    /// <summary>Under <c>fapi2</c>, the authorization response's <c>iss</c> is missing or is not the tenant's authority.</summary>
+    /// <summary>
+    /// The provider metadata's issuer is not the tenant's authority, or under <c>fapi2</c> the authorization response's
+    /// <c>iss</c> is missing or is not the tenant's authority.
+    /// </summary>
     public const string InvalidIssuer = "invalidIssuer";
 
     /// <summary>The identity provider answered with an error, or refused the code exchange.</summary>
@@ -30,7 +33,7 @@ internal static class SignInRefusals
     /// <param name="providerError">Whether the callback carries an <c>error</c> from the identity provider.</param>
     /// <param name="failure">The failure the OIDC handler reports.</param>
     /// <param name="tokenRejected">Whether the ID token was rejected for a missing user id or a missing or stale <c>auth_time</c>.</param>
-    /// <param name="issuerRejected">Whether the callback's <c>iss</c> was rejected under <c>fapi2</c>.</param>
+    /// <param name="issuerRejected">Whether the metadata's issuer, or under <c>fapi2</c> the callback's <c>iss</c>, was rejected.</param>
     public static string Classify(
         bool stateRead,
         bool otherTenantReadsState,
@@ -49,12 +52,13 @@ internal static class SignInRefusals
             return InvalidIssuer;
         }
 
-        if (providerError || failure is OpenIdConnectProtocolException)
+        // A nonce mismatch is a refused token, not a failure of the provider.
+        if (providerError || failure is OpenIdConnectProtocolException and not OpenIdConnectProtocolInvalidNonceException)
         {
             return ProviderError;
         }
 
-        if (tokenRejected || failure is SecurityTokenException || failure?.InnerException is SecurityTokenException)
+        if (tokenRejected || failure is OpenIdConnectProtocolInvalidNonceException || failure is SecurityTokenException || failure?.InnerException is SecurityTokenException)
         {
             return InvalidToken;
         }

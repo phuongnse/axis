@@ -77,6 +77,14 @@ public sealed class SignInRefusalsTests
     }
 
     [Fact]
+    public void A_nonce_that_does_not_match_is_an_invalid_token()
+    {
+        var reason = SignInRefusals.Classify(stateRead: true, otherTenantReadsState: false, providerError: false, new OpenIdConnectProtocolInvalidNonceException(), tokenRejected: false, issuerRejected: false);
+
+        Assert.Equal(SignInRefusals.InvalidToken, reason);
+    }
+
+    [Fact]
     public void A_token_that_fails_validation_is_an_invalid_token()
     {
         var reason = SignInRefusals.Classify(stateRead: true, otherTenantReadsState: false, providerError: false, new SecurityTokenInvalidSignatureException(), tokenRejected: false, issuerRejected: false);

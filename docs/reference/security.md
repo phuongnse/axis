@@ -134,7 +134,14 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place. _(planned f
     `session.signInRefused`, with a reason code, when it refuses. A refused
     callback still redirects to the sign-in page. A token with no user id, or
     with an `auth_time` that is missing or older than 8 hours, is refused with
-    the reason `invalidToken`.
+    the reason `invalidToken`. So is an ID token with a nonce that the sign-in
+    did not send, or with an `aud` that is not the tenant's client id.
+  - The callback also compares the `issuer` of the provider's metadata with the
+    tenant's `Authority`, character for character, after one trailing `/` is
+    removed from the `Authority`. Metadata with another issuer creates no
+    session and is refused as `invalidIssuer`. The check runs before the code is
+    sent to the token endpoint, for every tenant. The start of sign-in does not
+    run it.
   - `POST /api/auth/sign-out` writes `session.signedOut` only when a session
     existed.
   - An expired session writes nothing. A host that resolves to no tenant writes
@@ -586,8 +593,8 @@ verification bullet below is _(planned for M16)_.
     the sign-in as `providerError`. The authorization code is not bound to the
     key, and the PAR request carries no proof. The server keeps no token after
     sign-in, so the DPoP-bound access token is discarded.
-  - A `standard` tenant is unchanged: no PAR, no `iss` check, no DPoP, and a
-    client secret.
+  - A `standard` tenant is unchanged: no PAR, no check of the `iss` response
+    parameter, no DPoP, and a client secret.
 - **Machine callers under `fapi2`.** Inbound endpoints and service accounts
   accept only access tokens bound to a DPoP key (RFC 9449). A DPoP proof is a
   short signed JWT that the caller makes for each request, so a stolen token is
