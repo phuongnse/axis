@@ -50,8 +50,7 @@
       "slow": true,
       "results": [
         "artifacts/test-results"
-      ],
-      "group": "fast"
+      ]
     },
     {
       "name": "integration",

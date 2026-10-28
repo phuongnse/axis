@@ -114,11 +114,13 @@ with the reasons. What each one does is in NexKit's
   `error-context.md` files, and the performance workflow's
   `test-results-performance`.
 - **NexKit's checks skip suites that a change cannot affect.** NexKit runs the
-  checks in three jobs at once, with `parallel_checks` on: the build, lint, unit
-  and smoke tests in one job, the group `fast`, and the integration and E2E tests
-  each in their own. A check round then takes about as long as its slowest
-  job, instead of all of them in a row, which took 20 to 50 minutes. Under
-  NexKit's `NEXKIT_BASE_SHA`, a suite that no changed file can affect is
+  checks in four jobs at once, with `parallel_checks` on: the build, lint and
+  unit tests in one job, the group `fast`, and the smoke, integration and E2E
+  tests each in their own. A check round then takes about as long as its
+  slowest job, instead of all of them in a row, which took 20 to 50 minutes.
+  The smoke tests have their own job because in the `fast` job, after the
+  build, lint and unit tests, they made it the slowest, at about 25 minutes.
+  Under NexKit's `NEXKIT_BASE_SHA`, a suite that no changed file can affect is
   skipped, and any doubt runs it. CI on `main` sets no base and runs every
   suite, so a slowdown shows after the merge. The integration performance
   tests, whose class names end in `PerformanceTests`, run neither in NexKit's
