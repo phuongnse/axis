@@ -82,9 +82,10 @@ class. When that class has failed a test before, the change fixes or guards ever
 class, through a shared helper, a fixture or a lint rule. The classes seen so far and their guards:
 
 - An outside download or service: `scripts/setup.sh` and the CI install steps try again.
-- A click during an animation or a redraw: `waitForDialog`, `confirmDialog` and the drag helper
-  wait until the element is ready. The drag helper, and the binding choice in the journeys, also
-  wait until the page canvas has drawn the dropped draft (`waitForCanvas`).
+- A click during an animation or a redraw: Playwright asks for reduced motion, so the SPA shows
+  dialogs and overlays without animation. `waitForDialog`, `confirmDialog` and the drag helper wait
+  until the element is ready. The drag helper, and the binding choice in the journeys, also wait
+  until the page canvas has drawn the dropped draft (`waitForCanvas`).
 - The real clock: a test fixes the time with `axis.now` and runs schedules in UTC.
 - State left by another test: a test counts from its own baseline.
 - Planner statistics: a seed that a plan depends on runs `ANALYZE` over every row.
@@ -95,8 +96,9 @@ To run one shard, set `AXIS_E2E_SHARD`, such as `AXIS_E2E_SHARD=2/3 scripts/e2e.
 results go to `artifacts/test-results/playwright-<n>.xml`. The smoke tests run in a CI job of their own,
 from `scripts/smoke.sh`, so the integration job and the shards hold only their own tests.
 
-_(planned for M16)_ The SPA turns off its animations when the browser asks for reduced motion, and
-Playwright asks for it.
+The SPA turns off its animations when the browser asks for reduced motion, and Playwright asks for
+it, so `waitForDialog` and `confirmDialog` return at once. A spec that slows animations on purpose
+to prove a wait asks for motion again with `test.use({ reducedMotion: 'no-preference' })`.
 
 Each application's test scenarios are a suite of their own, named `scenarios-<application name>`.
 The integration tests run them and write `artifacts/test-results/scenarios-<application name>.xml`.
