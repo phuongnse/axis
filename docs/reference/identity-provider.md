@@ -248,8 +248,10 @@ _(planned for M17)_
   [shell design system previews](shell.md#design-system-previews). The Keycloak theme `axis` feeds them a real
   context: its `login.ftl` writes Keycloak's sign-in data as JSON and a React bundle draws the page. `scripts/build.sh`
   builds the theme from `web/keycloak-theme/` into `artifacts/keycloak-theme/axis/login/` and checks its files and
-  fonts. Keycloak's other pages still come from its `keycloak` parent theme, and nothing mounts the theme into
-  Keycloak yet.
+  fonts. Keycloak's other pages still come from its `keycloak` parent theme. The development realm `axis` uses the theme as
+  its login theme: Compose, `scripts/dev.sh`, `scripts/e2e.sh` and the Keycloak of the integration tests load it from
+  `artifacts/keycloak-theme`, and each builds it first. The on-premises install, the Helm chart and the realms of
+  `tenant create` do not use it yet.
 
 ## Installation
 

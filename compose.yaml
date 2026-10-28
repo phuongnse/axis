@@ -41,7 +41,9 @@ services:
       retries: 30
 
   # Imports the axis realm from samples/keycloak on start. The admin console login is admin / admin. It also holds the
-  # breached-password list that realms made by `tenant create` check passwords against.
+  # breached-password list that realms made by `tenant create` check passwords against. The realm signs people in on
+  # the Axis theme, which is mounted from artifacts/keycloak-theme. Build it first with
+  # `npm run build:keycloak-theme --prefix web`, or Docker creates the folder owned by root and the build fails.
   keycloak:
     image: quay.io/keycloak/keycloak:26.4
     command: ["start-dev", "--import-realm"]
@@ -51,6 +53,7 @@ services:
     volumes:
       - ./samples/keycloak:/opt/keycloak/data/import:ro
       - ./deploy/keycloak/password-blacklists:/opt/keycloak/data/password-blacklists:ro
+      - ./artifacts/keycloak-theme:/opt/keycloak/themes:ro
     ports:
       - "127.0.0.1:${AXIS_KEYCLOAK_PORT:-8080}:8080"
     # Healthy once the realm answers. The image has bash but no curl.

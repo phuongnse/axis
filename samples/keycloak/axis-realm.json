@@ -1,6 +1,7 @@
 {
   "realm": "axis",
   "enabled": true,
+  "loginTheme": "axis",
   "internationalizationEnabled": true,
   "supportedLocales": ["en", "vi"],
   "defaultLocale": "en",
