@@ -33,7 +33,7 @@ confirmed these points on issue #778 on 2026-10-20.
   - The new folder is the kebab-case `name`. A name or folder that already
     exists is `409`. A `name` that does not match the manifest name pattern is
     `400`. So is a name whose kebab-case form is longer than 60 characters or
-    is a reserved site path (`api`, `health`, `assets`, `studio`).
+    is a reserved site path (`api`, `health`, `assets`, `studio`, `account`).
   - The whole folder is written under the write lock, to a hidden temporary
     folder that is then renamed. A reader never sees half an application.
   - The answer is `201` with the application's `name`, a `Location` and the

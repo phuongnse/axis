@@ -29,6 +29,11 @@ export function signInUrl(returnUrl: string): string {
   return `/api/auth/sign-in?returnUrl=${encodeURIComponent(returnUrl)}`
 }
 
+/** The server's sign-in address that makes the identity provider ask for credentials again, then returns to `returnUrl`. */
+export function reauthenticateUrl(returnUrl: string): string {
+  return `${signInUrl(returnUrl)}&reauthenticate=true`
+}
+
 /** The shell's sign-in page, where the server sends the browser after a refused sign-in. */
 export const signInFailedPath = '/?signIn=failed'
 

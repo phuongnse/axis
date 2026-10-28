@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -96,11 +96,27 @@ describe('UserMenu', () => {
     expect(screen.getByRole('menuitem', { name: texts['shell.account.signOut'] })).toBeInTheDocument()
   })
 
+  it.each(locales)(
+    'has a Sessions entry that links to the account screen, with the platform $name text',
+    async ({ texts }) => {
+      stubServer(anna)
+      renderMenu(texts)
+
+      await userEvent.click(await screen.findByRole('button', { name: 'Anna Employee' }))
+
+      const link = within(await screen.findByRole('menu', { name: texts['shell.account.label'] })).getByRole('link', {
+        name: texts['shell.account.sessions'],
+      })
+      expect(link).toHaveAttribute('href', '/account')
+    },
+  )
+
   it('has its texts in every platform locale', () => {
     for (const { texts } of locales) {
       expect(texts).toHaveProperty(['shell.account.label'])
       expect(texts).toHaveProperty(['shell.account.signIn'])
       expect(texts).toHaveProperty(['shell.account.signOut'])
+      expect(texts).toHaveProperty(['shell.account.sessions'])
       expect(texts).toHaveProperty(['shell.studio.link'])
     }
   })
