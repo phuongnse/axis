@@ -926,9 +926,8 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     `/api/auth/sign-in` with the current path and query string as `returnUrl`, so
     the person comes back there, but to `/` from the sign-in page `/?signIn=failed`.
   - With someone signed in, it shows their display name. Its menu holds
-    **Sessions**, which opens the sessions screen below, and
-    **Sign out**, which ends the session and then sends the browser to the
-    identity provider's sign-out page.
+    **Sessions**, which opens the sessions screen below, and **Sign out**, which
+    ends the session and then sends the browser to the identity provider's sign-out page.
   - **Sessions screen.** The platform route `/account` lists the person's live
     sessions from `GET /api/me/sessions`, newest sign-in first. It sits beside
     `/studio`, before the site route, so `account` is a reserved site path. A
