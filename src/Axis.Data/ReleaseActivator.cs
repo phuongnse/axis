@@ -2,6 +2,7 @@ using System.Data.Common;
 using System.Text.Json;
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Model;
+using Axis.Configuration.Realms;
 using Axis.Configuration.Releases;
 using Axis.Configuration.Storage;
 using Axis.Data.Storage;
@@ -11,14 +12,21 @@ namespace Axis.Data;
 /// <summary>
 /// Makes a compiled release the active release of its application: it checks that no other
 /// application is active under the manifest name or holds one of its site paths, checks that the
-/// tenant has every deployment binding its connectors and the package operations its processes use
-/// name with the right kind, provisions the
+/// tenant has every deployment binding its connectors, its <c>oidc</c> identity providers and the package operations
+/// its processes use name with the right kind, checks that no identity provider would make one person two users
+/// of the tenant, provisions the
 /// entity tables and then sets the active release with its site paths. Between the two it recomputes the stored
 /// computed values of each entity whose computed definitions differ from the previously active release's.
 /// <para>
 /// On a preview tenant (<see cref="ActivationBindings.IsPreview"/>) a missing binding is a warning, which the result
 /// carries while activation goes on. A binding of the wrong kind and an <c>http</c> URL outside Development are still
 /// errors.
+/// </para>
+/// <para>
+/// Activation reads the identity providers of the tenant's other active releases and plans the realm from them and the
+/// release (<see cref="ActivationResult.Realm"/>). A provider that names the same issuer binding as another provider with
+/// other client bindings, or the same bindings with other <c>claims</c>, is refused with
+/// <see cref="DiagnosticCodes.IdentityProviderSplitsUser"/> before provisioning. Nothing applies the plan to the realm yet.
 /// </para>
 /// <para>
 /// It also refuses a module upgrade that drops a module entity or field, or changes a field's type, with
@@ -142,6 +150,17 @@ public static class ReleaseActivator
             return new ActivationResult(bindingDiagnostics);
         }
 
+        // Also before provisioning: a provider that would split a person changes nothing.
+        var realm = await PlanRealmAsync(store, model, bindings, cancellationToken);
+        var splitting = realm.Conflicts
+            .Where(conflict => conflict.ApplicationId == manifest.Id)
+            .Select(SplitsUser)
+            .ToList();
+        if (splitting.Count > 0)
+        {
+            return new ActivationResult([.. bindingDiagnostics, .. splitting]);
+        }
+
         var sitePaths = model.Sites.Select(site => site.Path).ToList();
         var migrations = new MigrationContext(
             release.Id,
@@ -157,7 +176,72 @@ public static class ReleaseActivator
             TenantId = bindings.TenantId,
         };
         var provisioned = await EntityProvisioner.ProvisionAsync(model, data, migrations, cancellationToken);
-        return new ActivationResult([.. bindingDiagnostics, .. provisioned.Diagnostics]);
+        var diagnostics = new List<Diagnostic>([.. bindingDiagnostics, .. provisioned.Diagnostics]);
+        return diagnostics.Any(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error)
+            ? new ActivationResult(diagnostics)
+            : new ActivationResult(diagnostics) { Realm = realm.Plan };
+    }
+
+    // The realm plan from the tenant's other active releases and the release being activated, which replaces the
+    // application's own active release. A provider whose bindings the tenant lacks is left out.
+    private static async Task<RealmPlanResult> PlanRealmAsync(
+        IActiveReleaseStore store, ApplicationModel model, ActivationBindings bindings, CancellationToken cancellationToken)
+    {
+        var applications = new List<RealmApplication>();
+        foreach (var active in await store.ListAsync(cancellationToken))
+        {
+            if (active.ApplicationId == model.Manifest.Id
+                || await store.GetReleaseAsync(active.ReleaseId, cancellationToken) is not { } stored)
+            {
+                continue;
+            }
+
+            applications.Add(RealmApplication.FromRelease(active.Name, stored));
+        }
+
+        applications.Add(RealmApplication.FromModel(model));
+        return RealmPlanner.Build([.. applications.Select(application => application with
+        {
+            Providers = [.. application.Providers.Where(provider => IsBound(provider, bindings))],
+        })]);
+    }
+
+    // Whether the tenant has every binding of an oidc provider with the right kind, ignoring letter case.
+    private static bool IsBound(IdentityProviderModel provider, ActivationBindings bindings)
+    {
+        if (provider.Type != "oidc")
+        {
+            return true;
+        }
+
+        bool Has(string? name, string kind) =>
+            name is null
+            || bindings.Bindings.FirstOrDefault(pair => string.Equals(pair.Key, name, StringComparison.OrdinalIgnoreCase)).Value?.Kind == kind;
+
+        return provider.IssuerBinding is not null
+            && Has(provider.IssuerBinding, ActivationBinding.UrlKind)
+            && Has(provider.ClientIdBinding, ActivationBinding.SecretKind)
+            && Has(provider.ClientSecretBinding, ActivationBinding.SecretKind)
+            && Has(provider.ClientKeyBinding, ActivationBinding.SecretKind);
+    }
+
+    private static Diagnostic SplitsUser(RealmConflict conflict)
+    {
+        var provider = conflict.Provider;
+        var other = $"the provider '{conflict.OtherProvider.Name}' of the application '{conflict.Other.Name}'";
+        return conflict.Kind == RealmConflictKind.ClientBindings
+            ? new Diagnostic(
+                DiagnosticCodes.IdentityProviderSplitsUser,
+                $"The identity provider '{provider.Name}' names the issuer binding '{provider.IssuerBinding}' with other client bindings than {other}. The same person would become two users. Use the same client bindings.",
+                provider.File,
+                "/issuer/binding",
+                provider.Id)
+            : new Diagnostic(
+                DiagnosticCodes.IdentityProviderSplitsUser,
+                $"The identity provider '{provider.Name}' names the same bindings as {other} but other claims. The same person would become two users. Use the same claims.",
+                provider.File,
+                "/claims",
+                provider.Id);
     }
 
     // The module upgrade the release makes over the application's active release; none before the first activation.
@@ -247,7 +331,8 @@ public static class ReleaseActivator
 
     /// <summary>
     /// Reports every binding the tenant lacks or holds with another kind: the file storage binding of the
-    /// application, those of the connectors, and the <c>url</c> and <c>secret</c> bindings that a package operation step uses declares. Also
+    /// application, those of the connectors, those of the <c>oidc</c> identity providers (<c>issuer</c> as <c>url</c>, the
+    /// client bindings as <c>secret</c>), and the <c>url</c> and <c>secret</c> bindings that a package operation step uses declares. Also
     /// reports every base URL that is not <c>https</c> when <c>http</c> is not allowed. A missing binding is a warning
     /// on a preview tenant. A message names the tenant and the binding, never its value.
     /// </summary>
@@ -280,6 +365,17 @@ public static class ReleaseActivator
             {
                 CheckBinding(auth.Binding, ActivationBinding.SecretKind, auth.BindingPath, bindings, Report);
             }
+        }
+
+        foreach (var provider in model.IdentityProviders.Where(provider => provider.Type == "oidc"))
+        {
+            void Report(string code, string message, string path, DiagnosticSeverity severity = DiagnosticSeverity.Error) =>
+                diagnostics.Add(new Diagnostic(code, message, provider.File, path, provider.Id, severity));
+
+            CheckBinding(provider.IssuerBinding, ActivationBinding.UrlKind, "/issuer/binding", bindings, Report);
+            CheckBinding(provider.ClientIdBinding, ActivationBinding.SecretKind, "/clientId/binding", bindings, Report);
+            CheckBinding(provider.ClientSecretBinding, ActivationBinding.SecretKind, "/clientSecret/binding", bindings, Report);
+            CheckBinding(provider.ClientKeyBinding, ActivationBinding.SecretKind, "/clientKey/binding", bindings, Report);
         }
 
         foreach (var process in model.Processes)
@@ -319,8 +415,13 @@ public static class ReleaseActivator
 
     /// <summary>Gives the binding named <paramref name="name"/> when the tenant has it with <paramref name="kind"/>, otherwise reports it.</summary>
     private static ActivationBinding? CheckBinding(
-        string name, string kind, string path, ActivationBindings bindings, Action<string, string, string, DiagnosticSeverity> report)
+        string? name, string kind, string path, ActivationBindings bindings, Action<string, string, string, DiagnosticSeverity> report)
     {
+        if (name is null)
+        {
+            return null;
+        }
+
         var binding = bindings.Bindings.TryGetValue(name, out var exact)
             ? exact
             : bindings.Bindings.FirstOrDefault(pair => string.Equals(pair.Key, name, StringComparison.OrdinalIgnoreCase)).Value;
