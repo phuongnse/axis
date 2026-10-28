@@ -319,6 +319,19 @@ for (const [name, keys] of Object.entries(stateKeys)) {
   }
 }
 
+for (const mode of modes) {
+  test(`the shell preview's Form page breadcrumb links back to Requests in ${mode} mode`, async ({ page }) => {
+    const recording = await openHarness(page, `?preview=shell&mode=${mode}`, { sandboxed: true, frameWidth: 992 })
+    const breadcrumb = figure(page.frameLocator('iframe'), 'Form page').getByRole('navigation', {
+      name: 'Breadcrumb',
+      exact: true,
+    })
+
+    await expect(breadcrumb.getByRole('link', { name: 'Requests', exact: true })).toHaveAttribute('href', '/sample/requests')
+    expect(recording.errors).toEqual([])
+  })
+}
+
 test('the field-date-time preview opens its date picker', async ({ page }) => {
   const recording = await openHarness(page, '?preview=field-date-time&mode=light')
   await figure(page, 'Typical').getByLabel(fieldLabel('Submitted at')).click()

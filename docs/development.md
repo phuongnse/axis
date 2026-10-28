@@ -422,7 +422,7 @@ checks that a field preview has no Save button and no history, and that the `sta
 the load error alert. For each field type except the child collection, it checks in both modes that the required,
 read-only and error states show. It checks the child collection's reference, computed, error, read-only and empty
 states, and the form's validation, read-only and wizard states. It mounts the shell, sign-in and identity sign-in previews in a
-992 px frame sandboxed without `allow-forms`, and checks a key element of each state. It opens the date-time picker and the reference lookup
+992 px frame sandboxed without `allow-forms`, and checks a key element of each state. It checks that the Form page's breadcrumb links to Requests. It opens the date-time picker and the reference lookup
 and adds a child collection row. It mounts the `form` preview in a frame sandboxed like the artifact's and checks its
 validation messages and a save. It finds each data preview's empty text under its "Empty" caption, the table's row
 and toolbar actions, the inbox's overdue and claimed tags, and the inspector's failed instance and dead letter actions.
