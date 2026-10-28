@@ -29,6 +29,8 @@
   "shell.account.sessions.loadFailed": "Không thể tải các phiên đăng nhập của bạn.",
   "shell.account.sessions.endFailed": "Không thể kết thúc phiên.",
   "shell.navigation.menu": "Trình đơn",
+  "shell.navigation.collapse": "Thu gọn điều hướng",
+  "shell.navigation.expand": "Mở rộng điều hướng",
   "shell.notifications.label": "Thông báo",
   "shell.notifications.unread": "chưa đọc",
   "shell.notifications.unreadItem": "Chưa đọc",

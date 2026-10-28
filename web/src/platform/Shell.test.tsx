@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { DatePicker, Table, theme } from 'antd'
 import viVN from 'antd/locale/vi_VN'
@@ -27,6 +27,13 @@ const navigationTexts = [
       'nav.notes': 'Notes',
       'nav.categories': 'Categories',
       'shell.navigation.menu': 'Menu',
+      'shell.navigation.collapse': 'Collapse navigation',
+      'shell.navigation.expand': 'Expand navigation',
+      'shell.serverStatus.title': 'Server status',
+      'shell.serverStatus.ready': 'Ready',
+      'shell.serverStatus.checking': 'Checking',
+      'shell.serverStatus.unavailable': 'Unavailable',
+      'site.title': 'Workspace',
     },
     fallbackTexts: {},
   },
@@ -63,13 +70,24 @@ function renderShell(
   )
 }
 
-// The 404 answers the account button's GET /api/me, so the button shows nothing.
-beforeEach(() => {
+/** Answers the footer's GET /api/about with the version, or with 401 for nobody signed in. */
+function stubAbout(version: string | null) {
   vi.stubGlobal(
     'fetch',
-    vi.fn(async () => new Response(JSON.stringify({ title: 'Not found', status: 404 }), { status: 404 })),
+    vi.fn(async (input: string) => {
+      if (input === '/api/about') {
+        return version === null
+          ? new Response(null, { status: 401 })
+          : new Response(JSON.stringify({ version }), { status: 200 })
+      }
+      return new Response(JSON.stringify({ title: 'Not found', status: 404 }), { status: 404 })
+    }),
   )
-})
+}
+
+// The 401 answers the footer's GET /api/about, so the footer shows no version. The 404 answers the account
+// button's GET /api/me, so the button shows nothing.
+beforeEach(() => stubAbout(null))
 
 afterEach(() => {
   dayjs.locale('en')
@@ -218,11 +236,84 @@ describe('Shell at narrow width', () => {
 })
 
 describe('Shell above narrow width', () => {
-  it('shows the navigation in the header without a Menu button', () => {
+  it('shows the navigation in a sidebar without a Menu button', () => {
     renderShell('en', ['/'], notesNavigation)
 
     expect(screen.queryByRole('button', { name: 'Menu' })).not.toBeInTheDocument()
+    expect(screen.getByRole('navigation', { name: 'Menu' })).toBeVisible()
     expect(screen.getByRole('link', { name: 'Notes' })).toBeVisible()
+    expect(screen.getByRole('button', { name: 'Collapse navigation' })).toHaveAttribute('aria-expanded', 'true')
+  })
+
+  it('links the mark and the title to the first navigation page', () => {
+    renderShell('en', ['/e2e/notes'], notesNavigation)
+
+    const home = within(screen.getByRole('banner')).getByRole('link', { name: 'Workspace' })
+    expect(home).toHaveAttribute('href', '/')
+    expect(home).toHaveTextContent('W')
+  })
+
+  it('collapses the sidebar to icons and opens it again, naming what the button does', async () => {
+    renderShell('en', ['/'], notesNavigation)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Collapse navigation' }))
+
+    const expand = screen.getByRole('button', { name: 'Expand navigation' })
+    expect(expand).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByRole('button', { name: 'Collapse navigation' })).not.toBeInTheDocument()
+    await userEvent.hover(screen.getByRole('menuitem', { name: 'Notes' }))
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Notes')
+
+    await userEvent.click(expand)
+
+    expect(screen.getByRole('button', { name: 'Collapse navigation' })).toHaveAttribute('aria-expanded', 'true')
+  })
+
+  it('stays collapsed while the person follows a navigation link', async () => {
+    renderShell('en', ['/'], notesNavigation)
+    await userEvent.click(screen.getByRole('button', { name: 'Collapse navigation' }))
+    // The collapsed entry's tooltip repeats its link outside the navigation, so look inside the navigation.
+    const navigation = within(screen.getByRole('navigation', { name: 'Menu' }))
+
+    await userEvent.click(navigation.getByRole('link', { name: 'Categories' }))
+
+    expect(navigation.getByRole('link', { name: 'Categories' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('button', { name: 'Expand navigation' })).toHaveAttribute('aria-expanded', 'false')
+  })
+
+  it('has no sidebar and no collapse button on a one-page site', () => {
+    renderShell('en', ['/'], notesNavigation.slice(0, 1))
+
+    expect(screen.queryByRole('navigation')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Collapse navigation' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Expand navigation' })).not.toBeInTheDocument()
+  })
+})
+
+describe('Shell footer', () => {
+  it('shows the version to a signed-in person', async () => {
+    stubAbout('0.1.0')
+    renderShell('en', ['/'], notesNavigation)
+
+    await waitFor(() =>
+      expect(screen.getByRole('contentinfo')).toHaveTextContent(`© ${new Date().getFullYear()} Axis · v0.1.0`),
+    )
+  })
+
+  it('shows no version to an anonymous visitor', async () => {
+    renderShell('en', ['/'], notesNavigation)
+
+    await waitFor(() => expect(fetch).toHaveBeenCalledWith('/api/about', expect.anything()))
+    const footer = screen.getByRole('contentinfo')
+    expect(footer).toHaveTextContent(`© ${new Date().getFullYear()} Axis`)
+    expect(footer).not.toHaveTextContent(' · v')
+  })
+
+  it('shows the readiness of the server', async () => {
+    renderShell('en', ['/'], notesNavigation)
+
+    expect(within(screen.getByRole('contentinfo')).getByText('Server status')).toBeVisible()
+    expect(await screen.findByTestId('footer-server-status')).toBeInTheDocument()
   })
 })
 

@@ -64,6 +64,7 @@ describe.each(['light', 'dark'] as const)('the accessible colours of the Ant Des
     expect(config.components?.Menu).toMatchObject({
       itemSelectedColor: colour.primaryText,
       horizontalItemSelectedColor: colour.primaryText,
+      collapsedWidth: 64,
       dangerItemColor: colour.dangerText,
       dangerItemHoverColor: colour.dangerText,
       dangerItemSelectedColor: colour.dangerText,

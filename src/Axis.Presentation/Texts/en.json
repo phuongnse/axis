@@ -29,6 +29,8 @@
   "shell.account.sessions.loadFailed": "Your sessions could not be loaded.",
   "shell.account.sessions.endFailed": "The session could not be ended.",
   "shell.navigation.menu": "Menu",
+  "shell.navigation.collapse": "Collapse navigation",
+  "shell.navigation.expand": "Expand navigation",
   "shell.notifications.label": "Notifications",
   "shell.notifications.unread": "unread",
   "shell.notifications.unreadItem": "Unread",

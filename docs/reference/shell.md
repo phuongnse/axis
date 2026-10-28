@@ -6,15 +6,12 @@ person sees, and the sign-in screen when nobody is signed in. This page holds th
 endpoints and the widgets are in [frontend](frontend.md), and sign-in and the session in
 [security](security.md#sign-in-and-the-session).
 
-[D98](../decisions/d98-rules-from-the-shell-review.md) agrees everything on this page. Only the
-[navigation icons](#navigation-icons) list, its check, the API field and the SPA map are built. M16 builds the rest, so
-every other section is _(planned for M16)_. Until it is built, the shell is as [frontend](frontend.md) describes it: one header
-with the site's title, its navigation as a horizontal menu, the notification bell, the account button, the locale
-switch and the theme toggle.
+[D98](../decisions/d98-rules-from-the-shell-review.md) agrees everything on this page. The [layout](#layout) and the
+[navigation icons](#navigation-icons) are built. M16 builds the rest, so every other section is _(planned for M16)_.
+Until the app switcher and the preferences menu are built, the header keeps the locale switch, the theme toggle and the
+Studio link beside the account button.
 
 ## Layout
-
-_(planned for M16)_
 
 - **Header.** One row, 48 px high, on `surface` with a `borderSubtle` rule below it. From the left: the button that
   collapses the sidebar, the site's mark, the site's title, then on the right the notification bell, the app switcher,
