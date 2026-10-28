@@ -1,6 +1,7 @@
 import { expect, test } from '../test'
 import type { APIRequestContext, Page } from '@playwright/test'
 import { csrfHeaders } from '../csrf'
+import { cellValue } from '../fields'
 import { sessionFile } from '../sessions'
 
 // The record and file APIs need a session with a grant, so these journeys start signed in as the employee anna.
@@ -116,5 +117,5 @@ test('a child row with a file is added on an asset form and its link shows on th
   await page.goto(`/e2e/assetdetail?asset=${asset.id}`)
   const link = page.getByRole('link', { name: file, exact: true })
   await expect(link).toBeVisible()
-  await expect(page.getByRole('textbox', { name: 'Note 1', exact: true })).toHaveValue('Signed copy')
+  await expect(cellValue(page, 'attachments', 0, 'note')).toHaveText('Signed copy')
 })
