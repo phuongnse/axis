@@ -11,6 +11,14 @@
       },
       "additionalProperties": false
     },
+    "tlsSecretReference": {
+      "type": "object",
+      "description": "A reference to an existing Kubernetes TLS Secret, with the keys tls.crt and tls.key. It never holds a value.",
+      "properties": {
+        "name": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
     "volume": {
       "type": "object",
       "description": "Any Kubernetes volume source, or empty for none."
@@ -101,6 +109,7 @@
         "platformConnection": { "$ref": "#/definitions/secretReference" },
         "platformSchemaConnection": { "$ref": "#/definitions/secretReference" },
         "platformSecretKey": { "$ref": "#/definitions/secretReference" },
+        "serverCertificate": { "$ref": "#/definitions/tlsSecretReference" },
         "scenarioServerConnection": { "$ref": "#/definitions/secretReference" }
       },
       "additionalProperties": false

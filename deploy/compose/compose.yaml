@@ -12,10 +12,14 @@
 # AXIS_STUDIO_DIR       The Studio folders, mounted read-write at /studio on both servers. Default ./studio. It must
 #                       be writable by UID 1654.
 # AXIS_APPS_DIR         The application folders for `activate`, mounted at /apps. Default ./apps.
-# AXIS_SERVER_PORT      The host port of the server, on 127.0.0.1 only. Default 8080. Without TLS, put a
-#                       reverse proxy on the same machine in front of it.
+# AXIS_SERVER_TLS_DIR   The folder with tls.crt and tls.key of the servers, issued for the name `servers`, mounted
+#                       read-only at /server-tls on both servers only. UID 1654 must read both files. Default
+#                       ./server-tls. The servers listen on HTTPS only, and the server does not start without it.
+# AXIS_SERVER_PORT      The host port of the server, on 127.0.0.1 only. Default 8080. It serves HTTPS, so a client
+#                       checks the certificate for the name `servers`.
 # AXIS_WORKER_HEALTH_PORT  The host port of the worker's health endpoints, on 127.0.0.1 only. Default 5208.
 # AXIS_TLS_DIR          The folder with tls.crt and tls.key for the proxy, mounted read-only at /certs. Default ./tls.
+#                       It also holds server-ca.crt, the one authority certificate that the proxy trusts for the servers.
 # AXIS_HTTPS_PORT       The host port of the proxy. Default 443.
 # AXIS_SERVER_2_PORT    The host port of the second server replica, on 127.0.0.1 only. Default 8081.
 # AXIS_NETWORK_SUBNET   The subnet of the Compose network. Default 172.31.250.0/24. Change it when it overlaps a
@@ -48,6 +52,10 @@ x-server: &server
   environment:
     <<: *host-environment
     ForwardedHeaders__KnownProxies__0: ${AXIS_PROXY_ADDRESS:-172.31.250.10}
+    # HTTPS only. A Kestrel endpoint replaces the plain HTTP port 8080 of the image, so nothing listens on it.
+    Kestrel__Endpoints__Https__Url: https://+:8443
+    Kestrel__Endpoints__Https__Certificate__Path: /server-tls/tls.crt
+    Kestrel__Endpoints__Https__Certificate__KeyPath: /server-tls/tls.key
     # No value: these pass through from the shell. Studio stays off without them.
     Studio__Folders__0:
     Studio__AuthorRole:
@@ -61,6 +69,8 @@ x-server: &server
     - ${AXIS_MODULES_DIR:-./modules}:/modules:ro
     # Read-write, and the same folder on every replica, because the write lock is keyed by the folder path.
     - ${AXIS_STUDIO_DIR:-./studio}:/studio
+    # The certificate and the private key of the servers. No other service mounts them.
+    - ${AXIS_SERVER_TLS_DIR:-./server-tls}:/server-tls:ro
   secrets:
     - ConnectionStrings__Platform
     - ConnectionStrings__PlatformSchema
@@ -70,7 +80,7 @@ services:
   server:
     <<: *server
     ports:
-      - "127.0.0.1:${AXIS_SERVER_PORT:-8080}:8080"
+      - "127.0.0.1:${AXIS_SERVER_PORT:-8080}:8443"
 
   # The second replica. Start it only after `server` is ready.
   server-2:
@@ -78,10 +88,10 @@ services:
     profiles:
       - replicas
     ports:
-      - "127.0.0.1:${AXIS_SERVER_2_PORT:-8081}:8080"
+      - "127.0.0.1:${AXIS_SERVER_2_PORT:-8081}:8443"
 
-  # Ends TLS with /certs/tls.crt and /certs/tls.key and forwards to every server that answers to `servers`.
-  # It holds no secret: the folder is mounted from the host.
+  # Ends TLS with /certs/tls.crt and /certs/tls.key and forwards to every server that answers to `servers`, over
+  # TLS. It trusts only /certs/server-ca.crt for the servers. It holds no secret: the folder is mounted from the host.
   proxy:
     image: caddy:2.10.2-alpine
     profiles:
