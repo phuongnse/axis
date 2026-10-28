@@ -31,6 +31,9 @@ _(planned for M17)_
   [keeping the realm in step](#keeping-the-realm-in-step).
 - The realm's sessions last at most 8 hours, the lifetime of Axis's session, see
   [session lifetimes](security.md#session-lifetimes-and-re-authentication).
+- The realm holds the account rules of [accounts](user-administration.md#accounts): an authenticator code at every
+  sign-in, passwords of 12 to 128 characters that are not on the breached-password list, a wait after 5 failed
+  sign-ins, a password reset link of 30 minutes and no self-registration.
 - _(planned for M17)_ The realm also has its people, its brokered identity providers, a client for each site and the
   Axis theme.
 - _(planned for M17)_ The realm's display name is the organization's name, which every sign-in page shows under its
@@ -178,8 +181,12 @@ _(planned for M17)_
   that Axis's hosts use to change the realm: `axis-activation`, with rights over the realm's providers and clients, for
   activation, and `axis-users`, with rights over its users only, for the users page. It stores their secrets and the
   platform client's secret encrypted in the tenant directory and points the tenant's `Oidc` block at the realm. A
-  second run updates the realm. Only `Axis.Admin` holds the identity provider's admin rights over every realm, from the
+  second run updates the realm and brings it up to the account rules. Only `Axis.Admin` holds the identity provider's admin rights over every realm, from the
   `IdentityProvider` settings of its own, see [administration](administration.md#settings).
+- **The breached-password list:** the realm's password policy names the file `axis-breached-passwords.txt`, which every
+  identity provider that `tenant create` targets must hold in its `data/password-blacklists` folder. The repository
+  keeps it in `deploy/keycloak/password-blacklists`, see `deploy/keycloak/README.md`. Without the file, `tenant create`
+  fails at its realm step, also for a realm that exists.
 - _(planned for M17)_ **Kept in step later:** `tenant host add`, `remove` and `move` do not change the realm yet, so the
   platform client has no redirect addresses until a later part of M17 adds them.
 - **Realm sync:** the realm sync is built. It signs in to the realm as `axis-activation` and makes the realm's

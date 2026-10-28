@@ -268,7 +268,9 @@ the admin container only.
    the server has created those tables, so start it only after `/health/ready`.
 4. Create a tenant with
    `docker compose run --rm admin tenant create <id> --host <host>`.
-   The command creates the tenant's realm in the identity provider, so
+   The command creates the tenant's realm in the identity provider, so the identity provider must mount the folder
+   `deploy/keycloak/password-blacklists` at `/opt/keycloak/data/password-blacklists`. The realm's password policy
+   names the breached-password list in it, and without the file `tenant create` fails at its realm step.
    `IdentityProvider__Url` and `IdentityProvider__AdminClientId` must pass through from
    your shell. The admin client secret is the `IdentityProvider__AdminClientSecret` file, so it is in no
    command line. Every `admin` run needs that file, because Compose refuses to start a service whose secret file is
@@ -365,8 +367,8 @@ states. The `replicas` profile starts `server-2`, configured like
 steps say, and `scripts/smoke.sh` runs it. It builds the three production images
 and starts a test PostgreSQL over TLS and a Keycloak over HTTPS, with a certificate
 authority it makes for the run, and imports a copy of the development realm that
-adds the tenants' `https://` redirect addresses. Keycloak starts with an admin client for `tenant create`, and the admin host
-trusts the authority too. PostgreSQL serves a certificate
+adds the tenants' `https://` redirect addresses. Keycloak starts with an admin client for `tenant create`, mounts `deploy/keycloak/password-blacklists` at
+`/opt/keycloak/data/password-blacklists`, and the admin host trusts the authority too. PostgreSQL serves a certificate
 of the same authority for the name `postgres`, and every connection string sets
 `SSL Mode=VerifyFull` and that authority as `Root Certificate`. A static check of the rendered configuration shows that
 `compose.yaml` alone gives no service the scenario secret or `Studio__Tests`, and that adding
