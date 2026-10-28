@@ -121,7 +121,7 @@ describe('checkStudioExpression', () => {
     })
   })
 
-  it.each([400, 401, 503])('answers null for %i and does not start sign-in', async (status) => {
+  it.each([400, 401, 503])('answers null for %i and does not ask to sign in', async (status) => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async () => new Response(null, { status })),

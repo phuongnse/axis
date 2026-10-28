@@ -3,6 +3,7 @@ import { Navigate, Outlet, useParams } from 'react-router'
 import { readStoredLocale, storeLocale } from '../platform/locale'
 import { Shell } from '../platform/Shell'
 import { fetchApplicationSite, type ApplicationSite } from '../platform/site'
+import { useSignInNeeded } from '../platform/signInNeeded'
 import { TextProvider } from '../platform/TextProvider'
 import { fetchSiteTexts, type TextMap } from '../platform/texts'
 import { LocaleLoadFailed, ShellError } from './LocaleLoadFailed'
@@ -27,6 +28,7 @@ export function SiteRoute() {
 
 function SiteShell({ path }: { path: string }) {
   const platform = usePlatform()
+  const signInNeeded = useSignInNeeded()
   const [loaded, setLoaded] = useState<LoadedSite | 'missing' | 'failed'>()
   const [localeFailed, setLocaleFailed] = useState(false)
   const localeRequest = useRef<AbortController>(undefined)
@@ -120,7 +122,8 @@ function SiteShell({ path }: { path: string }) {
     )
   }
   if (loaded === 'failed') {
-    return <ShellError />
+    // Without a session the site cannot load, so the sign-in prompt alone explains it.
+    return signInNeeded ? null : <ShellError />
   }
   if (!loaded) {
     return null

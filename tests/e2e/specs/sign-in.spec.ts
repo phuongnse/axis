@@ -2,7 +2,7 @@ import { expect, test } from '../test'
 import type { Page } from '@playwright/test'
 
 // The platform home page stays open while nobody is signed in. Every application page needs a
-// session and would start sign-in on its own, before the header's button is clicked.
+// session and shows the sign-in prompt, and only a click on a Sign in button starts sign-in.
 
 /** Signs in as Anna on the Keycloak login page from the header's sign-in button on the home page. */
 async function signInAsAnna(page: Page) {

@@ -1,6 +1,7 @@
 import '@testing-library/jest-dom/vitest'
 import { cleanup } from '@testing-library/react'
 import { afterAll, afterEach, expect, vi } from 'vitest'
+import { resetSignInNeeded } from '../platform/signInNeeded'
 import { recordAntdDeprecation, takeAntdDeprecations } from './antdDeprecations'
 
 // Ant Design 6 keeps deprecated props in its types, so only its runtime warning shows them. Record it to fail the test.
@@ -14,6 +15,7 @@ afterEach(() => {
   cleanup()
   vi.unstubAllGlobals()
   localStorage.clear()
+  resetSignInNeeded()
   expect(takeAntdDeprecations(), 'Ant Design deprecation warnings').toEqual([])
 })
 

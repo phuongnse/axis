@@ -31,7 +31,7 @@ interface NotificationBellProps {
  * and opens a panel with the notifications, newest first, 10 to a page. A row opens its page, if it has one,
  * and marks the notification read. The count reloads when the bell mounts, on every navigation, when the
  * panel opens and after any mark read. The bell renders nothing until the first load succeeds, and after a
- * failed load while the panel is closed. It never starts sign-in.
+ * failed load while the panel is closed. It never shows the sign-in prompt.
  */
 export function NotificationBell({ path, sitePath, locale }: NotificationBellProps) {
   const t = useText()
