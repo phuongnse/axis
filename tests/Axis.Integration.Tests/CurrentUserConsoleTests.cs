@@ -10,7 +10,7 @@ public sealed class CurrentUserConsoleTests(RecordApiFixture fixture) : IClassFi
 
     [Theory]
     [InlineData("rita", true)]
-    [InlineData("anna", false)]
+    [InlineData("requester", false)]
     public async Task Console_is_true_only_for_a_person_who_holds_the_operator_role(string user, bool expected)
     {
         await using var factory = fixture.Factory.WithWebHostBuilder(builder => builder.UseSetting("Console:OperatorRole", "reader"));
@@ -21,7 +21,7 @@ public sealed class CurrentUserConsoleTests(RecordApiFixture fixture) : IClassFi
 
     [Theory]
     [InlineData("rita")]
-    [InlineData("anna")]
+    [InlineData("requester")]
     public async Task Console_is_false_for_everyone_when_the_operator_role_is_not_set(string user)
     {
         using var client = fixture.CreateClient().SignedInAs(user);

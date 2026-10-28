@@ -20,7 +20,7 @@ public sealed class ProcessStartLockTests(ProcessStartFixture fixture) : IClassF
     {
         var subject = await fixture.InsertRequestAsync(status: null);
         var firstRelease = await fixture.ActiveReleaseIdAsync();
-        using var client = fixture.CreateClient().SignedInAs("anna");
+        using var client = fixture.CreateClient().SignedInAs("requester");
 
         // The activation takes the start lock exclusively and stops before it commits.
         var reached = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);

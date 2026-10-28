@@ -16,7 +16,7 @@ public sealed class NavigatePathPageTests(RecordApiFixture fixture) : IClassFixt
     [Fact]
     public async Task User_who_reads_the_departments_gets_the_path_action_with_the_record_api_of_each_reference()
     {
-        using var page = await GetPageAsync("anna", "itemlinks");
+        using var page = await GetPageAsync("requester", "itemlinks");
 
         var table = Assert.Single(page.RootElement.GetProperty("widgets").EnumerateArray().ToList());
         Assert.Equal(

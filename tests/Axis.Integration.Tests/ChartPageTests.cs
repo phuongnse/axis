@@ -12,7 +12,7 @@ public sealed class ChartPageTests(RecordApiFixture fixture) : IClassFixture<Rec
     [Fact]
     public async Task User_who_can_run_the_data_source_gets_the_chart_with_its_series_and_no_access()
     {
-        using var page = await GetPageAsync("anna", "itemchart");
+        using var page = await GetPageAsync("requester", "itemchart");
 
         var widget = Assert.Single(page.RootElement.GetProperty("widgets").EnumerateArray().ToList());
         Assert.Equal("chart", widget.GetProperty("type").GetString());
@@ -31,7 +31,7 @@ public sealed class ChartPageTests(RecordApiFixture fixture) : IClassFixture<Rec
     [Fact]
     public async Task Widget_that_is_not_a_chart_has_a_null_chart()
     {
-        using var page = await GetPageAsync("anna", "items");
+        using var page = await GetPageAsync("requester", "items");
 
         var widget = Assert.Single(page.RootElement.GetProperty("widgets").EnumerateArray().ToList());
         Assert.Equal(JsonValueKind.Null, widget.GetProperty("chart").ValueKind);
@@ -65,7 +65,7 @@ public sealed class ChartPageTests(RecordApiFixture fixture) : IClassFixture<Rec
     [Fact]
     public async Task User_who_can_run_the_data_source_gets_the_chart_next_to_the_table()
     {
-        using var page = await GetPageAsync("anna", "itemchartoverview");
+        using var page = await GetPageAsync("requester", "itemchartoverview");
 
         var columns = Assert.Single(page.RootElement.GetProperty("widgets").EnumerateArray().ToList());
         var chart = Assert.Single(columns.GetProperty("columns").EnumerateArray().ToList()[1].GetProperty("widgets").EnumerateArray().ToList());
@@ -77,7 +77,7 @@ public sealed class ChartPageTests(RecordApiFixture fixture) : IClassFixture<Rec
     [Fact]
     public async Task Site_navigation_does_not_list_the_chart_pages()
     {
-        using var site = await GetSiteAsync("anna");
+        using var site = await GetSiteAsync("requester");
 
         Assert.Equal(
             ["Items", "Departments"],

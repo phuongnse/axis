@@ -2,8 +2,8 @@ import { expect, test } from "../test";
 import { csrfHeaders } from "../csrf";
 import { sessionFile } from "../sessions";
 
-// The record API needs a session with a grant, so this journey starts signed in as the employee anna.
-test.use({ storageState: sessionFile("anna") });
+// The record API needs a session with a grant, so this journey starts signed in as the employee requester.
+test.use({ storageState: sessionFile("requester") });
 
 test("the title link opens a note, and saving returns to the table with the edited row", async ({
   page,

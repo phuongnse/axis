@@ -5,7 +5,7 @@
   "formatVersion": 1,
   "now": "2026-10-01T09:00:00Z",
   "users": {
-    "anna": [
+    "requester": [
       "requester"
     ],
     "binh": [
@@ -16,7 +16,7 @@
     {
       "type": "createRecord",
       "entity": "Request",
-      "as": "anna",
+      "as": "requester",
       "save": "request",
       "values": {
         "title": "New laptop",
@@ -35,7 +35,7 @@
       "type": "startProcess",
       "process": "RequestApproval",
       "record": "request",
-      "as": "anna"
+      "as": "requester"
     },
     {
       "type": "expectTask",

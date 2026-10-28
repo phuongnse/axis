@@ -10,7 +10,7 @@ namespace Axis.Integration.Tests;
 /// <summary>
 /// The upload route of a file field, on the FilesApp fixture in tenant A. Its <c>Claim</c> entity has a
 /// <c>receipt</c> file field with a <c>maxSize</c> of 1024 bytes that accepts PDF and any image, and an
-/// <c>attachments</c> child collection whose rows have a <c>file</c> field. <c>anna</c> may create and update
+/// <c>attachments</c> child collection whose rows have a <c>file</c> field. <c>requester</c> may create and update
 /// claims, <c>rita</c> may only read them, and <c>fia</c> may update only their <c>title</c>. FilesApp names the
 /// tenant's <c>Files</c> <c>storage</c> binding, so the bytes of an upload go to <c>axis.file_contents</c>.
 /// </summary>
@@ -59,10 +59,10 @@ public sealed class FileUploadTests(RecordApiFixture fixture) : IClassFixture<Re
     [Fact]
     public async Task A_user_with_an_update_grant_uploads_a_file_that_is_stored_as_pending()
     {
-        using var anna = fixture.CreateClient().SignedInAs("anna");
+        using var requester = fixture.CreateClient().SignedInAs("requester");
         var bytes = Pdf(300);
 
-        using var response = await anna.SendAsync(Upload(Receipt, bytes, "application/pdf", "C:\\scans\\invoice.pdf"), CancellationToken);
+        using var response = await requester.SendAsync(Upload(Receipt, bytes, "application/pdf", "C:\\scans\\invoice.pdf"), CancellationToken);
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
@@ -73,7 +73,7 @@ public sealed class FileUploadTests(RecordApiFixture fixture) : IClassFixture<Re
         Assert.Equal(300, body.RootElement.GetProperty("size").GetInt64());
 
         Assert.Equal("pending", await StoredAsync(id, "state"));
-        Assert.Equal("anna", await StoredAsync(id, "uploaded_by"));
+        Assert.Equal("requester", await StoredAsync(id, "uploaded_by"));
         Assert.Equal("receipt", await StoredAsync(id, "field_path"));
         Assert.Equal("database", await StoredAsync(id, "storage_kind"));
         Assert.Equal("invoice.pdf", await StoredAsync(id, "name"));
@@ -89,10 +89,10 @@ public sealed class FileUploadTests(RecordApiFixture fixture) : IClassFixture<Re
     [Fact]
     public async Task A_field_of_a_child_entity_is_stored_under_its_path()
     {
-        using var anna = fixture.CreateClient().SignedInAs("anna");
+        using var requester = fixture.CreateClient().SignedInAs("requester");
         var bytes = Encoding.UTF8.GetBytes("a note");
 
-        using var response = await anna.SendAsync(Upload(Attachment, bytes, "text/plain", "note.txt"), CancellationToken);
+        using var response = await requester.SendAsync(Upload(Attachment, bytes, "text/plain", "note.txt"), CancellationToken);
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
@@ -104,10 +104,10 @@ public sealed class FileUploadTests(RecordApiFixture fixture) : IClassFixture<Re
     [Fact]
     public async Task A_part_without_a_content_type_is_stored_as_octet_stream_and_the_name_is_cleaned()
     {
-        using var anna = fixture.CreateClient().SignedInAs("anna");
+        using var requester = fixture.CreateClient().SignedInAs("requester");
         var longName = new string('a', 300);
 
-        using var response = await anna.SendAsync(Upload(Attachment, [1, 2, 3], null, $"../etc/{longName}"), CancellationToken);
+        using var response = await requester.SendAsync(Upload(Attachment, [1, 2, 3], null, $"../etc/{longName}"), CancellationToken);
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
@@ -179,9 +179,9 @@ public sealed class FileUploadTests(RecordApiFixture fixture) : IClassFixture<Re
     [InlineData("/api/apps/Missing/entities/Claim/fields/receipt/files")]
     public async Task A_path_that_names_no_file_field_gets_404(string path)
     {
-        using var anna = fixture.CreateClient().SignedInAs("anna");
+        using var requester = fixture.CreateClient().SignedInAs("requester");
 
-        using var response = await anna.SendAsync(Upload(path, Pdf(10), "application/pdf"), CancellationToken);
+        using var response = await requester.SendAsync(Upload(path, Pdf(10), "application/pdf"), CancellationToken);
 
         using (await ReadProblemAsync(response, HttpStatusCode.NotFound))
         {
@@ -191,27 +191,27 @@ public sealed class FileUploadTests(RecordApiFixture fixture) : IClassFixture<Re
     [Fact]
     public async Task A_file_over_the_field_limit_gets_413_and_one_at_the_limit_is_stored()
     {
-        using var anna = fixture.CreateClient().SignedInAs("anna");
+        using var requester = fixture.CreateClient().SignedInAs("requester");
         var before = await FileCountAsync();
 
-        using var over = await anna.SendAsync(Upload(Receipt, Pdf(1025), "application/pdf"), CancellationToken);
+        using var over = await requester.SendAsync(Upload(Receipt, Pdf(1025), "application/pdf"), CancellationToken);
         using (await ReadProblemAsync(over, HttpStatusCode.RequestEntityTooLarge))
         {
         }
 
         Assert.Equal(before, await FileCountAsync());
 
-        using var exact = await anna.SendAsync(Upload(Receipt, Pdf(1024), "application/pdf"), CancellationToken);
+        using var exact = await requester.SendAsync(Upload(Receipt, Pdf(1024), "application/pdf"), CancellationToken);
         Assert.Equal(HttpStatusCode.Created, exact.StatusCode);
     }
 
     [Fact]
     public async Task A_media_type_that_accept_refuses_gets_415()
     {
-        using var anna = fixture.CreateClient().SignedInAs("anna");
+        using var requester = fixture.CreateClient().SignedInAs("requester");
         var before = await FileCountAsync();
 
-        using var response = await anna.SendAsync(Upload(Receipt, Encoding.UTF8.GetBytes("text"), "text/plain", "a.txt"), CancellationToken);
+        using var response = await requester.SendAsync(Upload(Receipt, Encoding.UTF8.GetBytes("text"), "text/plain", "a.txt"), CancellationToken);
 
         using (await ReadProblemAsync(response, HttpStatusCode.UnsupportedMediaType))
         {
@@ -226,11 +226,11 @@ public sealed class FileUploadTests(RecordApiFixture fixture) : IClassFixture<Re
     [InlineData(Attachment, "image/svg+xml")]
     public async Task A_declared_svg_gets_415_whatever_accept_allows(string path, string mediaType)
     {
-        using var anna = fixture.CreateClient().SignedInAs("anna");
+        using var requester = fixture.CreateClient().SignedInAs("requester");
         var before = await FileCountAsync();
         var svg = Encoding.UTF8.GetBytes("<svg xmlns=\"http://www.w3.org/2000/svg\"><script>alert(1)</script></svg>");
 
-        using var response = await anna.SendAsync(Upload(path, svg, mediaType, "a.svg"), CancellationToken);
+        using var response = await requester.SendAsync(Upload(path, svg, mediaType, "a.svg"), CancellationToken);
 
         using (await ReadProblemAsync(response, HttpStatusCode.UnsupportedMediaType))
         {
@@ -242,10 +242,10 @@ public sealed class FileUploadTests(RecordApiFixture fixture) : IClassFixture<Re
     [Fact]
     public async Task A_subtype_wildcard_and_media_type_parameters_are_accepted()
     {
-        using var anna = fixture.CreateClient().SignedInAs("anna");
+        using var requester = fixture.CreateClient().SignedInAs("requester");
         byte[] png = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0, 0];
 
-        using var response = await anna.SendAsync(Upload(Receipt, png, "IMAGE/PNG; charset=binary", "a.png"), CancellationToken);
+        using var response = await requester.SendAsync(Upload(Receipt, png, "IMAGE/PNG; charset=binary", "a.png"), CancellationToken);
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
@@ -259,12 +259,12 @@ public sealed class FileUploadTests(RecordApiFixture fixture) : IClassFixture<Re
     [InlineData(new byte[] { 0x47, 0x49, 0x46, 0x38 }, "application/pdf")]
     public async Task A_file_that_starts_like_an_executable_or_not_like_its_type_gets_415(byte[] bytes, string mediaType)
     {
-        using var anna = fixture.CreateClient().SignedInAs("anna");
+        using var requester = fixture.CreateClient().SignedInAs("requester");
         var before = await FileCountAsync();
 
         // An executable is refused for any declared type, and the attachment field accepts any type.
-        using var attachment = await anna.SendAsync(Upload(Attachment, bytes, mediaType, "invoice.pdf"), CancellationToken);
-        using var receipt = await anna.SendAsync(Upload(Receipt, bytes, "application/pdf", "invoice.pdf"), CancellationToken);
+        using var attachment = await requester.SendAsync(Upload(Attachment, bytes, mediaType, "invoice.pdf"), CancellationToken);
+        using var receipt = await requester.SendAsync(Upload(Receipt, bytes, "application/pdf", "invoice.pdf"), CancellationToken);
 
         using (await ReadProblemAsync(attachment, HttpStatusCode.UnsupportedMediaType))
         {
@@ -280,10 +280,10 @@ public sealed class FileUploadTests(RecordApiFixture fixture) : IClassFixture<Re
     [Fact]
     public async Task A_request_that_is_not_multipart_gets_415()
     {
-        using var anna = fixture.CreateClient().SignedInAs("anna");
+        using var requester = fixture.CreateClient().SignedInAs("requester");
 
-        using var json = await anna.SendAsync(Request(HttpMethod.Post, Receipt, HostA, "{}", "application/json"), CancellationToken);
-        using var noBoundary = await anna.SendAsync(Request(HttpMethod.Post, Receipt, HostA, "x", "multipart/form-data"), CancellationToken);
+        using var json = await requester.SendAsync(Request(HttpMethod.Post, Receipt, HostA, "{}", "application/json"), CancellationToken);
+        using var noBoundary = await requester.SendAsync(Request(HttpMethod.Post, Receipt, HostA, "x", "multipart/form-data"), CancellationToken);
 
         using (await ReadProblemAsync(json, HttpStatusCode.UnsupportedMediaType))
         {
@@ -297,18 +297,18 @@ public sealed class FileUploadTests(RecordApiFixture fixture) : IClassFixture<Re
     [Fact]
     public async Task A_missing_misnamed_nameless_empty_or_extra_part_gets_400()
     {
-        using var anna = fixture.CreateClient().SignedInAs("anna");
+        using var requester = fixture.CreateClient().SignedInAs("requester");
         var before = await FileCountAsync();
 
         var noParts = Request(HttpMethod.Post, Receipt, HostA);
         noParts.Content = new MultipartFormDataContent();
-        using var missing = await anna.SendAsync(noParts, CancellationToken);
-        using var misnamed = await anna.SendAsync(Upload(Receipt, Pdf(10), "application/pdf", "a.pdf", "other"), CancellationToken);
-        using var nameless = await anna.SendAsync(Upload(Receipt, Pdf(10), "application/pdf", null), CancellationToken);
-        using var empty = await anna.SendAsync(Upload(Receipt, [], "application/pdf"), CancellationToken);
+        using var missing = await requester.SendAsync(noParts, CancellationToken);
+        using var misnamed = await requester.SendAsync(Upload(Receipt, Pdf(10), "application/pdf", "a.pdf", "other"), CancellationToken);
+        using var nameless = await requester.SendAsync(Upload(Receipt, Pdf(10), "application/pdf", null), CancellationToken);
+        using var empty = await requester.SendAsync(Upload(Receipt, [], "application/pdf"), CancellationToken);
         var twoParts = Upload(Receipt, Pdf(10), "application/pdf");
         ((MultipartFormDataContent)twoParts.Content!).Add(new ByteArrayContent(Pdf(10)), "file", "second.pdf");
-        using var extra = await anna.SendAsync(twoParts, CancellationToken);
+        using var extra = await requester.SendAsync(twoParts, CancellationToken);
 
         foreach (var response in new[] { missing, misnamed, nameless, empty, extra })
         {

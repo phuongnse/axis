@@ -58,14 +58,14 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
     {
         using var client = CreateClient();
 
-        var signIn = await SignInAsync(client, "anna", "/apps/purchase-requests");
+        var signIn = await SignInAsync(client, "requester", "/apps/purchase-requests");
         var me = await SendAsync(client, HttpMethod.Get, "/api/me");
 
         Assert.Equal("/apps/purchase-requests", signIn.ReturnedTo);
         Assert.Equal(HttpStatusCode.OK, me.StatusCode);
         using var body = JsonDocument.Parse(await me.Content.ReadAsStringAsync(CancellationToken));
-        Assert.Equal("anna", body.RootElement.GetProperty("id").GetString());
-        Assert.Equal("Anna Employee", body.RootElement.GetProperty("displayName").GetString());
+        Assert.Equal("requester", body.RootElement.GetProperty("id").GetString());
+        Assert.Equal("Requester User", body.RootElement.GetProperty("displayName").GetString());
         Assert.Equal(["employee", "requester"], body.RootElement.GetProperty("roles").EnumerateArray().Select(role => role.GetString()).Order(StringComparer.Ordinal));
     }
 
@@ -77,7 +77,7 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
         await using var factory = Factory.WithWebHostBuilder(builder =>
             builder.ConfigureTestServices(services => services.AddSingleton<TimeProvider>(clock)));
         using var client = CreateClient(factory);
-        await SignInAsync(client, "anna", "/");
+        await SignInAsync(client, "requester", "/");
         Assert.Equal(HttpStatusCode.OK, (await SendAsync(client, HttpMethod.Get, "/api/me")).StatusCode);
 
         // Every 30 minutes up to 7 hours 30 minutes after sign-in, so the idle limit never ends the session.
@@ -125,7 +125,7 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
     {
         using var client = CreateClient();
 
-        var signIn = await SignInAsync(client, "anna", "/");
+        var signIn = await SignInAsync(client, "requester", "/");
         await SendAsync(client, HttpMethod.Get, "/api/me");
 
         Assert.NotEmpty(_serverResponses);
@@ -145,8 +145,8 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
         Assert.NotEqual(idBytes, row.IdHash);
         Assert.NotEqual(signIn.SessionCookie, Base64Url.EncodeToString(row.IdHash));
         Assert.NotEqual(sessionId, Base64Url.EncodeToString(row.IdHash));
-        Assert.Equal("anna", row.UserId);
-        Assert.Equal("Anna Employee", row.DisplayName);
+        Assert.Equal("requester", row.UserId);
+        Assert.Equal("Requester User", row.DisplayName);
         Assert.Equal(["employee", "requester"], row.Roles.Order(StringComparer.Ordinal));
         Assert.NotNull(row.AuthenticatedAt);
         Assert.Empty(await ReadSessionsAsync("b"));
@@ -156,7 +156,7 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
     public async Task A_copied_cookie_stops_working_once_the_session_signs_out()
     {
         using var client = CreateClient();
-        var signIn = await SignInAsync(client, "anna", "/");
+        var signIn = await SignInAsync(client, "requester", "/");
         using var cookieless = CreateCookielessClient();
         var copied = signIn.SessionCookie;
         Assert.Equal(HttpStatusCode.OK, (await GetMeWithCookieAsync(cookieless, "localhost", copied)).StatusCode);
@@ -174,8 +174,8 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
     {
         using var client = CreateClient();
 
-        var first = await SignInAsync(client, "anna", "/");
-        var second = await SignInAsync(client, "anna", "/");
+        var first = await SignInAsync(client, "requester", "/");
+        var second = await SignInAsync(client, "requester", "/");
 
         var firstId = ReadSessionId(first.SessionCookie);
         var secondId = ReadSessionId(second.SessionCookie);
@@ -191,7 +191,7 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
     public async Task A_session_taken_to_another_tenants_host_signs_nobody_in()
     {
         using var client = CreateClient();
-        var signIn = await SignInAsync(client, "anna", "/");
+        var signIn = await SignInAsync(client, "requester", "/");
         using var cookieless = CreateCookielessClient();
 
         var sameTenant = await GetMeWithCookieAsync(cookieless, "localhost", signIn.SessionCookie);
@@ -206,7 +206,7 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
     public async Task Sign_out_ends_the_session_and_answers_the_identity_providers_sign_out_address()
     {
         using var client = CreateClient();
-        await SignInAsync(client, "anna", "/");
+        await SignInAsync(client, "requester", "/");
 
         var signOut = await SendAsync(client, HttpMethod.Post, "/api/auth/sign-out");
         var me = await SendAsync(client, HttpMethod.Get, "/api/me");
@@ -224,7 +224,7 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
     public async Task Sign_out_without_the_csrf_header_is_refused_and_keeps_the_session()
     {
         using var client = CreateClient();
-        await SignInAsync(client, "anna", "/");
+        await SignInAsync(client, "requester", "/");
 
         var signOut = await SendAsync(client, HttpMethod.Post, "/api/auth/sign-out", csrfHeader: false);
         var me = await SendAsync(client, HttpMethod.Get, "/api/me");
@@ -239,7 +239,7 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
     public async Task Sign_out_clears_the_sites_cache_and_storage_and_a_refused_sign_out_does_not()
     {
         using var client = CreateClient();
-        await SignInAsync(client, "anna", "/");
+        await SignInAsync(client, "requester", "/");
 
         var refused = await SendAsync(client, HttpMethod.Post, "/api/auth/sign-out", csrfHeader: false);
 
@@ -257,11 +257,11 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
     {
         using var client = CreateClient();
 
-        await SignInAsync(client, "anna", "/");
+        await SignInAsync(client, "requester", "/");
 
         var record = Assert.Single(await ReadAuditAsync("a", "session.signedIn"));
-        Assert.Equal("anna", record.Actor);
-        Assert.Equal("Anna Employee", record.ActorName);
+        Assert.Equal("requester", record.Actor);
+        Assert.Equal("Requester User", record.ActorName);
         Assert.Null(record.ApplicationId);
         using var details = JsonDocument.Parse(record.Details);
         Assert.Equal(ClientAddress, details.RootElement.GetProperty("clientAddress").GetString());
@@ -273,7 +273,7 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
     public async Task Sign_out_writes_one_audit_record_and_a_refused_sign_out_writes_none()
     {
         using var client = CreateClient();
-        await SignInAsync(client, "anna", "/");
+        await SignInAsync(client, "requester", "/");
 
         var refused = await SendAsync(client, HttpMethod.Post, "/api/auth/sign-out", csrfHeader: false);
 
@@ -284,8 +284,8 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
 
         Assert.Equal(HttpStatusCode.OK, signOut.StatusCode);
         var record = Assert.Single(await ReadAuditAsync("a", "session.signedOut"));
-        Assert.Equal("anna", record.Actor);
-        Assert.Equal("Anna Employee", record.ActorName);
+        Assert.Equal("requester", record.Actor);
+        Assert.Equal("Requester User", record.ActorName);
         using var details = JsonDocument.Parse(record.Details);
         Assert.Equal(ClientAddress, details.RootElement.GetProperty("clientAddress").GetString());
     }
@@ -362,7 +362,7 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
         // Tenant a reads the user id from a claim that Keycloak's token lacks, so the token is rejected.
         using var factory = Factory.WithWebHostBuilder(builder => builder.UseSetting("Tenants:a:Oidc:Claims:UserId", "axis_missing_claim"));
         using var client = CreateClient(factory);
-        var callbackPath = await LoginAtKeycloakAsync(client, "anna", returnUrl: null);
+        var callbackPath = await LoginAtKeycloakAsync(client, "requester", returnUrl: null);
 
         var callback = await SendAsync(client, HttpMethod.Get, callbackPath);
 
@@ -380,7 +380,7 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
         using var provider = new ProviderRewriteHandler();
         await using var factory = FactoryWith(provider);
         using var client = CreateClient(factory);
-        var callbackPath = await LoginAtKeycloakAsync(client, "anna", returnUrl: null, authorize => ReplaceQueryValue(authorize, "nonce", Base64Url.EncodeToString(RandomNumberGenerator.GetBytes(32))));
+        var callbackPath = await LoginAtKeycloakAsync(client, "requester", returnUrl: null, authorize => ReplaceQueryValue(authorize, "nonce", Base64Url.EncodeToString(RandomNumberGenerator.GetBytes(32))));
 
         var callback = await SendAsync(client, HttpMethod.Get, callbackPath);
 
@@ -397,7 +397,7 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
         using var provider = new ProviderRewriteHandler(editMetadata: metadata => metadata["issuer"] = "http://impostor.example.test/realms/axis");
         await using var factory = FactoryWith(provider);
         using var client = CreateClient(factory);
-        var callbackPath = await LoginAtKeycloakAsync(client, "anna", returnUrl: null);
+        var callbackPath = await LoginAtKeycloakAsync(client, "requester", returnUrl: null);
 
         var callback = await SendAsync(client, HttpMethod.Get, callbackPath);
 
@@ -415,7 +415,7 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
         using var provider = new ProviderRewriteHandler(editIdToken: claims => claims["aud"] = "another-client");
         await using var factory = FactoryWith(provider);
         using var client = CreateClient(factory);
-        var callbackPath = await LoginAtKeycloakAsync(client, "anna", returnUrl: null);
+        var callbackPath = await LoginAtKeycloakAsync(client, "requester", returnUrl: null);
 
         var callback = await SendAsync(client, HttpMethod.Get, callbackPath);
 
@@ -434,7 +434,7 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
         await using var factory = FactoryWith(provider);
         using var client = CreateClient(factory);
 
-        await SignInAsync(client, "anna", "/");
+        await SignInAsync(client, "requester", "/");
 
         Assert.Equal(HttpStatusCode.OK, (await SendAsync(client, HttpMethod.Get, "/api/me")).StatusCode);
         Assert.Single(await ReadSessionsAsync("a"));
@@ -444,7 +444,7 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
     public async Task No_audit_record_holds_a_token_the_session_cookie_or_the_user_agent()
     {
         using var client = CreateClient();
-        var signIn = await SignInAsync(client, "anna", "/");
+        var signIn = await SignInAsync(client, "requester", "/");
         await SendAsync(client, HttpMethod.Post, "/api/auth/sign-out");
 
         foreach (var tenant in new[] { "a", "b" })
@@ -470,12 +470,12 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
     {
         using var client = CreateClient();
 
-        await SignInAsync(client, "anna", "/");
+        await SignInAsync(client, "requester", "/");
 
         var profile = Assert.Single(await ReadProfilesAsync("a"));
-        Assert.Equal("anna", profile.UserId);
-        Assert.Equal("Anna Employee", profile.DisplayName);
-        Assert.Equal("anna@axis.local", profile.Email);
+        Assert.Equal("requester", profile.UserId);
+        Assert.Equal("Requester User", profile.DisplayName);
+        Assert.Equal("requester@axis.local", profile.Email);
         Assert.Equal("vi", profile.Locale);
         Assert.True(profile.FirstSignedInAt <= profile.LastSignedInAt);
         Assert.Empty(await ReadProfilesAsync("b"));
@@ -486,19 +486,19 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
     {
         using (var first = CreateClient())
         {
-            await SignInAsync(first, "anna", "/");
+            await SignInAsync(first, "requester", "/");
         }
 
         var before = Assert.Single(await ReadProfilesAsync("a"));
         await using var otherName = Factory.WithWebHostBuilder(builder => builder.UseSetting("Tenants:a:Oidc:Claims:DisplayName", "given_name"));
         using (var second = CreateClient(otherName))
         {
-            await SignInAsync(second, "anna", "/");
+            await SignInAsync(second, "requester", "/");
         }
 
         var after = Assert.Single(await ReadProfilesAsync("a"));
-        Assert.Equal("Anna Employee", before.DisplayName);
-        Assert.Equal("Anna", after.DisplayName);
+        Assert.Equal("Requester User", before.DisplayName);
+        Assert.Equal("Requester", after.DisplayName);
         Assert.Equal(before.FirstSignedInAt, after.FirstSignedInAt);
         Assert.True(after.LastSignedInAt > before.LastSignedInAt);
     }
@@ -513,12 +513,12 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
         }))
         {
             using var client = CreateClient(named);
-            await SignInAsync(client, "anna", "/");
+            await SignInAsync(client, "requester", "/");
         }
 
         var stored = Assert.Single(await ReadProfilesAsync("a"));
-        Assert.Equal("anna", stored.Email);
-        Assert.Equal("Anna", stored.Locale);
+        Assert.Equal("requester", stored.Email);
+        Assert.Equal("Requester", stored.Locale);
 
         await using var missing = Factory.WithWebHostBuilder(builder =>
         {
@@ -527,13 +527,13 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
         });
         using (var client = CreateClient(missing))
         {
-            await SignInAsync(client, "anna", "/");
+            await SignInAsync(client, "requester", "/");
         }
 
         var cleared = Assert.Single(await ReadProfilesAsync("a"));
         Assert.Null(cleared.Email);
         Assert.Null(cleared.Locale);
-        Assert.Equal("Anna Employee", cleared.DisplayName);
+        Assert.Equal("Requester User", cleared.DisplayName);
     }
 
     [Fact]
@@ -551,7 +551,7 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
             builder.ConfigureLogging(logging => logging.SetMinimumLevel(LogLevel.Trace).AddProvider(logs)));
         using var client = CreateClient(host);
 
-        var signIn = await SignInAsync(client, "anna", "/apps/purchase-requests");
+        var signIn = await SignInAsync(client, "requester", "/apps/purchase-requests");
         var me = await SendAsync(client, HttpMethod.Get, "/api/me");
 
         Assert.Equal("/apps/purchase-requests", signIn.ReturnedTo);
@@ -559,7 +559,7 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
         Assert.Single(await ReadAuditAsync("a", "session.signedIn"));
         var warning = Assert.Single(logs.Entries, entry => entry.Contains("The profile of the signed-in user could not be written.", StringComparison.Ordinal));
         Assert.StartsWith("Warning:", warning, StringComparison.Ordinal);
-        Assert.DoesNotContain("anna@axis.local", warning, StringComparison.Ordinal);
+        Assert.DoesNotContain("requester@axis.local", warning, StringComparison.Ordinal);
     }
 
     public async ValueTask InitializeAsync()

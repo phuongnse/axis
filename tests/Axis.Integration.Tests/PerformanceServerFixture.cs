@@ -17,9 +17,9 @@ namespace Axis.Integration.Tests;
 /// <summary>
 /// One tenant database, <c>a</c>, with the configuration and data migrations applied and one fixture
 /// application activated, served by the real server on host <c>a.example.test</c>. The test
-/// authentication scheme signs in <c>anna</c> with one role. A subclass names the application folder
+/// authentication scheme signs in <c>requester</c> with one role. A subclass names the application folder
 /// and the role, and may seed rows once the application is active. <see cref="Client"/> is signed in as
-/// <c>anna</c>.
+/// <c>requester</c>.
 /// </summary>
 public abstract class PerformanceServerFixture(string application, string role) : IAsyncLifetime
 {
@@ -78,9 +78,9 @@ public abstract class PerformanceServerFixture(string application, string role) 
             builder.UseSetting("Tenants:a:ConnectionString", PostgreSqlServer.RuntimeConnectionString(connectionString));
             builder.UseSetting("Tenants:a:SchemaConnectionString", connectionString);
             builder.UseTestOidc("a");
-            builder.UseTestAuthentication(new TestIdentity("anna", "Anna Analyst", role));
+            builder.UseTestAuthentication(new TestIdentity("requester", "Requester User", role));
         });
-        _client = _factory.CreateClient().SignedInAs("anna");
+        _client = _factory.CreateClient().SignedInAs("requester");
     }
 
     public async ValueTask DisposeAsync()

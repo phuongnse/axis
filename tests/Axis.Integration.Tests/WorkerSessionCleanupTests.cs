@@ -127,7 +127,7 @@ public sealed class WorkerSessionCleanupTests(PostgreSqlFixture database) : ICla
         await using var command = dataSource.CreateCommand(
             """
             INSERT INTO axis.sessions (id_hash, user_id, display_name, roles, signed_in_at, last_request_at)
-            VALUES (@hash, 'anna', 'Anna Employee', '{employee}', @signedIn, @lastRequest)
+            VALUES (@hash, 'requester', 'Requester User', '{employee}', @signedIn, @lastRequest)
             """);
         command.Parameters.AddWithValue("hash", hash);
         command.Parameters.AddWithValue("signedIn", signedInAt);

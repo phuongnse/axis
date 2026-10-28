@@ -4,9 +4,9 @@ import { csrfHeaders } from '../csrf'
 import { sessionFile, useSession } from '../sessions'
 import { expectShown, fieldValue } from '../fields'
 
-// The employee anna may create, update and submit purchase requests. The department manager chau
+// The employee requester may create, update and submit purchase requests. The department manager chau
 // may only read them and holds no start grant, so the pages hide what chau may not do.
-test.use({ storageState: sessionFile('anna') })
+test.use({ storageState: sessionFile('requester') })
 
 // Specs run in parallel against one database, so each test looks only at the request it creates.
 const appPath = '/api/apps/PurchaseRequests'

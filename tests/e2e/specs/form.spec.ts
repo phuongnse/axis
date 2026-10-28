@@ -7,8 +7,8 @@ import { pickOption } from '../select'
 import { sessionFile, useSession } from '../sessions'
 import { chooseTheme } from '../shell'
 
-// The record API needs a session with a grant, so these journeys start signed in as the employee anna.
-test.use({ storageState: sessionFile('anna') })
+// The record API needs a session with a grant, so these journeys start signed in as the employee requester.
+test.use({ storageState: sessionFile('requester') })
 
 // Specs run in parallel against one database, so these tests rely only on the records they create,
 // and fewer than one hundred notes in all for the list check.

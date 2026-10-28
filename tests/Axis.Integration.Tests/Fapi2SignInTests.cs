@@ -58,12 +58,12 @@ public sealed partial class Fapi2SignInTests(KeycloakFixture keycloak, PostgreSq
         await using var _ = factory;
         using var client = CreateClient(factory, _fapiAddress);
 
-        var callback = await LogInAtKeycloakAsync(client, authority, "anna", _fapiAddress, par: true);
+        var callback = await LogInAtKeycloakAsync(client, authority, "requester", _fapiAddress, par: true);
         using var signedIn = await SendAsync(client, callback.PathAndQuery);
 
         Assert.Equal(HttpStatusCode.Found, signedIn.StatusCode);
         Assert.Contains(signedIn.Headers.GetValues("Set-Cookie"), cookie => cookie.StartsWith($"{Session.Scheme}=", StringComparison.Ordinal));
-        Assert.Equal("anna", await MeAsync(client));
+        Assert.Equal("requester", await MeAsync(client));
         var fapi = calls["fapi"].Calls;
         var par = Assert.Single(fapi, call => call.Url.EndsWith(ParPath, StringComparison.Ordinal));
         Assert.Equal(HttpMethod.Post, par.Method);
@@ -114,7 +114,7 @@ public sealed partial class Fapi2SignInTests(KeycloakFixture keycloak, PostgreSq
         var (factory, calls, _, databases) = await StartConfigurationHostAsync(authority);
         await using var _ = factory;
         using var client = CreateClient(factory, _fapiAddress);
-        var callback = await LogInAtKeycloakAsync(client, authority, "anna", _fapiAddress, par: true);
+        var callback = await LogInAtKeycloakAsync(client, authority, "requester", _fapiAddress, par: true);
 
         using var refused = await SendAsync(client, WithIssuer(callback, issuer).PathAndQuery);
 
@@ -178,11 +178,11 @@ public sealed partial class Fapi2SignInTests(KeycloakFixture keycloak, PostgreSq
         });
         using var client = CreateClient(factory, _fapiAddress);
 
-        var callback = await LogInAtKeycloakAsync(client, authority, "anna", _fapiAddress, par: true);
+        var callback = await LogInAtKeycloakAsync(client, authority, "requester", _fapiAddress, par: true);
         using var signedIn = await SendAsync(client, callback.PathAndQuery);
 
         Assert.Equal(HttpStatusCode.Found, signedIn.StatusCode);
-        Assert.Equal("anna", await MeAsync(client));
+        Assert.Equal("requester", await MeAsync(client));
         var assertions = recorder.Calls.Where(call => call.Form.ContainsKey("client_assertion")).Select(call => call.Form["client_assertion"]).ToList();
         Assert.True(assertions.Count >= 2, "The PAR request and the token request each carry an assertion.");
         Assert.All(assertions, assertion => Assert.Equal("key-2", new JsonWebToken(assertion).Kid));
@@ -276,11 +276,11 @@ public sealed partial class Fapi2SignInTests(KeycloakFixture keycloak, PostgreSq
         var before = recorder.Calls.Count;
         using var client = CreateClient(factory, _fapiAddress);
 
-        var callback = await LogInAtKeycloakAsync(client, authority, "anna", _fapiAddress, par: true);
+        var callback = await LogInAtKeycloakAsync(client, authority, "requester", _fapiAddress, par: true);
         using var signedIn = await SendAsync(client, callback.PathAndQuery);
 
         Assert.Equal(HttpStatusCode.Found, signedIn.StatusCode);
-        Assert.Equal("anna", await MeAsync(client));
+        Assert.Equal("requester", await MeAsync(client));
         var assertions = recorder.Calls.Skip(before).Where(call => call.Form.ContainsKey("client_assertion")).Select(call => call.Form["client_assertion"]).ToList();
         Assert.True(assertions.Count >= 2, "The PAR request and the token request each carry an assertion.");
         Assert.All(assertions, assertion => Assert.Equal(keyId, new JsonWebToken(assertion).Kid));

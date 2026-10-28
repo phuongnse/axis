@@ -4,8 +4,8 @@ import { csrfHeaders } from '../csrf'
 import { sessionFile, useSession } from '../sessions'
 import { chooseTheme } from '../shell'
 
-// The record API needs a session with a grant, so these journeys start signed in as the employee anna.
-test.use({ storageState: sessionFile('anna') })
+// The record API needs a session with a grant, so these journeys start signed in as the employee requester.
+test.use({ storageState: sessionFile('requester') })
 
 // Specs run in parallel against one database, so this test looks only for the task it starts.
 test('the manager a task is assigned to sees it in the inbox in light and dark mode, and another user does not', async ({
@@ -50,11 +50,11 @@ test('the manager a task is assigned to sees it in the inbox in light and dark m
     await expect(themedRow.getByRole('cell', { name: title, exact: true })).toBeVisible()
   }
 
-  // A new context has its own cookies, so Anna's session does not change the manager's.
-  const otherContext = await browser.newContext({ baseURL, storageState: sessionFile('anna') })
+  // A new context has its own cookies, so the requester's session does not change the manager's.
+  const otherContext = await browser.newContext({ baseURL, storageState: sessionFile('requester') })
   const other = await otherContext.newPage()
   await other.goto('/e2e/tasks')
-  await expect(other.getByRole('banner').getByRole('button', { name: 'Anna Employee', exact: true })).toBeVisible()
+  await expect(other.getByRole('banner').getByRole('button', { name: 'Requester User', exact: true })).toBeVisible()
   await expect(other.getByRole('main').getByText('No open tasks.', { exact: true })).toBeVisible()
   await expect(other.getByText(new RegExp(title, 'i'))).toHaveCount(0)
   await otherContext.close()

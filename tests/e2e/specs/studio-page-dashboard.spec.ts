@@ -159,8 +159,8 @@ test.describe('Studio builds a dashboard page with a KPI and a chart', () => {
 
     const sites = await readdir(path.join(folder, 'sites'))
     const site = JSON.parse(await readFile(path.join(folder, 'sites', sites[0]), 'utf8')) as { path: string }
-    // Anna holds the requester role, whose policy reads both data sources.
-    await useSession(page, 'anna')
+    // The requester holds the requester role, whose policy reads both data sources.
+    await useSession(page, 'requester')
     await page.goto(`${server.url}/${site.path}/dashboard`)
     await expect(page.getByTestId('kpi-tile')).toContainText(`Requests ${stamp}`)
     await expect(page.getByTestId('chart-widget')).toContainText(`By status ${stamp}`)

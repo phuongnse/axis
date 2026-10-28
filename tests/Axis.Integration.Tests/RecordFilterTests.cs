@@ -59,8 +59,8 @@ public sealed class RecordFilterTests(RecordApiFixture fixture) : IClassFixture<
         await AssertProblemAsync(await SendAsync(fern, "GET", $"{Items}/{unset:D}/history"), HttpStatusCode.NotFound, NotFoundTitle);
 
         // The record exists: a user with an unfiltered read grant reads it.
-        using var anna = await SendAsync(fixture.Client, "GET", $"{Items}/{unset:D}");
-        Assert.Equal(HttpStatusCode.OK, anna.StatusCode);
+        using var requester = await SendAsync(fixture.Client, "GET", $"{Items}/{unset:D}");
+        Assert.Equal(HttpStatusCode.OK, requester.StatusCode);
     }
 
     [Fact]
@@ -186,7 +186,7 @@ public sealed class RecordFilterTests(RecordApiFixture fixture) : IClassFixture<
     public async Task A_user_id_with_sql_text_is_a_parameter_and_matches_no_record()
     {
         await fixture.ResetAsync();
-        var annas = await InsertTicketAsync("Printer", "anna");
+        var annas = await InsertTicketAsync("Printer", "requester");
         var ferns = await InsertTicketAsync("Shelf", "fern");
         using var mallory = fixture.CreateClient().SignedInAs(SqlTextUser);
         using var fern = fixture.CreateClient().SignedInAs("fern");

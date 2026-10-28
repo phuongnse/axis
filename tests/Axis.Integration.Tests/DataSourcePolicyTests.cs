@@ -134,7 +134,7 @@ public sealed class DataSourcePolicyTests(RecordApiFixture fixture) : IClassFixt
 
         // A day in the past, inserted directly, because the ticket validation refuses a past due time.
         var past = DateTimeOffset.UtcNow.AddDays(-1).ToString("O", CultureInfo.InvariantCulture);
-        await fixture.InsertAsync(TenantA, "Ticket", new Dictionary<string, string?> { ["title"] = "Printer", ["dueAt"] = past, ["requester"] = "anna" });
+        await fixture.InsertAsync(TenantA, "Ticket", new Dictionary<string, string?> { ["title"] = "Printer", ["dueAt"] = past, ["requester"] = "requester" });
         var ferns = await fixture.InsertAsync(
             TenantA, "Ticket", new Dictionary<string, string?> { ["title"] = "Shelf", ["dueAt"] = past, ["requester"] = "fern" });
         using var mallory = fixture.CreateClient().SignedInAs(SqlTextUser);

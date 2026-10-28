@@ -12,7 +12,7 @@ public sealed class DetailPageTests(RecordApiFixture fixture) : IClassFixture<Re
     [Fact]
     public async Task User_with_full_access_gets_the_detail_with_its_record_parameter_form_and_access()
     {
-        using var page = await GetPageAsync("anna", "orderdetail");
+        using var page = await GetPageAsync("requester", "orderdetail");
 
         Assert.Equal("OrderDetail", page.RootElement.GetProperty("name").GetString());
         var widget = Assert.Single(page.RootElement.GetProperty("widgets").EnumerateArray().ToList());
@@ -39,7 +39,7 @@ public sealed class DetailPageTests(RecordApiFixture fixture) : IClassFixture<Re
     [Fact]
     public async Task Widget_that_is_not_a_detail_has_a_null_detail()
     {
-        using var page = await GetPageAsync("anna", "items");
+        using var page = await GetPageAsync("requester", "items");
 
         var widget = Assert.Single(page.RootElement.GetProperty("widgets").EnumerateArray().ToList());
         Assert.Equal(JsonValueKind.Null, widget.GetProperty("detail").ValueKind);
@@ -81,7 +81,7 @@ public sealed class DetailPageTests(RecordApiFixture fixture) : IClassFixture<Re
     [Fact]
     public async Task Site_navigation_does_not_list_the_detail_page()
     {
-        using var client = fixture.CreateClient().SignedInAs("anna");
+        using var client = fixture.CreateClient().SignedInAs("requester");
         using var request = Request("/api/sites/records", HostA);
         using var response = await client.SendAsync(request, CancellationToken);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);

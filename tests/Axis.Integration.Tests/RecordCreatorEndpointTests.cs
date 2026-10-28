@@ -19,12 +19,12 @@ public sealed class RecordCreatorEndpointTests(RecordApiFixture fixture) : IClas
     public async Task Create_sets_the_creator_field_to_the_signed_in_user_and_is_refused_without_a_session()
     {
         await fixture.ResetAsync();
-        using var anna = fixture.CreateClient().SignedInAs("anna");
+        using var requester = fixture.CreateClient().SignedInAs("requester");
 
-        using var annas = await PostAsync(anna, """{ "title": "Anna's" }""", HttpStatusCode.Created);
-        Assert.Equal("anna", Requester(annas));
+        using var annas = await PostAsync(requester, """{ "title": "Requester's" }""", HttpStatusCode.Created);
+        Assert.Equal("requester", Requester(annas));
         using var annasRead = await GetJsonAsync(Id(annas));
-        Assert.Equal("anna", Requester(annasRead));
+        Assert.Equal("requester", Requester(annasRead));
 
         // A create without a session is refused, so no record is ever created without a creator.
         using var signedOut = fixture.CreateClient();
@@ -36,25 +36,25 @@ public sealed class RecordCreatorEndpointTests(RecordApiFixture fixture) : IClas
     public async Task Body_that_sets_the_creator_field_is_400_at_that_field_and_writes_nothing()
     {
         await fixture.ResetAsync();
-        using var anna = fixture.CreateClient().SignedInAs("anna");
+        using var requester = fixture.CreateClient().SignedInAs("requester");
 
-        using var create = await PostAsync(anna, """{ "title": "Set", "requester": "x" }""", HttpStatusCode.BadRequest);
+        using var create = await PostAsync(requester, """{ "title": "Set", "requester": "x" }""", HttpStatusCode.BadRequest);
         Assert.Equal([("/values/requester", "Cannot be set.")], Errors(create));
-        using var createNull = await PostAsync(anna, """{ "title": "Set", "requester": null }""", HttpStatusCode.BadRequest);
+        using var createNull = await PostAsync(requester, """{ "title": "Set", "requester": null }""", HttpStatusCode.BadRequest);
         Assert.Equal([("/values/requester", "Cannot be set.")], Errors(createNull));
         Assert.Equal(0, (await fixture.TableShapeAsync(TenantA, "Ticket")).RowCount);
 
-        using var created = await PostAsync(anna, """{ "title": "Kept" }""", HttpStatusCode.Created);
+        using var created = await PostAsync(requester, """{ "title": "Kept" }""", HttpStatusCode.Created);
         var id = Id(created);
 
-        using var update = await PatchAsync(anna, id, """{ "version": 1, "values": { "requester": "binh" } }""");
+        using var update = await PatchAsync(requester, id, """{ "version": 1, "values": { "requester": "binh" } }""");
         Assert.Equal([("/values/requester", "Cannot be set.")], Errors(update));
-        using var updateNull = await PatchAsync(anna, id, """{ "version": 1, "values": { "requester": null } }""");
+        using var updateNull = await PatchAsync(requester, id, """{ "version": 1, "values": { "requester": null } }""");
         Assert.Equal([("/values/requester", "Cannot be set.")], Errors(updateNull));
 
         using var read = await GetJsonAsync(id);
         Assert.Equal(1, read.RootElement.GetProperty("version").GetInt64());
-        Assert.Equal("anna", Requester(read));
+        Assert.Equal("requester", Requester(read));
     }
 
     private static string Id(JsonDocument record) => record.RootElement.GetProperty("id").GetString()!;

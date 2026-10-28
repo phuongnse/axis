@@ -97,7 +97,7 @@ public sealed class QueryPlanPerformanceTests(ProcessStepFixture fixture) : ICla
             $"""
             INSERT INTO axis.audit_records
                 (id, occurred_at, actor, action, application_id, entity_id, record_id, process_instance_id, details)
-            SELECT gen_random_uuid(), now() - n * interval '1 second', 'anna', '{AuditActions.RecordUpdated}', @application,
+            SELECT gen_random_uuid(), now() - n * interval '1 second', 'requester', '{AuditActions.RecordUpdated}', @application,
                    @entity, (@records::uuid[])[n % {AuditedRecords} + 1], NULL, jsonb_build_object()
             FROM generate_series(1, {AuditRecordCount}) AS n
             """))

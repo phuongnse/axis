@@ -62,7 +62,7 @@ public sealed class RecordDeleteRunningProcessTests(ProcessStartFixture fixture)
     {
         var subject = await fixture.InsertRequestAsync(status: null);
         await fixture.InsertInstanceAsync(subject);
-        using var client = fixture.CreateClient().SignedInAs("anna");
+        using var client = fixture.CreateClient().SignedInAs("requester");
 
         using var response = await DeleteAsync(client, subject);
 

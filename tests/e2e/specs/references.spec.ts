@@ -4,8 +4,8 @@ import { csrfHeaders } from '../csrf'
 import { waitForDialog } from '../dialogs'
 import { sessionFile } from '../sessions'
 
-// The record API needs a session with a grant, so this journey starts signed in as the employee anna.
-test.use({ storageState: sessionFile('anna') })
+// The record API needs a session with a grant, so this journey starts signed in as the employee requester.
+test.use({ storageState: sessionFile('requester') })
 
 // Specs run in parallel against one database, so this test relies only on the records it creates.
 async function createRecord(request: APIRequestContext, entity: string, values: Record<string, unknown>) {

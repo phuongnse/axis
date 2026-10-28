@@ -19,7 +19,7 @@ namespace Axis.Integration.Tests;
 /// <summary>The scenario runner against a real PostgreSQL server, one temporary database per scenario.</summary>
 public sealed class ScenarioRunnerTests
 {
-    private const string Clerk = """{ "anna": ["clerk"] }""";
+    private const string Clerk = """{ "requester": ["clerk"] }""";
     private const string Reader = """{ "rita": ["reader"] }""";
 
     private static readonly Lazy<PackageCatalog> _packages = new(() => PackageCatalog.Load(SamplePackages.Path));
@@ -30,9 +30,9 @@ public sealed class ScenarioRunnerTests
     public async Task A_scenario_that_creates_updates_and_expects_a_record_passes_and_drops_its_database()
     {
         using var folder = Application(Scenario("CreateAndUpdate", Clerk, """
-            { "type": "createRecord", "entity": "Note", "as": "anna", "save": "note", "values": { "title": "Desk", "quantity": 3 } },
+            { "type": "createRecord", "entity": "Note", "as": "requester", "save": "note", "values": { "title": "Desk", "quantity": 3 } },
             { "type": "expectRecord", "record": "note", "values": { "title": "Desk", "quantity": 3 } },
-            { "type": "updateRecord", "record": "note", "as": "anna", "values": { "title": "Desk", "quantity": 5 } },
+            { "type": "updateRecord", "record": "note", "as": "requester", "values": { "title": "Desk", "quantity": 5 } },
             { "type": "expectRecord", "record": "note", "values": { "quantity": 5.0 } }
             """));
 
@@ -47,8 +47,8 @@ public sealed class ScenarioRunnerTests
     public async Task An_expectation_that_differs_fails_with_the_step_the_field_and_both_values_and_drops_the_database()
     {
         using var folder = Application(Scenario("Mismatch", Clerk, """
-            { "type": "createRecord", "entity": "Note", "as": "anna", "save": "note", "values": { "title": "Desk", "quantity": 3 } },
-            { "type": "updateRecord", "record": "note", "as": "anna", "values": { "title": "Desk", "quantity": 4 } },
+            { "type": "createRecord", "entity": "Note", "as": "requester", "save": "note", "values": { "title": "Desk", "quantity": 3 } },
+            { "type": "updateRecord", "record": "note", "as": "requester", "values": { "title": "Desk", "quantity": 4 } },
             { "type": "expectRecord", "record": "note", "values": { "title": "Desk", "quantity": 3 } }
             """));
 
@@ -87,8 +87,8 @@ public sealed class ScenarioRunnerTests
     public async Task A_failing_third_step_reports_its_index_and_its_message_without_the_step_prefix()
     {
         using var folder = Application(Scenario("ThirdStep", Clerk, """
-            { "type": "createRecord", "entity": "Note", "as": "anna", "save": "note", "values": { "title": "Desk", "quantity": 3 } },
-            { "type": "updateRecord", "record": "note", "as": "anna", "values": { "title": "Desk", "quantity": 4 } },
+            { "type": "createRecord", "entity": "Note", "as": "requester", "save": "note", "values": { "title": "Desk", "quantity": 3 } },
+            { "type": "updateRecord", "record": "note", "as": "requester", "values": { "title": "Desk", "quantity": 4 } },
             { "type": "expectRecord", "record": "note", "values": { "title": "Desk", "quantity": 3 } }
             """));
 
@@ -109,7 +109,7 @@ public sealed class ScenarioRunnerTests
     public async Task A_scenario_of_an_application_that_does_not_compile_reports_no_step()
     {
         using var folder = Application(Scenario("Broken", Clerk, """
-            { "type": "createRecord", "entity": "Missing", "as": "anna", "values": { "title": "Desk" } }
+            { "type": "createRecord", "entity": "Missing", "as": "requester", "values": { "title": "Desk" } }
             """));
 
         var result = await RunAsync(folder, "Broken");
@@ -141,7 +141,7 @@ public sealed class ScenarioRunnerTests
     {
         using var folder = Application(Scenario("Rows", Clerk, """
             {
-              "type": "createRecord", "entity": "Note", "as": "anna", "save": "note",
+              "type": "createRecord", "entity": "Note", "as": "requester", "save": "note",
               "values": {
                 "title": "Desk",
                 "dueAt": "2026-10-01T09:00:00+02:00",
@@ -167,11 +167,11 @@ public sealed class ScenarioRunnerTests
     {
         using var folder = Application(
             Scenario("Row", Clerk, """
-                { "type": "createRecord", "entity": "Note", "as": "anna", "save": "note", "values": { "title": "Desk", "lines": [{ "text": "Leg", "price": 12.5 }] } },
+                { "type": "createRecord", "entity": "Note", "as": "requester", "save": "note", "values": { "title": "Desk", "lines": [{ "text": "Leg", "price": 12.5 }] } },
                 { "type": "expectRecord", "record": "note", "values": { "lines": [{ "text": "Top" }] } }
                 """),
             Scenario("Count", Clerk, """
-                { "type": "createRecord", "entity": "Note", "as": "anna", "save": "note", "values": { "title": "Desk", "lines": [{ "text": "Leg" }] } },
+                { "type": "createRecord", "entity": "Note", "as": "requester", "save": "note", "values": { "title": "Desk", "lines": [{ "text": "Leg" }] } },
                 { "type": "expectRecord", "record": "note", "values": { "lines": [] } }
                 """));
 
@@ -199,10 +199,10 @@ public sealed class ScenarioRunnerTests
     {
         using var folder = Application(
             Scenario("RightPath", Clerk, """
-                { "type": "createRecord", "entity": "Note", "as": "anna", "values": { "quantity": 1 }, "expect": { "invalid": "title" } }
+                { "type": "createRecord", "entity": "Note", "as": "requester", "values": { "quantity": 1 }, "expect": { "invalid": "title" } }
                 """),
             Scenario("WrongPath", Clerk, """
-                { "type": "createRecord", "entity": "Note", "as": "anna", "values": { "quantity": 1 }, "expect": { "invalid": "quantity" } }
+                { "type": "createRecord", "entity": "Note", "as": "requester", "values": { "quantity": 1 }, "expect": { "invalid": "quantity" } }
                 """));
 
         var right = await RunAsync(folder, "RightPath");
@@ -219,8 +219,8 @@ public sealed class ScenarioRunnerTests
     public async Task A_second_create_with_the_same_unique_value_passes_with_expect_conflict()
     {
         using var folder = Application(Scenario("Conflict", Clerk, """
-            { "type": "createRecord", "entity": "Note", "as": "anna", "values": { "title": "Desk", "code": "A-1" } },
-            { "type": "createRecord", "entity": "Note", "as": "anna", "values": { "title": "Chair", "code": "A-1" }, "expect": "conflict" }
+            { "type": "createRecord", "entity": "Note", "as": "requester", "values": { "title": "Desk", "code": "A-1" } },
+            { "type": "createRecord", "entity": "Note", "as": "requester", "values": { "title": "Chair", "code": "A-1" }, "expect": "conflict" }
             """));
 
         var result = await RunAsync(folder, "Conflict");
@@ -232,10 +232,10 @@ public sealed class ScenarioRunnerTests
     public async Task An_update_and_a_delete_of_a_deleted_record_pass_with_expect_not_found()
     {
         using var folder = Application(Scenario("Gone", Clerk, """
-            { "type": "createRecord", "entity": "Note", "as": "anna", "save": "note", "values": { "title": "Desk" } },
-            { "type": "deleteRecord", "record": "note", "as": "anna" },
-            { "type": "updateRecord", "record": "note", "as": "anna", "values": { "title": "Chair" }, "expect": "notFound" },
-            { "type": "deleteRecord", "record": "note", "as": "anna", "expect": "notFound" }
+            { "type": "createRecord", "entity": "Note", "as": "requester", "save": "note", "values": { "title": "Desk" } },
+            { "type": "deleteRecord", "record": "note", "as": "requester" },
+            { "type": "updateRecord", "record": "note", "as": "requester", "values": { "title": "Chair" }, "expect": "notFound" },
+            { "type": "deleteRecord", "record": "note", "as": "requester", "expect": "notFound" }
             """));
 
         var result = await RunAsync(folder, "Gone");
@@ -247,9 +247,9 @@ public sealed class ScenarioRunnerTests
     public async Task An_update_of_a_deleted_record_without_expect_fails_with_the_not_found_outcome()
     {
         using var folder = Application(Scenario("GoneUnexpected", Clerk, """
-            { "type": "createRecord", "entity": "Note", "as": "anna", "save": "note", "values": { "title": "Desk" } },
-            { "type": "deleteRecord", "record": "note", "as": "anna" },
-            { "type": "updateRecord", "record": "note", "as": "anna", "values": { "title": "Chair" } }
+            { "type": "createRecord", "entity": "Note", "as": "requester", "save": "note", "values": { "title": "Desk" } },
+            { "type": "deleteRecord", "record": "note", "as": "requester" },
+            { "type": "updateRecord", "record": "note", "as": "requester", "values": { "title": "Chair" } }
             """));
 
         var result = await RunAsync(folder, "GoneUnexpected");
@@ -261,7 +261,7 @@ public sealed class ScenarioRunnerTests
     public async Task A_create_that_succeeds_despite_expect_denied_fails_with_the_expectation_and_the_outcome()
     {
         using var folder = Application(Scenario("Unexpected", Clerk, """
-            { "type": "createRecord", "entity": "Note", "as": "anna", "values": { "title": "Desk" }, "expect": "denied" }
+            { "type": "createRecord", "entity": "Note", "as": "requester", "values": { "title": "Desk" }, "expect": "denied" }
             """));
 
         var result = await RunAsync(folder, "Unexpected");
@@ -274,11 +274,11 @@ public sealed class ScenarioRunnerTests
     {
         using var folder = Application(
             Scenario("Passing", Clerk, """
-                { "type": "createRecord", "entity": "Note", "as": "anna", "save": "note", "values": { "title": "Desk" } },
+                { "type": "createRecord", "entity": "Note", "as": "requester", "save": "note", "values": { "title": "Desk" } },
                 { "type": "expectRecord", "record": "note", "values": { "title": "Desk" } }
                 """),
             Scenario("Failing", Clerk, """
-                { "type": "createRecord", "entity": "Note", "as": "anna", "save": "note", "values": { "title": "Desk" } },
+                { "type": "createRecord", "entity": "Note", "as": "requester", "save": "note", "values": { "title": "Desk" } },
                 { "type": "expectRecord", "record": "note", "values": { "title": "Chair" } }
                 """));
         using var results = new TemporaryFolder();
@@ -306,7 +306,7 @@ public sealed class ScenarioRunnerTests
     public async Task A_folder_that_passes_exits_with_0()
     {
         using var folder = Application(Scenario("Passing", Clerk, """
-            { "type": "createRecord", "entity": "Note", "as": "anna", "values": { "title": "Desk" } }
+            { "type": "createRecord", "entity": "Note", "as": "requester", "values": { "title": "Desk" } }
             """));
         using var results = new TemporaryFolder();
 
@@ -321,7 +321,7 @@ public sealed class ScenarioRunnerTests
     public async Task A_folder_that_does_not_compile_exits_with_2_and_writes_no_junit_file()
     {
         using var folder = Application(Scenario("Broken", Clerk, """
-            { "type": "createRecord", "entity": "Missing", "as": "anna", "values": { "title": "Desk" } }
+            { "type": "createRecord", "entity": "Missing", "as": "requester", "values": { "title": "Desk" } }
             """));
         using var results = new TemporaryFolder();
         var output = new StringWriter();
@@ -338,7 +338,7 @@ public sealed class ScenarioRunnerTests
     public async Task A_modules_folder_that_does_not_exist_exits_with_2_and_names_the_setting()
     {
         using var folder = Application(Scenario("Passing", Clerk, """
-            { "type": "createRecord", "entity": "Note", "as": "anna", "values": { "title": "Desk" } }
+            { "type": "createRecord", "entity": "Note", "as": "requester", "values": { "title": "Desk" } }
             """));
         using var results = new TemporaryFolder();
         var output = new StringWriter();
@@ -365,15 +365,15 @@ public sealed class ScenarioRunnerTests
     }
 
     private const string Purchasing = """
-        { "anna": ["employee"], "binh": ["department-manager"], "dung": ["department-manager"], "chau": ["finance-reviewer"] }
+        { "requester": ["employee"], "binh": ["department-manager"], "dung": ["department-manager"], "chau": ["finance-reviewer"] }
         """;
 
     private const string CreateRequest = """
-        { "type": "createRecord", "entity": "PurchaseRequest", "as": "anna", "save": "request", "values": { "title": "Chairs", "manager": "binh", "amount": 5000 } },
+        { "type": "createRecord", "entity": "PurchaseRequest", "as": "requester", "save": "request", "values": { "title": "Chairs", "manager": "binh", "amount": 5000 } },
         """;
 
     private const string StartApproval = """
-        { "type": "startProcess", "process": "PurchaseRequestApproval", "record": "request", "as": "anna" },
+        { "type": "startProcess", "process": "PurchaseRequestApproval", "record": "request", "as": "requester" },
         """;
 
     [Fact]
@@ -398,7 +398,7 @@ public sealed class ScenarioRunnerTests
     public async Task A_request_at_the_threshold_waits_for_the_finance_reviewer_after_the_manager()
     {
         using var folder = PurchaseApplication(Scenario("AtThreshold", Purchasing, """
-            { "type": "createRecord", "entity": "PurchaseRequest", "as": "anna", "save": "request", "values": { "title": "Servers", "manager": "binh", "amount": 10000 } },
+            { "type": "createRecord", "entity": "PurchaseRequest", "as": "requester", "save": "request", "values": { "title": "Servers", "manager": "binh", "amount": 10000 } },
             """ + StartApproval + """
             { "type": "completeTask", "record": "request", "step": "managerApproval", "outcome": "approve", "as": "binh" },
             { "type": "expectInstance", "process": "PurchaseRequestApproval", "record": "request", "state": "waiting", "step": "financeApproval" },
@@ -420,7 +420,7 @@ public sealed class ScenarioRunnerTests
             { "type": "startProcess", "process": "PurchaseRequestApproval", "record": "request", "as": "chau", "expect": "denied" },
             { "type": "completeTask", "record": "request", "step": "managerApproval", "outcome": "approve", "as": "binh", "expect": "notFound" },
             """ + StartApproval + """
-            { "type": "startProcess", "process": "PurchaseRequestApproval", "record": "request", "as": "anna", "expect": "conflict" },
+            { "type": "startProcess", "process": "PurchaseRequestApproval", "record": "request", "as": "requester", "expect": "conflict" },
             { "type": "completeTask", "record": "request", "step": "managerApproval", "outcome": "approve", "as": "dung", "expect": "denied" },
             { "type": "expectInstance", "process": "PurchaseRequestApproval", "record": "request", "state": "waiting" },
             { "type": "completeTask", "record": "request", "step": "managerApproval", "outcome": "approve", "as": "binh" },
@@ -511,11 +511,11 @@ public sealed class ScenarioRunnerTests
     public async Task A_user_notified_in_app_and_by_email_passes_expectNotification_on_each_channel_and_with_no_channel()
     {
         using var folder = NotifyApplication(Scenario("NotifyUser", Purchasing, ApproveBelowThreshold + """
-            { "type": "expectNotification", "recipient": { "user": "anna" }, "channel": "inApp", "values": { "title": "Chairs" } },
-            { "type": "expectNotification", "recipient": { "user": "anna" }, "channel": "email", "values": { "title": "Chairs" } },
-            { "type": "expectNotification", "recipient": { "user": "anna" }, "values": { "title": "Chairs" } },
-            { "type": "expectNotification", "recipient": { "email": "ANNA@scenario.invalid" }, "channel": "email", "values": { "title": "Chairs" } },
-            { "type": "expectNotification", "recipient": { "user": "anna" } }
+            { "type": "expectNotification", "recipient": { "user": "requester" }, "channel": "inApp", "values": { "title": "Chairs" } },
+            { "type": "expectNotification", "recipient": { "user": "requester" }, "channel": "email", "values": { "title": "Chairs" } },
+            { "type": "expectNotification", "recipient": { "user": "requester" }, "values": { "title": "Chairs" } },
+            { "type": "expectNotification", "recipient": { "email": "REQUESTER@scenario.invalid" }, "channel": "email", "values": { "title": "Chairs" } },
+            { "type": "expectNotification", "recipient": { "user": "requester" } }
             """));
 
         var result = await RunAsync(folder, "NotifyUser");
@@ -529,7 +529,7 @@ public sealed class ScenarioRunnerTests
     public async Task A_different_expected_value_fails_expectNotification_naming_the_value_and_both_values(string channel)
     {
         using var folder = NotifyApplication(Scenario("NotifyMismatch", Purchasing, ApproveBelowThreshold + $$"""
-            { "type": "expectNotification", "recipient": { "user": "anna" }, "channel": "{{channel}}", "values": { "title": "Desks" } }
+            { "type": "expectNotification", "recipient": { "user": "requester" }, "channel": "{{channel}}", "values": { "title": "Desks" } }
             """));
 
         var result = await RunAsync(folder, "NotifyMismatch");
@@ -537,7 +537,7 @@ public sealed class ScenarioRunnerTests
         Assert.False(result.Passed);
         Assert.Equal(3, result.Step);
         Assert.Equal("expectNotification", result.StepType);
-        Assert.Contains("user 'anna'", result.Message);
+        Assert.Contains("user 'requester'", result.Message);
         Assert.Contains("'title'", result.Message);
         Assert.Contains("\"Desks\"", result.Message);
         Assert.Contains("\"Chairs\"", result.Message);
@@ -547,7 +547,7 @@ public sealed class ScenarioRunnerTests
     public async Task An_expected_value_the_notification_does_not_hold_fails_expectNotification_naming_the_value()
     {
         using var folder = NotifyApplication(Scenario("NotifyMissingValue", Purchasing, ApproveBelowThreshold + """
-            { "type": "expectNotification", "recipient": { "user": "anna" }, "channel": "email", "values": { "amount": 5000 } }
+            { "type": "expectNotification", "recipient": { "user": "requester" }, "channel": "email", "values": { "amount": 5000 } }
             """));
 
         var result = await RunAsync(folder, "NotifyMissingValue");
@@ -562,7 +562,7 @@ public sealed class ScenarioRunnerTests
     [InlineData("""{ "user": "binh" }""", "inApp")]
     [InlineData("""{ "user": "binh" }""", "email")]
     [InlineData("""{ "email": "binh@scenario.invalid" }""", "email")]
-    [InlineData("""{ "email": "anna@scenario.invalid" }""", "inApp")]
+    [InlineData("""{ "email": "requester@scenario.invalid" }""", "inApp")]
     public async Task A_recipient_that_was_not_notified_on_the_channel_fails_expectNotification_with_no_notification_found(string recipient, string channel)
     {
         using var folder = NotifyApplication(Scenario("NotifyNobody", Purchasing, ApproveBelowThreshold + $$"""
@@ -583,9 +583,9 @@ public sealed class ScenarioRunnerTests
         using var logs = new LogCollector();
         using var loggers = LoggerFactory.Create(builder => builder.AddProvider(logs));
         using var folder = NotifyApplication(Scenario("NotifyAfterTime", Purchasing, ApproveBelowThreshold + """
-            { "type": "expectNotification", "recipient": { "user": "anna" }, "channel": "email", "values": { "title": "Chairs" } },
+            { "type": "expectNotification", "recipient": { "user": "requester" }, "channel": "email", "values": { "title": "Chairs" } },
             { "type": "advanceTime", "by": "PT1H" },
-            { "type": "expectNotification", "recipient": { "user": "anna" }, "channel": "email", "values": { "title": "Chairs" } }
+            { "type": "expectNotification", "recipient": { "user": "requester" }, "channel": "email", "values": { "title": "Chairs" } }
             """, now: ScheduleNow));
 
         var result = await RunAsync(folder, "NotifyAfterTime", loggerFactory: loggers);
@@ -615,7 +615,7 @@ public sealed class ScenarioRunnerTests
     public async Task A_timer_waits_until_advance_time_passes_its_wait()
     {
         using var folder = TimerApplication(Scenario("CoolDown", Purchasing, CreateRequest + """
-            { "type": "startProcess", "process": "CoolDown", "record": "request", "as": "anna" },
+            { "type": "startProcess", "process": "CoolDown", "record": "request", "as": "requester" },
             { "type": "expectInstance", "process": "CoolDown", "record": "request", "state": "waiting" },
             { "type": "advanceTime", "by": "PT30M" },
             { "type": "expectInstance", "process": "CoolDown", "record": "request", "state": "waiting" },

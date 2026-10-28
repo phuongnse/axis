@@ -26,14 +26,14 @@ public sealed class PurchaseRequestConcurrencyTests(SampleAppFixture fixture) : 
     [Fact]
     public async Task Ten_concurrent_submits_of_one_request_start_one_instance_and_create_one_manager_task()
     {
-        using var anna = fixture.CreateClient().SignedInAs("anna");
-        var subject = await CreateRequestAsync(anna, 500);
+        using var requester = fixture.CreateClient().SignedInAs("requester");
+        var subject = await CreateRequestAsync(requester, 500);
         var clients = new List<HttpClient>();
         try
         {
             for (var i = 0; i < 10; i++)
             {
-                clients.Add(fixture.CreateClient().SignedInAs("anna"));
+                clients.Add(fixture.CreateClient().SignedInAs("requester"));
             }
 
             // Half repeat one key, as retries after a lost response do. The rest are separate clicks.
@@ -71,7 +71,7 @@ public sealed class PurchaseRequestConcurrencyTests(SampleAppFixture fixture) : 
             // Once the key's start won, every repeat of it gets that start's response. Otherwise
             // the key was never stored, and the submitted request fails the start condition.
             var keyWon = results.Any(result => result.Key == key && result.Status == HttpStatusCode.Created);
-            using var repeat = await PostStartAsync(anna, subject, key);
+            using var repeat = await PostStartAsync(requester, subject, key);
             if (keyWon)
             {
                 Assert.Equal(HttpStatusCode.Created, repeat.StatusCode);
@@ -96,8 +96,8 @@ public sealed class PurchaseRequestConcurrencyTests(SampleAppFixture fixture) : 
     [Fact]
     public async Task A_submit_waits_for_an_uncommitted_edit_and_checks_the_start_condition_on_the_edited_request()
     {
-        using var anna = fixture.CreateClient().SignedInAs("anna");
-        var subject = await CreateRequestAsync(anna, 500);
+        using var requester = fixture.CreateClient().SignedInAs("requester");
+        var subject = await CreateRequestAsync(requester, 500);
 
         await using var connection = await fixture.OpenConnectionAsync();
         await using var transaction = await connection.BeginTransactionAsync(CancellationToken);
@@ -113,7 +113,7 @@ public sealed class PurchaseRequestConcurrencyTests(SampleAppFixture fixture) : 
             Assert.Equal(1, await edit.ExecuteNonQueryAsync(CancellationToken));
         }
 
-        var start = PostStartAsync(anna, subject);
+        var start = PostStartAsync(requester, subject);
         await WaitUntilAsync(async () => start.IsCompleted || await fixture.AdminCountAsync(
             "SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock'") == 1, "The start did not wait on the lock.");
         await transaction.CommitAsync(CancellationToken);
@@ -129,16 +129,16 @@ public sealed class PurchaseRequestConcurrencyTests(SampleAppFixture fixture) : 
     [Fact]
     public async Task A_title_edit_racing_a_submit_and_the_worker_succeeds_or_conflicts_and_is_never_lost()
     {
-        using var anna = fixture.CreateClient().SignedInAs("anna");
-        using var editor = fixture.CreateClient().SignedInAs("anna");
+        using var requester = fixture.CreateClient().SignedInAs("requester");
+        using var editor = fixture.CreateClient().SignedInAs("requester");
         for (var round = 0; round < 5; round++)
         {
-            var subject = await CreateRequestAsync(anna, 500);
-            var (original, _, version) = await ReadAsync(anna, subject);
+            var subject = await CreateRequestAsync(requester, 500);
+            var (original, _, version) = await ReadAsync(requester, subject);
             Assert.Equal(1L, version);
             var title = $"Edited {Guid.NewGuid():N}";
 
-            var start = PostStartAsync(anna, subject);
+            var start = PostStartAsync(requester, subject);
             var edit = SendAsync(editor, HttpMethod.Patch, $"{Records}/{subject:D}", $$"""{ "version": 1, "values": { "title": "{{title}}" } }""");
             await Task.WhenAll(start, edit, RunWorkerAsync());
             await fixture.RunUntilIdleAsync(CancellationToken);
@@ -149,7 +149,7 @@ public sealed class PurchaseRequestConcurrencyTests(SampleAppFixture fixture) : 
             // A submit that wins first puts the request outside the employee's update filter, so the edit is 403.
             Assert.Contains(edited.StatusCode, new[] { HttpStatusCode.OK, HttpStatusCode.Conflict, HttpStatusCode.Forbidden });
 
-            var (finalTitle, status, finalVersion) = await ReadAsync(anna, subject);
+            var (finalTitle, status, finalVersion) = await ReadAsync(requester, subject);
             Assert.Equal("submitted", status);
             var instance = Assert.Single(await fixture.InstancesAsync(subject));
             Assert.Equal(finalVersion, (long)(await fixture.ScalarAsync(
@@ -163,12 +163,12 @@ public sealed class PurchaseRequestConcurrencyTests(SampleAppFixture fixture) : 
     [Fact]
     public async Task Two_finance_reviewers_completing_one_task_at_once_record_one_decision()
     {
-        using var anna = fixture.CreateClient().SignedInAs("anna");
+        using var requester = fixture.CreateClient().SignedInAs("requester");
         using var chau = fixture.CreateClient().SignedInAs("chau");
         using var dung = fixture.CreateClient().SignedInAs("dung");
         using var hoa = fixture.CreateClient().SignedInAs("hoa");
-        var subject = await CreateRequestAsync(anna, 10000);
-        var instance = await StartAsync(anna, subject);
+        var subject = await CreateRequestAsync(requester, 10000);
+        var instance = await StartAsync(requester, subject);
         await fixture.RunUntilIdleAsync(CancellationToken);
         using (var approved = await CompleteAsync(chau, await OpenTaskAsync(instance, "managerApproval"), """{ "outcome": "approve" }"""))
         {
@@ -203,15 +203,15 @@ public sealed class PurchaseRequestConcurrencyTests(SampleAppFixture fixture) : 
             ("instance", instance)));
 
         await fixture.RunUntilIdleAsync(CancellationToken);
-        Assert.Equal("approved", (await ReadAsync(anna, subject)).Status);
+        Assert.Equal("approved", (await ReadAsync(requester, subject)).Status);
     }
 
     [Fact]
     public async Task Concurrent_manager_completions_give_one_success_and_a_later_repeat_changes_nothing()
     {
-        using var anna = fixture.CreateClient().SignedInAs("anna");
-        var subject = await CreateRequestAsync(anna, 500);
-        var instance = await StartAsync(anna, subject);
+        using var requester = fixture.CreateClient().SignedInAs("requester");
+        var subject = await CreateRequestAsync(requester, 500);
+        var instance = await StartAsync(requester, subject);
         await fixture.RunUntilIdleAsync(CancellationToken);
         var task = await OpenTaskAsync(instance, "managerApproval");
 

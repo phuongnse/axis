@@ -52,7 +52,7 @@ public sealed class AdminTenantRestoreTests(AdminBackupFixture fixture) : IClass
         await scenario.SetEmailAndLocaleClaimsAsync(fixture.TenantId, "mail", "lang");
         await fixture.ExecuteAsync(
             "INSERT INTO axis.sessions (id_hash, user_id, display_name, roles, signed_in_at, last_request_at) "
-            + "VALUES (sha256(gen_random_uuid()::text::bytea), 'anna', 'Anna Employee', '{employee}', now(), now())");
+            + "VALUES (sha256(gen_random_uuid()::text::bytea), 'requester', 'Requester User', '{employee}', now(), now())");
         Assert.Equal(0, (await fixture.BackupAsync(file)).Exit);
         var original = await scenario.RowAsync(fixture.TenantId);
         var originalHosts = await scenario.HostsAsync(fixture.TenantId);
@@ -80,7 +80,7 @@ public sealed class AdminTenantRestoreTests(AdminBackupFixture fixture) : IClass
         Assert.Equal(0, await CountSessionsAsync(newId));
 
         await using var server = CreateDirectoryServer(scenario.Platform);
-        using var restored = server.CreateClient().SignedInAs("anna");
+        using var restored = server.CreateClient().SignedInAs("requester");
         await RefreshAsync(server);
         using (var held = await restored.SendAsync(Request("/api/me", newHost), CancellationToken))
         {
@@ -133,7 +133,7 @@ public sealed class AdminTenantRestoreTests(AdminBackupFixture fixture) : IClass
         var fileId = Guid.NewGuid();
         await fixture.ExecuteAsync(
             "INSERT INTO axis.files (id, application_id, entity_id, field_path, owner_record_id, name, media_type, size, sha256, storage_kind, state, uploaded_by, uploaded_at) "
-            + $"VALUES ('{fileId:D}', '{Guid.NewGuid():D}', '{Guid.NewGuid():D}', 'receipt', NULL, 'invoice.pdf', 'application/pdf', {bytes.Length}, decode('{hash}', 'hex'), 'database', 'attached', 'anna', now()); "
+            + $"VALUES ('{fileId:D}', '{Guid.NewGuid():D}', '{Guid.NewGuid():D}', 'receipt', NULL, 'invoice.pdf', 'application/pdf', {bytes.Length}, decode('{hash}', 'hex'), 'database', 'attached', 'requester', now()); "
             + $"INSERT INTO axis.file_contents (file_id, content) VALUES ('{fileId:D}', decode('{Convert.ToHexStringLower(bytes)}', 'hex'))");
         using var folder = new TemporaryFolder();
         var file = Path.Combine(folder.Path, "backup.tar");
@@ -200,7 +200,7 @@ public sealed class AdminTenantRestoreTests(AdminBackupFixture fixture) : IClass
         Assert.Equal("suspended", row.Status);
 
         await using var server = CreateDirectoryServer(scenario.Platform);
-        using var client = server.CreateClient().SignedInAs("anna");
+        using var client = server.CreateClient().SignedInAs("requester");
         Assert.Equal(0, (await scenario.RunAsync(["tenant", "resume", id])).Exit);
         await RefreshAsync(server);
         using var served = await client.SendAsync(Request("/api/me", host), CancellationToken);

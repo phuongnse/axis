@@ -24,14 +24,14 @@ function purchasingSystemToken(request: APIRequestContext) {
 }
 
 /**
- * Anna's token, issued through the purchasing-system client so that it has the endpoint audience.
- * Anna holds only the employee role.
+ * The requester's token, issued through the purchasing-system client so that it has the endpoint audience.
+ * The requester holds only the employee role.
  */
 function annaToken(request: APIRequestContext) {
   return accessToken(request, {
     grant_type: 'password',
     ...purchasingClient,
-    username: 'anna',
+    username: 'requester',
     password: 'axis',
   })
 }

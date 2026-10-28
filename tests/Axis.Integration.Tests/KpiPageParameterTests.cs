@@ -20,7 +20,7 @@ public sealed class KpiPageParameterTests(RecordApiFixture fixture) : IClassFixt
     [Fact]
     public async Task Page_metadata_carries_the_binding_of_the_kpi_and_the_page_parameter()
     {
-        using var page = await GetAsync("anna", "/api/sites/records/pages/itemdepartmentkpi", HttpStatusCode.OK);
+        using var page = await GetAsync("requester", "/api/sites/records/pages/itemdepartmentkpi", HttpStatusCode.OK);
 
         var widget = Assert.Single(page.RootElement.GetProperty("widgets").EnumerateArray().ToList());
         Assert.Equal("kpi", widget.GetProperty("type").GetString());
@@ -44,9 +44,9 @@ public sealed class KpiPageParameterTests(RecordApiFixture fixture) : IClassFixt
                 new Dictionary<string, string?> { ["name"] = name, ["department"] = department.ToString("D"), ["quantity"] = quantity });
         }
 
-        using var inSales = await GetAsync("anna", $"{Rows}?inDepartment={sales:D}", HttpStatusCode.OK);
-        using var inOps = await GetAsync("anna", $"{Rows}?inDepartment={ops:D}", HttpStatusCode.OK);
-        using var missing = await GetAsync("anna", Rows, HttpStatusCode.BadRequest);
+        using var inSales = await GetAsync("requester", $"{Rows}?inDepartment={sales:D}", HttpStatusCode.OK);
+        using var inOps = await GetAsync("requester", $"{Rows}?inDepartment={ops:D}", HttpStatusCode.OK);
+        using var missing = await GetAsync("requester", Rows, HttpStatusCode.BadRequest);
 
         Assert.Equal("""{"items":3,"quantitySum":8}""", TotalRow(inSales));
         Assert.Equal("""{"items":1,"quantitySum":4}""", TotalRow(inOps));

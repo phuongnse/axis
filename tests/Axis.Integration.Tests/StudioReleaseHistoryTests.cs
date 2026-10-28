@@ -71,9 +71,9 @@ public sealed class StudioReleaseHistoryTests : IAsyncLifetime
         Assert.NotEqual(newest.GetProperty("contentHash").GetString(), edited.GetProperty("folderContentHash").GetString());
         Assert.Equal(2, edited.GetProperty("items").GetArrayLength());
 
-        using var anna = factory.CreateClient().SignedInAs("anna");
+        using var requester = factory.CreateClient().SignedInAs("requester");
         using var anonymous = factory.CreateClient();
-        Assert.Equal(HttpStatusCode.Forbidden, (await anna.SendAsync(RecordApiFixture.Request(ReleasesUrl, Host), CancellationToken)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await requester.SendAsync(RecordApiFixture.Request(ReleasesUrl, Host), CancellationToken)).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await anonymous.SendAsync(RecordApiFixture.Request(ReleasesUrl, Host), CancellationToken)).StatusCode);
     }
 
@@ -133,7 +133,7 @@ public sealed class StudioReleaseHistoryTests : IAsyncLifetime
             builder.UseSetting("ActivateOnStartup:0", folder);
             builder.UseSetting("Studio:Folders:0", folder);
             builder.UseSetting("Studio:AuthorRole", "author");
-            builder.UseTestAuthentication(new TestIdentity("hoa", "Hoa Author", "author"), new TestIdentity("anna", "Anna", "employee"));
+            builder.UseTestAuthentication(new TestIdentity("hoa", "Hoa Author", "author"), new TestIdentity("requester", "Requester", "employee"));
         });
 
     private static void CopyDirectory(string source, string target)

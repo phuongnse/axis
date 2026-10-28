@@ -1,8 +1,8 @@
 import { expect, test } from "../test";
 import { sessionFile } from "../sessions";
 
-// The data source needs a grant, so these journeys start signed in as the employee anna.
-test.use({ storageState: sessionFile("anna") });
+// The data source needs a grant, so these journeys start signed in as the employee requester.
+test.use({ storageState: sessionFile("requester") });
 
 // Specs run in parallel against one database, so the totals change between runs. The checks match
 // the number pattern; Vitest covers the exact formatting and the empty text.

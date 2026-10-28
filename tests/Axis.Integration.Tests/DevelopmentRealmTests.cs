@@ -14,7 +14,7 @@ public sealed class DevelopmentRealmTests(KeycloakFixture keycloak) : IAsyncLife
 
     public static TheoryData<string, string, string[]> Users => new()
     {
-        { "anna", "Anna Employee", ["employee", "requester"] },
+        { "requester", "Requester User", ["employee", "requester"] },
         { "lan", "Lan Employee", ["employee"] },
         { "binh", "Binh Engineering Manager", ["department-manager"] },
         { "chau", "Chau Operations Manager", ["department-manager"] },
@@ -58,7 +58,7 @@ public sealed class DevelopmentRealmTests(KeycloakFixture keycloak) : IAsyncLife
     [Fact]
     public async Task Refuses_a_wrong_password()
     {
-        using var response = await RequestTokenAsync("anna", "wrong");
+        using var response = await RequestTokenAsync("requester", "wrong");
         var body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
@@ -126,7 +126,7 @@ public sealed class DevelopmentRealmTests(KeycloakFixture keycloak) : IAsyncLife
             ["grant_type"] = "password",
             ["client_id"] = KeycloakFixture.PurchasingClientId,
             ["client_secret"] = KeycloakFixture.PurchasingClientSecret,
-            ["username"] = "anna",
+            ["username"] = "requester",
             ["password"] = KeycloakFixture.Password,
         });
         using var response = await client.PostAsync(new Uri($"{_authority}/protocol/openid-connect/token"), form, TestContext.Current.CancellationToken);
@@ -136,7 +136,7 @@ public sealed class DevelopmentRealmTests(KeycloakFixture keycloak) : IAsyncLife
         using var tokens = JsonDocument.Parse(body);
         using var payload = DecodePayload(tokens.RootElement.GetProperty("access_token").GetString()!);
         var claims = payload.RootElement;
-        Assert.Equal("anna", claims.GetProperty("sub").GetString());
+        Assert.Equal("requester", claims.GetProperty("sub").GetString());
         Assert.Contains("axis-endpoints", Audiences(claims));
         Assert.Equal(JsonValueKind.Array, claims.GetProperty("roles").ValueKind);
         Assert.Equal(["employee", "requester"], claims.GetProperty("roles").EnumerateArray().Select(role => role.GetString()).Order(StringComparer.Ordinal));

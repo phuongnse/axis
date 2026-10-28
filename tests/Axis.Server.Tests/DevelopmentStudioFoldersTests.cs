@@ -47,7 +47,7 @@ public sealed class DevelopmentStudioFoldersTests
     public async Task A_user_without_the_author_role_gets_403_from_the_list_of_applications_under_the_development_settings()
     {
         await using var factory = CreateFactory();
-        using var client = factory.CreateClient().SignedInAs("anna");
+        using var client = factory.CreateClient().SignedInAs("requester");
 
         var response = await client.GetAsync(new Uri("/api/studio/apps", UriKind.Relative), CancellationToken);
 
@@ -65,7 +65,7 @@ public sealed class DevelopmentStudioFoldersTests
         using var author = factory.CreateClient().SignedInAs("hoa");
         Assert.Equal(HttpStatusCode.OK, (await author.GetAsync(url, CancellationToken)).StatusCode);
 
-        using var employee = factory.CreateClient().SignedInAs("anna");
+        using var employee = factory.CreateClient().SignedInAs("requester");
         Assert.Equal(HttpStatusCode.Forbidden, (await employee.GetAsync(url, CancellationToken)).StatusCode);
     }
 
@@ -99,7 +99,7 @@ public sealed class DevelopmentStudioFoldersTests
             builder.UseTestOidc("default");
             builder.UseTestAuthentication(
                 new TestIdentity("hoa", "Hoa Author", "author"),
-                new TestIdentity("anna", "Anna Employee", "employee"));
+                new TestIdentity("requester", "Requester User", "employee"));
         });
     }
 

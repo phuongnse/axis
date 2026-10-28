@@ -3,8 +3,8 @@ import type { APIRequestContext } from "@playwright/test";
 import { csrfHeaders } from "../csrf";
 import { sessionFile } from "../sessions";
 
-// The record API needs a session with a grant, so these journeys start signed in as the employee anna.
-test.use({ storageState: sessionFile("anna") });
+// The record API needs a session with a grant, so these journeys start signed in as the employee requester.
+test.use({ storageState: sessionFile("requester") });
 
 async function createRecord(
   request: APIRequestContext,

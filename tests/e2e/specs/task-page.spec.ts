@@ -5,8 +5,8 @@ import { csrfHeaders } from '../csrf'
 import { expectShown, fieldLabel, fieldValue } from '../fields'
 import { sessionFile, useSession } from '../sessions'
 
-// The record API needs a session with a grant, so these journeys start signed in as the employee anna.
-test.use({ storageState: sessionFile('anna') })
+// The record API needs a session with a grant, so these journeys start signed in as the employee requester.
+test.use({ storageState: sessionFile('requester') })
 
 const notesPath = '/api/apps/E2eApp/entities/Note/records'
 const tasksPath = '/api/apps/E2eApp/tasks'
@@ -83,7 +83,7 @@ test('a user who is not the assignee sees that the task is assigned to someone e
   baseURL,
 }) => {
   const { taskId } = await startReview(request, playwright.request, baseURL, 'Elsewhere')
-  await useSession(page, 'anna')
+  await useSession(page, 'requester')
 
   await page.goto(`/e2e/tasks/${taskId}`)
 

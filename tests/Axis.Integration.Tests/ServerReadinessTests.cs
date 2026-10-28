@@ -51,7 +51,7 @@ public sealed class ServerReadinessTests(PostgreSqlFixture database) : IClassFix
         var (a, b) = await CreateDatabasesAsync();
         var logs = new LogCollector();
         await using var factory = CreateFactory(a, b, RecordsApp, logs);
-        using var client = factory.CreateClient().SignedInAs("anna");
+        using var client = factory.CreateClient().SignedInAs("requester");
         var (healthyStatus, healthyBody) = await ReadyAsync(client);
         Assert.Equal(HttpStatusCode.OK, healthyStatus);
         Assert.Equal(Healthy, healthyBody);
@@ -258,7 +258,7 @@ public sealed class ServerReadinessTests(PostgreSqlFixture database) : IClassFix
             builder.UseSetting("Tenants:b:ConnectionString", PostgreSqlServer.RuntimeConnectionString(b));
             builder.UseSetting("Tenants:b:SchemaConnectionString", b);
             builder.UseTestOidc("a", "b");
-            builder.UseTestAuthentication(new TestIdentity("anna", "Anna Employee", "employee"));
+            builder.UseTestAuthentication(new TestIdentity("requester", "Requester User", "employee"));
             if (folder is not null)
             {
                 builder.UseSetting("ActivateOnStartup:0", folder);

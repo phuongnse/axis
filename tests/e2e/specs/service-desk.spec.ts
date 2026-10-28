@@ -8,7 +8,7 @@ import { sessionFile, useSession, type SampleUser } from "../sessions";
 
 // The service desk sample runs on the same platform as the other samples, with no platform code of its
 // own. Specs run in parallel against one database, so each test looks only for the tickets it creates.
-// Every ticket gets its own title, which is its display field, so the title finds its task. anna and lan
+// Every ticket gets its own title, which is its display field, so the title finds its task. requester and lan
 // are requesters, linh and nam lead the service desk, and khoa and minh are agents in the scenarios. Only
 // khoa is an agent in the development realm.
 const appPath = "/api/apps/ServiceDesk";
@@ -98,17 +98,17 @@ async function openTask(page: Page, title: string, label: string) {
   await row.getByRole("link", { name: label, exact: true }).click();
 }
 
-test("anna submits a ticket, linh triages it to khoa, khoa resolves it, and anna confirms it closed", async ({
+test("requester submits a ticket, linh triages it to khoa, khoa resolves it, and requester confirms it closed", async ({
   page,
   playwright,
   baseURL,
 }) => {
   const title = `Zz Close ${runId()}`;
-  const id = await asUser(playwright.request, baseURL, "anna", (anna) =>
-    createTicket(anna, title),
+  const id = await asUser(playwright.request, baseURL, "requester", (requester) =>
+    createTicket(requester, title),
   );
 
-  await useSession(page, "anna");
+  await useSession(page, "requester");
   await page.goto(`/service-desk/ticketform/${id}`);
   await expect(page.getByLabel(fieldLabel("Title"))).toHaveValue(title);
   // Submit shows on the last step only.
@@ -129,7 +129,7 @@ test("anna submits a ticket, linh triages it to khoa, khoa resolves it, and anna
   await page.getByRole("button", { name: "Resolve", exact: true }).click();
   await expect(page).toHaveURL(/\/service-desk\/mytasks$/);
 
-  await useSession(page, "anna");
+  await useSession(page, "requester");
   await openTask(page, title, "Confirm resolution");
   await expectShown(fieldValue(page, "resolution"), "Replaced the battery.");
   await page.getByRole("button", { name: "Confirm", exact: true }).click();
@@ -149,9 +149,9 @@ test("linh claims a triage task so nam no longer lists it, then reassigns it to 
   baseURL,
 }) => {
   const title = `Zz Reassign ${runId()}`;
-  const id = await asUser(playwright.request, baseURL, "anna", async (anna) => {
-    const created = await createTicket(anna, title);
-    await start(anna, created);
+  const id = await asUser(playwright.request, baseURL, "requester", async (requester) => {
+    const created = await createTicket(requester, title);
+    await start(requester, created);
     return created;
   });
   // Both leads list the triage task until one of them claims it.
@@ -217,9 +217,9 @@ test("an agent cannot open a ticket that is assigned to another agent, by its fo
   playwright,
   baseURL,
 }) => {
-  const id = await asUser(playwright.request, baseURL, "anna", async (anna) => {
-    const created = await createTicket(anna, `Zz Other agent ${runId()}`);
-    await start(anna, created);
+  const id = await asUser(playwright.request, baseURL, "requester", async (requester) => {
+    const created = await createTicket(requester, `Zz Other agent ${runId()}`);
+    await start(requester, created);
     return created;
   });
   const triage = await taskId(playwright.request, baseURL, "linh", id);
@@ -253,7 +253,7 @@ test("an agent cannot open a ticket that is assigned to another agent, by its fo
 });
 
 test("the ticket form guides the requester through two steps", async ({ page }) => {
-  await useSession(page, "anna");
+  await useSession(page, "requester");
   await page.goto("/service-desk/ticketform/new");
   await expect(page.getByLabel(fieldLabel("Title"))).toBeVisible();
   await expect(page.getByLabel(fieldLabel("Description"))).toBeVisible();
@@ -273,13 +273,13 @@ test("the ticket form guides the requester through two steps", async ({ page }) 
 });
 
 test("the ticket form shows the resolution, marked required, only while the status is resolved", async ({ page }) => {
-  await useSession(page, "anna");
+  await useSession(page, "requester");
   await page.goto("/service-desk/ticketform/new");
   await page.getByLabel(fieldLabel("Title")).fill(`Zz Resolution ${runId()}`);
   await page.getByRole("button", { name: "Next", exact: true }).click();
 
   const status = page.getByRole("combobox", { name: "Status", exact: true });
-  // Anna cannot write resolution, so the form shows it as plain text. Its label has no input to point to.
+  // The requester cannot write resolution, so the form shows it as plain text. Its label has no input to point to.
   const resolution = fieldValue(page, "resolution");
   const requiredMark = page.locator("label", { hasText: "Resolution" }).locator('span[aria-hidden="true"]').last();
   await pickOption(status, "draft");
@@ -299,8 +299,8 @@ test("the service desk lead sees the open and urgent tiles and the chart by cate
   // The lead's navigation has four entries, which the default window would fold into the overflow menu.
   await page.setViewportSize({ width: 1440, height: 900 });
   // One open ticket, so the tile and the chart have something to count.
-  await asUser(playwright.request, baseURL, "anna", async (anna) => {
-    await start(anna, await createTicket(anna, `Zz Dashboard ${runId()}`));
+  await asUser(playwright.request, baseURL, "requester", async (requester) => {
+    await start(requester, await createTicket(requester, `Zz Dashboard ${runId()}`));
   });
 
   await useSession(page, "linh");
@@ -323,7 +323,7 @@ test("the service desk lead sees the open and urgent tiles and the chart by cate
 });
 
 test("a requester has no Dashboard entry, and the page endpoint answers 403", async ({ page }) => {
-  await useSession(page, "anna");
+  await useSession(page, "requester");
   await page.goto("/service-desk/mytickets");
   await expect(page.getByRole("menuitem", { name: "My tickets", exact: true })).toBeVisible();
   await expect(page.getByRole("menuitem", { name: "Dashboard", exact: true })).toHaveCount(0);
@@ -336,17 +336,17 @@ test("a requester has no Dashboard entry, and the page endpoint answers 403", as
   expect((await page.request.get("/api/sites/service-desk/pages/Dashboard")).status()).toBe(403);
 });
 
-test("anna presses View on her ticket in My tickets and sees it read-only on the detail page", async ({
+test("requester presses View on their ticket in My tickets and sees it read-only on the detail page", async ({
   page,
   playwright,
   baseURL,
 }) => {
   const title = `Zz View ${runId()}`;
-  const id = await asUser(playwright.request, baseURL, "anna", (anna) =>
-    createTicket(anna, title),
+  const id = await asUser(playwright.request, baseURL, "requester", (requester) =>
+    createTicket(requester, title),
   );
 
-  await useSession(page, "anna");
+  await useSession(page, "requester");
   await page.goto("/service-desk/mytickets?pageSize=100");
   await page
     .getByRole("row", { name: new RegExp(title) })
@@ -364,8 +364,8 @@ test("an agent opening the detail page of a ticket that is not assigned to them 
   baseURL,
 }) => {
   // The draft ticket is never started, so no agent is assigned to it.
-  const id = await asUser(playwright.request, baseURL, "anna", (anna) =>
-    createTicket(anna, `Zz Unassigned ${runId()}`),
+  const id = await asUser(playwright.request, baseURL, "requester", (requester) =>
+    createTicket(requester, `Zz Unassigned ${runId()}`),
   );
 
   await useSession(page, "khoa");

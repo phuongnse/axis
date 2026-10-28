@@ -30,7 +30,7 @@ request ends `approved`:
   "formatVersion": 1,
   "now": "2026-10-01T09:00:00Z",
   "users": {
-    "anna": ["employee"],
+    "requester": ["employee"],
     "binh": ["department-manager"],
     "lan": ["finance-reviewer"]
   },
@@ -48,7 +48,7 @@ request ends `approved`:
     {
       "type": "createRecord",
       "entity": "PurchaseRequest",
-      "as": "anna",
+      "as": "requester",
       "save": "request",
       "values": {
         "title": "Laptops",
@@ -59,7 +59,7 @@ request ends `approved`:
         "lineItems": [{ "description": "Laptop", "quantity": 3, "unitPrice": 5000 }]
       }
     },
-    { "type": "startProcess", "process": "PurchaseRequestApproval", "record": "request", "as": "anna" },
+    { "type": "startProcess", "process": "PurchaseRequestApproval", "record": "request", "as": "requester" },
     { "type": "expectTask", "record": "request", "step": "managerApproval", "assignee": { "user": "binh" } },
     { "type": "completeTask", "record": "request", "step": "managerApproval", "outcome": "approve", "as": "binh" },
     {
@@ -183,9 +183,9 @@ Every step has a `type`. These are the step kinds:
   so an email-only `notify` step can be checked too.
 - A failure names the recipient and channel. It names the differing value with
   the expected and actual values, for example
-  `Step 4 (expectNotification): notification to user 'anna' by email expected value 'title' "Chairs" but was "Desks"`.
+  `Step 4 (expectNotification): notification to user 'requester' by email expected value 'title' "Chairs" but was "Desks"`.
   When nothing matches it says
-  `no email notification to user 'anna' was found`.
+  `no email notification to user 'requester' was found`.
 - Emails stay stubbed. The scenario tenant has no mail host, so nothing is
   sent. The `notification.email` item runs in an `advanceTime` step, which
   makes it due once, after the other work is done, even when the scenario's
@@ -255,14 +255,14 @@ advances three hours, the schedule has fired and the manager has a task:
   "formatVersion": 1,
   "now": "2026-10-01T09:00:00Z",
   "users": {
-    "anna": ["employee"],
+    "requester": ["employee"],
     "binh": ["department-manager"]
   },
   "steps": [
     {
       "type": "createRecord",
       "entity": "PurchaseRequest",
-      "as": "anna",
+      "as": "requester",
       "save": "request",
       "values": {
         "title": "Laptops",
