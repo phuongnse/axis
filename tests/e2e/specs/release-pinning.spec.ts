@@ -5,7 +5,7 @@ import { expect, test } from '../test'
 import type { APIRequest, APIRequestContext, TestInfo } from '@playwright/test'
 import { activateFolder } from '../activate'
 import { csrfHeaders } from '../csrf'
-import { fieldLabel } from '../fields'
+import { expectShown, fieldValue } from '../fields'
 import { sessionFile, useSession } from '../sessions'
 
 // The record API needs a session with a grant, so these journeys start signed in as the employee anna.
@@ -86,7 +86,7 @@ test.describe('the active release of the release application changes', () => {
 
     await page.goto(`/release-app/tasks/${taskId}`)
 
-    await expect(page.getByLabel(fieldLabel('Topic'))).toHaveValue(topic)
+    await expectShown(fieldValue(page, 'topic'), topic)
     await expect(page.getByLabel(/Headline/)).toHaveCount(0)
   })
 
@@ -102,7 +102,7 @@ test.describe('the active release of the release application changes', () => {
 
     await page.goto(`/release-app/tasks/${taskId}`)
 
-    await expect(page.getByLabel(fieldLabel('Headline'))).toHaveValue(topic)
+    await expectShown(fieldValue(page, 'topic'), topic)
     await expect(page.getByLabel(/Topic/)).toHaveCount(0)
   })
 })
