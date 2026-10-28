@@ -8,4 +8,5 @@ public sealed record SiteMetadata(string Name, string TitleKey, SiteLocales Loca
 public sealed record SiteLocales(string Default, string Fallback, IReadOnlyList<string> Available);
 
 /// <summary>One navigation entry. The label is a text key, never literal text.</summary>
-public sealed record NavigationItem(string Key, string Path, string LabelKey);
+/// <param name="Icon">An Axis icon name, or null when the entry has none.</param>
+public sealed record NavigationItem(string Key, string Path, string LabelKey, string? Icon);

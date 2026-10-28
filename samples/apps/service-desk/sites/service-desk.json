@@ -17,25 +17,29 @@
       "page": "MyTickets",
       "label": {
         "textKey": "nav.myTickets"
-      }
+      },
+      "icon": "support"
     },
     {
       "page": "MyTasks",
       "label": {
         "textKey": "nav.myTasks"
-      }
+      },
+      "icon": "tasks"
     },
     {
       "page": "AllTickets",
       "label": {
         "textKey": "nav.allTickets"
-      }
+      },
+      "icon": "list"
     },
     {
       "page": "Dashboard",
       "label": {
         "textKey": "nav.dashboard"
-      }
+      },
+      "icon": "dashboard"
     }
   ]
 }

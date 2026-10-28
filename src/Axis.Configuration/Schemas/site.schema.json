@@ -39,7 +39,13 @@
         "required": ["page", "label"],
         "properties": {
           "page": { "$ref": "#/$defs/name", "x-axis-reference": "page" },
-          "label": { "$ref": "#/$defs/textReference" }
+          "label": { "$ref": "#/$defs/textReference" },
+          "icon": {
+            "enum": [
+              "home", "dashboard", "list", "inbox", "tasks", "form", "document", "folder", "chart", "process", "people",
+              "person", "calendar", "clock", "money", "cart", "tag", "device", "tool", "support", "mail", "settings"
+            ]
+          }
         }
       }
     }
