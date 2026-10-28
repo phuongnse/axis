@@ -8,6 +8,7 @@ import { navigatePath } from './navigateAction'
 import { fetchRecords, type RecordItem, type RecordValue } from './records'
 import type { WidgetMetadata } from './site'
 import { useText } from './texts'
+import { useDesignTokens } from './themeMode'
 import { useEmptyStyle } from './useEmptyStyle'
 import { visuallyHidden } from './visuallyHidden'
 
@@ -45,6 +46,7 @@ export function KpiWidget({ sitePath, widget, locale, pageValues }: KpiWidgetPro
   const t = useText()
   const canvas = useCanvasActions()
   const emptyStyle = useEmptyStyle()
+  const { colour } = useDesignTokens()
   const { dataSource, kpi } = widget
   // The server sets both on a kpi widget.
   const { name, rowsPath, columns } = dataSource!
@@ -97,11 +99,22 @@ export function KpiWidget({ sitePath, widget, locale, pageValues }: KpiWidgetPro
     content = (
       <Flex vertical gap="small">
         <div data-testid="kpi-value">
-          {t(labelKey)}: <strong>{display(measure)}</strong>
+          <div style={{ fontWeight: 500, color: colour.textMuted }}>
+            {t(labelKey)}
+            {/* Transparent, not hidden: an absolute span adds a space before the colon in the accessible name. */}
+            <span style={{ color: 'transparent' }}>: </span>
+          </div>
+          <div
+            data-testid="kpi-measure"
+            style={{ fontSize: 24, lineHeight: '32px', fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}
+          >
+            {display(measure)}
+          </div>
         </div>
         {comparison && (
           <div data-testid="kpi-comparison">
-            {t(comparison.labelKey)}: <strong>{display(comparison.measure)}</strong>
+            <span style={{ color: colour.textMuted }}>{t(comparison.labelKey)}: </span>
+            {display(comparison.measure)}
           </div>
         )}
         {navigate && canvas.active && (

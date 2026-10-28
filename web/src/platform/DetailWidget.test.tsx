@@ -4,9 +4,9 @@ import { MemoryRouter, useLocation } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { DetailWidget } from './DetailWidget'
 import type { EntityWidgetMetadata, FieldMetadata, FieldType } from './site'
-import { descriptionItem } from '../test/antd'
 import { TextProvider } from './TextProvider'
 import { hostileMarkup } from '../test/hostile'
+import { NarrowWidthOverride } from './useNarrowWidth'
 
 function field(name: string, type: FieldType, labelKey: string | null): FieldMetadata {
   return {
@@ -188,6 +188,29 @@ function renderDetail(widget: EntityWidgetMetadata = noteWidget) {
   )
 }
 
+// The same two sections, with the main section's fields one half of the row each.
+const widthsWidget: EntityWidgetMetadata = {
+  ...sectionsWidget,
+  form: {
+    ...sectionsWidget.form!,
+    sections: [
+      {
+        ...sectionsWidget.form!.sections[0],
+        fields: [
+          { name: 'title', readOnly: false, width: 6 },
+          { name: 'category', readOnly: false, width: 6 },
+        ],
+      },
+      ...sectionsWidget.form!.sections.slice(1),
+    ],
+  },
+}
+
+/** The field that shows the label `label`: its `dt` and `dd` sit in one wrapper div. */
+function fieldItem(label: string): HTMLElement {
+  return screen.getByText(label, { selector: 'dt' }).parentElement!
+}
+
 afterEach(() => vi.unstubAllGlobals())
 
 const fileId = '3c1d5e7f-9a2b-4c4d-8e6f-0a1b2c3d4e5f'
@@ -237,7 +260,7 @@ describe('DetailWidget', () => {
     renderDetail(receiptWidget)
 
     await screen.findByText('Receipt')
-    expect(within(descriptionItem('Receipt')).getByRole('link', { name: 'paper.pdf' })).toHaveAttribute(
+    expect(within(fieldItem('Receipt')).getByRole('link', { name: 'paper.pdf' })).toHaveAttribute(
       'href',
       `/api/apps/E2eApp/files/${fileId}`,
     )
@@ -254,13 +277,46 @@ describe('DetailWidget', () => {
 
     expect(await screen.findByText('Main')).toBeInTheDocument()
     expect(screen.getByText('Details')).toBeInTheDocument()
-    expect(descriptionItem('Title')).toHaveTextContent('Buy paper')
-    expect(descriptionItem('Category')).toHaveTextContent('Office')
-    expect(descriptionItem('Done')).toHaveTextContent('Yes')
+    expect(fieldItem('Title')).toHaveTextContent('Buy paper')
+    expect(fieldItem('Category')).toHaveTextContent('Office')
+    expect(fieldItem('Done')).toHaveTextContent('Yes')
     expect(screen.queryByText('priority')).toBeNull()
     // The detail shows every field as plain text, the child collection's rows included.
     expect(screen.queryAllByRole('textbox')).toHaveLength(0)
     expect(requests()).toEqual([{ url: `${recordsPath}/${noteId}`, method: 'GET', body: undefined }])
+  })
+
+  it('shows each section as a description list with its fields in the sections column widths', async () => {
+    stubFetch({ status: 200, body: noteJson('Buy paper') })
+
+    renderDetail(widthsWidget)
+
+    await screen.findByText('Main')
+    const lists = screen.getByTestId('detail').querySelectorAll('dl')
+    expect(lists).toHaveLength(2)
+    expect(screen.getByText('Title', { selector: 'dt' }).closest('dl')).toBe(lists[0])
+    expect(lists[0]).toHaveStyle({ gridTemplateColumns: 'repeat(12, minmax(0, 1fr))' })
+    expect(fieldItem('Title')).toHaveStyle({ gridColumn: 'span 6' })
+    expect(fieldItem('Title').querySelector('dd')).toHaveTextContent('Buy paper')
+    expect(fieldItem('Category')).toHaveStyle({ gridColumn: 'span 6' })
+  })
+
+  it('gives every field the whole row at narrow width', async () => {
+    stubFetch({ status: 200, body: noteJson('Buy paper') })
+
+    render(
+      <NarrowWidthOverride value={true}>
+        <MemoryRouter initialEntries={[`/e2e/notedetail?note=${noteId}`]}>
+          <TextProvider catalogs={catalogs} development={false}>
+            <DetailWidget widget={widthsWidget} sitePath="e2e" recordId={noteId} locale="en" />
+          </TextProvider>
+        </MemoryRouter>
+      </NarrowWidthOverride>,
+    )
+
+    await screen.findByText('Main')
+    expect(fieldItem('Title')).toHaveStyle({ gridColumn: 'span 12' })
+    expect(fieldItem('Category')).toHaveStyle({ gridColumn: 'span 12' })
   })
 
   it('shows every field of the entity without a form, labelled by its label key or its name', async () => {
@@ -269,8 +325,8 @@ describe('DetailWidget', () => {
     renderDetail()
 
     expect(await screen.findByText('Title')).toBeInTheDocument()
-    expect(descriptionItem('priority')).toHaveTextContent('7')
-    expect(descriptionItem('Category')).toHaveTextContent('Office')
+    expect(fieldItem('priority')).toHaveTextContent('7')
+    expect(fieldItem('Category')).toHaveTextContent('Office')
     expect(screen.queryByText('Main')).toBeNull()
   })
 
@@ -281,11 +337,12 @@ describe('DetailWidget', () => {
     renderDetail()
 
     expect(await screen.findByText('Title')).toBeInTheDocument()
-    expect(descriptionItem('Title')).toHaveTextContent(/^TitleNot set$/)
-    expect(within(descriptionItem('Title')!).getByText('Not set')).toHaveStyle({ fontStyle: 'italic' })
-    expect(descriptionItem('priority')).toHaveTextContent(/^priorityNot set$/)
-    expect(descriptionItem('Category')).toHaveTextContent(/^CategoryNot set$/)
-    expect(descriptionItem('Done')).toHaveTextContent('Yes')
+    expect(fieldItem('Title')).toHaveTextContent(/^TitleNot set$/)
+    expect(screen.getByText('Title', { selector: 'dt' })).toHaveStyle({ fontWeight: '500' })
+    expect(within(fieldItem('Title')).getByText('Not set')).toHaveStyle({ fontStyle: 'italic' })
+    expect(fieldItem('priority')).toHaveTextContent(/^priorityNot set$/)
+    expect(fieldItem('Category')).toHaveTextContent(/^CategoryNot set$/)
+    expect(fieldItem('Done')).toHaveTextContent('Yes')
   })
 
   it('shows the rows of a child collection in a read-only table', async () => {
@@ -326,7 +383,7 @@ describe('DetailWidget', () => {
 
     expect(await screen.findByText('Word')).toBeInTheDocument()
     const tags = within(screen.getByTestId('detail-references-software')).getAllByText(/./)
-    expect(descriptionItem('Software')).toContainElement(tags[0])
+    expect(fieldItem('Software')).toContainElement(tags[0])
     expect(tags.map((tag) => tag.textContent)).toEqual(['Word', 'id-excel', 'Visio'])
   })
 
