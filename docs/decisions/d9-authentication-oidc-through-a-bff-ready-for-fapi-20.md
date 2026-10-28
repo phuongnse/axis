@@ -10,6 +10,8 @@ Status: **Agreed**
 - **Identity provider:** an external OIDC provider. Development uses Keycloak.
   Enterprise SAML or directory identities are handled by brokering through the
   identity provider, not inside Axis.
+  - [D99](d99-axis-ships-its-own-identity-provider.md) changes this line: Axis ships its own identity provider, which
+    brokers to each organization's.
 - **FAPI 2.0:** the structure follows FAPI 2.0 roles (authorization server,
   confidential client, resource server). PAR, `private_key_jwt` and DPoP can be
   enabled later without restructuring. FAPI conformance is a later milestone.

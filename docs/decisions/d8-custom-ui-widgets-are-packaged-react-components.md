@@ -12,10 +12,10 @@ A custom widget is a React and TypeScript component in an extension package.
 - **What it may call:** the backend only through platform APIs.
 - **Not allowed:** raw HTML or JavaScript in configuration.
 - **When:** after Studio.
-- **Plan:** [D46](d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9.md) places custom widgets in M17,
+- **Plan:** [D46](d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9.md) places custom widgets in M18,
   after the page, form and process designers.
   - [D88](d88-custom-widgets-in-the-designer-palette-and-a-published-sdk.md)
-    gives the design that M17 builds: the manifest, loading, the SDK and the
+    gives the design that M18 builds: the manifest, loading, the SDK and the
     palette.
 
 The standard widgets and form components must be good enough that custom

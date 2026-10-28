@@ -113,7 +113,7 @@ configuration in `samples/apps/purchase-requests/`. It is not platform code.
 
 ### Extensibility
 
-_(planned for M17)_ Purchase requests prove the extensibility milestone, as
+_(planned for M18)_ Purchase requests prove the extensibility milestone, as
 [D94](decisions/d94-purchase-requests-prove-the-extensibility-milestone.md)
 agrees.
 
