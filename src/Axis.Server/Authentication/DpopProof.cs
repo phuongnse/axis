@@ -1,3 +1,4 @@
+using System.Numerics;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -20,6 +21,9 @@ internal static class DpopProof
 
     /// <summary>How far a proof's <c>iat</c> may be from the server's clock, in either direction.</summary>
     public static readonly TimeSpan IatWindow = TimeSpan.FromSeconds(60);
+
+    /// <summary>The shortest RSA key a proof may be signed with, in bits (the floor of FAPI 2.0).</summary>
+    public const int MinimumRsaKeyBits = 2048;
 
     private const string ProofType = "dpop+jwt";
 
@@ -66,7 +70,8 @@ internal static class DpopProof
 
     /// <summary>
     /// Whether the request carries exactly one valid proof for the access token. The proof must be signed with the key in
-    /// its own <c>jwk</c> header, which must hold no private key. Its <c>htm</c> must be the request's method, its
+    /// its own <c>jwk</c> header, which must hold no private key and, for an RSA key, a modulus of at least
+    /// <see cref="MinimumRsaKeyBits"/> bits. Its <c>htm</c> must be the request's method, its
     /// <c>htu</c> the request's scheme, host and path (the query and fragment are ignored), its <c>iat</c> within
     /// <see cref="IatWindow"/> of <paramref name="now"/>, its <c>jti</c> not blank and its <c>ath</c> the hash of the
     /// access token. The key's thumbprint must equal <paramref name="expectedJkt"/>, the <c>cnf.jkt</c> of the token.
@@ -95,7 +100,7 @@ internal static class DpopProof
             }
 
             var jwk = new JsonWebKey(jwkElement.GetRawText());
-            if (jwk.HasPrivateKey)
+            if (jwk.HasPrivateKey || (jwk.Kty == "RSA" && !HasMinimumRsaKeySize(jwk)))
             {
                 return false;
             }
@@ -132,6 +137,11 @@ internal static class DpopProof
             return false;
         }
     }
+
+    // The library enforces only 1024 bits when it verifies, so the modulus is measured here.
+    private static bool HasMinimumRsaKeySize(JsonWebKey jwk) =>
+        !string.IsNullOrEmpty(jwk.N)
+        && new BigInteger(Base64UrlEncoder.DecodeBytes(jwk.N), isUnsigned: true, isBigEndian: true).GetBitLength() >= MinimumRsaKeyBits;
 
     private static bool TargetMatches(string target, HttpRequest request) =>
         Uri.TryCreate(target, UriKind.Absolute, out var proofed)

@@ -223,7 +223,8 @@ and creates no tables. See
   `ConnectionStrings:Platform`. Its role has `USAGE` on the `platform` schema
   and `SELECT` on its tables, and nothing else. The server sets this in one
   transaction after the migrations, and revokes any wider right the role had
-  there. It refuses a role that is the role of `ConnectionStrings:PlatformSchema`.
+  there. The step holds an advisory lock until it ends, so servers that start
+  together run it one after the other. It refuses a role that is the role of `ConnectionStrings:PlatformSchema`.
   It does not yet check whether the role is a superuser, owns the schema or
   inherits rights through membership. The `platform.audit_records` table is
   the one exception: the role gets no right on it at all. The same step revokes
@@ -744,8 +745,11 @@ schema of the tenant database.
     | `session.signedOut`     | `POST /api/auth/sign-out` with a session | The user id and the display name | `{ "clientAddress" }`           |
     | `session.signInRefused` | The callback is refused                  | `anonymous`, null                | `{ "reason", "clientAddress" }` |
     - `reason` is one of `otherTenant`, `invalidToken`, `invalidState`,
-      `invalidIssuer` or `providerError`. `invalidIssuer` is a `fapi2` callback
-      whose `iss` is missing or is not the tenant's `Authority`.
+      `invalidIssuer` or `providerError`. `invalidToken` also covers an ID token
+      with a nonce that the sign-in did not send. `invalidIssuer` is a callback
+      whose provider metadata names an issuer other than the tenant's
+      `Authority`, in any profile, or a `fapi2` callback whose `iss` is missing
+      or is not the tenant's `Authority`.
       `providerError` covers a person who cancels at the identity provider, and
       a provider error.
     - `application_id`, `entity_id`, `record_id` and `process_instance_id` are
