@@ -8,7 +8,13 @@ public sealed record SiteList(IReadOnlyList<SiteListItem> Sites);
 
 /// <summary>One site in the list.</summary>
 /// <param name="Titles">The site title in each available locale, keyed by the locale as the site declares it.</param>
-public sealed record SiteListItem(string Path, string TitleKey, IReadOnlyDictionary<string, string> Titles);
+/// <param name="Application">The application the site belongs to, so a client can group sites by application.</param>
+public sealed record SiteListItem(string Path, string TitleKey, IReadOnlyDictionary<string, string> Titles, SiteApplication Application);
+
+/// <summary>The application of a listed site.</summary>
+/// <param name="Name">The application's declared name.</param>
+/// <param name="Titles">The application's title in each locale it has texts for. It is the label's text, or the name when the application has no label.</param>
+public sealed record SiteApplication(string Name, IReadOnlyDictionary<string, string> Titles);
 
 /// <summary>What the SPA needs to build an application site's shell: title, locales and navigation.</summary>
 /// <param name="TitleKey">Text key of the site title.</param>

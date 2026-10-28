@@ -18,7 +18,7 @@ public sealed class SiteEndpointTests(RecordApiFixture fixture) : IClassFixture<
         var sitesInA = listInA.RootElement.GetProperty("sites").EnumerateArray().ToList();
         Assert.Equal(["records", "second"], sitesInA.Select(site => site.GetProperty("path").GetString()));
         var records = sitesInA[0];
-        Assert.Equal(["path", "titleKey", "titles"], records.EnumerateObject().Select(property => property.Name));
+        Assert.Equal(["path", "titleKey", "titles", "application"], records.EnumerateObject().Select(property => property.Name));
         Assert.Equal("site.title", records.GetProperty("titleKey").GetString());
         Assert.Equal(
             [("en", "Records"), ("vi", "Hồ sơ")],
@@ -26,6 +26,18 @@ public sealed class SiteEndpointTests(RecordApiFixture fixture) : IClassFixture<
         Assert.Equal(
             [("en", "Second")],
             sitesInA[1].GetProperty("titles").EnumerateObject().Select(property => (property.Name, property.Value.GetString())));
+
+        // RecordsApp has no label, so its title is its name. SecondApp's label gives its title.
+        var recordsApplication = records.GetProperty("application");
+        Assert.Equal("RecordsApp", recordsApplication.GetProperty("name").GetString());
+        Assert.Equal(
+            [("en", "RecordsApp"), ("vi", "RecordsApp")],
+            recordsApplication.GetProperty("titles").EnumerateObject().Select(property => (property.Name, property.Value.GetString())));
+        var secondApplication = sitesInA[1].GetProperty("application");
+        Assert.Equal("SecondApp", secondApplication.GetProperty("name").GetString());
+        Assert.Equal(
+            [("en", "Second application")],
+            secondApplication.GetProperty("titles").EnumerateObject().Select(property => (property.Name, property.Value.GetString())));
 
         var sitesInB = listInB.RootElement.GetProperty("sites").EnumerateArray().ToList();
         Assert.Equal(["records"], sitesInB.Select(site => site.GetProperty("path").GetString()));
@@ -230,6 +242,7 @@ public sealed class SiteEndpointTests(RecordApiFixture fixture) : IClassFixture<
 
     [Theory]
     [InlineData("/api/sites")]
+    [InlineData("/api/about")]
     [InlineData("/api/sites/records")]
     [InlineData("/api/sites/records/texts/en")]
     [InlineData("/api/sites/records/texts/en?release=6f1c2a40-7a3b-4c52-9d0e-1b2c3d4e5f60")]
@@ -247,6 +260,20 @@ public sealed class SiteEndpointTests(RecordApiFixture fixture) : IClassFixture<
 
         using var problem = await ReadProblemAsync(response, HttpStatusCode.Unauthorized);
         Assert.Equal("Sign in to read or write this data.", problem.RootElement.GetProperty("title").GetString());
+    }
+
+    [Fact]
+    public async Task About_gives_the_informational_version_of_the_server_to_a_session()
+    {
+        using var about = await GetJsonAsync("/api/about", HostA);
+
+        var version = typeof(Program).Assembly
+            .GetCustomAttributes(typeof(System.Reflection.AssemblyInformationalVersionAttribute), inherit: false)
+            .Cast<System.Reflection.AssemblyInformationalVersionAttribute>()
+            .Single()
+            .InformationalVersion;
+        Assert.Equal(["version"], about.RootElement.EnumerateObject().Select(property => property.Name));
+        Assert.Equal(version, about.RootElement.GetProperty("version").GetString());
     }
 
     [Theory]
