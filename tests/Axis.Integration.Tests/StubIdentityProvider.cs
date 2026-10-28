@@ -60,6 +60,16 @@ internal sealed class StubIdentityProvider : HttpMessageHandler
                 """;
         }
 
+        if (uri.AbsolutePath.EndsWith("/authentication/flows", StringComparison.Ordinal))
+        {
+            return """[{"alias":"axis first login"}]""";
+        }
+
+        if (uri.AbsolutePath.EndsWith("/authentication/flows/axis%20first%20login/executions", StringComparison.Ordinal))
+        {
+            return """[{"id":"c","providerId":"idp-create-user-if-unique","requirement":"REQUIRED"}]""";
+        }
+
         return uri.AbsolutePath.EndsWith("/service-account-user", StringComparison.Ordinal)
             ? """{"id":"u"}"""
             : """{"name":"r","id":"r"}""";
