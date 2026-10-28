@@ -5,7 +5,8 @@ their organization uses. [D99](../decisions/d99-axis-ships-its-own-identity-prov
 [D100](../decisions/d100-identity-providers-per-application-and-sign-in-per-site.md) lets each application declare how
 its people sign in and each site pick from that. M17 builds it, and each section says whether it is built. The
 `identityProvider` resource, a site's `signIn` and their compile checks are built, and so is the tenant's realm that
-`tenant create` makes. Sign-in and activation do not read them yet, and a new realm has no accounts, no redirect addresses and
+`tenant create` makes. Activation checks the bindings of `oidc` providers and refuses providers that would split a person. Sign-in does
+not read them yet, activation does not change the realm yet, and a new realm has no accounts, no redirect addresses and
 no role mappings, so until they do, a tenant signs in through an identity provider that runs outside
 Axis, which `tenant oidc set` points its `Oidc` block at, as [security](security.md#sign-in-and-the-session) describes. Accounts, roles given by an administrator and the
 users page are in [user administration](user-administration.md).
@@ -98,8 +99,9 @@ so Studio edits it, with the identity provider editor of [Studio](studio.md), an
   - A module holds no identity provider, because it holds no bindings, so a module file of this kind is `AXC0202`.
   - A site's `signIn` entry that names no provider is `AXC0289`, see
     [sites and sign-in](#sites-and-sign-in).
-- **Not read yet:** sign-in and activation do not read the resource yet. Activation does not check the bindings
-  against the tenant's. Studio's blank application creates an `accounts` provider, and New resource creates
+- **Read only by activation:** activation checks the bindings of `oidc` providers against the tenant's, and refuses
+  providers that would split a person into two users, see [users](#users). It plans the realm it wants, but does
+  not change the realm yet. Sign-in does not read the resource yet. Studio's blank application creates an `accounts` provider, and New resource creates
   more from an `accounts` starter. Studio edits the kind with the identity provider editor, which does not show a
   binding's value, and a site's `signIn` with a picker of the application's providers.
 
@@ -156,7 +158,11 @@ _(planned for M17)_
 - **One provider per binding:** the realm holds one brokered provider for each set of bindings. Two applications
   whose providers name the same bindings use the same provider in the realm, and the platform sign-in shares it too,
   so a person is one user across the tenant. Two providers that name the same issuer or metadata binding with other
-  client bindings fail activation, because the same person would become two users.
+  client bindings fail activation, because the same person would become two users. Two with the same bindings and
+  other `claims` fail too. Both are `AXC0291`, reported before provisioning at `/issuer/binding` or `/claims` of
+  the provider that is activated, and built for `oidc` providers. Activation compares binding names ignoring letter
+  case, reads the providers of the tenant's other active releases, and gives each provider the alias `oidc-` and its
+  lower-case issuer binding.
 - **No automatic linking:** a person who signs in through two providers is two users, even when both give the same
   email. The realm never links them by email, because another provider's email is not proof of who signed in.
   Linking that the person proves on both sides comes later.
@@ -179,8 +185,10 @@ _(planned for M17)_
 - **Brought in step by activation:** activating a release adds, changes and removes the realm's brokered providers,
   their claim mappers and the site clients to match the active releases of the tenant and its platform sign-in. A
   provider that nothing names any more is removed. Its users stay, but cannot sign in through it.
-- **Bindings:** a missing binding, or a binding of the wrong kind, fails activation, as for a connector. On a preview
-  tenant activation leaves the provider out with a warning, see [preview tenants](#preview-tenants).
+- **Bindings:** a missing binding, or a binding of the wrong kind, fails activation, as for a connector (`AXC0100`).
+  Built for `oidc` providers: `issuer` is a `url` binding, and `clientId`, `clientSecret` and `clientKey` are `secret`
+  bindings. On a preview tenant activation leaves the provider out with a warning, see
+  [preview tenants](#preview-tenants).
 - **Profile:** the realm's clients follow the tenant's sign-in profile. Under `fapi2` Axis registers the client key in
   the realm itself, see [FAPI 2.0 profile](security.md#fapi-20-profile).
 

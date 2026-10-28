@@ -803,10 +803,15 @@ flowchart LR
      changes nothing. It then checks each site path; it returns one `AXC0031`
      for every site whose path another application holds, and changes
      nothing. It then checks the deployment bindings of every connector, and
-     of every package operation that a process step uses, against the tenant's.
+     of every package operation that a process step uses, against the tenant's,
+     and the bindings of every `oidc` identity provider (`issuer` as `url`;
+     `clientId`, `clientSecret` and `clientKey` as `secret`).
      It returns one `AXC0100` for every binding the tenant lacks or holds with
      another kind, and outside Development one `AXC0101` for every base URL
      binding or package `url` binding that is not `https`, and changes
+     nothing. It then reads the identity providers of the tenant's other
+     active releases and returns `AXC0291` for a provider that would make one
+     person two users, see [users](identity-provider.md#users), and changes
      nothing. It then provisions the entity tables (see
      [Storage](storage.md#storage)); when provisioning returns diagnostics, they are
      returned and the active release is untouched. Only then is the release
