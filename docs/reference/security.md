@@ -102,7 +102,12 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place. _(planned f
     `{ "signOutUrl" }`. The SPA then sends the browser to that URL, and the
     identity provider returns it to `/`. The SPA calls sign-out with `fetch`
     so it can send the CSRF header, and a `fetch` call cannot follow a
-    redirect to the identity provider as a page. The shell header's
+    redirect to the identity provider as a page. A successful sign-out also
+    sends `Clear-Site-Data: "cache", "storage"`, so the browser drops the
+    site's HTTP cache and storage, and a refused one sends no such header.
+    The SPA keeps only the theme and the locale in browser storage, under
+    `axis.themeMode` and `axis.locale`, so a sign-out resets both. See
+    [headers](headers-and-rate-limits.md#security-headers). The shell header's
     [account button](frontend.md) offers sign-in and
     sign-out. A `401` from an API call shows a sign-in prompt, and only a
     click on its button calls `GET /api/auth/sign-in`, so no session starts

@@ -55,6 +55,7 @@ import {
 import { useText } from './texts'
 import { useNarrowWidth } from './useNarrowWidth'
 import { isVisible } from './visibleWhen'
+import { setOwn } from './ownProperty'
 
 interface TableWidgetProps {
   sitePath: string
@@ -215,7 +216,7 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
         ? pageValues?.[widget.parameters[parameter.name]]
         : query.parameters?.[parameter.name]
       if (value) {
-        values[parameter.name] = value
+        setOwn(values, parameter.name, value)
       }
     }
     return values
@@ -229,7 +230,7 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
   // Bumped after a row start, so the same URL is requested again.
   const [reloads, setReloads] = useState(0)
   // A key is kept per process and row while its start has no final answer: a network error or a 5xx.
-  const startKeys = useRef<Record<string, string>>({})
+  const startKeys = useRef(new Map<string, string>())
   const [starting, setStarting] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
   const [actionDone, setActionDone] = useState<string | null>(null)
@@ -303,7 +304,8 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
       setActionDone(null)
       const keyName = `${action.instancesPath} ${rowId}`
       try {
-        const key = (startKeys.current[keyName] ??= newIdempotencyKey())
+        const key = startKeys.current.get(keyName) ?? newIdempotencyKey()
+        startKeys.current.set(keyName, key)
         let result
         try {
           result = await startProcess(action.instancesPath, rowId, key)
@@ -312,7 +314,7 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
           setActionError(t('shell.form.startFailed'))
           return
         }
-        delete startKeys.current[keyName]
+        startKeys.current.delete(keyName)
         if (result.ok) {
           setReloads((count) => count + 1)
           return
@@ -657,7 +659,7 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
     const next: Record<string, string> = {}
     for (const parameter of parameterNames) {
       if (current[parameter]) {
-        next[parameter] = current[parameter]
+        setOwn(next, parameter, current[parameter])
       }
     }
     setSearchParams(

@@ -905,12 +905,12 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   task inbox. See [task-inbox-widget.md](task-inbox-widget.md).
 - **Process inspector widget**. A page whose widget is a `processInspector` lists the instances of
   one process and opens one. See [process-inspector-widget.md](process-inspector-widget.md).
-- **Locale.** The shell header has a locale switch next to the light/dark
-  toggle, in the Menu panel at narrow width. The chosen locale is kept in `localStorage` under `axis.locale`,
-  like the theme mode under `axis.themeMode`. One key serves every site: a site starts in the stored locale
-  when it offers it, and in its default locale otherwise. The shell keeps the current texts until the chosen
-  locale's texts have loaded. If they fail to load, it stays in the current
-  locale and shows an error message.
+- **Locale.** The shell header has a locale switch next to the light/dark toggle, in the Menu panel at narrow width. The
+  chosen locale is kept in `localStorage` under `axis.locale`, like the theme mode under `axis.themeMode`. These are the
+  only keys the SPA keeps in browser storage. Sign-out clears both through `Clear-Site-Data`, so the next sign-in starts
+  in the system theme and the site's default locale. One key serves every site: a site starts in the stored locale when
+  it offers it, and in its default locale otherwise. The shell keeps the current texts until the chosen locale's texts
+  have loaded. If they fail to load, it stays in the current locale and shows an error message.
   - Ant Design components, such as picker placeholders, follow the UI
     locale. `en` maps to Ant Design's `en_US` and `vi` to `vi_VN`, ignoring
     letter case, and any other locale uses `en_US`. dayjs, which the pickers

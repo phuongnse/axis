@@ -1,4 +1,5 @@
 import type { FieldMetadata } from './site'
+import { setOwn } from './ownProperty'
 
 /** The page sizes a table offers. */
 export const pageSizes = [10, 20, 50, 100]
@@ -48,7 +49,7 @@ export function parseTableQuery(
     // `get` returns the first value of a repeated parameter.
     const value = params.get(name)
     if (value) {
-      parameters[name] = value
+      setOwn(parameters, name, value)
     }
   }
   const search = searchable ? params.get('search') : null
