@@ -139,6 +139,8 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
     own clock, runs once when the tenant becomes ready and then at most every
     5 minutes, and never touches a tenant it does not serve. `tenant restore`
     empties the table, so no session comes back with an archive.
+  - An operator ends one user's sessions or all sessions of a tenant with
+    [`tenant session end`](tenant-setting-commands.md#sessions).
   - In `Development` and `Testing`, which run over plain http, the session
     cookie and the OIDC helper cookies are Secure only on https requests.
   - Behind a named proxy, the callback and sign-out addresses and the cookie's
