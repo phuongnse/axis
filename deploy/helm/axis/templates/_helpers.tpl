@@ -121,22 +121,31 @@ readOnly: true
 {{- end }}
 {{- end }}
 
-{{/* The probes of a host. Call with the name of the container port. */}}
+{{/* The probes of a host. Call with the name of the container port. A port named https is probed over HTTPS. */}}
 {{- define "axis.probes" -}}
 startupProbe:
   httpGet:
     path: /health/live
     port: {{ . }}
+    {{- if eq . "https" }}
+    scheme: HTTPS
+    {{- end }}
   periodSeconds: 5
   failureThreshold: 30
 livenessProbe:
   httpGet:
     path: /health/live
     port: {{ . }}
+    {{- if eq . "https" }}
+    scheme: HTTPS
+    {{- end }}
   periodSeconds: 10
 readinessProbe:
   httpGet:
     path: /health/ready
     port: {{ . }}
+    {{- if eq . "https" }}
+    scheme: HTTPS
+    {{- end }}
   periodSeconds: 10
 {{- end }}

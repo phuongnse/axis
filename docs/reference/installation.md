@@ -96,7 +96,9 @@ file.
 | `Modules:Path` | `Modules__Path` | server, worker, admin | no | Set to `/modules`. |
 | `Templates:Path` | `Templates__Path` | server | no | Optional. Unset in production, so Studio lists no application templates. The folder holds `<id>/<version>/` template folders, and a folder that does not exist stops the server. See [application templates](modules-and-templates.md#application-templates). |
 | `Health:Urls` | `Health__Urls` | worker | no | The image keeps `http://127.0.0.1:5208`. The Helm chart sets it to all interfaces so the kubelet can probe it. |
-| `ASPNETCORE_HTTP_PORTS` | `ASPNETCORE_HTTP_PORTS` | server | no | The image default is 8080. |
+| `ASPNETCORE_HTTP_PORTS` | `ASPNETCORE_HTTP_PORTS` | server | no | The image default is 8080, plain HTTP. The Compose example and the Helm chart replace it with the Kestrel endpoint below, so nothing listens on 8080. |
+| `Kestrel:Endpoints:Https:Url` | `Kestrel__Endpoints__Https__Url` | server | no | The Compose example and the Helm chart set `https://+:8443`. A Kestrel endpoint replaces `ASPNETCORE_HTTP_PORTS`, so the server serves HTTPS only. |
+| `Kestrel:Endpoints:Https:Certificate:Path`, `Kestrel:Endpoints:Https:Certificate:KeyPath` | `Kestrel__Endpoints__Https__Certificate__Path`, `Kestrel__Endpoints__Https__Certificate__KeyPath` | server | no | The Compose example and the Helm chart set `/server-tls/tls.crt` and `/server-tls/tls.key`. The key is a private key, so the folder is a mounted volume and never a setting. See [TLS](#tls). |
 | `OTEL_*` | `OTEL_*` | server, worker | maybe | Optional. See [telemetry export](host-settings.md#telemetry-export). A collector token in the headers is secret. |
 
 Read the rules of each setting in
@@ -275,11 +277,21 @@ sets it, 30 seconds by default.
   the server trust only that file.
 - **Ports.** The server listens on `127.0.0.1:8080` of the host, the second
   replica on `127.0.0.1:8081`, and the worker's health endpoints on
-  `127.0.0.1:5208`. The proxy is the only service published beyond the machine,
+  `127.0.0.1:5208`. Both servers serve HTTPS only, on container port 8443, and
+  the worker's health endpoint stays plain HTTP because it carries no application
+  traffic. The proxy is the only service published beyond the machine,
   on port 443. Without the proxy, put a reverse proxy of your own on the same
-  machine in front of the server. See
+  machine in front of the server, and make it connect over HTTPS and check the
+  server certificate. See
   [forwarded headers](#several-server-replicas). The images hold no `curl`, so the
-  example has no container health check. Probe `/health/ready` from the host.
+  example has no container health check. Probe `/health/ready` from the host, for
+  example `curl --cacert <ca> --resolve servers:8080:127.0.0.1 https://servers:8080/health/ready`.
+- **The server certificate.** Put `tls.crt` and `tls.key` in
+  `AXIS_SERVER_TLS_DIR`, which defaults to `./server-tls`. The certificate is
+  issued for the name `servers`, the network alias of both replicas. Compose
+  mounts the folder read-only at `/server-tls` on both servers and on no other
+  service, so only the servers hold the private key. Both files must be readable
+  by UID 1654, the user of the image. A server does not start without them.
 - **The purchase request sample** needs a purchasing system binding, which
   `tenant binding set` sets, see
   [deployment bindings](tenant-setting-commands.md#deployment-bindings). This
@@ -293,14 +305,19 @@ states. The `replicas` profile starts `server-2`, configured like
 - **The certificate.** Put `tls.crt` and `tls.key` in `AXIS_TLS_DIR`, which
   defaults to `./tls`. Compose mounts the folder read-only at `/certs`, so no
   compose file holds a certificate or a key. The files must be readable by the
-  proxy. The certificate must cover every tenant host, see [TLS](#tls).
+  proxy. The certificate must cover every tenant host, see [TLS](#tls). Put
+  `server-ca.crt` in the same folder: the certificate of the authority that
+  issued the server certificate. The proxy trusts that one certificate for the
+  servers and no other.
 - **The ports.** The proxy publishes `AXIS_HTTPS_PORT`, 443 by default.
   `server-2` publishes `127.0.0.1:${AXIS_SERVER_2_PORT}`, 8081 by default, for
   health probes.
 - **The replicas.** Both servers answer to the network alias `servers`. The
   proxy looks that name up again every five seconds, so a restarted replica
   rejoins on its own. A request to a replica that is down is retried on the
-  other one.
+  other one. The proxy connects to port 8443 over TLS and checks that the
+  certificate is for the name `servers` and comes from the authority in
+  `server-ca.crt`.
 - **The forwarded headers.** The Compose network has a fixed subnet,
   `AXIS_NETWORK_SUBNET`, 172.31.250.0/24 by default. The proxy has a fixed
   address in it, `AXIS_PROXY_ADDRESS`, 172.31.250.10 by default. Both servers
@@ -366,14 +383,17 @@ operator uses it. The test then:
    `psql`, and checks that the installed publisher runs both to `succeeded`.
    The publisher's log shows `one claim ok` and `two claim ok`, and the
    `publisher` service is still running.
-8. Starts the second replica and the TLS proxy, with a proxy certificate from
-   the test's authority. Signs an employee in through the proxy over HTTPS with plain
+8. Starts the second replica and the TLS proxy, with a proxy certificate and a
+   server certificate from the test's authority, and that authority's certificate
+   as `server-ca.crt`. Checks that a plain HTTP request to a server port gets no
+   HTTP response, and that the servers answer on their own ports over HTTPS for the
+   name `servers`. Signs an employee in through the proxy over HTTPS with plain
    HTTP requests, posting Keycloak's login form directly. Checks that the
    redirect carries `redirect_uri=https://one.axis.test/api/auth/callback` even
    when the client sends its own `X-Forwarded-Proto` and `X-Forwarded-Host`,
    that every `__Host-Axis.Session` cookie is `Secure` with `Path=/` and no domain, and that `GET /api/me`
    answers `200`. Then restarts `server` and checks that `GET /api/me` with the
-   same cookie answers `200` through the proxy and on the ports of `server` and
+   same cookie answers `200` through the proxy and on the HTTPS ports of `server` and
    `server-2`. Also checks that a default handshake with the proxy negotiates
    TLS 1.3, that a TLS 1.2 handshake with an ECDHE GCM cipher succeeds and that
    a TLS 1.2 handshake offering only CBC ciphers is refused.
@@ -393,7 +413,11 @@ the same Studio folder read-write at `/studio` while the worker, the
 publisher, the admin host and the proxy do not. They also check that the
 Caddyfile sets `protocols tls1.2 tls1.3`, lists only ECDHE AEAD ciphers and has
 `:443` as its only site address, and that the proxy publishes only container
-port 443.
+port 443. They check that both servers set the three Kestrel HTTPS settings and
+publish only container port 8443, that both mount the server certificate folder
+read-only and that no other service does, and that the Caddyfile forwards to
+port 8443 over TLS with the server name `servers`, trusts only
+`/certs/server-ca.crt` and never skips the verification.
 
 ## In the cloud
 
@@ -410,7 +434,8 @@ publisher has no HTTP endpoint. Its termination grace period is 360 seconds,
 longer than the five-minute lease. It mounts the same secrets as the migrate
 Job. It has no Ingress. The server and worker Deployments each have a startup,
 liveness and readiness probe, see
-[health checks](../architecture.md#health-checks). The chart sets
+[health checks](../architecture.md#health-checks). The server's probes use
+HTTPS, and the worker's use plain HTTP. The chart sets
 `Health__Urls` to `http://0.0.0.0:5208` for the worker, so the kubelet can
 reach it. The server alone mounts the Studio volume and gets the Studio and
 forwarded headers settings. The pods run as a non-root user with a read-only root
@@ -435,6 +460,14 @@ same Secret, or to another one. Then set `secrets.scenarioServerConnection` and
 
 A secret store works too, if it syncs into a Kubernetes Secret.
 
+The server serves HTTPS only, so it needs a certificate for the DNS name of its
+Service, such as `axis-server.<namespace>.svc`. Create it as a Kubernetes TLS
+Secret, from a certificate that your Ingress trusts:
+
+```sh
+kubectl create secret tls axis-server-tls --cert=tls.crt --key=tls.key
+```
+
 **Install.** Write a values file that names the Secrets, then run:
 
 ```sh
@@ -449,6 +482,8 @@ secrets:
     name: axis-platform
   platformSecretKey:
     name: axis-platform
+  serverCertificate:
+    name: axis-server-tls
 ```
 
 Each pod mounts only the secrets it needs as files in `/run/secrets`. The
@@ -456,6 +491,8 @@ server gets all three, the worker gets the first and the last, and the migrate
 Job and the publisher get the last two. The publisher also gets
 `Scenarios__ServerConnectionString` when `secrets.scenarioServerConnection` is
 set. Neither has an `Admin:ConnectionString`.
+The server also mounts the `serverCertificate` Secret read-only at `/server-tls`, and no
+other pod does.
 Rendering fails with a message that names the value when a `name` is missing.
 The values schema rejects any field in a reference other than `name` and `key`.
 
@@ -473,7 +510,8 @@ The values schema rejects any field in a reference other than `name` and `key`.
 | `studio.persistence` | none | A Kubernetes volume source for the Studio folders, mounted read-write at `/studio` on every server replica. It is required when `studio.folders` is set, and rendering fails with a message that names it when it is missing. On its own it does nothing. The chart creates no claim. With several replicas it needs a `ReadWriteMany` storage class. |
 | `forwardedHeaders.knownProxies`, `forwardedHeaders.knownNetworks` | none | Server only. IP addresses and CIDR ranges of your proxies, rendered as `ForwardedHeaders__KnownProxies__N` and `ForwardedHeaders__KnownNetworks__N`. Empty trusts no proxy. |
 | `server.resources`, `worker.resources`, `migrate.resources` | none | Kubernetes resource requests and limits. |
-| `server.service.type`, `server.service.port` | `ClusterIP`, 80 | The Service of the server. Put your own Ingress in front of it, see [TLS](#tls). |
+| `server.service.type`, `server.service.port` | `ClusterIP`, 443 | The Service of the server. Its port is named `https` and forwards to the server's HTTPS port, 8443. Put your own Ingress in front of it, see [TLS](#tls). |
+| `secrets.serverCertificate` | none, required | Secret `name` of a Kubernetes TLS Secret with `tls.crt` and `tls.key`, for the DNS name of the server Service. It has no `key`. The server serves HTTPS only, and rendering fails with a message that names `secrets.serverCertificate.name` when it is missing. |
 | `publisher.resources` | none | Kubernetes resource requests and limits of the publisher. |
 | `secrets.scenarioServerConnection` | empty | Publisher only. Secret `name` and `key` of `Scenarios:ServerConnectionString`. The chart mounts it only when it is set. Create the role as in [On premises](#on-premises). |
 | `studio.tests` | `false` | Server only. `true` renders `Studio__Tests`, which turns on `studioTest`. Set it together with `secrets.scenarioServerConnection`. |
@@ -502,7 +540,7 @@ The chart has no Job for them.
 **Checks.** `scripts/lint.sh` runs `helm lint --strict` and validates the
 rendered manifests against the Kubernetes schemas with kubeconform.
 `scripts/helm.test.mjs` renders the chart and checks the probes, the migrate
-Job, the publisher Deployment, the secret references, the Studio volume, the forwarded headers, and that the chart renders no Ingress and a `ClusterIP` server Service. `scripts/setup.sh` installs the pinned Helm,
+Job, the publisher Deployment, the secret references, the Studio volume, the forwarded headers, that the server alone listens on HTTPS with its certificate Secret and is probed over HTTPS, that the Service port is named `https`, that rendering fails without `secrets.serverCertificate.name`, and that the chart renders no Ingress and a `ClusterIP` server Service. `scripts/setup.sh` installs the pinned Helm,
 kubeconform and Kubernetes schemas into `~/.cache/axis-tools`. Axis has no test
 against a live cluster.
 
@@ -526,8 +564,9 @@ Studio folder, with its smoke test, are built.
   the [installation key](tenant-setting-commands.md#installation-key) rotation,
   which signs nobody out. The first start after this change also signs
   everyone out once.
-- **Forwarded headers.** Behind a proxy that ends TLS, the server sees plain
-  HTTP. Name your proxies so the server can read the real scheme and host:
+- **Forwarded headers.** Behind a proxy that ends TLS, the server does not see
+  the client's connection, only the proxy's. Name your proxies so the server can
+  read the real scheme and host:
 
   | Setting | Environment variable | Meaning |
   | --- | --- | --- |
@@ -609,17 +648,28 @@ The rule for traffic that comes in, and for every connection Axis makes.
 - **Telemetry export.** Outside Development every OTLP endpoint that is set must be an
   `https` URL, or the server and the worker stop at start. See
   [telemetry export](host-settings.md#telemetry-export).
-- **Proxy to server.** _(planned for M16)_ Traffic between the proxy and the
-  server uses TLS. Inside the Compose network or the cluster it is plain HTTP
-  today.
+- **Proxy to server.** The server serves HTTPS only and has no plain HTTP
+  listener, so traffic between the proxy and the server never falls back to
+  unencrypted. The certificate comes from you. The Compose proxy connects over
+  TLS, checks that the certificate is for the name `servers` and trusts only
+  `server-ca.crt`, the authority you name. With Helm, your own Ingress must
+  connect to the Service over HTTPS and verify the server certificate. The
+  worker's health endpoint stays plain HTTP. Only the host or the kubelet
+  probes it, and it carries no application traffic.
 
 **What the Compose example sets.** The Caddyfile sets `protocols tls1.2 tls1.3`
-and the `ciphers` list above. The proxy publishes container port 443 only.
+and the `ciphers` list above. The proxy publishes container port 443 only. Both
+servers set a Kestrel HTTPS endpoint on port 8443 with the certificate in
+`AXIS_SERVER_TLS_DIR`, and the proxy forwards to port 8443 over TLS with the
+server name `servers` and `/certs/server-ca.crt` as its only trusted authority.
 
 **What the Helm chart leaves to you.** The chart has no Ingress, and the
 server Service is `ClusterIP`. Your own Ingress or load balancer ends TLS, so
 it must meet the rules for incoming traffic above. The chart cannot enforce
-versions or ciphers there.
+versions or ciphers there. It also cannot make the Ingress connect over HTTPS
+and verify the server certificate. The chart sets a Kestrel HTTPS endpoint from
+the Secret in `secrets.serverCertificate`, probes it over HTTPS and names the
+Service port `https`.
 
 The proxy follows
 [D49](../decisions/d49-several-server-replicas-behind-a-tls-proxy.md).
@@ -648,6 +698,16 @@ PostgreSQL serve TLS and set `SSL Mode=VerifyFull` in `ConnectionStrings__Platfo
 `ConnectionStrings__PlatformSchema` and `Admin__ConnectionString`. Add
 `Root Certificate` when the certificate comes from a private authority. The admin
 image checks the same strings, so `migrate` in step 2 needs them too.
+
+**The server certificate.** The server serves HTTPS only, so it does not start
+without a certificate. An existing install must create it before the rollout.
+With Compose, put `tls.crt` and `tls.key` for the name `servers` in
+`AXIS_SERVER_TLS_DIR`, and `server-ca.crt` in `AXIS_TLS_DIR`. The server does
+not start without the first two, and the proxy cannot reach the server without
+the third. The server's host port now serves HTTPS.
+With Helm, create the TLS Secret and set `secrets.serverCertificate.name`.
+Rendering fails without it. The Service port is now 443 and named `https`, so
+point your Ingress at it over HTTPS.
 
 **No downgrade.** Migrations are not reversed. To roll back, restore the backup
 from step 1 and run the old images.

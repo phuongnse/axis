@@ -28,3 +28,4 @@ artifacts/
 src/Axis.Server/wwwroot/
 
 deploy/compose/secrets/
+deploy/compose/server-tls/

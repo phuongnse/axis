@@ -1,5 +1,8 @@
-# Ends TLS and forwards to every server replica. It looks up the network alias `servers` every five seconds,
-# so a restarted replica rejoins, and it retries a request on the other replica when one is down.
+# Ends TLS and forwards to every server replica over TLS. It checks that the replica's certificate is for the name
+# servers and trusts only the authority certificate /certs/server-ca.crt for it, never the system roots and never
+# tls_insecure_skip_verify. The replicas listen on HTTPS only, on port 8443. It looks up the network alias
+# `servers` every five seconds, so a restarted replica rejoins, and it retries a request on the other replica
+# when one is down.
 # No trusted_proxies is set, so Caddy replaces any X-Forwarded-For, X-Forwarded-Proto and X-Forwarded-Host
 # that a client sends with its own values. The server trusts these headers only from this proxy.
 # TLS is limited to 1.2 and 1.3. On 1.2 only ECDHE ciphers with AES-GCM or ChaCha20-Poly1305 are accepted, so every
@@ -14,8 +17,13 @@
 		ciphers TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256 TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256 TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384 TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384 TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256 TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256
 	}
 	reverse_proxy {
-		dynamic a servers 8080 {
+		dynamic a servers 8443 {
 			refresh 5s
+		}
+		transport http {
+			tls
+			tls_server_name servers
+			tls_trust_pool file /certs/server-ca.crt
 		}
 		lb_try_duration 10s
 		fail_duration 10s
