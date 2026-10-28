@@ -176,13 +176,31 @@ describe('KpiWidget', () => {
     expect(screen.getByTestId('kpi-comparison')).toHaveTextContent(/^Urgent: 3$/)
   })
 
-  it('shows a muted italic dash with the empty text hidden for assistive technology', async () => {
+  it('shows the measure large and in tabular figures, under a label in the field label style', async () => {
+    stubRows(totalRow('{"openCount":12.50,"urgentCount":3}'))
+
+    renderKpi(withComparison)
+
+    const measure = await screen.findByTestId('kpi-measure')
+    expect(measure).toHaveTextContent(/^12\.50$/)
+    expect(measure).toHaveStyle({
+      fontSize: '24px',
+      lineHeight: '32px',
+      fontWeight: '600',
+      fontVariantNumeric: 'tabular-nums',
+    })
+    expect(screen.getByTestId('kpi-value')).toContainElement(measure)
+    expect(screen.getByText('Open', { selector: 'div' })).toHaveStyle({ fontWeight: '500' })
+  })
+
+  it('shows a muted italic dash at the measure size, with the empty text hidden for assistive technology', async () => {
     stubRows(totalRow('{"openCount":null,"urgentCount":3}'))
 
     renderKpi(withComparison)
 
     const dash = await screen.findByText('—')
     expect(dash).toHaveAttribute('aria-hidden', 'true')
+    expect(screen.getByTestId('kpi-measure')).toContainElement(dash)
     expect(dash.parentElement).toHaveStyle({ fontStyle: 'italic' })
     // The hidden text stays in the accessibility tree but is clipped out of sight.
     expect(screen.getByText('No value')).toHaveStyle({ position: 'absolute', width: '1px' })
