@@ -39,7 +39,7 @@ public static class ApplicationSites
             site.Path,
             site.Title.TextKey,
             new SiteLocales(site.Locales.Default, site.Locales.Fallback, site.Locales.Available),
-            [.. site.Navigation.Select(entry => new SiteNavigationItem(entry.Page.Name, entry.Label.TextKey))],
+            [.. site.Navigation.Select(entry => new SiteNavigationItem(entry.Page.Name, entry.Label.TextKey, entry.Icon))],
             $"/api/apps/{application.Manifest.Name}/notifications");
     }
 

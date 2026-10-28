@@ -7,7 +7,7 @@
   "title": { "textKey": "site.title" },
   "locales": { "default": "en", "fallback": "en", "available": ["en", "vi"] },
   "navigation": [
-    { "page": "MyLeaveRequests", "label": { "textKey": "nav.myLeaveRequests" } },
-    { "page": "MyTasks", "label": { "textKey": "nav.myTasks" } }
+    { "page": "MyLeaveRequests", "label": { "textKey": "nav.myLeaveRequests" }, "icon": "calendar" },
+    { "page": "MyTasks", "label": { "textKey": "nav.myTasks" }, "icon": "tasks" }
   ]
 }

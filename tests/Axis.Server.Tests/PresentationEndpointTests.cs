@@ -31,6 +31,7 @@ public sealed class PresentationEndpointTests
         Assert.Contains("vi", site.Locales.Available);
         var home = Assert.Single(site.Navigation, item => item.Path == "/");
         Assert.Equal("shell.nav.home", home.LabelKey);
+        Assert.Equal("home", home.Icon);
     }
 
     [Fact]
@@ -129,7 +130,7 @@ public sealed class PresentationEndpointTests
 
     private sealed record LocalesBody(string Default, string Fallback, List<string> Available);
 
-    private sealed record NavigationBody(string Key, string Path, string LabelKey);
+    private sealed record NavigationBody(string Key, string Path, string LabelKey, string? Icon);
 
     private sealed record TextsBody(string Locale, Dictionary<string, string> Texts);
 }

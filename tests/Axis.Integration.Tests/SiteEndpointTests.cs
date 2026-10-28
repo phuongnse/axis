@@ -57,9 +57,27 @@ public sealed class SiteEndpointTests(RecordApiFixture fixture) : IClassFixture<
         Assert.Equal("en", locales.GetProperty("fallback").GetString());
         Assert.Equal(["en", "vi"], locales.GetProperty("available").EnumerateArray().Select(locale => locale.GetString()));
         Assert.Equal(
-            [("Items", "nav.items"), ("Departments", "nav.departments")],
+            [("Items", "nav.items", "list"), ("Departments", "nav.departments", null)],
             root.GetProperty("navigation").EnumerateArray()
-                .Select(entry => (entry.GetProperty("page").GetString(), entry.GetProperty("labelKey").GetString())));
+                .Select(entry => (entry.GetProperty("page").GetString(), entry.GetProperty("labelKey").GetString(), entry.GetProperty("icon").GetString())));
+        Assert.All(
+            root.GetProperty("navigation").EnumerateArray(),
+            entry => Assert.Equal(["page", "labelKey", "icon"], entry.EnumerateObject().Select(property => property.Name)));
+    }
+
+    [Fact]
+    public async Task Platform_site_gives_its_home_entry_the_home_icon()
+    {
+        using var client = fixture.CreateClient();
+        using var request = Request("/api/site", HostA);
+
+        using var response = await client.SendAsync(request, CancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var site = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync(CancellationToken), cancellationToken: CancellationToken);
+        var home = Assert.Single(site.RootElement.GetProperty("navigation").EnumerateArray());
+        Assert.Equal("home", home.GetProperty("key").GetString());
+        Assert.Equal("home", home.GetProperty("icon").GetString());
     }
 
     [Fact]

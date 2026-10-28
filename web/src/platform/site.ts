@@ -6,6 +6,8 @@ export interface NavigationItem {
   key: string
   path: string
   labelKey: string
+  /** An Axis icon name, see navigationIcons. */
+  icon?: string | null
 }
 
 /** The locales a site offers. */
@@ -42,7 +44,7 @@ export interface ApplicationSite {
   path: string
   titleKey: string
   locales: SiteLocales
-  navigation: { page: string; labelKey: string }[]
+  navigation: { page: string; labelKey: string; icon?: string | null }[]
   /** The address of the application's notification routes. */
   notificationsPath?: string | null
 }

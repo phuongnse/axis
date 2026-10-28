@@ -1008,18 +1008,19 @@ test.describe('the author builds the service desk with Studio only', () => {
     await page.getByTestId('studio-field-/locales/available/1').getByRole('textbox').fill('vi')
 
     // The starter site has the entry for Home, which the author turns into the first entry.
-    const navigation: [page: string, key: string][] = [
-      ['MyTickets', 'nav.myTickets'],
-      ['MyTasks', 'nav.myTasks'],
-      ['AllTickets', 'nav.allTickets'],
-      ['Dashboard', 'nav.dashboard'],
+    const navigation: [page: string, key: string, icon: string][] = [
+      ['MyTickets', 'nav.myTickets', 'support'],
+      ['MyTasks', 'nav.myTasks', 'tasks'],
+      ['AllTickets', 'nav.allTickets', 'list'],
+      ['Dashboard', 'nav.dashboard', 'dashboard'],
     ]
-    for (const [index, [target, key]] of navigation.entries()) {
+    for (const [index, [target, key, icon]] of navigation.entries()) {
       if (index > 0) {
         await page.getByTestId('studio-field-/navigation').getByRole('button', { name: 'Add', exact: true }).click()
       }
       await pick(page, `studio-field-/navigation/${index}/page`, target)
       await writeLabel(page, `studio-field-/navigation/${index}/label`, key, en[key])
+      await pick(page, `studio-field-/navigation/${index}/icon`, icon)
     }
     await save(page)
     await expectForm(page)

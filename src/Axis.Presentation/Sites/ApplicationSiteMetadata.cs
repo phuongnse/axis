@@ -21,8 +21,9 @@ public sealed record SiteApplication(string Name, IReadOnlyDictionary<string, st
 /// <param name="NotificationsPath">The address of the application's notification routes, which the shell's bell reads.</param>
 public sealed record ApplicationSite(string Path, string TitleKey, SiteLocales Locales, IReadOnlyList<SiteNavigationItem> Navigation, string NotificationsPath);
 
-/// <summary>One navigation entry of an application site: the page it opens and the text key of its label.</summary>
-public sealed record SiteNavigationItem(string Page, string LabelKey);
+/// <summary>One navigation entry of an application site: the page it opens, the text key of its label and its icon.</summary>
+/// <param name="Icon">An Axis icon name, or null when the entry has none.</param>
+public sealed record SiteNavigationItem(string Page, string LabelKey, string? Icon);
 
 /// <summary>
 /// What the SPA needs to render a page: its title, its parameters and its widgets. The widgets are the top level of a tree: a
