@@ -15,7 +15,8 @@
 // The production hosts refuse a connection string with a weaker mode.
 // Keycloak imports a copy of the development realm that adds the https redirect addresses of the tenants.
 // The production server refuses an identity provider over plain http, so Keycloak serves https and only
-// the server and the admin tool in this test trust the certificate authority, through SSL_CERT_FILE.
+// the server, the admin tool and the publisher in this test trust the certificate authority, through SSL_CERT_FILE.
+// The publisher updates a tenant's realm after it activates a release.
 // Keycloak starts with an admin client, which `tenant create` signs in as to create each tenant's realm. A new realm has
 // no users, so the test points tenant one back at the development realm before the proxy signs the requester in.
 import assert from 'node:assert/strict'
@@ -663,7 +664,7 @@ describe('the on-premises installation', () => {
             server: serverOverride,
             'server-2': serverOverride,
             worker: { environment: refresh, ...trustOverride },
-            publisher: { environment: refresh, ...trustOverride },
+            publisher: { environment: { ...refresh, SSL_CERT_FILE: '/run/test-ca/ca.crt' }, ...trustOverride },
             admin: { environment: { SSL_CERT_FILE: '/run/test-ca/ca.crt' }, ...trustOverride },
           },
         }),

@@ -287,7 +287,7 @@ sets it, 30 seconds by default.
   which refuses an identity provider over plain `http`. So `tenant create` refuses a plain `http`
   `IdentityProvider__Url` there too.
 - **A private certificate authority.** When the identity provider's certificate
-  comes from your own authority, add its certificate to the trust store of the server and of the admin host. Do not replace the store: pointing `SSL_CERT_FILE` at one file makes
+  comes from your own authority, add its certificate to the trust store of the server, of the admin host and of the publisher. Do not replace the store: pointing `SSL_CERT_FILE` at one file makes
   the server trust only that file.
 - **Ports.** The server listens on `127.0.0.1:8080` of the host, the second
   replica on `127.0.0.1:8081`, and the worker's health endpoints on
@@ -368,7 +368,7 @@ steps say, and `scripts/smoke.sh` runs it. It builds the three production images
 and starts a test PostgreSQL over TLS and a Keycloak over HTTPS, with a certificate
 authority it makes for the run, and imports a copy of the development realm that
 adds the tenants' `https://` redirect addresses. Keycloak starts with an admin client for `tenant create`, mounts `deploy/keycloak/password-blacklists` at
-`/opt/keycloak/data/password-blacklists`, and the admin host trusts the authority too. PostgreSQL serves a certificate
+`/opt/keycloak/data/password-blacklists`, and the admin host and the publisher trust the authority too. PostgreSQL serves a certificate
 of the same authority for the name `postgres`, and every connection string sets
 `SSL Mode=VerifyFull` and that authority as `Root Certificate`. A static check of the rendered configuration shows that
 `compose.yaml` alone gives no service the scenario secret or `Studio__Tests`, and that adding
@@ -633,7 +633,8 @@ The rule for traffic that comes in, and for every connection Axis makes.
 
 - **The identity provider.** Outside Development and Testing the server
   accepts an identity provider over `https` only (`RequireHttpsMetadata`). It
-  validates the certificate against the system trust store. Add a private
+  validates the certificate against the system trust store. The admin host and the publisher
+  update each tenant's realm, so they trust it the same way. Add a private
   authority to that store. Do not replace the store with `SSL_CERT_FILE`, which
   makes the server trust only that file, see [on premises](#on-premises).
 - **PostgreSQL.** Set `SSL Mode=VerifyFull` in the host's own connection

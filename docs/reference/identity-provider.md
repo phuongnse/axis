@@ -202,10 +202,16 @@ _(planned for M17)_
   `<provider alias>.<subject>`. Each provider names the realm's first-login flow. It touches no other client or
   provider, so `axis`, `axis-activation`, `axis-users` and anything an operator added stay. Both tenant catalogs carry
   the realm's name, the identity provider's address and the activation secret, see
-  [tenant realm](host-settings.md#tenant-realm). Activation does not call it yet.
+  [tenant realm](host-settings.md#tenant-realm).
 - **Brought in step by activation:** activating a release adds, changes and removes the realm's brokered providers,
   their claim mappers and the site clients to match the active releases of the tenant and its platform sign-in. A
   provider that nothing names any more is removed. Its users stay, but cannot sign in through it.
+  Built for `Axis.Admin`: `activate`, and the publisher's `publish`, `publish` with target `preview` and `rollback`
+  update the realm inside their `activate` step, after the activation has committed. A tenant without an activation
+  secret, such as a preview tenant or one that signs in through an outside identity provider, skips the update. A
+  failure of the identity provider fails the step with a line that names the identity provider step and its status
+  code, and the new release stays active, see [activate](administration.md#activate). A `validate` and a `test`
+  never update the realm. The server's startup activation does not update the realm yet.
 - **Bindings:** a missing binding, or a binding of the wrong kind, fails activation, as for a connector (`AXC0100`).
   Built for `oidc` providers: `issuer` is a `url` binding, and `clientId`, `clientSecret` and `clientKey` are `secret`
   bindings. On a preview tenant activation leaves the provider out with a warning, see
