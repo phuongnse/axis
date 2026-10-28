@@ -21,9 +21,8 @@ const schemaByKind = new Map(
     schema,
   ]),
 )
-// The manifest is not created from Studio. The identity provider kind has no starter yet, because Studio's
-// identity provider editor and the create route come with a later M17 issue.
-const notCreatedKinds = ['application', 'identityProvider']
+// The manifest is not created from Studio.
+const notCreatedKinds = ['application']
 const createdKinds = [...schemaByKind.keys()].filter((kind) => !notCreatedKinds.includes(kind)).toSorted()
 
 function resolvePointer(root: unknown, pointer: string): unknown {
@@ -35,7 +34,7 @@ function resolvePointer(root: unknown, pointer: string): unknown {
 }
 
 describe('the starters', () => {
-  it('cover every bundled schema except the manifest and the identity provider', () => {
+  it('cover every bundled schema except the manifest', () => {
     expect(createdKinds.length).toBeGreaterThan(0)
     expect(starterKinds).toEqual(createdKinds)
   })

@@ -36,6 +36,7 @@ import { ConnectorEditor } from './ConnectorEditor'
 import { EndpointValues } from './EndpointValues'
 import { FormSteps } from './FormSteps'
 import { EntityDesigner } from './EntityDesigner'
+import { IdentityProviderEditor } from './IdentityProviderEditor'
 import { emptyHistory, endStep, recordStep, redoStep, undoStep, type DraftSnapshot } from './draftHistory'
 import { EntityMigrationQuestions } from './EntityMigrationQuestions'
 import { ExpressionCheckContext } from './expressionCheckContext'
@@ -45,6 +46,7 @@ import { ProcessEditor } from './ProcessEditor'
 import { ScenarioEditor } from './ScenarioEditor'
 import { SchemaForm } from './SchemaForm'
 import { SeedGrid } from './SeedGrid'
+import { SiteSignIn } from './SiteSignIn'
 import type { FormUse } from './StudioFormUsedOn'
 import type { OpenResource } from './StudioReferences'
 import { TextTable, type TextColumn } from './TextTable'
@@ -146,7 +148,9 @@ function Drawn({ onDrawn, children }: { onDrawn: (drawn: boolean) => void; child
  * a column per field, below the form of its other properties, and Save is off while a value would fail seeding. When
  * the entity is not in the folder, the seed uses the generic form. A scenario shows a typed editor of its name, users,
  * stubs and steps, and the JSON view edits the same draft. A connector opens in the connector editor, which shows a
- * binding as a name only. A page opens in the page editor, which shows its widgets as a tree with add, move and remove
+ * binding as a name only. An identity provider opens in the identity provider editor, which shows the fields of its type
+ * and keeps a key it does not show, and a site's `signIn` is a list of rows that each pick one of the application's
+ * identity providers, beside the generic form of the site's other properties. A page opens in the page editor, which shows its widgets as a tree with add, move and remove
  * and a panel for the selected widget, and keeps a key it does not show. A process opens in the process editor, which shows its
  * steps as cards, with the decision, end and task panels and a picker of the draft's step names for every transition.
  * A page also has a Design tab, which draws the draft with the site's widgets over placeholder data, beside a palette
@@ -482,6 +486,14 @@ export function StudioEditor({
     }
     const { values: _values, ...properties } = schema.properties ?? {}
     return { ...schema, properties, required: schema.required?.filter((name) => name !== 'values') }
+  }, [item.kind, schema])
+
+  const siteSchema = useMemo(() => {
+    if (item.kind !== 'site' || !schema) {
+      return undefined
+    }
+    const { signIn: _signIn, ...properties } = schema.properties ?? {}
+    return { ...schema, properties, required: schema.required?.filter((name) => name !== 'signIn') }
   }, [item.kind, schema])
 
   const formSchema = useMemo(() => {
@@ -874,6 +886,8 @@ export function StudioEditor({
                       />
                     ) : item.kind === 'connector' && schema ? (
                       <ConnectorEditor value={draft} onChange={change} />
+                    ) : item.kind === 'identityProvider' && schema ? (
+                      <IdentityProviderEditor value={draft} onChange={change} />
                     ) : processSchema ? (
                       <ProcessEditor schema={processSchema} value={draft} onChange={change} />
                     ) : item.kind === 'page' && schema ? (
@@ -882,6 +896,17 @@ export function StudioEditor({
                       <Flex vertical gap="middle">
                         <SchemaForm schema={endpointSchema} value={draft} onChange={change} />
                         <EndpointValues fields={endpointFields} values={draft.values} onChange={change} />
+                      </Flex>
+                    ) : siteSchema ? (
+                      <Flex vertical gap="middle">
+                        <SchemaForm schema={siteSchema} value={draft} onChange={change} />
+                        <SiteSignIn
+                          providers={resources
+                            .filter((resource) => resource.kind === 'identityProvider' && resource.name)
+                            .map((resource) => resource.name!)}
+                          value={draft.signIn}
+                          onChange={change}
+                        />
                       </Flex>
                     ) : formSchema ? (
                       <Flex vertical gap="middle">

@@ -96,8 +96,9 @@ so Studio edits it, with the identity provider editor of [Studio](studio.md), an
   - A site's `signIn` entry that names no provider is `AXC0289`, see
     [sites and sign-in](#sites-and-sign-in).
 - **Not read yet:** sign-in and activation do not read the resource yet. Activation does not check the bindings
-  against the tenant's. Studio's blank application creates an `accounts` provider, but Studio has no other way to create
-  the kind yet, so an author adds any other provider by hand.
+  against the tenant's. Studio's blank application creates an `accounts` provider, and New resource creates
+  more from an `accounts` starter. Studio edits the kind with the identity provider editor, which does not show a
+  binding's value, and a site's `signIn` with a picker of the application's providers.
 
 ## Sites and sign-in
 

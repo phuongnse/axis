@@ -42,6 +42,10 @@
     },
     "emptyReferences": ["/entity", "/sections/0/title/textKey", "/sections/0/fields/0/field"]
   },
+  "identityProvider": {
+    "content": { "type": "accounts" },
+    "emptyReferences": []
+  },
   "migration": {
     "content": {
       "entity": "",
