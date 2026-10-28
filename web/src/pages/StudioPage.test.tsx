@@ -5,6 +5,7 @@ import { MemoryRouter, useLocation } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import purchaseRequestApproval from '../../../samples/apps/purchase-requests/processes/purchase-request-approval.json'
+import { isSignInNeeded } from '../platform/signInNeeded'
 import { assignLocation } from '../platform/navigation'
 import { ThemeModeProvider } from '../platform/theme'
 import { TextProvider } from '../platform/TextProvider'
@@ -888,7 +889,7 @@ describe('StudioPage', () => {
     expect(new Headers(init!.headers).get('If-Match')).toBe('"b"')
   })
 
-  it('starts sign-in when the reload after a reconnect answers 401', async () => {
+  it('asks to sign in when the reload after a reconnect answers 401', async () => {
     vi.mocked(assignLocation).mockClear()
     const outage: Outage = { down: null }
     stubServer(undefined, undefined, outage)
@@ -902,10 +903,8 @@ describe('StudioPage', () => {
     await screen.findByTestId('studio-reconnecting', {}, { timeout: 3000 })
     outage.down = { status: 401 }
 
-    await waitFor(
-      () => expect(assignLocation).toHaveBeenCalledWith(expect.stringMatching(/^\/api\/auth\/sign-in\?returnUrl=/)),
-      { timeout: 3000 },
-    )
+    await waitFor(() => expect(isSignInNeeded()).toBe(true), { timeout: 3000 })
+    expect(assignLocation).not.toHaveBeenCalled()
   })
 })
 

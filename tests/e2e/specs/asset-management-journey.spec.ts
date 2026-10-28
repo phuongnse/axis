@@ -8,7 +8,7 @@ import { compareApplicationFolders } from '../folder-comparison'
 import { pickAction, pickOption, pickOptions } from '../select'
 import { assetManagement, journeyApplications, journeyURL } from '../server-settings'
 import { csrfHeaders } from '../csrf'
-import { fieldLabel } from '../fields'
+import { cellValue, expectShown, fieldLabel } from '../fields'
 import { useJourneySession } from '../sessions'
 import { createResource, openFormTab } from '../studio-resources'
 
@@ -77,6 +77,8 @@ test.describe('the author builds the asset management application with Studio on
     )
     await page.getByRole('button', { name: 'Save', exact: true }).click()
     for (const [field, choice] of answers) {
+      // A click while the dialog zooms in is lost, so wait until it has finished opening.
+      await waitForDialog(page)
       await expect(page.getByTestId('studio-migration-field')).toHaveText(field)
       // A click during the dialog's zoom-in is lost, so each answer waits for its dialog to open.
       const dialog = await waitForDialog(page)
@@ -1255,8 +1257,8 @@ test.describe('the author builds the asset management application with Studio on
     for (const name of software) {
       await expect(labels).toContainText(name)
     }
-    await expect(page.getByLabel(fieldLabel('Vendor 1'))).toHaveValue(vendor)
-    await expect(page.getByLabel(fieldLabel('Cost 1'))).toHaveValue(/200/)
+    await expectShown(cellValue(page, 'maintenance', 0, 'vendor'), vendor)
+    await expectShown(cellValue(page, 'maintenance', 0, 'cost'), /200/)
   })
 
   test('quan imports the asset CSV after a clean dry run and finds the imported assets in the register', async ({

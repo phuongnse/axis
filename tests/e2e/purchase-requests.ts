@@ -1,7 +1,7 @@
 import { expect, test } from './test'
 import type { Page } from '@playwright/test'
 import { csrfHeaders } from './csrf'
-import { fieldLabel } from './fields'
+import { expectShown, fieldLabel, fieldValue } from './fields'
 
 // Specs run in parallel against one database, so each test looks only for the request and the tasks
 // it creates. They use Operations, whose manager is chau, so that the per-department test keeps the
@@ -69,7 +69,7 @@ export async function decide(
 ) {
   const row = await waitForTask(page, title)
   await row.getByRole('link', { name: task, exact: true }).click()
-  await expect(page.getByLabel(fieldLabel('Title'))).toHaveValue(title)
+  await expectShown(fieldValue(page, 'title'), title)
   if (comment !== undefined) {
     await page.getByLabel(fieldLabel('Decision comments')).fill(comment)
   }
@@ -82,14 +82,14 @@ export async function decide(
  * it read-only.
  */
 export function statusValue(page: Page) {
-  return page.getByLabel(fieldLabel('Status'))
+  return fieldValue(page, 'status')
 }
 
 /** Opens the request form until it shows `status`, since the worker ends the process later. */
 export async function expectStatus(page: Page, id: string, status: string) {
   await expect(async () => {
     await page.goto(`/purchasing/purchaserequestform/${id}`)
-    await expect(statusValue(page)).toHaveValue(status, { timeout: 1_000 })
+    await expectShown(statusValue(page), status, { timeout: 1_000 })
   }).toPass({ timeout: 30_000 })
 }
 

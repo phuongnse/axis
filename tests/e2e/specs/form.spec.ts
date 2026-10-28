@@ -2,7 +2,7 @@ import { expect, test } from '../test'
 import type { APIRequestContext, Locator, Page } from '@playwright/test'
 import { csrfHeaders } from '../csrf'
 import { waitForDialog } from '../dialogs'
-import { fieldLabel } from '../fields'
+import { expectShown, fieldLabel, fieldValue } from '../fields'
 import { pickOption } from '../select'
 import { sessionFile, useSession } from '../sessions'
 
@@ -77,7 +77,7 @@ test('a note is created and edited in the form, in light and dark mode', async (
     await expect(row).toContainText(text)
   }
 
-  await row.getByRole('button', { name: 'Open', exact: true }).click()
+  await row.getByRole('link', { name: title, exact: true }).click()
   await expect(page.getByRole('textbox', { name: 'Title', exact: true })).toHaveValue(title)
   await page.getByRole('textbox', { name: 'Title', exact: true }).fill(`${title} edited`)
   await page.getByRole('button', { name: 'Save', exact: true }).click()
@@ -89,7 +89,7 @@ test('a note is created and edited in the form, in light and dark mode', async (
   await expect(edited).toContainText(`C-${run}`)
 
   await page.getByRole('switch', { name: 'Dark mode', exact: true }).click()
-  await edited.getByRole('button', { name: 'Open', exact: true }).click()
+  await edited.getByRole('link', { name: `${title} edited`, exact: true }).click()
   const dark = page.locator('[data-theme-mode="dark"]')
   await expect(dark.getByRole('textbox', { name: 'Title', exact: true })).toHaveValue(`${title} edited`)
   await dark.getByRole('button', { name: 'Cancel', exact: true }).click()
@@ -113,18 +113,18 @@ test('a note saved by a signed-in user shows its creator read-only', async ({ pa
   )
   await openForm(page, page.getByRole('button', { name: 'New', exact: true }))
   await expect(page).toHaveURL(/\/e2e\/noteform\/new$/)
-  await expect(page.getByLabel(fieldLabel('Created by'))).toHaveValue('Not set')
+  await expectShown(fieldValue(page, 'createdBy'), 'Not set')
   await page.getByRole('textbox', { name: 'Title', exact: true }).fill(title)
   await page.getByRole('button', { name: 'Save', exact: true }).click()
 
   await expect(page).toHaveURL(/\/e2e\/notes\?pageSize=100&sort=-title$/)
   await openForm(
     page,
-    page.getByRole('row', { name: new RegExp(`${title} `) }).getByRole('button', { name: 'Open', exact: true }),
+    page.getByRole('row', { name: new RegExp(`${title} `) }).getByRole('link', { name: title, exact: true }),
   )
   await expect(page.getByRole('textbox', { name: 'Title', exact: true })).toHaveValue(title)
-  const createdBy = page.getByLabel(fieldLabel('Created by'))
-  await expect(createdBy).toHaveValue(me.id)
+  const createdBy = fieldValue(page, 'createdBy')
+  await expectShown(createdBy, me.id)
   await expect(createdBy).not.toBeEditable()
 })
 
@@ -148,7 +148,7 @@ test('line items are added, edited and removed in the form, in light and dark mo
 
   await expect(page).toHaveURL(tablePath)
   const row = page.getByRole('row', { name: new RegExp(`${title} `) })
-  await row.getByRole('button', { name: 'Open', exact: true }).click()
+  await row.getByRole('link', { name: title, exact: true }).click()
   await expect(cell('Description 1')).toHaveValue('Pens')
   await expect(cell('Quantity 1')).toHaveValue('2')
   await expect(cell('Description 2')).toHaveValue('Ink')
@@ -163,7 +163,7 @@ test('line items are added, edited and removed in the form, in light and dark mo
   await dark.getByRole('button', { name: 'Save', exact: true }).click()
 
   await expect(page).toHaveURL(tablePath)
-  await row.getByRole('button', { name: 'Open', exact: true }).click()
+  await row.getByRole('link', { name: title, exact: true }).click()
   await expect(page).toHaveURL(new RegExp(`/e2e/noteform/${id}$`))
   await page.reload()
   await expect(dark.getByLabel(fieldLabel('Description 1'))).toHaveValue('Pens')
@@ -190,7 +190,7 @@ test('after a signed-in user edits a note, its history shows the update first, i
   await page.reload()
 
   const row = page.getByRole('row', { name: new RegExp(`${title} `) })
-  await row.getByRole('button', { name: 'Open', exact: true }).click()
+  await row.getByRole('link', { name: title, exact: true }).click()
   await expect(page.getByRole('textbox', { name: 'Title', exact: true })).toHaveValue(title)
   await page.getByRole('textbox', { name: 'Title', exact: true }).fill(`${title} edited`)
   await page.getByRole('button', { name: 'Save', exact: true }).click()
@@ -201,7 +201,7 @@ test('after a signed-in user edits a note, its history shows the update first, i
     if (mode === 'dark') {
       await page.getByRole('switch', { name: 'Dark mode', exact: true }).click()
     }
-    await edited.getByRole('button', { name: 'Open', exact: true }).click()
+    await edited.getByRole('link', { name: `${title} edited`, exact: true }).click()
     const history = page.locator(`[data-theme-mode="${mode}"]`).getByTestId('record-history')
     await expect(history).toContainText('History')
     const entries = history.getByTestId('history-entry')
@@ -316,7 +316,7 @@ test('a category is picked in the lookup of a line item and shows on the saved l
   await expect(page).toHaveURL(/\/e2e\/notes\?pageSize=100&sort=-title$/)
   await page
     .getByRole('row', { name: new RegExp(`${title} `) })
-    .getByRole('button', { name: 'Open', exact: true })
+    .getByRole('link', { name: title, exact: true })
     .click()
   await expect(page.getByLabel(fieldLabel('Category 1'))).toHaveValue(category)
 })
@@ -329,8 +329,8 @@ test('a form in two sections shows both titles, and saving keeps its read-only f
   await expect(page.getByRole('heading', { name: 'Main', exact: true })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Details', exact: true })).toBeVisible()
   await expect(page.getByRole('textbox', { name: 'Title', exact: true })).toHaveValue(`Sections ${run}`)
-  const code = page.getByLabel(fieldLabel('Code'))
-  await expect(code).toHaveValue(`S-${run}`)
+  const code = fieldValue(page, 'code')
+  await expectShown(code, `S-${run}`)
   await expect(code).not.toBeEditable()
   // A field the form does not list is not shown.
   await expect(page.getByLabel(/Done/)).toBeHidden()

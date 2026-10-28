@@ -2,7 +2,7 @@ import { expect, test } from '../test'
 import type { APIRequestContext, Page } from '@playwright/test'
 import { csrfHeaders } from '../csrf'
 import { waitForDialog } from '../dialogs'
-import { fieldLabel } from '../fields'
+import { cellValue, expectShown, fieldLabel, fieldValue } from '../fields'
 import { expectChosen, pickOption } from '../select'
 import { sessionFile, useSession } from '../sessions'
 
@@ -77,11 +77,11 @@ test('a purchase request is created with line items, shows the computed total, i
   await expect(row).toContainText('2,550.90')
 
   // The server computes each line amount and the total on save, so the form shows them once reopened.
-  await row.getByRole('button', { name: 'Open', exact: true }).click()
+  await row.getByRole('link', { name: title, exact: true }).click()
   await expect(page.getByRole('textbox', { name: 'Title', exact: true })).toHaveValue(title)
-  await expect(cell('Amount 1')).toHaveValue('2,500.90')
-  await expect(cell('Amount 2')).toHaveValue('50.00')
-  await expect(cell('Total amount')).toHaveValue('2,550.90')
+  await expectShown(cellValue(page, 'lineItems', 0, 'amount'), '2,500.90')
+  await expectShown(cellValue(page, 'lineItems', 1, 'amount'), '50.00')
+  await expectShown(fieldValue(page, 'totalAmount'), '2,550.90')
   await page.getByRole('textbox', { name: 'Title', exact: true }).fill(`${title} edited`)
   await page.getByRole('button', { name: 'Save', exact: true }).click()
 
@@ -93,11 +93,11 @@ test('a purchase request is created with line items, shows the computed total, i
   await expect(edited).toContainText('Acme Supplies')
 
   await page.getByRole('switch', { name: 'Dark mode', exact: true }).click()
-  await edited.getByRole('button', { name: 'Open', exact: true }).click()
+  await edited.getByRole('link', { name: `${title} edited`, exact: true }).click()
   const dark = page.locator('[data-theme-mode="dark"]')
   await expect(dark.getByRole('textbox', { name: 'Title', exact: true })).toHaveValue(`${title} edited`)
   await expect(dark.getByLabel(fieldLabel('Department'))).toHaveValue('Finance')
-  await expect(dark.getByLabel(fieldLabel('Total amount'))).toHaveValue('2,550.90')
+  await expectShown(fieldValue(dark, 'totalAmount'), '2,550.90')
   await dark.getByRole('button', { name: 'Cancel', exact: true }).click()
   await expect(page).toHaveURL(tablePath)
 })
@@ -106,13 +106,13 @@ test('a new purchase request gets a number from the sequence on save, and the fo
   page,
 }) => {
   const title = `Numbered ${Date.now()}-${test.info().retry}`
-  const number = page.getByLabel(fieldLabel('Number'))
+  const number = fieldValue(page, 'number')
   await page.goto('/purchasing/purchaserequests?pageSize=100&sort=-title')
 
   // The server numbers the request on create, so the new form shows the field empty and read-only.
   await page.getByRole('button', { name: 'New', exact: true }).click()
   await expect(page).toHaveURL(/\/purchasing\/purchaserequestform\/new$/)
-  await expect(number).toHaveValue('Not set')
+  await expectShown(number, 'Not set')
   await expect(number).toHaveAttribute('readonly')
   await page.getByRole('textbox', { name: 'Title', exact: true }).fill(title)
   await choose(page, 'department', 'Department', 'Finance')
@@ -126,11 +126,11 @@ test('a new purchase request gets a number from the sequence on save, and the fo
   await expect(page).toHaveURL(tablePath)
   await page
     .getByRole('row', { name: new RegExp(`${title} `) })
-    .getByRole('button', { name: 'Open', exact: true })
+    .getByRole('link', { name: title, exact: true })
     .click()
   await expect(page.getByRole('textbox', { name: 'Title', exact: true })).toHaveValue(title)
   await expect(number).toHaveAttribute('readonly')
-  await expect(number).toHaveValue(new RegExp(`^PR-${new Date().getUTCFullYear()}-\\d{5}$`))
+  await expectShown(number, new RegExp(`^PR-${new Date().getUTCFullYear()}-\\d{5}$`))
 })
 
 test('the purchase request list reads a data source, shows department names, and keeps paging and sorting after reload, in light and dark mode', async ({

@@ -354,9 +354,31 @@ const signedOutPages: {
   },
 ];
 
+/**
+ * Opens `address` while signed out and checks that the sign-in prompt shows and no sign-in request
+ * goes out. Then it clicks **Sign in** on the prompt and logs in as `user` on the Keycloak login page.
+ */
+async function signInFromPrompt(page: Page, address: string, user: SampleUser) {
+  const signInRequests: string[] = [];
+  page.on("request", (request) => {
+    const { pathname } = new URL(request.url());
+    if (pathname === "/api/auth/sign-in") {
+      signInRequests.push(request.url());
+    }
+  });
+
+  await page.goto(address);
+  const prompt = page.getByTestId("sign-in-prompt");
+  await expect(prompt).toBeVisible();
+  expect(signInRequests).toEqual([]);
+
+  await prompt.getByRole("button", { name: "Sign in", exact: true }).click();
+  await logIn(page, user);
+}
+
 for (const entry of signedOutPages) {
   // Each test has its own browser context, so no Keycloak session carries over from another sign-in.
-  test(`a signed-out person who opens ${entry.name} signs in on the Keycloak login page and lands back on it`, async ({
+  test(`a signed-out person who opens ${entry.name} signs in from the prompt on the Keycloak login page and lands back on it`, async ({
     page,
     request,
     playwright,
@@ -371,15 +393,14 @@ for (const entry of signedOutPages) {
     // The request fixture holds no session either.
     expect((await request.get(entry.api(id))).status()).toBe(401);
 
-    await page.goto(address);
-    await logIn(page, entry.user);
+    await signInFromPrompt(page, address, entry.user);
 
     await page.waitForURL(`${baseURL}${address}`);
     await entry.expectation(page, title);
   });
 }
 
-test("a signed-out person who opens My tasks signs in on the Keycloak login page and lands back on it", async ({
+test("a signed-out person who opens My tasks signs in from the prompt on the Keycloak login page and lands back on it", async ({
   page,
   request,
   baseURL,
@@ -389,14 +410,13 @@ test("a signed-out person who opens My tasks signs in on the Keycloak login page
   // The request fixture holds no session either.
   expect((await request.get(`${tasksPath}?pageSize=100`)).status()).toBe(401);
 
-  await page.goto(address);
-  await logIn(page, "chau");
+  await signInFromPrompt(page, address, "chau");
 
   await page.waitForURL(`${baseURL}${address}`);
   await expect(page.getByRole("columnheader", { name: "Task", exact: true })).toBeVisible();
 });
 
-test("a signed-out person who opens a task's address signs in on the Keycloak login page and lands back on it", async ({
+test("a signed-out person who opens a task's address signs in from the prompt on the Keycloak login page and lands back on it", async ({
   page,
   request,
   playwright,
@@ -409,8 +429,7 @@ test("a signed-out person who opens a task's address signs in on the Keycloak lo
 
   expect((await request.get(`${tasksPath}/${taskId}`)).status()).toBe(401);
 
-  await page.goto(address);
-  await logIn(page, "chau");
+  await signInFromPrompt(page, address, "chau");
 
   await page.waitForURL(`${baseURL}${address}`);
   await expect(page.getByRole("button", { name: "Approve", exact: true })).toBeVisible();

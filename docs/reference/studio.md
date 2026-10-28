@@ -238,7 +238,7 @@ Run and the Test results list, the read-only view of a module entity, and the re
     file changed in the meantime, the next save gets a `409`. Studio does not
     resend a save that got no answer, so the author clicks Save again.
   - Save and Delete are off while the message shows.
-  - A `401` from a reload starts sign-in, as elsewhere.
+  - A `401` from a reload shows the sign-in prompt, as elsewhere.
 - **Reference pickers.** A property that the schema marks with
   [`x-axis-reference`](resource-files.md#schema-keywords) shows as a select over
   the names that the [names route](authoring.md#names) lists, in place of a text
@@ -330,7 +330,7 @@ Run and the Test results list, the read-only view of a module entity, and the re
     `requiredWhen` on a saved form field is checked before the first save. A
     place inside a new field or item that the file does not hold has none.
     When there is no answer, or the check answers `400` or
-    `401`, the last result stays on screen. A `401` does not start sign-in, so
+    `401`, the last result stays on screen. A `401` does not show the sign-in prompt, so
     the draft is kept. The editor never blocks Save.
 - **Entity designer** _(built)_. It is in [the entity designer](entity-designer.md).
 - **Migrations from the designer** _(built)_. The designer compares
@@ -870,7 +870,7 @@ Run and the Test results list, the read-only view of a module entity, and the re
     A KPI's navigate action is a link-style button on the label line, and the
     tile is not a link. At narrow width, a table's row actions fold into a menu
     that the canvas cannot open, because it cancels the click. There the author
-    selects a row action from the tree and the panel. _(planned)_ A table's
+    selects a row action from the tree and the panel. A table's
     first `navigate` row action draws as the link of its identifying column,
     which selects the action as a button does. Three or more other row actions
     fold into the "…" menu at any width, and are selected the same way, see

@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import { formItem } from '../test/antd'
+import { isSignInNeeded } from './signInNeeded'
 import { assignLocation } from './navigation'
 import { ProcessInstancePage } from './ProcessInstancePage'
 import type { WidgetMetadata } from './site'
@@ -426,14 +427,15 @@ describe('ProcessInstancePage', () => {
     expect(screen.queryByTestId('inspector-instance')).not.toBeInTheDocument()
   })
 
-  it('starts sign-in when nobody is signed in', async () => {
+  it('asks to sign in when nobody is signed in', async () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {})
     vi.mocked(assignLocation).mockReset()
     stubApi({ detail: { status: 401 } })
 
     renderPage()
 
-    await waitFor(() => expect(assignLocation).toHaveBeenCalledOnce())
+    await waitFor(() => expect(isSignInNeeded()).toBe(true))
+    expect(assignLocation).not.toHaveBeenCalled()
   })
 
   it('shows only the command buttons the detail allows', async () => {

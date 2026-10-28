@@ -1,7 +1,7 @@
 import { expect, test } from "../test";
 import type { APIRequest, APIRequestContext } from "@playwright/test";
 import { csrfHeaders } from "../csrf";
-import { fieldLabel } from "../fields";
+import { expectShown, fieldLabel, fieldValue } from "../fields";
 import { expectChosen } from "../select";
 import { sessionFile, useSession, type SampleUser } from "../sessions";
 
@@ -134,7 +134,7 @@ test("anna submits a leave request, chau approves it in My tasks, and anna sees 
     await expect(row).toBeVisible({ timeout: 1_000 });
   }).toPass({ timeout: 30_000 });
   await row.getByRole("link", { name: "Manager approval", exact: true }).click();
-  await expect(page.getByLabel(fieldLabel("Reason"))).toHaveValue(reason);
+  await expectShown(fieldValue(page, "reason"), reason);
   await page.getByRole("button", { name: "Approve", exact: true }).click();
   await expect(page).toHaveURL(/\/leave\/mytasks$/);
 
@@ -144,7 +144,7 @@ test("anna submits a leave request, chau approves it in My tasks, and anna sees 
     await page.goto(`/leave/leaverequestform/${id}`);
     await expectChosen(page.getByRole('combobox', { name: 'Status', exact: true }), "approved", { timeout: 1_000 });
   }).toPass({ timeout: 30_000 });
-  await expect(page.getByLabel(fieldLabel("Days"))).toHaveValue("3");
+  await expectShown(fieldValue(page, "days"), "3");
 });
 
 test("an employee cannot open another employee's leave request, by its form or the API", async ({

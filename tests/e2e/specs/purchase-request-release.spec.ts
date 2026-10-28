@@ -6,7 +6,7 @@ import type { Browser, Page, TestInfo } from '@playwright/test'
 import { activateFolder, startServer } from '../activate'
 import { csrfHeaders } from '../csrf'
 import { confirmDialog, waitForDialog } from '../dialogs'
-import { fieldLabel } from '../fields'
+import { expectShown, fieldLabel, fieldValue } from '../fields'
 import { guardStep } from '../hang-guard'
 import { appPath, createRequest, decide, expectStatus, submit, waitForTask } from '../purchase-requests'
 import { previewURL, purchaseRequests } from '../server-settings'
@@ -143,7 +143,7 @@ async function publishWithLabel(page: Page, label: string) {
 async function reviewAndApprove(page: Page, title: string, shown: string, hidden: string) {
   const row = await waitForTask(page, title)
   await row.getByRole('link', { name: 'Manager approval', exact: true }).click()
-  await expect(page.getByLabel(fieldLabel('Title'))).toHaveValue(title)
+  await expectShown(fieldValue(page, 'title'), title)
   for (const mode of ['light', 'dark']) {
     if (mode === 'dark') await page.getByRole('switch', { name: 'Dark mode', exact: true }).click()
     const theme = page.locator(`[data-theme-mode="${mode}"]`)

@@ -9,6 +9,8 @@ import { PlatformShellRoute } from './pages/PlatformShellRoute'
 import { SiteIndex, SiteRoute } from './pages/SiteRoute'
 import { StudioPage } from './pages/StudioPage'
 import { readStoredLocale } from './platform/locale'
+import { SignInPrompt } from './platform/SignInPrompt'
+import { TextProvider } from './platform/TextProvider'
 import { fetchSite, type SiteMetadata } from './platform/site'
 import { fetchTexts, type TextMap } from './platform/texts'
 
@@ -53,15 +55,23 @@ function PlatformRoot({ development }: { development: boolean }) {
     [loaded, development],
   )
 
+  const catalogs = useMemo(
+    () => loaded && [{ texts: loaded.current.texts, fallbackTexts: loaded.fallbackTexts }],
+    [loaded],
+  )
+
   if (failed) {
     return <ShellError />
   }
-  if (!platform) {
+  if (!platform || !catalogs) {
     return null
   }
   return (
     <PlatformContext.Provider value={platform}>
       <Outlet />
+      <TextProvider catalogs={catalogs} development={development}>
+        <SignInPrompt />
+      </TextProvider>
     </PlatformContext.Provider>
   )
 }

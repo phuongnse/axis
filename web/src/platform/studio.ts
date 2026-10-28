@@ -29,14 +29,14 @@ async function studioFetch(path: string, init?: RequestInit): Promise<Response> 
 }
 
 /**
- * Resolves once `GET /api/me` answers with anything but no answer or 502, 503 or 504. It does not start sign-in on
+ * Resolves once `GET /api/me` answers with anything but no answer or 502, 503 or 504. It does not show the sign-in prompt on
  * a 401, because the reloads after the reconnect do. It rejects when `signal` aborts.
  */
 export async function waitForServer(signal: AbortSignal, delays: readonly number[] = reconnectDelays): Promise<void> {
   for (let attempt = 0; ; attempt++) {
     await pause(delays[Math.min(attempt, delays.length - 1)], signal)
     try {
-      const response = await apiFetch('/api/me', { signal }, { signInOnUnauthorized: false })
+      const response = await apiFetch('/api/me', { signal }, { promptSignInOnUnauthorized: false })
       if (!unavailableStatuses.has(response.status)) {
         return
       }
@@ -78,7 +78,7 @@ export interface ExpressionCheck {
 
 /**
  * Checks one expression where it stands, without saving it. Any status other than 200 answers `null`, and the
- * check does not start sign-in on a 401. It rejects when the server does not answer.
+ * check does not show the sign-in prompt on a 401. It rejects when the server does not answer.
  */
 export async function checkStudioExpression(
   application: string,
@@ -95,7 +95,7 @@ export async function checkStudioExpression(
       body: JSON.stringify({ resourceId, path, expression }),
       signal,
     },
-    { signInOnUnauthorized: false },
+    { promptSignInOnUnauthorized: false },
   )
   if (!response.ok) {
     return null
@@ -336,7 +336,7 @@ export interface ResourceGroup {
 }
 
 /**
- * Loads the applications Studio may edit. A 403 returns {@link forbidden}. A 401 starts sign-in and
+ * Loads the applications Studio may edit. A 403 returns {@link forbidden}. A 401 shows the sign-in prompt and
  * throws, as any other failure does.
  */
 export async function fetchStudioApps(signal?: AbortSignal): Promise<StudioApplication[] | typeof forbidden> {
@@ -350,7 +350,7 @@ export async function fetchStudioApps(signal?: AbortSignal): Promise<StudioAppli
   return ((await response.json()) as { items: StudioApplication[] }).items
 }
 
-/** Loads the newest installed version of each application template. A 401 starts sign-in and throws, as any other failure does. */
+/** Loads the newest installed version of each application template. A 401 shows the sign-in prompt and throws, as any other failure does. */
 export async function fetchStudioTemplates(signal?: AbortSignal): Promise<StudioTemplate[]> {
   const response = await studioFetch('/api/studio/templates', { signal })
   if (!response.ok) {
@@ -382,7 +382,7 @@ export async function createStudioApp(name: string, template?: string): Promise<
   return { status: 'created', name: body.name, diagnostics: body.diagnostics }
 }
 
-/** Loads the resources of an application's folder, sorted by file. A 401 starts sign-in and throws, as any other failure does. */
+/** Loads the resources of an application's folder, sorted by file. A 401 shows the sign-in prompt and throws, as any other failure does. */
 export async function fetchStudioResources(application: string, signal?: AbortSignal): Promise<StudioResourceItem[]> {
   const path = `/api/studio/apps/${encodeURIComponent(application)}/resources`
   const response = await studioFetch(path, { signal })
@@ -392,7 +392,7 @@ export async function fetchStudioResources(application: string, signal?: AbortSi
   return ((await response.json()) as { items: StudioResourceItem[] }).items
 }
 
-/** Loads the compile diagnostics of an application's folder. A 401 starts sign-in and throws, as any other failure does. */
+/** Loads the compile diagnostics of an application's folder. A 401 shows the sign-in prompt and throws, as any other failure does. */
 export async function fetchStudioDiagnostics(application: string, signal?: AbortSignal): Promise<StudioDiagnostic[]> {
   const path = `/api/studio/apps/${encodeURIComponent(application)}/diagnostics`
   const response = await studioFetch(path, { signal })
@@ -458,7 +458,7 @@ export interface StudioPolicyMatrix {
   roles: StudioMatrixRole[]
 }
 
-/** Loads the policy matrix of an application's folder. A 401 starts sign-in and throws, as any other failure does. */
+/** Loads the policy matrix of an application's folder. A 401 shows the sign-in prompt and throws, as any other failure does. */
 export async function fetchStudioPolicyMatrix(application: string, signal?: AbortSignal): Promise<StudioPolicyMatrix> {
   const path = `/api/studio/apps/${encodeURIComponent(application)}/policy-matrix`
   const response = await studioFetch(path, { signal })
@@ -468,7 +468,7 @@ export async function fetchStudioPolicyMatrix(application: string, signal?: Abor
   return (await response.json()) as StudioPolicyMatrix
 }
 
-/** Loads one resource with its content. A 401 starts sign-in and throws, as any other failure does. */
+/** Loads one resource with its content. A 401 shows the sign-in prompt and throws, as any other failure does. */
 export async function fetchStudioResource(
   application: string,
   id: string,
@@ -484,7 +484,7 @@ export async function fetchStudioResource(
 
 /**
  * Loads one file of the module version that the application pins, with its content. The file is read-only, and its
- * `file` is `modules/<module>/<path>`. A 401 starts sign-in and throws, as any other failure does.
+ * `file` is `modules/<module>/<path>`. A 401 shows the sign-in prompt and throws, as any other failure does.
  */
 export async function fetchStudioModuleResource(
   application: string,
@@ -502,7 +502,7 @@ export async function fetchStudioModuleResource(
 
 /**
  * Patches a resource, with the version the editor loaded in `If-Match`. A 409 means the file changed since,
- * and nothing was written. A 401 starts sign-in and throws, as any other failure does.
+ * and nothing was written. A 401 shows the sign-in prompt and throws, as any other failure does.
  */
 export async function patchStudioResource(
   application: string,
@@ -537,7 +537,7 @@ export type ChangesResult =
 
 /**
  * Writes several changes in one call, in list order. A 409 means a patched version is stale or a created id or file
- * exists, and nothing was written. A 401 starts sign-in and throws, as any other failure does, including a 400.
+ * exists, and nothing was written. A 401 shows the sign-in prompt and throws, as any other failure does, including a 400.
  */
 export async function saveStudioChanges(application: string, changes: StudioChange[]): Promise<ChangesResult> {
   const path = `/api/studio/apps/${encodeURIComponent(application)}/changes`
@@ -558,7 +558,7 @@ export async function saveStudioChanges(application: string, changes: StudioChan
 
 /**
  * Creates a resource from `content`, which holds its `id`, `kind` and `name`. A 409 means the id or the file exists, and
- * a 400 means the name or the locale is refused. Nothing is written for either. A 401 starts sign-in and throws, as any
+ * a 400 means the name or the locale is refused. Nothing is written for either. A 401 shows the sign-in prompt and throws, as any
  * other failure does.
  */
 export async function createStudioResource(
@@ -596,7 +596,7 @@ export async function createStudioResource(
   }
 }
 
-/** Loads what a resource uses and what uses it. A 401 starts sign-in and throws, as any other failure does. */
+/** Loads what a resource uses and what uses it. A 401 shows the sign-in prompt and throws, as any other failure does. */
 export async function fetchResourceReferences(
   application: string,
   id: string,
@@ -610,7 +610,7 @@ export async function fetchResourceReferences(
   return (await response.json()) as StudioResourceReferences
 }
 
-/** Loads what uses a text key. A 401 starts sign-in and throws, as any other failure does. */
+/** Loads what uses a text key. A 401 shows the sign-in prompt and throws, as any other failure does. */
 export async function fetchTextReferences(
   application: string,
   key: string,
@@ -631,7 +631,7 @@ export type TextKeyWriteResult =
 
 /**
  * Writes one text key in every locale at once. `texts` holds the text of each locale. A 400 means the locales or
- * the key are refused, and nothing was written. A 401 starts sign-in and throws, as any other failure does.
+ * the key are refused, and nothing was written. A 401 shows the sign-in prompt and throws, as any other failure does.
  */
 export async function writeStudioText(
   application: string,
@@ -659,7 +659,7 @@ export async function writeStudioText(
 
 /**
  * Deletes a resource, with the version the editor loaded in `If-Match`. A 409 means the file changed since,
- * and nothing was deleted. A 401 starts sign-in and throws, as any other failure does.
+ * and nothing was deleted. A 401 shows the sign-in prompt and throws, as any other failure does.
  */
 export async function deleteStudioResource(application: string, id: string, version: string): Promise<DeleteResult> {
   const path = `/api/studio/apps/${encodeURIComponent(application)}/resources/${encodeURIComponent(id)}`
@@ -682,7 +682,7 @@ export interface TextWriteResult {
 
 /**
  * Writes one text key in every locale at once. `texts` holds exactly the folder's locales. It takes no version, so the
- * last write to a key wins. Any status other than 200 throws, so the author's input stays. A 401 starts sign-in and
+ * last write to a key wins. Any status other than 200 throws, so the author's input stays. A 401 shows the sign-in prompt and
  * throws, as any other failure does.
  */
 export async function putStudioTexts(
@@ -769,7 +769,7 @@ export interface PublishDetails {
   note?: string
 }
 
-/** Sends a validate request. It answers at once with the queued request. A 401 starts sign-in and throws, as any other failure does. */
+/** Sends a validate request. It answers at once with the queued request. A 401 shows the sign-in prompt and throws, as any other failure does. */
 export async function validateStudioApp(application: string): Promise<StudioRequest> {
   const path = `/api/studio/apps/${encodeURIComponent(application)}/validate`
   const response = await studioFetch(path, { method: 'POST' })
@@ -781,7 +781,7 @@ export async function validateStudioApp(application: string): Promise<StudioRequ
 
 /**
  * Sends a test request, which runs the scenarios named in `scenarios`, or every scenario when it is undefined. It
- * answers at once with the queued request. A 401 starts sign-in and throws, as any other failure does.
+ * answers at once with the queued request. A 401 shows the sign-in prompt and throws, as any other failure does.
  */
 export async function testStudioApp(application: string, scenarios?: string[]): Promise<StudioRequest> {
   const path = `/api/studio/apps/${encodeURIComponent(application)}/test`
@@ -796,7 +796,7 @@ export async function testStudioApp(application: string, scenarios?: string[]): 
   return (await response.json()) as StudioRequest
 }
 
-/** Sends a preview request, which publishes the folder to the preview tenant. It answers at once with the queued request. A 401 starts sign-in and throws, as any other failure does. */
+/** Sends a preview request, which publishes the folder to the preview tenant. It answers at once with the queued request. A 401 shows the sign-in prompt and throws, as any other failure does. */
 export async function previewStudioApp(application: string): Promise<StudioRequest> {
   const path = `/api/studio/apps/${encodeURIComponent(application)}/preview`
   const response = await studioFetch(path, { method: 'POST' })
@@ -818,7 +818,7 @@ export function previewSiteUrl(
   return `${location.protocol}//${host}${location.port ? `:${location.port}` : ''}/${sitePath}`
 }
 
-/** Sends a rollback request to an earlier release. It answers at once with the queued request. A 401 starts sign-in and throws, as any other failure does. */
+/** Sends a rollback request to an earlier release. It answers at once with the queued request. A 401 shows the sign-in prompt and throws, as any other failure does. */
 export async function rollbackStudioRelease(application: string, releaseId: string): Promise<StudioRequest> {
   const path = `/api/studio/apps/${encodeURIComponent(application)}/releases/${encodeURIComponent(releaseId)}/rollback`
   const response = await studioFetch(path, { method: 'POST' })
@@ -828,7 +828,7 @@ export async function rollbackStudioRelease(application: string, releaseId: stri
   return (await response.json()) as StudioRequest
 }
 
-/** Sends a publish request. Empty strings are left out of the body. A 401 starts sign-in and throws, as any other failure does. */
+/** Sends a publish request. Empty strings are left out of the body. A 401 shows the sign-in prompt and throws, as any other failure does. */
 export async function publishStudioApp(application: string, details: PublishDetails = {}): Promise<StudioRequest> {
   const path = `/api/studio/apps/${encodeURIComponent(application)}/publish`
   const body: PublishDetails = {}
@@ -849,7 +849,7 @@ export async function publishStudioApp(application: string, details: PublishDeta
   return (await response.json()) as StudioRequest
 }
 
-/** Loads a request with its status and diagnostics. A 401 starts sign-in and throws, as any other failure does. */
+/** Loads a request with its status and diagnostics. A 401 shows the sign-in prompt and throws, as any other failure does. */
 export async function fetchStudioRequest(
   application: string,
   id: string,
@@ -863,7 +863,7 @@ export async function fetchStudioRequest(
   return (await response.json()) as StudioRequest
 }
 
-/** Loads the release history of an application. A 401 starts sign-in and throws, as any other failure does. */
+/** Loads the release history of an application. A 401 shows the sign-in prompt and throws, as any other failure does. */
 export async function fetchStudioReleases(application: string, signal?: AbortSignal): Promise<StudioReleases> {
   const path = `/api/studio/apps/${encodeURIComponent(application)}/releases`
   const response = await studioFetch(path, { signal })
