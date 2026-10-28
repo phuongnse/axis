@@ -227,8 +227,12 @@ _(planned for M17)_
 - The theme is built from the SPA's own React components and tokens into a Keycloak theme, so the pages look like the
   rest of Axis. Its texts are message bundles in every locale the platform offers. The "Continue with" labels come
   from the applications' texts.
-- _(built)_ The design system's `identitySignIn` preview draws these pages from fixtures, see
-  [shell design system previews](shell.md#design-system-previews).
+- _(built)_ The sign-in page is drawn by shared React components in `web/src/identitySignIn/` from a sign-in context:
+  title, providers, accounts, username, error, login address, remember-me, forgot-password address, locales and
+  texts. The account form is a real `<form method="post">` to the login address. The design system's
+  `identitySignIn` preview feeds the components fixtures, see
+  [shell design system previews](shell.md#design-system-previews). The Keycloak theme that feeds them a real
+  context is not built yet.
 
 ## Installation
 
