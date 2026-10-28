@@ -527,8 +527,9 @@ The rule for traffic that comes in, and for every connection Axis makes.
 
 - **The identity provider.** Outside Development and Testing the server
   accepts an identity provider over `https` only (`RequireHttpsMetadata`). It
-  validates the certificate against the system trust store.
-  `SSL_CERT_FILE` adds to it, see [on premises](#on-premises).
+  validates the certificate against the system trust store. Add a private
+  authority to that store. Do not replace the store with `SSL_CERT_FILE`, which
+  makes the server trust only that file, see [on premises](#on-premises).
 - **PostgreSQL.** _(planned for M16)_ Connections use TLS and check the
   server's certificate.
 - **URL bindings.** A `url` binding must be `https` outside Development.
