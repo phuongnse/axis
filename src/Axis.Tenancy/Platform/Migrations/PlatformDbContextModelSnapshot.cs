@@ -227,6 +227,14 @@ namespace Axis.Tenancy.Platform.Migrations
                         .HasColumnType("text")
                         .HasColumnName("preview_of");
 
+                    b.Property<byte[]>("RealmActivationClientSecret")
+                        .HasColumnType("bytea")
+                        .HasColumnName("realm_activation_client_secret");
+
+                    b.Property<byte[]>("RealmUsersClientSecret")
+                        .HasColumnType("bytea")
+                        .HasColumnName("realm_users_client_secret");
+
                     b.Property<byte[]>("RuntimePassword")
                         .IsRequired()
                         .HasColumnType("bytea")
