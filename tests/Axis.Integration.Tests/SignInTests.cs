@@ -236,6 +236,23 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
     }
 
     [Fact]
+    public async Task Sign_out_clears_the_sites_cache_and_storage_and_a_refused_sign_out_does_not()
+    {
+        using var client = CreateClient();
+        await SignInAsync(client, "anna", "/");
+
+        var refused = await SendAsync(client, HttpMethod.Post, "/api/auth/sign-out", csrfHeader: false);
+
+        Assert.Equal(HttpStatusCode.Forbidden, refused.StatusCode);
+        Assert.False(refused.Headers.Contains("Clear-Site-Data"));
+
+        var signOut = await SendAsync(client, HttpMethod.Post, "/api/auth/sign-out");
+
+        Assert.Equal(HttpStatusCode.OK, signOut.StatusCode);
+        Assert.Equal("\"cache\", \"storage\"", string.Join(", ", signOut.Headers.GetValues("Clear-Site-Data")));
+    }
+
+    [Fact]
     public async Task Sign_in_writes_one_audit_record_with_the_user_and_the_client_address()
     {
         using var client = CreateClient();

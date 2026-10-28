@@ -57,10 +57,10 @@ internal sealed class LogCollector : ILoggerProvider, ISupportExternalScope
                     }
                 },
                 scope);
-            collector._records.Enqueue(new LogRecordEntry(message, scope));
+            collector._records.Enqueue(new LogRecordEntry(logLevel, message, scope));
         }
     }
 }
 
-/// <summary>A log message with the key and value pairs of the scopes it was written in, such as <c>TraceId</c> and <c>TenantId</c>.</summary>
-internal sealed record LogRecordEntry(string Message, Dictionary<string, object?> Scope);
+/// <summary>A log message with its level and the key and value pairs of the scopes it was written in, such as <c>TraceId</c> and <c>TenantId</c>.</summary>
+internal sealed record LogRecordEntry(LogLevel Level, string Message, Dictionary<string, object?> Scope);

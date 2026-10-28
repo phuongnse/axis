@@ -19,7 +19,7 @@ run_suite PaymentReferences.Tests samples/packages/PaymentReferences.Tests dotne
 run_suite web web npm test --prefix web -- \
   --reporter=default --reporter=junit --outputFile.junit="$results_dir/web.xml"
 
-# The report, smoke test selection, link check, docs structure check, locator check, raw HTML check, bundle budget check,
+# The report, smoke test selection, link check, docs structure check, locator check, raw HTML check, prototype pollution check, bundle budget check,
 # font check, design-system bundle check, dependency scan, setup retries, image build retries, E2E folder
 # comparison, hang guard, dialog and drag helpers, Compose status helper and Helm chart scripts' own tests.
 node --test scripts/test-report.test.mjs || status=1
@@ -28,6 +28,7 @@ node --test scripts/check-links.test.mjs || status=1
 node --test scripts/check-docs.test.mjs || status=1
 node --test scripts/check-locators.test.mjs || status=1
 node --test scripts/check-raw-html.test.mjs || status=1
+node --test scripts/check-prototype-pollution.test.mjs || status=1
 node --test scripts/check-bundle.test.mjs || status=1
 node --test scripts/check-fonts.test.mjs || status=1
 node --test scripts/check-design-system.test.mjs || status=1

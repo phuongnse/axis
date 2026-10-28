@@ -100,7 +100,7 @@ export function FormWidget({ widget, sitePath, pages, recordId, returnTo, locale
   const [started, setStarted] = useState(false)
   // The Idempotency-Key of each action's start that got no final answer, by start endpoint, so a
   // retry cannot start a second instance.
-  const startKeys = useRef<Record<string, string>>({})
+  const startKeys = useRef(new Map<string, string>())
 
   const start = useCallback(
     (record: RecordItem) => {
@@ -113,7 +113,7 @@ export function FormWidget({ widget, sitePath, pages, recordId, returnTo, locale
   )
 
   useEffect(() => {
-    startKeys.current = {}
+    startKeys.current = new Map()
     if (recordId === null) {
       return
     }
@@ -223,7 +223,8 @@ export function FormWidget({ widget, sitePath, pages, recordId, returnTo, locale
         return
       }
       // A key is kept only while its start has no final answer: a network error or a 5xx.
-      const key = (startKeys.current[action.instancesPath] ??= newIdempotencyKey())
+      const key = startKeys.current.get(action.instancesPath) ?? newIdempotencyKey()
+      startKeys.current.set(action.instancesPath, key)
       let result
       try {
         result = await startProcess(action.instancesPath, recordId, key)
@@ -232,7 +233,7 @@ export function FormWidget({ widget, sitePath, pages, recordId, returnTo, locale
         setFormErrors([t('shell.form.startFailed')])
         return
       }
-      delete startKeys.current[action.instancesPath]
+      startKeys.current.delete(action.instancesPath)
       if (result.ok) {
         setStarted(true)
         await reload()

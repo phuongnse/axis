@@ -615,8 +615,15 @@ can go from a reported `traceId` to its logs with no collector.
 - **Skipped trigger starts.** A trigger that skips a start because its `when`
   or start condition hit a run-time error logs the error kind, never the
   error message.
+- **Refused bearer tokens.** A refused token logs a warning with the tenant and
+  a reason: a fixed text, or the exception type, never a message or the token.
+- **Refused requests.** A `403` logs a warning with the HTTP method and the
+  route template, never the path or the query string.
 - **Line breaks.** The console formatter indents every line of a message after
-  its first, so a value with a line break cannot start a new log entry.
+  its first, so a value with a line break cannot start a new log entry. It also
+  starts each entry with a UTC timestamp.
+
+The [log inventory](reference/log-inventory.md) lists every log.
 
 ### Correlation
 

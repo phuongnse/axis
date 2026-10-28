@@ -102,7 +102,12 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place. _(planned f
     `{ "signOutUrl" }`. The SPA then sends the browser to that URL, and the
     identity provider returns it to `/`. The SPA calls sign-out with `fetch`
     so it can send the CSRF header, and a `fetch` call cannot follow a
-    redirect to the identity provider as a page. The shell header's
+    redirect to the identity provider as a page. A successful sign-out also
+    sends `Clear-Site-Data: "cache", "storage"`, so the browser drops the
+    site's HTTP cache and storage, and a refused one sends no such header.
+    The SPA keeps only the theme and the locale in browser storage, under
+    `axis.themeMode` and `axis.locale`, so a sign-out resets both. See
+    [headers](headers-and-rate-limits.md#security-headers). The shell header's
     [account button](frontend.md) offers sign-in and
     sign-out. A `401` from an API call shows a sign-in prompt, and only a
     click on its button calls `GET /api/auth/sign-in`, so no session starts
@@ -416,7 +421,9 @@ systems.
 
 - **Token checks.** The server checks each token against the tenant
   [resolved from the host](../architecture.md#request-resolution). Any failure is a `401`
-  with `WWW-Authenticate: Bearer`, which never says which check failed. Under
+  with `WWW-Authenticate: Bearer`, which never says which check failed. The
+  server writes a warning with the tenant and the reason, see the
+  [log inventory](log-inventory.md#security-events). Under
   the `fapi2` profile the `401` says `WWW-Authenticate: DPoP algs="ES256 PS256"`
   and the token must also be DPoP-bound, see
   [machine callers under `fapi2`](#fapi-20-profile).

@@ -27,6 +27,7 @@ import type { EntityMetadata, FieldMetadata, FormMetadata } from './site'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
 import { useNarrowWidth } from './useNarrowWidth'
+import { setOwn } from './ownProperty'
 
 /** The values the form started from, which decide what changed, with the record's labels and version. */
 interface Snapshot {
@@ -300,10 +301,10 @@ export function useRecordForm(
       // A failed validation's message is a text key. A fixed message is no key, so it shows as is.
       const messages = problem.errors[pointer].map((message) => t(message))
       if (cell) {
-        onCells[cell.collection] = { ...onCells[cell.collection], [cell.key]: messages }
+        setOwn(onCells, cell.collection, { ...onCells[cell.collection], [cell.key]: messages })
         named.add(cell.collection)
       } else if (name !== null && shown.some(({ field }) => field.name === name)) {
-        onFields[name] = messages
+        setOwn(onFields, name, messages)
         named.add(name)
       } else {
         onForm.push(...messages)
