@@ -1,3 +1,6 @@
+using Axis.Tenancy.Platform;
+using Microsoft.Extensions.Configuration;
+
 namespace Axis.Tenancy.Tests;
 
 public sealed class DirectoryTenantCatalogTests
@@ -71,6 +74,94 @@ public sealed class DirectoryTenantCatalogTests
         Assert.Empty(served.OidcChanges(read.Withhold(["a"])));
         Assert.Equal(["a"], read.OidcChanges(served));
     }
+
+    [Fact]
+    public void A_row_with_an_activation_secret_gets_a_realm_whose_secret_decrypts_to_the_stored_value()
+    {
+        var cipher = CipherFor();
+        var row = Row(cipher);
+
+        var realm = DirectoryTenantCatalog.Realm(row, cipher);
+
+        Assert.NotNull(realm);
+        Assert.Equal(new Uri("https://idp.example.test/"), realm.BaseAddress);
+        Assert.Equal("acme", realm.Name);
+        Assert.Equal(ActivationSecret, realm.ActivationClientSecret.Reveal());
+        Assert.DoesNotContain(ActivationSecret, realm.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_preview_row_gets_no_realm()
+    {
+        var cipher = CipherFor();
+        var row = Row(cipher);
+        row.PreviewOf = "main";
+
+        Assert.Null(DirectoryTenantCatalog.Realm(row, cipher));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void A_row_without_an_activation_secret_gets_no_realm(bool empty)
+    {
+        var cipher = CipherFor();
+        var row = Row(cipher);
+        row.RealmActivationClientSecret = empty ? [] : null;
+
+        Assert.Null(DirectoryTenantCatalog.Realm(row, cipher));
+    }
+
+    [Fact]
+    public void A_row_that_signs_in_with_an_outside_identity_provider_gets_no_realm()
+    {
+        var cipher = CipherFor();
+        var row = Row(cipher);
+        row.OidcAuthority = "https://login.example.test/realms/other";
+
+        Assert.Null(DirectoryTenantCatalog.Realm(row, cipher));
+    }
+
+    [Fact]
+    public void Bindings_decrypt_a_secret_only_when_it_is_revealed_and_match_names_ignoring_letter_case()
+    {
+        var cipher = CipherFor();
+        var rows = new[]
+        {
+            new TenantBindingRow { TenantId = "acme", Name = "Issuer", Kind = DeploymentBindingKinds.Url, Url = "https://login.example.test" },
+            new TenantBindingRow
+            {
+                TenantId = "acme",
+                Name = "Secret",
+                Kind = DeploymentBindingKinds.Secret,
+                SecretValue = cipher.Encrypt("acme", TenantSecretFields.Binding("Secret"), "binding-v4lue"),
+            },
+        };
+
+        var bindings = DirectoryTenantCatalog.Bindings("acme", rows, cipher);
+
+        Assert.Equal("https://login.example.test", bindings["issuer"].Url);
+        Assert.Equal("binding-v4lue", bindings["SECRET"].Secret!.Reveal());
+    }
+
+    private const string ActivationSecret = "activ4tion-cl13nt-s3cret";
+
+    private static TenantRow Row(TenantSecretCipher cipher) =>
+        new()
+        {
+            Id = "acme",
+            Status = "active",
+            OidcAuthority = "https://idp.example.test/realms/acme",
+            RealmActivationClientSecret = cipher.Encrypt("acme", TenantSecretFields.RealmActivationClientSecret, ActivationSecret),
+        };
+
+    private static TenantSecretCipher CipherFor() =>
+        TenantSecretCipher.Load(new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Platform:SecretKey"] = Convert.ToBase64String(Enumerable.Range(1, 32).Select(i => (byte)i).ToArray()),
+            })
+            .Build());
 
     private static (string Id, string Key, string OidcKey) OidcKeys(string id, string oidcKey) => (id, $"key-{id}", oidcKey);
 
