@@ -14,8 +14,8 @@ and the Helm chart, and behind any proxy.
 
 | Header                      | Value                                                                                                                                                                                                     | On                                            |
 | --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
-| `Content-Security-Policy`   | `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'` | Every response                                |
-| `Strict-Transport-Security` | `max-age=31536000`                                                                                                                                                                                        | Only when the request's scheme is `https`     |
+| `Content-Security-Policy`   | `default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'` | Every response                                |
+| `Strict-Transport-Security` | `max-age=31536000; includeSubDomains`                                                                                                                                                                     | Only when the request's scheme is `https`     |
 | `X-Content-Type-Options`    | `nosniff`                                                                                                                                                                                                 | Every response                                |
 | `Referrer-Policy`           | `strict-origin-when-cross-origin`                                                                                                                                                                         | Every response                                |
 | `Cross-Origin-Opener-Policy` | `same-origin`                                                                                                                                                                                            | Every response                                |
@@ -32,6 +32,12 @@ and the Helm chart, and behind any proxy.
   [forwarded headers](host-settings.md#forwarded-headers) rules of
   [D49](../decisions/d49-several-server-replicas-behind-a-tls-proxy.md). The server never sends the
   header in `Development`, so a developer's browser does not remember it for `localhost`.
+  `includeSubDomains` meets ASVS Level 2 and tells browsers to refuse plain http on every subdomain
+  of a tenant's host, so an operator must serve those subdomains over https.
+- **Base URI.** `base-uri 'none'` meets ASVS V3.4.3. The SPA has no `<base>` element.
+- **Content-Type.** Text, JSON and XML answers name `charset=utf-8`, including problem details, the
+  SPA page and static files. An answer that already names a charset keeps it. An attachment keeps
+  the file's media type, because the server does not know the encoding of an uploaded file.
 - **Static files.** The SPA's hashed files under `/assets/` get
   `Cache-Control: public, max-age=31536000, immutable`. `index.html` and the other files keep the
   revalidation by ETag. `no-store` applies only under `/api`, and replaces any `Cache-Control` an
@@ -44,7 +50,8 @@ and the Helm chart, and behind any proxy.
 - **File download.** A file download keeps to this policy and adds `Content-Disposition: attachment`.
   A custom widget bundle is served from the server's own origin and calls no `eval`.
 - **Tests.** Integration tests check the headers on the SPA page, a static file, an API response, a
-  `401` and the `404` for an unknown host. They check that HSTS is missing on plain http and in
+  `401` and the `404` for an unknown host, and the exact `Content-Type` with its charset on those
+  answers and on a `403`. A unit test shows which types get a charset. They check that HSTS is missing on plain http and in
   `Development`, and that HSTS follows the forwarded scheme only from a named proxy. The Playwright
   run uses the shared `test` of `tests/e2e/test.ts`, which fails any test whose pages report a
   Content Security Policy violation.
