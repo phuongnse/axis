@@ -138,6 +138,7 @@ function SiteShell({ path }: { path: string }) {
           key: item.page,
           path: `/${site.path}/${item.page.toLowerCase()}`,
           labelKey: item.labelKey,
+          icon: item.icon,
         }))}
         locales={site.locales.available}
         locale={locale}

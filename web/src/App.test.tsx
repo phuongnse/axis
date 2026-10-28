@@ -60,6 +60,7 @@ const texts: Record<string, Record<string, string>> = {
   vi: {
     'shell.nav.home': 'Trang chủ',
     'shell.home.title': 'Chào mừng đến với Axis',
+    'shell.serverStatus.title': 'Trạng thái máy chủ',
     'shell.locale.label': 'Ngôn ngữ',
     'shell.locale.en': 'English',
     'shell.locale.vi': 'Tiếng Việt',
@@ -401,7 +402,7 @@ describe('App', () => {
 
     renderApp()
 
-    expect(await screen.findByText('Ready')).toBeInTheDocument()
+    expect(await within(await screen.findByTestId('server-status')).findByText('Ready')).toBeInTheDocument()
     expect(fetch).toHaveBeenCalledWith('/health/ready', expect.anything())
   })
 
@@ -410,7 +411,7 @@ describe('App', () => {
 
     renderApp()
 
-    expect(await screen.findByText('Unavailable')).toBeInTheDocument()
+    expect(await within(await screen.findByTestId('server-status')).findByText('Unavailable')).toBeInTheDocument()
   })
 
   it('switches between light and dark mode and remembers the choice', async () => {
@@ -430,12 +431,12 @@ describe('App', () => {
     renderApp()
 
     const light = await findShellRoot('light')
-    expect(within(light).getByRole('menuitem', { name: 'Home' })).toBeInTheDocument()
+    expect(within(light).getByRole('link', { name: 'Axis' })).toBeInTheDocument()
 
     await userEvent.click(screen.getByRole('switch', { name: 'Dark mode' }))
 
     const dark = await findShellRoot('dark')
-    expect(within(dark).getByRole('menuitem', { name: 'Home' })).toBeInTheDocument()
+    expect(within(dark).getByRole('link', { name: 'Axis' })).toBeInTheDocument()
     expect(within(dark).getByText('Welcome to Axis')).toBeInTheDocument()
   })
 
@@ -449,7 +450,7 @@ describe('App', () => {
     await userEvent.click(within(language).getByText('Tiếng Việt'))
 
     expect(await screen.findByText('Chào mừng đến với Axis')).toBeInTheDocument()
-    expect(screen.getByRole('menuitem', { name: 'Trang chủ' })).toBeInTheDocument()
+    expect(within(screen.getByRole('contentinfo')).getByText('Trạng thái máy chủ')).toBeInTheDocument()
     expect(screen.getByRole('radiogroup', { name: 'Ngôn ngữ' })).toBeInTheDocument()
     expect(localStorage.getItem('axis.locale')).toBe('vi')
   })
@@ -793,7 +794,7 @@ describe('App', () => {
     renderApp('/no-such-site')
 
     expect(await screen.findByTestId('not-found')).toHaveTextContent('Page not found')
-    expect(screen.getByRole('menuitem', { name: 'Home' })).toBeInTheDocument()
+    expect(within(screen.getByRole('banner')).getByRole('link', { name: 'Axis' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Go to the home page' })).toHaveAttribute('href', '/')
   })
 
@@ -815,6 +816,6 @@ describe('App', () => {
     renderApp('/e2e/notes/42/edit')
 
     expect(await screen.findByTestId('not-found')).toBeInTheDocument()
-    expect(screen.getByRole('menuitem', { name: 'Home' })).toBeInTheDocument()
+    expect(within(screen.getByRole('banner')).getByRole('link', { name: 'Axis' })).toBeInTheDocument()
   })
 })
