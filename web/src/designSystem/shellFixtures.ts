@@ -30,12 +30,18 @@ const user: CurrentUser = {
   studioCreate: false,
   studioPreviewHost: null,
   studioTest: false,
+  console: true,
 }
 
+const purchasing = { name: 'Purchasing', titles: { en: 'Purchasing' } }
+const people = { name: 'People', titles: { en: 'People' } }
+const serviceDesk = { name: 'ServiceDesk', titles: { en: 'Service desk' } }
+
 const sites: SiteListItem[] = [
-  { path: sitePath, titleKey: 'preview.site.title', titles: { en: 'Purchase requests' } },
-  { path: 'leave', titleKey: 'leave.title', titles: { en: 'Leave requests' } },
-  { path: 'service-desk', titleKey: 'desk.title', titles: { en: 'Service desk' } },
+  { path: sitePath, titleKey: 'preview.site.title', titles: { en: 'Purchase requests' }, application: purchasing },
+  { path: 'leave', titleKey: 'leave.title', titles: { en: 'Leave requests' }, application: people },
+  { path: 'agents', titleKey: 'agents.title', titles: { en: 'Agent desk' }, application: serviceDesk },
+  { path: 'help', titleKey: 'help.title', titles: { en: 'Help portal' }, application: serviceDesk },
 ]
 
 const notifications: NotificationPage = {

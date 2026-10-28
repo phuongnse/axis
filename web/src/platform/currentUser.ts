@@ -15,6 +15,8 @@ export interface CurrentUser {
   studioPreviewHost: string | null
   /** Whether the user sees the test controls in Studio: true for an author when the server's `Studio:Tests` is on. */
   studioTest: boolean
+  /** Proposed: whether the user may open the operator console: they hold the role `Console:OperatorRole` names. */
+  console?: boolean
 }
 
 /**

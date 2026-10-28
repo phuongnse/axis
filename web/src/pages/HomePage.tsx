@@ -1,11 +1,15 @@
+import { DashboardOutlined, ToolOutlined } from '@ant-design/icons'
 import { Alert, Avatar, Badge, Empty, Flex, Spin, Typography } from 'antd'
-import { useEffect, useState } from 'react'
-import { Link, useSearchParams } from 'react-router'
+import type { ReactNode } from 'react'
+import { useSearchParams } from 'react-router'
 import { startSignIn } from '../platform/api'
 import { AxisButton } from '../platform/AxisButton'
+import type { CurrentUser } from '../platform/currentUser'
+import { localizedTitle, useCurrentUser, useSites } from '../platform/launcher'
+import { LaunchTile, TitleMark } from '../platform/LaunchTile'
 import { PageLayout } from '../platform/PageLayout'
 import { useServerStatus, type ServerStatus } from '../platform/serverStatus'
-import { fetchSites, type SiteListItem } from '../platform/site'
+import type { SiteListItem } from '../platform/site'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { usePlatform } from './context'
@@ -16,46 +20,24 @@ const statusBadge: Record<ServerStatus, 'processing' | 'success' | 'error'> = {
   unavailable: 'error',
 }
 
-/** The site title in the current locale, or in the site's first locale when it lacks the current one. */
-function siteTitle(site: SiteListItem, locale: string): string {
-  return site.titles[locale] ?? Object.values(site.titles)[0] ?? site.path
+/** Proposed: the tiles of a section fill a grid of columns at least 240 px wide. */
+function TileGrid({ children }: { children: ReactNode }) {
+  const { spacing } = useDesignTokens()
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: spacing.md }}>
+      {children}
+    </div>
+  )
 }
 
-/** Proposed: a site is a tile with its mark, its title and its path, and the whole tile opens the site. */
-function SiteTile({ site, locale }: { site: SiteListItem; locale: string }) {
-  const { colour, spacing, radius } = useDesignTokens()
-  const title = siteTitle(site, locale)
+function Section({ id, title, children }: { id: string; title: string; children: ReactNode }) {
   return (
-    <Link
-      to={`/${site.path}`}
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: spacing.sm,
-        padding: spacing.md,
-        background: colour.surface,
-        border: `1px solid ${colour.borderSubtle}`,
-        borderRadius: radius.base,
-        color: colour.text,
-      }}
-    >
-      <Avatar
-        aria-hidden
-        shape="square"
-        size={40}
-        style={{ flex: 'none', background: colour.primary, fontWeight: 600 }}
-      >
-        {title.trim().charAt(0).toUpperCase()}
-      </Avatar>
-      <Flex vertical style={{ minWidth: 0 }}>
-        <Typography.Text strong ellipsis>
-          {title}
-        </Typography.Text>
-        <Typography.Text type="secondary" ellipsis>
-          /{site.path}
-        </Typography.Text>
-      </Flex>
-    </Link>
+    <section aria-labelledby={id}>
+      <Typography.Title id={id} level={5} style={{ marginTop: 0 }}>
+        {title}
+      </Typography.Title>
+      {children}
+    </section>
   )
 }
 
@@ -83,36 +65,55 @@ function SignInPanel() {
   )
 }
 
-function SiteList() {
-  const t = useText()
+/**
+ * Proposed: the sites, grouped under the title of the application they belong to when the tenant has more than
+ * one application, so a reader sees which sites one application offers.
+ */
+function SiteGroups({ sites, locale }: { sites: SiteListItem[]; locale: string }) {
   const { spacing } = useDesignTokens()
-  const { locale } = usePlatform().current
-  // `null` when nobody is signed in.
-  const [sites, setSites] = useState<SiteListItem[] | null>()
-  const [failed, setFailed] = useState(false)
+  const groups = new Map<string, { title: string; sites: SiteListItem[] }>()
+  for (const site of sites) {
+    const key = site.application?.name ?? ''
+    const title = site.application ? localizedTitle(site.application.titles, locale, site.application.name) : ''
+    const group = groups.get(key) ?? { title, sites: [] }
+    group.sites.push(site)
+    groups.set(key, group)
+  }
+  const tiles = (list: SiteListItem[]) => (
+    <TileGrid>
+      {list.map((site) => {
+        const title = localizedTitle(site.titles, locale, site.path)
+        return (
+          <LaunchTile key={site.path} to={`/${site.path}`} mark={<TitleMark title={title} size={32} />} title={title} />
+        )
+      })}
+    </TileGrid>
+  )
+  if (groups.size < 2) {
+    return tiles(sites)
+  }
+  return (
+    <Flex vertical gap={spacing.md}>
+      {[...groups.values()].map((group) => (
+        <Flex key={group.title} vertical gap={spacing.xs}>
+          <Typography.Text type="secondary">{group.title}</Typography.Text>
+          {tiles(group.sites)}
+        </Flex>
+      ))}
+    </Flex>
+  )
+}
 
-  useEffect(() => {
-    const controller = new AbortController()
-    fetchSites(controller.signal)
-      .then(setSites)
-      .catch((error: unknown) => {
-        if (!controller.signal.aborted) {
-          console.warn('Loading the sites failed', error)
-          setFailed(true)
-        }
-      })
-    return () => controller.abort()
-  }, [])
+function SitesSection() {
+  const t = useText()
+  const { locale } = usePlatform().current
+  const { sites, failed } = useSites()
 
   if (sites === null) {
     return <SignInPanel />
   }
-
   return (
-    <section aria-labelledby="home-sites">
-      <Typography.Title id="home-sites" level={5} style={{ marginTop: 0 }}>
-        {t('shell.home.sites.title')}
-      </Typography.Title>
+    <Section id="home-sites" title={t('shell.home.sites.title')}>
       {failed ? (
         <Alert data-testid="sites-error" type="error" title={t('shell.home.sites.loadFailed')} />
       ) : sites === undefined ? (
@@ -120,14 +121,43 @@ function SiteList() {
       ) : sites.length === 0 ? (
         <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('shell.home.sites.empty')} />
       ) : (
-        // Proposed: the tiles fill a grid of columns at least 240 px wide.
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: spacing.md }}>
-          {sites.map((site) => (
-            <SiteTile key={site.path} site={site} locale={locale} />
-          ))}
-        </div>
+        <SiteGroups sites={sites} locale={locale} />
       )}
-    </section>
+    </Section>
+  )
+}
+
+/** Proposed: the tools of the platform, each only for the users who may open it: Studio for authors, the console for operators. */
+function ToolsSection({ user }: { user: CurrentUser }) {
+  const t = useText()
+  const { colour } = useDesignTokens()
+  const icon = (glyph: ReactNode) => (
+    <Avatar aria-hidden shape="square" size={32} icon={glyph} style={{ flex: 'none', background: colour.primary }} />
+  )
+  if (!user.studio && !user.console) {
+    return null
+  }
+  return (
+    <Section id="home-tools" title={t('shell.home.tools.title')}>
+      <TileGrid>
+        {user.studio && (
+          <LaunchTile
+            to="/studio"
+            mark={icon(<ToolOutlined />)}
+            title={t('shell.studio.link')}
+            description={t('shell.home.studio.description')}
+          />
+        )}
+        {user.console && (
+          <LaunchTile
+            to="/console"
+            mark={icon(<DashboardOutlined />)}
+            title={t('shell.console.link')}
+            description={t('shell.home.console.description')}
+          />
+        )}
+      </TileGrid>
+    </Section>
   )
 }
 
@@ -150,8 +180,13 @@ function StatusFooter() {
   )
 }
 
+/**
+ * Proposed: the platform home page launches what the signed-in user may open: their sites, grouped by application,
+ * then the tools of their roles. With nobody signed in it asks them to sign in.
+ */
 export function HomePage() {
   const t = useText()
+  const user = useCurrentUser()
   const [searchParams] = useSearchParams()
   const signInFailed = searchParams.get('signIn') === 'failed'
 
@@ -161,7 +196,8 @@ export function HomePage() {
       {signInFailed && (
         <Alert data-testid="sign-in-failed" role="alert" type="warning" showIcon title={t('shell.home.signInFailed')} />
       )}
-      <SiteList />
+      <SitesSection />
+      {user && <ToolsSection user={user} />}
       <StatusFooter />
     </PageLayout>
   )

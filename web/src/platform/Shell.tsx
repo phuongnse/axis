@@ -1,10 +1,12 @@
 import { MenuFoldOutlined, MenuOutlined, MenuUnfoldOutlined, SettingOutlined } from '@ant-design/icons'
-import { Avatar, ConfigProvider, Dropdown, Layout, Menu, Typography, type MenuProps } from 'antd'
+import { ConfigProvider, Dropdown, Layout, Menu, Typography, type MenuProps } from 'antd'
 import dayjs from 'dayjs'
 import { useContext, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { Link, useLocation } from 'react-router'
 import { antLocaleFor, dayjsLocaleFor } from './antLocale'
+import { AppSwitcher } from './AppSwitcher'
 import { AxisButton } from './AxisButton'
+import { TitleMark } from './LaunchTile'
 import { navigationIcon } from './navigationIcons'
 import { NotificationBell } from './NotificationBell'
 import { ShellHeightContext } from './shellHeight'
@@ -49,19 +51,6 @@ function activeNavigationKey(navigation: readonly NavigationItem[], pathname: st
     }
   }
   return best?.key
-}
-
-/**
- * Proposed: the site's mark, the first letter of its title on a `primary` tile, beside the title in the header. The
- * avatar draws its letter in the light solid text colour, which reads on `primary` in both modes.
- */
-function SiteMark({ title }: { title: string }) {
-  const { colour } = useDesignTokens()
-  return (
-    <Avatar aria-hidden shape="square" size={28} style={{ flex: 'none', background: colour.primary, fontWeight: 600 }}>
-      {title.trim().charAt(0).toUpperCase()}
-    </Avatar>
-  )
 }
 
 /**
@@ -232,7 +221,7 @@ export function Shell({
                 color: colour.text,
               }}
             >
-              <SiteMark title={title} />
+              <TitleMark title={title} size={28} />
               <Typography.Text strong ellipsis>
                 {title}
               </Typography.Text>
@@ -240,6 +229,7 @@ export function Shell({
             {notifications && (
               <NotificationBell path={notifications.path} sitePath={notifications.sitePath} locale={locale} />
             )}
+            <AppSwitcher locale={locale} />
             <PreferencesMenu locales={locales} locale={locale} onLocaleChange={onLocaleChange} />
             <UserMenu />
           </Layout.Header>

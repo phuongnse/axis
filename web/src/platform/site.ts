@@ -30,6 +30,8 @@ export interface SiteListItem {
   path: string
   titleKey: string
   titles: Record<string, string>
+  /** Proposed: the application the site belongs to, by its name and its title per available locale. */
+  application?: { name: string; titles: Record<string, string> }
 }
 
 /** An application site, as served by `GET /api/sites/{path}`. */
