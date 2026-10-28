@@ -413,7 +413,7 @@ internal sealed class TenantRestore : IAsyncDisposable
 
     // The steps of the database run with the host and port of the admin connection, where the database was created.
     private TenantDatabaseSteps Steps =>
-        _steps ??= new TenantDatabaseSteps(_settings.Cipher, _row!, _admin.Host!, _admin.Port, _cancellationToken);
+        _steps ??= new TenantDatabaseSteps(_settings.Cipher, _row!, _admin.Host!, _admin.Port, TenantDatabaseTls.From(_admin.ConnectionString), _cancellationToken);
 
     // A database that holds tables is restored already: pg_restore runs in one transaction, so it restored everything or nothing.
     private async Task RestoreAsync()
@@ -451,6 +451,7 @@ internal sealed class TenantRestore : IAsyncDisposable
         info.Environment["PGDATABASE"] = row.DatabaseName;
         info.Environment["PGUSER"] = row.SchemaUser;
         info.Environment["PGPASSWORD"] = password;
+        TenantDatabaseTls.From(_admin.ConnectionString).ApplyTo(info.Environment);
         info.Environment.Remove("PGPASSFILE");
         info.Environment.Remove("PGSERVICE");
 
