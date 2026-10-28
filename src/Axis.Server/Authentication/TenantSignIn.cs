@@ -36,7 +36,10 @@ internal static class TenantSignIn
     /// </summary>
     public const string TokenRejectedItem = "axis:sign_in_token_rejected";
 
-    /// <summary>The request item that <c>OnAuthorizationCodeReceived</c> sets when it rejects the callback's <c>iss</c>.</summary>
+    /// <summary>
+    /// The request item that <c>OnAuthorizationCodeReceived</c> sets when it rejects the provider metadata's issuer, or under
+    /// <c>fapi2</c> the callback's <c>iss</c>.
+    /// </summary>
     public const string IssuerRejectedItem = "axis:sign_in_issuer_rejected";
 
     /// <summary>The request item that <c>OnTokenValidated</c> fills with the <see cref="ProfileClaims"/> for <c>OnTicketReceived</c>.</summary>
@@ -183,6 +186,8 @@ internal sealed partial class TenantSignInOptions(TenantSignInSettings settings,
                 authenticatedAt: SignInRecency.TryRead(authTime, out var authenticatedAt) ? authenticatedAt : null);
             return Task.CompletedTask;
         };
+        // Every profile refuses metadata whose issuer is not the tenant's authority, before the code goes to the token endpoint.
+        options.Events.OnAuthorizationCodeReceived = async context => await CheckMetadataIssuerAsync(context, tenant);
         if (fapi2)
         {
             ConfigureFapi2(options, tenant, tenantId);
@@ -239,10 +244,29 @@ internal sealed partial class TenantSignInOptions(TenantSignInSettings settings,
         };
     }
 
+    // The handler checks that the ID token's iss matches the metadata, so metadata from another issuer would pass with a
+    // token from that issuer. This check compares the metadata's issuer with the tenant's authority. It returns the
+    // metadata, or null after it failed the callback.
+    private static async Task<OpenIdConnectConfiguration?> CheckMetadataIssuerAsync(
+        AuthorizationCodeReceivedContext context,
+        TenantOidcSettings tenant)
+    {
+        var httpContext = context.HttpContext;
+        var configuration = await context.Options.ConfigurationManager!.GetConfigurationAsync(httpContext.RequestAborted);
+        if (!string.Equals(configuration.Issuer, tenant.Authority!.TrimEnd('/'), StringComparison.Ordinal))
+        {
+            httpContext.Items[TenantSignIn.IssuerRejectedItem] = true;
+            context.Fail("The provider metadata's issuer is not the tenant's authority.");
+            return null;
+        }
+
+        return configuration;
+    }
+
     // Under fapi2 the client authenticates with private_key_jwt at the PAR and token endpoints, signed with the newest
     // client key. The identity provider refuses a reused jti, so each request gets its own assertion. The callback must
     // carry an iss that is the tenant's authority (RFC 9207), and the token request carries a DPoP proof (RFC 9449).
-    // Both run in the code event, so a refused issuer never sends the code to the token endpoint.
+    // Both run in the code event after the metadata check, so a refused issuer never sends the code to the token endpoint.
     private static void ConfigureFapi2(OpenIdConnectOptions options, TenantOidcSettings tenant, string tenantId)
     {
         options.Events.OnRedirectToIdentityProvider = async context =>
@@ -264,6 +288,11 @@ internal sealed partial class TenantSignInOptions(TenantSignInSettings settings,
         options.Events.OnAuthorizationCodeReceived = async context =>
         {
             var httpContext = context.HttpContext;
+            if (await CheckMetadataIssuerAsync(context, tenant) is not { } configuration)
+            {
+                return;
+            }
+
             var issuer = context.ProtocolMessage.GetParameter(OpenIdConnectParameterNames.Iss);
             if (!string.Equals(issuer, tenant.Authority!.TrimEnd('/'), StringComparison.Ordinal))
             {
@@ -272,7 +301,6 @@ internal sealed partial class TenantSignInOptions(TenantSignInSettings settings,
                 return;
             }
 
-            var configuration = await context.Options.ConfigurationManager!.GetConfigurationAsync(httpContext.RequestAborted);
             var response = await DpopTokenRequest.SendAsync(
                 context.Backchannel,
                 configuration.TokenEndpoint,

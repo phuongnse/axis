@@ -744,8 +744,11 @@ schema of the tenant database.
     | `session.signedOut`     | `POST /api/auth/sign-out` with a session | The user id and the display name | `{ "clientAddress" }`           |
     | `session.signInRefused` | The callback is refused                  | `anonymous`, null                | `{ "reason", "clientAddress" }` |
     - `reason` is one of `otherTenant`, `invalidToken`, `invalidState`,
-      `invalidIssuer` or `providerError`. `invalidIssuer` is a `fapi2` callback
-      whose `iss` is missing or is not the tenant's `Authority`.
+      `invalidIssuer` or `providerError`. `invalidToken` also covers an ID token
+      with a nonce that the sign-in did not send. `invalidIssuer` is a callback
+      whose provider metadata names an issuer other than the tenant's
+      `Authority`, in any profile, or a `fapi2` callback whose `iss` is missing
+      or is not the tenant's `Authority`.
       `providerError` covers a person who cancels at the identity provider, and
       a provider error.
     - `application_id`, `entity_id`, `record_id` and `process_instance_id` are

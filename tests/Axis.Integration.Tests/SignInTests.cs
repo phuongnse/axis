@@ -1,10 +1,14 @@
 using System.Buffers.Text;
+using System.Collections.Concurrent;
 using System.Net;
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 using Axis.Server.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -13,6 +17,8 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.JsonWebTokens;
+using Microsoft.IdentityModel.Tokens;
 using Npgsql;
 
 namespace Axis.Integration.Tests;
@@ -352,6 +358,72 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
     }
 
     [Fact]
+    public async Task A_callback_whose_id_token_has_another_nonce_is_refused_and_writes_no_session()
+    {
+        using var provider = new ProviderRewriteHandler();
+        await using var factory = FactoryWith(provider);
+        using var client = CreateClient(factory);
+        var callbackPath = await LoginAtKeycloakAsync(client, "anna", returnUrl: null, authorize => ReplaceQueryValue(authorize, "nonce", Base64Url.EncodeToString(RandomNumberGenerator.GetBytes(32))));
+
+        var callback = await SendAsync(client, HttpMethod.Get, callbackPath);
+
+        AssertRedirectedToSignInPage(callback);
+        Assert.Empty(await ReadSessionsAsync("a"));
+        Assert.Empty(await ReadAuditAsync("a", "session.signedIn"));
+        Assert.Equal("invalidToken", await ReadRefusalReasonAsync("a"));
+        Assert.Equal(HttpStatusCode.Unauthorized, (await SendAsync(client, HttpMethod.Get, "/api/me")).StatusCode);
+    }
+
+    [Fact]
+    public async Task Provider_metadata_whose_issuer_is_not_the_authority_refuses_the_callback_before_the_code_is_sent()
+    {
+        using var provider = new ProviderRewriteHandler(editMetadata: metadata => metadata["issuer"] = "http://impostor.example.test/realms/axis");
+        await using var factory = FactoryWith(provider);
+        using var client = CreateClient(factory);
+        var callbackPath = await LoginAtKeycloakAsync(client, "anna", returnUrl: null);
+
+        var callback = await SendAsync(client, HttpMethod.Get, callbackPath);
+
+        AssertRedirectedToSignInPage(callback);
+        Assert.Empty(await ReadSessionsAsync("a"));
+        Assert.Empty(await ReadAuditAsync("a", "session.signedIn"));
+        Assert.Equal("invalidIssuer", await ReadRefusalReasonAsync("a"));
+        Assert.Contains(provider.Paths, path => path.EndsWith(".well-known/openid-configuration", StringComparison.Ordinal));
+        Assert.DoesNotContain(provider.Paths, path => path.EndsWith("/protocol/openid-connect/token", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task An_id_token_for_another_audience_is_refused_and_writes_no_session()
+    {
+        using var provider = new ProviderRewriteHandler(editIdToken: claims => claims["aud"] = "another-client");
+        await using var factory = FactoryWith(provider);
+        using var client = CreateClient(factory);
+        var callbackPath = await LoginAtKeycloakAsync(client, "anna", returnUrl: null);
+
+        var callback = await SendAsync(client, HttpMethod.Get, callbackPath);
+
+        AssertRedirectedToSignInPage(callback);
+        Assert.Empty(await ReadSessionsAsync("a"));
+        Assert.Empty(await ReadAuditAsync("a", "session.signedIn"));
+        Assert.Equal("invalidToken", await ReadRefusalReasonAsync("a"));
+        Assert.Equal(HttpStatusCode.Unauthorized, (await SendAsync(client, HttpMethod.Get, "/api/me")).StatusCode);
+    }
+
+    [Fact]
+    public async Task A_re_signed_id_token_for_the_client_signs_in()
+    {
+        // The control for the audience test: the same re-signing with the audience left alone is accepted, so the audience is what refuses.
+        using var provider = new ProviderRewriteHandler(editIdToken: _ => { });
+        await using var factory = FactoryWith(provider);
+        using var client = CreateClient(factory);
+
+        await SignInAsync(client, "anna", "/");
+
+        Assert.Equal(HttpStatusCode.OK, (await SendAsync(client, HttpMethod.Get, "/api/me")).StatusCode);
+        Assert.Single(await ReadSessionsAsync("a"));
+    }
+
+    [Fact]
     public async Task No_audit_record_holds_a_token_the_session_cookie_or_the_user_agent()
     {
         using var client = CreateClient();
@@ -518,6 +590,17 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
 
     private HttpClient CreateClient() => CreateClient(Factory);
 
+    /// <summary>A host whose tenant a reaches the identity provider through <paramref name="provider"/>.</summary>
+    private WebApplicationFactory<Program> FactoryWith(ProviderRewriteHandler provider) =>
+        Factory.WithWebHostBuilder(builder => builder.ConfigureTestServices(services =>
+            services.Configure<OpenIdConnectOptions>(TenantSignIn.SchemeName("a"), options => options.BackchannelHttpHandler = provider)));
+
+    private static Uri ReplaceQueryValue(Uri address, string name, string value) =>
+        new UriBuilder(address)
+        {
+            Query = Regex.Replace(address.Query.TrimStart('?'), $"(^|&){Regex.Escape(name)}=[^&]*", $"$1{name}={Uri.EscapeDataString(value)}"),
+        }.Uri;
+
     private static HttpClient CreateClient(WebApplicationFactory<Program> factory) =>
         factory.CreateClient(new WebApplicationFactoryClientOptions
         {
@@ -565,7 +648,7 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
     /// Starts sign-in at the server and logs in on Keycloak's login form. Returns the path and query
     /// of the callback address that Keycloak sends the browser to, which the caller sends to the server.
     /// </summary>
-    private async Task<string> LoginAtKeycloakAsync(HttpClient client, string username, string? returnUrl)
+    private async Task<string> LoginAtKeycloakAsync(HttpClient client, string username, string? returnUrl, Func<Uri, Uri>? rewriteAuthorize = null)
     {
         var path = returnUrl is null ? "/api/auth/sign-in" : $"/api/auth/sign-in?returnUrl={Uri.EscapeDataString(returnUrl)}";
         var challenge = await SendAsync(client, HttpMethod.Get, path);
@@ -575,6 +658,10 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
         Assert.Contains("code_challenge=", authorize.Query, StringComparison.Ordinal);
         Assert.Contains("code_challenge_method=S256", authorize.Query, StringComparison.Ordinal);
         Assert.Contains("max_age=28800", authorize.Query, StringComparison.Ordinal);
+        if (rewriteAuthorize is not null)
+        {
+            authorize = rewriteAuthorize(authorize);
+        }
 
         // A separate client plays the browser at Keycloak. Keycloak marks its cookies Secure, which a
         // browser sends to http://localhost but a CookieContainer does not, so the client carries
@@ -693,6 +780,13 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
         return rows;
     }
 
+    private async Task<string?> ReadRefusalReasonAsync(string tenant)
+    {
+        var record = Assert.Single(await ReadAuditAsync(tenant, "session.signInRefused"));
+        using var details = JsonDocument.Parse(record.Details);
+        return details.RootElement.GetProperty("reason").GetString();
+    }
+
     private async Task<List<SessionRow>> ReadSessionsAsync(string tenant)
     {
         await using var connection = new NpgsqlConnection(_databases[tenant]);
@@ -722,6 +816,83 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
     private sealed record ProfileRow(string UserId, string DisplayName, string? Email, string? Locale, DateTimeOffset FirstSignedInAt, DateTimeOffset LastSignedInAt);
 
     private sealed record AuditRow(string Actor, string? ActorName, string Action, Guid? ApplicationId, string Details);
+
+    /// <summary>
+    /// Sends the server's calls to Keycloak and records their paths. It can change the provider metadata, and it can change
+    /// the claims of the ID token that the token endpoint returns. The changed token is signed with a key of its own, which
+    /// the handler adds to the key set that Keycloak publishes.
+    /// </summary>
+    private sealed class ProviderRewriteHandler(Action<JsonObject>? editMetadata = null, Action<JsonObject>? editIdToken = null)
+        : DelegatingHandler(new HttpClientHandler())
+    {
+        private const string KeyId = "axis-test";
+
+        private readonly ConcurrentQueue<string> _paths = new();
+        private readonly RSA _rsa = RSA.Create(2048);
+
+        public IReadOnlyCollection<string> Paths => _paths;
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            var path = request.RequestUri!.AbsolutePath;
+            _paths.Enqueue(path);
+            var response = await base.SendAsync(request, cancellationToken);
+            if (editMetadata is not null && path.EndsWith(".well-known/openid-configuration", StringComparison.Ordinal))
+            {
+                await RewriteAsync(response, editMetadata, cancellationToken);
+            }
+            else if (editIdToken is not null && path.EndsWith("/protocol/openid-connect/certs", StringComparison.Ordinal))
+            {
+                await RewriteAsync(response, AddKey, cancellationToken);
+            }
+            else if (editIdToken is not null && path.EndsWith("/protocol/openid-connect/token", StringComparison.Ordinal))
+            {
+                await RewriteAsync(response, Resign, cancellationToken);
+            }
+
+            return response;
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                _rsa.Dispose();
+            }
+
+            base.Dispose(disposing);
+        }
+
+        private static async Task RewriteAsync(HttpResponseMessage response, Action<JsonObject> edit, CancellationToken cancellationToken)
+        {
+            var body = JsonNode.Parse(await response.Content.ReadAsStringAsync(cancellationToken))!.AsObject();
+            edit(body);
+            response.Content = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json");
+        }
+
+        private void AddKey(JsonObject keySet)
+        {
+            var key = JsonWebKeyConverter.ConvertFromRSASecurityKey(new RsaSecurityKey(_rsa) { KeyId = KeyId });
+            keySet["keys"]!.AsArray().Add(new JsonObject
+            {
+                ["kty"] = "RSA",
+                ["use"] = "sig",
+                ["alg"] = SecurityAlgorithms.RsaSha256,
+                ["kid"] = KeyId,
+                ["n"] = key.N,
+                ["e"] = key.E,
+            });
+        }
+
+        private void Resign(JsonObject tokenResponse)
+        {
+            var idToken = tokenResponse["id_token"]!.GetValue<string>();
+            var claims = JsonNode.Parse(Base64UrlEncoder.Decode(idToken.Split('.')[1]))!.AsObject();
+            editIdToken!(claims);
+            var credentials = new SigningCredentials(new RsaSecurityKey(_rsa) { KeyId = KeyId }, SecurityAlgorithms.RsaSha256);
+            tokenResponse["id_token"] = new JsonWebTokenHandler().CreateToken(claims.ToJsonString(), credentials);
+        }
+    }
 
     /// <summary>The system clock moved forward by <see cref="Advance"/>, so real tokens are valid until it moves.</summary>
     private sealed class OffsetClock : TimeProvider
