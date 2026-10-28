@@ -424,6 +424,34 @@ public sealed class PresentationCompilerTests
     }
 
     [Theory]
+    [InlineData("rocket")]
+    [InlineData("Home")]
+    public void Navigation_icon_outside_the_list_is_reported_at_its_icon(string icon)
+    {
+        using var folder = Folder().With("sites/sales.json", Site(navigationIcon: icon));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.SchemaViolation, "sites/sales.json", "/navigation/0/icon"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void Navigation_icon_in_the_list_is_accepted()
+    {
+        using var folder = Folder().With("sites/sales.json", Site(navigationIcon: "home"));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+        Assert.Equal("home", Assert.Single(Assert.Single(result.Model.Sites).Navigation).Icon);
+    }
+
+    [Theory]
     [InlineData("api")]
     [InlineData("health")]
     [InlineData("assets")]
@@ -625,11 +653,12 @@ public sealed class PresentationCompilerTests
         string titleKey = "site.title",
         string locales = """ "default": "en", "fallback": "en", "available": ["en"] """,
         string navigationPage = "Orders",
-        string navigationKey = "nav.orders") =>
+        string navigationKey = "nav.orders",
+        string? navigationIcon = null) =>
         $$"""
         { "id": "{{id}}", "kind": "site", "name": "{{name}}", "formatVersion": 1, "path": "{{path}}",
           "title": { "textKey": "{{titleKey}}" }, "locales": { {{locales}} },
-          "navigation": [ { "page": "{{navigationPage}}", "label": { "textKey": "{{navigationKey}}" } } ] }
+          "navigation": [ { "page": "{{navigationPage}}", "label": { "textKey": "{{navigationKey}}" }{{(navigationIcon is null ? "" : $", \"icon\": \"{navigationIcon}\"")}} } ] }
         """;
 
     internal static string Page(

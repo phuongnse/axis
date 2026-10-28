@@ -6,8 +6,9 @@ person sees, and the sign-in screen when nobody is signed in. This page holds th
 endpoints and the widgets are in [frontend](frontend.md), and sign-in and the session in
 [security](security.md#sign-in-and-the-session).
 
-[D98](../decisions/d98-rules-from-the-shell-review.md) agrees everything on this page. None of it is built yet: M16 builds
-it, so every section is _(planned for M16)_. Until it is built, the shell is as [frontend](frontend.md) describes it: one header
+[D98](../decisions/d98-rules-from-the-shell-review.md) agrees everything on this page. Only the
+[navigation icons](#navigation-icons) list, its check, the API field and the SPA map are built. M16 builds the rest, so
+every other section is _(planned for M16)_. Until it is built, the shell is as [frontend](frontend.md) describes it: one header
 with the site's title, its navigation as a horizontal menu, the notification bell, the account button, the locale
 switch and the theme toggle.
 
@@ -40,8 +41,6 @@ _(planned for M16)_
 
 ## Navigation icons
 
-_(planned for M16)_
-
 - A navigation entry of a `site` resource may have an `icon`: one name from a closed list that Axis owns, such as
   `home`, `dashboard`, `list`, `inbox`, `tasks`, `form`, `document`, `folder`, `chart`, `process`, `people`,
   `person`, `calendar`, `clock`, `money`, `cart`, `tag`, `device`, `tool`, `support`, `mail` and `settings`. The
@@ -49,9 +48,9 @@ _(planned for M16)_
 - The names are Axis's, never the UI library's. The SPA maps each name to one outlined icon, so replacing the library
   changes the map and no application, as [D58](../decisions/d58-ant-design-is-a-detail-of-the-spa-without-procomponents.md)
   requires.
-- An entry with no icon shows a neutral page icon. An icon is `aria-hidden`, as the label names the entry.
-- `GET /api/sites/{path}` gives each navigation item its `icon`, or `null`. The platform site's Home entry has the
-  `home` icon.
+- The map gives an entry with no icon a neutral page icon. An icon is `aria-hidden`, as the label names the entry.
+- `GET /api/sites/{path}` gives each navigation item its `icon`, or `null`. `GET /api/site` gives the platform
+  site's Home entry the `home` icon.
 
 ## Page header
 

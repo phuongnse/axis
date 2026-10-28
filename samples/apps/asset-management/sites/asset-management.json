@@ -20,13 +20,15 @@
       "page": "Assets",
       "label": {
         "textKey": "nav.assets"
-      }
+      },
+      "icon": "device"
     },
     {
       "page": "Dashboard",
       "label": {
         "textKey": "nav.dashboard"
-      }
+      },
+      "icon": "dashboard"
     }
   ]
 }

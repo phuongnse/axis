@@ -150,8 +150,8 @@ flowchart LR
      (`AXC0088`), both at `/widgets/{i}/actions/{j}/process`. A `startProcess`
      entry in a table's `rowActions` is checked the same way against the table's
      root entity, at `/widgets/{i}/rowActions/{j}/process`. A navigation entry
-     must name a loaded page (`AXC0023`). _(planned for M16)_ Its `icon` must be a name from
-     Axis's list, see [navigation icons](shell.md#navigation-icons). Entity, page, data source, form and process names
+     must name a loaded page (`AXC0023`). Its optional `icon` must be a name from
+     Axis's list, see [navigation icons](shell.md#navigation-icons), otherwise it is `AXC0004` at `/navigation/{i}/icon`. Entity, page, data source, form and process names
      resolve ignoring letter case, and a name whose file was not loaded
      because of its own errors is not reported again. Site titles, navigation labels, page titles and action labels join the
      `AXC0028` check.

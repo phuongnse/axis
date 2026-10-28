@@ -7,7 +7,7 @@
   "title": { "textKey": "site.title" },
   "locales": { "default": "en", "fallback": "en", "available": ["en", "vi"] },
   "navigation": [
-    { "page": "Items", "label": { "textKey": "nav.items" } },
+    { "page": "Items", "label": { "textKey": "nav.items" }, "icon": "list" },
     { "page": "Departments", "label": { "textKey": "nav.departments" } }
   ]
 }

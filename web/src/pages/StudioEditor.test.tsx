@@ -97,6 +97,7 @@ beforeAll(() =>
     loadKindSchema('page'),
     loadKindSchema('entity'),
     loadKindSchema('form'),
+    loadKindSchema('site'),
     import('./StudioFormDesign'),
   ]),
 )
@@ -444,6 +445,41 @@ function sentPatch(fetchMock: ReturnType<typeof vi.fn>): PatchOperation[] {
   const [, init] = fetchMock.mock.calls.find(([, call]) => call?.method === 'PATCH')!
   return JSON.parse(init!.body as string) as PatchOperation[]
 }
+
+const siteId = '3a5c1f0e-6b7d-4e21-9c84-2f1d0a9b7c11'
+
+const siteItem: StudioResourceItem = {
+  id: siteId,
+  kind: 'site',
+  name: 'Purchasing',
+  file: 'sites/purchasing.json',
+  version: 'si1',
+  usedBy: 0,
+}
+
+const siteContent = {
+  id: siteId,
+  kind: 'site',
+  name: 'Purchasing',
+  formatVersion: 1,
+  path: 'purchasing',
+  title: { textKey: 'site.title' },
+  locales: { default: 'en', fallback: 'en', available: ['en'] },
+  navigation: [{ page: 'PurchaseRequests', label: { textKey: 'nav.purchaseRequests' } }],
+}
+
+describe('StudioEditor for a site', () => {
+  it('offers the icons of the list for a navigation entry and saves the chosen one', async () => {
+    const { fetchMock } = stubResource(siteItem, siteContent)
+    renderResource(siteItem)
+
+    await chooseOption('tasks', await screen.findByTestId('studio-field-/navigation/0/icon', {}, slow))
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await screen.findByTestId('studio-saved')
+    expect(sentPatch(fetchMock)).toEqual([{ op: 'add', path: '/navigation/0/icon', value: 'tasks' }])
+  })
+})
 
 describe('StudioEditor for a connector', () => {
   it('shows the binding names and saves only names, reading only the resource route', async () => {
