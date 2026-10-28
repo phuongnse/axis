@@ -38,7 +38,7 @@ _(planned for M17)_
 _(planned for M17)_
 
 An `identityProvider` resource declares one way for the application's people to sign in. It is part of the release,
-so Studio edits it and test scenarios check it.
+so Studio edits it, with the identity provider editor of [Studio](studio.md), and test scenarios check it.
 
 ```json
 {
