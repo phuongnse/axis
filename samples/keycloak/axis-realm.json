@@ -4,6 +4,12 @@
   "internationalizationEnabled": true,
   "supportedLocales": ["en", "vi"],
   "defaultLocale": "en",
+  "otpPolicyType": "totp",
+  "otpPolicyAlgorithm": "HmacSHA1",
+  "otpPolicyDigits": 6,
+  "otpPolicyPeriod": 30,
+  "otpPolicyLookAheadWindow": 1,
+  "otpPolicyCodeReusable": true,
   "roles": {
     "client": {
       "axis": [
@@ -259,6 +265,12 @@
           "type": "password",
           "value": "axis",
           "temporary": false
+        },
+        {
+          "type": "otp",
+          "userLabel": "Development authenticator",
+          "secretData": "{\"value\":\"WR7XJ3HI4SM2RXQJIT52VBKFCZG6UYM3\"}",
+          "credentialData": "{\"subType\":\"totp\",\"digits\":6,\"counter\":0,\"period\":30,\"algorithm\":\"HmacSHA1\",\"secretEncoding\":\"BASE32\"}"
         }
       ],
       "requiredActions": [],
@@ -282,6 +294,12 @@
           "type": "password",
           "value": "axis",
           "temporary": false
+        },
+        {
+          "type": "otp",
+          "userLabel": "Development authenticator",
+          "secretData": "{\"value\":\"7PRWXMSP2E336EXZGEX4BEAPKNUVI6Y2\"}",
+          "credentialData": "{\"subType\":\"totp\",\"digits\":6,\"counter\":0,\"period\":30,\"algorithm\":\"HmacSHA1\",\"secretEncoding\":\"BASE32\"}"
         }
       ],
       "requiredActions": [],
@@ -304,6 +322,12 @@
           "type": "password",
           "value": "axis",
           "temporary": false
+        },
+        {
+          "type": "otp",
+          "userLabel": "Development authenticator",
+          "secretData": "{\"value\":\"GTSP2WVGREAPQUYFQ32BGCSZYGEBNKTY\"}",
+          "credentialData": "{\"subType\":\"totp\",\"digits\":6,\"counter\":0,\"period\":30,\"algorithm\":\"HmacSHA1\",\"secretEncoding\":\"BASE32\"}"
         }
       ],
       "requiredActions": [],
@@ -326,6 +350,12 @@
           "type": "password",
           "value": "axis",
           "temporary": false
+        },
+        {
+          "type": "otp",
+          "userLabel": "Development authenticator",
+          "secretData": "{\"value\":\"7QK7LUR7WMNOF4EGSAACB727M3KXJYFT\"}",
+          "credentialData": "{\"subType\":\"totp\",\"digits\":6,\"counter\":0,\"period\":30,\"algorithm\":\"HmacSHA1\",\"secretEncoding\":\"BASE32\"}"
         }
       ],
       "requiredActions": [],
@@ -348,6 +378,12 @@
           "type": "password",
           "value": "axis",
           "temporary": false
+        },
+        {
+          "type": "otp",
+          "userLabel": "Development authenticator",
+          "secretData": "{\"value\":\"BYBM2H3Q6LLKZVOI2JZBBDEPFHV33HFE\"}",
+          "credentialData": "{\"subType\":\"totp\",\"digits\":6,\"counter\":0,\"period\":30,\"algorithm\":\"HmacSHA1\",\"secretEncoding\":\"BASE32\"}"
         }
       ],
       "requiredActions": [],
@@ -370,6 +406,12 @@
           "type": "password",
           "value": "axis",
           "temporary": false
+        },
+        {
+          "type": "otp",
+          "userLabel": "Development authenticator",
+          "secretData": "{\"value\":\"DH47E4WWF5LHL6I3IVNTWBOBXVKBFV6J\"}",
+          "credentialData": "{\"subType\":\"totp\",\"digits\":6,\"counter\":0,\"period\":30,\"algorithm\":\"HmacSHA1\",\"secretEncoding\":\"BASE32\"}"
         }
       ],
       "requiredActions": [],
@@ -392,6 +434,12 @@
           "type": "password",
           "value": "axis",
           "temporary": false
+        },
+        {
+          "type": "otp",
+          "userLabel": "Development authenticator",
+          "secretData": "{\"value\":\"TOP6GPKSSHDUUX7KEVHBA6JZIQAAXYEE\"}",
+          "credentialData": "{\"subType\":\"totp\",\"digits\":6,\"counter\":0,\"period\":30,\"algorithm\":\"HmacSHA1\",\"secretEncoding\":\"BASE32\"}"
         }
       ],
       "requiredActions": [],
@@ -415,6 +463,12 @@
           "type": "password",
           "value": "axis",
           "temporary": false
+        },
+        {
+          "type": "otp",
+          "userLabel": "Development authenticator",
+          "secretData": "{\"value\":\"LBJQ3LHLQ322ZZQCP5MK7RANWOW4BKMN\"}",
+          "credentialData": "{\"subType\":\"totp\",\"digits\":6,\"counter\":0,\"period\":30,\"algorithm\":\"HmacSHA1\",\"secretEncoding\":\"BASE32\"}"
         }
       ],
       "requiredActions": [],
@@ -437,6 +491,12 @@
           "type": "password",
           "value": "axis",
           "temporary": false
+        },
+        {
+          "type": "otp",
+          "userLabel": "Development authenticator",
+          "secretData": "{\"value\":\"5PZTQUVSB6FCB4JTZYF3TYJNLYMMO77A\"}",
+          "credentialData": "{\"subType\":\"totp\",\"digits\":6,\"counter\":0,\"period\":30,\"algorithm\":\"HmacSHA1\",\"secretEncoding\":\"BASE32\"}"
         }
       ],
       "requiredActions": [],
@@ -459,6 +519,12 @@
           "type": "password",
           "value": "axis",
           "temporary": false
+        },
+        {
+          "type": "otp",
+          "userLabel": "Development authenticator",
+          "secretData": "{\"value\":\"MOKDOGRFNH75L57UASAQ2IDNS7UXXHGC\"}",
+          "credentialData": "{\"subType\":\"totp\",\"digits\":6,\"counter\":0,\"period\":30,\"algorithm\":\"HmacSHA1\",\"secretEncoding\":\"BASE32\"}"
         }
       ],
       "requiredActions": [],
@@ -481,6 +547,12 @@
           "type": "password",
           "value": "axis",
           "temporary": false
+        },
+        {
+          "type": "otp",
+          "userLabel": "Development authenticator",
+          "secretData": "{\"value\":\"PRPJOZ7CUNLT5CWPKJTKFZ23GCGVWFRR\"}",
+          "credentialData": "{\"subType\":\"totp\",\"digits\":6,\"counter\":0,\"period\":30,\"algorithm\":\"HmacSHA1\",\"secretEncoding\":\"BASE32\"}"
         }
       ],
       "requiredActions": [],
@@ -503,6 +575,12 @@
           "type": "password",
           "value": "axis",
           "temporary": false
+        },
+        {
+          "type": "otp",
+          "userLabel": "Development authenticator",
+          "secretData": "{\"value\":\"CVG23J7LZP7CNKQ2NZ4NMQPXVWDLMISM\"}",
+          "credentialData": "{\"subType\":\"totp\",\"digits\":6,\"counter\":0,\"period\":30,\"algorithm\":\"HmacSHA1\",\"secretEncoding\":\"BASE32\"}"
         }
       ],
       "requiredActions": [],
@@ -525,6 +603,12 @@
           "type": "password",
           "value": "axis",
           "temporary": false
+        },
+        {
+          "type": "otp",
+          "userLabel": "Development authenticator",
+          "secretData": "{\"value\":\"XMHIJH6W5ZYGM5UEDSIV3WTYI6NCB2NG\"}",
+          "credentialData": "{\"subType\":\"totp\",\"digits\":6,\"counter\":0,\"period\":30,\"algorithm\":\"HmacSHA1\",\"secretEncoding\":\"BASE32\"}"
         }
       ],
       "requiredActions": [],
@@ -547,6 +631,12 @@
           "type": "password",
           "value": "axis",
           "temporary": false
+        },
+        {
+          "type": "otp",
+          "userLabel": "Development authenticator",
+          "secretData": "{\"value\":\"SWNOXHT4SOGNCDAP5DJ3FRWHYQQ43GQK\"}",
+          "credentialData": "{\"subType\":\"totp\",\"digits\":6,\"counter\":0,\"period\":30,\"algorithm\":\"HmacSHA1\",\"secretEncoding\":\"BASE32\"}"
         }
       ],
       "requiredActions": [],

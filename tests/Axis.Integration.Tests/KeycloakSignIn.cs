@@ -32,6 +32,24 @@ internal static partial class KeycloakSignIn
         // browser sends to http://localhost but a CookieContainer does not, so the client carries them itself.
         using var browserHandler = new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false };
         using var browser = new HttpClient(browserHandler);
+        var (password, cookieHeader) = await SubmitPasswordAsync(browser, authorize, username);
+        var login = await SubmitCodeAsync(browser, password, cookieHeader, username);
+        Assert.True(login.StatusCode == HttpStatusCode.Found, await login.Content.ReadAsStringAsync(cancellationToken));
+        var callback = login.Headers.Location!;
+        Assert.Equal($"{expectedBase.GetLeftPart(UriPartial.Authority)}/api/auth/callback", callback.GetLeftPart(UriPartial.Path));
+        return callback;
+    }
+
+    /// <summary>
+    /// Opens the login page at <paramref name="authorize"/> and posts the password of the development user, as a browser
+    /// would. Returns the response, which holds the code form, and the Cookie header that the browser carries.
+    /// </summary>
+    public static async Task<(HttpResponseMessage Response, string CookieHeader)> SubmitPasswordAsync(
+        HttpClient browser,
+        Uri authorize,
+        string username)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
         var loginPage = await browser.GetAsync(authorize, cancellationToken);
         var html = await loginPage.Content.ReadAsStringAsync(cancellationToken);
         Assert.True(loginPage.StatusCode == HttpStatusCode.OK, html);
@@ -45,13 +63,47 @@ internal static partial class KeycloakSignIn
                 ["credentialId"] = "",
             }),
         };
-        loginRequest.Headers.Add("Cookie", string.Join("; ", loginPage.Headers.GetValues("Set-Cookie")
-            .Select(cookie => cookie.Split(';')[0])));
-        var login = await browser.SendAsync(loginRequest, cancellationToken);
-        Assert.True(login.StatusCode == HttpStatusCode.Found, await login.Content.ReadAsStringAsync(cancellationToken));
-        var callback = login.Headers.Location!;
-        Assert.Equal($"{expectedBase.GetLeftPart(UriPartial.Authority)}/api/auth/callback", callback.GetLeftPart(UriPartial.Path));
-        return callback;
+        var cookieHeader = string.Join("; ", loginPage.Headers.GetValues("Set-Cookie").Select(cookie => cookie.Split(';')[0]));
+        loginRequest.Headers.Add("Cookie", cookieHeader);
+        return (await browser.SendAsync(loginRequest, cancellationToken), cookieHeader);
+    }
+
+    /// <summary>
+    /// Answers the code form that follows the password: asserts that <paramref name="passwordResponse"/> holds it, and
+    /// posts <paramref name="code"/>, or the user's current code, to the form's action. Returns the response, which
+    /// redirects to the callback when the code is right.
+    /// </summary>
+    public static async Task<HttpResponseMessage> SubmitCodeAsync(
+        HttpClient browser,
+        HttpResponseMessage passwordResponse,
+        string cookieHeader,
+        string username,
+        string? code = null)
+    {
+        var cancellationToken = TestContext.Current.CancellationToken;
+        var html = await passwordResponse.Content.ReadAsStringAsync(cancellationToken);
+        Assert.True(passwordResponse.StatusCode == HttpStatusCode.OK && html.Contains("id=\"otp\"", StringComparison.Ordinal), html);
+        var action = WebUtility.HtmlDecode(FormActionPattern().Match(html).Groups["action"].Value);
+        // A cookie that the password response sets again replaces the one the browser sent.
+        var cookies = cookieHeader.Split("; ").ToDictionary(cookie => cookie.Split('=', 2)[0], cookie => cookie);
+        if (passwordResponse.Headers.TryGetValues("Set-Cookie", out var setCookies))
+        {
+            foreach (var cookie in setCookies.Select(setCookie => setCookie.Split(';')[0]))
+            {
+                cookies[cookie.Split('=', 2)[0]] = cookie;
+            }
+        }
+
+        using var request = new HttpRequestMessage(HttpMethod.Post, new Uri(action))
+        {
+            Content = new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["otp"] = code ?? DevelopmentTotp.Code(username),
+                ["login"] = "Sign In",
+            }),
+        };
+        request.Headers.Add("Cookie", string.Join("; ", cookies.Values));
+        return await browser.SendAsync(request, cancellationToken);
     }
 
     [GeneratedRegex("""<form\b[^>]*\baction="(?<action>[^"]+)""")]

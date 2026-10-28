@@ -1,4 +1,5 @@
 import { expect, test } from '../test'
+import { logInAtKeycloak } from '../keycloak'
 
 // A person signs in from the home page, opens a site from its application card, uses the navigation, opens a form
 // with the table's main action and returns through the breadcrumb. Below 992 px there is no sidebar, so the journey
@@ -14,9 +15,7 @@ for (const { name, width } of [
     await page.goto('/')
     const main = page.getByRole('main')
     await main.getByRole('button', { name: 'Sign in', exact: true }).click()
-    await page.locator('#username').fill('requester')
-    await page.locator('#password').fill('axis')
-    await page.locator('#kc-login').click()
+    await logInAtKeycloak(page, 'requester')
 
     await expect(main.getByText('Welcome to Axis', { exact: true })).toBeVisible()
     await main.getByRole('link', { name: 'E2E notes', exact: true }).click()

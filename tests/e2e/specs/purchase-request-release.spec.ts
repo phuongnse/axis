@@ -13,6 +13,7 @@ import { previewURL, purchaseRequests } from '../server-settings'
 import { useSession } from '../sessions'
 import { openTab } from '../studio-resources'
 import { chooseTheme } from '../shell'
+import { logInAtKeycloak } from '../keycloak'
 
 // Each activation starts a second server, which takes a few seconds.
 test.setTimeout(180_000)
@@ -122,9 +123,7 @@ async function signInToPreview(browser: Browser, baseURL: string, user: string) 
   })
   const page = await context.newPage()
   await page.goto('/api/auth/sign-in?returnUrl=/')
-  await page.locator('#username').fill(user)
-  await page.locator('#password').fill('axis')
-  await page.locator('#kc-login').click()
+  await logInAtKeycloak(page, user)
   await page.waitForURL(`${previewURL(baseURL)}/`)
   return { context, page }
 }

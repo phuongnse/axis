@@ -374,6 +374,8 @@ sign-out address. This holds under both
 These are test fixtures. Docs and GitHub text name roles instead. A new
 sample reuses a user that holds the role it needs before it adds a user.
 `scripts/lint.sh` checks this table against `samples/keycloak/axis-realm.json`.
+Every user signs in with the password `axis` and a 6-digit code. Each user's TOTP secret is the `otp` credential in that
+file, and the realm accepts a code more than once. See [development realm and users](../development.md#development-realm-and-users).
 
 | User               | Roles                   | Used by                                                                                                                                       |
 | ------------------ | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
