@@ -10,7 +10,8 @@ namespace Axis.Integration.Tests;
 /// <summary>
 /// <see cref="RealmSync"/> makes the site clients and brokered <c>oidc</c> providers of a realm that
 /// <see cref="TenantRealm"/> made match a desired state. It changes only clients that start with <c>site-</c> and
-/// providers that start with <c>oidc-</c>, puts the provider's alias into each site client's ID token, and changes
+/// providers that start with <c>oidc-</c>, puts the provider's alias into each site client's ID token, points each
+/// provider at the realm's first-login flow and gives it a username mapper, and changes
 /// nothing when it cannot sign in as <c>axis-activation</c>.
 /// </summary>
 public sealed class RealmSyncTests(KeycloakFixture keycloak) : IAsyncLifetime
@@ -48,7 +49,13 @@ public sealed class RealmSyncTests(KeycloakFixture keycloak) : IAsyncLifetime
         Assert.Equal(1, await CountClientsAsync(token, realm, "site-service-desk"));
         var provider = await GetJsonAsync(token, $"admin/realms/{realm}/identity-provider/instances/{Alias}");
         Assert.Equal("oidc", provider.GetProperty("providerId").GetString());
-        Assert.Equal(["display name", "email", "locale", "roles groups"], await MapperNamesAsync(token, realm));
+        Assert.Equal(["display name", "email", "locale", "roles groups", "username"], await MapperNamesAsync(token, realm));
+        Assert.Equal(RealmSync.FirstLoginFlowAlias, provider.GetProperty("firstBrokerLoginFlowAlias").GetString());
+        var mappers = await GetJsonAsync(token, $"admin/realms/{realm}/identity-provider/instances/{Alias}/mappers");
+        var username = Assert.Single(mappers.EnumerateArray(), m => m.GetProperty("name").GetString() == "username");
+        Assert.Equal("oidc-username-idp-mapper", username.GetProperty("identityProviderMapper").GetString());
+        Assert.Equal("${ALIAS}.${CLAIM.sub}", username.GetProperty("config").GetProperty("template").GetString());
+        Assert.Equal("IMPORT", username.GetProperty("config").GetProperty("syncMode").GetString());
     }
 
     [Fact]
@@ -103,7 +110,7 @@ public sealed class RealmSyncTests(KeycloakFixture keycloak) : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Syncing_the_same_state_twice_leaves_one_client_per_site_and_one_provider_with_four_mappers()
+    public async Task Syncing_the_same_state_twice_leaves_one_client_per_site_and_one_provider_with_five_mappers()
     {
         var realm = await NewRealmAsync();
         var state = State(["purchasing", "service-desk"], [Provider()]);
@@ -115,7 +122,7 @@ public sealed class RealmSyncTests(KeycloakFixture keycloak) : IAsyncLifetime
         Assert.Equal(1, await CountClientsAsync(token, realm, "site-service-desk"));
         var providers = await GetJsonAsync(token, $"admin/realms/{realm}/identity-provider/instances");
         Assert.Equal(1, providers.EnumerateArray().Count(p => p.GetProperty("alias").GetString() == Alias));
-        Assert.Equal(4, (await MapperNamesAsync(token, realm)).Count);
+        Assert.Equal(5, (await MapperNamesAsync(token, realm)).Count);
         var clients = await GetJsonAsync(token, $"admin/realms/{realm}/clients?clientId=site-purchasing");
         Assert.Equal(1, clients[0].GetProperty("protocolMappers").EnumerateArray()
             .Count(m => m.GetProperty("protocolMapper").GetString() == "oidc-usersessionmodel-note-mapper"));
