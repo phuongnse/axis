@@ -44,7 +44,7 @@ public sealed class AdminTenantOidcSetTests(PostgreSqlFixture database, Keycloak
         var authority = await keycloak.StartAsync();
         await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
         var id = scenario.NewTenantId();
-        Assert.Equal(0, (await scenario.RunAsync(CreateArgs(id, "localhost", authority))).Exit);
+        Assert.Equal(0, (await CreateAsync(scenario, id, "localhost", authority)).Exit);
         await using var factory = CreateFactory(scenario.Platform);
         using var failing = CreateClient(factory);
 
@@ -359,8 +359,16 @@ public sealed class AdminTenantOidcSetTests(PostgreSqlFixture database, Keycloak
 
     private static string[] Lines(string pem) => pem.ReplaceLineEndings("\n").TrimEnd('\n').Split('\n');
 
-    private static string[] CreateArgs(string id, string host, Uri authority) =>
-        ["tenant", "create", id, "--host", host, "--oidc-authority", authority.ToString(), "--oidc-client-id", KeycloakFixture.ClientId];
+    // Creates the tenant, which gets a realm of its own, then points it back at the development realm. The secret stays the generated one.
+    private static async Task<AdminResult> CreateAsync(AdminScenario scenario, string id, string host, Uri authority)
+    {
+        var created = await scenario.RunAsync(AdminScenario.CreateArgs(id, host));
+        return created.Exit != 0
+            ? created
+            : await scenario.RunAsync(
+                ["tenant", "oidc", "set", id, "--authority", authority.ToString(), "--client-id", KeycloakFixture.ClientId],
+                extra: _directory);
+    }
 
     private static WebApplicationFactory<Program> CreateFactory(string platform) =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
@@ -425,7 +433,7 @@ public sealed class AdminTenantOidcSetTests(PostgreSqlFixture database, Keycloak
     private static async Task<string> CreateServedTenantAsync(AdminScenario scenario, Uri authority)
     {
         var id = scenario.NewTenantId();
-        Assert.Equal(0, (await scenario.RunAsync(CreateArgs(id, $"{id}.example.test", authority))).Exit);
+        Assert.Equal(0, (await CreateAsync(scenario, id, $"{id}.example.test", authority)).Exit);
         await using (var context = new PlatformDbContext(new DbContextOptionsBuilder<PlatformDbContext>().UseNpgsql(scenario.Platform).Options))
         {
             context.TenantBindings.AddRange(

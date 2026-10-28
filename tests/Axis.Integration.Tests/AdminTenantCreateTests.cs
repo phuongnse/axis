@@ -26,7 +26,7 @@ public sealed class AdminTenantCreateTests(PostgreSqlFixture database) : IClassF
 
         Assert.Equal(0, result.Exit);
         Assert.Equal(
-            ["entry", "roles", "database", "grants", "migrations", "grants", "role-check", "version"],
+            ["entry", "realm", "roles", "database", "grants", "migrations", "grants", "role-check", "version"],
             result.Output.Select(line => line.Split(' ')[1]));
         Assert.All(result.Output, line => Assert.EndsWith(" ok", line, StringComparison.Ordinal));
         var row = await scenario.RowAsync(id);
@@ -235,23 +235,121 @@ public sealed class AdminTenantCreateTests(PostgreSqlFixture database) : IClassF
     }
 
     [Fact]
-    public async Task Create_without_the_client_secret_or_with_a_wrong_shape_exits_2()
+    public async Task Create_without_the_identity_provider_url_or_with_a_wrong_shape_exits_2()
+    {
+        await using var scenario = await NewScenarioAsync();
+        var id = scenario.NewTenantId();
+        var noUrl = await scenario.RunAsync(
+            AdminScenario.CreateArgs(id, "shop.example.test"),
+            extra: new Dictionary<string, string?> { ["IdentityProvider:Url"] = null });
+        var noHost = await scenario.RunAsync(["tenant", "create", id]);
+        var oidcAuthority = await scenario.RunAsync([.. AdminScenario.CreateArgs(id, "shop.example.test"), "--oidc-authority", AdminScenario.Authority]);
+        var oidcClientId = await scenario.RunAsync([.. AdminScenario.CreateArgs(id, "shop.example.test"), "--oidc-client-id", "axis"]);
+        var unknown = await scenario.RunAsync(["tenant", "delete", id]);
+
+        Assert.Equal(2, noUrl.Exit);
+        Assert.Contains("IdentityProvider:Url", noUrl.Error[0], StringComparison.Ordinal);
+        Assert.Equal(2, noHost.Exit);
+        Assert.StartsWith("Usage:", noHost.Error[0], StringComparison.Ordinal);
+        Assert.All(new[] { oidcAuthority, oidcClientId }, result =>
+        {
+            Assert.Equal(2, result.Exit);
+            Assert.StartsWith("Usage:", result.Error[0], StringComparison.Ordinal);
+        });
+        Assert.Equal(2, unknown.Exit);
+        Assert.Equal(0L, await scenario.CountEntriesAsync());
+        Assert.Empty(scenario.IdentityProvider.Paths);
+
+        await scenario.AssertNoSecretsAsync();
+    }
+
+    [Theory]
+    [InlineData("IdentityProvider:AdminClientId", null)]
+    [InlineData("IdentityProvider:AdminClientSecret", null)]
+    [InlineData("IdentityProvider:Url", "not a url")]
+    [InlineData("IdentityProvider:Url", "ftp://idp.example.test/")]
+    public async Task Create_with_a_missing_or_invalid_identity_provider_setting_exits_2_naming_the_setting(string setting, string? value)
     {
         await using var scenario = await NewScenarioAsync();
         var id = scenario.NewTenantId();
 
-        var noSecret = await scenario.RunAsync(AdminScenario.CreateArgs(id, "shop.example.test"), withClientSecret: false);
-        var noHost = await scenario.RunAsync(["tenant", "create", id, "--oidc-authority", AdminScenario.Authority, "--oidc-client-id", "axis"]);
-        var unknown = await scenario.RunAsync(["tenant", "delete", id]);
+        var result = await scenario.RunAsync(
+            AdminScenario.CreateArgs(id, "shop.example.test"),
+            extra: new Dictionary<string, string?> { [setting] = value });
 
-        Assert.Equal(2, noSecret.Exit);
-        Assert.Contains("AXIS_OIDC_CLIENT_SECRET", noSecret.Error[0], StringComparison.Ordinal);
-        Assert.Equal(2, noHost.Exit);
-        Assert.StartsWith("Usage:", noHost.Error[0], StringComparison.Ordinal);
-        Assert.Equal(2, unknown.Exit);
+        Assert.Equal(2, result.Exit);
+        Assert.Empty(result.Output);
+        Assert.Contains(setting, Assert.Single(result.Error), StringComparison.Ordinal);
         Assert.Equal(0L, await scenario.CountEntriesAsync());
+        Assert.Empty(scenario.IdentityProvider.Paths);
+    }
 
+    [Fact]
+    public async Task Create_refuses_the_tenant_id_master_because_the_identity_provider_owns_that_realm()
+    {
+        await using var scenario = await NewScenarioAsync();
+
+        var result = await scenario.CreateAsync("master", "shop.example.test");
+
+        Assert.Equal(2, result.Exit);
+        Assert.Contains("master", Assert.Single(result.Error), StringComparison.Ordinal);
+        Assert.Equal(0L, await scenario.CountEntriesAsync());
+        Assert.Empty(scenario.IdentityProvider.Paths);
+    }
+
+    [Fact]
+    public async Task Create_outside_development_and_testing_refuses_a_plain_http_identity_provider_address()
+    {
+        await using var scenario = await NewScenarioAsync();
+        var id = scenario.NewTenantId();
+
+        var result = await scenario.RunAsync(
+            AdminScenario.CreateArgs(id, "shop.example.test"),
+            extra: new Dictionary<string, string?>
+            {
+                ["DOTNET_ENVIRONMENT"] = "Production",
+                ["Admin:ConnectionString"] = new NpgsqlConnectionStringBuilder(scenario.AdminConnection) { SslMode = SslMode.VerifyFull }.ConnectionString,
+                ["ConnectionStrings:PlatformSchema"] = new NpgsqlConnectionStringBuilder(scenario.Platform) { SslMode = SslMode.VerifyFull }.ConnectionString,
+            });
+
+        Assert.Equal(2, result.Exit);
+        Assert.Contains("IdentityProvider:Url", Assert.Single(result.Error), StringComparison.Ordinal);
+        Assert.Contains("https", result.Error[0], StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_rerun_after_a_stop_at_the_realm_step_reuses_the_stored_secrets_and_finishes()
+    {
+        await using var scenario = await NewScenarioAsync();
+        var id = scenario.NewTenantId();
+        var failing = await scenario.RunAsync(AdminScenario.CreateArgs(id, "shop.example.test"), identityProvider: new FailingHandler());
+
+        Assert.Equal(1, failing.Exit);
+        Assert.Equal([$"{id} entry ok"], failing.Output.Take(1));
+        Assert.Contains($"{id} realm failed", failing.Output[1], StringComparison.Ordinal);
+        var stopped = await scenario.RowAsync(id);
+        Assert.Equal("provisioning", stopped.Status);
+        Assert.Equal(AdminScenario.RealmAuthority(id), stopped.OidcAuthority);
+        Assert.Equal("axis", stopped.OidcClientId);
+        Assert.NotEmpty(stopped.OidcClientSecret);
+        Assert.NotEmpty(stopped.RealmActivationClientSecret!);
+        Assert.NotEmpty(stopped.RealmUsersClientSecret!);
+
+        var rerun = await scenario.CreateAsync(id, "shop.example.test");
+
+        Assert.Equal(0, rerun.Exit);
+        var done = await scenario.RowAsync(id);
+        Assert.Equal("active", done.Status);
+        Assert.Equal(stopped.OidcClientSecret, done.OidcClientSecret);
+        Assert.Equal(stopped.RealmActivationClientSecret, done.RealmActivationClientSecret);
+        Assert.Equal(stopped.RealmUsersClientSecret, done.RealmUsersClientSecret);
         await scenario.AssertNoSecretsAsync();
+    }
+
+    private sealed class FailingHandler : HttpMessageHandler
+    {
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
+            Task.FromResult(new HttpResponseMessage(HttpStatusCode.InternalServerError));
     }
 
     private Task<AdminScenario> NewScenarioAsync(bool migrate = true) => AdminScenario.NewAsync(database, migrate, CancellationToken);

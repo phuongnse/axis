@@ -196,8 +196,8 @@ See
 [D42](../decisions/d42-tenant-directory-in-the-platform-database.md).
 The `platform` schema, its migrations, the read-only grant, the secret cipher
 and the directory source of the server and the worker are built. `Axis.Admin
-tenant create` writes the tables and encrypts the stored passwords and the OIDC
-client secret. `tenant suspend` and `tenant resume` change a tenant's status,
+tenant create` writes the tables and encrypts the stored passwords, the OIDC
+client secret and the secrets of the tenant realm's other two clients. `tenant suspend` and `tenant resume` change a tenant's status,
 and `tenant restore` adds a suspended tenant. The platform tables exist
 under both tenant sources: the server creates them at start and sets the
 read-only grant. Under both sources the server keeps its data protection keys
@@ -269,11 +269,12 @@ a tenant only when this value is the one the host was built for, see
   else. The [cryptographic inventory](keys-and-data-protection.md#cryptographic-inventory)
   lists every key:
   - the runtime and schema database passwords, in `platform.tenants`;
-  - the OIDC client secret, in `platform.tenants`;
+  - the OIDC client secret, in `platform.tenants`. For a tenant that `tenant create` made, it is the secret of the
+    realm's platform client;
   - the SMTP password of a tenant's own mail settings, in `platform.tenants`,
     see [mail settings](notifications.md#mail-settings);
   - the secrets of a tenant realm's activation client and users client, in
-    `platform.tenants`, written by `tenant create` _(planned for M17)_, see
+    `platform.tenants`, written by `tenant create`, see
     [keeping the realm in step](identity-provider.md#keeping-the-realm-in-step);
   - the value of a `secret` binding, in `platform.tenant_bindings`;
   - the client keys of a tenant under the `fapi2` sign-in profile, in

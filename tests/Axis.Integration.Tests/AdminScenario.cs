@@ -17,6 +17,7 @@ internal sealed record AdminResult(int Exit, string[] Output, string[] Error);
 internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisposable
 {
     private readonly string _clientSecret = $"client-{Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(12))}";
+    private readonly string _identityProviderSecret = $"idp-{Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(12))}";
     private readonly List<string> _adminPasswords = [];
     private readonly List<string> _texts = [];
     private readonly List<string> _tenants = [];
@@ -30,13 +31,22 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
 
     public const string Authority = "https://127.0.0.1:1/realms/axis";
 
+    /// <summary>The authority that <c>tenant create</c> gives the tenant when the identity provider address is the default one.</summary>
+    public static string RealmAuthority(string id) => $"http://127.0.0.1:1/realms/{id}";
+
     public static readonly TenantSecretCipher Cipher = TenantSecretCipher.Load(
         new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?> { [TenantSecretCipher.KeySetting] = TestSecretKey }).Build());
 
     public string Platform { get; } = platform;
 
-    /// <summary>The OIDC client secret that <c>tenant create</c> gets, for tests that check it never leaks.</summary>
+    /// <summary>The OIDC client secret that <c>tenant restore</c> and <c>tenant oidc set</c> get, for tests that check it never leaks.</summary>
     public string ClientSecret => _clientSecret;
+
+    /// <summary>The secret of the admin client of the identity provider, which <c>tenant create</c> gets by default.</summary>
+    public string IdentityProviderSecret => _identityProviderSecret;
+
+    /// <summary>The identity provider stub that <see cref="RunAsync"/> uses unless a test passes another handler.</summary>
+    public StubIdentityProvider IdentityProvider { get; } = new();
 
     /// <summary>The passwords of the admin roles this scenario made.</summary>
     public IReadOnlyList<string> AdminPasswords => _adminPasswords;
@@ -48,8 +58,6 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
     [
         "tenant", "create", id,
         .. hosts.SelectMany(host => new[] { "--host", host }),
-        "--oidc-authority", Authority,
-        "--oidc-client-id", "axis",
     ];
 
     /// <summary>The arguments that create a preview tenant of <paramref name="main"/>. Each binding is <c>name=value</c>.</summary>
@@ -129,7 +137,8 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
         IReadOnlyDictionary<string, string?>? extra = null,
         TimeSpan? publisherLease = null,
         TimeSpan? publisherTestLimit = null,
-        string? input = null)
+        string? input = null,
+        HttpMessageHandler? identityProvider = null)
     {
         var settings = new Dictionary<string, string?>
         {
@@ -139,6 +148,10 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
             ["ConnectionStrings:PlatformSchema"] = Platform,
             ["Platform:SecretKey"] = TestSecretKey,
             ["AXIS_OIDC_CLIENT_SECRET"] = withClientSecret ? _clientSecret : null,
+            // The address is never reached, because the stub answers in its place.
+            ["IdentityProvider:Url"] = "http://127.0.0.1:1/",
+            ["IdentityProvider:AdminClientId"] = "axis-admin",
+            ["IdentityProvider:AdminClientSecret"] = _identityProviderSecret,
             ["PATH"] = path,
             ["Extensions:Path"] = SamplePackages.Path,
             ["Modules:Path"] = SampleModules.Path,
@@ -151,17 +164,16 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(settings).Build();
         using var error = new StringWriter();
         output ??= new StringWriter();
-        var exit = publisherLease is not null || publisherTestLimit is not null
-            ? await AdminCommands.RunAsync(
-                args,
-                configuration,
-                new StringReader(input ?? ""),
-                output,
-                error,
-                publisherLease ?? Publisher.DefaultLeaseDuration,
-                publisherTestLimit ?? Publisher.DefaultTestLimit,
-                stop?.Token ?? CancellationToken)
-            : await AdminCommands.RunAsync(args, configuration, new StringReader(input ?? ""), output, error, stop?.Token ?? CancellationToken);
+        var exit = await AdminCommands.RunAsync(
+            args,
+            configuration,
+            new StringReader(input ?? ""),
+            output,
+            error,
+            publisherLease ?? Publisher.DefaultLeaseDuration,
+            publisherTestLimit ?? Publisher.DefaultTestLimit,
+            identityProvider ?? IdentityProvider,
+            stop?.Token ?? CancellationToken);
         var text = output.ToString()!;
         _texts.Add(text);
         _texts.Add(error.ToString());
@@ -292,12 +304,17 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
     public async Task AssertNoSecretsAsync(TenantSecretCipher? cipher = null)
     {
         cipher ??= Cipher;
-        var secrets = new List<string>([.. _adminPasswords, _clientSecret]);
+        var secrets = new List<string>([.. _adminPasswords, _clientSecret, _identityProviderSecret]);
         await using (var context = NewContext())
         {
             // Without the platform tables there is no directory, so no generated password.
             foreach (var tenant in migrated ? await context.Tenants.AsNoTracking().ToListAsync(CancellationToken) : [])
             {
+                if (tenant.OidcClientSecret.Length > 0)
+                {
+                    secrets.Add(cipher.Decrypt(tenant.Id, TenantSecretFields.OidcClientSecret, tenant.OidcClientSecret).Reveal());
+                }
+
                 if (tenant.SchemaPassword.Length > 0)
                 {
                     secrets.Add(cipher.Decrypt(tenant.Id, TenantSecretFields.SchemaPassword, tenant.SchemaPassword).Reveal());

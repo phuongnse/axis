@@ -33,6 +33,12 @@ internal static partial class AdminCommands
 
     public const string DotnetEnvironmentSetting = "DOTNET_ENVIRONMENT";
 
+    public const string IdentityProviderUrlSetting = "IdentityProvider:Url";
+
+    public const string IdentityProviderAdminClientIdSetting = "IdentityProvider:AdminClientId";
+
+    public const string IdentityProviderAdminClientSecretSetting = "IdentityProvider:AdminClientSecret";
+
     private const string Provisioning = "provisioning";
 
     private const string ActiveStatus = "active";
@@ -49,7 +55,7 @@ internal static partial class AdminCommands
 
     internal const string Usage =
         """
-        Usage: tenant create <id> --host <host>... --oidc-authority <url> --oidc-client-id <id>
+        Usage: tenant create <id> --host <host>...
                tenant create <id> --preview-of <main> --host <host>... [--binding <name>=<value>]...
                tenant backup <id> --out <file>
                tenant restore <file> --tenant <id> --host <host>...
@@ -92,9 +98,10 @@ internal static partial class AdminCommands
         TextWriter output,
         TextWriter error,
         CancellationToken cancellationToken) =>
-        RunAsync(args, configuration, input, output, error, Publisher.DefaultLeaseDuration, Publisher.DefaultTestLimit, cancellationToken);
+        RunAsync(args, configuration, input, output, error, Publisher.DefaultLeaseDuration, Publisher.DefaultTestLimit, null, cancellationToken);
 
-    // The publisher lease and the test limit are parameters so that tests can use short ones. The product has no setting for them.
+    // The publisher lease, the test limit and the identity provider handler are parameters so that tests can use short ones and a stub.
+    // The product has no setting for them.
     internal static async Task<int> RunAsync(
         string[] args,
         IConfiguration configuration,
@@ -103,6 +110,7 @@ internal static partial class AdminCommands
         TextWriter error,
         TimeSpan publisherLease,
         TimeSpan publisherTestLimit,
+        HttpMessageHandler? identityProviderHandler,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(args);
@@ -133,7 +141,7 @@ internal static partial class AdminCommands
             }
         }
 
-        return await command.RunAsync(new AdminRun(command, args, configuration, input, output, error, publisherLease, publisherTestLimit, cancellationToken));
+        return await command.RunAsync(new AdminRun(command, args, configuration, input, output, error, publisherLease, publisherTestLimit, identityProviderHandler, cancellationToken));
     }
 
     /// <summary>
@@ -142,7 +150,7 @@ internal static partial class AdminCommands
     /// </summary>
     internal static IReadOnlyList<AdminCommand> Commands { get; } =
     [
-        new("tenant create", AuditMark.OnePerTenant, run => CreateAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.CancellationToken)),
+        new("tenant create", AuditMark.OnePerTenant, run => CreateAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.IdentityProviderHandler, run.CancellationToken)),
         new("tenant backup", AuditMark.OnePerTenant, run => BackupAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.CancellationToken)),
         new("tenant restore", AuditMark.OnePerTenant, run => RestoreAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.CancellationToken)),
         new("tenant suspend", AuditMark.OnePerTenant, run => StatusAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.CancellationToken)),
@@ -190,6 +198,7 @@ internal static partial class AdminCommands
         IConfiguration configuration,
         TextWriter output,
         TextWriter error,
+        HttpMessageHandler? identityProviderHandler,
         CancellationToken cancellationToken)
     {
         var request = ParseTenantCreate(args);
@@ -199,11 +208,25 @@ internal static partial class AdminCommands
             return 2;
         }
 
-        var settings = ReadCreateSettings(configuration, needsClientSecret: request.PreviewOf is null, out var problem);
+        var settings = ReadCreateSettings(configuration, needsClientSecret: false, out var problem);
         if (settings is null)
         {
             error.WriteLine(problem);
             return 2;
+        }
+
+        // A preview tenant gets no realm, so it needs none of the identity provider settings.
+        if (request.PreviewOf is null)
+        {
+            var environment = new AdminEnvironment(configuration[DotnetEnvironmentSetting] ?? Environments.Production);
+            var identityProvider = ReadIdentityProvider(configuration, environment, out problem);
+            if (identityProvider is null)
+            {
+                error.WriteLine(problem);
+                return 2;
+            }
+
+            settings = settings with { IdentityProvider = identityProvider };
         }
 
         try
@@ -221,7 +244,11 @@ internal static partial class AdminCommands
             return 1;
         }
 
-        return await new TenantCreate(settings, request, new TenantAudit(command, settings.PlatformConnectionString), output, cancellationToken).RunAsync();
+        using var http = identityProviderHandler is null
+            ? new HttpClient { Timeout = TimeSpan.FromSeconds(60) }
+            : new HttpClient(identityProviderHandler, disposeHandler: false);
+        var realm = settings.IdentityProvider is null ? null : new TenantRealm(http, settings.IdentityProvider);
+        return await new TenantCreate(settings, request, realm, new TenantAudit(command, settings.PlatformConnectionString), output, cancellationToken).RunAsync();
     }
 
     private static async Task<int> RekeyAsync(
@@ -794,8 +821,6 @@ internal static partial class AdminCommands
 
         var hosts = new List<string>();
         var bindings = new List<KeyValuePair<string, string>>();
-        string? authority = null;
-        string? clientId = null;
         string? previewOf = null;
         for (var i = 3; i < args.Length; i += 2)
         {
@@ -809,12 +834,6 @@ internal static partial class AdminCommands
             {
                 case "--host":
                     hosts.Add(value);
-                    break;
-                case "--oidc-authority" when authority is null:
-                    authority = value;
-                    break;
-                case "--oidc-client-id" when clientId is null:
-                    clientId = value;
                     break;
                 case "--preview-of" when previewOf is null:
                     previewOf = value;
@@ -839,17 +858,10 @@ internal static partial class AdminCommands
             return null;
         }
 
-        // A preview tenant takes the sign-in settings of its main tenant, so it takes no OIDC option. A binding is only for a preview.
-        if (previewOf is not null)
-        {
-            return authority is null && clientId is null
-                ? new TenantCreateRequest(args[2], hosts, null, null, previewOf, bindings)
-                : null;
-        }
-
-        return authority is null || clientId is null || bindings.Count > 0
+        // A binding is only for a preview tenant.
+        return previewOf is null && bindings.Count > 0
             ? null
-            : new TenantCreateRequest(args[2], hosts, authority, clientId, null, bindings);
+            : new TenantCreateRequest(args[2], hosts, previewOf, bindings);
     }
 
     private static async Task<int> MigrateAsync(
@@ -1445,8 +1457,8 @@ internal static partial class AdminCommands
     }
 
     /// <summary>
-    /// Reads the settings of <c>tenant create</c>: the common ones, the admin role and, unless it makes a preview tenant, the
-    /// OIDC client secret. A preview tenant never reads the secret, even when it is set.
+    /// Reads the settings of <c>tenant create</c>: the common ones, the admin role and, when <paramref name="needsClientSecret"/> is true,
+    /// the OIDC client secret, which <c>tenant restore</c> reads. A command that does not need it never reads it, even when it is set.
     /// </summary>
     private static CreateSettings? ReadCreateSettings(IConfiguration configuration, bool needsClientSecret, out string problem)
     {
@@ -1492,6 +1504,58 @@ internal static partial class AdminCommands
         return new CreateSettings(adminBuilder, common.PlatformConnectionString, common.Cipher, secret);
     }
 
+    /// <summary>
+    /// Reads the identity provider settings of <c>tenant create</c>. The address must be an absolute http or https URL, and https
+    /// outside Development and Testing. A message names the setting and never its value.
+    /// </summary>
+    private static IdentityProviderAdmin? ReadIdentityProvider(IConfiguration configuration, IHostEnvironment environment, out string problem)
+    {
+        problem = "";
+        var url = configuration[IdentityProviderUrlSetting];
+        var clientId = configuration[IdentityProviderAdminClientIdSetting];
+        var clientSecret = configuration[IdentityProviderAdminClientSecretSetting];
+
+        if (string.IsNullOrWhiteSpace(url))
+        {
+            problem = $"The setting {IdentityProviderUrlSetting} is required.";
+            return null;
+        }
+
+        if (!Uri.TryCreate(url, UriKind.Absolute, out var address)
+            || (address.Scheme != Uri.UriSchemeHttp && address.Scheme != Uri.UriSchemeHttps))
+        {
+            problem = $"The setting {IdentityProviderUrlSetting} must be an absolute http or https URL.";
+            return null;
+        }
+
+        if (address.Scheme != Uri.UriSchemeHttps && DatabaseTlsRequirement.Applies(environment))
+        {
+            problem = $"The setting {IdentityProviderUrlSetting} must be an https URL.";
+            return null;
+        }
+
+        if (string.IsNullOrWhiteSpace(clientId))
+        {
+            problem = $"The setting {IdentityProviderAdminClientIdSetting} is required.";
+            return null;
+        }
+
+        if (string.IsNullOrEmpty(clientSecret))
+        {
+            problem = $"The setting {IdentityProviderAdminClientSecretSetting} is required.";
+            return null;
+        }
+
+        // A trailing slash keeps a path of the address when a relative address is added to it.
+        var baseAddress = new UriBuilder(address) { Query = "", Fragment = "" }.Uri;
+        if (!baseAddress.AbsolutePath.EndsWith('/'))
+        {
+            baseAddress = new Uri(baseAddress.ToString() + "/");
+        }
+
+        return new IdentityProviderAdmin(baseAddress, clientId, clientSecret);
+    }
+
     /// <summary>Returns the reason to refuse the command, or null. It checks the admin role and the input before any tenant work.</summary>
     private static async Task<string?> ValidateAsync(CreateSettings settings, TenantCreateRequest request, CancellationToken cancellationToken)
     {
@@ -1508,15 +1572,10 @@ internal static partial class AdminCommands
                 ?? await PreviewProblemAsync(settings.PlatformConnectionString, request, cancellationToken);
         }
 
-        if (!Uri.TryCreate(request.OidcAuthority, UriKind.Absolute, out var authority)
-            || (authority.Scheme != Uri.UriSchemeHttp && authority.Scheme != Uri.UriSchemeHttps))
+        // The realm is named after the tenant, and the master realm is the identity provider's own admin realm.
+        if (request.Id == "master")
         {
-            return "--oidc-authority must be an absolute http or https URL.";
-        }
-
-        if (string.IsNullOrWhiteSpace(request.OidcClientId))
-        {
-            return "--oidc-client-id must not be blank.";
+            return "The tenant id 'master' is reserved by the identity provider.";
         }
 
         return await PlatformTablesProblemAsync(settings.PlatformConnectionString, cancellationToken);
@@ -1701,14 +1760,12 @@ internal static partial class AdminCommands
 }
 
 /// <summary>
-/// <c>tenant create</c>. A main tenant has the OIDC settings and no <paramref name="PreviewOf"/>. A preview tenant has
-/// <paramref name="PreviewOf"/>, no OIDC settings and any <paramref name="Bindings"/>.
+/// <c>tenant create</c>. A main tenant has no <paramref name="PreviewOf"/> and gets a realm. A preview tenant has
+/// <paramref name="PreviewOf"/>, no realm and any <paramref name="Bindings"/>.
 /// </summary>
 internal sealed record TenantCreateRequest(
     string Id,
     IReadOnlyList<string> Hosts,
-    string? OidcAuthority,
-    string? OidcClientId,
     string? PreviewOf,
     IReadOnlyList<KeyValuePair<string, string>> Bindings);
 
@@ -1746,12 +1803,16 @@ internal sealed class AdminEnvironment(string environmentName) : IHostEnvironmen
 
 internal sealed record BackupSettings(string PlatformConnectionString, TenantSecretCipher Cipher, string SearchPath);
 
-/// <summary>The settings of <c>tenant create</c>, which also needs the admin role and, except for a preview tenant, the OIDC client secret.</summary>
+/// <summary>
+/// The settings of <c>tenant create</c>, which also needs the admin role. <paramref name="OidcClientSecret"/> is for <c>tenant restore</c>.
+/// <paramref name="IdentityProvider"/> is set only by <c>tenant create</c> of a main tenant.
+/// </summary>
 internal sealed record CreateSettings(
     NpgsqlConnectionStringBuilder Admin,
     string PlatformConnectionString,
     TenantSecretCipher Cipher,
-    string? OidcClientSecret);
+    string? OidcClientSecret,
+    IdentityProviderAdmin? IdentityProvider = null);
 
 /// <summary>The settings of <c>tenant restore</c>: those of <c>tenant create</c>, the <c>PATH</c> and the installed extension packages, which may be unset.</summary>
 internal sealed record RestoreSettings(CreateSettings Create, string SearchPath, string? ExtensionsPath);

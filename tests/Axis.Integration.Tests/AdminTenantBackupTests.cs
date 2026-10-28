@@ -68,7 +68,7 @@ public sealed class AdminTenantBackupTests(AdminBackupFixture fixture) : IClassF
         Assert.Equal("active", directory.GetProperty("status").GetString());
         Assert.Equal(JsonValueKind.Null, directory.GetProperty("previewOf").ValueKind);
         Assert.Equal([AdminBackupFixture.Host], directory.GetProperty("hosts").EnumerateArray().Select(host => host.GetString()));
-        Assert.Equal(AdminScenario.Authority, directory.GetProperty("oidcAuthority").GetString());
+        Assert.Equal(AdminScenario.RealmAuthority(fixture.TenantId), directory.GetProperty("oidcAuthority").GetString());
         Assert.Equal("axis", directory.GetProperty("oidcClientId").GetString());
         Assert.Equal("axis-services", directory.GetProperty("serviceAudience").GetString());
         var bindings = directory.GetProperty("bindings").EnumerateArray().ToDictionary(binding => binding.GetProperty("name").GetString()!);
