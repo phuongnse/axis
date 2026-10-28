@@ -10,6 +10,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Axis.Configuration.Loading;
 using Axis.Processes.Instances;
+using Axis.Tenancy;
 using Axis.Tenancy.Platform;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
@@ -41,6 +42,7 @@ internal sealed class TenantBackup : IAsyncDisposable
     };
 
     private readonly BackupSettings _settings;
+    private readonly TenantDatabaseTls _tls;
     private readonly BackupPlan _plan;
     private readonly TenantAudit _audit;
     private readonly TextWriter _output;
@@ -55,6 +57,7 @@ internal sealed class TenantBackup : IAsyncDisposable
     public TenantBackup(BackupSettings settings, BackupPlan plan, TenantAudit audit, TextWriter output, CancellationToken cancellationToken)
     {
         _settings = settings;
+        _tls = TenantDatabaseTls.From(settings.PlatformConnectionString);
         _plan = plan;
         _audit = audit;
         _output = output;
@@ -197,7 +200,7 @@ internal sealed class TenantBackup : IAsyncDisposable
     {
         var row = _plan.Row;
         var password = _settings.Cipher.Decrypt(_id, TenantSecretFields.SchemaPassword, row.SchemaPassword).Reveal();
-        var connectionString = new NpgsqlConnectionStringBuilder
+        var builder = new NpgsqlConnectionStringBuilder
         {
             Host = row.DatabaseHost,
             Port = row.DatabasePort,
@@ -205,9 +208,10 @@ internal sealed class TenantBackup : IAsyncDisposable
             Username = row.SchemaUser,
             Password = password,
             Pooling = false,
-        }.ConnectionString;
+        };
+        _tls.ApplyTo(builder);
 
-        await using var connection = new NpgsqlConnection(connectionString);
+        await using var connection = new NpgsqlConnection(builder.ConnectionString);
         await connection.OpenAsync(_cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(IsolationLevel.RepeatableRead, _cancellationToken);
 
@@ -305,6 +309,7 @@ internal sealed class TenantBackup : IAsyncDisposable
         info.Environment["PGDATABASE"] = row.DatabaseName;
         info.Environment["PGUSER"] = row.SchemaUser;
         info.Environment["PGPASSWORD"] = password;
+        _tls.ApplyTo(info.Environment);
         info.Environment.Remove("PGPASSFILE");
         info.Environment.Remove("PGSERVICE");
 

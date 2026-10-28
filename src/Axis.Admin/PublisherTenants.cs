@@ -59,7 +59,7 @@ internal sealed class DirectoryPublisherTenants(PlatformSettings settings, TimeS
                 row.Id,
                 row.SchemaVersion,
                 bindings[row.Id],
-                () => new TenantDatabaseSteps(settings.Cipher, row, row.DatabaseHost, row.DatabasePort, CancellationToken.None)),
+                () => new TenantDatabaseSteps(settings.Cipher, row, row.DatabaseHost, row.DatabasePort, TenantDatabaseTls.From(settings.PlatformConnectionString), CancellationToken.None)),
             StringComparer.Ordinal);
         var previewIds = rows
             .Where(row => row.PreviewOf is not null)

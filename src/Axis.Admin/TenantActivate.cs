@@ -2,6 +2,7 @@ using Axis.Configuration.Modules;
 using Axis.Configuration.Packages;
 using Axis.Configuration.Releases;
 using Axis.Data;
+using Axis.Tenancy;
 using Axis.Tenancy.Platform;
 
 namespace Axis.Admin;
@@ -53,7 +54,7 @@ internal sealed class TenantActivate(
             return false;
         }
 
-        await using var steps = new TenantDatabaseSteps(settings.Cipher, row, row.DatabaseHost, row.DatabasePort, cancellationToken);
+        await using var steps = new TenantDatabaseSteps(settings.Cipher, row, row.DatabaseHost, row.DatabasePort, TenantDatabaseTls.From(settings.PlatformConnectionString), cancellationToken);
         var run = await new TenantReleaseActivation(inlineRecomputeLimit, output, error, cancellationToken).RunAsync(
             row.Id,
             row.SchemaVersion,

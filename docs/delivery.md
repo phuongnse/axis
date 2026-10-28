@@ -384,9 +384,10 @@ issues, pull requests and sub-issues.
   is on, but it deletes neither the branches of the pull requests NexKit
   merges nor those of cloud sessions that push nothing. When the owner asks,
   the local session lists every `nexkit/` branch whose pull request is merged
-  and every `claude/` branch with no pull request and no commit that `main`
-  lacks, and the owner deletes them. A branch with an open pull request, or a
-  closed one that was not merged, stays.
+  or that NexKit closed as `already_on_base`, because `main` already holds its
+  change, and every `claude/` branch with no pull request and no commit that
+  `main` lacks, and the owner deletes them. A branch with an open pull
+  request, or any other closed one that was not merged, stays.
 
 [nexkit-how]: https://github.com/phuongnse/nexkit/blob/main/docs/how-it-works.md
 [nexkit-config]: https://github.com/phuongnse/nexkit/blob/main/docs/configuration.md

@@ -248,7 +248,7 @@ internal static class TenantSettings
 
         try
         {
-            await using var steps = new TenantDatabaseSteps(setup.Cipher!, row, row.DatabaseHost, row.DatabasePort, run.CancellationToken);
+            await using var steps = new TenantDatabaseSteps(setup.Cipher!, row, row.DatabaseHost, row.DatabasePort, TenantDatabaseTls.From(setup.Connection), run.CancellationToken);
             var connection = await steps.SchemaConnectionAsync();
             var ended = user is null
                 ? await SessionRevocation.EndAllAsync(connection, run.CancellationToken)

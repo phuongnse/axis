@@ -196,7 +196,7 @@ internal sealed class TenantCreate : IAsyncDisposable
         _provisioning ??= new TenantProvisioning(_admin, _settings.Cipher, _platform, _row!, _cancellationToken);
 
     private TenantDatabaseSteps Steps =>
-        _steps ??= new TenantDatabaseSteps(_settings.Cipher, _row!, _admin.Host!, _admin.Port, _cancellationToken);
+        _steps ??= new TenantDatabaseSteps(_settings.Cipher, _row!, _admin.Host!, _admin.Port, TenantDatabaseTls.From(_admin.ConnectionString), _cancellationToken);
 
     private async Task ActivateAsync()
     {
