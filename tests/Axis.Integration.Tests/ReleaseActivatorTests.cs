@@ -234,6 +234,89 @@ public sealed class ReleaseActivatorTests(DataDatabaseFixture database) : IClass
     }
 
     [Theory]
+    [InlineData(false, "/issuer/binding")]
+    [InlineData(true, "/clientId/binding")]
+    public async Task An_oidc_provider_binding_the_tenant_lacks_or_holds_with_another_kind_is_a_diagnostic_and_the_release_is_not_activated(
+        bool clientIdIsUrl, string path)
+    {
+        var suffix = $"{Guid.NewGuid():N}";
+        using var folder = OidcFolder(_applicationId, _name, Guid.NewGuid(), _orderId, $"Issuer{suffix}", $"Client{suffix}", $"Secret{suffix}");
+        var compiled = await CompileAsync(folder);
+        var bindings = new Dictionary<string, ActivationBinding>(StringComparer.OrdinalIgnoreCase)
+        {
+            [$"Secret{suffix}"] = new(ActivationBinding.SecretKind, null),
+        };
+        if (clientIdIsUrl)
+        {
+            bindings[$"Issuer{suffix}"] = new(ActivationBinding.UrlKind, new Uri("https://issuer.example.test"));
+            bindings[$"Client{suffix}"] = new(ActivationBinding.UrlKind, new Uri("https://client.example.test"));
+        }
+        else
+        {
+            bindings[$"Client{suffix}"] = new(ActivationBinding.SecretKind, null);
+        }
+
+        var result = await ActivateAsync(compiled, new ActivationBindings("acme", bindings, AllowHttp: false));
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.MissingDeploymentBinding, "identity-providers/company.json", path, DiagnosticSeverity.Error),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.Severity));
+        Assert.Null(result.Realm);
+        Assert.Null(await FindActiveAsync(_applicationId));
+    }
+
+    [Fact]
+    public async Task On_a_preview_tenant_an_oidc_provider_without_bindings_is_a_warning_and_the_plan_leaves_it_out()
+    {
+        var suffix = $"{Guid.NewGuid():N}";
+        using var folder = OidcFolder(_applicationId, _name, Guid.NewGuid(), _orderId, $"Issuer{suffix}", $"Client{suffix}", $"Secret{suffix}");
+        var compiled = await CompileAsync(folder);
+
+        var result = await ActivateAsync(compiled, ActivationBindings.None("acme") with { IsPreview = true });
+
+        Assert.All(result.Diagnostics, diagnostic => Assert.Equal((DiagnosticCodes.MissingDeploymentBinding, DiagnosticSeverity.Warning), (diagnostic.Code, diagnostic.Severity)));
+        Assert.NotEmpty(result.Diagnostics);
+        Assert.Equal(compiled.Release?.Id, (await FindActiveAsync(_applicationId))?.ReleaseId);
+        Assert.Empty(result.Realm!.Providers);
+    }
+
+    [Fact]
+    public async Task A_provider_that_names_the_issuer_binding_of_another_application_with_other_client_bindings_is_refused_and_the_release_is_not_activated()
+    {
+        var suffix = $"{Guid.NewGuid():N}";
+        var otherApplicationId = Guid.NewGuid();
+        var otherName = $"App{Guid.NewGuid():N}";
+        using var first = OidcFolder(_applicationId, _name, Guid.NewGuid(), _orderId, $"Issuer{suffix}", $"ClientA{suffix}", $"SecretA{suffix}");
+        using var second = OidcFolder(otherApplicationId, otherName, Guid.NewGuid(), Guid.NewGuid(), $"Issuer{suffix}", $"ClientB{suffix}", $"SecretB{suffix}");
+        var bindings = new Dictionary<string, ActivationBinding>(StringComparer.OrdinalIgnoreCase)
+        {
+            [$"Issuer{suffix}"] = new(ActivationBinding.UrlKind, new Uri("https://issuer.example.test")),
+        };
+        foreach (var name in new[] { "ClientA", "SecretA", "ClientB", "SecretB" })
+        {
+            bindings[$"{name}{suffix}"] = new(ActivationBinding.SecretKind, null);
+        }
+
+        var tenant = new ActivationBindings("acme", bindings, AllowHttp: false);
+        var activated = await ActivateAsync(await CompileAsync(first), tenant);
+        Assert.Empty(activated.Diagnostics);
+        var plan = Assert.Single(activated.Realm!.Providers);
+        Assert.Equal($"oidc-issuer{suffix}", plan.Alias);
+
+        var result = await ActivateAsync(await CompileAsync(second), tenant);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.IdentityProviderSplitsUser, "identity-providers/company.json", "/issuer/binding"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Contains($"'{_name}'", diagnostic.Message);
+        Assert.Null(result.Realm);
+        Assert.Null(await FindActiveAsync(otherApplicationId));
+        Assert.NotNull(await FindActiveAsync(_applicationId));
+    }
+
+    [Theory]
     [InlineData("secret", "secret", "/baseUrl/binding")]
     [InlineData("url", "url", "/auth/token/binding")]
     public async Task On_a_preview_tenant_a_binding_of_the_wrong_kind_is_still_an_error_and_changes_nothing(
@@ -567,6 +650,24 @@ public sealed class ReleaseActivatorTests(DataDatabaseFixture database) : IClass
             .With("pages/orders.json", OrdersPage(Guid.NewGuid()))
             .With("sites/main.json", Site(siteId ?? Guid.NewGuid(), path))
             .With("identity-providers/accounts.json", AccountsProvider(Guid.NewGuid()));
+
+    /// <summary>An application with an <c>oidc</c> provider named <c>company</c>, which needs the text of its label.</summary>
+    private static TemporaryFolder OidcFolder(
+        Guid applicationId, string name, Guid providerId, Guid orderId, string issuer, string clientId, string clientSecret) =>
+        ApplicationFolder(applicationId, name, orderId, NumberField)
+            .With("texts/en.json", $$"""
+                { "id": "{{Guid.NewGuid()}}", "kind": "text", "name": "TextsEn", "formatVersion": 1, "locale": "en",
+                  "texts": { "provider.company": "Company" } }
+                """)
+            .With("identity-providers/company.json", OidcProvider(providerId, "company", issuer, clientId, clientSecret));
+
+    private static string OidcProvider(Guid id, string name, string issuer, string clientId, string clientSecret) =>
+        $$"""
+        { "id": "{{id}}", "kind": "identityProvider", "name": "{{name}}", "formatVersion": 1, "type": "oidc",
+          "label": { "textKey": "provider.company" },
+          "issuer": { "binding": "{{issuer}}" }, "clientId": { "binding": "{{clientId}}" },
+          "clientSecret": { "binding": "{{clientSecret}}" } }
+        """;
 
     private static string Texts(Guid id) =>
         $$"""
