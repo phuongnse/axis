@@ -279,14 +279,16 @@ test("the ticket form shows the resolution, marked required, only while the stat
   await page.getByRole("button", { name: "Next", exact: true }).click();
 
   const status = page.getByRole("combobox", { name: "Status", exact: true });
-  // The required mark is CSS content in the accessible name, as with the title.
-  const resolution = page.getByRole("textbox", { name: "Resolution", exact: true });
+  // Anna cannot write resolution, so the form shows it as plain text. Its label has no input to point to.
+  const resolution = fieldValue(page, "resolution");
+  const requiredMark = page.locator("label", { hasText: "Resolution" }).locator('span[aria-hidden="true"]').last();
   await pickOption(status, "draft");
-  await expect(page.getByLabel(fieldLabel("Resolution"))).toBeHidden();
+  await expect(resolution).toHaveCount(0);
   await pickOption(status, "resolved");
   await expect(resolution).toBeVisible();
+  await expect(requiredMark).toHaveText("*");
   await pickOption(status, "draft");
-  await expect(page.getByLabel(fieldLabel("Resolution"))).toBeHidden();
+  await expect(resolution).toHaveCount(0);
 });
 
 test("the service desk lead sees the open and urgent tiles and the chart by category on the Dashboard", async ({
