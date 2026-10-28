@@ -8,6 +8,7 @@
   "shell.serverStatus.checking": "Checking",
   "shell.serverStatus.ready": "Ready",
   "shell.serverStatus.unavailable": "Unavailable",
+  "shell.footer.platformVersion": "Platform version",
   "shell.theme.dark": "Dark mode",
   "shell.theme.darkShort": "Dark",
   "shell.theme.lightShort": "Light",

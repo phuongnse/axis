@@ -34,6 +34,8 @@ interface ShellProps {
 // Proposed: the header is 48 px high, and the navigation sits in a sidebar of 224 px that collapses to a strip
 // of icons 64 px wide.
 const headerHeight = 48
+// The year of the copyright line, read once when the SPA loads.
+const copyrightYear = new Date().getFullYear()
 const sidebarWidth = 224
 const collapsedWidth = 64
 
@@ -115,9 +117,9 @@ const statusBadge: Record<ServerStatus, 'processing' | 'success' | 'error'> = {
 }
 
 /**
- * Proposed: a slim footer under every page: the platform's name with its version for a signed-in user, and the
- * server's readiness, which turns red for
- * everyone when the server is unavailable.
+ * Proposed: a slim footer under every page: the copyright line with the current year and the platform's name, the
+ * platform version for a signed-in user only, and the server's readiness, which turns red for everyone when the
+ * server is unavailable.
  */
 function ShellFooter() {
   const t = useText()
@@ -138,8 +140,8 @@ function ShellFooter() {
       }}
     >
       <Typography.Text type="secondary">
-        {t('shell.title')}
-        {version && ` ${version}`}
+        © {copyrightYear} {t('shell.title')}
+        {version && ` · ${t('shell.footer.platformVersion')} ${version}`}
       </Typography.Text>
       <Typography.Text type="secondary">
         {t('shell.serverStatus.title')}:{' '}

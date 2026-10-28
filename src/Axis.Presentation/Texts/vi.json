@@ -8,6 +8,7 @@
   "shell.serverStatus.checking": "Đang kiểm tra",
   "shell.serverStatus.ready": "Sẵn sàng",
   "shell.serverStatus.unavailable": "Không khả dụng",
+  "shell.footer.platformVersion": "Phiên bản nền tảng",
   "shell.theme.dark": "Chế độ tối",
   "shell.theme.darkShort": "Tối",
   "shell.theme.lightShort": "Sáng",

@@ -13,6 +13,23 @@ import { useDesignTokens } from '../platform/themeMode'
 import { useNarrowWidth } from '../platform/useNarrowWidth'
 import { usePlatform } from './context'
 
+/** Proposed: the home page lays tiles out in three columns of one width, one column at narrow width. */
+function ThreeColumns({ children }: { children: ReactNode }) {
+  const { spacing } = useDesignTokens()
+  const narrow = useNarrowWidth()
+  return (
+    <div
+      style={{
+        display: 'grid',
+        gridTemplateColumns: narrow ? 'minmax(0, 1fr)' : 'repeat(3, minmax(0, 1fr))',
+        gap: spacing.md,
+      }}
+    >
+      {children}
+    </div>
+  )
+}
+
 /** A panel on `surface` with a quiet border, the frame of every block of the home page. */
 function Panel({ children, padding }: { children: ReactNode; padding: number }) {
   const { colour, radius } = useDesignTokens()
@@ -37,22 +54,14 @@ function Panel({ children, padding }: { children: ReactNode; padding: number }) 
  */
 function Tools({ user }: { user: CurrentUser }) {
   const t = useText()
-  const { colour, spacing } = useDesignTokens()
-  const narrow = useNarrowWidth()
-  const count = Number(user.studio) + Number(user.console)
+  const { colour } = useDesignTokens()
   const icon = (glyph: ReactNode) => (
     <Avatar aria-hidden shape="square" size={32} icon={glyph} style={{ flex: 'none', background: colour.primary }} />
   )
   return (
-    // Proposed: the tools sit side by side in columns of one width, 240 px, and stack at narrow width.
+    // Proposed: the tools sit under the welcome, in the first columns of the page's three.
     <nav aria-label={t('shell.home.tools.title')}>
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: narrow ? 'minmax(0, 1fr)' : `repeat(${count}, 240px)`,
-          gap: spacing.md,
-        }}
-      >
+      <ThreeColumns>
         {user.studio && (
           <LaunchTile
             to="/studio"
@@ -69,24 +78,23 @@ function Tools({ user }: { user: CurrentUser }) {
             description={t('shell.home.console.description')}
           />
         )}
-      </div>
+      </ThreeColumns>
     </nav>
   )
 }
 
 /**
- * Proposed: the welcome band, the platform level of the page. It greets the user, and holds the tools of their roles,
- * or the Sign in button when nobody is signed in.
+ * Proposed: the welcome band, the platform level of the page. It greets the user, with the tools of their roles
+ * under the greeting, or the Sign in button when nobody is signed in.
  */
 function WelcomeBand({ user }: { user: CurrentUser | null | undefined }) {
   const t = useText()
   const { spacing } = useDesignTokens()
-  const narrow = useNarrowWidth()
   const hasTools = Boolean(user?.studio || user?.console)
   return (
     <Panel padding={spacing.lg}>
-      <Flex vertical={narrow} justify="space-between" align={narrow ? 'stretch' : 'center'} gap={spacing.lg}>
-        <Flex vertical gap={spacing.xs} align="flex-start" style={{ flex: 1, minWidth: 0 }}>
+      <Flex vertical gap={spacing.lg}>
+        <Flex vertical gap={spacing.xs} align="flex-start">
           <Typography.Title level={4} style={{ margin: 0 }}>
             {t('shell.home.title')}
           </Typography.Title>
@@ -158,8 +166,8 @@ function byApplication(sites: SiteListItem[], locale: string, fallbackTitle: str
 }
 
 /**
- * Proposed: an application is a card, the application level of the page: its mark, its title and the number of its
- * sites, over its sites, the site level.
+ * Proposed: an application is a card across the page, the application level: its mark, its title and the number
+ * of its sites, over its sites in three columns, the site level.
  */
 function ApplicationCard({ group, locale }: { group: ApplicationGroup; locale: string }) {
   const { colour, spacing } = useDesignTokens()
@@ -178,11 +186,11 @@ function ApplicationCard({ group, locale }: { group: ApplicationGroup; locale: s
           </Typography.Title>
           <Typography.Text type="secondary">{group.sites.length}</Typography.Text>
         </Flex>
-        <Flex vertical>
+        <ThreeColumns>
           {group.sites.map((site) => (
             <SiteRow key={site.path} site={site} locale={locale} />
           ))}
-        </Flex>
+        </ThreeColumns>
       </section>
     </Panel>
   )
@@ -213,19 +221,12 @@ function Applications() {
       ) : sites.length === 0 ? (
         <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('shell.home.sites.empty')} />
       ) : (
-        // Proposed: the application cards fill a grid of columns at least 260 px wide.
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
-            gap: spacing.md,
-            alignItems: 'start',
-          }}
-        >
+        // Proposed: each application takes the full width, one under another, so cards never differ in width.
+        <Flex vertical gap={spacing.md}>
           {groups.map((group) => (
             <ApplicationCard key={group.key} group={group} locale={locale} />
           ))}
-        </div>
+        </Flex>
       )}
     </section>
   )
