@@ -147,7 +147,11 @@ public sealed class AdminTenantStatusTests(PostgreSqlFixture database) : IClassF
         Assert.Contains("platform tables do not exist", noTables.Error[0], StringComparison.Ordinal);
 
         var onlyPlatform = new ConfigurationBuilder()
-            .AddInMemoryCollection(new Dictionary<string, string?> { ["ConnectionStrings:PlatformSchema"] = scenario.Platform })
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["DOTNET_ENVIRONMENT"] = "Testing",
+                ["ConnectionStrings:PlatformSchema"] = scenario.Platform,
+            })
             .Build();
         using var output = new StringWriter();
         using var error = new StringWriter();

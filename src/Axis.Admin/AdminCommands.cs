@@ -18,7 +18,8 @@ namespace Axis.Admin;
 
 /// <summary>
 /// The commands of the admin host. Exit code 0 means the command succeeded, 1 that a step failed and 2 that nothing ran:
-/// a usage or settings error. A message that names a setting never holds its value.
+/// a usage or settings error. Outside Development and Testing, a command refuses a connection setting below <c>SSL Mode=VerifyFull</c>.
+/// A message that names a setting never holds its value.
 /// </summary>
 internal static partial class AdminCommands
 {
@@ -115,6 +116,21 @@ internal static partial class AdminCommands
         {
             error.WriteLine(Usage);
             return 2;
+        }
+
+        // Checked before any command runs, so no command opens a connection without full certificate checks.
+        var environment = new AdminEnvironment(configuration[DotnetEnvironmentSetting] ?? Environments.Production);
+        if (DatabaseTlsRequirement.Applies(environment))
+        {
+            foreach (var setting in new[] { AdminSetting, PlatformSetting, ScenarioServerSetting })
+            {
+                var problem = DatabaseTlsRequirement.Problem(setting, configuration[setting]);
+                if (problem is not null)
+                {
+                    error.WriteLine(problem);
+                    return 2;
+                }
+            }
         }
 
         return await command.RunAsync(new AdminRun(command, args, configuration, input, output, error, publisherLease, publisherTestLimit, cancellationToken));

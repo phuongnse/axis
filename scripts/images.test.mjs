@@ -1,6 +1,7 @@
 // Smoke test for the production images: builds axis-server, axis-worker and axis-admin, checks what they
-// hold, and runs them read-only with their settings in /run/secrets files. Requires Docker.
-// Run from scripts/smoke.sh.
+// hold, and runs them read-only with their settings in /run/secrets files. The test PostgreSQL serves TLS with a
+// certificate from an authority made for the run, and the connection strings set SSL Mode=VerifyFull, which the
+// production hosts require. Requires Docker and openssl. Run from scripts/smoke.sh.
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
@@ -9,6 +10,7 @@ import { join } from 'node:path'
 import { after, before, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { buildImage } from './lib/docker-build.mjs'
+import { issuePostgresCertificate, postgresTlsScript, serverCertificateMount, verifyFull } from './lib/postgres-tls.mjs'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
 const timeout = 20 * 60 * 1000
@@ -20,6 +22,7 @@ const secretKey = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA='
 
 let version
 let folder
+let trustDir
 const containers = []
 
 const image = (target) => `${target}:${suffix}`
@@ -50,6 +53,16 @@ before(
     folder = mkdtempSync(join(tmpdir(), 'axis-images-'))
     for (const target of targets) await buildImage({ target, version, tag: image(target) })
 
+    const certificates = issuePostgresCertificate({
+      folder,
+      name: postgres,
+      openssl: (...args) => {
+        const result = spawnSync('openssl', args, { encoding: 'utf8' })
+        assert.equal(result.status, 0, `openssl ${args.join(' ')}\n${result.stdout}${result.stderr}`)
+      },
+    })
+    trustDir = certificates.trustDir
+
     run(['network', 'create', network])
     run([
       'run',
@@ -58,6 +71,8 @@ before(
       postgres,
       '--network',
       network,
+      '--entrypoint',
+      'sh',
       '-e',
       'POSTGRES_USER=axis',
       '-e',
@@ -66,7 +81,11 @@ before(
       'POSTGRES_PASSWORD=images-test',
       '-v',
       `${join(root, 'samples/postgres/init-roles.sql')}:/docker-entrypoint-initdb.d/init-roles.sql:ro`,
+      '-v',
+      `${certificates.serverDir}:${serverCertificateMount}:ro`,
       'postgres:18-alpine',
+      '-c',
+      postgresTlsScript,
     ])
     // Check over TCP: the initialization server listens only on the Unix socket, so the check succeeds
     // only after the init scripts have run.
@@ -146,6 +165,8 @@ const startReadOnly = (target, secrets, port, extra) => {
     `127.0.0.1::${port}`,
     '-v',
     `${secrets}:/run/secrets:ro`,
+    '-v',
+    `${trustDir}:/run/test-ca:ro`,
     '-e',
     'Tenancy__Source=directory',
     '-e',
@@ -160,7 +181,7 @@ const startReadOnly = (target, secrets, port, extra) => {
   return { id, url: `http://127.0.0.1:${mapped.split(':').pop()}/health/live` }
 }
 
-const connection = (user) => `Host=${postgres};Database=axis;Username=${user};Password=axis`
+const connection = (user) => `Host=${postgres};Database=axis;Username=${user};Password=axis${verifyFull('/run/test-ca/ca.crt')}`
 
 const waitLive = async ({ id, url }) => {
   let status = 0
