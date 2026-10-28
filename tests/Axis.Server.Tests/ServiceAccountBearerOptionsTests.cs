@@ -73,6 +73,25 @@ public sealed class ServiceAccountBearerOptionsTests
         Assert.True(context.Result?.None);
     }
 
+    [Theory]
+    [InlineData("endpoint-a")]
+    [InlineData("service-a")]
+    public void Both_bearer_schemes_accept_only_asymmetric_signature_algorithms(string scheme)
+    {
+        var options = Configure(scheme, new TenantOidcSettings
+        {
+            Authority = "https://127.0.0.1:1/realms/axis",
+            EndpointAudience = "axis-endpoints",
+            ServiceAudience = "axis-services",
+        });
+
+        var algorithms = options.TokenValidationParameters.ValidAlgorithms.ToArray();
+
+        Assert.Equal(BearerCallerOptions.Algorithms, algorithms);
+        Assert.DoesNotContain(algorithms, algorithm => algorithm.StartsWith("HS", StringComparison.OrdinalIgnoreCase));
+        Assert.DoesNotContain(algorithms, algorithm => string.Equals(algorithm, "none", StringComparison.OrdinalIgnoreCase));
+    }
+
     private static JwtBearerOptions Configure(string scheme, TenantOidcSettings settings)
     {
         var tenants = new TenantSignInSettings(new Dictionary<string, TenantOidcSettings> { ["a"] = settings });
