@@ -105,7 +105,8 @@ export function Shell({ titleKey, navigation, locales, locale, onLocaleChange, n
   return (
     <div data-theme-mode={mode}>
       <ConfigProvider locale={antLocaleFor(locale)}>
-        <Layout style={{ minHeight: '100vh' }}>
+        {/* A design-system frame sets --shell-min-height to its own height, so its states fit their card. */}
+        <Layout style={{ minHeight: 'var(--shell-min-height, 100vh)' }}>
           <Layout.Header
             style={{
               display: 'flex',

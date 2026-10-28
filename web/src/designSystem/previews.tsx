@@ -1,16 +1,21 @@
 import type { ReactNode } from 'react'
+import type { InitialEntry } from 'react-router'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
+import { SignInCard } from '../pages/HomePage'
 import { ChartWidget } from '../platform/ChartWidget'
 import { DetailWidget } from '../platform/DetailWidget'
 import { FormWidget } from '../platform/FormWidget'
 import { KpiWidget } from '../platform/KpiWidget'
 import { ProcessInspectorWidget } from '../platform/ProcessInspectorWidget'
+import { SignInPromptDialog } from '../platform/SignInPrompt'
 import type { EntityWidgetMetadata, WidgetMetadata } from '../platform/site'
 import { TableWidget } from '../platform/TableWidget'
 import { TaskInboxWidget } from '../platform/TaskInboxWidget'
 import { WidgetTree } from '../platform/WidgetTree'
 import { FieldPreview } from './FieldPreview'
+import { IdentitySignIn } from './IdentitySignIn'
 import { SubmittedOnMount } from './SubmittedOnMount'
+import { CollapsedOnMount, ShellPreview } from './ShellPreview'
 import {
   blankDetailWidget,
   chartWidget,
@@ -71,6 +76,10 @@ export interface PreviewState {
   caption: string
   draw: () => ReactNode
   routes?: Record<string, () => unknown>
+  /** The address the state starts at. */
+  entry?: InitialEntry
+  /** The height of the frame the state draws in, with its menus and dialogs inside it. */
+  frameHeight?: number
 }
 
 /** A preview with one state, the typical one. */
@@ -186,6 +195,47 @@ export const previews: Record<string, readonly PreviewState[]> = {
       type === 'child-collection' ? childCollectionStates : fieldStates(type),
     ]),
   ),
+  shell: [
+    { caption: 'Application site', draw: () => <ShellPreview />, entry: '/sample/requests', frameHeight: 600 },
+    {
+      caption: 'Navigation collapsed',
+      draw: () => (
+        <CollapsedOnMount>
+          <ShellPreview />
+        </CollapsedOnMount>
+      ),
+      entry: '/sample/requests',
+      frameHeight: 600,
+    },
+    {
+      caption: 'Form page',
+      draw: () => <ShellPreview />,
+      entry: { pathname: '/sample/request/new', state: { from: '/sample/requests' } },
+      frameHeight: 600,
+    },
+    { caption: 'Platform site', draw: () => <ShellPreview />, entry: '/', frameHeight: 600 },
+  ],
+  signIn: [
+    { caption: 'Signed out', draw: () => <SignInCard />, entry: '/', frameHeight: 480 },
+    { caption: 'Sign-in refused', draw: () => <SignInCard />, entry: '/?signIn=failed', frameHeight: 480 },
+    {
+      caption: 'Session ended',
+      draw: () => (
+        <>
+          <ShellPreview />
+          <SignInPromptDialog open />
+        </>
+      ),
+      entry: '/sample/requests',
+      frameHeight: 480,
+    },
+  ],
+  identitySignIn: [
+    { caption: 'Sign in', draw: () => <IdentitySignIn page="signIn" />, frameHeight: 600 },
+    { caption: 'Wrong password', draw: () => <IdentitySignIn page="wrongPassword" />, frameHeight: 600 },
+    { caption: 'Organization sign-in only', draw: () => <IdentitySignIn page="organizationOnly" />, frameHeight: 600 },
+    { caption: 'Two-step verification', draw: () => <IdentitySignIn page="twoStep" />, frameHeight: 600 },
+  ],
 }
 
 /** The fixture answers that the states of the previews bring, in one record. */
