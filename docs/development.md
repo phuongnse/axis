@@ -110,7 +110,7 @@ A failure names the scenario and the step. To run them by hand, run
 ## Production images and Axis.Admin
 
 The `Dockerfile` also has three production targets, `axis-server`, `axis-worker` and `axis-admin`,
-which hold no samples or development settings. Build one with
+which hold no samples, development settings or source control metadata. Build one with
 `docker build --target axis-server --build-arg AXIS_VERSION=<version> .`. `scripts/smoke.sh` builds
 and runs all three in the `images` suite, from `scripts/images.test.mjs`. The default target is still
 the development server. The `images` and on-premises suites build each image up to three times, and wait

@@ -113,7 +113,7 @@ after(() => {
   for (const target of targets) docker(['rmi', '-f', image(target)], { stdio: 'ignore' })
 })
 
-test('no image holds samples or development settings', { timeout }, () => {
+test('no image holds samples, development settings or source control metadata', { timeout }, () => {
   for (const target of targets) {
     const id = run(['create', image(target)])
     let paths
@@ -137,6 +137,11 @@ test('no image holds samples or development settings', { timeout }, () => {
       paths.filter((path) => path.endsWith('appsettings.Development.json')),
       [],
       `${target} holds development settings`,
+    )
+    assert.deepEqual(
+      paths.filter((path) => /(^|\/)\.(git|svn)(\/|$)/.test(path)),
+      [],
+      `${target} holds source control metadata`,
     )
     assert.deepEqual(
       paths.filter((path) => /^(extensions|modules)\/./.test(path)),
