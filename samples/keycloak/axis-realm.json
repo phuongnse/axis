@@ -244,13 +244,13 @@
   ],
   "users": [
     {
-      "id": "anna",
-      "username": "anna",
+      "id": "requester",
+      "username": "requester",
       "enabled": true,
-      "email": "anna@axis.local",
+      "email": "requester@axis.local",
       "emailVerified": true,
-      "firstName": "Anna",
-      "lastName": "Employee",
+      "firstName": "Requester",
+      "lastName": "User",
       "attributes": {
         "locale": ["vi"]
       },

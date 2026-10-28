@@ -2,9 +2,9 @@ import { expect, test } from "../test";
 import { csrfHeaders } from "../csrf";
 import { sessionFile } from "../sessions";
 
-// The record API needs a session with a grant, so this journey starts signed in as the employee anna.
+// The record API needs a session with a grant, so this journey starts signed in as the employee requester.
 test.use({
-  storageState: sessionFile("anna"),
+  storageState: sessionFile("requester"),
   viewport: { width: 390, height: 844 },
 });
 

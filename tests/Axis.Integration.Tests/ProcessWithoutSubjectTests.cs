@@ -155,7 +155,7 @@ public sealed class ProcessWithoutSubjectTests(ProcessStepFixture fixture) : ICl
             process,
             new JsonObject { ["days"] = days },
             instanceId,
-            "anna",
+            "requester",
             null,
             null,
             CancellationToken);

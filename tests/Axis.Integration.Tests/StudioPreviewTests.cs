@@ -138,13 +138,13 @@ public sealed class StudioPreviewTests : IAsyncLifetime
             Assert.Equal(StudioPublishTests.PreviewHost, me.RootElement.GetProperty("studioPreviewHost").GetString());
         }
 
-        using var anna = factory.CreateClient().SignedInAs("anna");
-        using var annaMe = await StudioPublishTests.GetJsonAsync(anna, "/api/me", HostA);
+        using var requester = factory.CreateClient().SignedInAs("requester");
+        using var annaMe = await StudioPublishTests.GetJsonAsync(requester, "/api/me", HostA);
         Assert.False(annaMe.RootElement.GetProperty("studio").GetBoolean());
         Assert.Equal(JsonValueKind.Null, annaMe.RootElement.GetProperty("studioPreviewHost").ValueKind);
 
         // A person who is not an author has no right to preview.
-        using var refused = await StudioPublishTests.SendAsync(anna, HttpMethod.Post, PreviewUrl, HostA);
+        using var refused = await StudioPublishTests.SendAsync(requester, HttpMethod.Post, PreviewUrl, HostA);
         Assert.Equal(HttpStatusCode.Forbidden, refused.StatusCode);
         Assert.Equal(0L, await StudioPublishTests.CountRequestsAsync(main));
     }

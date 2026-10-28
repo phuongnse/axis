@@ -27,7 +27,7 @@ namespace Axis.Integration.Tests;
 /// <c>a.example.test</c> and <c>b.example.test</c>. Tenant A also has the SecondApp and FilesApp fixtures
 /// activated, and a compiled release of an application that was never activated. FilesApp names a
 /// <c>storage</c> binding, <c>Files</c>, which tenant A holds with the value <c>database</c>. The test
-/// authentication scheme signs in <c>anna</c>, an employee with every grant of both applications,
+/// authentication scheme signs in <c>requester</c>, an employee with every grant of both applications,
 /// and users with fewer grants: <c>binh</c> holds no role, <c>rita</c> is a reader, <c>uma</c>
 /// holds only undeclared role names, <c>fia</c> holds only grants with fields, on items,
 /// tickets and orders and none on departments, plus <c>import</c> on items and tickets and no <c>update</c> on tickets,
@@ -36,7 +36,7 @@ namespace Axis.Integration.Tests;
 /// holds only a read filter that is <c>false</c>, and <c>faye</c> holds a read filter that
 /// overflows for some items and one that matches items of the Finance department. <c>eve</c> may read
 /// and export the items that have a status, without some of their fields, and export a grouped data source.
-/// <see cref="Client"/> is signed in as <c>anna</c>.
+/// <see cref="Client"/> is signed in as <c>requester</c>.
 /// </summary>
 public sealed class RecordApiFixture : IAsyncLifetime
 {
@@ -172,7 +172,7 @@ public sealed class RecordApiFixture : IAsyncLifetime
             builder.UseSetting("Tenants:b:SchemaConnectionString", ConnectionString(TenantB));
             builder.UseTestOidc("a", "b");
             builder.UseTestAuthentication(
-                new TestIdentity("anna", "Anna Employee", "employee"),
+                new TestIdentity("requester", "Requester User", "employee"),
                 new TestIdentity("binh", "Binh Manager"),
                 new TestIdentity("rita", "Rita Reader", "reader"),
                 new TestIdentity("uma", "Uma Undeclared", "Employee", "auditor"),
@@ -187,7 +187,7 @@ public sealed class RecordApiFixture : IAsyncLifetime
                 new TestIdentity("kai", "Kai Keyed", "keyed"),
                 new TestIdentity(SqlTextUser, "Mallory", "filtered"));
         });
-        _client = _factory.CreateClient().SignedInAs("anna");
+        _client = _factory.CreateClient().SignedInAs("requester");
     }
 
     public async ValueTask DisposeAsync()

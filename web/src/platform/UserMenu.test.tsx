@@ -11,9 +11,9 @@ import { UserMenu } from './UserMenu'
 
 vi.mock('./navigation')
 
-const anna: CurrentUser = {
-  id: 'anna',
-  displayName: 'Anna Employee',
+const requester: CurrentUser = {
+  id: 'requester',
+  displayName: 'Requester User',
   roles: ['employee'],
   studio: false,
   studioPublisher: false,
@@ -89,10 +89,10 @@ describe('UserMenu', () => {
   )
 
   it.each(locales)('shows the name with a sign-out menu from the platform $name texts', async ({ texts }) => {
-    stubServer(anna)
+    stubServer(requester)
     renderMenu(texts)
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Anna Employee' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Requester User' }))
 
     expect(await screen.findByRole('menu', { name: texts['shell.account.label'] })).toBeInTheDocument()
     expect(screen.getByRole('menuitem', { name: texts['shell.account.signOut'] })).toBeInTheDocument()
@@ -101,10 +101,10 @@ describe('UserMenu', () => {
   it.each(locales)(
     'has a Sessions entry that links to the account screen, with the platform $name text',
     async ({ texts }) => {
-      stubServer(anna)
+      stubServer(requester)
       renderMenu(texts)
 
-      await userEvent.click(await screen.findByRole('button', { name: 'Anna Employee' }))
+      await userEvent.click(await screen.findByRole('button', { name: 'Requester User' }))
 
       const link = within(await screen.findByRole('menu', { name: texts['shell.account.label'] })).getByRole('link', {
         name: texts['shell.account.sessions'],
@@ -143,10 +143,10 @@ describe('UserMenu', () => {
   })
 
   it('shows the name of a signed-in person on the home page', async () => {
-    stubServer(anna)
+    stubServer(requester)
     renderMenu(platformEnglish, '/')
 
-    expect(await screen.findByRole('button', { name: 'Anna Employee' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Requester User' })).toBeInTheDocument()
   })
 
   it('sends the browser to sign in and back to the current page', async () => {
@@ -161,10 +161,10 @@ describe('UserMenu', () => {
   })
 
   it('ends the session with the CSRF header, then goes to the sign-out address', async () => {
-    const fetchMock = stubServer(anna)
+    const fetchMock = stubServer(requester)
     renderMenu()
 
-    await userEvent.click(await screen.findByRole('button', { name: 'Anna Employee' }))
+    await userEvent.click(await screen.findByRole('button', { name: 'Requester User' }))
     await userEvent.click(await screen.findByRole('menuitem', { name: 'Sign out' }))
 
     await waitFor(() => expect(assignLocation).toHaveBeenCalledExactlyOnceWith(signOutUrl))
@@ -175,7 +175,7 @@ describe('UserMenu', () => {
 
   it('renders nothing when loading the user fails', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    const fetchMock = stubServer(anna)
+    const fetchMock = stubServer(requester)
     fetchMock.mockImplementation(async () => new Response(null, { status: 500 }))
     renderMenu()
 

@@ -169,7 +169,7 @@ test.describe('the active release of the purchase request sample changes', () =>
   test('a waiting request finishes on the release it started on', async ({ page }, testInfo) => {
     // Starts on the committed sample, whatever an earlier test left active.
     await activateFolder(purchaseRequests)
-    await useSession(page, 'anna')
+    await useSession(page, 'requester')
     const { title, id } = await createRequest(page, 'Pinned release', 5000)
     await submit(page, id, title)
     await useSession(page, 'chau')
@@ -189,7 +189,7 @@ test.describe('the active release of the purchase request sample changes', () =>
 
   test('a request submitted after the new release runs on it', async ({ page }, testInfo) => {
     await activateFolder(await releaseB(testInfo))
-    await useSession(page, 'anna')
+    await useSession(page, 'requester')
     const { title, id } = await createRequest(page, 'New release', 5000)
     await submit(page, id, title)
 
@@ -219,7 +219,7 @@ test.describe('the active release of the purchase request sample changes', () =>
         timeout: 60_000,
       })
       await expect(page.getByTestId('studio-release-number')).toBeVisible()
-      await useSession(page, 'anna')
+      await useSession(page, 'requester')
       await page.goto('/purchasing/suppliers')
       await expect(page.getByRole('columnheader', { name: heading, exact: true })).toBeVisible()
     } finally {
@@ -253,8 +253,8 @@ test.describe('the active release of the purchase request sample changes', () =>
       )
 
       // The preview tenant shares its database with the main E2E server, which is the one with a Keycloak redirect
-      // address, so anna signs in to the preview host of that server, as in the preview tenant journey.
-      const { context, page: preview } = await signInToPreview(browser, baseURL!, 'anna')
+      // address, so requester signs in to the preview host of that server, as in the preview tenant journey.
+      const { context, page: preview } = await signInToPreview(browser, baseURL!, 'requester')
       try {
         await preview.goto('/purchasing/suppliers')
         await expect(preview.getByRole('columnheader', { name: heading, exact: true })).toBeVisible()
@@ -262,7 +262,7 @@ test.describe('the active release of the purchase request sample changes', () =>
         await context.close()
       }
 
-      await useSession(page, 'anna')
+      await useSession(page, 'requester')
       await page.goto('/purchasing/suppliers')
       await expect(page.getByRole('columnheader', { name: 'Name', exact: true })).toBeVisible()
       await expect(page.getByRole('columnheader', { name: new RegExp(heading) })).toHaveCount(0)
@@ -293,7 +293,7 @@ test.describe('the active release of the purchase request sample changes', () =>
       })
       await expect(page.getByTestId('studio-release-number')).toHaveCount(0)
       await expect(page.getByTestId('studio-diagnostics')).toContainText('AXC0100')
-      await useSession(page, 'anna')
+      await useSession(page, 'requester')
       await page.goto('/purchasing/suppliers')
       await expect(page.getByRole('columnheader', { name: 'Name', exact: true })).toBeVisible()
       await expect(page.getByRole('columnheader', { name: new RegExp(heading) })).toHaveCount(0)
@@ -352,7 +352,7 @@ test.describe('the active release of the purchase request sample changes', () =>
       // The folder still has heading B, so it differs from the release that is active again.
       await expect(page.getByTestId('studio-folder-differs')).toBeVisible()
 
-      await useSession(page, 'anna')
+      await useSession(page, 'requester')
       await page.goto('/purchasing/suppliers')
       await expect(page.getByRole('columnheader', { name: headingA, exact: true })).toBeVisible()
       await expect(page.getByRole('columnheader', { name: new RegExp(headingB) })).toHaveCount(0)
@@ -455,7 +455,7 @@ test.describe('the active release of the purchase request sample changes', () =>
     try {
       // A request that waits for its manager before the publish. The total stays under the finance threshold,
       // so the manager's approval ends the process.
-      await useSession(page, 'anna')
+      await useSession(page, 'requester')
       const request = await createRequest(page, 'Journey', 500)
       await submit(page, request.id, request.title)
       await useSession(page, 'chau')
@@ -485,14 +485,14 @@ test.describe('the active release of the purchase request sample changes', () =>
 
       await page.getByTestId('studio-preview').click()
       await expect(status).toHaveAttribute('data-status', 'succeeded', { timeout: 60_000 })
-      const preview = await signInToPreview(browser, baseURL!, 'anna')
+      const preview = await signInToPreview(browser, baseURL!, 'requester')
       try {
         await preview.page.goto(suppliers)
         await expect(preview.page.getByText(title, { exact: true }).first()).toBeVisible()
       } finally {
         await preview.context.close()
       }
-      await useSession(page, 'anna')
+      await useSession(page, 'requester')
       await page.goto(suppliers)
       await expect(page.getByText('Suppliers', { exact: true }).first()).toBeVisible()
       await expect(page.getByText(new RegExp(title))).toHaveCount(0)
@@ -504,7 +504,7 @@ test.describe('the active release of the purchase request sample changes', () =>
       const published = page.getByTestId('studio-release-row').filter({ hasText: label })
       await expect(published).toHaveAttribute('data-number', String(maxNumber + 1))
       await expect(published).toHaveAttribute('data-active', 'true')
-      await useSession(page, 'anna')
+      await useSession(page, 'requester')
       await page.goto(suppliers)
       await expect(page.getByText(title, { exact: true }).first()).toBeVisible()
 
@@ -534,7 +534,7 @@ test.describe('the active release of the purchase request sample changes', () =>
       await confirmDialog(page, 'Roll back')
       await expect(status).toContainText('Rolled back', { timeout: 60_000 })
       await expect(status).toHaveAttribute('data-status', 'succeeded')
-      await useSession(page, 'anna')
+      await useSession(page, 'requester')
       await page.goto(suppliers)
       await expect(page.getByText('Suppliers', { exact: true }).first()).toBeVisible()
       await expect(page.getByText(new RegExp(title))).toHaveCount(0)

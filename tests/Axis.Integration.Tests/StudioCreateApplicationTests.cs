@@ -161,11 +161,11 @@ public sealed class StudioCreateApplicationTests(PostgreSqlFixture database) : I
     {
         using var setup = await Setup.StartAsync(database);
         using var anonymous = setup.Factory.CreateClient();
-        using var anna = setup.Factory.CreateClient().SignedInAs("anna");
+        using var requester = setup.Factory.CreateClient().SignedInAs("requester");
         using var hoa = setup.Factory.CreateClient().SignedInAs("hoa");
 
         using var unauthorized = await PostAsync(anonymous, """{ "name": "Fine" }""");
-        using var notAuthor = await PostAsync(anna, """{ "name": "Fine" }""");
+        using var notAuthor = await PostAsync(requester, """{ "name": "Fine" }""");
         using var noCsrf = await PostAsync(hoa, """{ "name": "Fine" }""", csrf: false);
 
         Assert.Equal(HttpStatusCode.Unauthorized, unauthorized.StatusCode);
@@ -297,7 +297,7 @@ public sealed class StudioCreateApplicationTests(PostgreSqlFixture database) : I
                 builder.UseTestOidc("default");
                 builder.UseTestAuthentication(
                     new TestIdentity("hoa", "Hoa Author", "author"),
-                    new TestIdentity("anna", "Anna Employee", "employee"));
+                    new TestIdentity("requester", "Requester User", "employee"));
                 if (writer is not null)
                 {
                     builder.ConfigureTestServices(services => services.AddSingleton(writer));

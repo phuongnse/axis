@@ -29,7 +29,7 @@ public sealed class QueryTimeoutTests(RecordApiFixture fixture) : IClassFixture<
         var id = await InsertItemAsync(SecretName);
         using var metrics = new MetricCollector();
         await using var host = CreateHost();
-        using var client = host.CreateClient().SignedInAs("anna");
+        using var client = host.CreateClient().SignedInAs("requester");
 
         await using (await LockAsync(ItemTable()))
         {
@@ -73,7 +73,7 @@ public sealed class QueryTimeoutTests(RecordApiFixture fixture) : IClassFixture<
 
         // Each route resolves the application or the site first, so locking the release tables stalls every one of them.
         await using var host = CreateHost();
-        using var client = host.CreateClient().SignedInAs("anna");
+        using var client = host.CreateClient().SignedInAs("requester");
 
         await using (await LockAsync("axis.active_releases", "axis.releases", "axis.active_sites"))
         {
@@ -103,7 +103,7 @@ public sealed class QueryTimeoutTests(RecordApiFixture fixture) : IClassFixture<
         await InsertItemAsync("Chair");
         var table = ItemTable();
         await using var host = CreateHost();
-        using var client = host.CreateClient().SignedInAs("anna");
+        using var client = host.CreateClient().SignedInAs("requester");
 
         // The policy makes only the statements that start with the count slow, as the read filters of the user would.
         await AdminAsync(
@@ -143,7 +143,7 @@ public sealed class QueryTimeoutTests(RecordApiFixture fixture) : IClassFixture<
         await fixture.ResetAsync();
         var id = await InsertItemAsync("Desk");
         await using var host = CreateHost();
-        using var client = host.CreateClient().SignedInAs("anna");
+        using var client = host.CreateClient().SignedInAs("requester");
 
         await using (await LockAsync(ItemTable()))
         {

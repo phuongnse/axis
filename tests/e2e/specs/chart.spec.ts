@@ -2,8 +2,8 @@ import { expect, test } from "../test";
 import { csrfHeaders } from "../csrf";
 import { sessionFile } from "../sessions";
 
-// The data source needs a grant, so this journey starts signed in as the employee anna.
-test.use({ storageState: sessionFile("anna") });
+// The data source needs a grant, so this journey starts signed in as the employee requester.
+test.use({ storageState: sessionFile("requester") });
 
 // Specs run in parallel against one database, so the groups change between runs. The check covers
 // the chart's structure and headers; Vitest covers the exact groups, values and notes.

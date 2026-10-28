@@ -104,7 +104,7 @@ public sealed class PresentationEndpointTests
     public async Task Site_path_outside_the_pattern_is_a_404_problem_without_a_query(string path)
     {
         await using var factory = CreateFactory();
-        using var client = factory.CreateClient().SignedInAs("anna");
+        using var client = factory.CreateClient().SignedInAs("requester");
 
         var response = await client.GetAsync(new Uri(path, UriKind.Relative), CancellationToken);
 
@@ -123,7 +123,7 @@ public sealed class PresentationEndpointTests
             builder.UseSetting("Tenants:default:ConnectionString", UnreachableDatabase);
             builder.UseSetting("Tenants:default:SchemaConnectionString", UnreachableDatabase);
             builder.UseTestOidc("default");
-            builder.UseTestAuthentication(new TestIdentity("anna", "Anna Employee"));
+            builder.UseTestAuthentication(new TestIdentity("requester", "Requester User"));
         });
 
     private sealed record SiteBody(string Name, string TitleKey, LocalesBody Locales, List<NavigationBody> Navigation);

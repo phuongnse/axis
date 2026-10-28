@@ -1446,7 +1446,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     await row.getByRole('link', { name: label, exact: true }).click()
   }
 
-  test('anna submits a ticket on the published site, linh triages it to khoa, khoa resolves it, anna opens it from the bell and confirms it closed', async ({
+  test('requester submits a ticket on the published site, linh triages it to khoa, khoa resolves it, requester opens it from the bell and confirms it closed', async ({
     page,
   }) => {
     const title = `Zz Journey ${Date.now()}`
@@ -1455,7 +1455,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     const bell = (page: Page) => page.getByRole('button', { name: /^Notifications(, \d+ unread)?$/ })
     const resolvedRow = (dialog: Locator) => dialog.getByRole('button').filter({ hasText: resolution })
 
-    await useJourneySession(page, 'anna')
+    await useJourneySession(page, 'requester')
     await page.goto(`${journeyURL}/service-desk/mytickets`)
     await page.getByRole('button', { name: 'New', exact: true }).click()
     await expect(page).toHaveURL(/\/service-desk\/ticketform\/new$/)
@@ -1490,7 +1490,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     await expect(page).toHaveURL(/\/service-desk\/mytasks$/)
 
     // The worker notifies the requester some time after the decision. The bell opens the ticket on its detail page.
-    await useJourneySession(page, 'anna')
+    await useJourneySession(page, 'requester')
     let dialog: Locator
     await expect(async () => {
       await page.goto(`${journeyURL}/service-desk/mytickets`)
@@ -1509,7 +1509,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     const leadDialog = await waitForDialog(page, 'Notifications')
     await expect(resolvedRow(leadDialog)).toHaveCount(0)
 
-    await useJourneySession(page, 'anna')
+    await useJourneySession(page, 'requester')
     await openTask(page, title, 'Confirm resolution')
     await expectShown(fieldValue(page, 'resolution'), resolution)
     await page.getByRole('button', { name: 'Confirm', exact: true }).click()

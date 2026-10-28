@@ -53,21 +53,21 @@ public sealed class RateLimitTests(KeycloakFixture keycloak) : IAsyncLifetime
     [Fact]
     public async Task A_user_past_the_session_limit_is_refused_while_another_user_tenant_or_partition_still_passes()
     {
-        var anna = await SignInAsync("a", "anna", HostA);
-        var annaOnC = await SignInAsync("c", "anna", HostC);
+        var requester = await SignInAsync("a", "requester", HostA);
+        var annaOnC = await SignInAsync("c", "requester", HostC);
         var ben = await SignInAsync("a", "ben", HostA);
 
         for (var count = 0; count < SessionLimit; count++)
         {
-            using var me = await SendAsync(HttpMethod.Get, "/api/me", HostA, session: anna);
+            using var me = await SendAsync(HttpMethod.Get, "/api/me", HostA, session: requester);
             Assert.Equal(HttpStatusCode.OK, me.StatusCode);
         }
 
-        using var refused = await SendAsync(HttpMethod.Get, "/api/me", HostA, session: anna);
-        using var otherAddress = await SendAsync(HttpMethod.Get, "/api/me", HostA, session: anna, address: "10.0.0.9");
+        using var refused = await SendAsync(HttpMethod.Get, "/api/me", HostA, session: requester);
+        using var otherAddress = await SendAsync(HttpMethod.Get, "/api/me", HostA, session: requester, address: "10.0.0.9");
         using var otherUser = await SendAsync(HttpMethod.Get, "/api/me", HostA, session: ben);
         using var otherTenant = await SendAsync(HttpMethod.Get, "/api/me", HostC, session: annaOnC);
-        using var publishing = await SendAsync(HttpMethod.Post, ValidatePath, HostA, session: anna, csrf: true);
+        using var publishing = await SendAsync(HttpMethod.Post, ValidatePath, HostA, session: requester, csrf: true);
         using var open = await SendAsync(HttpMethod.Get, "/health/live", HostA);
 
         await AssertRefusedAsync(refused);
@@ -81,19 +81,19 @@ public sealed class RateLimitTests(KeycloakFixture keycloak) : IAsyncLifetime
     [Fact]
     public async Task A_user_past_the_publishing_limit_is_refused_while_the_session_and_another_user_still_pass()
     {
-        var anna = await SignInAsync("a", "anna", HostA);
+        var requester = await SignInAsync("a", "requester", HostA);
         var ben = await SignInAsync("a", "ben", HostA);
 
         for (var count = 0; count < PublishingLimit; count++)
         {
-            using var validate = await SendAsync(HttpMethod.Post, ValidatePath, HostA, session: anna, csrf: true);
+            using var validate = await SendAsync(HttpMethod.Post, ValidatePath, HostA, session: requester, csrf: true);
             Assert.NotEqual(HttpStatusCode.TooManyRequests, validate.StatusCode);
         }
 
-        using var refused = await SendAsync(HttpMethod.Post, ValidatePath, HostA, session: anna, csrf: true);
-        using var publish = await SendAsync(HttpMethod.Post, "/api/studio/apps/x/publish", HostA, session: anna, csrf: true);
-        using var status = await SendAsync(HttpMethod.Get, "/api/studio/apps/x/requests/1", HostA, session: anna);
-        using var me = await SendAsync(HttpMethod.Get, "/api/me", HostA, session: anna);
+        using var refused = await SendAsync(HttpMethod.Post, ValidatePath, HostA, session: requester, csrf: true);
+        using var publish = await SendAsync(HttpMethod.Post, "/api/studio/apps/x/publish", HostA, session: requester, csrf: true);
+        using var status = await SendAsync(HttpMethod.Get, "/api/studio/apps/x/requests/1", HostA, session: requester);
+        using var me = await SendAsync(HttpMethod.Get, "/api/me", HostA, session: requester);
         using var otherUser = await SendAsync(HttpMethod.Post, ValidatePath, HostA, session: ben, csrf: true);
 
         await AssertRefusedAsync(refused);
@@ -140,7 +140,7 @@ public sealed class RateLimitTests(KeycloakFixture keycloak) : IAsyncLifetime
     public async Task A_valid_bearer_caller_past_the_bearer_limit_is_refused_while_an_invalid_token_still_gets_a_401()
     {
         var token = await RequestPurchasingTokenAsync();
-        var anna = await SignInAsync("a", "anna", HostA);
+        var requester = await SignInAsync("a", "requester", HostA);
 
         for (var count = 0; count < BearerLimit; count++)
         {
@@ -152,7 +152,7 @@ public sealed class RateLimitTests(KeycloakFixture keycloak) : IAsyncLifetime
         using var status = await SendAsync(HttpMethod.Get, StatusPath, HostA, bearer: token);
         using var resigned = await SendAsync(HttpMethod.Post, EndpointPath, HostA, bearer: Resign(token));
         using var missing = await SendAsync(HttpMethod.Post, EndpointPath, HostA);
-        using var me = await SendAsync(HttpMethod.Get, "/api/me", HostA, session: anna);
+        using var me = await SendAsync(HttpMethod.Get, "/api/me", HostA, session: requester);
 
         await AssertRefusedAsync(refused);
         await AssertRefusedAsync(status);
@@ -164,15 +164,15 @@ public sealed class RateLimitTests(KeycloakFixture keycloak) : IAsyncLifetime
     [Fact]
     public async Task A_refused_write_gets_its_csrf_403_and_an_anonymous_request_its_401_before_any_429()
     {
-        var anna = await SignInAsync("a", "anna", HostA);
+        var requester = await SignInAsync("a", "requester", HostA);
         for (var count = 0; count < SessionLimit; count++)
         {
-            using var me = await SendAsync(HttpMethod.Get, "/api/me", HostA, session: anna);
+            using var me = await SendAsync(HttpMethod.Get, "/api/me", HostA, session: requester);
             Assert.Equal(HttpStatusCode.OK, me.StatusCode);
         }
 
-        using var withoutHeader = await SendAsync(HttpMethod.Post, "/api/auth/sign-out", HostA, session: anna);
-        using var withHeader = await SendAsync(HttpMethod.Post, "/api/auth/sign-out", HostA, session: anna, csrf: true);
+        using var withoutHeader = await SendAsync(HttpMethod.Post, "/api/auth/sign-out", HostA, session: requester);
+        using var withHeader = await SendAsync(HttpMethod.Post, "/api/auth/sign-out", HostA, session: requester, csrf: true);
         using var anonymous = await SendAsync(HttpMethod.Get, "/api/me", HostA);
 
         Assert.Equal(HttpStatusCode.Forbidden, withoutHeader.StatusCode);

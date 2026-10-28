@@ -168,7 +168,7 @@ describe('buildRecordBody', () => {
 
   it('leaves a creator field out even when it holds a value', () => {
     const withCreator = [...fields, { ...field('createdBy', 'text'), creator: true }]
-    expect(buildRecordBody(withCreator, { amount: '1.50', createdBy: 'anna' }, 2)).toBe(
+    expect(buildRecordBody(withCreator, { amount: '1.50', createdBy: 'requester' }, 2)).toBe(
       '{"version":2,"values":{"amount":1.50}}',
     )
   })

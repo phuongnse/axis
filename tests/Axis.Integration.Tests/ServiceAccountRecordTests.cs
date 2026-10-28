@@ -259,7 +259,7 @@ public sealed class ServiceAccountRecordTests(KeycloakFixture keycloak) : IAsync
         var token = await RequestTokenAsync(KeycloakFixture.ReportingClientId, KeycloakFixture.ReportingClientSecret);
         var cookie = await SignInAnnaAsync();
 
-        // Anna may read Restricted, the reporting system may not, so a 403 shows that the token judged the request.
+        // The requester may read Restricted, the reporting system may not, so a 403 shows that the token judged the request.
         using var byToken = await SendAsync(HttpMethod.Get, Restricted, token, cookie: cookie);
         using var garbled = await SendAsync(HttpMethod.Get, Restricted, "not-a-token", cookie: cookie);
         using var unsafeByCookie = await SendAsync(HttpMethod.Post, Restricted, bearer: null, """{ "values": { "title": "No" } }""", cookie: cookie);
@@ -505,7 +505,7 @@ public sealed class ServiceAccountRecordTests(KeycloakFixture keycloak) : IAsync
 
     private sealed record ReportTable(string Name, string Id, string Title, string Status);
 
-    /// <summary>Answers <c>GET /test/session</c> by signing anna, an employee, in to tenant a.</summary>
+    /// <summary>Answers <c>GET /test/session</c> by signing requester, an employee, in to tenant a.</summary>
     private sealed class SessionStartupFilter : IStartupFilter
     {
         public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) => app =>
@@ -518,7 +518,7 @@ public sealed class ServiceAccountRecordTests(KeycloakFixture keycloak) : IAsync
                     branch.UseTenantResolution();
                     branch.Run(async context =>
                     {
-                        await context.SignInAsync(Session.Scheme, Session.CreatePrincipal("a", "anna", "Anna Employee", ["employee"]));
+                        await context.SignInAsync(Session.Scheme, Session.CreatePrincipal("a", "requester", "Requester User", ["employee"]));
                         context.Response.StatusCode = StatusCodes.Status204NoContent;
                     });
                 });

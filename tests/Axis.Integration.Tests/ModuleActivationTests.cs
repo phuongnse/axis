@@ -44,7 +44,7 @@ public sealed class ModuleActivationTests(ModuleAppFixture fixture) : IClassFixt
     [Fact]
     public async Task A_department_created_in_one_application_is_not_listed_in_the_other()
     {
-        using var client = fixture.CreateClient().SignedInAs("anna");
+        using var client = fixture.CreateClient().SignedInAs("requester");
         var code = $"ISO{Guid.NewGuid():N}"[..12];
 
         await CreateDepartmentAsync(client, AppA, code, "Isolated");
@@ -56,7 +56,7 @@ public sealed class ModuleActivationTests(ModuleAppFixture fixture) : IClassFixt
     [Fact]
     public async Task Each_application_holds_the_seed_rows_of_the_module_in_its_own_table()
     {
-        using var client = fixture.CreateClient().SignedInAs("anna");
+        using var client = fixture.CreateClient().SignedInAs("requester");
 
         foreach (var app in new[] { AppA, AppB })
         {
@@ -72,7 +72,7 @@ public sealed class ModuleActivationTests(ModuleAppFixture fixture) : IClassFixt
     [Fact]
     public async Task A_reference_to_a_seeded_module_department_is_stored_and_read_back()
     {
-        using var client = fixture.CreateClient().SignedInAs("anna");
+        using var client = fixture.CreateClient().SignedInAs("requester");
 
         using var create = RecordApiFixture.Request(
             HttpMethod.Post,
@@ -94,7 +94,7 @@ public sealed class ModuleActivationTests(ModuleAppFixture fixture) : IClassFixt
     [Fact]
     public async Task Each_application_numbers_its_departments_from_one_with_its_own_counter()
     {
-        using var client = fixture.CreateClient().SignedInAs("anna");
+        using var client = fixture.CreateClient().SignedInAs("requester");
 
         foreach (var app in new[] { AppA, AppB })
         {
@@ -121,7 +121,7 @@ public sealed class ModuleActivationTests(ModuleAppFixture fixture) : IClassFixt
     [Fact]
     public async Task The_module_entity_url_has_two_segments_and_needs_a_grant()
     {
-        using var granted = fixture.CreateClient().SignedInAs("anna");
+        using var granted = fixture.CreateClient().SignedInAs("requester");
         using var denied = fixture.CreateClient().SignedInAs("binh");
 
         using (var request = RecordApiFixture.Request(HttpMethod.Get, $"{AppA}/{Departments}", ModuleAppFixture.Host))
@@ -146,7 +146,7 @@ public sealed class ModuleActivationTests(ModuleAppFixture fixture) : IClassFixt
     [Fact]
     public async Task The_module_data_source_returns_the_seeded_departments_to_a_user_with_a_grant()
     {
-        using var client = fixture.CreateClient().SignedInAs("anna");
+        using var client = fixture.CreateClient().SignedInAs("requester");
 
         using var request = RecordApiFixture.Request(HttpMethod.Get, $"{AppA}/{DepartmentsDataSource}?pageSize=100", ModuleAppFixture.Host);
         using var response = await client.SendAsync(request, CancellationToken);
@@ -163,10 +163,10 @@ public sealed class ModuleActivationTests(ModuleAppFixture fixture) : IClassFixt
     [Fact]
     public async Task The_module_data_source_needs_its_own_grant()
     {
-        using var withoutGrant = fixture.CreateClient().SignedInAs("anna");
+        using var withoutGrant = fixture.CreateClient().SignedInAs("requester");
         using var withoutRole = fixture.CreateClient().SignedInAs("binh");
 
-        // In ModuleAppB, anna reads the module entity but holds no grant on the data source.
+        // In ModuleAppB, requester reads the module entity but holds no grant on the data source.
         using (var request = RecordApiFixture.Request(HttpMethod.Get, $"{AppB}/{Departments}", ModuleAppFixture.Host))
         {
             using var response = await withoutGrant.SendAsync(request, CancellationToken);
@@ -192,7 +192,7 @@ public sealed class ModuleActivationTests(ModuleAppFixture fixture) : IClassFixt
     [InlineData("data-sources/Departments/rows")]
     public async Task A_module_data_source_path_that_names_nothing_is_a_404(string path)
     {
-        using var client = fixture.CreateClient().SignedInAs("anna");
+        using var client = fixture.CreateClient().SignedInAs("requester");
 
         using var request = RecordApiFixture.Request(HttpMethod.Get, $"{AppA}/{path}", ModuleAppFixture.Host);
         using var response = await client.SendAsync(request, CancellationToken);
@@ -205,7 +205,7 @@ public sealed class ModuleActivationTests(ModuleAppFixture fixture) : IClassFixt
     [InlineData(AppB)]
     public async Task A_department_whose_code_breaks_the_module_rule_is_refused_in_each_application(string app)
     {
-        using var client = fixture.CreateClient().SignedInAs("anna");
+        using var client = fixture.CreateClient().SignedInAs("requester");
 
         using var request = RecordApiFixture.Request(
             HttpMethod.Post, $"{app}/{Departments}", ModuleAppFixture.Host, """{ "values": { "code": "X", "name": "Short" } }""");

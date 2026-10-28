@@ -230,7 +230,7 @@ public sealed class RecordImportEndpointTests(RecordApiFixture fixture) : IClass
     {
         await ResetAsync();
         await using var limited = fixture.Factory.WithWebHostBuilder(builder => builder.UseSetting("Data:ImportMaxBytes", "64"));
-        using var client = limited.CreateClient().SignedInAs("anna");
+        using var client = limited.CreateClient().SignedInAs("requester");
         var small = "name\nDesk\n";
         var large = "name\n" + string.Join('\n', Enumerable.Repeat("A long item name for the file", 10)) + "\n";
 
@@ -273,13 +273,13 @@ public sealed class RecordImportEndpointTests(RecordApiFixture fixture) : IClass
         Assert.Equal("committed", await StateAsync(upload.Id, Tickets));
         Assert.True(await FileClearedAsync(upload.Id));
         Assert.Equal(3L, await TicketCountAsync());
-        Assert.Equal(3L, await TicketCountAsync("f_requester = 'anna' AND f_number IS NOT NULL"));
+        Assert.Equal(3L, await TicketCountAsync("f_requester = 'requester' AND f_number IS NOT NULL"));
         Assert.Equal(3L, (long)(await fixture.ScalarAsync(TenantA, $"SELECT count(DISTINCT f_number) FROM {TicketTable}"))!);
         Assert.Equal(
             3L,
             (long)(await fixture.ScalarAsync(
                 TenantA,
-                $"SELECT count(*) FROM axis.audit_records WHERE action = 'record.created' AND actor = 'anna' AND actor_name = 'Anna Employee' AND record_id IN (SELECT id FROM {TicketTable})"))!);
+                $"SELECT count(*) FROM axis.audit_records WHERE action = 'record.created' AND actor = 'requester' AND actor_name = 'Requester User' AND record_id IN (SELECT id FROM {TicketTable})"))!);
         Assert.Equal(audits + 4, await fixture.AuditRecordCountAsync(TenantA));
         Assert.Equal(imported + 1, await ImportedAuditCountAsync());
         Assert.Equal(importedByAnna + 1, await ImportedAuditCountAsync(ImportedByAnnaFilter));
@@ -313,11 +313,11 @@ public sealed class RecordImportEndpointTests(RecordApiFixture fixture) : IClass
             2L,
             (long)(await fixture.ScalarAsync(
                 TenantA,
-                $"SELECT count(*) FROM axis.audit_records WHERE action = 'record.updated' AND actor = 'anna' AND actor_name = 'Anna Employee' AND record_id IN (SELECT id FROM {TicketTable} WHERE f_code IN ('a1', 'b1'))"))!);
+                $"SELECT count(*) FROM axis.audit_records WHERE action = 'record.updated' AND actor = 'requester' AND actor_name = 'Requester User' AND record_id IN (SELECT id FROM {TicketTable} WHERE f_code IN ('a1', 'b1'))"))!);
         Assert.Equal(updates + 2, (long)(await fixture.ScalarAsync(TenantA, "SELECT count(*) FROM axis.audit_records WHERE action = 'record.updated'"))!);
         Assert.Equal(
             1L,
-            await ImportedAuditCountAsync("actor = 'anna' AND details = '{\"created\": 2, \"updated\": 2}'::jsonb"));
+            await ImportedAuditCountAsync("actor = 'requester' AND details = '{\"created\": 2, \"updated\": 2}'::jsonb"));
     }
 
     [Fact]
@@ -742,7 +742,7 @@ public sealed class RecordImportEndpointTests(RecordApiFixture fixture) : IClass
         (long)(await fixture.ScalarAsync(TenantA, $"SELECT count(*) FROM {TicketTable}{(where is null ? "" : $" WHERE {where}")}"))!;
 
     private const string ImportedByAnnaFilter =
-        "actor = 'anna' AND actor_name = 'Anna Employee' AND record_id IS NULL AND process_instance_id IS NULL AND entity_id IS NOT NULL AND details = '{\"created\": 3, \"updated\": 0}'::jsonb";
+        "actor = 'requester' AND actor_name = 'Requester User' AND record_id IS NULL AND process_instance_id IS NULL AND entity_id IS NOT NULL AND details = '{\"created\": 3, \"updated\": 0}'::jsonb";
 
     private async Task<long> ImportedAuditCountAsync(string? where = null) =>
         (long)(await fixture.ScalarAsync(TenantA, $"SELECT count(*) FROM axis.audit_records WHERE action = 'records.imported'{(where is null ? "" : $" AND {where}")}"))!;

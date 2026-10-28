@@ -14,7 +14,7 @@ public sealed class KpiPageTests(RecordApiFixture fixture) : IClassFixture<Recor
     [Fact]
     public async Task User_who_can_run_the_data_source_gets_the_kpi_with_its_measures_and_navigate_and_no_access()
     {
-        using var page = await GetPageAsync("anna", "itemkpi");
+        using var page = await GetPageAsync("requester", "itemkpi");
 
         var widget = Assert.Single(page.RootElement.GetProperty("widgets").EnumerateArray().ToList());
         Assert.Equal("kpi", widget.GetProperty("type").GetString());
@@ -32,7 +32,7 @@ public sealed class KpiPageTests(RecordApiFixture fixture) : IClassFixture<Recor
     [Fact]
     public async Task Widget_that_is_not_a_kpi_has_a_null_kpi()
     {
-        using var page = await GetPageAsync("anna", "items");
+        using var page = await GetPageAsync("requester", "items");
 
         var widget = Assert.Single(page.RootElement.GetProperty("widgets").EnumerateArray().ToList());
         Assert.Equal(JsonValueKind.Null, widget.GetProperty("kpi").ValueKind);
@@ -80,7 +80,7 @@ public sealed class KpiPageTests(RecordApiFixture fixture) : IClassFixture<Recor
     [Fact]
     public async Task User_who_can_run_the_data_source_gets_the_kpi_next_to_the_table()
     {
-        using var page = await GetPageAsync("anna", "itemkpioverview");
+        using var page = await GetPageAsync("requester", "itemkpioverview");
 
         var columns = Assert.Single(page.RootElement.GetProperty("widgets").EnumerateArray().ToList());
         var kpi = Assert.Single(columns.GetProperty("columns").EnumerateArray().ToList()[1].GetProperty("widgets").EnumerateArray().ToList());
@@ -92,7 +92,7 @@ public sealed class KpiPageTests(RecordApiFixture fixture) : IClassFixture<Recor
     [Fact]
     public async Task Site_navigation_does_not_list_the_kpi_pages()
     {
-        using var site = await GetSiteAsync("anna");
+        using var site = await GetSiteAsync("requester");
 
         Assert.Equal(
             ["Items", "Departments"],

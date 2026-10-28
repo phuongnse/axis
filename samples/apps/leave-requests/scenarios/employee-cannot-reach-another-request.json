@@ -5,7 +5,7 @@
   "formatVersion": 1,
   "now": "2026-10-01T09:00:00Z",
   "users": {
-    "anna": [
+    "requester": [
       "employee"
     ],
     "lan": [
@@ -16,7 +16,7 @@
     {
       "type": "createRecord",
       "entity": "LeaveRequest",
-      "as": "anna",
+      "as": "requester",
       "save": "request",
       "values": {
         "department": "d1b09f14-34f5-4831-9708-158361c860df",

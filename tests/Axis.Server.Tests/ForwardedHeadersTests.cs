@@ -161,7 +161,7 @@ public sealed class ForwardedHeadersTests
         builder.ConfigureTestServices(services => services.AddSingleton<IStartupFilter, SessionStartupFilter>());
     }
 
-    /// <summary>Signs anna in to tenant b on its own host and returns the session cookie.</summary>
+    /// <summary>Signs requester in to tenant b on its own host and returns the session cookie.</summary>
     private static async Task<string> SignInAsync(WebApplicationFactory<Program> factory)
     {
         _ = factory.Server;
@@ -207,7 +207,7 @@ public sealed class ForwardedHeadersTests
     private static string RenewedSessionCookie(HttpContext context) =>
         context.Response.Headers.SetCookie.Single(cookie => cookie!.StartsWith($"{Session.Scheme}=", StringComparison.Ordinal))!;
 
-    /// <summary>Answers <c>GET /test/session</c> by signing anna in to tenant b.</summary>
+    /// <summary>Answers <c>GET /test/session</c> by signing requester in to tenant b.</summary>
     private sealed class SessionStartupFilter : IStartupFilter
     {
         public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) => app =>
@@ -216,7 +216,7 @@ public sealed class ForwardedHeadersTests
             {
                 if (HttpMethods.IsGet(context.Request.Method) && context.Request.Path == "/test/session")
                 {
-                    await context.SignInAsync(Session.Scheme, Session.CreatePrincipal("b", "anna", "Anna Employee", ["employee"]));
+                    await context.SignInAsync(Session.Scheme, Session.CreatePrincipal("b", "requester", "Requester User", ["employee"]));
                     context.Response.StatusCode = StatusCodes.Status204NoContent;
                     return;
                 }

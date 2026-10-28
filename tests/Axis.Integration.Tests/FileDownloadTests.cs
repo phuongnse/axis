@@ -7,7 +7,7 @@ using static Axis.Integration.Tests.RecordApiFixture;
 namespace Axis.Integration.Tests;
 
 /// <summary>
-/// Downloading an attached file, on the FilesApp fixture in tenant A. <c>anna</c> may create, update and read
+/// Downloading an attached file, on the FilesApp fixture in tenant A. <c>requester</c> may create, update and read
 /// claims, <c>fern</c> may read only the claims titled Shared, <c>fia</c> may read only the title of a claim, and
 /// <c>binh</c> holds no role. Every refusal after sign-in is the same 404.
 /// </summary>
@@ -69,11 +69,11 @@ public sealed class FileDownloadTests(RecordApiFixture fixture) : IClassFixture<
     // A claim with a receipt and a child row file, both attached.
     private async Task<(Guid Claim, Guid Receipt, Guid Note)> AttachedClaimAsync(string title)
     {
-        using var anna = fixture.CreateClient().SignedInAs("anna");
-        var claim = await CreateClaimAsync(anna, title);
-        var receipt = await UploadAsync(anna, Receipt);
-        var note = await UploadAsync(anna, Attachment, "a note", "text/plain", "note.txt");
-        await UpdateAsync(anna, claim, 1, $$"""{ "receipt": "{{receipt:D}}", "attachments": [{ "file": "{{note:D}}", "note": "Scan" }] }""");
+        using var requester = fixture.CreateClient().SignedInAs("requester");
+        var claim = await CreateClaimAsync(requester, title);
+        var receipt = await UploadAsync(requester, Receipt);
+        var note = await UploadAsync(requester, Attachment, "a note", "text/plain", "note.txt");
+        await UpdateAsync(requester, claim, 1, $$"""{ "receipt": "{{receipt:D}}", "attachments": [{ "file": "{{note:D}}", "note": "Scan" }] }""");
         return (claim, receipt, note);
     }
 
@@ -144,29 +144,29 @@ public sealed class FileDownloadTests(RecordApiFixture fixture) : IClassFixture<
     [Fact]
     public async Task A_pending_file_gets_404_even_for_the_user_who_uploaded_it()
     {
-        using var anna = fixture.CreateClient().SignedInAs("anna");
-        var pending = await UploadAsync(anna, Receipt);
+        using var requester = fixture.CreateClient().SignedInAs("requester");
+        var pending = await UploadAsync(requester, Receipt);
 
-        await AssertNotFoundAsync(anna, pending.ToString("D"));
+        await AssertNotFoundAsync(requester, pending.ToString("D"));
     }
 
     [Fact]
     public async Task A_file_that_a_later_update_replaced_gets_404()
     {
-        using var anna = fixture.CreateClient().SignedInAs("anna");
-        var claim = await CreateClaimAsync(anna, "Shared");
-        var first = await UploadAsync(anna, Receipt);
-        await UpdateAsync(anna, claim, 1, $$"""{ "receipt": "{{first:D}}" }""");
-        using (var before = await DownloadAsync(anna, first.ToString("D")))
+        using var requester = fixture.CreateClient().SignedInAs("requester");
+        var claim = await CreateClaimAsync(requester, "Shared");
+        var first = await UploadAsync(requester, Receipt);
+        await UpdateAsync(requester, claim, 1, $$"""{ "receipt": "{{first:D}}" }""");
+        using (var before = await DownloadAsync(requester, first.ToString("D")))
         {
             Assert.Equal(HttpStatusCode.OK, before.StatusCode);
         }
 
-        var second = await UploadAsync(anna, Receipt, Pdf + "second", fileName: "second.pdf");
-        await UpdateAsync(anna, claim, 2, $$"""{ "receipt": "{{second:D}}" }""");
+        var second = await UploadAsync(requester, Receipt, Pdf + "second", fileName: "second.pdf");
+        await UpdateAsync(requester, claim, 2, $$"""{ "receipt": "{{second:D}}" }""");
 
-        await AssertNotFoundAsync(anna, first.ToString("D"));
-        using var after = await DownloadAsync(anna, second.ToString("D"));
+        await AssertNotFoundAsync(requester, first.ToString("D"));
+        using var after = await DownloadAsync(requester, second.ToString("D"));
         await AssertAttachmentAsync(after, Pdf + "second", "application/pdf", "second.pdf");
     }
 
@@ -175,22 +175,22 @@ public sealed class FileDownloadTests(RecordApiFixture fixture) : IClassFixture<
     [InlineData("not-a-guid")]
     public async Task An_unknown_or_malformed_id_gets_404(string id)
     {
-        using var anna = fixture.CreateClient().SignedInAs("anna");
+        using var requester = fixture.CreateClient().SignedInAs("requester");
 
-        await AssertNotFoundAsync(anna, id);
-        await AssertNotFoundAsync(anna, Guid.NewGuid().ToString("D"));
+        await AssertNotFoundAsync(requester, id);
+        await AssertNotFoundAsync(requester, Guid.NewGuid().ToString("D"));
     }
 
     [Fact]
     public async Task An_uploaded_html_file_is_downloaded_as_an_attachment()
     {
         const string Html = "<html><script>alert(1)</script></html>";
-        using var anna = fixture.CreateClient().SignedInAs("anna");
-        var claim = await CreateClaimAsync(anna, "Shared");
-        var page = await UploadAsync(anna, Attachment, Html, "text/html", "page.html");
-        await UpdateAsync(anna, claim, 1, $$"""{ "attachments": [{ "file": "{{page:D}}" }] }""");
+        using var requester = fixture.CreateClient().SignedInAs("requester");
+        var claim = await CreateClaimAsync(requester, "Shared");
+        var page = await UploadAsync(requester, Attachment, Html, "text/html", "page.html");
+        await UpdateAsync(requester, claim, 1, $$"""{ "attachments": [{ "file": "{{page:D}}" }] }""");
 
-        using var response = await DownloadAsync(anna, page.ToString("D"));
+        using var response = await DownloadAsync(requester, page.ToString("D"));
 
         await AssertAttachmentAsync(response, Html, "text/html", "page.html");
     }
@@ -201,8 +201,8 @@ public sealed class FileDownloadTests(RecordApiFixture fixture) : IClassFixture<
         var data = new byte[1_048_576];
         new Random(76).NextBytes(data);
         "AXIS"u8.CopyTo(data);
-        using var anna = fixture.CreateClient().SignedInAs("anna");
-        var claim = await CreateClaimAsync(anna, "Shared");
+        using var requester = fixture.CreateClient().SignedInAs("requester");
+        var claim = await CreateClaimAsync(requester, "Shared");
 
         var request = Request(HttpMethod.Post, Attachment, HostA);
         var form = new MultipartFormDataContent();
@@ -211,16 +211,16 @@ public sealed class FileDownloadTests(RecordApiFixture fixture) : IClassFixture<
         form.Add(part, "file", "large.bin");
         request.Content = form;
         Guid file;
-        using (var uploaded = await anna.SendAsync(request, CancellationToken))
+        using (var uploaded = await requester.SendAsync(request, CancellationToken))
         {
             Assert.Equal(HttpStatusCode.Created, uploaded.StatusCode);
             using var body = JsonDocument.Parse(await uploaded.Content.ReadAsStringAsync(CancellationToken));
             file = body.RootElement.GetProperty("id").GetGuid();
         }
 
-        await UpdateAsync(anna, claim, 1, $$"""{ "attachments": [{ "file": "{{file:D}}" }] }""");
+        await UpdateAsync(requester, claim, 1, $$"""{ "attachments": [{ "file": "{{file:D}}" }] }""");
 
-        using var response = await DownloadAsync(anna, file.ToString("D"));
+        using var response = await DownloadAsync(requester, file.ToString("D"));
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal(data.Length, response.Content.Headers.ContentLength);

@@ -5,8 +5,8 @@ import { visibleDialog } from '../dialogs'
 import { sessionFile } from '../sessions'
 
 // The SPA turns its animations off when the browser asks for reduced motion, and the config asks for it in every
-// project (D97). anna holds the delete grant on notes.
-test.use({ storageState: sessionFile('anna') })
+// project (D97). requester holds the delete grant on notes.
+test.use({ storageState: sessionFile('requester') })
 
 const notesPath = '/api/apps/E2eApp/entities/Note/records'
 const deletesPage = '/e2e/notedeletes?pageSize=100&sort=-title'

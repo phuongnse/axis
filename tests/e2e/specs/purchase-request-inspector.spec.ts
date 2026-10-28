@@ -18,8 +18,8 @@ import {
 import { sessionFile, useSession, type SampleUser } from '../sessions'
 import { chooseTheme } from '../shell'
 
-// The employee anna starts the approval. The operator giang or the finance reviewer dung inspects it.
-test.use({ storageState: sessionFile('anna') })
+// The employee requester starts the approval. The operator giang or the finance reviewer dung inspects it.
+test.use({ storageState: sessionFile('requester') })
 
 const instancesPath = `${appPath}/processes/PurchaseRequestApproval/instances`
 
@@ -57,14 +57,14 @@ function seedDeadLetter(): string {
 }
 
 /**
- * Starts the approval of a new Operations request as anna, then signs in as the inspecting user,
+ * Starts the approval of a new Operations request as requester, then signs in as the inspecting user,
  * giang unless the test names another. It returns the request's title and id, and the id of the
  * instance once the instance waits at manager approval. Specs run in
  * parallel against one database, so the list holds many instances. The newest come first, and the
  * test looks only for its own by subject id.
  */
 async function startWaitingInstance(page: Page, inspector: SampleUser = 'giang') {
-  await useSession(page, 'anna')
+  await useSession(page, 'requester')
   const { title, id } = await createRequest(page, 'Zz Inspect', 500)
   const started = await page.request.post(instancesPath, { data: { subjectId: id }, headers: csrfHeaders })
   expect(started.status()).toBe(201)
@@ -117,7 +117,7 @@ test('the operator follows a history entry to its approval instance and an emplo
   await expect(page).toHaveURL(new RegExp(`/purchasing/approvals/${instanceId}$`))
   await expect(page.getByTestId('inspector-instance')).toBeVisible()
 
-  await useSession(page, 'anna')
+  await useSession(page, 'requester')
   await page.goto(`/purchasing/purchaserequestform/${requestId}`)
   await expect(page.getByTestId('history-entry').first()).toBeVisible()
   await expect(page.getByTestId('history-inspect-link')).toHaveCount(0)
@@ -126,7 +126,7 @@ test('the operator follows a history entry to its approval instance and an emplo
 test('an employee has no Approvals entry, sees no instance and is refused by the inspection API', async ({ page }) => {
   const { instanceId } = await startWaitingInstance(page)
 
-  await useSession(page, 'anna')
+  await useSession(page, 'requester')
   await page.goto('/purchasing/mytasks')
   await expect(page.getByRole('menuitem', { name: 'My tasks', exact: true })).toBeVisible()
   await expect(page.getByRole('menuitem', { name: /Approvals/ })).toHaveCount(0)
@@ -141,7 +141,7 @@ test('an employee has no Approvals entry, sees no instance and is refused by the
 })
 
 test('the list endpoint answers 403 to an employee and 200 to the operator', async ({ page }) => {
-  await useSession(page, 'anna')
+  await useSession(page, 'requester')
   expect((await page.request.get(instancesPath)).status()).toBe(403)
 
   await useSession(page, 'giang')
@@ -192,7 +192,7 @@ test('a finance reviewer resolves an unknown purchase order call in the inspecto
 }) => {
   // The worker marks the call unknown, then runs its first lookup, which answers 503.
   test.setTimeout(120_000)
-  await useSession(page, 'anna')
+  await useSession(page, 'requester')
   const { title, id } = await createRequest(page, 'Zz Resolve', 500)
   const number = await requestNumber(page, id)
   // The stub stores the order but answers without its number, and every lookup for it answers 503.
@@ -241,7 +241,7 @@ test('a finance reviewer resolves an unknown purchase order call in the inspecto
     expect(((await response.json()) as { state: string }).state).toBe('completed')
   }).toPass({ timeout: 30_000 })
 
-  await useSession(page, 'anna')
+  await useSession(page, 'requester')
   const read = await page.request.get(`${recordsPath}/${id}`)
   expect(read.ok()).toBe(true)
   const values = ((await read.json()) as { values: { status: string; purchaseOrderNumber: string } }).values

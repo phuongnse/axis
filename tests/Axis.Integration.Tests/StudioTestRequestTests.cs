@@ -76,13 +76,13 @@ public sealed class StudioTestRequestTests : IAsyncLifetime
         var connectionString = await _database.CreateDatabaseAsync("studio_test_refuse", CancellationToken);
         await using var factory = StudioPublishTests.NewFactory(folder.Path, [("a", StudioPublishTests.HostA, connectionString)]);
         using var nobody = factory.CreateClient();
-        using var anna = factory.CreateClient().SignedInAs("anna");
+        using var requester = factory.CreateClient().SignedInAs("requester");
         using var hoa = factory.CreateClient().SignedInAs("hoa");
 
         using var signedOut = await StudioPublishTests.SendAsync(nobody, HttpMethod.Post, TestUrl, StudioPublishTests.HostA);
         Assert.Equal(HttpStatusCode.Unauthorized, signedOut.StatusCode);
 
-        using var notAuthor = await StudioPublishTests.SendAsync(anna, HttpMethod.Post, TestUrl, StudioPublishTests.HostA);
+        using var notAuthor = await StudioPublishTests.SendAsync(requester, HttpMethod.Post, TestUrl, StudioPublishTests.HostA);
         Assert.Equal(HttpStatusCode.Forbidden, notAuthor.StatusCode);
 
         using var withoutCsrf = new HttpRequestMessage(HttpMethod.Post, new Uri(TestUrl, UriKind.Relative));

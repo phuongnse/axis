@@ -70,10 +70,10 @@ public sealed class StudioTemplateEndpointTests : IDisposable
     {
         AddTemplate("tpl-a", "1.0.0");
         await using var factory = CreateFactory(TemplatesFolder);
-        using var anna = factory.CreateClient().SignedInAs("anna");
+        using var requester = factory.CreateClient().SignedInAs("requester");
         using var anonymous = factory.CreateClient();
 
-        var forbidden = await anna.GetAsync(new Uri("/api/studio/templates", UriKind.Relative), CancellationToken);
+        var forbidden = await requester.GetAsync(new Uri("/api/studio/templates", UriKind.Relative), CancellationToken);
         var unauthorized = await anonymous.GetAsync(new Uri("/api/studio/templates", UriKind.Relative), CancellationToken);
 
         Assert.Equal(HttpStatusCode.Forbidden, forbidden.StatusCode);
@@ -149,6 +149,6 @@ public sealed class StudioTemplateEndpointTests : IDisposable
             builder.UseTestOidc("default");
             builder.UseTestAuthentication(
                 new TestIdentity("hoa", "Hoa Author", "author"),
-                new TestIdentity("anna", "Anna Employee", "employee"));
+                new TestIdentity("requester", "Requester User", "employee"));
         });
 }

@@ -5,7 +5,7 @@
   "formatVersion": 1,
   "now": "2026-10-01T09:00:00Z",
   "users": {
-    "anna": ["employee"],
+    "requester": ["employee"],
     "binh": ["department-manager"]
   },
   "stubs": [
@@ -22,7 +22,7 @@
     {
       "type": "createRecord",
       "entity": "PurchaseRequest",
-      "as": "anna",
+      "as": "requester",
       "save": "request",
       "values": {
         "title": "Chairs",
@@ -33,7 +33,7 @@
         "lineItems": [{ "description": "Chair", "quantity": 2, "unitPrice": 1500 }]
       }
     },
-    { "type": "startProcess", "process": "PurchaseRequestApproval", "record": "request", "as": "anna" },
+    { "type": "startProcess", "process": "PurchaseRequestApproval", "record": "request", "as": "requester" },
     { "type": "expectTask", "record": "request", "step": "managerApproval", "assignee": { "user": "binh" } },
     { "type": "completeTask", "record": "request", "step": "managerApproval", "outcome": "approve", "as": "binh" },
     {

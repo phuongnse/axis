@@ -205,12 +205,12 @@ public sealed class StudioPageMetadataTests : IAsyncLifetime
     {
         await using var factory = CreateFactory();
         using var anonymous = factory.CreateClient();
-        using var anna = factory.CreateClient().SignedInAs("anna");
+        using var requester = factory.CreateClient().SignedInAs("requester");
         using var hoa = factory.CreateClient().SignedInAs("hoa");
         var json = SavedForm().ToJsonString();
 
         Assert.Equal(HttpStatusCode.Unauthorized, (await Post(anonymous, json, id: FormId)).StatusCode);
-        Assert.Equal(HttpStatusCode.Forbidden, (await Post(anna, json, id: FormId)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await Post(requester, json, id: FormId)).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await Post(hoa, json, id: FormId, csrf: false)).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await Post(hoa, json, id: EntityId)).StatusCode);
         Assert.Equal(HttpStatusCode.UnsupportedMediaType, (await Post(hoa, json, id: FormId, contentType: "text/plain")).StatusCode);
@@ -369,12 +369,12 @@ public sealed class StudioPageMetadataTests : IAsyncLifetime
     {
         await using var factory = CreateFactory();
         using var anonymous = factory.CreateClient();
-        using var anna = factory.CreateClient().SignedInAs("anna");
+        using var requester = factory.CreateClient().SignedInAs("requester");
         using var hoa = factory.CreateClient().SignedInAs("hoa");
         var json = SavedPage().ToJsonString();
 
         Assert.Equal(HttpStatusCode.Unauthorized, (await Post(anonymous, json)).StatusCode);
-        Assert.Equal(HttpStatusCode.Forbidden, (await Post(anna, json)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await Post(requester, json)).StatusCode);
         Assert.Equal(HttpStatusCode.Forbidden, (await Post(hoa, json, csrf: false)).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await Post(hoa, json, application: "Unknown")).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await Post(hoa, json, id: Guid.NewGuid().ToString("D"))).StatusCode);
@@ -507,7 +507,7 @@ public sealed class StudioPageMetadataTests : IAsyncLifetime
             builder.UseTestOidc("default");
             builder.UseTestAuthentication(
                 new TestIdentity("hoa", "Hoa Author", "author"),
-                new TestIdentity("anna", "Anna Employee", "employee"));
+                new TestIdentity("requester", "Requester User", "employee"));
         });
 
     private static void CopyDirectory(string source, string target)

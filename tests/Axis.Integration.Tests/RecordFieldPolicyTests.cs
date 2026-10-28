@@ -10,7 +10,7 @@ namespace Axis.Integration.Tests;
 /// <c>department</c>, creates and updates its <c>name</c> and <c>quantity</c>, reads and creates a
 /// ticket's <c>title</c>, and reads an order's <c>lineCount</c> but not its <c>title</c>, the
 /// display field. They read a bundle's <c>title</c> but not its searchable <c>note</c>. They hold no
-/// grant on departments. <c>anna</c> holds every grant.
+/// grant on departments. <c>requester</c> holds every grant.
 /// </summary>
 public sealed class RecordFieldPolicyTests(RecordApiFixture fixture) : IClassFixture<RecordApiFixture>
 {
@@ -71,7 +71,7 @@ public sealed class RecordFieldPolicyTests(RecordApiFixture fixture) : IClassFix
             Assert.Equal("fia", stored.RootElement.GetProperty("values").GetProperty("requester").GetString());
         }
 
-        // anna's grants cover every field.
+        // requester's grants cover every field.
         using var full = await ReadJsonAsync(await SendAsync(fixture.Client, "GET", $"{Items}/{id:D}", null));
         Assert.Contains(("total", "37.50"), Values(full.RootElement));
     }
@@ -185,7 +185,7 @@ public sealed class RecordFieldPolicyTests(RecordApiFixture fixture) : IClassFix
         using var fia = fixture.CreateClient().SignedInAs("fia");
         var note = $"{Bundles}?search={Uri.EscapeDataString("LÀM VIỆC")}";
 
-        // anna reads every field, so the upper-case text finds the note, which is not the display field.
+        // requester reads every field, so the upper-case text finds the note, which is not the display field.
         using (var full = await ReadJsonAsync(await SendAsync(fixture.Client, "GET", note, null)))
         {
             Assert.Equal(id.ToString("D"), Assert.Single(full.RootElement.GetProperty("items").EnumerateArray()).GetProperty("id").GetString());

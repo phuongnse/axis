@@ -11,7 +11,7 @@ using static Axis.Integration.Tests.RecordApiFixture;
 namespace Axis.Integration.Tests;
 
 /// <summary>
-/// Attaching an uploaded file by a record write, on the FilesApp fixture in tenant A. <c>anna</c> may create and
+/// Attaching an uploaded file by a record write, on the FilesApp fixture in tenant A. <c>requester</c> may create and
 /// update claims. A claim has a <c>receipt</c> file field and an <c>attachments</c> child collection whose rows
 /// have a <c>file</c> field.
 /// </summary>
@@ -75,17 +75,17 @@ public sealed class FileAttachTests(RecordApiFixture fixture) : IClassFixture<Re
     [Fact]
     public async Task An_update_attaches_a_receipt_and_a_child_row_file_and_a_read_returns_their_details()
     {
-        using var anna = fixture.CreateClient().SignedInAs("anna");
-        var claim = await CreateClaimAsync(anna);
-        var receipt = await UploadAsync(anna, Receipt);
-        var note = await UploadAsync(anna, Attachment, "a note", "text/plain", "note.txt");
+        using var requester = fixture.CreateClient().SignedInAs("requester");
+        var claim = await CreateClaimAsync(requester);
+        var receipt = await UploadAsync(requester, Receipt);
+        var note = await UploadAsync(requester, Attachment, "a note", "text/plain", "note.txt");
 
-        using var updated = await UpdateAsync(anna, claim, 1, $$"""{ "receipt": "{{receipt:D}}", "attachments": [{ "file": "{{note:D}}", "note": "Scan" }] }""");
+        using var updated = await UpdateAsync(requester, claim, 1, $$"""{ "receipt": "{{receipt:D}}", "attachments": [{ "file": "{{note:D}}", "note": "Scan" }] }""");
 
         Assert.Equal(HttpStatusCode.OK, updated.StatusCode);
         using var written = JsonDocument.Parse(await updated.Content.ReadAsStringAsync(CancellationToken));
         Assert.Equal(receipt, written.RootElement.GetProperty("values").GetProperty("receipt").GetProperty("id").GetGuid());
-        using var read = await ReadAsync(anna, claim);
+        using var read = await ReadAsync(requester, claim);
         var values = read.RootElement.GetProperty("values");
         Assert.Equal($$"""{"id":"{{receipt:D}}","name":"receipt.pdf","mediaType":"application/pdf","size":9}""", values.GetProperty("receipt").GetRawText());
         Assert.Equal(
@@ -99,7 +99,7 @@ public sealed class FileAttachTests(RecordApiFixture fixture) : IClassFixture<Re
         }
 
         // A list read returns the same object.
-        using var list = await anna.SendAsync(Request($"{Claims}?pageSize=100", HostA), CancellationToken);
+        using var list = await requester.SendAsync(Request($"{Claims}?pageSize=100", HostA), CancellationToken);
         using var page = JsonDocument.Parse(await list.Content.ReadAsStringAsync(CancellationToken));
         var item = page.RootElement.GetProperty("items").EnumerateArray().Single(item => item.GetProperty("id").GetGuid() == claim);
         Assert.Equal(receipt, item.GetProperty("values").GetProperty("receipt").GetProperty("id").GetGuid());
@@ -108,10 +108,10 @@ public sealed class FileAttachTests(RecordApiFixture fixture) : IClassFixture<Re
     [Fact]
     public async Task A_create_attaches_a_file_to_the_new_record()
     {
-        using var anna = fixture.CreateClient().SignedInAs("anna");
-        var receipt = await UploadAsync(anna, Receipt);
+        using var requester = fixture.CreateClient().SignedInAs("requester");
+        var receipt = await UploadAsync(requester, Receipt);
 
-        using var response = await anna.SendAsync(
+        using var response = await requester.SendAsync(
             Request(HttpMethod.Post, Claims, HostA, $$"""{ "values": { "title": "New", "receipt": "{{receipt:D}}" } }"""),
             CancellationToken);
 
@@ -126,10 +126,10 @@ public sealed class FileAttachTests(RecordApiFixture fixture) : IClassFixture<Re
     [Fact]
     public async Task A_null_receipt_reads_as_null()
     {
-        using var anna = fixture.CreateClient().SignedInAs("anna");
-        var claim = await CreateClaimAsync(anna);
+        using var requester = fixture.CreateClient().SignedInAs("requester");
+        var claim = await CreateClaimAsync(requester);
 
-        using var read = await ReadAsync(anna, claim);
+        using var read = await ReadAsync(requester, claim);
 
         Assert.Equal(JsonValueKind.Null, read.RootElement.GetProperty("values").GetProperty("receipt").ValueKind);
     }
@@ -137,8 +137,8 @@ public sealed class FileAttachTests(RecordApiFixture fixture) : IClassFixture<Re
     [Fact]
     public async Task A_file_id_that_does_not_qualify_gets_400_with_one_message_at_the_field()
     {
-        using var anna = fixture.CreateClient().SignedInAs("anna");
-        var claim = await CreateClaimAsync(anna);
+        using var requester = fixture.CreateClient().SignedInAs("requester");
+        var claim = await CreateClaimAsync(requester);
 
         var foreign = Guid.CreateVersion7();
         Assert.True(fixture.FilesModel.TryGetEntity("Claim", out var entity));
@@ -152,18 +152,18 @@ public sealed class FileAttachTests(RecordApiFixture fixture) : IClassFixture<Re
                 CancellationToken);
         }
 
-        var otherClaim = await CreateClaimAsync(anna);
-        var elsewhere = await UploadAsync(anna, Receipt);
-        using (var attached = await UpdateAsync(anna, otherClaim, 1, $$"""{ "receipt": "{{elsewhere:D}}" }"""))
+        var otherClaim = await CreateClaimAsync(requester);
+        var elsewhere = await UploadAsync(requester, Receipt);
+        using (var attached = await UpdateAsync(requester, otherClaim, 1, $$"""{ "receipt": "{{elsewhere:D}}" }"""))
         {
             Assert.Equal(HttpStatusCode.OK, attached.StatusCode);
         }
 
-        var otherField = await UploadAsync(anna, Attachment, "a note", "text/plain", "note.txt");
+        var otherField = await UploadAsync(requester, Attachment, "a note", "text/plain", "note.txt");
 
         foreach (var id in new[] { foreign, elsewhere, otherField, Guid.NewGuid() })
         {
-            using var response = await UpdateAsync(anna, claim, 1, $$"""{ "receipt": "{{id:D}}" }""");
+            using var response = await UpdateAsync(requester, claim, 1, $$"""{ "receipt": "{{id:D}}" }""");
             await AssertRefusedAsync(response, "/values/receipt");
         }
 
@@ -171,20 +171,20 @@ public sealed class FileAttachTests(RecordApiFixture fixture) : IClassFixture<Re
         Assert.Equal("pending", await StoredAsync(foreign, "state"));
         Assert.Equal("pending", await StoredAsync(otherField, "state"));
         Assert.Equal(otherClaim.ToString("D"), await StoredAsync(elsewhere, "owner_record_id"));
-        using var read = await ReadAsync(anna, claim);
+        using var read = await ReadAsync(requester, claim);
         Assert.Equal(1, read.RootElement.GetProperty("version").GetInt64());
     }
 
     [Fact]
     public async Task A_child_row_file_that_does_not_qualify_gets_400_at_the_row_and_a_repeated_id_at_the_later_cell()
     {
-        using var anna = fixture.CreateClient().SignedInAs("anna");
-        var claim = await CreateClaimAsync(anna);
-        var receipt = await UploadAsync(anna, Receipt);
-        var note = await UploadAsync(anna, Attachment, "a note", "text/plain", "note.txt");
+        using var requester = fixture.CreateClient().SignedInAs("requester");
+        var claim = await CreateClaimAsync(requester);
+        var receipt = await UploadAsync(requester, Receipt);
+        var note = await UploadAsync(requester, Attachment, "a note", "text/plain", "note.txt");
 
-        using var wrongField = await UpdateAsync(anna, claim, 1, $$"""{ "attachments": [{ "file": "{{receipt:D}}" }] }""");
-        using var repeated = await UpdateAsync(anna, claim, 1, $$"""{ "attachments": [{ "file": "{{note:D}}" }, { "file": "{{note:D}}" }] }""");
+        using var wrongField = await UpdateAsync(requester, claim, 1, $$"""{ "attachments": [{ "file": "{{receipt:D}}" }] }""");
+        using var repeated = await UpdateAsync(requester, claim, 1, $$"""{ "attachments": [{ "file": "{{note:D}}" }, { "file": "{{note:D}}" }] }""");
 
         await AssertRefusedAsync(wrongField, "/values/attachments/0/file");
         await AssertRefusedAsync(repeated, "/values/attachments/1/file");
@@ -194,20 +194,20 @@ public sealed class FileAttachTests(RecordApiFixture fixture) : IClassFixture<Re
     [Fact]
     public async Task Resending_the_same_file_ids_keeps_the_files()
     {
-        using var anna = fixture.CreateClient().SignedInAs("anna");
-        var claim = await CreateClaimAsync(anna);
-        var receipt = await UploadAsync(anna, Receipt);
-        var note = await UploadAsync(anna, Attachment, "a note", "text/plain", "note.txt");
+        using var requester = fixture.CreateClient().SignedInAs("requester");
+        var claim = await CreateClaimAsync(requester);
+        var receipt = await UploadAsync(requester, Receipt);
+        var note = await UploadAsync(requester, Attachment, "a note", "text/plain", "note.txt");
         var values = $$"""{ "receipt": "{{receipt:D}}", "attachments": [{ "file": "{{note:D}}", "note": "Scan" }] }""";
-        using (var first = await UpdateAsync(anna, claim, 1, values))
+        using (var first = await UpdateAsync(requester, claim, 1, values))
         {
             Assert.Equal(HttpStatusCode.OK, first.StatusCode);
         }
 
-        using var again = await UpdateAsync(anna, claim, 2, values);
+        using var again = await UpdateAsync(requester, claim, 2, values);
 
         Assert.Equal(HttpStatusCode.OK, again.StatusCode);
-        using var read = await ReadAsync(anna, claim);
+        using var read = await ReadAsync(requester, claim);
         Assert.Equal(receipt, read.RootElement.GetProperty("values").GetProperty("receipt").GetProperty("id").GetGuid());
         Assert.Equal(note, read.RootElement.GetProperty("values").GetProperty("attachments")[0].GetProperty("file").GetProperty("id").GetGuid());
         Assert.Equal("attached", await StoredAsync(receipt, "state"));
@@ -217,9 +217,9 @@ public sealed class FileAttachTests(RecordApiFixture fixture) : IClassFixture<Re
     [Fact]
     public async Task A_write_with_no_uploader_attaches_nothing_and_is_invalid()
     {
-        using var anna = fixture.CreateClient().SignedInAs("anna");
-        var claim = await CreateClaimAsync(anna);
-        var receipt = await UploadAsync(anna, Receipt);
+        using var requester = fixture.CreateClient().SignedInAs("requester");
+        var claim = await CreateClaimAsync(requester);
+        var receipt = await UploadAsync(requester, Receipt);
         Assert.True(fixture.FilesModel.TryGetEntity("Claim", out var entity));
         var field = entity.Fields.Single(candidate => candidate.Name == "receipt");
 

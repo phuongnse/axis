@@ -127,7 +127,7 @@ public sealed class SessionLifetimeTests(PostgreSqlFixture database) : IAsyncLif
             HandleCookies = handleCookies,
         });
 
-    /// <summary>Signs anna in to tenant a and returns the value of the session cookie.</summary>
+    /// <summary>Signs requester in to tenant a and returns the value of the session cookie.</summary>
     private static async Task<string> SignInAsync(HttpClient client)
     {
         var response = await client.GetAsync(new Uri("/test/session", UriKind.Relative), CancellationToken);
@@ -158,7 +158,7 @@ public sealed class SessionLifetimeTests(PostgreSqlFixture database) : IAsyncLif
         return (long)(await command.ExecuteScalarAsync(CancellationToken))!;
     }
 
-    /// <summary>Answers <c>GET /test/session</c> by signing anna in to tenant a.</summary>
+    /// <summary>Answers <c>GET /test/session</c> by signing requester in to tenant a.</summary>
     private sealed class SessionStartupFilter : IStartupFilter
     {
         public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) => app =>
@@ -171,7 +171,7 @@ public sealed class SessionLifetimeTests(PostgreSqlFixture database) : IAsyncLif
                     branch.UseTenantResolution();
                     branch.Run(async context =>
                     {
-                        await context.SignInAsync(Session.Scheme, Session.CreatePrincipal("a", "anna", "Anna Employee", ["employee"]));
+                        await context.SignInAsync(Session.Scheme, Session.CreatePrincipal("a", "requester", "Requester User", ["employee"]));
                         context.Response.StatusCode = StatusCodes.Status204NoContent;
                     });
                 });

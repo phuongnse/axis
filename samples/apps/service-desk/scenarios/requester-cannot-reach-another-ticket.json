@@ -5,14 +5,14 @@
   "formatVersion": 1,
   "now": "2026-10-01T09:00:00Z",
   "users": {
-    "anna": ["requester"],
+    "requester": ["requester"],
     "lan": ["requester"]
   },
   "steps": [
     {
       "type": "createRecord",
       "entity": "Ticket",
-      "as": "anna",
+      "as": "requester",
       "save": "ticket",
       "values": {
         "title": "Laptop will not start",
@@ -39,7 +39,7 @@
     {
       "type": "updateRecord",
       "record": "ticket",
-      "as": "anna",
+      "as": "requester",
       "values": {
         "resolution": "Fixed"
       },

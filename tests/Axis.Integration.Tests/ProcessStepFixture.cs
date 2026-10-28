@@ -255,7 +255,7 @@ public sealed class ProcessStepFixture : IAsyncLifetime
     /// <summary>
     /// Sets the title of the request <paramref name="id"/> at <paramref name="version"/> in
     /// <paramref name="transaction"/>, as a user's record update does, with its <c>record.updated</c>
-    /// audit record by the user <c>anna</c>. Returns the new version.
+    /// audit record by the user <c>requester</c>. Returns the new version.
     /// </summary>
     public async Task<long> UpdateTitleAsync(NpgsqlTransaction transaction, Guid id, long version, string title)
     {
@@ -266,7 +266,7 @@ public sealed class ProcessStepFixture : IAsyncLifetime
         await AuditRecords.AppendAsync(
             transaction,
             new AuditEntry(
-                "anna",
+                "requester",
                 AuditActions.RecordUpdated,
                 Model.Manifest.Id,
                 RequestEntity.Id,

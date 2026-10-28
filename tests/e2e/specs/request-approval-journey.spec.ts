@@ -70,10 +70,10 @@ test.describe('the author builds an application from the request-approval templa
     await expect(rows).toHaveAttribute('data-active', 'true')
   })
 
-  test('anna submits a request on the published site, and minh approves it', async ({ page }) => {
+  test('requester submits a request on the published site, and minh approves it', async ({ page }) => {
     const title = `Zz Request ${Date.now()}`
 
-    await useJourneySession(page, 'anna')
+    await useJourneySession(page, 'requester')
     await page.goto(`${journeyURL}/equipment-requests/myrequests`)
     await page.getByRole('button', { name: 'New', exact: true }).click()
     await expect(page).toHaveURL(/\/equipment-requests\/requestform\/new$/)
@@ -94,7 +94,7 @@ test.describe('the author builds an application from the request-approval templa
     await useJourneySession(page, 'minh')
     await waitForTask(page, title)
 
-    await useJourneySession(page, 'anna')
+    await useJourneySession(page, 'requester')
     await page.goto(`${journeyURL}/equipment-requests/mytasks?pageSize=100`)
     await expect(page.getByRole('table')).toBeVisible()
     await expect(page.getByRole('row', { name: new RegExp(title) })).toHaveCount(0)
@@ -106,7 +106,7 @@ test.describe('the author builds an application from the request-approval templa
     await expect(page).toHaveURL(/\/equipment-requests\/mytasks$/)
 
     // The worker ends the process some time after the decision.
-    await useJourneySession(page, 'anna')
+    await useJourneySession(page, 'requester')
     await expect(async () => {
       await page.goto(`${journeyURL}/equipment-requests/requestform/${id}`)
       await expectChosen(page.getByRole('combobox', { name: 'Status', exact: true }), 'approved', { timeout: 1_000 })

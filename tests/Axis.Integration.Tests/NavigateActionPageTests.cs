@@ -20,7 +20,7 @@ public sealed class NavigateActionPageTests(ProcessStartFixture fixture) : IClas
     [Fact]
     public async Task User_who_can_read_the_target_page_gets_the_navigate_actions_of_a_table()
     {
-        var table = await TableOfOverviewAsync("anna");
+        var table = await TableOfOverviewAsync("requester");
 
         Assert.Equal([ShowSubmissionsOfRow, OpenRequestForm, StartSubmit], RawItems(table.GetProperty("rowActions")));
         Assert.Equal([ShowSubmissions], RawItems(table.GetProperty("toolbarActions")));
@@ -41,7 +41,7 @@ public sealed class NavigateActionPageTests(ProcessStartFixture fixture) : IClas
     [Fact]
     public async Task Table_lists_a_row_start_process_action_only_for_a_role_with_the_start_grant()
     {
-        var withGrant = await TableOfOverviewAsync("anna");
+        var withGrant = await TableOfOverviewAsync("requester");
         var withoutGrant = await TableOfOverviewAsync("olga");
 
         Assert.Contains(StartSubmit, RawItems(withGrant.GetProperty("rowActions")));
@@ -53,7 +53,7 @@ public sealed class NavigateActionPageTests(ProcessStartFixture fixture) : IClas
     [Fact]
     public async Task Form_widget_lists_its_start_process_and_navigate_actions_in_page_file_order()
     {
-        var form = await FormOfRequestFormAsync("anna");
+        var form = await FormOfRequestFormAsync("requester");
 
         Assert.Equal(
             [
@@ -77,8 +77,8 @@ public sealed class NavigateActionPageTests(ProcessStartFixture fixture) : IClas
     [Fact]
     public async Task Page_metadata_lists_the_parameters_of_the_page()
     {
-        using var submissions = await GetAsync("anna", "/api/sites/processes/pages/submissions");
-        using var overview = await GetAsync("anna", "/api/sites/processes/pages/overview");
+        using var submissions = await GetAsync("requester", "/api/sites/processes/pages/submissions");
+        using var overview = await GetAsync("requester", "/api/sites/processes/pages/overview");
 
         Assert.Equal(HttpStatusCode.OK, submissions.StatusCode);
         Assert.Equal(HttpStatusCode.OK, overview.StatusCode);

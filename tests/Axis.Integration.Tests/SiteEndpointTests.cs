@@ -377,7 +377,7 @@ public sealed class SiteEndpointTests(RecordApiFixture fixture) : IClassFixture<
     [Fact]
     public async Task Access_lists_import_last_on_an_entity_table_for_a_user_who_holds_it()
     {
-        using var employee = fixture.CreateClient().SignedInAs("anna");
+        using var employee = fixture.CreateClient().SignedInAs("requester");
         using var reader = fixture.CreateClient().SignedInAs("rita");
 
         using var table = await GetJsonAsync(employee, "/api/sites/records/pages/items", HostA);
@@ -395,7 +395,7 @@ public sealed class SiteEndpointTests(RecordApiFixture fixture) : IClassFixture<
     public async Task Access_lists_export_on_an_entity_table_and_a_data_source_table_for_a_user_who_holds_it()
     {
         using var exporter = fixture.CreateClient().SignedInAs("eve");
-        using var employee = fixture.CreateClient().SignedInAs("anna");
+        using var employee = fixture.CreateClient().SignedInAs("requester");
         using var reader = fixture.CreateClient().SignedInAs("rita");
 
         using var table = await GetJsonAsync(exporter, "/api/sites/records/pages/items", HostA);

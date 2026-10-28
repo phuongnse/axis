@@ -50,7 +50,7 @@ public sealed class TenantDirectoryPerformanceTests(PostgreSqlFixture database) 
         var platformName = new NpgsqlConnectionStringBuilder(scenario.Platform).Database!;
         using var spans = new SpanCollector();
         await using var factory = CreateServer(scenario.Platform);
-        using var client = factory.CreateClient().SignedInAs("anna");
+        using var client = factory.CreateClient().SignedInAs("requester");
 
         // The control: a refresh does query the platform database, so the span check can fail.
         await factory.Services.GetRequiredService<TenantDirectoryRefresh>().RefreshAsync(CancellationToken);
@@ -84,7 +84,7 @@ public sealed class TenantDirectoryPerformanceTests(PostgreSqlFixture database) 
         await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
         var seed = await CreateSeedAsync(scenario);
         await using var factory = CreateServer(scenario.Platform);
-        using var client = factory.CreateClient().SignedInAs("anna");
+        using var client = factory.CreateClient().SignedInAs("requester");
         var refresh = factory.Services.GetRequiredService<TenantDirectoryRefresh>();
         var hosts = await AddTenantsAsync(scenario, seed);
 

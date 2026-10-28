@@ -79,12 +79,12 @@ public sealed partial class AdminPreviewTenantTests(PostgreSqlFixture database, 
             HandleCookies = true,
         });
 
-        await SignInAsync(client, authority, "anna");
+        await SignInAsync(client, authority, "requester");
 
         using var me = await client.GetAsync("/api/me", CancellationToken);
         Assert.Equal(HttpStatusCode.OK, me.StatusCode);
         using var body = JsonDocument.Parse(await me.Content.ReadAsStringAsync(CancellationToken));
-        Assert.Equal("anna", body.RootElement.GetProperty("id").GetString());
+        Assert.Equal("requester", body.RootElement.GetProperty("id").GetString());
         await scenario.AssertNoSecretsAsync();
     }
 

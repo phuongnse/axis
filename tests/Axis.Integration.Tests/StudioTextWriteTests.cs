@@ -99,12 +99,12 @@ public sealed class StudioTextWriteTests(PostgreSqlFixture database) : IClassFix
     {
         using var folder = StudioPublishTests.NewFolder();
         await using var factory = await CreateFactoryAsync(folder.Path);
-        using var anna = factory.CreateClient().SignedInAs("anna");
+        using var requester = factory.CreateClient().SignedInAs("requester");
         using var anonymous = factory.CreateClient();
         var before = Snapshot(folder.Path);
         const string body = """{"texts":{"en":"Hello","vi":"Xin chào"}}""";
 
-        using var forbidden = await PutAsync(anna, "greeting.new", body);
+        using var forbidden = await PutAsync(requester, "greeting.new", body);
         using var unauthorized = await PutAsync(anonymous, "greeting.new", body);
 
         Assert.Equal(HttpStatusCode.Forbidden, forbidden.StatusCode);
@@ -145,7 +145,7 @@ public sealed class StudioTextWriteTests(PostgreSqlFixture database) : IClassFix
             builder.UseTestOidc("default");
             builder.UseTestAuthentication(
                 new TestIdentity("hoa", "Hoa Author", "author"),
-                new TestIdentity("anna", "Anna Employee", "employee"));
+                new TestIdentity("requester", "Requester User", "employee"));
         });
     }
 }

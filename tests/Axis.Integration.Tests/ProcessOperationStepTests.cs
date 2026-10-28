@@ -124,7 +124,7 @@ public sealed class ProcessOperationStepTests(ProcessStepFixture fixture) : ICla
         Assert.Equal(3L, record.Version);
         Assert.Equal("Changed by a user", record.Values["title"]!.GetValue<string>());
         Assert.Equal("submitted", record.Values["status"]!.GetValue<string>());
-        Assert.Equal([("anna", 2L), ("system", 3L)], await RecordUpdatedVersionsAsync(subjectId));
+        Assert.Equal([("requester", 2L), ("system", 3L)], await RecordUpdatedVersionsAsync(subjectId));
     }
 
     [Fact]
@@ -147,7 +147,7 @@ public sealed class ProcessOperationStepTests(ProcessStepFixture fixture) : ICla
         var record = await fixture.RequestAsync(subjectId);
         Assert.Equal((3L, "Changed by a user", "submitted"), (record.Version, record.Values["title"]!.GetValue<string>(), record.Values["status"]!.GetValue<string>()));
         Assert.Equal(2L, JsonNode.Parse((await fixture.HistoryAsync(instanceId))[0].Input)!["subjectVersion"]!.GetValue<long>());
-        Assert.Equal([("anna", 2L), ("system", 3L)], await RecordUpdatedVersionsAsync(subjectId));
+        Assert.Equal([("requester", 2L), ("system", 3L)], await RecordUpdatedVersionsAsync(subjectId));
     }
 
     private Guid RequestEntityId

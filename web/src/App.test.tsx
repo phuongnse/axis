@@ -104,7 +104,7 @@ const sites: SiteListItem[] = [
 
 const signedInUser: CurrentUser = {
   id: 'user-1',
-  displayName: 'Anna',
+  displayName: 'Requester',
   roles: [],
   studio: false,
   studioPublisher: false,

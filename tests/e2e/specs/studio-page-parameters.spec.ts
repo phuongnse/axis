@@ -177,7 +177,7 @@ test.describe("Studio declares a page parameter and links to the page", () => {
     ) as { path: string };
 
     // The requester role holds read access to the page, and the request is the requester's own.
-    await useSession(page, "anna");
+    await useSession(page, "requester");
     const created = await page.request.post(
       `${server.url}/api/apps/${name}/entities/Request/records`,
       {

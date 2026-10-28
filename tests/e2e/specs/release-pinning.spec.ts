@@ -8,8 +8,8 @@ import { csrfHeaders } from '../csrf'
 import { expectShown, fieldValue } from '../fields'
 import { sessionFile, useSession } from '../sessions'
 
-// The record API needs a session with a grant, so these journeys start signed in as the employee anna.
-test.use({ storageState: sessionFile('anna') })
+// The record API needs a session with a grant, so these journeys start signed in as the employee requester.
+test.use({ storageState: sessionFile('requester') })
 
 // Each activation starts a second server, which takes a few seconds.
 test.setTimeout(180_000)

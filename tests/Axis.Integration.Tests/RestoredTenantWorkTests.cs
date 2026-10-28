@@ -44,11 +44,11 @@ public sealed class RestoredTenantWorkTests(AdminBackupFixture fixture) : IClass
     {
         var scenario = fixture.Scenario;
         var original = await scenario.RowAsync(fixture.TenantId);
-        using var anna = fixture.CreateClient();
+        using var requester = fixture.CreateClient();
 
         // Request A waits for its manager at backup time. Request B starts with no worker running, so its first step is still due.
-        var requestA = await AdminBackupFixture.CreateRequestAsync(anna);
-        var instanceA = await StartAsync(anna, requestA);
+        var requestA = await AdminBackupFixture.CreateRequestAsync(requester);
+        var instanceA = await StartAsync(requester, requestA);
 
         // The server limits the runtime role to reading the platform schema when it starts. The workers need that before any server runs.
         await using (var connection = new NpgsqlConnection(scenario.Platform))
@@ -68,8 +68,8 @@ public sealed class RestoredTenantWorkTests(AdminBackupFixture fixture) : IClass
             await first.DisposeAsync();
         }
 
-        var requestB = await AdminBackupFixture.CreateRequestAsync(anna);
-        var instanceB = await StartAsync(anna, requestB);
+        var requestB = await AdminBackupFixture.CreateRequestAsync(requester);
+        var instanceB = await StartAsync(requester, requestB);
         Assert.NotEqual(Waiting, await StateAsync(original, instanceB));
 
         using var folder = new TemporaryFolder();

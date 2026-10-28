@@ -61,7 +61,7 @@ public sealed class StudioNamesTests : IAsyncLifetime
             builder.UseSetting("Studio:AuthorRole", "author");
             builder.UseTestAuthentication(
                 new TestIdentity("hoa", "Hoa Author", "author"),
-                new TestIdentity("anna", "Anna Employee", "employee"));
+                new TestIdentity("requester", "Requester User", "employee"));
         });
     }
 
@@ -217,7 +217,7 @@ public sealed class StudioNamesTests : IAsyncLifetime
         using var anonymousResponse = await anonymous.SendAsync(RecordApiFixture.Request("/api/studio/apps/PurchaseRequests/names", Host), CancellationToken);
         Assert.Equal(HttpStatusCode.Unauthorized, anonymousResponse.StatusCode);
 
-        using var employee = _factory.CreateClient().SignedInAs("anna");
+        using var employee = _factory.CreateClient().SignedInAs("requester");
         using var employeeResponse = await employee.SendAsync(RecordApiFixture.Request("/api/studio/apps/PurchaseRequests/names", Host), CancellationToken);
         Assert.Equal(HttpStatusCode.Forbidden, employeeResponse.StatusCode);
 

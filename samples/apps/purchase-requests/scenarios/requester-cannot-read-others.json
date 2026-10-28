@@ -5,14 +5,14 @@
   "formatVersion": 1,
   "now": "2026-10-01T09:00:00Z",
   "users": {
-    "anna": ["employee"],
+    "requester": ["employee"],
     "chau": ["employee"]
   },
   "steps": [
     {
       "type": "createRecord",
       "entity": "PurchaseRequest",
-      "as": "anna",
+      "as": "requester",
       "save": "request",
       "values": {
         "title": "Chairs",

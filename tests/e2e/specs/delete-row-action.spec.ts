@@ -4,9 +4,9 @@ import { csrfHeaders } from '../csrf'
 import { confirmDialog, waitForDialog } from '../dialogs'
 import { sessionFile, useSession } from '../sessions'
 
-// anna holds the delete grant on notes. dung, a finance reviewer, reads notes whose title contains
+// requester holds the delete grant on notes. dung, a finance reviewer, reads notes whose title contains
 // 'Shared' and holds no delete grant.
-test.use({ storageState: sessionFile('anna') })
+test.use({ storageState: sessionFile('requester') })
 
 // Specs run in parallel against one database, so these tests rely only on the notes they create. The
 // 'zzz' prefix and the descending sort put them on the first page.
