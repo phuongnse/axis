@@ -20,8 +20,11 @@ public static class TenantEmailSettings
 {
     private const string Conflict = "Another command changed the tenant at the same moment. Run the command again.";
 
-    /// <summary>Returns why the change is refused without reading the directory, or <see langword="null"/> when it is well formed.</summary>
-    public static string? Problem(TenantEmailChange change)
+    /// <summary>
+    /// Returns why the change is refused without reading the directory, or <see langword="null"/> when it is well formed.
+    /// Only <paramref name="allowPlainSmtp"/>, which is <see langword="true"/> in Development, allows <c>--tls false</c>.
+    /// </summary>
+    public static string? Problem(TenantEmailChange change, bool allowPlainSmtp)
     {
         ArgumentNullException.ThrowIfNull(change);
 
@@ -38,6 +41,11 @@ public static class TenantEmailSettings
         if (change.Port is < 1 or > 65535)
         {
             return "--port must be between 1 and 65535.";
+        }
+
+        if (change.UseTls == false && !allowPlainSmtp)
+        {
+            return "--tls false is allowed only in Development.";
         }
 
         if (change.Password is not null && change.Password.Reveal().Length == 0)
@@ -61,6 +69,7 @@ public static class TenantEmailSettings
     /// <summary>
     /// Gives the tenant its own mail settings, replacing any it had. The password is stored encrypted, bound to the tenant. The
     /// audit record names the settings that were given, in a fixed order, and never a value. A preview tenant has its own.
+    /// Only <paramref name="allowPlainSmtp"/>, which is <see langword="true"/> in Development, allows the change to turn TLS off.
     /// </summary>
     public static async Task<TenantSettingResult> SetAsync(
         PlatformDbContext platform,
@@ -68,6 +77,7 @@ public static class TenantEmailSettings
         string command,
         string tenantId,
         TenantEmailChange change,
+        bool allowPlainSmtp,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(platform);
@@ -75,7 +85,7 @@ public static class TenantEmailSettings
         ArgumentException.ThrowIfNullOrWhiteSpace(tenantId);
         ArgumentNullException.ThrowIfNull(change);
 
-        var problem = Problem(change);
+        var problem = Problem(change, allowPlainSmtp);
         if (problem is not null)
         {
             return TenantSettingResult.Refused(problem);

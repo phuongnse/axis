@@ -29,6 +29,45 @@ public sealed class WorkerOptionsTests
         Assert.Contains("Worker:MetricsInterval", exception.Message, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("OTEL_EXPORTER_OTLP_ENDPOINT")]
+    [InlineData("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT")]
+    [InlineData("OTEL_EXPORTER_OTLP_METRICS_ENDPOINT")]
+    [InlineData("OTEL_EXPORTER_OTLP_LOGS_ENDPOINT")]
+    public void An_http_otlp_endpoint_outside_Development_stops_the_worker_at_startup_naming_the_variable_and_not_its_value(string variable)
+    {
+        var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings { EnvironmentName = "Production", DisableDefaults = true });
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            [variable] = "http://collector.example.test:4318",
+            ["Tenants:a:Hosts:0"] = "a.example.test",
+
+            // No database is opened: the worker is built, never started.
+            ["Tenants:a:ConnectionString"] = "Host=127.0.0.1;Port=1;Database=axis;Username=axis;Password=axis",
+        });
+
+        var exception = Assert.Throws<InvalidOperationException>(() => builder.Services.AddAxisWorker(builder.Configuration, builder.Environment));
+
+        Assert.Contains(variable, exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("collector.example.test", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("Development", "http://collector.example.test:4318")]
+    [InlineData("Production", "https://collector.example.test:4318")]
+    public void An_http_otlp_endpoint_in_Development_and_an_https_one_elsewhere_build_the_worker(string environment, string endpoint)
+    {
+        var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings { EnvironmentName = environment, DisableDefaults = true });
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["OTEL_EXPORTER_OTLP_ENDPOINT"] = endpoint,
+            ["Tenants:a:Hosts:0"] = "a.example.test",
+            ["Tenants:a:ConnectionString"] = "Host=127.0.0.1;Port=1;Database=axis;Username=axis;Password=axis",
+        });
+
+        builder.Services.AddAxisWorker(builder.Configuration, builder.Environment);
+    }
+
     [Fact]
     public void A_delivery_attempts_setting_below_one_stops_the_worker_at_startup_naming_the_setting()
     {

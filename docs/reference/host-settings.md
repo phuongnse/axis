@@ -460,4 +460,6 @@ variables:
 With no endpoint, nothing is exported and logs still go to the console. The
 headers may carry a collector token, so they come from the environment and
 never from a committed file. Docker Compose and `scripts/dev.sh` set no
-endpoint and start no collector.
+endpoint and start no collector. Outside Development every endpoint variable that
+is set must be an absolute `https` URL, or the server and the worker stop at start
+and the error names the variable, never its value. Development accepts `http`.
