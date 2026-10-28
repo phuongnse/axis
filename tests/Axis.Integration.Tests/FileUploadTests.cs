@@ -220,6 +220,25 @@ public sealed class FileUploadTests(RecordApiFixture fixture) : IClassFixture<Re
         Assert.Equal(before, await FileCountAsync());
     }
 
+    [Theory]
+    [InlineData(Receipt, "image/svg+xml")]
+    [InlineData(Receipt, "IMAGE/SVG+XML; charset=utf-8")]
+    [InlineData(Attachment, "image/svg+xml")]
+    public async Task A_declared_svg_gets_415_whatever_accept_allows(string path, string mediaType)
+    {
+        using var anna = fixture.CreateClient().SignedInAs("anna");
+        var before = await FileCountAsync();
+        var svg = Encoding.UTF8.GetBytes("<svg xmlns=\"http://www.w3.org/2000/svg\"><script>alert(1)</script></svg>");
+
+        using var response = await anna.SendAsync(Upload(path, svg, mediaType, "a.svg"), CancellationToken);
+
+        using (await ReadProblemAsync(response, HttpStatusCode.UnsupportedMediaType))
+        {
+        }
+
+        Assert.Equal(before, await FileCountAsync());
+    }
+
     [Fact]
     public async Task A_subtype_wildcard_and_media_type_parameters_are_accepted()
     {

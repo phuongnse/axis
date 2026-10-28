@@ -19,6 +19,9 @@ for the detail. The owner agreed these points on 2026-10-25.
   password rules, account lockout and account recovery. Axis has no
   passwords of its own ([D9](d9-authentication-oidc-through-a-bff-ready-for-fapi-20.md)).
   The tracking names each such requirement as delegated.
+- **Delegated to the operator:** malware scanning of uploaded files, see
+  [D76](d76-file-money-and-enum-label-field-types.md). The owner agreed this
+  on 2026-10-28.
 - **Tracking:**
   - A new reference page, [ASVS](../reference/asvs.md), lists each Level 2
     requirement once, with its status: met, gap, delegated or not
