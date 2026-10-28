@@ -48,7 +48,7 @@ owner confirmed these points on issue #783 on 2026-10-20.
 - **Tests:** test scenarios cover the happy path, a rejection, a reopen then
   resubmit, and denied access for each role.
 - **Users:** two new realm users, `khoa` with the role `agent` and `linh` with
-  the role `service-desk-lead`. `anna` also gets the role `requester`. The
+  the role `service-desk-lead`. The development user `requester` also gets the role `requester`. The
   development password stays `axis`. The roles of the existing users stay as
   they are.
 - **Built only through Studio:**

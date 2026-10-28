@@ -12,7 +12,7 @@ public sealed class WidgetTreePageTests(ProcessStartFixture fixture) : IClassFix
     [Fact]
     public async Task User_who_reads_requests_and_inspects_the_process_gets_the_whole_tree()
     {
-        using var response = await GetAsync("anna", "/api/sites/processes/pages/overview");
+        using var response = await GetAsync("requester", "/api/sites/processes/pages/overview");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         using var page = await ReadJsonAsync(response);

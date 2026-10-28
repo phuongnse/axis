@@ -24,7 +24,7 @@ public sealed class ScenarioCompilerTests
     public void Every_problem_of_a_scenario_gets_its_own_code_at_its_path_in_one_compile()
     {
         using var folder = SampleCopy().With(ScenarioFile, Scenario("""
-            "users": { "anna": ["employee", "ghost-role"], "binh": ["department-manager"] },
+            "users": { "requester": ["employee", "ghost-role"], "binh": ["department-manager"] },
             "stubs": [
               { "connector": { "name": "Missing", "operation": "createPurchaseOrder" }, "output": {} },
               { "connector": { "name": "purchasingsystem", "operation": "nope" }, "output": {} },
@@ -34,7 +34,7 @@ public sealed class ScenarioCompilerTests
               { "operation": "payment-references/CreditorReference", "output": { "creditorReference": "RF18", "extra": 1 } }
             ],
             "steps": [
-              { "type": "createRecord", "entity": "PurchaseRequest", "as": "anna", "save": "request",
+              { "type": "createRecord", "entity": "PurchaseRequest", "as": "requester", "save": "request",
                 "values": {
                   "title": "Laptops",
                   "nonexistent": 1,
@@ -42,13 +42,13 @@ public sealed class ScenarioCompilerTests
                   "currency": "GBP",
                   "lineItems": [{ "quantity": "three", "bogus": 1 }, 5]
                 } },
-              { "type": "createRecord", "entity": "Nope", "as": "anna", "save": "other", "values": {} },
-              { "type": "createRecord", "entity": "LineItem", "as": "anna", "values": {} },
-              { "type": "createRecord", "entity": "Department", "as": "anna", "save": "department", "values": {} },
-              { "type": "createRecord", "entity": "PurchaseRequest", "as": "anna", "save": "request", "values": {} },
-              { "type": "startProcess", "process": "Unknown", "record": "request", "as": "anna" },
+              { "type": "createRecord", "entity": "Nope", "as": "requester", "save": "other", "values": {} },
+              { "type": "createRecord", "entity": "LineItem", "as": "requester", "values": {} },
+              { "type": "createRecord", "entity": "Department", "as": "requester", "save": "department", "values": {} },
+              { "type": "createRecord", "entity": "PurchaseRequest", "as": "requester", "save": "request", "values": {} },
+              { "type": "startProcess", "process": "Unknown", "record": "request", "as": "requester" },
               { "type": "startProcess", "process": "PurchaseRequestApproval", "record": "missing", "as": "nobody" },
-              { "type": "startProcess", "process": "PurchaseRequestApproval", "record": "department", "as": "anna" },
+              { "type": "startProcess", "process": "PurchaseRequestApproval", "record": "department", "as": "requester" },
               { "type": "completeTask", "record": "request", "step": "nothing", "outcome": "approve", "as": "binh" },
               { "type": "completeTask", "record": "request", "step": "MANAGERAPPROVAL", "outcome": "nope", "as": "binh" },
               { "type": "expectTask", "record": "request", "step": "managerApproval", "assignee": { "role": "ghost-role" } },
@@ -63,7 +63,7 @@ public sealed class ScenarioCompilerTests
         Assert.Equal(
             new[]
             {
-                ("AXC0180", "/users/anna/1"),
+                ("AXC0180", "/users/requester/1"),
                 ("AXC0190", "/stubs/0/connector/name"),
                 ("AXC0190", "/stubs/1/connector/operation"),
                 ("AXC0191", "/stubs/2/output/bogus"),
@@ -100,11 +100,11 @@ public sealed class ScenarioCompilerTests
     public void An_expectNotification_recipient_that_is_not_declared_is_AXC0180_or_AXC0181_at_its_path()
     {
         using var folder = SampleCopy().With(ScenarioFile, Scenario("""
-            "users": { "anna": ["employee"] },
+            "users": { "requester": ["employee"] },
             "steps": [
               { "type": "expectNotification", "recipient": { "role": "ghost-role" } },
               { "type": "expectNotification", "recipient": { "user": "zed" }, "channel": "email" },
-              { "type": "expectNotification", "recipient": { "user": "anna" }, "channel": "inApp", "values": { "title": "Chairs" } },
+              { "type": "expectNotification", "recipient": { "user": "requester" }, "channel": "inApp", "values": { "title": "Chairs" } },
               { "type": "expectNotification", "recipient": { "role": "employee" } },
               { "type": "expectNotification", "recipient": { "email": "who@example.com" }, "channel": "email" }
             ]
@@ -118,18 +118,18 @@ public sealed class ScenarioCompilerTests
     }
 
     [Theory]
-    [InlineData("""{ "type": "expectNotification", "recipient": { "user": "anna" }, "channel": "sms" }""")]
-    [InlineData("""{ "type": "expectNotification", "recipient": { "user": "anna" }, "as": "anna" }""")]
-    [InlineData("""{ "type": "expectNotification", "recipient": { "user": "anna", "role": "employee" } }""")]
+    [InlineData("""{ "type": "expectNotification", "recipient": { "user": "requester" }, "channel": "sms" }""")]
+    [InlineData("""{ "type": "expectNotification", "recipient": { "user": "requester" }, "as": "requester" }""")]
+    [InlineData("""{ "type": "expectNotification", "recipient": { "user": "requester", "role": "employee" } }""")]
     [InlineData("""{ "type": "expectNotification", "recipient": {} }""")]
     [InlineData("""{ "type": "expectNotification", "channel": "email" }""")]
-    [InlineData("""{ "type": "expectNotification", "recipient": { "user": "anna" }, "by": "P1D" }""")]
-    [InlineData("""{ "type": "advanceTime", "by": "P1D", "recipient": { "user": "anna" } }""")]
+    [InlineData("""{ "type": "expectNotification", "recipient": { "user": "requester" }, "by": "P1D" }""")]
+    [InlineData("""{ "type": "advanceTime", "by": "P1D", "recipient": { "user": "requester" } }""")]
     [InlineData("""{ "type": "expectRecord", "record": "request", "values": {}, "channel": "email" }""")]
     public void A_malformed_expectNotification_step_is_AXC0004_inside_the_step(string step)
     {
         using var folder = SampleCopy().With(ScenarioFile, Scenario($$"""
-            "users": { "anna": ["employee"] },
+            "users": { "requester": ["employee"] },
             "steps": [{{step}}]
             """));
 
@@ -150,10 +150,10 @@ public sealed class ScenarioCompilerTests
                   "start": "done", "steps": [{ "name": "done", "type": "end" }] }
                 """)
             .With(ScenarioFile, Scenario("""
-                "users": { "anna": ["employee"] },
+                "users": { "requester": ["employee"] },
                 "steps": [
-                  { "type": "createRecord", "entity": "PurchaseRequest", "as": "anna", "save": "request", "values": { "title": "Laptops" } },
-                  { "type": "startProcess", "process": "NightlyJob", "record": "request", "as": "anna" },
+                  { "type": "createRecord", "entity": "PurchaseRequest", "as": "requester", "save": "request", "values": { "title": "Laptops" } },
+                  { "type": "startProcess", "process": "NightlyJob", "record": "request", "as": "requester" },
                   { "type": "expectInstance", "process": "NightlyJob", "record": "request", "state": "running" }
                 ]
                 """));
@@ -168,18 +168,18 @@ public sealed class ScenarioCompilerTests
 
     [Theory]
     [InlineData("""{ "type": "teleport", "record": "request" }""")]
-    [InlineData("""{ "type": "createRecord", "entity": "Department", "as": "anna", "save": "dept", "values": {}, "expect": "denied" }""")]
+    [InlineData("""{ "type": "createRecord", "entity": "Department", "as": "requester", "save": "dept", "values": {}, "expect": "denied" }""")]
     [InlineData("""{ "type": "expectRecord", "record": "request", "values": {}, "expect": "denied" }""")]
     [InlineData("""{ "type": "deleteRecord", "record": "request" }""")]
     [InlineData("""{ "type": "expectTask", "record": "request", "step": "managerApproval" }""")]
     [InlineData("""{ "type": "advanceTime" }""")]
-    [InlineData("""{ "type": "advanceTime", "by": "P1D", "as": "anna" }""")]
+    [InlineData("""{ "type": "advanceTime", "by": "P1D", "as": "requester" }""")]
     [InlineData("""{ "type": "advanceTime", "by": "P1D", "expect": "denied" }""")]
     [InlineData("""{ "type": "expectRecord", "record": "request", "values": {}, "by": "P1D" }""")]
     public void A_malformed_step_is_a_schema_violation(string step)
     {
         using var folder = SampleCopy().With(ScenarioFile, Scenario($$"""
-            "users": { "anna": ["employee"] },
+            "users": { "requester": ["employee"] },
             "steps": [{{step}}]
             """));
 
@@ -200,7 +200,7 @@ public sealed class ScenarioCompilerTests
     {
         using var folder = SampleCopy().With(ScenarioFile, Scenario($$"""
             "now": "2026-10-01T09:00:00Z",
-            "users": { "anna": ["employee"] },
+            "users": { "requester": ["employee"] },
             "steps": [{ "type": "advanceTime", "by": "{{by}}" }]
             """));
 
@@ -215,7 +215,7 @@ public sealed class ScenarioCompilerTests
     public void An_advance_time_step_in_a_scenario_without_now_is_AXC0194_at_the_step()
     {
         using var folder = SampleCopy().With(ScenarioFile, Scenario("""
-            "users": { "anna": ["employee"] },
+            "users": { "requester": ["employee"] },
             "steps": [{ "type": "advanceTime", "by": "P1D" }]
             """));
 
@@ -230,7 +230,7 @@ public sealed class ScenarioCompilerTests
     public void An_advance_time_step_that_breaks_both_rules_reports_both_codes()
     {
         using var folder = SampleCopy().With(ScenarioFile, Scenario("""
-            "users": { "anna": ["employee"] },
+            "users": { "requester": ["employee"] },
             "steps": [{ "type": "advanceTime", "by": "P1M" }]
             """));
 
@@ -250,7 +250,7 @@ public sealed class ScenarioCompilerTests
     {
         using var folder = SampleCopy().With(ScenarioFile, Scenario($$"""
             "now": "2026-10-01T09:00:00Z",
-            "users": { "anna": ["employee"] },
+            "users": { "requester": ["employee"] },
             "steps": [{ "type": "advanceTime", "by": "{{by}}" }]
             """));
 
@@ -264,12 +264,12 @@ public sealed class ScenarioCompilerTests
     public void A_stub_with_outcome_failed_and_no_output_compiles()
     {
         using var folder = SampleCopy().With(ScenarioFile, Scenario("""
-            "users": { "anna": ["employee"] },
+            "users": { "requester": ["employee"] },
             "stubs": [
               { "connector": { "name": "PurchasingSystem", "operation": "createPurchaseOrder" }, "outcome": "failed" },
               { "operation": "payment-references/creditorReference", "outcome": "failed" }
             ],
-            "steps": [{ "type": "createRecord", "entity": "PurchaseRequest", "as": "anna", "values": {} }]
+            "steps": [{ "type": "createRecord", "entity": "PurchaseRequest", "as": "requester", "values": {} }]
             """));
 
         var result = ApplicationCompiler.Compile(folder.Path, SamplePackages.Versions);
@@ -285,9 +285,9 @@ public sealed class ScenarioCompilerTests
     public void A_stub_needs_exactly_one_of_output_and_a_failed_outcome(string stub)
     {
         using var folder = SampleCopy().With(ScenarioFile, Scenario($$"""
-            "users": { "anna": ["employee"] },
+            "users": { "requester": ["employee"] },
             "stubs": [{{stub}}],
-            "steps": [{ "type": "createRecord", "entity": "PurchaseRequest", "as": "anna", "values": {} }]
+            "steps": [{ "type": "createRecord", "entity": "PurchaseRequest", "as": "requester", "values": {} }]
             """));
 
         var result = ApplicationCompiler.Compile(folder.Path, SamplePackages.Versions);
@@ -308,8 +308,8 @@ public sealed class ScenarioCompilerTests
     {
         using var folder = SampleCopy().With(ScenarioFile, Scenario($$"""
             "now": "{{now}}",
-            "users": { "anna": ["employee"] },
-            "steps": [{ "type": "createRecord", "entity": "PurchaseRequest", "as": "anna", "values": {} }]
+            "users": { "requester": ["employee"] },
+            "steps": [{ "type": "createRecord", "entity": "PurchaseRequest", "as": "requester", "values": {} }]
             """));
 
         var result = ApplicationCompiler.Compile(folder.Path, SamplePackages.Versions);
@@ -325,8 +325,8 @@ public sealed class ScenarioCompilerTests
     {
         using var folder = SampleCopy().With(ScenarioFile, Scenario($$"""
             "now": "{{now}}",
-            "users": { "anna": ["employee"] },
-            "steps": [{ "type": "createRecord", "entity": "PurchaseRequest", "as": "anna", "values": {} }]
+            "users": { "requester": ["employee"] },
+            "steps": [{ "type": "createRecord", "entity": "PurchaseRequest", "as": "requester", "values": {} }]
             """));
 
         var result = ApplicationCompiler.Compile(folder.Path, SamplePackages.Versions);
@@ -383,9 +383,9 @@ public sealed class ScenarioCompilerTests
     public void Valid_values_of_every_type_compile_and_null_computed_and_read_only_fields_are_allowed()
     {
         using var folder = SampleCopy().With(ScenarioFile, Scenario("""
-            "users": { "anna": ["employee"] },
+            "users": { "requester": ["employee"] },
             "steps": [
-              { "type": "createRecord", "entity": "PurchaseRequest", "as": "anna", "save": "request",
+              { "type": "createRecord", "entity": "PurchaseRequest", "as": "requester", "save": "request",
                 "values": {
                   "TITLE": "Laptops",
                   "department": "15d5bba1-eaf1-431b-9001-e1e3ade50979",
@@ -412,8 +412,8 @@ public sealed class ScenarioCompilerTests
             .With("entities/broken.json", """{ "id": "0a0a0a0a-0a0a-4a0a-8a0a-0a0a0a0a0a0a", "kind": "entity", "name": "Broken", "formatVersion": 1 }""")
             .With("roles/broken.json", """{ "id": "0b0b0b0b-0b0b-4b0b-8b0b-0b0b0b0b0b0b", "kind": "role", "name": "broken-role", "formatVersion": 1 }""")
             .With(ScenarioFile, Scenario("""
-                "users": { "anna": ["broken-role"] },
-                "steps": [{ "type": "createRecord", "entity": "Broken", "as": "anna", "values": {} }]
+                "users": { "requester": ["broken-role"] },
+                "steps": [{ "type": "createRecord", "entity": "Broken", "as": "requester", "values": {} }]
                 """));
 
         var result = ApplicationCompiler.Compile(folder.Path, SamplePackages.Versions);
@@ -453,9 +453,9 @@ public sealed class ScenarioCompilerTests
     }
 
     private static string ValidScenario(string title) => Scenario($$"""
-        "users": { "anna": ["employee"] },
+        "users": { "requester": ["employee"] },
         "steps": [
-          { "type": "createRecord", "entity": "PurchaseRequest", "as": "anna", "save": "request", "values": { "title": "{{title}}" } }
+          { "type": "createRecord", "entity": "PurchaseRequest", "as": "requester", "save": "request", "values": { "title": "{{title}}" } }
         ]
         """);
 

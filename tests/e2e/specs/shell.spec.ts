@@ -90,7 +90,7 @@ test('the shell keeps its colours in light and dark mode', async ({ page }) => {
 })
 
 test('the sidebar draws the current entry in the selected colour in light and dark mode', async ({ page }) => {
-  await useSession(page, 'anna')
+  await useSession(page, 'requester')
   await page.goto('/e2e/notes')
 
   for (const mode of ['light', 'dark'] as const) {
@@ -123,7 +123,7 @@ test('switching the locale changes the texts and survives a reload', async ({ pa
 
 test('the home page opens a site in its own shell, in light and dark mode', async ({ page }) => {
   // The site opens on its notes page, which reads records, and the record API needs a session.
-  await useSession(page, 'anna')
+  await useSession(page, 'requester')
   await page.goto('/')
 
   await page.getByRole('link', { name: 'E2E notes', exact: true }).click()
@@ -142,7 +142,7 @@ test('the home page opens a site in its own shell, in light and dark mode', asyn
 
 test('an unknown site is not found inside the platform shell', async ({ page }) => {
   // The site endpoints need a session, or the page would show the sign-in prompt.
-  await useSession(page, 'anna')
+  await useSession(page, 'requester')
   const response = await page.goto('/no-such-site')
 
   expect(response?.status()).toBe(200)
@@ -151,7 +151,7 @@ test('an unknown site is not found inside the platform shell', async ({ page }) 
 })
 
 test('an unknown page is not found inside the site shell', async ({ page }) => {
-  await useSession(page, 'anna')
+  await useSession(page, 'requester')
   const response = await page.goto('/e2e/no-such-page')
 
   expect(response?.status()).toBe(200)
@@ -160,7 +160,7 @@ test('an unknown page is not found inside the site shell', async ({ page }) => {
 })
 
 test('a site collapses its sidebar to icons and keeps it collapsed on the next page', async ({ page }) => {
-  await useSession(page, 'anna')
+  await useSession(page, 'requester')
   await page.goto('/e2e/notes')
   const sidebar = page.locator('#shell-sidebar')
   await expect(sidebar).toBeVisible()
@@ -195,7 +195,7 @@ test('the footer shows the version only to a signed-in person', async ({ page })
   await expect(footer.getByTestId('footer-server-status')).toContainText('Ready')
   await expect(footer).not.toContainText(' · v')
 
-  await useSession(page, 'anna')
+  await useSession(page, 'requester')
   await page.goto('/')
 
   await expect(page.getByRole('contentinfo')).toContainText(new RegExp(`© ${year} Axis · v\\S+`))

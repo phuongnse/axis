@@ -23,11 +23,11 @@ public sealed class PurchaseRequestLostResponseTests(SampleAppFixture fixture) :
     [Fact]
     public async Task A_worker_stopped_after_the_order_is_stored_is_settled_by_the_next_worker_with_one_order()
     {
-        using var anna = fixture.CreateClient().SignedInAs("anna");
+        using var requester = fixture.CreateClient().SignedInAs("requester");
         using var chau = fixture.CreateClient().SignedInAs("chau");
-        var (subject, number) = await CreateAsync(anna);
+        var (subject, number) = await CreateAsync(requester);
         await StubAsync($"/test/hold-request/{number}");
-        var instance = await StartAsync(anna, subject);
+        var instance = await StartAsync(requester, subject);
 
         var call = Guid.Empty;
         using (var workerA = await fixture.StartWorkerAsync(new LogCollector()))
@@ -39,7 +39,7 @@ public sealed class PurchaseRequestLostResponseTests(SampleAppFixture fixture) :
 
         // The stopped worker recorded nothing about its attempt.
         Assert.Equal("sending:1", await CallAsync(call));
-        Assert.Null((await NumbersAsync(anna, subject)).PurchaseOrderNumber);
+        Assert.Null((await NumbersAsync(requester, subject)).PurchaseOrderNumber);
         Assert.Equal("waiting:createPurchaseOrder", await StateAsync(instance));
 
         await EndLeaseAsync(call);
@@ -55,7 +55,7 @@ public sealed class PurchaseRequestLostResponseTests(SampleAppFixture fixture) :
         }
 
         Assert.Equal("succeeded:2", await CallAsync(call));
-        var (_, orderNumber) = await NumbersAsync(anna, subject);
+        var (_, orderNumber) = await NumbersAsync(requester, subject);
         Assert.NotNull(orderNumber);
         Assert.Equal(orderNumber, Assert.Single(await fixture.OrdersAsync(number)));
         Assert.Equal(0L, await WorkItemsAsync(instance));
@@ -65,11 +65,11 @@ public sealed class PurchaseRequestLostResponseTests(SampleAppFixture fixture) :
     [Fact]
     public async Task Two_workers_racing_on_the_same_call_create_one_order()
     {
-        using var anna = fixture.CreateClient().SignedInAs("anna");
+        using var requester = fixture.CreateClient().SignedInAs("requester");
         using var chau = fixture.CreateClient().SignedInAs("chau");
-        var (subject, number) = await CreateAsync(anna);
+        var (subject, number) = await CreateAsync(requester);
         await StubAsync($"/test/hold-request/{number}");
-        var instance = await StartAsync(anna, subject);
+        var instance = await StartAsync(requester, subject);
 
         var logsA = new LogCollector();
         var logsB = new LogCollector();
@@ -91,7 +91,7 @@ public sealed class PurchaseRequestLostResponseTests(SampleAppFixture fixture) :
         await workerA.StopAsync(CancellationToken);
         await workerB.StopAsync(CancellationToken);
 
-        var (_, orderNumber) = await NumbersAsync(anna, subject);
+        var (_, orderNumber) = await NumbersAsync(requester, subject);
         Assert.NotNull(orderNumber);
         Assert.Equal(orderNumber, Assert.Single(await fixture.OrdersAsync(number)));
         Assert.Equal(1L, await SystemAuditAsync(instance, "connector.called"));
@@ -110,11 +110,11 @@ public sealed class PurchaseRequestLostResponseTests(SampleAppFixture fixture) :
     [Fact]
     public async Task A_dropped_response_is_retried_with_the_same_key_and_history_and_audit_show_the_attempts_and_the_settlement()
     {
-        using var anna = fixture.CreateClient().SignedInAs("anna");
+        using var requester = fixture.CreateClient().SignedInAs("requester");
         using var chau = fixture.CreateClient().SignedInAs("chau");
-        var (subject, number) = await CreateAsync(anna);
+        var (subject, number) = await CreateAsync(requester);
         await StubAsync($"/test/drop-request/{number}");
-        var instance = await StartAsync(anna, subject);
+        var instance = await StartAsync(requester, subject);
 
         var logs = new LogCollector();
         var call = Guid.Empty;
@@ -130,7 +130,7 @@ public sealed class PurchaseRequestLostResponseTests(SampleAppFixture fixture) :
             await worker.StopAsync(CancellationToken);
         }
 
-        var (orderNumber, version) = await ReadAsync(anna, subject);
+        var (orderNumber, version) = await ReadAsync(requester, subject);
         Assert.NotNull(orderNumber);
         Assert.Equal(orderNumber, Assert.Single(await fixture.OrdersAsync(number)));
 
@@ -172,10 +172,10 @@ public sealed class PurchaseRequestLostResponseTests(SampleAppFixture fixture) :
     }
 
     /// <summary>Creates a draft Operations request below the finance threshold, and returns its id and number.</summary>
-    private static async Task<(Guid Subject, string Number)> CreateAsync(HttpClient anna)
+    private static async Task<(Guid Subject, string Number)> CreateAsync(HttpClient requester)
     {
-        var subject = await CreateRequestAsync(anna, 500);
-        var (number, _) = await NumbersAsync(anna, subject);
+        var subject = await CreateRequestAsync(requester, 500);
+        var (number, _) = await NumbersAsync(requester, subject);
         return (subject, number);
     }
 

@@ -14,9 +14,9 @@ public sealed class PageAccessTests(SampleAppFixture fixture) : IClassFixture<Sa
     [Fact]
     public async Task An_employee_may_create_update_and_submit_a_purchase_request()
     {
-        using var anna = fixture.CreateClient().SignedInAs("anna");
+        using var requester = fixture.CreateClient().SignedInAs("requester");
 
-        var widget = await FormWidgetAsync(anna);
+        var widget = await FormWidgetAsync(requester);
 
         var access = widget.GetProperty("access");
         Assert.Equal(["read", "create", "update"], Names(access.GetProperty("actions")));

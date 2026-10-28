@@ -126,8 +126,8 @@ public sealed class StudioPublishTests : IAsyncLifetime
         Assert.True(lanMe.RootElement.GetProperty("studio").GetBoolean());
         Assert.False(lanMe.RootElement.GetProperty("studioPublisher").GetBoolean());
 
-        using var anna = factory.CreateClient().SignedInAs("anna");
-        using var annaMe = await GetJsonAsync(anna, "/api/me", HostA);
+        using var requester = factory.CreateClient().SignedInAs("requester");
+        using var annaMe = await GetJsonAsync(requester, "/api/me", HostA);
         Assert.False(annaMe.RootElement.GetProperty("studioPublisher").GetBoolean());
     }
 
@@ -252,7 +252,7 @@ public sealed class StudioPublishTests : IAsyncLifetime
             builder.UseTestAuthentication(
                 new TestIdentity("hoa", "Hoa Author", "author", "publisher"),
                 new TestIdentity("lan", "Lan", "author"),
-                new TestIdentity("anna", "Anna", "employee"));
+                new TestIdentity("requester", "Requester", "employee"));
         });
 
     // Runs the publisher of one tenant in this process until it is disposed. The server has migrated the database by now.

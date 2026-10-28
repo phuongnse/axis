@@ -18,9 +18,9 @@ namespace Axis.Integration.Tests;
 /// <summary>
 /// One tenant database, <c>a</c>, with the configuration, data and processes migrations applied
 /// and the ProcessApp fixture activated, served by the real server on host <c>a.example.test</c>.
-/// The test authentication scheme signs in <c>anna</c>, who holds <c>requester</c>, and
+/// The test authentication scheme signs in <c>requester</c>, who holds <c>requester</c>, and
 /// <c>olga</c>, who holds <c>reader</c> and may also delete requests, and <c>sam</c>, who holds <c>status-reader</c>, may
-/// inspect <c>Submit</c> and reads only the <c>status</c> field of a request, not its title. <see cref="Client"/> is signed in as <c>anna</c>.
+/// inspect <c>Submit</c> and reads only the <c>status</c> field of a request, not its title. <see cref="Client"/> is signed in as <c>requester</c>.
 /// </summary>
 public sealed class ProcessStartFixture : IAsyncLifetime
 {
@@ -80,11 +80,11 @@ public sealed class ProcessStartFixture : IAsyncLifetime
             builder.UseSetting("Tenants:a:SchemaConnectionString", _connectionString);
             builder.UseTestOidc("a");
             builder.UseTestAuthentication(
-                new TestIdentity("anna", "Anna Employee", "requester"),
+                new TestIdentity("requester", "Requester User", "requester"),
                 new TestIdentity("olga", "Olga Reader", "reader"),
                 new TestIdentity("sam", "Sam Status", "status-reader"));
         });
-        _client = _factory.CreateClient().SignedInAs("anna");
+        _client = _factory.CreateClient().SignedInAs("requester");
     }
 
     public async ValueTask DisposeAsync()

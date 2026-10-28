@@ -127,7 +127,7 @@ public sealed class SharedKeyRingTests(PostgreSqlFixture database) : IClassFixtu
             builder.ConfigureTestServices(services => services.AddSingleton<IStartupFilter, SessionStartupFilter>());
         });
 
-    /// <summary>Signs anna in on the server and returns the value of the session cookie.</summary>
+    /// <summary>Signs requester in on the server and returns the value of the session cookie.</summary>
     internal static async Task<string> SignInAsync(WebApplicationFactory<Program> factory)
     {
         using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = false });
@@ -170,7 +170,7 @@ public sealed class SharedKeyRingTests(PostgreSqlFixture database) : IClassFixtu
         return rows;
     }
 
-    /// <summary>Answers <c>GET /test/session</c> by signing anna in to the default tenant.</summary>
+    /// <summary>Answers <c>GET /test/session</c> by signing requester in to the default tenant.</summary>
     internal sealed class SessionStartupFilter : IStartupFilter
     {
         public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) => app =>
@@ -183,7 +183,7 @@ public sealed class SharedKeyRingTests(PostgreSqlFixture database) : IClassFixtu
                     branch.UseTenantResolution();
                     branch.Run(async context =>
                     {
-                        await context.SignInAsync(Session.Scheme, Session.CreatePrincipal("default", "anna", "Anna Employee", ["employee"]));
+                        await context.SignInAsync(Session.Scheme, Session.CreatePrincipal("default", "requester", "Requester User", ["employee"]));
                         context.Response.StatusCode = StatusCodes.Status204NoContent;
                     });
                 });

@@ -41,7 +41,7 @@ public sealed class TenantDirectoryTests(PostgreSqlFixture database, KeycloakFix
         var b = await PrepareTenantAsync("b", role);
         var platform = await PreparePlatformAsync(a with { Host = "a.example.test" }, b with { Host = "b.example.test" });
         await using var factory = CreateFactory(platform, new LogCollector());
-        using var client = factory.CreateClient().SignedInAs("anna");
+        using var client = factory.CreateClient().SignedInAs("requester");
 
         await CreateDepartmentAsync(client, "a.example.test", "Sales-a");
         await CreateDepartmentAsync(client, "b.example.test", "Sales-b");
@@ -66,7 +66,7 @@ public sealed class TenantDirectoryTests(PostgreSqlFixture database, KeycloakFix
             a with { Id = "c", Host = "c.example.test", DatabaseHost = "127.0.0.1", DatabasePort = 1 });
         var logs = new LogCollector();
         await using var factory = CreateFactory(platform, logs);
-        using var client = factory.CreateClient().SignedInAs("anna");
+        using var client = factory.CreateClient().SignedInAs("requester");
 
         await CreateDepartmentAsync(client, "a.example.test", "Sales-a");
         Assert.Contains("Sales-a", await ListAsync(client, "a.example.test"), StringComparison.Ordinal);
@@ -94,7 +94,7 @@ public sealed class TenantDirectoryTests(PostgreSqlFixture database, KeycloakFix
             logs,
             ("Tenants:x:Hosts:0", "x.example.test"),
             ("Tenants:x:ConnectionString", a.RuntimeConnectionString()));
-        using var client = factory.CreateClient().SignedInAs("anna");
+        using var client = factory.CreateClient().SignedInAs("requester");
 
         using var ignored = await client.SendAsync(Request(Departments, "x.example.test"), CancellationToken);
         using var served = await client.SendAsync(Request(Departments, "a.example.test"), CancellationToken);
@@ -146,7 +146,7 @@ public sealed class TenantDirectoryTests(PostgreSqlFixture database, KeycloakFix
         var b = await PrepareTenantAsync("b", role);
         var platform = await PreparePlatformAsync(a with { Host = "a.example.test" });
         await using var factory = CreateFactory(platform, new LogCollector());
-        using var client = factory.CreateClient().SignedInAs("anna");
+        using var client = factory.CreateClient().SignedInAs("requester");
         using var before = await client.SendAsync(Request(Departments, "b.example.test"), CancellationToken);
         Assert.Equal(HttpStatusCode.NotFound, before.StatusCode);
 
@@ -164,7 +164,7 @@ public sealed class TenantDirectoryTests(PostgreSqlFixture database, KeycloakFix
         var quiz = await PrepareTenantAsync("quiz", role);
         var platform = await PreparePlatformAsync(quiz with { Host = "quiz.example.test" });
         await using var factory = CreateFactory(platform, new LogCollector());
-        using var client = factory.CreateClient().SignedInAs("anna");
+        using var client = factory.CreateClient().SignedInAs("requester");
         await ListAsync(client, "quiz.example.test");
 
         await UpdateTenantAsync(platform, "quiz", row => row.Status = "suspended");
@@ -196,7 +196,7 @@ public sealed class TenantDirectoryTests(PostgreSqlFixture database, KeycloakFix
         }
 
         await using var factory = CreateFactory(platform, new LogCollector());
-        using var client = factory.CreateClient().SignedInAs("anna");
+        using var client = factory.CreateClient().SignedInAs("requester");
         await ListAsync(client, "a2.example.test");
 
         await using (var context = PlatformContext(platform))
@@ -219,7 +219,7 @@ public sealed class TenantDirectoryTests(PostgreSqlFixture database, KeycloakFix
         var b = await PrepareTenantAsync("b", role);
         var platform = await PreparePlatformAsync(a with { Host = "a.example.test" });
         await using var factory = CreateFactory(platform, new LogCollector());
-        using var client = factory.CreateClient().SignedInAs("anna");
+        using var client = factory.CreateClient().SignedInAs("requester");
         var unsafeRole = new Role(PostgreSqlServer.SchemaRole, PostgreSqlServer.RolePassword);
 
         await AddTenantsAsync(platform, b with { Host = "b.example.test", Role = unsafeRole });
@@ -241,7 +241,7 @@ public sealed class TenantDirectoryTests(PostgreSqlFixture database, KeycloakFix
         var a = await PrepareTenantAsync("a", role);
         var platform = await PreparePlatformAsync(a with { Host = "a.example.test" });
         await using var factory = CreateFactory(platform, new LogCollector());
-        using var client = factory.CreateClient().SignedInAs("anna");
+        using var client = factory.CreateClient().SignedInAs("requester");
         await ListAsync(client, "a.example.test");
 
         await SetRuntimeRoleAsync(platform, "a", new Role(PostgreSqlServer.SchemaRole, PostgreSqlServer.RolePassword));
@@ -263,7 +263,7 @@ public sealed class TenantDirectoryTests(PostgreSqlFixture database, KeycloakFix
         var b = await PrepareTenantAsync("b", role);
         var platform = await PreparePlatformAsync(a with { Host = "a.example.test" }, b with { Host = "b.example.test" });
         await using var factory = CreateFactory(platform, new LogCollector());
-        using var client = factory.CreateClient().SignedInAs("anna");
+        using var client = factory.CreateClient().SignedInAs("requester");
         await CreateDepartmentAsync(client, "a.example.test", "Sales-a");
         await CreateDepartmentAsync(client, "b.example.test", "Sales-b");
 
@@ -306,7 +306,7 @@ public sealed class TenantDirectoryTests(PostgreSqlFixture database, KeycloakFix
         await UpdateTenantAsync(platform, "b", row => row.SchemaVersion = "20000101000000_Old");
         var logs = new LogCollector();
         await using var factory = CreateFactory(platform, logs);
-        using var client = factory.CreateClient().SignedInAs("anna");
+        using var client = factory.CreateClient().SignedInAs("requester");
 
         await ListAsync(client, "a.example.test");
         using var held = await client.SendAsync(Request(Departments, "b.example.test"), CancellationToken);
@@ -401,7 +401,7 @@ public sealed class TenantDirectoryTests(PostgreSqlFixture database, KeycloakFix
         var platform = await PreparePlatformAsync(a with { Host = "a.example.test" });
         var logs = new LogCollector();
         await using var factory = CreateFactory(platform, logs);
-        using var client = factory.CreateClient().SignedInAs("anna");
+        using var client = factory.CreateClient().SignedInAs("requester");
 
         await AddTenantsAsync(platform, b with { Host = "b.example.test" });
         await UpdateTenantAsync(platform, "b", row => row.OidcAuthority = "");
@@ -440,7 +440,7 @@ public sealed class TenantDirectoryTests(PostgreSqlFixture database, KeycloakFix
         var platform = await PreparePlatformAsync(a with { Host = "a.example.test" });
         var logs = new LogCollector();
         await using var factory = CreateFactory(platform, logs);
-        using var client = factory.CreateClient().SignedInAs("anna");
+        using var client = factory.CreateClient().SignedInAs("requester");
         await CreateDepartmentAsync(client, "a.example.test", "Sales-a");
         var (before, beforeBody) = await ReadyAsync(client);
         Assert.Equal(HttpStatusCode.OK, before);
@@ -495,7 +495,7 @@ public sealed class TenantDirectoryTests(PostgreSqlFixture database, KeycloakFix
                 builder.UseSetting(key, value);
             }
 
-            builder.UseTestAuthentication(new TestIdentity("anna", "Anna Employee", "employee"));
+            builder.UseTestAuthentication(new TestIdentity("requester", "Requester User", "employee"));
         });
 
     private static Role NewRole() =>

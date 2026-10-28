@@ -44,10 +44,10 @@ public sealed class DirectorySignInTests(PostgreSqlFixture database, KeycloakFix
         using var clientB = CreateClient(factory, _addressB);
         using var cookieless = CreateClient(factory, _addressB, handleCookies: false);
 
-        var signInA = await SignInAsync(clientA, authority, "anna", _addressA);
+        var signInA = await SignInAsync(clientA, authority, "requester", _addressA);
         var signInB = await SignInAsync(clientB, authority, "binh", _addressB);
 
-        Assert.Equal("anna", await MeAsync(clientA));
+        Assert.Equal("requester", await MeAsync(clientA));
         Assert.Equal("binh", await MeAsync(clientB));
         using var crossed = await GetMeWithCookieAsync(cookieless, signInA.SessionCookie);
         Assert.Equal(HttpStatusCode.Unauthorized, crossed.StatusCode);
@@ -62,7 +62,7 @@ public sealed class DirectorySignInTests(PostgreSqlFixture database, KeycloakFix
         await using var _ = factory;
         using var clientA = CreateClient(factory, _addressA);
         using var clientB = CreateClient(factory, _addressB);
-        var callback = await LogInAtKeycloakAsync(clientA, authority, "anna", _addressA);
+        var callback = await LogInAtKeycloakAsync(clientA, authority, "requester", _addressA);
 
         using var onB = await SendAsync(clientB, callback.PathAndQuery);
         using var meOnB = await SendAsync(clientB, "/api/me");
@@ -76,7 +76,7 @@ public sealed class DirectorySignInTests(PostgreSqlFixture database, KeycloakFix
 
         Assert.Equal(HttpStatusCode.Found, onA.StatusCode);
         Assert.Contains(onA.Headers.GetValues("Set-Cookie"), cookie => cookie.StartsWith($"{Session.Scheme}=", StringComparison.Ordinal));
-        Assert.Equal("anna", await MeAsync(clientA));
+        Assert.Equal("requester", await MeAsync(clientA));
         await AssertNoClientSecretAsync(logs, platform);
     }
 

@@ -5,11 +5,11 @@ import { chooseTheme } from '../shell'
 // The platform home page stays open while nobody is signed in, and is then the sign-in card. Every application page
 // needs a session and shows the sign-in prompt, and only a click on a Sign in button starts sign-in.
 
-/** Signs in as Anna on the Keycloak login page from the sign-in card on the home page. */
+/** Signs in as the requester on the Keycloak login page from the sign-in card on the home page. */
 async function signInAsAnna(page: Page) {
   await page.goto('/')
   await page.getByRole('main').getByRole('button', { name: 'Sign in', exact: true }).click()
-  await page.locator('#username').fill('anna')
+  await page.locator('#username').fill('requester')
   await page.locator('#password').fill('axis')
   await page.locator('#kc-login').click()
 }
@@ -27,7 +27,7 @@ test('a person signs in on the Keycloak login page, returns to the home page, an
       await chooseTheme(page, 'Dark')
     }
     const shell = page.locator(`[data-theme-mode="${mode}"]`)
-    await expect(shell.getByRole('banner').getByRole('button', { name: 'Anna Employee', exact: true })).toBeVisible()
+    await expect(shell.getByRole('banner').getByRole('button', { name: 'Requester User', exact: true })).toBeVisible()
   }
 })
 
@@ -37,7 +37,7 @@ test('after signing out from the header menu, the current user endpoint answers 
 }) => {
   await signInAsAnna(page)
   const banner = page.getByRole('banner')
-  await banner.getByRole('button', { name: 'Anna Employee', exact: true }).click()
+  await banner.getByRole('button', { name: 'Requester User', exact: true }).click()
   await page.getByRole('menuitem', { name: 'Sign out', exact: true }).click()
 
   // The server keeps no ID token, so Keycloak may ask to confirm the sign-out.
@@ -71,11 +71,11 @@ test('a person who cancels at the Keycloak login page lands on the home page wit
   await expect(signIn).toBeVisible()
 
   await signIn.click()
-  await page.locator('#username').fill('anna')
+  await page.locator('#username').fill('requester')
   await page.locator('#password').fill('axis')
   await page.locator('#kc-login').click()
 
   await expect(page).toHaveURL(`${baseURL}/`)
-  await expect(banner.getByRole('button', { name: 'Anna Employee', exact: true })).toBeVisible()
+  await expect(banner.getByRole('button', { name: 'Requester User', exact: true })).toBeVisible()
   await expect(page.getByRole('alert').filter({ hasText: 'Sign-in did not complete.' })).toHaveCount(0)
 })

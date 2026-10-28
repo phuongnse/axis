@@ -310,7 +310,7 @@ function sequenceJson(version: number) {
 }
 
 function creatorJson(version: number) {
-  return `{"id":"${noteId}","version":${version},"values":{"title":"Buy paper","priority":2,"createdBy":"anna"},"labels":{}}`
+  return `{"id":"${noteId}","version":${version},"values":{"title":"Buy paper","priority":2,"createdBy":"requester"},"labels":{}}`
 }
 
 function computedJson(version: number) {
@@ -402,7 +402,7 @@ type Answer = { status: number; body: string } | typeof networkError
 
 const historyPath = `${recordsPath}/${noteId}/history?page=1&pageSize=20`
 
-const historyJson = `{"items":[{"id":"01926b3e-5f40-7c8a-9b1d-2e3f4a5b6c7d","occurredAt":"2026-10-06T02:05:00.123456Z","actor":"anna","actorName":"Anna Admin","action":"record.updated","processInstanceId":null,"details":{"version":2,"fields":["title"]}}],"page":1,"pageSize":20,"totalCount":1}`
+const historyJson = `{"items":[{"id":"01926b3e-5f40-7c8a-9b1d-2e3f4a5b6c7d","occurredAt":"2026-10-06T02:05:00.123456Z","actor":"requester","actorName":"Requester User","action":"record.updated","processInstanceId":null,"details":{"version":2,"fields":["title"]}}],"page":1,"pageSize":20,"totalCount":1}`
 
 const statePath = '/api/apps/E2eApp/forms/NoteSections/state'
 
@@ -601,7 +601,7 @@ describe('FormWidget', () => {
     const entry = await screen.findByTestId('history-entry')
     expect(screen.getByTestId('record-history')).toHaveTextContent('History')
     expect(entry).toHaveTextContent('Updated')
-    expect(entry).toHaveTextContent('Anna Admin')
+    expect(entry).toHaveTextContent('Requester User')
     expect(entry).toHaveTextContent('Changed: Title')
     expect(historyRequests()).toEqual([historyPath])
   })
@@ -1310,7 +1310,7 @@ describe('FormWidget', () => {
     renderForm(noteId, creatorWidget)
 
     const createdBy = await screen.findByTestId('field-value-createdBy')
-    await waitFor(() => expect(createdBy).toHaveTextContent('anna'))
+    await waitFor(() => expect(createdBy).toHaveTextContent('requester'))
     expect(screen.queryByRole('textbox', { name: 'Created by' })).not.toBeInTheDocument()
     const priority = screen.getByLabelText('Priority')
     await userEvent.clear(priority)

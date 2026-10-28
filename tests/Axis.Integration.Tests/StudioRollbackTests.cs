@@ -30,7 +30,7 @@ public sealed class StudioRollbackTests : IAsyncLifetime
         var connectionString = await _database.CreateDatabaseAsync("studio_rollback", CancellationToken);
         await using var factory = NewFactory(folder.Path, [("a", HostA, connectionString)]);
         using var hoa = factory.CreateClient().SignedInAs("hoa");
-        using var anna = factory.CreateClient().SignedInAs("anna");
+        using var requester = factory.CreateClient().SignedInAs("requester");
         await using var publisher = RunPublisher("a", HostA, connectionString);
 
         // Release 1 is the startup activation. Release 2 is published with another label.
@@ -41,8 +41,8 @@ public sealed class StudioRollbackTests : IAsyncLifetime
         Assert.NotEqual(first, second);
         await AssertNavigationAsync(hoa, "Teams");
 
-        var subject = await SampleAppFixture.CreateRequestAsync(anna, 500m);
-        var oldInstance = await SampleAppFixture.StartAsync(anna, subject);
+        var subject = await SampleAppFixture.CreateRequestAsync(requester, 500m);
+        var oldInstance = await SampleAppFixture.StartAsync(requester, subject);
         Assert.Equal(second, await InstanceReleaseAsync(connectionString, oldInstance));
         using var published = await GetJsonAsync(hoa, $"{ApplicationUrl}/releases", HostA);
         var folderHash = published.RootElement.GetProperty("folderContentHash").GetString();
@@ -81,8 +81,8 @@ public sealed class StudioRollbackTests : IAsyncLifetime
         // The folder is untouched, and the instance of release 2 keeps its release. A new start pins release 1.
         Assert.Contains("\"Teams\"", await File.ReadAllTextAsync(Path.Combine(folder.Path, "texts", "en.json"), CancellationToken), StringComparison.Ordinal);
         Assert.Equal((second, ProcessStarts.Running), (await InstanceReleaseAsync(connectionString, oldInstance), await InstanceStateAsync(connectionString, oldInstance)));
-        var other = await SampleAppFixture.CreateRequestAsync(anna, 500m);
-        var newInstance = await SampleAppFixture.StartAsync(anna, other);
+        var other = await SampleAppFixture.CreateRequestAsync(requester, 500m);
+        var newInstance = await SampleAppFixture.StartAsync(requester, other);
         Assert.Equal(first, await InstanceReleaseAsync(connectionString, newInstance));
 
         Assert.Equal(1L, await CountAuditAsync(connectionString, "release.rolledBack"));
@@ -131,7 +131,7 @@ public sealed class StudioRollbackTests : IAsyncLifetime
         await using var factory = NewFactory(folder.Path, [("a", HostA, connectionString)]);
         using var hoa = factory.CreateClient().SignedInAs("hoa");
         using var lan = factory.CreateClient().SignedInAs("lan");
-        using var anna = factory.CreateClient().SignedInAs("anna");
+        using var requester = factory.CreateClient().SignedInAs("requester");
         using var nobody = factory.CreateClient();
         using var startup = await GetJsonAsync(hoa, $"{ApplicationUrl}/releases", HostA);
         var release = startup.RootElement.GetProperty("active").GetProperty("releaseId").GetGuid();
@@ -140,7 +140,7 @@ public sealed class StudioRollbackTests : IAsyncLifetime
         using var withoutPublisher = await SendAsync(lan, HttpMethod.Post, url, HostA);
         Assert.Equal(HttpStatusCode.Forbidden, withoutPublisher.StatusCode);
         Assert.Equal("You do not hold the publisher role.", (await ReadAsync(withoutPublisher)).RootElement.GetProperty("title").GetString());
-        using var withoutAuthor = await SendAsync(anna, HttpMethod.Post, url, HostA);
+        using var withoutAuthor = await SendAsync(requester, HttpMethod.Post, url, HostA);
         Assert.Equal(HttpStatusCode.Forbidden, withoutAuthor.StatusCode);
         using var signedOut = await SendAsync(nobody, HttpMethod.Post, url, HostA);
         Assert.Equal(HttpStatusCode.Unauthorized, signedOut.StatusCode);

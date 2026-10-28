@@ -264,7 +264,7 @@ public sealed class EndpointCallerTests(KeycloakFixture keycloak) : IAsyncLifeti
                 ["grant_type"] = "password",
                 ["client_id"] = KeycloakFixture.PurchasingClientId,
                 ["client_secret"] = KeycloakFixture.PurchasingClientSecret,
-                ["username"] = "anna",
+                ["username"] = "requester",
                 ["password"] = KeycloakFixture.Password,
                 ["scope"] = "openid",
             },
@@ -280,7 +280,7 @@ public sealed class EndpointCallerTests(KeycloakFixture keycloak) : IAsyncLifeti
             ["grant_type"] = "password",
             ["client_id"] = KeycloakFixture.ClientId,
             ["client_secret"] = KeycloakFixture.ClientSecret,
-            ["username"] = "anna",
+            ["username"] = "requester",
             ["password"] = KeycloakFixture.Password,
             ["scope"] = "openid",
         });
@@ -375,7 +375,7 @@ public sealed class EndpointCallerTests(KeycloakFixture keycloak) : IAsyncLifeti
     }
 
     /// <summary>
-    /// Answers <c>GET /test/session</c> by signing anna in to tenant a, and records the endpoint
+    /// Answers <c>GET /test/session</c> by signing requester in to tenant a, and records the endpoint
     /// caller that authentication found on every other request.
     /// </summary>
     private sealed class CallerStartupFilter(ConcurrentQueue<EndpointCallerIdentity?> callers) : IStartupFilter
@@ -386,7 +386,7 @@ public sealed class EndpointCallerTests(KeycloakFixture keycloak) : IAsyncLifeti
             {
                 if (HttpMethods.IsGet(context.Request.Method) && context.Request.Path == "/test/session")
                 {
-                    await context.SignInAsync(Session.Scheme, Session.CreatePrincipal("a", "anna", "Anna Employee", ["employee"]));
+                    await context.SignInAsync(Session.Scheme, Session.CreatePrincipal("a", "requester", "Requester User", ["employee"]));
                     context.Response.StatusCode = StatusCodes.Status204NoContent;
                     return;
                 }

@@ -21,16 +21,16 @@ public sealed class PurchaseRequestReachTests(SampleAppFixture fixture) : IClass
     [Fact]
     public async Task Each_role_reaches_exactly_the_requests_its_policy_allows()
     {
-        using var anna = fixture.CreateClient().SignedInAs("anna");
+        using var requester = fixture.CreateClient().SignedInAs("requester");
         using var lan = fixture.CreateClient().SignedInAs("lan");
         using var chau = fixture.CreateClient().SignedInAs("chau");
         using var binh = fixture.CreateClient().SignedInAs("binh");
         using var dung = fixture.CreateClient().SignedInAs("dung");
 
-        // Anna: an Operations draft and a submitted Engineering request.
-        var annaDraft = await CreateRequestAsync(anna, 500, Operations);
-        var annaSubmitted = await CreateRequestAsync(anna, 500, Engineering);
-        await StartAsync(anna, annaSubmitted);
+        // The requester: an Operations draft and a submitted Engineering request.
+        var annaDraft = await CreateRequestAsync(requester, 500, Operations);
+        var annaSubmitted = await CreateRequestAsync(requester, 500, Engineering);
+        await StartAsync(requester, annaSubmitted);
         await fixture.RunUntilIdleAsync(CancellationToken);
 
         // Lan: an approved Operations request and an Engineering draft.
@@ -41,7 +41,7 @@ public sealed class PurchaseRequestReachTests(SampleAppFixture fixture) : IClass
         await fixture.RunUntilIdleAsync(CancellationToken);
         var lanDraft = await CreateRequestAsync(lan, 500, Engineering);
 
-        Assert.Equal(new HashSet<Guid> { annaDraft, annaSubmitted }, await ListAsync(anna));
+        Assert.Equal(new HashSet<Guid> { annaDraft, annaSubmitted }, await ListAsync(requester));
         Assert.Equal(new HashSet<Guid> { lanApproved, lanDraft }, await ListAsync(lan));
         Assert.Equal(new HashSet<Guid> { annaDraft, lanApproved }, await ListAsync(chau));
         Assert.Equal(new HashSet<Guid> { annaSubmitted, lanDraft }, await ListAsync(binh));
@@ -49,15 +49,15 @@ public sealed class PurchaseRequestReachTests(SampleAppFixture fixture) : IClass
 
         Assert.Equal(HttpStatusCode.NotFound, await StatusOfAsync(chau, $"{Records}/{annaSubmitted:D}"));
         Assert.Equal(HttpStatusCode.NotFound, await StatusOfAsync(dung, $"{Records}/{annaDraft:D}"));
-        Assert.Equal(HttpStatusCode.NotFound, await StatusOfAsync(anna, $"{Records}/{lanDraft:D}"));
+        Assert.Equal(HttpStatusCode.NotFound, await StatusOfAsync(requester, $"{Records}/{lanDraft:D}"));
 
-        foreach (var client in new[] { anna, lan, chau, binh, dung })
+        foreach (var client in new[] { requester, lan, chau, binh, dung })
         {
             Assert.Equal(HttpStatusCode.OK, await StatusOfAsync(client, $"{App}/entities/Department/records"));
             Assert.Equal(HttpStatusCode.OK, await StatusOfAsync(client, $"{App}/entities/Supplier/records"));
         }
 
-        Assert.Equal(HttpStatusCode.Forbidden, await StatusOfAsync(anna, $"{App}/data-sources/RequestsByDepartment/rows"));
+        Assert.Equal(HttpStatusCode.Forbidden, await StatusOfAsync(requester, $"{App}/data-sources/RequestsByDepartment/rows"));
         Assert.Equal(HttpStatusCode.OK, await StatusOfAsync(chau, $"{App}/data-sources/RequestsByDepartment/rows"));
     }
 

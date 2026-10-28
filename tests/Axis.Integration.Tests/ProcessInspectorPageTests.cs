@@ -12,7 +12,7 @@ public sealed class ProcessInspectorPageTests(ProcessStartFixture fixture) : ICl
     [Fact]
     public async Task Inspector_widget_describes_its_process_and_list_endpoint_and_has_no_access()
     {
-        using var response = await GetAsync("anna", "/api/sites/processes/pages/submissions");
+        using var response = await GetAsync("requester", "/api/sites/processes/pages/submissions");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         using var page = await ReadJsonAsync(response);
@@ -25,7 +25,7 @@ public sealed class ProcessInspectorPageTests(ProcessStartFixture fixture) : ICl
     [Fact]
     public async Task User_with_inspect_sees_the_inspector_page_in_navigation_and_reads_it()
     {
-        using var response = await GetAsync("anna", "/api/sites/processes");
+        using var response = await GetAsync("requester", "/api/sites/processes");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         using var site = await ReadJsonAsync(response);

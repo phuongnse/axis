@@ -35,20 +35,20 @@ public sealed partial class PreviewTenantSignInTests(KeycloakFixture keycloak, P
     {
         using var client = CreateClient();
 
-        await SignInAsync(client, "anna");
+        await SignInAsync(client, "requester");
         var me = await client.GetAsync("/api/me", CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, me.StatusCode);
         using var body = JsonDocument.Parse(await me.Content.ReadAsStringAsync(CancellationToken));
-        Assert.Equal("anna", body.RootElement.GetProperty("id").GetString());
-        Assert.Equal("Anna Employee", body.RootElement.GetProperty("displayName").GetString());
+        Assert.Equal("requester", body.RootElement.GetProperty("id").GetString());
+        Assert.Equal("Requester User", body.RootElement.GetProperty("displayName").GetString());
     }
 
     [Fact]
     public async Task A_session_made_on_the_preview_tenants_host_gets_401_on_the_main_tenants_host()
     {
         using var client = CreateClient();
-        var sessionCookie = await SignInAsync(client, "anna");
+        var sessionCookie = await SignInAsync(client, "requester");
         using var cookieless = Factory.CreateClient(new WebApplicationFactoryClientOptions
         {
             BaseAddress = _serverAddress,

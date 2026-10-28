@@ -1,8 +1,8 @@
 import { expect, test } from "../test";
 import { sessionFile } from "../sessions";
 
-// The table and the KPI need a grant, so these journeys start signed in as the employee anna.
-test.use({ storageState: sessionFile("anna") });
+// The table and the KPI need a grant, so these journeys start signed in as the employee requester.
+test.use({ storageState: sessionFile("requester") });
 
 test("a columns widget shows a table and a titled section side by side, in the ratio of their widths", async ({
   page,

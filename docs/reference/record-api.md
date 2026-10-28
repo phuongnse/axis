@@ -900,8 +900,8 @@ For example:
     {
       "id": "01926b3e-5f40-7c8a-9b1d-2e3f4a5b6c7d",
       "occurredAt": "2026-10-06T02:05:00.123456Z",
-      "actor": "anna",
-      "actorName": "Anna Employee",
+      "actor": "requester",
+      "actorName": "Requester User",
       "action": "record.updated",
       "processInstanceId": null,
       "details": { "version": 2, "fields": ["title"] },
@@ -910,8 +910,8 @@ For example:
     {
       "id": "01926b3a-1c20-7b4d-8e6f-7a8b9c0d1e2f",
       "occurredAt": "2026-10-06T02:00:00.123456Z",
-      "actor": "anna",
-      "actorName": "Anna Employee",
+      "actor": "requester",
+      "actorName": "Requester User",
       "action": "record.created",
       "processInstanceId": null,
       "details": { "version": 1 },

@@ -16,7 +16,7 @@ public sealed class RecordEndpointErrorTests
     {
         await using var factory = CreateFactory();
         // A signed-in request gets past the session check, so it reaches the database.
-        using var client = factory.CreateClient().SignedInAs("anna");
+        using var client = factory.CreateClient().SignedInAs("requester");
 
         var response = await client.GetAsync(new Uri("/api/apps/Any/entities/Any/records", UriKind.Relative), CancellationToken);
 
@@ -36,6 +36,6 @@ public sealed class RecordEndpointErrorTests
             builder.UseSetting("Tenants:default:ConnectionString", UnreachableDatabase);
             builder.UseSetting("Tenants:default:SchemaConnectionString", UnreachableDatabase);
             builder.UseTestOidc("default");
-            builder.UseTestAuthentication(new TestIdentity("anna", "Anna Employee"));
+            builder.UseTestAuthentication(new TestIdentity("requester", "Requester User"));
         });
 }

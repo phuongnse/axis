@@ -92,9 +92,9 @@ public sealed class FilePerformanceTests(RecordApiFixture fixture) : IClassFixtu
     public async Task A_25_MB_upload_finishes_within_the_time_limit_and_allocates_less_than_the_file()
     {
         var data = Payload();
-        using var anna = Client().SignedInAs("anna");
+        using var requester = Client().SignedInAs("requester");
 
-        var (time, allocated) = await BestOfAsync(async () => await UploadAsync(anna, data));
+        var (time, allocated) = await BestOfAsync(async () => await UploadAsync(requester, data));
 
         TestContext.Current.TestOutputHelper?.WriteLine($"A {data.Length}-byte upload took {time} and allocated {allocated} bytes.");
         Assert.True(time < _limit, $"The best upload took {time}.");
@@ -105,17 +105,17 @@ public sealed class FilePerformanceTests(RecordApiFixture fixture) : IClassFixtu
     public async Task A_25_MB_download_finishes_within_the_time_limit_and_allocates_less_than_the_file()
     {
         var data = Payload();
-        using var anna = Client().SignedInAs("anna");
+        using var requester = Client().SignedInAs("requester");
         Guid claim;
-        using (var created = await anna.SendAsync(Request(HttpMethod.Post, Claims, HostA, """{ "values": { "title": "Large" } }"""), CancellationToken))
+        using (var created = await requester.SendAsync(Request(HttpMethod.Post, Claims, HostA, """{ "values": { "title": "Large" } }"""), CancellationToken))
         {
             Assert.Equal(HttpStatusCode.Created, created.StatusCode);
             using var body = JsonDocument.Parse(await created.Content.ReadAsStringAsync(CancellationToken));
             claim = body.RootElement.GetProperty("id").GetGuid();
         }
 
-        var file = await UploadAsync(anna, data);
-        using (var attached = await anna.SendAsync(
+        var file = await UploadAsync(requester, data);
+        using (var attached = await requester.SendAsync(
             Request(HttpMethod.Patch, $"{Claims}/{claim:D}", HostA, $$"""{ "version": 1, "values": { "attachments": [{ "file": "{{file:D}}" }] } }"""),
             CancellationToken))
         {
@@ -124,7 +124,7 @@ public sealed class FilePerformanceTests(RecordApiFixture fixture) : IClassFixtu
 
         var (time, allocated) = await BestOfAsync(async () =>
         {
-            using var response = await anna.SendAsync(
+            using var response = await requester.SendAsync(
                 Request($"/api/apps/FilesApp/files/{file:D}", HostA),
                 HttpCompletionOption.ResponseHeadersRead,
                 CancellationToken);

@@ -10,7 +10,7 @@ namespace Axis.Integration.Tests;
 /// The process instance detail lists the operator commands the signed-in user may take, and marks a call
 /// resolvable, from the user's grants and the states. The sample gives <c>inspect</c> to the <c>operator</c>
 /// role, here <c>giang</c>, and <c>cancel</c>, <c>retry</c> and <c>resolve</c> to the finance reviewers.
-/// <c>khanh</c> holds both roles. <c>anna</c> starts the approvals and <c>chau</c> is the manager of
+/// <c>khanh</c> holds both roles. <c>requester</c> starts the approvals and <c>chau</c> is the manager of
 /// Operations. Each test leaves no due work item behind, so the next one finds only its own.
 /// </summary>
 public sealed class ProcessInstanceCommandsTests(SampleAppFixture fixture) : IClassFixture<SampleAppFixture>
@@ -24,9 +24,9 @@ public sealed class ProcessInstanceCommandsTests(SampleAppFixture fixture) : ICl
     [Fact]
     public async Task A_waiting_instance_lists_cancel_only_for_a_user_with_the_cancel_grant()
     {
-        using var anna = fixture.CreateClient().SignedInAs("anna");
-        var subject = await CreateRequestAsync(anna, 500);
-        var instance = await StartAsync(anna, subject);
+        using var requester = fixture.CreateClient().SignedInAs("requester");
+        var subject = await CreateRequestAsync(requester, 500);
+        var instance = await StartAsync(requester, subject);
         await fixture.RunUntilIdleAsync(CancellationToken);
 
         using (var khanh = await GetAsync("khanh", instance))
@@ -43,8 +43,8 @@ public sealed class ProcessInstanceCommandsTests(SampleAppFixture fixture) : ICl
     [Fact]
     public async Task A_failed_instance_lists_retry_only_for_a_user_with_the_retry_grant()
     {
-        using var anna = fixture.CreateClient().SignedInAs("anna");
-        var instance = await FailAsync(anna);
+        using var requester = fixture.CreateClient().SignedInAs("requester");
+        var instance = await FailAsync(requester);
 
         using (var khanh = await GetAsync("khanh", instance))
         {
@@ -59,8 +59,8 @@ public sealed class ProcessInstanceCommandsTests(SampleAppFixture fixture) : ICl
     [Fact]
     public async Task An_unknown_call_is_resolvable_with_its_outputs_only_for_a_user_with_the_resolve_grant()
     {
-        using var anna = fixture.CreateClient().SignedInAs("anna");
-        var (instance, call) = await UnknownCallAsync(anna);
+        using var requester = fixture.CreateClient().SignedInAs("requester");
+        var (instance, call) = await UnknownCallAsync(requester);
 
         using (var khanh = await GetAsync("khanh", instance))
         {
@@ -97,15 +97,15 @@ public sealed class ProcessInstanceCommandsTests(SampleAppFixture fixture) : ICl
     }
 
     // Starts an approval for a request whose department has no manager, and runs it until managerApproval fails.
-    private async Task<Guid> FailAsync(HttpClient anna)
+    private async Task<Guid> FailAsync(HttpClient requester)
     {
         var department = Guid.NewGuid();
         await fixture.ScalarAsync(
             $"INSERT INTO {_departments} ({EntityNaming.Quote(EntityNaming.IdColumn)}, {EntityNaming.Quote(EntityNaming.Column("code"))}, {EntityNaming.Quote(EntityNaming.Column("name"))}) VALUES (@id, @code, 'No manager')",
             ("id", department),
             ("code", "T" + department.ToString("N")[..10]));
-        var subject = await CreateRequestAsync(anna, 500, department);
-        var instance = await StartAsync(anna, subject);
+        var subject = await CreateRequestAsync(requester, 500, department);
+        var instance = await StartAsync(requester, subject);
         await fixture.RunUntilIdleAsync(CancellationToken);
         Assert.Equal("failed", await StateAsync(instance));
         return instance;
@@ -113,11 +113,11 @@ public sealed class ProcessInstanceCommandsTests(SampleAppFixture fixture) : ICl
 
     // Starts an approval, approves it as the manager and runs it until the purchase order call is staged. The call is
     // then set to unknown with no work item, as a connector with no lookup leaves it.
-    private async Task<(Guid Instance, Guid Call)> UnknownCallAsync(HttpClient anna)
+    private async Task<(Guid Instance, Guid Call)> UnknownCallAsync(HttpClient requester)
     {
         using var chau = fixture.CreateClient().SignedInAs("chau");
-        var subject = await CreateRequestAsync(anna, 500);
-        var instance = await StartAsync(anna, subject);
+        var subject = await CreateRequestAsync(requester, 500);
+        var instance = await StartAsync(requester, subject);
         await fixture.RunUntilIdleAsync(CancellationToken);
         var task = (Guid)(await fixture.ScalarAsync("SELECT id FROM axis.process_tasks WHERE process_instance_id = @id AND state = 'open'", ("id", instance)))!;
         using (var approved = await CompleteAsync(chau, task, """{ "outcome": "approve" }"""))

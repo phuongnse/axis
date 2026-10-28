@@ -4,8 +4,8 @@ import { csrfHeaders } from '../csrf'
 import { cellValue } from '../fields'
 import { sessionFile } from '../sessions'
 
-// The record and file APIs need a session with a grant, so these journeys start signed in as the employee anna.
-test.use({ storageState: sessionFile('anna') })
+// The record and file APIs need a session with a grant, so these journeys start signed in as the employee requester.
+test.use({ storageState: sessionFile('requester') })
 
 // Specs run in parallel against one database, so each test relies only on the records it creates.
 async function createAsset(request: APIRequestContext, name: string) {

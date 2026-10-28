@@ -152,7 +152,7 @@ public sealed class AdminMigrateTests(PostgreSqlFixture database) : IClassFixtur
         Assert.Equal(0, (await scenario.CreateAsync(id, host)).Exit);
         await scenario.SetSchemaVersionAsync(id, OldVersion);
         await using var factory = CreateFactory(scenario.Platform);
-        using var client = factory.CreateClient().SignedInAs("anna");
+        using var client = factory.CreateClient().SignedInAs("requester");
 
         using var held = await client.SendAsync(Request("/api/me", host), CancellationToken);
         Assert.Equal(HttpStatusCode.ServiceUnavailable, held.StatusCode);
@@ -244,7 +244,7 @@ public sealed class AdminMigrateTests(PostgreSqlFixture database) : IClassFixtur
 
             // An hour, so the timer never races the refresh that the test triggers itself.
             builder.UseSetting("Tenancy:RefreshInterval", "01:00:00");
-            builder.UseTestAuthentication(new TestIdentity("anna", "Anna Employee", "employee"));
+            builder.UseTestAuthentication(new TestIdentity("requester", "Requester User", "employee"));
         });
 
     private sealed class CancelAfterEntryWriter(CancellationTokenSource source) : StringWriter

@@ -11,7 +11,7 @@ namespace Axis.Integration.Tests;
 /// <summary>
 /// An operator with a <c>cancel</c> grant stops a running or waiting purchase request approval,
 /// through the HTTP API. The sample gives the grant to the finance reviewers, here <c>dung</c>.
-/// <c>anna</c> starts the approvals and <c>chau</c> is the manager. Each test leaves no due work
+/// <c>requester</c> starts the approvals and <c>chau</c> is the manager. Each test leaves no due work
 /// item behind, so the next one finds only its own.
 /// </summary>
 public sealed class ProcessCancelTests(SampleAppFixture fixture) : IClassFixture<SampleAppFixture>
@@ -27,11 +27,11 @@ public sealed class ProcessCancelTests(SampleAppFixture fixture) : IClassFixture
     [Fact]
     public async Task Cancelling_an_instance_waiting_for_the_manager_closes_its_task_and_lets_the_record_start_again()
     {
-        using var anna = fixture.CreateClient().SignedInAs("anna");
+        using var requester = fixture.CreateClient().SignedInAs("requester");
         using var chau = fixture.CreateClient().SignedInAs("chau");
         using var dung = fixture.CreateClient().SignedInAs("dung");
-        var subject = await CreateRequestAsync(anna, 500);
-        var instance = await StartAsync(anna, subject);
+        var subject = await CreateRequestAsync(requester, 500);
+        var instance = await StartAsync(requester, subject);
         await fixture.RunUntilIdleAsync(CancellationToken);
         var task = await OpenTaskAsync(instance);
         Assert.Contains(task, await InboxAsync(chau));
@@ -60,7 +60,7 @@ public sealed class ProcessCancelTests(SampleAppFixture fixture) : IClassFixture
 
         // The cancel does not undo the submit, so the author takes the request back before starting it again.
         await SetStatusAsync(subject, "returned");
-        var second = await StartAsync(anna, subject);
+        var second = await StartAsync(requester, subject);
         Assert.NotEqual(instance, second);
         await fixture.RunUntilIdleAsync(CancellationToken);
         var rows = await fixture.InstancesAsync(subject);
@@ -70,10 +70,10 @@ public sealed class ProcessCancelTests(SampleAppFixture fixture) : IClassFixture
     [Fact]
     public async Task Cancelling_an_instance_deletes_the_deadline_item_of_its_open_task()
     {
-        using var anna = fixture.CreateClient().SignedInAs("anna");
+        using var requester = fixture.CreateClient().SignedInAs("requester");
         using var dung = fixture.CreateClient().SignedInAs("dung");
-        var subject = await CreateRequestAsync(anna, 500);
-        var instance = await StartAsync(anna, subject);
+        var subject = await CreateRequestAsync(requester, 500);
+        var instance = await StartAsync(requester, subject);
         await fixture.RunUntilIdleAsync(CancellationToken);
         var task = await OpenTaskAsync(instance);
 
@@ -99,10 +99,10 @@ public sealed class ProcessCancelTests(SampleAppFixture fixture) : IClassFixture
     [Fact]
     public async Task A_cancel_writes_one_audit_record_with_the_user_and_the_reason_and_a_history_row()
     {
-        using var anna = fixture.CreateClient().SignedInAs("anna");
+        using var requester = fixture.CreateClient().SignedInAs("requester");
         using var dung = fixture.CreateClient().SignedInAs("dung");
-        var subject = await CreateRequestAsync(anna, 500);
-        var instance = await StartAsync(anna, subject);
+        var subject = await CreateRequestAsync(requester, 500);
+        var instance = await StartAsync(requester, subject);
         await fixture.RunUntilIdleAsync(CancellationToken);
         var task = await OpenTaskAsync(instance);
 
@@ -144,9 +144,9 @@ public sealed class ProcessCancelTests(SampleAppFixture fixture) : IClassFixture
     [Fact]
     public async Task Cancelling_an_instance_with_a_pending_call_cancels_the_call_and_sends_nothing()
     {
-        using var anna = fixture.CreateClient().SignedInAs("anna");
+        using var requester = fixture.CreateClient().SignedInAs("requester");
         using var dung = fixture.CreateClient().SignedInAs("dung");
-        var (subject, instance) = await StageCallAsync(anna);
+        var (subject, instance) = await StageCallAsync(requester);
         var call = await CallAsync(instance);
         Assert.Equal("pending", await CallStateAsync(call));
         Assert.Equal(1L, await WorkItemsAsync(instance));
@@ -164,7 +164,7 @@ public sealed class ProcessCancelTests(SampleAppFixture fixture) : IClassFixture
         Assert.Equal([call], details.RootElement.GetProperty("operationIds").EnumerateArray().Select(id => id.GetGuid()));
 
         await fixture.RunUntilIdleAsync(CancellationToken);
-        var (number, orderNumber) = await NumbersAsync(anna, subject);
+        var (number, orderNumber) = await NumbersAsync(requester, subject);
         Assert.Empty(await fixture.OrdersAsync(number));
         Assert.Null(orderNumber);
         Assert.Equal("cancelled", await StateAsync(instance));
@@ -173,9 +173,9 @@ public sealed class ProcessCancelTests(SampleAppFixture fixture) : IClassFixture
     [Fact]
     public async Task Cancelling_an_instance_whose_call_is_unknown_is_refused_and_changes_nothing()
     {
-        using var anna = fixture.CreateClient().SignedInAs("anna");
+        using var requester = fixture.CreateClient().SignedInAs("requester");
         using var dung = fixture.CreateClient().SignedInAs("dung");
-        var (_, instance) = await StageCallAsync(anna);
+        var (_, instance) = await StageCallAsync(requester);
         var call = await CallAsync(instance);
         await fixture.ScalarAsync("UPDATE axis.connector_calls SET state = 'unknown' WHERE id = @id", ("id", call));
         var historyBefore = await fixture.CountAsync("SELECT count(*) FROM axis.process_step_history WHERE process_instance_id = @id", ("id", instance));
@@ -207,11 +207,11 @@ public sealed class ProcessCancelTests(SampleAppFixture fixture) : IClassFixture
     [Fact]
     public async Task A_step_a_worker_had_loaded_commits_nothing_after_the_cancel()
     {
-        using var anna = fixture.CreateClient().SignedInAs("anna");
+        using var requester = fixture.CreateClient().SignedInAs("requester");
         using var chau = fixture.CreateClient().SignedInAs("chau");
         using var dung = fixture.CreateClient().SignedInAs("dung");
-        var subject = await CreateRequestAsync(anna, 500);
-        var instance = await StartAsync(anna, subject);
+        var subject = await CreateRequestAsync(requester, 500);
+        var instance = await StartAsync(requester, subject);
         await fixture.RunUntilIdleAsync(CancellationToken);
         using (var approved = await CompleteAsync(chau, await OpenTaskAsync(instance), """{ "outcome": "approve" }"""))
         {
@@ -245,7 +245,7 @@ public sealed class ProcessCancelTests(SampleAppFixture fixture) : IClassFixture
         await transaction.RollbackAsync(CancellationToken);
         await run;
 
-        Assert.Equal("submitted", (await ReadStatusAsync(anna, subject)));
+        Assert.Equal("submitted", (await ReadStatusAsync(requester, subject)));
         Assert.Equal("cancelled", await StateAsync(instance));
 
         // The only new history row is the cancel's own, recorded at the step the instance was on.
@@ -264,14 +264,14 @@ public sealed class ProcessCancelTests(SampleAppFixture fixture) : IClassFixture
     [Fact]
     public async Task A_user_without_a_cancel_grant_gets_403_and_a_completed_instance_gets_409()
     {
-        using var anna = fixture.CreateClient().SignedInAs("anna");
+        using var requester = fixture.CreateClient().SignedInAs("requester");
         using var chau = fixture.CreateClient().SignedInAs("chau");
         using var dung = fixture.CreateClient().SignedInAs("dung");
-        var subject = await CreateRequestAsync(anna, 500);
-        var instance = await StartAsync(anna, subject);
+        var subject = await CreateRequestAsync(requester, 500);
+        var instance = await StartAsync(requester, subject);
         await fixture.RunUntilIdleAsync(CancellationToken);
 
-        using (var denied = await CancelAsync(anna, instance, Reason))
+        using (var denied = await CancelAsync(requester, instance, Reason))
         {
             Assert.Equal(HttpStatusCode.Forbidden, denied.StatusCode);
         }
@@ -299,10 +299,10 @@ public sealed class ProcessCancelTests(SampleAppFixture fixture) : IClassFixture
     [Fact]
     public async Task A_cancel_that_is_not_well_formed_or_names_no_instance_writes_nothing()
     {
-        using var anna = fixture.CreateClient().SignedInAs("anna");
+        using var requester = fixture.CreateClient().SignedInAs("requester");
         using var dung = fixture.CreateClient().SignedInAs("dung");
-        var subject = await CreateRequestAsync(anna, 500);
-        var instance = await StartAsync(anna, subject);
+        var subject = await CreateRequestAsync(requester, 500);
+        var instance = await StartAsync(requester, subject);
         await fixture.RunUntilIdleAsync(CancellationToken);
 
         foreach (var (body, key, message) in new[]
@@ -349,11 +349,11 @@ public sealed class ProcessCancelTests(SampleAppFixture fixture) : IClassFixture
     }
 
     // Starts an approval and runs its steps, up to the staged purchase order call. The call is not sent.
-    private async Task<(Guid Subject, Guid Instance)> StageCallAsync(HttpClient anna)
+    private async Task<(Guid Subject, Guid Instance)> StageCallAsync(HttpClient requester)
     {
         using var chau = fixture.CreateClient().SignedInAs("chau");
-        var subject = await CreateRequestAsync(anna, 500);
-        var instance = await StartAsync(anna, subject);
+        var subject = await CreateRequestAsync(requester, 500);
+        var instance = await StartAsync(requester, subject);
         await fixture.RunUntilIdleAsync(CancellationToken);
         using (var approved = await CompleteAsync(chau, await OpenTaskAsync(instance), """{ "outcome": "approve" }"""))
         {

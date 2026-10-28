@@ -6,8 +6,8 @@ import { noSideways, phoneWidth } from '../phone'
 import { pickOption } from '../select'
 import { sessionFile } from '../sessions'
 
-// anna saves a new request as a draft, because she may write only draft and returned requests.
-test.use({ storageState: sessionFile('anna'), viewport: { width: phoneWidth, height: 812 } })
+// requester saves a new request as a draft, because the requester may write only draft and returned requests.
+test.use({ storageState: sessionFile('requester'), viewport: { width: phoneWidth, height: 812 } })
 
 /** Opens the lookup of the reference field `field`, labelled `label`, and picks the row named `name`. */
 async function choose(page: Page, field: string, label: string, name: string) {

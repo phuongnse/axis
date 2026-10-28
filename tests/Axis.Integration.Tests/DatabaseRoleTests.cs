@@ -16,9 +16,9 @@ public sealed class DatabaseRoleTests(SampleAppFixture fixture) : IClassFixture<
     [Fact]
     public async Task Every_server_and_worker_session_on_the_tenant_database_belongs_to_the_runtime_role()
     {
-        using var anna = fixture.CreateClient().SignedInAs("anna");
-        var subject = await CreateRequestAsync(anna, 500);
-        await StartAsync(anna, subject);
+        using var requester = fixture.CreateClient().SignedInAs("requester");
+        var subject = await CreateRequestAsync(requester, 500);
+        await StartAsync(requester, subject);
 
         Assert.True(await fixture.RunUntilIdleAsync(CancellationToken) > 0);
 

@@ -63,7 +63,7 @@ public sealed class AdminTenantOidcSetTests(PostgreSqlFixture database, Keycloak
         using var me = await client.GetAsync(new Uri("/api/me", UriKind.Relative), CancellationToken);
         Assert.Equal(HttpStatusCode.OK, me.StatusCode);
         using var body = JsonDocument.Parse(await me.Content.ReadAsStringAsync(CancellationToken));
-        Assert.Equal("anna", body.RootElement.GetProperty("displayName").GetString());
+        Assert.Equal("requester", body.RootElement.GetProperty("displayName").GetString());
     }
 
     [Fact]
@@ -392,7 +392,7 @@ public sealed class AdminTenantOidcSetTests(PostgreSqlFixture database, Keycloak
     // Logs in at Keycloak and completes the callback. True when the server answered with a session cookie.
     private static async Task<bool> TrySignInAsync(HttpClient client, Uri authority)
     {
-        var callback = await KeycloakSignIn.LogInAsync(client, authority, "anna", _address);
+        var callback = await KeycloakSignIn.LogInAsync(client, authority, "requester", _address);
         try
         {
             using var response = await client.GetAsync(new Uri(callback.PathAndQuery, UriKind.Relative), CancellationToken);

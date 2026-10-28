@@ -73,7 +73,7 @@ test.describe('hoa runs the test scenarios of the purchase request sample from S
     const author = (await (await page.request.get('/api/me')).json()) as { studioTest: boolean }
     expect(author.studioTest).toBe(true)
 
-    await useSession(page, 'anna')
+    await useSession(page, 'requester')
     const employee = (await (await page.request.get('/api/me')).json()) as { studioTest: boolean }
     expect(employee.studioTest).toBe(false)
   })

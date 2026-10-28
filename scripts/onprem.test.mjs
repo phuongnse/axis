@@ -2,7 +2,7 @@
 // production images exactly as docs/reference/installation.md says. It runs against a test PostgreSQL
 // and Keycloak, creates two tenants and their realms in Keycloak, activates the leave request sample and checks each tenant's
 // site and sign-in, suspend and resume, an unknown host, and a publish request that the installed
-// publisher runs in each tenant. It then starts a second server replica and a TLS proxy, signs anna in
+// publisher runs in each tenant. It then starts a second server replica and a TLS proxy, signs requester in
 // through the proxy, and restarts the first replica. The servers listen on HTTPS only, with a certificate of the
 // test authority for the name servers, and the proxy trusts that authority only. With Studio on, it saves a resource through one replica,
 // reads it back through the other, and checks that a stale save answers 409. Requires Docker and openssl, and the
@@ -17,7 +17,7 @@
 // The production server refuses an identity provider over plain http, so Keycloak serves https and only
 // the server and the admin tool in this test trust the certificate authority, through SSL_CERT_FILE.
 // Keycloak starts with an admin client, which `tenant create` signs in as to create each tenant's realm. A new realm has
-// no users, so the test points tenant one back at the development realm before the proxy signs anna in.
+// no users, so the test points tenant one back at the development realm before the proxy signs the requester in.
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import { createHash, randomBytes } from 'node:crypto'
@@ -851,7 +851,7 @@ RETURNING id;`,
       for (const id of Object.keys(hosts)) assert.match(publisherLog, new RegExp(`^${id} claim ok$`, 'm'))
       assert.match(run(['ps', '--status', 'running', '--services']), /^publisher$/m)
 
-      // A new realm has no users, so tenant one goes back to the development realm, where anna and hoa can sign in.
+      // A new realm has no users, so tenant one goes back to the development realm, where the requester and hoa can sign in.
       const point = admin(
         ['tenant', 'oidc', 'set', 'one', '--authority', keycloakAuthority, '--client-id', 'axis', '--client-secret'],
         { AXIS_OIDC_CLIENT_SECRET: clientSecret },
@@ -891,7 +891,7 @@ RETURNING id;`,
 
       // The sign-in redirect names the tenant host over https, even when the client sends its own
       // forwarded headers, which the proxy replaces.
-      const { jar: proxyJar, done } = await signInViaProxy('anna', {
+      const { jar: proxyJar, done } = await signInViaProxy('requester', {
         'x-forwarded-proto': 'http',
         'x-forwarded-host': hosts.two,
         'x-forwarded-for': '203.0.113.9',

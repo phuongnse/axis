@@ -348,7 +348,7 @@ public sealed class ReferenceIndexTests
                 { "id": "44444444-4444-4444-8444-444444444441", "kind": "process", "name": "OrderReview", "formatVersion": 1,
                   "entity": "Order", "start": "review",
                   "steps": [
-                    { "name": "review", "type": "task", "label": { "textKey": "task.review" }, "assignee": { "user": "'anna'" }, "form": "Missing",
+                    { "name": "review", "type": "task", "label": { "textKey": "task.review" }, "assignee": { "user": "'requester'" }, "form": "Missing",
                       "outcomes": [ { "name": "ok", "label": { "textKey": "task.ok" }, "next": "done" } ] },
                     { "name": "done", "type": "end" } ] }
                 """);
@@ -412,7 +412,7 @@ public sealed class ReferenceIndexTests
         Assert.Equivalent(
             new (string, string, string)[]
             {
-                (ReferenceRelations.ScenarioRole, "/users/anna/0", "approver"),
+                (ReferenceRelations.ScenarioRole, "/users/requester/0", "approver"),
                 (ReferenceRelations.StubConnector, "/stubs/0/connector/name", "PurchasingSystem"),
                 (ReferenceRelations.StubPackage, "/stubs/1/operation", "test-package"),
                 (ReferenceRelations.ScenarioEntity, "/steps/0/entity", "Order"),
@@ -437,7 +437,7 @@ public sealed class ReferenceIndexTests
         Assert.Equivalent(
             new (string, string, string)[]
             {
-                (ReferenceRelations.ScenarioRole, "/users/anna/0", "approver"),
+                (ReferenceRelations.ScenarioRole, "/users/requester/0", "approver"),
                 (ReferenceRelations.ScenarioEntity, "/steps/0/entity", "Order"),
                 (ReferenceRelations.ScenarioRole, "/steps/1/assignee/role", "approver"),
             },
@@ -700,7 +700,7 @@ public sealed class ReferenceIndexTests
 
     private const string Assignee = """
         { "id": "66666666-6666-4666-8666-666666666604", "kind": "rule", "name": "Assignee", "formatVersion": 1,
-          "parameters": [{ "name": "value", "type": "integer" }], "resultType": "text", "expression": "'anna'" }
+          "parameters": [{ "name": "value", "type": "integer" }], "resultType": "text", "expression": "'requester'" }
         """;
 
     private static List<(string Relation, string Path, string To)> ProcessEdges(CompilationResult result) =>
@@ -819,21 +819,21 @@ public sealed class ReferenceIndexTests
                 """)
             .With("scenarios/order-flow.json", """
                 { "id": "cccccccc-cccc-4ccc-8ccc-cccccccccc01", "kind": "scenario", "name": "OrderFlow", "formatVersion": 1,
-                  "users": { "anna": ["approver"] },
+                  "users": { "requester": ["approver"] },
                   "stubs": [
                     { "connector": { "name": "PurchasingSystem", "operation": "count" }, "output": {} },
                     { "operation": "test-package/sum", "output": {} } ],
                   "steps": [
-                    { "type": "createRecord", "entity": "Order", "as": "anna", "save": "order", "values": {} },
-                    { "type": "startProcess", "process": "OrderReview", "record": "order", "as": "anna" },
+                    { "type": "createRecord", "entity": "Order", "as": "requester", "save": "order", "values": {} },
+                    { "type": "startProcess", "process": "OrderReview", "record": "order", "as": "requester" },
                     { "type": "expectTask", "record": "order", "step": "approve", "assignee": { "role": "approver" } } ] }
                 """);
 
     private static string ScenarioWithUnknownTaskStep => """
         { "id": "cccccccc-cccc-4ccc-8ccc-cccccccccc01", "kind": "scenario", "name": "OrderFlow", "formatVersion": 1,
-          "users": { "anna": ["approver"] },
+          "users": { "requester": ["approver"] },
           "steps": [
-            { "type": "createRecord", "entity": "Order", "as": "anna", "save": "order", "values": {} },
+            { "type": "createRecord", "entity": "Order", "as": "requester", "save": "order", "values": {} },
             { "type": "expectTask", "record": "order", "step": "missing", "assignee": { "role": "approver" } } ] }
         """;
 

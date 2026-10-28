@@ -103,15 +103,15 @@ function row(page: Page, title: string) {
   return page.getByRole("row", { name: new RegExp(`${title} `) });
 }
 
-/** Creates and starts an Operations request as anna, and returns its id. */
+/** Creates and starts an Operations request as requester, and returns its id. */
 async function startOperationsRequest(
   apiRequest: APIRequest,
   baseURL: string | undefined,
   title: string,
 ) {
-  return asUser(apiRequest, baseURL, "anna", async (anna) => {
-    const created = await createRequest(anna, title, "Operations");
-    await start(anna, created);
+  return asUser(apiRequest, baseURL, "requester", async (requester) => {
+    const created = await createRequest(requester, title, "Operations");
+    await start(requester, created);
     return created;
   });
 }
@@ -156,16 +156,16 @@ test("an employee does not see another employee's request in the list or by its 
 }) => {
   const run = runId();
   const lanTitle = `Zz Deny ${run} lan`;
-  const annaTitle = `Zz Deny ${run} anna`;
+  const annaTitle = `Zz Deny ${run} requester`;
   const lanId = await asUser(playwright.request, baseURL, "lan", (lan) =>
     createRequest(lan, lanTitle, "Operations"),
   );
-  const annaId = await asUser(playwright.request, baseURL, "anna", (anna) =>
-    createRequest(anna, annaTitle, "Operations"),
+  const annaId = await asUser(playwright.request, baseURL, "requester", (requester) =>
+    createRequest(requester, annaTitle, "Operations"),
   );
-  await useSession(page, "anna");
+  await useSession(page, "requester");
 
-  // With sort=-title, anna's request sorts right after lan's, so a missing row is not on another page.
+  // With sort=-title, requester's request sorts right after lan's, so a missing row is not on another page.
   await page.goto(listAddress);
   await expect(row(page, annaTitle)).toBeVisible();
   await expect(row(page, lanTitle)).toHaveCount(0);
@@ -192,10 +192,10 @@ test("a department manager does not see another department's request in the list
   const { engineeringId, operationsId } = await asUser(
     playwright.request,
     baseURL,
-    "anna",
-    async (anna) => ({
-      engineeringId: await createRequest(anna, engineeringTitle, "Engineering"),
-      operationsId: await createRequest(anna, operationsTitle, "Operations"),
+    "requester",
+    async (requester) => ({
+      engineeringId: await createRequest(requester, engineeringTitle, "Engineering"),
+      operationsId: await createRequest(requester, operationsTitle, "Operations"),
     }),
   );
   // binh manages Engineering. chau manages Operations.
@@ -226,7 +226,7 @@ test("an employee who opens a manager's task cannot see or complete it, and the 
   const title = `Zz Task ${runId()}`;
   const id = await startOperationsRequest(playwright.request, baseURL, title);
   const taskId = await managerTaskId(playwright.request, baseURL, id);
-  await useSession(page, "anna");
+  await useSession(page, "requester");
 
   await page.goto(`/purchasing/mytasks/${taskId}`);
   await expect(
@@ -261,14 +261,14 @@ test("a finance reviewer sees a submitted request read-only, and an update throu
   baseURL,
 }) => {
   const title = `Zz Finance ${runId()}`;
-  const id = await asUser(playwright.request, baseURL, "anna", async (anna) => {
-    const created = await createRequest(anna, title, "Operations");
-    await start(anna, created);
+  const id = await asUser(playwright.request, baseURL, "requester", async (requester) => {
+    const created = await createRequest(requester, title, "Operations");
+    await start(requester, created);
     // The worker submits the request some time after the start. dung reads only submitted requests.
     await expect
       .poll(
         async () => {
-          const read = await anna.get(`${recordsPath}/${created}`);
+          const read = await requester.get(`${recordsPath}/${created}`);
           return ((await read.json()) as { values: { status: string } }).values
             .status;
         },
@@ -302,7 +302,7 @@ test("a finance reviewer sees a submitted request read-only, and an update throu
 
 /**
  * The sample pages that read records. Each opens with no session, and `user` signs in. The request
- * id is that of an Engineering draft by anna, which anna and its manager binh may read.
+ * id is that of an Engineering draft by requester, which requester and its manager binh may read.
  */
 const signedOutPages: {
   name: string;
@@ -314,7 +314,7 @@ const signedOutPages: {
   {
     name: "the request list",
     address: () => listAddress,
-    user: "anna",
+    user: "requester",
     api: () =>
       `${appPath}/data-sources/PurchaseRequestList/rows?pageSize=100&sort=-title`,
     expectation: (page, title) => expect(row(page, title)).toBeVisible(),
@@ -322,7 +322,7 @@ const signedOutPages: {
   {
     name: "the request form",
     address: (id) => `/purchasing/purchaserequestform/${id}`,
-    user: "anna",
+    user: "requester",
     api: (id) => `${recordsPath}/${id}`,
     expectation: (page, title) =>
       expect(page.getByRole("textbox", { name: "Title", exact: true })).toHaveValue(title),
@@ -339,7 +339,7 @@ const signedOutPages: {
   {
     name: "Departments",
     address: () => "/purchasing/departments",
-    user: "anna",
+    user: "requester",
     api: () => `${appPath}/entities/Department/records?pageSize=100`,
     expectation: (page) =>
       expect(page.getByRole("row", { name: /Engineering/ })).toBeVisible(),
@@ -347,7 +347,7 @@ const signedOutPages: {
   {
     name: "Suppliers",
     address: () => "/purchasing/suppliers",
-    user: "anna",
+    user: "requester",
     api: () => `${appPath}/entities/Supplier/records?pageSize=100`,
     expectation: (page) =>
       expect(page.getByRole("row", { name: /Acme Supplies/ })).toBeVisible(),
@@ -385,8 +385,8 @@ for (const entry of signedOutPages) {
     baseURL,
   }) => {
     const title = `Zz Signed out ${runId()}`;
-    const id = await asUser(playwright.request, baseURL, "anna", (anna) =>
-      createRequest(anna, title, "Engineering"),
+    const id = await asUser(playwright.request, baseURL, "requester", (requester) =>
+      createRequest(requester, title, "Engineering"),
     );
     const address = entry.address(id);
 

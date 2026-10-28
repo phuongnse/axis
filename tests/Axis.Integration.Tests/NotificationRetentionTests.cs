@@ -39,7 +39,7 @@ public sealed class NotificationRetentionTests(PostgreSqlFixture database) : ICl
     {
         var tenant = await CreateTenantDatabaseAsync("notification_retention_edge");
         var now = DateTimeOffset.UtcNow;
-        var edge = await InsertAsync(tenant, now.AddDays(-90), "anna");
+        var edge = await InsertAsync(tenant, now.AddDays(-90), "requester");
 
         await using var connection = new NpgsqlConnection(PostgreSqlServer.RuntimeConnectionString(tenant));
         await connection.OpenAsync(CancellationToken);
@@ -54,7 +54,7 @@ public sealed class NotificationRetentionTests(PostgreSqlFixture database) : ICl
     {
         var tenant = await CreateTenantDatabaseAsync("notification_retention_huge");
         var now = DateTimeOffset.UtcNow;
-        var old = await InsertAsync(tenant, now.AddDays(-400), "anna");
+        var old = await InsertAsync(tenant, now.AddDays(-400), "requester");
 
         await using var connection = new NpgsqlConnection(PostgreSqlServer.RuntimeConnectionString(tenant));
         await connection.OpenAsync(CancellationToken);
@@ -71,8 +71,8 @@ public sealed class NotificationRetentionTests(PostgreSqlFixture database) : ICl
         var clock = new TestClock();
 
         // The real time is months after the clock, so a worker that used the database's time would delete the young notification too.
-        await InsertAsync(tenant, clock.GetUtcNow().AddDays(-31), "anna");
-        var young = await InsertAsync(tenant, clock.GetUtcNow().AddDays(-29), "anna");
+        await InsertAsync(tenant, clock.GetUtcNow().AddDays(-31), "requester");
+        var young = await InsertAsync(tenant, clock.GetUtcNow().AddDays(-29), "requester");
         var logs = new LogCollector();
         using var host = BuildHost(clock, logs, tenant);
 
@@ -118,8 +118,8 @@ public sealed class NotificationRetentionTests(PostgreSqlFixture database) : ICl
     // A notification 91 days old with two recipient rows and a read, and one 89 days old with a read.
     private static async Task<(Guid Old, Guid Young)> SeedAsync(string tenant, DateTimeOffset now)
     {
-        var old = await InsertAsync(tenant, now.AddDays(-91), "anna", "ben");
-        var young = await InsertAsync(tenant, now.AddDays(-89), "anna");
+        var old = await InsertAsync(tenant, now.AddDays(-91), "requester", "ben");
+        var young = await InsertAsync(tenant, now.AddDays(-89), "requester");
         return (old, young);
     }
 

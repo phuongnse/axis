@@ -7,9 +7,9 @@ import { expectChosen, pickOption } from '../select'
 import { sessionFile, useSession } from '../sessions'
 import { chooseLanguage, chooseTheme } from '../shell'
 
-// The record API needs a session with a grant, so these journeys start signed in as the employee anna.
-// anna saves a new request as a draft, because she may write only draft and returned requests.
-test.use({ storageState: sessionFile('anna') })
+// The record API needs a session with a grant, so these journeys start signed in as the employee requester.
+// requester saves a new request as a draft, because the requester may write only draft and returned requests.
+test.use({ storageState: sessionFile('requester') })
 
 // Specs run in parallel against one database, so these tests rely only on the seeded departments and
 // suppliers of the purchase request sample, and on the requests they create.
@@ -72,7 +72,7 @@ test('a purchase request is created with line items, shows the computed total, i
 
   await expect(page).toHaveURL(tablePath)
   const row = page.getByRole('row', { name: new RegExp(`${title} `) })
-  for (const text of ['anna', 'Finance', 'Acme Supplies', 'VND', '2,550.90', 'draft']) {
+  for (const text of ['requester', 'Finance', 'Acme Supplies', 'VND', '2,550.90', 'draft']) {
     await expect(row).toContainText(text)
   }
   await page.reload()
@@ -249,7 +249,7 @@ test('the per-department page shows one row per department with its total, sorts
   page,
   request,
 }) => {
-  // anna submits one request in each department, so the finance reviewer dung reads them all.
+  // requester submits one request in each department, so the finance reviewer dung reads them all.
   // Engineering < Finance < Operations by total, even with other tests adding Operations requests in parallel.
   const prices = { Engineering: 1, Finance: 100, Operations: 9000000 }
   const ids: string[] = []

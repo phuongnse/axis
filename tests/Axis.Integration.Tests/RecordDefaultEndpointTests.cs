@@ -21,9 +21,9 @@ public sealed class RecordDefaultEndpointTests(RecordApiFixture fixture) : IClas
     public async Task Create_fills_left_out_fields_keeps_null_and_stamps_now_with_the_transaction_time_and_update_applies_none()
     {
         await fixture.ResetAsync();
-        using var anna = fixture.CreateClient().SignedInAs("anna");
+        using var requester = fixture.CreateClient().SignedInAs("requester");
 
-        using var created = await SendAsync(anna, HttpMethod.Post, Reminders, """{ "values": { "title": "Call", "priority": null } }""");
+        using var created = await SendAsync(requester, HttpMethod.Post, Reminders, """{ "values": { "title": "Call", "priority": null } }""");
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
         using var createdJson = await ReadJsonAsync(created);
         var id = createdJson.RootElement.GetProperty("id").GetString()!;
@@ -38,7 +38,7 @@ public sealed class RecordDefaultEndpointTests(RecordApiFixture fixture) : IClas
             $"SELECT occurred_at FROM axis.audit_records WHERE record_id = '{id}' AND action = 'record.created'"))!;
         Assert.Equal(audited, remindAt.UtcDateTime);
 
-        using var updated = await SendAsync(anna, HttpMethod.Patch, $"{Reminders}/{id}", """{ "version": 1, "values": { "title": "Call back" } }""");
+        using var updated = await SendAsync(requester, HttpMethod.Patch, $"{Reminders}/{id}", """{ "version": 1, "values": { "title": "Call back" } }""");
         Assert.Equal(HttpStatusCode.OK, updated.StatusCode);
         using var afterUpdate = await GetAsync(id);
         var after = afterUpdate.RootElement.GetProperty("values");
@@ -53,9 +53,9 @@ public sealed class RecordDefaultEndpointTests(RecordApiFixture fixture) : IClas
     public async Task Create_fills_a_default_that_the_body_leaves_out()
     {
         await fixture.ResetAsync();
-        using var anna = fixture.CreateClient().SignedInAs("anna");
+        using var requester = fixture.CreateClient().SignedInAs("requester");
 
-        using var created = await SendAsync(anna, HttpMethod.Post, Reminders, """{ "values": { "title": "Plain" } }""");
+        using var created = await SendAsync(requester, HttpMethod.Post, Reminders, """{ "values": { "title": "Plain" } }""");
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
         using var json = await ReadJsonAsync(created);
 
@@ -68,9 +68,9 @@ public sealed class RecordDefaultEndpointTests(RecordApiFixture fixture) : IClas
     public async Task A_required_field_with_a_default_sent_as_null_is_400_required_and_writes_nothing()
     {
         await fixture.ResetAsync();
-        using var anna = fixture.CreateClient().SignedInAs("anna");
+        using var requester = fixture.CreateClient().SignedInAs("requester");
 
-        using var response = await SendAsync(anna, HttpMethod.Post, Reminders, """{ "values": { "title": "Call", "state": null } }""");
+        using var response = await SendAsync(requester, HttpMethod.Post, Reminders, """{ "values": { "title": "Call", "state": null } }""");
 
         using var problem = await ReadProblemAsync(response, HttpStatusCode.BadRequest);
         Assert.Equal([("/values/state", "Required.")], Errors(problem));
@@ -81,10 +81,10 @@ public sealed class RecordDefaultEndpointTests(RecordApiFixture fixture) : IClas
     public async Task A_default_that_fails_at_run_time_is_400_at_its_field_and_writes_nothing()
     {
         await fixture.ResetAsync();
-        using var anna = fixture.CreateClient().SignedInAs("anna");
+        using var requester = fixture.CreateClient().SignedInAs("requester");
         var audits = await fixture.AuditRecordCountAsync(TenantA);
 
-        using var response = await SendAsync(anna, HttpMethod.Post, Gauges, """{ "values": {} }""");
+        using var response = await SendAsync(requester, HttpMethod.Post, Gauges, """{ "values": {} }""");
 
         using var problem = await ReadProblemAsync(response, HttpStatusCode.BadRequest);
         Assert.Equal([("/values/ratio", "Could not be computed.")], Errors(problem));
@@ -92,7 +92,7 @@ public sealed class RecordDefaultEndpointTests(RecordApiFixture fixture) : IClas
         Assert.Equal(audits, await fixture.AuditRecordCountAsync(TenantA));
 
         // A body that sets the field never runs its default.
-        using var set = await SendAsync(anna, HttpMethod.Post, Gauges, """{ "values": { "ratio": 2 } }""");
+        using var set = await SendAsync(requester, HttpMethod.Post, Gauges, """{ "values": { "ratio": 2 } }""");
         Assert.Equal(HttpStatusCode.Created, set.StatusCode);
     }
 

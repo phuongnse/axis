@@ -5,7 +5,7 @@
   "formatVersion": 1,
   "now": "2026-10-01T09:00:00Z",
   "users": {
-    "anna": ["requester"],
+    "requester": ["requester"],
     "khoa": ["agent"],
     "linh": ["service-desk-lead"]
   },
@@ -13,7 +13,7 @@
     {
       "type": "createRecord",
       "entity": "Ticket",
-      "as": "anna",
+      "as": "requester",
       "save": "ticket",
       "values": {
         "title": "Laptop will not start",
@@ -25,7 +25,7 @@
       "type": "startProcess",
       "process": "TicketHandling",
       "record": "ticket",
-      "as": "anna"
+      "as": "requester"
     },
     {
       "type": "completeTask",
@@ -53,7 +53,7 @@
       "record": "ticket",
       "step": "confirm",
       "outcome": "reopen",
-      "as": "anna"
+      "as": "requester"
     },
     {
       "type": "expectRecord",
@@ -92,7 +92,7 @@
       "record": "ticket",
       "step": "confirm",
       "outcome": "confirm",
-      "as": "anna"
+      "as": "requester"
     },
     {
       "type": "expectRecord",
