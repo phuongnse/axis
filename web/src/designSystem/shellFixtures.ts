@@ -69,14 +69,14 @@ export const platformSite: SiteMetadata = {
   name: 'platform',
   titleKey: 'shell.title',
   locales: { default: 'en', fallback: 'en', available: ['en', 'vi'] },
-  navigation: [{ key: 'home', path: '/', labelKey: 'shell.nav.home' }],
+  navigation: [{ key: 'home', path: '/', labelKey: 'shell.nav.home', icon: 'home' }],
 }
 
 /** The fixture application site's navigation, as the site route builds it from its pages. */
 export const siteNavigation: NavigationItem[] = [
-  { key: 'Dashboard', path: `/${sitePath}/dashboard`, labelKey: 'preview.dashboard' },
-  { key: 'Requests', path: `/${sitePath}/requests`, labelKey: 'preview.requests' },
-  { key: 'Tasks', path: `/${sitePath}/tasks`, labelKey: 'preview.tasks' },
-  { key: 'Categories', path: `/${sitePath}/categories`, labelKey: 'preview.categories' },
-  { key: 'Instances', path: `/${sitePath}/instances`, labelKey: 'preview.instances' },
+  { key: 'Dashboard', path: `/${sitePath}/dashboard`, labelKey: 'preview.dashboard', icon: 'dashboard' },
+  { key: 'Requests', path: `/${sitePath}/requests`, labelKey: 'preview.requests', icon: 'cart' },
+  { key: 'Tasks', path: `/${sitePath}/tasks`, labelKey: 'preview.tasks', icon: 'tasks' },
+  { key: 'Categories', path: `/${sitePath}/categories`, labelKey: 'preview.categories', icon: 'tag' },
+  { key: 'Instances', path: `/${sitePath}/instances`, labelKey: 'preview.instances', icon: 'process' },
 ]

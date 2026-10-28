@@ -192,6 +192,11 @@ export const previews: Record<string, readonly PreviewState[]> = {
   ),
   shell: [
     { caption: 'Application site', draw: () => <SiteShellPreview />, at: `/${sitePath}/requests` },
+    {
+      caption: 'Navigation collapsed',
+      draw: () => <SiteShellPreview collapsed />,
+      at: `/${sitePath}/requests`,
+    },
     { caption: 'Platform site', draw: () => <PlatformShellPreview />, at: '/' },
   ],
   signIn: [

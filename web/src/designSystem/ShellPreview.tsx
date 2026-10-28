@@ -24,7 +24,7 @@ function Frame({ children }: { children: ReactNode }) {
 }
 
 /** An application site's shell around its Requests page, which holds the request table. */
-export function SiteShellPreview() {
+export function SiteShellPreview({ collapsed = false }: { collapsed?: boolean }) {
   return (
     <Frame>
       <Shell
@@ -34,6 +34,7 @@ export function SiteShellPreview() {
         locale={locale}
         onLocaleChange={() => {}}
         notifications={{ path: notificationsPath, sitePath }}
+        initiallyCollapsed={collapsed}
       >
         <PageLayout title={siteTexts['preview.requests']}>
           <TableWidget sitePath={sitePath} widget={tableWidget} locale={locale} pageValues={{}} />
