@@ -67,9 +67,9 @@ public sealed class RecordMoneyEndpointTests(RecordApiFixture fixture) : IClassF
     public async Task User_without_a_grant_cannot_create_an_expense()
     {
         await fixture.ResetAsync();
-        using var binh = fixture.CreateClient().SignedInAs("binh");
+        using var manager = fixture.CreateClient().SignedInAs("manager");
 
-        using var response = await SendAsync(binh, HttpMethod.Post, Expenses, """{ "values": { "title": "Taxi", "amountVnd": 1 } }""");
+        using var response = await SendAsync(manager, HttpMethod.Post, Expenses, """{ "values": { "title": "Taxi", "amountVnd": 1 } }""");
 
         using var problem = await ReadProblemAsync(response, HttpStatusCode.Forbidden);
         Assert.Equal("You have no grant for this action.", problem.RootElement.GetProperty("title").GetString());

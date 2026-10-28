@@ -13,7 +13,7 @@ const tasksPath = '/api/apps/E2eApp/tasks'
 
 /**
  * Creates a note, starts a review of it and returns the note and its task. The task is assigned to
- * binh. Specs run in parallel against one database, so each test looks only for the task it starts.
+ * manager. Specs run in parallel against one database, so each test looks only for the task it starts.
  */
 async function startReview(
   request: APIRequestContext,
@@ -31,13 +31,13 @@ async function startReview(
   })
   expect(started.status()).toBe(201)
 
-  // This context holds binh's saved session and shares no cookies with the browser or the request fixture.
-  const binh = await apiRequest.newContext({ baseURL, storageState: sessionFile('binh') })
+  // This context holds manager's saved session and shares no cookies with the browser or the request fixture.
+  const manager = await apiRequest.newContext({ baseURL, storageState: sessionFile('manager') })
   let taskId = ''
   try {
     // The worker creates the task some time after the start.
     await expect(async () => {
-      const response = await binh.get(`${tasksPath}?pageSize=100`)
+      const response = await manager.get(`${tasksPath}?pageSize=100`)
       expect(response.ok()).toBe(true)
       const page = await response.json()
       const task = page.items.find((item: { subject: { id: string } }) => item.subject.id === note.id)
@@ -45,7 +45,7 @@ async function startReview(
       taskId = task.id
     }).toPass({ timeout: 30_000 })
   } finally {
-    await binh.dispose()
+    await manager.dispose()
   }
   return { title, noteId: note.id as string, taskId }
 }
@@ -57,7 +57,7 @@ test('the manager opens a task from the inbox, fills in a field, approves and re
   baseURL,
 }) => {
   const { title, noteId } = await startReview(request, playwright.request, baseURL, 'Approve')
-  await useSession(page, 'binh')
+  await useSession(page, 'manager')
 
   await page.goto('/e2e/tasks')
   const row = page.getByRole('row', { name: new RegExp(title) })
@@ -98,7 +98,7 @@ test('choosing an outcome after the task was decided shows that it is already co
   baseURL,
 }) => {
   const { taskId } = await startReview(request, playwright.request, baseURL, 'Decided')
-  await useSession(page, 'binh')
+  await useSession(page, 'manager')
 
   await page.goto(`/e2e/tasks/${taskId}`)
   const approve = page.getByRole('button', { name: 'Approve', exact: true })

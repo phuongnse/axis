@@ -58,7 +58,7 @@ public sealed class RecordPolicyTests(RecordApiFixture fixture) : IClassFixture<
     [MemberData(nameof(Routes))]
     public async Task Every_route_is_403_for_a_user_without_a_grant_and_writes_nothing(string method, string path, string? body)
     {
-        using var client = fixture.CreateClient().SignedInAs("binh");
+        using var client = fixture.CreateClient().SignedInAs("manager");
 
         await AssertRefusedAsync(client, method, path, body, HttpStatusCode.Forbidden, ForbiddenTitle);
     }

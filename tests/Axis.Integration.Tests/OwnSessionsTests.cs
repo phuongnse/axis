@@ -37,11 +37,11 @@ public sealed class OwnSessionsTests(PostgreSqlFixture database) : IAsyncLifetim
         using var client = CreateClient();
         var annaFirst = await SignInAsync(client, "requester", authenticatedMinutesAgo: 0);
         var annaSecond = await SignInAsync(client, "requester", authenticatedMinutesAgo: 0);
-        var lan = await SignInAsync(client, "lan", authenticatedMinutesAgo: 0);
+        var employee = await SignInAsync(client, "employee", authenticatedMinutesAgo: 0);
 
         var first = await ListAsync(client, annaFirst);
         var second = await ListAsync(client, annaSecond);
-        var other = await ListAsync(client, lan);
+        var other = await ListAsync(client, employee);
 
         Assert.Equal(2, first.Sessions.Count);
         Assert.Equal(1, first.Sessions.Count(session => session.Current));
@@ -50,9 +50,9 @@ public sealed class OwnSessionsTests(PostgreSqlFixture database) : IAsyncLifetim
         Assert.NotEqual(first.Sessions.Single(session => session.Current).Id, second.Sessions.Single(session => session.Current).Id);
         Assert.All(first.Sessions, session => Assert.Equal(_clock.GetUtcNow(), session.SignedInAt));
         Assert.True(first.EndAllowed);
-        var lanSession = Assert.Single(other.Sessions);
-        Assert.True(lanSession.Current);
-        Assert.DoesNotContain(first.Sessions, session => session.Id == lanSession.Id);
+        var employeeSession = Assert.Single(other.Sessions);
+        Assert.True(employeeSession.Current);
+        Assert.DoesNotContain(first.Sessions, session => session.Id == employeeSession.Id);
         Assert.Equal((await HashesAsync("requester")).Order(StringComparer.Ordinal), first.Sessions.Select(session => session.Id).Order(StringComparer.Ordinal));
     }
 
@@ -77,17 +77,17 @@ public sealed class OwnSessionsTests(PostgreSqlFixture database) : IAsyncLifetim
     {
         using var client = CreateClient();
         var requester = await SignInAsync(client, "requester", authenticatedMinutesAgo: 0);
-        await SignInAsync(client, "lan", authenticatedMinutesAgo: 0);
-        var lanId = Assert.Single(await HashesAsync("lan"));
+        await SignInAsync(client, "employee", authenticatedMinutesAgo: 0);
+        var employeeId = Assert.Single(await HashesAsync("employee"));
 
-        var response = await SendAsync(client, HttpMethod.Delete, $"/api/me/sessions/{lanId}", requester);
+        var response = await SendAsync(client, HttpMethod.Delete, $"/api/me/sessions/{employeeId}", requester);
         var unknown = await SendAsync(client, HttpMethod.Delete, $"/api/me/sessions/{Base64Url.EncodeToString(new byte[32])}", requester);
         var malformed = await SendAsync(client, HttpMethod.Delete, "/api/me/sessions/not*base64", requester);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, unknown.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, malformed.StatusCode);
-        Assert.Equal([lanId], await HashesAsync("lan"));
+        Assert.Equal([employeeId], await HashesAsync("employee"));
         Assert.Equal(2L, await CountAsync());
     }
 
@@ -99,13 +99,13 @@ public sealed class OwnSessionsTests(PostgreSqlFixture database) : IAsyncLifetim
         using var client = CreateClient();
         var caller = await SignInAsync(client, "requester", authenticatedMinutesAgo);
         await SignInAsync(client, "requester", authenticatedMinutesAgo: 0);
-        await SignInAsync(client, "lan", authenticatedMinutesAgo: 0);
+        await SignInAsync(client, "employee", authenticatedMinutesAgo: 0);
         var otherId = (await ListAsync(client, caller)).Sessions.Single(session => !session.Current).Id;
-        var lanId = Assert.Single(await HashesAsync("lan"));
+        var employeeId = Assert.Single(await HashesAsync("employee"));
 
         var listed = await ListAsync(client, caller);
         var one = await SendAsync(client, HttpMethod.Delete, $"/api/me/sessions/{otherId}", caller);
-        var unknown = await SendAsync(client, HttpMethod.Delete, $"/api/me/sessions/{lanId}", caller);
+        var unknown = await SendAsync(client, HttpMethod.Delete, $"/api/me/sessions/{employeeId}", caller);
         var others = await SendAsync(client, HttpMethod.Delete, "/api/me/sessions", caller);
 
         Assert.False(listed.EndAllowed);
@@ -140,7 +140,7 @@ public sealed class OwnSessionsTests(PostgreSqlFixture database) : IAsyncLifetim
         var current = await SignInAsync(client, "requester", authenticatedMinutesAgo: 1);
         var second = await SignInAsync(client, "requester", authenticatedMinutesAgo: 0);
         var third = await SignInAsync(client, "requester", authenticatedMinutesAgo: 0);
-        await SignInAsync(client, "lan", authenticatedMinutesAgo: 0);
+        await SignInAsync(client, "employee", authenticatedMinutesAgo: 0);
         var secondId = (await ListAsync(client, second)).Sessions.Single(session => session.Current).Id;
 
         var endOne = await SendAsync(client, HttpMethod.Delete, $"/api/me/sessions/{secondId}", current);
@@ -157,7 +157,7 @@ public sealed class OwnSessionsTests(PostgreSqlFixture database) : IAsyncLifetim
         Assert.Equal(HttpStatusCode.Unauthorized, (await SendAsync(client, HttpMethod.Get, "/api/me", third)).StatusCode);
         var remaining = Assert.Single((await ListAsync(client, current)).Sessions);
         Assert.True(remaining.Current);
-        Assert.Single(await HashesAsync("lan"));
+        Assert.Single(await HashesAsync("employee"));
         Assert.Equal(2L, await CountAsync());
 
         var endCurrent = await SendAsync(client, HttpMethod.Delete, $"/api/me/sessions/{remaining.Id}", current);

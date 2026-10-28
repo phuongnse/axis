@@ -28,7 +28,7 @@ namespace Axis.Integration.Tests;
 /// activated, and a compiled release of an application that was never activated. FilesApp names a
 /// <c>storage</c> binding, <c>Files</c>, which tenant A holds with the value <c>database</c>. The test
 /// authentication scheme signs in <c>requester</c>, an employee with every grant of both applications,
-/// and users with fewer grants: <c>binh</c> holds no role, <c>rita</c> is a reader, <c>uma</c>
+/// and users with fewer grants: <c>manager</c> holds no role, <c>rita</c> is a reader, <c>uma</c>
 /// holds only undeclared role names, <c>fia</c> holds only grants with fields, on items,
 /// tickets and orders and none on departments, plus <c>import</c> on items and tickets and no <c>update</c> on tickets,
 /// and <c>dora</c> holds only a data source grant. <c>fern</c>
@@ -173,7 +173,7 @@ public sealed class RecordApiFixture : IAsyncLifetime
             builder.UseTestOidc("a", "b");
             builder.UseTestAuthentication(
                 new TestIdentity("requester", "Requester User", "employee"),
-                new TestIdentity("binh", "Binh Manager"),
+                new TestIdentity("manager", "Manager User"),
                 new TestIdentity("rita", "Rita Reader", "reader"),
                 new TestIdentity("uma", "Uma Undeclared", "Employee", "auditor"),
                 new TestIdentity("fern", "Fern Filtered", "filtered"),

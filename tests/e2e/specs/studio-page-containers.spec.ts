@@ -87,7 +87,7 @@ test.describe('Studio builds a page with two columns', () => {
 
     const title = page.getByTestId('studio-field-/title')
     await title.getByRole('textbox', { name: 'en', exact: true }).fill(`Overview ${stamp}`)
-    await title.getByRole('textbox', { name: 'vi', exact: true }).fill(`Tổng quan ${stamp}`)
+    await title.getByRole('textbox', { name: 'vi', exact: true }).fill(`Tổng hợp ${stamp}`)
     await title.getByRole('button', { name: 'Write texts', exact: true }).click()
     await expect(title.getByTestId('studio-label-written')).toBeVisible()
 

@@ -365,11 +365,11 @@ public sealed class ScenarioRunnerTests
     }
 
     private const string Purchasing = """
-        { "requester": ["employee"], "binh": ["department-manager"], "dung": ["department-manager"], "chau": ["finance-reviewer"] }
+        { "requester": ["employee"], "manager": ["department-manager"], "finance-reviewer": ["department-manager"], "manager-2": ["finance-reviewer"] }
         """;
 
     private const string CreateRequest = """
-        { "type": "createRecord", "entity": "PurchaseRequest", "as": "requester", "save": "request", "values": { "title": "Chairs", "manager": "binh", "amount": 5000 } },
+        { "type": "createRecord", "entity": "PurchaseRequest", "as": "requester", "save": "request", "values": { "title": "Chairs", "manager": "manager", "amount": 5000 } },
         """;
 
     private const string StartApproval = """
@@ -382,8 +382,8 @@ public sealed class ScenarioRunnerTests
         using var folder = PurchaseApplication(Scenario("BelowThreshold", Purchasing, CreateRequest + StartApproval + """
             { "type": "expectInstance", "process": "PurchaseRequestApproval", "record": "request", "state": "waiting", "step": "managerApproval" },
             { "type": "expectTask", "record": "request", "step": "managerApproval", "state": "open" },
-            { "type": "expectTask", "record": "request", "step": "managerApproval", "assignee": { "user": "binh" } },
-            { "type": "completeTask", "record": "request", "step": "managerApproval", "outcome": "approve", "as": "binh" },
+            { "type": "expectTask", "record": "request", "step": "managerApproval", "assignee": { "user": "manager" } },
+            { "type": "completeTask", "record": "request", "step": "managerApproval", "outcome": "approve", "as": "manager" },
             { "type": "expectInstance", "process": "PurchaseRequestApproval", "record": "request", "state": "completed" },
             { "type": "expectTask", "record": "request", "step": "managerApproval", "state": "completed" },
             { "type": "expectRecord", "record": "request", "values": { "status": "approved" } }
@@ -398,12 +398,12 @@ public sealed class ScenarioRunnerTests
     public async Task A_request_at_the_threshold_waits_for_the_finance_reviewer_after_the_manager()
     {
         using var folder = PurchaseApplication(Scenario("AtThreshold", Purchasing, """
-            { "type": "createRecord", "entity": "PurchaseRequest", "as": "requester", "save": "request", "values": { "title": "Servers", "manager": "binh", "amount": 10000 } },
+            { "type": "createRecord", "entity": "PurchaseRequest", "as": "requester", "save": "request", "values": { "title": "Servers", "manager": "manager", "amount": 10000 } },
             """ + StartApproval + """
-            { "type": "completeTask", "record": "request", "step": "managerApproval", "outcome": "approve", "as": "binh" },
+            { "type": "completeTask", "record": "request", "step": "managerApproval", "outcome": "approve", "as": "manager" },
             { "type": "expectInstance", "process": "PurchaseRequestApproval", "record": "request", "state": "waiting", "step": "financeApproval" },
             { "type": "expectTask", "record": "request", "step": "financeApproval", "assignee": { "role": "finance-reviewer" } },
-            { "type": "completeTask", "record": "request", "step": "financeApproval", "outcome": "reject", "as": "chau" },
+            { "type": "completeTask", "record": "request", "step": "financeApproval", "outcome": "reject", "as": "manager-2" },
             { "type": "expectInstance", "process": "PurchaseRequestApproval", "record": "request", "state": "completed" },
             { "type": "expectRecord", "record": "request", "values": { "status": "rejected" } }
             """));
@@ -417,14 +417,14 @@ public sealed class ScenarioRunnerTests
     public async Task A_start_without_a_grant_a_completion_by_a_non_assignee_and_a_second_start_are_refused_as_expected()
     {
         using var folder = PurchaseApplication(Scenario("Refused", Purchasing, CreateRequest + """
-            { "type": "startProcess", "process": "PurchaseRequestApproval", "record": "request", "as": "chau", "expect": "denied" },
-            { "type": "completeTask", "record": "request", "step": "managerApproval", "outcome": "approve", "as": "binh", "expect": "notFound" },
+            { "type": "startProcess", "process": "PurchaseRequestApproval", "record": "request", "as": "manager-2", "expect": "denied" },
+            { "type": "completeTask", "record": "request", "step": "managerApproval", "outcome": "approve", "as": "manager", "expect": "notFound" },
             """ + StartApproval + """
             { "type": "startProcess", "process": "PurchaseRequestApproval", "record": "request", "as": "requester", "expect": "conflict" },
-            { "type": "completeTask", "record": "request", "step": "managerApproval", "outcome": "approve", "as": "dung", "expect": "denied" },
+            { "type": "completeTask", "record": "request", "step": "managerApproval", "outcome": "approve", "as": "finance-reviewer", "expect": "denied" },
             { "type": "expectInstance", "process": "PurchaseRequestApproval", "record": "request", "state": "waiting" },
-            { "type": "completeTask", "record": "request", "step": "managerApproval", "outcome": "approve", "as": "binh" },
-            { "type": "completeTask", "record": "request", "step": "managerApproval", "outcome": "approve", "as": "binh", "expect": "conflict" }
+            { "type": "completeTask", "record": "request", "step": "managerApproval", "outcome": "approve", "as": "manager" },
+            { "type": "completeTask", "record": "request", "step": "managerApproval", "outcome": "approve", "as": "manager", "expect": "conflict" }
             """));
 
         var result = await RunAsync(folder, "Refused");
@@ -436,7 +436,7 @@ public sealed class ScenarioRunnerTests
     public async Task A_completion_by_a_non_assignee_without_an_expectation_fails_with_the_denied_outcome()
     {
         using var folder = PurchaseApplication(Scenario("NotTheAssignee", Purchasing, CreateRequest + StartApproval + """
-            { "type": "completeTask", "record": "request", "step": "managerApproval", "outcome": "approve", "as": "dung" }
+            { "type": "completeTask", "record": "request", "step": "managerApproval", "outcome": "approve", "as": "finance-reviewer" }
             """));
 
         var result = await RunAsync(folder, "NotTheAssignee");
@@ -450,13 +450,13 @@ public sealed class ScenarioRunnerTests
     public async Task A_completion_writes_the_values_the_form_makes_editable_and_refuses_a_read_only_field()
     {
         using var written = PurchaseApplication(Scenario("EditableValue", Purchasing, CreateRequest + StartApproval + """
-            { "type": "completeTask", "record": "request", "step": "managerApproval", "outcome": "approve", "as": "binh", "values": { "decisionComments": "ok" } },
+            { "type": "completeTask", "record": "request", "step": "managerApproval", "outcome": "approve", "as": "manager", "values": { "decisionComments": "ok" } },
             { "type": "expectRecord", "record": "request", "values": { "decisionComments": "ok", "status": "approved" } }
             """));
         using var refused = PurchaseApplication(Scenario("ReadOnlyValue", Purchasing, CreateRequest + StartApproval + """
-            { "type": "completeTask", "record": "request", "step": "managerApproval", "outcome": "approve", "as": "binh", "values": { "amount": 5 }, "expect": { "invalid": "amount" } },
+            { "type": "completeTask", "record": "request", "step": "managerApproval", "outcome": "approve", "as": "manager", "values": { "amount": 5 }, "expect": { "invalid": "amount" } },
             { "type": "expectTask", "record": "request", "step": "managerApproval", "state": "open" },
-            { "type": "completeTask", "record": "request", "step": "managerApproval", "outcome": "approve", "as": "binh", "values": { "amount": 5 } }
+            { "type": "completeTask", "record": "request", "step": "managerApproval", "outcome": "approve", "as": "manager", "values": { "amount": 5 } }
             """));
 
         var passed = await RunAsync(written, "EditableValue");
@@ -472,7 +472,7 @@ public sealed class ScenarioRunnerTests
     public async Task A_failed_task_or_instance_expectation_names_the_step_and_both_values()
     {
         using var task = PurchaseApplication(Scenario("WrongAssignee", Purchasing, CreateRequest + StartApproval + """
-            { "type": "expectTask", "record": "request", "step": "managerApproval", "assignee": { "user": "dung" } }
+            { "type": "expectTask", "record": "request", "step": "managerApproval", "assignee": { "user": "finance-reviewer" } }
             """));
         using var instance = PurchaseApplication(Scenario("WrongState", Purchasing, CreateRequest + StartApproval + """
             { "type": "expectInstance", "process": "PurchaseRequestApproval", "record": "request", "state": "completed" }
@@ -486,7 +486,7 @@ public sealed class ScenarioRunnerTests
         var missing = await RunAsync(noTask, "NoTaskYet");
 
         Assert.Equal(
-            "Step 3 (expectTask): task 'managerApproval' expected assignee user 'dung' but was user 'binh'", wrongAssignee.Failure);
+            "Step 3 (expectTask): task 'managerApproval' expected assignee user 'finance-reviewer' but was user 'manager'", wrongAssignee.Failure);
         Assert.StartsWith("Step 3 (expectInstance): ", wrongState.Failure);
         Assert.Contains("expected state completed but was waiting", wrongState.Failure);
         Assert.Contains("managerApproval", wrongState.Failure);
@@ -559,9 +559,9 @@ public sealed class ScenarioRunnerTests
     [Theory]
     [InlineData("""{ "role": "finance-reviewer" }""", "inApp")]
     [InlineData("""{ "role": "employee" }""", "email")]
-    [InlineData("""{ "user": "binh" }""", "inApp")]
-    [InlineData("""{ "user": "binh" }""", "email")]
-    [InlineData("""{ "email": "binh@scenario.invalid" }""", "email")]
+    [InlineData("""{ "user": "manager" }""", "inApp")]
+    [InlineData("""{ "user": "manager" }""", "email")]
+    [InlineData("""{ "email": "manager@scenario.invalid" }""", "email")]
     [InlineData("""{ "email": "requester@scenario.invalid" }""", "inApp")]
     public async Task A_recipient_that_was_not_notified_on_the_channel_fails_expectNotification_with_no_notification_found(string recipient, string channel)
     {
@@ -649,7 +649,7 @@ public sealed class ScenarioRunnerTests
     public async Task A_task_escalation_reassigns_the_task_after_advance_time_passes_it_and_the_deadline_comes_later()
     {
         using var folder = DeadlineApplication(Scenario("TaskEscalation", Purchasing, CreateRequest + StartApproval + """
-            { "type": "expectTask", "record": "request", "step": "managerApproval", "assignee": { "user": "binh" } },
+            { "type": "expectTask", "record": "request", "step": "managerApproval", "assignee": { "user": "manager" } },
             { "type": "advanceTime", "by": "PT12H" },
             { "type": "expectTask", "record": "request", "step": "managerApproval", "assignee": { "role": "department-manager" } },
             { "type": "expectTask", "record": "request", "step": "managerApproval", "state": "open" },
@@ -683,7 +683,7 @@ public sealed class ScenarioRunnerTests
             { "type": "expectInstance", "process": "PurchaseRequestApproval", "record": "request", "state": "waiting", "step": "financeApproval" }
             """, now: ScheduleNow));
         using var completed = DeadlineApplication(Scenario("CompletedFirst", Purchasing, CreateRequest + StartApproval + """
-            { "type": "completeTask", "record": "request", "step": "managerApproval", "outcome": "approve", "as": "binh" },
+            { "type": "completeTask", "record": "request", "step": "managerApproval", "outcome": "approve", "as": "manager" },
             { "type": "expectInstance", "process": "PurchaseRequestApproval", "record": "request", "state": "completed" },
             { "type": "advanceTime", "by": "P2D" },
             { "type": "expectInstance", "process": "PurchaseRequestApproval", "record": "request", "state": "completed" },
@@ -744,7 +744,7 @@ public sealed class ScenarioRunnerTests
     public async Task An_action_that_runs_more_work_items_than_the_limit_fails_at_that_step()
     {
         using var folder = PurchaseApplication(Scenario("TooManySteps", Purchasing, CreateRequest + StartApproval + """
-            { "type": "completeTask", "record": "request", "step": "managerApproval", "outcome": "approve", "as": "binh" }
+            { "type": "completeTask", "record": "request", "step": "managerApproval", "outcome": "approve", "as": "manager" }
             """));
 
         var result = await RunAsync(folder, "TooManySteps", workItemLimit: 2);
@@ -755,7 +755,7 @@ public sealed class ScenarioRunnerTests
     }
 
     private const string ApproveBelowThreshold = CreateRequest + StartApproval + """
-        { "type": "completeTask", "record": "request", "step": "managerApproval", "outcome": "approve", "as": "binh" },
+        { "type": "completeTask", "record": "request", "step": "managerApproval", "outcome": "approve", "as": "manager" },
         """;
 
     private const string OrderStub = """{ "connector": { "name": "PurchasingSystem", "operation": "createPurchaseOrder" }, "output": { "orderNumber": "PO-1001" } }""";

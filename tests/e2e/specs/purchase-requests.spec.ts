@@ -249,7 +249,7 @@ test('the per-department page shows one row per department with its total, sorts
   page,
   request,
 }) => {
-  // requester submits one request in each department, so the finance reviewer dung reads them all.
+  // requester submits one request in each department, so the finance-reviewer user reads them all.
   // Engineering < Finance < Operations by total, even with other tests adding Operations requests in parallel.
   const prices = { Engineering: 1, Finance: 100, Operations: 9000000 }
   const ids: string[] = []
@@ -290,7 +290,7 @@ test('the per-department page shows one row per department with its total, sorts
   // Only this test submits Engineering requests, and no one decides them, so their total stays fixed
   // during the run. The approval spec adds Operations requests in parallel, so the Operations total is
   // not checked.
-  await useSession(page, 'dung')
+  await useSession(page, 'finance-reviewer')
   const groups = await page.request.get(`${appPath}/data-sources/RequestsByDepartment/rows?pageSize=100`)
   expect(groups.status()).toBe(200)
   const body = (await groups.json()) as {
@@ -397,7 +397,7 @@ test('searching in the supplier lookup filters the suppliers by name, and pickin
 
 test('switching the locale to Vietnamese shows the Vietnamese navigation', async ({ page }) => {
   // The per-department page is not in the employee's navigation, so this test runs as the finance reviewer.
-  await useSession(page, 'dung')
+  await useSession(page, 'finance-reviewer')
   // The header actions take room. At the default width they can push the last Vietnamese
   // navigation entry into the overflow menu, so this test uses a wider window.
   await page.setViewportSize({ width: 1440, height: 900 })

@@ -6,7 +6,7 @@
   "now": "2026-10-01T09:00:00Z",
   "users": {
     "requester": ["requester"],
-    "lan": ["requester"]
+    "employee": ["requester"]
   },
   "steps": [
     {
@@ -23,7 +23,7 @@
     {
       "type": "updateRecord",
       "record": "ticket",
-      "as": "lan",
+      "as": "employee",
       "values": {
         "title": "x"
       },
@@ -33,7 +33,7 @@
       "type": "startProcess",
       "process": "TicketHandling",
       "record": "ticket",
-      "as": "lan",
+      "as": "employee",
       "expect": "notFound"
     },
     {

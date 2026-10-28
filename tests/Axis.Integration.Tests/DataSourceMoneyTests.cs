@@ -55,10 +55,10 @@ public sealed class DataSourceMoneyTests(RecordApiFixture fixture) : IClassFixtu
     public async Task User_without_a_read_grant_on_the_data_source_gets_403()
     {
         await fixture.ResetAsync();
-        using var binh = fixture.CreateClient().SignedInAs("binh");
+        using var manager = fixture.CreateClient().SignedInAs("manager");
 
         using var request = Request(HttpMethod.Get, Rows, HostA);
-        using var response = await binh.SendAsync(request, CancellationToken);
+        using var response = await manager.SendAsync(request, CancellationToken);
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }

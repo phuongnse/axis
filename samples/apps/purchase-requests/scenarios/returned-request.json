@@ -6,7 +6,7 @@
   "now": "2026-10-01T09:00:00Z",
   "users": {
     "requester": ["employee"],
-    "binh": ["department-manager"]
+    "manager": ["department-manager"]
   },
   "steps": [
     {
@@ -24,7 +24,7 @@
       }
     },
     { "type": "startProcess", "process": "PurchaseRequestApproval", "record": "request", "as": "requester" },
-    { "type": "completeTask", "record": "request", "step": "managerApproval", "outcome": "return", "as": "binh" },
+    { "type": "completeTask", "record": "request", "step": "managerApproval", "outcome": "return", "as": "manager" },
     { "type": "expectRecord", "record": "request", "values": { "status": "returned" } },
     {
       "type": "expectInstance",
@@ -40,6 +40,6 @@
       "step": "managerApproval",
       "state": "open"
     },
-    { "type": "expectTask", "record": "request", "step": "managerApproval", "assignee": { "user": "binh" } }
+    { "type": "expectTask", "record": "request", "step": "managerApproval", "assignee": { "user": "manager" } }
   ]
 }

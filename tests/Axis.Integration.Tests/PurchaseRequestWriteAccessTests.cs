@@ -50,11 +50,11 @@ public sealed class PurchaseRequestWriteAccessTests(SampleAppFixture fixture) : 
     public async Task An_employee_may_update_their_returned_request()
     {
         using var requester = fixture.CreateClient().SignedInAs("requester");
-        using var chau = fixture.CreateClient().SignedInAs("chau");
+        using var manager2 = fixture.CreateClient().SignedInAs("manager-2");
         var subject = await CreateRequestAsync(requester, 500);
         await StartAsync(requester, subject);
         await fixture.RunUntilIdleAsync(CancellationToken);
-        await ReturnAsync(chau, subject);
+        await ReturnAsync(manager2, subject);
         await fixture.RunUntilIdleAsync(CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, await EditTitleAsync(requester, subject));

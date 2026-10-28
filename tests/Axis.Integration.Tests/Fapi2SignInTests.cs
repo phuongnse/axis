@@ -92,11 +92,11 @@ public sealed partial class Fapi2SignInTests(KeycloakFixture keycloak, PostgreSq
         await using var _ = factory;
         using var client = CreateClient(factory, _plainAddress);
 
-        var callback = await LogInAtKeycloakAsync(client, authority, "binh", _plainAddress, par: false);
+        var callback = await LogInAtKeycloakAsync(client, authority, "manager", _plainAddress, par: false);
         using var signedIn = await SendAsync(client, WithIssuer(callback, issuer: null).PathAndQuery);
 
         Assert.Equal(HttpStatusCode.Found, signedIn.StatusCode);
-        Assert.Equal("binh", await MeAsync(client));
+        Assert.Equal("manager", await MeAsync(client));
         var plain = calls["plain"].Calls;
         Assert.DoesNotContain(plain, call => call.Url.EndsWith(ParPath, StringComparison.Ordinal));
         Assert.DoesNotContain(plain, call => call.Form.ContainsKey("client_assertion"));

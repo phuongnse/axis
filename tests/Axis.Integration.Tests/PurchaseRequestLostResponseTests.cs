@@ -24,7 +24,7 @@ public sealed class PurchaseRequestLostResponseTests(SampleAppFixture fixture) :
     public async Task A_worker_stopped_after_the_order_is_stored_is_settled_by_the_next_worker_with_one_order()
     {
         using var requester = fixture.CreateClient().SignedInAs("requester");
-        using var chau = fixture.CreateClient().SignedInAs("chau");
+        using var manager2 = fixture.CreateClient().SignedInAs("manager-2");
         var (subject, number) = await CreateAsync(requester);
         await StubAsync($"/test/hold-request/{number}");
         var instance = await StartAsync(requester, subject);
@@ -32,7 +32,7 @@ public sealed class PurchaseRequestLostResponseTests(SampleAppFixture fixture) :
         var call = Guid.Empty;
         using (var workerA = await fixture.StartWorkerAsync(new LogCollector()))
         {
-            await ApproveAsync(chau, instance);
+            await ApproveAsync(manager2, instance);
             call = await StoredWhileSendingAsync(instance, number);
             await workerA.StopAsync(CancellationToken);
         }
@@ -66,7 +66,7 @@ public sealed class PurchaseRequestLostResponseTests(SampleAppFixture fixture) :
     public async Task Two_workers_racing_on_the_same_call_create_one_order()
     {
         using var requester = fixture.CreateClient().SignedInAs("requester");
-        using var chau = fixture.CreateClient().SignedInAs("chau");
+        using var manager2 = fixture.CreateClient().SignedInAs("manager-2");
         var (subject, number) = await CreateAsync(requester);
         await StubAsync($"/test/hold-request/{number}");
         var instance = await StartAsync(requester, subject);
@@ -74,7 +74,7 @@ public sealed class PurchaseRequestLostResponseTests(SampleAppFixture fixture) :
         var logsA = new LogCollector();
         var logsB = new LogCollector();
         using var workerA = await fixture.StartWorkerAsync(logsA);
-        await ApproveAsync(chau, instance);
+        await ApproveAsync(manager2, instance);
         var call = await StoredWhileSendingAsync(instance, number);
 
         // Worker A still waits for its response when worker B takes the call over and settles it.
@@ -111,7 +111,7 @@ public sealed class PurchaseRequestLostResponseTests(SampleAppFixture fixture) :
     public async Task A_dropped_response_is_retried_with_the_same_key_and_history_and_audit_show_the_attempts_and_the_settlement()
     {
         using var requester = fixture.CreateClient().SignedInAs("requester");
-        using var chau = fixture.CreateClient().SignedInAs("chau");
+        using var manager2 = fixture.CreateClient().SignedInAs("manager-2");
         var (subject, number) = await CreateAsync(requester);
         await StubAsync($"/test/drop-request/{number}");
         var instance = await StartAsync(requester, subject);
@@ -120,7 +120,7 @@ public sealed class PurchaseRequestLostResponseTests(SampleAppFixture fixture) :
         var call = Guid.Empty;
         using (var worker = await fixture.StartWorkerAsync(logs))
         {
-            await ApproveAsync(chau, instance);
+            await ApproveAsync(manager2, instance);
             await WaitUntilAsync(async () => await InstanceCallAsync(instance) == "pending:1", "The call did not turn pending.");
             call = await CallIdAsync(instance);
             Assert.NotNull(await LastErrorAsync(call));
@@ -179,14 +179,14 @@ public sealed class PurchaseRequestLostResponseTests(SampleAppFixture fixture) :
         return (subject, number);
     }
 
-    /// <summary>Waits until the running worker has opened chau's task for the instance, and approves it.</summary>
-    private async Task ApproveAsync(HttpClient chau, Guid instance)
+    /// <summary>Waits until the running worker has opened manager-2's task for the instance, and approves it.</summary>
+    private async Task ApproveAsync(HttpClient manager2, Guid instance)
     {
         await WaitUntilAsync(async () => await StateAsync(instance) == "waiting:managerApproval", "The instance did not wait for approval.");
         var task = (Guid)(await fixture.ScalarAsync(
             "SELECT id FROM axis.process_tasks WHERE process_instance_id = @instance AND state = 'open'",
             ("instance", instance)))!;
-        using var completed = await CompleteAsync(chau, task, """{ "outcome": "approve" }""");
+        using var completed = await CompleteAsync(manager2, task, """{ "outcome": "approve" }""");
         Assert.Equal(HttpStatusCode.OK, completed.StatusCode);
     }
 

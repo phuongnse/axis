@@ -24,7 +24,7 @@ public sealed class ScenarioCompilerTests
     public void Every_problem_of_a_scenario_gets_its_own_code_at_its_path_in_one_compile()
     {
         using var folder = SampleCopy().With(ScenarioFile, Scenario("""
-            "users": { "requester": ["employee", "ghost-role"], "binh": ["department-manager"] },
+            "users": { "requester": ["employee", "ghost-role"], "manager": ["department-manager"] },
             "stubs": [
               { "connector": { "name": "Missing", "operation": "createPurchaseOrder" }, "output": {} },
               { "connector": { "name": "purchasingsystem", "operation": "nope" }, "output": {} },
@@ -49,8 +49,8 @@ public sealed class ScenarioCompilerTests
               { "type": "startProcess", "process": "Unknown", "record": "request", "as": "requester" },
               { "type": "startProcess", "process": "PurchaseRequestApproval", "record": "missing", "as": "nobody" },
               { "type": "startProcess", "process": "PurchaseRequestApproval", "record": "department", "as": "requester" },
-              { "type": "completeTask", "record": "request", "step": "nothing", "outcome": "approve", "as": "binh" },
-              { "type": "completeTask", "record": "request", "step": "MANAGERAPPROVAL", "outcome": "nope", "as": "binh" },
+              { "type": "completeTask", "record": "request", "step": "nothing", "outcome": "approve", "as": "manager" },
+              { "type": "completeTask", "record": "request", "step": "MANAGERAPPROVAL", "outcome": "nope", "as": "manager" },
               { "type": "expectTask", "record": "request", "step": "managerApproval", "assignee": { "role": "ghost-role" } },
               { "type": "expectTask", "record": "request", "step": "managerApproval", "assignee": { "user": "zed" } },
               { "type": "expectInstance", "process": "PurchaseRequestApproval", "record": "request", "state": "running", "step": "nowhere" }

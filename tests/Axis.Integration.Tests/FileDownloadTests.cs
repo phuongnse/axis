@@ -9,7 +9,7 @@ namespace Axis.Integration.Tests;
 /// <summary>
 /// Downloading an attached file, on the FilesApp fixture in tenant A. <c>requester</c> may create, update and read
 /// claims, <c>fern</c> may read only the claims titled Shared, <c>fia</c> may read only the title of a claim, and
-/// <c>binh</c> holds no role. Every refusal after sign-in is the same 404.
+/// <c>manager</c> holds no role. Every refusal after sign-in is the same 404.
 /// </summary>
 public sealed class FileDownloadTests(RecordApiFixture fixture) : IClassFixture<RecordApiFixture>
 {
@@ -115,10 +115,10 @@ public sealed class FileDownloadTests(RecordApiFixture fixture) : IClassFixture<
     public async Task A_user_without_a_read_grant_gets_404()
     {
         var (_, receipt, note) = await AttachedClaimAsync("Shared");
-        using var binh = fixture.CreateClient().SignedInAs("binh");
+        using var manager = fixture.CreateClient().SignedInAs("manager");
 
-        await AssertNotFoundAsync(binh, receipt.ToString("D"));
-        await AssertNotFoundAsync(binh, note.ToString("D"));
+        await AssertNotFoundAsync(manager, receipt.ToString("D"));
+        await AssertNotFoundAsync(manager, note.ToString("D"));
     }
 
     [Fact]

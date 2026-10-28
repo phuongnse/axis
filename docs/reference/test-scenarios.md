@@ -31,8 +31,8 @@ request ends `approved`:
   "now": "2026-10-01T09:00:00Z",
   "users": {
     "requester": ["employee"],
-    "binh": ["department-manager"],
-    "lan": ["finance-reviewer"]
+    "manager": ["department-manager"],
+    "employee": ["finance-reviewer"]
   },
   "stubs": [
     {
@@ -60,8 +60,8 @@ request ends `approved`:
       }
     },
     { "type": "startProcess", "process": "PurchaseRequestApproval", "record": "request", "as": "requester" },
-    { "type": "expectTask", "record": "request", "step": "managerApproval", "assignee": { "user": "binh" } },
-    { "type": "completeTask", "record": "request", "step": "managerApproval", "outcome": "approve", "as": "binh" },
+    { "type": "expectTask", "record": "request", "step": "managerApproval", "assignee": { "user": "manager" } },
+    { "type": "completeTask", "record": "request", "step": "managerApproval", "outcome": "approve", "as": "manager" },
     {
       "type": "expectInstance",
       "process": "PurchaseRequestApproval",
@@ -70,7 +70,7 @@ request ends `approved`:
       "step": "financeApproval"
     },
     { "type": "expectTask", "record": "request", "step": "financeApproval", "assignee": { "role": "finance-reviewer" } },
-    { "type": "completeTask", "record": "request", "step": "financeApproval", "outcome": "approve", "as": "lan" },
+    { "type": "completeTask", "record": "request", "step": "financeApproval", "outcome": "approve", "as": "employee" },
     {
       "type": "expectInstance",
       "process": "PurchaseRequestApproval",
@@ -256,7 +256,7 @@ advances three hours, the schedule has fired and the manager has a task:
   "now": "2026-10-01T09:00:00Z",
   "users": {
     "requester": ["employee"],
-    "binh": ["department-manager"]
+    "manager": ["department-manager"]
   },
   "steps": [
     {
@@ -273,9 +273,9 @@ advances three hours, the schedule has fired and the manager has a task:
         "lineItems": [{ "description": "Laptop", "quantity": 3, "unitPrice": 5000 }]
       }
     },
-    { "type": "completeTask", "record": "request", "step": "managerApproval", "outcome": "approve", "as": "binh", "expect": "notFound" },
+    { "type": "completeTask", "record": "request", "step": "managerApproval", "outcome": "approve", "as": "manager", "expect": "notFound" },
     { "type": "advanceTime", "by": "PT3H" },
-    { "type": "expectTask", "record": "request", "step": "managerApproval", "assignee": { "user": "binh" } }
+    { "type": "expectTask", "record": "request", "step": "managerApproval", "assignee": { "user": "manager" } }
   ]
 }
 ```
@@ -330,7 +330,7 @@ What runs now:
   the scenario with `ConditionFailed`, and no `expect` matches it.
 - `expectInstance` and `expectTask`. They read the newest instance or task of
   the record. A failure names both values, for example
-  `Step 4 (expectTask): task 'managerApproval' expected assignee user 'binh' but was user 'dung'`
+  `Step 4 (expectTask): task 'managerApproval' expected assignee user 'manager' but was user 'finance-reviewer'`
   or `instance of process 'PurchaseRequestApproval' expected state completed but
   was waiting at step 'managerApproval'`. `step` on `expectInstance` is compared
   ignoring letter case.

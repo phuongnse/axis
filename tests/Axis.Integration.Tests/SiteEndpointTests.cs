@@ -321,7 +321,7 @@ public sealed class SiteEndpointTests(RecordApiFixture fixture) : IClassFixture<
     [Theory]
     [InlineData("rita", "departments")]
     [InlineData("rita", "itemsbydepartment")]
-    [InlineData("binh", "items")]
+    [InlineData("manager", "items")]
     [InlineData("fia", "itemsbydepartment")]
     public async Task Page_the_user_cannot_read_is_a_403_problem(string user, string page)
     {
@@ -337,7 +337,7 @@ public sealed class SiteEndpointTests(RecordApiFixture fixture) : IClassFixture<
     [Fact]
     public async Task Unknown_page_is_a_404_before_the_grants_are_checked()
     {
-        using var client = fixture.CreateClient().SignedInAs("binh");
+        using var client = fixture.CreateClient().SignedInAs("manager");
         using var request = Request("/api/sites/records/pages/Unknown", HostA);
 
         using var response = await client.SendAsync(request, CancellationToken);
@@ -348,7 +348,7 @@ public sealed class SiteEndpointTests(RecordApiFixture fixture) : IClassFixture<
     [Fact]
     public async Task Task_inbox_page_is_readable_by_a_user_without_a_role()
     {
-        using var client = fixture.CreateClient().SignedInAs("binh");
+        using var client = fixture.CreateClient().SignedInAs("manager");
 
         using var page = await GetJsonAsync(client, "/api/sites/records/pages/mytasks", HostA);
 

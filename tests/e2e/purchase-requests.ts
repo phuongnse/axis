@@ -4,7 +4,7 @@ import { csrfHeaders } from './csrf'
 import { expectShown, fieldLabel, fieldValue } from './fields'
 
 // Specs run in parallel against one database, so each test looks only for the request and the tasks
-// it creates. They use Operations, whose manager is chau, so that the per-department test keeps the
+// it creates. They use Operations, whose manager is manager-2, so that the per-department test keeps the
 // Engineering total fixed.
 export const appPath = '/api/apps/PurchaseRequests'
 export const recordsPath = `${appPath}/entities/PurchaseRequest/records`

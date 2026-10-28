@@ -10,7 +10,7 @@
       "name": "review",
       "type": "task",
       "label": { "textKey": "ticketReview.task" },
-      "assignee": { "user": "'binh'" },
+      "assignee": { "user": "'manager'" },
       "form": "TicketReview",
       "dueIn": "P3D",
       "outcomes": [

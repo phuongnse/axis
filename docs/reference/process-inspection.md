@@ -264,7 +264,7 @@ in any state. The body has these parts:
       "assignee": "manager",
       "state": "completed",
       "outcome": "approve",
-      "completedBy": "binh",
+      "completedBy": "manager",
       "createdAt": "2026-10-10T02:05:00.123456Z",
       "completedAt": "2026-10-10T04:00:00.000000Z"
     }

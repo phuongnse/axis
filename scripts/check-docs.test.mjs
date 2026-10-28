@@ -323,8 +323,8 @@ describe('development users', () => {
 
   beforeEach(() => {
     write('docs/README.md', '# Documentation\n\n| [Decisions](decisions.md) | [Guide](reference/guide.md) | [Security](reference/security.md) |\n')
-    writeSecurity(userRow('requester', ['employee', 'requester']), userRow('binh', ['department-manager']))
-    writeRealm(realmUser('requester', ['employee', 'requester']), realmUser('binh', ['department-manager']))
+    writeSecurity(userRow('requester', ['employee', 'requester']), userRow('manager', ['department-manager']))
+    writeRealm(realmUser('requester', ['employee', 'requester']), realmUser('manager', ['department-manager']))
   })
 
   test('passes on matching files', () => {
@@ -332,31 +332,31 @@ describe('development users', () => {
   })
 
   test('passes when the roles are in another order', () => {
-    writeSecurity(userRow('requester', ['requester', 'employee']), userRow('binh', ['department-manager']))
+    writeSecurity(userRow('requester', ['requester', 'employee']), userRow('manager', ['department-manager']))
 
     assert.deepEqual(messages(), [])
   })
 
   test('reports a table user who is not in the realm, on the table row', () => {
-    writeSecurity(userRow('requester', ['employee', 'requester']), userRow('binh', ['department-manager']), userRow('chau', ['department-manager']))
+    writeSecurity(userRow('requester', ['employee', 'requester']), userRow('manager', ['department-manager']), userRow('manager-2', ['department-manager']))
 
-    assert.deepEqual(messages(), [`${security}:11: chau is in the development users table but not in ${realmFile}`])
+    assert.deepEqual(messages(), [`${security}:11: manager-2 is in the development users table but not in ${realmFile}`])
   })
 
   test('reports a realm user who is not in the table, on the username line', () => {
     const text = writeRealm(
       realmUser('requester', ['employee', 'requester']),
-      realmUser('binh', ['department-manager']),
-      realmUser('dung', ['finance-reviewer']),
+      realmUser('manager', ['department-manager']),
+      realmUser('finance-reviewer', ['finance-reviewer']),
     )
 
     assert.deepEqual(messages(), [
-      `${realmFile}:${lineOf(text, '"username": "dung"')}: dung is in ${realmFile} but not in the development users table of ${security}`,
+      `${realmFile}:${lineOf(text, '"username": "finance-reviewer"')}: finance-reviewer is in ${realmFile} but not in the development users table of ${security}`,
     ])
   })
 
   test('reports roles that differ, naming both lists on the table row', () => {
-    writeSecurity(userRow('requester', ['employee']), userRow('binh', ['department-manager']))
+    writeSecurity(userRow('requester', ['employee']), userRow('manager', ['department-manager']))
 
     assert.deepEqual(messages(), [
       `${security}:9: requester has the roles employee in the table and employee, requester in ${realmFile}`,
@@ -364,10 +364,10 @@ describe('development users', () => {
   })
 
   test('reports an id that differs from the username on the username line', () => {
-    const text = writeRealm(realmUser('requester', ['employee', 'requester']), realmUser('binh', ['department-manager'], 'binh-id'))
+    const text = writeRealm(realmUser('requester', ['employee', 'requester']), realmUser('manager', ['department-manager'], 'manager-id'))
 
     assert.deepEqual(messages(), [
-      `${realmFile}:${lineOf(text, '"username": "binh"')}: binh has the id 'binh-id': a development user's id is its username`,
+      `${realmFile}:${lineOf(text, '"username": "manager"')}: manager has the id 'manager-id': a development user's id is its username`,
     ])
   })
 

@@ -20,7 +20,7 @@ public sealed class PurchaseRequestResubmitTests(SampleAppFixture fixture) : ICl
     public async Task A_returned_request_keeps_its_ended_instance_and_a_resubmission_starts_a_new_one_on_the_active_release()
     {
         using var requester = fixture.CreateClient().SignedInAs("requester");
-        using var chau = fixture.CreateClient().SignedInAs("chau");
+        using var manager2 = fixture.CreateClient().SignedInAs("manager-2");
         var subject = await CreateRequestAsync(requester, 500);
         using (var started = await StartAsync(requester, subject))
         {
@@ -28,7 +28,7 @@ public sealed class PurchaseRequestResubmitTests(SampleAppFixture fixture) : ICl
         }
 
         await fixture.RunUntilIdleAsync(CancellationToken);
-        await DecideAsync(chau, subject, "return");
+        await DecideAsync(manager2, subject, "return");
 
         Assert.Equal("returned", await StatusAsync(requester, subject));
         var first = Assert.Single(await fixture.InstancesAsync(subject));
@@ -72,7 +72,7 @@ public sealed class PurchaseRequestResubmitTests(SampleAppFixture fixture) : ICl
     public async Task A_rejected_request_fails_the_start_condition_and_no_instance_is_created()
     {
         using var requester = fixture.CreateClient().SignedInAs("requester");
-        using var chau = fixture.CreateClient().SignedInAs("chau");
+        using var manager2 = fixture.CreateClient().SignedInAs("manager-2");
         var subject = await CreateRequestAsync(requester, 500);
         using (var started = await StartAsync(requester, subject))
         {
@@ -80,7 +80,7 @@ public sealed class PurchaseRequestResubmitTests(SampleAppFixture fixture) : ICl
         }
 
         await fixture.RunUntilIdleAsync(CancellationToken);
-        await DecideAsync(chau, subject, "reject");
+        await DecideAsync(manager2, subject, "reject");
         Assert.Equal("rejected", await StatusAsync(requester, subject));
 
         using var again = await StartAsync(requester, subject);

@@ -45,10 +45,10 @@ public sealed class DirectorySignInTests(PostgreSqlFixture database, KeycloakFix
         using var cookieless = CreateClient(factory, _addressB, handleCookies: false);
 
         var signInA = await SignInAsync(clientA, authority, "requester", _addressA);
-        var signInB = await SignInAsync(clientB, authority, "binh", _addressB);
+        var signInB = await SignInAsync(clientB, authority, "manager", _addressB);
 
         Assert.Equal("requester", await MeAsync(clientA));
-        Assert.Equal("binh", await MeAsync(clientB));
+        Assert.Equal("manager", await MeAsync(clientB));
         using var crossed = await GetMeWithCookieAsync(cookieless, signInA.SessionCookie);
         Assert.Equal(HttpStatusCode.Unauthorized, crossed.StatusCode);
         Assert.NotEmpty(signInB.SessionCookie);

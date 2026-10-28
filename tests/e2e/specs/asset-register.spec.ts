@@ -3,13 +3,13 @@ import { expect, test } from '../test'
 import { csrfHeaders } from '../csrf'
 import { useSession } from '../sessions'
 
-// The asset register runs on the same platform as the other samples. quan, the asset manager, sees every
+// The asset register runs on the same platform as the other samples. The asset-manager user sees every
 // asset, where an employee sees only the assets they hold. Specs run in parallel against one database, so
 // this test relies only on the assets it creates, each named with a unique part of its own.
 const assetsPath = '/api/apps/AssetManagement/entities/Asset/records'
 
 test('the asset register finds an asset by name from its search box', async ({ page }) => {
-  await useSession(page, 'quan')
+  await useSession(page, 'asset-manager')
   const run = `${Date.now()}-${test.info().retry}`
   const laptop = `Laptop ${run}`
   const monitor = `Monitor ${run}`
@@ -31,7 +31,7 @@ test('the asset register finds an asset by name from its search box', async ({ p
 })
 
 test('an asset manager exports the searched assets to CSV and finds only the match', async ({ page }) => {
-  await useSession(page, 'quan')
+  await useSession(page, 'asset-manager')
   const run = `${Date.now()}-${test.info().retry}`
   const printer = `Printer ${run}`
   const scanner = `Scanner ${run}`
@@ -60,7 +60,7 @@ test('an asset manager exports the searched assets to CSV and finds only the mat
 })
 
 test('an employee sees the assets and no Export button', async ({ page }) => {
-  await useSession(page, 'lan')
+  await useSession(page, 'employee')
 
   await page.goto('/asset-management/assets')
 

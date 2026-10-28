@@ -27,10 +27,10 @@ public sealed class StudioTestRequestTests : IAsyncLifetime
         using var folder = StudioPublishTests.NewFolder();
         var connectionString = await _database.CreateDatabaseAsync("studio_test_store", CancellationToken);
         await using var factory = StudioPublishTests.NewFactory(folder.Path, [("a", StudioPublishTests.HostA, connectionString)]);
-        using var lan = factory.CreateClient().SignedInAs("lan");
+        using var employee = factory.CreateClient().SignedInAs("employee");
 
         using var accepted = await StudioPublishTests.SendAsync(
-            lan, HttpMethod.Post, TestUrl, StudioPublishTests.HostA, """{ "scenarios": ["Second", "First"] }""");
+            employee, HttpMethod.Post, TestUrl, StudioPublishTests.HostA, """{ "scenarios": ["Second", "First"] }""");
 
         Assert.Equal(HttpStatusCode.Accepted, accepted.StatusCode);
         using var request = await StudioPublishTests.ReadAsync(accepted);
@@ -51,12 +51,12 @@ public sealed class StudioTestRequestTests : IAsyncLifetime
         using var folder = StudioPublishTests.NewFolder();
         var connectionString = await _database.CreateDatabaseAsync("studio_test_all", CancellationToken);
         await using var factory = StudioPublishTests.NewFactory(folder.Path, [("a", StudioPublishTests.HostA, connectionString)]);
-        using var lan = factory.CreateClient().SignedInAs("lan");
+        using var employee = factory.CreateClient().SignedInAs("employee");
 
         foreach (var body in new string?[] { null, "{}", """{ "scenarios": [] }""" })
         {
             using var accepted = await StudioPublishTests.SendAsync(
-                lan, HttpMethod.Post, TestUrl, StudioPublishTests.HostA, body, contentType: body is null ? null : "application/json");
+                employee, HttpMethod.Post, TestUrl, StudioPublishTests.HostA, body, contentType: body is null ? null : "application/json");
             Assert.Equal(HttpStatusCode.Accepted, accepted.StatusCode);
         }
 

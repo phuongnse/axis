@@ -25,7 +25,7 @@ public sealed class PurchaseRequestRecoveryTests(SampleAppFixture fixture) : ICl
     public async Task A_decision_made_while_no_worker_runs_is_taken_up_by_the_next_worker(int unitPrice, string state, string steps, string status)
     {
         using var requester = fixture.CreateClient().SignedInAs("requester");
-        using var chau = fixture.CreateClient().SignedInAs("chau");
+        using var manager2 = fixture.CreateClient().SignedInAs("manager-2");
         var subject = await CreateRequestAsync(requester, unitPrice);
         var instance = await StartAsync(requester, subject);
 
@@ -39,7 +39,7 @@ public sealed class PurchaseRequestRecoveryTests(SampleAppFixture fixture) : ICl
         var task = (Guid)(await fixture.ScalarAsync(
             "SELECT id FROM axis.process_tasks WHERE process_instance_id = @instance AND state = 'open'",
             ("instance", instance)))!;
-        using (var completed = await CompleteAsync(chau, task, """{ "outcome": "approve" }"""))
+        using (var completed = await CompleteAsync(manager2, task, """{ "outcome": "approve" }"""))
         {
             Assert.Equal(HttpStatusCode.OK, completed.StatusCode);
         }

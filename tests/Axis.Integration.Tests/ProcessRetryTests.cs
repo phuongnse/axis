@@ -11,7 +11,7 @@ namespace Axis.Integration.Tests;
 /// <summary>
 /// An operator with a <c>retry</c> grant sends a failed purchase request approval back to its
 /// failed step, through the HTTP API. The sample gives the grant to the finance reviewers, here
-/// <c>dung</c>. <c>requester</c> starts the approvals and <c>chau</c> is the manager of Operations.
+/// <c>finance-reviewer</c>. <c>requester</c> starts the approvals and <c>manager-2</c> is the manager of Operations.
 /// A step fails when the request's department has no manager, and a retry works once the
 /// department is Operations. Each test leaves no due work item behind, so the next one finds
 /// only its own.
@@ -36,14 +36,14 @@ public sealed class ProcessRetryTests(SampleAppFixture fixture) : IClassFixture<
     public async Task A_step_that_failed_on_bad_data_runs_again_after_the_record_is_fixed()
     {
         using var requester = fixture.CreateClient().SignedInAs("requester");
-        using var chau = fixture.CreateClient().SignedInAs("chau");
-        using var dung = fixture.CreateClient().SignedInAs("dung");
+        using var manager2 = fixture.CreateClient().SignedInAs("manager-2");
+        using var financeReviewer = fixture.CreateClient().SignedInAs("finance-reviewer");
         var (subject, instance) = await FailAsync(requester);
         var releaseBefore = await ScalarAsync("SELECT release_id FROM axis.process_instances WHERE id = @id", instance);
         Assert.NotNull(await ScalarAsync("SELECT ended_at FROM axis.process_instances WHERE id = @id", instance));
         await SetDepartmentAsync(subject, Operations);
 
-        using (var response = await RetryAsync(dung, instance, Reason))
+        using (var response = await RetryAsync(financeReviewer, instance, Reason))
         {
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
             using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
@@ -65,10 +65,10 @@ public sealed class ProcessRetryTests(SampleAppFixture fixture) : IClassFixture<
         await fixture.RunUntilIdleAsync(CancellationToken);
         Assert.Equal("waiting", await StateAsync(instance));
         var task = await OpenTaskAsync(instance);
-        Assert.Contains(task, await InboxAsync(chau));
+        Assert.Contains(task, await InboxAsync(manager2));
 
         // The step ran with the department as it is now, so its manager decides and the instance moves on.
-        using var approved = await CompleteAsync(chau, task, """{ "outcome": "reject" }""");
+        using var approved = await CompleteAsync(manager2, task, """{ "outcome": "reject" }""");
         Assert.Equal(HttpStatusCode.OK, approved.StatusCode);
         await fixture.RunUntilIdleAsync(CancellationToken);
         Assert.Equal("completed", await StateAsync(instance));
@@ -78,7 +78,7 @@ public sealed class ProcessRetryTests(SampleAppFixture fixture) : IClassFixture<
     public async Task Retrying_while_another_instance_waits_for_the_record_is_409_and_changes_nothing()
     {
         using var requester = fixture.CreateClient().SignedInAs("requester");
-        using var dung = fixture.CreateClient().SignedInAs("dung");
+        using var financeReviewer = fixture.CreateClient().SignedInAs("finance-reviewer");
         var (subject, instance) = await FailAsync(requester);
         await SetDepartmentAsync(subject, Operations);
         await SetStatusAsync(subject, "returned");
@@ -88,7 +88,7 @@ public sealed class ProcessRetryTests(SampleAppFixture fixture) : IClassFixture<
         var revision = await ScalarAsync("SELECT revision FROM axis.process_instances WHERE id = @id", instance);
         var history = await HistoryAsync(instance);
 
-        using (var response = await RetryAsync(dung, instance, Reason))
+        using (var response = await RetryAsync(financeReviewer, instance, Reason))
         {
             using var problem = await RecordApiFixture.ReadProblemAsync(response, HttpStatusCode.Conflict);
             Assert.Equal(AlreadyRunningTitle, problem.RootElement.GetProperty("title").GetString());
@@ -102,7 +102,7 @@ public sealed class ProcessRetryTests(SampleAppFixture fixture) : IClassFixture<
     public async Task A_retry_that_loses_the_race_on_the_unique_index_is_409_and_changes_nothing()
     {
         using var requester = fixture.CreateClient().SignedInAs("requester");
-        using var dung = fixture.CreateClient().SignedInAs("dung");
+        using var financeReviewer = fixture.CreateClient().SignedInAs("finance-reviewer");
         var (subject, instance) = await FailAsync(requester);
         await SetDepartmentAsync(subject, Operations);
         var revision = await ScalarAsync("SELECT revision FROM axis.process_instances WHERE id = @id", instance);
@@ -130,7 +130,7 @@ public sealed class ProcessRetryTests(SampleAppFixture fixture) : IClassFixture<
             // The retry does not see the uncommitted row, so it waits on the unique index.
             var retry = Task.Run(async () =>
             {
-                using var response = await RetryAsync(dung, instance, Reason);
+                using var response = await RetryAsync(financeReviewer, instance, Reason);
                 using var problem = await RecordApiFixture.ReadProblemAsync(response, HttpStatusCode.Conflict);
                 return problem.RootElement.GetProperty("title").GetString();
             }, CancellationToken);
@@ -152,15 +152,15 @@ public sealed class ProcessRetryTests(SampleAppFixture fixture) : IClassFixture<
     public async Task A_user_without_a_retry_grant_gets_403_and_an_instance_that_is_not_failed_gets_409()
     {
         using var requester = fixture.CreateClient().SignedInAs("requester");
-        using var chau = fixture.CreateClient().SignedInAs("chau");
-        using var dung = fixture.CreateClient().SignedInAs("dung");
+        using var manager2 = fixture.CreateClient().SignedInAs("manager-2");
+        using var financeReviewer = fixture.CreateClient().SignedInAs("finance-reviewer");
         var (_, failed) = await FailAsync(requester);
         using (var denied = await RetryAsync(requester, failed, Reason))
         {
             Assert.Equal(HttpStatusCode.Forbidden, denied.StatusCode);
         }
 
-        using (var managerDenied = await RetryAsync(chau, failed, Reason))
+        using (var managerDenied = await RetryAsync(manager2, failed, Reason))
         {
             Assert.Equal(HttpStatusCode.Forbidden, managerDenied.StatusCode);
         }
@@ -172,20 +172,20 @@ public sealed class ProcessRetryTests(SampleAppFixture fixture) : IClassFixture<
         var instance = await StartAsync(requester, subject);
         await fixture.RunUntilIdleAsync(CancellationToken);
         Assert.Equal("waiting", await StateAsync(instance));
-        using (var waiting = await RetryAsync(dung, instance, Reason))
+        using (var waiting = await RetryAsync(financeReviewer, instance, Reason))
         {
             using var problem = await RecordApiFixture.ReadProblemAsync(waiting, HttpStatusCode.Conflict);
             Assert.Equal("The instance is not failed.", problem.RootElement.GetProperty("title").GetString());
         }
 
-        using (var rejected = await CompleteAsync(chau, await OpenTaskAsync(instance), """{ "outcome": "reject" }"""))
+        using (var rejected = await CompleteAsync(manager2, await OpenTaskAsync(instance), """{ "outcome": "reject" }"""))
         {
             Assert.Equal(HttpStatusCode.OK, rejected.StatusCode);
         }
 
         await fixture.RunUntilIdleAsync(CancellationToken);
         Assert.Equal("completed", await StateAsync(instance));
-        using (var completed = await RetryAsync(dung, instance, Reason))
+        using (var completed = await RetryAsync(financeReviewer, instance, Reason))
         {
             using var problem = await RecordApiFixture.ReadProblemAsync(completed, HttpStatusCode.Conflict);
             Assert.Equal("The instance is not failed.", problem.RootElement.GetProperty("title").GetString());
@@ -199,11 +199,11 @@ public sealed class ProcessRetryTests(SampleAppFixture fixture) : IClassFixture<
     public async Task A_retry_writes_one_audit_record_with_the_user_and_the_reason_and_a_history_row()
     {
         using var requester = fixture.CreateClient().SignedInAs("requester");
-        using var dung = fixture.CreateClient().SignedInAs("dung");
+        using var financeReviewer = fixture.CreateClient().SignedInAs("finance-reviewer");
         var (subject, instance) = await FailAsync(requester);
         await SetDepartmentAsync(subject, Operations);
 
-        using (var response = await RetryAsync(dung, instance, Reason))
+        using (var response = await RetryAsync(financeReviewer, instance, Reason))
         {
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         }
@@ -217,7 +217,7 @@ public sealed class ProcessRetryTests(SampleAppFixture fixture) : IClassFixture<
             command.Parameters.AddWithValue("id", instance);
             await using var reader = await command.ExecuteReaderAsync(CancellationToken);
             Assert.True(await reader.ReadAsync(CancellationToken));
-            Assert.Equal(("dung", "Dung Finance Reviewer", subject), (reader.GetString(0), reader.GetString(1), reader.GetGuid(2)));
+            Assert.Equal(("finance-reviewer", "Finance Reviewer User", subject), (reader.GetString(0), reader.GetString(1), reader.GetGuid(2)));
         }
 
         using var details = JsonDocument.Parse((string)(await fixture.ScalarAsync(
@@ -245,7 +245,7 @@ public sealed class ProcessRetryTests(SampleAppFixture fixture) : IClassFixture<
     public async Task A_retry_that_is_not_well_formed_or_names_no_instance_writes_nothing()
     {
         using var requester = fixture.CreateClient().SignedInAs("requester");
-        using var dung = fixture.CreateClient().SignedInAs("dung");
+        using var financeReviewer = fixture.CreateClient().SignedInAs("finance-reviewer");
         var (subject, instance) = await FailAsync(requester);
         await SetDepartmentAsync(subject, Operations);
 
@@ -257,14 +257,14 @@ public sealed class ProcessRetryTests(SampleAppFixture fixture) : IClassFixture<
             ("[]", "", "Must be a JSON object."),
         })
         {
-            using var response = await RetryAsync(dung, instance, body);
+            using var response = await RetryAsync(financeReviewer, instance, body);
             using var problem = await RecordApiFixture.ReadProblemAsync(response, HttpStatusCode.BadRequest);
             var errors = problem.RootElement.GetProperty("errors");
             Assert.Equal([key], errors.EnumerateObject().Select(error => error.Name));
             Assert.Equal([message], errors.GetProperty(key).EnumerateArray().Select(error => error.GetString()));
         }
 
-        using (var unknown = await RetryAsync(dung, Guid.NewGuid(), Reason))
+        using (var unknown = await RetryAsync(financeReviewer, Guid.NewGuid(), Reason))
         {
             Assert.Equal(HttpStatusCode.NotFound, unknown.StatusCode);
         }
@@ -277,12 +277,12 @@ public sealed class ProcessRetryTests(SampleAppFixture fixture) : IClassFixture<
     public async Task A_retried_purchase_order_call_is_sent_again_with_the_same_key_and_ends_with_one_order()
     {
         using var requester = fixture.CreateClient().SignedInAs("requester");
-        using var dung = fixture.CreateClient().SignedInAs("dung");
+        using var financeReviewer = fixture.CreateClient().SignedInAs("finance-reviewer");
         var (_, number, instance) = await FailAtPurchaseOrderAsync(requester);
         var call = (Guid)(await ScalarAsync("SELECT id FROM axis.connector_calls WHERE process_instance_id = @id", instance))!;
         await StubAsync($"/test/available-request/{number}");
 
-        using (var response = await RetryAsync(dung, instance, Reason))
+        using (var response = await RetryAsync(financeReviewer, instance, Reason))
         {
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         }
@@ -325,14 +325,14 @@ public sealed class ProcessRetryTests(SampleAppFixture fixture) : IClassFixture<
     public async Task A_retried_purchase_order_call_sends_the_input_evaluated_from_the_record_as_it_is_now()
     {
         using var requester = fixture.CreateClient().SignedInAs("requester");
-        using var dung = fixture.CreateClient().SignedInAs("dung");
+        using var financeReviewer = fixture.CreateClient().SignedInAs("finance-reviewer");
         var (subject, number, instance) = await FailAtPurchaseOrderAsync(requester);
         var call = (Guid)(await ScalarAsync("SELECT id FROM axis.connector_calls WHERE process_instance_id = @id", instance))!;
         Assert.NotEqual("GLOBEX", await fixture.ScalarAsync("SELECT input->>'supplierCode' FROM axis.connector_calls WHERE id = @id", ("id", call)));
         await UpdateRequestAsync(subject, "supplier", _globex);
         await StubAsync($"/test/available-request/{number}");
 
-        using (var response = await RetryAsync(dung, instance, Reason))
+        using (var response = await RetryAsync(financeReviewer, instance, Reason))
         {
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         }
@@ -344,18 +344,18 @@ public sealed class ProcessRetryTests(SampleAppFixture fixture) : IClassFixture<
         Assert.Equal("GLOBEX", Assert.Single(await OrdersAsync(number)).SupplierCode);
     }
 
-    // Starts an approval for a request of 500 whose purchasing system is unavailable, approves it as chau,
+    // Starts an approval for a request of 500 whose purchasing system is unavailable, approves it as manager-2,
     // and runs it until the createPurchaseOrder call has used up its five attempts and the instance failed.
     private async Task<(Guid Subject, string Number, Guid Instance)> FailAtPurchaseOrderAsync(HttpClient requester)
     {
-        using var chau = fixture.CreateClient().SignedInAs("chau");
+        using var manager2 = fixture.CreateClient().SignedInAs("manager-2");
         var subject = await CreateRequestAsync(requester, 500);
         var (number, _) = await NumbersAsync(requester, subject);
         await StubAsync($"/test/unavailable-request/{number}");
         var instance = await StartAsync(requester, subject);
         await fixture.RunUntilIdleAsync(CancellationToken);
         Assert.Equal("waiting", await StateAsync(instance));
-        using (var approved = await CompleteAsync(chau, await OpenTaskAsync(instance), """{ "outcome": "approve" }"""))
+        using (var approved = await CompleteAsync(manager2, await OpenTaskAsync(instance), """{ "outcome": "approve" }"""))
         {
             Assert.Equal(HttpStatusCode.OK, approved.StatusCode);
         }

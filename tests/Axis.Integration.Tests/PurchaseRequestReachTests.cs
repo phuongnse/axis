@@ -22,10 +22,10 @@ public sealed class PurchaseRequestReachTests(SampleAppFixture fixture) : IClass
     public async Task Each_role_reaches_exactly_the_requests_its_policy_allows()
     {
         using var requester = fixture.CreateClient().SignedInAs("requester");
-        using var lan = fixture.CreateClient().SignedInAs("lan");
-        using var chau = fixture.CreateClient().SignedInAs("chau");
-        using var binh = fixture.CreateClient().SignedInAs("binh");
-        using var dung = fixture.CreateClient().SignedInAs("dung");
+        using var employee = fixture.CreateClient().SignedInAs("employee");
+        using var manager2 = fixture.CreateClient().SignedInAs("manager-2");
+        using var manager = fixture.CreateClient().SignedInAs("manager");
+        using var financeReviewer = fixture.CreateClient().SignedInAs("finance-reviewer");
 
         // The requester: an Operations draft and a submitted Engineering request.
         var annaDraft = await CreateRequestAsync(requester, 500, Operations);
@@ -33,32 +33,32 @@ public sealed class PurchaseRequestReachTests(SampleAppFixture fixture) : IClass
         await StartAsync(requester, annaSubmitted);
         await fixture.RunUntilIdleAsync(CancellationToken);
 
-        // Lan: an approved Operations request and an Engineering draft.
-        var lanApproved = await CreateRequestAsync(lan, 500, Operations);
-        await StartAsync(lan, lanApproved);
+        // Employee: an approved Operations request and an Engineering draft.
+        var employeeApproved = await CreateRequestAsync(employee, 500, Operations);
+        await StartAsync(employee, employeeApproved);
         await fixture.RunUntilIdleAsync(CancellationToken);
-        await ApproveAsync(chau, lanApproved);
+        await ApproveAsync(manager2, employeeApproved);
         await fixture.RunUntilIdleAsync(CancellationToken);
-        var lanDraft = await CreateRequestAsync(lan, 500, Engineering);
+        var employeeDraft = await CreateRequestAsync(employee, 500, Engineering);
 
         Assert.Equal(new HashSet<Guid> { annaDraft, annaSubmitted }, await ListAsync(requester));
-        Assert.Equal(new HashSet<Guid> { lanApproved, lanDraft }, await ListAsync(lan));
-        Assert.Equal(new HashSet<Guid> { annaDraft, lanApproved }, await ListAsync(chau));
-        Assert.Equal(new HashSet<Guid> { annaSubmitted, lanDraft }, await ListAsync(binh));
-        Assert.Equal(new HashSet<Guid> { annaSubmitted, lanApproved }, await ListAsync(dung));
+        Assert.Equal(new HashSet<Guid> { employeeApproved, employeeDraft }, await ListAsync(employee));
+        Assert.Equal(new HashSet<Guid> { annaDraft, employeeApproved }, await ListAsync(manager2));
+        Assert.Equal(new HashSet<Guid> { annaSubmitted, employeeDraft }, await ListAsync(manager));
+        Assert.Equal(new HashSet<Guid> { annaSubmitted, employeeApproved }, await ListAsync(financeReviewer));
 
-        Assert.Equal(HttpStatusCode.NotFound, await StatusOfAsync(chau, $"{Records}/{annaSubmitted:D}"));
-        Assert.Equal(HttpStatusCode.NotFound, await StatusOfAsync(dung, $"{Records}/{annaDraft:D}"));
-        Assert.Equal(HttpStatusCode.NotFound, await StatusOfAsync(requester, $"{Records}/{lanDraft:D}"));
+        Assert.Equal(HttpStatusCode.NotFound, await StatusOfAsync(manager2, $"{Records}/{annaSubmitted:D}"));
+        Assert.Equal(HttpStatusCode.NotFound, await StatusOfAsync(financeReviewer, $"{Records}/{annaDraft:D}"));
+        Assert.Equal(HttpStatusCode.NotFound, await StatusOfAsync(requester, $"{Records}/{employeeDraft:D}"));
 
-        foreach (var client in new[] { requester, lan, chau, binh, dung })
+        foreach (var client in new[] { requester, employee, manager2, manager, financeReviewer })
         {
             Assert.Equal(HttpStatusCode.OK, await StatusOfAsync(client, $"{App}/entities/Department/records"));
             Assert.Equal(HttpStatusCode.OK, await StatusOfAsync(client, $"{App}/entities/Supplier/records"));
         }
 
         Assert.Equal(HttpStatusCode.Forbidden, await StatusOfAsync(requester, $"{App}/data-sources/RequestsByDepartment/rows"));
-        Assert.Equal(HttpStatusCode.OK, await StatusOfAsync(chau, $"{App}/data-sources/RequestsByDepartment/rows"));
+        Assert.Equal(HttpStatusCode.OK, await StatusOfAsync(manager2, $"{App}/data-sources/RequestsByDepartment/rows"));
     }
 
     /// <summary>The ids of the purchase requests that <paramref name="client"/> lists.</summary>
