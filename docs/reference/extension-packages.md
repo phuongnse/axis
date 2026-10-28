@@ -12,7 +12,7 @@ operation is in
 [Package operations](process-execution.md#package-operations), and how an application
 declares its packages is in
 [Extension packages](#declaring-packages-in-an-application). Widgets in
-packages, the published SDK and package runners are _(planned for M17)_, see
+packages, the published SDK and package runners are _(planned for M18)_, see
 [custom widgets](custom-widgets.md) and [Package runners](#package-runners).
 
 Dn refers to [decisions.md](../decisions.md). The design follows
@@ -34,7 +34,7 @@ custom code out of configuration is in
   and a manifest, `axis-package.json`.
 - **No data access.** A package cannot read or write entities. Data access
   comes later.
-- **Widgets** _(planned for M17)_. A package may also hold custom widgets,
+- **Widgets** _(planned for M18)_. A package may also hold custom widgets,
   React components that a page names. A custom widget builds on Axis widgets
   and Axis tokens, never on Ant Design directly
   ([D58](../decisions/d58-ant-design-is-a-detail-of-the-spa-without-procomponents.md)).
@@ -73,9 +73,9 @@ package folder. This example uses an illustrative package,
 - **`version`.** A SemVer version in plain `major.minor.patch` form, such as
   `1.2.0`. Pre-release versions come later.
 - **`assembly`.** The file name of the package's main assembly, in the
-  package folder. _(planned for M17)_ It is optional for a package that holds
+  package folder. _(planned for M18)_ It is optional for a package that holds
   only widgets.
-- **`widgets`** _(planned for M17)_. The custom widgets the package offers,
+- **`widgets`** _(planned for M18)_. The custom widgets the package offers,
   each with a `name`, an `entry`, a `label`, `properties` and an `sdk` range.
   See [widgets in a package manifest](custom-widgets.md#widgets-in-a-package-manifest).
 - **`operations`.** The operations the package offers. Each has these:
@@ -102,7 +102,7 @@ package folder. This example uses an illustrative package,
 ## Contracts
 
 `Axis.Extensions` is the only assembly a package
-references. _(planned for M17)_ It is published as a NuGet package, at a 0.x
+references. _(planned for M18)_ It is published as a NuGet package, at a 0.x
 version with no compatibility promise, see [the SDK](custom-widgets.md#the-sdk).
 It holds only these types:
 
@@ -160,7 +160,7 @@ public class RetryableException : Exception { }
   not start.
 - **Both hosts.** The server and the worker must hold the same packages. The
   server compiles and activates against them, and the worker runs them.
-  _(planned for M17)_ The `package-host` container holds them too, and its
+  _(planned for M18)_ The `package-host` container holds them too, and its
   runners run them, see [Package runners](#package-runners).
 - **Restart.** Each host reads the folder at startup. Installing a new
   version needs a restart of both hosts.
@@ -212,7 +212,7 @@ public class RetryableException : Exception { }
 
 ## Loading
 
-_(planned for M17)_ Outside Development, the worker no longer loads package
+_(planned for M18)_ Outside Development, the worker no longer loads package
 code and the server only reads its metadata, see
 [Package runners](#package-runners). This section describes in-process
 loading, which stays for Development.
@@ -295,7 +295,7 @@ tenant of the call.
 
 ## Package runners
 
-_(planned for M17)_ Packages run outside the worker, in package runners, as
+_(planned for M18)_ Packages run outside the worker, in package runners, as
 [D90](../decisions/d90-extension-packages-run-out-of-process.md) agrees.
 
 - **The runner host.** `Axis.PackageHost` runs package operations. The worker
@@ -336,7 +336,7 @@ _(planned for M17)_ Packages run outside the worker, in package runners, as
 A package loads in the host's process, so loading it is not
 isolation. The capability limits stop mistakes. They do not stop a package
 that sets out to get around them. Packages are trusted code that the operator
-installs and reviews. _(planned for M17)_ Outside Development, packages run in
+installs and reviews. _(planned for M18)_ Outside Development, packages run in
 [package runners](#package-runners). There, the runner's network route, empty
 environment, read-only file system, resource limits and kill at the timeout
 stop the items in the list below, and the runner holds nothing of the host to

@@ -48,7 +48,7 @@ NexKit issue, and NexKit's agents neither read nor write Claude Design.
   publishes the bundle.
 - **Not the widget SDK:** the bundle is a preview of the standard widgets with
   fixtures. It is not the published SDK for custom widgets that
-  [D8](d8-custom-ui-widgets-are-packaged-react-components.md) and M17 plan,
+  [D8](d8-custom-ui-widgets-are-packaged-react-components.md) and M18 plan,
   and it gives configuration no new way to run code.
 
 _Why:_ static files show how a widget looks, but not its pickers, dialogs,
