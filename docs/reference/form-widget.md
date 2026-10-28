@@ -173,19 +173,20 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
   - **Child collections.** A child collection field shows its rows as a
     table under the field's label.
     - There is one column per child field, headed by its label or its name.
-      Each cell uses the input the form uses for that field type, so number
+      Each editable cell uses the input the form uses for that field type, so number
       text, dates and enums behave as in the rest of the form. A cell
       input's accessible name is the column header and the one-based row
       number, such as `Quantity 2`. A file cell is the file input, and its
-      Upload button is named like `Upload File 2`. A computed child field's cell is a
-      read-only text input with the row's value, formatted as a table cell
-      shows it. An empty read-only or computed cell shows a muted italic "—".
+      Upload button is named like `Upload File 2`. A computed child field's
+      cell, and every cell of a read-only collection, shows the row's value as
+      plain text, not an input, formatted as a table cell shows it. It keeps an
+      input's 32px height, so it lines up with the inputs beside it. An empty
+      read-only or computed cell shows a muted italic "—". A read-only file cell
+      shows its download link, or a dash when it has no file.
       Integer, decimal and money columns sit on the right, in the header and
-      in the text and input cells, in tabular figures, see **Shown values** in
+      in every cell, in tabular figures, see **Shown values** in
       [frontend.md](frontend.md).
-    - _(planned)_ A read-only or computed cell shows plain text, not an
-      input, and keeps an input's 32px height, so it lines up with the inputs
-      beside it. A reference column is 240px wide.
+    - _(planned)_ A reference column is 240px wide.
     - Each row has a remove row button: a red trash icon button with its
       name as a tooltip. An add button below the table appends a row with
       every child field `null`. Rows cannot be reordered.

@@ -3,7 +3,7 @@ import type { FrameLocator, Locator, Page } from '@playwright/test'
 import { readdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { waitForDialog } from '../dialogs'
-import { fieldLabel, fieldValue } from '../fields'
+import { cellValue, expectShown, fieldLabel, fieldValue } from '../fields'
 
 // The design-system bundle is a separate build, which scripts/e2e.sh makes with scripts/design-system.sh. The page
 // web/design-system.html is its harness. The bundle answers every API call of the fixture application from fixtures,
@@ -203,7 +203,7 @@ for (const mode of modes) {
     const recording = await openHarness(page, `?preview=field-child-collection&mode=${mode}`)
 
     const reference = figure(page, 'Reference and computed cells')
-    await expect(reference.getByLabel(fieldLabel('Amount 1'))).toHaveAttribute('readonly')
+    await expectShown(cellValue(reference, 'lines', 0, 'amount'), '1,700.00')
     await expect(
       reference.getByTestId('reference-lines-0-category').getByRole('button', { name: 'Choose Category 1', exact: true }),
     ).toBeVisible()
@@ -211,7 +211,8 @@ for (const mode of modes) {
       'Unit price cannot be negative.',
     )
     const readOnly = figure(page, 'Read-only')
-    await expect(readOnly.getByLabel(fieldLabel('Description 1'))).toHaveAttribute('readonly')
+    await expectShown(cellValue(readOnly, 'lines', 0, 'description'), 'Standing desk')
+    await expect(readOnly.getByRole('textbox')).toHaveCount(0)
     await expect(readOnly.getByRole('button', { name: 'Add row', exact: true })).toHaveCount(0)
     const empty = figure(page, 'Empty')
     await expect(empty.getByRole('button', { name: 'Add row', exact: true })).toBeVisible()

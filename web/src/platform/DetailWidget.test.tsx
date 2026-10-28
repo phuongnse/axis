@@ -258,8 +258,8 @@ describe('DetailWidget', () => {
     expect(descriptionItem('Category')).toHaveTextContent('Office')
     expect(descriptionItem('Done')).toHaveTextContent('Yes')
     expect(screen.queryByText('priority')).toBeNull()
-    // The rows of the child collection are the only inputs, and they are read-only.
-    screen.getAllByRole('textbox').forEach((input) => expect(input).toHaveAttribute('readonly'))
+    // The detail shows every field as plain text, the child collection's rows included.
+    expect(screen.queryAllByRole('textbox')).toHaveLength(0)
     expect(requests()).toEqual([{ url: `${recordsPath}/${noteId}`, method: 'GET', body: undefined }])
   })
 
@@ -293,9 +293,9 @@ describe('DetailWidget', () => {
 
     renderDetail()
 
-    expect(await screen.findByLabelText('Description 1')).toHaveValue('Pens')
-    expect(screen.getByLabelText('Description 1')).toHaveAttribute('readonly')
-    expect(screen.getByLabelText('Quantity 1')).toHaveValue('2')
+    expect(await screen.findByTestId('cell-lines-0-description')).toHaveTextContent('Pens')
+    expect(screen.getByTestId('cell-lines-0-quantity')).toHaveTextContent('2')
+    expect(screen.queryByRole('textbox')).toBeNull()
     expect(screen.queryByRole('button', { name: 'Add row' })).toBeNull()
   })
 
@@ -359,8 +359,8 @@ describe('DetailWidget', () => {
 
     renderDetail(widget)
 
-    expect(await screen.findByLabelText('product 1')).toHaveValue('Desk')
-    expect(screen.getByLabelText('product 2')).toHaveValue('—')
+    expect(await screen.findByTestId('cell-lines-0-product')).toHaveTextContent('Desk')
+    expect(screen.getByTestId('cell-lines-1-product')).toHaveTextContent('—')
   })
 
   it('shows the not-found page when the record API answers 404', async () => {

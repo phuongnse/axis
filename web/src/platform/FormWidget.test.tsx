@@ -1181,8 +1181,8 @@ describe('FormWidget', () => {
 
     expect(await screen.findByTestId('field-value-total')).toHaveTextContent('3.00')
     expect(screen.queryByRole('textbox', { name: 'Total' })).not.toBeInTheDocument()
-    expect(screen.getByLabelText('Line code 1')).toHaveValue('PENS')
-    expect(screen.getByLabelText('Line code 1')).toHaveAttribute('readonly')
+    expect(screen.getByTestId('cell-lines-0-code')).toHaveTextContent('PENS')
+    expect(screen.queryByRole('textbox', { name: 'Line code 1' })).toBeNull()
 
     const priority = screen.getByLabelText('Priority')
     await userEvent.clear(priority)
@@ -1204,7 +1204,20 @@ describe('FormWidget', () => {
 
     await screen.findByTestId('field-value-total')
     expect(screen.getByTestId('field-value-total')).toHaveTextContent('3.00')
-    expect(screen.getByTestId('cell-lines-0-code')).toHaveValue('PENS')
+    expect(screen.getByTestId('cell-lines-0-code')).toHaveTextContent('PENS')
+  })
+
+  it('shows an empty computed cell as a muted dash in plain text, with no input', async () => {
+    stubFetch({
+      status: 200,
+      body: `{"id":"${noteId}","version":1,"values":{"title":"Buy paper","priority":2,"amount":1.50,"total":3.00,"lines":[{"description":"Pens","code":"PENS"},{"description":"Ink"}]},"labels":{}}`,
+    })
+    renderForm(noteId, computedWidget)
+
+    const empty = await screen.findByTestId('cell-lines-1-code')
+    expect(empty).toHaveTextContent('—')
+    expect(within(empty).getByText('—')).toHaveStyle({ fontStyle: 'italic' })
+    expect(within(empty).queryByRole('textbox')).toBeNull()
   })
 
   it('shows the currency beside a money input and sends the typed amount as a plain number', async () => {
@@ -1358,12 +1371,11 @@ describe('FormWidget', () => {
     expect(screen.queryByRole('textbox', { name: 'Code' })).not.toBeInTheDocument()
     expect(screen.getByTestId('field-value-category')).toHaveTextContent('Office')
     expect(screen.queryByRole('button', { name: 'Choose' })).not.toBeInTheDocument()
-    expect(screen.getByRole('textbox', { name: 'Description 1' })).toHaveValue('Pens')
-    expect(screen.getByRole('textbox', { name: 'Description 1' })).toHaveAttribute('readonly')
+    expect(screen.getByTestId('cell-lines-0-description')).toHaveTextContent('Pens')
+    expect(screen.queryByRole('textbox', { name: 'Description 1' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Add row' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Remove' })).not.toBeInTheDocument()
 
-    await userEvent.type(screen.getByRole('textbox', { name: 'Description 1' }), '!')
     const priority = screen.getByLabelText('Priority')
     await userEvent.clear(priority)
     await userEvent.type(priority, '3')
