@@ -64,10 +64,13 @@ with the reasons. What each one does is in NexKit's
 - **Issues run in parallel unless one needs another.** Marks follow the rules
   of NexKit's [`request` skill][nexkit-request]. The milestone's docs sweep is
   marked *blocked by* every other issue of the milestone, with no reason line
-  for each. At most six issues run at once, with `max_parallel` at 6. Each
-  issue's check round takes three runner jobs, CI on `main` takes more after
-  each merge, and pull requests that must be up to date merge one at a time,
-  so more issues at once mostly wait for runners, usage limits and each other.
+  for each. At most three issues run at once, with `max_parallel` at 3.
+  Pull requests that must be up to date merge one at a time, about one per
+  check round. Each merge sends every waiting pull request through another
+  round, and only one of them merges after it, so more issues at once mostly
+  spend runner jobs, usage limits and `conflicts.max_rounds` on rounds that
+  merge nothing. Each round takes three runner jobs, and CI on `main` takes
+  more after each merge.
 - **NexKit merges a pull request once it passes,** with
   [`merge.auto`][nexkit-auto-merge] on, because the AI review and the checks
   are the gate Axis relies on. The owner turns the setting off to decide each

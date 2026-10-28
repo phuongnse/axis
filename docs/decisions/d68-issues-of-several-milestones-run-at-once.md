@@ -29,6 +29,9 @@ milestone.
   - The owner set the limit to six on 2026-10-27, with NexKit's parallel
     checks and branches that must be up to date. See
     [delivery](../delivery.md#decisions).
+  - The owner lowered the limit to three on 2026-10-28, because pull requests
+    that must be up to date merge one at a time, and each merge checked every
+    waiting pull request again.
 - **Turned on in steps:** NexKit is upgraded first with the milestone scope
   unchanged, and the scope changes in a pull request of its own, so a problem
   points to one of the two.
