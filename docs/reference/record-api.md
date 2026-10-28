@@ -185,7 +185,7 @@ covers reads the whole entity table.
   runs past `Data:QueryTimeout`, `totalCount` is `null`.
 
 The paging parameters are digits only: a sign, a space or a repeated parameter
-(`page=1&page=2`) is invalid.
+(`page=1&page=2`) is invalid. A repeated `sort` or `search` is invalid too.
 
 A `sort` or `search` that names a
 [pending field](migrations.md#recomputing-computed-fields) is a `409`. For

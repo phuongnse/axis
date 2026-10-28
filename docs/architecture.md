@@ -615,6 +615,8 @@ can go from a reported `traceId` to its logs with no collector.
 - **Skipped trigger starts.** A trigger that skips a start because its `when`
   or start condition hit a run-time error logs the error kind, never the
   error message.
+- **Line breaks.** The console formatter indents every line of a message after
+  its first, so a value with a line break cannot start a new log entry.
 
 ### Correlation
 
