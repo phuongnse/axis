@@ -75,8 +75,8 @@ public sealed class AssetWarrantyReminderTests(AssetWarrantyReminderFixture fixt
 
         await using var connection = await tenant.DataSource.OpenConnectionAsync(CancellationToken);
         var applicationId = tenant.Model.Manifest.Id;
-        var managerPage = await NotificationQueries.ListAsync(connection, applicationId, "quan", ["asset-manager"], false, 1, 50, CancellationToken);
-        var otherManagerPage = await NotificationQueries.ListAsync(connection, applicationId, "linh", ["asset-manager"], false, 1, 50, CancellationToken);
+        var managerPage = await NotificationQueries.ListAsync(connection, applicationId, "asset-manager", ["asset-manager"], false, 1, 50, CancellationToken);
+        var otherManagerPage = await NotificationQueries.ListAsync(connection, applicationId, "lead", ["asset-manager"], false, 1, 50, CancellationToken);
         foreach (var page in new[] { managerPage, otherManagerPage })
         {
             var item = Assert.Single(page.Items);
@@ -87,7 +87,7 @@ public sealed class AssetWarrantyReminderTests(AssetWarrantyReminderFixture fixt
             Assert.Equal(due, Guid.Parse(JsonNode.Parse(item.OpenParameters!)!["asset"]!.GetValue<string>()));
         }
 
-        foreach (var (user, roles) in new[] { ("thao", new[] { "auditor" }), ("lan", new[] { "employee" }) })
+        foreach (var (user, roles) in new[] { ("auditor", new[] { "auditor" }), ("employee", new[] { "employee" }) })
         {
             var page = await NotificationQueries.ListAsync(connection, applicationId, user, roles, false, 1, 50, CancellationToken);
             Assert.Equal((0, 0L), (page.Items.Count, page.TotalCount));

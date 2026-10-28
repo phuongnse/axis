@@ -8,10 +8,10 @@
     "requester": [
       "employee"
     ],
-    "binh": [
+    "manager": [
       "department-manager"
     ],
-    "chau": [
+    "manager-2": [
       "department-manager"
     ]
   },
@@ -49,7 +49,7 @@
       "record": "request",
       "step": "managerApproval",
       "assignee": {
-        "user": "chau"
+        "user": "manager-2"
       }
     },
     {
@@ -57,7 +57,7 @@
       "record": "request",
       "step": "managerApproval",
       "outcome": "approve",
-      "as": "chau",
+      "as": "manager-2",
       "values": {
         "decisionComment": "Enjoy"
       }

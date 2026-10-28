@@ -172,7 +172,7 @@ test.describe('the active release of the purchase request sample changes', () =>
     await useSession(page, 'requester')
     const { title, id } = await createRequest(page, 'Pinned release', 5000)
     await submit(page, id, title)
-    await useSession(page, 'chau')
+    await useSession(page, 'manager-2')
     await waitForTask(page, title)
 
     await activateFolder(await releaseB(testInfo))
@@ -180,7 +180,7 @@ test.describe('the active release of the purchase request sample changes', () =>
     await reviewAndApprove(page, title, 'Decision', 'Your decision')
     // The old threshold of 10000 still applies, so the manager's approval ends the process.
     await expectStatus(page, id, 'approved')
-    await useSession(page, 'dung')
+    await useSession(page, 'finance-reviewer')
     const tasks = await page.request.get(`${appPath}/tasks?pageSize=100`)
     expect(tasks.status()).toBe(200)
     const { items } = (await tasks.json()) as { items: { subject: { id: string } }[] }
@@ -193,11 +193,11 @@ test.describe('the active release of the purchase request sample changes', () =>
     const { title, id } = await createRequest(page, 'New release', 5000)
     await submit(page, id, title)
 
-    await useSession(page, 'chau')
+    await useSession(page, 'manager-2')
     await reviewAndApprove(page, title, 'Your decision', 'Decision')
 
     // The new threshold of 1000 applies, so the request also needs the finance reviewer.
-    await useSession(page, 'dung')
+    await useSession(page, 'finance-reviewer')
     await decide(page, title, 'Finance approval', 'Approve')
     await expectStatus(page, id, 'approved')
   })
@@ -458,7 +458,7 @@ test.describe('the active release of the purchase request sample changes', () =>
       await useSession(page, 'requester')
       const request = await createRequest(page, 'Journey', 500)
       await submit(page, request.id, request.title)
-      await useSession(page, 'chau')
+      await useSession(page, 'manager-2')
       await waitForTask(page, request.title)
 
       // The release that is active now, which the request is pinned to, and the newest number so far.
@@ -509,11 +509,11 @@ test.describe('the active release of the purchase request sample changes', () =>
       await expect(page.getByText(title, { exact: true }).first()).toBeVisible()
 
       // The request approved after the publish finishes on the release it started on.
-      await useSession(page, 'chau')
+      await useSession(page, 'manager-2')
       await decide(page, request.title, 'Manager approval', 'Approve')
       // The manager sees the status read-only, which the helper can read as a value.
       await expectStatus(page, request.id, 'approved')
-      await useSession(page, 'giang')
+      await useSession(page, 'operator')
       await expect(async () => {
         const response = await page.request.get(`${appPath}/processes/PurchaseRequestApproval/instances?pageSize=100`)
         expect(response.status()).toBe(200)

@@ -11,7 +11,7 @@ namespace Axis.Integration.Tests;
 /// <c>ActivateOnStartup</c>. Both use the <c>departments</c> test module installed under
 /// <c>Fixtures/Modules</c>, so the module's department table and seed rows exist once for each.
 /// ModuleAppA also has an <c>Employee</c> entity that references a department. The test
-/// authentication scheme signs in <c>requester</c>, an employee, and <c>binh</c>, who holds no role.
+/// authentication scheme signs in <c>requester</c>, an employee, and <c>manager</c>, who holds no role.
 /// </summary>
 public sealed class ModuleAppFixture : IAsyncLifetime
 {
@@ -68,7 +68,7 @@ public sealed class ModuleAppFixture : IAsyncLifetime
             builder.UseSetting("ActivateOnStartup:1", Path.Combine(_fixtures, "ModuleAppB"));
             builder.UseTestAuthentication(
                 new TestIdentity("requester", "Requester User", "employee"),
-                new TestIdentity("binh", "Binh No Role"));
+                new TestIdentity("manager", "Manager No Role"));
         });
 
         // Creating a client starts the server, which migrates the database, activates both applications and seeds them.

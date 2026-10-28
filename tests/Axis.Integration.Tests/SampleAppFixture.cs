@@ -29,8 +29,8 @@ namespace Axis.Integration.Tests;
 /// One tenant database, <c>a</c>, served by the real server on host <c>a.example.test</c>. The
 /// server migrates it and activates the purchase request sample through <c>ActivateOnStartup</c>,
 /// so the sample's department seeds are applied as well. The test authentication scheme signs in
-/// <c>requester</c> and <c>lan</c>, two employees, <c>chau</c>, the Operations manager, <c>binh</c>, the
-/// Engineering manager, and <c>dung</c> and <c>reviewer</c>, two finance reviewers. The fixture also holds the worker's services for the tenant, with the host never
+/// <c>requester</c> and <c>employee</c>, two employees, <c>manager-2</c>, the Operations manager, <c>manager</c>, the
+/// Engineering manager, and <c>finance-reviewer</c> and <c>reviewer</c>, two finance reviewers. The fixture also holds the worker's services for the tenant, with the host never
 /// started, so a test runs the work items itself. A test can instead start real worker hosts with
 /// <see cref="StartWorkerAsync"/>, and stop them to stand for a worker that is down.
 /// The purchasing system stub runs in process over <c>http</c>. The workers run in Development, the
@@ -45,10 +45,10 @@ public sealed class SampleAppFixture : IAsyncLifetime
 
     public const string Host = "a.example.test";
 
-    /// <summary>The id of the seeded Operations department, whose manager is <c>chau</c>.</summary>
+    /// <summary>The id of the seeded Operations department, whose manager is <c>manager-2</c>.</summary>
     public static readonly Guid Operations = Guid.Parse("2cec287b-4f8a-4ac4-a38c-08214a1846ae");
 
-    /// <summary>The id of the seeded Engineering department, whose manager is <c>binh</c>.</summary>
+    /// <summary>The id of the seeded Engineering department, whose manager is <c>manager</c>.</summary>
     public static readonly Guid Engineering = Guid.Parse("15d5bba1-eaf1-431b-9001-e1e3ade50979");
 
     private static readonly string _appFolder = Path.Combine(AppContext.BaseDirectory, "Samples", "purchase-requests");
@@ -99,12 +99,12 @@ public sealed class SampleAppFixture : IAsyncLifetime
             builder.UseSetting("ActivateOnStartup:0", _appFolder);
             builder.UseTestAuthentication(
                 new TestIdentity("requester", "Requester User", "employee"),
-                new TestIdentity("lan", "Lan Employee", "employee"),
-                new TestIdentity("chau", "Chau Operations Manager", "department-manager"),
-                new TestIdentity("binh", "Binh Engineering Manager", "department-manager"),
-                new TestIdentity("dung", "Dung Finance Reviewer", "finance-reviewer"),
+                new TestIdentity("employee", "Employee User", "employee"),
+                new TestIdentity("manager-2", "Manager 2 User", "department-manager"),
+                new TestIdentity("manager", "Manager User", "department-manager"),
+                new TestIdentity("finance-reviewer", "Finance Reviewer User", "finance-reviewer"),
                 new TestIdentity("reviewer", "Reviewer User", "finance-reviewer"),
-                new TestIdentity("giang", "Giang Operator", "operator"),
+                new TestIdentity("operator", "Operator User", "operator"),
                 new TestIdentity("khanh", "Khanh Operator Reviewer", "operator", "finance-reviewer"));
         });
 

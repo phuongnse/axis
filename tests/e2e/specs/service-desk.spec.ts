@@ -8,9 +8,9 @@ import { sessionFile, useSession, type SampleUser } from "../sessions";
 
 // The service desk sample runs on the same platform as the other samples, with no platform code of its
 // own. Specs run in parallel against one database, so each test looks only for the tickets it creates.
-// Every ticket gets its own title, which is its display field, so the title finds its task. requester and lan
-// are requesters, linh and nam lead the service desk, and khoa and minh are agents in the scenarios. Only
-// khoa is an agent in the development realm.
+// Every ticket gets its own title, which is its display field, so the title finds its task. requester and employee
+// are requesters, lead and lead-2 lead the service desk, and agent and approver are agents in the scenarios. Only
+// agent is an agent in the development realm.
 const appPath = "/api/apps/ServiceDesk";
 const recordsPath = `${appPath}/entities/Ticket/records`;
 const tasksPath = `${appPath}/tasks`;
@@ -98,7 +98,7 @@ async function openTask(page: Page, title: string, label: string) {
   await row.getByRole("link", { name: label, exact: true }).click();
 }
 
-test("requester submits a ticket, linh triages it to khoa, khoa resolves it, and requester confirms it closed", async ({
+test("requester submits a ticket, lead triages it to agent, agent resolves it, and requester confirms it closed", async ({
   page,
   playwright,
   baseURL,
@@ -116,14 +116,14 @@ test("requester submits a ticket, linh triages it to khoa, khoa resolves it, and
   await page.getByRole("button", { name: "Submit", exact: true }).click();
   await expect(page.getByTestId("form-started")).toBeVisible();
 
-  await useSession(page, "linh");
+  await useSession(page, "lead");
   await openTask(page, title, "Triage ticket");
   await expectShown(fieldValue(page, "title"), title);
-  await page.getByLabel(fieldLabel("Assigned agent")).fill("khoa");
+  await page.getByLabel(fieldLabel("Assigned agent")).fill("agent");
   await page.getByRole("button", { name: "Assign", exact: true }).click();
   await expect(page).toHaveURL(/\/service-desk\/mytasks$/);
 
-  await useSession(page, "khoa");
+  await useSession(page, "agent");
   await openTask(page, title, "Resolve ticket");
   await page.getByLabel(fieldLabel("Resolution")).fill("Replaced the battery.");
   await page.getByRole("button", { name: "Resolve", exact: true }).click();
@@ -143,7 +143,7 @@ test("requester submits a ticket, linh triages it to khoa, khoa resolves it, and
   }).toPass({ timeout: 30_000 });
 });
 
-test("linh claims a triage task so nam no longer lists it, then reassigns it to khoa by name", async ({
+test("lead claims a triage task so lead-2 no longer lists it, then reassigns it to agent by name", async ({
   page,
   playwright,
   baseURL,
@@ -155,9 +155,9 @@ test("linh claims a triage task so nam no longer lists it, then reassigns it to 
     return created;
   });
   // Both leads list the triage task until one of them claims it.
-  await taskId(playwright.request, baseURL, "nam", id);
+  await taskId(playwright.request, baseURL, "lead-2", id);
 
-  await useSession(page, "linh");
+  await useSession(page, "lead");
   await openTask(page, title, "Triage ticket");
   await page.getByRole("button", { name: "Claim", exact: true }).click();
   await expect(page.getByRole("button", { name: "Release", exact: true })).toBeVisible();
@@ -165,7 +165,7 @@ test("linh claims a triage task so nam no longer lists it, then reassigns it to 
   await expect(page.getByRole("button", { name: "Claim", exact: true })).toHaveCount(0);
 
   // The claim hides the task from the other lead.
-  await useSession(page, "nam");
+  await useSession(page, "lead-2");
   const listed = page.waitForResponse(
     (response) =>
       response.url().includes(tasksPath) && response.request().method() === "GET",
@@ -173,8 +173,8 @@ test("linh claims a triage task so nam no longer lists it, then reassigns it to 
   await page.goto("/service-desk/mytasks?pageSize=100");
   expect((await listed).status()).toBe(200);
   await expect(page.getByRole("row", { name: new RegExp(title) })).toHaveCount(0);
-  await asUser(playwright.request, baseURL, "nam", async (nam) => {
-    const response = await nam.get(`${tasksPath}?pageSize=100`);
+  await asUser(playwright.request, baseURL, "lead-2", async (lead2) => {
+    const response = await lead2.get(`${tasksPath}?pageSize=100`);
     expect(response.status()).toBe(200);
     const { items } = (await response.json()) as {
       items: { subject: { id: string } }[];
@@ -182,7 +182,7 @@ test("linh claims a triage task so nam no longer lists it, then reassigns it to 
     expect(items.map((item) => item.subject.id)).not.toContain(id);
   });
 
-  await useSession(page, "linh");
+  await useSession(page, "lead");
   const row = page.getByRole("row", { name: new RegExp(title) });
   await expect(async () => {
     await page.goto("/service-desk/mytasks?pageSize=100");
@@ -194,14 +194,14 @@ test("linh claims a triage task so nam no longer lists it, then reassigns it to 
 
   const dialog = await waitForDialog(page);
   await dialog.getByRole("radio", { name: "Person", exact: true }).check();
-  await pickOption(dialog.getByRole("combobox"), "Khoa Agent", "Khoa");
-  await dialog.getByLabel(fieldLabel("Reason")).fill("Khoa knows this printer.");
+  await pickOption(dialog.getByRole("combobox"), "Agent User", "Agent");
+  await dialog.getByLabel(fieldLabel("Reason")).fill("The agent knows this printer.");
   // The page has a button with the same name, so the click stays in the dialog.
   await dialog.getByRole("button", { name: "Reassign", exact: true }).click();
   await expect(page).toHaveURL(/\/service-desk\/mytasks$/);
 
-  // The triage form does not load for khoa, whose ticket grant hides a ticket with no agent. So khoa only finds the task.
-  await useSession(page, "khoa");
+  // The triage form does not load for agent, whose ticket grant hides a ticket with no agent. So agent only finds the task.
+  await useSession(page, "agent");
   await expect(async () => {
     await page.goto("/service-desk/mytasks?pageSize=100");
     await expect(
@@ -222,28 +222,28 @@ test("an agent cannot open a ticket that is assigned to another agent, by its fo
     await start(requester, created);
     return created;
   });
-  const triage = await taskId(playwright.request, baseURL, "linh", id);
-  await asUser(playwright.request, baseURL, "linh", async (linh) => {
-    const read = await linh.get(`${recordsPath}/${id}`);
+  const triage = await taskId(playwright.request, baseURL, "lead", id);
+  await asUser(playwright.request, baseURL, "lead", async (lead) => {
+    const read = await lead.get(`${recordsPath}/${id}`);
     expect(read.status()).toBe(200);
     const { version } = (await read.json()) as { version: number };
-    const completed = await linh.post(`${tasksPath}/${triage}/complete`, {
-      data: { outcome: "assign", values: { assignedAgent: "minh" }, version },
+    const completed = await lead.post(`${tasksPath}/${triage}/complete`, {
+      data: { outcome: "assign", values: { assignedAgent: "approver" }, version },
       headers: csrfHeaders,
     });
     expect(completed.status()).toBe(200);
   });
   // The worker moves the ticket to assigned some time after the decision.
-  await asUser(playwright.request, baseURL, "linh", async (linh) => {
+  await asUser(playwright.request, baseURL, "lead", async (lead) => {
     await expect(async () => {
-      const read = await linh.get(`${recordsPath}/${id}`);
+      const read = await lead.get(`${recordsPath}/${id}`);
       const { values } = (await read.json()) as {
         values: { status: string };
       };
       expect(values.status).toBe("assigned");
     }).toPass({ timeout: 30_000 });
   });
-  await useSession(page, "khoa");
+  await useSession(page, "agent");
 
   await page.goto(`/service-desk/ticketform/${id}`);
   await expect(page.getByTestId("not-found")).toBeVisible();
@@ -303,7 +303,7 @@ test("the service desk lead sees the open and urgent tiles and the chart by cate
     await start(requester, await createTicket(requester, `Zz Dashboard ${runId()}`));
   });
 
-  await useSession(page, "linh");
+  await useSession(page, "lead");
   await page.goto("/service-desk/dashboard");
 
   await expect(page.getByRole("menuitem", { name: "Dashboard", exact: true })).toBeVisible();
@@ -368,7 +368,7 @@ test("an agent opening the detail page of a ticket that is not assigned to them 
     createTicket(requester, `Zz Unassigned ${runId()}`),
   );
 
-  await useSession(page, "khoa");
+  await useSession(page, "agent");
   await page.goto(`/service-desk/ticketdetail?ticket=${id}`);
 
   await expect(page.getByTestId("not-found")).toBeVisible();

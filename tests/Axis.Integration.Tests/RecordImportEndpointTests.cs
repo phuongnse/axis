@@ -163,11 +163,11 @@ public sealed class RecordImportEndpointTests(RecordApiFixture fixture) : IClass
         await ResetAsync();
         using var rita = fixture.CreateClient().SignedInAs("rita");
         using var fia = fixture.CreateClient().SignedInAs("fia");
-        using var binh = fixture.CreateClient().SignedInAs("binh");
+        using var manager = fixture.CreateClient().SignedInAs("manager");
 
         using var noImport = await SendAsync(rita, HttpMethod.Post, $"{Items}/imports", "name\nDesk\n");
         using var noUpdate = await SendAsync(fia, HttpMethod.Post, $"{Tickets}/imports?key=title", "title\nA\n");
-        using var noGrant = await SendAsync(binh, HttpMethod.Post, $"{Items}/imports", "name\nDesk\n");
+        using var noGrant = await SendAsync(manager, HttpMethod.Post, $"{Items}/imports", "name\nDesk\n");
         using var anonymous = fixture.CreateClient();
         using var anon = await SendAsync(anonymous, HttpMethod.Post, $"{Items}/imports", "name\nDesk\n");
 

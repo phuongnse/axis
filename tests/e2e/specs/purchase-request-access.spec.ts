@@ -117,18 +117,18 @@ async function startOperationsRequest(
 }
 
 /**
- * The id of the manager approval task for the Operations request `id`. chau manages Operations, so
- * the worker assigns the task to chau. It waits until the worker has created the task.
+ * The id of the manager approval task for the Operations request `id`. manager-2 manages Operations, so
+ * the worker assigns the task to manager-2. It waits until the worker has created the task.
  */
 async function managerTaskId(
   apiRequest: APIRequest,
   baseURL: string | undefined,
   id: string,
 ) {
-  return asUser(apiRequest, baseURL, "chau", async (chau) => {
+  return asUser(apiRequest, baseURL, "manager-2", async (manager2) => {
     let found = "";
     await expect(async () => {
-      const response = await chau.get(`${tasksPath}?pageSize=100`);
+      const response = await manager2.get(`${tasksPath}?pageSize=100`);
       expect(response.status()).toBe(200);
       const { items } = (await response.json()) as {
         items: { id: string; subject: { id: string } }[];
@@ -155,30 +155,30 @@ test("an employee does not see another employee's request in the list or by its 
   baseURL,
 }) => {
   const run = runId();
-  const lanTitle = `Zz Deny ${run} lan`;
+  const employeeTitle = `Zz Deny ${run} employee`;
   const annaTitle = `Zz Deny ${run} requester`;
-  const lanId = await asUser(playwright.request, baseURL, "lan", (lan) =>
-    createRequest(lan, lanTitle, "Operations"),
+  const employeeId = await asUser(playwright.request, baseURL, "employee", (employee) =>
+    createRequest(employee, employeeTitle, "Operations"),
   );
   const annaId = await asUser(playwright.request, baseURL, "requester", (requester) =>
     createRequest(requester, annaTitle, "Operations"),
   );
   await useSession(page, "requester");
 
-  // With sort=-title, requester's request sorts right after lan's, so a missing row is not on another page.
+  // With sort=-title, requester's request sorts right after employee's, so a missing row is not on another page.
   await page.goto(listAddress);
   await expect(row(page, annaTitle)).toBeVisible();
-  await expect(row(page, lanTitle)).toHaveCount(0);
-  await page.goto(`/purchasing/purchaserequestform/${lanId}`);
+  await expect(row(page, employeeTitle)).toHaveCount(0);
+  await page.goto(`/purchasing/purchaserequestform/${employeeId}`);
   await expect(page.getByTestId("not-found")).toBeVisible();
   await expect(page.getByRole("textbox", { name: /Title/ })).toHaveCount(0);
 
-  expect((await page.request.get(`${recordsPath}/${lanId}`)).status()).toBe(
+  expect((await page.request.get(`${recordsPath}/${employeeId}`)).status()).toBe(
     404,
   );
   const ids = await listedIds(page.request);
   expect(ids).toContain(annaId);
-  expect(ids).not.toContain(lanId);
+  expect(ids).not.toContain(employeeId);
 });
 
 test("a department manager does not see another department's request in the list or by its address", async ({
@@ -198,8 +198,8 @@ test("a department manager does not see another department's request in the list
       operationsId: await createRequest(requester, operationsTitle, "Operations"),
     }),
   );
-  // binh manages Engineering. chau manages Operations.
-  await useSession(page, "binh");
+  // manager manages Engineering. manager-2 manages Operations.
+  await useSession(page, "manager");
 
   await page.goto(listAddress);
   await expect(row(page, engineeringTitle)).toBeVisible();
@@ -248,8 +248,8 @@ test("an employee who opens a manager's task cannot see or complete it, and the 
     headers: csrfHeaders,
   });
   expect(completed.status()).toBe(403);
-  await asUser(playwright.request, baseURL, "chau", async (chau) => {
-    const read = await chau.get(`${tasksPath}/${taskId}`);
+  await asUser(playwright.request, baseURL, "manager-2", async (manager2) => {
+    const read = await manager2.get(`${tasksPath}/${taskId}`);
     expect(read.status()).toBe(200);
     expect(((await read.json()) as { state: string }).state).toBe("open");
   });
@@ -264,7 +264,7 @@ test("a finance reviewer sees a submitted request read-only, and an update throu
   const id = await asUser(playwright.request, baseURL, "requester", async (requester) => {
     const created = await createRequest(requester, title, "Operations");
     await start(requester, created);
-    // The worker submits the request some time after the start. dung reads only submitted requests.
+    // The worker submits the request some time after the start. finance-reviewer reads only submitted requests.
     await expect
       .poll(
         async () => {
@@ -277,7 +277,7 @@ test("a finance reviewer sees a submitted request read-only, and an update throu
       .toBe("submitted");
     return created;
   });
-  await useSession(page, "dung");
+  await useSession(page, "finance-reviewer");
 
   await page.goto(`/purchasing/purchaserequestform/${id}`);
   await expectShown(fieldValue(page, "title"), title);
@@ -302,7 +302,7 @@ test("a finance reviewer sees a submitted request read-only, and an update throu
 
 /**
  * The sample pages that read records. Each opens with no session, and `user` signs in. The request
- * id is that of an Engineering draft by requester, which requester and its manager binh may read.
+ * id is that of an Engineering draft by requester, which requester and its manager may read.
  */
 const signedOutPages: {
   name: string;
@@ -331,7 +331,7 @@ const signedOutPages: {
     // An employee may not read this data source, so its department manager signs in.
     name: "Requests by department",
     address: () => "/purchasing/requestsbydepartment",
-    user: "binh",
+    user: "manager",
     api: () => `${appPath}/data-sources/RequestsByDepartment/rows?pageSize=100`,
     expectation: (page) =>
       expect(page.getByRole("row", { name: /^Engineering / })).toBeVisible(),
@@ -410,7 +410,7 @@ test("a signed-out person who opens My tasks signs in from the prompt on the Key
   // The request fixture holds no session either.
   expect((await request.get(`${tasksPath}?pageSize=100`)).status()).toBe(401);
 
-  await signInFromPrompt(page, address, "chau");
+  await signInFromPrompt(page, address, "manager-2");
 
   await page.waitForURL(`${baseURL}${address}`);
   await expect(page.getByRole("columnheader", { name: "Task", exact: true })).toBeVisible();
@@ -429,7 +429,7 @@ test("a signed-out person who opens a task's address signs in from the prompt on
 
   expect((await request.get(`${tasksPath}/${taskId}`)).status()).toBe(401);
 
-  await signInFromPrompt(page, address, "chau");
+  await signInFromPrompt(page, address, "manager-2");
 
   await page.waitForURL(`${baseURL}${address}`);
   await expect(page.getByRole("button", { name: "Approve", exact: true })).toBeVisible();

@@ -130,14 +130,14 @@ public sealed class StudioRollbackTests : IAsyncLifetime
         var connectionString = await _database.CreateDatabaseAsync("studio_rollback_roles", CancellationToken);
         await using var factory = NewFactory(folder.Path, [("a", HostA, connectionString)]);
         using var author = factory.CreateClient().SignedInAs("author");
-        using var lan = factory.CreateClient().SignedInAs("lan");
+        using var employee = factory.CreateClient().SignedInAs("employee");
         using var requester = factory.CreateClient().SignedInAs("requester");
         using var nobody = factory.CreateClient();
         using var startup = await GetJsonAsync(author, $"{ApplicationUrl}/releases", HostA);
         var release = startup.RootElement.GetProperty("active").GetProperty("releaseId").GetGuid();
         var url = $"{ApplicationUrl}/releases/{release:D}/rollback";
 
-        using var withoutPublisher = await SendAsync(lan, HttpMethod.Post, url, HostA);
+        using var withoutPublisher = await SendAsync(employee, HttpMethod.Post, url, HostA);
         Assert.Equal(HttpStatusCode.Forbidden, withoutPublisher.StatusCode);
         Assert.Equal("You do not hold the publisher role.", (await ReadAsync(withoutPublisher)).RootElement.GetProperty("title").GetString());
         using var withoutAuthor = await SendAsync(requester, HttpMethod.Post, url, HostA);

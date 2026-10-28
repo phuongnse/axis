@@ -270,13 +270,13 @@
       }
     },
     {
-      "id": "lan",
-      "username": "lan",
+      "id": "employee",
+      "username": "employee",
       "enabled": true,
-      "email": "lan@axis.local",
+      "email": "employee@axis.local",
       "emailVerified": true,
-      "firstName": "Lan",
-      "lastName": "Employee",
+      "firstName": "Employee",
+      "lastName": "User",
       "credentials": [
         {
           "type": "password",
@@ -292,13 +292,13 @@
       }
     },
     {
-      "id": "binh",
-      "username": "binh",
+      "id": "manager",
+      "username": "manager",
       "enabled": true,
-      "email": "binh@axis.local",
+      "email": "manager@axis.local",
       "emailVerified": true,
-      "firstName": "Binh",
-      "lastName": "Engineering Manager",
+      "firstName": "Manager",
+      "lastName": "User",
       "credentials": [
         {
           "type": "password",
@@ -314,13 +314,13 @@
       }
     },
     {
-      "id": "chau",
-      "username": "chau",
+      "id": "manager-2",
+      "username": "manager-2",
       "enabled": true,
-      "email": "chau@axis.local",
+      "email": "manager-2@axis.local",
       "emailVerified": true,
-      "firstName": "Chau",
-      "lastName": "Operations Manager",
+      "firstName": "Manager 2",
+      "lastName": "User",
       "credentials": [
         {
           "type": "password",
@@ -336,13 +336,13 @@
       }
     },
     {
-      "id": "dung",
-      "username": "dung",
+      "id": "finance-reviewer",
+      "username": "finance-reviewer",
       "enabled": true,
-      "email": "dung@axis.local",
+      "email": "finance-reviewer@axis.local",
       "emailVerified": true,
-      "firstName": "Dung",
-      "lastName": "Finance Reviewer",
+      "firstName": "Finance Reviewer",
+      "lastName": "User",
       "credentials": [
         {
           "type": "password",
@@ -358,13 +358,13 @@
       }
     },
     {
-      "id": "giang",
-      "username": "giang",
+      "id": "operator",
+      "username": "operator",
       "enabled": true,
-      "email": "giang@axis.local",
+      "email": "operator@axis.local",
       "emailVerified": true,
-      "firstName": "Giang",
-      "lastName": "Operator",
+      "firstName": "Operator",
+      "lastName": "User",
       "credentials": [
         {
           "type": "password",
@@ -403,13 +403,13 @@
       }
     },
     {
-      "id": "khoa",
-      "username": "khoa",
+      "id": "agent",
+      "username": "agent",
       "enabled": true,
-      "email": "khoa@axis.local",
+      "email": "agent@axis.local",
       "emailVerified": true,
-      "firstName": "Khoa",
-      "lastName": "Agent",
+      "firstName": "Agent",
+      "lastName": "User",
       "credentials": [
         {
           "type": "password",
@@ -425,13 +425,13 @@
       }
     },
     {
-      "id": "linh",
-      "username": "linh",
+      "id": "lead",
+      "username": "lead",
       "enabled": true,
-      "email": "linh@axis.local",
+      "email": "lead@axis.local",
       "emailVerified": true,
-      "firstName": "Linh",
-      "lastName": "Service Desk Lead",
+      "firstName": "Lead",
+      "lastName": "User",
       "credentials": [
         {
           "type": "password",
@@ -447,13 +447,13 @@
       }
     },
     {
-      "id": "minh",
-      "username": "minh",
+      "id": "approver",
+      "username": "approver",
       "enabled": true,
-      "email": "minh@axis.local",
+      "email": "approver@axis.local",
       "emailVerified": true,
-      "firstName": "Minh",
-      "lastName": "Approver",
+      "firstName": "Approver",
+      "lastName": "User",
       "credentials": [
         {
           "type": "password",
@@ -469,13 +469,13 @@
       }
     },
     {
-      "id": "nam",
-      "username": "nam",
+      "id": "lead-2",
+      "username": "lead-2",
       "enabled": true,
-      "email": "nam@axis.local",
+      "email": "lead-2@axis.local",
       "emailVerified": true,
-      "firstName": "Nam",
-      "lastName": "Service Desk Lead",
+      "firstName": "Lead 2",
+      "lastName": "User",
       "credentials": [
         {
           "type": "password",
@@ -491,13 +491,13 @@
       }
     },
     {
-      "id": "quan",
-      "username": "quan",
+      "id": "asset-manager",
+      "username": "asset-manager",
       "enabled": true,
-      "email": "quan@axis.local",
+      "email": "asset-manager@axis.local",
       "emailVerified": true,
-      "firstName": "Quan",
-      "lastName": "Asset Manager",
+      "firstName": "Asset Manager",
+      "lastName": "User",
       "credentials": [
         {
           "type": "password",
@@ -513,13 +513,13 @@
       }
     },
     {
-      "id": "thao",
-      "username": "thao",
+      "id": "auditor",
+      "username": "auditor",
       "enabled": true,
-      "email": "thao@axis.local",
+      "email": "auditor@axis.local",
       "emailVerified": true,
-      "firstName": "Thao",
-      "lastName": "Auditor",
+      "firstName": "Auditor",
+      "lastName": "User",
       "credentials": [
         {
           "type": "password",

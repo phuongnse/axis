@@ -122,7 +122,7 @@ public sealed class ModuleActivationTests(ModuleAppFixture fixture) : IClassFixt
     public async Task The_module_entity_url_has_two_segments_and_needs_a_grant()
     {
         using var granted = fixture.CreateClient().SignedInAs("requester");
-        using var denied = fixture.CreateClient().SignedInAs("binh");
+        using var denied = fixture.CreateClient().SignedInAs("manager");
 
         using (var request = RecordApiFixture.Request(HttpMethod.Get, $"{AppA}/{Departments}", ModuleAppFixture.Host))
         {
@@ -164,7 +164,7 @@ public sealed class ModuleActivationTests(ModuleAppFixture fixture) : IClassFixt
     public async Task The_module_data_source_needs_its_own_grant()
     {
         using var withoutGrant = fixture.CreateClient().SignedInAs("requester");
-        using var withoutRole = fixture.CreateClient().SignedInAs("binh");
+        using var withoutRole = fixture.CreateClient().SignedInAs("manager");
 
         // In ModuleAppB, requester reads the module entity but holds no grant on the data source.
         using (var request = RecordApiFixture.Request(HttpMethod.Get, $"{AppB}/{Departments}", ModuleAppFixture.Host))

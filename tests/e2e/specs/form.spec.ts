@@ -99,7 +99,7 @@ test('a note is created and edited in the form, in light and dark mode', async (
 
 test('a note saved by a signed-in user shows its creator read-only', async ({ page }) => {
   const title = `Creator ${Date.now()}-${test.info().retry}`
-  await useSession(page, 'binh')
+  await useSession(page, 'manager')
   const me = (await (await page.request.get('/api/me')).json()) as { id: string }
   await page.goto('/e2e/notes?pageSize=100&sort=-title')
 
@@ -183,10 +183,10 @@ test('after a signed-in user edits a note, its history shows the update first, i
   const run = `${Date.now()}-${test.info().retry}`
   const title = `History ${run}`
   const tablePath = /\/e2e\/notes\?pageSize=100&sort=-title$/
-  await useSession(page, 'binh')
+  await useSession(page, 'manager')
   await page.goto('/e2e/notes?pageSize=100&sort=-title')
-  await expect(page.getByRole('banner').getByRole('button', { name: 'Binh Engineering Manager', exact: true })).toBeVisible()
-  // The page's request context shares the session cookie, so Binh creates the note.
+  await expect(page.getByRole('banner').getByRole('button', { name: 'Manager User', exact: true })).toBeVisible()
+  // The page's request context shares the session cookie, so the manager creates the note.
   await createRecord(page.request, 'Note', { title })
   await page.reload()
 
@@ -207,11 +207,11 @@ test('after a signed-in user edits a note, its history shows the update first, i
     await expect(history).toContainText('History')
     const entries = history.getByTestId('history-entry')
     await expect(entries).toHaveCount(2)
-    for (const text of ['Updated', 'Binh Engineering Manager', 'Changed: Title']) {
+    for (const text of ['Updated', 'Manager User', 'Changed: Title']) {
       await expect(entries.first()).toContainText(text)
     }
     await expect(entries.nth(1)).toContainText('Created')
-    await expect(entries.nth(1)).toContainText('Binh Engineering Manager')
+    await expect(entries.nth(1)).toContainText('Manager User')
     await page.getByRole('button', { name: 'Cancel', exact: true }).click()
     await expect(page).toHaveURL(tablePath)
   }

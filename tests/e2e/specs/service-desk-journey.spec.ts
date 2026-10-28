@@ -409,9 +409,9 @@ test.describe('the author builds the service desk with Studio only', () => {
     await expect(page.getByTestId('studio-seed-row')).toHaveCount(3)
 
     const records = [
-      ['Hardware', 'khoa'],
-      ['Software', 'khoa'],
-      ['Access', 'khoa'],
+      ['Hardware', 'agent'],
+      ['Software', 'agent'],
+      ['Access', 'agent'],
     ]
     for (const [index, [name, defaultAgent]] of records.entries()) {
       const row = page.getByTestId('studio-seed-row').nth(index)
@@ -1446,7 +1446,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     await row.getByRole('link', { name: label, exact: true }).click()
   }
 
-  test('requester submits a ticket on the published site, linh triages it to khoa, khoa resolves it, requester opens it from the bell and confirms it closed', async ({
+  test('requester submits a ticket on the published site, lead triages it to agent, agent resolves it, requester opens it from the bell and confirms it closed', async ({
     page,
   }) => {
     const title = `Zz Journey ${Date.now()}`
@@ -1476,14 +1476,14 @@ test.describe('the author builds the service desk with Studio only', () => {
     await page.getByRole('button', { name: 'Submit', exact: true }).click()
     await expect(page.getByTestId('form-started')).toBeVisible()
 
-    await useJourneySession(page, 'linh')
+    await useJourneySession(page, 'lead')
     await openTask(page, title, 'Triage ticket')
     await expectShown(fieldValue(page, 'title'), title)
-    await page.getByLabel(fieldLabel('Assigned agent')).fill('khoa')
+    await page.getByLabel(fieldLabel('Assigned agent')).fill('agent')
     await page.getByRole('button', { name: 'Assign', exact: true }).click()
     await expect(page).toHaveURL(/\/service-desk\/mytasks$/)
 
-    await useJourneySession(page, 'khoa')
+    await useJourneySession(page, 'agent')
     await openTask(page, title, 'Resolve ticket')
     await page.getByLabel(fieldLabel('Resolution')).fill(resolution)
     await page.getByRole('button', { name: 'Resolve', exact: true }).click()
@@ -1503,7 +1503,7 @@ test.describe('the author builds the service desk with Studio only', () => {
     await expect(page.getByText(title, { exact: true }).first()).toBeVisible()
 
     // The lead is not told about a ticket that is on time.
-    await useJourneySession(page, 'linh')
+    await useJourneySession(page, 'lead')
     await page.goto(`${journeyURL}/service-desk/mytasks`)
     await bell(page).click()
     const leadDialog = await waitForDialog(page, 'Notifications')

@@ -115,7 +115,7 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
     {
         using var client = CreateClient();
 
-        var signIn = await SignInAsync(client, "binh", returnUrl: null);
+        var signIn = await SignInAsync(client, "manager", returnUrl: null);
 
         Assert.Equal("/", signIn.ReturnedTo);
     }

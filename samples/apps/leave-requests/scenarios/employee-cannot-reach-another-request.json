@@ -8,7 +8,7 @@
     "requester": [
       "employee"
     ],
-    "lan": [
+    "employee": [
       "employee"
     ]
   },
@@ -30,7 +30,7 @@
     {
       "type": "updateRecord",
       "record": "request",
-      "as": "lan",
+      "as": "employee",
       "values": {
         "reason": "x"
       },
@@ -40,7 +40,7 @@
       "type": "startProcess",
       "process": "LeaveRequestApproval",
       "record": "request",
-      "as": "lan",
+      "as": "employee",
       "expect": "notFound"
     },
     {

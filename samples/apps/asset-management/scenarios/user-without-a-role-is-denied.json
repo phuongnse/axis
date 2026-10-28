@@ -5,7 +5,7 @@
   "formatVersion": 1,
   "now": "2026-10-01T09:00:00Z",
   "users": {
-    "quan": [
+    "asset-manager": [
       "asset-manager"
     ],
     "nobody": []
@@ -14,11 +14,11 @@
     {
       "type": "createRecord",
       "entity": "Asset",
-      "as": "quan",
+      "as": "asset-manager",
       "save": "asset",
       "values": {
-        "name": "Laptop of Lan",
-        "holder": "lan"
+        "name": "Laptop of the employee",
+        "holder": "employee"
       }
     },
     {
@@ -43,7 +43,7 @@
       "type": "expectRecord",
       "record": "asset",
       "values": {
-        "name": "Laptop of Lan"
+        "name": "Laptop of the employee"
       }
     }
   ]

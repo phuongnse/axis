@@ -4,7 +4,7 @@ import { useSession } from '../sessions'
 
 // The purchasing system submits purchase requests through the sample's SubmitPurchaseRequest
 // endpoint with a bearer token. Specs run in parallel against one database, so each test looks only
-// for the request it creates. They use Operations, whose manager is chau, so that the per-department
+// for the request it creates. They use Operations, whose manager is manager-2, so that the per-department
 // test keeps the Engineering total fixed.
 const appPath = '/api/apps/PurchaseRequests'
 const endpoint = `${appPath}/endpoints/SubmitPurchaseRequest`
@@ -95,7 +95,7 @@ test('the purchasing system submits a request through the endpoint, and the depa
   page,
   request,
 }) => {
-  await useSession(page, 'chau')
+  await useSession(page, 'manager-2')
   const department = await departmentId(page, 'Operations')
   const title = unique('Endpoint desk')
 
@@ -113,7 +113,7 @@ test('a repeated endpoint call with the same Idempotency-Key returns the first r
   page,
   request,
 }) => {
-  await useSession(page, 'chau')
+  await useSession(page, 'manager-2')
   const department = await departmentId(page, 'Operations')
   const title = unique('Endpoint repeat')
   const key = unique('endpoint-repeat')
@@ -137,7 +137,7 @@ test('a repeated endpoint call with the same Idempotency-Key returns the first r
 })
 
 test('a realm user without the purchasing-system role may not call the endpoint', async ({ page, request }) => {
-  await useSession(page, 'chau')
+  await useSession(page, 'manager-2')
   const department = await departmentId(page, 'Operations')
 
   const response = await submit(request, await annaToken(request), department, unique('Endpoint denied'))

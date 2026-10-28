@@ -6,7 +6,7 @@
   "now": "2026-10-01T09:00:00Z",
   "users": {
     "requester": ["employee"],
-    "chau": ["employee"]
+    "manager-2": ["employee"]
   },
   "steps": [
     {
@@ -23,8 +23,8 @@
         "lineItems": [{ "description": "Chair", "quantity": 2, "unitPrice": 1500 }]
       }
     },
-    { "type": "updateRecord", "record": "request", "as": "chau", "values": { "title": "x" }, "expect": "notFound" },
-    { "type": "startProcess", "process": "PurchaseRequestApproval", "record": "request", "as": "chau", "expect": "notFound" },
+    { "type": "updateRecord", "record": "request", "as": "manager-2", "values": { "title": "x" }, "expect": "notFound" },
+    { "type": "startProcess", "process": "PurchaseRequestApproval", "record": "request", "as": "manager-2", "expect": "notFound" },
     { "type": "expectRecord", "record": "request", "values": { "title": "Chairs" } }
   ]
 }

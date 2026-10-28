@@ -6,7 +6,7 @@
   "now": "2026-10-01T09:00:00Z",
   "users": {
     "requester": ["requester"],
-    "linh": ["service-desk-lead"]
+    "lead": ["service-desk-lead"]
   },
   "steps": [
     {
@@ -31,7 +31,7 @@
       "record": "ticket",
       "step": "triage",
       "outcome": "reject",
-      "as": "linh"
+      "as": "lead"
     },
     {
       "type": "expectRecord",

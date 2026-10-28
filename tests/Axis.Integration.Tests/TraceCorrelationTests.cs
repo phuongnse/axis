@@ -17,7 +17,7 @@ public sealed class TraceCorrelationTests(SampleAppFixture fixture) : IClassFixt
 {
     private const string App = "/api/apps/PurchaseRequests";
 
-    private static readonly string[] _users = ["requester", "lan", "chau", "binh", "dung", "author"];
+    private static readonly string[] _users = ["requester", "employee", "manager-2", "manager", "finance-reviewer", "author"];
 
     // The attribute keys of each Axis span in the telemetry design.
     private static readonly Dictionary<string, string[]> _axisKeys = new(StringComparer.Ordinal)
@@ -69,15 +69,15 @@ public sealed class TraceCorrelationTests(SampleAppFixture fixture) : IClassFixt
     {
         using var collector = new SpanCollector();
         using var requester = fixture.CreateClient().SignedInAs("requester");
-        using var chau = fixture.CreateClient().SignedInAs("chau");
-        using var dung = fixture.CreateClient().SignedInAs("dung");
+        using var manager2 = fixture.CreateClient().SignedInAs("manager-2");
+        using var financeReviewer = fixture.CreateClient().SignedInAs("finance-reviewer");
         var marker = $"Marker{Guid.NewGuid():N}";
         var subject = await CreateAsync(requester, marker, 10000, traceparent: null);
         var instance = await StartAsync(requester, subject);
         await fixture.RunUntilIdleAsync(CancellationToken);
-        await ApproveAsync(chau, instance, "managerApproval");
+        await ApproveAsync(manager2, instance, "managerApproval");
         await fixture.RunUntilIdleAsync(CancellationToken);
-        await ApproveAsync(dung, instance, "financeApproval");
+        await ApproveAsync(financeReviewer, instance, "financeApproval");
         await fixture.RunUntilIdleAsync(CancellationToken);
 
         // The journey reached the connector call and the package call.
@@ -121,14 +121,14 @@ public sealed class TraceCorrelationTests(SampleAppFixture fixture) : IClassFixt
     {
         using var collector = new MetricCollector();
         using var requester = fixture.CreateClient().SignedInAs("requester");
-        using var chau = fixture.CreateClient().SignedInAs("chau");
-        using var dung = fixture.CreateClient().SignedInAs("dung");
+        using var manager2 = fixture.CreateClient().SignedInAs("manager-2");
+        using var financeReviewer = fixture.CreateClient().SignedInAs("finance-reviewer");
         var subject = await CreateAsync(requester, $"Request {Guid.NewGuid():N}", 10000, traceparent: null);
         var instance = await StartAsync(requester, subject);
         await fixture.RunUntilIdleAsync(CancellationToken);
-        await ApproveAsync(chau, instance, "managerApproval");
+        await ApproveAsync(manager2, instance, "managerApproval");
         await fixture.RunUntilIdleAsync(CancellationToken);
-        await ApproveAsync(dung, instance, "financeApproval");
+        await ApproveAsync(financeReviewer, instance, "financeApproval");
         await fixture.RunUntilIdleAsync(CancellationToken);
 
         Assert.Equal("completed", await fixture.ScalarAsync("SELECT state FROM axis.process_instances WHERE id = @instance", ("instance", instance)));

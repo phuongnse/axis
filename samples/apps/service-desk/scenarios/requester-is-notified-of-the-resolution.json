@@ -8,10 +8,10 @@
     "requester": [
       "requester"
     ],
-    "khoa": [
+    "agent": [
       "agent"
     ],
-    "linh": [
+    "lead": [
       "service-desk-lead"
     ]
   },
@@ -38,7 +38,7 @@
       "record": "ticket",
       "step": "triage",
       "outcome": "assign",
-      "as": "linh",
+      "as": "lead",
       "values": {
         "category": "3f1c2a6e-5b0d-4e0a-9c1f-7a2d8b4e6c01",
         "priority": "high"
@@ -49,7 +49,7 @@
       "record": "ticket",
       "step": "resolve",
       "assignee": {
-        "user": "khoa"
+        "user": "agent"
       }
     },
     {
@@ -57,7 +57,7 @@
       "record": "ticket",
       "step": "resolve",
       "outcome": "resolve",
-      "as": "khoa",
+      "as": "agent",
       "values": {
         "resolution": "Replaced the battery."
       }

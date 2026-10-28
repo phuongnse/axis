@@ -6,7 +6,7 @@
   "now": "2026-10-01T09:00:00Z",
   "users": {
     "requester": ["employee"],
-    "binh": ["department-manager"]
+    "manager": ["department-manager"]
   },
   "steps": [
     {
@@ -24,13 +24,13 @@
       }
     },
     { "type": "startProcess", "process": "PurchaseRequestApproval", "record": "request", "as": "requester" },
-    { "type": "completeTask", "record": "request", "step": "managerApproval", "outcome": "approve", "as": "binh" },
+    { "type": "completeTask", "record": "request", "step": "managerApproval", "outcome": "approve", "as": "manager" },
     {
       "type": "completeTask",
       "record": "request",
       "step": "financeApproval",
       "outcome": "approve",
-      "as": "binh",
+      "as": "manager",
       "expect": "denied"
     },
     { "type": "expectTask", "record": "request", "step": "financeApproval", "state": "open" }
