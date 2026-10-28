@@ -223,7 +223,8 @@ and creates no tables. See
   `ConnectionStrings:Platform`. Its role has `USAGE` on the `platform` schema
   and `SELECT` on its tables, and nothing else. The server sets this in one
   transaction after the migrations, and revokes any wider right the role had
-  there. It refuses a role that is the role of `ConnectionStrings:PlatformSchema`.
+  there. The step holds an advisory lock until it ends, so servers that start
+  together run it one after the other. It refuses a role that is the role of `ConnectionStrings:PlatformSchema`.
   It does not yet check whether the role is a superuser, owns the schema or
   inherits rights through membership. The `platform.audit_records` table is
   the one exception: the role gets no right on it at all. The same step revokes
