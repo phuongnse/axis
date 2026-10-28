@@ -174,7 +174,7 @@
     "enabled": true,
     "scope": null,
     "answer": "recommended",
-    "max_parallel": 6
+    "max_parallel": 3
   },
   "evidence": {
     "artifacts": [
