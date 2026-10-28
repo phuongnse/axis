@@ -1,5 +1,5 @@
 import { MenuFoldOutlined, MenuOutlined, MenuUnfoldOutlined, SettingOutlined } from '@ant-design/icons'
-import { ConfigProvider, Dropdown, Layout, Menu, Typography, type MenuProps } from 'antd'
+import { Badge, ConfigProvider, Dropdown, Layout, Menu, Typography, type MenuProps } from 'antd'
 import dayjs from 'dayjs'
 import { useContext, useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { Link, useLocation } from 'react-router'
@@ -9,6 +9,7 @@ import { AxisButton } from './AxisButton'
 import { TitleMark } from './LaunchTile'
 import { navigationIcon } from './navigationIcons'
 import { NotificationBell } from './NotificationBell'
+import { useServerStatus, type ServerStatus } from './serverStatus'
 import { ShellHeightContext } from './shellHeight'
 import type { NavigationItem } from './site'
 import { useText } from './texts'
@@ -106,10 +107,50 @@ function PreferencesMenu({
   )
 }
 
+const statusBadge: Record<ServerStatus, 'processing' | 'success' | 'error'> = {
+  checking: 'processing',
+  ready: 'success',
+  unavailable: 'error',
+}
+
+/**
+ * Proposed: a slim footer under every page: the platform's name, and the server's readiness, which turns red for
+ * everyone when the server is unavailable.
+ */
+function ShellFooter() {
+  const t = useText()
+  const serverStatus = useServerStatus()
+  const { colour, spacing } = useDesignTokens()
+  return (
+    <Layout.Footer
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: spacing.md,
+        paddingBlock: spacing.xs,
+        paddingInline: spacing.lg,
+        background: colour.surface,
+        borderTop: `1px solid ${colour.borderSubtle}`,
+      }}
+    >
+      <Typography.Text type="secondary">{t('shell.title')}</Typography.Text>
+      <Typography.Text type="secondary">
+        {t('shell.serverStatus.title')}:{' '}
+        <Badge
+          data-testid="server-status"
+          status={statusBadge[serverStatus]}
+          text={<Typography.Text type="secondary">{t(`shell.serverStatus.${serverStatus}`)}</Typography.Text>}
+        />
+      </Typography.Text>
+    </Layout.Footer>
+  )
+}
+
 /**
  * The layout of every site, the platform site and application sites alike: a header with the site's mark and
- * title, the notification bell, the language and theme menu and the account button, and the site's navigation in
- * a sidebar beside the page. The sidebar collapses to a strip of the entries' icons, each named by a tooltip. Ant
+ * title, the notification bell, the language and theme menu and the account button, the site's navigation in
+ * a sidebar beside the page, and a footer under it. The sidebar collapses to a strip of the entries' icons, each named by a tooltip. Ant
  * Design components and dayjs follow the locale. At narrow width, below 992 px, the navigation sits in a panel
  * under the header, which a Menu button opens and closes.
  */
@@ -234,7 +275,10 @@ export function Shell({
             <UserMenu />
           </Layout.Header>
           {!sidebar ? (
-            <Layout.Content style={{ padding: spacing.lg }}>{children}</Layout.Content>
+            <>
+              <Layout.Content style={{ padding: spacing.lg }}>{children}</Layout.Content>
+              <ShellFooter />
+            </>
           ) : narrow ? (
             <>
               <nav
@@ -251,6 +295,7 @@ export function Shell({
                 {menu}
               </nav>
               <Layout.Content style={{ padding: spacing.lg }}>{children}</Layout.Content>
+              <ShellFooter />
             </>
           ) : (
             <Layout hasSider>
@@ -267,7 +312,10 @@ export function Shell({
                   {menu}
                 </nav>
               </Layout.Sider>
-              <Layout.Content style={{ padding: spacing.lg, minWidth: 0 }}>{children}</Layout.Content>
+              <Layout style={{ minWidth: 0 }}>
+                <Layout.Content style={{ padding: spacing.lg, minWidth: 0 }}>{children}</Layout.Content>
+                <ShellFooter />
+              </Layout>
             </Layout>
           )}
         </Layout>
