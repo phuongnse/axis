@@ -26,8 +26,8 @@ export interface NotificationPage {
   unreadCount: number
 }
 
-// The bell sits in the header of every page, so a 401 never starts sign-in from it.
-const quiet = { signInOnUnauthorized: false }
+// The bell sits in the header of every page, so a 401 never shows the sign-in prompt from it.
+const quiet = { promptSignInOnUnauthorized: false }
 
 /** Loads page `page` of the notifications at `path`, newest first. */
 export async function fetchNotifications(

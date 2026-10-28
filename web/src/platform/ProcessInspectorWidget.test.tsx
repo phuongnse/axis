@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
+import { isSignInNeeded } from './signInNeeded'
 import { assignLocation } from './navigation'
 import { ProcessInspectorWidget } from './ProcessInspectorWidget'
 import type { WidgetMetadata } from './site'
@@ -282,7 +283,7 @@ describe('ProcessInspectorWidget', () => {
     expect(screen.queryByRole('table')).not.toBeInTheDocument()
   })
 
-  it('starts sign-in with the current path and query string when nobody is signed in', async () => {
+  it('asks to sign in when nobody is signed in', async () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {})
     vi.mocked(assignLocation).mockReset()
     history.pushState(null, '', '/e2e/inspector?state=waiting')
@@ -290,11 +291,8 @@ describe('ProcessInspectorWidget', () => {
 
     renderWidget('?state=waiting')
 
-    await waitFor(() =>
-      expect(assignLocation).toHaveBeenCalledExactlyOnceWith(
-        '/api/auth/sign-in?returnUrl=%2Fe2e%2Finspector%3Fstate%3Dwaiting',
-      ),
-    )
+    await waitFor(() => expect(isSignInNeeded()).toBe(true))
+    expect(assignLocation).not.toHaveBeenCalled()
   })
 
   it('shows the empty text when there are no instances', async () => {

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { isSignInNeeded } from './signInNeeded'
 import { assignLocation } from './navigation'
 import { fetchTask, fetchTasks, reassignTask, searchUsers, usersPath } from './tasks'
 
@@ -10,7 +11,7 @@ beforeEach(() => {
 })
 
 describe('task API calls', () => {
-  it('start sign-in on a 401 with the current path and query string, and throw', async () => {
+  it('ask to sign in on a 401 and throw', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(
@@ -20,9 +21,8 @@ describe('task API calls', () => {
 
     await expect(fetchTasks('/api/tasks', 'pageSize=100')).rejects.toThrow('status 401')
     await expect(fetchTask('/api/tasks', 'task-1')).rejects.toThrow('status 401')
-    expect(assignLocation).toHaveBeenCalledTimes(2)
-    expect(assignLocation).toHaveBeenNthCalledWith(1, '/api/auth/sign-in?returnUrl=%2Fe2e%2Ftasks%3FpageSize%3D100')
-    expect(assignLocation).toHaveBeenNthCalledWith(2, '/api/auth/sign-in?returnUrl=%2Fe2e%2Ftasks%3FpageSize%3D100')
+    expect(isSignInNeeded()).toBe(true)
+    expect(assignLocation).not.toHaveBeenCalled()
   })
 })
 

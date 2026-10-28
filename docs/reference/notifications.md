@@ -181,7 +181,7 @@ A text value may hold named placeholders, such as
     notification read. A row without a page only marks it read.
   - The count reloads when the site loads, on every page navigation, when the
     panel opens and after any mark read. There is no timer. A failure to read
-    the list hides the bell and never starts sign-in.
+    the list hides the bell and never shows the sign-in prompt.
 
 ## Email
 

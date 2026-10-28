@@ -427,11 +427,11 @@ export async function fetchSite(signal?: AbortSignal): Promise<SiteMetadata> {
 }
 
 /**
- * Loads the tenant's application sites, or returns `null` when nobody is signed in. The 401 does not
+ * show the sign-in prompt, so the platform home page stays open to a signed-out person.
  * start sign-in, so the platform home page stays open to a signed-out person.
  */
 export async function fetchSites(signal?: AbortSignal): Promise<SiteListItem[] | null> {
-  const response = await apiFetch('/api/sites', { signal }, { signInOnUnauthorized: false })
+  const response = await apiFetch('/api/sites', { signal }, { promptSignInOnUnauthorized: false })
   if (response.status === 401) {
     return null
   }

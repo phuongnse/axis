@@ -122,7 +122,7 @@ test('the home page opens a site in its own shell, in light and dark mode', asyn
 })
 
 test('an unknown site is not found inside the platform shell', async ({ page }) => {
-  // The site endpoints need a session, or the page would start sign-in.
+  // The site endpoints need a session, or the page would show the sign-in prompt.
   await useSession(page, 'anna')
   const response = await page.goto('/no-such-site')
 

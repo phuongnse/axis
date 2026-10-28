@@ -22,7 +22,7 @@ export interface CurrentUser {
  * sign-in, because the shell asks before anyone has chosen to sign in.
  */
 export async function fetchCurrentUser(signal?: AbortSignal): Promise<CurrentUser | null> {
-  const response = await apiFetch('/api/me', { signal }, { signInOnUnauthorized: false })
+  const response = await apiFetch('/api/me', { signal }, { promptSignInOnUnauthorized: false })
   if (response.status === 401) {
     return null
   }

@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../src/Axis.Presentation/Texts/en.json'
 import platformVietnamese from '../../src/Axis.Presentation/Texts/vi.json'
 import { App } from './App'
+import { apiFetch, signInUrl } from './platform/api'
 import { assignLocation } from './platform/navigation'
 import type {
   ApplicationSite,
@@ -47,6 +48,8 @@ const texts: Record<string, Record<string, string>> = {
     'shell.home.sites.loadFailed': 'The sites could not be loaded.',
     'shell.home.sites.signIn': 'Sign in to see the sites.',
     'shell.home.signInFailed': 'Sign-in did not complete. Try again.',
+    'shell.account.signIn': 'Sign in',
+    'shell.signInPrompt.message': 'Sign in to continue.',
     'shell.notFound.title': 'Page not found',
     'shell.notFound.message': 'There is nothing at this address.',
     'shell.notFound.home': 'Go to the home page',
@@ -302,7 +305,14 @@ function json(body: unknown, status = 200) {
 }
 
 /** Stubs `fetch` with the server's routes. */
-function stubServer({ ready = true, siteStatus = 200, sitesStatus = 200, failingLocale = '' } = {}) {
+function stubServer({
+  ready = true,
+  siteStatus = 200,
+  sitesStatus = 200,
+  failingLocale = '',
+  e2eSiteStatus = 200,
+  recordsStatus = 200,
+} = {}) {
   const fetchMock = vi.fn(async (input: string) => {
     if (input === '/health/ready') {
       return json({}, ready ? 200 : 503)
@@ -313,10 +323,16 @@ function stubServer({ ready = true, siteStatus = 200, sitesStatus = 200, failing
     if (input === '/api/sites') {
       return sitesStatus === 200 ? json({ sites }) : json({}, sitesStatus)
     }
+    if (input === '/api/sites/e2e' && e2eSiteStatus !== 200) {
+      return json({ title: 'Sign in to read or write this data.', status: e2eSiteStatus }, e2eSiteStatus)
+    }
     if (input.startsWith('/api/sites/')) {
       return siteRoute(input.replace('/api/sites/', ''), failingLocale)
     }
     if (input.startsWith('/api/apps/')) {
+      if (recordsStatus !== 200) {
+        return json({ title: 'Sign in to read or write this data.', status: recordsStatus }, recordsStatus)
+      }
       // A list of records has no id segment. No record exists, so a record by id is not found.
       return input.startsWith(`${noteEntity.recordsPath}/`)
         ? json({ title: 'Not found', status: 404 }, 404)
@@ -535,6 +551,59 @@ describe('App', () => {
     for (const texts of [platformEnglish, platformVietnamese]) {
       expect(texts).toHaveProperty(['shell.home.signInFailed'])
     }
+  })
+
+  it('has the sign-in prompt text in every platform locale', () => {
+    for (const texts of [platformEnglish, platformVietnamese]) {
+      expect(texts).toHaveProperty(['shell.signInPrompt.message'])
+    }
+  })
+
+  it('shows the sign-in prompt, and does not start sign-in, when a site page opens and nobody is signed in', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    vi.mocked(assignLocation).mockReset()
+    stubServer({ e2eSiteStatus: 401 })
+
+    renderApp('/e2e/notes?x=1')
+
+    const prompt = await screen.findByTestId('sign-in-prompt')
+    expect(prompt).toBeInTheDocument()
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    expect(within(prompt).getByText('Sign in to continue.')).toBeInTheDocument()
+    expect(screen.queryByTestId('shell-error')).not.toBeInTheDocument()
+    expect(assignLocation).not.toHaveBeenCalled()
+  })
+
+  it('starts sign-in with the current path and query string when the prompt Sign in is clicked', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    vi.mocked(assignLocation).mockReset()
+    history.pushState(null, '', '/e2e/notes?x=1')
+    stubServer({ e2eSiteStatus: 401 })
+
+    renderApp('/e2e/notes?x=1')
+
+    const prompt = await screen.findByTestId('sign-in-prompt')
+    expect(assignLocation).not.toHaveBeenCalled()
+    await userEvent.click(within(prompt).getByRole('button', { name: 'Sign in' }))
+
+    expect(assignLocation).toHaveBeenCalledExactlyOnceWith(signInUrl('/e2e/notes?x=1'))
+  })
+
+  it('shows the sign-in prompt over the page when a call answers 401 during use', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    vi.mocked(assignLocation).mockReset()
+    stubServer()
+    renderApp('/e2e/notes')
+    expect(await screen.findByText('No records yet.')).toBeInTheDocument()
+    expect(screen.queryByTestId('sign-in-prompt')).not.toBeInTheDocument()
+
+    stubServer({ recordsStatus: 401 })
+    await userEvent.click(screen.getByRole('button', { name: 'New' }))
+    await apiFetch('/api/apps/E2eApp/entities/Note/records')
+
+    expect(await screen.findByTestId('sign-in-prompt')).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'Notes' })).toBeInTheDocument()
+    expect(assignLocation).not.toHaveBeenCalled()
   })
 
   it('shows site titles in the current locale', async () => {

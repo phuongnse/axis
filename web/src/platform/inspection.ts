@@ -246,7 +246,7 @@ export function retryWarns(instance: InstanceDetail): boolean {
 
 /**
  * Loads one page of the instances of a process, newest first. `query` holds the inspection API's
- * `state`, `page` and `pageSize`. A 403 returns {@link forbidden}. A 401 starts sign-in and throws,
+ * `state`, `page` and `pageSize`. A 403 returns {@link forbidden}. A 401 shows the sign-in prompt and throws,
  * as any other failure does.
  */
 export async function fetchInstances(
@@ -266,7 +266,7 @@ export async function fetchInstances(
 
 /**
  * Loads one instance in any state, or returns `null` when the process has none with the id. A 403
- * returns {@link forbidden}. A 401 starts sign-in and throws, as any other failure does.
+ * returns {@link forbidden}. A 401 shows the sign-in prompt and throws, as any other failure does.
  */
 export async function fetchInstance(
   instancesPath: string,
@@ -312,7 +312,7 @@ async function readProblem(response: Response): Promise<CommandResult | null> {
 
 /**
  * Sends an operator command to an instance with the reason the audit keeps. A 400, 403, 404 or 409
- * comes back as the problem. A 401 starts sign-in and throws, as any other failure does.
+ * comes back as the problem. A 401 shows the sign-in prompt and throws, as any other failure does.
  */
 export async function sendCommand(
   instancesPath: string,
@@ -339,7 +339,7 @@ export async function sendCommand(
 
 /**
  * Loads one page of the dead letters of a process, newest first. `query` holds the dead letter API's
- * `state`, `page` and `pageSize`. A 403 returns {@link forbidden}. A 401 starts sign-in and throws,
+ * `state`, `page` and `pageSize`. A 403 returns {@link forbidden}. A 401 shows the sign-in prompt and throws,
  * as any other failure does.
  */
 export async function fetchDeadLetters(
@@ -359,7 +359,7 @@ export async function fetchDeadLetters(
 
 /**
  * Sends an operator command to a dead letter with the reason the audit keeps. A 400, 403, 404 or 409
- * comes back as the problem. A 401 starts sign-in and throws, as any other failure does.
+ * comes back as the problem. A 401 shows the sign-in prompt and throws, as any other failure does.
  */
 export async function sendDeadLetterCommand(
   deadLettersPath: string,
@@ -386,7 +386,7 @@ export async function sendDeadLetterCommand(
 
 /**
  * Sends the resolve of an `unknown` call. `body` is the text {@link buildResolveBody} wrote. A 400,
- * 403, 404 or 409 comes back as the problem. A 401 starts sign-in and throws, as any other failure does.
+ * 403, 404 or 409 comes back as the problem. A 401 shows the sign-in prompt and throws, as any other failure does.
  */
 export async function resolveCall(
   instancesPath: string,
