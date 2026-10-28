@@ -1,5 +1,5 @@
 import { readFileSync, writeFileSync } from 'node:fs'
-import { fieldLabel } from '../fields'
+import { expectShown, fieldLabel, fieldValue, shownValue } from '../fields'
 import { expect, test } from '../test'
 import type { Page } from '@playwright/test'
 import {
@@ -38,12 +38,12 @@ async function restartWorker() {
  * purchasing system after approval, and returns it. It waits up to `timeout` milliseconds.
  */
 async function expectPurchaseOrderNumber(page: Page, id: string, timeout = 30_000) {
-  const field = page.getByLabel(fieldLabel('Purchase order number'))
+  const field = fieldValue(page, 'purchaseOrderNumber')
   await expect(async () => {
     await page.goto(`/purchasing/purchaserequestform/${id}`)
-    await expect(field).not.toHaveValue('Not set', { timeout: 1_000 })
+    await expect.poll(() => shownValue(field), { timeout: 1_000 }).not.toBe('Not set')
   }).toPass({ timeout })
-  return field.inputValue()
+  return shownValue(field)
 }
 
 /**
@@ -51,10 +51,10 @@ async function expectPurchaseOrderNumber(page: Page, id: string, timeout = 30_00
  * matches `pattern`. The sample's extension package writes it after the purchase order is created.
  */
 async function expectPaymentReference(page: Page, id: string, pattern: RegExp, timeout = 30_000) {
-  const field = page.getByLabel(fieldLabel('Payment reference'))
+  const field = fieldValue(page, 'paymentReference')
   await expect(async () => {
     await page.goto(`/purchasing/purchaserequestform/${id}`)
-    await expect(field).toHaveValue(pattern, { timeout: 1_000 })
+    await expectShown(field, pattern, { timeout: 1_000 })
   }).toPass({ timeout })
 }
 
@@ -118,7 +118,7 @@ test('a request below the threshold is approved by the department manager from M
   await decide(page, title, 'Manager approval', 'Approve', comment)
 
   await expectStatus(page, id, 'approved')
-  await expect(page.getByLabel(fieldLabel('Decision comments'))).toHaveValue(comment)
+  await expectShown(fieldValue(page, 'decisionComments'), comment)
   await expectHistory(page, ['Chau Operations Manager'])
   await expectOnePurchaseOrder(page, id)
   // ISO 11649: RF, two check digits, then the request number without its hyphens.
@@ -177,7 +177,7 @@ test('a returned request is edited and submitted again, and the manager then app
 
   await useSession(page, 'anna')
   await page.goto(`/purchasing/purchaserequestform/${id}`)
-  await expect(page.getByLabel(fieldLabel('Decision comments'))).toHaveValue(comment)
+  await expectShown(fieldValue(page, 'decisionComments'), comment)
   await page.getByLabel(fieldLabel('Quantity 1')).fill('2')
   // Submit saves the edit before it starts the process.
   await page.getByRole('button', { name: 'Submit', exact: true }).click()
@@ -203,7 +203,7 @@ test('a rejected request cannot be submitted again, and the manager gets no new 
   await decide(page, title, 'Manager approval', 'Reject')
   await expectStatus(page, id, 'rejected')
   // The process ends with the rejection, so the purchasing system is never called.
-  await expect(page.getByLabel(fieldLabel('Purchase order number'))).toHaveValue('Not set')
+  await expectShown(fieldValue(page, 'purchaseOrderNumber'), 'Not set')
   expect(await purchaseOrders(page, await requestNumber(page, id))).toEqual([])
 
   await useSession(page, 'anna')

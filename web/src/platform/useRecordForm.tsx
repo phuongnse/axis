@@ -421,12 +421,14 @@ export function useRecordForm(
     const value = values[field.name] ?? null
     const id = field.name
     if (field.type !== 'child-collection' && (readOnly || field.computed || field.sequence || field.creator)) {
+      const testId = `field-value-${field.name}`
       if (field.type === 'references') {
         const joined = referencesLabels(value, labels[field.name]).join(', ')
         return (
           <Input
             id={id}
             readOnly
+            data-testid={testId}
             aria-describedby={helpId}
             value={joined || notSet}
             style={joined ? undefined : emptyStyle}
@@ -434,21 +436,28 @@ export function useRecordForm(
         )
       }
       if (field.type === 'file') {
-        return isFileValue(value) ? (
-          <FileLink field={field} value={value} />
-        ) : (
-          <Input id={id} readOnly aria-describedby={helpId} value={notSet} style={emptyStyle} />
+        return (
+          <div data-testid={testId}>
+            {isFileValue(value) ? (
+              <FileLink field={field} value={value} />
+            ) : (
+              <Input id={id} readOnly aria-describedby={helpId} value={notSet} style={emptyStyle} />
+            )}
+          </div>
         )
       }
       // An empty value shows the words, because fields are read one by one.
       if (value === null) {
-        return <Input id={id} readOnly aria-describedby={helpId} value={notSet} style={emptyStyle} />
+        return (
+          <Input id={id} readOnly data-testid={testId} aria-describedby={helpId} value={notSet} style={emptyStyle} />
+        )
       }
       // The server sets the value on save, so it is shown as a table cell shows it.
       return (
         <Input
           id={id}
           readOnly
+          data-testid={testId}
           aria-describedby={helpId}
           value={formatValue(field, value as RecordValue, labels, { locale, text: t }, values)}
         />
