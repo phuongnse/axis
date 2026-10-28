@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "build:design-system": "vite build --config vite.design-system.config.ts",
+    "build:keycloak-theme": "vite build --config vite.keycloak-theme.config.ts",
     "lint": "oxlint --deny-warnings && tsc -b --noEmit && prettier --check .",
     "preview": "vite preview",
     "test": "vitest run",
