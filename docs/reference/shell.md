@@ -7,9 +7,9 @@ endpoints and the widgets are in [frontend](frontend.md), and sign-in and the se
 [security](security.md#sign-in-and-the-session).
 
 [D98](../decisions/d98-rules-from-the-shell-review.md) agrees everything on this page. The [layout](#layout) and the
-[navigation icons](#navigation-icons), the [page header](#page-header) and the
-[app switcher and preferences](#app-switcher-and-preferences) are built. M16 builds the rest, so every other section is
-_(planned for M16)_.
+[navigation icons](#navigation-icons), the [page header](#page-header), the
+[app switcher and preferences](#app-switcher-and-preferences), the [platform home page](#platform-home-page) and
+[session ended](#session-ended) are built. M16 builds the rest, so every other section is _(planned for M16)_.
 
 ## Layout
 
@@ -77,22 +77,22 @@ _(planned for M16)_.
 
 ## Platform home page
 
-_(planned for M16)_
-
 - **Signed in.** The page goes from the highest level to the lowest.
   - A welcome band on `surface`: "Welcome to Axis" and "Open an application below to start working.", and under them
     the tools of the person's roles, Studio for an author ("Build and publish applications.") and the operator console
-    for an operator, each a tile with its icon beside its title and description, aligned to the top.
+    for an operator ("See what failed and run the commands that fix it."), each a tile with its icon beside its title
+    and description, aligned to the top.
   - "Applications" with their number, then one card per application across the page, in title order: the
     application's mark, its title and the number of its sites, over its sites. Each site is a row with its mark and
     title that opens the site, with no icon after it.
   - Tools and sites share one grid of three columns, so their columns line up. Below 992 px it is one column.
 - **Signed out.** The home page is the sign-in screen: one card in the middle of the page with the Axis mark, "Sign in
   to Axis", "You sign in at your organization's sign-in page, then come back here." and a full-width Sign in button.
-  The header shows no second Sign in button there. Nothing starts sign-in until the person clicks it.
+  The header shows no second Sign in button there. Nothing starts sign-in until the person clicks it. The page shows
+  the card when `GET /api/me` or `GET /api/sites` answers `401`.
 - **Refused sign-in.** `/?signIn=failed` shows the same card, with the warning "Sign-in did not complete. Try again."
   above the button, with no reason.
-- **Endpoints.** These three are built, while the page that uses them stays planned.
+- **Endpoints.** The page uses these three.
   - `GET /api/sites` gives each site its `application`, `{ "name", "titles" }`, the application's name and its title
     per locale it has texts for, from the `label` in its `application.json` or its name when it has none, so the home page can group the sites.
   - `GET /api/me` adds a boolean `console`, true when the person holds the role `Console:OperatorRole` names, see the
@@ -101,8 +101,6 @@ _(planned for M16)_
     images carry. Without a session it answers `401`, like every other `/api` path that needs one.
 
 ## Session ended
-
-_(planned for M16)_
 
 - When a request answers `401` after sign-in, such as once the session has ended at the re-authentication Axis asks
   for every 8 hours, the sign-in dialog is titled "Your session has ended" and reads "Sign in again to continue." It

@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -62,10 +62,10 @@ function stubServer(current: CurrentUser | null) {
   return fetchMock
 }
 
-function renderMenu(texts: Record<string, string> = platformEnglish) {
+function renderMenu(texts: Record<string, string> = platformEnglish, path = '/e2e/notes') {
   render(
     <TextProvider catalogs={[{ texts, fallbackTexts: texts }]} development={false}>
-      <MemoryRouter>
+      <MemoryRouter initialEntries={[path]}>
         <UserMenu />
       </MemoryRouter>
     </TextProvider>,
@@ -128,6 +128,25 @@ describe('UserMenu', () => {
 
     expect(await screen.findByRole('button', { name: 'Hoa Author' })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Studio' })).not.toBeInTheDocument()
+  })
+
+  it('shows no sign-in button on the home page, which is the sign-in screen, when nobody is signed in', async () => {
+    const fetchMock = stubServer(null)
+    renderMenu(platformEnglish, '/')
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/me', expect.anything()))
+    // Let the answer settle, so the absence is not just the loading state.
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20))
+    })
+    expect(screen.queryByRole('button')).not.toBeInTheDocument()
+  })
+
+  it('shows the name of a signed-in person on the home page', async () => {
+    stubServer(anna)
+    renderMenu(platformEnglish, '/')
+
+    expect(await screen.findByRole('button', { name: 'Anna Employee' })).toBeInTheDocument()
   })
 
   it('sends the browser to sign in and back to the current page', async () => {

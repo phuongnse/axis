@@ -12,7 +12,7 @@ test('the SPA draws its text in IBM Plex Sans from its own origin, Vietnamese in
   })
 
   await page.goto('/')
-  const welcome = page.getByRole('main').getByText('Welcome to Axis', { exact: true })
+  const welcome = page.getByRole('main').getByText('Sign in to Axis', { exact: true })
   await expect(welcome).toBeVisible()
 
   const family = await welcome.evaluate((element) => getComputedStyle(element).fontFamily)

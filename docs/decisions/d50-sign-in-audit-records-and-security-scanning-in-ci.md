@@ -34,6 +34,9 @@ The owner confirmed these points on issue #707 on 2026-10-19.
     and `npm audit --audit-level=high` in `web` and `tests/e2e`.
   - It fails on a vulnerability of high or critical severity, and prints each
     one with its package and advisory.
+  - A finding that `scripts/scan-accepted.json` records with its date passes
+    until its time frame ends, see
+    [dependency updates](../development.md#dependency-updates).
   - CI runs it on its existing triggers and once a week. A finding on the
     weekly run opens no issue. The red run is the signal.
   - It is not a NexKit check until a hand-made change to `.nexkit/` adds it.

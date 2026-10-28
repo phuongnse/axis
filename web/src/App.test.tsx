@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
@@ -7,6 +7,7 @@ import platformVietnamese from '../../src/Axis.Presentation/Texts/vi.json'
 import { App } from './App'
 import { apiFetch, signInUrl } from './platform/api'
 import { assignLocation } from './platform/navigation'
+import type { CurrentUser } from './platform/currentUser'
 import type {
   ApplicationSite,
   EntityMetadata,
@@ -16,7 +17,6 @@ import type {
   WidgetAccess,
 } from './platform/site'
 import { ThemeModeProvider } from './platform/theme'
-import { isBlurred } from './test/antd'
 
 vi.mock('./platform/navigation')
 
@@ -48,13 +48,20 @@ const texts: Record<string, Record<string, string>> = {
     'shell.locale.en': 'English',
     'shell.locale.vi': 'Tiếng Việt',
     'shell.locale.loadFailed': 'The texts for this language could not be loaded.',
-    'shell.home.sites.title': 'Sites',
-    'shell.home.sites.empty': 'No application is active.',
-    'shell.home.sites.loadFailed': 'The sites could not be loaded.',
-    'shell.home.sites.signIn': 'Sign in to see the sites.',
+    'shell.home.subtitle': 'Open an application below to start working.',
+    'shell.home.studio.description': 'Build and publish applications.',
+    'shell.home.console.description': 'See what failed and run the commands that fix it.',
+    'shell.home.applications.title': 'Applications',
+    'shell.home.applications.site': 'site',
+    'shell.home.applications.sites': 'sites',
+    'shell.home.applications.empty': 'No application is active.',
+    'shell.home.applications.loadFailed': 'The sites could not be loaded.',
+    'shell.home.signIn.title': 'Sign in to Axis',
+    'shell.home.signIn.message': "You sign in at your organization's sign-in page, then come back here.",
     'shell.home.signInFailed': 'Sign-in did not complete. Try again.',
     'shell.account.signIn': 'Sign in',
-    'shell.signInPrompt.message': 'Sign in to continue.',
+    'shell.signInPrompt.title': 'Your session has ended',
+    'shell.signInPrompt.message': 'Sign in again to continue.',
     'shell.notFound.title': 'Page not found',
     'shell.notFound.message': 'There is nothing at this address.',
     'shell.notFound.home': 'Go to the home page',
@@ -80,7 +87,32 @@ const sites: SiteListItem[] = [
     titles: { en: 'E2E notes', vi: 'Ghi chú E2E' },
     application: { name: 'E2eNotes', titles: { en: 'E2E notes', vi: 'Ghi chú E2E' } },
   },
+  // Listed out of title order, so the tests see the sort.
+  {
+    path: 'desk-staff',
+    titleKey: 'site.title',
+    titles: { en: 'Staff desk' },
+    application: { name: 'ServiceDesk', titles: { en: 'Service desk' } },
+  },
+  {
+    path: 'desk-customers',
+    titleKey: 'site.title',
+    titles: { en: 'Customer portal' },
+    application: { name: 'ServiceDesk', titles: { en: 'Service desk' } },
+  },
 ]
+
+const signedInUser: CurrentUser = {
+  id: 'user-1',
+  displayName: 'Anna',
+  roles: [],
+  studio: false,
+  studioPublisher: false,
+  studioCreate: false,
+  studioPreviewHost: null,
+  studioTest: false,
+  console: false,
+}
 
 const e2eSite: ApplicationSite = {
   path: 'e2e',
@@ -326,10 +358,15 @@ function stubServer({
   failingLocale = '',
   e2eSiteStatus = 200,
   recordsStatus = 200,
+  // `null` answers 401, as when nobody is signed in.
+  me = signedInUser as CurrentUser | null,
 } = {}) {
   const fetchMock = vi.fn(async (input: string) => {
     if (input === '/health/ready') {
       return json({}, ready ? 200 : 503)
+    }
+    if (input === '/api/me') {
+      return me === null ? json({ title: 'Sign in to continue.', status: 401 }, 401) : json(me)
     }
     if (input === '/api/site') {
       return json(siteStatus === 200 ? site : {}, siteStatus)
@@ -414,7 +451,7 @@ describe('App', () => {
 
     renderApp()
 
-    expect(await within(await screen.findByTestId('server-status')).findByText('Ready')).toBeInTheDocument()
+    expect(await within(await screen.findByTestId('footer-server-status')).findByText('Ready')).toBeInTheDocument()
     expect(fetch).toHaveBeenCalledWith('/health/ready', expect.anything())
   })
 
@@ -423,7 +460,9 @@ describe('App', () => {
 
     renderApp()
 
-    expect(await within(await screen.findByTestId('server-status')).findByText('Unavailable')).toBeInTheDocument()
+    expect(
+      await within(await screen.findByTestId('footer-server-status')).findByText('Unavailable'),
+    ).toBeInTheDocument()
   })
 
   it('switches between light and dark mode and remembers the choice', async () => {
@@ -513,58 +552,155 @@ describe('App', () => {
     expect(await screen.findByTestId('shell-error')).toHaveTextContent('Could not load the site.')
   })
 
-  it('lists the sites of the tenant on the home page', async () => {
+  it('groups the sites under application cards in title order, each with its site count', async () => {
     stubServer()
 
     renderApp()
 
-    await screen.findByRole('link', { name: 'E2E notes' })
-    // Spin keeps the list blurred, with pointer-events: none, for one commit after loading ends.
-    const link = await waitFor(() => {
-      const found = screen.getByRole('link', { name: 'E2E notes' })
-      expect(isBlurred(found)).toBe(false)
-      return found
-    })
+    const desk = await screen.findByRole('region', { name: 'Service desk' })
+    const notes = screen.getByRole('region', { name: 'E2E notes' })
+    // Service desk sorts after E2E notes as a title, though its sites are listed first.
+    expect(notes.compareDocumentPosition(desk) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(within(desk).getByText('2 sites')).toBeInTheDocument()
+    expect(within(notes).getByText('1 site')).toBeInTheDocument()
+    expect(
+      within(desk)
+        .getAllByRole('link')
+        .map((link) => [link.textContent, link.getAttribute('href')]),
+    ).toEqual([
+      ['CCustomer portal', '/desk-customers'],
+      ['SStaff desk', '/desk-staff'],
+    ])
+    expect(screen.getByRole('heading', { name: 'Applications' })).toBeInTheDocument()
+    expect(screen.getByText('2')).toBeInTheDocument()
+    expect(screen.queryByTestId('server-status')).not.toBeInTheDocument()
+  })
+
+  it('opens a site from its application card', async () => {
+    stubServer()
+
+    renderApp()
+
+    const link = await within(await screen.findByRole('region', { name: 'E2E notes' })).findByRole('link')
     expect(link).toHaveAttribute('href', '/e2e')
     await userEvent.click(link)
     expect(await screen.findByRole('heading', { name: 'All notes' })).toBeInTheDocument()
     expect(screen.getByTestId('location')).toHaveTextContent('/e2e/notes')
   })
 
-  it('keeps the sites card and shows an error when the sites cannot be loaded', async () => {
+  it('shows the Studio and operator console tiles only for the roles that hold them', async () => {
+    for (const [studio, console_] of [
+      [true, false],
+      [false, true],
+      [true, true],
+      [false, false],
+    ]) {
+      stubServer({ me: { ...signedInUser, studio, console: console_ } })
+
+      const { unmount } = renderApp()
+
+      await screen.findByText('Welcome to Axis')
+      const main = within(screen.getByRole('main'))
+      const studioTile = main.queryByRole('link', { name: /Studio/ })
+      const consoleTile = main.queryByRole('link', { name: /Operator console/ })
+      expect(studioTile !== null).toBe(studio)
+      expect(consoleTile !== null).toBe(console_)
+      if (studioTile) {
+        expect(studioTile).toHaveAttribute('href', '/studio')
+        expect(studioTile).toHaveTextContent('Build and publish applications.')
+      }
+      if (consoleTile) {
+        expect(consoleTile).toHaveAttribute('href', '/console')
+        expect(consoleTile).toHaveTextContent('See what failed and run the commands that fix it.')
+      }
+      unmount()
+    }
+  })
+
+  it('shows the welcome band with its guidance for a signed-in person', async () => {
+    stubServer()
+
+    renderApp()
+
+    expect(await screen.findByRole('heading', { name: 'Welcome to Axis' })).toBeInTheDocument()
+    expect(screen.getByText('Open an application below to start working.')).toBeInTheDocument()
+    expect(screen.queryByText('Sign in to Axis')).not.toBeInTheDocument()
+  })
+
+  it('keeps the applications heading and shows an error when the sites cannot be loaded', async () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {})
     stubServer({ sitesStatus: 500 })
 
     renderApp()
 
-    const error = await screen.findByTestId('sites-error')
+    const error = await screen.findByTestId('applications-error')
     expect(error).toHaveTextContent('The sites could not be loaded.')
-    expect(screen.getByText('Sites')).toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: 'E2E notes' })).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Applications' })).toBeInTheDocument()
+    expect(screen.getByText('Welcome to Axis')).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /E2E notes/ })).not.toBeInTheDocument()
   })
 
-  it('shows a sign-in prompt in place of the sites without starting sign-in when nobody is signed in', async () => {
+  it('shows an empty message when no application is active', async () => {
+    stubServer()
+    const fetchMock = vi.mocked(fetch)
+    const answer = fetchMock.getMockImplementation()!
+    fetchMock.mockImplementation(async (input, init) =>
+      input === '/api/sites' ? json({ sites: [] }) : answer(input, init),
+    )
+
+    renderApp()
+
+    expect(await screen.findByText('No application is active.')).toBeInTheDocument()
+  })
+
+  it('shows the sign-in card, with one Sign in button and without starting sign-in, when nobody is signed in', async () => {
     vi.mocked(assignLocation).mockReset()
+    stubServer({ me: null })
+
+    renderApp()
+
+    expect(await screen.findByText('Sign in to Axis')).toBeInTheDocument()
+    expect(
+      screen.getByText("You sign in at your organization's sign-in page, then come back here."),
+    ).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: 'Sign in' })).toHaveLength(1)
+    expect(screen.queryByTestId('sign-in-failed')).not.toBeInTheDocument()
+    expect(screen.queryByText('Welcome to Axis')).not.toBeInTheDocument()
+    expect(assignLocation).not.toHaveBeenCalled()
+  })
+
+  it('shows the sign-in card when the sites answer 401 though the user loaded', async () => {
     stubServer({ sitesStatus: 401 })
 
     renderApp()
 
-    expect(await screen.findByTestId('sites-sign-in')).toHaveTextContent('Sign in to see the sites.')
-    expect(screen.queryByTestId('sign-in-failed')).not.toBeInTheDocument()
-    expect(screen.getByText('Sites')).toBeInTheDocument()
-    expect(screen.queryByTestId('sites-error')).not.toBeInTheDocument()
-    expect(assignLocation).not.toHaveBeenCalled()
+    expect(await screen.findByText('Sign in to Axis')).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: 'Sign in' })).toHaveLength(1)
   })
 
-  it('shows a sign-in-did-not-complete alert above the sign-in prompt when the address has the marker', async () => {
-    stubServer({ sitesStatus: 401 })
+  it('starts sign-in with the home page when the sign-in card button is clicked', async () => {
+    vi.mocked(assignLocation).mockReset()
+    history.pushState(null, '', '/')
+    stubServer({ me: null })
+
+    renderApp()
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Sign in' }))
+
+    expect(assignLocation).toHaveBeenCalledExactlyOnceWith(signInUrl('/'))
+  })
+
+  it('shows a sign-in-did-not-complete warning above the Sign in button when the address has the marker', async () => {
+    stubServer({ me: null })
 
     renderApp('/?signIn=failed')
 
     const alert = await screen.findByTestId('sign-in-failed')
     expect(alert).toHaveTextContent('Sign-in did not complete. Try again.')
     expect(alert).toHaveAttribute('role', 'alert')
-    expect(await screen.findByTestId('sites-sign-in')).toBeInTheDocument()
+    const button = screen.getByRole('button', { name: 'Sign in' })
+    expect(alert.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.getAllByRole('button', { name: 'Sign in' })).toHaveLength(1)
   })
 
   it('has the sign-in-did-not-complete text in every platform locale', () => {
@@ -573,9 +709,14 @@ describe('App', () => {
     }
   })
 
-  it('has the sign-in prompt text in every platform locale', () => {
+  it('has the sign-in prompt and home page texts in every platform locale', () => {
     for (const texts of [platformEnglish, platformVietnamese]) {
+      expect(texts).toHaveProperty(['shell.signInPrompt.title'])
       expect(texts).toHaveProperty(['shell.signInPrompt.message'])
+      expect(texts).toHaveProperty(['shell.home.signIn.title'])
+      expect(texts).toHaveProperty(['shell.home.signIn.message'])
+      expect(texts).toHaveProperty(['shell.home.subtitle'])
+      expect(texts).toHaveProperty(['shell.home.applications.title'])
     }
   })
 
@@ -589,9 +730,28 @@ describe('App', () => {
     const prompt = await screen.findByTestId('sign-in-prompt')
     expect(prompt).toBeInTheDocument()
     expect(screen.getByRole('dialog')).toBeInTheDocument()
-    expect(within(prompt).getByText('Sign in to continue.')).toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'Your session has ended' })).toBeInTheDocument()
+    expect(within(prompt).getByText('Sign in again to continue.')).toBeInTheDocument()
     expect(screen.queryByTestId('shell-error')).not.toBeInTheDocument()
     expect(assignLocation).not.toHaveBeenCalled()
+  })
+
+  it('keeps the sign-in prompt open after Escape and a click on the mask', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    stubServer({ e2eSiteStatus: 401 })
+
+    renderApp('/e2e/notes')
+
+    const prompt = await screen.findByTestId('sign-in-prompt')
+    await userEvent.keyboard('{Escape}')
+    const wrap = document.querySelector<HTMLElement>('.ant-modal-wrap')!
+    await userEvent.click(wrap)
+
+    expect(prompt).toBeInTheDocument()
+    const dialog = screen.getByRole('dialog', { name: 'Your session has ended' })
+    expect(dialog).toBeInTheDocument()
+    expect(dialog).not.toHaveClass('ant-zoom-leave')
+    expect(wrap).toBeInTheDocument()
   })
 
   it('starts sign-in with the current path and query string when the prompt Sign in is clicked', async () => {

@@ -1,6 +1,6 @@
 import { Button, Dropdown, type MenuProps } from 'antd'
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router'
+import { Link, useLocation } from 'react-router'
 import { startSignIn } from './api'
 import { fetchCurrentUser, signOutSession, type CurrentUser } from './currentUser'
 import { assignLocation } from './navigation'
@@ -11,10 +11,11 @@ import { useText } from './texts'
  * to the identity provider and back to the current page. With someone signed in, it shows their
  * name, with a menu. Its Sessions entry opens the account screen. Its sign-out entry ends the
  * session, then sends the browser to the identity provider's sign-out page. It renders nothing while
- * the user loads, or when loading fails.
+ * the user loads, when loading fails, or with nobody signed in on the home page, which is the sign-in screen.
  */
 export function UserMenu() {
   const t = useText()
+  const { pathname } = useLocation()
   const [user, setUser] = useState<CurrentUser | null | undefined>(undefined)
 
   useEffect(() => {
@@ -32,6 +33,10 @@ export function UserMenu() {
   }
 
   if (user === null) {
+    // The home page is the sign-in screen, which has its own Sign in button.
+    if (pathname === '/') {
+      return null
+    }
     return (
       <Button type="text" onClick={startSignIn}>
         {t('shell.account.signIn')}

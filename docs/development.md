@@ -20,7 +20,7 @@ Run from the repository root. NexKit and CI run the scripts from `scripts/setup.
 | `scripts/e2e.sh`         | Starts PostgreSQL, Keycloak, the built purchasing system stub, server, worker and publisher, creates the `journey` tenant for Studio journeys with its own database `axis_journey`, roles `axis_journey_schema` and `axis_journey_runtime`, and server on `127.0.0.2`, which the worker and the publisher serve too, builds and checks the design-system bundle in `artifacts/design-system` for its spec, and runs Playwright in Chromium. Playwright and the services it starts are skipped when `NEXKIT_BASE_SHA` is set and every changed file is under `docs/` or is a Markdown file. With arguments, which go to Playwright, such as `tests/e2e/specs/studio.spec.ts` or `--grep 'publishes'`, it runs only the matching specs, after the sign-in setup. With `AXIS_E2E_SHARD`, such as `1/3`, it runs only that shard of Playwright | Docker  |
 | `scripts/smoke.sh`       | The smoke tests, each skipped when `NEXKIT_BASE_SHA` is set and every changed file is under `docs/` or is a Markdown file, the safe list in `scripts/lib/affected.mjs`: the `dev-script` test starts `scripts/dev.sh` in a copy of the repository, the `compose` test runs the Compose stack, the `images` test builds and runs the production images, and the `onprem` test installs `deploy/compose/` from the production images for two tenants. It installs the sample modules in `artifacts/modules` first, for the `onprem` test. CI and NexKit each run it as a job of its own | Docker  |
 | `scripts/performance.sh` | The performance tests of the integration tests, whose class names end in `PerformanceTests`, alone and one class at a time, against real PostgreSQL and Keycloak. It writes `artifacts/test-results/performance.xml`. The performance workflow runs it on every push to `main`. It is not a NexKit check. With arguments, which go to `dotnet test` in place of its class filter, such as `--filter-class '*SearchPerformanceTests'`, it runs only the matching classes | Docker  |
-| `scripts/scan.sh`        | NuGet and npm vulnerability scan that fails on high or critical findings. CI is to run it on its triggers and once a week _(planned for M16)_                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | Network |
+| `scripts/scan.sh`        | NuGet and npm vulnerability scan that fails on high or critical findings, unless the finding is in `scripts/scan-accepted.json` and its time frame has not ended, see [dependency updates](#dependency-updates). CI is to run it on its triggers and once a week _(planned for M16)_                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   | Network |
 | `scripts/load.sh`        | _(Planned for M16.)_ The load test: k6 in a container against the Compose stack with two server replicas, on a generated application of typical size. It prints each performance objective with its measured value and fails when one is missed. CI runs it once a week and on demand. It is not a NexKit check and gates no merge. See [performance](reference/performance.md)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | Docker  |
 
 The CodeQL workflow, `.github/workflows/codeql.yml`, scans C# and TypeScript on pull requests to
@@ -50,6 +50,46 @@ them is among the main bundle files. Do not raise the budget to make the check p
 output. It lists the font files in `assets/` and fails when a file is not IBM Plex Sans or IBM Plex
 Mono in the Latin, Latin Extended or Vietnamese subset, when one of the six combinations has no
 `.woff2` file, or when a license text is missing from `fonts/`.
+
+## Dependency updates
+
+Axis keeps its third-party packages current, and sets how fast a vulnerable one must change.
+
+**Inventory.** These files list every dependency and its version.
+
+- `Directory.Packages.props` holds the central version of each direct NuGet package.
+  `dotnet list package --include-transitive` lists the transitive ones, which the scan reads too.
+- `web/package-lock.json` and `tests/e2e/package-lock.json` pin every npm package.
+- `global.json` pins the .NET SDK.
+
+**Sources.** Packages come from nuget.org and the npm registry, `registry.npmjs.org`, and nowhere
+else. The repository has no `nuget.config` and no `.npmrc`, so no other source is set. A change
+that adds a source changes this section too.
+
+**Time frames.** The time starts on the day the scan first finds the vulnerability.
+
+| Severity | Time frame to update or replace the package |
+| --- | --- |
+| Critical | 7 days |
+| High | 30 days |
+| Moderate | 90 days |
+| Low | The next routine update |
+
+- **Routine update.** At least once per milestone, every dependency moves to its latest compatible
+  version, whether or not it has a finding.
+- **What the scan enforces.** `scripts/scan.sh` enforces the time frames of critical and high
+  findings, see [D50](decisions/d50-sign-in-audit-records-and-security-scanning-in-ci.md). It prints
+  moderate and low findings and passes. People keep their time frames in the routine update.
+- **A fix that does not exist yet.** When no fixed version exists, record the finding in
+  `scripts/scan-accepted.json`: `{ "advisory": "GHSA-...", "package": "<name>", "found": "YYYY-MM-DD",
+  "reason": "<why it waits>" }`. `found` is the day the scan first found it. The scan then passes
+  the finding until `found` plus its time frame, and prints `accepted until <date>`.
+- **Past the deadline.** After that date the scan fails again and prints
+  `past its time frame since <date>` on the finding's line. Update the package, or remove the
+  package, and delete the entry.
+- **A bad entry.** An entry with no advisory, no package, no date, an invalid date or a date in the
+  future fails the scan and names the entry. An entry that matches no finding does nothing, so
+  delete it when its package is updated.
 
 ## Test runs and reports
 
@@ -185,7 +225,7 @@ Studio saves into those committed folders, so `git checkout -- samples/apps` rev
 The `publisher` role lets the authoring API publish, shows **Publish** on the Studio page and allows
 rollback from the release history. Under `scripts/dev.sh`,
 the server signs people in through Keycloak at `/api/auth/sign-in`, and the session then
-answers `GET /api/me`. The SPA header offers sign-in and sign-out there. Sign-in through
+answers `GET /api/me`. The SPA offers sign-in on the home page and in the header, and sign-out in the header there. Sign-in through
 Compose is not wired yet: the server in its container cannot reach Keycloak at the address the
 browser uses. The site endpoints, the record API and the data source endpoint need a session, so
 under Compose they answer `401`, and an application page shows the sign-in prompt, whose button starts a sign-in that cannot complete yet.
