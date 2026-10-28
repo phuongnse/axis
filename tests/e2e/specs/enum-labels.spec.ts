@@ -2,6 +2,7 @@ import { expect, test } from '../test'
 import type { APIRequestContext } from '@playwright/test'
 import { expectChosen, pickOption } from '../select'
 import { sessionFile } from '../sessions'
+import { chooseLanguage } from '../shell'
 
 // The record API needs a session with a grant, so this journey starts signed in as the employee anna.
 test.use({ storageState: sessionFile('anna') })
@@ -55,7 +56,7 @@ test('a note status shows its label in English and Vietnamese, and the record ke
     },
     { times: 1 },
   )
-  await page.getByRole('radiogroup', { name: 'Language', exact: true }).getByText('Tiếng Việt', { exact: true }).click()
+  await chooseLanguage(page, 'Tiếng Việt')
   // The site stores the chosen language only once its texts have loaded, so the page waits for that first.
   await expectChosen(page.getByRole('combobox', { name: 'Trạng thái', exact: true }), 'Đang mở')
 

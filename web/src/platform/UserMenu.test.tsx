@@ -119,26 +119,14 @@ describe('UserMenu', () => {
       expect(texts).toHaveProperty(['shell.account.signIn'])
       expect(texts).toHaveProperty(['shell.account.signOut'])
       expect(texts).toHaveProperty(['shell.account.sessions'])
-      expect(texts).toHaveProperty(['shell.studio.link'])
     }
   })
 
-  it.each(locales)('links to Studio for an author, with the platform $name text', async ({ texts }) => {
+  it('shows no Studio link beside the name of an author', async () => {
     stubServer(hoa)
-    renderMenu(texts)
-
-    const link = await screen.findByRole('link', { name: texts['shell.studio.link'] })
-
-    expect(link).toHaveAttribute('href', '/studio')
-    expect(screen.getByRole('button', { name: 'Hoa Author' })).toBeInTheDocument()
-  })
-
-  it('shows no Studio link to someone who may not use Studio', async () => {
-    stubServer(anna)
     renderMenu()
 
-    await screen.findByRole('button', { name: 'Anna Employee' })
-
+    expect(await screen.findByRole('button', { name: 'Hoa Author' })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Studio' })).not.toBeInTheDocument()
   })
 

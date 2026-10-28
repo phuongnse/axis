@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { expect, test } from '../test'
 import { csrfHeaders } from '../csrf'
 import { sessionFile, useSession } from '../sessions'
+import { chooseTheme } from '../shell'
 
 // The record API needs a session with a grant, so these journeys start signed in as the employee anna.
 test.use({ storageState: sessionFile('anna') })
@@ -38,7 +39,7 @@ test('the manager a task is assigned to sees it in the inbox in light and dark m
 
   for (const mode of ['light', 'dark']) {
     if (mode === 'dark') {
-      await page.getByRole('switch', { name: 'Dark mode', exact: true }).click()
+      await chooseTheme(page, 'Dark')
     }
     const shell = page.locator(`[data-theme-mode="${mode}"]`)
     const themedRow = shell.getByRole('row', { name: new RegExp(title) })

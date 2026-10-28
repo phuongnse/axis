@@ -8,6 +8,7 @@ import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { emptyDescription } from '../test/antd'
 import { antLocaleFor, dayjsLocaleFor } from './antLocale'
+import { PreferencesMenu } from './PreferencesMenu'
 import { Shell } from './Shell'
 import { TextProvider } from './TextProvider'
 import { ThemeModeProvider } from './theme'
@@ -33,6 +34,7 @@ const navigationTexts = [
       'shell.serverStatus.ready': 'Ready',
       'shell.serverStatus.checking': 'Checking',
       'shell.serverStatus.unavailable': 'Unavailable',
+      'shell.preferences.label': 'Language and theme',
       'site.title': 'Workspace',
     },
     fallbackTexts: {},
@@ -225,13 +227,84 @@ describe('Shell at narrow width', () => {
     expect(button).toHaveAttribute('aria-expanded', 'false')
   })
 
-  it('moves the locale switch and the theme toggle into the panel', async () => {
+  it('moves the language and theme menu into the panel', async () => {
     renderShell('en', ['/'], notesNavigation)
-    expect(screen.queryByRole('switch')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Language and theme' })).not.toBeInTheDocument()
 
     await userEvent.click(screen.getByRole('button', { name: 'Menu' }))
 
-    expect(screen.getByRole('switch')).toBeVisible()
+    const panel = document.getElementById('shell-menu')!
+    expect(within(panel).getByRole('button', { name: 'Language and theme' })).toBeVisible()
+    expect(within(screen.getByRole('banner')).queryByRole('button', { name: 'Language and theme' })).toBeNull()
+  })
+})
+
+describe('PreferencesMenu', () => {
+  const preferenceTexts = [
+    {
+      texts: {
+        'shell.preferences.label': 'Language and theme',
+        'shell.locale.label': 'Language',
+        'shell.locale.en': 'English',
+        'shell.locale.vi': 'Tiếng Việt',
+        'shell.theme.label': 'Theme',
+        'shell.theme.light': 'Light',
+        'shell.theme.dark': 'Dark',
+      },
+      fallbackTexts: {},
+    },
+  ]
+
+  function renderPreferences(onLocaleChange = vi.fn()) {
+    render(
+      <ThemeModeProvider>
+        <TextProvider catalogs={preferenceTexts} development={false}>
+          <PreferencesMenu locales={['en', 'vi']} locale="en" onLocaleChange={onLocaleChange} />
+        </TextProvider>
+      </ThemeModeProvider>,
+    )
+    return onLocaleChange
+  }
+
+  async function openMenu() {
+    await userEvent.click(screen.getByRole('button', { name: 'Language and theme' }))
+    return screen.findByRole('menu', { name: 'Language and theme' })
+  }
+
+  it('lists the languages and the themes in two groups, with the current ones marked', async () => {
+    localStorage.setItem('axis.themeMode', 'light')
+    renderPreferences()
+
+    const menu = within(await openMenu())
+
+    expect(menu.getByText('Language')).toBeInTheDocument()
+    expect(menu.getByText('Theme')).toBeInTheDocument()
+    expect(menu.getByRole('menuitemradio', { name: 'English' })).toHaveAttribute('aria-checked', 'true')
+    expect(menu.getByRole('menuitemradio', { name: 'Tiếng Việt' })).toHaveAttribute('aria-checked', 'false')
+    expect(menu.getByRole('menuitemradio', { name: 'Light' })).toHaveAttribute('aria-checked', 'true')
+    expect(menu.getByRole('menuitemradio', { name: 'Dark' })).toHaveAttribute('aria-checked', 'false')
+  })
+
+  it('asks for the picked language, and not for the current one', async () => {
+    const onLocaleChange = renderPreferences()
+
+    await userEvent.click(within(await openMenu()).getByRole('menuitemradio', { name: 'English' }))
+    expect(onLocaleChange).not.toHaveBeenCalled()
+
+    await userEvent.click(within(await openMenu()).getByRole('menuitemradio', { name: 'Tiếng Việt' }))
+    expect(onLocaleChange).toHaveBeenCalledExactlyOnceWith('vi')
+  })
+
+  it('switches to the dark theme, stores it and marks it as current', async () => {
+    localStorage.setItem('axis.themeMode', 'light')
+    renderPreferences()
+
+    await userEvent.click(within(await openMenu()).getByRole('menuitemradio', { name: 'Dark' }))
+
+    expect(localStorage.getItem('axis.themeMode')).toBe('dark')
+    const menu = within(await openMenu())
+    expect(menu.getByRole('menuitemradio', { name: 'Dark' })).toHaveAttribute('aria-checked', 'true')
+    expect(menu.getByRole('menuitemradio', { name: 'Light' })).toHaveAttribute('aria-checked', 'false')
   })
 })
 

@@ -1,5 +1,6 @@
 import { expect, test } from '../test'
 import type { Page } from '@playwright/test'
+import { chooseTheme } from '../shell'
 
 // The platform home page stays open while nobody is signed in. Every application page needs a
 // session and shows the sign-in prompt, and only a click on a Sign in button starts sign-in.
@@ -23,7 +24,7 @@ test('a person signs in on the Keycloak login page, returns to the home page, an
   await expect(page).toHaveURL(`${baseURL}/`)
   for (const mode of ['light', 'dark']) {
     if (mode === 'dark') {
-      await page.getByRole('switch', { name: 'Dark mode', exact: true }).click()
+      await chooseTheme(page, 'Dark')
     }
     const shell = page.locator(`[data-theme-mode="${mode}"]`)
     await expect(shell.getByRole('banner').getByRole('button', { name: 'Anna Employee', exact: true })).toBeVisible()

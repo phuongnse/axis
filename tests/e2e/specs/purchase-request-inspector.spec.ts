@@ -16,6 +16,7 @@ import {
   submit,
 } from '../purchase-requests'
 import { sessionFile, useSession, type SampleUser } from '../sessions'
+import { chooseTheme } from '../shell'
 
 // The employee anna starts the approval. The operator giang or the finance reviewer dung inspects it.
 test.use({ storageState: sessionFile('anna') })
@@ -97,7 +98,7 @@ test('the operator opens an instance waiting for the manager and sees the path a
 
   for (const mode of ['light', 'dark']) {
     if (mode === 'dark') {
-      await page.getByRole('switch', { name: 'Dark mode', exact: true }).click()
+      await chooseTheme(page, 'Dark')
     }
     const shell = page.locator(`[data-theme-mode="${mode}"]`)
     await expect(shell.getByTestId('inspector-step-submit')).toContainText('Taken')
