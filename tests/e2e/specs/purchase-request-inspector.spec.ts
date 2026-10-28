@@ -18,7 +18,7 @@ import {
 import { sessionFile, useSession, type SampleUser } from '../sessions'
 import { chooseTheme } from '../shell'
 
-// The employee requester starts the approval. The operator giang or the finance reviewer dung inspects it.
+// The employee requester starts the approval. The operator or the finance-reviewer user inspects it.
 test.use({ storageState: sessionFile('requester') })
 
 const instancesPath = `${appPath}/processes/PurchaseRequestApproval/instances`
@@ -58,12 +58,12 @@ function seedDeadLetter(): string {
 
 /**
  * Starts the approval of a new Operations request as requester, then signs in as the inspecting user,
- * giang unless the test names another. It returns the request's title and id, and the id of the
+ * operator unless the test names another. It returns the request's title and id, and the id of the
  * instance once the instance waits at manager approval. Specs run in
  * parallel against one database, so the list holds many instances. The newest come first, and the
  * test looks only for its own by subject id.
  */
-async function startWaitingInstance(page: Page, inspector: SampleUser = 'giang') {
+async function startWaitingInstance(page: Page, inspector: SampleUser = 'operator') {
   await useSession(page, 'requester')
   const { title, id } = await createRequest(page, 'Zz Inspect', 500)
   const started = await page.request.post(instancesPath, { data: { subjectId: id }, headers: csrfHeaders })
@@ -89,7 +89,7 @@ test('the operator opens an instance waiting for the manager and sees the path a
   const { title, instanceId } = await startWaitingInstance(page)
 
   await page.goto('/purchasing/approvals?state=waiting&pageSize=100')
-  await expect(page.getByRole('banner').getByRole('button', { name: 'Giang Operator', exact: true })).toBeVisible()
+  await expect(page.getByRole('banner').getByRole('button', { name: 'Operator User', exact: true })).toBeVisible()
   await page
     .locator(`tr[data-row-key="${instanceId}"]`)
     .getByRole('link', { name: title, exact: true })
@@ -105,7 +105,7 @@ test('the operator opens an instance waiting for the manager and sees the path a
     const approval = shell.getByTestId('inspector-step-managerApproval')
     await expect(approval).toContainText('Manager approval')
     await expect(approval).toContainText('Current')
-    await expect(shell.getByRole('row', { name: /Manager approval.*user: chau.*open/ })).toBeVisible()
+    await expect(shell.getByRole('row', { name: /Manager approval.*user: manager-2.*open/ })).toBeVisible()
   }
 })
 
@@ -144,14 +144,14 @@ test('the list endpoint answers 403 to an employee and 200 to the operator', asy
   await useSession(page, 'requester')
   expect((await page.request.get(instancesPath)).status()).toBe(403)
 
-  await useSession(page, 'giang')
+  await useSession(page, 'operator')
   expect((await page.request.get(instancesPath)).status()).toBe(200)
 })
 
 test('a finance reviewer cancels a waiting request in the inspector and its task leaves the manager inbox', async ({
   page,
 }) => {
-  const { requestId, instanceId } = await startWaitingInstance(page, 'dung')
+  const { requestId, instanceId } = await startWaitingInstance(page, 'finance-reviewer')
 
   await page.goto(`/purchasing/approvals/${instanceId}`)
   await expect(page.getByTestId('inspector-instance')).toBeVisible()
@@ -164,7 +164,7 @@ test('a finance reviewer cancels a waiting request in the inspector and its task
   await expect(page.getByTestId('inspector-instance')).toContainText('Cancelled')
   await expect(page.getByTestId('inspector-command-cancel')).toHaveCount(0)
 
-  await useSession(page, 'chau')
+  await useSession(page, 'manager-2')
   await expect(async () => {
     const response = await page.request.get(`${appPath}/tasks?pageSize=100`)
     expect(response.status()).toBe(200)
@@ -200,10 +200,10 @@ test('a finance reviewer resolves an unknown purchase order call in the inspecto
   expect(unknown.status()).toBe(204)
   await submit(page, id, title)
 
-  await useSession(page, 'chau')
+  await useSession(page, 'manager-2')
   await decide(page, title, 'Manager approval', 'Approve')
 
-  await useSession(page, 'dung')
+  await useSession(page, 'finance-reviewer')
   let instanceId = ''
   await expect(async () => {
     const response = await page.request.get(`${instancesPath}?pageSize=100`)
@@ -254,7 +254,7 @@ test('a finance reviewer is refused a redeliver and discards a dead letter, and 
   page,
 }) => {
   const id = seedDeadLetter()
-  await useSession(page, 'dung')
+  await useSession(page, 'finance-reviewer')
 
   await page.goto('/purchasing/approvals')
   const row = page.locator(`tr[data-row-key="${id}"]`)
@@ -282,7 +282,7 @@ test('a finance reviewer is refused a redeliver and discards a dead letter, and 
 
 test('the operator sees an open dead letter and no Redeliver or Discard button', async ({ page }) => {
   const id = seedDeadLetter()
-  await useSession(page, 'giang')
+  await useSession(page, 'operator')
 
   await page.goto('/purchasing/approvals')
   await expect(page.locator(`tr[data-row-key="${id}"]`)).toBeVisible()

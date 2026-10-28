@@ -3,7 +3,7 @@ import type { Page } from '@playwright/test'
 import { csrfHeaders } from '../csrf'
 import { useSession } from '../sessions'
 
-// The operator giang inspects a parent process that started a child sub-process. Neither has a subject.
+// The operator inspects a parent process that started a child sub-process. Neither has a subject.
 // The child waits on a 24-hour timer, so both stay waiting for the whole run.
 const instancesPath = '/api/apps/SubprocessApp/processes/ParentJob/instances'
 
@@ -16,7 +16,7 @@ interface Detail {
  * without a subject allows one running instance, so a second start is a 409 and the instance that waits is reused.
  */
 async function waitingParent(page: Page): Promise<{ parentId: string; childId: string }> {
-  await useSession(page, 'giang')
+  await useSession(page, 'operator')
   const started = await page.request.post(instancesPath, {
     data: { parameters: { label: 'e2e' } },
     headers: csrfHeaders,

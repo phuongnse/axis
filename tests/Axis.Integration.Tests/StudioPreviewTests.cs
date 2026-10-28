@@ -31,7 +31,7 @@ public sealed class StudioPreviewTests : IAsyncLifetime
         var main = await _database.CreateDatabaseAsync("studio_preview_main", CancellationToken);
         var preview = await _database.CreateDatabaseAsync("studio_preview_preview", CancellationToken);
         await using var factory = StudioPublishTests.NewFactory(folder.Path, [("a", HostA, main)], preview);
-        using var lan = factory.CreateClient().SignedInAs("lan");
+        using var employee = factory.CreateClient().SignedInAs("employee");
         var activeBefore = await AdminScalarAsync(main, "SELECT release_id FROM axis.active_releases");
         var activationsBefore = await AdminScalarAsync(main, "SELECT count(*) FROM axis.release_activations");
         var previewBefore = await AdminScalarAsync(preview, "SELECT release_id FROM axis.active_releases");
@@ -39,7 +39,7 @@ public sealed class StudioPreviewTests : IAsyncLifetime
         Assert.NotNull(previewBefore);
         await StudioPublishTests.EditTextsAsync(folder.Path, "Departments", "Teams");
 
-        using var accepted = await StudioPublishTests.SendAsync(lan, HttpMethod.Post, PreviewUrl, HostA);
+        using var accepted = await StudioPublishTests.SendAsync(employee, HttpMethod.Post, PreviewUrl, HostA);
 
         Assert.Equal(HttpStatusCode.Accepted, accepted.StatusCode);
         using var request = await StudioPublishTests.ReadAsync(accepted);
@@ -51,7 +51,7 @@ public sealed class StudioPreviewTests : IAsyncLifetime
         Assert.Equal(1L, await StudioPublishTests.CountRequestsAsync(main));
 
         await using var publisher = StudioPublishTests.RunPublisher("a", HostA, main, preview);
-        using var finished = await StudioPublishTests.WaitForFinalAsync(lan, accepted.Headers.Location!.OriginalString, HostA);
+        using var finished = await StudioPublishTests.WaitForFinalAsync(employee, accepted.Headers.Location!.OriginalString, HostA);
 
         Assert.Equal("succeeded", finished.RootElement.GetProperty("status").GetString());
         Assert.Equal("preview", finished.RootElement.GetProperty("target").GetString());
@@ -64,7 +64,7 @@ public sealed class StudioPreviewTests : IAsyncLifetime
         Assert.Equal(activationsBefore, await AdminScalarAsync(main, "SELECT count(*) FROM axis.release_activations"));
 
         // The main tenant still serves the old text.
-        using var texts = await StudioPublishTests.GetJsonAsync(lan, "/api/sites/purchasing/texts/en", HostA);
+        using var texts = await StudioPublishTests.GetJsonAsync(employee, "/api/sites/purchasing/texts/en", HostA);
         Assert.Equal("Departments", texts.RootElement.GetProperty("texts").GetProperty("nav.departments").GetString());
     }
 
@@ -97,7 +97,7 @@ public sealed class StudioPreviewTests : IAsyncLifetime
         var main = await _database.CreateDatabaseAsync("studio_preview_broken_main", CancellationToken);
         var preview = await _database.CreateDatabaseAsync("studio_preview_broken_preview", CancellationToken);
         await using var factory = StudioPublishTests.NewFactory(folder.Path, [("a", HostA, main)], preview);
-        using var lan = factory.CreateClient().SignedInAs("lan");
+        using var employee = factory.CreateClient().SignedInAs("employee");
         var activeBefore = await AdminScalarAsync(preview, "SELECT release_id FROM axis.active_releases");
         var activationsBefore = await AdminScalarAsync(preview, "SELECT count(*) FROM axis.release_activations");
         Assert.NotNull(activeBefore);
@@ -109,10 +109,10 @@ public sealed class StudioPreviewTests : IAsyncLifetime
         Assert.NotEqual(entity, broken);
         await File.WriteAllTextAsync(entityPath, broken, CancellationToken);
 
-        using var accepted = await StudioPublishTests.SendAsync(lan, HttpMethod.Post, PreviewUrl, HostA);
+        using var accepted = await StudioPublishTests.SendAsync(employee, HttpMethod.Post, PreviewUrl, HostA);
         Assert.Equal(HttpStatusCode.Accepted, accepted.StatusCode);
         await using var publisher = StudioPublishTests.RunPublisher("a", HostA, main, preview);
-        using var finished = await StudioPublishTests.WaitForFinalAsync(lan, accepted.Headers.Location!.OriginalString, HostA);
+        using var finished = await StudioPublishTests.WaitForFinalAsync(employee, accepted.Headers.Location!.OriginalString, HostA);
 
         Assert.Equal("failed", finished.RootElement.GetProperty("status").GetString());
         Assert.Equal("preview", finished.RootElement.GetProperty("target").GetString());
@@ -131,7 +131,7 @@ public sealed class StudioPreviewTests : IAsyncLifetime
         var preview = await _database.CreateDatabaseAsync("studio_preview_me_preview", CancellationToken);
         await using var factory = StudioPublishTests.NewFactory(folder.Path, [("a", HostA, main)], preview);
 
-        foreach (var author in new[] { "lan", "author" })
+        foreach (var author in new[] { "employee", "author" })
         {
             using var client = factory.CreateClient().SignedInAs(author);
             using var me = await StudioPublishTests.GetJsonAsync(client, "/api/me", HostA);

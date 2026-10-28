@@ -8,7 +8,7 @@
     "requester": [
       "employee"
     ],
-    "binh": [
+    "manager": [
       "department-manager"
     ]
   },
@@ -38,7 +38,7 @@
       "record": "request",
       "step": "managerApproval",
       "outcome": "approve",
-      "as": "binh",
+      "as": "manager",
       "expect": "denied"
     },
     {

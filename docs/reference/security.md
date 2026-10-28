@@ -375,22 +375,22 @@ These are test fixtures. Docs and GitHub text name roles instead. A new
 sample reuses a user that holds the role it needs before it adds a user.
 `scripts/lint.sh` checks this table against `samples/keycloak/axis-realm.json`.
 
-| User            | Roles                   | Used by                                                                                                                                       |
-| --------------- | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| `requester`     | `employee`, `requester` | Purchase request, leave request and service desk samples; E2E journeys, request approval journey. Has the locale `vi`, the only user with one |
-| `lan`           | `employee`              | Purchase request, leave request and asset management samples (holds assets); E2E journeys                                                     |
-| `binh`          | `department-manager`    | Purchase request and leave request samples; E2E journeys                                                                                      |
-| `chau`          | `department-manager`    | Purchase request and leave request samples; E2E journeys                                                                                      |
-| `dung`          | `finance-reviewer`      | Purchase request sample seeds; E2E journeys                                                                                                   |
-| `giang`         | `operator`              | Purchase request sample's Approvals inspector; E2E journeys                                                                                   |
-| `author`        | `author`, `publisher`   | Studio and the authoring API under `scripts/dev.sh`; E2E Studio journeys                                                                      |
-| `khoa`          | `agent`                 | Service desk sample; E2E journeys                                                                                                             |
-| `linh`          | `service-desk-lead`     | Service desk sample; E2E journeys                                                                                                             |
-| `minh`          | `approver`              | Request approval template journey; E2E journeys                                                                                               |
-| `nam`           | `service-desk-lead`     | Service desk sample; E2E claim and reassign journey                                                                                           |
-| `quan`          | `asset-manager`         | Asset management sample; E2E asset management journey                                                                                         |
-| `thao`          | `auditor`               | Asset management sample; E2E asset management journey                                                                                         |
-| `administrator` | `tenant-administrator`  | The users page _(planned for M17)_                                                                                                            |
+| User               | Roles                   | Used by                                                                                                                                       |
+| ------------------ | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `requester`        | `employee`, `requester` | Purchase request, leave request and service desk samples; E2E journeys, request approval journey. Has the locale `vi`, the only user with one |
+| `employee`         | `employee`              | Purchase request, leave request and asset management samples (holds assets); E2E journeys                                                     |
+| `manager`          | `department-manager`    | Purchase request and leave request samples; E2E journeys                                                                                      |
+| `manager-2`        | `department-manager`    | Purchase request and leave request samples; E2E journeys                                                                                      |
+| `finance-reviewer` | `finance-reviewer`      | Purchase request sample seeds; E2E journeys                                                                                                   |
+| `operator`         | `operator`              | Purchase request sample's Approvals inspector; E2E journeys                                                                                   |
+| `author`           | `author`, `publisher`   | Studio and the authoring API under `scripts/dev.sh`; E2E Studio journeys                                                                      |
+| `agent`            | `agent`                 | Service desk sample; E2E journeys                                                                                                             |
+| `lead`             | `service-desk-lead`     | Service desk sample; E2E journeys                                                                                                             |
+| `approver`         | `approver`              | Request approval template journey; E2E journeys                                                                                               |
+| `lead-2`           | `service-desk-lead`     | Service desk sample; E2E claim and reassign journey                                                                                           |
+| `asset-manager`    | `asset-manager`         | Asset management sample; E2E asset management journey                                                                                         |
+| `auditor`          | `auditor`               | Asset management sample; E2E asset management journey                                                                                         |
+| `administrator`    | `tenant-administrator`  | The users page _(planned for M17)_                                                                                                            |
 
 ## Machine callers
 

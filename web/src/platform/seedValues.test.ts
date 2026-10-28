@@ -108,7 +108,7 @@ describe('seedValueProblem', () => {
   it('checks references for the hyphenated UUID form', () => {
     expect(problem({ type: 'reference' }, 'C6A80CFD-75d2-4847-8cc0-f603c2af74fa')).toBeNull()
     expect(problem({ type: 'reference' }, 'c6a80cfd75d248478cc0f603c2af74fa')).toBe(wrongType)
-    expect(problem({ type: 'reference' }, 'dung')).toBe(wrongType)
+    expect(problem({ type: 'reference' }, 'finance-reviewer')).toBe(wrongType)
   })
 })
 

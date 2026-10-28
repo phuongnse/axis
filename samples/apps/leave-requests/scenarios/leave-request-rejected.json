@@ -8,10 +8,10 @@
     "requester": [
       "employee"
     ],
-    "binh": [
+    "manager": [
       "department-manager"
     ],
-    "chau": [
+    "manager-2": [
       "department-manager"
     ]
   },
@@ -41,7 +41,7 @@
       "record": "request",
       "step": "managerApproval",
       "outcome": "reject",
-      "as": "chau"
+      "as": "manager-2"
     },
     {
       "type": "expectRecord",

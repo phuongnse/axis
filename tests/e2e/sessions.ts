@@ -5,34 +5,34 @@ import { journeyURL } from "./server-settings";
 
 export type SampleUser =
   | "requester"
-  | "lan"
-  | "binh"
-  | "chau"
-  | "dung"
-  | "giang"
+  | "employee"
+  | "manager"
+  | "manager-2"
+  | "finance-reviewer"
+  | "operator"
   | "author"
-  | "khoa"
-  | "linh"
-  | "minh"
-  | "nam"
-  | "quan"
-  | "thao";
+  | "agent"
+  | "lead"
+  | "approver"
+  | "lead-2"
+  | "asset-manager"
+  | "auditor";
 
 /** The sample users and the roles the development realm gives them. */
 export const sampleUsers: Record<SampleUser, string[]> = {
   requester: ["employee", "requester"],
-  lan: ["employee"],
-  binh: ["department-manager"],
-  chau: ["department-manager"],
-  dung: ["finance-reviewer"],
-  giang: ["operator"],
+  employee: ["employee"],
+  manager: ["department-manager"],
+  "manager-2": ["department-manager"],
+  "finance-reviewer": ["finance-reviewer"],
+  operator: ["operator"],
   author: ["author", "publisher"],
-  khoa: ["agent"],
-  linh: ["service-desk-lead"],
-  minh: ["approver"],
-  nam: ["service-desk-lead"],
-  quan: ["asset-manager"],
-  thao: ["auditor"],
+  agent: ["agent"],
+  lead: ["service-desk-lead"],
+  approver: ["approver"],
+  "lead-2": ["service-desk-lead"],
+  "asset-manager": ["asset-manager"],
+  auditor: ["auditor"],
 };
 
 const journeyRoles = [

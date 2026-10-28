@@ -47,7 +47,7 @@ test('a user opens a notification from the bell with the keyboard, and another u
   await expect(page).toHaveURL(new RegExp(`/e2e/notedetail\\?note=${note.id}$`))
   await expect(page.getByRole('button', { name: 'Notifications', exact: true })).toBeVisible()
 
-  await useSession(page, 'lan')
+  await useSession(page, 'employee')
   await page.goto('/e2e/notes')
   await expect(page.getByRole('button', { name: 'Notifications', exact: true })).toBeVisible()
 })

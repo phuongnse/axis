@@ -119,7 +119,7 @@ public sealed class FileUploadTests(RecordApiFixture fixture) : IClassFixture<Re
     [Theory]
     [InlineData("rita")]
     [InlineData("fia")]
-    [InlineData("binh")]
+    [InlineData("manager")]
     public async Task A_user_whose_grants_do_not_cover_the_field_gets_403_and_nothing_is_stored(string user)
     {
         using var client = fixture.CreateClient().SignedInAs(user);

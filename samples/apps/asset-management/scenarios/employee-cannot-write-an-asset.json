@@ -5,10 +5,10 @@
   "formatVersion": 1,
   "now": "2026-10-01T09:00:00Z",
   "users": {
-    "quan": [
+    "asset-manager": [
       "asset-manager"
     ],
-    "lan": [
+    "employee": [
       "employee"
     ]
   },
@@ -16,18 +16,18 @@
     {
       "type": "createRecord",
       "entity": "Asset",
-      "as": "quan",
+      "as": "asset-manager",
       "save": "lanAsset",
       "values": {
-        "name": "Laptop of Lan",
-        "holder": "lan",
+        "name": "Laptop of the employee",
+        "holder": "employee",
         "status": "assigned"
       }
     },
     {
       "type": "createRecord",
       "entity": "Asset",
-      "as": "quan",
+      "as": "asset-manager",
       "save": "annaAsset",
       "values": {
         "name": "Laptop of the requester",
@@ -38,7 +38,7 @@
     {
       "type": "updateRecord",
       "record": "annaAsset",
-      "as": "lan",
+      "as": "employee",
       "values": {
         "name": "x"
       },
@@ -47,7 +47,7 @@
     {
       "type": "updateRecord",
       "record": "lanAsset",
-      "as": "lan",
+      "as": "employee",
       "values": {
         "name": "x"
       },
@@ -56,7 +56,7 @@
     {
       "type": "createRecord",
       "entity": "Asset",
-      "as": "lan",
+      "as": "employee",
       "values": {
         "name": "Own laptop"
       },

@@ -8,8 +8,8 @@ namespace Axis.Integration.Tests;
 
 /// <summary>
 /// An operator with a <c>resolve</c> grant settles a purchase order call whose outcome is unknown, through the
-/// HTTP API. The sample gives the grant to the finance reviewers, here <c>dung</c>. <c>requester</c> starts the
-/// approvals and <c>chau</c> is the manager. The sample connector declares a lookup, so each test forces the call
+/// HTTP API. The sample gives the grant to the finance reviewers, here <c>finance-reviewer</c>. <c>requester</c> starts the
+/// approvals and <c>manager-2</c> is the manager. The sample connector declares a lookup, so each test forces the call
 /// to <c>unknown</c> and deletes its work item, as a connector with no lookup leaves it. Each test leaves no due
 /// work item behind, so the next one finds only its own.
 /// </summary>
@@ -25,11 +25,11 @@ public sealed class ProcessResolveTests(SampleAppFixture fixture) : IClassFixtur
     public async Task Resolving_an_unknown_call_as_succeeded_writes_the_output_and_the_instance_runs_on()
     {
         using var requester = fixture.CreateClient().SignedInAs("requester");
-        using var dung = fixture.CreateClient().SignedInAs("dung");
+        using var financeReviewer = fixture.CreateClient().SignedInAs("finance-reviewer");
         var (subject, instance, call) = await UnknownCallAsync(requester);
         var (number, _) = await NumbersAsync(requester, subject);
 
-        using (var response = await ResolveAsync(dung, instance, call, Succeeded))
+        using (var response = await ResolveAsync(financeReviewer, instance, call, Succeeded))
         {
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
             using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
@@ -54,10 +54,10 @@ public sealed class ProcessResolveTests(SampleAppFixture fixture) : IClassFixtur
     public async Task A_succeeded_resolve_writes_one_audit_record_with_the_user_and_the_reason_and_no_connector_called()
     {
         using var requester = fixture.CreateClient().SignedInAs("requester");
-        using var dung = fixture.CreateClient().SignedInAs("dung");
+        using var financeReviewer = fixture.CreateClient().SignedInAs("finance-reviewer");
         var (subject, instance, call) = await UnknownCallAsync(requester);
 
-        using (var response = await ResolveAsync(dung, instance, call, Succeeded))
+        using (var response = await ResolveAsync(financeReviewer, instance, call, Succeeded))
         {
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         }
@@ -69,7 +69,7 @@ public sealed class ProcessResolveTests(SampleAppFixture fixture) : IClassFixtur
             0L,
             await fixture.CountAsync("SELECT count(*) FROM axis.audit_records WHERE process_instance_id = @id AND action = 'connector.called'", ("id", instance)));
         Assert.Equal(
-            ("dung", "Dung Finance Reviewer", subject),
+            ("finance-reviewer", "Finance Reviewer User", subject),
             await AuditActorAsync(instance, "connector.callResolved"));
         using var details = JsonDocument.Parse((string)(await fixture.ScalarAsync(
             "SELECT details::text FROM axis.audit_records WHERE process_instance_id = @id AND action = 'connector.callResolved'", ("id", instance)))!);
@@ -84,7 +84,7 @@ public sealed class ProcessResolveTests(SampleAppFixture fixture) : IClassFixtur
         Assert.Equal("Checked in the purchasing system", details.RootElement.GetProperty("reason").GetString());
 
         // The record update names the user too, and the history row says the call was resolved by hand.
-        Assert.Equal(("dung", "Dung Finance Reviewer", subject), await AuditActorAsync(instance, "record.updated", "details->'fields' = '[\"purchaseOrderNumber\"]'::jsonb"));
+        Assert.Equal(("finance-reviewer", "Finance Reviewer User", subject), await AuditActorAsync(instance, "record.updated", "details->'fields' = '[\"purchaseOrderNumber\"]'::jsonb"));
         Assert.Equal(
             1L,
             await fixture.CountAsync(
@@ -97,7 +97,7 @@ public sealed class ProcessResolveTests(SampleAppFixture fixture) : IClassFixtur
     public async Task A_resolve_whose_output_lacks_a_required_value_is_400_and_changes_nothing()
     {
         using var requester = fixture.CreateClient().SignedInAs("requester");
-        using var dung = fixture.CreateClient().SignedInAs("dung");
+        using var financeReviewer = fixture.CreateClient().SignedInAs("finance-reviewer");
         var (subject, instance, call) = await UnknownCallAsync(requester);
         var revision = await ScalarAsync("SELECT revision FROM axis.process_instances WHERE id = @id", instance);
         var history = await HistoryAsync(instance);
@@ -112,7 +112,7 @@ public sealed class ProcessResolveTests(SampleAppFixture fixture) : IClassFixtur
             ("""{ "reason": "Checked", "outcome": "succeeded" }""", "/output/orderNumber", "Required."),
         })
         {
-            using var response = await ResolveAsync(dung, instance, call, body);
+            using var response = await ResolveAsync(financeReviewer, instance, call, body);
             using var problem = await RecordApiFixture.ReadProblemAsync(response, HttpStatusCode.BadRequest);
             var errors = problem.RootElement.GetProperty("errors");
             Assert.Equal([key], errors.EnumerateObject().Select(error => error.Name));
@@ -132,7 +132,7 @@ public sealed class ProcessResolveTests(SampleAppFixture fixture) : IClassFixtur
     public async Task A_body_of_the_wrong_shape_is_400()
     {
         using var requester = fixture.CreateClient().SignedInAs("requester");
-        using var dung = fixture.CreateClient().SignedInAs("dung");
+        using var financeReviewer = fixture.CreateClient().SignedInAs("finance-reviewer");
         var (_, instance, call) = await UnknownCallAsync(requester);
 
         foreach (var (body, key, message) in new[]
@@ -146,7 +146,7 @@ public sealed class ProcessResolveTests(SampleAppFixture fixture) : IClassFixtur
             ("[]", "", "Must be a JSON object."),
         })
         {
-            using var response = await ResolveAsync(dung, instance, call, body);
+            using var response = await ResolveAsync(financeReviewer, instance, call, body);
             using var problem = await RecordApiFixture.ReadProblemAsync(response, HttpStatusCode.BadRequest);
             var errors = problem.RootElement.GetProperty("errors");
             Assert.Equal([key], errors.EnumerateObject().Select(error => error.Name));
@@ -162,11 +162,11 @@ public sealed class ProcessResolveTests(SampleAppFixture fixture) : IClassFixtur
     public async Task Resolving_as_failed_fails_the_instance_and_a_retry_sends_again_under_the_same_identity()
     {
         using var requester = fixture.CreateClient().SignedInAs("requester");
-        using var dung = fixture.CreateClient().SignedInAs("dung");
+        using var financeReviewer = fixture.CreateClient().SignedInAs("finance-reviewer");
         var (subject, instance, call) = await UnknownCallAsync(requester);
         var (number, _) = await NumbersAsync(requester, subject);
 
-        using (var response = await ResolveAsync(dung, instance, call, Failed))
+        using (var response = await ResolveAsync(financeReviewer, instance, call, Failed))
         {
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
             using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
@@ -179,7 +179,7 @@ public sealed class ProcessResolveTests(SampleAppFixture fixture) : IClassFixtur
         Assert.Equal(
             1L,
             await fixture.CountAsync("SELECT count(*) FROM axis.audit_records WHERE process_instance_id = @id AND action = 'process.failed'", ("id", instance)));
-        Assert.Equal(("dung", "Dung Finance Reviewer", subject), await AuditActorAsync(instance, "process.failed"));
+        Assert.Equal(("finance-reviewer", "Finance Reviewer User", subject), await AuditActorAsync(instance, "process.failed"));
         Assert.Equal(
             1L,
             await fixture.CountAsync(
@@ -187,7 +187,7 @@ public sealed class ProcessResolveTests(SampleAppFixture fixture) : IClassFixtur
                 ("id", instance)));
         Assert.Equal(0L, await DueWorkItemsAsync(instance));
 
-        using (var retried = await RetryAsync(dung, instance, """{ "reason": "Send it again" }"""))
+        using (var retried = await RetryAsync(financeReviewer, instance, """{ "reason": "Send it again" }"""))
         {
             Assert.Equal(HttpStatusCode.OK, retried.StatusCode);
         }
@@ -206,27 +206,27 @@ public sealed class ProcessResolveTests(SampleAppFixture fixture) : IClassFixtur
     public async Task A_user_without_the_grant_a_call_that_is_not_unknown_and_an_unknown_call_id_change_nothing()
     {
         using var requester = fixture.CreateClient().SignedInAs("requester");
-        using var chau = fixture.CreateClient().SignedInAs("chau");
-        using var dung = fixture.CreateClient().SignedInAs("dung");
+        using var manager2 = fixture.CreateClient().SignedInAs("manager-2");
+        using var financeReviewer = fixture.CreateClient().SignedInAs("finance-reviewer");
         var (_, instance, call) = await UnknownCallAsync(requester);
         var revision = await ScalarAsync("SELECT revision FROM axis.process_instances WHERE id = @id", instance);
         var history = await HistoryAsync(instance);
         var audit = await AuditAsync(instance);
 
-        foreach (var client in new[] { requester, chau })
+        foreach (var client in new[] { requester, manager2 })
         {
             using var denied = await ResolveAsync(client, instance, call, Succeeded);
             Assert.Equal(HttpStatusCode.Forbidden, denied.StatusCode);
         }
 
-        using (var unknown = await ResolveAsync(dung, instance, Guid.NewGuid(), Succeeded))
+        using (var unknown = await ResolveAsync(financeReviewer, instance, Guid.NewGuid(), Succeeded))
         {
             Assert.Equal(HttpStatusCode.NotFound, unknown.StatusCode);
         }
 
         // A call of another instance is no call of this one.
         var (_, other, otherCall) = await UnknownCallAsync(requester);
-        using (var elsewhere = await ResolveAsync(dung, instance, otherCall, Succeeded))
+        using (var elsewhere = await ResolveAsync(financeReviewer, instance, otherCall, Succeeded))
         {
             Assert.Equal(HttpStatusCode.NotFound, elsewhere.StatusCode);
         }
@@ -239,7 +239,7 @@ public sealed class ProcessResolveTests(SampleAppFixture fixture) : IClassFixtur
 
         // A pending call is refused with 409.
         await fixture.ScalarAsync("UPDATE axis.connector_calls SET state = 'pending' WHERE id = @id", ("id", call));
-        using (var pending = await ResolveAsync(dung, instance, call, Succeeded))
+        using (var pending = await ResolveAsync(financeReviewer, instance, call, Succeeded))
         {
             using var problem = await RecordApiFixture.ReadProblemAsync(pending, HttpStatusCode.Conflict);
             Assert.Equal("The call's outcome is not unknown.", problem.RootElement.GetProperty("title").GetString());
@@ -248,7 +248,7 @@ public sealed class ProcessResolveTests(SampleAppFixture fixture) : IClassFixtur
         // An unknown call of an instance that is no longer waiting on its step is refused with 409.
         await fixture.ScalarAsync("UPDATE axis.connector_calls SET state = 'unknown' WHERE id = @id", ("id", call));
         await fixture.ScalarAsync("UPDATE axis.process_instances SET state = 'running' WHERE id = @id", ("id", instance));
-        using (var running = await ResolveAsync(dung, instance, call, Succeeded))
+        using (var running = await ResolveAsync(financeReviewer, instance, call, Succeeded))
         {
             using var problem = await RecordApiFixture.ReadProblemAsync(running, HttpStatusCode.Conflict);
             Assert.Equal("The instance is not waiting on the call's step.", problem.RootElement.GetProperty("title").GetString());
@@ -267,12 +267,12 @@ public sealed class ProcessResolveTests(SampleAppFixture fixture) : IClassFixtur
     // then set to unknown with no work item, as a connector with no lookup leaves it.
     private async Task<(Guid Subject, Guid Instance, Guid Call)> UnknownCallAsync(HttpClient requester)
     {
-        using var chau = fixture.CreateClient().SignedInAs("chau");
+        using var manager2 = fixture.CreateClient().SignedInAs("manager-2");
         var subject = await CreateRequestAsync(requester, 500);
         var instance = await StartAsync(requester, subject);
         await fixture.RunUntilIdleAsync(CancellationToken);
         var task = (Guid)(await fixture.ScalarAsync("SELECT id FROM axis.process_tasks WHERE process_instance_id = @id AND state = 'open'", ("id", instance)))!;
-        using (var approved = await CompleteAsync(chau, task, """{ "outcome": "approve" }"""))
+        using (var approved = await CompleteAsync(manager2, task, """{ "outcome": "approve" }"""))
         {
             Assert.Equal(HttpStatusCode.OK, approved.StatusCode);
         }

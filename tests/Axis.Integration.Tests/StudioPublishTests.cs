@@ -74,21 +74,21 @@ public sealed class StudioPublishTests : IAsyncLifetime
         using var folder = NewFolder();
         var connectionString = await _database.CreateDatabaseAsync("studio_publish_roles", CancellationToken);
         await using var factory = NewFactory(folder.Path, [("a", HostA, connectionString)]);
-        using var lan = factory.CreateClient().SignedInAs("lan");
+        using var employee = factory.CreateClient().SignedInAs("employee");
         using var nobody = factory.CreateClient();
         using var author = factory.CreateClient().SignedInAs("author");
 
-        using var refused = await SendAsync(lan, HttpMethod.Post, PublishUrl, HostA);
+        using var refused = await SendAsync(employee, HttpMethod.Post, PublishUrl, HostA);
         Assert.Equal(HttpStatusCode.Forbidden, refused.StatusCode);
         Assert.Equal("You do not hold the publisher role.", (await ReadAsync(refused)).RootElement.GetProperty("title").GetString());
         Assert.Equal(0L, await CountRequestsAsync(connectionString));
 
-        using var accepted = await SendAsync(lan, HttpMethod.Post, ValidateUrl, HostA);
+        using var accepted = await SendAsync(employee, HttpMethod.Post, ValidateUrl, HostA);
         Assert.Equal(HttpStatusCode.Accepted, accepted.StatusCode);
         Assert.NotNull(accepted.Headers.Location);
         Assert.Equal("validate", (await ReadAsync(accepted)).RootElement.GetProperty("kind").GetString());
         await using var publisher = RunPublisher("a", HostA, connectionString);
-        using var finished = await WaitForFinalAsync(lan, accepted.Headers.Location!.OriginalString, HostA);
+        using var finished = await WaitForFinalAsync(employee, accepted.Headers.Location!.OriginalString, HostA);
         Assert.Equal("succeeded", finished.RootElement.GetProperty("status").GetString());
         Assert.Equal(JsonValueKind.Null, finished.RootElement.GetProperty("releaseId").ValueKind);
         Assert.Equal(1L, await CountRequestsAsync(connectionString));
@@ -121,10 +121,10 @@ public sealed class StudioPublishTests : IAsyncLifetime
         Assert.True(authorMe.RootElement.GetProperty("studio").GetBoolean());
         Assert.True(authorMe.RootElement.GetProperty("studioPublisher").GetBoolean());
 
-        using var lan = factory.CreateClient().SignedInAs("lan");
-        using var lanMe = await GetJsonAsync(lan, "/api/me", HostA);
-        Assert.True(lanMe.RootElement.GetProperty("studio").GetBoolean());
-        Assert.False(lanMe.RootElement.GetProperty("studioPublisher").GetBoolean());
+        using var employee = factory.CreateClient().SignedInAs("employee");
+        using var employeeMe = await GetJsonAsync(employee, "/api/me", HostA);
+        Assert.True(employeeMe.RootElement.GetProperty("studio").GetBoolean());
+        Assert.False(employeeMe.RootElement.GetProperty("studioPublisher").GetBoolean());
 
         using var requester = factory.CreateClient().SignedInAs("requester");
         using var annaMe = await GetJsonAsync(requester, "/api/me", HostA);
@@ -251,7 +251,7 @@ public sealed class StudioPublishTests : IAsyncLifetime
             builder.UseSetting("Studio:PublisherRole", "publisher");
             builder.UseTestAuthentication(
                 new TestIdentity("author", "Author User", "author", "publisher"),
-                new TestIdentity("lan", "Lan", "author"),
+                new TestIdentity("employee", "Employee User", "author"),
                 new TestIdentity("requester", "Requester", "employee"));
         });
 

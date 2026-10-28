@@ -10,7 +10,7 @@ namespace Axis.Integration.Tests;
 /// <c>pricing</c> section and its <c>price</c> field are visible when the quantity is above 0, and
 /// <c>price</c> is required when the quantity is above 10. An item's quantity is positive. <c>fia</c>
 /// reads only an item's <c>name</c> and <c>department</c>, <c>fern</c> reads only items with a status,
-/// and <c>binh</c> holds no grant.
+/// and <c>manager</c> holds no grant.
 /// </summary>
 public sealed class FormStateEndpointTests(RecordApiFixture fixture) : IClassFixture<RecordApiFixture>
 {
@@ -96,9 +96,9 @@ public sealed class FormStateEndpointTests(RecordApiFixture fixture) : IClassFix
     [Fact]
     public async Task User_without_a_grant_is_403()
     {
-        using var binh = fixture.CreateClient().SignedInAs("binh");
+        using var manager = fixture.CreateClient().SignedInAs("manager");
 
-        using var response = await SendAsync(binh, """{ "recordId": null, "values": {}, "touched": [] }""");
+        using var response = await SendAsync(manager, """{ "recordId": null, "values": {}, "touched": [] }""");
 
         using var problem = await ReadProblemAsync(response, HttpStatusCode.Forbidden);
         Assert.Equal("You have no grant for this action.", problem.RootElement.GetProperty("title").GetString());

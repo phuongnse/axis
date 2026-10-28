@@ -5,10 +5,10 @@
   "formatVersion": 1,
   "now": "2026-10-01T09:00:00Z",
   "users": {
-    "quan": [
+    "asset-manager": [
       "asset-manager"
     ],
-    "thao": [
+    "auditor": [
       "auditor"
     ]
   },
@@ -16,17 +16,17 @@
     {
       "type": "createRecord",
       "entity": "Asset",
-      "as": "quan",
+      "as": "asset-manager",
       "save": "asset",
       "values": {
-        "name": "Laptop of Lan",
-        "holder": "lan"
+        "name": "Laptop of the employee",
+        "holder": "employee"
       }
     },
     {
       "type": "createRecord",
       "entity": "Asset",
-      "as": "thao",
+      "as": "auditor",
       "values": {
         "name": "Audit laptop"
       },
@@ -35,7 +35,7 @@
     {
       "type": "updateRecord",
       "record": "asset",
-      "as": "thao",
+      "as": "auditor",
       "values": {
         "name": "x"
       },
@@ -44,13 +44,13 @@
     {
       "type": "deleteRecord",
       "record": "asset",
-      "as": "thao",
+      "as": "auditor",
       "expect": "denied"
     },
     {
       "type": "createRecord",
       "entity": "Category",
-      "as": "thao",
+      "as": "auditor",
       "values": {
         "name": "Printer"
       },
@@ -60,7 +60,7 @@
       "type": "expectRecord",
       "record": "asset",
       "values": {
-        "name": "Laptop of Lan"
+        "name": "Laptop of the employee"
       }
     }
   ]

@@ -2,17 +2,17 @@ import { expect, test } from '../test'
 import type { Page } from '@playwright/test'
 
 // The account menu opens the sessions screen, where a person ends another of their own sessions. The test
-// signs in as Lan in two fresh browser contexts, because the saved sessions of the other specs must stay alive.
+// signs in as the employee in two fresh browser contexts, because the saved sessions of the other specs must stay alive.
 // The sign-in at Keycloak is at most 5 minutes old, so the screen allows ending sessions.
 
-/** Signs in as Lan on the Keycloak login page from the sign-in card on the home page. */
-async function signInAsLan(page: Page) {
+/** Signs in as the employee on the Keycloak login page from the sign-in card on the home page. */
+async function signInAsEmployee(page: Page) {
   await page.goto('/')
   await page.getByRole('main').getByRole('button', { name: 'Sign in', exact: true }).click()
-  await page.locator('#username').fill('lan')
+  await page.locator('#username').fill('employee')
   await page.locator('#password').fill('axis')
   await page.locator('#kc-login').click()
-  await expect(page.getByRole('banner').getByRole('button', { name: 'Lan Employee', exact: true })).toBeVisible()
+  await expect(page.getByRole('banner').getByRole('button', { name: 'Employee User', exact: true })).toBeVisible()
 }
 
 test('a person ends another session of their own from the sessions screen, and that browser shows the sign-in prompt', async ({
@@ -24,8 +24,8 @@ test('a person ends another session of their own from the sessions screen, and t
   try {
     const pageA = await contextA.newPage()
     const pageB = await contextB.newPage()
-    await signInAsLan(pageA)
-    await signInAsLan(pageB)
+    await signInAsEmployee(pageA)
+    await signInAsEmployee(pageB)
 
     const listed = await pageB.request.get('/api/me/sessions')
     expect(listed.status()).toBe(200)
@@ -33,7 +33,7 @@ test('a person ends another session of their own from the sessions screen, and t
     const idOfB = sessionsOfB.sessions.find((session) => session.current)?.id
     expect(idOfB).toBeTruthy()
 
-    await pageA.getByRole('banner').getByRole('button', { name: 'Lan Employee', exact: true }).click()
+    await pageA.getByRole('banner').getByRole('button', { name: 'Employee User', exact: true }).click()
     await pageA.getByRole('menuitem', { name: 'Sessions', exact: true }).click()
     await expect(pageA).toHaveURL(`${baseURL}/account`)
 

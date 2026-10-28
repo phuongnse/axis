@@ -105,7 +105,7 @@ const propertyCases: [StepType, StepProperty][] = stepTypes.flatMap((type) =>
   stepProperties[type].map(({ name }): [StepType, StepProperty] => [type, name]),
 )
 
-function scenario(steps: Step[], users: Record<string, string[]> = { author: ['manager'], lan: ['clerk'] }) {
+function scenario(steps: Step[], users: Record<string, string[]> = { author: ['manager'], employee: ['clerk'] }) {
   return {
     id: '6f0c1c3e-2a4b-4d7e-9c1f-5b8a7d6e4f21',
     kind: 'scenario',
@@ -209,8 +209,8 @@ async function showAndEdit(
       return { path: 'record', next: 'invoice' }
     case 'as':
       expect(field).toHaveTextContent('author')
-      await pick(panel, 'as', 'lan')
-      return { path: 'as', next: 'lan' }
+      await pick(panel, 'as', 'employee')
+      return { path: 'as', next: 'employee' }
     case 'process':
       expect(field).toHaveTextContent('Approval')
       await pick(panel, 'process', 'Shipping')
@@ -237,12 +237,12 @@ async function showAndEdit(
       return { path: 'expect', next: 'notFound' }
     case 'assignee':
       expect(field).toHaveTextContent('author')
-      await pick(panel, 'user', 'lan')
-      return { path: 'assignee/user', next: 'lan' }
+      await pick(panel, 'user', 'employee')
+      return { path: 'assignee/user', next: 'employee' }
     case 'recipient':
       expect(field).toHaveTextContent('author')
-      await pick(panel, 'user', 'lan')
-      return { path: 'recipient/user', next: 'lan' }
+      await pick(panel, 'user', 'employee')
+      return { path: 'recipient/user', next: 'employee' }
     case 'channel':
       expect(field).toHaveTextContent('email')
       await pick(panel, 'channel', 'inApp')
@@ -387,7 +387,7 @@ describe.each(['light', 'dark'])('ScenarioEditor in %s mode', (mode) => {
     const panel = within(screen.getByTestId('studio-field-/steps/0'))
     await pick(panel, 'Step type', 'expectNotification')
     await pick(panel, 'recipient kind', 'User')
-    await pick(panel, 'user', 'lan')
+    await pick(panel, 'user', 'employee')
     await pick(panel, 'channel', 'email')
     await userEvent.click(panel.getByRole('button', { name: 'Add value' }))
     const name = panel.getByRole('textbox', { name: 'Value name' })
@@ -401,7 +401,7 @@ describe.each(['light', 'dark'])('ScenarioEditor in %s mode', (mode) => {
       initial as unknown,
     ) as Record<string, unknown>
     expect(saved.steps).toEqual([
-      { type: 'expectNotification', recipient: { user: 'lan' }, channel: 'email', values: { title: 'Chairs' } },
+      { type: 'expectNotification', recipient: { user: 'employee' }, channel: 'email', values: { title: 'Chairs' } },
     ])
   })
 
@@ -450,18 +450,18 @@ describe.each(['light', 'dark'])('ScenarioEditor in %s mode', (mode) => {
 
     const input = screen.getByRole('textbox', { name: 'User id' })
     await userEvent.clear(input)
-    await userEvent.type(input, 'lan')
+    await userEvent.type(input, 'employee')
     await userEvent.tab()
 
-    expect(onChange).toHaveBeenCalledWith('/users', { lan: ['manager'] })
+    expect(onChange).toHaveBeenCalledWith('/users', { employee: ['manager'] })
   })
 
   it('refuses a user id that another user has, and shows the id again', async () => {
-    const { onChange } = renderEditor(scenario([], { author: [], lan: [] }))
+    const { onChange } = renderEditor(scenario([], { author: [], employee: [] }))
 
     const input = screen.getAllByRole('textbox', { name: 'User id' })[0]
     await userEvent.clear(input)
-    await userEvent.type(input, 'lan')
+    await userEvent.type(input, 'employee')
     await userEvent.tab()
 
     expect(onChange).not.toHaveBeenCalledWith('/users', expect.anything())

@@ -4,8 +4,8 @@ import { csrfHeaders } from '../csrf'
 import { sessionFile, useSession } from '../sessions'
 import { expectShown, fieldValue } from '../fields'
 
-// The employee requester may create, update and submit purchase requests. The department manager chau
-// may only read them and holds no start grant, so the pages hide what chau may not do.
+// The employee requester may create, update and submit purchase requests. The department manager manager-2
+// may only read them and holds no start grant, so the pages hide what manager-2 may not do.
 test.use({ storageState: sessionFile('requester') })
 
 // Specs run in parallel against one database, so each test looks only at the request it creates.
@@ -51,7 +51,7 @@ test('a user without a create grant sees no New button, and one without a start 
   await expect(page.getByRole('textbox', { name: 'Title', exact: true })).toHaveValue(title)
   await expect(page.getByRole('button', { name: 'Submit', exact: true })).toBeVisible()
 
-  await useSession(page, 'chau')
+  await useSession(page, 'manager-2')
   await page.goto('/purchasing/purchaserequests')
   // The rows show once the page has loaded, so the missing button is not just not rendered yet.
   await expect(page.getByRole('table').getByRole('link').first()).toBeVisible()
@@ -71,7 +71,7 @@ test('a user without an update grant sees the form read-only and no Save button'
   await expect(titleInput).not.toHaveAttribute('readonly')
   await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeVisible()
 
-  await useSession(page, 'chau')
+  await useSession(page, 'manager-2')
   await page.goto(`/purchasing/purchaserequestform/${id}`)
   await expectShown(fieldValue(page, 'title'), title)
   await expect(titleInput).toHaveCount(0)

@@ -113,13 +113,13 @@ test('a request below the threshold is approved by the department manager from M
   const { title, id } = await createRequest(page, 'Approve small', 500)
   await submit(page, id, title)
 
-  await useSession(page, 'chau')
+  await useSession(page, 'manager-2')
   const comment = `Fine ${Date.now()}`
   await decide(page, title, 'Manager approval', 'Approve', comment)
 
   await expectStatus(page, id, 'approved')
   await expectShown(fieldValue(page, 'decisionComments'), comment)
-  await expectHistory(page, ['Chau Operations Manager'])
+  await expectHistory(page, ['Manager 2 User'])
   await expectOnePurchaseOrder(page, id)
   // ISO 11649: RF, two check digits, then the request number without its hyphens.
   const number = await requestNumber(page, id)
@@ -137,7 +137,7 @@ test('a request whose purchase order response is lost still gets exactly one pur
   expect(drop.status()).toBe(204)
   await submit(page, id, title)
 
-  await useSession(page, 'chau')
+  await useSession(page, 'manager-2')
   await decide(page, title, 'Manager approval', 'Approve')
 
   await expectStatus(page, id, 'approved')
@@ -151,17 +151,17 @@ test('a request at the threshold needs the finance reviewer after the manager be
   const { title, id } = await createRequest(page, 'Approve large', 10000)
   await submit(page, id, title)
 
-  await useSession(page, 'chau')
+  await useSession(page, 'manager-2')
   await decide(page, title, 'Manager approval', 'Approve')
   const read = await page.request.get(`${recordsPath}/${id}`)
   expect(read.ok()).toBe(true)
   expect(((await read.json()) as { values: { status: string } }).values.status).toBe('submitted')
 
-  await useSession(page, 'dung')
+  await useSession(page, 'finance-reviewer')
   await decide(page, title, 'Finance approval', 'Approve')
 
   await expectStatus(page, id, 'approved')
-  await expectHistory(page, ['Chau Operations Manager', 'Dung Finance Reviewer'])
+  await expectHistory(page, ['Manager 2 User', 'Finance Reviewer User'])
   await expectOnePurchaseOrder(page, id)
 })
 
@@ -170,7 +170,7 @@ test('a returned request is edited and submitted again, and the manager then app
   const { title, id } = await createRequest(page, 'Return', 500)
   await submit(page, id, title)
 
-  await useSession(page, 'chau')
+  await useSession(page, 'manager-2')
   const comment = `Two desks, please ${Date.now()}`
   await decide(page, title, 'Manager approval', 'Return', comment)
   await expectStatus(page, id, 'returned')
@@ -183,7 +183,7 @@ test('a returned request is edited and submitted again, and the manager then app
   await page.getByRole('button', { name: 'Submit', exact: true }).click()
   await expect(page.getByTestId('form-started')).toBeVisible()
 
-  await useSession(page, 'chau')
+  await useSession(page, 'manager-2')
   await decide(page, title, 'Manager approval', 'Approve')
 
   await expectStatus(page, id, 'approved')
@@ -199,7 +199,7 @@ test('a rejected request cannot be submitted again, and the manager gets no new 
   const { title, id } = await createRequest(page, 'Reject', 500)
   await submit(page, id, title)
 
-  await useSession(page, 'chau')
+  await useSession(page, 'manager-2')
   await decide(page, title, 'Manager approval', 'Reject')
   await expectStatus(page, id, 'rejected')
   // The process ends with the rejection, so the purchasing system is never called.
@@ -220,7 +220,7 @@ test('a rejected request cannot be submitted again, and the manager gets no new 
   )
   await expect(page.getByTestId('form-started')).toHaveCount(0)
 
-  await useSession(page, 'chau')
+  await useSession(page, 'manager-2')
   const tasks = await page.request.get(`${appPath}/tasks?pageSize=100`)
   expect(tasks.status()).toBe(200)
   const { items } = (await tasks.json()) as { items: { subject: { id: string } }[] }
@@ -232,7 +232,7 @@ test('a request waiting for the manager is approved after the worker restarts', 
   const { title, id } = await createRequest(page, 'Restart', 500)
   await submit(page, id, title)
 
-  await useSession(page, 'chau')
+  await useSession(page, 'manager-2')
   await waitForTask(page, title)
   await restartWorker()
   await decide(page, title, 'Manager approval', 'Approve')

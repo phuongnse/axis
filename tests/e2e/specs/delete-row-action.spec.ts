@@ -4,7 +4,7 @@ import { csrfHeaders } from '../csrf'
 import { confirmDialog, waitForDialog } from '../dialogs'
 import { sessionFile, useSession } from '../sessions'
 
-// requester holds the delete grant on notes. dung, a finance reviewer, reads notes whose title contains
+// requester holds the delete grant on notes. The finance-reviewer user reads notes whose title contains
 // 'Shared' and holds no delete grant.
 test.use({ storageState: sessionFile('requester') })
 
@@ -45,7 +45,7 @@ test('a user without the delete grant sees no Delete button, and the server refu
   const title = `zzz Shared delete ${run}`
   const note = await createNote(request, title)
 
-  await useSession(page, 'dung')
+  await useSession(page, 'finance-reviewer')
   await page.goto(deletesPage)
   const row = page.getByRole('row', { name: new RegExp(title) })
   await expect(row).toBeVisible()

@@ -33,7 +33,7 @@ async function releaseB(testInfo: TestInfo) {
 }
 
 /**
- * Creates a ticket, starts its review and returns the topic and the task id. The task is assigned to binh.
+ * Creates a ticket, starts its review and returns the topic and the task id. The task is assigned to manager.
  * Specs run in parallel against one database, so each test looks only for the task it starts.
  */
 async function startReview(request: APIRequestContext, apiRequest: APIRequest, baseURL: string | undefined) {
@@ -50,13 +50,13 @@ async function startReview(request: APIRequestContext, apiRequest: APIRequest, b
   })
   expect(started.status()).toBe(201)
 
-  // This context holds binh's saved session and shares no cookies with the browser or the request fixture.
-  const binh = await apiRequest.newContext({ baseURL, storageState: sessionFile('binh') })
+  // This context holds manager's saved session and shares no cookies with the browser or the request fixture.
+  const manager = await apiRequest.newContext({ baseURL, storageState: sessionFile('manager') })
   let taskId = ''
   try {
     // The worker creates the task some time after the start.
     await expect(async () => {
-      const response = await binh.get(`${tasksPath}?pageSize=100`)
+      const response = await manager.get(`${tasksPath}?pageSize=100`)
       expect(response.ok()).toBe(true)
       const page = await response.json()
       const task = page.items.find((item: { subject: { id: string } }) => item.subject.id === ticket.id)
@@ -64,7 +64,7 @@ async function startReview(request: APIRequestContext, apiRequest: APIRequest, b
       taskId = task.id
     }).toPass({ timeout: 30_000 })
   } finally {
-    await binh.dispose()
+    await manager.dispose()
   }
   return { topic, taskId }
 }
@@ -82,7 +82,7 @@ test.describe('the active release of the release application changes', () => {
     await activateFolder(releaseA)
     const { topic, taskId } = await startReview(request, playwright.request, baseURL)
     await activateFolder(await releaseB(testInfo))
-    await useSession(page, 'binh')
+    await useSession(page, 'manager')
 
     await page.goto(`/release-app/tasks/${taskId}`)
 
@@ -98,7 +98,7 @@ test.describe('the active release of the release application changes', () => {
   }, testInfo) => {
     await activateFolder(await releaseB(testInfo))
     const { topic, taskId } = await startReview(request, playwright.request, baseURL)
-    await useSession(page, 'binh')
+    await useSession(page, 'manager')
 
     await page.goto(`/release-app/tasks/${taskId}`)
 

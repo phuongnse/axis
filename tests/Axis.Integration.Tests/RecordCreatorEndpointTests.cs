@@ -47,7 +47,7 @@ public sealed class RecordCreatorEndpointTests(RecordApiFixture fixture) : IClas
         using var created = await PostAsync(requester, """{ "title": "Kept" }""", HttpStatusCode.Created);
         var id = Id(created);
 
-        using var update = await PatchAsync(requester, id, """{ "version": 1, "values": { "requester": "binh" } }""");
+        using var update = await PatchAsync(requester, id, """{ "version": 1, "values": { "requester": "manager" } }""");
         Assert.Equal([("/values/requester", "Cannot be set.")], Errors(update));
         using var updateNull = await PatchAsync(requester, id, """{ "version": 1, "values": { "requester": null } }""");
         Assert.Equal([("/values/requester", "Cannot be set.")], Errors(updateNull));
