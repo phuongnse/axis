@@ -83,7 +83,7 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
     the instance detail again, so it shows the new state, tasks, calls and
     `commands`. On a `400`, `403`, `404` or `409`, the dialog shows the
     problem's title. Any other failure shows a generic text, and a `401`
-    starts sign-in. The Retry dialog first warns when a call on the instance's
+    shows the sign-in prompt. The Retry dialog first warns when a call on the instance's
     current step has `failed`, and that call is a package call whose
     `idempotent` is not `true`. A failed connector call gets no warning. The
     server still checks every command, so the page never decides who may act.
@@ -128,7 +128,7 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
     loaded with `GET /api/sites/{path}/texts/{locale}?release={releaseId}`, as
     the inbox does. A step without a label shows its name.
   - **Errors.** With nobody signed in, the API answers `401` and the widget
-    starts sign-in like any other call. A `403` shows a message that the user
+    shows the sign-in prompt like any other call. A `403` shows a message that the user
     may not inspect the process. A `404` on the instance page shows a message
     that the instance does not exist, inside the page. Any other failure shows
     a generic load error. The server checks every request, so the page never

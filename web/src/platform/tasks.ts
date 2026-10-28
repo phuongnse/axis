@@ -93,7 +93,7 @@ export const assignedElsewhere = 'assignedElsewhere'
 
 /**
  * Loads one page of the signed-in user's open tasks, in the task API's order. `query` holds the
- * task API's `page` and `pageSize`. A 401 starts sign-in and throws, as any other failure does.
+ * task API's `page` and `pageSize`. A 401 shows the sign-in prompt and throws, as any other failure does.
  */
 export async function fetchTasks(tasksPath: string, query: string, signal?: AbortSignal): Promise<TaskPage> {
   const response = await apiFetch(`${tasksPath}${query ? `?${query}` : ''}`, { signal })
@@ -105,7 +105,7 @@ export async function fetchTasks(tasksPath: string, query: string, signal?: Abor
 
 /**
  * Loads one task in any state, or returns `null` when the task API has no task with the id. A 403
- * returns {@link assignedElsewhere}. A 401 starts sign-in and throws, as any other failure does.
+ * returns {@link assignedElsewhere}. A 401 shows the sign-in prompt and throws, as any other failure does.
  */
 export async function fetchTask(
   tasksPath: string,
@@ -128,7 +128,7 @@ export async function fetchTask(
 
 /**
  * Completes a task. `body` is the prepared body text, so number text reaches the server unchanged.
- * A 400, 403 or 409 comes back as the problem. A 401 starts sign-in and throws, as any other
+ * A 400, 403 or 409 comes back as the problem. A 401 shows the sign-in prompt and throws, as any other
  * failure does.
  */
 export async function completeTask(tasksPath: string, id: string, body: string): Promise<CompleteResult> {
@@ -152,7 +152,7 @@ export async function completeTask(tasksPath: string, id: string, body: string):
 
 /**
  * Claims or releases a task and returns the task as the route answers it. A 403 or 409 comes back
- * as the status. A 401 starts sign-in and throws, as any other failure does.
+ * as the status. A 401 shows the sign-in prompt and throws, as any other failure does.
  */
 export async function runTaskCommand(
   tasksPath: string,
@@ -185,7 +185,7 @@ export interface UserOption {
 
 /**
  * Reassigns a task to a role or a user. A 400 comes back as the problem, and a 403 or 409 as the
- * status. A 401 starts sign-in and throws, as any other failure does.
+ * status. A 401 shows the sign-in prompt and throws, as any other failure does.
  */
 export async function reassignTask(tasksPath: string, id: string, body: ReassignBody): Promise<ReassignResult> {
   const response = await apiFetch(`${tasksPath}/${id}/reassign`, {

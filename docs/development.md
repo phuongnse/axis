@@ -185,7 +185,7 @@ the server signs people in through Keycloak at `/api/auth/sign-in`, and the sess
 answers `GET /api/me`. The SPA header offers sign-in and sign-out there. Sign-in through
 Compose is not wired yet: the server in its container cannot reach Keycloak at the address the
 browser uses. The site endpoints, the record API and the data source endpoint need a session, so
-under Compose they answer `401`, and an application page starts a sign-in that cannot complete yet.
+under Compose they answer `401`, and an application page shows the sign-in prompt, whose button starts a sign-in that cannot complete yet.
 See [sign-in and the session](reference/security.md#sign-in-and-the-session).
 The realm also has the client `axis-fapi` for the `fapi2` sign-in profile. Only an integration
 test host uses it, and it signs in with the development keys in `samples/keycloak`, see

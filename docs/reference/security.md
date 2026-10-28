@@ -99,7 +99,9 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
     so it can send the CSRF header, and a `fetch` call cannot follow a
     redirect to the identity provider as a page. The shell header's
     [account button](frontend.md) offers sign-in and
-    sign-out.
+    sign-out. A `401` from an API call shows a sign-in prompt, and only a
+    click on its button calls `GET /api/auth/sign-in`, so no session starts
+    without an action of the person.
 - **Audit.** Sign-in writes
   [audit records](storage.md#audit-records-and-sequence-counters)
   in the database of the tenant that the host resolves to, see
@@ -243,7 +245,7 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place.
   it does not yet, because the server in its container cannot reach Keycloak
   at the address the browser uses. So under Compose the site endpoints, the
   record API and the data source endpoint answer `401`, and an application
-  page starts a sign-in that cannot complete.
+  page shows the sign-in prompt, and its button starts a sign-in that cannot complete.
   - It holds the development users listed in
     [development users](#development-users), with fixed ids that seed data
     and E2E journeys name.
