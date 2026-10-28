@@ -30,6 +30,7 @@ public sealed class AdminCommandTableTests
                 ["tenant host move"] = AuditMark.OnePerTenant,
                 ["tenant email set"] = AuditMark.OnePerTenant,
                 ["tenant email clear"] = AuditMark.OnePerTenant,
+                ["tenant session end"] = AuditMark.OnePerTenant,
                 ["platform rekey"] = AuditMark.OnePerRun,
                 ["tenant list"] = AuditMark.None,
                 ["tenant binding list"] = AuditMark.None,

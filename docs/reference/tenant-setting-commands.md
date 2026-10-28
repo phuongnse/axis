@@ -12,7 +12,7 @@ password rotation, [`tenant rotate-passwords`](#database-passwords), is built. T
 built, see [installation key](#installation-key). The
 [deployment binding](#deployment-bindings) and [host](#hosts) commands are built too. So is
 [`tenant oidc set`](#sign-in-settings), with its client key options, and the
-[mail settings](#mail-settings) commands. The rest is _(planned for M16)_.
+[mail settings](#mail-settings) commands. So is ending [sessions](#sessions). The rest is _(planned for M16)_.
 
 ## Common rules
 
@@ -188,6 +188,31 @@ successful run of either command prints `<id> email ok`.
   commands do.
 - A move raises the `version` of both tenants.
 
+## Sessions
+
+`tenant session end <id> --user <user>` deletes every session of one person in the tenant.
+`tenant session end <id> --all` deletes every session of the tenant. The next request on each
+deleted session answers 401, on every replica, because every request reads its row in
+`axis.sessions`. A successful run prints one line, `<id> sessions ok: <n> ended`, and exits with
+code 0, also when `n` is 0. A failure prints `<id> sessions failed: <message>` and exits with code 1.
+
+- **Settings.** `ConnectionStrings:PlatformSchema`, `Platform:SecretKey` and
+  `Tenancy:Source=directory`. It needs no admin role.
+- **Schema role.** It connects to the tenant database as the tenant's schema role, as `migrate`
+  does, and decrypts that password with `Platform:SecretKey`. That role owns `axis.sessions`.
+- **Which tenants.** An `active`, `suspended` or preview tenant. A tenant that is still
+  `provisioning` exits with code 2, because its database may not exist yet.
+- **The user id.** It must match the stored user id exactly, with letter case. A person with no
+  sessions is not an error: the run prints `0 ended`.
+- **Audit.** One [platform audit record](#platform-audit-records) is written after the checks and
+  before the delete. Its `changed` holds `user:<user>` or `all`. If the delete then fails, the
+  record stays, the failure is printed, and running the command again completes it.
+- **Exit code 2, nothing changes.** `Tenancy:Source` is not `directory`, a setting is missing, the
+  tenant is unknown or still provisioning, or the options are wrong: none, both, a blank `--user`
+  or an unknown option. No audit record is written.
+- **What it does not do.** It does not disable the person's account. They can sign in again at
+  once through the identity provider.
+
 ## Database passwords
 
 `tenant rotate-passwords <id>` sets new generated passwords for the tenant's runtime and schema
@@ -264,7 +289,7 @@ keys. It can be rotated without signing anyone out.
   built. `PlatformAuditRecords.WriteAsync` in `Axis.Administration` writes one record.
 - **What writes it.** Every `Axis.Admin` command that acts on a tenant: `tenant create`,
   `tenant suspend`, `tenant resume`, `tenant rotate-passwords`, `tenant oidc set`, `tenant backup`,
-  `tenant restore`, `migrate` and `activate` are built. `tenant backup` writes one because an
+  `tenant restore`, `migrate` and `activate` are built. So is `tenant session end`. `tenant backup` writes one because an
   archive holds a tenant's data. `tenant binding set`, `tenant binding remove`, `tenant host add`,
   `tenant host remove` and `tenant host move` are built and write one each. So are `tenant email set`
   and `tenant email clear`, which name the [mail settings](#mail-settings) they changed. `platform rekey` is
@@ -277,11 +302,12 @@ keys. It can be rotated without signing anyone out.
   has decrypted and before the first update, and `changed` holds the counts. A usage error, a missing setting, an unknown tenant or a
   host that another tenant holds writes none, because nothing started. A record means the command
   started work for the tenant, not that the work succeeded. The `changed` names of these commands
-  are empty, because the command already says what changed. `tenant rotate-passwords` and
-  `tenant oidc set` are the exceptions. The record of `tenant rotate-passwords` names both roles,
+  are empty, because the command already says what changed. `tenant rotate-passwords`,
+  `tenant oidc set` and `tenant session end` are the exceptions. The record of `tenant rotate-passwords` names both roles,
   `axis_<id>_runtime` and `axis_<id>_schema`, and never a password. The record of `tenant oidc set`
   names the [settings](#sign-in-settings) it was given and never a value. `tenant oidc set` writes
-  its record after its checks and before the change.
+  its record after its checks and before the change. The record of `tenant session end` holds
+  `user:<user>` or `all`, and is written after its checks and before the delete.
   The binding and host commands differ: each is one small transaction that writes its record and
   makes its change together, so a record means the change was made. A command that is refused or
   fails rolls its record back too.
