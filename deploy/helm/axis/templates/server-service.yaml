@@ -10,6 +10,6 @@ spec:
   selector:
     {{- include "axis.selectorLabels" (dict "root" . "component" "server") | nindent 4 }}
   ports:
-    - name: http
+    - name: https
       port: {{ .Values.server.service.port }}
-      targetPort: http
+      targetPort: https

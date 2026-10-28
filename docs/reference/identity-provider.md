@@ -1,10 +1,12 @@
 # Axis's identity provider
 
-Axis ships an identity provider of its own, so every tenant's people sign in on one standard Axis page, whatever
-identity provider their organization uses. [D99](../decisions/d99-axis-ships-its-own-identity-provider.md) agrees
-it. None of it is built yet: M17 builds it, so every section is _(planned for M17)_. Until it is built, each
-tenant's `Oidc` block points at an identity provider that runs outside Axis, as
-[security](security.md#sign-in-and-the-session) describes.
+Axis ships an identity provider of its own, so people sign in on one standard Axis page, whatever identity provider
+their organization uses. [D99](../decisions/d99-axis-ships-its-own-identity-provider.md) agrees it, and
+[D100](../decisions/d100-identity-providers-per-application-and-sign-in-per-site.md) lets each application declare how
+its people sign in and each site pick from that. None of it is built yet: M17 builds it, so every section is
+_(planned for M17)_. Until it is built, each tenant's `Oidc` block points at an identity provider that runs outside
+Axis, as [security](security.md#sign-in-and-the-session) describes. Accounts, roles given by an administrator and the
+users page are in [user administration](user-administration.md).
 
 ## What it is
 
@@ -14,36 +16,155 @@ _(planned for M17)_
   worker.
 - The server's sign-in does not change: it stays the confidential OIDC client of
   [D23](../decisions/d23-sign-in-through-oidc-and-the-bff-session.md), and the session stays on the server. Each
-  tenant's `Oidc` block points at that tenant's realm in Axis's identity provider.
-- It brokers to the identity providers of the tenant's organization. A person of an organization that uses Microsoft
-  Entra ID or Okta clicks "Continue with Microsoft" or "Continue with Okta" on the Axis page, signs in there, and comes
-  back through Axis's identity provider to Axis.
+  tenant's `Oidc` block points at that tenant's realm in Axis's identity provider, and nowhere else.
+- The realm brokers to the identity providers that the tenant's applications declare. A person of an organization that
+  uses Microsoft Entra ID clicks "Continue with Microsoft" on the Axis page, signs in there, and comes back through
+  Axis's identity provider to Axis.
 
 ## Realms
 
 _(planned for M17)_
 
-- Each tenant has one realm of its own, with its people, its sign-in settings, its brokered identity providers and
-  the Axis theme. Tenants share nothing in it, as they share no database.
+- Each tenant has one realm of its own, with its people, its brokered identity providers, a client for its platform
+  sign-in and one for each site, and the Axis theme. Tenants share nothing in it, as they share no database.
 - The realm's display name is the organization's name, which every sign-in page shows under its title.
+- The realm's sessions last at most 8 hours, the lifetime of Axis's session, see
+  [session lifetimes](security.md#session-lifetimes-and-re-authentication).
+- A preview tenant has no realm. It signs people in through its main tenant's realm, see
+  [preview tenants](#preview-tenants).
 
-## Accounts and MFA
-
-_(planned for M17)_
-
-- A realm may hold accounts of its own, for an organization with no identity provider. Each tenant turns them on or
-  off. With them off, the sign-in page shows only the organization's own identity providers.
-- An account of Axis's identity provider must use a second step, a code from an authenticator app, because Axis then
-  holds the password and answers for it. A person who signs in through their organization's identity provider follows
-  that organization's MFA policy, and Axis asks for no second step on top.
-
-## Direct sign-in
+## Identity provider resource
 
 _(planned for M17)_
 
-- Every tenant signs in through Axis's identity provider. An `Oidc` block that points straight at an organization's
-  identity provider stays supported only while that tenant moves to Axis's identity provider, so the platform keeps one
-  sign-in path to build, test and secure.
+An `identityProvider` resource declares one way for the application's people to sign in. It is part of the release,
+so Studio edits it and test scenarios check it.
+
+```json
+{
+  "id": "5d0b8c1e-2f4a-4b6c-9d8e-7a1b2c3d4e51",
+  "kind": "identityProvider",
+  "name": "company",
+  "formatVersion": 1,
+  "type": "oidc",
+  "label": { "textKey": "signIn.company" },
+  "issuer": { "binding": "CompanyIssuer" },
+  "clientId": { "binding": "CompanyClientId" },
+  "clientSecret": { "binding": "CompanyClientSecret" },
+  "claims": { "displayName": "name", "email": "email", "locale": "locale" },
+  "roles": {
+    "claim": "groups",
+    "values": {
+      "purchasing-managers": "manager",
+      "finance": "finance-reviewer"
+    }
+  }
+}
+```
+
+- **`type`:**
+  - `accounts`: accounts that the realm holds, see [accounts](user-administration.md#accounts). It has no `label`,
+    bindings or `claims`, because the account form is its sign-in. An application has at most one.
+  - `oidc`: a provider that the realm brokers to over OpenID Connect. `issuer` is a `url` binding, the address its
+    discovery document is found at. `clientId` is a `secret` binding. The client credential is either `clientSecret`
+    or `clientKey`, a `secret` binding with a private key for `private_key_jwt`, as many national providers require.
+  - `saml`: a provider that the realm brokers to over SAML 2.0. `metadata` is a `url` binding, the address of the
+    provider's metadata. The realm signs its requests with a key of its own and publishes its own metadata for the
+    organization to register.
+- **`label`:** the text of the "Continue with" button, as a text key of the application.
+- **`claims`:** the claims that give the display name, the email and the locale, by default `name`, `email` and
+  `locale`. The realm links a person to the provider by the provider's own subject, and the user id that Axis keeps is
+  always the realm's `sub`, see [users](#users).
+- **`roles`:** how the provider's claims give the application's roles. `claim` names the claim, by default `roles`.
+  `values` maps a claim value to a role. Without `values`, a claim value gives the role of the same name, as the roles
+  claim does today, see [claim values](roles-and-policies.md). A value that gives no declared role is ignored.
+- **`acr`:** optional, the assurance levels the provider must sign the person in at. The sign-in request asks for
+  them, and the server refuses an ID token whose `acr` is not one of them.
+- **Checks:** an unknown `type`, a binding of the wrong kind, a missing binding, a role in `values` that the
+  application does not declare, a second `accounts` provider and a site's `signIn` entry that names no provider are
+  compile errors with new diagnostic codes. A module holds no identity provider, because it holds no bindings.
+
+## Sites and sign-in
+
+_(planned for M17)_
+
+- **`signIn`:** a site lists the providers it allows, by name, as `"signIn": ["company"]`. A site with no `signIn`
+  allows its application's providers, all of them. An application with sites and no provider is a compile error.
+- **A client for each site:** activation gives each site a client of the tenant's realm. A sign-in starts for the site
+  that `returnUrl` opens, through that site's client, and the realm's page shows only that site's providers. With one
+  provider and no accounts, the server sends the person straight to it.
+- **The callback checks again:** the realm tells the server which provider signed the person in. The server refuses a
+  callback whose provider is not in the site's `signIn`, or whose `acr` the provider does not accept, as any refused
+  callback, see [security](security.md#sign-in-and-the-session). The realm's page is not the control.
+- **Sign-in once:** a person signed in through a provider at the realm opens another site that allows it without
+  being asked again. A site that does not allow it asks the person to sign in with one it does.
+- **A host of its own:** `tenant host add <id> <host> --site <path>` gives a tenant host to one site, see
+  [hosts](tenant-setting-commands.md#hosts).
+  - That host serves only the site, at `/`. Platform pages and other sites are `404` there, and its session cookie
+    reaches nothing else.
+  - The tenant's other hosts send the site's path to its own host, so the site has one origin.
+  - A site for people outside the organization, such as citizens or customers, should get a host of its own. Sites
+    that share a host share an origin, so a script that runs in one could act in the other for a person signed in to
+    both.
+
+## Platform sign-in
+
+_(planned for M17)_
+
+- The home page, Studio, the operator console, the account page and the users page belong to no site. The tenant's
+  platform sign-in says which providers they accept.
+- `tenant sign-in set <id>` sets it, with `--accounts true|false` and one `--provider <name>` for each brokered
+  provider, each given its type and bindings as an `identityProvider` resource names them, see
+  [sign-in settings](tenant-setting-commands.md#sign-in-settings).
+- The author, publisher, operator and administrator roles are roles claim values of the platform sign-in, mapped as
+  `roles` maps them, or roles that the users page gives.
+- `tenant create` sets accounts on, so a new tenant can sign in its first administrator before any application is
+  published, see [the first administrator](user-administration.md#the-first-administrator).
+- On the tenant's host the home page's sign-in also offers the providers of the sites that share the host. After
+  sign-in the home page lists only the sites that allow the provider the person used.
+
+## Users
+
+_(planned for M17)_
+
+- **The user id is the realm's `sub`.** The issuer is always the tenant's realm, so a user is one realm user.
+- **One provider per binding:** the realm holds one brokered provider for each set of bindings. Two applications
+  whose providers name the same bindings use the same provider in the realm, and the platform sign-in shares it too,
+  so a person is one user across the tenant. Two providers that name the same issuer or metadata binding with other
+  client bindings fail activation, because the same person would become two users.
+- **No automatic linking:** a person who signs in through two providers is two users, even when both give the same
+  email. The realm never links them by email, because another provider's email is not proof of who signed in.
+  Linking that the person proves on both sides comes later.
+- **Roles:** at sign-in the session gets, for each application, the roles that the provider's `roles` mapping gives
+  and the roles the [users page](user-administration.md#roles) gives. Platform roles come the same way from the
+  platform sign-in.
+
+## Keeping the realm in step
+
+_(planned for M17)_
+
+- **Created by `Axis.Admin`:** `tenant create` creates the tenant's realm, its platform client, and two clients that
+  Axis's hosts use to change the realm: one with rights over the realm's providers and clients, for activation, and
+  one with rights over its users only, for the users page. It stores their secrets encrypted in the tenant directory.
+  Only `Axis.Admin` holds the identity provider's admin rights over every realm, from its own settings, see
+  [administration](administration.md).
+- **Brought in step by activation:** activating a release adds, changes and removes the realm's brokered providers,
+  their claim mappers and the site clients to match the active releases of the tenant and its platform sign-in. A
+  provider that nothing names any more is removed. Its users stay, but cannot sign in through it.
+- **Bindings:** a missing binding, or a binding of the wrong kind, fails activation, as for a connector. On a preview
+  tenant activation leaves the provider out with a warning, see [preview tenants](#preview-tenants).
+- **Profile:** the realm's clients follow the tenant's sign-in profile. Under `fapi2` Axis registers the client key in
+  the realm itself, see [FAPI 2.0 profile](security.md#fapi-20-profile).
+
+## Preview tenants
+
+_(planned for M17)_
+
+- A preview tenant signs people in through its main tenant's realm and platform sign-in. Its bindings are empty by
+  default, so its sites' brokered providers are left out and an author tries the application through the platform
+  sign-in.
+- On a preview tenant each site accepts the platform sign-in, and a person holds the application roles the main
+  tenant's users page gives them.
 
 ## Theme
 
@@ -52,15 +173,17 @@ _(planned for M17)_
 - Every page of Axis's identity provider has one frame: the Axis mark above one card in the middle of the page on
   `canvas`, and below it the language links and "© <year> Axis". It follows light and dark mode and the Axis tokens and
   fonts, as the SPA does.
-- The sign-in page lists the organization's identity providers first, then "or" and the account form: email or
-  username, password with "Forgot password?", "Keep me signed in" and a full-width Sign in button.
+- The sign-in page lists the site's brokered providers first, then "or" and the account form when the site allows
+  accounts: email or username, password with "Forgot password?", "Keep me signed in" and a full-width Sign in button.
+  "Keep me signed in" keeps the realm's session when the browser closes, never past the 8-hour lifetime of
+  [sessions](security.md#session-lifetimes-and-re-authentication).
 - A wrong password keeps the username, marks the password and reads "Invalid email, username or password." above the
   form, never saying which one was wrong.
-- An organization that signs in only through its own identity provider shows its button alone, under one line that
-  names it.
+- A site that allows one brokered provider and no accounts shows its button alone, under one line that names it.
 - Two-step verification asks for the 6-digit code, with "Try another way" and "Back to sign in".
 - The theme is built from the SPA's own React components and tokens into a Keycloak theme, so the pages look like the
-  rest of Axis. Its texts are message bundles in every locale the platform offers.
+  rest of Axis. Its texts are message bundles in every locale the platform offers. The "Continue with" labels come
+  from the applications' texts.
 - _(built)_ The design system's `identitySignIn` preview draws these pages from fixtures, see
   [shell design system previews](shell.md#design-system-previews).
 
@@ -69,6 +192,10 @@ _(planned for M17)_
 _(planned for M17)_
 
 - Docker Compose, the Helm chart and the on-premises install run Axis's identity provider with its own database on the
-  PostgreSQL server, behind the same TLS proxy as the server. The operator upgrades it with Axis.
-- The development realm `axis` stays for `scripts/dev.sh` and the tests, see
-  [security](security.md#development-users).
+  PostgreSQL server, behind the same TLS proxy as the server, on one host of its own for the installation. The
+  operator upgrades it with Axis, which pins its version.
+- The development realm `axis` stays for `scripts/dev.sh` and the tests, as the `default` tenant's realm, see
+  [security](security.md#development-users). Activation keeps it in step as any realm.
+- **Backup and restore:** the identity provider's database holds the accounts and their credentials. The operator
+  backs it up with the installation. `tenant backup` does not carry them, so a tenant restored to another
+  installation gets a new realm, and its accounts need new invitations.

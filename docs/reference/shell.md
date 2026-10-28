@@ -72,6 +72,9 @@ cards, which is _(planned)_.
   light and dark themes, the current ones selected. It replaces the locale switch and the theme toggle in the header,
   for signed-in people and for nobody signed in alike. At narrow width it sits in the Menu panel, while the app
   switcher stays in the header.
+- **Users.** _(planned for M17)_ The app switcher and the home page's welcome band also offer the users page to an
+  administrator, after the operator console, see [the administrator role](user-administration.md#the-administrator-role).
+  On a site's own host the app switcher lists only that site and no tools.
 
 ## Platform home page
 

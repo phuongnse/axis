@@ -29,7 +29,9 @@ flowchart LR
 1. **Load.** Every `*.json` file in the folder and its subfolders is one
    resource. Each is validated against the JSON Schema for its `kind`
    (`application`, `entity`, `site`, `page`, `text`, `seed`, `dataSource`,
-   `rule`, `sequence`, `process`, `form`, `role`, `policy`, `connector`, `event`, `endpoint`, `trigger`, `migration` or `scenario`). The manifest is the
+   `rule`, `sequence`, `process`, `form`, `role`, `policy`, `connector`, `event`, `endpoint`, `trigger`, `migration` or `scenario`).
+   _(planned for M17)_ `identityProvider` joins them, see
+   [identity provider resource](identity-provider.md#identity-provider-resource). The manifest is the
    single `application` resource, stored as `application.json` at the
    folder root; an `application` resource in any other file is not used as
    the manifest. Resource IDs are unique across the application, compared as

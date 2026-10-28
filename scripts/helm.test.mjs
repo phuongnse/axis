@@ -34,22 +34,62 @@ function find(output, kind, name) {
 }
 
 describe('the Axis Helm chart', () => {
-  test('both hosts have liveness and readiness probes, the worker on its own address', () => {
+  test('both hosts have liveness and readiness probes, the server over HTTPS and the worker on its own address', () => {
     const output = renderOk()
     const server = find(output, 'Deployment', 'axis-server')
     const worker = find(output, 'Deployment', 'axis-worker')
 
-    for (const [document, port] of [
-      [server, 'http'],
-      [worker, 'health'],
+    for (const [document, port, scheme] of [
+      [server, 'https', '\\s+scheme: HTTPS'],
+      [worker, 'health', ''],
     ]) {
-      assert.match(document, new RegExp(`livenessProbe:\\n\\s+httpGet:\\n\\s+path: /health/live\\n\\s+port: ${port}\\n`))
-      assert.match(document, new RegExp(`readinessProbe:\\n\\s+httpGet:\\n\\s+path: /health/ready\\n\\s+port: ${port}\\n`))
+      for (const [probe, path] of [
+        ['startupProbe', 'live'],
+        ['livenessProbe', 'live'],
+        ['readinessProbe', 'ready'],
+      ]) {
+        assert.match(document, new RegExp(`${probe}:\\n\\s+httpGet:\\n\\s+path: /health/${path}\\n\\s+port: ${port}\\n${scheme}`))
+      }
     }
-    assert.match(server, /- name: http\n\s+containerPort: 8080/)
+    assert.match(server, /- name: https\n\s+containerPort: 8443/)
+    assert.doesNotMatch(server, /containerPort: 8080|port: http\n/)
     assert.match(worker, /- name: health\n\s+containerPort: 5208/)
+    assert.doesNotMatch(worker, /scheme:/)
     assert.match(worker, /- name: Health__Urls\n\s+value: http:\/\/0\.0\.0\.0:5208\n/)
     assert.doesNotMatch(server, /Health__Urls/)
+  })
+
+  test('the server listens on HTTPS only, with the certificate of its TLS Secret, and no other host does', () => {
+    const output = renderOk()
+    const server = find(output, 'Deployment', 'axis-server')
+    assert.match(server, /- name: Kestrel__Endpoints__Https__Url\n\s+value: https:\/\/\+:8443\n/)
+    assert.match(server, /- name: Kestrel__Endpoints__Https__Certificate__Path\n\s+value: \/server-tls\/tls\.crt\n/)
+    assert.match(server, /- name: Kestrel__Endpoints__Https__Certificate__KeyPath\n\s+value: \/server-tls\/tls\.key\n/)
+    assert.doesNotMatch(server, /Kestrel__Endpoints__Http__|ASPNETCORE_URLS|ASPNETCORE_HTTP_PORTS/)
+    assert.match(server, /- name: server-tls\n\s+mountPath: \/server-tls\n\s+readOnly: true\n/)
+    assert.match(
+      server,
+      /- name: server-tls\n\s+secret:\n\s+secretName: "axis-server-tls"\n(\s+#.*\n)?\s+defaultMode: 292\n\s+items:\n\s+- key: tls\.crt\n\s+path: tls\.crt\n\s+- key: tls\.key\n\s+path: tls\.key\n/,
+    )
+    for (const [kind, name] of [
+      ['Deployment', 'axis-worker'],
+      ['Deployment', 'axis-publisher'],
+      ['Job', 'axis-migrate'],
+    ]) {
+      assert.doesNotMatch(find(output, kind, name), /server-tls|Kestrel__|axis-server-tls/)
+    }
+  })
+
+  test('the server Service is port 443 named https and targets the https port', () => {
+    const service = find(renderOk(), 'Service', 'axis-server')
+    assert.match(service, /ports:\n\s+- name: https\n\s+port: 443\n\s+targetPort: https\n/)
+    assert.doesNotMatch(service, /name: http\n/)
+  })
+
+  test('a missing server certificate reference fails and names it', () => {
+    const result = render('--set', 'secrets.serverCertificate.name=')
+    assert.notEqual(result.status, 0)
+    assert.match(result.stderr, /secrets\.serverCertificate\.name/)
   })
 
   test('a pre-upgrade Job runs migrate with the admin image', () => {

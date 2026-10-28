@@ -56,7 +56,10 @@ A `role` resource declares a role that users can hold:
   usual resource name rule refuses. With one lower-case form, letter case
   never matters.
 - **Claim values.** A role matches a roles claim value exactly. A claim value
-  that names no declared role is ignored.
+  that names no declared role is ignored. _(planned for M17)_ This becomes the
+  default of an identity provider's `roles` mapping, which may map other claim
+  values, and the users page gives roles too, see
+  [identity provider resource](identity-provider.md#identity-provider-resource).
 - **Label.** The `label` is required. Its text key joins the `AXC0028`
   check.
 - **Schema.** A name in another form, or a missing `label`, is `AXC0004`.

@@ -34,6 +34,13 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           env:
             {{- include "axis.hostEnv" . | nindent 12 }}
+            # HTTPS only: a Kestrel endpoint list replaces the plain HTTP port of the image.
+            - name: Kestrel__Endpoints__Https__Url
+              value: https://+:8443
+            - name: Kestrel__Endpoints__Https__Certificate__Path
+              value: /server-tls/tls.crt
+            - name: Kestrel__Endpoints__Https__Certificate__KeyPath
+              value: /server-tls/tls.key
             {{- range $i, $folder := .Values.studio.folders }}
             - name: Studio__Folders__{{ $i }}
               value: {{ printf "/studio/%s" $folder | quote }}
@@ -59,9 +66,9 @@ spec:
               value: {{ $network | quote }}
             {{- end }}
           ports:
-            - name: http
-              containerPort: 8080
-          {{- include "axis.probes" "http" | nindent 10 }}
+            - name: https
+              containerPort: 8443
+          {{- include "axis.probes" "https" | nindent 10 }}
           securityContext:
             {{- include "axis.containerSecurityContext" . | nindent 12 }}
           {{- with .Values.server.resources }}
@@ -70,12 +77,25 @@ spec:
           {{- end }}
           volumeMounts:
             {{- include "axis.volumeMounts" . | nindent 12 }}
+            - name: server-tls
+              mountPath: /server-tls
+              readOnly: true
             {{- if .Values.studio.folders }}
             - name: studio
               mountPath: /studio
             {{- end }}
       volumes:
         {{- include "axis.volumes" (dict "root" . "entries" (list "platformConnection" "platformSchemaConnection" "platformSecretKey")) | nindent 8 }}
+        - name: server-tls
+          secret:
+            secretName: {{ required "secrets.serverCertificate.name is required: the Kubernetes TLS Secret (tls.crt, tls.key) of the server's HTTPS endpoint" .Values.secrets.serverCertificate.name | quote }}
+            # Readable by the non-root user of the image.
+            defaultMode: 292
+            items:
+              - key: tls.crt
+                path: tls.crt
+              - key: tls.key
+                path: tls.key
         {{- if .Values.studio.folders }}
         - name: studio
           {{- toYaml .Values.studio.persistence | nindent 10 }}
