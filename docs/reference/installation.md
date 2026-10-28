@@ -113,6 +113,44 @@ Read the rules of each setting in
 - **The worker needs no schema connection** of any kind and gets no
   `ConnectionStrings:PlatformSchema`.
 
+## Outbound connections
+
+Every connection that the server and the worker open, with the setting that
+names its address. The TLS rule of each is under [TLS](#tls).
+
+| Host | Destination | Named by | TLS |
+| --- | --- | --- | --- |
+| server, worker | The platform database | `ConnectionStrings:Platform`. The server also uses `ConnectionStrings:PlatformSchema`, only at start | [PostgreSQL](#tls) |
+| server, worker | Each tenant's database | The [tenant directory](../architecture.md#tenant-directory), with the platform connection's TLS settings | [PostgreSQL](#tls) |
+| server | Each tenant's identity provider: discovery, signing keys and the token endpoint, with DPoP and pushed authorization requests under `fapi2` | The tenant's OIDC `Authority` in the tenant directory | [Identity provider](#tls) |
+| server, worker | The telemetry collector | `OTEL_EXPORTER_OTLP_*`, see [telemetry export](host-settings.md#telemetry-export) | [Telemetry export](#tls) |
+| worker | A connector's service | The `url` binding that the connector names as its `baseUrl`, see [deployment bindings](integration-resources.md#deployment-bindings) | [URL bindings](#tls) |
+| worker | A package operation's service | A `url` binding that the operation declares in its `capabilities` | [URL bindings](#tls) |
+| worker | The mail server | `Email:Smtp:Host`, or the tenant's email settings, see [notifications](notifications.md) | [Mail](#tls) |
+
+The admin host and the publisher connect to PostgreSQL only: the admin host
+with `Admin:ConnectionString` and `ConnectionStrings:PlatformSchema`, and the
+publisher also with `Scenarios:ServerConnectionString`. Neither calls an
+HTTP address.
+
+- **The allowlist.** Every address comes from an operator setting or from a
+  deployment binding. The operator sets both, and a release holds only binding
+  names, never an address. So the settings and the bindings are the allowlist
+  of the server and the worker.
+- **No user names an address.** No user, author or API caller can give an
+  address in a request, a form, a release or a record. A connector or a package
+  operation can reach only the host of the binding it names.
+- **No redirects.** A connector call never follows one. A `3xx` fails the call,
+  see [call outcomes](process-execution.md#call-outcomes).
+- **No network rule in the examples.** The Compose example and the Helm chart
+  set no egress rule. An operator may add one that allows only the destinations
+  of this table.
+- **Extension packages are trusted code.** A package runs in the worker's
+  process, so installing one means trusting its code. The `url` binding limits
+  the client that Axis hands to it, not the package's own code.
+- **Planned.** An OAuth2 `tokenUrl` and an outbound webhook _(planned for M18)_
+  will name a `url` binding too, and join this table.
+
 ## On premises
 
 This installs Axis on one machine with Docker Compose. PostgreSQL and the OIDC

@@ -45,7 +45,10 @@ before(() => {
 
 after(() => rmSync(stubs, { recursive: true, force: true }))
 
-function scan({ dotnet = 'dotnet-clean.json', npm = 'npm-clean.json', ...env } = {}) {
+// The accepted-list fixtures count their days back from this date.
+const today = '2026-10-28'
+
+function scan({ dotnet = 'dotnet-clean.json', npm = 'npm-clean.json', accepted, ...env } = {}) {
   return spawnSync('bash', [script], {
     encoding: 'utf8',
     env: {
@@ -54,6 +57,8 @@ function scan({ dotnet = 'dotnet-clean.json', npm = 'npm-clean.json', ...env } =
       NPM: path.join(stubs, 'npm'),
       DOTNET_FIXTURE: `${fixtures}${dotnet}`,
       NPM_FIXTURE: `${fixtures}${npm}`,
+      SCAN_TODAY: today,
+      SCAN_ACCEPTED: accepted ? `${fixtures}${accepted}` : path.join(path.dirname(script), 'scan-accepted.json'),
       ...env,
     },
   })
@@ -129,5 +134,62 @@ describe('scripts/scan.sh', () => {
     assert.equal(result.status, 1)
     assert.match(result.stdout, /GHSA-5crp-9r3c-p9vr/)
     assert.match(result.stderr, /Scan failed, npm web/)
+  })
+
+  test('passes a high finding that was accepted 20 days ago and prints its deadline', () => {
+    const result = scan({ dotnet: 'dotnet-high.json', accepted: 'accepted-high-20-days.json' })
+    assert.equal(result.status, 0, result.stdout + result.stderr)
+    assert.match(result.stdout, /GHSA-5crp-9r3c-p9vr.*accepted until 2026-11-07/)
+    assert.match(result.stdout, /1 high or critical, 1 accepted within their time frame/)
+  })
+
+  test('fails a high finding that was accepted 31 days ago and prints the missed deadline', () => {
+    const result = scan({ dotnet: 'dotnet-high.json', accepted: 'accepted-high-31-days.json' })
+    assert.equal(result.status, 1)
+    assert.match(result.stdout, /GHSA-5crp-9r3c-p9vr.*past its time frame since 2026-10-27/)
+  })
+
+  test('fails a critical finding that was accepted 8 days ago', () => {
+    const result = scan({
+      npm: 'npm-clean.json',
+      NPM_FIXTURE_e2e: `${fixtures}npm-critical.json`,
+      accepted: 'accepted-critical-8-days.json',
+    })
+    assert.equal(result.status, 1)
+    assert.match(result.stdout, /GHSA-xvch-5gv4-984h.*past its time frame since 2026-10-27/)
+  })
+
+  test('passes a critical finding that was accepted 3 days ago', () => {
+    const result = scan({
+      npm: 'npm-clean.json',
+      NPM_FIXTURE_e2e: `${fixtures}npm-critical.json`,
+      accepted: 'accepted-critical-3-days.json',
+    })
+    assert.equal(result.status, 0, result.stdout + result.stderr)
+    assert.match(result.stdout, /GHSA-xvch-5gv4-984h.*accepted until 2026-11-01/)
+  })
+
+  test('does not let an accepted entry cover another package or advisory', () => {
+    const result = scan({ dotnet: 'dotnet-high.json', accepted: 'accepted-critical-3-days.json' })
+    assert.equal(result.status, 1)
+    assert.doesNotMatch(result.stdout, /accepted until/)
+  })
+
+  test('fails when an accepted entry has no date and names the entry', () => {
+    const result = scan({ dotnet: 'dotnet-high.json', accepted: 'accepted-missing-date.json' })
+    assert.equal(result.status, 1)
+    assert.match(result.stderr, /accepted list: GHSA-5crp-9r3c-p9vr Newtonsoft\.Json: found must be a date/)
+  })
+
+  test('fails when an accepted entry has an invalid date and names the entry', () => {
+    const result = scan({ dotnet: 'dotnet-high.json', accepted: 'accepted-invalid-date.json' })
+    assert.equal(result.status, 1)
+    assert.match(result.stderr, /accepted list: GHSA-5crp-9r3c-p9vr Newtonsoft\.Json: found must be a date/)
+  })
+
+  test('fails when the accepted list cannot be read', () => {
+    const result = scan({ accepted: 'missing.json' })
+    assert.equal(result.status, 1)
+    assert.match(result.stderr, /Scan failed, accepted list/)
   })
 })
