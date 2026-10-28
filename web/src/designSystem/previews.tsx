@@ -10,6 +10,8 @@ import { TableWidget } from '../platform/TableWidget'
 import { TaskInboxWidget } from '../platform/TaskInboxWidget'
 import { WidgetTree } from '../platform/WidgetTree'
 import { FieldPreview } from './FieldPreview'
+import { IdentitySignIn, type BrokeredProvider, type IdentityStep } from '../identity/IdentitySignIn'
+import { identityMessages } from '../identity/messages'
 import { FormPageShellPreview, PlatformShellPreview, SessionEndedPreview, SiteShellPreview } from './ShellPreview'
 import type { PreviewSession } from './shellFixtures'
 import { SubmittedOnMount } from './SubmittedOnMount'
@@ -133,6 +135,17 @@ const childCollectionStates: readonly PreviewState[] = [
   { caption: 'Empty', draw: () => <FieldPreview type="child-collection" record={emptyLinesRecord} /> },
 ]
 
+const brokers: BrokeredProvider[] = [
+  { alias: 'entra', name: 'Microsoft' },
+  { alias: 'okta', name: 'Okta' },
+]
+
+function identityPage(step: IdentityStep, providers: readonly BrokeredProvider[] = brokers) {
+  return () => (
+    <IdentitySignIn step={step} messages={identityMessages.en} organization="Contoso Ltd." providers={providers} />
+  )
+}
+
 /** What a preview draws: its states, each the shared widget component over fixture metadata. */
 export const previews: Record<string, readonly PreviewState[]> = {
   table: withAndWithoutData(
@@ -204,6 +217,12 @@ export const previews: Record<string, readonly PreviewState[]> = {
     { caption: 'Signed out', draw: () => <PlatformShellPreview />, at: '/' },
     { caption: 'Sign-in refused', draw: () => <PlatformShellPreview />, at: '/?signIn=failed' },
     { caption: 'Session ended', draw: () => <SessionEndedPreview />, at: `/${sitePath}/requests` },
+  ],
+  identitySignIn: [
+    { caption: 'Sign in', draw: identityPage('signIn') },
+    { caption: 'Wrong password', draw: identityPage('invalid') },
+    { caption: 'Organization sign-in only', draw: identityPage('organizationOnly', [brokers[0]]) },
+    { caption: 'Two-step verification', draw: identityPage('otp') },
   ],
 }
 
