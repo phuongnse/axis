@@ -75,7 +75,7 @@ test.describe('the journey tenant publishes a Studio application', () => {
 
 test('a requester has a journey session and cannot create an application there', async ({ page }) => {
   // useJourneySession checks that GET /api/me on the journey host answers as the requester.
-  await useJourneySession(page, 'anna')
+  await useJourneySession(page, 'requester')
   const response = await page.request.post(`${journeyURL}/api/studio/apps`, {
     headers: csrfHeaders,
     data: { name: 'Denied' },

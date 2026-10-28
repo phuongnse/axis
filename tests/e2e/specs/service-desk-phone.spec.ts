@@ -4,13 +4,13 @@ import { noSideways, phoneWidth } from '../phone'
 import { pickOption } from '../select'
 import { sessionFile, useSession } from '../sessions'
 
-// At phone width, anna creates a draft ticket and opens it from the folded row actions, and linh sees the Dashboard.
-test.use({ storageState: sessionFile('anna'), viewport: { width: phoneWidth, height: 812 } })
+// At phone width, requester creates a draft ticket and opens it from the folded row actions, and linh sees the Dashboard.
+test.use({ storageState: sessionFile('requester'), viewport: { width: phoneWidth, height: 812 } })
 
 const appPath = '/api/apps/ServiceDesk'
 const recordsPath = `${appPath}/entities/Ticket/records`
 
-test('anna creates a draft ticket at phone width and opens it from the folded row actions', async ({ page }) => {
+test('requester creates a draft ticket at phone width and opens it from the folded row actions', async ({ page }) => {
   const title = `Zz Phone ${Date.now()}-${test.info().retry}`
   await page.goto('/service-desk/mytickets?pageSize=100')
   await expect(page.getByRole('table').first()).toBeVisible()

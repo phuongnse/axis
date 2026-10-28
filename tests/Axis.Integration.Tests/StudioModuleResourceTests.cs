@@ -47,7 +47,7 @@ public sealed class StudioModuleResourceTests : IAsyncLifetime
             builder.UseSetting("Studio:AuthorRole", "author");
             builder.UseTestAuthentication(
                 new TestIdentity("hoa", "Hoa Author", "author"),
-                new TestIdentity("anna", "Anna Employee", "employee"));
+                new TestIdentity("requester", "Requester User", "employee"));
         });
     }
 
@@ -84,7 +84,7 @@ public sealed class StudioModuleResourceTests : IAsyncLifetime
         using var anonymousResponse = await anonymous.SendAsync(Request("LeaveRequests", "departments", DepartmentId), CancellationToken);
         Assert.Equal(HttpStatusCode.Unauthorized, anonymousResponse.StatusCode);
 
-        using var employee = _factory.CreateClient().SignedInAs("anna");
+        using var employee = _factory.CreateClient().SignedInAs("requester");
         using var employeeResponse = await employee.SendAsync(Request("LeaveRequests", "departments", DepartmentId), CancellationToken);
         Assert.Equal(HttpStatusCode.Forbidden, employeeResponse.StatusCode);
     }

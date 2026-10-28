@@ -14,7 +14,7 @@ for (const { name, width } of [
     await page.goto('/')
     const main = page.getByRole('main')
     await main.getByRole('button', { name: 'Sign in', exact: true }).click()
-    await page.locator('#username').fill('anna')
+    await page.locator('#username').fill('requester')
     await page.locator('#password').fill('axis')
     await page.locator('#kc-login').click()
 

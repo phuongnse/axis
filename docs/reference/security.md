@@ -377,7 +377,7 @@ sample reuses a user that holds the role it needs before it adds a user.
 
 | User            | Roles                   | Used by                                                                                                                                       |
 | --------------- | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| `anna`          | `employee`, `requester` | Purchase request, leave request and service desk samples; E2E journeys, request approval journey. Has the locale `vi`, the only user with one |
+| `requester`     | `employee`, `requester` | Purchase request, leave request and service desk samples; E2E journeys, request approval journey. Has the locale `vi`, the only user with one |
 | `lan`           | `employee`              | Purchase request, leave request and asset management samples (holds assets); E2E journeys                                                     |
 | `binh`          | `department-manager`    | Purchase request and leave request samples; E2E journeys                                                                                      |
 | `chau`          | `department-manager`    | Purchase request and leave request samples; E2E journeys                                                                                      |

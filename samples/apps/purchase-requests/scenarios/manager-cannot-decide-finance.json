@@ -5,14 +5,14 @@
   "formatVersion": 1,
   "now": "2026-10-01T09:00:00Z",
   "users": {
-    "anna": ["employee"],
+    "requester": ["employee"],
     "binh": ["department-manager"]
   },
   "steps": [
     {
       "type": "createRecord",
       "entity": "PurchaseRequest",
-      "as": "anna",
+      "as": "requester",
       "save": "request",
       "values": {
         "title": "Laptops",
@@ -23,7 +23,7 @@
         "lineItems": [{ "description": "Laptop", "quantity": 3, "unitPrice": 5000 }]
       }
     },
-    { "type": "startProcess", "process": "PurchaseRequestApproval", "record": "request", "as": "anna" },
+    { "type": "startProcess", "process": "PurchaseRequestApproval", "record": "request", "as": "requester" },
     { "type": "completeTask", "record": "request", "step": "managerApproval", "outcome": "approve", "as": "binh" },
     {
       "type": "completeTask",

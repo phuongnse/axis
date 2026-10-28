@@ -11,7 +11,7 @@ namespace Axis.Integration.Tests;
 
 /// <summary>
 /// Marking replaced and removed files <c>deleted</c>, and keeping a file's name and id out of audit records, on the
-/// FilesApp fixture in tenant A. <c>anna</c> may create and update claims but not delete them, so a delete is a call
+/// FilesApp fixture in tenant A. <c>requester</c> may create and update claims but not delete them, so a delete is a call
 /// of the command. The <c>receipt</c> field of a claim is <c>sensitive</c>.
 /// </summary>
 public sealed class FileCleanUpTests(RecordApiFixture fixture) : IClassFixture<RecordApiFixture>
@@ -109,16 +109,16 @@ public sealed class FileCleanUpTests(RecordApiFixture fixture) : IClassFixture<R
             version,
             values,
             rows,
-            uploader: "anna",
+            uploader: "requester",
             cancellationToken: CancellationToken);
     }
 
     [Fact]
     public async Task An_update_that_replaces_the_receipt_marks_the_old_file_deleted_in_its_transaction()
     {
-        using var anna = fixture.CreateClient().SignedInAs("anna");
-        var (claim, old, first, second) = await ClaimWithFilesAsync(anna);
-        var replacement = await UploadAsync(anna, Receipt, fileName: "new.pdf");
+        using var requester = fixture.CreateClient().SignedInAs("requester");
+        var (claim, old, first, second) = await ClaimWithFilesAsync(requester);
+        var replacement = await UploadAsync(requester, Receipt, fileName: "new.pdf");
         var model = Model();
 
         await using var connection = await OpenAsync();
@@ -138,8 +138,8 @@ public sealed class FileCleanUpTests(RecordApiFixture fixture) : IClassFixture<R
     [Fact]
     public async Task An_update_that_clears_the_receipt_marks_the_old_file_deleted_in_its_transaction()
     {
-        using var anna = fixture.CreateClient().SignedInAs("anna");
-        var (claim, old, first, _) = await ClaimWithFilesAsync(anna);
+        using var requester = fixture.CreateClient().SignedInAs("requester");
+        var (claim, old, first, _) = await ClaimWithFilesAsync(requester);
         var model = Model();
 
         await using var connection = await OpenAsync();
@@ -155,8 +155,8 @@ public sealed class FileCleanUpTests(RecordApiFixture fixture) : IClassFixture<R
     [Fact]
     public async Task An_update_that_drops_a_child_row_marks_only_its_file_deleted()
     {
-        using var anna = fixture.CreateClient().SignedInAs("anna");
-        var (claim, receipt, first, second) = await ClaimWithFilesAsync(anna);
+        using var requester = fixture.CreateClient().SignedInAs("requester");
+        var (claim, receipt, first, second) = await ClaimWithFilesAsync(requester);
         var model = Model();
 
         await using var connection = await OpenAsync();
@@ -185,11 +185,11 @@ public sealed class FileCleanUpTests(RecordApiFixture fixture) : IClassFixture<R
     [Fact]
     public async Task A_committed_update_through_the_api_leaves_the_replaced_file_deleted()
     {
-        using var anna = fixture.CreateClient().SignedInAs("anna");
-        var (claim, old, first, second) = await ClaimWithFilesAsync(anna);
-        var replacement = await UploadAsync(anna, Receipt, fileName: "new.pdf");
+        using var requester = fixture.CreateClient().SignedInAs("requester");
+        var (claim, old, first, second) = await ClaimWithFilesAsync(requester);
+        var replacement = await UploadAsync(requester, Receipt, fileName: "new.pdf");
 
-        using var response = await UpdateAsync(anna, claim, 2, $$"""{ "receipt": "{{replacement:D}}" }""");
+        using var response = await UpdateAsync(requester, claim, 2, $$"""{ "receipt": "{{replacement:D}}" }""");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         Assert.Equal("deleted", await StateAsync(old));
@@ -201,9 +201,9 @@ public sealed class FileCleanUpTests(RecordApiFixture fixture) : IClassFixture<R
     [Fact]
     public async Task A_record_delete_marks_the_root_and_child_row_files_deleted_in_its_transaction()
     {
-        using var anna = fixture.CreateClient().SignedInAs("anna");
-        var (claim, receipt, first, second) = await ClaimWithFilesAsync(anna);
-        var other = await ClaimWithFilesAsync(anna);
+        using var requester = fixture.CreateClient().SignedInAs("requester");
+        var (claim, receipt, first, second) = await ClaimWithFilesAsync(requester);
+        var other = await ClaimWithFilesAsync(requester);
         var model = Model();
 
         await using var connection = await OpenAsync();
@@ -227,11 +227,11 @@ public sealed class FileCleanUpTests(RecordApiFixture fixture) : IClassFixture<R
     [Fact]
     public async Task An_update_refused_for_a_stale_version_leaves_the_old_file_attached_and_the_new_upload_pending()
     {
-        using var anna = fixture.CreateClient().SignedInAs("anna");
-        var (claim, old, _, _) = await ClaimWithFilesAsync(anna);
-        var replacement = await UploadAsync(anna, Receipt, fileName: "new.pdf");
+        using var requester = fixture.CreateClient().SignedInAs("requester");
+        var (claim, old, _, _) = await ClaimWithFilesAsync(requester);
+        var replacement = await UploadAsync(requester, Receipt, fileName: "new.pdf");
 
-        using var response = await UpdateAsync(anna, claim, 1, $$"""{ "receipt": "{{replacement:D}}" }""");
+        using var response = await UpdateAsync(requester, claim, 1, $$"""{ "receipt": "{{replacement:D}}" }""");
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
         Assert.Equal("attached", await StateAsync(old));
@@ -241,15 +241,15 @@ public sealed class FileCleanUpTests(RecordApiFixture fixture) : IClassFixture<R
     [Fact]
     public async Task A_file_marked_deleted_cannot_be_sent_again()
     {
-        using var anna = fixture.CreateClient().SignedInAs("anna");
-        var (claim, old, _, _) = await ClaimWithFilesAsync(anna);
-        var replacement = await UploadAsync(anna, Receipt, fileName: "new.pdf");
-        using (var replaced = await UpdateAsync(anna, claim, 2, $$"""{ "receipt": "{{replacement:D}}" }"""))
+        using var requester = fixture.CreateClient().SignedInAs("requester");
+        var (claim, old, _, _) = await ClaimWithFilesAsync(requester);
+        var replacement = await UploadAsync(requester, Receipt, fileName: "new.pdf");
+        using (var replaced = await UpdateAsync(requester, claim, 2, $$"""{ "receipt": "{{replacement:D}}" }"""))
         {
             Assert.Equal(HttpStatusCode.OK, replaced.StatusCode);
         }
 
-        using var response = await UpdateAsync(anna, claim, 3, $$"""{ "receipt": "{{old:D}}" }""");
+        using var response = await UpdateAsync(requester, claim, 3, $$"""{ "receipt": "{{old:D}}" }""");
 
         using var problem = await ReadProblemAsync(response, HttpStatusCode.BadRequest);
         Assert.Equal("/values/receipt", Assert.Single(problem.RootElement.GetProperty("errors").EnumerateObject()).Name);
@@ -259,11 +259,11 @@ public sealed class FileCleanUpTests(RecordApiFixture fixture) : IClassFixture<R
     [Fact]
     public async Task The_audit_record_of_a_sensitive_receipt_change_names_the_field_and_neither_the_file_id_nor_its_name()
     {
-        using var anna = fixture.CreateClient().SignedInAs("anna");
-        var claim = await CreateClaimAsync(anna);
-        var receipt = await UploadAsync(anna, Receipt, fileName: "scan-417.pdf");
+        using var requester = fixture.CreateClient().SignedInAs("requester");
+        var claim = await CreateClaimAsync(requester);
+        var receipt = await UploadAsync(requester, Receipt, fileName: "scan-417.pdf");
 
-        using var response = await UpdateAsync(anna, claim, 1, $$"""{ "receipt": "{{receipt:D}}" }""");
+        using var response = await UpdateAsync(requester, claim, 1, $$"""{ "receipt": "{{receipt:D}}" }""");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var updated = Assert.Single(await fixture.AuditRecordsAsync(TenantA, claim), record => record.Action == "record.updated");

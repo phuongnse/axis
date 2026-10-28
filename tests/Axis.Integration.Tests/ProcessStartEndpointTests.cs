@@ -18,7 +18,7 @@ public sealed class ProcessStartEndpointTests(ProcessStartFixture fixture) : ICl
     {
         var subject = await fixture.InsertRequestAsync(status: null);
         var activeRelease = await fixture.ActiveReleaseIdAsync();
-        using var client = fixture.CreateClient().SignedInAs("anna");
+        using var client = fixture.CreateClient().SignedInAs("requester");
 
         using var response = await StartAsync(subject, client: client);
 
@@ -49,7 +49,7 @@ public sealed class ProcessStartEndpointTests(ProcessStartFixture fixture) : ICl
         Assert.Equal(1L, await fixture.CountAsync(
             """
             SELECT count(*) FROM axis.audit_records
-            WHERE process_instance_id = @id AND record_id = @subject AND actor = 'anna' AND actor_name = 'Anna Employee'
+            WHERE process_instance_id = @id AND record_id = @subject AND actor = 'requester' AND actor_name = 'Requester User'
               AND action = 'process.started'
               AND details = jsonb_build_object('processId', @process::text, 'releaseId', @release::text)
             """,
@@ -120,7 +120,7 @@ public sealed class ProcessStartEndpointTests(ProcessStartFixture fixture) : ICl
         Assert.Equal(1L, await CountInstancesAsync(subject));
         Assert.Equal(1L, await CountWorkItemsAsync(subject));
         Assert.Equal(1L, await fixture.CountAsync(
-            "SELECT count(*) FROM axis.audit_records WHERE process_instance_id = @id AND actor = 'anna' AND actor_name = 'Anna Employee'",
+            "SELECT count(*) FROM axis.audit_records WHERE process_instance_id = @id AND actor = 'requester' AND actor_name = 'Requester User'",
             ("id", instance)));
         Assert.Equal(1L, await fixture.CountAsync("SELECT count(*) FROM axis.audit_records WHERE record_id = @subject", ("subject", subject)));
         Assert.Equal(1L, await CountReceiptsAsync(subject));
@@ -257,9 +257,9 @@ public sealed class ProcessStartEndpointTests(ProcessStartFixture fixture) : ICl
         var process = NightlyJob();
         await fixture.EndInstancesAsync(process.Id);
         var activeRelease = await fixture.ActiveReleaseIdAsync();
-        using var anna = fixture.CreateClient().SignedInAs("anna");
+        using var requester = fixture.CreateClient().SignedInAs("requester");
 
-        using var response = await StartJobAsync("""{ "parameters": { "days": 31 } }""", client: anna);
+        using var response = await StartJobAsync("""{ "parameters": { "days": 31 } }""", client: requester);
 
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         using var body = await ReadJsonAsync(response);
@@ -283,7 +283,7 @@ public sealed class ProcessStartEndpointTests(ProcessStartFixture fixture) : ICl
             "SELECT count(*) FROM axis.process_work_items WHERE process_instance_id = @id AND kind = 'process.step'",
             ("id", id)));
         Assert.Equal(1L, await fixture.CountAsync(
-            "SELECT count(*) FROM axis.audit_records WHERE process_instance_id = @id AND actor = 'anna' AND action = 'process.started'",
+            "SELECT count(*) FROM axis.audit_records WHERE process_instance_id = @id AND actor = 'requester' AND action = 'process.started'",
             ("id", id)));
     }
 
@@ -402,7 +402,7 @@ public sealed class ProcessStartEndpointTests(ProcessStartFixture fixture) : ICl
     [Fact]
     public async Task A_start_on_a_record_outside_the_users_read_filters_is_the_400_of_an_unknown_record_and_stores_nothing()
     {
-        // Anna reads only the requests whose title starts with "Request".
+        // The requester reads only the requests whose title starts with "Request".
         var subject = await fixture.InsertRequestAsync(status: null, title: "Private");
 
         using var response = await StartAsync(subject, key: Guid.NewGuid().ToString());

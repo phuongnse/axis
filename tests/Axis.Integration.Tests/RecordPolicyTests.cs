@@ -116,7 +116,7 @@ public sealed class RecordPolicyTests(RecordApiFixture fixture) : IClassFixture<
         await AssertProblemAsync(list, HttpStatusCode.Forbidden, ForbiddenTitle);
     }
 
-    // dora holds a read grant on ActiveItems and none on Item, its root entity. anna holds both.
+    // dora holds a read grant on ActiveItems and none on Item, its root entity. requester holds both.
     [Fact]
     public async Task A_data_source_grant_without_a_read_grant_on_its_root_entity_is_403()
     {

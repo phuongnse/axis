@@ -4,8 +4,8 @@ import { csrfHeaders } from '../csrf'
 import { waitForDialog } from '../dialogs'
 import { sessionFile, useSession } from '../sessions'
 
-// The record and process APIs need a session with a grant, so this journey starts signed in as the employee anna.
-test.use({ storageState: sessionFile('anna') })
+// The record and process APIs need a session with a grant, so this journey starts signed in as the employee requester.
+test.use({ storageState: sessionFile('requester') })
 
 const notesPath = '/api/apps/E2eApp/entities/Note/records'
 const notificationsPath = '/api/apps/E2eApp/notifications'

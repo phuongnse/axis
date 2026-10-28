@@ -107,7 +107,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     [Fact]
     public async Task Me_answers_studio_only_for_an_author_while_Studio_is_on()
     {
-        foreach (var (user, role, expected) in new[] { ("hoa", "author", true), ("anna", "author", false), ("hoa", "", false) })
+        foreach (var (user, role, expected) in new[] { ("hoa", "author", true), ("requester", "author", false), ("hoa", "", false) })
         {
             await using var factory = CreateFactory(authorRole: role);
             using var client = factory.CreateClient().SignedInAs(user);
@@ -124,7 +124,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     [Fact]
     public async Task Me_answers_studioTest_only_for_an_author_while_Studio_Tests_is_on()
     {
-        foreach (var (user, tests, expected) in new[] { ("hoa", true, true), ("hoa", false, false), ("anna", true, false) })
+        foreach (var (user, tests, expected) in new[] { ("hoa", true, true), ("hoa", false, false), ("requester", true, false) })
         {
             await using var factory = CreateFactory(tests: tests);
             using var client = factory.CreateClient().SignedInAs(user);
@@ -144,7 +144,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
         {
             ("hoa", Path.Combine(_root, "created"), true),
             ("hoa", null, false),
-            ("anna", Path.Combine(_root, "created"), false),
+            ("requester", Path.Combine(_root, "created"), false),
         })
         {
             await using var factory = CreateFactory(applicationsPath: applicationsPath);
@@ -223,10 +223,10 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     public async Task User_without_the_author_role_gets_403_and_no_session_gets_401(string url)
     {
         await using var factory = CreateFactory();
-        using var anna = factory.CreateClient().SignedInAs("anna");
+        using var requester = factory.CreateClient().SignedInAs("requester");
         using var anonymous = factory.CreateClient();
 
-        var forbidden = await anna.GetAsync(new Uri(url, UriKind.Relative), CancellationToken);
+        var forbidden = await requester.GetAsync(new Uri(url, UriKind.Relative), CancellationToken);
         var unauthorized = await anonymous.GetAsync(new Uri(url, UriKind.Relative), CancellationToken);
 
         Assert.Equal(HttpStatusCode.Forbidden, forbidden.StatusCode);
@@ -633,7 +633,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     {
         await using var factory = CreateFactory();
         using var hoa = factory.CreateClient().SignedInAs("hoa");
-        using var anna = factory.CreateClient().SignedInAs("anna");
+        using var requester = factory.CreateClient().SignedInAs("requester");
         using var anonymous = factory.CreateClient();
         var path = Path.Combine(Folder, EntityFile);
         var before = File.ReadAllBytes(path);
@@ -641,7 +641,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
         var version = Sha256(path);
 
         var noCsrf = await Patch(hoa, patch, version, csrf: false);
-        var forbidden = await Patch(anna, patch, version);
+        var forbidden = await Patch(requester, patch, version);
         var unauthorized = await Patch(anonymous, patch, version);
 
         Assert.Equal(HttpStatusCode.Forbidden, noCsrf.StatusCode);
@@ -864,7 +864,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     {
         await using var factory = CreateFactory();
         using var hoa = factory.CreateClient().SignedInAs("hoa");
-        using var anna = factory.CreateClient().SignedInAs("anna");
+        using var requester = factory.CreateClient().SignedInAs("requester");
         using var anonymous = factory.CreateClient();
         var before = Snapshot();
         var body = $$"""{"id":"{{Guid.NewGuid()}}","kind":"entity","name":"Fresh"}""";
@@ -874,13 +874,13 @@ public sealed class StudioEndpointTests : IAsyncLifetime
         var created = new[]
         {
             await Create(hoa, body, csrf: false),
-            await Create(anna, body),
+            await Create(requester, body),
             await Create(anonymous, body),
         };
         var deleted = new[]
         {
             await Delete(hoa, supplier, version, csrf: false),
-            await Delete(anna, supplier, version),
+            await Delete(requester, supplier, version),
             await Delete(anonymous, supplier, version),
         };
 
@@ -1097,7 +1097,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     {
         await using var factory = CreateFactory();
         using var hoa = factory.CreateClient().SignedInAs("hoa");
-        using var anna = factory.CreateClient().SignedInAs("anna");
+        using var requester = factory.CreateClient().SignedInAs("requester");
         using var anonymous = factory.CreateClient();
         var before = Snapshot();
         var body = $$$"""{"changes":[{"create":{"id":"{{{Guid.NewGuid()}}}","kind":"policy","name":"Fresh"}}]}""";
@@ -1105,7 +1105,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
         var responses = new[]
         {
             await Changes(hoa, body, csrf: false),
-            await Changes(anna, body),
+            await Changes(requester, body),
             await Changes(anonymous, body),
         };
 
@@ -1377,13 +1377,13 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     {
         await using var factory = CreateFactory();
         using var hoa = factory.CreateClient().SignedInAs("hoa");
-        using var anna = factory.CreateClient().SignedInAs("anna");
+        using var requester = factory.CreateClient().SignedInAs("requester");
         using var anonymous = factory.CreateClient();
         var before = TextBytes();
         const string body = """{"texts":{"en":"A","vi":"B"}}""";
 
         Assert.Equal(HttpStatusCode.Forbidden, (await PutText(hoa, body, csrf: false)).StatusCode);
-        Assert.Equal(HttpStatusCode.Forbidden, (await PutText(anna, body)).StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, (await PutText(requester, body)).StatusCode);
         Assert.Equal(HttpStatusCode.Unauthorized, (await PutText(anonymous, body)).StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await PutText(hoa, body, application: "Unknown")).StatusCode);
         Assert.Equal(before, TextBytes());
@@ -1545,7 +1545,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
             builder.UseTestOidc("default");
             builder.UseTestAuthentication(
                 new TestIdentity("hoa", "Hoa Author", "author"),
-                new TestIdentity("anna", "Anna Employee", "employee"));
+                new TestIdentity("requester", "Requester User", "employee"));
         });
 
     private static async Task<JsonDocument> GetJson(HttpClient client, string url)

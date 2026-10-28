@@ -41,7 +41,7 @@ public sealed class AdminActivateTests(PostgreSqlFixture database) : IClassFixtu
         }
 
         await using var factory = CreateFactory(scenario.Platform);
-        using var client = factory.CreateClient().SignedInAs("anna");
+        using var client = factory.CreateClient().SignedInAs("requester");
         foreach (var id in ids)
         {
             using var site = await client.SendAsync(Request(Site, Host(id)), CancellationToken);
@@ -165,7 +165,7 @@ public sealed class AdminActivateTests(PostgreSqlFixture database) : IClassFixtu
         }
 
         await using var factory = CreateFactory(scenario.Platform);
-        using var client = factory.CreateClient().SignedInAs("anna");
+        using var client = factory.CreateClient().SignedInAs("requester");
 
         using var ready = await client.GetAsync(new Uri("/health/ready", UriKind.Relative), CancellationToken);
         Assert.Equal(HttpStatusCode.OK, ready.StatusCode);

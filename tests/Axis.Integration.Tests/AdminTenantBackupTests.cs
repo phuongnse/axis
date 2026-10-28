@@ -393,7 +393,7 @@ public sealed class AdminBackupFixture : IAsyncLifetime
             builder.UseSetting("Modules:Path", SampleModules.Path);
             builder.UseSetting("ActivateOnStartup:0", Path.Combine(AppContext.BaseDirectory, "Samples", "purchase-requests"));
             builder.UseSetting("ActivateOnStartup:1", Path.Combine(AppContext.BaseDirectory, "Samples", "leave-requests"));
-            builder.UseTestAuthentication(new TestIdentity("anna", "Anna Employee", "employee"));
+            builder.UseTestAuthentication(new TestIdentity("requester", "Requester User", "employee"));
         });
 
         // Creating a client starts the server, which activates both samples and seeds them.
@@ -416,8 +416,8 @@ public sealed class AdminBackupFixture : IAsyncLifetime
         await _database.DisposeAsync();
     }
 
-    /// <summary>A new client of the server, signed in as <c>anna</c>. The caller disposes it.</summary>
-    public HttpClient CreateClient() => (_factory ?? throw new InvalidOperationException("The test host is not started.")).CreateClient().SignedInAs("anna");
+    /// <summary>A new client of the server, signed in as <c>requester</c>. The caller disposes it.</summary>
+    public HttpClient CreateClient() => (_factory ?? throw new InvalidOperationException("The test host is not started.")).CreateClient().SignedInAs("requester");
 
     /// <summary>Creates a new database on the shared server and returns the schema role's connection string to it.</summary>
     public Task<string> NewDatabaseAsync(string prefix) => _database.CreateDatabaseAsync(prefix, CancellationToken);

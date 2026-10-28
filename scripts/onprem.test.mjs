@@ -2,7 +2,7 @@
 // production images exactly as docs/reference/installation.md says. It runs against a test PostgreSQL
 // and Keycloak, creates two tenants, activates the leave request sample and checks each tenant's
 // site and sign-in, suspend and resume, an unknown host, and a publish request that the installed
-// publisher runs in each tenant. It then starts a second server replica and a TLS proxy, signs anna in
+// publisher runs in each tenant. It then starts a second server replica and a TLS proxy, signs requester in
 // through the proxy, and restarts the first replica. The servers listen on HTTPS only, with a certificate of the
 // test authority for the name servers, and the proxy trusts that authority only. With Studio on, it saves a resource through one replica,
 // reads it back through the other, and checks that a stale save answers 409. Requires Docker and openssl, and the
@@ -865,7 +865,7 @@ RETURNING id;`,
 
       // The sign-in redirect names the tenant host over https, even when the client sends its own
       // forwarded headers, which the proxy replaces.
-      const { jar: proxyJar, done } = await signInViaProxy('anna', {
+      const { jar: proxyJar, done } = await signInViaProxy('requester', {
         'x-forwarded-proto': 'http',
         'x-forwarded-host': hosts.two,
         'x-forwarded-for': '203.0.113.9',

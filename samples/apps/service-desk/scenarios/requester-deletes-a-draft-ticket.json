@@ -5,13 +5,13 @@
   "formatVersion": 1,
   "now": "2026-10-01T09:00:00Z",
   "users": {
-    "anna": ["requester"]
+    "requester": ["requester"]
   },
   "steps": [
     {
       "type": "createRecord",
       "entity": "Ticket",
-      "as": "anna",
+      "as": "requester",
       "save": "draft",
       "values": {
         "title": "Laptop will not start",
@@ -22,12 +22,12 @@
     {
       "type": "deleteRecord",
       "record": "draft",
-      "as": "anna"
+      "as": "requester"
     },
     {
       "type": "updateRecord",
       "record": "draft",
-      "as": "anna",
+      "as": "requester",
       "values": {
         "title": "x"
       },
@@ -36,7 +36,7 @@
     {
       "type": "createRecord",
       "entity": "Ticket",
-      "as": "anna",
+      "as": "requester",
       "save": "submitted",
       "values": {
         "title": "Laptop will not start",
@@ -48,12 +48,12 @@
       "type": "startProcess",
       "process": "TicketHandling",
       "record": "submitted",
-      "as": "anna"
+      "as": "requester"
     },
     {
       "type": "deleteRecord",
       "record": "submitted",
-      "as": "anna",
+      "as": "requester",
       "expect": "denied"
     }
   ]

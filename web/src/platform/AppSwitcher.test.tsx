@@ -9,9 +9,9 @@ import type { CurrentUser } from './currentUser'
 import type { SiteListItem } from './site'
 import { TextProvider } from './TextProvider'
 
-const anna: CurrentUser = {
-  id: 'anna',
-  displayName: 'Anna Employee',
+const requester: CurrentUser = {
+  id: 'requester',
+  displayName: 'Requester User',
   roles: ['employee'],
   studio: false,
   studioPublisher: false,
@@ -20,8 +20,8 @@ const anna: CurrentUser = {
   studioTest: false,
   console: false,
 }
-const hoa: CurrentUser = { ...anna, id: 'hoa', displayName: 'Hoa Author', roles: ['author'], studio: true }
-const olga: CurrentUser = { ...anna, id: 'olga', displayName: 'Olga Operator', roles: ['operator'], console: true }
+const hoa: CurrentUser = { ...requester, id: 'hoa', displayName: 'Hoa Author', roles: ['author'], studio: true }
+const olga: CurrentUser = { ...requester, id: 'olga', displayName: 'Olga Operator', roles: ['operator'], console: true }
 
 const sites: SiteListItem[] = [
   {
@@ -90,7 +90,7 @@ describe('AppSwitcher', () => {
   })
 
   it('lists the sites of an employee, with neither Studio nor the operator console', async () => {
-    stubServer(anna)
+    stubServer(requester)
     renderSwitcher()
 
     const menu = await openSwitcher()
@@ -128,7 +128,7 @@ describe('AppSwitcher', () => {
   })
 
   it('shows the site titles of the locale, and the first title when a site lacks it', async () => {
-    stubServer(anna)
+    stubServer(requester)
     renderSwitcher('vi', platformVietnamese)
 
     const menu = await openSwitcher('Chuyển đến')
@@ -154,7 +154,7 @@ describe('AppSwitcher', () => {
 
   it('renders nothing when loading the user fails', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    const fetchMock = stubServer(anna)
+    const fetchMock = stubServer(requester)
     fetchMock.mockImplementation(async () => new Response(null, { status: 500 }))
     renderSwitcher()
 

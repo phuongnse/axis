@@ -4,7 +4,7 @@ import type { Page } from "@playwright/test";
 import { journeyURL } from "./server-settings";
 
 export type SampleUser =
-  | "anna"
+  | "requester"
   | "lan"
   | "binh"
   | "chau"
@@ -20,7 +20,7 @@ export type SampleUser =
 
 /** The sample users and the roles the development realm gives them. */
 export const sampleUsers: Record<SampleUser, string[]> = {
-  anna: ["employee", "requester"],
+  requester: ["employee", "requester"],
   lan: ["employee"],
   binh: ["department-manager"],
   chau: ["department-manager"],

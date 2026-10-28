@@ -20,14 +20,14 @@ public sealed class PurchaseRequestWriteAccessTests(SampleAppFixture fixture) : 
     [Fact]
     public async Task Creating_a_request_sets_the_requester_to_the_signed_in_user_and_a_client_value_is_400()
     {
-        using var anna = fixture.CreateClient().SignedInAs("anna");
+        using var requesterClient = fixture.CreateClient().SignedInAs("requester");
 
-        var subject = await CreateRequestAsync(anna, 500);
+        var subject = await CreateRequestAsync(requesterClient, 500);
 
-        var (requester, _) = await ReadAsync(anna, subject);
-        Assert.Equal("anna", requester);
+        var (requester, _) = await ReadAsync(requesterClient, subject);
+        Assert.Equal("requester", requester);
         using var create = await SendAsync(
-            anna,
+            requesterClient,
             HttpMethod.Post,
             Records,
             $$"""{ "values": { "title": "Set", "status": "draft", "department": "{{Operations:D}}", "requester": "x" } }""");
@@ -38,26 +38,26 @@ public sealed class PurchaseRequestWriteAccessTests(SampleAppFixture fixture) : 
     [Fact]
     public async Task An_employee_cannot_update_their_submitted_request()
     {
-        using var anna = fixture.CreateClient().SignedInAs("anna");
-        var subject = await CreateRequestAsync(anna, 500);
-        await StartAsync(anna, subject);
+        using var requester = fixture.CreateClient().SignedInAs("requester");
+        var subject = await CreateRequestAsync(requester, 500);
+        await StartAsync(requester, subject);
         await fixture.RunUntilIdleAsync(CancellationToken);
 
-        Assert.Equal(HttpStatusCode.Forbidden, await EditTitleAsync(anna, subject));
+        Assert.Equal(HttpStatusCode.Forbidden, await EditTitleAsync(requester, subject));
     }
 
     [Fact]
     public async Task An_employee_may_update_their_returned_request()
     {
-        using var anna = fixture.CreateClient().SignedInAs("anna");
+        using var requester = fixture.CreateClient().SignedInAs("requester");
         using var chau = fixture.CreateClient().SignedInAs("chau");
-        var subject = await CreateRequestAsync(anna, 500);
-        await StartAsync(anna, subject);
+        var subject = await CreateRequestAsync(requester, 500);
+        await StartAsync(requester, subject);
         await fixture.RunUntilIdleAsync(CancellationToken);
         await ReturnAsync(chau, subject);
         await fixture.RunUntilIdleAsync(CancellationToken);
 
-        Assert.Equal(HttpStatusCode.OK, await EditTitleAsync(anna, subject));
+        Assert.Equal(HttpStatusCode.OK, await EditTitleAsync(requester, subject));
     }
 
     /// <summary>Reads the request and changes its title at the version it read, and returns the status code.</summary>

@@ -245,7 +245,7 @@ public sealed class ProcessInspectionEndpointTests(ProcessStartFixture fixture) 
     [Fact]
     public async Task An_instance_whose_subject_record_is_outside_the_users_read_filter_is_not_listed_or_counted()
     {
-        // Anna reads only the requests whose title starts with "Request".
+        // The requester reads only the requests whose title starts with "Request".
         var visible = await StartAsync();
         var hiddenSubject = await fixture.InsertRequestAsync(status: null, title: "Hidden");
         var hidden = await fixture.InsertInstanceAsync(hiddenSubject);

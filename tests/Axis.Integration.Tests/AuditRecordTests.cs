@@ -26,7 +26,7 @@ public sealed class AuditRecordTests(RecordApiFixture fixture) : IClassFixture<R
 
         var created = Assert.Single(await fixture.AuditRecordsAsync(TenantA, id));
 
-        Assert.Equal(new AuditRecord("anna", "Anna Employee", "record.created", fixture.Model.Manifest.Id, item.Id, id, created.Details), created);
+        Assert.Equal(new AuditRecord("requester", "Requester User", "record.created", fixture.Model.Manifest.Id, item.Id, id, created.Details), created);
         AssertDetails("""{ "version": 1 }""", created.Details);
 
         // The body names the fields out of declaration order. The computed total changes too, but
@@ -46,7 +46,7 @@ public sealed class AuditRecordTests(RecordApiFixture fixture) : IClassFixture<R
         var audits = await fixture.AuditRecordsAsync(TenantA, id);
 
         Assert.Equal(["record.created", "record.updated", "record.deleted"], audits.Select(audit => audit.Action));
-        Assert.All(audits, audit => Assert.Equal(("anna", "Anna Employee", fixture.Model.Manifest.Id, item.Id, id), (audit.Actor, audit.ActorName, audit.ApplicationId, audit.EntityId, audit.RecordId)));
+        Assert.All(audits, audit => Assert.Equal(("requester", "Requester User", fixture.Model.Manifest.Id, item.Id, id), (audit.Actor, audit.ActorName, audit.ApplicationId, audit.EntityId, audit.RecordId)));
         AssertDetails("""{ "version": 2, "fields": ["name", "quantity", "parts"] }""", audits[1].Details);
         // A deleted record has no new version: the details hold the version it had.
         AssertDetails("""{ "version": 2 }""", audits[2].Details);
@@ -55,7 +55,7 @@ public sealed class AuditRecordTests(RecordApiFixture fixture) : IClassFixture<R
     [Fact]
     public async Task The_actor_and_their_name_are_the_signed_in_user()
     {
-        using var client = fixture.CreateClient().SignedInAs("anna");
+        using var client = fixture.CreateClient().SignedInAs("requester");
 
         var annas = await CreateItemAsync(client, HostA, """{ "name": "Chair" }""");
         using (var update = Request(HttpMethod.Patch, $"{Items}/{annas:D}", HostA, """{ "version": 1, "values": { "quantity": 2 } }"""))
@@ -65,7 +65,7 @@ public sealed class AuditRecordTests(RecordApiFixture fixture) : IClassFixture<R
         }
 
         Assert.Equal(
-            [("anna", "Anna Employee", "record.created"), ("anna", "Anna Employee", "record.updated")],
+            [("requester", "Requester User", "record.created"), ("requester", "Requester User", "record.updated")],
             (await fixture.AuditRecordsAsync(TenantA, annas)).Select(audit => (audit.Actor, audit.ActorName, audit.Action)));
     }
 
@@ -138,7 +138,7 @@ public sealed class AuditRecordTests(RecordApiFixture fixture) : IClassFixture<R
             TenantA,
             $$"""
             INSERT INTO axis.audit_records (id, occurred_at, actor, action, application_id, entity_id, record_id, process_instance_id, details)
-            VALUES ('{{Guid.CreateVersion7():D}}', now(), 'anna', 'record.created', '{{fixture.Model.Manifest.Id:D}}', NULL, '{{recordId:D}}', NULL, '{"version": 1}')
+            VALUES ('{{Guid.CreateVersion7():D}}', now(), 'requester', 'record.created', '{{fixture.Model.Manifest.Id:D}}', NULL, '{{recordId:D}}', NULL, '{"version": 1}')
             """);
 
         var exception = await Assert.ThrowsAsync<PostgresException>(
@@ -146,7 +146,7 @@ public sealed class AuditRecordTests(RecordApiFixture fixture) : IClassFixture<R
 
         Assert.Equal(PostgresErrorCodes.RestrictViolation, exception.SqlState);
         Assert.Equal(
-            new AuditRecord("anna", null, "record.created", fixture.Model.Manifest.Id, null, recordId, """{"version": 1}"""),
+            new AuditRecord("requester", null, "record.created", fixture.Model.Manifest.Id, null, recordId, """{"version": 1}"""),
             Assert.Single(await fixture.AuditRecordsAsync(TenantA, recordId)));
     }
 

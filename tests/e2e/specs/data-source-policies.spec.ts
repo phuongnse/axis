@@ -4,9 +4,9 @@ import { csrfHeaders } from '../csrf'
 import { waitForDialog } from '../dialogs'
 import { sessionFile, useSession } from '../sessions'
 
-// anna creates the records through the record API, then dung looks at them. dung's finance-reviewer
+// requester creates the records through the record API, then dung looks at them. dung's finance-reviewer
 // role reads only notes and categories whose title or name contains 'Shared'.
-test.use({ storageState: sessionFile('anna') })
+test.use({ storageState: sessionFile('requester') })
 
 async function createRecord(request: APIRequestContext, entity: string, values: Record<string, unknown>) {
   const response = await request.post(`/api/apps/E2eApp/entities/${entity}/records`, {

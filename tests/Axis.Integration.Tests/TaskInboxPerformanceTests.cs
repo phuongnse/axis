@@ -74,7 +74,7 @@ public sealed class TaskInboxPerformanceTests(ProcessStepFixture fixture) : ICla
 
         var page = await BestOfAsync(
             "task list",
-            () => TaskQueries.ListOpenAsync(connection, application, "anna", roles, 1, PageSize, CancellationToken));
+            () => TaskQueries.ListOpenAsync(connection, application, "requester", roles, 1, PageSize, CancellationToken));
 
         Assert.Equal(RoleTasks - ClaimedTasks, page.TotalCount);
         Assert.Equal(PageSize, page.Items.Count);
@@ -82,7 +82,7 @@ public sealed class TaskInboxPerformanceTests(ProcessStepFixture fixture) : ICla
             await QueryPlans.ExplainAsync(
                 fixture.DataSource,
                 TaskQueries.ListOpenCountSql,
-                command => TaskQueries.AddMayActParameters(command, application, "anna", roles),
+                command => TaskQueries.AddMayActParameters(command, application, "requester", roles),
                 CancellationToken),
             "ix_process_tasks_application_id_state_assignee",
             "process_tasks");
@@ -108,11 +108,11 @@ public sealed class TaskInboxPerformanceTests(ProcessStepFixture fixture) : ICla
                     (id, application_id, release_id, recipient_kind, recipient, subject_key, body_key, "values", created_at)
                 SELECT id, application_id, @release,
                        CASE WHEN n % 2 = 0 THEN '{ProcessNotifications.UserRecipient}' ELSE '{ProcessNotifications.RoleRecipient}' END,
-                       CASE WHEN n % 2 = 0 THEN 'anna' ELSE 'approver' END,
+                       CASE WHEN n % 2 = 0 THEN 'requester' ELSE 'approver' END,
                        'request.notice.subject', 'request.notice.body', jsonb_build_object(), now() - n * interval '1 second'
                 FROM series)
             INSERT INTO axis.notification_reads (notification_id, user_id)
-            SELECT id, 'anna' FROM series WHERE n <= {Notifications} AND n % 4 IN (1, 2)
+            SELECT id, 'requester' FROM series WHERE n <= {Notifications} AND n % 4 IN (1, 2)
             """))
         {
             insert.Parameters.AddWithValue("application", application);
@@ -128,7 +128,7 @@ public sealed class TaskInboxPerformanceTests(ProcessStepFixture fixture) : ICla
 
         var page = await BestOfAsync(
             "notification list",
-            () => NotificationQueries.ListAsync(connection, application, "anna", roles, unreadOnly: false, 1, PageSize, CancellationToken));
+            () => NotificationQueries.ListAsync(connection, application, "requester", roles, unreadOnly: false, 1, PageSize, CancellationToken));
 
         Assert.Equal(Notifications, page.TotalCount);
         Assert.Equal(Notifications / 2, page.UnreadCount);
@@ -139,7 +139,7 @@ public sealed class TaskInboxPerformanceTests(ProcessStepFixture fixture) : ICla
                 NotificationQueries.CountsSql,
                 command =>
                 {
-                    TaskQueries.AddMayActParameters(command, application, "anna", roles);
+                    TaskQueries.AddMayActParameters(command, application, "requester", roles);
                     command.Parameters.AddWithValue("unread", false);
                 },
                 CancellationToken),

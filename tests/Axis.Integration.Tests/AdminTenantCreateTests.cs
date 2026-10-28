@@ -36,7 +36,7 @@ public sealed class AdminTenantCreateTests(PostgreSqlFixture database) : IClassF
 
         await using (var factory = AdminScenario.CreateServer(scenario.Platform))
         {
-            using var client = factory.CreateClient().SignedInAs("anna");
+            using var client = factory.CreateClient().SignedInAs("requester");
             using var served = await client.SendAsync(Request("/api/me", "shop.example.test"), CancellationToken);
             using var unknown = await client.SendAsync(Request("/api/me", "other.example.test"), CancellationToken);
             Assert.Equal(HttpStatusCode.OK, served.StatusCode);

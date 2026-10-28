@@ -236,7 +236,7 @@ public sealed class StudioExpressionCheckTests : IClassFixture<StudioExpressionC
             var connectionString = await _database.CreateDatabaseAsync("studio_expression_check", CancellationToken);
             _factory = StudioPublishTests.NewFactory(_folder.Path, [("a", Host, connectionString)]);
             Author = _factory.CreateClient().SignedInAs("hoa");
-            Employee = _factory.CreateClient().SignedInAs("anna");
+            Employee = _factory.CreateClient().SignedInAs("requester");
             Anonymous = _factory.CreateClient();
 
             // The server has activated the folder by now. The migration only has to compile, so it is written afterwards.

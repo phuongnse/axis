@@ -33,7 +33,7 @@ public sealed class AdminTenantRotatePasswordsTests(PostgreSqlFixture database) 
         var id = await CreateServedTenantAsync(scenario);
         var logs = new LogCollector();
         await using var factory = CreateFactory(scenario.Platform, logs);
-        using var client = factory.CreateClient().SignedInAs("anna");
+        using var client = factory.CreateClient().SignedInAs("requester");
         await AssertStatusAsync(client, id, HttpStatusCode.OK);
         var before = await scenario.RowAsync(id);
         var oldRuntime = Decrypt(before, TenantSecretFields.RuntimePassword, before.RuntimePassword);
@@ -68,7 +68,7 @@ public sealed class AdminTenantRotatePasswordsTests(PostgreSqlFixture database) 
         Assert.Equal(0, (await scenario.CreateAsync(id, Host(id))).Exit);
         var logs = new LogCollector();
         await using var factory = CreateFactory(scenario.Platform, logs);
-        using var client = factory.CreateClient().SignedInAs("anna");
+        using var client = factory.CreateClient().SignedInAs("requester");
         await AssertStatusAsync(client, id, HttpStatusCode.OK, "/api/me");
         var before = await scenario.RowAsync(id);
         var oldRuntime = Decrypt(before, TenantSecretFields.RuntimePassword, before.RuntimePassword);

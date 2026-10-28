@@ -98,9 +98,9 @@ async function countHistory(page: Page, ...texts: string[]) {
   return count
 }
 
-/** Expects the history panel to list the submission by anna and a decision by each of `deciders`. */
+/** Expects the history panel to list the submission by requester and a decision by each of `deciders`. */
 async function expectHistory(page: Page, deciders: string[]) {
-  expect(await countHistory(page, 'Process started', 'Anna Employee')).toBe(1)
+  expect(await countHistory(page, 'Process started', 'Requester User')).toBe(1)
   for (const name of deciders) {
     expect(await countHistory(page, 'Task decided', name)).toBe(1)
   }
@@ -109,7 +109,7 @@ async function expectHistory(page: Page, deciders: string[]) {
 test('a request below the threshold is approved by the department manager from My tasks, with a comment', async ({
   page,
 }) => {
-  await useSession(page, 'anna')
+  await useSession(page, 'requester')
   const { title, id } = await createRequest(page, 'Approve small', 500)
   await submit(page, id, title)
 
@@ -129,7 +129,7 @@ test('a request below the threshold is approved by the department manager from M
 test('a request whose purchase order response is lost still gets exactly one purchase order', async ({ page }) => {
   // The worker sends the call again only after the sample's 30 second backoff.
   test.setTimeout(150_000)
-  await useSession(page, 'anna')
+  await useSession(page, 'requester')
   const { title, id } = await createRequest(page, 'Lost response', 500)
   const number = await requestNumber(page, id)
   // The stub stores the order for this request, then closes the connection without answering.
@@ -147,7 +147,7 @@ test('a request whose purchase order response is lost still gets exactly one pur
 test('a request at the threshold needs the finance reviewer after the manager before it is approved', async ({
   page,
 }) => {
-  await useSession(page, 'anna')
+  await useSession(page, 'requester')
   const { title, id } = await createRequest(page, 'Approve large', 10000)
   await submit(page, id, title)
 
@@ -166,7 +166,7 @@ test('a request at the threshold needs the finance reviewer after the manager be
 })
 
 test('a returned request is edited and submitted again, and the manager then approves it', async ({ page }) => {
-  await useSession(page, 'anna')
+  await useSession(page, 'requester')
   const { title, id } = await createRequest(page, 'Return', 500)
   await submit(page, id, title)
 
@@ -175,7 +175,7 @@ test('a returned request is edited and submitted again, and the manager then app
   await decide(page, title, 'Manager approval', 'Return', comment)
   await expectStatus(page, id, 'returned')
 
-  await useSession(page, 'anna')
+  await useSession(page, 'requester')
   await page.goto(`/purchasing/purchaserequestform/${id}`)
   await expectShown(fieldValue(page, 'decisionComments'), comment)
   await page.getByLabel(fieldLabel('Quantity 1')).fill('2')
@@ -191,11 +191,11 @@ test('a returned request is edited and submitted again, and the manager then app
   expect(read.ok()).toBe(true)
   const record = (await read.json()) as { values: { lineItems: { quantity: number }[] } }
   expect(record.values.lineItems.map((item) => item.quantity)).toEqual([2])
-  expect(await countHistory(page, 'Process started', 'Anna Employee')).toBe(2)
+  expect(await countHistory(page, 'Process started', 'Requester User')).toBe(2)
 })
 
 test('a rejected request cannot be submitted again, and the manager gets no new task', async ({ page }) => {
-  await useSession(page, 'anna')
+  await useSession(page, 'requester')
   const { title, id } = await createRequest(page, 'Reject', 500)
   await submit(page, id, title)
 
@@ -206,7 +206,7 @@ test('a rejected request cannot be submitted again, and the manager gets no new 
   await expectShown(fieldValue(page, 'purchaseOrderNumber'), 'Not set')
   expect(await purchaseOrders(page, await requestNumber(page, id))).toEqual([])
 
-  await useSession(page, 'anna')
+  await useSession(page, 'requester')
   await page.goto(`/purchasing/purchaserequestform/${id}`)
   await expect(page.getByRole('textbox', { name: 'Title', exact: true })).toHaveValue(title)
   const start = page.waitForResponse((response) =>
@@ -228,7 +228,7 @@ test('a rejected request cannot be submitted again, and the manager gets no new 
 })
 
 test('a request waiting for the manager is approved after the worker restarts', async ({ page }) => {
-  await useSession(page, 'anna')
+  await useSession(page, 'requester')
   const { title, id } = await createRequest(page, 'Restart', 500)
   await submit(page, id, title)
 

@@ -398,7 +398,7 @@ public sealed class PlatformRekeyTests(PostgreSqlFixture database) : IClassFixtu
 
     private static PlatformDbContext NewContext(string platform) => new(new DbContextOptionsBuilder<PlatformDbContext>().UseNpgsql(platform).Options);
 
-    /// <summary>Answers <c>GET /test/session</c> by signing anna in to the tenant.</summary>
+    /// <summary>Answers <c>GET /test/session</c> by signing requester in to the tenant.</summary>
     private sealed class SessionStartupFilter(string tenantId) : IStartupFilter
     {
         public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) => app =>
@@ -411,7 +411,7 @@ public sealed class PlatformRekeyTests(PostgreSqlFixture database) : IClassFixtu
                     branch.UseTenantResolution();
                     branch.Run(async context =>
                     {
-                        await context.SignInAsync(Session.Scheme, Session.CreatePrincipal(tenantId, "anna", "Anna Employee", ["employee"]));
+                        await context.SignInAsync(Session.Scheme, Session.CreatePrincipal(tenantId, "requester", "Requester User", ["employee"]));
                         context.Response.StatusCode = StatusCodes.Status204NoContent;
                     });
                 });

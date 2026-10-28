@@ -34,7 +34,7 @@ public sealed class CsrfHeaderTests(RecordApiFixture fixture) : IClassFixture<Re
     [InlineData("1, 1")]
     public async Task Writes_of_a_signed_in_user_without_the_header_are_a_403_and_change_nothing(string? header)
     {
-        using var client = fixture.CreateClient().SignedInAs("anna");
+        using var client = fixture.CreateClient().SignedInAs("requester");
 
         await AssertWritesRefusedAsync(client, header);
 

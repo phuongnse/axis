@@ -19,10 +19,10 @@ public sealed class PurchaseRequestResubmitTests(SampleAppFixture fixture) : ICl
     [Fact]
     public async Task A_returned_request_keeps_its_ended_instance_and_a_resubmission_starts_a_new_one_on_the_active_release()
     {
-        using var anna = fixture.CreateClient().SignedInAs("anna");
+        using var requester = fixture.CreateClient().SignedInAs("requester");
         using var chau = fixture.CreateClient().SignedInAs("chau");
-        var subject = await CreateRequestAsync(anna, 500);
-        using (var started = await StartAsync(anna, subject))
+        var subject = await CreateRequestAsync(requester, 500);
+        using (var started = await StartAsync(requester, subject))
         {
             Assert.Equal(HttpStatusCode.Created, started.StatusCode);
         }
@@ -30,23 +30,23 @@ public sealed class PurchaseRequestResubmitTests(SampleAppFixture fixture) : ICl
         await fixture.RunUntilIdleAsync(CancellationToken);
         await DecideAsync(chau, subject, "return");
 
-        Assert.Equal("returned", await StatusAsync(anna, subject));
+        Assert.Equal("returned", await StatusAsync(requester, subject));
         var first = Assert.Single(await fixture.InstancesAsync(subject));
         Assert.Equal(ProcessStarts.Completed, first.State);
 
-        using (var read = await SendAsync(anna, HttpMethod.Get, $"{Records}/{subject:D}"))
+        using (var read = await SendAsync(requester, HttpMethod.Get, $"{Records}/{subject:D}"))
         {
             Assert.Equal(HttpStatusCode.OK, read.StatusCode);
             var version = (await ReadJsonAsync(read)).RootElement.GetProperty("version").GetInt64();
             using var edited = await SendAsync(
-                anna,
+                requester,
                 HttpMethod.Patch,
                 $"{Records}/{subject:D}",
                 $$"""{ "version": {{version}}, "values": { "lineItems": [{ "description": "Desk", "quantity": 2, "unitPrice": 500 }] } }""");
             Assert.Equal(HttpStatusCode.OK, edited.StatusCode);
         }
 
-        using (var resubmitted = await StartAsync(anna, subject))
+        using (var resubmitted = await StartAsync(requester, subject))
         {
             Assert.Equal(HttpStatusCode.Created, resubmitted.StatusCode);
         }
@@ -59,7 +59,7 @@ public sealed class PurchaseRequestResubmitTests(SampleAppFixture fixture) : ICl
         Assert.Equal(ProcessStarts.Running, second.State);
         Assert.Equal(await fixture.ActiveReleaseIdAsync(CancellationToken), second.ReleaseId);
 
-        using var history = await SendAsync(anna, HttpMethod.Get, $"{Records}/{subject:D}/history?pageSize=100");
+        using var history = await SendAsync(requester, HttpMethod.Get, $"{Records}/{subject:D}/history?pageSize=100");
         Assert.Equal(HttpStatusCode.OK, history.StatusCode);
         var items = (await ReadJsonAsync(history)).RootElement.GetProperty("items").EnumerateArray().ToList();
         Assert.Equal(
@@ -71,19 +71,19 @@ public sealed class PurchaseRequestResubmitTests(SampleAppFixture fixture) : ICl
     [Fact]
     public async Task A_rejected_request_fails_the_start_condition_and_no_instance_is_created()
     {
-        using var anna = fixture.CreateClient().SignedInAs("anna");
+        using var requester = fixture.CreateClient().SignedInAs("requester");
         using var chau = fixture.CreateClient().SignedInAs("chau");
-        var subject = await CreateRequestAsync(anna, 500);
-        using (var started = await StartAsync(anna, subject))
+        var subject = await CreateRequestAsync(requester, 500);
+        using (var started = await StartAsync(requester, subject))
         {
             Assert.Equal(HttpStatusCode.Created, started.StatusCode);
         }
 
         await fixture.RunUntilIdleAsync(CancellationToken);
         await DecideAsync(chau, subject, "reject");
-        Assert.Equal("rejected", await StatusAsync(anna, subject));
+        Assert.Equal("rejected", await StatusAsync(requester, subject));
 
-        using var again = await StartAsync(anna, subject);
+        using var again = await StartAsync(requester, subject);
 
         using var problem = await RecordApiFixture.ReadProblemAsync(again, HttpStatusCode.BadRequest);
         var errors = problem.RootElement.GetProperty("errors");

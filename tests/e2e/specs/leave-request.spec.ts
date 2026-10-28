@@ -10,7 +10,7 @@ import { sessionFile, useSession, type SampleUser } from "../sessions";
 // straight to the API, so a hidden button never stands in for the server's check.
 //
 // Specs run in parallel against one database, so each test looks only for the requests it creates. Every
-// request gets its own reason, which is its display field, so the reason finds its task. anna and lan are employees. chau manages
+// request gets its own reason, which is its display field, so the reason finds its task. requester and lan are employees. chau manages
 // Operations and binh manages Engineering.
 const appPath = "/api/apps/LeaveRequests";
 const recordsPath = `${appPath}/entities/LeaveRequest/records`;
@@ -110,17 +110,17 @@ async function taskId(
   });
 }
 
-test("anna submits a leave request, chau approves it in My tasks, and anna sees it approved with its days", async ({
+test("requester submits a leave request, chau approves it in My tasks, and requester sees it approved with its days", async ({
   page,
   playwright,
   baseURL,
 }) => {
   const reason = `Zz Approve ${runId()}`;
-  const id = await asUser(playwright.request, baseURL, "anna", (anna) =>
-    createRequest(anna, reason),
+  const id = await asUser(playwright.request, baseURL, "requester", (requester) =>
+    createRequest(requester, reason),
   );
 
-  await useSession(page, "anna");
+  await useSession(page, "requester");
   await page.goto(`/leave/leaverequestform/${id}`);
   await expect(page.getByLabel(fieldLabel("Reason"))).toHaveValue(reason);
   await page.getByRole("button", { name: "Submit", exact: true }).click();
@@ -138,7 +138,7 @@ test("anna submits a leave request, chau approves it in My tasks, and anna sees 
   await page.getByRole("button", { name: "Approve", exact: true }).click();
   await expect(page).toHaveURL(/\/leave\/mytasks$/);
 
-  await useSession(page, "anna");
+  await useSession(page, "requester");
   // The worker ends the process some time after the decision.
   await expect(async () => {
     await page.goto(`/leave/leaverequestform/${id}`);
@@ -152,8 +152,8 @@ test("an employee cannot open another employee's leave request, by its form or t
   playwright,
   baseURL,
 }) => {
-  const id = await asUser(playwright.request, baseURL, "anna", (anna) =>
-    createRequest(anna, `Zz Deny ${runId()}`),
+  const id = await asUser(playwright.request, baseURL, "requester", (requester) =>
+    createRequest(requester, `Zz Deny ${runId()}`),
   );
   await useSession(page, "lan");
 
@@ -169,9 +169,9 @@ test("a manager of another department gets no task for the request, and cannot c
   playwright,
   baseURL,
 }) => {
-  const id = await asUser(playwright.request, baseURL, "anna", async (anna) => {
-    const created = await createRequest(anna, `Zz Scope ${runId()}`);
-    await start(anna, created);
+  const id = await asUser(playwright.request, baseURL, "requester", async (requester) => {
+    const created = await createRequest(requester, `Zz Scope ${runId()}`);
+    await start(requester, created);
     return created;
   });
   // chau manages Operations, so the task is chau's. It exists once the worker has created it.
@@ -202,10 +202,10 @@ test("a request whose last day is before its first day cannot be submitted, and 
   playwright,
   baseURL,
 }) => {
-  const id = await asUser(playwright.request, baseURL, "anna", (anna) =>
-    createRequest(anna, `Zz Dates ${runId()}`, "2026-11-04", "2026-11-02"),
+  const id = await asUser(playwright.request, baseURL, "requester", (requester) =>
+    createRequest(requester, `Zz Dates ${runId()}`, "2026-11-04", "2026-11-02"),
   );
-  await useSession(page, "anna");
+  await useSession(page, "requester");
 
   await page.goto(`/leave/leaverequestform/${id}`);
   await expectChosen(page.getByRole('combobox', { name: 'Status', exact: true }), "draft");

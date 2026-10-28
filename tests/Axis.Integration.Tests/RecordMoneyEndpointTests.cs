@@ -31,14 +31,14 @@ public sealed class RecordMoneyEndpointTests(RecordApiFixture fixture) : IClassF
     public async Task Money_is_written_and_read_as_a_decimal_with_its_scale()
     {
         await fixture.ResetAsync();
-        using var anna = fixture.CreateClient().SignedInAs("anna");
+        using var requester = fixture.CreateClient().SignedInAs("requester");
 
         using var created = await SendAsync(
-            anna, HttpMethod.Post, Expenses, """{ "values": { "title": "Taxi", "amountVnd": 1250000, "currency": "USD", "amount": 12.5 } }""");
+            requester, HttpMethod.Post, Expenses, """{ "values": { "title": "Taxi", "amountVnd": 1250000, "currency": "USD", "amount": 12.5 } }""");
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
         var id = (await ReadJsonAsync(created)).RootElement.GetProperty("id").GetString();
 
-        using var read = await SendAsync(anna, HttpMethod.Get, $"{Expenses}/{id}", null);
+        using var read = await SendAsync(requester, HttpMethod.Get, $"{Expenses}/{id}", null);
         Assert.Equal(HttpStatusCode.OK, read.StatusCode);
         using var record = await ReadJsonAsync(read);
         var values = record.RootElement.GetProperty("values");
@@ -52,9 +52,9 @@ public sealed class RecordMoneyEndpointTests(RecordApiFixture fixture) : IClassF
     public async Task Money_with_too_many_fraction_digits_is_400_at_the_field_and_writes_nothing(string values, string field, long digits)
     {
         await fixture.ResetAsync();
-        using var anna = fixture.CreateClient().SignedInAs("anna");
+        using var requester = fixture.CreateClient().SignedInAs("requester");
 
-        using var response = await SendAsync(anna, HttpMethod.Post, Expenses, $$"""{ "values": {{values}} }""");
+        using var response = await SendAsync(requester, HttpMethod.Post, Expenses, $$"""{ "values": {{values}} }""");
 
         using var problem = await ReadProblemAsync(response, HttpStatusCode.BadRequest);
         var error = Assert.Single(problem.RootElement.GetProperty("errors").EnumerateObject());

@@ -610,11 +610,11 @@ test.describe('Studio on a copy of its own', () => {
   })
 
   test('someone without the author role finds no Studio in the app switcher and sees a forbidden page', async ({ page }) => {
-    await useSession(page, 'anna')
+    await useSession(page, 'requester')
 
     await page.goto(`${server.url}/`)
     const banner = page.getByRole('banner')
-    await expect(banner.getByRole('button', { name: 'Anna Employee', exact: true })).toBeVisible()
+    await expect(banner.getByRole('button', { name: 'Requester User', exact: true })).toBeVisible()
     await banner.getByRole('button', { name: 'Switch to', exact: true }).click()
     await expect(page.getByRole('menu', { name: 'Switch to', exact: true })).toBeVisible()
     await expect(page.getByRole('menuitem', { name: /studio/i })).toHaveCount(0)

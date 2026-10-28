@@ -34,9 +34,9 @@ public sealed class RecordRangeEndpointTests(RecordApiFixture fixture) : IClassF
     public async Task Create_outside_a_limit_is_400_at_the_field_and_writes_nothing(string values, string expected)
     {
         await fixture.ResetAsync();
-        using var anna = fixture.CreateClient().SignedInAs("anna");
+        using var requester = fixture.CreateClient().SignedInAs("requester");
 
-        using var problem = await SendAsync(anna, HttpMethod.Post, Readings, $$"""{ "values": {{values}} }""", HttpStatusCode.BadRequest);
+        using var problem = await SendAsync(requester, HttpMethod.Post, Readings, $$"""{ "values": {{values}} }""", HttpStatusCode.BadRequest);
 
         Assert.Equal([Split(expected)], Errors(problem));
         Assert.Equal(0, (await fixture.TableShapeAsync(TenantA, "Reading")).RowCount);
@@ -47,16 +47,16 @@ public sealed class RecordRangeEndpointTests(RecordApiFixture fixture) : IClassF
     public async Task Update_outside_a_limit_is_400_at_the_field_and_keeps_the_record(string values, string expected)
     {
         await fixture.ResetAsync();
-        using var anna = fixture.CreateClient().SignedInAs("anna");
+        using var requester = fixture.CreateClient().SignedInAs("requester");
         using var created = await SendAsync(
-            anna, HttpMethod.Post, Readings, $$"""{ "values": {{OnTheBounds}} }""", HttpStatusCode.Created);
+            requester, HttpMethod.Post, Readings, $$"""{ "values": {{OnTheBounds}} }""", HttpStatusCode.Created);
         var id = created.RootElement.GetProperty("id").GetString();
 
         using var problem = await SendAsync(
-            anna, HttpMethod.Patch, $"{Readings}/{id}", $$"""{ "version": 1, "values": {{values}} }""", HttpStatusCode.BadRequest);
+            requester, HttpMethod.Patch, $"{Readings}/{id}", $$"""{ "version": 1, "values": {{values}} }""", HttpStatusCode.BadRequest);
 
         Assert.Equal([Split(expected)], Errors(problem));
-        using var read = await SendAsync(anna, HttpMethod.Get, $"{Readings}/{id}", null, HttpStatusCode.OK);
+        using var read = await SendAsync(requester, HttpMethod.Get, $"{Readings}/{id}", null, HttpStatusCode.OK);
         Assert.Equal(1, read.RootElement.GetProperty("version").GetInt64());
         Assert.Equal("abc", read.RootElement.GetProperty("values").GetProperty("code").GetString());
     }
@@ -65,13 +65,13 @@ public sealed class RecordRangeEndpointTests(RecordApiFixture fixture) : IClassF
     public async Task Values_on_each_bound_are_written_on_create_and_update()
     {
         await fixture.ResetAsync();
-        using var anna = fixture.CreateClient().SignedInAs("anna");
+        using var requester = fixture.CreateClient().SignedInAs("requester");
 
         using var upper = await SendAsync(
-            anna, HttpMethod.Post, Readings, $$"""{ "values": {{OnTheBounds}} }""", HttpStatusCode.Created);
+            requester, HttpMethod.Post, Readings, $$"""{ "values": {{OnTheBounds}} }""", HttpStatusCode.Created);
         var id = upper.RootElement.GetProperty("id").GetString();
         using var lower = await SendAsync(
-            anna,
+            requester,
             HttpMethod.Patch,
             $"{Readings}/{id}",
             """{ "version": 1, "values": { "count": 1, "amount": 99.5, "takenOn": "2026-01-01", "code": "abcdefghij" } }""",

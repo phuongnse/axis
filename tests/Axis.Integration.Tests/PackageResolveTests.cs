@@ -10,7 +10,7 @@ namespace Axis.Integration.Tests;
 /// <summary>
 /// An operator with a <c>resolve</c> grant settles a package operation call whose outcome is unknown, through the
 /// HTTP API. The sample's <c>assignPaymentReference</c> step runs an operation of the payment references package.
-/// <c>anna</c> starts the approvals, <c>chau</c> is the manager and <c>dung</c> has the grant. Each test forces the
+/// <c>requester</c> starts the approvals, <c>chau</c> is the manager and <c>dung</c> has the grant. Each test forces the
 /// call to <c>unknown</c> and deletes its work item, as an operation that is not idempotent leaves it. Each test leaves
 /// no due work item behind, so the next one finds only its own.
 /// </summary>
@@ -27,10 +27,10 @@ public sealed class PackageResolveTests(SampleAppFixture fixture) : IClassFixtur
     [Fact]
     public async Task Resolving_an_unknown_package_call_as_succeeded_writes_the_output_and_the_instance_runs_on()
     {
-        using var anna = fixture.CreateClient().SignedInAs("anna");
+        using var requester = fixture.CreateClient().SignedInAs("requester");
         using var dung = fixture.CreateClient().SignedInAs("dung");
-        var (subject, instance, call) = await UnknownCallAsync(anna);
-        Assert.Null(await PaymentReferenceAsync(anna, subject));
+        var (subject, instance, call) = await UnknownCallAsync(requester);
+        Assert.Null(await PaymentReferenceAsync(requester, subject));
 
         using (var response = await ResolveAsync(dung, instance, call, Succeeded))
         {
@@ -44,12 +44,12 @@ public sealed class PackageResolveTests(SampleAppFixture fixture) : IClassFixtur
         Assert.Equal("succeeded", await CallStateAsync(call));
         Assert.Null(await fixture.ScalarAsync("SELECT input FROM axis.package_calls WHERE id = @id", ("id", call)));
         Assert.NotNull(await fixture.ScalarAsync("SELECT settled_at FROM axis.package_calls WHERE id = @id", ("id", call)));
-        Assert.Equal("RF18PR0001", await PaymentReferenceAsync(anna, subject));
+        Assert.Equal("RF18PR0001", await PaymentReferenceAsync(requester, subject));
 
         await fixture.RunUntilIdleAsync(CancellationToken);
 
         Assert.Equal("completed", await StateAsync(instance));
-        Assert.Equal("RF18PR0001", await PaymentReferenceAsync(anna, subject));
+        Assert.Equal("RF18PR0001", await PaymentReferenceAsync(requester, subject));
         Assert.Equal(0L, await DueWorkItemsAsync(instance));
         Assert.Equal(
             1L,
@@ -68,9 +68,9 @@ public sealed class PackageResolveTests(SampleAppFixture fixture) : IClassFixtur
     [Fact]
     public async Task Resolving_as_failed_fails_the_instance_clears_the_input_and_audits_the_user()
     {
-        using var anna = fixture.CreateClient().SignedInAs("anna");
+        using var requester = fixture.CreateClient().SignedInAs("requester");
         using var dung = fixture.CreateClient().SignedInAs("dung");
-        var (subject, instance, call) = await UnknownCallAsync(anna);
+        var (subject, instance, call) = await UnknownCallAsync(requester);
 
         using (var response = await ResolveAsync(dung, instance, call, Failed))
         {
@@ -82,7 +82,7 @@ public sealed class PackageResolveTests(SampleAppFixture fixture) : IClassFixtur
         Assert.Equal("failed", await StateAsync(instance));
         Assert.Equal("failed", await CallStateAsync(call));
         Assert.Null(await fixture.ScalarAsync("SELECT input FROM axis.package_calls WHERE id = @id", ("id", call)));
-        Assert.Null(await PaymentReferenceAsync(anna, subject));
+        Assert.Null(await PaymentReferenceAsync(requester, subject));
         Assert.Equal(0L, await DueWorkItemsAsync(instance));
         Assert.Equal(
             1L,
@@ -117,9 +117,9 @@ public sealed class PackageResolveTests(SampleAppFixture fixture) : IClassFixtur
     [Fact]
     public async Task A_resolve_whose_output_does_not_fit_the_manifest_is_400_and_changes_nothing()
     {
-        using var anna = fixture.CreateClient().SignedInAs("anna");
+        using var requester = fixture.CreateClient().SignedInAs("requester");
         using var dung = fixture.CreateClient().SignedInAs("dung");
-        var (subject, instance, call) = await UnknownCallAsync(anna);
+        var (subject, instance, call) = await UnknownCallAsync(requester);
         var revision = await fixture.ScalarAsync("SELECT revision FROM axis.process_instances WHERE id = @id", ("id", instance));
         var history = await HistoryAsync(instance);
         var audit = await AuditAsync(instance);
@@ -146,28 +146,28 @@ public sealed class PackageResolveTests(SampleAppFixture fixture) : IClassFixtur
         Assert.Equal(revision, await fixture.ScalarAsync("SELECT revision FROM axis.process_instances WHERE id = @id", ("id", instance)));
         Assert.Equal(history, await HistoryAsync(instance));
         Assert.Equal(audit, await AuditAsync(instance));
-        Assert.Null(await PaymentReferenceAsync(anna, subject));
+        Assert.Null(await PaymentReferenceAsync(requester, subject));
     }
 
     [Fact]
     public async Task A_user_without_the_grant_and_a_package_call_that_is_not_unknown_change_nothing()
     {
-        using var anna = fixture.CreateClient().SignedInAs("anna");
+        using var requester = fixture.CreateClient().SignedInAs("requester");
         using var chau = fixture.CreateClient().SignedInAs("chau");
         using var dung = fixture.CreateClient().SignedInAs("dung");
-        var (_, instance, call) = await UnknownCallAsync(anna);
+        var (_, instance, call) = await UnknownCallAsync(requester);
         var revision = await fixture.ScalarAsync("SELECT revision FROM axis.process_instances WHERE id = @id", ("id", instance));
         var history = await HistoryAsync(instance);
         var audit = await AuditAsync(instance);
 
-        foreach (var client in new[] { anna, chau })
+        foreach (var client in new[] { requester, chau })
         {
             using var denied = await ResolveAsync(client, instance, call, Succeeded);
             Assert.Equal(HttpStatusCode.Forbidden, denied.StatusCode);
         }
 
         // A call of another instance is no call of this one.
-        var (_, _, otherCall) = await UnknownCallAsync(anna);
+        var (_, _, otherCall) = await UnknownCallAsync(requester);
         using (var elsewhere = await ResolveAsync(dung, instance, otherCall, Succeeded))
         {
             Assert.Equal(HttpStatusCode.NotFound, elsewhere.StatusCode);
@@ -193,11 +193,11 @@ public sealed class PackageResolveTests(SampleAppFixture fixture) : IClassFixtur
 
     // Starts an approval, approves it as the manager and runs it until the package call is staged. The call is
     // then set to unknown with no work item, as an operation that is not idempotent leaves it.
-    private async Task<(Guid Subject, Guid Instance, Guid Call)> UnknownCallAsync(HttpClient anna)
+    private async Task<(Guid Subject, Guid Instance, Guid Call)> UnknownCallAsync(HttpClient requester)
     {
         using var chau = fixture.CreateClient().SignedInAs("chau");
-        var subject = await CreateRequestAsync(anna, 500);
-        var instance = await StartAsync(anna, subject);
+        var subject = await CreateRequestAsync(requester, 500);
+        var instance = await StartAsync(requester, subject);
         await fixture.RunUntilIdleAsync(CancellationToken);
         var task = (Guid)(await fixture.ScalarAsync("SELECT id FROM axis.process_tasks WHERE process_instance_id = @id AND state = 'open'", ("id", instance)))!;
         using (var approved = await CompleteAsync(chau, task, """{ "outcome": "approve" }"""))

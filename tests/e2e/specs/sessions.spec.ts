@@ -13,6 +13,6 @@ test('a switch made while the previous user loads a page signs in the new user',
 })
 
 test('a check for a user the server does not sign in names both users', async ({ page }) => {
-  await useSession(page, 'anna')
-  await expect(expectSessionUser(page, 'chau')).rejects.toThrow(/chau[\s\S]*anna|anna[\s\S]*chau/)
+  await useSession(page, 'requester')
+  await expect(expectSessionUser(page, 'chau')).rejects.toThrow(/chau[\s\S]*requester|requester[\s\S]*chau/)
 })

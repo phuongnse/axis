@@ -20,7 +20,7 @@ public sealed class AdminTenantStatusTests(PostgreSqlFixture database) : IClassF
         var id = scenario.NewTenantId();
         Assert.Equal(0, (await scenario.CreateAsync(id, "shop.example.test")).Exit);
         await using var factory = AdminScenario.CreateServer(scenario.Platform);
-        using var client = factory.CreateClient().SignedInAs("anna");
+        using var client = factory.CreateClient().SignedInAs("requester");
         Assert.Equal(HttpStatusCode.OK, await StatusAsync(client, "shop.example.test"));
 
         var suspend = await scenario.RunAsync(["tenant", "suspend", id]);

@@ -49,7 +49,7 @@ describe('changeStepType', () => {
   })
 
   it('drops the recipient and the channel when a notification step becomes a task expectation', () => {
-    const step = { type: 'expectNotification', recipient: { user: 'anna' }, channel: 'email', note: 'keep me' }
+    const step = { type: 'expectNotification', recipient: { user: 'requester' }, channel: 'email', note: 'keep me' }
     expect(changeStepType(step, 'expectTask')).toEqual({ type: 'expectTask', note: 'keep me' })
   })
 })

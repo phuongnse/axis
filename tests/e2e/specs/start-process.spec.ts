@@ -4,8 +4,8 @@ import { csrfHeaders } from '../csrf'
 import { expectChosen } from '../select'
 import { sessionFile } from '../sessions'
 
-// The record API needs a session with a grant, so these journeys start signed in as the employee anna.
-test.use({ storageState: sessionFile('anna') })
+// The record API needs a session with a grant, so these journeys start signed in as the employee requester.
+test.use({ storageState: sessionFile('requester') })
 
 // Specs run in parallel against one database, so these tests rely only on the notes they create.
 const notesPath = '/api/apps/E2eApp/entities/Note/records'

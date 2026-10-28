@@ -24,10 +24,10 @@ public sealed class PurchaseRequestRecoveryTests(SampleAppFixture fixture) : ICl
     [InlineData(10000, "waiting", "financeApproval", "submitted")]
     public async Task A_decision_made_while_no_worker_runs_is_taken_up_by_the_next_worker(int unitPrice, string state, string steps, string status)
     {
-        using var anna = fixture.CreateClient().SignedInAs("anna");
+        using var requester = fixture.CreateClient().SignedInAs("requester");
         using var chau = fixture.CreateClient().SignedInAs("chau");
-        var subject = await CreateRequestAsync(anna, unitPrice);
-        var instance = await StartAsync(anna, subject);
+        var subject = await CreateRequestAsync(requester, unitPrice);
+        var instance = await StartAsync(requester, subject);
 
         var logs = new LogCollector();
         using (var workerA = await fixture.StartWorkerAsync(logs))
@@ -46,7 +46,7 @@ public sealed class PurchaseRequestRecoveryTests(SampleAppFixture fixture) : ICl
 
         Assert.Equal("running:financeCheck", await StateAsync(instance));
         Assert.Equal(1L, await WorkItemsAsync(instance));
-        Assert.Equal("submitted", (await ReadAsync(anna, subject)).Status);
+        Assert.Equal("submitted", (await ReadAsync(requester, subject)).Status);
 
         using (var workerB = await fixture.StartWorkerAsync(logs))
         {
@@ -54,7 +54,7 @@ public sealed class PurchaseRequestRecoveryTests(SampleAppFixture fixture) : ICl
             await workerB.StopAsync(CancellationToken);
         }
 
-        Assert.Equal(status, (await ReadAsync(anna, subject)).Status);
+        Assert.Equal(status, (await ReadAsync(requester, subject)).Status);
         Assert.Equal(0L, await WorkItemsAsync(instance));
         if (unitPrice >= 10000)
         {
@@ -77,7 +77,7 @@ public sealed class PurchaseRequestRecoveryTests(SampleAppFixture fixture) : ICl
         Assert.DoesNotContain(logs.Entries, entry => entry.StartsWith("Error", StringComparison.Ordinal));
 
         // Only the approved request has a purchase order, and the stub holds exactly one for it.
-        var (number, orderNumber) = await NumbersAsync(anna, subject);
+        var (number, orderNumber) = await NumbersAsync(requester, subject);
         var orders = await fixture.OrdersAsync(number);
         if (status == "approved")
         {
@@ -94,10 +94,10 @@ public sealed class PurchaseRequestRecoveryTests(SampleAppFixture fixture) : ICl
     [Fact]
     public async Task A_worker_that_dies_mid_step_leaves_no_partial_writes_and_the_next_worker_commits_the_step_once()
     {
-        using var anna = fixture.CreateClient().SignedInAs("anna");
-        var subject = await CreateRequestAsync(anna, 500);
-        var instance = await StartAsync(anna, subject);
-        var (_, version) = await ReadAsync(anna, subject);
+        using var requester = fixture.CreateClient().SignedInAs("requester");
+        var subject = await CreateRequestAsync(requester, 500);
+        var instance = await StartAsync(requester, subject);
+        var (_, version) = await ReadAsync(requester, subject);
 
         // Holding this lock blocks the step's audit insert, after it has advanced the instance,
         // written the record and inserted its history row, none of them committed.
@@ -134,7 +134,7 @@ public sealed class PurchaseRequestRecoveryTests(SampleAppFixture fixture) : ICl
             await transaction.RollbackAsync(CancellationToken);
         }
 
-        Assert.Equal(("draft", version), await ReadAsync(anna, subject));
+        Assert.Equal(("draft", version), await ReadAsync(requester, subject));
         Assert.Equal("running:submit:1", await StateAsync(instance, withRevision: true));
         Assert.Equal(0L, await fixture.CountAsync(
             "SELECT count(*) FROM axis.process_step_history WHERE process_instance_id = @instance", ("instance", instance)));
@@ -150,7 +150,7 @@ public sealed class PurchaseRequestRecoveryTests(SampleAppFixture fixture) : ICl
             await workerB.StopAsync(CancellationToken);
         }
 
-        Assert.Equal(("submitted", version + 1), await ReadAsync(anna, subject));
+        Assert.Equal(("submitted", version + 1), await ReadAsync(requester, subject));
         Assert.Equal(1L, await fixture.CountAsync(
             "SELECT count(*) FROM axis.process_step_history WHERE process_instance_id = @instance AND step = 'submit'",
             ("instance", instance)));

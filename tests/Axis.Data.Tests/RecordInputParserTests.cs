@@ -647,7 +647,7 @@ public sealed class RecordInputParserTests
     }
 
     [Theory]
-    [InlineData("\"anna\"")]
+    [InlineData("\"requester\"")]
     [InlineData("null")]
     public void Creator_field_set_by_the_body_is_an_error_at_its_pointer(string json)
     {

@@ -24,19 +24,19 @@ public sealed class RateLimitsTests
     [Fact]
     public void A_session_user_counts_in_the_partition_of_the_route_by_tenant_and_user()
     {
-        var user = Session.CreatePrincipal("a", "anna", "Anna", ["employee"]);
+        var user = Session.CreatePrincipal("a", "requester", "Requester", ["employee"]);
 
-        Assert.Equal((Partition.Session, "a|anna"), RateLimits.Choose(Request(new RateLimitRoute(Partition.Session, Bearer: false), user), "a"));
-        Assert.Equal((Partition.Publishing, "a|anna"), RateLimits.Choose(Request(new RateLimitRoute(Partition.Publishing, Bearer: false), user), "a"));
-        Assert.Equal((Partition.Session, "c|anna"), RateLimits.Choose(Request(new RateLimitRoute(Partition.Session, Bearer: false), user), "c"));
+        Assert.Equal((Partition.Session, "a|requester"), RateLimits.Choose(Request(new RateLimitRoute(Partition.Session, Bearer: false), user), "a"));
+        Assert.Equal((Partition.Publishing, "a|requester"), RateLimits.Choose(Request(new RateLimitRoute(Partition.Publishing, Bearer: false), user), "a"));
+        Assert.Equal((Partition.Session, "c|requester"), RateLimits.Choose(Request(new RateLimitRoute(Partition.Session, Bearer: false), user), "c"));
     }
 
     [Fact]
     public void A_session_does_not_count_as_bearer_on_a_route_that_takes_both()
     {
-        var user = Session.CreatePrincipal("a", "anna", "Anna", ["employee"]);
+        var user = Session.CreatePrincipal("a", "requester", "Requester", ["employee"]);
 
-        Assert.Equal((Partition.Session, "a|anna"), RateLimits.Choose(Request(new RateLimitRoute(Partition.Session, Bearer: true), user), "a"));
+        Assert.Equal((Partition.Session, "a|requester"), RateLimits.Choose(Request(new RateLimitRoute(Partition.Session, Bearer: true), user), "a"));
     }
 
     [Fact]
@@ -81,7 +81,7 @@ public sealed class RateLimitsTests
     [Fact]
     public void An_open_route_and_a_request_with_no_route_have_no_limit()
     {
-        var user = Session.CreatePrincipal("a", "anna", "Anna", ["employee"]);
+        var user = Session.CreatePrincipal("a", "requester", "Requester", ["employee"]);
 
         Assert.Null(RateLimits.Choose(Request(new RateLimitRoute(Session: null, Bearer: false, Open: true), user), "a"));
         Assert.Null(RateLimits.Choose(Request(route: null, user), "a"));

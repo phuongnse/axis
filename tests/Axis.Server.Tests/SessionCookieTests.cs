@@ -15,7 +15,7 @@ namespace Axis.Server.Tests;
 /// <summary>
 /// The name and attributes of the session cookie. Outside Development and Testing it is
 /// <c>__Host-Axis.Session</c>, with Secure, Path=/ and no domain, which a browser enforces. Development
-/// and Testing run over plain http, so they keep the name Axis.Session. A test-only path signs anna in with
+/// and Testing run over plain http, so they keep the name Axis.Session. A test-only path signs requester in with
 /// in-memory sessions, so no database is needed. The row of a session is tested on PostgreSQL in the
 /// integration tests.
 /// </summary>
@@ -120,7 +120,7 @@ public sealed class SessionCookieTests
             new Microsoft.Extensions.FileProviders.NullFileProvider();
     }
 
-    /// <summary>Answers <c>GET /test/session</c> by signing anna in to the default tenant.</summary>
+    /// <summary>Answers <c>GET /test/session</c> by signing requester in to the default tenant.</summary>
     private sealed class SessionStartupFilter : IStartupFilter
     {
         public Action<IApplicationBuilder> Configure(Action<IApplicationBuilder> next) => app =>
@@ -129,7 +129,7 @@ public sealed class SessionCookieTests
             {
                 if (HttpMethods.IsGet(context.Request.Method) && context.Request.Path == "/test/session")
                 {
-                    await context.SignInAsync(Session.Scheme, Session.CreatePrincipal("default", "anna", "Anna Employee", ["employee"]));
+                    await context.SignInAsync(Session.Scheme, Session.CreatePrincipal("default", "requester", "Requester User", ["employee"]));
                     context.Response.StatusCode = StatusCodes.Status204NoContent;
                     return;
                 }

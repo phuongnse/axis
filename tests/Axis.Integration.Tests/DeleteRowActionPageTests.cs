@@ -16,7 +16,7 @@ public sealed class DeleteRowActionPageTests(RecordApiFixture fixture) : IClassF
     [Fact]
     public async Task User_with_the_delete_grant_gets_the_delete_action_with_the_records_path_of_the_entity()
     {
-        var table = await TableOfPageAsync("anna", "items");
+        var table = await TableOfPageAsync("requester", "items");
 
         Assert.Contains(DeleteItem, RawItems(table.GetProperty("rowActions")));
         Assert.DoesNotContain(DeleteItem, RawItems(table.GetProperty("toolbarActions")));
@@ -26,7 +26,7 @@ public sealed class DeleteRowActionPageTests(RecordApiFixture fixture) : IClassF
     [Fact]
     public async Task Table_over_a_data_source_carries_the_records_path_of_the_root_entity()
     {
-        var table = await TableOfPageAsync("anna", "itemsbydepartment");
+        var table = await TableOfPageAsync("requester", "itemsbydepartment");
 
         Assert.Contains(DeleteItem, RawItems(table.GetProperty("rowActions")));
     }
