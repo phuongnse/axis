@@ -427,6 +427,10 @@ namespace Axis.Data.Storage.Migrations
                         .HasColumnType("bytea")
                         .HasColumnName("id_hash");
 
+                    b.Property<DateTimeOffset?>("AuthenticatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("authenticated_at");
+
                     b.Property<string>("DisplayName")
                         .IsRequired()
                         .HasColumnType("text")

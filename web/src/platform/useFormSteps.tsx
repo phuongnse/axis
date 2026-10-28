@@ -1,6 +1,6 @@
-import { Steps } from 'antd'
 import { useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { FormCanvasContext } from './formCanvas'
+import { FormStepsBar } from './FormStepsBar'
 import type { FormMetadata } from './site'
 import { useText } from './texts'
 import type { Section, useRecordForm } from './useRecordForm'
@@ -89,11 +89,7 @@ export function useFormSteps(
   }
 
   const progress: ReactNode = active && (
-    <Steps
-      data-testid="form-steps"
-      current={Math.max(position, 0)}
-      items={visible.map((step) => ({ title: t(steps[step].titleKey) }))}
-    />
+    <FormStepsBar titles={visible.map((step) => t(steps[step].titleKey))} current={Math.max(position, 0)} />
   )
 
   const fields: ReactNode = active ? (

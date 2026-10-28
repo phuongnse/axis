@@ -62,13 +62,15 @@ widget, is in [form-widget.md](form-widget.md) and [frontend.md](frontend.md).
     hidden is skipped and left out of the bar. Moving between steps keeps
     every typed value, and a save sends the changes from all steps. A form
     without `steps` looks as before.
-  - **Steps bar** _(planned)_. Each step is as wide as its title and is
-    joined to the next by a 48px line, so the bar sits on the left and never
-    stretches across the form. A title is cut with an ellipsis at 160px and
-    shows whole on hover. The current step always keeps its title. With seven
-    steps or more, only the current step shows its title and the others show
-    their number. A number shows its step's title on hover and on focus, and
-    to assistive technology. The bar is never wider than the form
+  - **Steps bar**. Each step is as wide as its title and is joined to the
+    next by a 48px line, so the bar sits on the left and never stretches
+    across the form. A title is cut with an ellipsis at 160px and shows whole
+    on hover. The current step always keeps its title and is marked with
+    `aria-current="step"`. With seven steps or more, only the current step
+    shows its title and the others show their number. A number shows its
+    step's title on hover and on focus, and to assistive technology. The bar
+    is never wider than the form, and when the steps do not fit it wraps
+    between steps
     ([D96](../decisions/d96-rules-from-the-design-system-review.md)).
   - **Failed check.** When the call for Next fails, by a network error or
     any answer but `200`, the form logs a warning and moves on to the next

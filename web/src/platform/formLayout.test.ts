@@ -3,6 +3,7 @@ import {
   addSection,
   addStep,
   dropPlace,
+  fieldRows,
   insertionPlace,
   moveField,
   movePlace,
@@ -447,5 +448,25 @@ describe('removeStep', () => {
   it('finds nothing for a missing step or a draft without steps', () => {
     expect(removeStep(draftWithSteps, 2)).toBeUndefined()
     expect(removeStep({ sections: [] }, 0)).toBeUndefined()
+  })
+})
+
+describe('fieldRows', () => {
+  it('fills a row of twelfths and starts a new row for a field that does not fit', () => {
+    expect(fieldRows([4, 4, 6, 12])).toEqual([[0, 1], [2], [3]])
+    expect(fieldRows([6, 6, 6])).toEqual([[0, 1], [2]])
+  })
+
+  it('gives a field of the full width its own row', () => {
+    expect(fieldRows([12])).toEqual([[0]])
+  })
+
+  it('gives every field its own row at narrow width, in file order', () => {
+    expect(fieldRows([4, 4, 6, 12], true)).toEqual([[0], [1], [2], [3]])
+  })
+
+  it('counts a width outside 1 to 12 as the full width, and no fields make no rows', () => {
+    expect(fieldRows([4, 0, 13, 4])).toEqual([[0], [1], [2], [3]])
+    expect(fieldRows([])).toEqual([])
   })
 })

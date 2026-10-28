@@ -85,7 +85,11 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place. _(planned f
   - `GET /api/auth/sign-in?returnUrl=` redirects to the tenant's identity
     provider. `returnUrl` must start with a single `/`. A value that does
     not, or that starts with `//` or `/\`, is a `400` problem details
-    response. A missing `returnUrl` means `/`.
+    response. A missing `returnUrl` means `/`. With `reauthenticate=true`
+    the redirect also carries `prompt=login` and `max_age=0`, so the identity
+    provider asks for credentials even when its own session is still open.
+    The new session then holds a fresh login time, which
+    [ending sessions](#session-lifetimes-and-re-authentication) needs.
   - `GET /api/auth/callback` is where the identity provider returns. It
     creates the session and redirects to `returnUrl`. A callback that fails
     creates no session and redirects to the shell's sign-in page, `/?signIn=failed`,
@@ -103,6 +107,24 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place. _(planned f
     sign-out. A `401` from an API call shows a sign-in prompt, and only a
     click on its button calls `GET /api/auth/sign-in`, so no session starts
     without an action of the person.
+  - `GET /api/me/sessions`, `DELETE /api/me/sessions/{id}` and
+    `DELETE /api/me/sessions` let a person see and end their own sessions.
+    They need a session, not a service account's bearer token.
+    - The list answers `{ "endAllowed", "sessions": [{ "id", "signedInAt",
+      "lastRequestAt", "current" }] }`. It holds only the caller's live
+      sessions, newest sign-in first. `current` marks the session that made
+      the request. `endAllowed` is true when the session may end sessions now.
+    - A session's `id` is the base64url form of the row's `id_hash`. It
+      cannot be turned back into a cookie.
+    - The two delete routes need the CSRF header and answer `204`. The first
+      ends the session with that id, which may be the current one. The second
+      ends all the caller's sessions except the current one.
+    - Both delete routes answer a `403` problem and delete nothing unless the
+      session's last login at the identity provider is no more than 5 minutes
+      old. A session with no stored login time cannot end sessions. The check
+      comes before the lookup of the id.
+    - An id that is not one of the caller's live sessions answers a `404`
+      problem, whoever owns it.
 - **Audit.** Sign-in writes
   [audit records](storage.md#audit-records-and-sequence-counters)
   in the database of the tenant that the host resolves to, see
@@ -123,8 +145,10 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place. _(planned f
 - **Session.** The session state is a row of `axis.sessions` in the tenant
   database, see [D84](../decisions/d84-asvs-level-2-and-a-server-side-session.md).
   - The row holds a hash of the session id, the user id, the display name,
-    the roles, the time of sign-in and the time of the last request. The
-    table never holds the session id itself, or a token, and no token
+    the roles, the time of sign-in, the time of the last request and the time
+    of the person's last login at the identity provider, read from the ID
+    token's `auth_time`. A session that was created before that column
+    existed holds no such time. The table never holds the session id itself, or a token, and no token
     reaches the browser.
   - The cookie is one HttpOnly, SameSite=Lax cookie. It holds only the random
     session id, 256 bits, wrapped and protected by the key ring below. It
@@ -202,7 +226,9 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place. _(planned f
     application, so they count as application content. The session is checked
     before any `404`, so a caller without a session cannot learn which sites
     or pages exist;
-  - `GET /api/me`.
+  - `GET /api/me`;
+  - `GET /api/me/sessions`, `DELETE /api/me/sessions/{id}` and
+    `DELETE /api/me/sessions`.
 
   Inbound endpoints under `/api/apps/{app}/endpoints/` are the exception.
   They take a bearer token and no session, see
@@ -290,6 +316,12 @@ sign-out address. This holds under both
   This holds because every sign-in request carries `max_age=28800`. So a
   still-open identity provider session cannot skip the login after Axis's
   session has ended at its 8-hour limit.
+- **Re-authentication before ending sessions.** A person ends sessions only
+  when the session's stored `auth_time` is no more than 5 minutes old, with
+  no clock skew allowed. Otherwise the shell sends the person to
+  `GET /api/auth/sign-in?reauthenticate=true`, which makes the identity
+  provider ask for credentials again. A person who signed in before the column
+  existed has no stored time and must sign in again first.
 - **The check at the callback.** The callback refuses an ID token whose
   `auth_time`, the time of the last login at the identity provider, is missing,
   unreadable or older than 8 hours. The check allows the clock skew of the token

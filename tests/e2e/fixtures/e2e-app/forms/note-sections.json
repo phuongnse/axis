@@ -7,7 +7,7 @@
   "sections": [
     {
       "title": { "textKey": "noteSections.main" },
-      "fields": [{ "field": "title" }, { "field": "code", "readOnly": true }]
+      "fields": [{ "field": "title", "width": 8 }, { "field": "code", "readOnly": true, "width": 4 }]
     },
     {
       "title": { "textKey": "noteSections.details" },

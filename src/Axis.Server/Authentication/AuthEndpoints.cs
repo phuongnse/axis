@@ -5,6 +5,7 @@ using Axis.Server.Users;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.Extensions.Options;
+using Microsoft.IdentityModel.Protocols.OpenIdConnect;
 
 namespace Axis.Server.Authentication;
 
@@ -27,7 +28,7 @@ internal static class AuthEndpoints
     }
 
     // Only a local path is a return address, so sign-in can never send the browser to another site.
-    private static IResult SignIn(string? returnUrl, ITenantContextAccessor tenants)
+    private static IResult SignIn(string? returnUrl, ITenantContextAccessor tenants, bool reauthenticate = false)
     {
         if (string.IsNullOrEmpty(returnUrl))
         {
@@ -39,7 +40,15 @@ internal static class AuthEndpoints
         }
 
         var tenant = tenants.Current ?? throw new InvalidOperationException("No tenant context is set.");
-        return Results.Challenge(new AuthenticationProperties { RedirectUri = returnUrl }, [TenantSignIn.SchemeName(tenant.TenantId)]);
+        var properties = new AuthenticationProperties { RedirectUri = returnUrl };
+        if (reauthenticate)
+        {
+            // The handler prefers these over its options, so the identity provider asks for credentials even when its own session is open.
+            properties.SetParameter(OpenIdConnectParameterNames.Prompt, "login");
+            properties.SetParameter<TimeSpan?>(OpenIdConnectParameterNames.MaxAge, TimeSpan.Zero);
+        }
+
+        return Results.Challenge(properties, [TenantSignIn.SchemeName(tenant.TenantId)]);
     }
 
     private static async Task<IResult> SignOutAsync(

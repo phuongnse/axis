@@ -154,7 +154,8 @@ internal sealed partial class TenantSignInOptions(TenantSignInSettings settings,
 
             // MapInboundClaims is false, so the claim keeps the name that the token gives it.
             var now = context.HttpContext.RequestServices.GetRequiredService<TimeProvider>().GetUtcNow();
-            if (!SignInRecency.IsRecent(principal.FindFirst("auth_time")?.Value, now, context.Options.TokenValidationParameters.ClockSkew))
+            var authTime = principal.FindFirst("auth_time")?.Value;
+            if (!SignInRecency.IsRecent(authTime, now, context.Options.TokenValidationParameters.ClockSkew))
             {
                 context.HttpContext.Items[TenantSignIn.TokenRejectedItem] = true;
                 context.Fail("The ID token's auth_time is missing or older than the session's lifetime.");
@@ -171,7 +172,8 @@ internal sealed partial class TenantSignInOptions(TenantSignInSettings settings,
                 tenantId,
                 userId,
                 string.IsNullOrWhiteSpace(displayName) ? userId : displayName,
-                roles);
+                roles,
+                authenticatedAt: SignInRecency.TryRead(authTime, out var authenticatedAt) ? authenticatedAt : null);
             return Task.CompletedTask;
         };
         if (fapi2)
