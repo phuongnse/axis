@@ -131,6 +131,13 @@ internal sealed partial class TenantSignInOptions(TenantSignInSettings settings,
         options.CorrelationCookie.SameSite = SameSiteMode.Lax;
         options.NonceCookie.SecurePolicy = securePolicy;
         options.NonceCookie.SameSite = SameSiteMode.Lax;
+        // Their path is the callback path, so the __Host- prefix, which needs path /, is not possible.
+        if (securePolicy == CookieSecurePolicy.Always)
+        {
+            options.CorrelationCookie.Name = "__Secure-Axis.Correlation.";
+            options.NonceCookie.Name = "__Secure-Axis.Nonce.";
+        }
+
         options.Events.OnMessageReceived = context =>
         {
             var current = context.HttpContext.RequestServices.GetRequiredService<ITenantContextAccessor>().Current;

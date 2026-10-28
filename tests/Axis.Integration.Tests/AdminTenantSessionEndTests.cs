@@ -28,16 +28,19 @@ public sealed class AdminTenantSessionEndTests(PostgreSqlFixture database) : ICl
         var a = await CreateTenantAsync(scenario);
         await using var server = CreateServer(scenario);
         var anna = await SignInAsync(server, a, "anna");
+        var annaElsewhere = await SignInAsync(server, a, "anna");
         var chau = await SignInAsync(server, a, "chau");
         Assert.Equal(HttpStatusCode.OK, await MeAsync(server, a, anna));
+        Assert.Equal(HttpStatusCode.OK, await MeAsync(server, a, annaElsewhere));
         Assert.Equal(HttpStatusCode.OK, await MeAsync(server, a, chau));
 
         var result = await scenario.RunAsync(["tenant", "session", "end", a, "--user", "anna"], extra: AdminScenario.Directory);
 
         Assert.Equal(0, result.Exit);
-        Assert.Equal([$"{a} sessions ok: 1 ended"], result.Output);
+        Assert.Equal([$"{a} sessions ok: 2 ended"], result.Output);
         Assert.Empty(result.Error);
         Assert.Equal(HttpStatusCode.Unauthorized, await MeAsync(server, a, anna));
+        Assert.Equal(HttpStatusCode.Unauthorized, await MeAsync(server, a, annaElsewhere));
         Assert.Equal(HttpStatusCode.OK, await MeAsync(server, a, chau));
         var record = Assert.Single(await scenario.AuditRecordsAsync(), record => record.Command == "tenant session end");
         Assert.Equal(a, record.TenantId);
