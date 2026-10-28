@@ -1,14 +1,20 @@
 import type { ChartKind } from '../platform/chartOption'
+import type { CurrentUser } from '../platform/currentUser'
+import type { NotificationPage } from '../platform/notifications'
 import type { HistoryPage, RecordItem, RecordPage } from '../platform/records'
 import type { DeadLetterPage, InstancePage } from '../platform/inspection'
 import type {
+  ApplicationSite,
   DataSourceMetadata,
   EntityMetadata,
   EntityWidgetMetadata,
   FieldMetadata,
   FieldType,
   FormMetadata,
+  PageMetadata,
   PageWidgetMetadata,
+  SiteListItem,
+  SiteMetadata,
   WidgetMetadata,
 } from '../platform/site'
 import type { TaskPage } from '../platform/tasks'
@@ -33,6 +39,7 @@ const requestTotalsPath = `${apiPath}/data-sources/RequestTotals/rows`
 const emptyRequestsPath = `${apiPath}/entities/EmptyRequest/records`
 const blankRequestsPath = `${apiPath}/entities/BlankRequest/records`
 const emptyTasksPath = `${apiPath}/empty-inbox/tasks`
+const notificationsPath = `${apiPath}/notifications`
 /** The rows of a data source with no rows, for the empty charts and kpi. */
 export const noRowsPath = `${apiPath}/data-sources/NoRequests/rows`
 
@@ -598,6 +605,97 @@ const requestTotalsPage: RecordPage = {
   totalCount: 1,
 }
 
+/** The platform site, with one Home entry, so the platform shell has no sidebar. */
+export const platformSite: SiteMetadata = {
+  name: 'Axis',
+  titleKey: 'shell.title',
+  locales: { default: locale, fallback: locale, available: [locale] },
+  navigation: [{ key: 'home', path: '/', labelKey: 'shell.nav.home', icon: 'home' }],
+}
+
+/** The application site, with two navigation pages, so its shell has a sidebar that collapses. */
+export const applicationSite: ApplicationSite = {
+  path: sitePath,
+  titleKey: 'site.title',
+  locales: { default: locale, fallback: locale, available: [locale] },
+  navigation: [
+    { page: 'Requests', labelKey: 'nav.requests', icon: 'list' },
+    { page: 'Tasks', labelKey: 'nav.tasks', icon: 'tasks' },
+  ],
+  notificationsPath,
+}
+
+const requestsPage: PageMetadata = {
+  name: 'Requests',
+  titleKey: 'page.requests',
+  parameters: [],
+  widgets: [tableWidget],
+}
+
+const requestPage: PageMetadata = {
+  name: 'Request',
+  titleKey: 'request.new',
+  parameters: [],
+  widgets: [formWidget],
+}
+
+const currentUser: CurrentUser = {
+  id: '3f8e9d0c-1b2a-4c3d-8e4f-5a6b7c8d9e0f',
+  displayName: 'Alex Morgan',
+  roles: ['Author', 'Operator'],
+  studio: true,
+  studioPublisher: false,
+  studioCreate: false,
+  studioPreviewHost: null,
+  studioTest: false,
+  console: true,
+}
+
+const purchaseApplication = { name: application, titles: { [locale]: 'Purchase requests' } }
+const serviceApplication = { name: 'ServiceDesk', titles: { [locale]: 'Service desk' } }
+
+/** Three sites in two applications, for the platform home page's cards. */
+const listedSites: SiteListItem[] = [
+  {
+    path: sitePath,
+    titleKey: 'site.title',
+    titles: { [locale]: 'Purchase requests' },
+    application: purchaseApplication,
+  },
+  {
+    path: 'archive',
+    titleKey: 'site.title',
+    titles: { [locale]: 'Archived requests' },
+    application: purchaseApplication,
+  },
+  { path: 'desk', titleKey: 'site.title', titles: { [locale]: 'Service desk' }, application: serviceApplication },
+]
+
+const notificationPage: NotificationPage = { items: [], page: 1, pageSize: 10, totalCount: 0, unreadCount: 2 }
+
+/** The identity provider's sign-in page, in English. The fixtures hold its texts until M17 builds the theme. */
+export const identityTexts = {
+  title: 'Sign in to Axis',
+  twoStepTitle: 'Two-step verification',
+  provider: 'Sign in with Contoso ID',
+  providerOnly: 'Your organization signs in only with Contoso ID.',
+  or: 'or',
+  username: 'Email or username',
+  usernameValue: 'alex.morgan@contoso.example',
+  password: 'Password',
+  forgotPassword: 'Forgot password?',
+  keepSignedIn: 'Keep me signed in',
+  invalid: 'Invalid email, username or password.',
+  signIn: 'Sign in',
+  twoStepMessage: 'Enter the 6-digit code from your authenticator app.',
+  code: 'Verification code',
+  verify: 'Verify',
+  tryAnotherWay: 'Try another way',
+  backToSignIn: 'Back to sign in',
+  english: 'English',
+  vietnamese: 'Tiếng Việt',
+}
+
 /** The site texts, in English. */
 export const siteTexts: Record<string, string> = {
   'request.label': 'Request',
@@ -632,10 +730,14 @@ export const siteTexts: Record<string, string> = {
   'preview.error.field': 'This value is not valid.',
   'preview.error.title': 'Enter a title.',
   'preview.error.unitPrice': 'Unit price cannot be negative.',
+  'site.title': 'Purchase requests',
+  'nav.requests': 'Requests',
+  'nav.tasks': 'Tasks',
+  'page.requests': 'Requests',
 }
 
 /** The API paths that the fixtures answer. A request outside them is not a fixture's to answer. */
-export const fixtureScopes = [`${apiPath}/`, `/api/sites/${sitePath}/`] as const
+export const fixtureScopes = [`${apiPath}/`, '/api/sites', '/api/me', '/api/about', '/health/ready'] as const
 
 /**
  * The answers of the fixture application's APIs, by path or by path and query. The page's own
@@ -656,4 +758,13 @@ export const routes: Record<string, () => unknown> = {
   [emptyTasksPath]: () => emptyTaskPage,
   [noRowsPath]: () => emptyRecordPage,
   [`/api/sites/${sitePath}/texts/${locale}`]: () => ({ texts: siteTexts }),
+  [`/api/sites/${sitePath}`]: () => applicationSite,
+  [`/api/sites/${sitePath}/pages/requests`]: () => requestsPage,
+  [`/api/sites/${sitePath}/pages/request`]: () => requestPage,
+  [formStatePath('RequestForm')]: noStateAnswer,
+  [notificationsPath]: () => notificationPage,
+  '/api/sites': () => ({ sites: listedSites }),
+  '/api/me': () => currentUser,
+  '/api/about': () => ({ version: '0.1.0' }),
+  '/health/ready': () => new Response(null, { status: 200 }),
 }
