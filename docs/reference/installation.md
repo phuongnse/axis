@@ -531,8 +531,9 @@ The rule for traffic that comes in, and for every connection Axis makes.
   `SSL_CERT_FILE` adds to it, see [on premises](#on-premises).
 - **PostgreSQL.** _(planned for M16)_ Connections use TLS and check the
   server's certificate.
-- **URL bindings.** _(planned for M16)_ A `url` binding accepts `https` only.
-  Today it accepts `http` or `https`.
+- **URL bindings.** A `url` binding must be `https` outside Development.
+  Activation refuses an `http` binding, and the worker never sends a call to
+  one, see [deployment bindings](integration-resources.md#deployment-bindings).
 - **Proxy to server.** _(planned for M16)_ Traffic between the proxy and the
   server uses TLS. Inside the Compose network or the cluster it is plain HTTP
   today.
