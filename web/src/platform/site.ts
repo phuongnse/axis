@@ -44,6 +44,11 @@ export function siteTitle(site: SiteListItem, locale: string): string {
   return site.titles[locale] ?? Object.values(site.titles)[0] ?? site.path
 }
 
+/** The application title in the given locale, or in the application's first locale when it lacks that one. */
+export function applicationTitle(app: SiteApplication, locale: string): string {
+  return app.titles[locale] ?? Object.values(app.titles)[0] ?? app.name
+}
+
 /** An application site, as served by `GET /api/sites/{path}`. */
 export interface ApplicationSite {
   path: string
@@ -440,10 +445,7 @@ export async function fetchSite(signal?: AbortSignal): Promise<SiteMetadata> {
   return (await response.json()) as SiteMetadata
 }
 
-/**
- * show the sign-in prompt, so the platform home page stays open to a signed-out person.
- * start sign-in, so the platform home page stays open to a signed-out person.
- */
+/** Loads the sites of the signed-in person, or returns `null` on a 401, which shows no sign-in prompt. */
 export async function fetchSites(signal?: AbortSignal): Promise<SiteListItem[] | null> {
   const response = await apiFetch('/api/sites', { signal }, { promptSignInOnUnauthorized: false })
   if (response.status === 401) {
