@@ -356,9 +356,12 @@ index. The same split keeps two pull requests from editing the same lines.
   relative link and anchor in the repository.
   [`scripts/check-docs.mjs`](../scripts/check-docs.mjs) checks that
   `docs/README.md` lists every doc, that the decisions index matches the
-  decision files, that the [ASVS](reference/asvs.md#requirements) requirements table has a valid
-  row for each listed id, and the size limits: 1,000 lines for a doc, 100 for
-  AGENTS.md and 250 for a `SKILL.md` under `.claude/skills/`. A doc fact that
+  decision files, that the [ASVS](reference/asvs.md#requirements) requirements
+  table has a valid row for each listed id, that the
+  [development users](reference/security.md#development-users) table lists the
+  same users and roles as the development realm file, and the size limits:
+  1,000 lines for a doc, 100 for AGENTS.md and 250 for a `SKILL.md` under
+  `.claude/skills/`. A doc fact that
   code can check, such as the diagnostic code table, has a unit test that
   compares the two and finds the table under `docs/` by its header, wherever
   it moves.
