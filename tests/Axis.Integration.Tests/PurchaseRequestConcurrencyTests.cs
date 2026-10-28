@@ -166,7 +166,7 @@ public sealed class PurchaseRequestConcurrencyTests(SampleAppFixture fixture) : 
         using var requester = fixture.CreateClient().SignedInAs("requester");
         using var chau = fixture.CreateClient().SignedInAs("chau");
         using var dung = fixture.CreateClient().SignedInAs("dung");
-        using var hoa = fixture.CreateClient().SignedInAs("hoa");
+        using var reviewer = fixture.CreateClient().SignedInAs("reviewer");
         var subject = await CreateRequestAsync(requester, 10000);
         var instance = await StartAsync(requester, subject);
         await fixture.RunUntilIdleAsync(CancellationToken);
@@ -180,11 +180,11 @@ public sealed class PurchaseRequestConcurrencyTests(SampleAppFixture fixture) : 
 
         var responses = await Task.WhenAll(
             CompleteAsync(dung, task, """{ "outcome": "approve" }"""),
-            CompleteAsync(hoa, task, """{ "outcome": "approve" }"""));
+            CompleteAsync(reviewer, task, """{ "outcome": "approve" }"""));
         using var first = responses[0];
         using var second = responses[1];
 
-        var winner = Assert.Single(new[] { ("dung", first), ("hoa", second) }, pair => pair.Item2.StatusCode == HttpStatusCode.OK).Item1;
+        var winner = Assert.Single(new[] { ("dung", first), ("reviewer", second) }, pair => pair.Item2.StatusCode == HttpStatusCode.OK).Item1;
         var loser = first.StatusCode == HttpStatusCode.OK ? second : first;
         using (var problem = await RecordApiFixture.ReadProblemAsync(loser, HttpStatusCode.Conflict))
         {
@@ -196,10 +196,10 @@ public sealed class PurchaseRequestConcurrencyTests(SampleAppFixture fixture) : 
             "SELECT count(*) FROM axis.process_step_history WHERE process_instance_id = @instance AND step = 'financeApproval' AND decision IS NOT NULL",
             ("instance", instance)));
         Assert.Equal(1L, await fixture.CountAsync(
-            "SELECT count(*) FROM axis.audit_records WHERE process_instance_id = @instance AND action = 'task.completed' AND actor IN ('dung', 'hoa')",
+            "SELECT count(*) FROM axis.audit_records WHERE process_instance_id = @instance AND action = 'task.completed' AND actor IN ('dung', 'reviewer')",
             ("instance", instance)));
         Assert.Equal(winner, await fixture.ScalarAsync(
-            "SELECT actor FROM axis.audit_records WHERE process_instance_id = @instance AND action = 'task.completed' AND actor IN ('dung', 'hoa')",
+            "SELECT actor FROM axis.audit_records WHERE process_instance_id = @instance AND action = 'task.completed' AND actor IN ('dung', 'reviewer')",
             ("instance", instance)));
 
         await fixture.RunUntilIdleAsync(CancellationToken);

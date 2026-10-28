@@ -14,7 +14,7 @@ function item(releaseId: string, number: number, activatedAt: string, label: str
     contentHash: `hash-${number}`,
     activatedAt,
     actor: 'user-1',
-    actorName: number === 1 ? 'Hoa' : null,
+    actorName: number === 1 ? 'Author User' : null,
     label,
     note: null,
     requestId: null,
@@ -62,7 +62,7 @@ describe.each(['light', 'dark'])('StudioReleasesList in %s mode', (mode) => {
     expect(rows.map((row) => row.getAttribute('data-number'))).toEqual(['2', '3', '2', '1'])
     expect(rows.filter((row) => row.hasAttribute('data-active'))).toEqual([rows[0]])
     expect(within(rows[0]).getByText('Active')).toBeInTheDocument()
-    expect(within(rows[3]).getByText('Hoa')).toBeInTheDocument()
+    expect(within(rows[3]).getByText('Author User')).toBeInTheDocument()
     expect(within(rows[1]).getByText('user-1')).toBeInTheDocument()
   })
 

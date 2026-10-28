@@ -61,7 +61,7 @@ test.describe('Studio edits a scenario in the typed editor', () => {
   }
 
   test('an author builds a scenario in the typed editor and the folder diagnostics stay the same', async ({ page }) => {
-    await useSession(page, 'hoa')
+    await useSession(page, 'author')
     await page.goto(`${server.url}/studio?app=PurchaseRequests`)
     const before = await diagnostics(page)
 
@@ -98,7 +98,7 @@ test.describe('Studio edits a scenario in the typed editor', () => {
   })
 
   test('an author adds a completeTask step that expects the author to be denied', async ({ page }) => {
-    await useSession(page, 'hoa')
+    await useSession(page, 'author')
     await page.goto(scenarioURL)
     await expect(page.getByTestId('studio-scenario-step')).toHaveCount(3)
 

@@ -383,7 +383,7 @@ sample reuses a user that holds the role it needs before it adds a user.
 | `chau`          | `department-manager`    | Purchase request and leave request samples; E2E journeys                                                                                      |
 | `dung`          | `finance-reviewer`      | Purchase request sample seeds; E2E journeys                                                                                                   |
 | `giang`         | `operator`              | Purchase request sample's Approvals inspector; E2E journeys                                                                                   |
-| `hoa`           | `author`, `publisher`   | Studio and the authoring API under `scripts/dev.sh`; E2E Studio journeys                                                                      |
+| `author`        | `author`, `publisher`   | Studio and the authoring API under `scripts/dev.sh`; E2E Studio journeys                                                                      |
 | `khoa`          | `agent`                 | Service desk sample; E2E journeys                                                                                                             |
 | `linh`          | `service-desk-lead`     | Service desk sample; E2E journeys                                                                                                             |
 | `minh`          | `approver`              | Request approval template journey; E2E journeys                                                                                               |

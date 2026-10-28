@@ -35,7 +35,7 @@ The owner confirmed these points on issue #704 on 2026-10-19.
   - `validate` needs the author role. `publish` and `rollback` need both the
     author role and the publisher role.
   - With no value, nobody may publish or roll back.
-  - The development realm gives `hoa` a `publisher` role.
+  - The development realm gives `author` a `publisher` role.
 - **The publisher:**
   - It is a long-running command of the admin tool, `axis-admin publisher`, in
     the `axis-admin` image.

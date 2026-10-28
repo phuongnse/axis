@@ -42,14 +42,14 @@ public sealed class StudioDesignerMigrationTests : IAsyncLifetime
             """, CancellationToken);
         var connectionString = await _database.CreateDatabaseAsync("studio_designer_migration", CancellationToken);
         await using var factory = NewFactory(folder.Path, [("a", HostA, connectionString)]);
-        using var hoa = factory.CreateClient().SignedInAs("hoa");
+        using var author = factory.CreateClient().SignedInAs("author");
         await using var publisher = RunPublisher("a", HostA, connectionString);
         var table = EntityNaming.QualifiedTable(EntityNaming.Table(_memoId));
         await PostgreSqlServer.AdminScalarAsync(
             connectionString,
             $"""INSERT INTO {table} ("id", "f_title", "f_note") VALUES ('{Guid.NewGuid()}', 'first', 'kept value')""",
             CancellationToken);
-        using var memo = await GetJsonAsync(hoa, $"{ApplicationUrl}/resources/{_memoId:D}", HostA);
+        using var memo = await GetJsonAsync(author, $"{ApplicationUrl}/resources/{_memoId:D}", HostA);
         var version = memo.RootElement.GetProperty("version").GetString();
 
         var migrationId = Guid.NewGuid();
@@ -60,7 +60,7 @@ public sealed class StudioDesignerMigrationTests : IAsyncLifetime
                             "changes": [ { "type": "renameField", "from": "note", "to": "remark" } ] } }
             ] }
             """;
-        using var saved = await SendAsync(hoa, HttpMethod.Post, $"{ApplicationUrl}/changes", HostA, body);
+        using var saved = await SendAsync(author, HttpMethod.Post, $"{ApplicationUrl}/changes", HostA, body);
 
         Assert.Equal(HttpStatusCode.OK, saved.StatusCode);
         using var answer = await ReadAsync(saved);
@@ -68,9 +68,9 @@ public sealed class StudioDesignerMigrationTests : IAsyncLifetime
         Assert.DoesNotContain(answer.RootElement.GetProperty("diagnostics").EnumerateArray(), diagnostic => diagnostic.GetProperty("severity").GetString() == "error");
         Assert.True(File.Exists(Path.Combine(folder.Path, "migrations", "memo-change20261021030405.json")));
 
-        using var accepted = await SendAsync(hoa, HttpMethod.Post, $"{ApplicationUrl}/publish", HostA);
+        using var accepted = await SendAsync(author, HttpMethod.Post, $"{ApplicationUrl}/publish", HostA);
         Assert.Equal(HttpStatusCode.Accepted, accepted.StatusCode);
-        using var finished = await WaitForFinalAsync(hoa, accepted.Headers.Location!.OriginalString, HostA);
+        using var finished = await WaitForFinalAsync(author, accepted.Headers.Location!.OriginalString, HostA);
         Assert.Equal("succeeded", finished.RootElement.GetProperty("status").GetString());
         Assert.Equal("kept value", await PostgreSqlServer.AdminScalarAsync(connectionString, $"""SELECT "f_remark" FROM {table} WHERE "f_title" = 'first'""", CancellationToken));
         Assert.Equal(0L, await PostgreSqlServer.AdminScalarAsync(
@@ -97,14 +97,14 @@ public sealed class StudioDesignerMigrationTests : IAsyncLifetime
             """, CancellationToken);
         var connectionString = await _database.CreateDatabaseAsync("studio_designer_convert", CancellationToken);
         await using var factory = NewFactory(folder.Path, [("a", HostA, connectionString)]);
-        using var hoa = factory.CreateClient().SignedInAs("hoa");
+        using var author = factory.CreateClient().SignedInAs("author");
         await using var publisher = RunPublisher("a", HostA, connectionString);
         var table = EntityNaming.QualifiedTable(EntityNaming.Table(_memoId));
         await PostgreSqlServer.AdminScalarAsync(
             connectionString,
             $"""INSERT INTO {table} ("id", "f_title", "f_qty") VALUES ('{Guid.NewGuid()}', 'first', '42')""",
             CancellationToken);
-        using var memo = await GetJsonAsync(hoa, $"{ApplicationUrl}/resources/{_memoId:D}", HostA);
+        using var memo = await GetJsonAsync(author, $"{ApplicationUrl}/resources/{_memoId:D}", HostA);
         var version = memo.RootElement.GetProperty("version").GetString();
 
         var migrationId = Guid.NewGuid();
@@ -115,15 +115,15 @@ public sealed class StudioDesignerMigrationTests : IAsyncLifetime
                             "changes": [ { "type": "convert", "field": "qty", "value": "qty" } ] } }
             ] }
             """;
-        using var saved = await SendAsync(hoa, HttpMethod.Post, $"{ApplicationUrl}/changes", HostA, body);
+        using var saved = await SendAsync(author, HttpMethod.Post, $"{ApplicationUrl}/changes", HostA, body);
 
         Assert.Equal(HttpStatusCode.OK, saved.StatusCode);
         using var answer = await ReadAsync(saved);
         Assert.DoesNotContain(answer.RootElement.GetProperty("diagnostics").EnumerateArray(), diagnostic => diagnostic.GetProperty("severity").GetString() == "error");
 
-        using var accepted = await SendAsync(hoa, HttpMethod.Post, $"{ApplicationUrl}/publish", HostA);
+        using var accepted = await SendAsync(author, HttpMethod.Post, $"{ApplicationUrl}/publish", HostA);
         Assert.Equal(HttpStatusCode.Accepted, accepted.StatusCode);
-        using var finished = await WaitForFinalAsync(hoa, accepted.Headers.Location!.OriginalString, HostA);
+        using var finished = await WaitForFinalAsync(author, accepted.Headers.Location!.OriginalString, HostA);
         Assert.Equal("succeeded", finished.RootElement.GetProperty("status").GetString());
         Assert.Equal(42L, await PostgreSqlServer.AdminScalarAsync(connectionString, $"""SELECT "f_qty" FROM {table} WHERE "f_title" = 'first'""", CancellationToken));
         Assert.Equal("bigint", await PostgreSqlServer.AdminScalarAsync(

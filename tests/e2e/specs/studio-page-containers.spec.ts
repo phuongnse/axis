@@ -64,7 +64,7 @@ test.describe('Studio builds a page with two columns', () => {
   test('an author builds a two-column page, publishes it and opens it on the site', async ({ page }) => {
     const name = `Columns${Date.now().toString(36)}`
     const stamp = Date.now().toString(36)
-    await useSession(page, 'hoa')
+    await useSession(page, 'author')
     await page.goto(`${server.url}/studio?app=PurchaseRequests`)
 
     await page.getByRole('button', { name: 'New application', exact: true }).click()

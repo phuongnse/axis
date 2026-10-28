@@ -92,8 +92,8 @@ public sealed class AdminPublisherTests(PostgreSqlFixture database) : IClassFixt
 
         Assert.Equal(1L, await ScalarAsync(scenario, ids[0], "SELECT count(*) FROM axis.audit_records WHERE action LIKE 'release.%'"));
         Assert.Equal(1L, await ScalarAsync(scenario, ids[0], "SELECT count(*) FROM axis.audit_records WHERE action = 'release.published'"));
-        Assert.Equal("hoa", await ScalarAsync(scenario, ids[0], "SELECT actor FROM axis.audit_records WHERE action = 'release.published'"));
-        Assert.Equal("Hoa Author", await ScalarAsync(scenario, ids[0], "SELECT actor_name FROM axis.audit_records WHERE action = 'release.published'"));
+        Assert.Equal("author", await ScalarAsync(scenario, ids[0], "SELECT actor FROM axis.audit_records WHERE action = 'release.published'"));
+        Assert.Equal("Author User", await ScalarAsync(scenario, ids[0], "SELECT actor_name FROM axis.audit_records WHERE action = 'release.published'"));
         Assert.Equal(await ApplicationIdAsync(), await ScalarAsync(scenario, ids[0], "SELECT application_id::text FROM axis.audit_records WHERE action = 'release.published'"));
         var details = JsonNode.Parse((string)(await ScalarAsync(scenario, ids[0], "SELECT details::text FROM axis.audit_records WHERE action = 'release.published'"))!)!;
         Assert.Equal(request.ToString("D"), details["requestId"]!.GetValue<string>());
@@ -101,8 +101,8 @@ public sealed class AdminPublisherTests(PostgreSqlFixture database) : IClassFixt
         Assert.Equal(release, details["releaseId"]!.GetValue<string>());
         Assert.Equal(1, details["number"]!.GetValue<int>());
         Assert.Equal(1L, await ScalarAsync(scenario, ids[0], "SELECT count(*) FROM axis.release_activations"));
-        Assert.Equal("hoa", await ScalarAsync(scenario, ids[0], "SELECT actor FROM axis.release_activations"));
-        Assert.Equal("Hoa Author", await ScalarAsync(scenario, ids[0], "SELECT actor_name FROM axis.release_activations"));
+        Assert.Equal("author", await ScalarAsync(scenario, ids[0], "SELECT actor FROM axis.release_activations"));
+        Assert.Equal("Author User", await ScalarAsync(scenario, ids[0], "SELECT actor_name FROM axis.release_activations"));
         Assert.Equal(request, await ScalarAsync(scenario, ids[0], "SELECT request_id FROM axis.release_activations"));
         await scenario.AssertNoSecretsAsync();
     }
@@ -652,7 +652,7 @@ public sealed class AdminPublisherTests(PostgreSqlFixture database) : IClassFixt
         await using var command = new NpgsqlCommand(
             """
             INSERT INTO axis.publish_requests (id, application_id, kind, status, snapshot, requested_by, requested_by_name, requested_at)
-            VALUES (@id, @application, @kind, 'queued', @snapshot, 'hoa', 'Hoa Author', clock_timestamp())
+            VALUES (@id, @application, @kind, 'queued', @snapshot, 'author', 'Author User', clock_timestamp())
             """,
             connection);
         command.Parameters.AddWithValue("id", id);

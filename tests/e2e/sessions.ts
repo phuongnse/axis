@@ -10,7 +10,7 @@ export type SampleUser =
   | "chau"
   | "dung"
   | "giang"
-  | "hoa"
+  | "author"
   | "khoa"
   | "linh"
   | "minh"
@@ -26,7 +26,7 @@ export const sampleUsers: Record<SampleUser, string[]> = {
   chau: ["department-manager"],
   dung: ["finance-reviewer"],
   giang: ["operator"],
-  hoa: ["author", "publisher"],
+  author: ["author", "publisher"],
   khoa: ["agent"],
   linh: ["service-desk-lead"],
   minh: ["approver"],

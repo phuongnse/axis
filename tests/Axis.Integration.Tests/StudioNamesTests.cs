@@ -60,7 +60,7 @@ public sealed class StudioNamesTests : IAsyncLifetime
             builder.UseSetting("Studio:Folders:2", _broken.Path);
             builder.UseSetting("Studio:AuthorRole", "author");
             builder.UseTestAuthentication(
-                new TestIdentity("hoa", "Hoa Author", "author"),
+                new TestIdentity("author", "Author User", "author"),
                 new TestIdentity("requester", "Requester User", "employee"));
         });
     }
@@ -221,14 +221,14 @@ public sealed class StudioNamesTests : IAsyncLifetime
         using var employeeResponse = await employee.SendAsync(RecordApiFixture.Request("/api/studio/apps/PurchaseRequests/names", Host), CancellationToken);
         Assert.Equal(HttpStatusCode.Forbidden, employeeResponse.StatusCode);
 
-        using var author = _factory.CreateClient().SignedInAs("hoa");
+        using var author = _factory.CreateClient().SignedInAs("author");
         using var unknownResponse = await author.SendAsync(RecordApiFixture.Request("/api/studio/apps/Unknown/names", Host), CancellationToken);
         Assert.Equal(HttpStatusCode.NotFound, unknownResponse.StatusCode);
     }
 
     private async Task<JsonElement> NamesAsync(string application)
     {
-        using var client = _factory.CreateClient().SignedInAs("hoa");
+        using var client = _factory.CreateClient().SignedInAs("author");
         using var request = RecordApiFixture.Request($"/api/studio/apps/{application}/names", Host);
         using var response = await client.SendAsync(request, CancellationToken);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);

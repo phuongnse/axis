@@ -105,7 +105,7 @@ public sealed class PublisherRollbackTests(PostgreSqlFixture database) : IClassF
     {
         Assert.Equal(1L, await ScalarAsync(scenario, tenant, $"SELECT count(*) FROM axis.audit_records WHERE action LIKE 'release.%'"));
         Assert.Equal(1L, await ScalarAsync(scenario, tenant, $"SELECT count(*) FROM axis.audit_records WHERE action = '{action}'"));
-        Assert.Equal("hoa", await ScalarAsync(scenario, tenant, $"SELECT actor FROM axis.audit_records WHERE action = '{action}'"));
+        Assert.Equal("author", await ScalarAsync(scenario, tenant, $"SELECT actor FROM axis.audit_records WHERE action = '{action}'"));
         var details = JsonNode.Parse((string)(await ScalarAsync(scenario, tenant, $"SELECT details::text FROM axis.audit_records WHERE action = '{action}'"))!)!;
         Assert.Equal(request.ToString("D"), details["requestId"]!.GetValue<string>());
         Assert.Equal(release.ToString("D"), details["releaseId"]!.GetValue<string>());
@@ -139,7 +139,7 @@ public sealed class PublisherRollbackTests(PostgreSqlFixture database) : IClassF
         await using var command = new NpgsqlCommand(
             """
             INSERT INTO axis.publish_requests (id, application_id, kind, status, release_id, requested_by, requested_by_name, requested_at)
-            VALUES (@id, @application, 'rollback', 'queued', @release, 'hoa', 'Hoa Author', clock_timestamp())
+            VALUES (@id, @application, 'rollback', 'queued', @release, 'author', 'Author User', clock_timestamp())
             """,
             connection);
         command.Parameters.AddWithValue("id", id);

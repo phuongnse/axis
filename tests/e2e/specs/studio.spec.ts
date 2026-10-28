@@ -56,7 +56,7 @@ test.describe('Studio on a copy of its own', () => {
   })
 
   test('an author opens Studio from the app switcher, searches for a resource and opens it', async ({ page }) => {
-    await useSession(page, 'hoa')
+    await useSession(page, 'author')
     const list = await page.request.get(`${server.url}/api/studio/apps/PurchaseRequests/resources`)
     const { items } = (await list.json()) as { items: { id: string; file: string }[] }
     const entity = items.find((item) => item.file === 'entities/purchase-request.json')!
@@ -75,7 +75,7 @@ test.describe('Studio on a copy of its own', () => {
   })
 
   test('an author changes the maxLength of an entity field and the file holds only that change', async ({ page }) => {
-    await useSession(page, 'hoa')
+    await useSession(page, 'author')
     const list = await page.request.get(`${server.url}/api/studio/apps/PurchaseRequests/resources`)
     const { items } = (await list.json()) as { items: { id: string; file: string }[] }
     const entity = items.find((item) => item.file === 'entities/purchase-request.json')!
@@ -97,7 +97,7 @@ test.describe('Studio on a copy of its own', () => {
   })
 
   test('an author sees an expression error as they type, and its type once fixed, without saving', async ({ page }) => {
-    await useSession(page, 'hoa')
+    await useSession(page, 'author')
     const list = await page.request.get(`${server.url}/api/studio/apps/PurchaseRequests/resources`)
     const { items } = (await list.json()) as { items: { id: string; file: string }[] }
     const entity = items.find((item) => item.file === 'entities/purchase-request.json')!
@@ -121,7 +121,7 @@ test.describe('Studio on a copy of its own', () => {
   })
 
   test('an author completes the names of a policy filter without saving', async ({ page }) => {
-    await useSession(page, 'hoa')
+    await useSession(page, 'author')
     const list = await page.request.get(`${server.url}/api/studio/apps/PurchaseRequests/resources`)
     const { items } = (await list.json()) as { items: { id: string; file: string }[] }
     const policy = items.find((item) => item.file === 'policies/employee-access.json')!
@@ -145,7 +145,7 @@ test.describe('Studio on a copy of its own', () => {
   })
 
   test('an author follows a Used by entry from a department to the entity that uses it', async ({ page }) => {
-    await useSession(page, 'hoa')
+    await useSession(page, 'author')
     const list = await page.request.get(`${server.url}/api/studio/apps/PurchaseRequests/resources`)
     const { items } = (await list.json()) as { items: { id: string; file: string }[] }
     const department = items.find((item) => item.file === 'entities/department.json')!
@@ -164,7 +164,7 @@ test.describe('Studio on a copy of its own', () => {
   })
 
   test('an author picks a data source of a page from the names and the Uses list shows it', async ({ page }) => {
-    await useSession(page, 'hoa')
+    await useSession(page, 'author')
     const list = await page.request.get(`${server.url}/api/studio/apps/PurchaseRequests/resources`)
     const { items } = (await list.json()) as { items: { id: string; file: string }[] }
     const pageResource = items.find((item) => item.file === 'pages/requests-by-department.json')!
@@ -195,7 +195,7 @@ test.describe('Studio on a copy of its own', () => {
   })
 
   test('an author opens a grant field picker and it offers the fields of the granted entity', async ({ page }) => {
-    await useSession(page, 'hoa')
+    await useSession(page, 'author')
     const list = await page.request.get(`${server.url}/api/studio/apps/PurchaseRequests/resources`)
     const { items } = (await list.json()) as { items: { id: string; file: string }[] }
     const policy = items.find((item) => item.file === 'policies/employee-access.json')!
@@ -213,7 +213,7 @@ test.describe('Studio on a copy of its own', () => {
   })
 
   test('an author sees what the employee role may do in the policy matrix', async ({ page }) => {
-    await useSession(page, 'hoa')
+    await useSession(page, 'author')
 
     await page.goto(`${server.url}/studio?app=PurchaseRequests&view=policies`)
 
@@ -227,7 +227,7 @@ test.describe('Studio on a copy of its own', () => {
   test('an author gives a new role read on Supplier in the policy matrix and the access policy is created', async ({
     page,
   }) => {
-    await useSession(page, 'hoa')
+    await useSession(page, 'author')
     const roleFile = path.join(copy, 'roles/matrix-tester.json')
     const policyFile = path.join(copy, 'policies/matrix-tester-access.json')
     await rm(roleFile, { force: true })
@@ -277,7 +277,7 @@ test.describe('Studio on a copy of its own', () => {
   test('an author gives a new role read and export on a data source in the policy matrix and finds both in the policy file', async ({
     page,
   }) => {
-    await useSession(page, 'hoa')
+    await useSession(page, 'author')
     const roleFile = path.join(copy, 'roles/matrix-exporter.json')
     const policyFile = path.join(copy, 'policies/matrix-exporter-access.json')
     await rm(roleFile, { force: true })
@@ -334,7 +334,7 @@ test.describe('Studio on a copy of its own', () => {
     // A second server on a spare port, so the restart does not touch the server the other tests use.
     let restarted = await startServer({ ActivateOnStartup__0: e2eApp, Studio__Folders__0: copy })
     try {
-      await useSession(page, 'hoa')
+      await useSession(page, 'author')
       expect((await page.request.get(`${restarted.url}/api/me`)).status()).toBe(200)
       const list = await page.request.get(`${restarted.url}/api/studio/apps/PurchaseRequests/resources`)
       const { items } = (await list.json()) as { items: { id: string; file: string }[] }
@@ -366,7 +366,7 @@ test.describe('Studio on a copy of its own', () => {
   })
 
   test('an author selects a diagnostic and the editor shows the field at its path', async ({ page }) => {
-    await useSession(page, 'hoa')
+    await useSession(page, 'author')
     const list = await page.request.get(`${server.url}/api/studio/apps/PurchaseRequests/resources`)
     const { items } = (await list.json()) as { items: { id: string; file: string }[] }
     const endpoint = items.find((item) => item.file === 'endpoints/submit-purchase-request.json')!
@@ -398,7 +398,7 @@ test.describe('Studio on a copy of its own', () => {
   })
 
   test('an author adds a department in the seed grid and the file holds only that new record', async ({ page }) => {
-    await useSession(page, 'hoa')
+    await useSession(page, 'author')
     const list = await page.request.get(`${server.url}/api/studio/apps/PurchaseRequests/resources`)
     const { items } = (await list.json()) as { items: { id: string; file: string }[] }
     const seed = items.find((item) => item.file === 'seeds/departments.json')!
@@ -437,7 +437,7 @@ test.describe('Studio on a copy of its own', () => {
   })
 
   test('an author adds a text key in the text table and both locales hold it', async ({ page }) => {
-    await useSession(page, 'hoa')
+    await useSession(page, 'author')
     const list = await page.request.get(`${server.url}/api/studio/apps/PurchaseRequests/resources`)
     const { items } = (await list.json()) as { items: { id: string; file: string }[] }
     const english = items.find((item) => item.file === 'texts/en.json')!
@@ -467,7 +467,7 @@ test.describe('Studio on a copy of its own', () => {
   test('an author adds a connector operation in the connector editor and the file keeps the others', async ({
     page,
   }) => {
-    await useSession(page, 'hoa')
+    await useSession(page, 'author')
     const list = await page.request.get(`${server.url}/api/studio/apps/PurchaseRequests/resources`)
     const { items } = (await list.json()) as { items: { id: string; file: string }[] }
     const connector = items.find((item) => item.file === 'connectors/purchasing-system.json')!
@@ -509,7 +509,7 @@ test.describe('Studio on a copy of its own', () => {
   })
 
   test('an author edits an endpoint mapping row and the file holds only that expression changed', async ({ page }) => {
-    await useSession(page, 'hoa')
+    await useSession(page, 'author')
     const list = await page.request.get(`${server.url}/api/studio/apps/PurchaseRequests/resources`)
     const { items } = (await list.json()) as { items: { id: string; file: string }[] }
     const endpoint = items.find((item) => item.file === 'endpoints/submit-purchase-request.json')!
@@ -543,7 +543,7 @@ test.describe('Studio on a copy of its own', () => {
   })
 
   test('an author gives a new page a title in two locales, writes the texts and saves', async ({ page }) => {
-    await useSession(page, 'hoa')
+    await useSession(page, 'author')
     const pageFile = path.join(copy, 'pages/label-texts-e2e.json')
     const textFiles = ['en', 'vi'].map((locale) => path.join(copy, `texts/${locale}.json`))
     const [originalEn, originalVi] = await Promise.all(textFiles.map((file) => readFile(file, 'utf8')))
@@ -580,7 +580,7 @@ test.describe('Studio on a copy of its own', () => {
   })
 
   test('an author selects the steps of a process on its graph', async ({ page }) => {
-    await useSession(page, 'hoa')
+    await useSession(page, 'author')
     const list = await page.request.get(`${server.url}/api/studio/apps/PurchaseRequests/resources`)
     const { items } = (await list.json()) as { items: { id: string; file: string }[] }
     const process = items.find((item) => item.file === 'processes/purchase-request-approval.json')!
@@ -624,14 +624,14 @@ test.describe('Studio on a copy of its own', () => {
   })
 
   test('an author without the publisher role sees Validate and no Publish', async ({ page }) => {
-    // A second server whose publisher role nobody holds, so hoa is an author but not a publisher.
+    // A second server whose publisher role nobody holds, so author is an author but not a publisher.
     const noPublisher = await startServer({
       ActivateOnStartup__0: e2eApp,
       Studio__PublisherRole: 'release-manager',
       Studio__Folders__0: copy,
     })
     try {
-      await useSession(page, 'hoa')
+      await useSession(page, 'author')
 
       await page.goto(`${noPublisher.url}/studio?app=PurchaseRequests`)
 

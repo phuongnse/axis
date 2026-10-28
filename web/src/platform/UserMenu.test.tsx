@@ -22,9 +22,9 @@ const requester: CurrentUser = {
   studioTest: false,
   console: false,
 }
-const hoa: CurrentUser = {
-  id: 'hoa',
-  displayName: 'Hoa Author',
+const author: CurrentUser = {
+  id: 'author',
+  displayName: 'Author User',
   roles: ['author'],
   studio: true,
   studioPublisher: true,
@@ -123,10 +123,10 @@ describe('UserMenu', () => {
   })
 
   it('shows no Studio link beside the name of an author', async () => {
-    stubServer(hoa)
+    stubServer(author)
     renderMenu()
 
-    expect(await screen.findByRole('button', { name: 'Hoa Author' })).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Author User' })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Studio' })).not.toBeInTheDocument()
   })
 

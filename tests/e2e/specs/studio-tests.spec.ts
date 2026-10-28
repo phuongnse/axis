@@ -9,7 +9,7 @@ import { useSession } from '../sessions'
 
 const approvalBelowThreshold = '09d75317-fd9e-411e-8322-317778fc1b2b'
 
-test.describe('hoa runs the test scenarios of the purchase request sample from Studio', () => {
+test.describe('author runs the test scenarios of the purchase request sample from Studio', () => {
   test.describe.configure({ mode: 'serial' })
   // A second server starts, and the requests wait behind the publish requests that other specs queue. Each scenario
   // of the sample creates and drops a database.
@@ -34,7 +34,7 @@ test.describe('hoa runs the test scenarios of the purchase request sample from S
   })
 
   test('Run tests runs every scenario, and every scenario passes', async ({ page }) => {
-    await useSession(page, 'hoa')
+    await useSession(page, 'author')
     await page.goto(`${server.url}/studio?app=PurchaseRequests`)
     await page.getByTestId('studio-run-tests').click()
 
@@ -52,7 +52,7 @@ test.describe('hoa runs the test scenarios of the purchase request sample from S
     scenario.steps[5].values.status = 'rejected'
     await writeFile(scenarioFile, JSON.stringify(scenario, null, 2))
 
-    await useSession(page, 'hoa')
+    await useSession(page, 'author')
     await page.goto(`${server.url}/studio?app=PurchaseRequests&resource=${approvalBelowThreshold}`)
     await page.getByTestId('studio-run-scenario').click()
 
@@ -69,7 +69,7 @@ test.describe('hoa runs the test scenarios of the purchase request sample from S
   })
 
   test('GET /api/me shows the test controls to an author and not to anyone else', async ({ page }) => {
-    await useSession(page, 'hoa')
+    await useSession(page, 'author')
     const author = (await (await page.request.get('/api/me')).json()) as { studioTest: boolean }
     expect(author.studioTest).toBe(true)
 
@@ -84,7 +84,7 @@ test('the test controls do not show when the server has Studio:Tests off', async
   await cp(purchaseRequests, copy, { recursive: true })
   const off = await startServer({ ActivateOnStartup__0: e2eApp, Studio__Tests: 'false', Studio__Folders__0: copy })
   try {
-    await useSession(page, 'hoa')
+    await useSession(page, 'author')
     await page.goto(`${off.url}/studio?app=PurchaseRequests`)
     // Publish shows only once GET /api/me has answered, so the test controls have been decided too.
     await expect(page.getByTestId('studio-publish')).toBeVisible()

@@ -39,7 +39,7 @@ public sealed class StudioPublishTests : IAsyncLifetime
         using var folder = NewFolder();
         var connectionString = await _database.CreateDatabaseAsync("studio_publish", CancellationToken);
         await using var factory = NewFactory(folder.Path, [("a", HostA, connectionString)]);
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
 
         await EditTextsAsync(folder.Path, "Departments", "Teams");
         using var accepted = await SendAsync(client, HttpMethod.Post, PublishUrl, HostA, """{ "label": "Teams", "note": "Renamed." }""");
@@ -53,7 +53,7 @@ public sealed class StudioPublishTests : IAsyncLifetime
         Assert.Equal("PurchaseRequests", request.RootElement.GetProperty("application").GetString());
         Assert.Equal("Teams", request.RootElement.GetProperty("label").GetString());
         Assert.Equal("Renamed.", request.RootElement.GetProperty("note").GetString());
-        Assert.Equal("hoa", request.RootElement.GetProperty("requestedBy").GetString());
+        Assert.Equal("author", request.RootElement.GetProperty("requestedBy").GetString());
         Assert.Equal(0, request.RootElement.GetProperty("diagnostics").GetArrayLength());
 
         // The call has answered, so this edit is not in the request.
@@ -76,7 +76,7 @@ public sealed class StudioPublishTests : IAsyncLifetime
         await using var factory = NewFactory(folder.Path, [("a", HostA, connectionString)]);
         using var lan = factory.CreateClient().SignedInAs("lan");
         using var nobody = factory.CreateClient();
-        using var hoa = factory.CreateClient().SignedInAs("hoa");
+        using var author = factory.CreateClient().SignedInAs("author");
 
         using var refused = await SendAsync(lan, HttpMethod.Post, PublishUrl, HostA);
         Assert.Equal(HttpStatusCode.Forbidden, refused.StatusCode);
@@ -100,11 +100,11 @@ public sealed class StudioPublishTests : IAsyncLifetime
 
             using var withoutCsrf = new HttpRequestMessage(HttpMethod.Post, new Uri(url, UriKind.Relative));
             withoutCsrf.Headers.Host = HostA;
-            using var noHeader = await hoa.SendAsync(withoutCsrf, CancellationToken);
+            using var noHeader = await author.SendAsync(withoutCsrf, CancellationToken);
             Assert.Equal(HttpStatusCode.Forbidden, noHeader.StatusCode);
         }
 
-        using var unknown = await SendAsync(hoa, HttpMethod.Post, "/api/studio/apps/NoSuchApplication/publish", HostA);
+        using var unknown = await SendAsync(author, HttpMethod.Post, "/api/studio/apps/NoSuchApplication/publish", HostA);
         Assert.Equal(HttpStatusCode.NotFound, unknown.StatusCode);
         Assert.Equal(1L, await CountRequestsAsync(connectionString));
     }
@@ -116,10 +116,10 @@ public sealed class StudioPublishTests : IAsyncLifetime
         var connectionString = await _database.CreateDatabaseAsync("studio_publish_me", CancellationToken);
         await using var factory = NewFactory(folder.Path, [("a", HostA, connectionString)]);
 
-        using var hoa = factory.CreateClient().SignedInAs("hoa");
-        using var hoaMe = await GetJsonAsync(hoa, "/api/me", HostA);
-        Assert.True(hoaMe.RootElement.GetProperty("studio").GetBoolean());
-        Assert.True(hoaMe.RootElement.GetProperty("studioPublisher").GetBoolean());
+        using var author = factory.CreateClient().SignedInAs("author");
+        using var authorMe = await GetJsonAsync(author, "/api/me", HostA);
+        Assert.True(authorMe.RootElement.GetProperty("studio").GetBoolean());
+        Assert.True(authorMe.RootElement.GetProperty("studioPublisher").GetBoolean());
 
         using var lan = factory.CreateClient().SignedInAs("lan");
         using var lanMe = await GetJsonAsync(lan, "/api/me", HostA);
@@ -138,7 +138,7 @@ public sealed class StudioPublishTests : IAsyncLifetime
         var databaseA = await _database.CreateDatabaseAsync("studio_publish_a", CancellationToken);
         var databaseB = await _database.CreateDatabaseAsync("studio_publish_b", CancellationToken);
         await using var factory = NewFactory(folder.Path, [("a", HostA, databaseA), ("b", HostB, databaseB)]);
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
 
         using var accepted = await SendAsync(client, HttpMethod.Post, PublishUrl, HostA);
 
@@ -159,7 +159,7 @@ public sealed class StudioPublishTests : IAsyncLifetime
         using var folder = NewFolder();
         var connectionString = await _database.CreateDatabaseAsync("studio_publish_bad", CancellationToken);
         await using var factory = NewFactory(folder.Path, [("a", HostA, connectionString)]);
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
 
         foreach (var body in new[] { "[]", "not json", """{ "other": "x" }""", """{ "label": 1 }""", """{ "label": null }""", $$"""{ "label": "{{new string('x', 101)}}" }""", $$"""{ "note": "{{new string('x', 2001)}}" }""" })
         {
@@ -250,7 +250,7 @@ public sealed class StudioPublishTests : IAsyncLifetime
             builder.UseSetting("Studio:AuthorRole", "author");
             builder.UseSetting("Studio:PublisherRole", "publisher");
             builder.UseTestAuthentication(
-                new TestIdentity("hoa", "Hoa Author", "author", "publisher"),
+                new TestIdentity("author", "Author User", "author", "publisher"),
                 new TestIdentity("lan", "Lan", "author"),
                 new TestIdentity("requester", "Requester", "employee"));
         });

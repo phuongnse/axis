@@ -67,13 +67,13 @@ public sealed class ReleaseHistoryTests(DataDatabaseFixture database) : IClassFi
         using var folder = Folder("Sales");
         var compiled = await CompileAsync(folder);
         var requestId = Guid.NewGuid();
-        var actor = ActivationActor.User("hoa", "Hoa Author", "Spring", "Fixes the title.", requestId);
+        var actor = ActivationActor.User("author", "Author User", "Spring", "Fixes the title.", requestId);
 
         Assert.Empty((await ActivateAsync(compiled, actor)).Diagnostics);
 
         var row = Assert.Single(await ListAsync());
         Assert.Equal(
-            ("hoa", "Hoa Author", "Spring", "Fixes the title.", requestId, 1),
+            ("author", "Author User", "Spring", "Fixes the title.", requestId, 1),
             (row.Actor, row.ActorName, row.Label, row.Note, row.RequestId, row.Number));
         Assert.Equal(compiled.Release!.Id, row.ReleaseId);
     }

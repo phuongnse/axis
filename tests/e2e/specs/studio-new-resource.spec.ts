@@ -61,7 +61,7 @@ test.describe('Studio creates a resource from a starter', () => {
   }
 
   test('an author creates an entity and a page, and each opens in the editor', async ({ page }) => {
-    await useSession(page, 'hoa')
+    await useSession(page, 'author')
     await page.goto(`${server.url}/studio?app=PurchaseRequests`)
 
     await createResource(page, 'entity', 'CostCentre')
@@ -77,7 +77,7 @@ test.describe('Studio creates a resource from a starter', () => {
   })
 
   test('an author adds a vi text resource that holds every key of en', async ({ page }) => {
-    await useSession(page, 'hoa')
+    await useSession(page, 'author')
     await page.goto(`${server.url}/studio?app=PurchaseRequests`)
 
     await createResource(page, 'text', 'vi', 'TextsVi')
@@ -99,7 +99,7 @@ test.describe('Studio creates a resource from a starter', () => {
   test('an author builds an entity with enum, reference and child-collection fields in the designer', async ({
     page,
   }) => {
-    await useSession(page, 'hoa')
+    await useSession(page, 'author')
     await page.goto(`${server.url}/studio?app=PurchaseRequests`)
     const entityName = page.getByTestId('studio-entity-designer').getByRole('textbox', { name: 'Entity name', exact: true })
 
@@ -140,7 +140,7 @@ test.describe('Studio creates a resource from a starter', () => {
   }) => {
     const { id } = JSON.parse(await readFile(path.join(copy, 'entities', 'project.json'), 'utf8')) as { id: string }
 
-    await useSession(page, 'hoa')
+    await useSession(page, 'author')
     await page.goto(`${server.url}/studio?app=PurchaseRequests&resource=${id}`)
     await expect(page.getByTestId('studio-entity-designer').getByRole('textbox', { name: 'Entity name', exact: true })).toHaveValue(
       'Project',
@@ -166,7 +166,7 @@ test.describe('Studio creates a resource from a starter', () => {
   })
 
   test('an author builds money, file, references and labelled enum fields in the designer', async ({ page }) => {
-    await useSession(page, 'hoa')
+    await useSession(page, 'author')
     await page.goto(`${server.url}/studio?app=PurchaseRequests`)
     const entityName = page.getByTestId('studio-entity-designer').getByRole('textbox', { name: 'Entity name', exact: true })
     const savedFields = async (file: string) =>
@@ -232,7 +232,7 @@ test.describe('Studio creates a resource from a starter', () => {
   test('an author sets a default, a minimum, a searchable text field and a unique index in the designer', async ({
     page,
   }) => {
-    await useSession(page, 'hoa')
+    await useSession(page, 'author')
     await page.goto(`${server.url}/studio?app=PurchaseRequests`)
     const entityName = page.getByTestId('studio-entity-designer').getByRole('textbox', { name: 'Entity name', exact: true })
 
@@ -278,7 +278,7 @@ test.describe('Studio creates a resource from a starter', () => {
   })
 
   test('an author creates an oidc identity provider and lets the Purchasing site allow it', async ({ page }) => {
-    await useSession(page, 'hoa')
+    await useSession(page, 'author')
     await page.goto(`${server.url}/studio?app=PurchaseRequests`)
 
     await createResource(page, 'identityProvider', 'Company')
@@ -334,7 +334,7 @@ test.describe('Studio creates a resource from a starter', () => {
   })
 
   test('a click on the disabled Create button fails within the action timeout and names the button', async ({ page }) => {
-    await useSession(page, 'hoa')
+    await useSession(page, 'author')
     await page.goto(`${server.url}/studio?app=PurchaseRequests`)
     await page.getByRole('button', { name: 'New resource', exact: true }).click()
     const dialog = await waitForDialog(page, 'New resource')

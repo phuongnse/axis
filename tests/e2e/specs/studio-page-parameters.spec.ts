@@ -83,7 +83,7 @@ test.describe("Studio declares a page parameter and links to the page", () => {
     const name = `Params${Date.now().toString(36)}`;
     const stamp = Date.now().toString(36);
     const title = `Link ${stamp}`;
-    await useSession(page, "hoa");
+    await useSession(page, "author");
     await page.goto(`${server.url}/studio?app=PurchaseRequests`);
 
     await page.getByRole("button", { name: "New application", exact: true }).click();

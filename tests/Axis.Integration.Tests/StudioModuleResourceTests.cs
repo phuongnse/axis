@@ -46,7 +46,7 @@ public sealed class StudioModuleResourceTests : IAsyncLifetime
             builder.UseSetting("Studio:Folders:0", _leaveRequests.Path);
             builder.UseSetting("Studio:AuthorRole", "author");
             builder.UseTestAuthentication(
-                new TestIdentity("hoa", "Hoa Author", "author"),
+                new TestIdentity("author", "Author User", "author"),
                 new TestIdentity("requester", "Requester User", "employee"));
         });
     }
@@ -61,7 +61,7 @@ public sealed class StudioModuleResourceTests : IAsyncLifetime
     [Fact]
     public async Task An_author_reads_a_module_entity_with_its_fields()
     {
-        using var client = _factory.CreateClient().SignedInAs("hoa");
+        using var client = _factory.CreateClient().SignedInAs("author");
         using var response = await client.SendAsync(Request("LeaveRequests", "departments", DepartmentId), CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
@@ -96,7 +96,7 @@ public sealed class StudioModuleResourceTests : IAsyncLifetime
     [InlineData("LeaveRequests", "departments", "not-a-guid")]
     public async Task The_route_answers_404_for_an_unknown_application_module_or_resource(string application, string module, string id)
     {
-        using var client = _factory.CreateClient().SignedInAs("hoa");
+        using var client = _factory.CreateClient().SignedInAs("author");
         using var response = await client.SendAsync(Request(application, module, id), CancellationToken);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);

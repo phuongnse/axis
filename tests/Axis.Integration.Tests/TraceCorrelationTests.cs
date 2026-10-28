@@ -17,7 +17,7 @@ public sealed class TraceCorrelationTests(SampleAppFixture fixture) : IClassFixt
 {
     private const string App = "/api/apps/PurchaseRequests";
 
-    private static readonly string[] _users = ["requester", "lan", "chau", "binh", "dung", "hoa"];
+    private static readonly string[] _users = ["requester", "lan", "chau", "binh", "dung", "author"];
 
     // The attribute keys of each Axis span in the telemetry design.
     private static readonly Dictionary<string, string[]> _axisKeys = new(StringComparer.Ordinal)

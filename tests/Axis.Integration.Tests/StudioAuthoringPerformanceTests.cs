@@ -54,7 +54,7 @@ public sealed class StudioAuthoringPerformanceTests(PostgreSqlFixture database) 
     {
         using var folder = TypicalApplication.Write(Guid.NewGuid(), withErrors: false, out _);
         await using var factory = await CreateFactoryAsync(folder.Path);
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
 
         var (status, body, elapsed) = await Answer(
             "The names",
@@ -77,7 +77,7 @@ public sealed class StudioAuthoringPerformanceTests(PostgreSqlFixture database) 
             .ToArray();
         var ids = rules.Select(IdOf).ToArray();
         await using var factory = await CreateFactoryAsync(folder.Path);
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
 
         // The versions are read for each send, so the timed call carries the versions that the warm-up call left.
         var (status, body, elapsed) = await Answer(
@@ -105,7 +105,7 @@ public sealed class StudioAuthoringPerformanceTests(PostgreSqlFixture database) 
         using var studio = new TemporaryFolder();
         Assert.Equal(TemplateFiles, WriteTemplate(source.Path, templates.Path));
         await using var factory = await CreateFactoryAsync(studio.Path, applications.Path, templates.Path);
-        using var client = factory.CreateClient().SignedInAs("hoa");
+        using var client = factory.CreateClient().SignedInAs("author");
 
         // The first create pays for the JIT and the first compile of the process.
         using (var warmUp = await CreateAsync(client, $$"""{ "name": "WarmUp", "template": "{{TemplateId}}" }"""))
@@ -337,7 +337,7 @@ public sealed class StudioAuthoringPerformanceTests(PostgreSqlFixture database) 
         await using var command = new NpgsqlCommand(
             """
             INSERT INTO axis.publish_requests (id, application_id, kind, target, status, snapshot, requested_by, requested_by_name, requested_at, scenario_names)
-            VALUES (@id, @application, 'test', 'tenant', 'queued', @snapshot, 'hoa', 'Hoa Author', clock_timestamp(), NULL)
+            VALUES (@id, @application, 'test', 'tenant', 'queued', @snapshot, 'author', 'Author User', clock_timestamp(), NULL)
             """,
             connection);
         command.Parameters.AddWithValue("id", id);
@@ -379,7 +379,7 @@ public sealed class StudioAuthoringPerformanceTests(PostgreSqlFixture database) 
             }
 
             builder.UseTestOidc("default");
-            builder.UseTestAuthentication(new TestIdentity("hoa", "Hoa Author", "author"));
+            builder.UseTestAuthentication(new TestIdentity("author", "Author User", "author"));
         });
     }
 
