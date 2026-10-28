@@ -1,12 +1,14 @@
 import { MenuFoldOutlined, MenuUnfoldOutlined } from '@ant-design/icons'
-import { Button, ConfigProvider, Flex, Layout, Menu, Segmented, Space, Switch, Typography } from 'antd'
+import { Button, ConfigProvider, Layout, Menu, Space, Typography } from 'antd'
 import dayjs from 'dayjs'
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { Link, useLocation } from 'react-router'
+import { AppSwitcher } from './AppSwitcher'
 import { antLocaleFor, dayjsLocaleFor } from './antLocale'
 import { colourTokens } from './designTokens'
 import { navigationIcon } from './navigationIcons'
 import { NotificationBell } from './NotificationBell'
+import { PreferencesMenu } from './PreferencesMenu'
 import { ShellFooter } from './ShellFooter'
 import type { NavigationItem } from './site'
 import { useText } from './texts'
@@ -45,15 +47,16 @@ function activeNavigationKey(navigation: readonly NavigationItem[], pathname: st
 
 /**
  * The layout of every site, the platform site and application sites alike. A 48 px header holds the
- * collapse button, the site's mark and title, the notification bell, the account button, the locale
- * switch and the theme toggle. A site with two or more navigation entries has a sidebar of icons and
+ * collapse button, the site's mark and title, the notification bell, the app switcher, the language
+ * and theme menu and the account button. A site with two or more navigation entries has a sidebar of icons and
  * labels that collapses to a strip of icons. A footer runs across the bottom. Ant Design components
- * and dayjs follow the locale. At narrow width, below 992 px, the navigation, locale switch and
- * theme toggle sit in a panel that a Menu button opens and closes, and there is no sidebar.
+ * and dayjs follow the locale. At narrow width, below 992 px, the navigation and the language and
+ * theme menu sit in a panel that a Menu button opens and closes, and there is no sidebar. The app
+ * switcher stays in the header.
  */
 export function Shell({ titleKey, navigation, locales, locale, onLocaleChange, notifications, children }: ShellProps) {
   const t = useText()
-  const { mode, toggleMode } = useThemeMode()
+  const { mode } = useThemeMode()
   const { pathname } = useLocation()
   const { colour, spacing, radius } = useDesignTokens()
   const activeKey = activeNavigationKey(navigation, pathname)
@@ -79,26 +82,7 @@ export function Shell({ titleKey, navigation, locales, locale, onLocaleChange, n
       ),
     }
   })
-  const localeSwitch = (
-    <Segmented
-      aria-label={t('shell.locale.label')}
-      value={locale}
-      options={locales.map((tag) => ({
-        value: tag,
-        label: t(`shell.locale.${tag}`),
-      }))}
-      onChange={onLocaleChange}
-    />
-  )
-  const themeSwitch = (
-    <Switch
-      aria-label={t('shell.theme.dark')}
-      checked={mode === 'dark'}
-      checkedChildren={t('shell.theme.darkShort')}
-      unCheckedChildren={t('shell.theme.lightShort')}
-      onChange={toggleMode}
-    />
-  )
+  const preferences = <PreferencesMenu locales={locales} locale={locale} onLocaleChange={onLocaleChange} />
 
   const bell = notifications && (
     <NotificationBell path={notifications.path} sitePath={notifications.sitePath} locale={locale} />
@@ -170,6 +154,7 @@ export function Shell({ titleKey, navigation, locales, locale, onLocaleChange, n
             {narrow ? (
               <>
                 {bell}
+                <AppSwitcher locale={locale} />
                 <UserMenu />
                 <Button
                   ref={toggle}
@@ -185,9 +170,9 @@ export function Shell({ titleKey, navigation, locales, locale, onLocaleChange, n
             ) : (
               <Space>
                 {bell}
+                <AppSwitcher locale={locale} />
+                {preferences}
                 <UserMenu />
-                {localeSwitch}
-                {themeSwitch}
               </Space>
             )}
           </Layout.Header>
@@ -209,10 +194,7 @@ export function Shell({ titleKey, navigation, locales, locale, onLocaleChange, n
                 selectedKeys={activeKey ? [activeKey] : []}
                 items={items}
               />
-              <Flex vertical gap={spacing.md} align="flex-start">
-                {localeSwitch}
-                {themeSwitch}
-              </Flex>
+              {preferences}
             </nav>
           )}
           <Layout hasSider={sidebar}>

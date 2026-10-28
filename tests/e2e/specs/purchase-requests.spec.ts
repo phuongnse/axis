@@ -5,6 +5,7 @@ import { waitForDialog } from '../dialogs'
 import { cellValue, expectShown, fieldLabel, fieldValue } from '../fields'
 import { expectChosen, pickOption } from '../select'
 import { sessionFile, useSession } from '../sessions'
+import { chooseLanguage, chooseTheme } from '../shell'
 
 // The record API needs a session with a grant, so these journeys start signed in as the employee anna.
 // anna saves a new request as a draft, because she may write only draft and returned requests.
@@ -93,7 +94,7 @@ test('a purchase request is created with line items, shows the computed total, i
   await expect(edited).toContainText('Finance')
   await expect(edited).toContainText('Acme Supplies')
 
-  await page.getByRole('switch', { name: 'Dark mode', exact: true }).click()
+  await chooseTheme(page, 'Dark')
   await edited.getByRole('link', { name: `${title} edited`, exact: true }).click()
   const dark = page.locator('[data-theme-mode="dark"]')
   await expect(dark.getByRole('textbox', { name: 'Title', exact: true })).toHaveValue(`${title} edited`)
@@ -182,7 +183,7 @@ test('the purchase request list reads a data source, shows department names, and
   const first = page.getByRole('row').filter({ has: page.getByRole('cell') }).first()
   for (const mode of ['light', 'dark']) {
     if (mode === 'dark') {
-      await page.getByRole('switch', { name: 'Dark mode', exact: true }).click()
+      await chooseTheme(page, 'Dark')
     }
     await page.reload()
 
@@ -348,7 +349,7 @@ test('line rules show under the Quantity and Unit price of the line, and the tot
   // One save reports both lines, and the lines add up to -5, so the total rule fires as well.
   for (const mode of ['light', 'dark']) {
     if (mode === 'dark') {
-      await page.getByRole('switch', { name: 'Dark mode', exact: true }).click()
+      await chooseTheme(page, 'Dark')
     }
     const theme = page.locator(`[data-theme-mode="${mode}"]`)
     await theme.getByRole('button', { name: /^(loading )?Save$/ }).click()
@@ -399,8 +400,7 @@ test('switching the locale to Vietnamese shows the Vietnamese navigation', async
   await page.goto('/purchasing/purchaserequests')
   await expect(page.getByRole('menuitem', { name: 'Purchase requests', exact: true })).toBeVisible()
 
-  // The radio input itself takes no pointer events: people click its label.
-  await page.getByRole('radiogroup', { name: 'Language', exact: true }).getByText('Tiếng Việt', { exact: true }).click()
+  await chooseLanguage(page, 'Tiếng Việt')
 
   // Exact names, because "Theo phòng ban" also holds "Phòng ban".
   for (const item of ['Yêu cầu mua hàng', 'Theo phòng ban', 'Phòng ban', 'Nhà cung cấp']) {

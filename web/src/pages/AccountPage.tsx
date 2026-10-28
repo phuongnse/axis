@@ -20,7 +20,8 @@ import { usePlatform } from './context'
  */
 export function AccountPage() {
   const t = useText()
-  const { locale } = usePlatform().current
+  const platform = usePlatform()
+  const { locale } = platform.current
   const [sessions, setSessions] = useState<OwnSessions>()
   const [loadFailed, setLoadFailed] = useState(false)
   const [endFailed, setEndFailed] = useState(false)
@@ -64,7 +65,10 @@ export function AccountPage() {
   const time = (value: string) => new Date(value).toLocaleString(locale)
 
   return (
-    <PageLayout title={t('shell.account.sessions.title')}>
+    <PageLayout
+      title={t('shell.account.sessions.title')}
+      breadcrumb={[{ label: t(platform.site.titleKey), to: '/' }, { label: t('shell.account.sessions.title') }]}
+    >
       {loadFailed && <Alert data-testid="sessions-error" type="error" title={t('shell.account.sessions.loadFailed')} />}
       {endFailed && (
         <Alert data-testid="sessions-end-error" type="error" title={t('shell.account.sessions.endFailed')} />

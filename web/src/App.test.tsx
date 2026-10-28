@@ -36,9 +36,14 @@ const texts: Record<string, Record<string, string>> = {
     'shell.serverStatus.checking': 'Checking',
     'shell.serverStatus.ready': 'Ready',
     'shell.serverStatus.unavailable': 'Unavailable',
-    'shell.theme.dark': 'Dark mode',
-    'shell.theme.darkShort': 'Dark',
-    'shell.theme.lightShort': 'Light',
+    'shell.breadcrumb.label': 'Breadcrumb',
+    'shell.appSwitcher.label': 'Switch to',
+    'shell.appSwitcher.studio': 'Studio',
+    'shell.appSwitcher.console': 'Operator console',
+    'shell.preferences.label': 'Language and theme',
+    'shell.theme.label': 'Theme',
+    'shell.theme.light': 'Light',
+    'shell.theme.dark': 'Dark',
     'shell.locale.label': 'Language',
     'shell.locale.en': 'English',
     'shell.locale.vi': 'Tiếng Việt',
@@ -61,6 +66,7 @@ const texts: Record<string, Record<string, string>> = {
     'shell.nav.home': 'Trang chủ',
     'shell.home.title': 'Chào mừng đến với Axis',
     'shell.serverStatus.title': 'Trạng thái máy chủ',
+    'shell.preferences.label': 'Ngôn ngữ và giao diện',
     'shell.locale.label': 'Ngôn ngữ',
     'shell.locale.en': 'English',
     'shell.locale.vi': 'Tiếng Việt',
@@ -96,7 +102,7 @@ const siteTexts: Record<string, Record<string, string>> = {
     'pages.noteForm.title': 'Note',
     'notes.new': 'New',
     'pages.nestedForm.section': 'Nested note',
-    'shell.theme.dark': 'Night mode',
+    'shell.theme.dark': 'Night',
   },
   vi: {
     'site.title': 'Ghi chú E2E',
@@ -105,7 +111,7 @@ const siteTexts: Record<string, Record<string, string>> = {
     'pages.notes.title': 'Tất cả ghi chú',
     'pages.noteForm.title': 'Ghi chú',
     'notes.new': 'Tạo mới',
-    'shell.theme.dark': 'Chế độ đêm',
+    'shell.theme.dark': 'Đêm',
   },
 }
 
@@ -389,6 +395,12 @@ function renderApp(path = '/') {
   )
 }
 
+/** Opens the "Language and theme" menu and clicks one of its items. */
+async function choosePreference(button: string, item: string) {
+  await userEvent.click(await screen.findByRole('button', { name: button }))
+  await userEvent.click(await screen.findByRole('menuitemradio', { name: item }))
+}
+
 async function findShellRoot(mode: 'light' | 'dark') {
   const heading = await screen.findByText('Welcome to Axis')
   const root = heading.closest<HTMLElement>(`[data-theme-mode="${mode}"]`)
@@ -417,13 +429,14 @@ describe('App', () => {
   it('switches between light and dark mode and remembers the choice', async () => {
     stubServer()
     renderApp()
-    const toggle = await screen.findByRole('switch', { name: 'Dark mode' })
-    expect(toggle).not.toBeChecked()
+    await screen.findByText('Welcome to Axis')
 
-    await userEvent.click(toggle)
+    await choosePreference('Language and theme', 'Dark')
 
-    expect(toggle).toBeChecked()
     expect(localStorage.getItem('axis.themeMode')).toBe('dark')
+    await userEvent.click(screen.getByRole('button', { name: 'Language and theme' }))
+    expect(await screen.findByRole('menuitemradio', { name: 'Dark' })).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByRole('menuitemradio', { name: 'Light' })).toHaveAttribute('aria-checked', 'false')
   })
 
   it('renders the navigation and the page content in both themes', async () => {
@@ -433,7 +446,7 @@ describe('App', () => {
     const light = await findShellRoot('light')
     expect(within(light).getByRole('link', { name: 'Axis' })).toBeInTheDocument()
 
-    await userEvent.click(screen.getByRole('switch', { name: 'Dark mode' }))
+    await choosePreference('Language and theme', 'Dark')
 
     const dark = await findShellRoot('dark')
     expect(within(dark).getByRole('link', { name: 'Axis' })).toBeInTheDocument()
@@ -445,13 +458,11 @@ describe('App', () => {
     renderApp()
     await screen.findByText('Welcome to Axis')
 
-    // The radio input itself takes no pointer events: people click its label.
-    const language = screen.getByRole('radiogroup', { name: 'Language' })
-    await userEvent.click(within(language).getByText('Tiếng Việt'))
+    await choosePreference('Language and theme', 'Tiếng Việt')
 
     expect(await screen.findByText('Chào mừng đến với Axis')).toBeInTheDocument()
     expect(within(screen.getByRole('contentinfo')).getByText('Trạng thái máy chủ')).toBeInTheDocument()
-    expect(screen.getByRole('radiogroup', { name: 'Ngôn ngữ' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Ngôn ngữ và giao diện' })).toBeInTheDocument()
     expect(localStorage.getItem('axis.locale')).toBe('vi')
   })
 
@@ -461,14 +472,14 @@ describe('App', () => {
     renderApp()
     await screen.findByText('Welcome to Axis')
 
-    const language = screen.getByRole('radiogroup', { name: 'Language' })
-    await userEvent.click(within(language).getByText('Tiếng Việt'))
+    await choosePreference('Language and theme', 'Tiếng Việt')
 
     expect(await screen.findByTestId('locale-error')).toHaveTextContent(
       'The texts for this language could not be loaded.',
     )
     expect(screen.getByText('Welcome to Axis')).toBeInTheDocument()
-    expect(screen.getByRole('radio', { name: 'English' })).toBeChecked()
+    await userEvent.click(screen.getByRole('button', { name: 'Language and theme' }))
+    expect(await screen.findByRole('menuitemradio', { name: 'English' })).toHaveAttribute('aria-checked', 'true')
     expect(localStorage.getItem('axis.locale')).toBeNull()
   })
 
@@ -479,7 +490,8 @@ describe('App', () => {
     renderApp()
 
     expect(await screen.findByText('Chào mừng đến với Axis')).toBeInTheDocument()
-    expect(screen.getByRole('radio', { name: 'Tiếng Việt' })).toBeChecked()
+    await userEvent.click(screen.getByRole('button', { name: 'Ngôn ngữ và giao diện' }))
+    expect(await screen.findByRole('menuitemradio', { name: 'Tiếng Việt' })).toHaveAttribute('aria-checked', 'true')
   })
 
   it('ignores a stored locale the site does not offer', async () => {
@@ -515,7 +527,7 @@ describe('App', () => {
     })
     expect(link).toHaveAttribute('href', '/e2e')
     await userEvent.click(link)
-    expect(await screen.findByText('All notes')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'All notes' })).toBeInTheDocument()
     expect(screen.getByTestId('location')).toHaveTextContent('/e2e/notes')
   })
 
@@ -628,11 +640,11 @@ describe('App', () => {
 
     renderApp('/e2e/notes')
 
-    expect(await screen.findByText('All notes')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'All notes' })).toBeInTheDocument()
     expect(screen.getByRole('menuitem', { name: 'Notes' })).toBeInTheDocument()
     expect(screen.getByRole('menuitem', { name: 'Categories' })).toBeInTheDocument()
     expect(screen.queryByRole('menuitem', { name: 'Home' })).not.toBeInTheDocument()
-    expect(screen.getByText('E2E notes')).toBeInTheDocument()
+    expect(within(screen.getByRole('banner')).getByText('E2E notes')).toBeInTheDocument()
   })
 
   it('resolves a key both catalogs have to the site text, and other keys to the platform text', async () => {
@@ -640,23 +652,25 @@ describe('App', () => {
 
     renderApp('/e2e/notes')
 
-    expect(await screen.findByRole('switch', { name: 'Night mode' })).toBeInTheDocument()
-    expect(screen.getByRole('radiogroup', { name: 'Language' })).toBeInTheDocument()
+    await userEvent.click(await screen.findByRole('button', { name: 'Language and theme' }))
+
+    expect(await screen.findByRole('menuitemradio', { name: 'Night' })).toBeInTheDocument()
+    expect(screen.getByText('Language')).toBeInTheDocument()
   })
 
   it('switches the locale inside a site and remembers the choice', async () => {
     stubServer()
     renderApp('/e2e/notes')
-    await screen.findByText('All notes')
+    await screen.findByRole('heading', { name: 'All notes' })
 
-    const language = screen.getByRole('radiogroup', { name: 'Language' })
-    await userEvent.click(within(language).getByText('Tiếng Việt'))
+    await choosePreference('Language and theme', 'Tiếng Việt')
 
-    expect(await screen.findByText('Tất cả ghi chú')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Tất cả ghi chú' })).toBeInTheDocument()
     expect(fetch).toHaveBeenCalledWith('/api/sites/e2e/texts/vi', expect.anything())
     expect(screen.getByRole('menuitem', { name: 'Danh mục' })).toBeInTheDocument()
-    expect(screen.getByRole('switch', { name: 'Chế độ đêm' })).toBeInTheDocument()
-    expect(screen.getByRole('radiogroup', { name: 'Ngôn ngữ' })).toBeInTheDocument()
+    await userEvent.click(screen.getByRole('button', { name: 'Ngôn ngữ và giao diện' }))
+    expect(await screen.findByRole('menuitemradio', { name: 'Đêm' })).toBeInTheDocument()
+    expect(screen.getByText('Ngôn ngữ')).toBeInTheDocument()
     expect(localStorage.getItem('axis.locale')).toBe('vi')
   })
 
@@ -664,13 +678,12 @@ describe('App', () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {})
     stubServer({ failingLocale: 'vi' })
     renderApp('/e2e/notes')
-    await screen.findByText('All notes')
+    await screen.findByRole('heading', { name: 'All notes' })
 
-    const language = screen.getByRole('radiogroup', { name: 'Language' })
-    await userEvent.click(within(language).getByText('Tiếng Việt'))
+    await choosePreference('Language and theme', 'Tiếng Việt')
 
     expect(await screen.findByTestId('locale-error')).toBeInTheDocument()
-    expect(screen.getByText('All notes')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'All notes' })).toBeInTheDocument()
     expect(localStorage.getItem('axis.locale')).toBeNull()
   })
 
@@ -679,7 +692,7 @@ describe('App', () => {
 
     renderApp('/e2e')
 
-    expect(await screen.findByText('All notes')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'All notes' })).toBeInTheDocument()
     expect(screen.getByTestId('location')).toHaveTextContent('/e2e/notes')
   })
 
@@ -712,7 +725,41 @@ describe('App', () => {
 
     expect(await screen.findByRole('button', { name: 'Save' })).toBeInTheDocument()
     expect(screen.getByRole('textbox', { name: 'title' })).toBeInTheDocument()
-    expect(screen.getByText('Note')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Note' })).toBeInTheDocument()
+  })
+
+  it('shows a breadcrumb from the site through the table that opened a form page, with the last step as the current page', async () => {
+    stubServer()
+    renderApp('/e2e/notes?pageSize=100')
+    expect(await screen.findByText('No records yet.')).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'New' }))
+
+    const breadcrumb = within(await screen.findByRole('navigation', { name: 'Breadcrumb' }))
+    expect(breadcrumb.getByRole('link', { name: 'E2E notes' })).toHaveAttribute('href', '/e2e')
+    expect(breadcrumb.getByRole('link', { name: 'Notes' })).toHaveAttribute('href', '/e2e/notes?pageSize=100')
+    expect(breadcrumb.getByText('Note')).toHaveAttribute('aria-current', 'page')
+    expect(breadcrumb.queryByRole('link', { name: 'Note' })).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Note' })).toBeInTheDocument()
+  })
+
+  it('shows a breadcrumb of the site and the page when the page was not opened from a table', async () => {
+    stubServer()
+
+    renderApp('/e2e/noteform/new')
+
+    const breadcrumb = within(await screen.findByRole('navigation', { name: 'Breadcrumb' }))
+    expect(breadcrumb.getAllByRole('link').map((link) => link.textContent)).toEqual(['E2E notes'])
+    expect(breadcrumb.getByText('Note')).toHaveAttribute('aria-current', 'page')
+  })
+
+  it('shows no breadcrumb on the platform home page', async () => {
+    stubServer()
+
+    renderApp()
+
+    await screen.findByText('Welcome to Axis')
+    expect(screen.queryByRole('navigation', { name: 'Breadcrumb' })).not.toBeInTheDocument()
   })
 
   it('shows the not-found page for a record id the form page has no record for, or that is not an id', async () => {

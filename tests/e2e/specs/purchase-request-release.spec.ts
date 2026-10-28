@@ -12,6 +12,7 @@ import { appPath, createRequest, decide, expectStatus, submit, waitForTask } fro
 import { previewURL, purchaseRequests } from '../server-settings'
 import { useSession } from '../sessions'
 import { openTab } from '../studio-resources'
+import { chooseTheme } from '../shell'
 
 // Each activation starts a second server, which takes a few seconds.
 test.setTimeout(180_000)
@@ -146,7 +147,7 @@ async function reviewAndApprove(page: Page, title: string, shown: string, hidden
   await row.getByRole('link', { name: 'Manager approval', exact: true }).click()
   await expectShown(fieldValue(page, 'title'), title)
   for (const mode of ['light', 'dark']) {
-    if (mode === 'dark') await page.getByRole('switch', { name: 'Dark mode', exact: true }).click()
+    if (mode === 'dark') await chooseTheme(page, 'Dark')
     const theme = page.locator(`[data-theme-mode="${mode}"]`)
     await expect(theme.getByRole('heading', { name: shown, exact: true })).toBeVisible()
     await expect(theme.getByRole('heading', { name: new RegExp(hidden) })).toHaveCount(0)

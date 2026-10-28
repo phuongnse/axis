@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useLocation, useParams, useSearchParams } from 'react-router'
-import { PageLayout } from '../platform/PageLayout'
+import { PageLayout, type BreadcrumbStep } from '../platform/PageLayout'
 import { PageLeaf, type PageLeafProps } from '../platform/PageLeaf'
 import { detailRecordId, readPageParameters } from '../platform/pageParameters'
 import { ProcessInstancePage } from '../platform/ProcessInstancePage'
-import { fetchPage, type PageMetadata } from '../platform/site'
+import { fetchPage, type ApplicationSite, type PageMetadata } from '../platform/site'
 import { TaskPage } from '../platform/TaskPage'
 import { useText } from '../platform/texts'
 import { WidgetTree } from '../platform/WidgetTree'
@@ -42,8 +42,37 @@ export function PageRoute({ form }: { form?: FormMode }) {
       form={form}
       recordId={form === 'edit' ? id : null}
       returnTo={returnTo}
+      trail={{ site, from: typeof from === 'string' ? from : null }}
     />
   )
+}
+
+/** The site and the address of the navigation page that opened this page, which the breadcrumb is built from. */
+interface Trail {
+  site: ApplicationSite
+  from: string | null
+}
+
+/**
+ * The breadcrumb of a page: the site, then the navigation page the person came from when that is
+ * another page of the site, then the page itself. The `from` address keeps the paging and sorting of
+ * a table, so its link returns to the table as it was.
+ */
+function breadcrumbFor(trail: Trail, pageName: string, titleKey: string, t: (key: string) => string): BreadcrumbStep[] {
+  const { site, from } = trail
+  const steps: BreadcrumbStep[] = [{ label: t(site.titleKey), to: `/${site.path}` }]
+  if (from?.startsWith(`/${site.path}/`)) {
+    const pathname = from.split(/[?#]/, 1)[0].toLowerCase()
+    const origin = site.navigation.find(
+      (entry) =>
+        entry.page.toLowerCase() !== pageName.toLowerCase() && pathname === `/${site.path}/${entry.page}`.toLowerCase(),
+    )
+    if (origin) {
+      steps.push({ label: t(origin.labelKey), to: from })
+    }
+  }
+  steps.push({ label: t(titleKey) })
+  return steps
 }
 
 interface SitePageProps {
@@ -56,9 +85,10 @@ interface SitePageProps {
   form?: FormMode
   recordId: string | null
   returnTo: string
+  trail: Trail
 }
 
-function SitePage({ sitePath, pages, name, locale, fallbackLocale, form, recordId, returnTo }: SitePageProps) {
+function SitePage({ sitePath, pages, name, locale, fallbackLocale, form, recordId, returnTo, trail }: SitePageProps) {
   const t = useText()
   const [searchParams] = useSearchParams()
   const [page, setPage] = useState<PageMetadata | null | 'failed'>()
@@ -93,6 +123,8 @@ function SitePage({ sitePath, pages, name, locale, fallbackLocale, form, recordI
     return <NotFoundPage />
   }
 
+  const breadcrumb = breadcrumbFor(trail, page.name, page.titleKey, t)
+
   // A route check finds its widget anywhere in the tree, not only as the first widget.
   const leaves = leafWidgets(page.widgets)
   const taskInbox = leaves.find((widget) => widget.type === 'taskInbox')
@@ -104,7 +136,7 @@ function SitePage({ sitePath, pages, name, locale, fallbackLocale, form, recordI
       return <NotFoundPage />
     }
     return (
-      <PageLayout title={t(page.titleKey)}>
+      <PageLayout title={t(page.titleKey)} breadcrumb={breadcrumb}>
         <TaskPage
           sitePath={sitePath}
           pageName={page.name}
@@ -122,7 +154,7 @@ function SitePage({ sitePath, pages, name, locale, fallbackLocale, form, recordI
       return <NotFoundPage />
     }
     return (
-      <PageLayout title={t(page.titleKey)}>
+      <PageLayout title={t(page.titleKey)} breadcrumb={breadcrumb}>
         <ProcessInstancePage
           sitePath={sitePath}
           pages={pages}
@@ -156,7 +188,7 @@ function SitePage({ sitePath, pages, name, locale, fallbackLocale, form, recordI
   }
 
   return (
-    <PageLayout title={t(page.titleKey)}>
+    <PageLayout title={t(page.titleKey)} breadcrumb={breadcrumb}>
       <WidgetTree widgets={page.widgets} renderLeaf={(widget) => <PageLeaf widget={widget} {...leafProps} />} />
     </PageLayout>
   )

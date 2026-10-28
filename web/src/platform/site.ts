@@ -39,6 +39,11 @@ export interface SiteListItem {
   application: SiteApplication
 }
 
+/** The site title in the given locale, or in the site's first locale when it lacks that one. */
+export function siteTitle(site: SiteListItem, locale: string): string {
+  return site.titles[locale] ?? Object.values(site.titles)[0] ?? site.path
+}
+
 /** An application site, as served by `GET /api/sites/{path}`. */
 export interface ApplicationSite {
   path: string
