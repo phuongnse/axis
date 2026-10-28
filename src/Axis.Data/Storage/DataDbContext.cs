@@ -163,6 +163,7 @@ public sealed class DataDbContext(DbContextOptions<DataDbContext> options) : DbC
             session.Property(s => s.Roles).HasColumnName("roles").HasColumnType("text[]");
             session.Property(s => s.SignedInAt).HasColumnName("signed_in_at");
             session.Property(s => s.LastRequestAt).HasColumnName("last_request_at");
+            session.Property(s => s.AuthenticatedAt).HasColumnName("authenticated_at");
         });
 
         modelBuilder.Entity<FileRow>(file =>
