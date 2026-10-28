@@ -58,6 +58,8 @@ public sealed class ConfigurationTenantCatalog : ITenantCatalog
                 problems.Add(
                     $"Tenant '{id}' is a preview tenant and has its own Oidc block. A preview tenant uses the Oidc settings of its main tenant '{settings.PreviewOf}'.");
             }
+
+            AddRealmProblems(section.GetSection(id), id, settings.PreviewOf, problems);
         }
 
         if (!environment.IsDevelopment())
@@ -73,9 +75,53 @@ public sealed class ConfigurationTenantCatalog : ITenantCatalog
         return new ConfigurationTenantCatalog(Entries(options, section));
     }
 
+    // A blank ActivationClientSecret means the tenant has no realm details. With a secret, the realm needs its Name and an
+    // Oidc authority that ends in /realms/<Name>. A message names a setting and never holds a value.
+    private static void AddRealmProblems(IConfigurationSection tenant, string id, string? previewOf, List<string> problems)
+    {
+        var realm = tenant.GetSection("Realm");
+        var prefix = $"{TenantOptions.SectionName}:{id}";
+        if (!string.IsNullOrWhiteSpace(previewOf))
+        {
+            if (realm.Exists())
+            {
+                problems.Add($"Tenant '{id}' is a preview tenant and has its own Realm block. A preview tenant has no realm details of its own.");
+            }
+
+            return;
+        }
+
+        if (Blank(realm["ActivationClientSecret"]) is null)
+        {
+            return;
+        }
+
+        if (Blank(realm["Name"]) is not { } name)
+        {
+            problems.Add($"Tenant '{id}' sets {prefix}:Realm:ActivationClientSecret but has no {prefix}:Realm:Name.");
+        }
+        else if (TenantRealmAddress.BaseOf(tenant["Oidc:Authority"], name) is null)
+        {
+            problems.Add($"Tenant '{id}' sets {prefix}:Realm:ActivationClientSecret, so {prefix}:Oidc:Authority must be an http or https address that ends in /realms/{Uri.EscapeDataString(name)}.");
+        }
+    }
+
+    private static TenantRealmAccess? Realm(IConfigurationSection tenant, bool preview)
+    {
+        var realm = tenant.GetSection("Realm");
+        if (preview || Secret(realm["ActivationClientSecret"]) is not { } secret || Blank(realm["Name"]) is not { } name)
+        {
+            return null;
+        }
+
+        return TenantRealmAddress.BaseOf(tenant["Oidc:Authority"], name) is { } baseAddress
+            ? new TenantRealmAccess(baseAddress, name, secret)
+            : null;
+    }
+
     /// <summary>
     /// Builds a catalog from tenant options that already passed <see cref="TenantOptionsValidator"/>. It has no schema
-    /// connection and no sign-in settings, which <see cref="Load"/> reads from the configuration section. It does not
+    /// connection, no sign-in settings and no realm details, which <see cref="Load"/> reads from the configuration section. It does not
     /// copy a main tenant's sign-in settings into its preview tenant.
     /// </summary>
     public static ConfigurationTenantCatalog FromOptions(TenantOptions options)
@@ -113,7 +159,8 @@ public sealed class ConfigurationTenantCatalog : ITenantCatalog
                 oidc,
                 bindings,
                 main,
-                tenantSection is null ? null : EmailSettings.Read(tenantSection.GetSection("Email"), $"{TenantOptions.SectionName}:{id}:Email", []));
+                tenantSection is null ? null : EmailSettings.Read(tenantSection.GetSection("Email"), $"{TenantOptions.SectionName}:{id}:Email", []),
+                tenantSection is null ? null : Realm(tenantSection, main is not null));
         });
 
     private static TenantOidc? Oidc(IConfigurationSection? section) =>

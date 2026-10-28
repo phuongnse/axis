@@ -338,6 +338,31 @@ the operator sets it with
   redirect and sign-out addresses. An existing Compose volume has no
   `axis_preview` database and needs `docker compose down -v` once.
 
+### Tenant realm
+
+A tenant's catalog entry can carry what activation needs to sync the tenant's
+realm: the realm name, the identity provider's address and the secret of the
+`axis-activation` client. See
+[keeping the realm in step](identity-provider.md#keeping-the-realm-in-step).
+Activation does not use it yet.
+
+- **Under `configuration`.** The tenant settings `Tenants:{id}:Realm:Name` and
+  `Tenants:{id}:Realm:ActivationClientSecret` give it. As environment variables
+  they are `Tenants__<id>__Realm__Name` and
+  `Tenants__<id>__Realm__ActivationClientSecret`.
+- **Blank secret.** A blank `ActivationClientSecret` means the tenant has no
+  realm details, and then `Name` and the authority are not checked.
+- **Authority.** With a secret, the tenant needs a `Name`, and
+  `Tenants:{id}:Oidc:Authority` must be an http or https address that ends in
+  `/realms/<Name>`. The identity provider's address is the authority without
+  that ending. A message names the setting and never shows a value.
+- **Preview tenants.** A preview tenant has no realm details of its own. A
+  `Realm` block on one stops the start.
+- **Under `directory`.** `tenant create` stores the secret, and the realm name is
+  the tenant id. A tenant whose stored authority does not end in
+  `realms/<id>` has no realm details, because it signs in with an outside
+  identity provider.
+
 ## Data settings
 
 The server reads `Data:QueryTimeout`, `Data:ExportQueryTimeout`,

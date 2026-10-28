@@ -7,7 +7,7 @@ namespace Axis.Tenancy;
 /// <summary>
 /// The tenant catalog read from the tenant directory, the <c>directory</c> source. It holds the active tenants
 /// read at one moment, and the hosts of the other tenants, which resolve no tenant but are known. Each password and secret stays encrypted in memory and is decrypted only when a
-/// connection opens, the sign-in client is set up, a binding is resolved or an email is sent.
+/// connection opens, the sign-in client is set up, a binding is resolved, an email is sent or the realm is synced.
 /// </summary>
 public sealed class DirectoryTenantCatalog : ITenantCatalog
 {
@@ -278,16 +278,7 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
         TenantRow? main)
     {
         var id = row.Id;
-        var bindings = new Dictionary<string, TenantBinding>(StringComparer.OrdinalIgnoreCase);
-        foreach (var binding in bindingRows)
-        {
-            bindings[binding.Name] = binding.Kind == DeploymentBindingKinds.Secret
-                ? new TenantBinding(
-                    DeploymentBindingKinds.Secret,
-                    null,
-                    SecretValue.Deferred(() => cipher.Decrypt(id, TenantSecretFields.Binding(binding.Name), binding.SecretValue ?? []).Reveal()))
-                : new TenantBinding(binding.Kind, binding.Url, null);
-        }
+        var bindings = Bindings(id, bindingRows, cipher);
 
         var connectionString = SecretValue.Deferred(() =>
         {
@@ -320,7 +311,52 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
             signIn.OidcProfile,
             ClientKeys(signIn, cipher));
 
-        return new TenantEntry(id, hosts, connectionString, SchemaConnectionString: null, oidc, bindings, row.PreviewOf, Email(row, cipher));
+        return new TenantEntry(id, hosts, connectionString, SchemaConnectionString: null, oidc, bindings, row.PreviewOf, Email(row, cipher), Realm(row, cipher));
+    }
+
+    /// <summary>
+    /// The realm details of a tenant row, or <c>null</c> when the row has none: a preview tenant, a row without an
+    /// activation client secret, or a row whose <c>Oidc</c> authority does not end in <c>realms/</c> and the tenant id,
+    /// such as one that signs in with an outside identity provider. The realm name is the tenant id. The secret stays
+    /// encrypted until it is revealed.
+    /// </summary>
+    public static TenantRealmAccess? Realm(TenantRow row, TenantSecretCipher cipher)
+    {
+        ArgumentNullException.ThrowIfNull(row);
+        ArgumentNullException.ThrowIfNull(cipher);
+
+        var id = row.Id;
+        var stored = row.RealmActivationClientSecret;
+        if (row.PreviewOf is not null || stored is not { Length: > 0 } || TenantRealmAddress.BaseOf(row.OidcAuthority, id) is not { } baseAddress)
+        {
+            return null;
+        }
+
+        return new TenantRealmAccess(
+            baseAddress,
+            id,
+            SecretValue.Deferred(() => cipher.Decrypt(id, TenantSecretFields.RealmActivationClientSecret, stored).Reveal()));
+    }
+
+    /// <summary>The deployment bindings of a tenant keyed by name, ignoring letter case. A secret stays encrypted until it is revealed.</summary>
+    public static IReadOnlyDictionary<string, TenantBinding> Bindings(string tenantId, IEnumerable<TenantBindingRow> rows, TenantSecretCipher cipher)
+    {
+        ArgumentNullException.ThrowIfNull(tenantId);
+        ArgumentNullException.ThrowIfNull(rows);
+        ArgumentNullException.ThrowIfNull(cipher);
+
+        var bindings = new Dictionary<string, TenantBinding>(StringComparer.OrdinalIgnoreCase);
+        foreach (var binding in rows)
+        {
+            bindings[binding.Name] = binding.Kind == DeploymentBindingKinds.Secret
+                ? new TenantBinding(
+                    DeploymentBindingKinds.Secret,
+                    null,
+                    SecretValue.Deferred(() => cipher.Decrypt(tenantId, TenantSecretFields.Binding(binding.Name), binding.SecretValue ?? []).Reveal()))
+                : new TenantBinding(binding.Kind, binding.Url, null);
+        }
+
+        return bindings;
     }
 
     // A tenant has its own mail settings exactly when its SMTP host is set. A preview tenant's are its own, bound to its own id.
