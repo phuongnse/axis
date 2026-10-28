@@ -10,6 +10,7 @@ public sealed class ConfigurationTenantCatalogTests
     private const string SchemaConnection = "Host=db.example.test;Database=axis;Username=axis_schema;Password=schema-p4ssw0rd";
     private const string ClientSecret = "oidc-cl13nt-s3cret";
     private const string BindingSecret = "binding-s3cr3t-value";
+    private const string ActivationSecret = "activ4tion-cl13nt-s3cret";
 
     public static TheoryData<string, string[], string> InvalidSections() => new()
     {
@@ -317,6 +318,99 @@ public sealed class ConfigurationTenantCatalogTests
 
         Assert.Contains(setting, exception.Message, StringComparison.Ordinal);
         Assert.DoesNotContain(value, exception.Message.Replace(setting, "", StringComparison.Ordinal), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void The_Realm_settings_give_the_entry_its_realm_with_the_base_address_of_the_authority()
+    {
+        var entry = Assert.Single(Load(
+            [
+                .. Valid(),
+                "Tenants:default:Oidc:Authority=https://idp.example.test/realms/default",
+                "Tenants:default:Realm:Name=default",
+                $"Tenants:default:Realm:ActivationClientSecret={ActivationSecret}",
+            ]).Tenants);
+
+        var realm = Assert.IsType<TenantRealmAccess>(entry.Realm);
+        Assert.Equal(new Uri("https://idp.example.test/"), realm.BaseAddress);
+        Assert.Equal("default", realm.Name);
+        Assert.Equal(ActivationSecret, realm.ActivationClientSecret.Reveal());
+        Assert.DoesNotContain(ActivationSecret, entry.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void An_authority_with_a_path_prefix_and_a_trailing_slash_keeps_the_prefix_in_the_base_address()
+    {
+        var entry = Assert.Single(Load(
+            [
+                .. Valid(),
+                "Tenants:default:Oidc:Authority=https://idp.example.test/auth/realms/default/",
+                "Tenants:default:Realm:Name=default",
+                $"Tenants:default:Realm:ActivationClientSecret={ActivationSecret}",
+            ]).Tenants);
+
+        Assert.Equal(new Uri("https://idp.example.test/auth/"), entry.Realm!.BaseAddress);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void A_blank_activation_secret_gives_no_realm_whatever_the_authority(string secret)
+    {
+        var entry = Assert.Single(Load(
+            [
+                .. Valid(),
+                "Tenants:default:Oidc:Authority=https://idp.example.test/realm",
+                "Tenants:default:Realm:Name=default",
+                $"Tenants:default:Realm:ActivationClientSecret={secret}",
+            ]).Tenants);
+
+        Assert.Null(entry.Realm);
+    }
+
+    public static TheoryData<string, string[], string> InvalidRealms() => new()
+    {
+        {
+            "preview tenant with a Realm block",
+            [.. PreviewPair(), "Tenants:main-preview:Realm:Name=main", $"Tenants:main-preview:Realm:ActivationClientSecret={ActivationSecret}"],
+            "Tenant 'main-preview' is a preview tenant and has its own Realm block."
+        },
+        {
+            "authority of another realm",
+            [
+                .. Valid(),
+                "Tenants:default:Oidc:Authority=https://idp.example.test/realms/other",
+                "Tenants:default:Realm:Name=default",
+                $"Tenants:default:Realm:ActivationClientSecret={ActivationSecret}",
+            ],
+            "Tenants:default:Oidc:Authority must be an http or https address that ends in /realms/default"
+        },
+        {
+            "secret without an authority",
+            [.. Valid(), "Tenants:default:Realm:Name=default", $"Tenants:default:Realm:ActivationClientSecret={ActivationSecret}"],
+            "Tenants:default:Oidc:Authority must be an http or https address that ends in /realms/default"
+        },
+        {
+            "secret without a name",
+            [
+                .. Valid(),
+                "Tenants:default:Oidc:Authority=https://idp.example.test/realms/default",
+                $"Tenants:default:Realm:ActivationClientSecret={ActivationSecret}",
+            ],
+            "Tenants:default:Realm:Name"
+        },
+    };
+
+    [Theory]
+    [MemberData(nameof(InvalidRealms))]
+    public void A_bad_Realm_block_stops_the_load_and_the_message_holds_no_secret(string name, string[] settings, string message)
+    {
+        _ = name;
+
+        var exception = Assert.Throws<InvalidOperationException>(() => Load(settings));
+
+        Assert.Contains(message, exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(ActivationSecret, exception.Message, StringComparison.Ordinal);
     }
 
     private static string[] PreviewPair() =>

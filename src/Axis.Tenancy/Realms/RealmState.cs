@@ -2,7 +2,7 @@ namespace Axis.Tenancy.Realms;
 
 /// <summary>
 /// What a tenant's realm should hold: a client for each site path and a brokered <c>oidc</c> provider for each entry of
-/// <paramref name="Providers"/>. A later part builds it from the realm plan and the tenant's bindings, so it holds
+/// <paramref name="Providers"/>. <see cref="ActivationRealmSync"/> builds it from the realm plan and the tenant's bindings, so it holds
 /// resolved values and no binding names.
 /// </summary>
 public sealed record RealmState(IReadOnlyList<string> SitePaths, IReadOnlyList<RealmBrokeredProvider> Providers);

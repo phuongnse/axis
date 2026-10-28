@@ -16,6 +16,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Axis.Configuration\Axis.Configuration.csproj" />
     <ProjectReference Include="..\Axis.Core\Axis.Core.csproj" />
   </ItemGroup>
 
