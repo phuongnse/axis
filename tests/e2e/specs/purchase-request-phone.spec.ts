@@ -1,7 +1,7 @@
 import { expect, test } from '../test'
 import type { Page } from '@playwright/test'
 import { waitForDialog } from '../dialogs'
-import { fieldLabel } from '../fields'
+import { expectShown, fieldLabel, fieldValue } from '../fields'
 import { noSideways, phoneWidth } from '../phone'
 import { pickOption } from '../select'
 import { sessionFile } from '../sessions'
@@ -66,6 +66,6 @@ test('a purchase request is created and reopened at phone width, without the pag
   const row = page.getByRole('row', { name: new RegExp(`${title} `) })
   await row.getByRole('link', { name: title, exact: true }).click()
   await expect(page.getByRole('textbox', { name: 'Title', exact: true })).toHaveValue(title)
-  await expect(cell('Total amount')).toHaveValue('20.00')
+  await expectShown(fieldValue(page, 'totalAmount'), '20.00')
   await noSideways(page)
 })

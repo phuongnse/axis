@@ -1149,6 +1149,15 @@ describe('FormWidget', () => {
     })
   })
 
+  it('finds a computed field and a computed cell by their test ids, with the loaded value', async () => {
+    stubFetch({ status: 200, body: computedJson(1) })
+    renderForm(noteId, computedWidget)
+
+    await screen.findByTestId('field-value-total')
+    expect(screen.getByTestId('field-value-total')).toHaveValue('3.00')
+    expect(screen.getByTestId('cell-lines-0-code')).toHaveValue('PENS')
+  })
+
   it('shows the currency beside a money input and sends the typed amount as a plain number', async () => {
     const requests = stubFetch({ status: 200, body: moneyJson(1) }, { status: 200, body: moneyJson(2) })
     renderForm(noteId, moneyWidget)
