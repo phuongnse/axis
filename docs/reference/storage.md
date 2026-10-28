@@ -266,7 +266,8 @@ a tenant only when this value is the one the host was built for, see
 [administration](administration.md#migrate).
 
 - **Where secrets are stored.** Each of these is stored encrypted, and nowhere
-  else:
+  else. The [cryptographic inventory](keys-and-data-protection.md#cryptographic-inventory)
+  lists every key:
   - the runtime and schema database passwords, in `platform.tenants`;
   - the OIDC client secret, in `platform.tenants`;
   - the SMTP password of a tenant's own mail settings, in `platform.tenants`,
