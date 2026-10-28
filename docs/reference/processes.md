@@ -10,10 +10,10 @@ work, and the tables. The rest of the process reference is in these files:
   All are built.
 - [task-deadlines.md](task-deadlines.md): task escalations, deadlines, claim
   and reassign. All are built, except the email channel of an escalation,
-  _(planned for M16)_.
+  _(planned for M18)_.
 - [notifications.md](notifications.md): the `notify` operation and in-app and
   email notifications. All are built, except the escalation email and Mailpit
-  in Docker Compose and `scripts/dev.sh`, both _(planned for M16)_.
+  in Docker Compose and `scripts/dev.sh`, both _(planned for M18)_.
 - [process-execution.md](process-execution.md): execution, connector calls,
   package operations and the worker settings.
 - [process-events.md](process-events.md): raised events, triggers and
@@ -266,7 +266,7 @@ operation is built, see
     `expired` and the instance moves to `next`, see
     [Escalations and deadline](task-deadlines.md#escalations-and-deadline).
     `escalations` is optional and checked in the same section. The engine runs
-    the `reassign` and the `notify` of an escalation. Its `email` channel is _(planned for M16)_.
+    the `reassign` and the `notify` of an escalation. Its `email` channel is _(planned for M18)_.
   - `outcomes` is an array of `{ "name", "label": { "textKey" }, "next" }`,
     such as `approve`, `return` and `reject`. Each names the step taken when
     the task is completed with it.

@@ -61,8 +61,9 @@ through Studio, without editing JSON or code. Files stay the source of truth
 These are expected later. They must not shape early milestones beyond keeping
 the agreed extension points (see [decisions](decisions.md)).
 
-- Formal security certification. FAPI 2.0 and ASVS verification come in the
-  Hardening milestone, M16 (see the [roadmap](roadmap.md#milestones)).
+- Formal security certification. The FAPI 2.0 profile and the ASVS work are in the
+  Hardening milestone, M16. The conformance run and the ASVS sign-off are
+  _(planned for M18)_ (see the [roadmap](roadmap.md#milestones)).
 - Provisioning many tenants self-service, and Axis-hosted SaaS operations.
 - Custom UI widgets. They come after the visual designers (D8, D46).
 - Migrating live business data between installations.
@@ -317,7 +318,7 @@ access rules, a warranty reminder process and its weekday trigger. It is active
 in development, Compose and E2E. The Studio journey builds the whole folder,
 compares it with the sample, runs its scenarios from Studio, publishes it and
 uses its site to register, import and export assets. Only the import,
-attachment and maintenance scenarios are _(planned for M16)_.
+attachment and maintenance scenarios are _(planned for M18)_.
 
 ### Data
 
@@ -370,11 +371,11 @@ SPA serves its bundle there. Texts are in `en` and `vi`.
 
 - Built: an asset is registered, an employee and an auditor cannot write, a
   negative cost is refused, and a user without a role is denied.
-- _(planned for M16)_ An import of valid assets, and an import whose dry run
+- _(planned for M18)_ An import of valid assets, and an import whose dry run
   reports a bad row and writes nothing.
-- _(planned for M16)_ An asset with an attachment, a maintenance entry with a
+- _(planned for M18)_ An asset with an attachment, a maintenance entry with a
   vendor, and software.
-- _(planned for M16)_ Denied access for an employee to another holder's asset,
+- _(planned for M18)_ Denied access for an employee to another holder's asset,
   to its attachment's download and to an export, and for an auditor to an
   import.
 

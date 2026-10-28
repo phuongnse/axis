@@ -42,8 +42,8 @@ these points on 2026-10-25. It is built in M15. See
     never a value, and counts timeouts in a metric.
   - When only the count statement of a list times out, the answer is `200`
     with `totalCount: null`.
-  - M16 sets the limits against its SLOs. M15 ships the mechanism and the
-    defaults.
+  - The limits are set against the SLOs of [D82](d82-performance-slos-and-load-tests.md)
+    _(planned for M18)_. M15 ships the mechanism and the defaults.
 
 _Why:_ search on the display field alone misses what users type, and a scan
 of the whole table does not scale to the typical application size. Trigram
