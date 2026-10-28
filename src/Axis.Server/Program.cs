@@ -59,6 +59,10 @@ if (string.IsNullOrWhiteSpace(platformSchemaConnectionString))
     throw new InvalidOperationException("Connection string 'PlatformSchema' is not configured.");
 }
 
+// Read before any database work, so a connection without full certificate checks stops the start.
+DatabaseTlsRequirement.Require(builder.Environment, "ConnectionStrings:Platform", platformConnectionString);
+DatabaseTlsRequirement.Require(builder.Environment, "ConnectionStrings:PlatformSchema", platformSchemaConnectionString);
+
 var readerRole = new NpgsqlConnectionStringBuilder(platformConnectionString).Username;
 if (string.IsNullOrWhiteSpace(readerRole))
 {

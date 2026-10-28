@@ -26,7 +26,7 @@ public static class WorkerServiceCollectionExtensions
     /// </summary>
     /// <exception cref="InvalidOperationException">
     /// The tenant, worker or health configuration is invalid, <c>Data:ImportMaxRows</c> or <c>Notifications:RetentionDays</c> is not an integer of at least 1, <c>Tenancy:Source</c> is unknown, <c>ConnectionStrings:Platform</c>, <c>Platform:SecretKey</c> or <c>Tenancy:RefreshInterval</c> is missing or invalid under
-    /// <c>directory</c>, <c>Extensions:Path</c> or <c>Modules:Path</c> names a folder that does not exist, or the <c>Email</c> section is invalid.
+    /// <c>directory</c>, <c>ConnectionStrings:Platform</c> sets an SSL mode below <c>VerifyFull</c> or none under <c>directory</c> outside Development and Testing, <c>Extensions:Path</c> or <c>Modules:Path</c> names a folder that does not exist, or the <c>Email</c> section is invalid.
     /// </exception>
     public static IServiceCollection AddAxisWorker(this IServiceCollection services, IConfiguration configuration, IHostEnvironment environment)
     {
@@ -69,6 +69,8 @@ public static class WorkerServiceCollectionExtensions
             {
                 throw new InvalidOperationException("ConnectionStrings:Platform is required when Tenancy:Source is 'directory'.");
             }
+
+            DatabaseTlsRequirement.Require(environment, "ConnectionStrings:Platform", platformConnectionString);
 
             // Read first, so a bad value stops the start even when the database is not there.
             var refreshInterval = TenancySettings.RefreshInterval(configuration);

@@ -177,6 +177,34 @@ public sealed class WorkerOptionsTests
         Assert.Equal(("smtp.example.test", 2525, false, "axis@example.test"), (settings.Host, settings.Port, settings.UseTls, settings.From));
     }
 
+    [Theory]
+    [InlineData("Host=127.0.0.1;Port=1;Database=axis;Username=axis;Password=hunter2;SSL Mode=Prefer")]
+    [InlineData("Host=127.0.0.1;Port=1;Database=axis;Username=axis;Password=hunter2")]
+    public void Under_directory_a_production_worker_stops_at_startup_naming_the_platform_connection_without_full_certificate_checks(string platform)
+    {
+        var builder = WorkerBuilder(source: "directory", secretKey: Convert.ToBase64String(new byte[32]), platform: platform);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => builder.Services.AddAxisWorker(builder.Configuration, builder.Environment));
+
+        Assert.Contains("ConnectionStrings:Platform", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("VerifyFull", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("hunter2", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("Development")]
+    [InlineData("Testing")]
+    public void Under_directory_a_development_or_testing_worker_is_built_without_full_certificate_checks(string environment)
+    {
+        var builder = WorkerBuilder(
+            source: "directory",
+            secretKey: Convert.ToBase64String(new byte[32]),
+            platform: "Host=127.0.0.1;Port=1;Database=axis;Username=axis;Password=axis",
+            environment: environment);
+
+        builder.Services.AddAxisWorker(builder.Configuration, builder.Environment);
+    }
+
     private static HostApplicationBuilder EmailBuilder(params (string Key, string? Value)[] settings)
     {
         var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings { EnvironmentName = "Production", DisableDefaults = true });
@@ -194,9 +222,10 @@ public sealed class WorkerOptionsTests
     private static HostApplicationBuilder WorkerBuilder(
         string source,
         string? secretKey,
-        string? platform = "Host=127.0.0.1;Port=1;Database=axis;Username=axis;Password=axis")
+        string? platform = "Host=127.0.0.1;Port=1;Database=axis;Username=axis;Password=axis;SSL Mode=VerifyFull",
+        string environment = "Production")
     {
-        var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings { EnvironmentName = "Production", DisableDefaults = true });
+        var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings { EnvironmentName = environment, DisableDefaults = true });
         builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
         {
             ["Tenancy:Source"] = source,

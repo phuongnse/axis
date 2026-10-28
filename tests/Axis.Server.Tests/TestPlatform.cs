@@ -10,11 +10,12 @@ namespace Axis.Server.Tests;
 /// </summary>
 internal static class TestPlatform
 {
-    // Port 1 on loopback refuses connections immediately, so the database is unreachable.
-    public const string UnreachableDatabase = "Host=127.0.0.1;Port=1;Database=axis;Username=axis;Password=axis;Timeout=2";
+    // Port 1 on loopback refuses connections immediately, so the database is unreachable. The strings set VerifyFull,
+    // because a host outside Development and Testing refuses a connection string without it.
+    public const string UnreachableDatabase = "Host=127.0.0.1;Port=1;Database=axis;Username=axis;Password=axis;Timeout=2;SSL Mode=VerifyFull";
 
     /// <summary>The platform schema connection string. Its user differs from the user of the platform connection string.</summary>
-    public const string UnreachableSchemaDatabase = "Host=127.0.0.1;Port=1;Database=axis;Username=axis_schema;Password=axis;Timeout=2";
+    public const string UnreachableSchemaDatabase = "Host=127.0.0.1;Port=1;Database=axis;Username=axis_schema;Password=axis;Timeout=2;SSL Mode=VerifyFull";
 
     /// <summary>32 zero bytes in base64. It is a test key only.</summary>
     public const string SecretKey = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";

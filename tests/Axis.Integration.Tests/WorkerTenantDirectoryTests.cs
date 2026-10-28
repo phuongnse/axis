@@ -256,6 +256,7 @@ public sealed class WorkerTenantDirectoryTests(PostgreSqlFixture database) : ICl
 
         var settings = new Dictionary<string, string?>
         {
+            ["DOTNET_ENVIRONMENT"] = "Testing",
             ["ConnectionStrings:PlatformSchema"] = platform,
             ["Platform:SecretKey"] = TestSecretKey,
         };

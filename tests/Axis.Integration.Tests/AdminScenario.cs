@@ -133,6 +133,8 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
     {
         var settings = new Dictionary<string, string?>
         {
+            // The databases run without TLS, which only Development and Testing allow.
+            ["DOTNET_ENVIRONMENT"] = "Testing",
             ["Admin:ConnectionString"] = adminConnectionString ?? AdminConnection,
             ["ConnectionStrings:PlatformSchema"] = Platform,
             ["Platform:SecretKey"] = TestSecretKey,
