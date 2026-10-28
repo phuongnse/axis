@@ -60,6 +60,8 @@ internal static partial class AdminCommands
                tenant oidc set <id> [--authority <url>] [--client-id <id>] [--client-secret] [--claim <name>=<claim>]... [--endpoint-audience <value>] [--service-audience <value>] [--profile standard|fapi2] [--client-key] [--retire-client-key <kid>]
                tenant email set <id> --host <host> --from <address> [--port <n>] [--tls true|false] [--user-name <name>] [--password]
                tenant email clear <id>
+               tenant session end <id> --user <user>
+               tenant session end <id> --all
                tenant list
                tenant binding list <id>
                tenant binding set <id> <name> --url <value>
@@ -133,6 +135,7 @@ internal static partial class AdminCommands
         new("tenant oidc set", AuditMark.OnePerTenant, run => OidcSetAsync(run.Command.Name, run.Args, run.Configuration, run.Input, run.Output, run.Error, run.CancellationToken)),
         new("tenant email set", AuditMark.OnePerTenant, TenantSettings.EmailSetAsync),
         new("tenant email clear", AuditMark.OnePerTenant, TenantSettings.EmailClearAsync),
+        new("tenant session end", AuditMark.OnePerTenant, TenantSettings.SessionEndAsync),
         new("tenant list", AuditMark.None, run => StatusAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.CancellationToken)),
         new("tenant binding list", AuditMark.None, TenantSettings.BindingListAsync),
         new("tenant binding set", AuditMark.OnePerTenant, TenantSettings.BindingSetAsync),
