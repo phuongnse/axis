@@ -137,12 +137,36 @@ internal static class EndpointCaller
 /// <summary>
 /// Builds the options of a tenant's bearer schemes from its settings, each time the options are created. The endpoint
 /// caller scheme expects <c>Oidc:EndpointAudience</c> and the service account scheme <c>Oidc:ServiceAudience</c>. The
-/// token checks and the claim mapping are the same for both.
+/// token checks and the claim mapping are the same for both. A token must be signed with an algorithm in
+/// <see cref="Algorithms"/> and must not be marked as another type than an access token, so an ID token is refused.
 /// </summary>
 internal sealed class BearerCallerOptions(TenantSignInSettings settings, bool allowHttp, TimeProvider clock)
     : IConfigureNamedOptions<JwtBearerOptions>
 {
+    /// <summary>The signature algorithms a bearer token may use: RSA, RSA-PSS and ECDSA. <c>HS*</c> and <c>none</c> are refused.</summary>
+    public static readonly string[] Algorithms =
+        ["RS256", "RS384", "RS512", "PS256", "PS384", "PS512", "ES256", "ES384", "ES512"];
+
     private const string DpopScheme = "DPoP ";
+
+    /// <summary>
+    /// Whether the token is not marked as another type than an access token. The header <c>typ</c>, when present, must be
+    /// <c>at+jwt</c>, <c>application/at+jwt</c> or <c>JWT</c>, and the payload <c>typ</c> claim, when present, must be
+    /// <c>Bearer</c> or <c>DPoP</c>. Keycloak marks an ID token <c>ID</c>.
+    /// </summary>
+    private static bool IsAccessToken(JsonWebToken token)
+    {
+        if (!string.IsNullOrEmpty(token.Typ)
+            && !IsOneOf(token.Typ, "at+jwt", "application/at+jwt", "JWT"))
+        {
+            return false;
+        }
+
+        return !token.TryGetPayloadValue<string>("typ", out var claim) || IsOneOf(claim, "Bearer", "DPoP");
+    }
+
+    private static bool IsOneOf(string value, params string[] allowed) =>
+        allowed.Contains(value, StringComparer.OrdinalIgnoreCase);
 
     /// <summary>The thumbprint in the token's <c>cnf.jkt</c> claim, or null when the token is not bound to a key.</summary>
     private static string? BoundThumbprint(JsonWebToken token) =>
@@ -220,11 +244,16 @@ internal sealed class BearerCallerOptions(TenantSignInSettings settings, bool al
             },
             OnTokenValidated = async context =>
             {
+                if (context.SecurityToken is not JsonWebToken token || !IsAccessToken(token))
+                {
+                    context.Fail("The token is not an access token.");
+                    return;
+                }
+
                 if (dpopRequired)
                 {
                     // The proof is made for the token as the caller sent it, and the token holds the key's thumbprint.
-                    if (context.SecurityToken is not JsonWebToken token
-                        || !await DpopProof.IsValidAsync(context.Request, token.EncodedToken, BoundThumbprint(token), clock.GetUtcNow()))
+                    if (!await DpopProof.IsValidAsync(context.Request, token.EncodedToken, BoundThumbprint(token), clock.GetUtcNow()))
                     {
                         context.Fail("The access token is not bound to a valid DPoP proof.");
                         return;
@@ -257,6 +286,7 @@ internal sealed class BearerCallerOptions(TenantSignInSettings settings, bool al
 
         // The expiry is checked against the server's clock, so tests can replace it. The
         // parameters keep their default clock skew of 5 minutes.
+        options.TokenValidationParameters.ValidAlgorithms = Algorithms;
         options.TokenValidationParameters.LifetimeValidator = (notBefore, expires, _, parameters) =>
         {
             var now = clock.GetUtcNow().UtcDateTime;

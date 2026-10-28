@@ -5,6 +5,7 @@ using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Axis.Server.Authentication;
 using Axis.Server.Tests;
 using Microsoft.AspNetCore.Authentication;
@@ -20,8 +21,9 @@ namespace Axis.Integration.Tests;
 /// <summary>
 /// Other systems call inbound endpoints with a client credentials token from the tenant's identity
 /// provider. Tenant a at localhost and tenant c at c.example.test use the development realm, but only
-/// tenant a expects the endpoint audience. Tenant b at b.example.test uses Keycloak's master realm, so
-/// it has another issuer. The database is unreachable, so the paths name an application that the
+/// tenant a expects the endpoint audience. Tenant d at d.example.test uses the development realm and
+/// expects the <c>purchasing-system</c> client id as its audience, so an ID token of that client has the
+/// expected audience. Tenant b at b.example.test uses Keycloak's master realm, so it has another issuer. The database is unreachable, so the paths name an application that the
 /// name rule refuses: the call finds it without a query, and a valid caller gets a <c>404</c>.
 /// </summary>
 public sealed class EndpointCallerTests(KeycloakFixture keycloak) : IAsyncLifetime
@@ -32,6 +34,7 @@ public sealed class EndpointCallerTests(KeycloakFixture keycloak) : IAsyncLifeti
     private const string HostA = "localhost";
     private const string HostB = "b.example.test";
     private const string HostC = "c.example.test";
+    private const string HostD = "d.example.test";
     private const string EndpointPath = "/api/apps/Purchase_Requests/endpoints/SubmitPurchaseRequest";
     private const string StatusPath = "/api/apps/Purchase_Requests/endpoints/SubmitPurchaseRequest/instances/1";
 
@@ -95,6 +98,39 @@ public sealed class EndpointCallerTests(KeycloakFixture keycloak) : IAsyncLifeti
         Assert.All(_callers, caller => Assert.Null(caller));
     }
 
+    [Theory]
+    [InlineData("none")]
+    [InlineData("HS256")]
+    public async Task A_token_signed_with_an_algorithm_outside_the_allowlist_is_a_401(string algorithm)
+    {
+        var bearer = Rewrite(await RequestPurchasingTokenAsync(), algorithm);
+
+        using var call = await SendAsync(HttpMethod.Post, EndpointPath, HostA, bearer);
+
+        await AssertUnauthorizedAsync(call);
+    }
+
+    [Fact]
+    public async Task An_id_token_is_a_401_even_with_the_expected_audience()
+    {
+        var idToken = await RequestTokenAsync(
+            new Dictionary<string, string>
+            {
+                ["grant_type"] = "password",
+                ["client_id"] = KeycloakFixture.PurchasingClientId,
+                ["client_secret"] = KeycloakFixture.PurchasingClientSecret,
+                ["username"] = "anna",
+                ["password"] = KeycloakFixture.Password,
+                ["scope"] = "openid",
+            },
+            "id_token");
+
+        using var call = await SendAsync(HttpMethod.Post, EndpointPath, HostD, idToken);
+
+        await AssertUnauthorizedAsync(call);
+        Assert.All(_callers, caller => Assert.Null(caller));
+    }
+
     [Fact]
     public async Task A_session_cookie_without_a_token_is_a_401_on_an_endpoint_and_is_not_renewed()
     {
@@ -150,6 +186,7 @@ public sealed class EndpointCallerTests(KeycloakFixture keycloak) : IAsyncLifeti
             UseTenant(builder, "a", HostA, authority, endpointAudience: "axis-endpoints");
             UseTenant(builder, "b", HostB, masterRealm, endpointAudience: "axis-endpoints");
             UseTenant(builder, "c", HostC, authority, endpointAudience: null);
+            UseTenant(builder, "d", HostD, authority, endpointAudience: KeycloakFixture.PurchasingClientId);
             builder.ConfigureTestServices(services =>
             {
                 services.AddSingleton<TimeProvider>(_clock);
@@ -206,7 +243,7 @@ public sealed class EndpointCallerTests(KeycloakFixture keycloak) : IAsyncLifeti
             ["scope"] = "openid",
         });
 
-    private async Task<string> RequestTokenAsync(Dictionary<string, string> fields)
+    private async Task<string> RequestTokenAsync(Dictionary<string, string> fields, string field = "access_token")
     {
         using var client = new HttpClient();
         using var form = new FormUrlEncodedContent(fields);
@@ -214,7 +251,7 @@ public sealed class EndpointCallerTests(KeycloakFixture keycloak) : IAsyncLifeti
         var body = await response.Content.ReadAsStringAsync(CancellationToken);
         Assert.True(response.StatusCode == HttpStatusCode.OK, body);
         using var tokens = JsonDocument.Parse(body);
-        return tokens.RootElement.GetProperty("access_token").GetString()!;
+        return tokens.RootElement.GetProperty(field).GetString()!;
     }
 
     /// <summary>Signs the token's header and payload again with a key the realm never published, keeping its key id.</summary>
@@ -224,6 +261,22 @@ public sealed class EndpointCallerTests(KeycloakFixture keycloak) : IAsyncLifeti
         using var key = RSA.Create(2048);
         var signature = key.SignData(Encoding.ASCII.GetBytes($"{parts[0]}.{parts[1]}"), HashAlgorithmName.SHA256, RSASignaturePadding.Pkcs1);
         return $"{parts[0]}.{parts[1]}.{Base64Url.EncodeToString(signature)}";
+    }
+
+    /// <summary>
+    /// Gives the token another signature algorithm in its header and keeps its key id and type. A <c>none</c> token has
+    /// no signature, and an <c>HS256</c> token is signed with a random secret.
+    /// </summary>
+    private static string Rewrite(string token, string algorithm)
+    {
+        var parts = token.Split('.');
+        var header = JsonNode.Parse(Base64Url.DecodeFromChars(parts[0]))!.AsObject();
+        header["alg"] = algorithm;
+        var signingInput = $"{Base64Url.EncodeToString(Encoding.UTF8.GetBytes(header.ToJsonString()))}.{parts[1]}";
+        var signature = algorithm == "none"
+            ? []
+            : HMACSHA256.HashData(RandomNumberGenerator.GetBytes(32), Encoding.ASCII.GetBytes(signingInput));
+        return $"{signingInput}.{Base64Url.EncodeToString(signature)}";
     }
 
     private async Task<string> SignInAnnaAsync()
