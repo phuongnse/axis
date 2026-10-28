@@ -64,10 +64,13 @@ with the reasons. What each one does is in NexKit's
 - **Issues run in parallel unless one needs another.** Marks follow the rules
   of NexKit's [`request` skill][nexkit-request]. The milestone's docs sweep is
   marked *blocked by* every other issue of the milestone, with no reason line
-  for each. At most six issues run at once, with `max_parallel` at 6. Each
-  issue's check round takes three runner jobs, CI on `main` takes more after
-  each merge, and pull requests that must be up to date merge one at a time,
-  so more issues at once mostly wait for runners, usage limits and each other.
+  for each. At most three issues run at once, with `max_parallel` at 3.
+  Pull requests that must be up to date merge one at a time, about one per
+  check round. Each merge sends every waiting pull request through another
+  round, and only one of them merges after it, so more issues at once mostly
+  spend runner jobs, usage limits and `conflicts.max_rounds` on rounds that
+  merge nothing. Each round takes three runner jobs, and CI on `main` takes
+  more after each merge.
 - **NexKit merges a pull request once it passes,** with
   [`merge.auto`][nexkit-auto-merge] on, because the AI review and the checks
   are the gate Axis relies on. The owner turns the setting off to decide each
@@ -111,11 +114,13 @@ with the reasons. What each one does is in NexKit's
   `error-context.md` files, and the performance workflow's
   `test-results-performance`.
 - **NexKit's checks skip suites that a change cannot affect.** NexKit runs the
-  checks in three jobs at once, with `parallel_checks` on: the build, lint, unit
-  and smoke tests in one job, the group `fast`, and the integration and E2E tests
-  each in their own. A check round then takes about as long as its slowest
-  job, instead of all of them in a row, which took 20 to 50 minutes. Under
-  NexKit's `NEXKIT_BASE_SHA`, a suite that no changed file can affect is
+  checks in four jobs at once, with `parallel_checks` on: the build, lint and
+  unit tests in one job, the group `fast`, and the smoke, integration and E2E
+  tests each in their own. A check round then takes about as long as its
+  slowest job, instead of all of them in a row, which took 20 to 50 minutes.
+  The smoke tests have their own job because in the `fast` job, after the
+  build, lint and unit tests, they made it the slowest, at about 25 minutes.
+  Under NexKit's `NEXKIT_BASE_SHA`, a suite that no changed file can affect is
   skipped, and any doubt runs it. CI on `main` sets no base and runs every
   suite, so a slowdown shows after the merge. The integration performance
   tests, whose class names end in `PerformanceTests`, run neither in NexKit's
