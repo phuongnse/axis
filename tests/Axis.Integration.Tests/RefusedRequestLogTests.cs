@@ -7,7 +7,7 @@ namespace Axis.Integration.Tests;
 
 /// <summary>
 /// A request that the server refuses with a <c>403</c> writes a warning with the HTTP method and the route template, and
-/// the trace id and the tenant in its scope. The warning holds no value from the path. <c>binh</c> has no grant on
+/// the trace id and the tenant in its scope. The warning holds no value from the path. <c>manager</c> has no grant on
 /// the RecordsApp entities and <c>rita</c> has a read grant.
 /// </summary>
 public sealed class RefusedRequestLogTests(RecordApiFixture fixture) : IClassFixture<RecordApiFixture>
@@ -20,12 +20,12 @@ public sealed class RefusedRequestLogTests(RecordApiFixture fixture) : IClassFix
     [Fact]
     public async Task A_403_on_the_record_list_writes_a_warning_with_the_route_template_and_the_trace_id()
     {
-        using var binh = fixture.CreateClient().SignedInAs("binh");
+        using var manager = fixture.CreateClient().SignedInAs("manager");
         var (traceId, header) = NewTraceparent();
 
         using var request = Request(HttpMethod.Get, Items, HostA);
         request.Headers.Add("traceparent", header);
-        using var response = await binh.SendAsync(request, CancellationToken);
+        using var response = await manager.SendAsync(request, CancellationToken);
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
         var entry = Assert.Single(Refusals(traceId));

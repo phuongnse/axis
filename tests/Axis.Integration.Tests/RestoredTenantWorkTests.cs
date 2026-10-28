@@ -103,8 +103,8 @@ public sealed class RestoredTenantWorkTests(AdminBackupFixture fixture) : IClass
                 DatabaseOf(restored),
                 $"SELECT id FROM axis.process_tasks WHERE process_instance_id = '{instanceA:D}' AND state = 'open'",
                 CancellationToken))!;
-            using var chau = server.CreateClient().SignedInAs("chau");
-            using (var complete = await chau.SendAsync(
+            using var manager2 = server.CreateClient().SignedInAs("manager-2");
+            using (var complete = await manager2.SendAsync(
                 Request(HttpMethod.Post, $"{App}/tasks/{task:D}/complete", newHost, """{ "outcome": "approve" }"""),
                 CancellationToken))
             {
@@ -113,7 +113,7 @@ public sealed class RestoredTenantWorkTests(AdminBackupFixture fixture) : IClass
 
             await Polling.WaitUntilAsync(async () => (await StateAsync(restored, instanceA))?.StartsWith("completed:", StringComparison.Ordinal) == true, "The restored instance did not complete.");
 
-            using var read = await chau.SendAsync(Request($"{App}/entities/PurchaseRequest/records/{requestA:D}", newHost), CancellationToken);
+            using var read = await manager2.SendAsync(Request($"{App}/entities/PurchaseRequest/records/{requestA:D}", newHost), CancellationToken);
             Assert.Equal(HttpStatusCode.OK, read.StatusCode);
             using var record = JsonDocument.Parse(await read.Content.ReadAsStringAsync(CancellationToken));
             var values = record.RootElement.GetProperty("values");

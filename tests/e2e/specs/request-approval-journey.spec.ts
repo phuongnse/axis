@@ -70,7 +70,7 @@ test.describe('the author builds an application from the request-approval templa
     await expect(rows).toHaveAttribute('data-active', 'true')
   })
 
-  test('requester submits a request on the published site, and minh approves it', async ({ page }) => {
+  test('requester submits a request on the published site, and approver approves it', async ({ page }) => {
     const title = `Zz Request ${Date.now()}`
 
     await useJourneySession(page, 'requester')
@@ -91,7 +91,7 @@ test.describe('the author builds an application from the request-approval templa
     await page.getByRole('button', { name: 'Submit', exact: true }).click()
     await expect(page.getByTestId('form-started')).toBeVisible()
 
-    await useJourneySession(page, 'minh')
+    await useJourneySession(page, 'approver')
     await waitForTask(page, title)
 
     await useJourneySession(page, 'requester')
@@ -99,7 +99,7 @@ test.describe('the author builds an application from the request-approval templa
     await expect(page.getByRole('table')).toBeVisible()
     await expect(page.getByRole('row', { name: new RegExp(title) })).toHaveCount(0)
 
-    await useJourneySession(page, 'minh')
+    await useJourneySession(page, 'approver')
     await openTask(page, title, 'Approval')
     await page.getByLabel(fieldLabel('Decision comment')).fill('Approved')
     await page.getByRole('button', { name: 'Approve', exact: true }).click()

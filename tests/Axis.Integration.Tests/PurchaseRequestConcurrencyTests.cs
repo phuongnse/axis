@@ -61,7 +61,7 @@ public sealed class PurchaseRequestConcurrencyTests(SampleAppFixture fixture) : 
                 """
                 SELECT count(*) FROM axis.process_tasks
                 WHERE process_instance_id = @instance AND step = 'managerApproval' AND state = 'open'
-                  AND assignee_kind = 'user' AND assignee = 'chau'
+                  AND assignee_kind = 'user' AND assignee = 'manager-2'
                 """,
                 ("instance", instance.Id)));
             Assert.Equal(1L, await fixture.CountAsync(
@@ -164,13 +164,13 @@ public sealed class PurchaseRequestConcurrencyTests(SampleAppFixture fixture) : 
     public async Task Two_finance_reviewers_completing_one_task_at_once_record_one_decision()
     {
         using var requester = fixture.CreateClient().SignedInAs("requester");
-        using var chau = fixture.CreateClient().SignedInAs("chau");
-        using var dung = fixture.CreateClient().SignedInAs("dung");
+        using var manager2 = fixture.CreateClient().SignedInAs("manager-2");
+        using var financeReviewer = fixture.CreateClient().SignedInAs("finance-reviewer");
         using var reviewer = fixture.CreateClient().SignedInAs("reviewer");
         var subject = await CreateRequestAsync(requester, 10000);
         var instance = await StartAsync(requester, subject);
         await fixture.RunUntilIdleAsync(CancellationToken);
-        using (var approved = await CompleteAsync(chau, await OpenTaskAsync(instance, "managerApproval"), """{ "outcome": "approve" }"""))
+        using (var approved = await CompleteAsync(manager2, await OpenTaskAsync(instance, "managerApproval"), """{ "outcome": "approve" }"""))
         {
             Assert.Equal(HttpStatusCode.OK, approved.StatusCode);
         }
@@ -179,12 +179,12 @@ public sealed class PurchaseRequestConcurrencyTests(SampleAppFixture fixture) : 
         var task = await OpenTaskAsync(instance, "financeApproval");
 
         var responses = await Task.WhenAll(
-            CompleteAsync(dung, task, """{ "outcome": "approve" }"""),
+            CompleteAsync(financeReviewer, task, """{ "outcome": "approve" }"""),
             CompleteAsync(reviewer, task, """{ "outcome": "approve" }"""));
         using var first = responses[0];
         using var second = responses[1];
 
-        var winner = Assert.Single(new[] { ("dung", first), ("reviewer", second) }, pair => pair.Item2.StatusCode == HttpStatusCode.OK).Item1;
+        var winner = Assert.Single(new[] { ("finance-reviewer", first), ("reviewer", second) }, pair => pair.Item2.StatusCode == HttpStatusCode.OK).Item1;
         var loser = first.StatusCode == HttpStatusCode.OK ? second : first;
         using (var problem = await RecordApiFixture.ReadProblemAsync(loser, HttpStatusCode.Conflict))
         {
@@ -196,10 +196,10 @@ public sealed class PurchaseRequestConcurrencyTests(SampleAppFixture fixture) : 
             "SELECT count(*) FROM axis.process_step_history WHERE process_instance_id = @instance AND step = 'financeApproval' AND decision IS NOT NULL",
             ("instance", instance)));
         Assert.Equal(1L, await fixture.CountAsync(
-            "SELECT count(*) FROM axis.audit_records WHERE process_instance_id = @instance AND action = 'task.completed' AND actor IN ('dung', 'reviewer')",
+            "SELECT count(*) FROM axis.audit_records WHERE process_instance_id = @instance AND action = 'task.completed' AND actor IN ('finance-reviewer', 'reviewer')",
             ("instance", instance)));
         Assert.Equal(winner, await fixture.ScalarAsync(
-            "SELECT actor FROM axis.audit_records WHERE process_instance_id = @instance AND action = 'task.completed' AND actor IN ('dung', 'reviewer')",
+            "SELECT actor FROM axis.audit_records WHERE process_instance_id = @instance AND action = 'task.completed' AND actor IN ('finance-reviewer', 'reviewer')",
             ("instance", instance)));
 
         await fixture.RunUntilIdleAsync(CancellationToken);
@@ -220,7 +220,7 @@ public sealed class PurchaseRequestConcurrencyTests(SampleAppFixture fixture) : 
         {
             for (var i = 0; i < 6; i++)
             {
-                clients.Add(fixture.CreateClient().SignedInAs("chau"));
+                clients.Add(fixture.CreateClient().SignedInAs("manager-2"));
             }
 
             var responses = await Task.WhenAll(clients.Take(5).Select(client => CompleteAsync(client, task, """{ "outcome": "approve" }""")));

@@ -30,9 +30,9 @@ public sealed class PageAccessTests(SampleAppFixture fixture) : IClassFixture<Sa
     [Fact]
     public async Task A_department_manager_may_only_read_a_purchase_request_and_has_no_submit_action()
     {
-        using var chau = fixture.CreateClient().SignedInAs("chau");
+        using var manager2 = fixture.CreateClient().SignedInAs("manager-2");
 
-        var widget = await FormWidgetAsync(chau);
+        var widget = await FormWidgetAsync(manager2);
 
         Assert.Equal("""{"actions":["read"],"createFields":[],"updateFields":[]}""", widget.GetProperty("access").GetRawText());
         Assert.Equal(0, widget.GetProperty("actions").GetArrayLength());
@@ -41,10 +41,10 @@ public sealed class PageAccessTests(SampleAppFixture fixture) : IClassFixture<Sa
     [Fact]
     public async Task A_department_manager_keeps_the_task_inbox_in_navigation()
     {
-        using var chau = fixture.CreateClient().SignedInAs("chau");
+        using var manager2 = fixture.CreateClient().SignedInAs("manager-2");
         using var request = RecordApiFixture.Request(Site, Host);
 
-        using var response = await chau.SendAsync(request, CancellationToken);
+        using var response = await manager2.SendAsync(request, CancellationToken);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         using var site = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));

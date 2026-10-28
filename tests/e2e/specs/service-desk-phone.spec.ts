@@ -4,7 +4,7 @@ import { noSideways, phoneWidth } from '../phone'
 import { pickOption } from '../select'
 import { sessionFile, useSession } from '../sessions'
 
-// At phone width, requester creates a draft ticket and opens it from the folded row actions, and linh sees the Dashboard.
+// At phone width, requester creates a draft ticket and opens it from the folded row actions, and lead sees the Dashboard.
 test.use({ storageState: sessionFile('requester'), viewport: { width: phoneWidth, height: 812 } })
 
 const appPath = '/api/apps/ServiceDesk'
@@ -50,7 +50,7 @@ test('requester creates a draft ticket at phone width and opens it from the fold
   await noSideways(page)
 })
 
-test('linh sees the KPI tiles and the chart stacked below them on the Dashboard at phone width', async ({
+test('lead sees the KPI tiles and the chart stacked below them on the Dashboard at phone width', async ({
   page,
   request,
 }) => {
@@ -73,7 +73,7 @@ test('linh sees the KPI tiles and the chart stacked below them on the Dashboard 
   })
   expect(started.status()).toBe(201)
 
-  await useSession(page, 'linh')
+  await useSession(page, 'lead')
   await page.goto('/service-desk/dashboard')
 
   const tiles = page.getByTestId('kpi-tile')

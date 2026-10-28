@@ -6,8 +6,8 @@
   "now": "2026-10-01T09:00:00Z",
   "users": {
     "requester": ["requester"],
-    "khoa": ["agent"],
-    "linh": ["service-desk-lead"]
+    "agent": ["agent"],
+    "lead": ["service-desk-lead"]
   },
   "steps": [
     {
@@ -39,7 +39,7 @@
       "record": "ticket",
       "step": "triage",
       "outcome": "assign",
-      "as": "linh",
+      "as": "lead",
       "values": {
         "category": "3f1c2a6e-5b0d-4e0a-9c1f-7a2d8b4e6c01",
         "priority": "high"
@@ -50,7 +50,7 @@
       "record": "ticket",
       "step": "resolve",
       "assignee": {
-        "user": "khoa"
+        "user": "agent"
       }
     },
     {
@@ -58,7 +58,7 @@
       "record": "ticket",
       "step": "resolve",
       "outcome": "resolve",
-      "as": "khoa",
+      "as": "agent",
       "values": {
         "resolution": "Replaced the battery."
       }
@@ -83,7 +83,7 @@
       "record": "ticket",
       "values": {
         "status": "closed",
-        "assignedAgent": "khoa",
+        "assignedAgent": "agent",
         "resolution": "Replaced the battery."
       }
     },

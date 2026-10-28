@@ -9,8 +9,8 @@ namespace Axis.Integration.Tests;
 /// <summary>
 /// The process instance detail lists the operator commands the signed-in user may take, and marks a call
 /// resolvable, from the user's grants and the states. The sample gives <c>inspect</c> to the <c>operator</c>
-/// role, here <c>giang</c>, and <c>cancel</c>, <c>retry</c> and <c>resolve</c> to the finance reviewers.
-/// <c>khanh</c> holds both roles. <c>requester</c> starts the approvals and <c>chau</c> is the manager of
+/// role, here the <c>operator</c> user, and <c>cancel</c>, <c>retry</c> and <c>resolve</c> to the finance reviewers.
+/// <c>khanh</c> holds both roles. <c>requester</c> starts the approvals and <c>manager-2</c> is the manager of
 /// Operations. Each test leaves no due work item behind, so the next one finds only its own.
 /// </summary>
 public sealed class ProcessInstanceCommandsTests(SampleAppFixture fixture) : IClassFixture<SampleAppFixture>
@@ -35,9 +35,9 @@ public sealed class ProcessInstanceCommandsTests(SampleAppFixture fixture) : ICl
             Assert.Equal(["cancel"], Commands(khanh));
         }
 
-        using var giang = await GetAsync("giang", instance);
-        Assert.Equal("waiting", giang.RootElement.GetProperty("state").GetString());
-        Assert.Empty(Commands(giang));
+        using var operatorView = await GetAsync("operator", instance);
+        Assert.Equal("waiting", operatorView.RootElement.GetProperty("state").GetString());
+        Assert.Empty(Commands(operatorView));
     }
 
     [Fact]
@@ -52,8 +52,8 @@ public sealed class ProcessInstanceCommandsTests(SampleAppFixture fixture) : ICl
             Assert.Equal(["retry"], Commands(khanh));
         }
 
-        using var giang = await GetAsync("giang", instance);
-        Assert.Empty(Commands(giang));
+        using var operatorView = await GetAsync("operator", instance);
+        Assert.Empty(Commands(operatorView));
     }
 
     [Fact]
@@ -76,12 +76,12 @@ public sealed class ProcessInstanceCommandsTests(SampleAppFixture fixture) : ICl
             Assert.Empty(Commands(khanh));
         }
 
-        using var giang = await GetAsync("giang", instance);
-        var unresolvable = Assert.Single(giang.RootElement.GetProperty("calls").EnumerateArray());
+        using var operatorView = await GetAsync("operator", instance);
+        var unresolvable = Assert.Single(operatorView.RootElement.GetProperty("calls").EnumerateArray());
         Assert.Equal("unknown", unresolvable.GetProperty("state").GetString());
         Assert.False(unresolvable.GetProperty("resolvable").GetBoolean());
         Assert.False(unresolvable.TryGetProperty("outputs", out _));
-        Assert.Empty(Commands(giang));
+        Assert.Empty(Commands(operatorView));
     }
 
     private static List<string> Commands(JsonDocument body) =>
@@ -115,12 +115,12 @@ public sealed class ProcessInstanceCommandsTests(SampleAppFixture fixture) : ICl
     // then set to unknown with no work item, as a connector with no lookup leaves it.
     private async Task<(Guid Instance, Guid Call)> UnknownCallAsync(HttpClient requester)
     {
-        using var chau = fixture.CreateClient().SignedInAs("chau");
+        using var manager2 = fixture.CreateClient().SignedInAs("manager-2");
         var subject = await CreateRequestAsync(requester, 500);
         var instance = await StartAsync(requester, subject);
         await fixture.RunUntilIdleAsync(CancellationToken);
         var task = (Guid)(await fixture.ScalarAsync("SELECT id FROM axis.process_tasks WHERE process_instance_id = @id AND state = 'open'", ("id", instance)))!;
-        using (var approved = await CompleteAsync(chau, task, """{ "outcome": "approve" }"""))
+        using (var approved = await CompleteAsync(manager2, task, """{ "outcome": "approve" }"""))
         {
             Assert.Equal(HttpStatusCode.OK, approved.StatusCode);
         }

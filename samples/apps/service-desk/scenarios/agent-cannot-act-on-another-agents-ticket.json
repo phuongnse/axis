@@ -6,9 +6,9 @@
   "now": "2026-10-01T09:00:00Z",
   "users": {
     "requester": ["requester"],
-    "khoa": ["agent"],
-    "minh": ["agent"],
-    "linh": ["service-desk-lead"]
+    "agent": ["agent"],
+    "approver": ["agent"],
+    "lead": ["service-desk-lead"]
   },
   "steps": [
     {
@@ -33,11 +33,11 @@
       "record": "ticket",
       "step": "triage",
       "outcome": "assign",
-      "as": "linh",
+      "as": "lead",
       "values": {
         "category": "3f1c2a6e-5b0d-4e0a-9c1f-7a2d8b4e6c01",
         "priority": "high",
-        "assignedAgent": "minh"
+        "assignedAgent": "approver"
       }
     },
     {
@@ -45,7 +45,7 @@
       "record": "ticket",
       "step": "resolve",
       "outcome": "resolve",
-      "as": "khoa",
+      "as": "agent",
       "values": {
         "resolution": "Replaced the battery."
       },
@@ -54,7 +54,7 @@
     {
       "type": "updateRecord",
       "record": "ticket",
-      "as": "khoa",
+      "as": "agent",
       "values": {
         "resolution": "Fixed"
       },
@@ -71,7 +71,7 @@
       "record": "ticket",
       "step": "resolve",
       "assignee": {
-        "user": "minh"
+        "user": "approver"
       }
     }
   ]

@@ -6,8 +6,8 @@
   "now": "2026-10-01T09:00:00Z",
   "users": {
     "requester": ["employee"],
-    "binh": ["department-manager"],
-    "lan": ["finance-reviewer"]
+    "manager": ["department-manager"],
+    "employee": ["finance-reviewer"]
   },
   "stubs": [
     {
@@ -35,8 +35,8 @@
       }
     },
     { "type": "startProcess", "process": "PurchaseRequestApproval", "record": "request", "as": "requester" },
-    { "type": "expectTask", "record": "request", "step": "managerApproval", "assignee": { "user": "binh" } },
-    { "type": "completeTask", "record": "request", "step": "managerApproval", "outcome": "approve", "as": "binh" },
+    { "type": "expectTask", "record": "request", "step": "managerApproval", "assignee": { "user": "manager" } },
+    { "type": "completeTask", "record": "request", "step": "managerApproval", "outcome": "approve", "as": "manager" },
     {
       "type": "expectInstance",
       "process": "PurchaseRequestApproval",
@@ -45,7 +45,7 @@
       "step": "financeApproval"
     },
     { "type": "expectTask", "record": "request", "step": "financeApproval", "assignee": { "role": "finance-reviewer" } },
-    { "type": "completeTask", "record": "request", "step": "financeApproval", "outcome": "approve", "as": "lan" },
+    { "type": "completeTask", "record": "request", "step": "financeApproval", "outcome": "approve", "as": "employee" },
     {
       "type": "expectInstance",
       "process": "PurchaseRequestApproval",

@@ -5,7 +5,7 @@
   "formatVersion": 1,
   "now": "2026-10-01T09:00:00Z",
   "users": {
-    "quan": [
+    "asset-manager": [
       "asset-manager"
     ]
   },
@@ -13,7 +13,7 @@
     {
       "type": "createRecord",
       "entity": "Asset",
-      "as": "quan",
+      "as": "asset-manager",
       "values": {
         "name": "Dell Latitude 7440",
         "currency": "USD",

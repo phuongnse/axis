@@ -10,8 +10,8 @@ namespace Axis.Integration.Tests;
 
 /// <summary>
 /// An operator with a <c>cancel</c> grant stops a running or waiting purchase request approval,
-/// through the HTTP API. The sample gives the grant to the finance reviewers, here <c>dung</c>.
-/// <c>requester</c> starts the approvals and <c>chau</c> is the manager. Each test leaves no due work
+/// through the HTTP API. The sample gives the grant to the finance reviewers, here <c>finance-reviewer</c>.
+/// <c>requester</c> starts the approvals and <c>manager-2</c> is the manager. Each test leaves no due work
 /// item behind, so the next one finds only its own.
 /// </summary>
 public sealed class ProcessCancelTests(SampleAppFixture fixture) : IClassFixture<SampleAppFixture>
@@ -28,15 +28,15 @@ public sealed class ProcessCancelTests(SampleAppFixture fixture) : IClassFixture
     public async Task Cancelling_an_instance_waiting_for_the_manager_closes_its_task_and_lets_the_record_start_again()
     {
         using var requester = fixture.CreateClient().SignedInAs("requester");
-        using var chau = fixture.CreateClient().SignedInAs("chau");
-        using var dung = fixture.CreateClient().SignedInAs("dung");
+        using var manager2 = fixture.CreateClient().SignedInAs("manager-2");
+        using var financeReviewer = fixture.CreateClient().SignedInAs("finance-reviewer");
         var subject = await CreateRequestAsync(requester, 500);
         var instance = await StartAsync(requester, subject);
         await fixture.RunUntilIdleAsync(CancellationToken);
         var task = await OpenTaskAsync(instance);
-        Assert.Contains(task, await InboxAsync(chau));
+        Assert.Contains(task, await InboxAsync(manager2));
 
-        using (var response = await CancelAsync(dung, instance, Reason))
+        using (var response = await CancelAsync(financeReviewer, instance, Reason))
         {
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
             using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
@@ -50,10 +50,10 @@ public sealed class ProcessCancelTests(SampleAppFixture fixture) : IClassFixture
         Assert.NotNull(await fixture.ScalarAsync("SELECT ended_at FROM axis.process_instances WHERE id = @id", ("id", instance)));
         Assert.Equal("cancelled", await fixture.ScalarAsync("SELECT state FROM axis.process_tasks WHERE id = @id", ("id", task)));
         Assert.Null(await fixture.ScalarAsync("SELECT outcome FROM axis.process_tasks WHERE id = @id", ("id", task)));
-        Assert.DoesNotContain(task, await InboxAsync(chau));
+        Assert.DoesNotContain(task, await InboxAsync(manager2));
         Assert.Equal(0L, await WorkItemsAsync(instance));
 
-        using (var completed = await CompleteAsync(chau, task, """{ "outcome": "approve" }"""))
+        using (var completed = await CompleteAsync(manager2, task, """{ "outcome": "approve" }"""))
         {
             Assert.Equal(HttpStatusCode.Conflict, completed.StatusCode);
         }
@@ -71,7 +71,7 @@ public sealed class ProcessCancelTests(SampleAppFixture fixture) : IClassFixture
     public async Task Cancelling_an_instance_deletes_the_deadline_item_of_its_open_task()
     {
         using var requester = fixture.CreateClient().SignedInAs("requester");
-        using var dung = fixture.CreateClient().SignedInAs("dung");
+        using var financeReviewer = fixture.CreateClient().SignedInAs("finance-reviewer");
         var subject = await CreateRequestAsync(requester, 500);
         var instance = await StartAsync(requester, subject);
         await fixture.RunUntilIdleAsync(CancellationToken);
@@ -87,7 +87,7 @@ public sealed class ProcessCancelTests(SampleAppFixture fixture) : IClassFixture
             1L,
             await fixture.CountAsync("SELECT count(*) FROM axis.process_work_items WHERE task_id = @id AND kind = 'task.deadline'", ("id", task)));
 
-        using (var response = await CancelAsync(dung, instance, Reason))
+        using (var response = await CancelAsync(financeReviewer, instance, Reason))
         {
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         }
@@ -100,13 +100,13 @@ public sealed class ProcessCancelTests(SampleAppFixture fixture) : IClassFixture
     public async Task A_cancel_writes_one_audit_record_with_the_user_and_the_reason_and_a_history_row()
     {
         using var requester = fixture.CreateClient().SignedInAs("requester");
-        using var dung = fixture.CreateClient().SignedInAs("dung");
+        using var financeReviewer = fixture.CreateClient().SignedInAs("finance-reviewer");
         var subject = await CreateRequestAsync(requester, 500);
         var instance = await StartAsync(requester, subject);
         await fixture.RunUntilIdleAsync(CancellationToken);
         var task = await OpenTaskAsync(instance);
 
-        using (var response = await CancelAsync(dung, instance, Reason))
+        using (var response = await CancelAsync(financeReviewer, instance, Reason))
         {
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         }
@@ -116,7 +116,7 @@ public sealed class ProcessCancelTests(SampleAppFixture fixture) : IClassFixture
             await fixture.CountAsync(
                 "SELECT count(*) FROM axis.audit_records WHERE process_instance_id = @id AND action = 'process.cancelled'", ("id", instance)));
         Assert.Equal(
-            ("dung", "Dung Finance Reviewer", subject),
+            ("finance-reviewer", "Finance Reviewer User", subject),
             await AuditActorAsync(instance));
         using var details = JsonDocument.Parse((string)(await fixture.ScalarAsync(
             "SELECT details::text FROM axis.audit_records WHERE process_instance_id = @id AND action = 'process.cancelled'", ("id", instance)))!);
@@ -145,13 +145,13 @@ public sealed class ProcessCancelTests(SampleAppFixture fixture) : IClassFixture
     public async Task Cancelling_an_instance_with_a_pending_call_cancels_the_call_and_sends_nothing()
     {
         using var requester = fixture.CreateClient().SignedInAs("requester");
-        using var dung = fixture.CreateClient().SignedInAs("dung");
+        using var financeReviewer = fixture.CreateClient().SignedInAs("finance-reviewer");
         var (subject, instance) = await StageCallAsync(requester);
         var call = await CallAsync(instance);
         Assert.Equal("pending", await CallStateAsync(call));
         Assert.Equal(1L, await WorkItemsAsync(instance));
 
-        using (var response = await CancelAsync(dung, instance, Reason))
+        using (var response = await CancelAsync(financeReviewer, instance, Reason))
         {
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         }
@@ -174,7 +174,7 @@ public sealed class ProcessCancelTests(SampleAppFixture fixture) : IClassFixture
     public async Task Cancelling_an_instance_whose_call_is_unknown_is_refused_and_changes_nothing()
     {
         using var requester = fixture.CreateClient().SignedInAs("requester");
-        using var dung = fixture.CreateClient().SignedInAs("dung");
+        using var financeReviewer = fixture.CreateClient().SignedInAs("finance-reviewer");
         var (_, instance) = await StageCallAsync(requester);
         var call = await CallAsync(instance);
         await fixture.ScalarAsync("UPDATE axis.connector_calls SET state = 'unknown' WHERE id = @id", ("id", call));
@@ -182,7 +182,7 @@ public sealed class ProcessCancelTests(SampleAppFixture fixture) : IClassFixture
 
         try
         {
-            using var response = await CancelAsync(dung, instance, Reason);
+            using var response = await CancelAsync(financeReviewer, instance, Reason);
             using var problem = await RecordApiFixture.ReadProblemAsync(response, HttpStatusCode.Conflict);
             Assert.Equal(call, problem.RootElement.GetProperty("callId").GetGuid());
 
@@ -208,12 +208,12 @@ public sealed class ProcessCancelTests(SampleAppFixture fixture) : IClassFixture
     public async Task A_step_a_worker_had_loaded_commits_nothing_after_the_cancel()
     {
         using var requester = fixture.CreateClient().SignedInAs("requester");
-        using var chau = fixture.CreateClient().SignedInAs("chau");
-        using var dung = fixture.CreateClient().SignedInAs("dung");
+        using var manager2 = fixture.CreateClient().SignedInAs("manager-2");
+        using var financeReviewer = fixture.CreateClient().SignedInAs("finance-reviewer");
         var subject = await CreateRequestAsync(requester, 500);
         var instance = await StartAsync(requester, subject);
         await fixture.RunUntilIdleAsync(CancellationToken);
-        using (var approved = await CompleteAsync(chau, await OpenTaskAsync(instance), """{ "outcome": "approve" }"""))
+        using (var approved = await CompleteAsync(manager2, await OpenTaskAsync(instance), """{ "outcome": "approve" }"""))
         {
             Assert.Equal(HttpStatusCode.OK, approved.StatusCode);
         }
@@ -237,7 +237,7 @@ public sealed class ProcessCancelTests(SampleAppFixture fixture) : IClassFixture
             "SELECT count(*) FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock'") == 1, "The run did not wait on the lock.");
         Assert.False(run.IsCompleted);
 
-        using (var response = await CancelAsync(dung, instance, Reason))
+        using (var response = await CancelAsync(financeReviewer, instance, Reason))
         {
             Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         }
@@ -265,8 +265,8 @@ public sealed class ProcessCancelTests(SampleAppFixture fixture) : IClassFixture
     public async Task A_user_without_a_cancel_grant_gets_403_and_a_completed_instance_gets_409()
     {
         using var requester = fixture.CreateClient().SignedInAs("requester");
-        using var chau = fixture.CreateClient().SignedInAs("chau");
-        using var dung = fixture.CreateClient().SignedInAs("dung");
+        using var manager2 = fixture.CreateClient().SignedInAs("manager-2");
+        using var financeReviewer = fixture.CreateClient().SignedInAs("finance-reviewer");
         var subject = await CreateRequestAsync(requester, 500);
         var instance = await StartAsync(requester, subject);
         await fixture.RunUntilIdleAsync(CancellationToken);
@@ -276,21 +276,21 @@ public sealed class ProcessCancelTests(SampleAppFixture fixture) : IClassFixture
             Assert.Equal(HttpStatusCode.Forbidden, denied.StatusCode);
         }
 
-        using (var managerDenied = await CancelAsync(chau, instance, Reason))
+        using (var managerDenied = await CancelAsync(manager2, instance, Reason))
         {
             Assert.Equal(HttpStatusCode.Forbidden, managerDenied.StatusCode);
         }
 
         Assert.Equal("waiting", await StateAsync(instance));
 
-        using (var rejected = await CompleteAsync(chau, await OpenTaskAsync(instance), """{ "outcome": "reject" }"""))
+        using (var rejected = await CompleteAsync(manager2, await OpenTaskAsync(instance), """{ "outcome": "reject" }"""))
         {
             Assert.Equal(HttpStatusCode.OK, rejected.StatusCode);
         }
 
         await fixture.RunUntilIdleAsync(CancellationToken);
         Assert.Equal("completed", await StateAsync(instance));
-        using var response = await CancelAsync(dung, instance, Reason);
+        using var response = await CancelAsync(financeReviewer, instance, Reason);
         using var problem = await RecordApiFixture.ReadProblemAsync(response, HttpStatusCode.Conflict);
         Assert.Equal("The instance is not running or waiting.", problem.RootElement.GetProperty("title").GetString());
         Assert.Equal("completed", await StateAsync(instance));
@@ -300,7 +300,7 @@ public sealed class ProcessCancelTests(SampleAppFixture fixture) : IClassFixture
     public async Task A_cancel_that_is_not_well_formed_or_names_no_instance_writes_nothing()
     {
         using var requester = fixture.CreateClient().SignedInAs("requester");
-        using var dung = fixture.CreateClient().SignedInAs("dung");
+        using var financeReviewer = fixture.CreateClient().SignedInAs("finance-reviewer");
         var subject = await CreateRequestAsync(requester, 500);
         var instance = await StartAsync(requester, subject);
         await fixture.RunUntilIdleAsync(CancellationToken);
@@ -316,14 +316,14 @@ public sealed class ProcessCancelTests(SampleAppFixture fixture) : IClassFixture
             ("{", "", "Must be a JSON object."),
         })
         {
-            using var response = await CancelAsync(dung, instance, body);
+            using var response = await CancelAsync(financeReviewer, instance, body);
             using var problem = await RecordApiFixture.ReadProblemAsync(response, HttpStatusCode.BadRequest);
             var errors = problem.RootElement.GetProperty("errors");
             Assert.Equal([key], errors.EnumerateObject().Select(error => error.Name));
             Assert.Equal([message], errors.GetProperty(key).EnumerateArray().Select(error => error.GetString()));
         }
 
-        using (var unknown = await CancelAsync(dung, Guid.NewGuid(), Reason))
+        using (var unknown = await CancelAsync(financeReviewer, Guid.NewGuid(), Reason))
         {
             Assert.Equal(HttpStatusCode.NotFound, unknown.StatusCode);
         }
@@ -331,14 +331,14 @@ public sealed class ProcessCancelTests(SampleAppFixture fixture) : IClassFixture
         // Only the hyphenated form names an instance.
         using (var request = RecordApiFixture.Request(HttpMethod.Post, $"{App}/processes/PurchaseRequestApproval/instances/{instance:N}/cancel", Host, Reason))
         {
-            using var response = await dung.SendAsync(request, CancellationToken);
+            using var response = await financeReviewer.SendAsync(request, CancellationToken);
             Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
         }
 
         using (var request = RecordApiFixture.Request(HttpMethod.Post, $"{App}/processes/PurchaseRequestApproval/instances/{instance:D}/cancel", Host, Reason))
         {
             request.Content = new StringContent(Reason, System.Text.Encoding.UTF8, "text/plain");
-            using var response = await dung.SendAsync(request, CancellationToken);
+            using var response = await financeReviewer.SendAsync(request, CancellationToken);
             Assert.Equal(HttpStatusCode.UnsupportedMediaType, response.StatusCode);
         }
 
@@ -351,11 +351,11 @@ public sealed class ProcessCancelTests(SampleAppFixture fixture) : IClassFixture
     // Starts an approval and runs its steps, up to the staged purchase order call. The call is not sent.
     private async Task<(Guid Subject, Guid Instance)> StageCallAsync(HttpClient requester)
     {
-        using var chau = fixture.CreateClient().SignedInAs("chau");
+        using var manager2 = fixture.CreateClient().SignedInAs("manager-2");
         var subject = await CreateRequestAsync(requester, 500);
         var instance = await StartAsync(requester, subject);
         await fixture.RunUntilIdleAsync(CancellationToken);
-        using (var approved = await CompleteAsync(chau, await OpenTaskAsync(instance), """{ "outcome": "approve" }"""))
+        using (var approved = await CompleteAsync(manager2, await OpenTaskAsync(instance), """{ "outcome": "approve" }"""))
         {
             Assert.Equal(HttpStatusCode.OK, approved.StatusCode);
         }

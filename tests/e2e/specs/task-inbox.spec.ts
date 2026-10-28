@@ -27,9 +27,9 @@ test('the manager a task is assigned to sees it in the inbox in light and dark m
   })
   expect(started.status()).toBe(201)
 
-  await useSession(page, 'binh')
+  await useSession(page, 'manager')
   await page.goto('/e2e/tasks')
-  await expect(page.getByRole('banner').getByRole('button', { name: 'Binh Engineering Manager', exact: true })).toBeVisible()
+  await expect(page.getByRole('banner').getByRole('button', { name: 'Manager User', exact: true })).toBeVisible()
   const row = page.getByRole('row', { name: new RegExp(title) })
   // The worker creates the task some time after the start, so the inbox is loaded again until it shows.
   await expect(async () => {

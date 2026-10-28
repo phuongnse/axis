@@ -4,7 +4,7 @@ import { csrfHeaders } from '../csrf'
 import { waitForDialog } from '../dialogs'
 import { sessionFile, useSession } from '../sessions'
 
-// requester creates the records through the record API, then dung looks at them. dung's finance-reviewer
+// requester creates the records through the record API, then the finance-reviewer user looks at them. finance-reviewer's
 // role reads only notes and categories whose title or name contains 'Shared'.
 test.use({ storageState: sessionFile('requester') })
 
@@ -28,7 +28,7 @@ test('a data source table and a reference lookup show only the records the user 
   await createRecord(request, 'Category', { name: `0 Shared ${run}` })
   await createRecord(request, 'Category', { name: `0 Private ${run}` })
 
-  await useSession(page, 'dung')
+  await useSession(page, 'finance-reviewer')
   await page.goto('/e2e/noterows')
   await expect(page.getByRole('row', { name: new RegExp(`Shared ${run}`) })).toBeVisible()
   await expect(page.getByRole('row', { name: new RegExp(`Private ${run}`) })).toHaveCount(0)

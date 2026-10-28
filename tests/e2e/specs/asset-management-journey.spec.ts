@@ -1176,10 +1176,10 @@ test.describe('the author builds the asset management application with Studio on
     await expect(rows).toHaveAttribute('data-active', 'true')
   })
 
-  test('quan registers an asset with an invoice, two software records and a maintenance entry, and sees them on its detail page', async ({
+  test('asset-manager registers an asset with an invoice, two software records and a maintenance entry, and sees them on its detail page', async ({
     page,
   }) => {
-    await useJourneySession(page, 'quan')
+    await useJourneySession(page, 'asset-manager')
     // The sample has no page for Software or Vendor records, and neither entity is seeded.
     const software = [`Word ${run}`, `Excel ${run}`]
     const vendor = `Vendor ${run}`
@@ -1196,7 +1196,7 @@ test.describe('the author builds the asset management application with Studio on
     await page.getByRole('button', { name: 'New', exact: true }).click()
     await expect(page).toHaveURL(/\/asset-management\/assetform\/new$/)
     await page.getByRole('textbox', { name: 'Name', exact: true }).fill(registered)
-    await page.getByRole('textbox', { name: 'Holder', exact: true }).fill('lan')
+    await page.getByRole('textbox', { name: 'Holder', exact: true }).fill('employee')
     await pickOption(page.getByRole('combobox', { name: /^(\* )?Currency$/ }), 'USD')
     await page.getByLabel(fieldLabel('Purchase cost')).fill('1500')
 
@@ -1262,10 +1262,10 @@ test.describe('the author builds the asset management application with Studio on
     await expectShown(cellValue(page, 'maintenance', 0, 'cost'), /200/)
   })
 
-  test('quan imports the asset CSV after a clean dry run and finds the imported assets in the register', async ({
+  test('asset-manager imports the asset CSV after a clean dry run and finds the imported assets in the register', async ({
     page,
   }) => {
-    await useJourneySession(page, 'quan')
+    await useJourneySession(page, 'asset-manager')
     await page.goto(`${journeyURL}/asset-management/assets`)
 
     await page.getByRole('button', { name: 'Import', exact: true }).click()
@@ -1287,10 +1287,10 @@ test.describe('the author builds the asset management application with Studio on
     }
   })
 
-  test('thao exports the register to CSV and Excel, sees the dashboard and has no New or Import button', async ({
+  test('auditor exports the register to CSV and Excel, sees the dashboard and has no New or Import button', async ({
     page,
   }) => {
-    await useJourneySession(page, 'thao')
+    await useJourneySession(page, 'auditor')
     await page.goto(`${journeyURL}/asset-management/assets`)
     await expect(page.getByRole('table')).toBeVisible()
     await expect(page.getByRole('button', { name: 'New', exact: true })).toHaveCount(0)
@@ -1332,8 +1332,8 @@ test.describe('the author builds the asset management application with Studio on
     await expect(page.getByRole('img', { name: 'Assets by status', exact: true }).first()).toBeVisible()
   })
 
-  test('lan sees only the asset held and no Export, Import or New button', async ({ page }) => {
-    await useJourneySession(page, 'lan')
+  test('employee sees only the asset held and no Export, Import or New button', async ({ page }) => {
+    await useJourneySession(page, 'employee')
     await page.goto(`${journeyURL}/asset-management/assets`)
 
     await expect(page.getByRole('table')).toBeVisible()

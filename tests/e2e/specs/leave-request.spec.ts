@@ -10,8 +10,8 @@ import { sessionFile, useSession, type SampleUser } from "../sessions";
 // straight to the API, so a hidden button never stands in for the server's check.
 //
 // Specs run in parallel against one database, so each test looks only for the requests it creates. Every
-// request gets its own reason, which is its display field, so the reason finds its task. requester and lan are employees. chau manages
-// Operations and binh manages Engineering.
+// request gets its own reason, which is its display field, so the reason finds its task. requester and employee are employees. manager-2 manages
+// Operations and manager manages Engineering.
 const appPath = "/api/apps/LeaveRequests";
 const recordsPath = `${appPath}/entities/LeaveRequest/records`;
 const tasksPath = `${appPath}/tasks`;
@@ -110,7 +110,7 @@ async function taskId(
   });
 }
 
-test("requester submits a leave request, chau approves it in My tasks, and requester sees it approved with its days", async ({
+test("requester submits a leave request, manager-2 approves it in My tasks, and requester sees it approved with its days", async ({
   page,
   playwright,
   baseURL,
@@ -126,7 +126,7 @@ test("requester submits a leave request, chau approves it in My tasks, and reque
   await page.getByRole("button", { name: "Submit", exact: true }).click();
   await expect(page.getByTestId("form-started")).toBeVisible();
 
-  await useSession(page, "chau");
+  await useSession(page, "manager-2");
   const row = page.getByRole("row", { name: new RegExp(reason) });
   // The worker creates the task some time after the start.
   await expect(async () => {
@@ -155,7 +155,7 @@ test("an employee cannot open another employee's leave request, by its form or t
   const id = await asUser(playwright.request, baseURL, "requester", (requester) =>
     createRequest(requester, `Zz Deny ${runId()}`),
   );
-  await useSession(page, "lan");
+  await useSession(page, "employee");
 
   await page.goto(`/leave/leaverequestform/${id}`);
   await expect(page.getByTestId("not-found")).toBeVisible();
@@ -174,9 +174,9 @@ test("a manager of another department gets no task for the request, and cannot c
     await start(requester, created);
     return created;
   });
-  // chau manages Operations, so the task is chau's. It exists once the worker has created it.
-  const chauTask = await taskId(playwright.request, baseURL, "chau", id);
-  await useSession(page, "binh");
+  // manager-2 manages Operations, so the task is manager-2's. It exists once the worker has created it.
+  const manager2Task = await taskId(playwright.request, baseURL, "manager-2", id);
+  await useSession(page, "manager");
 
   const tasks = await page.request.get(`${tasksPath}?pageSize=100`);
   expect(tasks.status()).toBe(200);
@@ -186,12 +186,12 @@ test("a manager of another department gets no task for the request, and cannot c
   expect(items.filter((item) => item.subject.id === id)).toEqual([]);
 
   const completed = await page.request.post(
-    `${tasksPath}/${chauTask}/complete`,
+    `${tasksPath}/${manager2Task}/complete`,
     { data: { outcome: "approve" }, headers: csrfHeaders },
   );
   expect(completed.status()).toBe(403);
-  await asUser(playwright.request, baseURL, "chau", async (chau) => {
-    const read = await chau.get(`${tasksPath}/${chauTask}`);
+  await asUser(playwright.request, baseURL, "manager-2", async (manager2) => {
+    const read = await manager2.get(`${tasksPath}/${manager2Task}`);
     expect(read.status()).toBe(200);
     expect(((await read.json()) as { state: string }).state).toBe("open");
   });

@@ -2,8 +2,8 @@ import { expect, test } from "../test";
 import { waitForDialog } from "../dialogs";
 import { sessionFile, useSession } from "../sessions";
 
-// quan, an asset manager, holds the import and create grants on assets. thao, an auditor, only reads and exports them.
-test.use({ storageState: sessionFile("quan") });
+// The asset-manager user holds the import and create grants on assets. The auditor user only reads and exports them.
+test.use({ storageState: sessionFile("asset-manager") });
 
 // The assets persist in the shared database, so the test names its asset uniquely. The 'zzz' prefix and the
 // descending sort put it on the first page.
@@ -47,7 +47,7 @@ test("an asset manager imports a CSV, sees its error by row and field, fixes it 
 });
 
 test("an auditor sees the assets and no Import button", async ({ page }) => {
-  await useSession(page, "thao");
+  await useSession(page, "auditor");
 
   await page.goto(assetsPage);
 

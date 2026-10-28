@@ -33,8 +33,8 @@ public sealed class ProcessPathEvaluationTests(DataDatabaseFixture database) : I
         await using var connection = new NpgsqlConnection(database.ConnectionString);
         await connection.OpenAsync(CancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(CancellationToken);
-        var binh = await CreateAsync(connection, model, "Employee", ("name", "Binh"));
-        var sales = await CreateAsync(connection, model, "Department", ("name", "Sales"), ("manager", binh));
+        var manager = await CreateAsync(connection, model, "Employee", ("name", "Binh"));
+        var sales = await CreateAsync(connection, model, "Department", ("name", "Sales"), ("manager", manager));
         var routed = await CreateAsync(connection, model, "PurchaseRequest", ("title", "Laptops"), ("department", sales));
         var unrouted = await CreateAsync(connection, model, "PurchaseRequest", ("title", "Desks"), ("department", null));
 
@@ -55,8 +55,8 @@ public sealed class ProcessPathEvaluationTests(DataDatabaseFixture database) : I
         await using var npgsql = new NpgsqlDataSourceBuilder(database.ConnectionString).UseLoggerFactory(loggerFactory).Build();
         await using var connection = await npgsql.OpenConnectionAsync(CancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(CancellationToken);
-        var binh = await CreateAsync(connection, model, "Employee", ("name", "Binh"));
-        var sales = await CreateAsync(connection, model, "Department", ("name", "Sales"), ("manager", binh));
+        var manager = await CreateAsync(connection, model, "Employee", ("name", "Binh"));
+        var sales = await CreateAsync(connection, model, "Department", ("name", "Sales"), ("manager", manager));
         var request = await CreateAsync(connection, model, "PurchaseRequest", ("title", "Laptops"), ("department", sales));
         Assert.True(model.TryGetEntity("PurchaseRequest", out var entity));
         var record = await RecordQueries.GetAsync(connection, model, entity, request, CancellationToken);

@@ -69,7 +69,7 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
         .. bindings.SelectMany(binding => new[] { "--binding", binding }),
     ];
 
-    /// <summary>A server on the tenant directory of <paramref name="platform"/>, with <c>requester</c> and <c>chau</c> able to sign in.</summary>
+    /// <summary>A server on the tenant directory of <paramref name="platform"/>, with <c>requester</c> and <c>manager-2</c> able to sign in.</summary>
     public static WebApplicationFactory<Program> CreateServer(string platform) =>
         new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
@@ -82,7 +82,7 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
             builder.UseSetting("Modules:Path", SampleModules.Path);
             builder.UseTestAuthentication(
                 new TestIdentity("requester", "Requester User", "employee"),
-                new TestIdentity("chau", "Chau Operations Manager", "department-manager"));
+                new TestIdentity("manager-2", "Manager 2 User", "department-manager"));
         });
 
     /// <summary>Creates a platform database, migrates it unless <paramref name="migrate"/> is false, and returns the scenario on it.</summary>
