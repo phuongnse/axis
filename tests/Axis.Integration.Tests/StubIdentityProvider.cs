@@ -4,8 +4,10 @@ using System.Text;
 namespace Axis.Integration.Tests;
 
 /// <summary>
-/// Answers the calls that <c>TenantRealm</c> makes to the identity provider's admin API with success, so a test that only
-/// needs a tenant does not create a realm in the shared Keycloak. It records the path of every request.
+/// Answers the calls that <c>TenantRealm</c> and <c>RealmSync</c> make to the identity provider with success, so a test that only
+/// needs a tenant, or that activates a release in one, does not create or change a realm in the shared Keycloak. It reports
+/// no provider and no mapper, creates every client the sync asks for and serves one discovery document for every issuer.
+/// It records the path of every request.
 /// </summary>
 internal sealed class StubIdentityProvider : HttpMessageHandler
 {
@@ -36,6 +38,12 @@ internal sealed class StubIdentityProvider : HttpMessageHandler
             return Task.FromResult(Json(Body(uri)));
         }
 
+        // RealmSync reads the uuid of a created client from the Location header.
+        if (request.Method == HttpMethod.Post && uri.AbsolutePath.EndsWith("/clients", StringComparison.Ordinal))
+        {
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.Created) { Headers = { Location = new Uri($"{uri.AbsoluteUri}/{Guid.NewGuid()}") } });
+        }
+
         if (uri.AbsolutePath.EndsWith("/openid-connect/token", StringComparison.Ordinal))
         {
             return Task.FromResult(Json("""{"access_token":"stub"}"""));
@@ -46,6 +54,21 @@ internal sealed class StubIdentityProvider : HttpMessageHandler
 
     private static string Body(Uri uri)
     {
+        if (uri.AbsolutePath.EndsWith("/protocol-mappers/models", StringComparison.Ordinal)
+            || uri.AbsolutePath.EndsWith("/identity-provider/instances", StringComparison.Ordinal)
+            || uri.AbsolutePath.EndsWith("/mappers", StringComparison.Ordinal))
+        {
+            return "[]";
+        }
+
+        if (uri.AbsolutePath.EndsWith("/.well-known/openid-configuration", StringComparison.Ordinal))
+        {
+            return """
+                {"issuer":"https://issuer.example","authorization_endpoint":"https://issuer.example/authorize",
+                "token_endpoint":"https://issuer.example/token","jwks_uri":"https://issuer.example/jwks"}
+                """;
+        }
+
         if (uri.AbsolutePath.EndsWith("/clients", StringComparison.Ordinal))
         {
             var clientId = Uri.UnescapeDataString(uri.Query.Replace("?clientId=", "", StringComparison.Ordinal));

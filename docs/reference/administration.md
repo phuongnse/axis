@@ -634,7 +634,17 @@ a missing binding is an `AXC0100` warning and not an error, as
    release.
 3. `activate`: activate the release. This adds a row with the actor `operator`
    to the [release history](storage.md#release-history), unless the release is
-   already the active one.
+   already the active one. After the activation has committed, the step brings the
+   tenant's realm in step with the tenant's applications: it adds, changes and
+   removes the realm's `site-` clients and `oidc-` providers, see
+   [keeping the realm in step](identity-provider.md#keeping-the-realm-in-step). It
+   writes no line of its own. A tenant without an activation secret, such as a
+   preview tenant, skips the update. A failure of the identity provider fails the
+   step with a line that names the identity provider step and its status code, and
+   never a secret. The command reads the identity provider's address and the
+   activation secret from the tenant's own entry, so it needs no `IdentityProvider`
+   settings. It reaches the identity provider as `tenant create` does, so the admin
+   host must trust its certificate.
 4. `seed`: insert the seed records and write the schedule trigger state.
 5. `indexes`: build the non-unique indexes that activation left out of a table
    with more than `Activation:InlineRecomputeLimit` rows, with
@@ -658,7 +668,10 @@ command exits `1` at the end. A `seed` failure happens after activation has
 committed, so the new release stays active, as it does with startup activation.
 An `indexes` failure also happens after activation has committed, so the new
 release stays active, and the next activation builds the index again. Only a
-`compile` or `activate` failure keeps the previous release.
+`compile` or `activate` failure keeps the previous release. A failure of the
+realm update also happens after activation has committed, so the new release
+stays active. The `seed` and `indexes` steps do not run until `activate` is run
+again, which updates the realm again and then runs them.
 
 **Exit codes.** `0` when every tenant succeeded, also when none is `active`. `1`
 when at least one tenant failed. `2` for a folder that does not exist, an
@@ -789,7 +802,8 @@ role unless it says otherwise.
 3. For `publish`: `compile` the snapshot against the tenant database and store
    its release, `activate` the release, then `seed` and `indexes`. These are the
    steps of [activate](#activate) and report the same diagnostics. `seed` runs
-   as the runtime role, and `indexes` as the schema role. The compile reads the snapshot's files, never the application
+   as the runtime role, and `indexes` as the schema role. The `activate` step also updates the tenant's realm after the
+   activation has committed, as in [activate](#activate). The compile reads the snapshot's files, never the application
    folder on any disk. A snapshot that cannot be read, because it is not an array of
    `{ file, version, content }` or names a file twice, fails at `compile`
    and stores no release. Activation adds a row to the
@@ -817,7 +831,8 @@ role unless it says otherwise.
    the tables hold is `AXC0015`. A refused rollback changes nothing. The
    activation adds a row to the [release history](storage.md#release-history)
    with the requesting user and the request id, no label and no note, unless
-   the release is already active. `seed` then sets the schedule triggers and
+   the release is already active. The step then updates the tenant's realm to match the
+   rolled back release. `seed` then sets the schedule triggers and
    the seed records of that release, and `indexes` builds the indexes of that release
    that its tables lack. See [rollback](authoring.md#rollback).
 6. For `test`: `version`, then the step `test`. It checks, in this order, that
@@ -867,7 +882,9 @@ tenant's database, see [preview](authoring.md#preview). Only a `publish` is
 claimed with that target. The publisher runs its steps against the main tenant's
 preview tenant, with that tenant's database, schema role and bindings. It
 compiles, activates and seeds there, and adds the history row to the preview
-tenant's release history with the request id. The step lines name the preview
+tenant's release history with the request id. A preview tenant has no activation
+secret, so the `activate` step does not update a realm. A `validate` and a `test`
+never update a realm. The step lines name the preview
 tenant, for example `default-preview compile ok`. It writes no audit record. It
 sets the request `succeeded` or `failed` in the main tenant's database, with the
 renewal of the lease, and leaves the main tenant's release, release history and
@@ -888,7 +905,10 @@ already active adds no history row.
 previously active release stays active after a failed `compile` or `activate`.
 A `seed` failure happens after activation has committed, so the new release
 stays active and the request ends `failed` with its `releaseId`, as with
-`activate`. So does an `indexes` failure.
+`activate`. So does an `indexes` failure, and so does a failure of the realm
+update: the new release stays active, and `seed` and `indexes` do not run until
+the next activation of the tenant. The publisher calls the identity provider of
+each tenant that has a realm, so it must reach it and trust its certificate.
 
 **Stopping.** On `SIGTERM` or Ctrl+C the publisher stops claiming, finishes the
 request it is running, then exits. A running `test` request is the exception: a

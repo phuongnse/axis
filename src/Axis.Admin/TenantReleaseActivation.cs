@@ -6,6 +6,7 @@ using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Loading;
 using Axis.Configuration.Modules;
 using Axis.Configuration.Packages;
+using Axis.Configuration.Realms;
 using Axis.Configuration.Releases;
 using Axis.Configuration.Resources;
 using Axis.Configuration.Storage;
@@ -15,7 +16,9 @@ using Axis.Data.Storage;
 using Axis.Processes.Instances;
 using Axis.Processes.Storage;
 using Axis.Scenarios.Runner;
+using Axis.Tenancy;
 using Axis.Tenancy.Platform;
+using Axis.Tenancy.Realms;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 
@@ -37,6 +40,9 @@ internal readonly record struct ScenarioTestRun(bool Succeeded, JsonArray Scenar
 /// tenant and never a password, a host or a connection string. Compile, activate and indexes run as the tenant's schema role. The
 /// schedule trigger state and the seed records run as its runtime role. The indexes step builds the non-unique indexes that
 /// activation left out of a large table, and runs last, so a slow build holds back nothing else. Warnings go to the error writer.
+/// When the caller gives a realm sync, the activate step applies the realm plan to the tenant's realm after the activation
+/// committed. A realm failure fails that step, so the new release stays active and the seed and indexes steps wait for a rerun.
+/// A validate and a test never update the realm.
 /// </summary>
 internal sealed class TenantReleaseActivation(
     int inlineRecomputeLimit,
@@ -48,6 +54,7 @@ internal sealed class TenantReleaseActivation(
     /// Runs the steps for the tenant <paramref name="id"/>, whose directory entry or build records <paramref name="schemaVersion"/>. Every diagnostic of compile, activate and seed, warnings included, is added
     /// to <paramref name="diagnostics"/>. The release history records <paramref name="actor"/> for the activation.
     /// <paramref name="loadStep"/> names the second step, which loads the release: <c>compile</c>, or <c>rollback</c> for a stored release.
+    /// <paramref name="syncRealm"/> applies the realm plan of the activation to the tenant's realm, or is <c>null</c> when the tenant has no realm to update.
     /// </summary>
     public async Task<ReleaseRun> RunAsync(
         string id,
@@ -57,7 +64,8 @@ internal sealed class TenantReleaseActivation(
         Func<ConfigurationDbContext, Task<ReleaseCompilationResult>> compile,
         List<Diagnostic> diagnostics,
         ActivationActor actor,
-        string loadStep = "compile")
+        string loadStep = "compile",
+        Func<RealmPlan, Task>? syncRealm = null)
     {
         ConfigurationDbContext? configuration = null;
         DataDbContext? data = null;
@@ -88,6 +96,11 @@ internal sealed class TenantReleaseActivation(
                     {
                         throw new DiagnosticsFailure(activated.Diagnostics);
                     }
+
+                    if (syncRealm is not null && activated.Realm is { } plan)
+                    {
+                        await syncRealm(plan);
+                    }
                 })
                 && await Step(id, "seed", () => SeedAsync(connections, id, compiled!, diagnostics))
                 && await Step(id, "indexes", () => BuildIndexesAsync(connections, compiled!));
@@ -106,6 +119,17 @@ internal sealed class TenantReleaseActivation(
             }
         }
     }
+
+    /// <summary>
+    /// The realm sync for <see cref="RunAsync"/>: it applies a realm plan to the realm of <paramref name="realm"/> with the tenant's
+    /// <paramref name="bindings"/>. It is <c>null</c> when the tenant has no realm details, such as a preview tenant, so the step skips the sync.
+    /// </summary>
+    public static Func<RealmPlan, Task>? RealmSync(
+        HttpClient http,
+        TenantRealmAccess? realm,
+        IReadOnlyDictionary<string, TenantBinding> bindings,
+        CancellationToken cancellationToken) =>
+        realm is null ? null : plan => ActivationRealmSync.SyncAsync(http, realm, bindings, plan, cancellationToken);
 
     /// <summary>
     /// Runs the <c>version</c> step and then the <c>validate</c> step for the tenant <paramref name="id"/>. The validate step compiles

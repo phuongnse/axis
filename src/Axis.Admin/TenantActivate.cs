@@ -9,7 +9,8 @@ namespace Axis.Admin;
 
 /// <summary>
 /// <c>activate</c>: compiles an application folder and activates its release for each tenant, on its own. For each tenant
-/// it checks the schema version, compiles, activates and seeds. A tenant stops at its first failed step and keeps its
+/// it checks the schema version, compiles, activates and seeds. After the activation commits, the activate step updates the
+/// tenant's realm, unless the tenant has no activation secret, such as a preview tenant. A tenant stops at its first failed step and keeps its
 /// previous active release, and the other tenants go on. Each step writes one <c>ok</c> line, or one <c>failed</c> line for
 /// each error diagnostic. A line names the tenant and never a password, a host or a connection string. Compile and
 /// activate run as the tenant's schema role, over the host and port that the directory records for it. The schedule
@@ -19,6 +20,8 @@ internal sealed class TenantActivate(
     PlatformSettings settings,
     IReadOnlyList<TenantRow> tenants,
     IReadOnlyDictionary<string, ActivationBindings> bindings,
+    IReadOnlyDictionary<string, IReadOnlyDictionary<string, TenantBinding>> realmBindings,
+    HttpClient http,
     string folder,
     PackageCatalog packages,
     ModuleCatalog modules,
@@ -62,7 +65,8 @@ internal sealed class TenantActivate(
             bindings[row.Id],
             configuration => ReleaseCompiler.CompileAsync(folder, configuration, packages.Versions, modules.Modules, cancellationToken),
             [],
-            ActivationActor.Operator);
+            ActivationActor.Operator,
+            syncRealm: TenantReleaseActivation.RealmSync(http, DirectoryTenantCatalog.Realm(row, settings.Cipher), realmBindings[row.Id], cancellationToken));
         return run.Succeeded;
     }
 }
