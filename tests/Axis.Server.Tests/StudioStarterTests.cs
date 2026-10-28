@@ -19,6 +19,20 @@ public sealed class StudioStarterTests : IAsyncLifetime
     // Port 1 on loopback refuses connections immediately. The authoring API reads no database.
     private const string UnreachableDatabase = "Host=127.0.0.1;Port=1;Database=axis;Username=axis;Password=axis;Timeout=2";
 
+    private const string SampleOidcProvider = """
+        {
+          "id": "b52449b4-bc18-4972-bf11-7b73f5a82198",
+          "kind": "identityProvider",
+          "name": "accounts",
+          "formatVersion": 1,
+          "type": "oidc",
+          "label": { "textKey": "site.title" },
+          "issuer": { "binding": "StarterIssuer" },
+          "clientId": { "binding": "StarterClientId" },
+          "clientSecret": { "binding": "StarterClientSecret" }
+        }
+        """;
+
     private readonly string _root = Path.Combine(Path.GetTempPath(), $"axis-starters-{Guid.NewGuid():N}");
 
     private string Folder => Path.Combine(_root, "purchase-requests");
@@ -81,6 +95,16 @@ public sealed class StudioStarterTests : IAsyncLifetime
         foreach (var (key, value) in starter["content"]!.AsObject())
         {
             body[key] = key == "texts" ? texts.DeepClone() : value?.DeepClone();
+        }
+
+        if (kind == "identityProvider")
+        {
+            // The sample already has an accounts provider, and an application has at most one (AXC0288). The
+            // starter is the accounts provider, so the sample's becomes an oidc one and the starter is the only one.
+            await File.WriteAllTextAsync(
+                Path.Combine(Folder, "identity-providers", "accounts.json"),
+                SampleOidcProvider,
+                CancellationToken);
         }
 
         await using var factory = CreateFactory();
