@@ -14,12 +14,17 @@ holds the detail. None of it is built yet: M17 builds it, and the reference docs
   their own, as each tenant has a database of its own.
 - **Brokering:** the realm brokers to the identity providers of the tenant's organization, which the sign-in page offers
   as "Continue with" buttons.
+  - [D100](d100-identity-providers-per-application-and-sign-in-per-site.md) replaces this point and the next: the
+    providers and accounts are `identityProvider` resources of an application, and each site picks the ones it
+    allows.
 - **Accounts per tenant:** a realm may hold accounts of its own, for an organization with no identity provider. Each
   tenant turns them on or off.
 - **MFA for accounts:** an account of Axis's identity provider must use a second step. A person who signs in through
   their organization follows that organization's MFA policy.
 - **Direct sign-in only while moving:** an `Oidc` block that points straight at an organization's identity provider stays
   supported only while that tenant moves to Axis's identity provider.
+  - [D100](d100-identity-providers-per-application-and-sign-in-per-site.md) replaces this point: no tenant has to
+    move, so the `Oidc` block always points at the tenant's realm.
 - **The Axis theme:** the identity provider's pages are drawn from the SPA's React components and tokens, as the
   design system's `identitySignIn` preview shows.
 

@@ -127,6 +127,14 @@ creates a [preview tenant](../architecture.md#preview-tenants) of a main tenant.
 | `--preview-of <main>` | Makes the tenant the preview tenant of the main tenant `<main>`. |
 | `--binding <name>=<value>` | A `url` binding of the new tenant. Repeat it for more. The value is an absolute `http` or `https` URL. It is accepted only together with `--preview-of`. |
 
+_(planned for M17)_ The command creates the tenant's realm in
+[Axis's identity provider](identity-provider.md#keeping-the-realm-in-step), with its clients, and sets the
+tenant's `Oidc` block to the realm itself, so it takes no `--oidc-*` option and does not read
+`AXIS_OIDC_CLIENT_SECRET`. It turns accounts on in the tenant's
+[platform sign-in](identity-provider.md#platform-sign-in). `--administrator <email>` invites the first account with
+the administrator role, see [the first administrator](user-administration.md#the-first-administrator). The admin
+host's settings give it the identity provider's admin client. A preview tenant gets no realm.
+
 **Preview tenant.** With `--preview-of`, the command creates
 a [preview tenant](../architecture.md#preview-tenants) as
 [D48](../decisions/d48-preview-tenants.md) agrees. The steps below stay
