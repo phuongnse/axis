@@ -18,7 +18,7 @@ for example file parsing, complex calculations or system integrations.
   `AssemblyLoadContext` and gives them only the platform APIs they declared.
   Out-of-process isolation comes with multi-tenant hosting.
   - [D90](d90-extension-packages-run-out-of-process.md) replaces this point:
-    packages run out of process from M18, without waiting for multi-tenant
+    packages run out of process from M21, without waiting for multi-tenant
     hosting.
 
 _Why:_ real applications always need some custom code. Without an official

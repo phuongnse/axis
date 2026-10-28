@@ -5,7 +5,7 @@ Status: **Agreed**
 The owner agreed this on 2026-10-25. It replaces two points of
 [D40](d40-reusable-modules.md): that processes, pages, roles and policies stay
 out of a module, and that a module does not depend on other modules. Roles stay
-out. Everything else in D40 holds. Everything here is _(planned for M18)_. See
+out. Everything else in D40 holds. Everything here is _(planned for M20)_. See
 [modules](../reference/modules-and-templates.md#processes-pages-policies-and-dependencies).
 
 - **New kinds in a module:** a module may also hold `process`, `page` and

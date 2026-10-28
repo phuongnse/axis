@@ -114,19 +114,23 @@ configuration in `samples/apps/purchase-requests/`. It is not platform code.
 
 ### Extensibility
 
-_(planned for M18)_ Purchase requests prove the extensibility milestone, as
+Purchase requests prove the extensibility milestones, M19 to M23, as
 [D94](decisions/d94-purchase-requests-prove-the-extensibility-milestone.md)
-agrees.
+and [D101](decisions/d101-the-extensibility-milestone-is-split-into-six.md)
+agree. Each step ends the milestone that builds it.
 
-1. The application declares the `department-budgets` module, which depends on
-   the `departments` module, and maps its approver slot to the manager role.
-2. The author drags a packaged "budget usage" widget onto a purchase request
-   page in Studio.
-3. An approved request reaches the purchasing system through a connector that
-   signs in with client credentials and sends the line items as a list.
-4. The payment reference package runs out of process.
-5. A signed webhook announces the approval. When the receiver fails, the
-   platform operator redelivers the dead letter from the console.
+1. _(planned for M20)_ The application declares the `department-budgets`
+   module, which depends on the `departments` module, and maps its approver
+   slot to the manager role.
+2. _(planned for M22)_ The author drags a packaged "budget usage" widget onto
+   a purchase request page in Studio.
+3. _(planned for M19)_ An approved request reaches the purchasing system
+   through a connector that signs in with client credentials and sends the
+   line items as a list.
+4. _(planned for M21)_ The payment reference package runs out of process.
+5. _(planned for M19)_ A signed webhook announces the approval, and a receiver
+   that fails leaves a dead letter. _(planned for M23)_ The platform operator
+   redelivers the dead letter from the console.
 
 ## Second application: leave requests
 

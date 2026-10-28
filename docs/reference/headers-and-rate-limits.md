@@ -26,7 +26,7 @@ and the Helm chart, and behind any proxy.
 - **Scripts stay strict.** The SPA has no inline script and calls no `eval`. Scripts come only from
   the server's own origin. The one exception is the import map for
   [custom widgets](custom-widgets.md), whose `sha256` hash `script-src` lists when widgets are
-  installed _(planned for M18)_.
+  installed _(planned for M22)_.
 - **Styles allow inline.** The UI library writes `<style>` tags at run time, so `style-src` allows
   `'unsafe-inline'`. An injected style cannot run code.
 - **HSTS.** The scheme is the one after the

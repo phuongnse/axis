@@ -111,3 +111,4 @@ files agree, title and status included.
 | [D98](decisions/d98-rules-from-the-shell-review.md) | Rules from the shell review | **Agreed** |
 | [D99](decisions/d99-axis-ships-its-own-identity-provider.md) | Axis ships its own identity provider | **Agreed** |
 | [D100](decisions/d100-identity-providers-per-application-and-sign-in-per-site.md) | Identity providers per application and sign-in per site | **Agreed** |
+| [D101](decisions/d101-the-extensibility-milestone-is-split-into-six.md) | The extensibility milestone is split into six | **Agreed** |

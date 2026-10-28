@@ -2,12 +2,12 @@
 
 Status: **Agreed**
 
-The owner agreed this on 2026-10-25. M18 lets an application tell another
+The owner agreed this on 2026-10-25. M19 lets an application tell another
 system that an event happened, without a process step that calls a connector.
 It builds on the events of [D26](d26-events-and-triggers.md), the bindings of
 [D25](d25-connectors-deployment-bindings-and-secrets.md), and the event
 delivery limit and dead letters that M14 adds. Everything here is _(planned
-for M18)_. See
+for M19)_. See
 [outbound webhooks](../reference/integration-resources.md#outbound-webhooks).
 
 - **A `webhook` resource:**
