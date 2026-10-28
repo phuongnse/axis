@@ -200,7 +200,9 @@ _(planned for M17)_
   signed the person in into its ID token as the `identity_provider` claim, and each provider gets claim mappers for the
   display name, the email, the locale and each roles claim, and a `username` mapper that names a new user
   `<provider alias>.<subject>`. Each provider names the realm's first-login flow. It touches no other client or
-  provider, so `axis`, `axis-activation`, `axis-users` and anything an operator added stay. Activation does not call it yet.
+  provider, so `axis`, `axis-activation`, `axis-users` and anything an operator added stay. Both tenant catalogs carry
+  the realm's name, the identity provider's address and the activation secret, see
+  [tenant realm](host-settings.md#tenant-realm). Activation does not call it yet.
 - **Brought in step by activation:** activating a release adds, changes and removes the realm's brokered providers,
   their claim mappers and the site clients to match the active releases of the tenant and its platform sign-in. A
   provider that nothing names any more is removed. Its users stay, but cannot sign in through it.
