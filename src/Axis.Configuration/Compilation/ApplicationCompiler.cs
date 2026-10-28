@@ -404,6 +404,11 @@ public static partial class ApplicationCompiler
             CheckTextKey(role.Label, role, "/label", references, diagnostics);
         }
 
+        foreach (var provider in loaded.IdentityProviders)
+        {
+            CheckTextKey(provider.Label, provider, "/label", references, diagnostics);
+        }
+
         // A module rule sees only the rules of its own module. Application expressions call it
         // as '<module id>:<name>(…)', so the module rules are checked first.
         var moduleRules = RuleChecker.CheckModules(moduleResources.Rules, diagnostics).Values.ToList();
@@ -496,6 +501,13 @@ public static partial class ApplicationCompiler
             declaredModules,
             diagnostics);
         ConnectorChecker.Check(loaded.Connectors, diagnostics);
+        IdentityProviderChecker.Check(
+            loaded.IdentityProviders,
+            loaded.Application,
+            loaded.Connectors,
+            FindRole,
+            loaded.UnloadedRoleNames,
+            diagnostics);
         EventChecker.Check(
             allEvents,
             FindEntity,
@@ -615,6 +627,7 @@ public static partial class ApplicationCompiler
             Roles = loaded.Roles,
             Policies = loaded.Policies.Select(policy => PolicyChecker.Build(policy, entities, FindDataSource, FindProcess, FindEndpoint, rules, declaredModules)).ToList(),
             Connectors = loaded.Connectors.Select(ConnectorChecker.Build).ToList(),
+            IdentityProviders = loaded.IdentityProviders.Select(IdentityProviderChecker.Build).ToList(),
             Events = allEvents.Select(@event => EventChecker.Build(eventsByName[@event.Name], FindEntity)).ToList(),
             Endpoints = loaded.Endpoints.Select(endpoint => EndpointChecker.Build(endpoint, FindEntity, FindProcess)).ToList(),
             Triggers = loaded.Triggers.Select(trigger => TriggerChecker.Build(trigger, FindEntity, FindEvent, FindProcess, FindDataSource, rules, declaredModules)).ToList(),

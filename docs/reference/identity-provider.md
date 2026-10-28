@@ -3,8 +3,9 @@
 Axis ships an identity provider of its own, so people sign in on one standard Axis page, whatever identity provider
 their organization uses. [D99](../decisions/d99-axis-ships-its-own-identity-provider.md) agrees it, and
 [D100](../decisions/d100-identity-providers-per-application-and-sign-in-per-site.md) lets each application declare how
-its people sign in and each site pick from that. None of it is built yet: M17 builds it, so every section is
-_(planned for M17)_. Until it is built, each tenant's `Oidc` block points at an identity provider that runs outside
+its people sign in and each site pick from that. M17 builds it, and each section says whether it is built. The
+`identityProvider` resource and its compile checks are built. Sign-in and activation do not read the resource yet, so
+until they do, each tenant's `Oidc` block points at an identity provider that runs outside
 Axis, as [security](security.md#sign-in-and-the-session) describes. Accounts, roles given by an administrator and the
 users page are in [user administration](user-administration.md).
 
@@ -34,8 +35,6 @@ _(planned for M17)_
   [preview tenants](#preview-tenants).
 
 ## Identity provider resource
-
-_(planned for M17)_
 
 An `identityProvider` resource declares one way for the application's people to sign in. It is part of the release,
 so Studio edits it and test scenarios check it.
@@ -80,9 +79,23 @@ so Studio edits it and test scenarios check it.
   claim does today, see [claim values](roles-and-policies.md). A value that gives no declared role is ignored.
 - **`acr`:** optional, the assurance levels the provider must sign the person in at. The sign-in request asks for
   them, and the server refuses an ID token whose `acr` is not one of them.
-- **Checks:** an unknown `type`, a binding of the wrong kind, a missing binding, a role in `values` that the
-  application does not declare, a second `accounts` provider and a site's `signIn` entry that names no provider are
-  compile errors with new diagnostic codes. A module holds no identity provider, because it holds no bindings.
+- **Checks:** these are compile errors, see [diagnostic codes](diagnostic-codes.md).
+  - An unknown `type` is `AXC0284`. A missing binding is `AXC0286`: an `oidc` provider needs `issuer`, `clientId` and
+    `clientSecret` or `clientKey`, and a `saml` provider needs `metadata`.
+  - A binding of the wrong kind is `AXC0285`. No resource declares the kind of a binding, so the compiler compares
+    uses: a provider's binding name that the application also uses as another kind, ignoring letter case, fails. The
+    other uses are a connector's `baseUrl` (`url`) and `auth` (`secret`), the manifest's `fileStorage` (`storage`) and
+    the bindings of other providers. A clash with a package operation's binding shows up at activation.
+  - A role in `values` that the application does not declare is `AXC0287`, and a second `accounts` provider is
+    `AXC0288`.
+  - A `label` is a text key like any other label, so a key that no locale has is `AXC0028`.
+  - The schema refuses, as `AXC0004`, what a type does not take: a `label`, bindings or `claims` on `accounts`, a
+    `metadata` on `oidc`, an `issuer` or client binding on `saml`, and both `clientSecret` and `clientKey`. It also
+    requires a `label` for `oidc` and `saml`.
+  - A module holds no identity provider, because it holds no bindings, so a module file of this kind is `AXC0202`.
+  - A site's `signIn` entry that names no provider is a compile error with a new diagnostic code _(planned for M17)_.
+- **Not read yet:** sign-in and activation do not read the resource yet. Activation does not check the bindings
+  against the tenant's, and Studio does not create the kind, so an author adds the file by hand.
 
 ## Sites and sign-in
 

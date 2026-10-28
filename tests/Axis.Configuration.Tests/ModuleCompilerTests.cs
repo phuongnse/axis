@@ -714,6 +714,7 @@ public sealed class ModuleCompilerTests
     [InlineData("""{ "kind": "page" }""")]
     [InlineData("""{ "kind": "role" }""")]
     [InlineData("""{ "kind": "policy" }""")]
+    [InlineData("""{ "kind": "identityProvider" }""")]
     [InlineData("""{ "kind": "module", "id": "departments", "version": "1.0.0", "label": "Nested" }""")]
     [InlineData("""{ "kind": "unknown" }""")]
     [InlineData("""{ "kind": 5 }""")]
