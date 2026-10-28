@@ -30,7 +30,8 @@ detail.
   who ask their browser for reduced motion get the same.
 - **CI runs the end-to-end tests on several machines at once.** The CI
   workflow splits Playwright into shards, so a CI run takes about as long as
-  its integration job. NexKit's checks run the whole suite as before.
+  its integration job. NexKit's checks run the same three shards as jobs of
+  their own.
 
 _Why:_ from 20 to 27 October, 62 `bug` issues reported a failure on `main`.
 About 25 came from outside downloads and GitHub's API, which CI and setup now
