@@ -33,8 +33,8 @@ internal enum StudioCreateOutcome
 internal static class StudioApplications
 {
     /// <summary>
-    /// The files of a blank application named <paramref name="name"/>: the manifest, one site, a <c>Home</c> page and
-    /// an <c>en</c> text resource, each with a new id. It compiles with no diagnostic.
+    /// The files of a blank application named <paramref name="name"/>: the manifest, one site, an <c>accounts</c> identity
+    /// provider, a <c>Home</c> page and an <c>en</c> text resource, each with a new id. It compiles with no diagnostic.
     /// </summary>
     public static IReadOnlyList<(string File, byte[] Bytes)> Blank(string name)
     {
@@ -67,6 +67,14 @@ internal static class StudioApplications
                     ["page"] = "Home",
                     ["label"] = new JsonObject { ["textKey"] = "nav.home" },
                 }),
+            })),
+            ("identity-providers/accounts.json", StudioWrites.Serialize(new JsonObject
+            {
+                ["id"] = NewId(),
+                ["kind"] = "identityProvider",
+                ["name"] = "accounts",
+                ["formatVersion"] = 1,
+                ["type"] = "accounts",
             })),
             ("pages/home.json", StudioWrites.Serialize(new JsonObject
             {

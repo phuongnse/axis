@@ -221,6 +221,7 @@ and the `auditor` user `thao`, and uses `lan`, an employee, as the holder of ass
 The request-approval template journey, `tests/e2e/specs/request-approval-journey.spec.ts`,
 adds the `approver` user, `minh`. The `author` role lets the authoring API list and read the resources of every sample under
 `samples/apps/` under `scripts/dev.sh`, and opens the Studio page at http://localhost:5173/studio.
+Each sample declares one `accounts` identity provider in `identity-providers/accounts.json`, because a site needs one. Sign-in does not read it yet.
 Studio saves into those committed folders, so `git checkout -- samples/apps` reverts an edit.
 The `publisher` role lets the authoring API publish, shows **Publish** on the Studio page and allows
 rollback from the release history. Under `scripts/dev.sh`,

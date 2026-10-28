@@ -651,6 +651,7 @@ public sealed class ReferenceIndexTests
             """{ "type": "form", "form": "OrderEntry", "actions": [ { "type": "startProcess", "process": "OrderReview", "label": { "textKey": "order.submit" } }, { "type": "navigate", "page": "Orders", "label": { "textKey": "order.submit" } } ] }""",
             "55555555-5555-4555-8555-555555555552",
             "orderForm.title"))
+        .With("identity-providers/accounts.json", PresentationCompilerTests.AccountsProvider)
         .With("sites/sales.json", """
             { "id": "66666666-6666-4666-8666-666666666661", "kind": "site", "name": "Sales", "formatVersion": 1, "path": "sales",
               "title": { "textKey": "site.title" }, "locales": { "default": "en", "fallback": "en", "available": ["en"] },

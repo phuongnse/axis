@@ -11,6 +11,10 @@ public sealed class PresentationCompilerTests
         { "id": "0d3a1c52-2f0b-4b1e-9a51-6c0f7a1d2e01", "kind": "application", "name": "Sample", "formatVersion": 1 }
         """;
 
+    internal const string AccountsProvider = """
+        { "id": "0d3a1c52-2f0b-4b1e-9a51-6c0f7a1d2e02", "kind": "identityProvider", "name": "accounts", "formatVersion": 1, "type": "accounts" }
+        """;
+
     internal const string Order = """
         { "id": "11111111-1111-4111-8111-111111111111", "kind": "entity", "name": "Order", "formatVersion": 1,
           "fields": [ { "name": "number", "type": "text", "required": true } ] }
@@ -643,6 +647,7 @@ public sealed class PresentationCompilerTests
             .With("entities/customer.json", Customer)
             .With("texts/en.json", TextsEn)
             .With("sites/sales.json", Site())
+            .With("identity-providers/accounts.json", AccountsProvider)
             .With("pages/orders.json", Page("Orders", OrdersWidget))
             .With("pages/order-form.json", Page("OrderForm", """{ "type": "form", "entity": "Order" }""", "55555555-5555-4555-8555-555555555552", "orderForm.title"))
             .With("pages/customer-form.json", Page("CustomerForm", """{ "type": "form", "entity": "Customer" }""", "55555555-5555-4555-8555-555555555553", "customerForm.title"));

@@ -84,6 +84,12 @@ public sealed record ApplicationLoadResult(
     /// <summary>The <c>identityProvider</c> resources, in path order.</summary>
     public IReadOnlyList<IdentityProviderResource> IdentityProviders { get; init; } = [];
 
+    /// <summary>
+    /// The <c>name</c> of every <c>identityProvider</c> file that was not loaded because of its own errors,
+    /// compared ignoring letter case. A reference to one of these names is not reported again either.
+    /// </summary>
+    public IReadOnlySet<string> UnloadedIdentityProviderNames { get; init; } = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
     /// <summary>The <c>event</c> resources, in path order.</summary>
     public IReadOnlyList<EventResource> Events { get; init; } = [];
 

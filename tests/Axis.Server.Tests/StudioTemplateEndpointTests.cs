@@ -118,6 +118,9 @@ public sealed class StudioTemplateEndpointTests : IDisposable
               "navigation": [{ "page": "Home", "label": { "textKey": "nav.home" } }]
             }
             """);
+        Write(folder, "identity-providers/accounts.json", $$"""
+            { "id": "{{Guid.NewGuid()}}", "kind": "identityProvider", "name": "accounts", "formatVersion": 1, "type": "accounts" }
+            """);
     }
 
     private static void Write(string folder, string relativePath, string content)

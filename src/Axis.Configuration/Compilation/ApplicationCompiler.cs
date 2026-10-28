@@ -508,6 +508,11 @@ public static partial class ApplicationCompiler
             FindRole,
             loaded.UnloadedRoleNames,
             diagnostics);
+        IdentityProviderChecker.CheckSites(
+            loaded.Sites,
+            loaded.IdentityProviders,
+            loaded.UnloadedIdentityProviderNames,
+            diagnostics);
         EventChecker.Check(
             allEvents,
             FindEntity,
@@ -616,7 +621,7 @@ public static partial class ApplicationCompiler
             Manifest = loaded.Application,
             TimeZone = timeZone,
             Entities = entities,
-            Sites = loaded.Sites.Select(site => BuildSite(site, pagesByName)).ToList(),
+            Sites = loaded.Sites.Select(site => BuildSite(site, pagesByName, loaded.IdentityProviders)).ToList(),
             Pages = loaded.Pages.Select(page => BuildPage(page, entitiesByName, pagesByName, dataSourcesByName, formsByName, processesByName)).ToList(),
             Texts = texts,
             Seeds = allSeeds.Select(seed => BuildSeed(seed, entitiesByName, applicationId)).ToList(),
@@ -2376,7 +2381,10 @@ public static partial class ApplicationCompiler
     private static int MoneyDefaultScaleOf(FieldDefinition field) =>
         field.Currency is { } code && Currencies.TryGetMinorUnits(code, out var minorUnits) ? minorUnits : MoneyDefaultScale;
 
-    private static SiteModel BuildSite(SiteResource site, Dictionary<string, PageResource> pagesByName) =>
+    private static SiteModel BuildSite(
+        SiteResource site,
+        Dictionary<string, PageResource> pagesByName,
+        IReadOnlyList<IdentityProviderResource> providers) =>
         new()
         {
             Id = site.Id,
@@ -2388,6 +2396,10 @@ public static partial class ApplicationCompiler
             Navigation = site.Navigation
                 .Select(entry => new NavigationModel(PageReferenceTo(pagesByName[entry.Page]), entry.Label, entry.Icon))
                 .ToList(),
+            // The checker has resolved every name in signIn, so the lookup always succeeds.
+            SignIn = site.SignIn is { } names
+                ? names.Select(name => providers.First(provider => string.Equals(provider.Name, name, StringComparison.OrdinalIgnoreCase)).Name).ToList()
+                : providers.Select(provider => provider.Name).ToList(),
         };
 
     private static PageModel BuildPage(
