@@ -870,7 +870,7 @@ Run and the Test results list, the read-only view of a module entity, and the re
     A KPI's navigate action is a link-style button on the label line, and the
     tile is not a link. At narrow width, a table's row actions fold into a menu
     that the canvas cannot open, because it cancels the click. There the author
-    selects a row action from the tree and the panel. _(planned)_ A table's
+    selects a row action from the tree and the panel. A table's
     first `navigate` row action draws as the link of its identifying column,
     which selects the action as a button does. Three or more other row actions
     fold into the "…" menu at any width, and are selected the same way, see
