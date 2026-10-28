@@ -66,7 +66,7 @@ Detailed behaviour, one topic per file. Sections marked _(planned for Mx)_ are n
 | [Authoring API](reference/authoring.md)                                | The API that Studio uses to read, write and publish application folders               |
 | [Host settings](reference/host-settings.md)                            | Startup activation and the server, Studio, tenancy, data and file, admin, rate limit and telemetry settings |
 | [Administration](reference/administration.md)                          | The `Axis.Admin` commands: tenants, backup, restore, migrate, activate, publisher     |
-| [Tenant setting commands](reference/tenant-setting-commands.md)        | The `Axis.Admin` commands that change bindings, sign-in settings and hosts, rotate keys and passwords, and the platform audit records |
+| [Tenant setting commands](reference/tenant-setting-commands.md)        | The `Axis.Admin` commands that change bindings, sign-in settings and hosts, rotate keys and passwords, end sessions, and the platform audit records |
 | [Installation](reference/installation.md)                              | Production images and installs on premises and in the cloud                           |
 
 ## Working on Axis
