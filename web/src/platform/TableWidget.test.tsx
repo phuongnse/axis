@@ -14,6 +14,7 @@ import type {
   WidgetMetadata,
 } from './site'
 import { isSortableHeader } from '../test/antd'
+import { hostileMarkup } from '../test/hostile'
 import { designTokensFor } from './designTokens'
 import { TableWidget } from './TableWidget'
 import { TextProvider } from './TextProvider'
@@ -282,6 +283,28 @@ const fileId = '3c1d5e7f-9a2b-4c4d-8e6f-0a1b2c3d4e5f'
 const receiptPage = `{"items":[{"id":"${noteId}","version":1,"values":{"title":"Buy paper","done":false,"dueAt":null,"category":"${categoryId}","receipt":{"id":"${fileId}","name":"paper.pdf","mediaType":"application/pdf","size":2048}},"labels":{"category":"Office"}}],"page":1,"pageSize":20,"totalCount":1}`
 
 describe('TableWidget', () => {
+  it('shows a value that holds markup as text', async () => {
+    const page = {
+      items: [
+        {
+          id: noteId,
+          version: 1,
+          values: { title: hostileMarkup, done: false, dueAt: null, category: categoryId },
+          labels: { category: 'Office' },
+        },
+      ],
+      page: 1,
+      pageSize: 20,
+      totalCount: 1,
+    }
+    stubRecords(JSON.stringify(page))
+
+    renderWidget()
+
+    expect(await screen.findByText(hostileMarkup)).toBeInTheDocument()
+    expect(document.querySelector('img, [onerror]')).toBeNull()
+  })
+
   it('shows a file as a download link and does not sort by it', async () => {
     stubRecords(receiptPage)
 

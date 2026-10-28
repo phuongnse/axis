@@ -12,9 +12,10 @@ const keepLink: typeof theme.darkAlgorithm = (seed, map) => {
 
 /**
  * The theme for one mode. Ant Design keeps its algorithm and derives hover and active colours from it. Page values
- * replace the token file's values where the theme can use them.
+ * replace the token file's values where the theme can use them. Under reduced motion, Ant Design shows and hides
+ * its components at once, see D97.
  */
-export function antThemeFor(mode: ThemeMode, page?: PageTokenValues): ThemeConfig {
+export function antThemeFor(mode: ThemeMode, page?: PageTokenValues, reducedMotion = false): ThemeConfig {
   const { colour, type, spacing, radius, shadow } = designTokensFor(mode, page)
   // Ant Design derives the shade for the mode from a seed. A colour that still equals the token file's value for
   // the mode keeps the light seed, as the dark value is already a shade. Any other colour is the seed itself.
@@ -68,6 +69,8 @@ export function antThemeFor(mode: ThemeMode, page?: PageTokenValues): ThemeConfi
       marginLG: spacing.lg,
       marginXL: spacing.xl,
       borderRadius: radius.base,
+      // Left unset otherwise, so an outer provider that turns motion off still applies.
+      ...(reducedMotion && { motion: false }),
     },
     components: {
       Form: { colorError: colour.dangerText },

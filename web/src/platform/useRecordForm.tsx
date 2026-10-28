@@ -417,28 +417,41 @@ export function useRecordForm(
     })
   }
 
-  const input = (field: FieldMetadata, readOnly: boolean, required: boolean): ReactNode => {
+  const input = (field: FieldMetadata, readOnly: boolean, required: boolean, helpId: string | undefined): ReactNode => {
     const value = values[field.name] ?? null
     const id = field.name
     if (field.type !== 'child-collection' && (readOnly || field.computed || field.sequence || field.creator)) {
       if (field.type === 'references') {
         const joined = referencesLabels(value, labels[field.name]).join(', ')
-        return <Input id={id} readOnly value={joined || notSet} style={joined ? undefined : emptyStyle} />
+        return (
+          <Input
+            id={id}
+            readOnly
+            aria-describedby={helpId}
+            value={joined || notSet}
+            style={joined ? undefined : emptyStyle}
+          />
+        )
       }
       if (field.type === 'file') {
         return isFileValue(value) ? (
           <FileLink field={field} value={value} />
         ) : (
-          <Input id={id} readOnly value={notSet} style={emptyStyle} />
+          <Input id={id} readOnly aria-describedby={helpId} value={notSet} style={emptyStyle} />
         )
       }
       // An empty value shows the words, because fields are read one by one.
       if (value === null) {
-        return <Input id={id} readOnly value={notSet} style={emptyStyle} />
+        return <Input id={id} readOnly aria-describedby={helpId} value={notSet} style={emptyStyle} />
       }
       // The server sets the value on save, so it is shown as a table cell shows it.
       return (
-        <Input id={id} readOnly value={formatValue(field, value as RecordValue, labels, { locale, text: t }, values)} />
+        <Input
+          id={id}
+          readOnly
+          aria-describedby={helpId}
+          value={formatValue(field, value as RecordValue, labels, { locale, text: t }, values)}
+        />
       )
     }
     switch (field.type) {
@@ -451,6 +464,7 @@ export function useRecordForm(
               id={id}
               readOnly
               aria-required={required || undefined}
+              aria-describedby={helpId}
               value={typeof label === 'string' ? label : ''}
             />
             <Tooltip title={t('shell.form.choose')}>
@@ -475,6 +489,7 @@ export function useRecordForm(
             title={labelOf(field)}
             ids={Array.isArray(value) ? (value as string[]) : []}
             labels={Array.isArray(labels[field.name]) ? (labels[field.name] as (string | null)[]) : []}
+            ariaDescribedBy={helpId}
             onChange={(ids, idLabels) => {
               set(field.name, ids)
               setLabels((previous) => ({ ...previous, [field.name]: idLabels }))
@@ -512,6 +527,7 @@ export function useRecordForm(
             currency={moneyCurrency(field, values)}
             locale={locale}
             ariaRequired={required}
+            ariaDescribedBy={helpId}
             onChange={(next) => set(field.name, next)}
           />
         )
@@ -544,7 +560,8 @@ export function useRecordForm(
                   const { field } = entry
                   const errors = errorsOf(field.name)
                   const required = stateOf(field.name)?.required ?? field.required
-                  const control = input(field, lockedOf(entry), required)
+                  const helpId = field.helpKey ? `${field.name}-help` : undefined
+                  const control = input(field, lockedOf(entry), required, helpId)
                   const item = (
                     <Form.Item
                       key={field.name}
@@ -553,14 +570,24 @@ export function useRecordForm(
                       htmlFor={field.type === 'child-collection' ? undefined : field.name}
                       required={required}
                       validateStatus={errors ? 'error' : undefined}
+                      // Ant Design cancels the item's bottom margin under a message, so this one sets the gap below.
                       help={
                         errors && (
-                          <span role="alert" data-testid={`field-error-${field.name}`}>
+                          <div
+                            role="alert"
+                            data-testid={`field-error-${field.name}`}
+                            style={{ marginTop: 4, marginBottom: spacing.lg, fontSize: 14, lineHeight: '20px' }}
+                          >
                             {errors.join(' ')}
-                          </span>
+                          </div>
                         )
                       }
                     >
+                      {field.helpKey && (
+                        <div id={helpId} style={{ fontSize: 12, lineHeight: '20px', color: colour.textMuted }}>
+                          {t(field.helpKey)}
+                        </div>
+                      )}
                       {asking ? <div onBlur={() => leave(field.name)}>{control}</div> : control}
                     </Form.Item>
                   )

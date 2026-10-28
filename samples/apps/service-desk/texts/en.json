@@ -60,6 +60,10 @@
     "notifications.overdue.subject": "Tickets are overdue",
     "notifications.overdue.body": "Some tickets are more than {days} day(s) overdue. Open All tickets to see them.",
     "notifications.ticketDeleted.subject": "Ticket {number} was deleted",
-    "notifications.ticketDeleted.body": "The requester deleted the draft ticket {number}: {title}."
+    "notifications.ticketDeleted.body": "The requester deleted the draft ticket {number}: {title}.",
+    "ticket.late.subject": "Ticket {number} is late",
+    "ticket.late.body": "Ticket {number} is past its due date and is not resolved.",
+    "ticket.resolved.subject": "Ticket {number} is resolved",
+    "ticket.resolved.body": "Ticket {number} is resolved: {resolution}"
   }
 }

@@ -10,6 +10,7 @@ import { formItem, hasFieldError, isRequiredLabel } from '../test/antd'
 import { FormWidget } from './FormWidget'
 import type { EntityWidgetMetadata, FieldMetadata, FieldType } from './site'
 import { TextProvider } from './TextProvider'
+import { hostileMarkup } from '../test/hostile'
 
 function field(name: string, type: FieldType, labelKey: string | null): FieldMetadata {
   return {
@@ -249,6 +250,35 @@ const softwareWidget: EntityWidgetMetadata = {
   },
 }
 
+// A note whose title, total, software and attachment have help text, and whose priority has none.
+const helpWidget: EntityWidgetMetadata = {
+  ...noteWidget,
+  entity: {
+    ...noteWidget.entity,
+    fields: [
+      { ...field('title', 'text', 'note.title'), required: true, maxLength: 200, helpKey: 'note.titleHelp' },
+      field('priority', 'integer', 'note.priority'),
+      {
+        ...field('total', 'decimal', 'note.total'),
+        precision: 18,
+        scale: 2,
+        computed: true,
+        helpKey: 'note.totalHelp',
+      },
+      {
+        ...field('software', 'references', 'note.software'),
+        helpKey: 'note.softwareHelp',
+        target: { entity: 'Software', displayField: 'name', recordsPath: '/api/apps/E2eApp/entities/Software/records' },
+      },
+      {
+        ...field('attachment', 'file', 'note.attachment'),
+        helpKey: 'note.attachmentHelp',
+        uploadPath: '/api/apps/E2eApp/entities/Note/files',
+      },
+    ],
+  },
+}
+
 const wordId = '11111111-1111-4111-8111-111111111111'
 const excelId = '22222222-2222-4222-8222-222222222222'
 const visioId = '33333333-3333-4333-8333-333333333333'
@@ -345,6 +375,11 @@ const texts = {
   'noteLine.code': 'Line code',
   'note.total': 'Total',
   'note.amountPositive': 'Amount must be positive.',
+  'note.attachment': 'Attachment',
+  'note.titleHelp': 'Shown on the list.',
+  'note.totalHelp': 'Worked out by the server.',
+  'note.softwareHelp': 'Choose each tool the note uses.',
+  'note.attachmentHelp': 'Attach the signed form.',
   'noteSections.main': 'Main',
   'noteSections.details': 'Details',
   'noteSteps.main': 'Step one',
@@ -470,6 +505,31 @@ describe('FormWidget', () => {
 
   afterEach(() => {
     vi.useRealTimers()
+  })
+
+  it('shows a value that holds markup as text', async () => {
+    const record = {
+      id: noteId,
+      version: 1,
+      values: {
+        title: hostileMarkup,
+        code: null,
+        priority: 7,
+        amount: 12.5,
+        done: false,
+        dueOn: null,
+        dueAt: null,
+        status: null,
+        category: categoryId,
+      },
+      labels: { category: 'Office' },
+    }
+    stubFetch({ status: 200, body: JSON.stringify(record) })
+
+    renderForm(noteId)
+
+    expect(await screen.findByDisplayValue(hostileMarkup)).toBeInTheDocument()
+    expect(document.querySelector('img, [onerror]')).toBeNull()
   })
 
   it('shows one input per field with its label, and the reference label read-only', async () => {
@@ -645,6 +705,43 @@ describe('FormWidget', () => {
 
     expect(await screen.findByTestId('field-error-amount')).toHaveTextContent('Amount must be positive.')
     expect(screen.getByTestId('field-error-title')).toHaveTextContent('Required.')
+  })
+
+  it('shows help text that names its input with aria-describedby, and no help element for a field without help', async () => {
+    stubFetch()
+    const { container } = renderForm(null, helpWidget)
+
+    expect(await screen.findByText('Shown on the list.')).toHaveAttribute('id', 'title-help')
+    expect(screen.getByRole('textbox', { name: 'Title' })).toHaveAttribute('aria-describedby', 'title-help')
+    expect(container.querySelector('#priority-help')).toBeNull()
+    expect(screen.getByLabelText('Priority')).not.toHaveAttribute('aria-describedby')
+  })
+
+  it('names a read-only input and the references Add button with their help text', async () => {
+    stubFetch()
+    renderForm(null, helpWidget)
+
+    expect(await screen.findByText('Worked out by the server.')).toHaveAttribute('id', 'total-help')
+    expect(screen.getByLabelText('Total')).toHaveAttribute('aria-describedby', 'total-help')
+    expect(screen.getByRole('button', { name: 'Add Software' })).toHaveAttribute('aria-describedby', 'software-help')
+  })
+
+  it('shows a file field help text without tying the upload button to it', async () => {
+    stubFetch()
+    renderForm(null, helpWidget)
+
+    expect(await screen.findByText('Attach the signed form.')).toHaveAttribute('id', 'attachment-help')
+    expect(document.getElementById('attachment')).not.toHaveAttribute('aria-describedby')
+  })
+
+  it('keeps the help text of a field while it shows a validation message', async () => {
+    stubFetch({ status: 400, body: '{"title":"Invalid","status":400,"errors":{"/values/title":["Required."]}}' })
+    renderForm(null, helpWidget)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    expect(await screen.findByTestId('field-error-title')).toHaveTextContent('Required.')
+    expect(screen.getByText('Shown on the list.')).toHaveAttribute('id', 'title-help')
   })
 
   it('shows a stale version as a conflict and reloads the current values', async () => {

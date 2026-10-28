@@ -179,3 +179,28 @@ describe('FieldInput required', () => {
     expect(screen.getByRole(role, { name: 'limited' })).not.toHaveAttribute('aria-required')
   })
 })
+
+describe('FieldInput description', () => {
+  const inputs: [string, Partial<FieldMetadata>, string][] = [
+    ['text', {}, 'textbox'],
+    ['enum', { values: ['open', 'closed'] }, 'combobox'],
+    ['date', {}, 'textbox'],
+  ]
+
+  it.each(inputs)('names the describing element on a %s input', (type, limits, role) => {
+    render(
+      <TextProvider catalogs={catalogs} development={false}>
+        <FieldInput
+          field={field(type as FieldType, limits)}
+          value={null}
+          onChange={() => undefined}
+          ariaLabel="limited"
+          locale="en"
+          ariaDescribedBy="limited-help"
+        />
+      </TextProvider>,
+    )
+
+    expect(screen.getByRole(role, { name: 'limited' })).toHaveAttribute('aria-describedby', 'limited-help')
+  })
+})

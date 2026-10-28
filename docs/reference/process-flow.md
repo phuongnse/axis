@@ -7,17 +7,17 @@ subject. The process resource and the first four step types are in
 [architecture.md](../architecture.md) apply: sections marked _(planned for Mx)_
 are not built yet, and Dn refers to [decisions.md](../decisions.md).
 
-Everything in this file is _(planned for M14)_, except the
-[Timer step](#timer-step), [Loops](#loops) through a `task`, a `timer` or a
-`waitEvent` and the calls in them, the [sub-process step](#sub-process-step),
-the [create record operation](#create-record-operation) and the compile checks
-of the [wait for event step](#wait-for-event-step), which are built. So are its
-_Which occurrence_, _When the step runs_, _Waking_, _One use_ and _Timeout_ parts. The design follows
+Everything in this file is built: the [Timer step](#timer-step), [Loops](#loops),
+the [sub-process step](#sub-process-step), the
+[create record operation](#create-record-operation), the
+[wait for event step](#wait-for-event-step) with its _Which occurrence_, _When the
+step runs_, _Waking_, _One use_ and _Timeout_ parts, and
+[processes without a subject](#processes-without-a-subject). The design follows
 [D69](../decisions/d69-timer-wait-for-event-and-sub-process-steps-loops-and-create-record.md)
 and
 [D70](../decisions/d70-processes-without-a-subject-scheduled-jobs-and-delete-triggers.md).
-New compile problems are listed as new diagnostics. They get their codes in
-the [diagnostic code table](diagnostic-codes.md) when they are built.
+Each compile problem of this file is a diagnostic with its own code in the
+[diagnostic code table](diagnostic-codes.md).
 
 ## Timer step
 
@@ -74,9 +74,8 @@ A `waitEvent` step waits until an event about the subject record is raised:
   shows it as `waitEvent`, with a transition to `next` and one marked
   `timeout`. The worker runs the step: it goes on with an earlier
   occurrence or waits, and a `process.timer` item resumes it at its timeout.
-  The waking of a waiting instance by event delivery is not built yet. Studio's
-  palette offers the step, and a new step starts with an empty `event` and
-  `next`.
+  Event delivery wakes a waiting instance, see Waking below. Studio's palette
+  offers the step, and a new step starts with an empty `event` and `next`.
 - `event` names an `event` whose entity is the subject entity. An unknown
   event is `AXC0125` and an event about another entity is `AXC0283`, both at
   `/steps/{i}/event`.
@@ -257,8 +256,7 @@ A process may leave out `entity`. It then declares typed `parameters`. The
 compile checks in this section are built, and so are the instance storage,
 running such an instance on the engine, the start endpoint, the inspection
 list and detail and the operator commands cancel, retry and resolve, which check
-only the user's grant. The other starts described below are _(planned for
-M14)_.
+only the user's grant. So are the other starts described below.
 
 ```json
 {
