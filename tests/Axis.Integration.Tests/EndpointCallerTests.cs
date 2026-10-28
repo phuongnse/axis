@@ -15,6 +15,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace Axis.Integration.Tests;
 
@@ -40,6 +41,7 @@ public sealed class EndpointCallerTests(KeycloakFixture keycloak) : IAsyncLifeti
 
     private readonly TestClock _clock = new();
     private readonly ConcurrentQueue<EndpointCallerIdentity?> _callers = new();
+    private readonly LogCollector _logs = new();
     private Uri? _authority;
     private WebApplicationFactory<Program>? _factory;
     private HttpClient? _client;
@@ -113,22 +115,44 @@ public sealed class EndpointCallerTests(KeycloakFixture keycloak) : IAsyncLifeti
     [Fact]
     public async Task An_id_token_is_a_401_even_with_the_expected_audience()
     {
-        var idToken = await RequestTokenAsync(
-            new Dictionary<string, string>
-            {
-                ["grant_type"] = "password",
-                ["client_id"] = KeycloakFixture.PurchasingClientId,
-                ["client_secret"] = KeycloakFixture.PurchasingClientSecret,
-                ["username"] = "anna",
-                ["password"] = KeycloakFixture.Password,
-                ["scope"] = "openid",
-            },
-            "id_token");
+        var idToken = await RequestIdTokenAsync();
 
         using var call = await SendAsync(HttpMethod.Post, EndpointPath, HostD, idToken);
 
         await AssertUnauthorizedAsync(call);
         Assert.All(_callers, caller => Assert.Null(caller));
+    }
+
+    [Theory]
+    [InlineData("id token", HostD, "d", "not an access token")]
+    [InlineData("axis client", HostA, "a", "Exception")]
+    public async Task A_refused_token_writes_one_warning_with_the_tenant_the_reason_and_the_trace_id(
+        string kind, string host, string tenant, string reason)
+    {
+        var bearer = kind == "id token" ? await RequestIdTokenAsync() : await RequestAnnaTokenAsync();
+        var traceId = Guid.NewGuid().ToString("N");
+
+        using var call = await SendAsync(HttpMethod.Post, EndpointPath, host, bearer, traceparent: $"00-{traceId}-{Guid.NewGuid().ToString("N")[..16]}-01");
+
+        await AssertUnauthorizedAsync(call);
+        var entry = Assert.Single(TokenRefusals());
+        Assert.Equal(LogLevel.Warning, entry.Level);
+        Assert.Contains($"tenant {tenant} ", entry.Message, StringComparison.Ordinal);
+        Assert.Contains(reason, entry.Message, StringComparison.Ordinal);
+        Assert.Equal(traceId, entry.Scope["TraceId"]?.ToString());
+        Assert.DoesNotContain(bearer, entry.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(bearer.Split('.')[1], entry.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task A_valid_token_writes_no_refused_token_warning()
+    {
+        var token = await RequestPurchasingTokenAsync();
+
+        using var call = await SendAsync(HttpMethod.Post, EndpointPath, HostA, token);
+
+        await AssertProblemAsync(call, HttpStatusCode.NotFound, "No endpoint exists with this name.");
+        Assert.Empty(TokenRefusals());
     }
 
     [Fact]
@@ -187,6 +211,7 @@ public sealed class EndpointCallerTests(KeycloakFixture keycloak) : IAsyncLifeti
             UseTenant(builder, "b", HostB, masterRealm, endpointAudience: "axis-endpoints");
             UseTenant(builder, "c", HostC, authority, endpointAudience: null);
             UseTenant(builder, "d", HostD, authority, endpointAudience: KeycloakFixture.PurchasingClientId);
+            builder.ConfigureLogging(logging => logging.AddProvider(_logs));
             builder.ConfigureTestServices(services =>
             {
                 services.AddSingleton<TimeProvider>(_clock);
@@ -230,6 +255,23 @@ public sealed class EndpointCallerTests(KeycloakFixture keycloak) : IAsyncLifeti
             ["client_id"] = KeycloakFixture.PurchasingClientId,
             ["client_secret"] = KeycloakFixture.PurchasingClientSecret,
         });
+
+    // An ID token of the purchasing client, so it has the expected audience of tenant d.
+    private Task<string> RequestIdTokenAsync() =>
+        RequestTokenAsync(
+            new Dictionary<string, string>
+            {
+                ["grant_type"] = "password",
+                ["client_id"] = KeycloakFixture.PurchasingClientId,
+                ["client_secret"] = KeycloakFixture.PurchasingClientSecret,
+                ["username"] = "anna",
+                ["password"] = KeycloakFixture.Password,
+                ["scope"] = "openid",
+            },
+            "id_token");
+
+    private List<LogRecordEntry> TokenRefusals() =>
+        [.. _logs.Records.Where(record => record.Message.StartsWith("A bearer token for tenant", StringComparison.Ordinal))];
 
     // A token the realm issues to the axis client, so its audience is not the endpoint audience.
     private Task<string> RequestAnnaTokenAsync() =>
@@ -289,14 +331,19 @@ public sealed class EndpointCallerTests(KeycloakFixture keycloak) : IAsyncLifeti
         return cookie[(Session.Scheme.Length + 1)..];
     }
 
-    /// <summary>Sends a request without the CSRF header, with the bearer token and session cookie given.</summary>
-    private async Task<HttpResponseMessage> SendAsync(HttpMethod method, string path, string host, string? bearer, string? sessionCookie = null)
+    /// <summary>Sends a request without the CSRF header, with the bearer token, session cookie and trace parent given.</summary>
+    private async Task<HttpResponseMessage> SendAsync(HttpMethod method, string path, string host, string? bearer, string? sessionCookie = null, string? traceparent = null)
     {
         using var request = new HttpRequestMessage(method, new Uri(path, UriKind.Relative));
         request.Headers.Host = host;
         if (bearer is not null)
         {
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", bearer);
+        }
+
+        if (traceparent is not null)
+        {
+            request.Headers.Add("traceparent", traceparent);
         }
 
         if (sessionCookie is not null)

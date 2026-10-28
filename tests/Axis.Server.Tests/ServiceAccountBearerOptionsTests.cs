@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Axis.Server.Tests;
 
@@ -96,7 +97,7 @@ public sealed class ServiceAccountBearerOptionsTests
     {
         var tenants = new TenantSignInSettings(new Dictionary<string, TenantOidcSettings> { ["a"] = settings });
         var options = new JwtBearerOptions();
-        new BearerCallerOptions(tenants, allowHttp: false, TimeProvider.System).Configure(scheme, options);
+        new BearerCallerOptions(tenants, allowHttp: false, TimeProvider.System, NullLogger<BearerCallerOptions>.Instance).Configure(scheme, options);
         return options;
     }
 

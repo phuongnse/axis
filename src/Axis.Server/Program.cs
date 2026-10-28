@@ -234,6 +234,9 @@ if (!forwardedHeaders.IsEmpty)
 // checked against the resolved tenant.
 app.UseTenantResolution();
 
+// After tenant resolution, so the warning for a 403 carries the tenant, and before the CSRF check, so that refusal is logged.
+app.UseRefusedRequestLog();
+
 // Before the session, so a refused write does no work and renews no cookie.
 app.UseCsrfHeader();
 
