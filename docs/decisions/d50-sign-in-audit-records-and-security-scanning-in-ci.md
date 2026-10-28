@@ -4,7 +4,7 @@ Status: **Agreed**
 
 M10 adds two security baselines. Sign-in, sign-out and refused sign-ins leave
 audit records, and that part is built. CI runs static analysis, which is
-built. Running the dependency scan in CI is _(planned for M16)_. See
+built. Running the dependency scan in CI is _(planned for M18)_. See
 [audit records](../reference/storage.md#audit-records-and-sequence-counters) and
 [sign-in and the session](../reference/security.md#sign-in-and-the-session) for the
 detail. The ASVS level and its verification stay in M16

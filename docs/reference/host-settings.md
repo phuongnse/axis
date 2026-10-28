@@ -368,7 +368,8 @@ reads `Data:ImportMaxRows`. See
 - **A bad file size.** A `Files:MaxSize` that is not a whole number of bytes,
   at least 1, stops the start. A missing value takes the default.
 - **Writes.** Record writes, activation and the worker's own statements keep
-  their current limits. M16 sets the final values against its SLOs.
+  their current limits. The final values are set against the performance
+  objectives _(planned for M18)_.
 - **Environment.** As environment variables they are `Data__QueryTimeout`
   and so on.
 

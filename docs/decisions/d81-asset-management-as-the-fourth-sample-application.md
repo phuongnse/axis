@@ -8,7 +8,7 @@ service desk of
 M13, as [D46](d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9.md)
 planned. The owner agreed these points on 2026-10-25. The data, security, pages,
 dashboard, and import and export are built in M15. The import, attachment and
-maintenance scenarios, and the denied cases they lack, are _(planned for M16)_. See the
+maintenance scenarios, and the denied cases they lack, are _(planned for M18)_. See the
 [Fourth application section](../product-brief.md#fourth-application-asset-management)
 of the product brief for the data, security, pages and scenarios.
 

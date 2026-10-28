@@ -12,7 +12,7 @@ list them and mark them read, their retention, the staging of emails in the
 outbox and their sending over SMTP are built, and so are the dead letter of a
 failed email and the bell in the site shell. The mail settings in the tenant
 directory are built. A mail server in Docker Compose and `scripts/dev.sh`, and
-the email channel of a task escalation, are _(planned for M16)_, as is
+the email channel of a task escalation, are _(planned for M18)_, as is
 everything else in this file that says so. The design
 follows
 [D73](../decisions/d73-in-app-and-email-notifications.md). Dates follow the
@@ -269,5 +269,5 @@ Under `Tenancy:Source=directory` a tenant overrides `Email` in the tenant
 directory, where the password is encrypted as the OIDC client secret is. The
 [`tenant email set`](tenant-setting-commands.md#mail-settings) command sets it,
 and a tenant without it uses the host's settings. MailKit sends the email. The integration tests run Mailpit as the mail server.
-_(Planned for M16)_ Docker Compose and `scripts/dev.sh` run Mailpit too. Until
+_(Planned for M18)_ Docker Compose and `scripts/dev.sh` run Mailpit too. Until
 then they have no mail server, see [development](../development.md).
