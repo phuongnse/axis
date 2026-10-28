@@ -83,4 +83,11 @@ describe('scripts/smoke.sh', () => {
       assert.ok(run.stdout.includes(`${suite} (skipped: not affected by this change)`), suite)
     }
   })
+
+  test('runs every smoke test under NexKit for a server change', () => {
+    const run = runSmoke({ changed: 'src/Axis.Server/Program.cs' })
+
+    assert.equal(run.status, 0, run.stdout + run.stderr)
+    assert.deepEqual(run.written, Object.keys(suites))
+  })
 })
