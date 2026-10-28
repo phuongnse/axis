@@ -36,10 +36,10 @@ Run and the Test results list, the read-only view of a module entity, and the re
   [D51](../decisions/d51-creating-applications-and-resources-from-studio.md).
 - **New resource.** A **New resource** button above the search box opens a
   dialog that asks for the kind and the name, or the locale for a `text`
-  resource. The kind picker lists the 18 kinds that the create route accepts,
-  which is every kind except the manifest and `identityProvider`. The author can
-  type to narrow it. _(planned for M17)_ `identityProvider` joins them, with a
-  starter of type `accounts`.
+  resource. The kind picker lists the 19 kinds that the create route accepts,
+  which is every kind except the manifest. The author can type to narrow it. A
+  new `identityProvider` starts with type `accounts`, in
+  `identity-providers/<name>.json`.
   - It sends the kind's starter with an id from `crypto.randomUUID()`. A starter
     is the smallest content that passes the kind's schema. A reference the
     author must still choose is an empty string, so it shows up as a diagnostic.
@@ -48,7 +48,7 @@ Run and the Test results list, the read-only view of a module entity, and the re
   - The starters live in the SPA, in `web/src/platform/studioStarters.json`.
     Each lists the pointers of its empty references. A Vitest test checks each
     one against its bundled schema, so a schema file without a starter fails
-    (the manifest and `identityProvider` are exempt), and every error must be at a listed pointer. A server test reads the same
+    (the manifest is exempt), and every error must be at a listed pointer. A server test reads the same
     file, sends each starter through the create route, and checks that its
     diagnostics are at the listed pointers only.
   - A new text resource copies every key and text of the default locale of the
@@ -447,7 +447,7 @@ Run and the Test results list, the read-only view of a module entity, and the re
 - **Editors by kind.** Studio uses a typed editor for the kinds listed here, the entity
   designer for `entity`, and the generic form for every other kind. The seed editor,
   the connector editor, the scenario editor, the page editor, the endpoint mapping rows, the form steps panel, the text
-  editor, the process editor's step list, with its decision, end, task, timer and operation panels, and the entity designer are
+  editor, the identity provider editor with the site's `signIn` picker, the process editor's step list, with its decision, end, task, timer and operation panels, and the entity designer are
   built. The last column lists what still needs the JSON view, because the form cannot show it.
 
   | Kind          | Editor                                                          | Still needs the JSON view                                             |
@@ -456,7 +456,7 @@ Run and the Test results list, the read-only view of a module entity, and the re
   | `entity`      | Entity designer                                                 | Nothing                                                               |
   | `page`        | Typed editor, Design tab (see Page designer)                    | Nothing                                                               |
   | `form`        | Generic form, typed steps panel, Design tab (see Form designer) | Nothing                                                               |
-  | `site`        | Generic form, `signIn` picker _(planned for M17)_               | Nothing                                                               |
+  | `site`        | Generic form, `signIn` picker                                   | Nothing                                                               |
   | `process`     | Typed editor, Design tab with the process graph                 | Nothing                                                               |
   | `rule`        | Generic form                                                    | Nothing                                                               |
   | `sequence`    | Generic form                                                    | Nothing                                                               |
@@ -471,7 +471,7 @@ Run and the Test results list, the read-only view of a module entity, and the re
   | `seed`        | Typed editor                                                    | Nothing                                                               |
   | `scenario`    | Typed editor                                                    | Nothing                                                               |
   | `text`        | Typed editor                                                    | Nothing                                                               |
-  | `identityProvider` | Typed editor _(planned for M17)_                           | Nothing                                                               |
+  | `identityProvider` | Typed editor                                               | Nothing                                                               |
 
   The generic form sends a part to the JSON view when it holds `oneOf` or
   `anyOf`, when it holds `allOf` with an item that has more than `if`, `then`
@@ -685,7 +685,7 @@ Run and the Test results list, the read-only view of a module entity, and the re
       shows a hint, and the compiler reports the error.
     - **Unknown keys.** A key the editor does not show, in the file, in an
       operation or in `auth`, is saved unchanged.
-  - **Identity provider editor** _(planned for M17)_. The Form tab shows the
+  - **Identity provider editor** _(built)_. The Form tab shows the
     provider's name and `type`, then the fields of that type. The JSON view
     stays as a second view of the same draft. See
     [identity provider resource](identity-provider.md#identity-provider-resource).

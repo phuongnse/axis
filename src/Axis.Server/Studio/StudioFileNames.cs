@@ -35,6 +35,7 @@ internal static partial class StudioFileNames
         [ResourceKinds.Trigger] = "triggers",
         [ResourceKinds.Migration] = "migrations",
         [ResourceKinds.Scenario] = "scenarios",
+        [ResourceKinds.IdentityProvider] = "identity-providers",
     };
 
     /// <summary>The kinds that a create accepts: every resource kind except the manifest.</summary>
