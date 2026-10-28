@@ -17,7 +17,7 @@ the `claimed_by` and `claimed_at` columns are built, and so are release by a
 are built: the inbox marks, and Claim, Release and the Reassign dialog on the
 task page. The shape of `escalations` and its checks are built, and the compiler
 holds them in the model. The `task.escalate` work item and the runs of
-`reassign` and of `notify` are built. The `email` channel is _(planned for M16)_.
+`reassign` and of `notify` are built. The `email` channel is _(planned for M18)_.
 
 ## Escalations and deadline
 

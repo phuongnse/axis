@@ -496,7 +496,7 @@ Deliveries that keep failing stop after a limit and are kept as dead letters, se
 backoff, the limit, the two tables, the log, the metric and the
 [routes](#routes) are built for the start of an `async` trigger from
 `event.deliver`, for `trigger.fanOut` and for `notification.email`.
-_(Planned for M16)_ The waiting-instance target is not built yet.
+_(Planned for M18)_ The waiting-instance target is not built yet.
 
 **What counts.** Three kinds of work item deliver something, and each
 failure is counted for its own target:
