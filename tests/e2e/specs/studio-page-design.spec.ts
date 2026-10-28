@@ -8,6 +8,7 @@ import { waitForDialog } from "../dialogs";
 import { pickOption } from "../select";
 import { e2eApp, serviceDesk } from "../server-settings";
 import { useSession } from "../sessions";
+import { openTab } from "../studio-resources";
 
 // A second server starts in beforeAll, which takes a few seconds.
 test.setTimeout(180_000);
@@ -75,7 +76,7 @@ test.describe("Studio draws a page and a form on the Design tab", () => {
     await page.goto(
       `${server.url}/studio?app=ServiceDesk&resource=${dashboardId}`,
     );
-    await page.getByRole("tab", { name: "JSON", exact: true }).click();
+    await openTab(page, "JSON");
     const json = page.getByRole("textbox", { name: "JSON", exact: true });
     const draft = JSON.parse(await json.inputValue());
     draft.widgets[0].columns[1].widgets[0].dataSource = "MissingSource";

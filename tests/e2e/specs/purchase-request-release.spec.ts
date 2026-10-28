@@ -11,6 +11,7 @@ import { guardStep } from '../hang-guard'
 import { appPath, createRequest, decide, expectStatus, submit, waitForTask } from '../purchase-requests'
 import { previewURL, purchaseRequests } from '../server-settings'
 import { useSession } from '../sessions'
+import { openTab } from '../studio-resources'
 
 // Each activation starts a second server, which takes a few seconds.
 test.setTimeout(180_000)
@@ -73,7 +74,7 @@ async function editInStudio(
     change(content)
 
     await page.goto(`${serverUrl}/studio?app=PurchaseRequests&resource=${resource.id}`)
-    await page.getByRole('tab', { name: 'JSON', exact: true }).click()
+    await openTab(page, 'JSON')
     await page.getByRole('textbox', { name: 'JSON', exact: true }).fill(JSON.stringify(content, null, 2))
     await page.getByRole('button', { name: 'Save', exact: true }).click()
     await expect(page.getByTestId('studio-saved')).toBeVisible()
