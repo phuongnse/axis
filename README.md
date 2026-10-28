@@ -32,7 +32,7 @@ http://preview.localhost:5206, with its own database and no purchasing system bi
 Compose volume has no preview database, so run `docker compose down -v` once. That deletes its data.
 The SPA signs people in through Keycloak at `/api/auth/sign-in`, but sign-in through
 Compose is not wired yet. Every application page needs a session, so under Compose
-opening a sample page starts a sign-in that cannot complete yet. See
+opening a sample page shows the sign-in prompt, whose button starts a sign-in that cannot complete yet. See
 [development](docs/development.md#docker-compose) for the port variables. This setup is for local
 use. Production installs follow the [installation guide](docs/reference/installation.md),
 for Docker Compose on one machine and for Kubernetes.

@@ -4,6 +4,7 @@ import { MemoryRouter, useLocation } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import { formatValue } from './formatValue'
+import { isSignInNeeded } from './signInNeeded'
 import { assignLocation } from './navigation'
 import type { FieldMetadata, FieldType, WidgetMetadata } from './site'
 import { TaskPage } from './TaskPage'
@@ -779,7 +780,7 @@ describe('TaskPage', () => {
     expect(await screen.findByTestId('not-found')).toBeInTheDocument()
   })
 
-  it('starts sign-in with the current path and query string when nobody is signed in', async () => {
+  it('asks to sign in when nobody is signed in', async () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {})
     vi.mocked(assignLocation).mockReset()
     history.pushState(null, '', `/e2e/tasks/${taskId}?from=inbox`)
@@ -787,11 +788,8 @@ describe('TaskPage', () => {
 
     renderPage()
 
-    await waitFor(() =>
-      expect(assignLocation).toHaveBeenCalledExactlyOnceWith(
-        `/api/auth/sign-in?returnUrl=%2Fe2e%2Ftasks%2F${taskId}%3Ffrom%3Dinbox`,
-      ),
-    )
+    await waitFor(() => expect(isSignInNeeded()).toBe(true))
+    expect(assignLocation).not.toHaveBeenCalled()
     expect(screen.queryByTestId('tasks-sign-in')).not.toBeInTheDocument()
   })
 

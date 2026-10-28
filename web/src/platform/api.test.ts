@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { apiFetch, setApiGuard, startSignIn } from './api'
 import { fetchCurrentUser } from './currentUser'
 import { assignLocation } from './navigation'
+import { isSignInNeeded, subscribeSignInNeeded } from './signInNeeded'
 
 vi.mock('./navigation')
 
@@ -89,30 +90,45 @@ describe('apiFetch', () => {
     ])
   })
 
-  it('starts sign-in on a 401, with the current path and query as the return address', async () => {
+  it('asks to sign in on a 401 and does not start sign-in', async () => {
     stubFetch(401)
 
     const response = await apiFetch('/api/x')
 
     expect(response.status).toBe(401)
-    expect(assignLocation).toHaveBeenCalledExactlyOnceWith('/api/auth/sign-in?returnUrl=%2Fe2e%2Fnotes%3Fpage%3D2')
-  })
-
-  it('does not start sign-in on a 401 when the caller opts out', async () => {
-    stubFetch(401)
-
-    const response = await apiFetch('/api/x', undefined, { signInOnUnauthorized: false })
-
-    expect(response.status).toBe(401)
+    expect(isSignInNeeded()).toBe(true)
     expect(assignLocation).not.toHaveBeenCalled()
   })
 
-  it('does not start sign-in on a success', async () => {
+  it('does not ask to sign in on a 401 when the caller opts out', async () => {
+    stubFetch(401)
+
+    const response = await apiFetch('/api/x', undefined, { promptSignInOnUnauthorized: false })
+
+    expect(response.status).toBe(401)
+    expect(isSignInNeeded()).toBe(false)
+    expect(assignLocation).not.toHaveBeenCalled()
+  })
+
+  it('does not ask to sign in on a success', async () => {
     stubFetch(200)
 
     await apiFetch('/api/x')
 
+    expect(isSignInNeeded()).toBe(false)
     expect(assignLocation).not.toHaveBeenCalled()
+  })
+
+  it('tells a listener once, however many calls answer 401', async () => {
+    stubFetch(401)
+    const listener = vi.fn()
+    const unsubscribe = subscribeSignInNeeded(listener)
+
+    await apiFetch('/api/x')
+    await apiFetch('/api/y')
+    unsubscribe()
+
+    expect(listener).toHaveBeenCalledOnce()
   })
 })
 
@@ -131,12 +147,13 @@ describe('setApiGuard', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
-  it('does not start sign-in on a guarded 401', async () => {
+  it('does not ask to sign in on a guarded 401', async () => {
     setApiGuard(() => new Response(null, { status: 401 }))
 
     const response = await apiFetch('/api/apps/A/entities/B/records')
 
     expect(response.status).toBe(401)
+    expect(isSignInNeeded()).toBe(false)
     expect(assignLocation).not.toHaveBeenCalled()
   })
 
@@ -164,11 +181,12 @@ describe('setApiGuard', () => {
 })
 
 describe('fetchCurrentUser', () => {
-  it('returns null on a 401 and does not start sign-in', async () => {
+  it('returns null on a 401 and does not ask to sign in', async () => {
     const fetchMock = stubFetch(401)
 
     expect(await fetchCurrentUser()).toBeNull()
     expect(fetchMock.mock.calls[0][0]).toBe('/api/me')
+    expect(isSignInNeeded()).toBe(false)
     expect(assignLocation).not.toHaveBeenCalled()
   })
 })

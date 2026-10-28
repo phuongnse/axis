@@ -50,7 +50,7 @@ const emptyDash = (
  * clearable select filters them by state. `state`, `page` and `pageSize` live in the URL, and a
  * state change goes back to page 1. The first column links each row to the instance's address
  * under the inspector page. A `403` shows that the user may not inspect the process. With nobody
- * signed in, the inspection API's 401 starts sign-in.
+ * signed in, the inspection API's 401 shows the sign-in prompt.
  *
  * The step column shows the step's name, because a list row carries no label key. Under the list, the
  * process's open dead letters have their own list, which has its own page number.

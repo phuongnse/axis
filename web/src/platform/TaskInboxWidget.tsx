@@ -36,7 +36,7 @@ const dueAtField = { name: 'dueAt', type: 'date-time' } as const
  * Lists the signed-in user's open tasks in the application, in the task API's order: due date
  * first, with no due date last. Each row links to the task's address under the inbox page. Paging
  * lives in the URL as the task API's `page` and `pageSize`, as on a table. With nobody signed in, the
- * task API's 401 starts sign-in.
+ * task API's 401 shows the sign-in prompt.
  *
  * An overdue task shows an "Overdue" tag beside its due date, and a task the user claimed shows a
  * "Claimed by you" tag beside its label.
