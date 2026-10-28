@@ -10,7 +10,7 @@ namespace Axis.Presentation.Sites;
 /// </summary>
 public static class ApplicationSites
 {
-    /// <summary>The list entry of <paramref name="site"/>, with its title in each available locale.</summary>
+    /// <summary>The list entry of <paramref name="site"/>, with its title in each available locale and its application.</summary>
     public static SiteListItem ListItem(ApplicationModel application, SiteModel site)
     {
         ArgumentNullException.ThrowIfNull(application);
@@ -21,7 +21,13 @@ public static class ApplicationSites
             locale => locale,
             locale => FindText(application, locale)!.Texts[site.Title.TextKey],
             StringComparer.Ordinal);
-        return new SiteListItem(site.Path, site.Title.TextKey, titles);
+
+        // The compiler checks the label's text key (AXC0028), and locale drift (AXC0027) keeps every locale on the same keys.
+        var applicationTitles = application.Texts.ToDictionary(
+            text => text.Locale,
+            text => application.Manifest.Label is { } label ? text.Texts[label.TextKey] : application.Manifest.Name,
+            StringComparer.Ordinal);
+        return new SiteListItem(site.Path, site.Title.TextKey, titles, new SiteApplication(application.Manifest.Name, applicationTitles));
     }
 
     public static ApplicationSite Describe(ApplicationModel application, SiteModel site)
