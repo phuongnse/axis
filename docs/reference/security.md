@@ -425,6 +425,15 @@ systems.
     tenant's token is a `401`.
   - The audience, which must contain the tenant's `Oidc:EndpointAudience`.
   - The expiry.
+  - The signature algorithm, which must be `RS256`, `RS384`, `RS512`, `PS256`,
+    `PS384`, `PS512`, `ES256`, `ES384` or `ES512`. A token signed with `HS256`
+    or any other algorithm, or with `none`, is a `401`.
+  - The token type, which must be an access token. A token marked as another
+    type is a `401`: a header `typ` other than `at+jwt`,
+    `application/at+jwt` or `JWT`, or a payload `typ` claim other than
+    `Bearer` or `DPoP`. So Keycloak's ID token, which has the claim `ID`, is
+    refused even when its audience is the expected one. A token with no `typ`
+    is not refused, so identity providers that mark no type still work.
 - **Roles.** The caller's roles come from the configured roles claim
   (`Claims:Roles`), matched against the declared roles as for users.
 - **Caller id.** The caller's id comes from the configured user id claim
@@ -524,8 +533,8 @@ stay session-only until then.
   browser cannot add an `Authorization` header to a cross-site request
   without a CORS preflight, which Axis does not allow.
 - **Token checks.** The same as for [machine callers](#machine-callers):
-  the signature, the issuer, the expiry, and an audience that holds
-  `Oidc:ServiceAudience`. Any failure is a `401` with
+  the signature and its algorithm, the issuer, the expiry, the token type, and
+  an audience that holds `Oidc:ServiceAudience`. Any failure is a `401` with
   `WWW-Authenticate: Bearer`. Under the `fapi2` profile the token must also
   be DPoP-bound, the `401` says `WWW-Authenticate: DPoP algs="ES256 PS256"` and
   the token comes with a proof, see
@@ -536,6 +545,11 @@ stay session-only until then.
 - **Authorization.** The roles come from the configured roles claim. Policies
   apply unchanged, with their record filters and fields. A service account
   with no grant for the action gets a `403`.
+- **Scope.** The decision uses the caller id and the roles claim, as it does
+  for a person, and reads no `scope` or `authorization_details` claim. Policies
+  grant by role, and the identity provider gives the service account its roles,
+  so the roles claim carries its delegated authority. A token with a `scope`
+  claim is not refused, and the claim changes nothing.
 - **Actor.** The caller id comes from the configured user id claim, `sub` by
   default. It is the audit actor and the creator of a new record. The display
   name falls back to the client id, `azp`.
@@ -607,7 +621,8 @@ verification bullet below is _(planned for M16)_.
     refused, and so is a plain bearer token.
   - The proof's `typ` is `dpop+jwt` and its `alg` is `ES256` or `PS256`. Its
     `jwk` header holds the public key, and a `jwk` with a private key is
-    refused. The signature is checked with that key.
+    refused. A `PS256` key must be an RSA key of at least 2048 bits, the floor
+    of FAPI 2.0. The signature is checked with that key.
   - The proof's `htm` is the request's method. Its `htu` is the request's scheme,
     host and path, without the query and fragment, after the forwarded headers
     rules of

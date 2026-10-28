@@ -1,6 +1,10 @@
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
 using Axis.Server.Authentication;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Primitives;
+using Microsoft.IdentityModel.Tokens;
 
 namespace Axis.Server.Tests;
 
@@ -98,6 +102,37 @@ public sealed class DpopProofTests : IDisposable
             : Proof(ath: DpopTestKey.Hash("another.access.token"));
 
         Assert.False(await IsValidAsync(proof));
+    }
+
+    [Theory]
+    [InlineData(1024, false)]
+    [InlineData(2048, true)]
+    public async Task A_PS256_proof_needs_an_RSA_key_of_at_least_2048_bits(int bits, bool passes)
+    {
+        using var rsa = RSA.Create(bits);
+        var parameters = rsa.ExportParameters(false);
+        var jwk = new Dictionary<string, object>
+        {
+            ["kty"] = "RSA",
+            ["n"] = Base64UrlEncoder.Encode(parameters.Modulus),
+            ["e"] = Base64UrlEncoder.Encode(parameters.Exponent),
+        };
+        var header = JsonSerializer.Serialize(new Dictionary<string, object> { ["typ"] = "dpop+jwt", ["alg"] = "PS256", ["jwk"] = jwk });
+        var payload = JsonSerializer.Serialize(new Dictionary<string, object>
+        {
+            ["htm"] = "POST",
+            ["htu"] = Url,
+            ["iat"] = _now.ToUnixTimeSeconds(),
+            ["jti"] = Guid.NewGuid().ToString("N"),
+            ["ath"] = DpopTestKey.Hash(AccessToken),
+        });
+        var signingInput = $"{Base64UrlEncoder.Encode(header)}.{Base64UrlEncoder.Encode(payload)}";
+        var signature = rsa.SignData(Encoding.ASCII.GetBytes(signingInput), HashAlgorithmName.SHA256, RSASignaturePadding.Pss);
+        var thumbprint = Base64UrlEncoder.Encode(new JsonWebKey(JsonSerializer.Serialize(jwk)).ComputeJwkThumbprint());
+
+        var result = await IsValidAsync($"{signingInput}.{Base64UrlEncoder.Encode(signature)}", thumbprint);
+
+        Assert.Equal(passes, result);
     }
 
     [Fact]
