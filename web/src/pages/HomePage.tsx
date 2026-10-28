@@ -3,15 +3,10 @@ import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { PageLayout } from '../platform/PageLayout'
 import { statusBadge, useServerStatus } from '../platform/serverStatus'
-import { fetchSites, type SiteListItem } from '../platform/site'
+import { fetchSites, siteTitle, type SiteListItem } from '../platform/site'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { usePlatform } from './context'
-
-/** The site title in the current locale, or in the site's first locale when it lacks the current one. */
-function siteTitle(site: SiteListItem, locale: string): string {
-  return site.titles[locale] ?? Object.values(site.titles)[0] ?? site.path
-}
 
 function SiteList() {
   const t = useText()

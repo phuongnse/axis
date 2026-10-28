@@ -22,7 +22,7 @@ _(planned for Mx)_ are not built yet, and Dn refers to [decisions.md](../decisio
   every application of the tenant, and the commands below. It gives no grant on records, data
   sources, tasks or Studio.
 - **Header link.** `GET /api/me` already answers `console: true` for a user who holds the role, while the
-  console stays planned for M18. The header then shows a Console link. A user without the role who opens the route gets a `403`
+  console stays planned for M18. The app switcher then lists the operator console, linked to `/console`. A user without the role who opens the route gets a `403`
   from the API and sees a forbidden page. A signed-out user is sent to sign in.
 - **API.** The console calls routes under `/api/console/`. Each needs a session and the operator
   role, and every write needs the CSRF header, as the other session routes do. They are checked

@@ -55,14 +55,15 @@ test.describe('Studio on a copy of its own', () => {
     }
   })
 
-  test('an author follows the Studio link, searches for a resource and opens it', async ({ page }) => {
+  test('an author opens Studio from the app switcher, searches for a resource and opens it', async ({ page }) => {
     await useSession(page, 'hoa')
     const list = await page.request.get(`${server.url}/api/studio/apps/PurchaseRequests/resources`)
     const { items } = (await list.json()) as { items: { id: string; file: string }[] }
     const entity = items.find((item) => item.file === 'entities/purchase-request.json')!
 
     await page.goto(`${server.url}/`)
-    await page.getByRole('banner').getByRole('link', { name: 'Studio', exact: true }).click()
+    await page.getByRole('banner').getByRole('button', { name: 'Switch to', exact: true }).click()
+    await page.getByRole('menuitem', { name: 'Studio', exact: true }).click()
     // The sample is the only application, so it is picked without a choice.
     await expect(page).toHaveURL(/\/studio\?app=PurchaseRequests$/)
     await page.getByRole('searchbox', { name: 'Search by name or id', exact: true }).fill('PurchaseRequest')
@@ -608,13 +609,15 @@ test.describe('Studio on a copy of its own', () => {
     await expect(page.getByTestId('studio-graph-node-3')).toHaveAttribute('aria-current', 'true')
   })
 
-  test('someone without the author role sees no Studio link and a forbidden page', async ({ page }) => {
+  test('someone without the author role finds no Studio in the app switcher and sees a forbidden page', async ({ page }) => {
     await useSession(page, 'anna')
 
     await page.goto(`${server.url}/`)
     const banner = page.getByRole('banner')
     await expect(banner.getByRole('button', { name: 'Anna Employee', exact: true })).toBeVisible()
-    await expect(banner.getByRole('link', { name: /studio/i })).toHaveCount(0)
+    await banner.getByRole('button', { name: 'Switch to', exact: true }).click()
+    await expect(page.getByRole('menu', { name: 'Switch to', exact: true })).toBeVisible()
+    await expect(page.getByRole('menuitem', { name: /studio/i })).toHaveCount(0)
     await page.goto(`${server.url}/studio`)
 
     await expect(page.getByTestId('studio-forbidden')).toBeVisible()
