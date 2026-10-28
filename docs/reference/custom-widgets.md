@@ -2,7 +2,7 @@
 
 Detailed reference for custom widgets: React components that an extension package adds to the
 page widgets, how a page names one, how the SPA loads it, the SDK it builds on and how the page
-designer offers it. Everything in this file is _(planned for M17)_. The design follows
+designer offers it. Everything in this file is _(planned for M18)_. The design follows
 [D8](../decisions/d8-custom-ui-widgets-are-packaged-react-components.md) and
 [D88](../decisions/d88-custom-widgets-in-the-designer-palette-and-a-published-sdk.md). How a
 package is installed, versioned and pinned is in [extension packages](extension-packages.md).

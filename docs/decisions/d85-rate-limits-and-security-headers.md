@@ -50,7 +50,7 @@ for the detail. The owner agreed these points on 2026-10-25.
 - **Tests:** an integration test checks the headers and the `Content-Type` on a
   page, a static file and an API response. Another sends requests past a limit and expects the
   `429`.
-- **Later milestones:** routes that M14, M15 and M17 add take a partition from
+- **Later milestones:** routes that M14, M15 and M18 add take a partition from
   the list above. File downloads and custom widget bundles must keep to the
   Content Security Policy.
 

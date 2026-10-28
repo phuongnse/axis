@@ -6,14 +6,14 @@ person sees, and the sign-in screen when nobody is signed in. This page holds th
 endpoints and the widgets are in [frontend](frontend.md), and sign-in and the session in
 [security](security.md#sign-in-and-the-session).
 
-[D98](../decisions/d98-rules-from-the-shell-review.md) agrees everything on this page. None of it is built yet, so
-every section is _(planned)_. Until it is built, the shell is as [frontend](frontend.md) describes it: one header
+[D98](../decisions/d98-rules-from-the-shell-review.md) agrees everything on this page. None of it is built yet: M16 builds
+it, so every section is _(planned for M16)_. Until it is built, the shell is as [frontend](frontend.md) describes it: one header
 with the site's title, its navigation as a horizontal menu, the notification bell, the account button, the locale
 switch and the theme toggle.
 
 ## Layout
 
-_(planned)_
+_(planned for M16)_
 
 - **Header.** One row, 48 px high, on `surface` with a `borderSubtle` rule below it. From the left: the button that
   collapses the sidebar, the site's mark, the site's title, then on the right the notification bell, the app switcher,
@@ -40,7 +40,7 @@ _(planned)_
 
 ## Navigation icons
 
-_(planned)_
+_(planned for M16)_
 
 - A navigation entry of a `site` resource may have an `icon`: one name from a closed list that Axis owns, such as
   `home`, `dashboard`, `list`, `inbox`, `tasks`, `form`, `document`, `folder`, `chart`, `process`, `people`,
@@ -55,7 +55,7 @@ _(planned)_
 
 ## Page header
 
-_(planned)_
+_(planned for M16)_
 
 - Every page of a site starts with a header band on `surface` across the page area, with a `borderSubtle` rule below
   it, over the page's widgets on `canvas`.
@@ -68,7 +68,7 @@ _(planned)_
 
 ## App switcher and preferences
 
-_(planned)_
+_(planned for M16)_
 
 - **App switcher.** An icon button named "Switch to" opens a menu of the person's sites, by title, then the tools of
   their roles: Studio for an author and the operator console for an operator. It replaces the Studio link beside the
@@ -79,7 +79,7 @@ _(planned)_
 
 ## Platform home page
 
-_(planned)_
+_(planned for M16)_
 
 - **Signed in.** The page goes from the highest level to the lowest.
   - A welcome band on `surface`: "Welcome to Axis" and "Open an application below to start working.", and under them
@@ -104,7 +104,7 @@ _(planned)_
 
 ## Session ended
 
-_(planned)_
+_(planned for M16)_
 
 - When a request answers `401` after sign-in, such as once the session has ended at the re-authentication Axis asks
   for every 8 hours, the sign-in dialog is titled "Your session has ended" and reads "Sign in again to continue." It
@@ -112,7 +112,7 @@ _(planned)_
 
 ## Design system previews
 
-_(planned)_
+_(planned for M16)_
 
 - The design system has a seventh group of cards, Shell, after Shared states, with three previews:
   - `shell`: Application site, Navigation collapsed, Form page and Platform site.

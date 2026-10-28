@@ -361,8 +361,8 @@ fixtures, only for the API paths of the fixture application. It needs no server,
   desktop layout.
 - _(planned)_ The cards come in six groups, in this order: Field inputs (each `field-<type>`), Data widgets (`table`,
   `form`, `detail`), Charts and KPIs (each `chart-<kind>`, `kpi`), Process widgets (`taskInbox`,
-  `processInspector`), Containers (`columns`, `tabs`, `section`) and Shared states (`states`). A seventh group, Shell,
-  comes last, see [shell](reference/shell.md#design-system-previews).
+  `processInspector`), Containers (`columns`, `tabs`, `section`) and Shared states (`states`). _(planned for M16)_ A seventh
+  group, Shell, comes last, see [shell](reference/shell.md#design-system-previews).
   `scripts/design-system.sh` writes the card order as the bundle's first line, `/* @ds-bundle: {...} */`, so a sync
   keeps it.
 - `web/design-system.html` is the harness. After `scripts/design-system.sh`, open it from disk. With no

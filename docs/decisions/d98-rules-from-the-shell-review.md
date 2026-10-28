@@ -4,7 +4,7 @@ Status: **Agreed**
 
 The owner reviewed the shell, the platform home page and the sign-in screens in the Design System artifact, one
 change at a time, and agreed these rules on 2026-10-28. [Shell and home page](../reference/shell.md) holds the detail.
-None of it is built yet: the reference docs mark it _(planned)_, and one issue builds it.
+None of it is built yet: one issue in M16 builds it, and the reference docs mark it _(planned for M16)_.
 
 - **Layout:** a 48 px header with the site's mark and title, the notification bell, an app switcher, a language and
   theme menu and the account button; the site's navigation in a sidebar that collapses to a strip of icons, and no

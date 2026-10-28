@@ -26,7 +26,7 @@ An installation has three hosts:
   no HTTP endpoint.
 
 An installation also needs a PostgreSQL 18 server and an OIDC provider. Axis
-does not ship either one for production. _(planned)_ Axis ships its own
+does not ship either one for production. _(planned for M17)_ Axis ships its own
 identity provider, see [Axis's identity provider](identity-provider.md#installation).
 
 Every tenant database needs the `pg_trgm` extension, for
@@ -40,7 +40,7 @@ service may need `pg_trgm` on its list of allowed extensions.
 
 There are three production images: `axis-server`, `axis-worker` and
 `axis-admin`. They hold no sample, no sample extension package, no sample
-module, no development realm and no credential. _(planned for M17)_ A fourth
+module, no development realm and no credential. _(planned for M18)_ A fourth
 image, `axis-package-host`, runs the
 [package runners](extension-packages.md#package-runners) in the
 `package-host` container beside the worker. Compose and the Helm chart give
@@ -115,7 +115,7 @@ Read the rules of each setting in
 ## On premises
 
 This installs Axis on one machine with Docker Compose. PostgreSQL and the OIDC
-provider run elsewhere. _(planned)_ Compose runs
+provider run elsewhere. _(planned for M17)_ Compose runs
 [Axis's identity provider](identity-provider.md#installation). The example lives in `deploy/compose/`. Its
 `compose.yaml` has the server, the worker, the publisher and the admin host. Two
 more services sit under profiles: a TLS proxy and a second server replica, see
@@ -360,7 +360,7 @@ port 443.
 
 This installs Axis on Kubernetes with the Helm chart in `deploy/helm/axis/`.
 PostgreSQL, the OIDC provider and the source of secrets are external.
-_(planned)_ The chart runs [Axis's identity provider](identity-provider.md#installation).
+_(planned for M17)_ The chart runs [Axis's identity provider](identity-provider.md#installation).
 
 The chart has one Deployment for the server and one for the worker, and a
 Service for the server. It also has a Deployment for the publisher, with one

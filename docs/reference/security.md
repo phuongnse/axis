@@ -10,7 +10,7 @@ _(planned for Mx)_ are not built yet, and Dn refers to [decisions.md](../decisio
 
 It follows
 [D23](../decisions/d23-sign-in-through-oidc-and-the-bff-session.md).
-Sign-in, the session, `GET /api/me` and sign-in needed are in place. _(planned)_ Every tenant signs in through
+Sign-in, the session, `GET /api/me` and sign-in needed are in place. _(planned for M17)_ Every tenant signs in through
 [Axis's identity provider](identity-provider.md).
 
 - **Flow.** Sign-in uses the OIDC authorization code flow with PKCE. The
@@ -172,7 +172,7 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place. _(planned)_
   the session row. A role change at the identity provider applies at the next
   sign-in.
 - **Current user.** `GET /api/me` keeps its shape,
-  `{ "id", "displayName", "roles" }`, and reads the session. _(planned)_ It adds a boolean `console`, see the
+  `{ "id", "displayName", "roles" }`, and reads the session. _(planned for M16)_ It adds a boolean `console`, see the
   [platform home page](shell.md#platform-home-page). It adds a boolean
   `studio`, true when `Studio:Folders` is not empty or `Studio:ApplicationsPath` is set, and the user holds
   `Studio:AuthorRole`. See [D38](../decisions/d38-studio-edits-application-folders-through-an-authoring-api.md).

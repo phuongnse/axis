@@ -2,12 +2,13 @@
 
 Axis ships an identity provider of its own, so every tenant's people sign in on one standard Axis page, whatever
 identity provider their organization uses. [D99](../decisions/d99-axis-ships-its-own-identity-provider.md) agrees
-it. None of it is built yet, so every section is _(planned)_. Until it is built, each tenant's `Oidc` block points at
-an identity provider that runs outside Axis, as [security](security.md#sign-in-and-the-session) describes.
+it. None of it is built yet: M17 builds it, so every section is _(planned for M17)_. Until it is built, each
+tenant's `Oidc` block points at an identity provider that runs outside Axis, as
+[security](security.md#sign-in-and-the-session) describes.
 
 ## What it is
 
-_(planned)_
+_(planned for M17)_
 
 - Axis's identity provider is Keycloak with the Axis theme. Every installation runs it beside the server and the
   worker.
@@ -20,7 +21,7 @@ _(planned)_
 
 ## Realms
 
-_(planned)_
+_(planned for M17)_
 
 - Each tenant has one realm of its own, with its people, its sign-in settings, its brokered identity providers and
   the Axis theme. Tenants share nothing in it, as they share no database.
@@ -28,7 +29,7 @@ _(planned)_
 
 ## Accounts and MFA
 
-_(planned)_
+_(planned for M17)_
 
 - A realm may hold accounts of its own, for an organization with no identity provider. Each tenant turns them on or
   off. With them off, the sign-in page shows only the organization's own identity providers.
@@ -38,7 +39,7 @@ _(planned)_
 
 ## Direct sign-in
 
-_(planned)_
+_(planned for M17)_
 
 - Every tenant signs in through Axis's identity provider. An `Oidc` block that points straight at an organization's
   identity provider stays supported only while that tenant moves to Axis's identity provider, so the platform keeps one
@@ -46,7 +47,7 @@ _(planned)_
 
 ## Theme
 
-_(planned)_
+_(planned for M17)_
 
 - Every page of Axis's identity provider has one frame: the Axis mark above one card in the middle of the page on
   `canvas`, and below it the language links and "© <year> Axis". It follows light and dark mode and the Axis tokens and
@@ -65,7 +66,7 @@ _(planned)_
 
 ## Installation
 
-_(planned)_
+_(planned for M17)_
 
 - Docker Compose, the Helm chart and the on-premises install run Axis's identity provider with its own database on the
   PostgreSQL server, behind the same TLS proxy as the server. The operator upgrades it with Axis.

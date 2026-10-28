@@ -23,7 +23,7 @@ limit on these retries yet" of event delivery.
   time, at most one hour. After `Worker:DeliveryAttempts` failures, default 5,
   the worker writes a dead letter and carries on with the rest. The other
   triggers of the occurrence still get it.
-- **Dead letter:** one row in `axis.dead_letters`, generic by `kind`, so M17's
+- **Dead letter:** one row in `axis.dead_letters`, generic by `kind`, so M18's
   outbound webhooks can reuse it. It names what failed, the attempts, the last
   error as a fixed text with no value, and a state: `open`, `redelivered` or
   `discarded`.
