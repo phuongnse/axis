@@ -98,5 +98,5 @@ export function createStarter(kind: string, options: StarterOptions): Record<str
   if (kind === 'site') {
     body.path = kebabName(options.name)
   }
-  return Object.assign(body, content)
+  return { ...body, ...content }
 }

@@ -19,6 +19,9 @@ node scripts/check-locators.mjs
 # The SPA shows every value as text and never writes one into the page as HTML (ASVS V1.2.1, V3.2.2).
 node scripts/check-raw-html.mjs
 
+# The SPA has no code that a key such as __proto__ can turn into prototype pollution (ASVS V15.3.6).
+node scripts/check-prototype-pollution.mjs
+
 # A test outside a *PerformanceTests class passes or fails the same way on any runner, so it measures
 # no elapsed time. A polling deadline built on DateTime.UtcNow only ends a wait and is allowed.
 if git grep -nE --untracked '(^|[^[:alnum:]_])(Stopwatch|GetElapsedTime)([^[:alnum:]_]|$)|\.Elapsed([^[:alnum:]_]|$)' -- 'tests/*.cs' ':(exclude)tests/*PerformanceTests.cs'; then

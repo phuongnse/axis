@@ -32,6 +32,7 @@ import { LabelTexts } from './LabelTexts'
 import { LabelTextsContext } from './labelTextsContext'
 import { ReferencePicker } from './ReferencePicker'
 import type { ChangeHandler } from './SchemaForm'
+import { setOwn } from '../platform/ownProperty'
 
 const LazyExpressionEditor = lazy(() => import('./ExpressionEditor'))
 
@@ -746,7 +747,7 @@ function CurrencySource({
     const rebuilt: Content = {}
     for (const [key, value] of Object.entries(field)) {
       if (key !== 'currency' && key !== 'currencyField') {
-        rebuilt[key] = value
+        setOwn(rebuilt, key, value)
       }
     }
     if (next === 'field') {
@@ -809,12 +810,12 @@ function ValueLabels({ pointer, field, onChange }: { pointer: string; field: Con
     if (key === undefined) {
       delete merged[value]
     } else {
-      merged[value] = { textKey: key }
+      setOwn(merged, value, { textKey: key })
     }
     const ordered: Content = {}
     for (const name of [...values, ...Object.keys(merged)]) {
       if (Object.hasOwn(merged, name) && !Object.hasOwn(ordered, name)) {
-        ordered[name] = merged[name]
+        setOwn(ordered, name, merged[name])
       }
     }
     onChange(pointer, Object.keys(ordered).length === 0 ? undefined : ordered)

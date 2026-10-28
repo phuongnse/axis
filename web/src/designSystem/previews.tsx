@@ -190,7 +190,9 @@ export const previews: Record<string, readonly PreviewState[]> = {
 
 /** The fixture answers that the states of the previews bring, in one record. */
 export function stateRoutes(all: Record<string, readonly PreviewState[]>): Record<string, () => unknown> {
-  return Object.assign({}, ...Object.values(all).flatMap((states) => states.map((state) => state.routes ?? {})))
+  return Object.fromEntries(
+    Object.values(all).flatMap((states) => states.flatMap((state) => Object.entries(state.routes ?? {}))),
+  )
 }
 
 export const catalogs = [

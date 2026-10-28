@@ -1,4 +1,5 @@
 import type { StudioNameStep } from './studio'
+import { setOwn } from './ownProperty'
 
 /** The step types of a scenario, as `scenario.schema.json` lists them. */
 export const stepTypes = [
@@ -126,7 +127,7 @@ export function changeStepType(step: Step, type: StepType): Step {
     if (key === 'type') {
       next.type = type
     } else if (!isStepProperty(key) || allowed.has(key)) {
-      next[key] = value
+      setOwn(next, key, value)
     }
   }
   if (!Object.hasOwn(next, 'type')) {

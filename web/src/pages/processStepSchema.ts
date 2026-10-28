@@ -1,5 +1,6 @@
 import type { JsonSchema } from '../platform/studioSchemas'
 import { requiredStepKeys } from './processPalette'
+import { setOwn } from '../platform/ownProperty'
 
 type Content = Record<string, unknown>
 
@@ -52,13 +53,13 @@ export function withType(step: Content, type: string, schema: JsonSchema): Conte
   const next: Content = {}
   for (const [key, value] of Object.entries(step)) {
     if (!forbidden.has(key)) {
-      next[key] = value
+      setOwn(next, key, value)
     }
   }
   next.type = type
   for (const [key, initial] of Object.entries(structuredClone(requiredStepKeys[type] ?? {}))) {
     if (next[key] === undefined) {
-      next[key] = initial
+      setOwn(next, key, initial)
     }
   }
   return next
