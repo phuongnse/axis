@@ -37,6 +37,8 @@ the frontend React, TypeScript and Ant Design, and the storage PostgreSQL.
 - No application-specific code in the platform. Sample applications live under `samples/apps/`,
   extension packages under `samples/packages/`, modules under `samples/modules/` and templates
   under `samples/templates/`.
+  Built-in modules and applications _(planned for M26)_ will live under `modules/` and
+  `applications/`, see [D102](docs/decisions/d102-built-in-modules-open-to-change-and-bound-by-a-contract.md).
 - Never commit secrets, tokens, local logs or machine snapshots.
 - On GitHub, follow [writing on GitHub](docs/delivery.md#writing-on-github). Name the role that
   acts, never a development user.
