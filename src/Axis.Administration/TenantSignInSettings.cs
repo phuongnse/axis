@@ -6,15 +6,11 @@ using Microsoft.EntityFrameworkCore;
 namespace Axis.Administration;
 
 /// <summary>
-/// The sign-in settings to change. <see langword="null"/> means the option was not given. An empty audience or claim value
+/// The sign-in settings to change. <see langword="null"/> means the option was not given. An empty audience value
 /// removes the stored one. <paramref name="ClientKey"/> is the PEM of a client key to add and <paramref name="RetireClientKeyId"/>
 /// the key id of a client key to remove.
 /// </summary>
 public sealed record TenantSignInChange(
-    string? Authority,
-    string? ClientId,
-    string? ClientSecret,
-    IReadOnlyList<KeyValuePair<string, string>> Claims,
     string? EndpointAudience,
     string? ServiceAudience,
     string? Profile,
@@ -52,35 +48,15 @@ public sealed record TenantSignInResult(
 /// </summary>
 public static class TenantSignInSettings
 {
-    private static readonly string[] _claimNames = ["UserId", "DisplayName", "Roles", "Email", "Locale"];
-
     /// <summary>Returns why the change is refused without reading the directory, or <see langword="null"/> when it is well formed.</summary>
     public static string? Problem(TenantSignInChange change)
     {
         ArgumentNullException.ThrowIfNull(change);
 
-        if (change.Authority is null && change.ClientId is null && change.ClientSecret is null && change.Claims.Count == 0
-            && change.EndpointAudience is null && change.ServiceAudience is null && change.Profile is null
+        if (change.EndpointAudience is null && change.ServiceAudience is null && change.Profile is null
             && change.ClientKey is null && change.RetireClientKeyId is null)
         {
             return "Give at least one sign-in setting.";
-        }
-
-        if (change.Authority is not null
-            && (!Uri.TryCreate(change.Authority, UriKind.Absolute, out var authority)
-                || (authority.Scheme != Uri.UriSchemeHttp && authority.Scheme != Uri.UriSchemeHttps)))
-        {
-            return "--authority must be an absolute http or https URL.";
-        }
-
-        if (change.ClientId is not null && string.IsNullOrWhiteSpace(change.ClientId))
-        {
-            return "--client-id must not be blank.";
-        }
-
-        if (change.ClientSecret is { Length: 0 })
-        {
-            return "The client secret must not be empty.";
         }
 
         if (change.ClientKey is { Length: 0 })
@@ -96,20 +72,6 @@ public static class TenantSignInSettings
         if (change.RetireClientKeyId is not null && string.IsNullOrWhiteSpace(change.RetireClientKeyId))
         {
             return "--retire-client-key must not be blank.";
-        }
-
-        var seen = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var (name, _) in change.Claims)
-        {
-            if (!_claimNames.Contains(name, StringComparer.Ordinal))
-            {
-                return $"The claim name '{name}' is unknown. Use UserId, DisplayName, Roles, Email or Locale.";
-            }
-
-            if (!seen.Add(name))
-            {
-                return $"The claim name '{name}' is given more than once.";
-            }
         }
 
         if (change.Profile is not null && change.Profile is not (TenantSignInProfiles.Standard or TenantSignInProfiles.Fapi2))
@@ -219,16 +181,7 @@ public static class TenantSignInSettings
                 : "Retiring the last client key of a fapi2 tenant is refused.");
         }
 
-        var claims = change.Claims.ToDictionary(claim => claim.Key, claim => claim.Value, StringComparer.Ordinal);
         var changed = new List<string>();
-        AddIf(changed, "authority", change.Authority is not null);
-        AddIf(changed, "clientId", change.ClientId is not null);
-        AddIf(changed, "clientSecret", change.ClientSecret is not null);
-        AddIf(changed, "claimUserId", claims.ContainsKey("UserId"));
-        AddIf(changed, "claimDisplayName", claims.ContainsKey("DisplayName"));
-        AddIf(changed, "claimRoles", claims.ContainsKey("Roles"));
-        AddIf(changed, "claimEmail", claims.ContainsKey("Email"));
-        AddIf(changed, "claimLocale", claims.ContainsKey("Locale"));
         AddIf(changed, "endpointAudience", change.EndpointAudience is not null);
         AddIf(changed, "serviceAudience", change.ServiceAudience is not null);
         AddIf(changed, "profile", change.Profile is not null);
@@ -251,46 +204,6 @@ public static class TenantSignInSettings
         catch (Exception exception)
         {
             return new TenantSignInResult(TenantSignInOutcome.AuditFailed, null, exception, []);
-        }
-
-        if (change.Authority is not null)
-        {
-            row.OidcAuthority = change.Authority;
-        }
-
-        if (change.ClientId is not null)
-        {
-            row.OidcClientId = change.ClientId;
-        }
-
-        if (change.ClientSecret is not null)
-        {
-            row.OidcClientSecret = cipher.Encrypt(tenantId, TenantSecretFields.OidcClientSecret, change.ClientSecret);
-        }
-
-        if (claims.TryGetValue("UserId", out var userId))
-        {
-            row.ClaimUserId = NullIfEmpty(userId);
-        }
-
-        if (claims.TryGetValue("DisplayName", out var displayName))
-        {
-            row.ClaimDisplayName = NullIfEmpty(displayName);
-        }
-
-        if (claims.TryGetValue("Roles", out var roles))
-        {
-            row.ClaimRoles = NullIfEmpty(roles);
-        }
-
-        if (claims.TryGetValue("Email", out var email))
-        {
-            row.ClaimEmail = NullIfEmpty(email);
-        }
-
-        if (claims.TryGetValue("Locale", out var locale))
-        {
-            row.ClaimLocale = NullIfEmpty(locale);
         }
 
         if (change.EndpointAudience is not null)

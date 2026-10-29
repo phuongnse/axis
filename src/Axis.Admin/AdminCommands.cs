@@ -64,7 +64,7 @@ internal static partial class AdminCommands
                tenant suspend <id>
                tenant resume <id>
                tenant rotate-passwords <id>
-               tenant oidc set <id> [--authority <url>] [--client-id <id>] [--client-secret] [--claim <name>=<claim>]... [--endpoint-audience <value>] [--service-audience <value>] [--profile standard|fapi2] [--client-key] [--retire-client-key <kid>]
+               tenant oidc set <id> [--endpoint-audience <value>] [--service-audience <value>] [--profile standard|fapi2] [--client-key] [--retire-client-key <kid>]
                tenant sign-in set <id> --accounts true|false [--provider <name> --type oidc|saml [--issuer <binding>] [--client-id <binding>] [--client-secret <binding>] [--client-key <binding>] [--metadata <binding>] [--claim <name>=<claim>]... [--roles-claim <claim>] [--role <value>=<role>]...]...
                tenant email set <id> --host <host> --from <address> [--port <n>] [--tls true|false] [--user-name <name>] [--password]
                tenant email clear <id>
@@ -476,10 +476,9 @@ internal static partial class AdminCommands
     }
 
     /// <summary>
-    /// <c>tenant oidc set</c>. This only parses, reads the secret and prints. The rules are in <see cref="TenantSignInSettings"/>,
-    /// which refuses before it writes the audit record. The secret comes from <see cref="ClientSecretSetting"/> or the first line
-    /// of standard input, never from an argument, and no message echoes an argument. A client key comes from
-    /// <see cref="ClientKeySetting"/> or the whole of standard input. Both cannot read standard input in one run.
+    /// <c>tenant oidc set</c>. This only parses, reads the client key and prints. The rules are in <see cref="TenantSignInSettings"/>,
+    /// which refuses before it writes the audit record. No message echoes an argument. A client key comes from
+    /// <see cref="ClientKeySetting"/> or the whole of standard input, never from an argument.
     /// </summary>
     private static async Task<int> OidcSetAsync(
         string command,
@@ -533,22 +532,9 @@ internal static partial class AdminCommands
             }
 
             var change = request.Change;
-            var secretVariable = configuration[ClientSecretSetting];
-            var keyVariable = configuration[ClientKeySetting];
-            if (request.WithClientSecret && request.WithClientKey && string.IsNullOrEmpty(secretVariable) && string.IsNullOrEmpty(keyVariable))
-            {
-                error.WriteLine($"Give {ClientSecretSetting} or {ClientKeySetting}, because only one value can come from standard input.");
-                return 2;
-            }
-
-            if (request.WithClientSecret)
-            {
-                var secret = string.IsNullOrEmpty(secretVariable) ? (await input.ReadLineAsync(cancellationToken))?.TrimEnd('\r') : secretVariable;
-                change = change with { ClientSecret = secret ?? "" };
-            }
-
             if (request.WithClientKey)
             {
+                var keyVariable = configuration[ClientKeySetting];
                 var key = string.IsNullOrEmpty(keyVariable) ? await input.ReadToEndAsync(cancellationToken) : keyVariable;
                 change = change with { ClientKey = key };
             }
@@ -597,28 +583,13 @@ internal static partial class AdminCommands
             return null;
         }
 
-        var claims = new List<KeyValuePair<string, string>>();
-        var withSecret = false;
         var withKey = false;
         string? retireKeyId = null;
-        string? authority = null;
-        string? clientId = null;
         string? endpointAudience = null;
         string? serviceAudience = null;
         string? profile = null;
         for (var i = 4; i < args.Length; i++)
         {
-            if (args[i] == "--client-secret")
-            {
-                if (withSecret)
-                {
-                    return null;
-                }
-
-                withSecret = true;
-                continue;
-            }
-
             if (args[i] == "--client-key")
             {
                 if (withKey)
@@ -630,7 +601,7 @@ internal static partial class AdminCommands
                 continue;
             }
 
-            // A value may be empty, which removes an audience or a claim name, but never starts with a second option.
+            // A value may be empty, which removes an audience, but never starts with a second option.
             if (i + 1 >= args.Length || args[i + 1].StartsWith("--", StringComparison.Ordinal))
             {
                 return null;
@@ -639,12 +610,6 @@ internal static partial class AdminCommands
             var value = args[++i];
             switch (args[i - 1])
             {
-                case "--authority" when authority is null:
-                    authority = value;
-                    break;
-                case "--client-id" when clientId is null:
-                    clientId = value;
-                    break;
                 case "--endpoint-audience" when endpointAudience is null:
                     endpointAudience = value;
                     break;
@@ -657,16 +622,6 @@ internal static partial class AdminCommands
                 case "--retire-client-key" when retireKeyId is null:
                     retireKeyId = value;
                     break;
-                case "--claim":
-                    // The usage text never echoes an argument, so a claim name is never printed.
-                    var separator = value.IndexOf('=', StringComparison.Ordinal);
-                    if (separator <= 0)
-                    {
-                        return null;
-                    }
-
-                    claims.Add(new(value[..separator], value[(separator + 1)..]));
-                    break;
                 default:
                     return null;
             }
@@ -674,9 +629,8 @@ internal static partial class AdminCommands
 
         return new OidcSetRequest(
             args[3],
-            withSecret,
             withKey,
-            new TenantSignInChange(authority, clientId, null, claims, endpointAudience, serviceAudience, profile, null, retireKeyId));
+            new TenantSignInChange(endpointAudience, serviceAudience, profile, null, retireKeyId));
     }
 
     private static async Task<int> BackupAsync(
@@ -1820,8 +1774,8 @@ internal sealed record TenantCreateRequest(
     string? PreviewOf,
     IReadOnlyList<KeyValuePair<string, string>> Bindings);
 
-/// <summary><c>tenant oidc set</c>. <paramref name="WithClientSecret"/> says that the secret is to be read, and <paramref name="Change"/> does not hold it yet.</summary>
-internal sealed record OidcSetRequest(string Id, bool WithClientSecret, bool WithClientKey, TenantSignInChange Change);
+/// <summary><c>tenant oidc set</c>. <paramref name="WithClientKey"/> says that the client key is to be read, and <paramref name="Change"/> does not hold it yet.</summary>
+internal sealed record OidcSetRequest(string Id, bool WithClientKey, TenantSignInChange Change);
 
 internal sealed record MigrateRequest(string? Tenant, int Parallel);
 

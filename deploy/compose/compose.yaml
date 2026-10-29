@@ -44,7 +44,7 @@
 #
 # Profiles. `replicas` starts the second server, server-2. `admin` is for `docker compose run --rm admin`. The
 # TLS proxy and the identity provider have no profile, so `docker compose up` starts them.
-# AXIS_OIDC_CLIENT_SECRET  Passes through from the shell to `tenant restore` and `tenant oidc set`. It is never stored here.
+# AXIS_OIDC_CLIENT_SECRET  Passes through from the shell to `tenant restore`. It is never stored here.
 # Studio__Folders__0, Studio__AuthorRole, Studio__PublisherRole  Pass through from the shell to both servers.
 #                       Studio stays off without them.
 x-host: &host

@@ -194,11 +194,7 @@ public sealed class Fapi2SignInTests(KeycloakFixture keycloak, PostgreSqlFixture
         await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
         var id = scenario.NewTenantId();
         Assert.Equal(0, (await scenario.CreateAsync(id, "localhost")).Exit);
-        Assert.Equal(
-            0,
-            (await scenario.RunAsync(
-                ["tenant", "oidc", "set", id, "--authority", authority.ToString(), "--client-id", KeycloakFixture.FapiClientId],
-                extra: AdminScenario.Directory)).Exit);
+        await scenario.PointSignInAsync(id, authority, KeycloakFixture.FapiClientId);
         var oldKey = KeycloakFixture.FapiClientKey("key-1");
         var newKey = KeycloakFixture.FapiClientKey("key-2");
         Assert.True(TenantClientKeys.TryRead(oldKey, out _, out var oldKeyId, out _));
