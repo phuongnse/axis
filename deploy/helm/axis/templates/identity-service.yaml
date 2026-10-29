@@ -1,0 +1,16 @@
+# The management port of Keycloak is for the probes only, so the Service does not expose it.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-identity
+  labels:
+    {{- include "axis.labels" . | nindent 4 }}
+    app.kubernetes.io/component: identity
+spec:
+  type: {{ .Values.identity.service.type }}
+  selector:
+    {{- include "axis.selectorLabels" (dict "root" . "component" "identity") | nindent 4 }}
+  ports:
+    - name: https
+      port: {{ .Values.identity.service.port }}
+      targetPort: https

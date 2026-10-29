@@ -28,7 +28,7 @@ An installation has three hosts:
 An installation also needs a PostgreSQL 18 server. Axis does not ship one for
 production. The Compose example runs Axis's own identity provider, see
 [Axis's identity provider](identity-provider.md#installation), so it needs no
-OIDC provider of its own. The Helm chart _(planned for M17)_ will run it too.
+OIDC provider of its own. The Helm chart runs it too.
 
 Every tenant database needs the `pg_trgm` extension, for
 [search](../decisions/d80-search-more-aggregates-and-query-timeouts.md).
@@ -491,8 +491,9 @@ name `identity`, trusts only `/certs/server-ca.crt` in both places and never ski
 ## In the cloud
 
 This installs Axis on Kubernetes with the Helm chart in `deploy/helm/axis/`.
-PostgreSQL, the OIDC provider and the source of secrets are external.
-_(planned for M17)_ The chart runs [Axis's identity provider](identity-provider.md#installation).
+PostgreSQL and the source of secrets are external. The chart runs
+[Axis's identity provider](identity-provider.md#installation), so it needs no
+OIDC provider of its own.
 
 The chart has one Deployment for the server and one for the worker, and a
 Service for the server. It also has a Deployment for the publisher, with one
@@ -506,9 +507,31 @@ liveness and readiness probe, see
 [health checks](../architecture.md#health-checks). The server's probes use
 HTTPS, and the worker's use plain HTTP. The chart sets
 `Health__Urls` to `http://0.0.0.0:5208` for the worker, so the kubelet can
-reach it. The server alone mounts the Studio volume and gets the Studio and
-forwarded headers settings. The pods run as a non-root user with a read-only root
-file system.
+reach it. The server alone mounts the Studio volume and gets the Studio
+settings. The server and the identity provider get the forwarded headers
+settings. The pods run as a non-root user with a read-only root file system,
+except the identity provider, see below.
+
+**The identity provider.** The chart also has a Deployment and a Service named
+`<release>-identity`. There is no switch to turn them off, as `docker compose up`
+always starts the identity provider too. The Deployment runs one replica of
+Keycloak at `identity.image`, which defaults to the version that development, the
+tests and the Compose example pin. Axis does not cluster Keycloak. It runs
+`start` on HTTPS only, with the certificate of `secrets.identityCertificate`,
+and `identity.hostname` as its public host name. Its database settings and the
+`axis-admin` client secret are secret files, which a small script in the
+container command turns into Keycloak's variables, because Keycloak has no
+`_FILE` variables. The Axis theme and the breached-password list come from
+volumes that you name, see the table. The pod has a startup, liveness and
+readiness probe over HTTPS on Keycloak's management port, 9000. Keycloak
+rebuilds itself at start and writes into its image, so this one container has
+no read-only root file system. The Service has port 443, named `https`, and
+forwards to port 8443. It does not expose the management port. The chart renders no Ingress, so your own
+Ingress sends the identity host to this Service, as it sends the server's host
+to the server Service. Keycloak reads the forwarded headers only from
+`forwardedHeaders.knownProxies` and `knownNetworks`. It sets no proxy headers
+when both are empty. A cluster that runs `tenant create` still needs its own
+Job with the `IdentityProvider__*` settings, which the chart does not render.
 
 **Before the first install.** Create the database roles of
 [On premises](#on-premises). Then create the Kubernetes Secrets. The chart
@@ -520,7 +543,17 @@ kubectl create secret generic axis-platform \
   --from-literal=ConnectionStrings__Platform='<connection string>' \
   --from-literal=ConnectionStrings__PlatformSchema='<connection string>' \
   --from-literal=Platform__SecretKey='<32 bytes in base64>'
+kubectl create secret generic axis-identity \
+  --from-literal=KC_DB_URL='<JDBC URL of the identity provider database>' \
+  --from-literal=KC_DB_USERNAME='<database role>' \
+  --from-literal=KC_DB_PASSWORD='<password>' \
+  --from-literal=IdentityProvider__AdminClientSecret='<client secret of axis-admin>'
 ```
+
+The `axis-identity` Secret holds the four settings of the identity provider, as
+in [Axis's identity provider](identity-provider.md#installation). The JDBC URL
+may name the PostgreSQL authority certificate with `sslrootcert=/db-ca/root.crt`
+when you set `identity.databaseAuthority.volume`.
 
 To let Studio run test scenarios, add
 `--from-literal=Scenarios__ServerConnectionString='<connection string>'` to the
@@ -535,6 +568,13 @@ Secret, from a certificate that your Ingress trusts:
 
 ```sh
 kubectl create secret tls axis-server-tls --cert=tls.crt --key=tls.key
+```
+
+The identity provider also serves HTTPS only. Create a second TLS Secret for the
+DNS name of the identity Service, such as `axis-identity.<namespace>.svc`:
+
+```sh
+kubectl create secret tls axis-identity-tls --cert=tls.crt --key=tls.key
 ```
 
 **Install.** Write a values file that names the Secrets, then run:
@@ -553,15 +593,37 @@ secrets:
     name: axis-platform
   serverCertificate:
     name: axis-server-tls
+  identityDatabaseUrl:
+    name: axis-identity
+  identityDatabaseUsername:
+    name: axis-identity
+  identityDatabasePassword:
+    name: axis-identity
+  identityAdminClientSecret:
+    name: axis-identity
+  identityCertificate:
+    name: axis-identity-tls
+identity:
+  hostname: id.example.com
+  theme:
+    volume:
+      persistentVolumeClaim:
+        claimName: axis-keycloak-theme
+  passwordBlacklists:
+    volume:
+      persistentVolumeClaim:
+        claimName: axis-password-blacklists
 ```
 
 Each pod mounts only the secrets it needs as files in `/run/secrets`. The
-server gets all three, the worker gets the first and the last, and the migrate
-Job and the publisher get the last two. The publisher also gets
+server gets the first three, the worker gets the first and the third, and the migrate
+Job and the publisher get the second and the third. The publisher also gets
 `Scenarios__ServerConnectionString` when `secrets.scenarioServerConnection` is
-set. Neither has an `Admin:ConnectionString`.
+set. Neither has an `Admin:ConnectionString`. The identity provider gets the four
+`axis-identity` files and no other secret, and no other pod gets them.
 The server also mounts the `serverCertificate` Secret read-only at `/server-tls`, and no
-other pod does.
+other pod does. The identity provider mounts the `identityCertificate` Secret
+read-only at `/identity-tls` in the same way.
 Rendering fails with a message that names the value when a `name` is missing.
 The values schema rejects any field in a reference other than `name` and `key`.
 
@@ -577,10 +639,20 @@ The values schema rejects any field in a reference other than `name` and `key`.
 | `studio.folders` | none | Server only. The Studio folders, as paths relative to `/studio`. Each renders as `Studio__Folders__N` with the value `/studio/<path>`. Setting it turns Studio on. |
 | `studio.authorRole`, `studio.publisherRole` | empty | Server only. `Studio__AuthorRole` and `Studio__PublisherRole`. Rendered only when set. Without one, nobody may author or publish. |
 | `studio.persistence` | none | A Kubernetes volume source for the Studio folders, mounted read-write at `/studio` on every server replica. It is required when `studio.folders` is set, and rendering fails with a message that names it when it is missing. On its own it does nothing. The chart creates no claim. With several replicas it needs a `ReadWriteMany` storage class. |
-| `forwardedHeaders.knownProxies`, `forwardedHeaders.knownNetworks` | none | Server only. IP addresses and CIDR ranges of your proxies, rendered as `ForwardedHeaders__KnownProxies__N` and `ForwardedHeaders__KnownNetworks__N`. Empty trusts no proxy. |
+| `forwardedHeaders.knownProxies`, `forwardedHeaders.knownNetworks` | none | Server and identity provider. IP addresses and CIDR ranges of your proxies, rendered on the server as `ForwardedHeaders__KnownProxies__N` and `ForwardedHeaders__KnownNetworks__N`, and on the identity provider as one `KC_PROXY_TRUSTED_ADDRESSES` list with `KC_PROXY_HEADERS=xforwarded`. Empty trusts no proxy, and the identity provider sets no proxy headers. |
 | `server.resources`, `worker.resources`, `migrate.resources` | none | Kubernetes resource requests and limits. |
 | `server.service.type`, `server.service.port` | `ClusterIP`, 443 | The Service of the server. Its port is named `https` and forwards to the server's HTTPS port, 8443. Put your own Ingress in front of it, see [TLS](#tls). |
 | `secrets.serverCertificate` | none, required | Secret `name` of a Kubernetes TLS Secret with `tls.crt` and `tls.key`, for the DNS name of the server Service. It has no `key`. The server serves HTTPS only, and rendering fails with a message that names `secrets.serverCertificate.name` when it is missing. |
+| `identity.image` | `quay.io/keycloak/keycloak:26.4` | The whole image reference of the identity provider. `image.registry` and `image.tag` do not apply to it. |
+| `identity.hostname` | none, required | The public host name of the identity provider, without a scheme. It becomes `KC_HOSTNAME=https://<hostname>`. Rendering fails with a message that names it when it is missing. |
+| `identity.resources` | none | Kubernetes resource requests and limits of the identity provider. |
+| `identity.service.type`, `identity.service.port` | `ClusterIP`, 443 | The Service of the identity provider. Its port is named `https` and forwards to Keycloak's HTTPS port, 8443. Put your own Ingress in front of it. |
+| `identity.theme.volume` | none, required | A Kubernetes volume source with the built Axis theme, the output of `npm run build:keycloak-theme --prefix web`, mounted read-only at `/opt/keycloak/themes`. No release ships the built theme. Rendering fails with a message that names the value when it is missing. |
+| `identity.passwordBlacklists.volume` | none, required | A Kubernetes volume source with the breached-password list of `deploy/keycloak/password-blacklists`, mounted read-only at `/opt/keycloak/data/password-blacklists`. Without it `tenant create` fails at its realm step. Rendering fails with a message that names the value when it is missing. |
+| `identity.databaseAuthority.volume` | empty | Optional. A volume source with `root.crt`, the authority certificate of the PostgreSQL server, mounted read-only at `/db-ca`. A database with a public certificate can use `sslfactory=org.postgresql.ssl.DefaultJavaSSLFactory` in the JDBC URL instead. |
+| `secrets.identityDatabaseUrl`, `secrets.identityDatabaseUsername`, `secrets.identityDatabasePassword` | keys `KC_DB_URL`, `KC_DB_USERNAME`, `KC_DB_PASSWORD` | Identity provider only. Secret `name` and `key` of Keycloak's database settings. All three names are required. |
+| `secrets.identityAdminClientSecret` | key `IdentityProvider__AdminClientSecret` | Identity provider only. Secret `name` and `key` of the `axis-admin` client secret. Required. |
+| `secrets.identityCertificate` | none, required | Secret `name` of a Kubernetes TLS Secret with `tls.crt` and `tls.key`, for the DNS name of the identity Service. It has no `key`. Rendering fails with a message that names `secrets.identityCertificate.name` when it is missing. |
 | `publisher.resources` | none | Kubernetes resource requests and limits of the publisher. |
 | `secrets.scenarioServerConnection` | empty | Publisher only. Secret `name` and `key` of `Scenarios:ServerConnectionString`. The chart mounts it only when it is set. Create the role as in [On premises](#on-premises). |
 | `studio.tests` | `false` | Server only. `true` renders `Studio__Tests`, which turns on `studioTest`. Set it together with `secrets.scenarioServerConnection`. |
@@ -609,7 +681,7 @@ The chart has no Job for them.
 **Checks.** `scripts/lint.sh` runs `helm lint --strict` and validates the
 rendered manifests against the Kubernetes schemas with kubeconform.
 `scripts/helm.test.mjs` renders the chart and checks the probes, the migrate
-Job, the publisher Deployment, the secret references, the Studio volume, the forwarded headers, that the server alone listens on HTTPS with its certificate Secret and is probed over HTTPS, that the Service port is named `https`, that rendering fails without `secrets.serverCertificate.name`, and that the chart renders no Ingress and a `ClusterIP` server Service. `scripts/setup.sh` installs the pinned Helm,
+Job, the publisher Deployment, the secret references, the Studio volume, the forwarded headers, that the server alone listens on HTTPS with its certificate Secret and is probed over HTTPS, that the Service port is named `https`, that rendering fails without `secrets.serverCertificate.name`, and that the chart renders no Ingress and a `ClusterIP` server Service. It also checks that the identity Deployment runs the Keycloak image that the tests pin with `start`, mounts the theme and the password list read-only, has startup, liveness and readiness probes over HTTPS on its management port, and has a Service with port 443 named `https`. It checks that the identity secret files and certificate are mounted in the identity pod only and in no env entry, and that rendering fails, naming the value, without the identity host, the identity certificate, the theme volume or the password-list volume. `scripts/setup.sh` installs the pinned Helm,
 kubeconform and Kubernetes schemas into `~/.cache/axis-tools`. Axis has no test
 against a live cluster.
 
@@ -778,6 +850,14 @@ the third. The server's host port now serves HTTPS.
 With Helm, create the TLS Secret and set `secrets.serverCertificate.name`.
 Rendering fails without it. The Service port is now 443 and named `https`, so
 point your Ingress at it over HTTPS.
+
+**The Helm identity provider.** The chart now also runs the identity provider, so
+an existing install fails to render until you set the new required values:
+`identity.hostname`, `identity.theme.volume`, `identity.passwordBlacklists.volume`,
+`secrets.identityCertificate.name`, and the names of `secrets.identityDatabaseUrl`,
+`secrets.identityDatabaseUsername`, `secrets.identityDatabasePassword` and
+`secrets.identityAdminClientSecret`. Create the `axis-identity` and
+`axis-identity-tls` Secrets first, see [in the cloud](#in-the-cloud).
 
 **No downgrade.** Migrations are not reversed. To roll back, restore the backup
 from step 1 and run the old images.
