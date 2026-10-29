@@ -40,6 +40,10 @@ protocol.
   entry. It carries no signal beyond noise.
 - **A valid token.** It writes no entry of its own. The audit records of the actions it performs
   name the caller.
+- **Alerts** _(planned for M28)_. Each event above is also a metric, and the Helm chart ships alert
+  rules for a spike of refused sign-ins, refused tokens, `403` answers and `429` refusals per
+  tenant, a failing health check and a failed startup check, see
+  [D110](../decisions/d110-security-alerts-and-a-hardening-checklist-for-the-operator.md).
 
 ## Entry metadata and time
 

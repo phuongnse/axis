@@ -116,3 +116,9 @@ files agree, title and status included.
 | [D103](decisions/d103-modules-hold-triggers-scenarios-and-connector-slots.md) | Modules hold triggers, scenarios and connector slots | **Agreed** |
 | [D104](decisions/d104-codeql-and-the-performance-tests-run-every-night.md) | CodeQL and the performance tests run every night | **Agreed** |
 | [D105](decisions/d105-ci-on-main-runs-every-two-hours-and-four-issues-run-at-once.md) | CI on main runs every two hours, and four issues run at once | **Agreed** |
+| [D106](decisions/d106-a-threat-model-kept-current-like-the-asvs-tracking.md) | A threat model kept current like the ASVS tracking | **Agreed** |
+| [D107](decisions/d107-the-dependency-scan-runs-now-and-images-are-scanned-and-signed.md) | The dependency scan runs now, and images are scanned and signed | **Agreed** |
+| [D108](decisions/d108-reporting-a-vulnerability-and-security-fixes.md) | Reporting a vulnerability and security fixes | **Agreed** |
+| [D109](decisions/d109-sensitive-fields-and-backups-are-encrypted-and-history-keeps-no-names.md) | Sensitive fields and backups are encrypted, and history keeps no names | **Agreed** |
+| [D110](decisions/d110-security-alerts-and-a-hardening-checklist-for-the-operator.md) | Security alerts and a hardening checklist for the operator | **Agreed** |
+| [D111](decisions/d111-authentication-by-default-and-the-owner-guards-the-security-checks.md) | Authentication by default, and the owner guards the security checks | **Agreed** |

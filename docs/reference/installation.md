@@ -72,6 +72,10 @@ defaults to `0.0.0-dev`.
   as `pg_dump`, for backup and restore.
 - **Version.** Every image carries the Axis version in the OCI label
   `org.opencontainers.image.version`. `axis-admin version` prints it.
+- **Signed images** _(planned for M28)_. A release workflow publishes the images
+  to the GitHub container registry, each signed with cosign and with a CycloneDX
+  SBOM. Check the signature before an install or an upgrade, see
+  [D107](../decisions/d107-the-dependency-scan-runs-now-and-images-are-scanned-and-signed.md).
 
 ## Settings and secrets
 
@@ -816,7 +820,18 @@ Service port `https`.
 The proxy follows
 [D49](../decisions/d49-several-server-replicas-behind-a-tls-proxy.md).
 
+## Hardening checklist
+
+_(planned for M28)_ A list of every control that the [ASVS](asvs.md) tracking or the threat model
+delegates to the operator, such as disk encryption, malware scanning of uploads and access to the
+logs, with how to meet each one and how to check it. Outside Development, the server and the
+worker warn at start about each item they can see is missing, see
+[D110](../decisions/d110-security-alerts-and-a-hardening-checklist-for-the-operator.md).
+
 ## Upgrade
+
+Only the latest version of Axis gets security fixes, so an operator upgrades to get one, see
+[D108](../decisions/d108-reporting-a-vulnerability-and-security-fixes.md).
 
 An upgrade has a fixed order. A host serves only tenants on its own schema
 version, as [D43](../decisions/d43-tenant-provisioning-and-migrations-across-tenant-databases.md)

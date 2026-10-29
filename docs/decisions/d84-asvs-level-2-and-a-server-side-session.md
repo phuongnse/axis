@@ -58,6 +58,9 @@ for the detail. The owner agreed these points on 2026-10-25.
 - **Sign-off:** the tracking page can start at once. The final pass comes
   last in M16, after M14 and M15 have added their routes, so it covers what
   they built.
+  - [D106](d106-a-threat-model-kept-current-like-the-asvs-tracking.md) adds a
+    threat model, built in M18 before the final pass, because ASVS does not
+    ask what can go wrong in Axis's own design.
 
 _Why:_ an agreed level turns "secure" into a list that a review can check.
 Level 2 matches the data Axis holds, and delegating the account controls
