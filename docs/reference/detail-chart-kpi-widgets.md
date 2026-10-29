@@ -169,8 +169,10 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
   - **Look**. The label sits above, in the field label style of
     the form widget's **Field look**. The measure is below it, large: 24px at
     a 32px line height, weight 600, in tabular figures. The comparison sits
-    under it at body size, with its label muted. An empty measure is a muted
-    "—" with a visually hidden `shell.kpi.empty`, see **Shown values** in
+    under it at body size, with its label muted. _(planned for M18)_ No colon
+    shows between the comparison's label and its value, the value is in
+    tabular figures, and the "—" of an empty measure is weight 400. An empty
+    measure is a muted "—" with a visually hidden `shell.kpi.empty`, see **Shown values** in
     [frontend.md](frontend.md)
     ([D96](../decisions/d96-rules-from-the-design-system-review.md)).
   - **Click and reading**. With a `navigate`, the tile is a link to the target

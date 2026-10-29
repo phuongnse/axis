@@ -244,15 +244,19 @@ _(planned for M17)_
 
 - Every page of Axis's identity provider has one frame: the Axis mark above one card in the middle of the page on
   `canvas`, and below it the language links and "© <year> Axis". It follows light and dark mode and the Axis tokens and
-  fonts, as the SPA does.
+  fonts, as the SPA does. The mark is 32 px with the word "Axis" beside it. The card is at most 400 px wide, on
+  `surface` with a `borderSubtle` border, `radius-base` corners and `spacing-xl` padding. Its title, such as "Sign
+  in", has the organization's name under it in `textMuted`.
 - The sign-in page lists the site's brokered providers first, then "or" and the account form when the site allows
   accounts: email or username, password with "Forgot password?", "Keep me signed in" and a full-width Sign in button.
+  The brokered providers' "Continue with" buttons are secondary buttons. A field's label follows the form widget's
+  [field look](form-widget.md), and "Forgot password?" sits on the right of the password's label.
   "Keep me signed in" keeps the realm's session when the browser closes, never past the 8-hour lifetime of
   [sessions](security.md#session-lifetimes-and-re-authentication).
 - A wrong password keeps the username, marks the password and reads "Invalid email, username or password." above the
   form, never saying which one was wrong.
 - A site that allows one brokered provider and no accounts shows its button alone, under one line that names it.
-- Two-step verification asks for the 6-digit code, with "Try another way" and "Back to sign in".
+- Two-step verification asks for the 6-digit code in six boxes, one digit each, with "Try another way" and "Back to sign in".
 - The theme is built from the SPA's own React components and tokens into a Keycloak theme, so the pages look like the
   rest of Axis. Its texts are message bundles in every locale the platform offers. The "Continue with" labels come
   from the applications' texts.
