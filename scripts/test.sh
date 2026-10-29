@@ -20,8 +20,8 @@ run_suite web web npm test --prefix web -- \
   --reporter=default --reporter=junit --outputFile.junit="$results_dir/web.xml"
 
 # The report, smoke test selection, link check, docs structure check, locator check, raw HTML check, prototype pollution check, bundle budget check,
-# font check, design-system bundle check, dependency scan, setup retries, image build retries, E2E folder
-# comparison, hang guard, dialog and drag helpers, TOTP function, Compose status helper, dev script stop helper and
+# font check, design-system bundle check, dependency scan, setup retries, image build retries, E2E shard
+# split, E2E folder comparison, hang guard, dialog and drag helpers, TOTP function, Compose status helper, dev script stop helper and
 # Helm chart scripts' own tests.
 node --test scripts/test-report.test.mjs || status=1
 node --test scripts/affected.test.mjs || status=1
@@ -36,6 +36,7 @@ node --test scripts/check-design-system.test.mjs || status=1
 node --test scripts/scan.test.mjs || status=1
 node --test scripts/setup.test.mjs || status=1
 node --test scripts/e2e.test.mjs || status=1
+node --test scripts/e2e-shard.test.mjs || status=1
 node --test scripts/smoke.test.mjs || status=1
 node --test scripts/compose-status.test.mjs || status=1
 node --test scripts/dev-stop.test.mjs || status=1
