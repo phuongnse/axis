@@ -123,3 +123,4 @@ files agree, title and status included.
 | [D110](decisions/d110-security-alerts-and-a-hardening-checklist-for-the-operator.md) | Security alerts and a hardening checklist for the operator | **Agreed** |
 | [D111](decisions/d111-authentication-by-default-and-the-owner-guards-the-security-checks.md) | Authentication by default, and the owner guards the security checks | **Agreed** |
 | [D112](decisions/d112-ci-codeql-and-the-performance-tests-run-on-main-every-few-merges.md) | CI, CodeQL and the performance tests run on main every few merges | **Agreed** |
+| [D113](decisions/d113-branches-need-not-be-up-to-date-and-three-issues-run-at-once.md) | Branches need not be up to date, and three issues run at once | **Agreed** |
