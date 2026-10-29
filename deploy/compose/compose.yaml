@@ -27,6 +27,9 @@
 # AXIS_IDENTITY_TLS_DIR The folder with tls.crt and tls.key of the identity provider, issued for the name `identity`,
 #                       mounted read-only at /identity-tls on the identity provider only. UID 1000 must read both
 #                       files. Default ./identity-tls.
+# AXIS_IDENTITY_DB_CA_DIR  The folder with root.crt, the authority certificate of the PostgreSQL server, mounted
+#                       read-only at /db-ca on the identity provider only. The JDBC URL in KC_DB_URL names it with
+#                       sslrootcert=/db-ca/root.crt. UID 1000 must read it. Default ./db-ca.
 # AXIS_IDENTITY_THEME_DIR  The built Axis login theme, the output of `npm run build:keycloak-theme --prefix web`,
 #                       mounted read-only at /opt/keycloak/themes. Default ./keycloak-theme.
 # AXIS_PASSWORD_BLACKLISTS_DIR  The breached-password list that every realm checks, mounted read-only at
@@ -126,6 +129,8 @@ services:
       - ${AXIS_PASSWORD_BLACKLISTS_DIR:-../keycloak/password-blacklists}:/opt/keycloak/data/password-blacklists:ro
       # The certificate and the private key of the identity provider. No other service mounts them.
       - ${AXIS_IDENTITY_TLS_DIR:-./identity-tls}:/identity-tls:ro
+      # The authority certificate of the PostgreSQL server, for sslrootcert in KC_DB_URL. Public, so no secret.
+      - ${AXIS_IDENTITY_DB_CA_DIR:-./db-ca}:/db-ca:ro
     secrets:
       - KC_DB_URL
       - KC_DB_USERNAME

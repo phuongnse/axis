@@ -253,7 +253,10 @@ folder and the files readable by UID 1654, the user the images run as, and the
 files the identity provider reads readable by UID 1000, the user of the Keycloak image. The
 worker never gets `ConnectionStrings__PlatformSchema`. The three `KC_DB_*` files hold Keycloak's
 database settings: a JDBC URL such as
-`jdbc:postgresql://db.example.com:5432/axis_identity?sslmode=verify-full`, the user name and the password.
+`jdbc:postgresql://db.example.com:5432/axis_identity?sslmode=verify-full&sslrootcert=/db-ca/root.crt`, the user name
+and the password. Without `sslrootcert`, the PostgreSQL JDBC driver reads `~/.postgresql/root.crt`, which does not
+exist, and Keycloak does not start. For a PostgreSQL certificate from a public authority, use
+`sslfactory=org.postgresql.ssl.DefaultJavaSSLFactory` instead of `sslrootcert`.
 A small entrypoint script turns each file into the variable of the same name, because Keycloak has no `_FILE`
 variables. Generate the key once
 with `openssl rand -base64 32`. Each connection string sets `SSL Mode=VerifyFull`,
@@ -275,6 +278,10 @@ worker must reach it there too.
   proxy trusts. Compose mounts the folder read-only at `/identity-tls` on the identity provider and on no other
   service. Both files must be readable by UID 1000. Keycloak listens on HTTPS only, on port 8443, and publishes no
   port. The proxy certificate must also cover `AXIS_IDENTITY_HOST`.
+- **The database authority.** Put `root.crt`, the authority certificate of your PostgreSQL server, in
+  `AXIS_IDENTITY_DB_CA_DIR`, which defaults to `./db-ca`. Compose mounts the folder read-only at `/db-ca` on the
+  identity provider and on no other service, and `sslrootcert=/db-ca/root.crt` in `KC_DB_URL` names the file. It
+  must be readable by UID 1000. It is a public certificate, not a secret.
 - **The theme.** Build the Axis theme from the release's source with
   `npm run build:keycloak-theme --prefix web`. Set `AXIS_IDENTITY_THEME_DIR` to the output folder,
   `artifacts/keycloak-theme`. Compose mounts it read-only at `/opt/keycloak/themes`, so sign-in pages show the Axis

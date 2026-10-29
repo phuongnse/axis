@@ -254,11 +254,14 @@ describe('the identity provider', () => {
     assert.equal(mounts(identity, '/identity-tls').length, 1)
     assert.equal(mounts(identity, '/identity-tls')[0].read_only, true)
     assert.equal(mounts(identity, '/identity-tls')[0].source, join(root, 'deploy/compose/identity-tls'))
+    assert.equal(mounts(identity, '/db-ca').length, 1)
+    assert.equal(mounts(identity, '/db-ca')[0].read_only, true)
     assert.equal(mounts(identity, '/opt/keycloak/themes')[0]?.read_only, true)
     assert.equal(mounts(identity, '/opt/keycloak/data/password-blacklists')[0]?.read_only, true)
     for (const [name, service] of Object.entries(services)) {
       if (name === 'identity') continue
       assert.equal(mounts(service, '/identity-tls').length, 0, `${name} mounts the identity certificate folder`)
+      assert.equal(mounts(service, '/db-ca').length, 0, `${name} mounts the identity database authority folder`)
     }
   })
 
@@ -624,7 +627,7 @@ describe('the on-premises installation', () => {
       adminClientSecret = password()
       writeFile(join(secrets, 'IdentityProvider__AdminClientSecret'), adminClientSecret)
       // The identity provider's own database, with the same trust as every other connection.
-      writeFile(join(secrets, 'KC_DB_URL'), 'jdbc:postgresql://postgres:5432/axis_identity?sslmode=verify-full&sslrootcert=/run/test-ca/ca.crt')
+      writeFile(join(secrets, 'KC_DB_URL'), 'jdbc:postgresql://postgres:5432/axis_identity?sslmode=verify-full&sslrootcert=/db-ca/root.crt')
       writeFile(join(secrets, 'KC_DB_USERNAME'), 'axis_identity')
       writeFile(join(secrets, 'KC_DB_PASSWORD'), passwords.identity)
 
@@ -668,6 +671,13 @@ describe('the on-premises installation', () => {
       openssl('req', '-newkey', 'rsa:2048', '-nodes', '-subj', '/CN=identity', '-keyout', join('identity-tls', 'tls.key'), '-out', join('certs', 'identity.csr'))
       openssl('x509', '-req', '-in', join('certs', 'identity.csr'), '-CA', at('ca.crt'), '-CAkey', at('ca.key'), '-CAcreateserial', '-days', '2', '-extfile', 'identity.ext', '-out', join('identity-tls', 'tls.crt'))
       for (const name of readdirSync(identityTls)) chmodSync(join(identityTls, name), 0o644)
+
+      // The identity provider's database authority, which is what AXIS_IDENTITY_DB_CA_DIR names. KC_DB_URL points at root.crt in it.
+      const identityDbCa = join(folder, 'db-ca')
+      mkdirSync(identityDbCa)
+      chmodSync(identityDbCa, 0o755)
+      writeFileSync(join(identityDbCa, 'root.crt'), readFileSync(join(certs, 'ca.crt')))
+      chmodSync(join(identityDbCa, 'root.crt'), 0o644)
 
       // The proxy's folder holds tls.crt and tls.key, which is what AXIS_TLS_DIR names.
       const tls = join(folder, 'tls')
@@ -737,10 +747,10 @@ describe('the on-premises installation', () => {
                 `${serverDir}:${serverCertificateMount}:ro`,
               ],
             },
-            // The example's identity provider also imports the development realm and trusts the test authority for PostgreSQL.
+            // The example's identity provider also imports the development realm.
             identity: {
               command: [...rendered.services.identity.command, '--import-realm'],
-              volumes: [`${realm}:/opt/keycloak/data/import:ro`, `${certs}:/run/test-ca:ro`],
+              volumes: [`${realm}:/opt/keycloak/data/import:ro`],
             },
             server: serverOverride,
             'server-2': serverOverride,
@@ -763,6 +773,7 @@ describe('the on-premises installation', () => {
         AXIS_TLS_DIR: tls,
         AXIS_IDENTITY_HOST: identityHost,
         AXIS_IDENTITY_TLS_DIR: identityTls,
+        AXIS_IDENTITY_DB_CA_DIR: identityDbCa,
         AXIS_IDENTITY_THEME_DIR: join(root, 'artifacts/keycloak-theme'),
         AXIS_SERVER_TLS_DIR: serverTls,
         AXIS_WORKER_HEALTH_PORT: String(workerPort),
