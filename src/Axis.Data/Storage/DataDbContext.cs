@@ -165,6 +165,7 @@ public sealed class DataDbContext(DbContextOptions<DataDbContext> options) : DbC
             session.Property(s => s.LastRequestAt).HasColumnName("last_request_at");
             session.Property(s => s.AuthenticatedAt).HasColumnName("authenticated_at");
             session.Property(s => s.SitePath).HasColumnName("site_path");
+            session.Property(s => s.IdentityProvider).HasColumnName("identity_provider");
         });
 
         modelBuilder.Entity<FileRow>(file =>

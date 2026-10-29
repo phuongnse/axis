@@ -31,6 +31,7 @@ internal static class AuthEndpoints
 
     // Only a local path is a return address, so sign-in can never send the browser to another site.
     private static async Task<IResult> SignInAsync(
+        HttpContext httpContext,
         string? returnUrl,
         ITenantContextAccessor tenants,
         SiteSignIn sites,
@@ -60,6 +61,13 @@ internal static class AuthEndpoints
             if (site.AcrValues is { } acrValues)
             {
                 properties.SetParameter(SiteSignIn.AcrValuesParameter, acrValues);
+            }
+
+            // The realm's own session would sign the person in again through the provider that this site refuses.
+            var current = await httpContext.AuthenticateAsync(Session.Scheme);
+            if (current.Succeeded && !site.Allows(Session.ReadIdentityProvider(current.Principal)))
+            {
+                properties.SetParameter(OpenIdConnectParameterNames.Prompt, "login");
             }
         }
 

@@ -146,8 +146,18 @@ so Studio edits it, with the identity provider editor of [Studio](studio.md), an
   provider the person picks. The realm does not forward `acr_values` to the upstream provider, so the callback check is
   the control. A realm that was synced before this check has no `acr` mappers until its next activation, and a sign-in
   through a provider with a list is refused until then.
-- _(planned for M17)_ **Sign-in once:** a person signed in through a provider at the realm opens another site that allows it without
+- **Sign-in once:** a person signed in through a provider at the realm opens another site that allows it without
   being asked again. A site that does not allow it asks the person to sign in with one it does.
+  - The session row holds the alias of the provider that signed the person in, from the ID token's `identity_provider`
+    claim. A sign-in through accounts holds none, and so does a row from before the column, which counts as accounts.
+  - `GET /api/sites/{path}` and the texts and pages under it answer `401` for a session whose provider the site does not
+    allow. The answer comes after the `401` for no session and before the `404` for an unknown path. The SPA then shows its
+    sign-in card. `GET /api/sites`, the list, is not filtered.
+  - A sign-in for a site adds `prompt=login` when the browser holds a session that the site refuses, so the realm asks for
+    credentials and does not sign the person in again through the refused provider.
+  - A tenant without site clients checks nothing, as its tokens carry no `identity_provider` claim.
+  - The `/api/apps/{app}` data endpoints are not checked yet. They belong to an application, which can have several sites
+    with different sign-in.
 - **A host of its own:** `tenant host add <id> <host> --site <path>` gives a tenant host to one site, see
   [hosts](tenant-setting-commands.md#hosts). Both the command and the serving are built. The `configuration` tenant
   source gives a host to a site with `Tenants:{id}:SiteHosts`, see [host settings](host-settings.md#tenancy-settings).

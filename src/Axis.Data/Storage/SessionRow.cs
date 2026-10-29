@@ -31,4 +31,10 @@ public sealed class SessionRow
     /// created before the column existed.
     /// </summary>
     public string? SitePath { get; init; }
+
+    /// <summary>
+    /// The alias of the identity provider that signed the person in, from the ID token's <c>identity_provider</c> claim. It is null
+    /// for a sign-in through the tenant's accounts and for a session created before the column existed.
+    /// </summary>
+    public string? IdentityProvider { get; init; }
 }
