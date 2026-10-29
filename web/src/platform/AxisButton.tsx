@@ -19,6 +19,8 @@ export type AxisButtonProps =
       nameKey: string
       /** Draws the icon in `dangerText`. */
       destructive?: boolean
+      /** Appended to the accessible name only, such as a row number. The tooltip stays the name. */
+      nameSuffix?: string
     })
 
 /**
@@ -32,7 +34,7 @@ export function AxisButton(props: AxisButtonProps) {
   const { colour } = useDesignTokens()
 
   if (props.role === 'icon') {
-    const { role: _role, nameKey, destructive, icon, style, disabled, ...rest } = props
+    const { role: _role, nameKey, destructive, nameSuffix, icon, style, disabled, ...rest } = props
     const name = t(nameKey)
     const tint: CSSProperties = destructive && !disabled ? { color: colour.dangerText } : {}
     return (
@@ -41,7 +43,7 @@ export function AxisButton(props: AxisButtonProps) {
           {...rest}
           type="text"
           disabled={disabled}
-          aria-label={name}
+          aria-label={nameSuffix ? `${name} ${nameSuffix}` : name}
           icon={<span aria-hidden>{icon}</span>}
           style={{ ...tint, ...style }}
         />
