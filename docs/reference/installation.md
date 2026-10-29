@@ -97,7 +97,7 @@ file.
 | `IdentityProvider:Url` | `IdentityProvider__Url` | admin | no | The base address of Axis's identity provider. `tenant create` of a main tenant creates the tenant's realm there, and so does `tenant restore` of a tenant whose realm is missing. It must be `https`. |
 | `IdentityProvider:AdminClientId` | `IdentityProvider__AdminClientId` | admin | no | The client of the identity provider's `master` realm that `tenant create` signs in as. |
 | `IdentityProvider:AdminClientSecret` | `IdentityProvider__AdminClientSecret` | admin | yes | The secret of that client. Only `tenant create` of a main tenant and `tenant restore` read it. |
-| none | `AXIS_OIDC_CLIENT_SECRET` | admin | yes | The OIDC client secret of a restored tenant that keeps the archive's sign-in, which a restore under a new realm does not need. `tenant restore` and `tenant oidc set --client-secret` read it. `tenant create` does not. |
+| none | `AXIS_OIDC_CLIENT_SECRET` | admin | yes | The OIDC client secret of a restored tenant that keeps the archive's sign-in, which a restore under a new realm does not need. `tenant restore` reads it. `tenant create` does not. |
 | `Scenarios:ServerConnectionString` | `Scenarios__ServerConnectionString` | publisher | yes | Optional. A database role with `CREATEDB`, not a superuser, that owns no tenant database. It lets the publisher run `test` requests. Empty by default, and a `test` request then fails with `AXC0217`, which names the setting. See [On premises](#on-premises). |
 | `Studio:Tests` | `Studio__Tests` | server | no | Optional. `true` turns on `studioTest`, which shows the test controls in Studio. Off by default. Turn it on together with the publisher's `Scenarios:ServerConnectionString`. |
 | `Extensions:Path` | `Extensions__Path` | server, worker, admin | no | Set to `/extensions`. |
@@ -319,9 +319,8 @@ the admin container only.
    `https://<AXIS_IDENTITY_HOST>/` and sets the admin client id `axis-admin`, so you set no shell variable. The
    admin client secret is the `IdentityProvider__AdminClientSecret` file, so it is in no
    command line. Every `admin` run needs that file, because Compose refuses to start a service whose secret file is
-   missing. A new realm has no accounts and no redirect addresses yet, so until a later part of M17 adds them, point
-   the tenant at an identity provider that has its users with `tenant oidc set`, see
-   [sign-in settings](tenant-setting-commands.md#sign-in-settings).
+   missing. A new realm has no accounts and no redirect addresses yet, so until a later part of M17 adds them, add
+   them to the realm in the identity provider yourself.
 5. Activate an application with
    `docker compose run --rm admin activate /apps/<folder>`.
 
@@ -396,8 +395,7 @@ states. It is the only way to reach the identity provider. It routes by host: re
 - **Upgrading an existing install.** `docker compose up` now starts the proxy and the identity provider, because the
   `proxy` profile is gone. An install that started the proxy with `--profile proxy` keeps working. Before the
   upgrade, set `AXIS_IDENTITY_HOST`, create the `axis_identity` role and database, write the three `KC_DB_*` files,
-  and put the identity certificate in place. Then point each tenant's sign-in at its realm there, or keep your
-  own OIDC provider with `tenant oidc set`. The admin host no longer reads `IdentityProvider__Url` and
+  and put the identity certificate in place. Then point each tenant's sign-in at its realm there. The admin host no longer reads `IdentityProvider__Url` and
   `IdentityProvider__AdminClientId` from the shell.
 - **An existing install.** The network gains fixed address settings, and
   Compose does not change an existing network in place. Run
@@ -453,14 +451,14 @@ operator uses it. The test then:
    `psql`, and checks that the installed publisher runs both to `succeeded`.
    The publisher's log shows `one claim ok` and `two claim ok`, and the
    `publisher` service is still running.
-8. Runs `tenant oidc set one` to point tenant `one` back at the development realm, because a new realm has no
-   users, and waits for the next refresh. Starts the second replica, with a proxy certificate and a
+8. Adds a redirect address, a `roles` mapper, the four client roles and the accounts `requester` and `author` to
+   the realm of tenant `one` through the identity provider's admin API, because a new realm has none. Starts the second replica, with a proxy certificate and a
    server certificate from the test's authority, and that authority's certificate
    as `server-ca.crt`. Checks that a plain HTTP request to a server port gets no
    HTTP response, and that the servers answer on their own ports over HTTPS for the
    name `servers`. Signs an employee in through the proxy over HTTPS with plain
-   HTTP requests, posting the Axis theme's login form to its `loginAction`. Checks that the
-   redirect carries `redirect_uri=https://one.axis.test/api/auth/callback` even
+   HTTP requests, in the realm of tenant `one`, posting the Axis theme's login form to its `loginAction`. Checks that the
+   redirect goes to `/realms/one/protocol/openid-connect/auth` and carries `redirect_uri=https://one.axis.test/api/auth/callback` even
    when the client sends its own `X-Forwarded-Proto` and `X-Forwarded-Host`,
    that every `__Host-Axis.Session` cookie is `Secure` with `Path=/` and no domain, and that `GET /api/me`
    answers `200`. Then restarts `server` and checks that `GET /api/me` with the

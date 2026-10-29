@@ -7,7 +7,7 @@ its people sign in and each site pick from that. M17 builds it, and each section
 `identityProvider` resource, a site's `signIn` and their compile checks are built, and so is the tenant's realm that
 `tenant create` makes. Activation checks the bindings of `oidc` providers and refuses providers that would split a person. Sign-in does
 not read them yet, activation updates the realm, and a new realm has no accounts, no redirect addresses and no role mappings, so until they do, a tenant signs in through an identity provider that runs outside
-Axis, which `tenant oidc set` points its `Oidc` block at, as [security](security.md#sign-in-and-the-session) describes. Accounts, roles given by an administrator and the
+Axis when its `Oidc` block points there, as [security](security.md#sign-in-and-the-session) describes. No command points the block at another provider. Accounts, roles given by an administrator and the
 users page are in [user administration](user-administration.md).
 
 ## What it is
