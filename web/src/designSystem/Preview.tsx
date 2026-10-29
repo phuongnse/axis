@@ -14,8 +14,8 @@ function Canvas({ children }: { children: ReactNode }) {
 }
 
 /**
- * A frame of a fixed height, which the shell fills. Its popups open inside it, and the transform keeps a dialog's
- * mask inside it too, so several states fit one card.
+ * A frame at least as tall as its height, which the shell fills and which grows to hold the whole shell. Its popups
+ * open inside it, and the transform keeps a dialog's mask inside it too, so several states fit one card.
  */
 function Frame({ height, children }: { height: number; children: ReactNode }) {
   const { colour } = useDesignTokens()
@@ -25,8 +25,7 @@ function Frame({ height, children }: { height: number; children: ReactNode }) {
       ref={setFrame}
       style={
         {
-          height,
-          overflow: 'auto',
+          minHeight: height,
           position: 'relative',
           transform: 'translateZ(0)',
           border: `1px solid ${colour.borderSubtle}`,

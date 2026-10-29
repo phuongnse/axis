@@ -94,5 +94,10 @@ export function antThemeFor(mode: ThemeMode, page?: PageTokenValues, reducedMoti
   }
 }
 
+/** The tint Ant Design gives a selected item. Dropdown menus draw their selected item on it, so Axis reads it here. */
+export function selectedItemTint(mode: ThemeMode): string {
+  return theme.getDesignToken(antThemeFor(mode)).controlItemBgActive
+}
+
 /** Table cells hold form items that need no space below them, as the table rows already space the inputs. */
 export const compactFormTheme: ThemeConfig = { components: { Form: { itemMarginBottom: 0 } } }

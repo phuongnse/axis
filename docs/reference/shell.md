@@ -18,7 +18,7 @@ cards, which is _(planned)_.
   collapses the sidebar, the site's mark, the site's title, then on the right the notification bell, the app switcher,
   the language and theme menu and the account button. The mark is the first letter of the site's title on a
   `primary` tile with `radius-base` corners. The mark and the title are one link to the site's first navigation page.
-  The header's items are centred by its flex row, never by its line height. _(planned for M18)_ The header has
+  The header's items are centred by its flex row, never by its line height. The header has
   `spacing-md` padding at its sides, and the items on its right are `spacing-sm` apart. The collapse button, the app
   switcher and the language and theme button are icon-only buttons, so each shows its name as a tooltip on hover and
   on keyboard focus, see [buttons](frontend.md).
@@ -38,7 +38,7 @@ cards, which is _(planned)_.
   `surface` with a `borderSubtle` rule above it. On the left it reads "© <year> Axis", then " · v<version>" for a
   signed-in person only, as in "© 2026 Axis · v0.1.0". On the right it shows the server's readiness, "Server status"
   and a dot with Ready, Checking or Unavailable, so everyone sees when the server is unavailable. An anonymous visitor
-  never sees the version, because it tells an attacker which known weaknesses to try. _(planned for M18)_ The footer
+  never sees the version, because it tells an attacker which known weaknesses to try. The footer
   has `spacing-xs` padding above and below and `spacing-lg` at its sides. Its text is in `textMuted`, and the
   readiness reads "Server status:" with the dot and the word after it. In a design system preview, each state's
   frame shows the whole shell, from the header to the footer.
@@ -60,7 +60,7 @@ cards, which is _(planned)_.
 
 - Every page of a site starts with a header band on `surface` across the page area, with a `borderSubtle` rule below
   it, over the page's widgets on `canvas`.
-- The band holds the breadcrumb, then the page title in `heading4`. _(planned for M18)_ It has `spacing-lg` padding
+- The band holds the breadcrumb, then the page title in `heading4`. It has `spacing-lg` padding
   above and at its sides, `spacing-md` below the title, and `spacing-xs` between the breadcrumb and the title. The breadcrumb starts at the site and ends at the
   page: "Purchase requests › Requests". A form page opened from a table names that table's navigation page between
   them, "Purchase requests › Requests › New request", and its link returns to the table with its paging and sorting.
@@ -74,10 +74,10 @@ cards, which is _(planned)_.
 
 - **App switcher.** An icon button named "Switch to" opens a menu of the person's sites, by title, then the tools of
   their roles: Studio for an author, the operator console for an operator and Users for an administrator. It replaces the Studio link beside the
-  account button. With nobody signed in it is not shown. _(planned for M18)_ The menu shows the sites under the
+  account button. With nobody signed in it is not shown. The menu shows the sites under the
   heading "Sites" and the tools under the heading "Tools".
 - **Language and theme.** An icon button named "Language and theme" opens one menu with the site's languages and the
-  light and dark themes, the current ones selected. _(planned for M18)_ Its icon is a settings gear. The current
+  light and dark themes, the current ones selected. Its icon is a settings gear. The current
   language and theme are drawn selected, in `primaryText` on a `primary` tint, not only marked for assistive
   technology, and a divider separates the languages from the themes. It replaces the locale switch and the theme toggle in the header,
   for signed-in people and for nobody signed in alike. At narrow width it sits in the Menu panel, while the app
@@ -93,19 +93,19 @@ cards, which is _(planned)_.
     the tools of the person's roles, Studio for an author ("Build and publish applications."), the operator console
     for an operator ("See what failed and run the commands that fix it.") and Users for an administrator ("Invite
     people and give them roles."), each a tile with its icon beside its title
-    and description, aligned to the top. _(planned for M18)_ The band is a panel inside the page area, on `surface`
+    and description, aligned to the top. The band is a panel inside the page area, on `surface`
     with a `borderSubtle` border, `radius-base` corners and `spacing-lg` padding, not a band across the page. Each
     tool tile is a panel too, with `spacing-md` padding, and its icon is white on a 32 px `primary` square.
   - "Applications" with their number, then one card per application across the page, in title order: the
     application's mark, its title and the number of its sites, over its sites. Each site is a row with its mark and
-    title that opens the site, with no icon after it. _(planned for M18)_ The number of applications is plain text in
+    title that opens the site, with no icon after it. The number of applications is plain text in
     `textMuted`. Each card is a panel like the welcome band, with `spacing-md` padding. Its header row holds the
     application's 32 px mark, its title in `heading5` and, on the right, the number of its sites in `textMuted`, with
     a `divider` rule under it. A site row has `spacing-xs` padding, its 24 px mark and its title in `text`.
   - Tools and sites share one grid of three columns, so their columns line up. Below 992 px it is one column.
 - **Signed out.** The home page is the sign-in screen: one card in the middle of the page with the Axis mark, "Sign in
   to Axis", "You sign in at your organization's sign-in page, then come back here." and a full-width Sign in button.
-  _(planned for M18)_ The card is a panel like the welcome band, at most 420 px wide, with `spacing-xl` padding, a
+  The card is a panel like the welcome band, at most 420 px wide, with `spacing-xl` padding, a
   48 px mark and the explanation in `textMuted`. The header shows no second Sign in button there. Nothing starts sign-in until the person clicks it. The page shows
   the card when `GET /api/me` or `GET /api/sites` answers `401`.
 - **Refused sign-in.** `/?signIn=failed` shows the same card, with the warning "Sign-in did not complete. Try again."
@@ -134,5 +134,6 @@ cards, which is _(planned)_.
   - `identitySignIn`: the sign-in page of [Axis's identity provider](identity-provider.md#theme), in Sign in, Wrong
     password, Organization sign-in only and Two-step verification. It is built from fixtures through the shared sign-in components in `web/src/identitySignIn/`, and Two-step
     verification stays a preview-only state.
-- A shell preview draws the shell in a frame of its own height, so several states fit one card.
+- A shell preview draws the shell in a frame at least as tall as its height, which grows to hold the whole shell, so
+  several states fit one card.
 - See [widget previews](../development.md#widget-previews).
