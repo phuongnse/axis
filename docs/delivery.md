@@ -97,6 +97,11 @@ with the reasons. What each one does is in NexKit's
   on a branch that is up to date, and no approval from a person. They do not require the CI workflow, which
   runs on pushes to `main` and to hand-made branches but not on NexKit's
   branches. NexKit's checks run the same scripts there.
+  - [D111](decisions/d111-authentication-by-default-and-the-owner-guards-the-security-checks.md) adds one approval, by a hand-made `.github/CODEOWNERS` and
+    a rule the owner sets: a pull request that touches the files that define
+    the security checks needs the owner's review. NexKit cannot merge it, so it
+    waits, and the owner approves and merges it. The owner checks one thing:
+    whether the change adds an exception to a check, or loosens one, and why.
 - **There is no push token.** NexKit pushes with the Actions token, so it
   cannot push a merge that brings changes to `.github/workflows/`. The hourly
   driver merges those by hand.
@@ -326,6 +331,10 @@ The steps for a requested change, a design review and a sync are in the
   false fixes it in the same change. The rule is in the
   [AGENTS.md working rules](../AGENTS.md#working-rules), so the NexKit review
   applies it to every pull request.
+- **The threat model follows new trust boundaries** _(planned for M18)_. A
+  change that adds a new kind of route, host, caller, stored secret or
+  integration updates the threat model in the same change, and each docs sweep
+  reviews it, see [D106](decisions/d106-a-threat-model-kept-current-like-the-asvs-tracking.md).
 - **Rules and reasons, not incident history.** Docs state each rule and why
   it exists. They do not retell incidents or cite issue or pull request
   numbers as examples. That history belongs in issues, pull requests and git.

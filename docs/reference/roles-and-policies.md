@@ -336,6 +336,13 @@ user:
   grants cover it.
 - **Default.** `sensitive` defaults to `false`. It changes no table, so adding
   or removing it needs no migration.
+- **Encrypted at rest** _(planned for M27)_. The value is stored encrypted under
+  its tenant's data key, and adding or removing the flag encrypts or decrypts the
+  stored values in a migration. A filter, sort, aggregate, index, `unique`, stored
+  computed field or expression that runs as SQL on the field is a compile error,
+  and a field that declares an exact lookup may be filtered for equality. The
+  record API still shows the field to users whose grants cover it. See
+  [D109](../decisions/d109-sensitive-fields-and-backups-are-encrypted-and-history-keeps-no-names.md).
 - **Allowed fields.** `sensitive` is allowed on every type except
   `child-collection`, and on the fields of a child entity. On a
   `child-collection` field it is `AXC0013` at `/fields/{i}/sensitive`. A value

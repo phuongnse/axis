@@ -44,6 +44,20 @@ describe('the icon-only button', () => {
     expect(await screen.findByRole('tooltip')).toHaveTextContent(/^Add a row$/)
   })
 
+  it('draws a plain icon borderless and a joined icon as a bordered default button', () => {
+    renderIn(
+      'light',
+      <>
+        <AxisButton role="icon" icon={<PlusOutlined />} nameKey="test.add" />
+        <AxisButton role="icon" joined icon={<PlusOutlined />} nameKey="test.add" />
+      </>,
+    )
+
+    const [plain, joined] = screen.getAllByRole('button', { name: 'Add a row' })
+    expect(plain).toHaveClass('ant-btn-variant-text')
+    expect(joined).toHaveClass('ant-btn-color-default', 'ant-btn-variant-outlined')
+  })
+
   it('draws a destructive icon in dangerText', () => {
     renderIn('dark', <AxisButton role="icon" destructive icon={<PlusOutlined />} nameKey="test.add" />)
 
