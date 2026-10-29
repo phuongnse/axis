@@ -325,8 +325,8 @@ The steps for a requested change, a design review and a sync are in the
   applies it to every pull request.
 - **The threat model follows new trust boundaries** _(planned for M18)_. A
   change that adds a new kind of route, host, caller, stored secret or
-  integration updates the threat model in the same change, and each docs sweep
-  reviews it, see [D106](decisions/d106-a-threat-model-kept-current-like-the-asvs-tracking.md).
+  integration updates [the threat model](reference/threat-model.md) in the same change, and each docs
+  sweep reviews it, see [D106](decisions/d106-a-threat-model-kept-current-like-the-asvs-tracking.md).
 - **Rules and reasons, not incident history.** Docs state each rule and why
   it exists. They do not retell incidents or cite issue or pull request
   numbers as examples. That history belongs in issues, pull requests and git.
