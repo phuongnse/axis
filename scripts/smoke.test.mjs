@@ -42,7 +42,15 @@ function runSmoke({ changed, failing = [] } = {}) {
 
     const env = { ...process.env, PATH: `${bin}:${process.env.PATH}`, FAKE_CHANGED: changed ?? '' }
     // NODE_TEST_CONTEXT would make each suite's node --test skip its file.
-    for (const name of ['NODE_TEST_CONTEXT', 'NEXKIT_BASE_SHA', 'GITHUB_ACTIONS', 'GITHUB_STEP_SUMMARY', 'AXIS_TEST_RESULTS_DIR']) {
+    for (const name of [
+      'NODE_TEST_CONTEXT',
+      'NEXKIT_BASE_SHA',
+      'NEXKIT_VERIFIED_SHA',
+      'NEXKIT_CHECK_VERIFIED_SHA',
+      'GITHUB_ACTIONS',
+      'GITHUB_STEP_SUMMARY',
+      'AXIS_TEST_RESULTS_DIR',
+    ]) {
       delete env[name]
     }
     if (changed !== undefined) env.NEXKIT_BASE_SHA = 'abc'

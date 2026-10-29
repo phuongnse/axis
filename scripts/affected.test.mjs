@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { after, before, describe, test } from 'node:test'
-import { changedPaths, decideSafe, matches, safeSuites } from './lib/affected.mjs'
+import { changedPaths, decideSafe, matches, safeSuites, sinceCommit } from './lib/affected.mjs'
 
 const unreachable = () => assert.fail('The changed paths should not be listed.')
 const smoke = ['dev-script', 'compose', 'images', 'onprem']
@@ -84,6 +84,26 @@ describe('decideSafe', () => {
 
   test('runs every smoke suite when a docs change also touches another path', () => {
     for (const name of smoke) assert.equal(runs(name, ['docs/x.md', 'compose.yaml']), true, name)
+  })
+})
+
+describe('sinceCommit', () => {
+  test("prefers the check's own passed commit, then the last green round, then the merge base", () => {
+    const all = { NEXKIT_CHECK_VERIFIED_SHA: 'check', NEXKIT_VERIFIED_SHA: 'round', NEXKIT_BASE_SHA: 'base' }
+    assert.deepEqual(sinceCommit(all), { name: 'NEXKIT_CHECK_VERIFIED_SHA', sha: 'check' })
+    assert.deepEqual(sinceCommit({ ...all, NEXKIT_CHECK_VERIFIED_SHA: '' }), {
+      name: 'NEXKIT_VERIFIED_SHA',
+      sha: 'round',
+    })
+    assert.deepEqual(sinceCommit({ NEXKIT_BASE_SHA: 'base' }), { name: 'NEXKIT_BASE_SHA', sha: 'base' })
+  })
+
+  test('gives no commit outside NexKit', () => {
+    assert.equal(sinceCommit({}), undefined)
+    assert.equal(
+      sinceCommit({ NEXKIT_CHECK_VERIFIED_SHA: '', NEXKIT_VERIFIED_SHA: '', NEXKIT_BASE_SHA: '' }),
+      undefined,
+    )
   })
 })
 
@@ -215,6 +235,9 @@ exit 0
       FAKE_DOCKER_LOG: path.join(dir, 'docker-calls'),
       FAKE_DOTNET_LOG: path.join(dir, 'dotnet-calls'),
     }
+    // A run inside a NexKit check inherits its commits, which would decide in place of the fake base.
+    delete env.NEXKIT_CHECK_VERIFIED_SHA
+    delete env.NEXKIT_VERIFIED_SHA
     delete env.GITHUB_ACTIONS
     delete env.GITHUB_STEP_SUMMARY
   })
@@ -230,6 +253,17 @@ exit 0
     for (const suite of suites) {
       assert.ok(result.stdout.includes(`${suite} (skipped: not affected by this change)`), suite)
     }
+  })
+
+  test("integration.sh skips for a web/src change since the check's own passed commit alone", () => {
+    const result = run('scripts/integration.sh', 'web/src/x.ts', {
+      NEXKIT_BASE_SHA: '',
+      NEXKIT_CHECK_VERIFIED_SHA: 'def',
+    })
+
+    assert.equal(result.status, 0, result.stdout + result.stderr)
+    assert.ok(result.stdout.includes('Axis.Integration.Tests (skipped: not affected by this change)'), result.stdout)
+    assert.match(result.stderr, /since def \(NEXKIT_CHECK_VERIFIED_SHA\)/)
   })
 
   test('integration.sh leaves the performance tests out under NexKit', () => {
