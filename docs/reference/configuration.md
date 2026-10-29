@@ -632,11 +632,11 @@ flowchart LR
      - A key in `values` that names no field of the record's entity is
        `AXC0183` at `/steps/{i}/values/{key}`. The path continues into a child
        collection as `{key}/{n}/{key}`. A value that does not fit its field's
-       type is `AXC0189` at the same path. A reference must be a UUID and an
-       enum value must be one of the field's values. A child collection must be
-       an array of objects. `null` fits every type, and computed and read-only
-       fields are not refused, because a scenario may test that the record API
-       refuses a value.
+       type is `AXC0189` at the same path. A reference or references item is a
+       UUID or the alias of an earlier step's record of the target entity. An
+       enum value is one of the field's values. A child collection is an array
+       of objects. `null` fits every type, and computed and read-only fields
+       are not refused, as a scenario may test that the record API refuses one.
      - A `process` of `startProcess` or `expectInstance` that names no loaded
        process, or a process over another entity than the record's, is
        `AXC0184` at `/steps/{i}/process`. A `step` of `expectInstance` that

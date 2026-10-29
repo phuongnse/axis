@@ -422,6 +422,58 @@ public sealed class ScenarioCompilerTests
         Assert.NotEmpty(result.Diagnostics);
     }
 
+    [Fact]
+    public void A_reference_value_is_a_UUID_or_the_alias_of_an_earlier_step_of_the_target_entity()
+    {
+        using var folder = SampleCopy()
+            .With("entities/scenario-tag.json", """
+                { "id": "5a1c0e01-0000-4000-8000-000000000001", "kind": "entity", "name": "ScenarioTag", "formatVersion": 1,
+                  "displayField": "name", "fields": [{ "name": "name", "type": "text" }] }
+                """)
+            .With("entities/scenario-card-line.json", """
+                { "id": "5a1c0e01-0000-4000-8000-000000000002", "kind": "entity", "name": "ScenarioCardLine", "formatVersion": 1,
+                  "fields": [{ "name": "tag", "type": "reference", "target": "ScenarioTag" }] }
+                """)
+            .With("entities/scenario-card.json", """
+                { "id": "5a1c0e01-0000-4000-8000-000000000003", "kind": "entity", "name": "ScenarioCard", "formatVersion": 1,
+                  "fields": [
+                    { "name": "tag", "type": "reference", "target": "ScenarioTag" },
+                    { "name": "tags", "type": "references", "target": "ScenarioTag" },
+                    { "name": "lines", "type": "child-collection", "target": "ScenarioCardLine" }
+                  ] }
+                """)
+            .With(ScenarioFile, Scenario("""
+                "users": { "requester": ["employee"] },
+                "steps": [
+                  { "type": "createRecord", "entity": "Department", "as": "requester", "save": "dept", "values": {} },
+                  { "type": "createRecord", "entity": "ScenarioTag", "as": "requester", "save": "t", "values": {} },
+                  { "type": "createRecord", "entity": "PurchaseRequest", "as": "requester", "values": { "supplier": "dept", "department": "later" } },
+                  { "type": "createRecord", "entity": "PurchaseRequest", "as": "requester", "save": "self", "values": { "department": "self" } },
+                  { "type": "createRecord", "entity": "PurchaseRequest", "as": "requester", "values": { "department": "dept", "supplier": "6f9619ff-8b86-d011-b42d-00c04fc964ff" } },
+                  { "type": "createRecord", "entity": "ScenarioCard", "as": "requester", "save": "card",
+                    "values": { "tag": "t", "tags": ["t", "ghost", "6f9619ff-8b86-d011-b42d-00c04fc964ff", 5], "lines": [{ "tag": "t" }, { "tag": "dept" }] } },
+                  { "type": "updateRecord", "record": "card", "as": "requester", "values": { "tags": "t", "tag": null } },
+                  { "type": "expectRecord", "record": "card", "values": { "tag": "t", "tags": [] } },
+                  { "type": "createRecord", "entity": "Department", "as": "requester", "save": "later", "values": {} }
+                ]
+                """));
+
+        var result = ApplicationCompiler.Compile(folder.Path, SamplePackages.Versions);
+
+        Assert.Equal(
+            new[]
+            {
+                ("AXC0189", "/steps/2/values/supplier"),
+                ("AXC0189", "/steps/2/values/department"),
+                ("AXC0189", "/steps/3/values/department"),
+                ("AXC0189", "/steps/5/values/tags/1"),
+                ("AXC0189", "/steps/5/values/tags/3"),
+                ("AXC0189", "/steps/5/values/lines/1/tag"),
+                ("AXC0189", "/steps/6/values/tags"),
+            }.Order().ToArray(),
+            result.Diagnostics.Where(diagnostic => diagnostic.File == ScenarioFile).Select(diagnostic => (diagnostic.Code, diagnostic.Path)).Order().ToArray());
+    }
+
     private static TemporaryFolder SampleCopy()
     {
         var folder = new TemporaryFolder();

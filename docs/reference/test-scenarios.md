@@ -154,6 +154,14 @@ Every step has a `type`. These are the step kinds:
   no record.
 - The runner supplies the record's current `version` on updates and task
   completions, so no step names one.
+- A reference value in `values`, an item of a references field and a reference
+  inside a child row may be a UUID or the alias (the `save` name) of a record
+  that an earlier step saved, as in `"values": { "tag": "red", "tags": ["red", "blue"] }`.
+  The alias must be of the field's target entity, and a step cannot use the
+  alias it saves itself. In `createRecord`, `updateRecord`, `completeTask` and
+  `expectRecord`, the runner replaces the alias with the record's id. A string
+  in UUID form is always an id, and any other string is an alias. A value that
+  is neither is `AXC0189`.
 - `completeTask` and `expectTask` use the newest task of that step for the
   record. A returned request can create the same task again.
 - `assignee` is `{ "user": … }` or `{ "role": … }`. `state` uses the instance
