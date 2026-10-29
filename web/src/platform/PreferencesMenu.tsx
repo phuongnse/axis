@@ -1,14 +1,12 @@
-import { GlobalOutlined } from '@ant-design/icons'
-import { Button, Dropdown, type MenuProps } from 'antd'
+import { SettingOutlined } from '@ant-design/icons'
+import { Dropdown, type MenuProps } from 'antd'
+import { useMemo, type CSSProperties } from 'react'
+import { selectedItemTint } from './antTheme'
+import { AxisButton } from './AxisButton'
 import { useText } from './texts'
-import { useThemeMode, type ThemeMode } from './themeMode'
+import { useDesignTokens, useThemeMode, type ThemeMode } from './themeMode'
 
 const modes: readonly ThemeMode[] = ['light', 'dark']
-
-/** A menu item that is one of a set and says whether it is the current one. */
-function choice(key: string, label: string, current: boolean) {
-  return { key, label, role: 'menuitemradio', 'aria-checked': current }
-}
 
 /**
  * The "Language and theme" button in the shell header. Its menu holds the site's languages and
@@ -25,6 +23,16 @@ export function PreferencesMenu({
 }) {
   const t = useText()
   const { mode, toggleMode } = useThemeMode()
+  const { colour } = useDesignTokens()
+  const selected = useMemo<CSSProperties>(
+    () => ({ color: colour.primaryText, background: selectedItemTint(mode) }),
+    [colour, mode],
+  )
+
+  function choice(key: string, label: string, current: boolean) {
+    return { key, label, role: 'menuitemradio', 'aria-checked': current, style: current ? selected : undefined }
+  }
+
   const items = [
     {
       type: 'group',
@@ -32,6 +40,7 @@ export function PreferencesMenu({
       label: t('shell.locale.label'),
       children: locales.map((tag) => choice(`locale:${tag}`, t(`shell.locale.${tag}`), tag === locale)),
     },
+    { type: 'divider' },
     {
       type: 'group',
       key: 'theme',
@@ -54,7 +63,7 @@ export function PreferencesMenu({
 
   return (
     <Dropdown trigger={['click']} menu={{ items, onClick: pick, 'aria-label': label }}>
-      <Button type="text" aria-label={label} icon={<GlobalOutlined aria-hidden />} />
+      <AxisButton role="icon" nameKey="shell.preferences.label" icon={<SettingOutlined />} />
     </Dropdown>
   )
 }

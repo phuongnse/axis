@@ -332,6 +332,27 @@ for (const mode of modes) {
   })
 }
 
+for (const mode of modes) {
+  test(`the shell preview shows each state's footer inside its figure at 992px in ${mode} mode`, async ({ page }) => {
+    const recording = await openHarness(page, `?preview=shell&mode=${mode}`, { sandboxed: true, frameWidth: 992 })
+    const frame = page.frameLocator('iframe')
+
+    for (const caption of Object.keys(stateKeys.shell)) {
+      // The harness wraps the previews in a main landmark, which takes the footer out of the contentinfo role.
+      const footer = figure(frame, caption).locator('footer')
+      await expect(footer).toBeVisible()
+      const figureBox = await figure(frame, caption).boundingBox()
+      const footerBox = await footer.boundingBox()
+      if (!figureBox || !footerBox) {
+        throw new Error(`The ${caption} figure or its footer has no box`)
+      }
+      expect(footerBox.y).toBeGreaterThanOrEqual(figureBox.y)
+      expect(footerBox.y + footerBox.height).toBeLessThanOrEqual(figureBox.y + figureBox.height)
+    }
+    expect(recording.errors).toEqual([])
+  })
+}
+
 test('the field-date-time preview opens its date picker', async ({ page }) => {
   const recording = await openHarness(page, '?preview=field-date-time&mode=light')
   await figure(page, 'Typical').getByLabel(fieldLabel('Submitted at')).click()

@@ -1,9 +1,10 @@
 import { MenuFoldOutlined, MenuUnfoldOutlined } from '@ant-design/icons'
-import { Button, ConfigProvider, Layout, Menu, Space, Typography } from 'antd'
+import { Button, ConfigProvider, Flex, Layout, Menu, Typography } from 'antd'
 import dayjs from 'dayjs'
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { Link, useLocation } from 'react-router'
 import { AppSwitcher } from './AppSwitcher'
+import { AxisButton } from './AxisButton'
 import { antLocaleFor, dayjsLocaleFor } from './antLocale'
 import { navigationIcon } from './navigationIcons'
 import { NotificationBell } from './NotificationBell'
@@ -114,16 +115,16 @@ export function Shell({ titleKey, navigation, locales, locale, onLocaleChange, n
               gap: spacing.sm,
               height: 48,
               lineHeight: 'normal',
-              paddingInline: spacing.lg,
+              paddingInline: spacing.md,
               background: colour.surface,
               borderBottom: `1px solid ${colour.borderSubtle}`,
             }}
           >
             {sidebar && (
-              <Button
-                type="text"
+              <AxisButton
+                role="icon"
+                nameKey={collapsed ? 'shell.navigation.expand' : 'shell.navigation.collapse'}
                 icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
-                aria-label={t(collapsed ? 'shell.navigation.expand' : 'shell.navigation.collapse')}
                 aria-expanded={!collapsed}
                 aria-controls="shell-sidebar"
                 onClick={() => setCollapsed(!collapsed)}
@@ -153,12 +154,12 @@ export function Shell({ titleKey, navigation, locales, locale, onLocaleChange, n
                 </Button>
               </>
             ) : (
-              <Space>
+              <Flex align="center" gap={spacing.sm}>
                 {bell}
                 <AppSwitcher locale={locale} />
                 {preferences}
                 <UserMenu />
-              </Space>
+              </Flex>
             )}
           </Layout.Header>
           {narrow && (

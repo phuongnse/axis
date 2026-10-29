@@ -1,7 +1,8 @@
 import { AppstoreOutlined } from '@ant-design/icons'
-import { Button, Dropdown, type MenuProps } from 'antd'
+import { Dropdown, type MenuProps } from 'antd'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
+import { AxisButton } from './AxisButton'
 import { fetchCurrentUser, type CurrentUser } from './currentUser'
 import { fetchSites, siteTitle, type SiteListItem } from './site'
 import { useText } from './texts'
@@ -51,19 +52,26 @@ export function AppSwitcher({ locale }: { locale: string }) {
   if (user.users) {
     tools.push({ key: 'users', label: <Link to="/users">{t('shell.appSwitcher.users')}</Link> })
   }
-  const items: NonNullable<MenuProps['items']> = [
-    ...sites.map((site) => ({
-      key: `site:${site.path}`,
-      label: <Link to={`/${site.path}`}>{siteTitle(site, locale)}</Link>,
-    })),
-    ...(sites.length > 0 && tools.length > 0 ? [{ type: 'divider' as const }] : []),
-    ...tools,
-  ]
+  const items: NonNullable<MenuProps['items']> = []
+  if (sites.length > 0) {
+    items.push({
+      type: 'group',
+      key: 'sites',
+      label: t('shell.appSwitcher.sites'),
+      children: sites.map((site) => ({
+        key: `site:${site.path}`,
+        label: <Link to={`/${site.path}`}>{siteTitle(site, locale)}</Link>,
+      })),
+    })
+  }
+  if (tools.length > 0) {
+    items.push({ type: 'group', key: 'tools', label: t('shell.appSwitcher.tools'), children: tools })
+  }
   const label = t('shell.appSwitcher.label')
 
   return (
     <Dropdown trigger={['click']} menu={{ items, 'aria-label': label }}>
-      <Button type="text" aria-label={label} icon={<AppstoreOutlined aria-hidden />} />
+      <AxisButton role="icon" nameKey="shell.appSwitcher.label" icon={<AppstoreOutlined />} />
     </Dropdown>
   )
 }

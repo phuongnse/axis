@@ -48,7 +48,7 @@ function HeaderBand({ steps, children }: { steps: readonly BreadcrumbStep[]; chi
       style={{
         // Negative margins reach the edges of the content area, whose padding is spacing.lg.
         margin: `-${spacing.lg}px -${spacing.lg}px 0`,
-        padding: `${spacing.md}px ${spacing.lg}px`,
+        padding: `${spacing.lg}px ${spacing.lg}px ${spacing.md}px`,
         background: colour.surface,
         borderBottom: `1px solid ${colour.borderSubtle}`,
       }}
