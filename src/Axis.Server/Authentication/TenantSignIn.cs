@@ -18,7 +18,8 @@ namespace Axis.Server.Authentication;
 /// One OIDC client per tenant, using the code flow with PKCE. All of them share the callback path,
 /// and each one skips a callback that arrives on another tenant's host, so a callback can never
 /// complete sign-in for the wrong tenant. After the callback the server keeps no token: it reads
-/// the configured claims from the ID token into a <see cref="Session"/>.
+/// the configured claims from the ID token into a <see cref="Session"/>. A sign-in that starts on a site page goes through
+/// that site's client instead, see <see cref="SiteSignIn"/>.
 /// </summary>
 internal static class TenantSignIn
 {
@@ -149,6 +150,11 @@ internal sealed partial class TenantSignInOptions(TenantSignInSettings settings,
             options.NonceCookie.Name = "__Secure-Axis.Nonce.";
         }
 
+        if (!fapi2)
+        {
+            ConfigureSiteClients(options, tenant);
+        }
+
         options.Events.OnMessageReceived = context =>
         {
             var current = context.HttpContext.RequestServices.GetRequiredService<ITenantContextAccessor>().Current;
@@ -162,8 +168,21 @@ internal sealed partial class TenantSignInOptions(TenantSignInSettings settings,
         options.Events.OnTokenValidated = context =>
         {
             var principal = context.Principal;
-            var userId = principal?.FindFirst(tenant.Claims.UserId)?.Value;
-            if (principal is null || string.IsNullOrWhiteSpace(userId))
+            // The token must be for the client that started the sign-in, so a token for another site's client is refused.
+            var expectedClient = context.Properties?.Items.TryGetValue(SiteSignIn.SitePathItem, out var sitePath) == true && sitePath is not null
+                ? SiteSignIn.ClientId(sitePath)
+                : tenant.ClientId;
+            if (principal is null
+                || !principal.FindAll("aud").Any(claim => claim.Value == expectedClient)
+                || principal.FindFirst("azp") is { } authorizedParty && authorizedParty.Value != expectedClient)
+            {
+                context.HttpContext.Items[TenantSignIn.TokenRejectedItem] = true;
+                context.Fail("The ID token is not for the client that started the sign-in.");
+                return Task.CompletedTask;
+            }
+
+            var userId = principal.FindFirst(tenant.Claims.UserId)?.Value;
+            if (string.IsNullOrWhiteSpace(userId))
             {
                 context.HttpContext.Items[TenantSignIn.TokenRejectedItem] = true;
                 context.Fail("The ID token has no user id claim.");
@@ -216,7 +235,23 @@ internal sealed partial class TenantSignInOptions(TenantSignInSettings settings,
             return Task.CompletedTask;
         };
         // Every profile refuses metadata whose issuer is not the tenant's authority, before the code goes to the token endpoint.
-        options.Events.OnAuthorizationCodeReceived = async context => await CheckMetadataIssuerAsync(context, tenant);
+        options.Events.OnAuthorizationCodeReceived = async context =>
+        {
+            if (await CheckMetadataIssuerAsync(context, tenant) is null)
+            {
+                return;
+            }
+
+            // A sign-in that started on a site redeems the code as the site's client.
+            if (context.Properties?.Items.TryGetValue(SiteSignIn.SitePathItem, out var sitePath) == true
+                && sitePath is not null
+                && tenant.SiteClientKey is { } key)
+            {
+                var clientId = SiteSignIn.ClientId(sitePath);
+                context.TokenEndpointRequest!.ClientId = clientId;
+                context.TokenEndpointRequest.ClientSecret = SiteClientSecret.Derive(key.Reveal(), clientId);
+            }
+        };
         if (fapi2)
         {
             ConfigureFapi2(options, tenant, tenantId);
@@ -272,6 +307,30 @@ internal sealed partial class TenantSignInOptions(TenantSignInSettings settings,
             context.Response.Redirect(TenantSignIn.FailedPath);
             context.HandleResponse();
         };
+    }
+
+    // A sign-in that started on a site goes to the realm as the site's client, and may name the provider to go to. The ID
+    // token is for that client, so the audience check lets a site client through and OnTokenValidated checks for the exact one.
+    // A fapi2 tenant keeps its own client, so ConfigureFapi2 replaces the redirect event.
+    private static void ConfigureSiteClients(OpenIdConnectOptions options, TenantOidcSettings tenant)
+    {
+        options.Events.OnRedirectToIdentityProvider = context =>
+        {
+            if (context.Properties.Items.TryGetValue(SiteSignIn.SitePathItem, out var sitePath) && sitePath is not null)
+            {
+                context.ProtocolMessage.ClientId = SiteSignIn.ClientId(sitePath);
+            }
+
+            if (context.Properties.GetParameter<string>(SiteSignIn.ProviderHintParameter) is { Length: > 0 } hint)
+            {
+                context.ProtocolMessage.SetParameter("kc_idp_hint", hint);
+            }
+
+            return Task.CompletedTask;
+        };
+        options.TokenValidationParameters.AudienceValidator = (audiences, _, _) =>
+            audiences.Any(audience => audience == tenant.ClientId || audience.StartsWith(RealmSync.SiteClientPrefix, StringComparison.Ordinal));
+        options.ProtocolValidator = new SiteClientProtocolValidator { RequireStateValidation = false, NonceLifetime = TimeSpan.FromMinutes(15) };
     }
 
     // The handler checks that the ID token's iss matches the metadata, so metadata from another issuer would pass with a

@@ -20,7 +20,8 @@
 // The publisher updates a tenant's realm after it activates a release.
 // The identity provider starts with an admin client, which `tenant create` signs in as to create each tenant's realm.
 // A new realm has no accounts, no redirect address and no roles mapper, so the test adds them to realm one through the
-// admin API before the proxy signs the requester and the author in there.
+// admin API before the activation, which copies them to the site clients, and before the proxy signs the requester
+// and the author in there.
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import { createHash, createHmac, randomBytes } from 'node:crypto'
@@ -872,6 +873,60 @@ describe('the on-premises installation', () => {
         assert.doesNotMatch(create.stdout + create.stderr, new RegExp(adminClientSecret))
       }
 
+      // A new realm has no accounts, no redirect address and no roles mapper. Add them to realm one through the admin
+      // API, as the axis-admin client, so that requester and author can sign in there. The authenticators are the ones
+      // of the development users, so developmentCode still works. This comes before the activation, because the
+      // activation copies the redirect addresses and mappers of the axis client to the client of each site.
+      const tokenResponse = await keycloak(`https://${identityHost}/realms/master/protocol/openid-connect/token`, new Map(), {
+        method: 'POST',
+        form: { grant_type: 'client_credentials', client_id: 'axis-admin', client_secret: adminClientSecret },
+      })
+      assert.equal(tokenResponse.status, 200, `the admin token: ${tokenResponse.body}`)
+      const adminToken = JSON.parse(tokenResponse.body).access_token
+      const adminCall = async (method, path, body, ...statuses) => {
+        const response = await keycloakAdmin(method, path, adminToken, body)
+        assert.ok(statuses.includes(response.status), `${method} ${path} answered ${response.status}: ${response.body}`)
+        return response
+      }
+
+      const listed = await adminCall('GET', '/admin/realms/one/clients?clientId=axis', undefined, 200)
+      const platformClient = JSON.parse(listed.body)[0]
+      assert.ok(platformClient, 'realm one has no axis client')
+      const clientPath = `/admin/realms/one/clients/${platformClient.id}`
+      const update = { ...platformClient, redirectUris: [`https://${hosts.one}/*`] }
+      delete update.secret
+      await adminCall('PUT', clientPath, update, 204)
+      for (const name of ['employee', 'requester', 'author', 'publisher']) {
+        await adminCall('POST', `${clientPath}/roles`, { name }, 201)
+      }
+      const mapper = developmentRealm().clients.find((client) => client.clientId === 'axis').protocolMappers.find((item) => item.name === 'roles')
+      assert.ok(mapper, 'the development realm has no roles mapper on the axis client')
+      await adminCall('POST', `${clientPath}/protocol-mappers/models`, mapper, 201)
+      for (const [username, roles] of Object.entries({ requester: ['employee', 'requester'], author: ['author', 'publisher'] })) {
+        const created = await adminCall(
+          'POST',
+          '/admin/realms/one/users',
+          {
+            username,
+            enabled: true,
+            emailVerified: true,
+            email: `${username}@axis.local`,
+            firstName: username[0].toUpperCase() + username.slice(1),
+            lastName: 'User',
+            requiredActions: [],
+            credentials: [{ type: 'password', value: realmPassword, temporary: false }, developmentCredential(username)],
+          },
+          201,
+        )
+        const userId = created.headers.location.split('/').pop()
+        const representations = []
+        for (const name of roles) {
+          const role = await adminCall('GET', `${clientPath}/roles/${name}`, undefined, 200)
+          representations.push(JSON.parse(role.body))
+        }
+        await adminCall('POST', `/admin/realms/one/users/${userId}/role-mappings/clients/${platformClient.id}`, representations, 204)
+      }
+
       // Step 5, activate the leave request sample for every active tenant.
       const activate = admin(['activate', '/apps/leave-requests'])
       assert.equal(activate.status, 0, `activate\n${activate.stdout}${activate.stderr}`)
@@ -910,6 +965,7 @@ describe('the on-premises installation', () => {
       }
 
       // Each tenant has its own sign-in: a redirect to the authorization endpoint of its own realm that returns to its own host.
+      // The return URL opens the active site "leave", so the sign-in uses that site's client in the realm.
       for (const [id, host] of Object.entries(hosts)) {
         let signIn
         // The server fetches the OIDC metadata when it first needs it, so the first try can fail.
@@ -921,7 +977,7 @@ describe('the on-premises installation', () => {
         assert.equal(signIn.status, 302, `${host} sign-in: ${signIn.body}`)
         const location = new URL(signIn.headers.location)
         assert.equal(`${location.origin}${location.pathname}`, `https://${identityHost}/realms/${id}/protocol/openid-connect/auth`)
-        assert.equal(location.searchParams.get('client_id'), 'axis')
+        assert.equal(location.searchParams.get('client_id'), 'site-leave')
         assert.equal(location.searchParams.get('redirect_uri'), `https://${host}/api/auth/callback`)
       }
 
@@ -988,59 +1044,6 @@ RETURNING id;`,
       const publisherLog = compose(['logs', '--no-color', '--no-log-prefix', 'publisher']).stdout
       for (const id of Object.keys(hosts)) assert.match(publisherLog, new RegExp(`^${id} claim ok$`, 'm'))
       assert.match(run(['ps', '--status', 'running', '--services']), /^publisher$/m)
-
-      // A new realm has no accounts, no redirect address and no roles mapper. Add them to realm one through the admin
-      // API, as the axis-admin client, so that requester and author can sign in there. The authenticators are the ones
-      // of the development users, so developmentCode still works.
-      const tokenResponse = await keycloak(`https://${identityHost}/realms/master/protocol/openid-connect/token`, new Map(), {
-        method: 'POST',
-        form: { grant_type: 'client_credentials', client_id: 'axis-admin', client_secret: adminClientSecret },
-      })
-      assert.equal(tokenResponse.status, 200, `the admin token: ${tokenResponse.body}`)
-      const adminToken = JSON.parse(tokenResponse.body).access_token
-      const adminCall = async (method, path, body, ...statuses) => {
-        const response = await keycloakAdmin(method, path, adminToken, body)
-        assert.ok(statuses.includes(response.status), `${method} ${path} answered ${response.status}: ${response.body}`)
-        return response
-      }
-
-      const listed = await adminCall('GET', '/admin/realms/one/clients?clientId=axis', undefined, 200)
-      const platformClient = JSON.parse(listed.body)[0]
-      assert.ok(platformClient, 'realm one has no axis client')
-      const clientPath = `/admin/realms/one/clients/${platformClient.id}`
-      const update = { ...platformClient, redirectUris: [`https://${hosts.one}/*`] }
-      delete update.secret
-      await adminCall('PUT', clientPath, update, 204)
-      for (const name of ['employee', 'requester', 'author', 'publisher']) {
-        await adminCall('POST', `${clientPath}/roles`, { name }, 201)
-      }
-      const mapper = developmentRealm().clients.find((client) => client.clientId === 'axis').protocolMappers.find((item) => item.name === 'roles')
-      assert.ok(mapper, 'the development realm has no roles mapper on the axis client')
-      await adminCall('POST', `${clientPath}/protocol-mappers/models`, mapper, 201)
-      for (const [username, roles] of Object.entries({ requester: ['employee', 'requester'], author: ['author', 'publisher'] })) {
-        const created = await adminCall(
-          'POST',
-          '/admin/realms/one/users',
-          {
-            username,
-            enabled: true,
-            emailVerified: true,
-            email: `${username}@axis.local`,
-            firstName: username[0].toUpperCase() + username.slice(1),
-            lastName: 'User',
-            requiredActions: [],
-            credentials: [{ type: 'password', value: realmPassword, temporary: false }, developmentCredential(username)],
-          },
-          201,
-        )
-        const userId = created.headers.location.split('/').pop()
-        const representations = []
-        for (const name of roles) {
-          const role = await adminCall('GET', `${clientPath}/roles/${name}`, undefined, 200)
-          representations.push(JSON.parse(role.body))
-        }
-        await adminCall('POST', `/admin/realms/one/users/${userId}/role-mappings/clients/${platformClient.id}`, representations, 204)
-      }
 
       // Step 8, a second replica and the TLS proxy. The second replica starts once the first is ready. The proxy has
       // run since the start of the test.

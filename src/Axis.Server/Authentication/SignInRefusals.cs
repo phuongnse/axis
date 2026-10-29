@@ -12,7 +12,7 @@ internal static class SignInRefusals
     /// <summary>The callback's state came from another tenant's sign-in.</summary>
     public const string OtherTenant = "otherTenant";
 
-    /// <summary>The ID token failed validation, has no user id, or has an <c>auth_time</c> that is missing or too old, or carries a nonce that the sign-in did not send.</summary>
+    /// <summary>The ID token failed validation, has no user id, or has an <c>auth_time</c> that is missing or too old, carries a nonce that the sign-in did not send, or is not for the client that started the sign-in.</summary>
     public const string InvalidToken = "invalidToken";
 
     /// <summary>The callback's state is missing, unreadable or fails the correlation check.</summary>
