@@ -3,9 +3,13 @@ namespace Axis.Tenancy.Realms;
 /// <summary>
 /// What a tenant's realm should hold: a client for each site path and a brokered <c>oidc</c> provider for each entry of
 /// <paramref name="Providers"/>. <see cref="ActivationRealmSync"/> builds it from the realm plan and the tenant's bindings, so it holds
-/// resolved values and no binding names.
+/// resolved values and no binding names. <paramref name="PlatformClientSecret"/> is the secret of the platform client <c>axis</c>. When it is
+/// set, each site client's secret is <see cref="SiteClientSecret.Derive"/> of it. When it is <c>null</c>, Keycloak makes the secret.
 /// </summary>
-public sealed record RealmState(IReadOnlyList<string> SitePaths, IReadOnlyList<RealmBrokeredProvider> Providers);
+public sealed record RealmState(
+    IReadOnlyList<string> SitePaths,
+    IReadOnlyList<RealmBrokeredProvider> Providers,
+    string? PlatformClientSecret = null);
 
 /// <summary>
 /// A brokered <c>oidc</c> provider. The alias starts with <see cref="RealmSync.ProviderAliasPrefix"/>. The claims name

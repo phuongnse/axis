@@ -88,6 +88,21 @@ public sealed class DirectoryTenantCatalogTests
         Assert.Equal("acme", realm.Name);
         Assert.Equal(ActivationSecret, realm.ActivationClientSecret.Reveal());
         Assert.DoesNotContain(ActivationSecret, realm.ToString(), StringComparison.Ordinal);
+        Assert.Equal(PlatformSecret, realm.PlatformClientSecret!.Reveal());
+        Assert.DoesNotContain(PlatformSecret, realm.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_row_without_an_oidc_client_secret_gets_a_realm_without_a_platform_secret()
+    {
+        var cipher = CipherFor();
+        var row = Row(cipher);
+        row.OidcClientSecret = [];
+
+        var realm = DirectoryTenantCatalog.Realm(row, cipher);
+
+        Assert.NotNull(realm);
+        Assert.Null(realm.PlatformClientSecret);
     }
 
     [Fact]
@@ -145,6 +160,7 @@ public sealed class DirectoryTenantCatalogTests
     }
 
     private const string ActivationSecret = "activ4tion-cl13nt-s3cret";
+    private const string PlatformSecret = "pl4tform-cl13nt-s3cret";
 
     private static TenantRow Row(TenantSecretCipher cipher) =>
         new()
@@ -153,6 +169,7 @@ public sealed class DirectoryTenantCatalogTests
             Status = "active",
             OidcAuthority = "https://idp.example.test/realms/acme",
             RealmActivationClientSecret = cipher.Encrypt("acme", TenantSecretFields.RealmActivationClientSecret, ActivationSecret),
+            OidcClientSecret = cipher.Encrypt("acme", TenantSecretFields.OidcClientSecret, PlatformSecret),
         };
 
     private static TenantSecretCipher CipherFor() =>
