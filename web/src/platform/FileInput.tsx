@@ -1,5 +1,6 @@
-import { Button, Flex, Typography } from 'antd'
+import { Flex, Typography } from 'antd'
 import { useRef, useState, type ChangeEvent } from 'react'
+import { AxisButton } from './AxisButton'
 import { fileUrl, uploadFile } from './files'
 import type { FileValue } from './records'
 import type { FieldMetadata } from './site'
@@ -120,7 +121,8 @@ export function FileInput({ field, value, onChange, id, label, readOnly = false 
               data-testid={`file-picker-${field.name}`}
               onChange={(event) => void pick(event)}
             />
-            <Button
+            <AxisButton
+              role="secondary"
               id={id}
               ref={upload}
               loading={uploading}
@@ -128,13 +130,13 @@ export function FileInput({ field, value, onChange, id, label, readOnly = false 
               onClick={() => picker.current?.click()}
             >
               {t('shell.form.upload')}
-            </Button>
+            </AxisButton>
           </>
         )}
         {editable && !field.required && value !== null && (
-          <Button aria-label={`${t('shell.form.removeFile')} ${label}`} onClick={remove}>
+          <AxisButton role="destructive" aria-label={`${t('shell.form.removeFile')} ${label}`} onClick={remove}>
             {t('shell.form.removeFile')}
-          </Button>
+          </AxisButton>
         )}
       </Flex>
       {error !== null && (

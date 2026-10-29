@@ -88,7 +88,12 @@ export function antThemeFor(mode: ThemeMode, page?: PageTokenValues, reducedMoti
         dangerItemHoverColor: colour.dangerText,
         dangerItemSelectedColor: colour.dangerText,
       },
-      Pagination: { itemActiveColor: colour.primaryText, itemActiveColorHover: colour.primaryText },
+      Pagination: {
+        itemActiveColor: colour.primaryText,
+        itemActiveColorHover: colour.primaryText,
+        colorPrimary: colour.primaryText,
+        colorPrimaryHover: colour.primaryText,
+      },
       Button: { defaultShadow: 'none', primaryShadow: 'none', dangerShadow: 'none' },
     },
   }
