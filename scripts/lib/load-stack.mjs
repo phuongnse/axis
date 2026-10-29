@@ -130,7 +130,13 @@ export const writeLoadStack = (target, { proxyAddress = '172.31.250.10' } = {}) 
         k6: {
           profiles: ['load'],
           image: k6Image,
-          environment: { ...authorityFile, AXIS_LOAD_URL: `https://${tenantHost}`, AXIS_LOAD_USERS: '/load/users.json' },
+          environment: {
+            ...authorityFile,
+            AXIS_LOAD_URL: `https://${tenantHost}`,
+            AXIS_LOAD_USERS: '/load/users.json',
+            AXIS_LOAD_CALLER: '/load/caller.json',
+            AXIS_LOAD_TOKEN_URL: `https://${identityHost}/realms/load/protocol/openid-connect/token`,
+          },
           volumes: [`${join(root, 'tests/load')}:/scripts:ro`, `${join(folder, 'k6')}:/load:ro`, trustVolume],
           extra_hosts: [`${tenantHost}:${proxyAddress}`],
         },

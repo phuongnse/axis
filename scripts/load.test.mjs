@@ -64,7 +64,8 @@ function runLoad(args = [], extraEnv = {}) {
       'scripts/lib/postgres-tls.mjs',
       'scripts/lib/retry.sh',
       'deploy/compose/compose.yaml',
-      'tests/load/placeholder.js',
+      'tests/load/objectives.js',
+      'tests/load/lib/totp.js',
     ]) {
       mkdirSync(dirname(join(dir, file)), { recursive: true })
       copyFileSync(join(root, file), join(dir, file))
@@ -105,7 +106,7 @@ const indexOf = (run, text) => {
 }
 const k6Index = (run) => indexOf(run, 'run --rm --no-TTY k6')
 
-describe('scripts/load.sh starts the reference stack and runs the placeholder scenario', () => {
+describe('scripts/load.sh starts the reference stack and runs the objectives scenario', () => {
   test('every compose call names compose.yaml and the load override, and server starts before server-2', () => {
     const run = runLoad()
 
@@ -164,13 +165,13 @@ describe('scripts/load.sh starts the reference stack and runs the placeholder sc
     const run = runLoad(['--', '--vus', '5'])
 
     assert.equal(run.status, 0, run.stdout + run.stderr)
-    assert.match(run.calls[k6Index(run)], / k6 run --vus 5 \/scripts\/placeholder\.js$/)
+    assert.match(run.calls[k6Index(run)], / k6 run --vus 5 \/scripts\/objectives\.js$/)
   })
 
   test('without arguments after --, k6 gets the script alone', () => {
     const run = runLoad()
 
-    assert.match(run.calls[k6Index(run)], / k6 run \/scripts\/placeholder\.js$/)
+    assert.match(run.calls[k6Index(run)], / k6 run \/scripts\/objectives\.js$/)
   })
 
   test('a failing k6 run gives its exit code, and the stack is still removed', () => {
