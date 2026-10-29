@@ -112,10 +112,10 @@ internal static class TenantStatus
                 .Select(tenant => new { tenant.Id, tenant.Status, tenant.SchemaVersion, tenant.PreviewOf })
                 .ToListAsync(cancellationToken);
             var hostRows = await platform.TenantHosts.AsNoTracking()
-                .Select(host => new { host.TenantId, host.Host })
+                .Select(host => new { host.TenantId, host.Host, host.SitePath })
                 .ToListAsync(cancellationToken);
             tenants = [.. rows.Select(row => (row.Id, row.Status, row.SchemaVersion, row.PreviewOf)).OrderBy(row => row.Id, StringComparer.Ordinal)];
-            hosts = hostRows.OrderBy(row => row.Host, StringComparer.Ordinal).ToLookup(row => row.TenantId, row => row.Host);
+            hosts = hostRows.OrderBy(row => row.Host, StringComparer.Ordinal).ToLookup(row => row.TenantId, row => row.SitePath is null ? row.Host : $"{row.Host} ({row.SitePath})");
         }
         catch (Exception exception) when (exception is NpgsqlException or InvalidOperationException or OperationCanceledException)
         {

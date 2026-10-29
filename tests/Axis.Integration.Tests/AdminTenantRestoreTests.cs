@@ -126,6 +126,44 @@ public sealed class AdminTenantRestoreTests(AdminBackupFixture fixture) : IClass
     }
 
     [Fact]
+    public async Task A_site_host_is_listed_in_the_manifest_and_a_restored_host_of_the_same_name_gets_its_site()
+    {
+        using var folder = new TemporaryFolder();
+        var file = Path.Combine(folder.Path, "backup.tar");
+        var scenario = fixture.Scenario;
+        var newId = scenario.NewTenantId();
+        var siteHost = $"site-{newId}.example.test";
+        var plainHost = $"{newId}.example.test";
+
+        Assert.Equal(0, (await scenario.RunAsync(["tenant", "host", "add", fixture.TenantId, siteHost, "--site", "shop"], extra: AdminScenario.Directory)).Exit);
+        try
+        {
+            Assert.Equal(0, (await fixture.BackupAsync(file)).Exit);
+            using var manifest = JsonDocument.Parse(ReadManifest(file));
+            var directory = manifest.RootElement.GetProperty("directory");
+            var site = Assert.Single(directory.GetProperty("sites").EnumerateArray());
+            Assert.Equal("shop", site.GetProperty("path").GetString());
+            Assert.Equal(siteHost, site.GetProperty("host").GetString());
+            Assert.Contains(siteHost, directory.GetProperty("hosts").EnumerateArray().Select(host => host.GetString()));
+
+            // The host name is free for the restored tenant only once the original tenant gives it up.
+            Assert.Equal(0, (await scenario.RunAsync(["tenant", "host", "remove", fixture.TenantId, siteHost], extra: AdminScenario.Directory)).Exit);
+            var result = await scenario.RunAsync(RestoreArgs(file, newId, plainHost, siteHost.ToUpperInvariant()), path: fixture.Tools.PathSetting);
+
+            Assert.Equal(0, result.Exit);
+            Assert.Equal(new Dictionary<string, string> { [siteHost.ToUpperInvariant()] = "shop" }, await scenario.SitesAsync(newId));
+            Assert.Equal(2, (await scenario.HostsAsync(newId)).Length);
+        }
+        finally
+        {
+            if ((await scenario.HostsAsync(fixture.TenantId)).Contains(siteHost))
+            {
+                await scenario.RunAsync(["tenant", "host", "remove", fixture.TenantId, siteHost], extra: AdminScenario.Directory);
+            }
+        }
+    }
+
+    [Fact]
     public async Task A_backup_restored_under_a_new_id_holds_the_same_file_bytes_and_sha256()
     {
         var bytes = Enumerable.Range(0, 4096).Select(i => (byte)(i % 256)).ToArray();
@@ -613,6 +651,22 @@ public sealed class AdminTenantRestoreTests(AdminBackupFixture fixture) : IClass
 
         var position = bindings.Count(existing => string.CompareOrdinal((string)existing!["name"]!, "Files") < 0);
         bindings.Insert(position, binding);
+    }
+
+    private static string ReadManifest(string file)
+    {
+        using var stream = File.OpenRead(file);
+        using var reader = new TarReader(stream);
+        while (reader.GetNextEntry() is { } entry)
+        {
+            if (entry.Name == "manifest.json")
+            {
+                using var text = new StreamReader(entry.DataStream!, Encoding.UTF8);
+                return text.ReadToEnd();
+            }
+        }
+
+        throw new InvalidOperationException("The archive has no manifest.");
     }
 
     // Copies the archive and edits its manifest. The dump stays as it was.
