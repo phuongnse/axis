@@ -12,6 +12,10 @@ M17 does not change. See the [roadmap](../roadmap.md#milestones).
 
 - **Six milestones:**
   - M18 Carried-over verification: the work carried over from M16, unchanged.
+    [D106](d106-a-threat-model-kept-current-like-the-asvs-tracking.md) and
+    [D111](d111-authentication-by-default-and-the-owner-guards-the-security-checks.md)
+    add the threat model and its checks, and it is renamed Verification and
+    threat model.
   - M19 Connector OAuth2 and outbound webhooks:
     [D91](d91-connector-oauth2-and-structured-payloads.md) and
     [D92](d92-outbound-webhooks.md), and raising an event from an inbound
