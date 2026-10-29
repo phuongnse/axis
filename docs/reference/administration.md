@@ -305,7 +305,7 @@ the id:
 | --- | --- |
 | `id` | The tenant id. |
 | `status` | `provisioning`, `active` or `suspended`. |
-| `hosts` | The tenant's hosts, separated by commas. |
+| `hosts` | The tenant's hosts, separated by commas. A site host shows its path, such as `shop.example.test (shop)`. |
 | `schema version` | The recorded schema version, or `-` when it is empty. |
 | `preview of` | The id of the main tenant, for a preview tenant, or `-` for a main tenant. |
 
@@ -364,7 +364,7 @@ A tenant in any status except `provisioning` can be backed up, also a
 | --- | --- |
 | `status` | The status at backup, `active` or `suspended`. |
 | `previewOf` | The id of the main tenant for a [preview tenant](../architecture.md#preview-tenants), or `null` for a main tenant. |
-| `hosts` | The tenant's hosts, in ordinal order. |
+| `hosts`, `sites` | The tenant's hosts, in ordinal order. `sites` lists the hosts that belong to a site, each with `path` and `host`, in ordinal order of the path. An archive from before `sites` reads as no sites. |
 | `oidcAuthority` | The OIDC authority. |
 | `oidcClientId` | The OIDC client id. |
 | `realm` | `true` when the tenant signs in through its own realm in Axis's identity provider, see [identity provider](identity-provider.md). An archive from before the field reads as `false`, and a restore of it keeps its sign-in as it is. |
@@ -457,7 +457,7 @@ it keeps working without the module installed.
 
 1. `check`: read the archive and make every check above. It asks the identity provider whether the archive's realm exists.
 2. `entry`: write the directory entry with status `provisioning`. It takes the
-   new id and hosts, and everything else from `directory` in the manifest. A tenant that gets a new realm has empty sign-in settings until the `realm` step. A
+   new id and hosts, and everything else from `directory` in the manifest. A `--host` that matches a `sites` entry's `host`, ignoring letter case, gets its site. A tenant that gets a new realm has empty sign-in settings until the `realm` step. A
    `secret` binding is restored by name and kind, without a value. A `url` or `storage`
    binding is restored with its value. The check refuses an archive whose `storage` binding has
    a value other than `database`.

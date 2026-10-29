@@ -6,6 +6,7 @@ using System.Text.Json;
 using Axis.Configuration.Packages;
 using Axis.Configuration.Realms;
 using Axis.Configuration.Releases;
+using Axis.Configuration.Resources;
 using Axis.Configuration.Storage;
 using Axis.Processes.Storage;
 using Axis.Tenancy;
@@ -378,7 +379,9 @@ internal sealed class TenantRestore : IAsyncDisposable
         && manifest.Packages is not null
         && manifest.Packages.All(package => package is { Id: not null, Version: not null })
         && manifest.Directory.Bindings.All(binding => binding is { Name: not null, Kind: "url" or "secret" or "storage" } && (binding.Kind != "url" || binding.Url is not null) && (binding.Kind != "storage" || binding.Url == StorageBindingValues.Database))
-        && manifest.Directory.Bindings.Select(binding => binding.Name.ToLowerInvariant()).Distinct().Count() == manifest.Directory.Bindings.Count;
+        && manifest.Directory.Bindings.Select(binding => binding.Name.ToLowerInvariant()).Distinct().Count() == manifest.Directory.Bindings.Count
+        && (manifest.Directory.Sites is null || (manifest.Directory.Sites.All(site => site is { Host: not null } && SitePaths.IsValid(site.Path))
+            && manifest.Directory.Sites.Select(site => site.Path.ToLowerInvariant()).Distinct().Count() == manifest.Directory.Sites.Count));
 
     // Returns the exit code that ends the command, or null to go on.
     private async Task<int?> EntryAsync()
@@ -392,6 +395,9 @@ internal sealed class TenantRestore : IAsyncDisposable
                 .ToList();
             var keys = hosts.Select(host => host.ToLowerInvariant()).ToArray();
             var directory = _plan.Manifest.Directory;
+
+            // A typed host that matches a site host of the archive, ignoring letter case, gets that site. Other hosts get none.
+            var sitesByHost = (directory.Sites ?? []).ToDictionary(site => site.Host, site => site.Path, StringComparer.OrdinalIgnoreCase);
 
             _row = await _platform.Tenants.FirstOrDefaultAsync(tenant => tenant.Id == _id, _cancellationToken);
             if (_row is not null && _row.Status != Provisioning)
@@ -452,7 +458,7 @@ internal sealed class TenantRestore : IAsyncDisposable
             _row.ClaimLocale = directory.ClaimLocale;
             _row.EndpointAudience = directory.EndpointAudience;
             _row.ServiceAudience = directory.ServiceAudience;
-            _platform.TenantHosts.AddRange(hosts.Select(host => new TenantHostRow { TenantId = _id, Host = host }));
+            _platform.TenantHosts.AddRange(hosts.Select(host => new TenantHostRow { TenantId = _id, Host = host, SitePath = sitesByHost.GetValueOrDefault(host)?.ToLowerInvariant() }));
 
             // A secret binding comes back by name and kind only: the archive holds no value. A url or storage binding comes back with its value.
             _platform.TenantBindings.AddRange(directory.Bindings.Select(binding => new TenantBindingRow

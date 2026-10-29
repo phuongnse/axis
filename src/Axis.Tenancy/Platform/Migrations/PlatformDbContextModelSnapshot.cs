@@ -131,8 +131,16 @@ namespace Axis.Tenancy.Platform.Migrations
                         .HasColumnType("text")
                         .HasColumnName("host");
 
+                    b.Property<string>("SitePath")
+                        .HasColumnType("text")
+                        .HasColumnName("site_path");
+
                     b.HasKey("TenantId", "Host")
                         .HasName("pk_tenant_hosts");
+
+                    b.HasIndex("TenantId", "SitePath")
+                        .IsUnique()
+                        .HasDatabaseName("ix_tenant_hosts_tenant_id_site_path");
 
                     b.ToTable("tenant_hosts", "platform");
                 });

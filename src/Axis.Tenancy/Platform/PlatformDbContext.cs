@@ -104,6 +104,8 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
             host.HasKey(h => new { h.TenantId, h.Host }).HasName("pk_tenant_hosts");
             host.Property(h => h.TenantId).HasColumnName("tenant_id");
             host.Property(h => h.Host).HasColumnName("host");
+            host.Property(h => h.SitePath).HasColumnName("site_path");
+            host.HasIndex(h => new { h.TenantId, h.SitePath }).IsUnique().HasDatabaseName("ix_tenant_hosts_tenant_id_site_path");
         });
 
         modelBuilder.Entity<TenantBindingRow>(binding =>

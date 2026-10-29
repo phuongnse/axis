@@ -195,6 +195,15 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
         return await context.TenantHosts.AsNoTracking().Where(host => host.TenantId == id).Select(host => host.Host).ToArrayAsync(CancellationToken);
     }
 
+    /// <summary>The host to site path pairs of a tenant, for the hosts that belong to a site.</summary>
+    public async Task<Dictionary<string, string>> SitesAsync(string id)
+    {
+        await using var context = NewContext();
+        return await context.TenantHosts.AsNoTracking()
+            .Where(host => host.TenantId == id && host.SitePath != null)
+            .ToDictionaryAsync(host => host.Host, host => host.SitePath!, CancellationToken);
+    }
+
     public async Task<int> CountBindingsAsync(string id)
     {
         await using var context = NewContext();
@@ -276,7 +285,7 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
                 t.EndpointAudience, t.ServiceAudience, t.OidcClientKeyId, Convert.ToHexString(t.OidcClientKey ?? []), t.OidcPreviousClientKeyId,
                 Convert.ToHexString(t.OidcPreviousClientKey ?? []), t.SchemaVersion, t.PreviewOf, t.SmtpHost, t.SmtpPort, t.SmtpUseTls, t.SmtpUserName,
                 Convert.ToHexString(t.SmtpPassword ?? []), t.EmailFrom))
-            .Concat(hosts.Select(host => $"{host.TenantId}|{host.Host}"))
+            .Concat(hosts.Select(host => $"{host.TenantId}|{host.Host}|{host.SitePath}"))
             .Concat(bindings.Select(binding => $"{binding.TenantId}|{binding.Name}|{binding.Kind}|{binding.Url}")));
     }
 
