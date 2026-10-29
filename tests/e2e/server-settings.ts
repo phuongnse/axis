@@ -107,6 +107,9 @@ export function serverEnv(baseURL: string): Record<string, string> {
     // Endpoint calls need a token for this audience, as in appsettings.Development.json.
     Tenants__default__Oidc__EndpointAudience: 'axis-endpoints',
     Tenants__default__Oidc__ServiceAudience: 'axis-services',
+    // Startup activation brings the realm in step through the axis-activation client, as in appsettings.Development.json.
+    Tenants__default__Realm__Name: 'axis',
+    Tenants__default__Realm__ActivationClientSecret: 'axis-activation-development-secret',
     // The purchase request sample activates only with its purchasing system bindings. The stub
     // ignores the token. The worker gets the same bindings from scripts/e2e.sh.
     Tenants__default__Bindings__PurchasingSystemUrl__Kind: 'url',

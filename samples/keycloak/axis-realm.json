@@ -208,6 +208,19 @@
       ]
     },
     {
+      "clientId": "axis-activation",
+      "name": "Axis activation",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "axis-activation-development-secret",
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "implicitFlowEnabled": false,
+      "serviceAccountsEnabled": true
+    },
+    {
       "clientId": "axis-fapi",
       "name": "Axis FAPI 2.0",
       "enabled": true,
@@ -643,6 +656,21 @@
       "clientRoles": {
         "axis": [
           "tenant-administrator"
+        ]
+      }
+    },
+    {
+      "id": "axis-activation",
+      "username": "service-account-axis-activation",
+      "enabled": true,
+      "serviceAccountClientId": "axis-activation",
+      "clientRoles": {
+        "realm-management": [
+          "manage-identity-providers",
+          "view-identity-providers",
+          "manage-clients",
+          "view-clients",
+          "query-clients"
         ]
       }
     },

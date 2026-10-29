@@ -12,6 +12,7 @@ using Axis.Processes.Instances;
 using Axis.Server.Health;
 using Axis.Server.Tenancy;
 using Axis.Tenancy;
+using Axis.Tenancy.Realms;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
@@ -21,12 +22,13 @@ namespace Axis.Server.Applications;
 /// Migrates every configured tenant database and grants its runtime database role its rights (before
 /// and after the migrations) and checks over its own connection that the role can only read and write rows,
 /// then compiles the configured application folders
-/// against the installed extension packages, activates them in it, writes the state of their schedule triggers, writes their seed records and builds the indexes that activation left out of large tables. The work runs in <see cref="StartingAsync"/>, before any hosted
+/// against the installed extension packages, activates them in it, brings the tenant's realm in step with each one (for a tenant
+/// that has realm details, before its schedule triggers and seed), writes the state of their schedule triggers, writes their seed records and builds the indexes that activation left out of large tables. The work runs in <see cref="StartingAsync"/>, before any hosted
 /// service starts, so the server is not listening yet. The migrations, release storage, entity
 /// provisioning and the active release use a connection from the tenant's
 /// <c>SchemaConnectionString</c>, which closes when the tenant is done. The runtime database role is the
 /// user of the tenant's <c>ConnectionString</c>. The schedule trigger state
-/// and the seed records use the tenant's <c>ConnectionString</c>. Any exception or error diagnostic stops the start:
+/// and the seed records use the tenant's <c>ConnectionString</c>. Any exception, error diagnostic or failed realm update stops the start:
 /// tenants are processed in ordinal order of their id, and the first failure is thrown. The activation of a preview
 /// tenant may end with warnings, such as a missing deployment binding, which are logged and do not stop the start.
 /// Readiness reports Unhealthy until the last tenant is done, and stays so when a tenant fails.
@@ -42,6 +44,7 @@ internal sealed partial class StartupActivation(
     ITenantContextAccessor accessor,
     IServiceScopeFactory scopes,
     IHostEnvironment environment,
+    IHttpClientFactory http,
     StartupActivationStatus status,
     ILogger<StartupActivation> logger) : IHostedLifecycleService
 {
@@ -102,7 +105,8 @@ internal sealed partial class StartupActivation(
         await processes.Database.MigrateAsync(cancellationToken);
         await GrantRuntimeRoleAsync(schemaConnection, runtimeRole, tenantId, cancellationToken);
         await RuntimeRoleCheck.CheckAsync(await runtime.GetConnectionAsync(cancellationToken), tenantId, cancellationToken);
-        var bindings = TenantActivationBindings.For(tenants.Find(tenantId)!, environment.IsDevelopment());
+        var tenant = tenants.Find(tenantId)!;
+        var bindings = TenantActivationBindings.For(tenant, environment.IsDevelopment());
 
         foreach (var folder in options.Folders)
         {
@@ -123,6 +127,12 @@ internal sealed partial class StartupActivation(
                 if (activated.Diagnostics.Any(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error))
                 {
                     throw Failure("could not be activated", activated.Diagnostics, folder, tenantId);
+                }
+
+                if (activated.Realm is { } plan)
+                {
+                    using var client = http.CreateClient(nameof(StartupActivation));
+                    await ActivationRealmSync.SyncAsync(client, tenant.Realm, tenant.Bindings, plan, cancellationToken);
                 }
 
                 await TriggerSchedules.ActivateAsync(
