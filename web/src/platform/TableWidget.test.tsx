@@ -1223,6 +1223,15 @@ describe('TableWidget', () => {
       expect(await screen.findByRole('tooltip')).toHaveTextContent('Refresh')
     })
 
+    it('draws Refresh as a borderless icon button', async () => {
+      stubRecords()
+      renderWidget()
+
+      const refresh = await screen.findByRole('button', { name: 'Refresh' })
+      expect(refresh).toHaveClass('ant-btn-variant-text')
+      expect(refresh).not.toHaveClass('ant-btn-variant-outlined')
+    })
+
     it('draws the first toolbar action as the main action and the others as secondary in dark mode', async () => {
       stubRecords()
       const main: NavigateAction = { ...open, record: null, labelKey: 'note.add' }

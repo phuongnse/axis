@@ -594,6 +594,18 @@ describe('FormWidget', () => {
     expect(clear.querySelector('.anticon-close')).not.toBeNull()
   })
 
+  it('draws Choose and Clear as bordered buttons joined to the input', async () => {
+    stubFetch({ status: 200, body: noteJson('Buy paper', 1) })
+    renderForm(noteId)
+    await screen.findByLabelText('Category')
+
+    const group = screen.getByTestId('reference-category')
+    const choose = within(group).getByRole('button', { name: 'Choose' })
+    const clear = within(group).getByRole('button', { name: 'Clear' })
+    expect(choose).toHaveClass('ant-btn-variant-outlined', 'ant-btn-compact-item')
+    expect(clear).toHaveClass('ant-btn-variant-outlined', 'ant-btn-compact-item', 'ant-btn-compact-last-item')
+  })
+
   it('names Choose on keyboard focus', async () => {
     stubFetch({ status: 200, body: noteJson('Buy paper', 1) })
     renderForm(noteId)
@@ -602,6 +614,16 @@ describe('FormWidget', () => {
     act(() => screen.getByRole('button', { name: 'Choose' }).focus())
 
     expect(await screen.findByRole('tooltip')).toHaveTextContent('Choose')
+  })
+
+  it('names Clear on keyboard focus', async () => {
+    stubFetch({ status: 200, body: noteJson('Buy paper', 1) })
+    renderForm(noteId)
+    await screen.findByLabelText('Category')
+
+    act(() => screen.getByRole('button', { name: 'Clear' }).focus())
+
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Clear')
   })
 
   it('shows the history of a saved record below the form', async () => {
@@ -1151,6 +1173,19 @@ describe('FormWidget', () => {
     const choose = screen.getByRole('button', { name: 'Choose Category 1' })
     expect(choose.textContent).toBe('')
     expect(choose.querySelector('.anticon-search')).not.toBeNull()
+    expect(choose).toHaveClass('ant-btn-variant-outlined', 'ant-btn-compact-item')
+  })
+
+  it('draws the Clear of a child collection reference cell as a bordered button joined to its input', async () => {
+    stubFetch({ status: 200, body: categoryPageJson })
+    renderForm(null, lineCategoryWidget)
+    await userEvent.click(screen.getByRole('button', { name: 'Add row' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Choose Category 1' }))
+    await userEvent.click(await within(await screen.findByRole('dialog')).findByText('Office'))
+
+    const clear = await screen.findByRole('button', { name: 'Clear Category 1' })
+    expect(clear.textContent).toBe('')
+    expect(clear).toHaveClass('ant-btn-variant-outlined', 'ant-btn-compact-item', 'ant-btn-compact-last-item')
   })
 
   it('shows each child collection row remove button as a danger button with a trash icon', async () => {
