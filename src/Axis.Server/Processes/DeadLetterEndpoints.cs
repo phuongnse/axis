@@ -68,7 +68,7 @@ internal static class DeadLetterEndpoints
             return NotFound("The application has no process with this name.");
         }
 
-        if (!PolicyEvaluator.AllowsInspect(application, user.Roles, model))
+        if (!PolicyEvaluator.AllowsInspect(application, user.RolesIn(application), model))
         {
             return Grants.Forbidden();
         }
@@ -87,7 +87,7 @@ internal static class DeadLetterEndpoints
 
         var connection = await database.GetConnectionAsync(cancellationToken);
         var result = await DeadLetters.ListAsync(connection, application.Manifest.Id, model.Id, state, pageNumber, size, cancellationToken);
-        var mayRetry = PolicyEvaluator.AllowsRetry(application, user.Roles, model);
+        var mayRetry = PolicyEvaluator.AllowsRetry(application, user.RolesIn(application), model);
         var items = result.Items.Select(row => Item(row, mayRetry)).ToList();
         return Results.Ok(new DeadLetterListResponse(items, pageNumber, size, result.TotalCount));
     }
@@ -141,7 +141,7 @@ internal static class DeadLetterEndpoints
             return NotFound("The application has no process with this name.");
         }
 
-        if (!PolicyEvaluator.AllowsRetry(application, user.Roles, model))
+        if (!PolicyEvaluator.AllowsRetry(application, user.RolesIn(application), model))
         {
             return Grants.Forbidden();
         }

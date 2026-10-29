@@ -111,8 +111,8 @@ internal static class FileEndpoints
 
         var (owner, field) = target;
 
-        var read = PolicyEvaluator.Access(application, user.Roles, owner, PolicyAction.Read);
-        if (!read.Granted || !RecordFieldAccess.Read(application, user.Roles, owner).CanRead(field))
+        var read = PolicyEvaluator.Access(application, user.RolesIn(application), owner, PolicyAction.Read);
+        if (!read.Granted || !RecordFieldAccess.Read(application, user.RolesIn(application), owner).CanRead(field))
         {
             return FileNotFound();
         }
@@ -215,7 +215,7 @@ internal static class FileEndpoints
         }
 
         // A child collection is one field to the record write check, so it is the one the grant must cover.
-        if (!RecordFieldAccess.CanWrite(application!, user.Roles, model, collection is null ? target.Field.Name : target.Owner!.Name))
+        if (!RecordFieldAccess.CanWrite(application!, user.RolesIn(application!), model, collection is null ? target.Field.Name : target.Owner!.Name))
         {
             return Grants.Forbidden();
         }

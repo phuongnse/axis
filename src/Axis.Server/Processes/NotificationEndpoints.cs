@@ -73,7 +73,7 @@ internal static class NotificationEndpoints
             return Results.ValidationProblem(errors);
         }
 
-        var roles = PolicyEvaluator.HeldRoles(active.Model, user.Roles);
+        var roles = PolicyEvaluator.HeldRoles(active.Model, user.RolesIn(active.Model));
         var connection = await database.GetConnectionAsync(cancellationToken);
         var result = await NotificationQueries.ListAsync(
             connection, active.Model.Manifest.Id, user.Id, roles, unreadOnly, pageNumber, size, cancellationToken);
@@ -130,7 +130,7 @@ internal static class NotificationEndpoints
             return NotificationNotFound();
         }
 
-        var roles = PolicyEvaluator.HeldRoles(active.Model, user.Roles);
+        var roles = PolicyEvaluator.HeldRoles(active.Model, user.RolesIn(active.Model));
         var connection = await database.GetConnectionAsync(cancellationToken);
         return await NotificationQueries.MarkReadAsync(
             connection, active.Model.Manifest.Id, user.Id, roles, notificationId, cancellationToken)
@@ -155,7 +155,7 @@ internal static class NotificationEndpoints
             return ApplicationNotFound();
         }
 
-        var roles = PolicyEvaluator.HeldRoles(active.Model, user.Roles);
+        var roles = PolicyEvaluator.HeldRoles(active.Model, user.RolesIn(active.Model));
         var connection = await database.GetConnectionAsync(cancellationToken);
         await NotificationQueries.MarkAllReadAsync(connection, active.Model.Manifest.Id, user.Id, roles, cancellationToken);
         return Results.NoContent();

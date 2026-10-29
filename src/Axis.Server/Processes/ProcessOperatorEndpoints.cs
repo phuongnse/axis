@@ -108,7 +108,7 @@ internal static class ProcessOperatorEndpoints
             return NotFound("The application has no process with this name.");
         }
 
-        if (!PolicyEvaluator.AllowsCancel(application, user.Roles, model))
+        if (!PolicyEvaluator.AllowsCancel(application, user.RolesIn(application), model))
         {
             return Grants.Forbidden();
         }
@@ -219,7 +219,7 @@ internal static class ProcessOperatorEndpoints
             return NotFound("The application has no process with this name.");
         }
 
-        if (!PolicyEvaluator.AllowsRetry(application, user.Roles, model))
+        if (!PolicyEvaluator.AllowsRetry(application, user.RolesIn(application), model))
         {
             return Grants.Forbidden();
         }
@@ -345,7 +345,7 @@ internal static class ProcessOperatorEndpoints
             return NotFound("The application has no process with this name.");
         }
 
-        if (!PolicyEvaluator.AllowsResolve(application, user.Roles, model))
+        if (!PolicyEvaluator.AllowsResolve(application, user.RolesIn(application), model))
         {
             return Grants.Forbidden();
         }
@@ -656,7 +656,7 @@ internal static class ProcessOperatorEndpoints
             throw new InvalidOperationException($"The subject entity '{subjectEntity.Name}' of process '{model.Name}' is not in the model.");
         }
 
-        return (entity, PolicyEvaluator.Access(application, user.Roles, entity, PolicyAction.Read));
+        return (entity, PolicyEvaluator.Access(application, user.RolesIn(application), entity, PolicyAction.Read));
     }
 
     private static IResult InstanceNotFound() => NotFound("No instance of this process exists with this id.");

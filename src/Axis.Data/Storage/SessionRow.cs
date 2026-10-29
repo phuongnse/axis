@@ -37,4 +37,11 @@ public sealed class SessionRow
     /// for a sign-in through the tenant's accounts and for a session created before the column existed.
     /// </summary>
     public string? IdentityProvider { get; init; }
+
+    /// <summary>
+    /// The roles that the identity provider's <c>roles</c> mapping gave each application at sign-in, as a JSON object from the
+    /// application id to the list of role names. It is <c>{}</c> for a sign-in through the tenant's accounts and for a session
+    /// created before the column existed.
+    /// </summary>
+    public string ApplicationRoles { get; init; } = "{}";
 }

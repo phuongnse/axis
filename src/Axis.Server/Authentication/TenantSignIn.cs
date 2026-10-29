@@ -1,6 +1,7 @@
 using Axis.Core.Tenancy;
 using Axis.Data.Audit;
 using Axis.Data.Profiles;
+using Axis.Server.Applications;
 using Axis.Server.Studio;
 using Axis.Server.Tenancy;
 using Axis.Server.Users;
@@ -265,6 +266,15 @@ internal sealed partial class TenantSignInOptions(TenantSignInSettings settings,
                 roles = roles.Concat(mapped).Distinct(StringComparer.Ordinal);
             }
 
+            // Each active application maps the provider's roles claim to its own roles, which only its own policies see.
+            var signedInProvider = Blank(principal.FindFirst(RealmSync.IdentityProviderClaim)?.Value);
+            var applicationRoles = signedInProvider is null
+                ? null
+                : ApplicationRoles.Resolve(
+                    await context.HttpContext.RequestServices.GetRequiredService<ActiveApplicationResolver>().ListAsync(context.HttpContext.RequestAborted),
+                    signedInProvider,
+                    name => principal.FindAll(name).Select(claim => claim.Value));
+
             // The email and locale are not session claims. They go to OnTicketReceived in a request item.
             context.HttpContext.Items[TenantSignIn.ProfileClaimsItem] = new ProfileClaims(
                 Blank(principal.FindFirst(tenant.Claims.Email)?.Value),
@@ -275,7 +285,8 @@ internal sealed partial class TenantSignInOptions(TenantSignInSettings settings,
                 string.IsNullOrWhiteSpace(displayName) ? userId : displayName,
                 roles,
                 authenticatedAt: SignInRecency.TryRead(authTime, out var authenticatedAt) ? authenticatedAt : null,
-                identityProvider: Blank(principal.FindFirst(RealmSync.IdentityProviderClaim)?.Value));
+                identityProvider: Blank(principal.FindFirst(RealmSync.IdentityProviderClaim)?.Value),
+                applicationRoles: applicationRoles);
         };
         // Every profile refuses metadata whose issuer is not the tenant's authority, before the code goes to the token endpoint.
         options.Events.OnAuthorizationCodeReceived = async context =>

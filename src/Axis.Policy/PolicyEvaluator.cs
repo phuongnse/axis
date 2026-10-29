@@ -5,8 +5,8 @@ namespace Axis.Policy;
 /// <summary>
 /// Decides whether a user's roles grant an action on an entity, a data source, a process or an
 /// endpoint of an application. Access is denied unless a grant allows it. A role counts only when
-/// a roles claim value equals the name of a role the application declares, compared exactly, so
-/// any other value grants nothing. A policy applies when the user holds any of its roles. An entity grant with a
+/// a roles claim value, or a role that the application's identity provider mapping gave, equals the name of a role the
+/// application declares, compared exactly, so any other value grants nothing. A policy applies when the user holds any of its roles. An entity grant with a
 /// <see cref="GrantModel.Filter"/> grants the records that match it, and one with
 /// <see cref="GrantModel.Fields"/> grants those fields, through <see cref="Access"/> and
 /// <see cref="Fields"/>. The caller applies them: the record API and the data source endpoint

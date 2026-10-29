@@ -58,8 +58,8 @@ internal static class FormStateEndpoints
         // The form's entity is always in the model; the compiler resolved it.
         var entity = application.FindEntity(model.Entity.Id)
             ?? throw new InvalidOperationException("The application has no entity for the form.");
-        var create = PolicyEvaluator.Access(application, user.Roles, entity, PolicyAction.Create);
-        var update = PolicyEvaluator.Access(application, user.Roles, entity, PolicyAction.Update);
+        var create = PolicyEvaluator.Access(application, user.RolesIn(application), entity, PolicyAction.Create);
+        var update = PolicyEvaluator.Access(application, user.RolesIn(application), entity, PolicyAction.Update);
         if (!create.Granted && !update.Granted)
         {
             return Grants.Forbidden();
@@ -86,7 +86,7 @@ internal static class FormStateEndpoints
         if (body.RecordId is { } recordId)
         {
             // The draft is read only when the stored record is readable, as an update needs.
-            var read = PolicyEvaluator.Access(application, user.Roles, entity, PolicyAction.Read);
+            var read = PolicyEvaluator.Access(application, user.RolesIn(application), entity, PolicyAction.Read);
             if (!read.Granted)
             {
                 return RecordNotFound();
@@ -113,7 +113,7 @@ internal static class FormStateEndpoints
         }
 
         var now = await RecordQueries.TransactionTimeAsync(connection, cancellationToken);
-        var readable = RecordFieldAccess.Read(application, user.Roles, entity).Readable;
+        var readable = RecordFieldAccess.Read(application, user.RolesIn(application), entity).Readable;
         var sets = await RecordSets.ReadAsync(connection, application, entity, stored, body.Draft!.Input.Links, cancellationToken);
         return Results.Ok(FormStateEvaluator.Evaluate(application, model, entity, stored, body.Draft!, body.Touched!, readable, user.Id, now, sets));
     }

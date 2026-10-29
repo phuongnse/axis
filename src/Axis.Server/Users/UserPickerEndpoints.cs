@@ -40,7 +40,7 @@ internal static class UserPickerEndpoints
             return Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "No application is active under this name.");
         }
 
-        if (!PolicyEvaluator.AllowsReassignAny(active.Model, user.Roles))
+        if (!PolicyEvaluator.AllowsReassignAny(active.Model, user.RolesIn(active.Model)))
         {
             return Grants.Forbidden();
         }

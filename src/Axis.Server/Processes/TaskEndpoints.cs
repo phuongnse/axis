@@ -117,7 +117,7 @@ internal static class TaskEndpoints
             return Results.ValidationProblem(errors);
         }
 
-        var roles = PolicyEvaluator.HeldRoles(active.Model, user.Roles);
+        var roles = PolicyEvaluator.HeldRoles(active.Model, user.RolesIn(active.Model));
         var connection = await database.GetConnectionAsync(cancellationToken);
         var result = await TaskQueries.ListOpenAsync(
             connection, active.Model.Manifest.Id, user.Id, roles, pageNumber, size, cancellationToken);
@@ -187,7 +187,7 @@ internal static class TaskEndpoints
             return TaskNotFound();
         }
 
-        var roles = PolicyEvaluator.HeldRoles(active.Model, user.Roles);
+        var roles = PolicyEvaluator.HeldRoles(active.Model, user.RolesIn(active.Model));
         if (!TaskQueries.MayAct(task, user.Id, roles))
         {
             return AssignedToSomeoneElse();
@@ -226,7 +226,7 @@ internal static class TaskEndpoints
                 return TaskNotFound();
             }
 
-            var roles = PolicyEvaluator.HeldRoles(active.Model, user.Roles);
+            var roles = PolicyEvaluator.HeldRoles(active.Model, user.RolesIn(active.Model));
             var tenantId = (tenants.Current ?? throw new InvalidOperationException("No tenant context is set.")).TenantId;
             var connection = await database.GetConnectionAsync(cancellationToken);
             await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))
@@ -292,7 +292,7 @@ internal static class TaskEndpoints
             return TaskNotFound();
         }
 
-        var roles = PolicyEvaluator.HeldRoles(active.Model, user.Roles);
+        var roles = PolicyEvaluator.HeldRoles(active.Model, user.RolesIn(active.Model));
         if (!TaskQueries.MayAct(task, user.Id, roles))
         {
             return AssignedToSomeoneElse();
@@ -375,7 +375,7 @@ internal static class TaskEndpoints
             return TaskNotFound();
         }
 
-        var roles = PolicyEvaluator.HeldRoles(active.Model, user.Roles);
+        var roles = PolicyEvaluator.HeldRoles(active.Model, user.RolesIn(active.Model));
         var connection = await database.GetConnectionAsync(cancellationToken);
         await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))
         {
@@ -430,7 +430,7 @@ internal static class TaskEndpoints
             return TaskNotFound();
         }
 
-        var roles = PolicyEvaluator.HeldRoles(active.Model, user.Roles);
+        var roles = PolicyEvaluator.HeldRoles(active.Model, user.RolesIn(active.Model));
         var connection = await database.GetConnectionAsync(cancellationToken);
         await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))
         {
@@ -646,7 +646,7 @@ internal static class TaskEndpoints
     /// <summary>Whether <paramref name="user"/> holds <c>reassign</c> on the process of <paramref name="task"/> in the <paramref name="active"/> release.</summary>
     private static bool MayReassign(ApplicationModel active, CurrentUserResponse user, ProcessTaskRow task) =>
         active.Processes.FirstOrDefault(process => process.Id == task.ProcessId) is { } process
-        && PolicyEvaluator.AllowsReassign(active, user.Roles, process);
+        && PolicyEvaluator.AllowsReassign(active, user.RolesIn(active), process);
 
     /// <summary>
     /// The commands the user may take on <paramref name="task"/> now, in the order <c>claim</c>,

@@ -66,12 +66,12 @@ internal static class RecordImportEndpoints
             return notFound!;
         }
 
-        if (!PolicyEvaluator.AllowsImport(application!, user.Roles, model))
+        if (!PolicyEvaluator.AllowsImport(application!, user.RolesIn(application!), model))
         {
             return Grants.Forbidden();
         }
 
-        if (key is not null && !PolicyEvaluator.Access(application!, user.Roles, model, PolicyAction.Update).Granted)
+        if (key is not null && !PolicyEvaluator.Access(application!, user.RolesIn(application!), model, PolicyAction.Update).Granted)
         {
             return Grants.Forbidden();
         }
@@ -101,7 +101,7 @@ internal static class RecordImportEndpoints
             await RecordImports.InsertAsync(
                 connection,
                 transaction,
-                new RecordImport(id, tenantId, application!.Manifest.Id, model.Id, user.Id, user.DisplayName, user.Roles, key, format, file, itemId, created),
+                new RecordImport(id, tenantId, application!.Manifest.Id, model.Id, user.Id, user.DisplayName, user.RolesIn(application), key, format, file, itemId, created),
                 cancellationToken);
             await transaction.CommitAsync(cancellationToken);
         }
@@ -166,7 +166,7 @@ internal static class RecordImportEndpoints
         }
 
         // The worker writes with the roles stored at upload, so the user's current grants are checked here.
-        if (!PolicyEvaluator.AllowsImport(application!, user.Roles, model) || !PolicyEvaluator.Access(application!, user.Roles, model, PolicyAction.Create).Granted)
+        if (!PolicyEvaluator.AllowsImport(application!, user.RolesIn(application!), model) || !PolicyEvaluator.Access(application!, user.RolesIn(application!), model, PolicyAction.Create).Granted)
         {
             return Grants.Forbidden();
         }

@@ -5,8 +5,8 @@ their organization uses. [D99](../decisions/d99-axis-ships-its-own-identity-prov
 [D100](../decisions/d100-identity-providers-per-application-and-sign-in-per-site.md) lets each application declare how
 its people sign in and each site pick from that. M17 builds it, and each section says whether it is built. The
 `identityProvider` resource, a site's `signIn` and their compile checks are built, and so is the tenant's realm that
-`tenant create` makes. Activation checks the bindings of `oidc` providers and refuses providers that would split a person. Sign-in does
-not read them yet, activation updates the realm, and a new realm has no accounts, no redirect addresses and no role mappings, so until they do, a tenant signs in through an identity provider that runs outside
+`tenant create` makes. Activation checks the bindings of `oidc` providers and refuses providers that would split a person. Sign-in reads the
+`roles` mapping of each provider, activation updates the realm, and a new realm has no accounts, no redirect addresses and no role mappings, so until they do, a tenant signs in through an identity provider that runs outside
 Axis when its `Oidc` block points there, as [security](security.md#sign-in-and-the-session) describes. No command points the block at another provider. Accounts, roles given by an administrator and the
 users page are in [user administration](user-administration.md).
 
@@ -83,7 +83,7 @@ so Studio edits it, with the identity provider editor of [Studio](studio.md), an
   always the realm's `sub`, see [users](#users).
 - **`roles`:** how the provider's claims give the application's roles. `claim` names the claim, by default `roles`.
   `values` maps a claim value to a role. Without `values`, a claim value gives the role of the same name, as the roles
-  claim does today, see [claim values](roles-and-policies.md). A value that gives no declared role is ignored.
+  claim does, see [claim values](roles-and-policies.md). A value that gives no declared role is ignored.
 - **`acr`:** optional, the assurance levels the provider must sign the person in at. A sign-in that starts on a site asks
   for the levels of all the site's providers as `acr_values`. At the callback, the server compares the upstream `acr`,
   which the token carries as `identity_provider_acr`, with the list of the provider that signed the person in, and
@@ -242,9 +242,12 @@ _(planned for M17)_
   username is the provider's alias, a dot and the person's subject, such as `oidc-companyissuer.<sub>`, so two providers
   never clash on a username. The realm allows two users to share an email. Linking that the person proves on both sides
   comes later.
-- **Roles:** at sign-in the session gets, for each application, the roles that the provider's `roles` mapping gives
-  and the roles the [users page](user-administration.md#roles) gives. Platform roles come the same way from the
-  platform sign-in.
+- **Roles:** at sign-in the session gets, for each active application, the roles that the provider's `roles` mapping
+  gives, kept by application id. This is built. A provider matches when its alias equals the sign-in's `identity_provider`
+  claim, and an application with several matching providers gets the union of their roles. A role mapped in one
+  application grants nothing in another, and an account sign-in gets no mapped roles. The roles claim of the tenant
+  still gives roles to every application. Studio, the console and the users page check the roles claim and platform roles only. _(planned for M17)_ The roles the [users page](user-administration.md#roles)
+  gives join them. Platform roles come from the platform sign-in as before.
 
 ## Keeping the realm in step
 

@@ -10,8 +10,8 @@ namespace Axis.Server.Authentication;
 
 /// <summary>
 /// The session of a person who signed in through their tenant's identity provider. The state is a
-/// row of <c>axis.sessions</c> in the tenant database, with the user id, the display name, the roles and
-/// the times of sign-in and of the last request, and no token. The cookie holds only the random session
+/// row of <c>axis.sessions</c> in the tenant database, with the user id, the display name, the roles, the roles that each
+/// application's provider mapping gave and the times of sign-in and of the last request, and no token. The cookie holds only the random session
 /// id. A session counts as no session on another tenant's host or on another host of its tenant, after
 /// <see cref="IdleTimeout"/> without requests, or <see cref="MaxLifetime"/> after sign-in, and sign-out deletes the row at once.
 /// </summary>
@@ -39,6 +39,7 @@ internal static class Session
     private const string AuthenticatedAtClaim = "axis:authenticated_at";
     private const string SessionIdClaim = "axis:session_id";
     private const string IdentityProviderClaim = "axis:identity_provider";
+    private const string ApplicationRoleClaim = "axis:application_role";
 
     /// <summary>How recent the person's last login at the identity provider must be for the session to end sessions.</summary>
     public static readonly TimeSpan ReauthenticationWindow = TimeSpan.FromMinutes(5);
@@ -46,6 +47,7 @@ internal static class Session
     /// <param name="authenticatedAt">The person's last login at the identity provider, or null when it is not known.</param>
     /// <param name="sessionId">The public id of the stored session, set only for a principal that the store read.</param>
     /// <param name="identityProvider">The alias of the provider that signed the person in, or null for the tenant's accounts.</param>
+    /// <param name="applicationRoles">The roles that each application's provider mapping gave the person, by application id, or null for none.</param>
     public static ClaimsPrincipal CreatePrincipal(
         string tenantId,
         string userId,
@@ -53,7 +55,8 @@ internal static class Session
         IEnumerable<string> roles,
         DateTimeOffset? authenticatedAt = null,
         string? sessionId = null,
-        string? identityProvider = null)
+        string? identityProvider = null,
+        IReadOnlyDictionary<Guid, IReadOnlyList<string>>? applicationRoles = null)
     {
         List<Claim> claims =
         [
@@ -77,6 +80,11 @@ internal static class Session
             claims.Add(new Claim(IdentityProviderClaim, identityProvider));
         }
 
+        foreach (var (applicationId, applicationRoleNames) in applicationRoles ?? new Dictionary<Guid, IReadOnlyList<string>>())
+        {
+            claims.AddRange(applicationRoleNames.Select(role => new Claim(ApplicationRoleClaim, $"{applicationId:D}/{role}")));
+        }
+
         return new ClaimsPrincipal(new ClaimsIdentity(claims, Scheme, UserIdClaim, RoleClaim));
     }
 
@@ -87,7 +95,31 @@ internal static class Session
                 id,
                 principal.FindFirstValue(DisplayNameClaim) ?? id,
                 [.. principal.FindAll(RoleClaim).Select(claim => claim.Value)])
+            {
+                ApplicationRoles = ReadApplicationRoles(principal),
+            }
             : null;
+
+    private static Dictionary<Guid, IReadOnlyList<string>> ReadApplicationRoles(ClaimsPrincipal principal)
+    {
+        var result = new Dictionary<Guid, List<string>>();
+        foreach (var claim in principal.FindAll(ApplicationRoleClaim))
+        {
+            // The id has no "/", so the first one splits the id from the role name.
+            var split = claim.Value.IndexOf('/', StringComparison.Ordinal);
+            if (split > 0 && Guid.TryParseExact(claim.Value.AsSpan(0, split), "D", out var applicationId))
+            {
+                if (!result.TryGetValue(applicationId, out var names))
+                {
+                    result[applicationId] = names = [];
+                }
+
+                names.Add(claim.Value[(split + 1)..]);
+            }
+        }
+
+        return result.ToDictionary(pair => pair.Key, pair => (IReadOnlyList<string>)pair.Value);
+    }
 
     /// <summary>The tenant id of a session principal, or null when the principal is not a session.</summary>
     public static string? ReadTenantId(ClaimsPrincipal principal) => principal.FindFirstValue(TenantIdClaim);

@@ -185,7 +185,7 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place. _(planned f
     `auth_time`. It also holds the lower-case site path of the host that made the
     session, null for the tenant's own hosts, and the alias of the provider that
     signed the person in, from the ID token's `identity_provider` claim, none for
-    accounts. A session from before a column existed holds none of it and counts
+    accounts, and the roles that each application's provider mapping gave, by application id. A session from before a column existed holds none of it and counts
     as a sign-in through accounts on the tenant's own hosts. The table never holds the
     session id or a token, and none reaches the browser.
   - The cookie is one HttpOnly, SameSite=Lax cookie. It holds only the random
@@ -251,9 +251,9 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place. _(planned f
   cookie taken to another tenant's host signs nobody in there.
 - **Roles.** The roles come from the roles claim at sign-in and are kept in
   the session row. A role change at the identity provider applies at the next
-  sign-in. _(planned for M17)_ Each application's roles come from its identity provider's `roles` mapping and the
-  roles the users page gives, and a change on the users page applies to live sessions at once, see
-  [users](identity-provider.md#users) and [roles](user-administration.md#roles).
+  sign-in. Each application's roles also come from its provider's `roles` mapping, kept by application
+  id, see [users](identity-provider.md#users). _(planned for M17)_ The roles the users page gives join them, and a
+  change on the users page applies to live sessions at once, see [roles](user-administration.md#roles).
 - **Current user.** `GET /api/me` keeps its shape,
   `{ "id", "displayName", "roles" }`, and reads the session. It adds a boolean `console`, true when the user holds
   the role that `Console:OperatorRole` names. With no value set it is false for everyone. See the
@@ -762,8 +762,8 @@ section is built. It follows
 The `role` and `policy` resource files are described in
 [configuration](roles-and-policies.md).
 
-- **Roles.** A user's roles are the roles claim values kept in the
-  [session](#sign-in-and-the-session). A value matches a declared `role` of
+- **Roles.** A user's roles are the roles claim values and the roles that the
+  application's provider mapping gave, kept in the [session](#sign-in-and-the-session). A value matches a declared `role` of
   the application by its exact name. A value that names no declared role is
   ignored. A user matches a policy when they hold any of its roles.
 - **Grants.** A policy holds grants. Each grant gives actions on one target:

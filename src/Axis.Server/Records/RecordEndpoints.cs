@@ -123,7 +123,7 @@ internal static class RecordEndpoints
             return notFound!;
         }
 
-        var read = PolicyEvaluator.Access(application!, user.Roles, model, PolicyAction.Read);
+        var read = PolicyEvaluator.Access(application!, user.RolesIn(application!), model, PolicyAction.Read);
         if (!read.Granted)
         {
             return Grants.Forbidden();
@@ -136,7 +136,7 @@ internal static class RecordEndpoints
             return Grants.PendingFilter();
         }
 
-        var fields = RecordFieldAccess.Read(application!, user.Roles, model);
+        var fields = RecordFieldAccess.Read(application!, user.RolesIn(application!), model);
         var errors = new SortedDictionary<string, string[]>(StringComparer.Ordinal);
         PagingQuery.TryRead(page, pageSize, errors, out var pageNumber, out var size);
 
@@ -196,8 +196,8 @@ internal static class RecordEndpoints
             return notFound!;
         }
 
-        var read = PolicyEvaluator.Access(application!, user.Roles, model, PolicyAction.Read);
-        if (!PolicyEvaluator.AllowsExport(application!, user.Roles, model) || !read.Granted)
+        var read = PolicyEvaluator.Access(application!, user.RolesIn(application!), model, PolicyAction.Read);
+        if (!PolicyEvaluator.AllowsExport(application!, user.RolesIn(application!), model) || !read.Granted)
         {
             return Grants.Forbidden();
         }
@@ -209,7 +209,7 @@ internal static class RecordEndpoints
             return Grants.PendingFilter();
         }
 
-        var fields = RecordFieldAccess.Read(application!, user.Roles, model);
+        var fields = RecordFieldAccess.Read(application!, user.RolesIn(application!), model);
         var errors = new SortedDictionary<string, string[]>(StringComparer.Ordinal);
         var (order, searched) = ReadQuery(sort, search, request, model, fields, errors);
         ExportFile.TryParseFormat(format, errors, out var exportFormat);
@@ -360,7 +360,7 @@ internal static class RecordEndpoints
             return notFound!;
         }
 
-        var read = PolicyEvaluator.Access(application!, user.Roles, model, PolicyAction.Read);
+        var read = PolicyEvaluator.Access(application!, user.RolesIn(application!), model, PolicyAction.Read);
         if (!read.Granted)
         {
             return Grants.Forbidden();
@@ -391,7 +391,7 @@ internal static class RecordEndpoints
 
         // A computed field that is pending shows as the active release computes it. The read stores nothing.
         record = await PendingComputedReads.ApplyAsync(connection, database.ReadTransaction, application!, model, record, cancellationToken);
-        return Results.Ok(RecordFieldAccess.Read(application!, user.Roles, model).Visible(record));
+        return Results.Ok(RecordFieldAccess.Read(application!, user.RolesIn(application!), model).Visible(record));
     }
 
     // Every audit record that names the record is listed, whoever wrote it: the record API, a
@@ -422,7 +422,7 @@ internal static class RecordEndpoints
             return notFound!;
         }
 
-        var read = PolicyEvaluator.Access(application!, user.Roles, model, PolicyAction.Read);
+        var read = PolicyEvaluator.Access(application!, user.RolesIn(application!), model, PolicyAction.Read);
         if (!read.Granted)
         {
             return Grants.Forbidden();
@@ -454,7 +454,7 @@ internal static class RecordEndpoints
             return RecordNotFound();
         }
 
-        var fields = RecordFieldAccess.Read(application!, user.Roles, model);
+        var fields = RecordFieldAccess.Read(application!, user.RolesIn(application!), model);
         var result = await AuditRecords.ListForRecordAsync(connection, model.Id, recordId, pageNumber, size, cancellationToken);
         var instanceIds = result.Items
             .Where(item => item.ProcessInstanceId is not null)
@@ -471,7 +471,7 @@ internal static class RecordEndpoints
                 item.Action,
                 item.ProcessInstanceId,
                 VisibleDetails(JsonNode.Parse(item.Details)!, fields),
-                InspectPath(application, user.Roles, item.ProcessInstanceId, processIds)))
+                InspectPath(application, user.RolesIn(application), item.ProcessInstanceId, processIds)))
             .ToList();
         return Results.Ok(new RecordHistoryResponse(items, pageNumber, size, result.TotalCount));
     }
@@ -530,7 +530,7 @@ internal static class RecordEndpoints
                 application!,
                 releaseId,
                 model,
-                Actor(user),
+                Actor(user, application!),
                 BodyReader(request),
                 form,
                 loggerFactory,
@@ -544,7 +544,7 @@ internal static class RecordEndpoints
             return result is { Outcome: RecordCommandOutcome.Written, Record: { } created }
                 ? Results.Created(
                     $"/api/apps/{application!.Manifest.Name}/entities/{model.Name}/records/{created.Id:D}",
-                    RecordFieldAccess.Read(application, user.Roles, model).Visible(created))
+                    RecordFieldAccess.Read(application, user.RolesIn(application), model).Visible(created))
                 : WriteFailure(result);
         }
 
@@ -592,7 +592,7 @@ internal static class RecordEndpoints
                 releaseId,
                 model,
                 recordId,
-                Actor(user),
+                Actor(user, application!),
                 BodyReader(request),
                 form,
                 loggerFactory,
@@ -603,7 +603,7 @@ internal static class RecordEndpoints
             }
 
             return result is { Outcome: RecordCommandOutcome.Written, Record: { } updated }
-                ? Results.Ok(RecordFieldAccess.Read(application!, user.Roles, model).Visible(updated))
+                ? Results.Ok(RecordFieldAccess.Read(application!, user.RolesIn(application!), model).Visible(updated))
                 : WriteFailure(result);
         }
 
@@ -642,7 +642,7 @@ internal static class RecordEndpoints
 
             var connection = await database.GetConnectionAsync(cancellationToken);
             var result = await RecordCommand.DeleteAsync(
-                connection, TenantId(tenants), application!, releaseId, model, recordId, Actor(user), loggerFactory, cancellationToken);
+                connection, TenantId(tenants), application!, releaseId, model, recordId, Actor(user, application!), loggerFactory, cancellationToken);
             if (result.Outcome == RecordCommandOutcome.ReleaseChanged)
             {
                 continue;
@@ -654,7 +654,7 @@ internal static class RecordEndpoints
         return ReleaseRetry.Changed();
     }
 
-    private static RecordActor Actor(CurrentUserResponse user) => new(user.Id, user.DisplayName, user.Roles);
+    private static RecordActor Actor(CurrentUserResponse user, ApplicationModel application) => new(user.Id, user.DisplayName, user.RolesIn(application));
 
     // The route of a module entity has a module segment before the entity name.
     internal static string EntityName(HttpContext context, string entity) =>
@@ -666,7 +666,7 @@ internal static class RecordEndpoints
     // An id that names no record is a 403 when the user has no grant for the action, as the grant
     // comes before the id, and a 404 otherwise.
     private static IResult UnparsedId(ApplicationModel application, CurrentUserResponse user, EntityModel model, PolicyAction action) =>
-        PolicyEvaluator.Access(application, user.Roles, model, action).Granted ? RecordNotFound() : Grants.Forbidden();
+        PolicyEvaluator.Access(application, user.RolesIn(application), model, action).Granted ? RecordNotFound() : Grants.Forbidden();
 
     private static List<ExpressionModel> Expressions(IReadOnlyList<RecordFilter> filters) => RecordCommand.Expressions(filters);
 
