@@ -278,12 +278,15 @@ _(planned for M17)_
   texts. When the sign-in goes through a site client, which carries `axis.accounts`, `site` holds that site's
   providers and accounts flag. The page then lists only those providers, and shows the account form only when the realm
   and the site both allow accounts. A client without `axis.accounts`, such as `axis`, has no `site`, so the page shows
-  every provider and the form as before. The account form is a real `<form method="post">` to the login address. The design system's
+  every provider and the form as before. The account form is a real `<form method="post">` to the login address. The components draw the frame (the 32 px mark
+  with the word "Axis", the 400 px card and the organization's name under the title), the "Continue with" secondary
+  buttons, the form widget's field labels and "Forgot password?" on the password's row. A shared two-step page with six
+  code boxes exists too, but only the preview draws it. The design system's
   `identitySignIn` preview feeds the components fixtures, see
   [shell design system previews](shell.md#design-system-previews). The Keycloak theme `axis` feeds them a real
   context: its `login.ftl` writes Keycloak's sign-in data as JSON and a React bundle draws the page. `scripts/build.sh`
   builds the theme from `web/keycloak-theme/` into `artifacts/keycloak-theme/axis/login/` and checks its files and
-  fonts. Keycloak's other pages still come from its `keycloak` parent theme. The development realm `axis` uses the theme as
+  fonts. Keycloak's other pages, two-step verification included, still come from its `keycloak` parent theme. The development realm `axis` uses the theme as
   its login theme: Compose, `scripts/dev.sh`, `scripts/e2e.sh` and the Keycloak of the integration tests load it from
   `artifacts/keycloak-theme`, and each builds it first. The realms of `tenant create` name the theme as their login
   theme. The on-premises Compose example loads it from `AXIS_IDENTITY_THEME_DIR`, see

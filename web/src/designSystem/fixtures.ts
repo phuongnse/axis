@@ -18,7 +18,7 @@ import type {
   WidgetMetadata,
 } from '../platform/site'
 import type { TaskPage } from '../platform/tasks'
-import type { SignInContext, SignInTexts } from '../identitySignIn/signInContext'
+import type { SignInContext, SignInTexts, TwoStepTexts } from '../identitySignIn/signInContext'
 
 /** The fixture application. Its name is also the marker that tells a design-system build from the production SPA. */
 export const application = 'DesignSystemSample'
@@ -778,7 +778,7 @@ const notificationPage: NotificationPage = { items: [], page: 1, pageSize: 10, t
 
 /** The texts of the identity provider's sign-in page, in English. */
 export const identitySignInTexts: SignInTexts = {
-  signInWith: 'Sign in with {provider}',
+  continueWith: 'Continue with {provider}',
   providerOnly: 'Your organization signs in only with {provider}.',
   or: 'or',
   username: 'Email or username',
@@ -793,7 +793,7 @@ export const identitySignInTexts: SignInTexts = {
 /** What the identity provider's sign-in page draws in the design system. */
 export const identitySignInContext: SignInContext = {
   title: 'Sign in to Axis',
-  realmName: 'contoso',
+  realmName: 'Contoso',
   providers: [{ alias: 'contoso', label: 'Contoso ID', loginUrl: '#contoso' }],
   accounts: true,
   username: 'alex.morgan@contoso.example',
@@ -811,9 +811,9 @@ export const identitySignInContext: SignInContext = {
 export const identityInvalid = 'Invalid email, username or password.'
 
 /** The texts of the preview-only two-step verification page. */
-export const identityTwoStepTexts = {
-  twoStepTitle: 'Two-step verification',
-  twoStepMessage: 'Enter the 6-digit code from your authenticator app.',
+export const identityTwoStepTexts: TwoStepTexts = {
+  title: 'Two-step verification',
+  message: 'Enter the 6-digit code from your authenticator app.',
   code: 'Verification code',
   verify: 'Verify',
   tryAnotherWay: 'Try another way',
