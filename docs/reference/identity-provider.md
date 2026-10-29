@@ -202,7 +202,8 @@ _(planned for M17)_
   `<provider alias>.<subject>`. Each provider names the realm's first-login flow. It touches no other client or
   provider, so `axis`, `axis-activation`, `axis-users` and anything an operator added stay. Both tenant catalogs carry
   the realm's name, the identity provider's address and the activation secret, see
-  [tenant realm](host-settings.md#tenant-realm). Activation does not call it yet.
+  [tenant realm](host-settings.md#tenant-realm). The server's startup activation calls it, after it activates each
+  application folder, for a tenant that has realm details. `Axis.Admin` activation does not call it yet.
 - **Brought in step by activation:** activating a release adds, changes and removes the realm's brokered providers,
   their claim mappers and the site clients to match the active releases of the tenant and its platform sign-in. A
   provider that nothing names any more is removed. Its users stay, but cannot sign in through it.
@@ -259,7 +260,10 @@ _(planned for M17)_
   PostgreSQL server, behind the same TLS proxy as the server, on one host of its own for the installation. The
   operator upgrades it with Axis, which pins its version.
 - The development realm `axis` stays for `scripts/dev.sh` and the tests, as the `default` tenant's realm, see
-  [security](security.md#development-users). Activation keeps it in step as any realm.
+  [security](security.md#development-users). Under `scripts/dev.sh` and in the E2E run, the server's startup activation
+  keeps it in step through its `axis-activation` client, so the realm holds a `site-` client for each sample site, see
+  [development realm and users](../development.md#development-realm-and-users). Under Docker Compose it does not,
+  because the server's container cannot reach Keycloak at `localhost:8080`.
 - **Backup and restore:** the identity provider's database holds the accounts and their credentials. The operator
   backs it up with the installation. `tenant backup` does not carry them, so a tenant restored to another
   installation gets a new realm, and its accounts need new invitations.

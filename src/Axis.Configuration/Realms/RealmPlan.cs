@@ -4,7 +4,7 @@ namespace Axis.Configuration.Realms;
 
 /// <summary>
 /// The state of the tenant's realm that activation wants: a client for each site and a brokered provider for each
-/// set of <c>oidc</c> bindings. Nothing applies it to the realm yet.
+/// set of <c>oidc</c> bindings. Startup activation applies it to the realm through <c>ActivationRealmSync</c>.
 /// </summary>
 /// <param name="Sites">The site clients, in ordinal path order.</param>
 /// <param name="Providers">The providers, in ordinal alias order.</param>

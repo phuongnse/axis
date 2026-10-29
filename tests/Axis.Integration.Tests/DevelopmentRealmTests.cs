@@ -1,5 +1,6 @@
 using System.Buffers.Text;
 using System.Net;
+using System.Net.Http.Headers;
 using System.Text.Json;
 
 namespace Axis.Integration.Tests;
@@ -88,6 +89,32 @@ public sealed class DevelopmentRealmTests(KeycloakFixture keycloak) : IAsyncLife
         Assert.Contains("axis-endpoints", Audiences(claims));
         Assert.Equal(JsonValueKind.Array, claims.GetProperty("roles").ValueKind);
         Assert.Equal(["purchasing-system"], claims.GetProperty("roles").EnumerateArray().Select(role => role.GetString()));
+    }
+
+    // Startup activation signs in as this client to add the samples' site clients and brokered providers.
+    [Fact]
+    public async Task Issues_the_activation_client_a_token_that_lists_the_identity_providers_of_the_realm()
+    {
+        using var client = new HttpClient();
+        using var form = new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["grant_type"] = "client_credentials",
+            ["client_id"] = KeycloakFixture.ActivationClientId,
+            ["client_secret"] = KeycloakFixture.ActivationClientSecret,
+        });
+        using var tokenResponse = await client.PostAsync(new Uri($"{_authority}/protocol/openid-connect/token"), form, TestContext.Current.CancellationToken);
+        var tokenBody = await tokenResponse.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        Assert.True(tokenResponse.StatusCode == HttpStatusCode.OK, tokenBody);
+
+        using var tokens = JsonDocument.Parse(tokenBody);
+        using var request = new HttpRequestMessage(HttpMethod.Get, new Uri($"{await keycloak.BaseAddressAsync()}admin/realms/axis/identity-provider/instances"));
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", tokens.RootElement.GetProperty("access_token").GetString());
+        using var response = await client.SendAsync(request, TestContext.Current.CancellationToken);
+        var body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+
+        Assert.True(response.StatusCode == HttpStatusCode.OK, body);
+        using var providers = JsonDocument.Parse(body);
+        Assert.Equal(JsonValueKind.Array, providers.RootElement.ValueKind);
     }
 
     [Fact]
