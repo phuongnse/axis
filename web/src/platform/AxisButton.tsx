@@ -21,27 +21,30 @@ export type AxisButtonProps =
       destructive?: boolean
       /** Appended to the accessible name only, such as a row number. The tooltip stays the name. */
       nameSuffix?: string
+      /** Draws a bordered default button, to sit joined to an input in a Space.Compact. */
+      joined?: boolean
     })
 
 /**
  * The one button of Axis (D96). `finish` completes a form or a dialog and is solid primary. `main` is the main
  * action of a page and is an outline in `primaryText`. `secondary` is every other action and is the grey outline.
  * `destructive` removes data and is an outline in `dangerText`. `icon` has no text, so it takes a text key and shows
- * the name as a tooltip on hover and on keyboard focus. The role is not passed on to the DOM.
+ * the name as a tooltip on hover and on keyboard focus. An icon is borderless, unless `joined` draws it as a bordered
+ * default button for a control joined to an input. The role is not passed on to the DOM.
  */
 export function AxisButton(props: AxisButtonProps) {
   const t = useText()
   const { colour } = useDesignTokens()
 
   if (props.role === 'icon') {
-    const { role: _role, nameKey, destructive, nameSuffix, icon, style, disabled, ...rest } = props
+    const { role: _role, nameKey, destructive, nameSuffix, joined, icon, style, disabled, ...rest } = props
     const name = t(nameKey)
     const tint: CSSProperties = destructive && !disabled ? { color: colour.dangerText } : {}
     return (
       <Tooltip title={name} trigger={['hover', 'focus']}>
         <Button
           {...rest}
-          type="text"
+          type={joined ? 'default' : 'text'}
           disabled={disabled}
           aria-label={nameSuffix ? `${name} ${nameSuffix}` : name}
           icon={<span aria-hidden>{icon}</span>}

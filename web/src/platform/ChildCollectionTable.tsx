@@ -177,6 +177,7 @@ export function ChildCollectionTable({
                   <Input readOnly aria-label={`${label} ${index + 1}`} value={aligned[index]?.[child.name] ?? ''} />
                   <AxisButton
                     role="icon"
+                    joined
                     nameKey="shell.form.choose"
                     nameSuffix={`${label} ${index + 1}`}
                     icon={<SearchOutlined />}
@@ -185,6 +186,7 @@ export function ChildCollectionTable({
                   {!child.required && row[child.name] != null && (
                     <AxisButton
                       role="icon"
+                      joined
                       nameKey="shell.form.clear"
                       nameSuffix={`${label} ${index + 1}`}
                       icon={<CloseOutlined />}
