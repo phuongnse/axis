@@ -14,9 +14,11 @@ namespace Axis.Tenancy.Realms;
 /// master realm. Each site gets a confidential client <c>site-</c> and its path, which carries the attributes <c>axis.providers</c> (the aliases of the providers the site allows, separated by spaces) and <c>axis.accounts</c> (<c>true</c> or <c>false</c>), and which copies the redirect addresses, web origins and
 /// post-logout redirect addresses of <c>axis</c> and, when the state holds the platform secret, has the secret that
 /// <see cref="SiteClientSecret"/> derives from it. Its ID token carries the alias of the
-/// provider that signed the person in as the <c>identity_provider</c> claim. Each site client also copies the protocol mappers of
-/// <c>axis</c> by name, except one named <c>identity provider</c>, and never removes a mapper. Each provider gets claim mappers for the
-/// display name, the email, the locale and each roles claim, and a <c>username</c> mapper that names a new user after the
+/// provider that signed the person in as the <c>identity_provider</c> claim, and the <c>acr</c> that the provider signed the person in at as the
+/// <c>identity_provider_acr</c> claim, when the provider sent one. Each site client also copies the protocol mappers of
+/// <c>axis</c> by name, except the two named <c>identity provider</c> and <c>identity provider acr</c>, and never removes a mapper. Each
+/// provider gets claim mappers for the display name, the email, the locale and each roles claim, an <c>acr</c> mapper that copies the
+/// provider's <c>acr</c> claim into the person's realm session, and a <c>username</c> mapper that names a new user after the
 /// provider's alias and the person's subject. A provider with labels has the display name <c>${axisProvider.&lt;alias&gt;}</c>, and the
 /// sync writes the label of each platform locale as the realm text of that key through the realm localization API, which
 /// needs the <c>manage-realm</c> right, and removes the label texts (<see cref="LabelKeyPrefix"/>) of providers the realm no longer holds. Each provider also names the realm's own first-login flow
@@ -32,6 +34,9 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
     public const string SiteClientPrefix = "site-";
     public const string ProviderAliasPrefix = "oidc-";
     public const string IdentityProviderClaim = "identity_provider";
+
+    /// <summary>The claim of a site client's ID token that holds the <c>acr</c> the brokered provider signed the person in at.</summary>
+    public const string IdentityProviderAcrClaim = "identity_provider_acr";
 
     /// <summary>The start of the realm message key that holds a provider's label.</summary>
     public const string LabelKeyPrefix = "axisProvider.";
@@ -60,6 +65,10 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
     private const string UsernameMapperName = "username";
     private const string SessionNoteMapper = "oidc-usersessionmodel-note-mapper";
     private const string SessionNoteMapperName = "identity provider";
+    private const string AcrSessionNoteMapperName = "identity provider acr";
+    private const string AcrNoteMapper = "oidc-user-session-note-idp-mapper";
+    private const string AcrMapperName = "acr";
+    private const string AcrNote = "acr";
 
     public static string SiteClientId(string path) => SiteClientPrefix + path;
 
@@ -182,7 +191,8 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
                 EnsureSuccess(updated, $"update the client '{clientId}'");
             }
 
-            await EnsureSessionNoteMapperAsync(token, realmPath, uuid, clientId, cancellationToken);
+            await EnsureSessionNoteMapperAsync(token, realmPath, uuid, clientId, SessionNoteMapperName, SessionNoteConfig(IdentityProviderClaim, IdentityProviderClaim), cancellationToken);
+            await EnsureSessionNoteMapperAsync(token, realmPath, uuid, clientId, AcrSessionNoteMapperName, SessionNoteConfig(AcrNote, IdentityProviderAcrClaim), cancellationToken);
             await EnsurePlatformMappersAsync(token, realmPath, uuid, clientId, platformMappers, cancellationToken);
         }
 
@@ -248,10 +258,10 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
             ? [.. array.EnumerateArray().Where(item => item.ValueKind == JsonValueKind.String).Select(item => item.GetString()!)]
             : [];
 
-    private static Dictionary<string, string> SessionNoteConfig() => new()
+    private static Dictionary<string, string> SessionNoteConfig(string note, string claim) => new()
     {
-        ["user.session.note"] = IdentityProviderClaim,
-        ["claim.name"] = IdentityProviderClaim,
+        ["user.session.note"] = note,
+        ["claim.name"] = claim,
         ["id.token.claim"] = "true",
         ["access.token.claim"] = "false",
         ["userinfo.token.claim"] = "false",
@@ -259,15 +269,21 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
     };
 
     /// <summary>A client update does not replace protocol mappers, so this adds the mapper or corrects its config.</summary>
-    private async Task EnsureSessionNoteMapperAsync(string token, string realmPath, string uuid, string clientId, CancellationToken cancellationToken)
+    private async Task EnsureSessionNoteMapperAsync(
+        string token,
+        string realmPath,
+        string uuid,
+        string clientId,
+        string name,
+        Dictionary<string, string> desired,
+        CancellationToken cancellationToken)
     {
         var mappersPath = $"{realmPath}/clients/{uuid}/protocol-mappers/models";
         using var listed = await SendAsync(token, HttpMethod.Get, mappersPath, null, cancellationToken);
         EnsureSuccess(listed, $"list the mappers of the client '{clientId}'");
-        var desired = SessionNoteConfig();
         foreach (var mapper in (await listed.Content.ReadFromJsonAsync<JsonElement>(cancellationToken)).EnumerateArray())
         {
-            if (mapper.GetProperty("name").GetString() != SessionNoteMapperName)
+            if (mapper.GetProperty("name").GetString() != name)
             {
                 continue;
             }
@@ -277,21 +293,21 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
                 return;
             }
 
-            var representation = SessionNoteMapperRepresentation(desired);
+            var representation = SessionNoteMapperRepresentation(name, desired);
             representation["id"] = mapper.GetProperty("id").GetString();
             using var updated = await SendAsync(
                 token, HttpMethod.Put, $"{mappersPath}/{representation["id"]}", representation, cancellationToken);
-            EnsureSuccess(updated, $"update the mapper of the client '{clientId}'");
+            EnsureSuccess(updated, $"update the mapper '{name}' of the client '{clientId}'");
             return;
         }
 
-        using var created = await SendAsync(token, HttpMethod.Post, mappersPath, SessionNoteMapperRepresentation(desired), cancellationToken);
-        EnsureSuccess(created, $"create the mapper of the client '{clientId}'");
+        using var created = await SendAsync(token, HttpMethod.Post, mappersPath, SessionNoteMapperRepresentation(name, desired), cancellationToken);
+        EnsureSuccess(created, $"create the mapper '{name}' of the client '{clientId}'");
     }
 
-    private static Dictionary<string, object?> SessionNoteMapperRepresentation(Dictionary<string, string> config) => new()
+    private static Dictionary<string, object?> SessionNoteMapperRepresentation(string name, Dictionary<string, string> config) => new()
     {
-        ["name"] = SessionNoteMapperName,
+        ["name"] = name,
         ["protocol"] = "openid-connect",
         ["protocolMapper"] = SessionNoteMapper,
         ["config"] = config,
@@ -321,7 +337,7 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
         foreach (var mapper in array.EnumerateArray())
         {
             var name = mapper.GetProperty("name").GetString()!;
-            if (name == SessionNoteMapperName)
+            if (name is SessionNoteMapperName or AcrSessionNoteMapperName)
             {
                 continue;
             }
@@ -601,6 +617,13 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
                 ["target"] = "LOCAL",
             }),
         };
+        // Copies the upstream acr into the session note "acr", whatever its value, for the site client's acr mapper to read.
+        desired[AcrMapperName] = (AcrNoteMapper, new Dictionary<string, string>
+        {
+            ["syncMode"] = "FORCE",
+            ["claims"] = """[{"key":"acr","value":".*"}]""",
+            ["are.claim.values.regex"] = "true",
+        });
         foreach (var claim in provider.RolesClaims)
         {
             desired[$"roles {claim}"] = AttributeMapper(claim, RolesAttribute(claim));

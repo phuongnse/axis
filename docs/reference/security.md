@@ -158,8 +158,11 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place. _(planned f
     accounts.
   - A token that is valid, for a sign-in that started on a site, is refused with the reason `providerNotAllowed`
     when the site's `signIn` does not allow the provider that signed the person in, or when the site is no longer
-    active. It is checked before `providerNotAccepted`. See
+    active. It is checked before `acrNotAccepted` and `providerNotAccepted`. See
     [sites and sign-in](identity-provider.md#sites-and-sign-in).
+  - A token that is valid, for a sign-in that started on a site, is refused with the reason `acrNotAccepted` when the
+    provider that signed the person in has an `acr` list and the token's `identity_provider_acr` is missing or not in
+    it. It is checked after `providerNotAllowed` and before `providerNotAccepted`.
   - The callback also compares the `issuer` of the provider's metadata with the
     tenant's `Authority`, character for character, after one trailing `/` is
     removed from the `Authority`. Metadata with another issuer creates no

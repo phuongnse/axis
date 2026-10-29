@@ -84,8 +84,10 @@ so Studio edits it, with the identity provider editor of [Studio](studio.md), an
 - **`roles`:** how the provider's claims give the application's roles. `claim` names the claim, by default `roles`.
   `values` maps a claim value to a role. Without `values`, a claim value gives the role of the same name, as the roles
   claim does today, see [claim values](roles-and-policies.md). A value that gives no declared role is ignored.
-- **`acr`:** optional, the assurance levels the provider must sign the person in at. The sign-in request asks for
-  them, and the server refuses an ID token whose `acr` is not one of them.
+- **`acr`:** optional, the assurance levels the provider must sign the person in at. A sign-in that starts on a site asks
+  for the levels of all the site's providers as `acr_values`. At the callback, the server compares the upstream `acr`,
+  which the token carries as `identity_provider_acr`, with the list of the provider that signed the person in, and
+  refuses a token whose `acr` is missing or not in it. Account and platform-page sign-ins do not check it.
 - **Checks:** these are compile errors, see [diagnostic codes](diagnostic-codes.md).
   - An unknown `type` is `AXC0284`. A missing binding is `AXC0286`: an `oidc` provider needs `issuer`, `clientId` and
     `clientSecret` or `clientKey`, and a `saml` provider needs `metadata`.
@@ -105,7 +107,7 @@ so Studio edits it, with the identity provider editor of [Studio](studio.md), an
 - **Read only by activation:** activation checks the bindings of `oidc` providers against the tenant's, and refuses
   providers that would split a person into two users, see [users](#users). It plans the realm it wants.
   Activation updates the realm, through `Axis.Admin` and the server's startup activation, see
-  [keeping the realm in step](#keeping-the-realm-in-step). The realm's sign-in page shows each `oidc` provider's `label`. A sign-in that starts on a site page reads the providers a site allows, see [sites and sign-in](#sites-and-sign-in). The callback refuses a provider that the site does not allow. Studio's blank application creates an `accounts` provider, and New resource creates
+  [keeping the realm in step](#keeping-the-realm-in-step). The realm's sign-in page shows each `oidc` provider's `label`. A sign-in that starts on a site page reads the providers a site allows, see [sites and sign-in](#sites-and-sign-in). The callback refuses a provider that the site does not allow, and a token whose `acr` the provider's list does not accept. Studio's blank application creates an `accounts` provider, and New resource creates
   more from an `accounts` starter. Studio edits the kind with the identity provider editor, which does not show a
   binding's value, and a site's `signIn` with a picker of the application's providers.
 
@@ -136,7 +138,14 @@ so Studio edits it, with the identity provider editor of [Studio](studio.md), an
   does not allow that provider, or when the site is no longer active, see
   [security](security.md#sign-in-and-the-session). The realm's page is not the control, and a `kc_idp_hint` does not get
   around the check. The check runs after the token checks and before the platform sign-in check.
-  _(planned for M17)_ The callback also refuses a callback whose `acr` the provider does not accept.
+- **The callback checks the `acr`:** right after the provider check, when the site's application gives the provider that
+  signed the person in an `acr` list, the callback reads the token's `identity_provider_acr`. It refuses the token as
+  `acrNotAccepted` when the claim is missing or not in the list, see [security](security.md#sign-in-and-the-session).
+  A site's providers that share an alias add their lists together, and a provider without a list adds no check. The
+  request asks for the levels of all the site's providers as `acr_values`, because the server does not know which
+  provider the person picks. The realm does not forward `acr_values` to the upstream provider, so the callback check is
+  the control. A realm that was synced before this check has no `acr` mappers until its next activation, and a sign-in
+  through a provider with a list is refused until then.
 - _(planned for M17)_ **Sign-in once:** a person signed in through a provider at the realm opens another site that allows it without
   being asked again. A site that does not allow it asks the person to sign in with one it does.
 - **A host of its own:** `tenant host add <id> <host> --site <path>` gives a tenant host to one site, see
@@ -251,12 +260,14 @@ _(planned for M17)_
   `site-<path>` clients and `oidc-` providers match a desired state. Each site client puts the alias of the provider that
   signed the person in into its ID token as the `identity_provider` claim, and each provider gets claim mappers for the
   display name, the email, the locale and each roles claim, and a `username` mapper that names a new user
-  `<provider alias>.<subject>`. Each provider names the realm's first-login flow. It touches no other client or
+  `<provider alias>.<subject>`. Each provider also gets an `acr` mapper (`oidc-user-session-note-idp-mapper`) that copies the
+  upstream `acr` claim into the person's realm session, and each site client an `identity provider acr` mapper that puts
+  that session value into its ID token as the `identity_provider_acr` claim. Each provider names the realm's first-login flow. It touches no other client or
   provider, so `axis`, `axis-activation`, `axis-users` and anything an operator added stay. A site client that the sync
   creates or updates copies the client authentication and the PAR, PKCE, DPoP and key settings of `axis`, so activation
   never undoes what `tenant oidc set` wrote. It also gives that site client every protocol mapper of `axis`, matched by
-  name with the same type and config, so a sign-in through it carries the same claims. The `identity provider` mapper
-  stays as it is, and a mapper that is removed from `axis` is not removed from the site clients. Each site client also carries two attributes that every sync rewrites:
+  name with the same type and config, so a sign-in through it carries the same claims. The `identity provider` and
+  `identity provider acr` mappers stay as they are, and a mapper that is removed from `axis` is not removed from the site clients. Each site client also carries two attributes that every sync rewrites:
   `axis.providers`, the aliases of the providers the site allows separated by spaces, and `axis.accounts`, `true` or
   `false`. The sync refuses an alias that is empty or contains a space. It also copies the redirect addresses, web origins and post-logout redirect
   addresses of `axis`. When the tenant has a platform client secret, the site client's secret is base64url of

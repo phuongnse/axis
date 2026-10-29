@@ -1,4 +1,6 @@
+using Axis.Configuration.Model;
 using Axis.Configuration.Realms;
+using Axis.Configuration.Resources;
 using Axis.Server.Authentication;
 using Axis.Tenancy;
 
@@ -107,4 +109,79 @@ public sealed class SiteSignInTests
         Assert.Equal(expected, settings!.SiteClientKey is not null);
         Assert.Equal(expected ? "platform-secret" : null, settings.SiteClientKey?.Reveal());
     }
+
+    [Fact]
+    public void A_site_accepts_the_levels_of_the_allowed_providers_with_the_alias()
+    {
+        var model = Model(Provider("first", "issuer", ["2", "1"]), Provider("second", "ISSUER", ["3", "1"]), Provider("other", "elsewhere", ["9"]));
+
+        var accepted = SiteSignIn.AcceptedAcr(model, Site("first", "second", "other"), "oidc-issuer");
+
+        Assert.Equal(["2", "1", "3"], accepted);
+    }
+
+    [Fact]
+    public void A_site_ignores_the_levels_of_a_provider_it_does_not_allow()
+    {
+        var model = Model(Provider("first", "issuer", ["2"]), Provider("second", "issuer", ["3"]));
+
+        Assert.Equal(["2"], SiteSignIn.AcceptedAcr(model, Site("First"), "oidc-issuer"));
+        Assert.Empty(SiteSignIn.AcceptedAcr(model, Site(), "oidc-issuer"));
+    }
+
+    [Fact]
+    public void A_provider_without_a_list_gives_no_check()
+    {
+        var model = Model(Provider("first", "issuer", []), Provider("accounts", null, [], "accounts"));
+
+        Assert.Empty(SiteSignIn.AcceptedAcr(model, Site("first", "accounts"), "oidc-issuer"));
+        Assert.Empty(SiteSignIn.AcceptedAcr(model, Site("first", "accounts"), "oidc-unknown"));
+        Assert.Null(SiteSignIn.AcrValues(model, Site("first", "accounts")));
+    }
+
+    [Fact]
+    public void A_site_sends_the_distinct_levels_of_its_allowed_providers_in_ordinal_order()
+    {
+        var model = Model(Provider("first", "issuer", ["urn:high", "1"]), Provider("second", "other", ["1", "2"]), Provider("third", "third", ["9"]));
+
+        Assert.Equal("1 2 urn:high", SiteSignIn.AcrValues(model, Site("first", "second")));
+        Assert.Equal("9", SiteSignIn.AcrValues(model, Site("third")));
+    }
+
+    private static IdentityProviderModel Provider(string name, string? issuer, string[] acr, string type = "oidc") => new()
+    {
+        Id = Guid.NewGuid(),
+        Name = name,
+        File = $"identity-providers/{name}.json",
+        Type = type,
+        IssuerBinding = issuer,
+        Roles = new IdentityProviderRolesModel("roles", new Dictionary<string, string>()),
+        Acr = acr,
+    };
+
+    private static ApplicationModel Model(params IdentityProviderModel[] providers) => new()
+    {
+        Manifest = new ApplicationManifest
+        {
+            Id = Guid.NewGuid(),
+            Kind = ResourceKinds.Application,
+            Name = "sample",
+            FormatVersion = 1,
+            File = "application.json",
+        },
+        Entities = [],
+        IdentityProviders = providers,
+    };
+
+    private static SiteModel Site(params string[] signIn) => new()
+    {
+        Id = Guid.NewGuid(),
+        Name = "main",
+        Path = "main",
+        Title = new TextReference("title"),
+        Locales = new SiteLocales("en", "en", ["en"]),
+        File = "sites/main.json",
+        Navigation = [],
+        SignIn = signIn,
+    };
 }
