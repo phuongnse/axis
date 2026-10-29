@@ -214,6 +214,7 @@ builder.Services.AddSingleton(UsersSettings.Load(builder.Configuration));
 builder.Services.AddScoped<TenantDatabase>();
 builder.Services.AddSingleton<ActiveModelCache>();
 builder.Services.AddScoped<ActiveApplicationResolver>();
+builder.Services.AddScoped<SiteSignIn>();
 builder.Services.AddSingleton<ISiteMetadataProvider, PlatformSiteMetadataProvider>();
 builder.Services.AddSingleton<ITextResourceProvider, EmbeddedTextResourceProvider>();
 

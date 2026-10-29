@@ -201,29 +201,7 @@ public static class ReleaseActivator
         }
 
         applications.Add(RealmApplication.FromModel(model));
-        return RealmPlanner.Build([.. applications.Select(application => application with
-        {
-            Providers = [.. application.Providers.Where(provider => IsBound(provider, bindings))],
-        })], [.. bindings.PlatformProviders.Where(provider => IsBound(provider, bindings))]);
-    }
-
-    // Whether the tenant has every binding of an oidc provider with the right kind, ignoring letter case.
-    private static bool IsBound(IdentityProviderModel provider, ActivationBindings bindings)
-    {
-        if (provider.Type != "oidc")
-        {
-            return true;
-        }
-
-        bool Has(string? name, string kind) =>
-            name is null
-            || bindings.Bindings.FirstOrDefault(pair => string.Equals(pair.Key, name, StringComparison.OrdinalIgnoreCase)).Value?.Kind == kind;
-
-        return provider.IssuerBinding is not null
-            && Has(provider.IssuerBinding, ActivationBinding.UrlKind)
-            && Has(provider.ClientIdBinding, ActivationBinding.SecretKind)
-            && Has(provider.ClientSecretBinding, ActivationBinding.SecretKind)
-            && Has(provider.ClientKeyBinding, ActivationBinding.SecretKind);
+        return RealmBindingFilter.Plan(applications, bindings);
     }
 
     private static Diagnostic SplitsUser(RealmConflict conflict)

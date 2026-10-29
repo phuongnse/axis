@@ -105,14 +105,15 @@ so Studio edits it, with the identity provider editor of [Studio](studio.md), an
 - **Read only by activation:** activation checks the bindings of `oidc` providers against the tenant's, and refuses
   providers that would split a person into two users, see [users](#users). It plans the realm it wants.
   Activation updates the realm, through `Axis.Admin` and the server's startup activation, see
-  [keeping the realm in step](#keeping-the-realm-in-step). The realm's sign-in page shows each `oidc` provider's `label`. The rest of sign-in does not read the resource yet. Studio's blank application creates an `accounts` provider, and New resource creates
+  [keeping the realm in step](#keeping-the-realm-in-step). The realm's sign-in page shows each `oidc` provider's `label`. A sign-in that starts on a site page reads the providers a site allows, see [sites and sign-in](#sites-and-sign-in). The callback does not check them yet. Studio's blank application creates an `accounts` provider, and New resource creates
   more from an `accounts` starter. Studio edits the kind with the identity provider editor, which does not show a
   binding's value, and a site's `signIn` with a picker of the application's providers.
 
 ## Sites and sign-in
 
 - **`signIn`:** a site lists the providers it allows, by name, as `"signIn": ["company"]`. A site with no `signIn`
-  allows its application's providers, all of them. Built, with the compile checks below. Sign-in does not read it yet.
+  allows its application's providers, all of them. Built, with the compile checks below. A sign-in that starts on the site reads it, see
+  **A client for each site** below.
   - Names are compared ignoring letter case. The list has at least one entry and no repeated entry, or it is
     `AXC0004`. To allow every provider, leave `signIn` out.
   - An entry that names no provider of the application is `AXC0289`, at `/signIn/{i}` of the site file.
@@ -121,10 +122,14 @@ so Studio edits it, with the identity provider editor of [Studio](studio.md), an
   - A name that matches a provider file that failed the schema is not reported again, and such a file also prevents
     `AXC0290`.
   - The compiled site carries the providers it allows.
-- _(planned for M17)_ **A client for each site:** activation gives each site a client of the tenant's realm. A sign-in starts for the site
-  that `returnUrl` opens, through that site's client, and the realm's page shows only that site's providers. With one
-  provider and no accounts, the server sends the person straight to it. The page's filter is built, see the theme below.
-  Starting a sign-in through the site's client is not.
+- **A client for each site:** activation gives each site a client of the tenant's realm. A sign-in starts for the site
+  that `returnUrl` opens, through that site's client `site-<path>`, and the realm's page shows only that site's providers.
+  The server reads the first segment of `returnUrl` and looks for an active site with that path. With one
+  provider and no accounts, the server adds `kc_idp_hint=<alias>`, so the realm sends the person straight to it. The
+  server redeems the code as the site client, with the secret that derives from the platform client's secret, and refuses
+  an ID token whose `aud`, or `azp` when present, is not the client that started the sign-in. A preview tenant, a tenant
+  without realm details and a `fapi2` tenant keep the platform client `axis`, and so does a `returnUrl` that opens no
+  site. The page's filter is built, see the theme below.
 - _(planned for M17)_ **The callback checks again:** the realm tells the server which provider signed the person in. The server refuses a
   callback whose provider is not in the site's `signIn`, or whose `acr` the provider does not accept, as any refused
   callback, see [security](security.md#sign-in-and-the-session). The realm's page is not the control.

@@ -28,6 +28,15 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place. _(planned f
   - The server registers one OIDC client per tenant. All of them share the
     callback path, and each one ignores a callback that arrives on another
     tenant's host.
+  - A sign-in that starts on a site page goes to the tenant's realm as that
+    site's client, `site-<path>`, and the callback redeems the code with the
+    secret that derives from the platform client's secret. The ID token's `aud`,
+    and its `azp` when present, must be the client that started the sign-in.
+    Otherwise the callback is refused with reason `invalidToken` and creates no
+    session, also for a token issued to another site's client. A sign-in from
+    another page, a preview tenant, a tenant without realm details and a
+    `fapi2` tenant use the platform client `axis`. See
+    [sites and sign-in](identity-provider.md#sites-and-sign-in).
 - **Tenant settings.** Each tenant in the [`Tenants` section](../architecture.md#tenant-configuration)
   has an `Oidc` block. `Claims` names the claims that give the user id, the
   display name and the roles. Each claim name is optional, and the defaults

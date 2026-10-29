@@ -10,17 +10,20 @@ internal static partial class KeycloakSignIn
     /// <summary>
     /// Starts sign-in on the server and logs in at Keycloak's login form as a browser would. Returns the callback
     /// address that Keycloak sends the browser to, which has not been called. <paramref name="record"/> sees the
-    /// response of the server to the sign-in request, for a test that checks its responses.
+    /// response of the server to the sign-in request, for a test that checks its responses. A <paramref name="returnUrl"/>
+    /// goes to the sign-in request as a query value.
     /// </summary>
     public static async Task<Uri> LogInAsync(
         HttpClient client,
         Uri authority,
         string username,
         Uri expectedBase,
-        Func<HttpResponseMessage, Task<HttpResponseMessage>>? record = null)
+        Func<HttpResponseMessage, Task<HttpResponseMessage>>? record = null,
+        string? returnUrl = null)
     {
         var cancellationToken = TestContext.Current.CancellationToken;
-        using var request = new HttpRequestMessage(HttpMethod.Get, new Uri("/api/auth/sign-in", UriKind.Relative));
+        var path = returnUrl is null ? "/api/auth/sign-in" : $"/api/auth/sign-in?returnUrl={Uri.EscapeDataString(returnUrl)}";
+        using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(path, UriKind.Relative));
         using var challenge = record is null
             ? await client.SendAsync(request, cancellationToken)
             : await record(await client.SendAsync(request, cancellationToken));

@@ -45,6 +45,13 @@ internal sealed class TenantOidcSettings
     /// </summary>
     public PlatformSignIn? PlatformSignIn { get; set; }
 
+    /// <summary>
+    /// The secret of the platform client, which the site client secrets derive from, and which enables the sign-in of a site
+    /// through its own client. <c>null</c> for a preview tenant, a <c>fapi2</c> tenant and a tenant without realm details, which
+    /// keep the platform client.
+    /// </summary>
+    public SecretValue? SiteClientKey { get; set; }
+
     /// <summary>Reads the Oidc settings of one tenant and checks them.</summary>
     /// <param name="problems">Receives one message for each problem found. The messages hold no secret.</param>
     /// <returns>The settings, or null when there are problems.</returns>
@@ -67,6 +74,9 @@ internal sealed class TenantOidcSettings
             EndpointAudience = source.EndpointAudience,
             ServiceAudience = source.ServiceAudience,
             PlatformSignIn = tenant.PlatformSignIn,
+            SiteClientKey = tenant.PreviewOf is null && (source.Profile ?? TenantSignInProfiles.Standard) == TenantSignInProfiles.Standard
+                ? tenant.Realm?.PlatformClientSecret
+                : null,
             Claims =
             {
                 UserId = source.UserIdClaim ?? "",

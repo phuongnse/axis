@@ -14,7 +14,8 @@ namespace Axis.Server.Authentication;
 /// redirects there. The identity provider returns to <c>GET /api/auth/callback</c>, which the
 /// tenant's OIDC handler serves: it creates the <see cref="Session"/> and redirects to the
 /// <c>returnUrl</c>. A callback that fails creates no session and redirects to
-/// <see cref="TenantSignIn.FailedPath"/>.
+/// <see cref="TenantSignIn.FailedPath"/>. A <c>returnUrl</c> that opens an active site starts the sign-in through that site's
+/// client, see <see cref="SiteSignIn"/>.
 /// <c>POST /api/auth/sign-out</c> ends the session and answers the identity provider's sign-out
 /// address, for the SPA to send the browser to. The answer carries <c>Clear-Site-Data</c>, so the
 /// browser drops the site's cache and storage.
@@ -24,12 +25,17 @@ internal static class AuthEndpoints
     public static void MapAuthEndpoints(this IEndpointRouteBuilder endpoints)
     {
         var auth = endpoints.MapGroup("/api/auth");
-        auth.MapGet("/sign-in", SignIn).WithRateLimit(Partition.SignIn);
+        auth.MapGet("/sign-in", SignInAsync).WithRateLimit(Partition.SignIn);
         auth.MapPost("/sign-out", SignOutAsync);
     }
 
     // Only a local path is a return address, so sign-in can never send the browser to another site.
-    private static IResult SignIn(string? returnUrl, ITenantContextAccessor tenants, bool reauthenticate = false)
+    private static async Task<IResult> SignInAsync(
+        string? returnUrl,
+        ITenantContextAccessor tenants,
+        SiteSignIn sites,
+        CancellationToken cancellationToken,
+        bool reauthenticate = false)
     {
         if (string.IsNullOrEmpty(returnUrl))
         {
@@ -42,6 +48,16 @@ internal static class AuthEndpoints
 
         var tenant = tenants.Current ?? throw new InvalidOperationException("No tenant context is set.");
         var properties = new AuthenticationProperties { RedirectUri = returnUrl };
+        if (await sites.FindAsync(tenant.TenantId, returnUrl, cancellationToken) is { } site)
+        {
+            properties.Items[SiteSignIn.SitePathItem] = site.Path;
+            if (site.ProviderHint is { } hint)
+            {
+                // A parameter is not saved in the state, and only the redirect needs the hint.
+                properties.SetParameter(SiteSignIn.ProviderHintParameter, hint);
+            }
+        }
+
         if (reauthenticate)
         {
             // The handler prefers these over its options, so the identity provider asks for credentials even when its own session is open.
