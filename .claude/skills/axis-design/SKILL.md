@@ -139,8 +139,8 @@ A check passes only when the card behaves as it will in the artifact.
 4. Add a change note to the artifact that names the issue, as for a requested
    change.
 5. After the issue is merged, sync the artifact again. The sync keeps the
-   card groups and their order, which `scripts/design-system.sh` writes as
-   the bundle's first line, `/* @ds-bundle: {...} */`.
+   card order and names, which `scripts/design-system.sh` writes as the
+   bundle's first line, `/* @ds-bundle: {...} */`.
 
 ## A sync
 

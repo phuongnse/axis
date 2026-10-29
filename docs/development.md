@@ -444,18 +444,20 @@ fixtures, only for the API paths of the fixture application. It needs no server,
   artifact draws each card in a frame sandboxed without `allow-forms`, where the browser blocks a form's own
   submission before its submit event fires. The bundle therefore fires a form's submit event itself, for a click on
   a submit button, Enter in an input and `requestSubmit()`, and cancels the browser's submission.
-- The bundle's first line is `/* @ds-bundle: {...} */`, and the Design System artifact reads it. Its `width` is
-  992, the [narrow width](reference/frontend.md) breakpoint, which the line takes from `breakpointTokens.narrowWidth`.
-  The artifact lays out every card at that width and scales it to fit its frame, so every card shares one scale and
-  shows the desktop layout. A card never scrolls sideways at that width. The states of a card share one
-  `minmax(0, 1fr)` column, so a wide table scrolls inside its widget, as it does on a page.
-- The line's `groups` are the order of the cards, in seven groups: Field inputs (each `field-<type>`), Data widgets
-  (`table`, `form`, `detail`), Charts and KPIs (each `chart-<kind>`, `kpi`), Process widgets (`taskInbox`,
-  `processInspector`), Containers (`columns`, `tabs`, `section`), Shared states (`states`) and Shell (`shell`,
-  `signIn`, `identitySignIn`, see [shell](reference/shell.md#design-system-previews)). Each group has a `name` and
-  its `previews`, and every preview is in one group. The order is `web/src/designSystem/cardOrder.ts`.
-  `scripts/design-system.sh` writes the line with `scripts/design-system-header.mjs` after the build, so a sync keeps
-  it, and `scripts/check-design-system.mjs` rejects a bundle without a valid line.
+- The bundle's first line is `/* @ds-bundle: {"format":4,"namespace":"Axis","components":[{"name":"TextField"},...]} */`,
+  and the Design System artifact reads it. The namespace is `Axis`, and the artifact reads each card from `window.Axis`.
+  Each card's own marker in the artifact sets `width=992`, the [narrow width](reference/frontend.md) breakpoint. The
+  artifact scales the card to fit its frame, so every card shares one scale and shows the desktop layout. A card
+  never scrolls sideways at that width. The states of a card share one `minmax(0, 1fr)` column, so a wide table
+  scrolls inside its widget, as it does on a page.
+- The line's `components` name every card once, in the order of seven groups in `web/src/designSystem/cardOrder.ts`:
+  Field inputs (each `field-<type>`, named `<Type>Field`), Data widgets (`table`, `form`, `detail`), Charts and KPIs
+  (each `chart-<kind>`, named `Chart<Kind>`, and `kpi`), Process widgets (`taskInbox`, `processInspector`),
+  Containers (`columns`, `tabs`, `section`), Shared states (`states`) and Shell (`shell`, `signIn`,
+  `identitySignIn`, see [shell](reference/shell.md#design-system-previews)). Every other card takes its PascalCase
+  name, such as `Table` or `TaskInbox`. `scripts/design-system.sh` writes the line with
+  `scripts/design-system-header.mjs` after the build, so a sync keeps it. `scripts/check-design-system.mjs` rejects a
+  bundle whose line has no format 4, another namespace, or a card missing, named twice or matching no preview.
 - `web/design-system.html` is the harness. After `scripts/design-system.sh`, open it from disk. With no
   query it mounts every preview. `?preview=<name>&mode=light|dark` mounts one preview in that mode. The
   Vite dev server does not serve the previews.
@@ -469,7 +471,7 @@ checks that a field preview has no Save button and no history, and that the `sta
 the load error alert. For each field type except the child collection, it checks in both modes that the read-only state
 and the required mark, the help text and the message of the third state show. It checks the child collection's reference, computed, error, read-only and empty
 states, the form's validation, read-only, wizard, columns and many-steps states, and the table's row actions folded into its
-menu. It checks that the first line of the bundle lists the previews of `window.Axis`. It mounts the shell, sign-in and identity sign-in previews in a
+menu. It checks that the first line of the bundle names the card of each `window.Axis` preview, in order. It mounts the shell, sign-in and identity sign-in previews in a
 992 px frame sandboxed without `allow-forms`, and checks a key element of each state. It checks that the Form page's breadcrumb links to Requests. It opens the date-time picker and the reference lookup
 and adds a child collection row. It mounts the `form` preview in a frame sandboxed like the artifact's and checks its
 validation messages and a save. It finds each data preview's empty text under its "Empty" caption, the table's row

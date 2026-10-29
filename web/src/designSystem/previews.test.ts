@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest'
-import { cardGroups } from './cardOrder'
+import { cardGroups, cardName } from './cardOrder'
 import { fixtureScopes, routes } from './fixtures'
 import { previews } from './previews'
 
@@ -69,6 +69,36 @@ describe('design-system previews', () => {
     for (const { frameHeight } of states) {
       expect(frameHeight).toBeGreaterThan(0)
     }
+  })
+
+  test('the cards have the 25 names of the Design System artifact, in group order', () => {
+    expect(cardGroups.flatMap(({ previews: group }) => group).map(cardName)).toEqual([
+      'TextField',
+      'IntegerField',
+      'DecimalField',
+      'BooleanField',
+      'DateField',
+      'DateTimeField',
+      'EnumField',
+      'ReferenceField',
+      'ChildCollectionField',
+      'Table',
+      'Form',
+      'Detail',
+      'ChartBar',
+      'ChartLine',
+      'ChartPie',
+      'Kpi',
+      'TaskInbox',
+      'ProcessInspector',
+      'Columns',
+      'Tabs',
+      'Section',
+      'States',
+      'Shell',
+      'SignIn',
+      'IdentitySignIn',
+    ])
   })
 
   test("a state's own fixture paths are scoped and repeat no shared path or other state's path", () => {
