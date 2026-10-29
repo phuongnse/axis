@@ -1,0 +1,145 @@
+{{- if not .Values.identity.theme.volume }}
+{{- fail "identity.theme.volume is required: a volume source with the built Axis login theme, mounted at /opt/keycloak/themes" }}
+{{- end }}
+{{- if not .Values.identity.passwordBlacklists.volume }}
+{{- fail "identity.passwordBlacklists.volume is required: a volume source with the breached-password list, mounted at /opt/keycloak/data/password-blacklists" }}
+{{- end }}
+# Axis's identity provider, Keycloak. It always runs one replica, because Axis does not cluster it.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-identity
+  labels:
+    {{- include "axis.labels" . | nindent 4 }}
+    app.kubernetes.io/component: identity
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "axis.selectorLabels" (dict "root" . "component" "identity") | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "axis.labels" . | nindent 8 }}
+        app.kubernetes.io/component: identity
+    spec:
+      automountServiceAccountToken: false
+      {{- with .Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- range . }}
+        - name: {{ . | quote }}
+        {{- end }}
+      {{- end }}
+      securityContext:
+        {{- include "axis.podSecurityContext" . | nindent 8 }}
+      containers:
+        - name: identity
+          image: {{ .Values.identity.image | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          # Keycloak has no _FILE variables, so this script turns the secret files into its variables.
+          # It is the entrypoint script of the Compose example.
+          command:
+            - bash
+            - -c
+            - |
+              set -euo pipefail
+              for file in /run/secrets/KC_*; do export "$(basename "$file")=$(<"$file")"; done
+              export KC_BOOTSTRAP_ADMIN_CLIENT_SECRET="$(</run/secrets/IdentityProvider__AdminClientSecret)"
+              exec /opt/keycloak/bin/kc.sh "$@"
+            - kc
+          args:
+            - start
+          env:
+            - name: KC_DB
+              value: postgres
+            - name: KC_HOSTNAME
+              value: {{ printf "https://%s" (required "identity.hostname is required: the public host name of the identity provider, without a scheme" .Values.identity.hostname) | quote }}
+            - name: KC_HTTPS_CERTIFICATE_FILE
+              value: /identity-tls/tls.crt
+            - name: KC_HTTPS_CERTIFICATE_KEY_FILE
+              value: /identity-tls/tls.key
+            - name: KC_HEALTH_ENABLED
+              value: "true"
+            - name: KC_BOOTSTRAP_ADMIN_CLIENT_ID
+              value: axis-admin
+            {{- $trusted := concat (.Values.forwardedHeaders.knownProxies | default list) (.Values.forwardedHeaders.knownNetworks | default list) }}
+            {{- if $trusted }}
+            # Keycloak trusts every caller when proxy headers are on and no address is listed.
+            - name: KC_PROXY_HEADERS
+              value: xforwarded
+            - name: KC_PROXY_TRUSTED_ADDRESSES
+              value: {{ join "," $trusted | quote }}
+            {{- end }}
+          ports:
+            - name: https
+              containerPort: 8443
+            - name: management
+              containerPort: 9000
+          # Keycloak serves its management interface over HTTPS when HTTPS is on.
+          startupProbe:
+            httpGet:
+              path: /health/started
+              port: management
+              scheme: HTTPS
+            periodSeconds: 5
+            # The rebuild at start is slow.
+            failureThreshold: 60
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: management
+              scheme: HTTPS
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: management
+              scheme: HTTPS
+            periodSeconds: 10
+          securityContext:
+            allowPrivilegeEscalation: false
+            # Keycloak rebuilds itself at start and writes into its image.
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop:
+                - ALL
+          {{- with .Values.identity.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - {{ include "axis.secretsVolumeMount" . | nindent 14 | trim }}
+            - name: identity-tls
+              mountPath: /identity-tls
+              readOnly: true
+            - name: theme
+              mountPath: /opt/keycloak/themes
+              readOnly: true
+            - name: password-blacklists
+              mountPath: /opt/keycloak/data/password-blacklists
+              readOnly: true
+            {{- if .Values.identity.databaseAuthority.volume }}
+            - name: db-ca
+              mountPath: /db-ca
+              readOnly: true
+            {{- end }}
+      volumes:
+        - {{ include "axis.secretsVolume" (dict "root" . "entries" (list "identityDatabaseUrl" "identityDatabaseUsername" "identityDatabasePassword" "identityAdminClientSecret")) | nindent 10 | trim }}
+        - name: identity-tls
+          secret:
+            secretName: {{ required "secrets.identityCertificate.name is required: the Kubernetes TLS Secret (tls.crt, tls.key) of the identity provider's HTTPS endpoint" .Values.secrets.identityCertificate.name | quote }}
+            # Readable by the non-root user of the image.
+            defaultMode: 292
+            items:
+              - key: tls.crt
+                path: tls.crt
+              - key: tls.key
+                path: tls.key
+        - name: theme
+          {{- toYaml .Values.identity.theme.volume | nindent 10 }}
+        - name: password-blacklists
+          {{- toYaml .Values.identity.passwordBlacklists.volume | nindent 10 }}
+        {{- if .Values.identity.databaseAuthority.volume }}
+        - name: db-ca
+          {{- toYaml .Values.identity.databaseAuthority.volume | nindent 10 }}
+        {{- end }}
