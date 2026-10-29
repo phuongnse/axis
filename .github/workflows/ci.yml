@@ -3,17 +3,21 @@ name: CI
 # A push to any branch runs CI, so hand-made pull requests show its result. NexKit's
 # branches are left out: NexKit runs the same scripts as its own checks, and its pushes and
 # pull requests use the Actions token, which starts no workflow or waits for approval.
+# A merge by NexKit starts no push workflow, so main runs every two hours and on demand (D105).
+# NexKit's autopilot watches the runs on main, and a finished run starts a sweep through NexKit's
+# workflow_run trigger.
 on:
   push:
     branches-ignore: ['nexkit/**']
-  # NexKit starts CI on main after it merges, because its merge starts no push workflow.
+  schedule:
+    - cron: "41 */2 * * *"
   workflow_dispatch:
 
 permissions:
   contents: read
 
-# A newer push stops an older run on any branch but main. On main a run always finishes, so every
-# merge gets a result: a newer merge only replaces a run that is still waiting to start.
+# A newer push stops an older run on any branch but main. On main a run always finishes: a newer
+# run only replaces one that is still waiting to start.
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
@@ -130,26 +134,3 @@ jobs:
             tests/e2e/test-results
           if-no-files-found: ignore
           retention-days: 14
-
-  # NexKit autopilot looks at this run as soon as it ends: a run that NexKit started with
-  # the Actions token sends no workflow_run event, but it may dispatch NexKit's sweep.
-  nexkit-sweep:
-    needs: [checks]
-    if: always() && github.ref_name == github.event.repository.default_branch
-    runs-on: ubuntu-24.04
-    permissions:
-      actions: write
-    steps:
-      # GitHub's API rejects a dispatch at times with a server error, so a failed dispatch is
-      # tried again after a pause. The job fails only when every try fails.
-      - run: |
-          for attempt in 1 2 3; do
-            if gh workflow run nexkit.yml --repo "$GITHUB_REPOSITORY" --ref "$GITHUB_REF_NAME" \
-              -f command=autopilot -f number=autopilot -f note="after run $GITHUB_RUN_ID"; then
-              exit 0
-            fi
-            if [ "$attempt" -lt 3 ]; then sleep 30; fi
-          done
-          exit 1
-        env:
-          GH_TOKEN: ${{ github.token }}
