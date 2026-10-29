@@ -7,7 +7,7 @@ import type { SignInContext } from './signInContext'
 
 const context: SignInContext = {
   page: 'signIn',
-  title: 'Sign in to Axis',
+  title: 'Sign in',
   realmName: 'Contoso',
   providers: [{ alias: 'contoso', label: 'Contoso ID', loginUrl: '/broker/contoso' }],
   accounts: true,
@@ -61,12 +61,12 @@ describe('SignInPage', () => {
     expect(mark).toHaveStyle({ width: '32px', height: '32px' })
   })
 
-  it('names the organization under the title in the muted colour', () => {
+  it('shows the title "Sign in" with the organization\'s name under it in the muted colour', () => {
     render(<SignInPage context={context} />)
 
     const organization = screen.getByText('Contoso', { exact: true })
     expect(organization).toHaveStyle({ color: designTokensFor('light').colour.textMuted })
-    expect(organization.previousElementSibling).toHaveTextContent('Sign in to Axis')
+    expect(organization.previousElementSibling).toHaveTextContent(/^Sign in$/)
   })
 
   it('draws the field labels at weight 500 in the muted colour', () => {
