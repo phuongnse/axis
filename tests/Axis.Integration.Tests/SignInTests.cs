@@ -688,8 +688,8 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
         var loginPage = await browser.GetAsync(authorize, CancellationToken);
         var html = await loginPage.Content.ReadAsStringAsync(CancellationToken);
         Assert.True(loginPage.StatusCode == HttpStatusCode.OK, html);
-        var action = WebUtility.HtmlDecode(FormActionPattern().Match(html).Groups["action"].Value);
-        using var loginRequest = new HttpRequestMessage(HttpMethod.Post, new Uri(action))
+        var action = KeycloakSignIn.LoginAction(html);
+        using var loginRequest = new HttpRequestMessage(HttpMethod.Post, action)
         {
             Content = new FormUrlEncodedContent(new Dictionary<string, string>
             {
@@ -823,9 +823,6 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
     // A JWT is three base64url parts, and its header always starts with eyJ, which is {" encoded.
     [GeneratedRegex(@"eyJ[\w-]+\.[\w-]+\.")]
     private static partial Regex JwtPattern();
-
-    [GeneratedRegex("""<form\b[^>]*\baction="(?<action>[^"]+)""")]
-    private static partial Regex FormActionPattern();
 
     private sealed record SignInResult(string ReturnedTo, string SessionCookie);
 

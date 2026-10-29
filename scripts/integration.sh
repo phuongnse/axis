@@ -2,6 +2,7 @@
 # Integration tests against real PostgreSQL and Keycloak containers (requires Docker).
 # The integration tests also run the test scenarios of every application under samples/apps/ and of
 # every sample template under samples/templates/.
+# The Keycloak theme is built first, because the tests' Keycloak loads it.
 # Each application's scenarios are a suite named scenarios-NAME, written by that test.
 # The integration tests and the scenarios are skipped when $NEXKIT_BASE_SHA shows that every changed
 # path is on the safe list in scripts/lib/affected.mjs. The smoke test of scripts/dev.sh runs in
@@ -26,13 +27,18 @@ for manifest in samples/templates/*/application.json; do
   scenario_suites+=("scenarios-$name")
 done
 
+# The integration tests' Keycloak loads the Axis theme from the test output, which copies artifacts/keycloak-theme.
+build_theme() { npm run build:keycloak-theme --prefix web; }
+
 if [ "$#" -gt 0 ]; then
+  build_theme
   run_suite Axis.Integration.Tests tests/Axis.Integration.Tests dotnet test --project tests/Axis.Integration.Tests -c Release \
     --report-xunit-junit --report-xunit-junit-filename Axis.Integration.Tests.xml --results-directory "$results_dir" "$@"
   finish_report
 fi
 
 if affected integration; then
+  build_theme
   for suite in "${scenario_suites[@]}"; do expect_suite "$suite" .; done
   run_suite Axis.Integration.Tests tests/Axis.Integration.Tests dotnet test --project tests/Axis.Integration.Tests -c Release \
     --report-xunit-junit --report-xunit-junit-filename Axis.Integration.Tests.xml --results-directory "$results_dir" --filter-not-class '*PerformanceTests'

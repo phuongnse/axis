@@ -3,7 +3,6 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using System.Text.RegularExpressions;
 using Axis.Admin;
 using Axis.Administration;
 using Axis.Processes.Storage;
@@ -31,7 +30,7 @@ namespace Axis.Integration.Tests;
 /// with the client <c>axis</c>. Tenant <c>nopar</c> is a <c>fapi2</c> tenant whose provider metadata has no PAR
 /// endpoint. Each tenant's calls to Keycloak are recorded, so the tests can show what the server sent.
 /// </summary>
-public sealed partial class Fapi2SignInTests(KeycloakFixture keycloak, PostgreSqlFixture database) : IClassFixture<PostgreSqlFixture>
+public sealed class Fapi2SignInTests(KeycloakFixture keycloak, PostgreSqlFixture database) : IClassFixture<PostgreSqlFixture>
 {
     private const string ParPath = "/protocol/openid-connect/ext/par/request";
     private const string TokenPath = "/protocol/openid-connect/token";
@@ -432,8 +431,8 @@ public sealed partial class Fapi2SignInTests(KeycloakFixture keycloak, PostgreSq
 
         var html = await loginPage.Content.ReadAsStringAsync(CancellationToken);
         Assert.True(loginPage.StatusCode == HttpStatusCode.OK, html);
-        var action = WebUtility.HtmlDecode(FormActionPattern().Match(html).Groups["action"].Value);
-        using var loginRequest = new HttpRequestMessage(HttpMethod.Post, new Uri(action))
+        var action = KeycloakSignIn.LoginAction(html);
+        using var loginRequest = new HttpRequestMessage(HttpMethod.Post, action)
         {
             Content = new FormUrlEncodedContent(new Dictionary<string, string>
             {
@@ -486,9 +485,6 @@ public sealed partial class Fapi2SignInTests(KeycloakFixture keycloak, PostgreSq
         using var body = JsonDocument.Parse(await me.Content.ReadAsStringAsync(CancellationToken));
         return body.RootElement.GetProperty("id").GetString();
     }
-
-    [GeneratedRegex("""<form\b[^>]*\baction="(?<action>[^"]+)""")]
-    private static partial Regex FormActionPattern();
 
     /// <summary>One request that the server sent to Keycloak: its method, address, form fields and <c>DPoP</c> header.</summary>
     private sealed record RecordedCall(HttpMethod Method, string Url, Dictionary<string, string> Form, string? Dpop);
