@@ -66,7 +66,8 @@ widget, is in [form-widget.md](form-widget.md) and [frontend.md](frontend.md).
     next by a 48px line, so the bar sits on the left and never stretches
     across the form. A title is cut with an ellipsis at 160px and shows whole
     on hover. The current step always keeps its title and is marked with
-    `aria-current="step"`. With seven steps or more, only the current step
+    `aria-current="step"`. _(planned for M18)_ A finished step shows a check
+    mark in place of its number. With seven steps or more, only the current step
     shows its title and the others show their number. A number shows its
     step's title on hover and on focus, and to assistive technology. The bar
     is never wider than the form, and when the steps do not fit it wraps
