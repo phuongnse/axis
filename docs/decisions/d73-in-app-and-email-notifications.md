@@ -4,8 +4,7 @@ Status: **Agreed**
 
 M14 lets a process tell people what happened, in the site and by email. The
 owner agreed this on 2026-10-25. It is built in M14, except the email channel of
-an escalation's `notify` and Mailpit in Docker Compose and `scripts/dev.sh`, which
-are _(planned for M18)_. See [notifications](../reference/notifications.md). It replaces the "Axis has no
+an escalation's `notify`, which is _(planned for M18)_. See [notifications](../reference/notifications.md). It replaces the "Axis has no
 user directory" reason of the audit actor point of
 [D23](d23-sign-in-through-oidc-and-the-bff-session.md): Axis keeps a profile of
 each user who signs in.

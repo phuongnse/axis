@@ -12,8 +12,8 @@ work, and the tables. The rest of the process reference is in these files:
   and reassign. All are built, except the email channel of an escalation,
   _(planned for M18)_.
 - [notifications.md](notifications.md): the `notify` operation and in-app and
-  email notifications. All are built, except the escalation email and Mailpit
-  in Docker Compose and `scripts/dev.sh`, both _(planned for M18)_.
+  email notifications. All are built, except the escalation email,
+  _(planned for M18)_.
 - [process-execution.md](process-execution.md): execution, connector calls,
   package operations and the worker settings.
 - [process-events.md](process-events.md): raised events, triggers and
