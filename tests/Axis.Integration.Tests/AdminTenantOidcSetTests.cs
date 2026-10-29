@@ -6,7 +6,6 @@ using System.Text.Json;
 using Axis.Admin;
 using Axis.Administration;
 using Axis.Configuration.Tests;
-using Axis.Server.Authentication;
 using Axis.Server.Tenancy;
 using Axis.Server.Tests;
 using Axis.Tenancy;
@@ -34,90 +33,61 @@ public sealed class AdminTenantOidcSetTests(PostgreSqlFixture database, Keycloak
 
     private static readonly Dictionary<string, string?> _directory = new() { ["Tenancy:Source"] = "directory" };
 
-    private static readonly Uri _address = new("http://localhost:5206");
-
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
 
     [Fact]
-    public async Task A_new_secret_and_claim_name_let_a_person_sign_in_after_the_next_refresh()
-    {
-        var authority = await keycloak.StartAsync();
-        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
-        var id = scenario.NewTenantId();
-        Assert.Equal(0, (await CreateAsync(scenario, id, "localhost", authority)).Exit);
-        await using var factory = CreateFactory(scenario.Platform);
-        using var failing = CreateClient(factory);
-
-        // The secret that the tenant was created with is not the one of the realm's client.
-        Assert.False(await TrySignInAsync(failing, authority));
-
-        var result = await scenario.RunAsync(
-            ["tenant", "oidc", "set", id, "--client-secret", "--claim", "DisplayName=preferred_username", "--endpoint-audience", "axis-endpoints", "--service-audience", "axis-services"],
-            extra: Directory(KeycloakFixture.ClientSecret));
-        await RefreshAsync(factory);
-
-        Assert.Equal(0, result.Exit);
-        Assert.Equal([$"{id} oidc ok"], result.Output);
-        using var client = CreateClient(factory);
-        Assert.True(await TrySignInAsync(client, authority));
-        using var me = await client.GetAsync(new Uri("/api/me", UriKind.Relative), CancellationToken);
-        Assert.Equal(HttpStatusCode.OK, me.StatusCode);
-        using var body = JsonDocument.Parse(await me.Content.ReadAsStringAsync(CancellationToken));
-        Assert.Equal("requester", body.RootElement.GetProperty("displayName").GetString());
-    }
-
-    [Fact]
-    public async Task The_new_secret_is_stored_encrypted_and_no_output_or_record_holds_it_and_the_record_names_the_settings()
+    public async Task The_audiences_are_stored_and_the_record_names_them()
     {
         await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
         var id = scenario.NewTenantId();
         Assert.Equal(0, (await scenario.CreateAsync(id, $"{id}.example.test")).Exit);
         var before = await scenario.RowAsync(id);
-        var secret = $"new-{Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(16))}";
 
         var result = await scenario.RunAsync(
-            ["tenant", "oidc", "set", id, "--client-secret", "--claim", "DisplayName=preferred_username", "--endpoint-audience", "axis-endpoints", "--service-audience", "axis-services"],
-            extra: Directory(secret));
+            ["tenant", "oidc", "set", id, "--endpoint-audience", "axis-endpoints", "--service-audience", "axis-services"],
+            extra: _directory);
 
         Assert.Equal(0, result.Exit);
         Assert.Equal([$"{id} oidc ok"], result.Output);
         Assert.Empty(result.Error);
         var row = await scenario.RowAsync(id);
-        Assert.Equal(secret, AdminScenario.Cipher.Decrypt(id, TenantSecretFields.OidcClientSecret, row.OidcClientSecret).Reveal());
-        Assert.False(row.OidcClientSecret.AsSpan().IndexOf(Encoding.UTF8.GetBytes(secret)) >= 0, "The stored client secret holds the plain secret.");
-        Assert.Equal("preferred_username", row.ClaimDisplayName);
         Assert.Equal("axis-endpoints", row.EndpointAudience);
         Assert.Equal("axis-services", row.ServiceAudience);
         Assert.Equal(before.Version + 1, row.Version);
         Assert.Equal(before.OidcAuthority, row.OidcAuthority);
-        var records = await scenario.AuditRecordsAsync();
-        var record = Assert.Single(records, record => record.Command == "tenant oidc set");
+        Assert.Equal(before.OidcClientSecret, row.OidcClientSecret);
+        var record = Assert.Single(await scenario.AuditRecordsAsync(), record => record.Command == "tenant oidc set");
         Assert.Equal(id, record.TenantId);
-        Assert.Equal(["clientSecret", "claimDisplayName", "endpointAudience", "serviceAudience"], record.Changed);
-        Assert.All(records, entry => Assert.DoesNotContain(secret, entry.Text, StringComparison.Ordinal));
-        Assert.DoesNotContain(secret, string.Join('\n', [.. result.Output, .. result.Error]), StringComparison.Ordinal);
-
-        // Without the variable, the secret is the first line of standard input.
-        var second = $"second-{Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(16))}";
-        var piped = await scenario.RunAsync(
-            ["tenant", "oidc", "set", id, "--client-secret"],
-            withClientSecret: false,
-            extra: _directory,
-            input: $"{second}\nignored\n");
-
-        Assert.Equal(0, piped.Exit);
-        var after = await scenario.RowAsync(id);
-        Assert.Equal(second, AdminScenario.Cipher.Decrypt(id, TenantSecretFields.OidcClientSecret, after.OidcClientSecret).Reveal());
-        Assert.Equal(row.Version + 1, after.Version);
-        Assert.All(await scenario.AuditRecordsAsync(), entry => Assert.DoesNotContain(second, entry.Text, StringComparison.Ordinal));
-
-        // An empty secret on standard input is refused and changes nothing.
-        var snapshot = await scenario.SnapshotAsync();
-        var empty = await scenario.RunAsync(["tenant", "oidc", "set", id, "--client-secret"], withClientSecret: false, extra: _directory, input: "\n");
-
-        Assert.Equal(2, empty.Exit);
-        Assert.Equal(snapshot, await scenario.SnapshotAsync());
+        Assert.Equal(["endpointAudience", "serviceAudience"], record.Changed);
         await scenario.AssertNoSecretsAsync();
+    }
+
+    [Theory]
+    [InlineData("--authority", "https://idp.example.test/realms/x")]
+    [InlineData("--client-id", "x")]
+    [InlineData("--client-secret", null)]
+    [InlineData("--claim", "Email=mail")]
+    public async Task A_removed_option_exits_with_2_and_changes_neither_the_entry_nor_the_audit_records(string option, string? value)
+    {
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        var id = scenario.NewTenantId();
+        Assert.Equal(0, (await scenario.CreateAsync(id, $"{id}.example.test")).Exit);
+        var version = (await scenario.RowAsync(id)).Version;
+        var snapshot = await scenario.SnapshotAsync();
+        var records = (await scenario.AuditRecordsAsync()).Count;
+        string[] args = value is null
+            ? ["tenant", "oidc", "set", id, "--endpoint-audience", "axis-endpoints", option]
+            : ["tenant", "oidc", "set", id, "--endpoint-audience", "axis-endpoints", option, value];
+
+        // The client secret variable is set, so the old option would have found its value.
+        var result = await scenario.RunAsync(args, extra: _directory);
+
+        Assert.Equal(2, result.Exit);
+        Assert.Empty(result.Output);
+        Assert.NotEmpty(result.Error);
+        Assert.Equal(version, (await scenario.RowAsync(id)).Version);
+        Assert.Equal(snapshot, await scenario.SnapshotAsync());
+        Assert.Equal(records, (await scenario.AuditRecordsAsync()).Count);
     }
 
     [Fact]
@@ -134,10 +104,10 @@ public sealed class AdminTenantOidcSetTests(PostgreSqlFixture database, Keycloak
         var refusals = new[]
         {
             await scenario.RunAsync(["tenant", "oidc", "set", main, "--profile", "fapi2"], extra: _directory),
-            await scenario.RunAsync(["tenant", "oidc", "set", preview, "--client-id", "x"], extra: _directory),
-            await scenario.RunAsync(["tenant", "oidc", "set", main, "--claim", "Nickname=nick"], extra: _directory),
-            await scenario.RunAsync(["tenant", "oidc", "set", "t-unknown", "--client-id", "x"], extra: _directory),
-            await scenario.RunAsync(["tenant", "oidc", "set", main, "--client-id", "x"]),
+            await scenario.RunAsync(["tenant", "oidc", "set", preview, "--endpoint-audience", "x"], extra: _directory),
+            await scenario.RunAsync(["tenant", "oidc", "set", main, "--profile", "nope"], extra: _directory),
+            await scenario.RunAsync(["tenant", "oidc", "set", "t-unknown", "--endpoint-audience", "x"], extra: _directory),
+            await scenario.RunAsync(["tenant", "oidc", "set", main, "--endpoint-audience", "x"]),
         };
 
         Assert.All(refusals, refusal =>
@@ -285,8 +255,6 @@ public sealed class AdminTenantOidcSetTests(PostgreSqlFixture database, Keycloak
             (["tenant", "oidc", "set", one, "--client-key"], Key(narrow.ExportSubjectPublicKeyInfoPem()), null),
             (["tenant", "oidc", "set", one, "--client-key"], _directory, ""),
             (["tenant", "oidc", "set", one, "--client-key"], _directory, "garbage\n"),
-            // Both values would come from standard input.
-            (["tenant", "oidc", "set", one, "--client-key", "--client-secret"], _directory, NewKeyPem()),
             // A repeated option.
             (["tenant", "oidc", "set", one, "--client-key", "--client-key"], Key(NewKeyPem()), null),
             (["tenant", "oidc", "set", two, "--retire-client-key", "a", "--retire-client-key", "b"], _directory, null),
@@ -329,9 +297,6 @@ public sealed class AdminTenantOidcSetTests(PostgreSqlFixture database, Keycloak
         Assert.Null((await scenario.RowAsync(id)).ServiceAudience);
     }
 
-    private static Dictionary<string, string?> Directory(string secret) =>
-        new Dictionary<string, string?> { ["Tenancy:Source"] = "directory", ["AXIS_OIDC_CLIENT_SECRET"] = secret };
-
     private static Dictionary<string, string?> Key(string pem) =>
         new Dictionary<string, string?> { ["Tenancy:Source"] = "directory", [AdminCommands.ClientKeySetting] = pem };
 
@@ -359,15 +324,16 @@ public sealed class AdminTenantOidcSetTests(PostgreSqlFixture database, Keycloak
 
     private static string[] Lines(string pem) => pem.ReplaceLineEndings("\n").TrimEnd('\n').Split('\n');
 
-    // Creates the tenant, which gets a realm of its own, then points it back at the development realm. The secret stays the generated one.
+    // Creates the tenant, which gets a realm of its own, then points it at the development realm. The secret stays the generated one.
     private static async Task<AdminResult> CreateAsync(AdminScenario scenario, string id, string host, Uri authority)
     {
-        var created = await scenario.RunAsync(AdminScenario.CreateArgs(id, host));
-        return created.Exit != 0
-            ? created
-            : await scenario.RunAsync(
-                ["tenant", "oidc", "set", id, "--authority", authority.ToString(), "--client-id", KeycloakFixture.ClientId],
-                extra: _directory);
+        var created = await scenario.CreateAsync(id, host);
+        if (created.Exit == 0)
+        {
+            await scenario.PointSignInAsync(id, authority, KeycloakFixture.ClientId);
+        }
+
+        return created;
     }
 
     private static WebApplicationFactory<Program> CreateFactory(string platform) =>
@@ -383,27 +349,8 @@ public sealed class AdminTenantOidcSetTests(PostgreSqlFixture database, Keycloak
             builder.UseSetting("Modules:Path", SampleModules.Path);
         });
 
-    private static HttpClient CreateClient(WebApplicationFactory<Program> factory) =>
-        factory.CreateClient(new WebApplicationFactoryClientOptions { BaseAddress = _address, AllowAutoRedirect = false });
-
     private static Task RefreshAsync(WebApplicationFactory<Program> factory) =>
         factory.Services.GetRequiredService<TenantDirectoryRefresh>().RefreshAsync(CancellationToken);
-
-    // Logs in at Keycloak and completes the callback. True when the server answered with a session cookie.
-    private static async Task<bool> TrySignInAsync(HttpClient client, Uri authority)
-    {
-        var callback = await KeycloakSignIn.LogInAsync(client, authority, "requester", _address);
-        try
-        {
-            using var response = await client.GetAsync(new Uri(callback.PathAndQuery, UriKind.Relative), CancellationToken);
-            return response.Headers.TryGetValues("Set-Cookie", out var cookies)
-                && cookies.Any(cookie => cookie.StartsWith($"{Session.Scheme}=", StringComparison.Ordinal));
-        }
-        catch (HttpRequestException)
-        {
-            return false;
-        }
-    }
 
     private static async Task<HttpStatusCode> StatusAsync(HttpClient client, string id, string token)
     {

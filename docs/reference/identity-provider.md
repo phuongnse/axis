@@ -7,7 +7,7 @@ its people sign in and each site pick from that. M17 builds it, and each section
 `identityProvider` resource, a site's `signIn` and their compile checks are built, and so is the tenant's realm that
 `tenant create` makes. Activation checks the bindings of `oidc` providers and refuses providers that would split a person. Sign-in does
 not read them yet, activation updates the realm, and a new realm has no accounts, no redirect addresses and no role mappings, so until they do, a tenant signs in through an identity provider that runs outside
-Axis, which `tenant oidc set` points its `Oidc` block at, as [security](security.md#sign-in-and-the-session) describes. Accounts, roles given by an administrator and the
+Axis when its `Oidc` block points there, as [security](security.md#sign-in-and-the-session) describes. No command points the block at another provider. Accounts, roles given by an administrator and the
 users page are in [user administration](user-administration.md).
 
 ## What it is
@@ -131,10 +131,17 @@ so Studio edits it, with the identity provider editor of [Studio](studio.md), an
 - _(planned for M17)_ **Sign-in once:** a person signed in through a provider at the realm opens another site that allows it without
   being asked again. A site that does not allow it asks the person to sign in with one it does.
 - **A host of its own:** `tenant host add <id> <host> --site <path>` gives a tenant host to one site, see
-  [hosts](tenant-setting-commands.md#hosts). The command is built. _(planned for M17)_ The serving below is not.
-  - That host serves only the site, at `/`. Platform pages and other sites are `404` there, and its session cookie
-    reaches nothing else.
-  - The tenant's other hosts send the site's path to its own host, so the site has one origin.
+  [hosts](tenant-setting-commands.md#hosts). Both the command and the serving are built. Only the `directory` tenant
+  source has site hosts, so hosts from the `configuration` source serve the whole tenant.
+  - That host serves only the site: the SPA under the site's path, the web root's static files, sign-in
+    (`/api/auth/*`), `GET /api/me`, the SPA shell's `/api/site`, `/api/texts/{locale}` and `/api/about`,
+    `/api/sites/{path}` and below for that site, and `/api/apps/{app}` for the site's application. Everything else is
+    a `404` problem there, such as `/api/sites`, other sites and applications, Studio, the users page, the account
+    page and `/api/me/sessions`. The refusal comes before authentication, so it renews no session.
+  - The site keeps its path on its own host, so it opens at `shop.example.test/shop`. `/` on that host redirects to
+    `/{path}`. Serving the site at `/` comes later and needs a change in the SPA.
+  - The tenant's other hosts redirect the site's path and anything below it with `302` to the same path and query on
+    the site's host, so the site has one origin. The site's API under `/api` still answers on the other hosts.
   - A site for people outside the organization, such as citizens or customers, should get a host of its own. Sites
     that share a host share an origin, so a script that runs in one could act in the other for a person signed in to
     both.

@@ -67,10 +67,6 @@ built, see [installation key](#installation-key). The
 
 | Option                         | Meaning                                                                                       |
 | ------------------------------ | --------------------------------------------------------------------------------------------- |
-| `--authority <url>`            | The authority of the tenant's identity provider                                               |
-| `--client-id <id>`             | The OIDC client id                                                                            |
-| `--client-secret`              | Replaces the client secret, from `AXIS_OIDC_CLIENT_SECRET` or standard input                  |
-| `--claim <name>=<claim>`       | A claim name: `UserId`, `DisplayName`, `Roles`, `Email` or `Locale`                              |
 | `--endpoint-audience <value>`  | `Oidc:EndpointAudience`, see [machine callers](security.md#machine-callers). Empty removes it |
 | `--service-audience <value>`   | `Oidc:ServiceAudience`, see [service accounts](security.md#service-accounts). Empty removes it |
 | `--profile standard\|fapi2`    | The sign-in profile, see [FAPI 2.0 profile](security.md#fapi-20-profile)                      |
@@ -80,21 +76,14 @@ built, see [installation key](#installation-key). The
 A successful run prints `<id> oidc ok`. With `--client-key` it then prints `<id> client-key <kid>`
 and the public key as a PEM.
 
-- **The secret.** `--client-secret` takes no value. The secret comes from `AXIS_OIDC_CLIENT_SECRET`,
-  or from the first line of standard input when the variable is not set, as in
-  `printf %s "$SECRET" | tenant oidc set <id> --client-secret`. An empty secret exits with code 2.
-  The secret is stored encrypted and never printed.
 - **Empty values.** An empty `--endpoint-audience` or `--service-audience` removes the audience. A
-  tenant without a service audience refuses service account tokens again after the next refresh. An
-  empty claim, as in `--claim Email=`, removes the stored claim name, so the default claim applies
-  again.
+  tenant without a service audience refuses service account tokens again after the next refresh.
 - **Any status.** The command works on a tenant in any status, including `provisioning` and
   `suspended`, because sign-in settings need neither the tenant's database nor its roles. It needs
   `ConnectionStrings:PlatformSchema` and `Platform:SecretKey`, and not `Admin:ConnectionString`.
 - **Audit.** One [platform audit record](#platform-audit-records) names every setting the command
-  was given, even when the new value equals the stored one. The names are `authority`, `clientId`,
-  `clientSecret`, `claimUserId`, `claimDisplayName`, `claimRoles`, `claimEmail`, `claimLocale`,
-  `endpointAudience`, `serviceAudience` and `profile`, in that order. A name is never a value. Then
+  was given, even when the new value equals the stored one. The names are `endpointAudience`,
+  `serviceAudience` and `profile`, in that order. A name is never a value. Then
   come `retireClientKey:<kid>` and `clientKey:<kid>` for the key options, with the key id and never
   the key.
 - **The client key.** `--client-key` takes no value. The key is an EC P-256 private key as a PEM. It
@@ -102,9 +91,6 @@ and the public key as a PEM.
   set, as in `tenant oidc set <id> --client-key < key.pem`. The command stores the key encrypted, in
   PKCS#8 form, as the tenant's newest key. It never prints the private key. A PEM that is empty or
   is not an EC P-256 private key exits with code 2.
-  `--client-key` and `--client-secret` together need `AXIS_OIDC_CLIENT_SECRET` or
-  `AXIS_OIDC_CLIENT_KEY`. When neither is set, both would read standard input, so the command exits
-  with code 2.
 - **The key id.** The key id is the [RFC 7638](https://www.rfc-editor.org/rfc/rfc7638) JWK
   thumbprint of the public key, with SHA-256, in base64url. Axis works it out from the key, so the
   same key always has the same key id. The command prints it, with the public key as a PEM. An operator
@@ -136,22 +122,23 @@ and the public key as a PEM.
   `--profile standard --retire-client-key <kid>` removes the last key of a tenant that leaves `fapi2`.
   When both key options are given, the key is retired first and then the new one is added.
 - **Exit code 2, nothing changes.** `Tenancy:Source` is not `directory`, the tenant is unknown, the
-  tenant is a preview tenant, which has no sign-in settings of its own, no setting is given, a claim
-  name or the profile is unknown, the tenant would be `fapi2` without a client key, the
-  authority is not an absolute `http` or `https` URL, the client id is blank, the secret is
-  empty, the client key is empty or not an EC P-256 private key, the tenant would hold a third
-  client key, the key is already held, the key id to retire is unknown or blank, or both the secret
-  and the key would read standard input. The `version` stays and no audit record is written.
+  tenant is a preview tenant, which has no sign-in settings of its own, no setting is given, the
+  profile is unknown, the tenant would be `fapi2` without a client key, the client key is empty or
+  not an EC P-256 private key, the tenant would hold a third client key, the key is already held, the
+  key id to retire is unknown or blank, or an option is given twice or is unknown. The removed
+  `--authority`, `--client-id`, `--client-secret` and `--claim` are unknown options. The `version`
+  stays and no audit record is written.
 - **Exit code 1 when the realm cannot be updated.** The command prints `<id> realm failed: <message>`.
   The message names the identity provider step and its status code, never a body or a secret. The
   tenant's keys, profile and `version` stay as they were, so running the command again completes the
   change. The audit record is already written.
 
-- _(planned for M17)_ Every tenant signs in through its realm in
-  [Axis's identity provider](identity-provider.md), which `tenant create` sets up. `--authority`, `--client-id`,
-  `--client-secret` and `--claim` go, because the realm gives the authority and the clients, and each
-  `identityProvider` resource names its own claims. The audiences, the profile and the client keys stay. Axis registers a client key in the realm itself, as
-  `tenant oidc set` does today for a tenant with a realm.
+- The command no longer takes `--authority`, `--client-id`, `--client-secret` or `--claim`, because the
+  realm that `tenant create` sets up in [Axis's identity provider](identity-provider.md) gives the
+  authority and the clients. The audiences, the profile and the client keys stay.
+- _(planned for M17)_ Every tenant signs in through its realm, and each `identityProvider` resource
+  names its own claims. Axis registers a client key in the realm itself, as `tenant oidc set` does
+  today for a tenant with a realm.
 
 ### Platform sign-in
 
@@ -178,7 +165,7 @@ A successful run prints `<id> sign-in ok`. The options are named after the field
 resource.
 
 - **A binding name, never a value.** `--client-secret` here takes the name of a secret
-  [deployment binding](#deployment-bindings). `tenant oidc set --client-secret` takes no value and reads a secret.
+  [deployment binding](#deployment-bindings).
   The command does not check that the binding exists, because activation does, and an operator may set the binding
   after the sign-in.
 - **A whole replacement.** A run replaces the tenant's whole platform sign-in: accounts and every provider. A provider
@@ -264,9 +251,9 @@ successful run of either command prints `<id> email ok`.
 - Every host command exits with code 2 for a tenant that is still `provisioning`, as the binding
   commands do.
 - A move raises the `version` of both tenants.
-- _(planned for M17)_ A host that belongs to a site serves only that site, and the tenant's other hosts send the
-  site's path to it, see [sites and sign-in](identity-provider.md#sites-and-sign-in). Until then, the server does
-  not read `site_path`, and a site host serves the whole tenant.
+- A host that belongs to a site serves only that site, and the tenant's other hosts redirect the site's path to it,
+  see [sites and sign-in](identity-provider.md#sites-and-sign-in). Only the `directory` tenant source has site
+  hosts.
 
 ## Sessions
 
