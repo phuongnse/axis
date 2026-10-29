@@ -227,7 +227,7 @@ flowchart LR
 
 Spoofing does not apply. The operator installs each package, and a caller does not send a package an identity.
 
-Webhooks come with M19. The identity provider has its own issue in M18, and Studio authoring is not covered yet.
+Webhooks come with M19. The identity provider has its own issue in M18.
 
 ### Authoring
 
@@ -342,57 +342,289 @@ flowchart LR
 
 | Id | Threat | Boundary | Category | Rating | Status | Evidence |
 | --- | --- | --- | --- | --- | --- | --- |
-| P1 | An author widens access by changing a policy or a role. | Author and release | Elevation of privilege | High | **Mitigated** | `StudioPublishTests` and `StudioRollbackTests` show that publishing and rolling back need the publisher role. `PolicyMatrixTests` shows what each policy grants. See [publishing](authoring.md#publishing). |
-| P2 | One person holds the author role and the publisher role, and widens access alone. | Author and release | Elevation of privilege | Medium | **Delegated** | The operator decides who holds each role at the identity provider. See [Studio settings](host-settings.md#studio-settings). |
-| P3 | An author denies having published a release. | Author and release | Repudiation | Low | **Mitigated** | `AdminPublisherTests` writes one audit record for each publish. `StudioReleaseHistoryTests` lists each activation, newest first. See [audit](authoring.md#audit). |
-| P4 | A data source shows a field that the user may not read. | Author and release | Information disclosure | Medium | **Mitigated** | `DataSourcePolicyTests` answers 403 for the whole data source. See [data source authorization](data-sources.md#authorization). |
-| P5 | An author expression injects SQL. | Author and release | Tampering | High | **Mitigated** | `SqlTranslatorTests` checks that text and names never reach the SQL unquoted, and that literals are typed parameters. |
-| P6 | A user without the author role calls the Studio API. | Studio API | Elevation of privilege | High | **Mitigated** | `StudioEndpointTests` answers 403 without the author role and 401 without a session. `StudioTextWriteTests` does the same for text writes. |
-| P7 | A site in another origin sends a write as a signed-in author. | Studio API | Tampering | Medium | **Mitigated** | `StudioEndpointTests` refuses a write without the CSRF header. `CsrfHeaderTests` does the same for record writes. |
-| P8 | A write escapes the application folder through `..`, a link or a folder link. | Studio API | Tampering | High | **Mitigated** | `StudioEndpointTests` refuses a name with `..` and does not write through a linked file or folder. `StudioCreateApplicationTests` refuses a name with `..`. |
-| P9 | Two authors overwrite each other's changes. | Studio API | Tampering | Medium | **Mitigated** | `StudioWriteLockTests` gives one of two writes that share a version a 409. See [versions](authoring.md#versions). |
-| P10 | The live release differs from the folder the author sent to publish. | Publishing | Tampering | Medium | **Mitigated** | `StudioPublishTests` shows that the release keeps the folder as it was at the call. A later edit is not in it. |
-| P11 | A publish from one tenant's host changes another tenant. | Publishing | Elevation of privilege | High | **Mitigated** | `StudioPublishTests` stores the request in that tenant's database only. `AdminPublisherTests` activates the release for that tenant only. |
-| P12 | A new release changes work that is already running. | Publishing | Tampering | High | **Mitigated** | Running instances stay on the release they started on. `StudioRollbackTests`, `TaskReleaseTests` and `PinnedReleaseStartTests` cover this. |
-| P13 | Activation or rollback breaks data that is already stored. | Publishing | Tampering | High | **Mitigated** | `MigrationActivationTests` and `ModuleUpgradeTests` refuse a change that would break stored data, and change nothing. `PublisherRollbackTests` fails a rollback across a rename. |
-| P14 | A request keeps crashing the publisher and blocks the queue. | Publishing | Denial of service | Medium | **Mitigated** | `AdminPublisherTests` fails a request with `AXC0215` after three expired claims. |
-| P15 | The server activates a release or holds a schema connection. | Publishing | Elevation of privilege | High | **Mitigated** | The server stores a publish request and never activates. Only the publisher holds the tenant schema role. See [publishing](authoring.md#publishing) and [D47](../decisions/d47-publishing-from-studio.md). |
-| P16 | A test request reaches the tenant's data. | Publishing | Information disclosure | Medium | **Mitigated** | `PublisherTestRequestTests` runs scenarios in their own database and leaves no record in the tenant database. |
-| P17 | A preview reaches its main tenant's data. | Preview tenant | Information disclosure | High | **Mitigated** | `PublisherPreviewTests` activates the release on the preview tenant only. `StudioPreviewTests` leaves the main tenant unchanged. See [preview tenants](../architecture.md#preview-tenants). |
-| P18 | A preview uses the main tenant's bindings. | Preview tenant | Information disclosure | Medium | **Mitigated** | `PreviewTenantActivationTests` gives the preview its own bindings, empty by default. `ReleaseActivatorTests` warns for each missing binding on a preview. |
-| P19 | A session made on the preview host is used on the main host, or the other way round. | Preview tenant | Spoofing | Medium | **Mitigated** | `PreviewTenantSignInTests` answers 401 when a session made on the preview host is used on the main host. |
-| P20 | The preview accepts a service account or machine token. | Preview tenant | Elevation of privilege | Medium | **Mitigated** | The preview has no service or endpoint audience, so it accepts no such token. See [preview tenants](../architecture.md#preview-tenants). |
-| P21 | An administrator of the main tenant manages users on the preview. | Preview tenant | Elevation of privilege | Medium | **Mitigated** | `StudioPreviewTests` says that the users route is off on the preview for an administrator. |
-| P22 | A module changes under a live release. | Modules and templates | Tampering | Medium | **Mitigated** | `ModulePinningTests` shows that a release holds its own module files. The compiler copies them into the release under its content hash. See [modules](modules-and-templates.md#modules). |
-| P23 | A module brings in roles or policies. | Modules and templates | Elevation of privilege | Medium | **Mitigated** | `ModuleCompilerTests` reports a role or policy file in a module as an error. |
-| P24 | An untrusted module or template is installed. | Modules and templates | Tampering | High | **Delegated** | The operator chooses what sits in `Modules:Path` and `Templates:Path`. See [modules](modules-and-templates.md#modules). |
-| P25 | A template brings a wide policy into a new application. | Modules and templates | Elevation of privilege | Medium | **Mitigated** | `StudioCreateApplicationTests` copies a template as a new application. `StudioPublishTests` shows that an author without the publisher role cannot publish it. |
+| P36 | An author widens access by changing a policy or a role. | Author and release | Elevation of privilege | High | **Mitigated** | `StudioPublishTests` and `StudioRollbackTests` show that publishing and rolling back need the publisher role. `PolicyMatrixTests` shows what each policy grants. See [publishing](authoring.md#publishing). |
+| P37 | One person holds the author role and the publisher role, and widens access alone. | Author and release | Elevation of privilege | Medium | **Delegated** | The operator decides who holds each role at the identity provider. See [Studio settings](host-settings.md#studio-settings). |
+| P38 | An author denies having published a release. | Author and release | Repudiation | Low | **Mitigated** | `AdminPublisherTests` writes one audit record for each publish. `StudioReleaseHistoryTests` lists each activation, newest first. See [audit](authoring.md#audit). |
+| P39 | A data source shows a field that the user may not read. | Author and release | Information disclosure | Medium | **Mitigated** | `DataSourcePolicyTests` answers 403 for the whole data source. See [data source authorization](data-sources.md#authorization). |
+| P40 | An author expression injects SQL. | Author and release | Tampering | High | **Mitigated** | `SqlTranslatorTests` checks that text and names never reach the SQL unquoted, and that literals are typed parameters. |
+| P41 | A user without the author role calls the Studio API. | Studio API | Elevation of privilege | High | **Mitigated** | `StudioEndpointTests` answers 403 without the author role and 401 without a session. `StudioTextWriteTests` does the same for text writes. |
+| P42 | A site in another origin sends a write as a signed-in author. | Studio API | Tampering | Medium | **Mitigated** | `StudioEndpointTests` refuses a write without the CSRF header. `CsrfHeaderTests` does the same for record writes. |
+| P43 | A write escapes the application folder through `..`, a link or a folder link. | Studio API | Tampering | High | **Mitigated** | `StudioEndpointTests` refuses a name with `..` and does not write through a linked file or folder. `StudioCreateApplicationTests` refuses a name with `..`. |
+| P44 | Two authors overwrite each other's changes. | Studio API | Tampering | Medium | **Mitigated** | `StudioWriteLockTests` gives one of two writes that share a version a 409. See [versions](authoring.md#versions). |
+| P45 | The live release differs from the folder the author sent to publish. | Publishing | Tampering | Medium | **Mitigated** | `StudioPublishTests` shows that the release keeps the folder as it was at the call. A later edit is not in it. |
+| P46 | A publish from one tenant's host changes another tenant. | Publishing | Elevation of privilege | High | **Mitigated** | `StudioPublishTests` stores the request in that tenant's database only. `AdminPublisherTests` activates the release for that tenant only. |
+| P47 | A new release changes work that is already running. | Publishing | Tampering | High | **Mitigated** | Running instances stay on the release they started on. `StudioRollbackTests`, `TaskReleaseTests` and `PinnedReleaseStartTests` cover this. |
+| P48 | Activation or rollback breaks data that is already stored. | Publishing | Tampering | High | **Mitigated** | `MigrationActivationTests` and `ModuleUpgradeTests` refuse a change that would break stored data, and change nothing. `PublisherRollbackTests` fails a rollback across a rename. |
+| P49 | A request keeps crashing the publisher and blocks the queue. | Publishing | Denial of service | Medium | **Mitigated** | `AdminPublisherTests` fails a request with `AXC0215` after three expired claims. |
+| P50 | The server activates a release or holds a schema connection. | Publishing | Elevation of privilege | High | **Mitigated** | The server stores a publish request and never activates. Only the publisher holds the tenant schema role. See [publishing](authoring.md#publishing) and [D47](../decisions/d47-publishing-from-studio.md). |
+| P51 | A test request reaches the tenant's data. | Publishing | Information disclosure | Medium | **Mitigated** | `PublisherTestRequestTests` runs scenarios in their own database and leaves no record in the tenant database. |
+| P52 | A preview reaches its main tenant's data. | Preview tenant | Information disclosure | High | **Mitigated** | `PublisherPreviewTests` activates the release on the preview tenant only. `StudioPreviewTests` leaves the main tenant unchanged. See [preview tenants](../architecture.md#preview-tenants). |
+| P53 | A preview uses the main tenant's bindings. | Preview tenant | Information disclosure | Medium | **Mitigated** | `PreviewTenantActivationTests` gives the preview its own bindings, empty by default. `ReleaseActivatorTests` warns for each missing binding on a preview. |
+| P54 | A session made on the preview host is used on the main host, or the other way round. | Preview tenant | Spoofing | Medium | **Mitigated** | `PreviewTenantSignInTests` answers 401 when a session made on the preview host is used on the main host. |
+| P55 | The preview accepts a service account or machine token. | Preview tenant | Elevation of privilege | Medium | **Mitigated** | The preview has no service or endpoint audience, so it accepts no such token. See [preview tenants](../architecture.md#preview-tenants). |
+| P56 | An administrator of the main tenant manages users on the preview. | Preview tenant | Elevation of privilege | Medium | **Mitigated** | `StudioPreviewTests` says that the users route is off on the preview for an administrator. |
+| P57 | A module changes under a live release. | Modules and templates | Tampering | Medium | **Mitigated** | `ModulePinningTests` shows that a release holds its own module files. The compiler copies them into the release under its content hash. See [modules](modules-and-templates.md#modules). |
+| P58 | A module brings in roles or policies. | Modules and templates | Elevation of privilege | Medium | **Mitigated** | `ModuleCompilerTests` reports a role or policy file in a module as an error. |
+| P59 | An untrusted module or template is installed. | Modules and templates | Tampering | High | **Delegated** | The operator chooses what sits in `Modules:Path` and `Templates:Path`. See [modules](modules-and-templates.md#modules). |
+| P60 | A template brings a wide policy into a new application. | Modules and templates | Elevation of privilege | Medium | **Mitigated** | `StudioCreateApplicationTests` copies a template as a new application. `StudioPublishTests` shows that an author without the publisher role cannot publish it. |
 
-## The installation
+### Personal data
 
-The images, Docker Compose, the Helm chart and an install on premises.
+Axis holds personal data about the people who use it: user profiles with email addresses, records and
+their history, audit records with client addresses, notifications, logs and traces, uploaded files,
+exports and backups. LINDDUN finds the privacy threats to that data, see
+[D106](../decisions/d106-a-threat-model-kept-current-like-the-asvs-tracking.md).
 
 ```mermaid
 flowchart LR
-    subgraph images [Container images]
-        Images[axis-server, axis-worker, axis-admin and axis-package-host]
+    subgraph idp [Identity provider]
+        Claims[Identity provider claims]
     end
-    subgraph compose [Docker Compose example]
-        ComposeFile[Compose file]
+    subgraph server [Server]
+        Api[Server API]
     end
-    subgraph helm [Helm chart]
-        Chart[Helm chart]
+    subgraph worker [Worker]
+        Steps[Process steps and notify]
     end
-    subgraph host [On-premises host]
-        Host[Host files and secrets]
+    subgraph tenantdb [Tenant database]
+        Profiles[(User profiles)]
+        Records[(Records, record history and audit records with client addresses)]
+        Files[(Uploaded files)]
+        Outbox[(Notifications and email outbox)]
     end
-    Images --> ComposeFile
-    Images --> Chart
-    Images --> Host
+    subgraph outside [Outside systems]
+        Smtp[SMTP server]
+        Collector[Collector run by the operator]
+    end
+    subgraph browser [Browser]
+        Download[Export file]
+    end
+    subgraph operator [Operator]
+        Admin[Admin tool tenant backup]
+        Archive[(Archive kept by the operator)]
+    end
+    Claims -->|name, email and locale at sign-in| Profiles
+    Api -->|writes| Records
+    Api -->|stores uploads| Files
+    Api -->|builds| Download
+    Steps -->|writes| Outbox
+    Outbox -->|sent over SMTP| Smtp
+    Api -->|logs and traces| Collector
+    Steps -->|logs and traces| Collector
+    Admin -->|tenant backup| Archive
 ```
 
 | Id | Threat | Boundary | Category | Rating | Status | Evidence |
 | --- | --- | --- | --- | --- | --- | --- |
+| P61 | A trace holds a person's user id, a field value or a bound address. | Personal data | Linking | Medium | **Mitigated** | `TraceCorrelationTests` (on the purchase request journey, no span holds a field value, a secret, a user id or a bound address). |
+| P62 | A record's history shows a person's actions in another tenant. | Personal data | Linking | Low | **Mitigated** | `RecordHistoryTests` (a record's history holds only its own tenant's audit records). |
+| P63 | The reassign picker shows other users' names to someone without the grant. | Personal data | Identifying | Medium | **Mitigated** | `TaskReassignTests` (the picker is 403 for anyone without the grant, and lists at most 20 profiles). |
+| P64 | A user learns that a record or file exists from the answer code. | Personal data | Detecting | Medium | **Mitigated** | `FileDownloadTests` (no read grant, or a read filter that excludes the record, gets 404), `RecordHistoryTests` (a deleted record's history is 404). |
+| P65 | Other users see whether a person has read a notification. | Personal data | Detecting | Low | **Mitigated** | `NotificationEndpointTests` (marking notifications read lowers the unread count only for the caller). |
+| P66 | A user reads personal fields without a grant. | Personal data | Data disclosure | High | **Mitigated** | `RecordFieldPolicyTests` (reads and writes hold only the fields the user may read, and a write to any other field is a 403). |
+| P67 | An export holds rows or columns that the user may not read. | Personal data | Data disclosure | High | **Mitigated** | `ExportEndpointTests` (hidden rows and columns are absent, a user without the export grant gets 403 and nothing is audited, and each export is audited). |
+| P68 | A profile's email reaches a log. | Personal data | Data disclosure | Medium | **Mitigated** | `SignInTests` (a profile that cannot be written logs a warning without the email). |
+| P69 | A sensitive input shows in process inspection. | Personal data | Data disclosure | Medium | **Mitigated** | `ProcessInstanceDetailTests` (the input that maps a sensitive field is hidden from a user who may read the field). |
+| P70 | People do not know what Axis keeps about them. | Personal data | Unawareness | Medium | **Delegated** | The operator. Axis names no regulation, so the operator tells people what the application keeps, see [Restricted](keys-and-data-protection.md#restricted). |
+| P71 | A person cannot correct their profile. | Personal data | Unawareness | Low | **Delegated** | The identity provider. Each sign-in rewrites the profile from its claims, see [user profiles](notifications.md#user-profiles). |
+| P72 | Notifications are kept longer than needed. | Personal data | Non-compliance | Medium | **Mitigated** | `NotificationRetentionTests` (notifications over the retention days are deleted with their reads, and newer ones stay). |
+| P73 | Logs, telemetry and backup archives are kept longer than needed. | Personal data | Non-compliance | Medium | **Delegated** | The operator keeps and removes them, see [log inventory](log-inventory.md#logs) and [Restricted](keys-and-data-protection.md#restricted). |
+
+Non-repudiation does not apply as a privacy threat. The audit records exist so that a person cannot deny
+a business action, see P3, P12 and P20. What they keep about a person is in the list below.
+
+Open, waiting for an issue:
+
+- (Identifying, Medium) session audit records keep the full client address forever, _(planned for M27)_,
+  [D109](../decisions/d109-sensitive-fields-and-backups-are-encrypted-and-history-keeps-no-names.md).
+- (Identifying, Medium) audit records keep the actor's display name, `actor_name`, forever, _(planned for
+  M27)_, [D109](../decisions/d109-sensitive-fields-and-backups-are-encrypted-and-history-keeps-no-names.md).
+- (Data disclosure, High) a database login, a dump or a replica reads personal data and `sensitive` fields
+  in clear, _(planned for M27)_, [D109](../decisions/d109-sensitive-fields-and-backups-are-encrypted-and-history-keeps-no-names.md).
+  Until then the operator's control is I15.
+- (Data disclosure, High) a backup archive is readable by whoever holds it, _(planned for M27)_,
+  [D109](../decisions/d109-sensitive-fields-and-backups-are-encrypted-and-history-keeps-no-names.md).
+  Until then the operator's control is I15.
+- (Non-compliance, Medium) `axis.email_outbox` rows keep the address and the body forever.
+- (Non-compliance, Medium) `axis.user_profiles` rows and old audit records cannot be removed for a person's
+  removal request.
+
+Each becomes a **Gap** row, linked to its issue, once that issue exists.
+
+## The installation
+
+The operator installs Axis from its images, with Docker Compose, the Helm chart or on premises. The
+overview shows the parts of an install. Each part has its own table below.
+
+```mermaid
+flowchart LR
+    subgraph operator [Operator]
+        Person[Operator]
+    end
+    subgraph registry [Registry]
+        Images[Images axis-server, axis-worker and axis-admin]
+    end
+    subgraph hosts [Hosts]
+        Proxy[TLS proxy]
+        Servers[Server replicas]
+        Worker[Worker and publisher]
+    end
+    subgraph secrets [Secrets]
+        Files[Secret files or Kubernetes Secrets]
+    end
+    subgraph data [Databases and backups]
+        Db[(Platform and tenant databases)]
+        Backups[(Backups)]
+    end
+    Person -->|builds or pulls| Images
+    Person -->|writes| Files
+    Person -->|stores| Backups
+    Images -->|starts| Servers
+    Images -->|starts| Worker
+    Files -->|read at start| Servers
+    Files -->|read at start| Worker
+    Proxy -->|HTTPS| Servers
+    Servers -->|runtime role| Db
+    Worker -->|runtime role| Db
+    Db -->|pg_dump and tenant backup| Backups
+```
+
+### Operator and installation
+
+The operator writes the secrets and the settings, then starts the hosts. Each row is a threat to that work.
+
+```mermaid
+flowchart LR
+    subgraph operator [Operator]
+        Person[Operator with host or cluster access]
+    end
+    subgraph install [Installation]
+        Files[Secret files or Kubernetes Secrets]
+        Settings[Compose file or Helm values]
+    end
+    Person -->|writes| Files
+    Person -->|edits| Settings
+    Settings -->|names the secrets only| Files
+```
+
+| Id | Threat | Boundary | Category | Rating | Status | Evidence |
+| --- | --- | --- | --- | --- | --- | --- |
+| I1 | A secret ends up in a Compose or values file, or in an environment variable. | Operator and installation | Information disclosure | High | **Mitigated** | `scripts/onprem.test.mjs` (no file under deploy/compose holds a password, a client secret or a key), `scripts/helm.test.mjs` (no env entry holds a secret setting, and no Secret object is rendered). |
+| I2 | Someone with host or cluster access reads the secret files or the TLS private key. | Operator and installation | Information disclosure | High | **Delegated** | The operator controls who can read the secret files and the TLS key, see [On premises](installation.md#on-premises) and [In the cloud](installation.md#in-the-cloud). |
+| I3 | An admin command changes a tenant or the platform and leaves no record. | Operator and installation | Repudiation | Medium | **Mitigated** | `AdminPlatformAuditTests` (each of the seven admin commands writes one record with its tenant, user and machine and no secret), `PlatformRekeyTests` (a successful rekey writes one record with no tenant). |
+| I4 | A host gets more database rights than its job needs, such as a worker with the schema role. | Operator and installation | Elevation of privilege | High | **Mitigated** | `DatabaseRoleTests` (every server and worker session on a tenant database uses the runtime role), `scripts/compose.test.mjs` (the worker gets only the runtime role), `scripts/helm.test.mjs` (the worker gets no platform schema connection). |
+
+Spoofing, tampering and denial of service do not apply to the operator's own steps. The operator already has host access, see I2.
+
+### Images and registry
+
+The images travel from a registry to each host, where Compose or the Helm chart starts them.
+
+```mermaid
+flowchart LR
+    subgraph registry [Registry]
+        Images[axis-server, axis-worker and axis-admin images]
+    end
+    subgraph host [Host or cluster]
+        Pull[Compose or Helm pulls the image]
+        Running[Running container with a read-only root file system]
+    end
+    Images -->|pulled by tag| Pull
+    Pull -->|starts| Running
+```
+
+| Id | Threat | Boundary | Category | Rating | Status | Evidence |
+| --- | --- | --- | --- | --- | --- | --- |
+| I5 | An image is swapped or changed between the registry and the host. | Images and registry | Tampering | High | **Delegated** | The operator builds the images or pulls them from a registry the operator controls, see [Images](installation.md#images). Signed images are planned for M28, see [D107](../decisions/d107-the-dependency-scan-runs-now-and-images-are-scanned-and-signed.md). |
+| I6 | An image ships samples, development settings or source control metadata. | Images and registry | Information disclosure | High | **Mitigated** | `scripts/images.test.mjs` (no image holds a sample, a Development settings file or `.git`). |
+| I7 | A process in a container writes to its image or runs as root. | Images and registry | Elevation of privilege | High | **Mitigated** | `scripts/images.test.mjs` (each image runs as a user other than root, and the server and worker start read-only with their settings in `/run/secrets`). |
+| I8 | An install keeps running a version with a known vulnerability. | Images and registry | Elevation of privilege | Medium | **Delegated** | The operator upgrades to the latest version, the only one that gets security fixes, see [Upgrade](installation.md#upgrade). |
+
+Spoofing and repudiation do not apply to an image, which is a file that signs no one in and writes no record. Denial of service is covered by the server rows, such as P6.
+
+### Proxy and server replicas
+
+Clients reach the server replicas through a TLS proxy. The proxy checks each replica's certificate before it forwards a request.
+
+```mermaid
+flowchart LR
+    subgraph clients [Clients]
+        Browser[Browser or caller]
+    end
+    subgraph edge [TLS proxy]
+        Proxy[TLS proxy in front of the replicas]
+    end
+    subgraph replicas [Server replicas]
+        Servers[Server replicas on HTTPS only]
+    end
+    Browser -->|HTTPS| Proxy
+    Proxy -->|HTTPS with the server certificate checked| Servers
+```
+
+| Id | Threat | Boundary | Category | Rating | Status | Evidence |
+| --- | --- | --- | --- | --- | --- | --- |
+| I9 | A client fakes its address, scheme or host through forwarded headers. | Proxy and server replicas | Spoofing | High | **Mitigated** | `ForwardedHeadersTests` (an address that is not listed cannot fake its host or its scheme), `scripts/helm.test.mjs` (forwarded header settings render on the server only). |
+| I10 | Traffic between a client, the proxy and a server is read or changed. | Proxy and server replicas | Information disclosure | High | **Mitigated** | `scripts/onprem.test.mjs` (the servers answer HTTPS only, the proxy takes only TLS 1.2 and 1.3, refuses CBC ciphers on TLS 1.2, and trusts only the server certificate authority). |
+| I11 | A TLS endpoint that the operator runs in front of the server accepts weak TLS or skips the server certificate check. | Proxy and server replicas | Information disclosure | High | **Delegated** | The operator uses only the TLS versions and ciphers that [TLS](installation.md#tls) lists, and checks the server certificate as the Compose proxy does. |
+| I12 | A replica restarts and drops sessions, or a replica with another key joins the install. | Proxy and server replicas | Denial of service | Medium | **Mitigated** | `SharedKeyRingTests` (a session survives a restart and another instance accepts it, and a server with another key fails to start), `scripts/onprem.test.mjs` (a restarted replica serves a signed-in user again). |
+| I13 | A save through one replica overwrites a newer save made through another. | Proxy and server replicas | Tampering | Medium | **Mitigated** | `scripts/onprem.test.mjs` (a stale save through one replica answers 409 after a save through another). |
+
+Repudiation does not apply here, because the server writes the audit records, see P3. Elevation of privilege does not apply to the proxy, which only forwards requests. The access checks are in the server, see P7.
+
+### Database and backups
+
+The server and the worker reach tenant databases with the runtime role. Backups hold copies of the databases.
+
+```mermaid
+flowchart LR
+    subgraph app [Server and worker]
+        Runtime[Server and worker]
+    end
+    subgraph database [Database host]
+        Db[(Platform and tenant databases)]
+    end
+    subgraph backupstore [Backup storage]
+        Archive[(Dumps and tenant archives)]
+    end
+    Runtime -->|runtime role over verify-full TLS| Db
+    Db -->|pg_dump and tenant backup| Archive
+```
+
+| Id | Threat | Boundary | Category | Rating | Status | Evidence |
+| --- | --- | --- | --- | --- | --- | --- |
+| I14 | A backup archive or its output holds a tenant secret. | Database and backups | Information disclosure | High | **Mitigated** | `AdminTenantBackupTests` (the archive and the output of a backup hold no secret of the tenant). |
+| I15 | A stolen archive or database dump exposes business data. | Database and backups | Information disclosure | High | **Delegated** | The operator stores backups under access control and under disk or database encryption, see [What else to back up](administration.md#what-else-to-back-up) and [Restricted](keys-and-data-protection.md#restricted). Encrypted archives are planned for M27, see [D109](../decisions/d109-sensitive-fields-and-backups-are-encrypted-and-history-keeps-no-names.md). |
+| I16 | A backup is stored with the installation key, so a stolen backup yields the stored secrets. | Database and backups | Information disclosure | High | **Delegated** | The operator keeps the installation key apart from the backups, see [What else to back up](administration.md#what-else-to-back-up). |
+| I17 | A failed upgrade or a lost database cannot be restored. | Database and backups | Denial of service | Medium | **Delegated** | The operator backs up the platform and tenant databases before each upgrade, see [Upgrade](installation.md#upgrade). |
+| I18 | A host connects to PostgreSQL without a full certificate check. | Database and backups | Tampering | High | **Mitigated** | `DatabaseTlsStartTests` (a production server stops at start on a connection string without full certificate checks), `AdminDatabaseTlsTests` (an admin command exits with status 2 for such a string). |
+
+Spoofing, repudiation and elevation of privilege on the database are covered by the server rows, P9, P12 and P13.
+
+### Stored secrets and key ring
+
+The installation key encrypts every stored secret and each data protection key. The data protection keys sit in the platform database.
+
+```mermaid
+flowchart LR
+    subgraph hosts [Server and worker hosts]
+        Files[Installation key in secret files or Kubernetes Secrets]
+    end
+    subgraph platform [Platform database]
+        Ring[(Data protection key ring)]
+        Secrets[(Encrypted tenant secrets)]
+    end
+    Files -->|encrypts| Ring
+    Files -->|encrypts| Secrets
+```
+
+| Id | Threat | Boundary | Category | Rating | Status | Evidence |
+| --- | --- | --- | --- | --- | --- | --- |
+| I19 | Data protection keys are read in clear from the platform database. | Stored secrets and key ring | Information disclosure | High | **Mitigated** | `SharedKeyRingTests` (the stored keys hold no plain key material and decrypt only with the installation key). |
+| I20 | A rekey leaves the old installation key able to decrypt stored values. | Stored secrets and key ring | Information disclosure | High | **Mitigated** | `PlatformRekeyTests` (after a rekey, the new key alone decrypts every encrypted column). |
+| I21 | The previous installation key stays on the hosts after a rekey. | Stored secrets and key ring | Information disclosure | Medium | **Delegated** | The operator removes `Platform:PreviousSecretKey` from every host once the rekey has run, see [Installation key](tenant-setting-commands.md#installation-key). |
+| I22 | A leaked installation key stays in use until the operator rotates it. | Stored secrets and key ring | Information disclosure | High | **Delegated** | The operator runs `platform rekey` and changes the secrets at once when a key may have leaked, see [Key policy](keys-and-data-protection.md#key-policy). |
+
+Other categories do not apply to stored keys. A changed key ring fails to start, see I12, and a rekey writes a record, see I3.
 
 ## The way Axis is built
 
