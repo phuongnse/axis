@@ -1,14 +1,18 @@
+using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace Axis.Tenancy.Realms;
 
 /// <summary>
-/// Lists the users of a tenant's realm. It signs in to the realm as <c>axis-users</c> with the client credentials grant.
-/// That client's service account can only view and query users. It reads one page of users with the number of all
-/// users that match the search, and for each user on the page the alias of the first federated identity. An error
-/// names the step and the status code, never a response body or a secret.
+/// Lists and changes the users of a tenant's realm. It signs in to the realm as <c>axis-users</c> with the client
+/// credentials grant. That client's service account views, queries and manages users, and nothing else in the realm.
+/// It reads one page of users with the number of all users that match the search, and for each user on the page the
+/// alias of the first federated identity. It also finds one user, disables or enables a user, ends a user's realm
+/// sessions and removes a user's authenticators. An error names the step and the status code, never a response body
+/// or a secret.
 /// </summary>
 public sealed class RealmUsers(HttpClient http, TenantRealmUsers access)
 {
@@ -49,6 +53,83 @@ public sealed class RealmUsers(HttpClient http, TenantRealmUsers access)
             total);
     }
 
+    /// <summary>
+    /// Reads one user's state, or <c>null</c> when the realm has no user with this id or the user is a service account.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">An identity provider step answered an error status.</exception>
+    public async Task<RealmUserState?> FindAsync(string userId, CancellationToken cancellationToken)
+    {
+        var token = await TokenAsync(cancellationToken);
+        var path = UserPath(userId);
+        using var response = await GetAsync(token, path, cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+
+        EnsureSuccess(response, "read the user");
+        var user = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+
+        // A user's representation does not tell a service account. The search leaves service accounts out, and an exact search finds the user by name.
+        var username = Text(user, "username") ?? "";
+        using var found = await GetAsync(
+            token, $"admin/realms/{Uri.EscapeDataString(access.Realm)}/users?briefRepresentation=true&max=100&search={Uri.EscapeDataString($"\"{username}\"")}", cancellationToken);
+        EnsureSuccess(found, "search the user");
+        var matches = await found.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        if (!matches.EnumerateArray().Any(match => Text(match, "id") == userId))
+        {
+            return null;
+        }
+
+        return new RealmUserState(
+            userId,
+            user.TryGetProperty("enabled", out var enabled) && enabled.ValueKind == JsonValueKind.True,
+            await ProviderAliasAsync(token, $"admin/realms/{Uri.EscapeDataString(access.Realm)}/users", userId, cancellationToken));
+    }
+
+    /// <summary>Disables or enables the user. It reads the full representation and writes it back, because a partial update can clear fields.</summary>
+    /// <exception cref="InvalidOperationException">An identity provider step answered an error status.</exception>
+    public async Task SetEnabledAsync(string userId, bool enabled, CancellationToken cancellationToken)
+    {
+        var token = await TokenAsync(cancellationToken);
+        var path = UserPath(userId);
+        using var read = await GetAsync(token, path, cancellationToken);
+        EnsureSuccess(read, "read the user");
+        var user = (await read.Content.ReadFromJsonAsync<JsonNode>(cancellationToken))!.AsObject();
+        user["enabled"] = enabled;
+        using var written = await SendAsync(token, HttpMethod.Put, path, user, cancellationToken);
+        EnsureSuccess(written, enabled ? "enable the user" : "disable the user");
+    }
+
+    /// <summary>Ends every session of the user in the realm.</summary>
+    /// <exception cref="InvalidOperationException">An identity provider step answered an error status.</exception>
+    public async Task LogOutAsync(string userId, CancellationToken cancellationToken)
+    {
+        var token = await TokenAsync(cancellationToken);
+        using var response = await SendAsync(token, HttpMethod.Post, $"{UserPath(userId)}/logout", null, cancellationToken);
+        EnsureSuccess(response, "end the realm sessions of the user");
+    }
+
+    /// <summary>Removes the user's authenticator app, so the next sign-in asks for a new one.</summary>
+    /// <exception cref="InvalidOperationException">An identity provider step answered an error status.</exception>
+    public async Task RemoveAuthenticatorsAsync(string userId, CancellationToken cancellationToken)
+    {
+        var token = await TokenAsync(cancellationToken);
+        var path = UserPath(userId);
+        using var listed = await GetAsync(token, $"{path}/credentials", cancellationToken);
+        EnsureSuccess(listed, "list the credentials of the user");
+        var credentials = (await listed.Content.ReadFromJsonAsync<JsonElement>(cancellationToken)).EnumerateArray().ToList();
+        foreach (var credential in credentials.Where(credential => Text(credential, "type") == "otp"))
+        {
+            using var removed = await SendAsync(
+                token, HttpMethod.Delete, $"{path}/credentials/{Uri.EscapeDataString(credential.GetProperty("id").GetString()!)}", null, cancellationToken);
+            EnsureSuccess(removed, "remove the authenticator of the user");
+        }
+    }
+
+    private string UserPath(string userId) =>
+        $"admin/realms/{Uri.EscapeDataString(access.Realm)}/users/{Uri.EscapeDataString(userId)}";
+
     private async Task<string> TokenAsync(CancellationToken cancellationToken)
     {
         using var content = new FormUrlEncodedContent(new Dictionary<string, string>
@@ -74,10 +155,18 @@ public sealed class RealmUsers(HttpClient http, TenantRealmUsers access)
             : null;
     }
 
-    private async Task<HttpResponseMessage> GetAsync(string token, string path, CancellationToken cancellationToken)
+    private Task<HttpResponseMessage> GetAsync(string token, string path, CancellationToken cancellationToken) =>
+        SendAsync(token, HttpMethod.Get, path, null, cancellationToken);
+
+    private async Task<HttpResponseMessage> SendAsync(string token, HttpMethod method, string path, object? body, CancellationToken cancellationToken)
     {
-        using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(access.BaseAddress, path));
+        using var request = new HttpRequestMessage(method, new Uri(access.BaseAddress, path));
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        if (body is not null)
+        {
+            request.Content = JsonContent.Create(body);
+        }
+
         return await http.SendAsync(request, cancellationToken);
     }
 
@@ -92,3 +181,6 @@ public sealed record RealmUserPage(IReadOnlyList<RealmUser> Users, int TotalCoun
 
 /// <summary>A user of a tenant's realm. <c>ProviderAlias</c> is the alias of the first federated identity, or <c>null</c> for an account.</summary>
 public sealed record RealmUser(string Id, string Username, string? FirstName, string? LastName, string? Email, bool Enabled, string? ProviderAlias);
+
+/// <summary>The state of one realm user that a command needs. <c>ProviderAlias</c> is the alias of the first federated identity, or <c>null</c> for an account.</summary>
+public sealed record RealmUserState(string Id, bool Enabled, string? ProviderAlias);
