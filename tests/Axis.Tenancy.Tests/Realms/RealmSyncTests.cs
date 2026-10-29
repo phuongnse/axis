@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text;
+using Axis.Configuration.Realms;
 using Axis.Tenancy.Realms;
 
 namespace Axis.Tenancy.Tests.Realms;
@@ -46,7 +47,7 @@ public sealed class RealmSyncTests
     private static async Task Sync(ScriptedHandler handler)
     {
         using var http = new HttpClient(handler, disposeHandler: false);
-        await new RealmSync(http, new Uri("http://idp.test/")).SyncAsync("r", "s", new RealmState(["a"], []), CancellationToken.None);
+        await new RealmSync(http, new Uri("http://idp.test/")).SyncAsync("r", "s", new RealmState([new RealmSiteClient("a", Accounts: true, [])], []), CancellationToken.None);
     }
 
     private sealed class ScriptedHandler(params HttpStatusCode[] clientUpdates) : HttpMessageHandler

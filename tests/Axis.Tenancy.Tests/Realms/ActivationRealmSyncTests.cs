@@ -13,12 +13,19 @@ public sealed class ActivationRealmSyncTests
     public void A_plan_with_two_sites_and_one_oidc_provider_maps_to_the_resolved_state()
     {
         var plan = new RealmPlan(
-            [new RealmSiteClient("purchasing", Accounts: false, ["oidc-partner"]), new RealmSiteClient("requests", Accounts: false, ["oidc-partner"])],
+            [new RealmSiteClient("purchasing", Accounts: false, ["oidc-partner"]), new RealmSiteClient("requests", Accounts: true, [])],
             [Provider(clientSecretBinding: "PartnerSecret")]);
 
         var state = ActivationRealmSync.ToState(plan, Bindings());
 
-        Assert.Equal(["purchasing", "requests"], state.SitePaths);
+        Assert.Equal(plan.Sites.Count, state.Sites.Count);
+        foreach (var (expected, actual) in plan.Sites.Zip(state.Sites))
+        {
+            Assert.Equal(expected.Path, actual.Path);
+            Assert.Equal(expected.Accounts, actual.Accounts);
+            Assert.True(expected.Providers.SequenceEqual(actual.Providers));
+        }
+
         var provider = Assert.Single(state.Providers);
         Assert.Equal("oidc-partner", provider.Alias);
         Assert.Equal(new Uri("https://partner.example.test/realms/p"), provider.Issuer);
