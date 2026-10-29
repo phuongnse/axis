@@ -64,7 +64,15 @@ describe('design-system previews', () => {
     ['signIn', ['Signed out', 'Sign-in refused', 'Session ended']],
     [
       'identitySignIn',
-      ['Sign in', 'Wrong password', 'Organization sign-in only', 'Two-step verification', 'Add an authenticator'],
+      [
+        'Sign in',
+        'Wrong password',
+        'Organization sign-in only',
+        'Two-step verification',
+        'Forgot password',
+        'Set password',
+        'Add an authenticator',
+      ],
     ],
   ])('the %s preview has its states, each in a frame of its own height', (name, captions) => {
     const states = previews[name]

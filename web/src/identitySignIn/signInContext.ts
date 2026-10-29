@@ -34,6 +34,27 @@ export interface TwoStepTexts {
   backToSignIn: string
 }
 
+/** The texts of the "Forgot password?" page. */
+export interface ResetPasswordTexts {
+  title: string
+  message: string
+  username: string
+  usernameRequired: string
+  sendLink: string
+  backToSignIn: string
+}
+
+/** The texts of the page that sets a password. */
+export interface UpdatePasswordTexts {
+  title: string
+  message: string
+  newPassword: string
+  confirmPassword: string
+  newPasswordRequired: string
+  passwordsDiffer: string
+  setPassword: string
+}
+
 /** The texts of the page that adds an authenticator. */
 export interface AddAuthenticatorTexts {
   title: string
@@ -118,5 +139,36 @@ export interface AddAuthenticatorContext {
   texts: AddAuthenticatorTexts
 }
 
+/** What the "Forgot password?" page draws: the email or username that Keycloak sends a link to. */
+export interface ResetPasswordContext {
+  page: 'resetPassword'
+  title: string
+  realmName: string
+  /** The username that the person typed on the sign-in page, if any. */
+  username?: string
+  /** The message to show above the form. No error means no alert. */
+  error?: string
+  /** Where the form posts `username`. */
+  loginAction: string
+  /** Where "Back to sign in" goes. */
+  loginUrl: string
+  locales: SignInLocale[]
+  texts: ResetPasswordTexts
+}
+
+/** What the page that sets a password draws. An invitation and a reset link both open it. */
+export interface UpdatePasswordContext {
+  page: 'updatePassword'
+  title: string
+  realmName: string
+  /** The message to show above the form. No error means no alert. */
+  error?: string
+  /** Where the form posts `password-new`, `password-confirm` and `logout-sessions`. */
+  loginAction: string
+  locales: SignInLocale[]
+  texts: UpdatePasswordTexts
+}
+
 /** What the page of the identity provider's theme draws, told apart by `page`. */
-export type IdentityContext = SignInContext | TwoStepContext | AddAuthenticatorContext
+export type IdentityContext =
+  SignInContext | TwoStepContext | AddAuthenticatorContext | ResetPasswordContext | UpdatePasswordContext

@@ -243,7 +243,8 @@ Docker Compose, `scripts/dev.sh` and `scripts/e2e.sh` start Keycloak with the de
 realm imported from `samples/keycloak/axis-realm.json`. The development password is `axis`
 for every user. After the password, the Keycloak login page asks for a 6-digit code, as D99 requires of every account.
 The password page is the Axis sign-in theme, built into `artifacts/keycloak-theme` and set as the realm's `loginTheme`.
-The code page is still Keycloak's own.
+The code, forgot-password and set-password pages are the Axis theme too. The realm allows "Forgot password?" but sends no
+email.
 Each user has a fixed secret in the realm file, the `secretData` value of the user's `otp` credential. It is Base32, and it is test data like
 the password. To get a code, add the secret to an authenticator app as a time-based account (SHA-1, 6 digits, 30 seconds), or run
 `oathtool --totp -b <secret>`. The realm accepts a code more than once, so tests can sign in the same user several times within 30 seconds.

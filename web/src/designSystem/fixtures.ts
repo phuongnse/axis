@@ -21,10 +21,14 @@ import type { TaskPage } from '../platform/tasks'
 import type {
   AddAuthenticatorContext,
   AddAuthenticatorTexts,
+  ResetPasswordContext,
+  ResetPasswordTexts,
   SignInContext,
   SignInTexts,
   TwoStepContext,
   TwoStepTexts,
+  UpdatePasswordContext,
+  UpdatePasswordTexts,
 } from '../identitySignIn/signInContext'
 
 /** The fixture application. Its name is also the marker that tells a design-system build from the production SPA. */
@@ -838,6 +842,49 @@ export const identityTwoStepContext: TwoStepContext = {
   tryAnotherWay: true,
   locales: identitySignInContext.locales,
   texts: identityTwoStepTexts,
+}
+
+/** The texts of the "Forgot password?" page, in English. */
+export const identityResetPasswordTexts: ResetPasswordTexts = {
+  title: 'Reset your password',
+  message: 'Enter your email or username and we will send you a link to set a new password.',
+  username: 'Email or username',
+  usernameRequired: 'Enter your email or username.',
+  sendLink: 'Send link',
+  backToSignIn: 'Back to sign in',
+}
+
+/** What the identity provider's "Forgot password?" page draws in the design system. */
+export const identityResetPasswordContext: ResetPasswordContext = {
+  page: 'resetPassword',
+  title: identityResetPasswordTexts.title,
+  realmName: identitySignInContext.realmName,
+  username: identitySignInContext.username,
+  loginAction: '#reset',
+  loginUrl: '#sign-in',
+  locales: identitySignInContext.locales,
+  texts: identityResetPasswordTexts,
+}
+
+/** The texts of the page that sets a password, in English. */
+export const identityUpdatePasswordTexts: UpdatePasswordTexts = {
+  title: 'Set your password',
+  message: 'Choose a new password for your account.',
+  newPassword: 'New password',
+  confirmPassword: 'Confirm password',
+  newPasswordRequired: 'Enter a new password.',
+  passwordsDiffer: 'The passwords do not match.',
+  setPassword: 'Set password',
+}
+
+/** What the identity provider's page that sets a password draws in the design system. */
+export const identityUpdatePasswordContext: UpdatePasswordContext = {
+  page: 'updatePassword',
+  title: identityUpdatePasswordTexts.title,
+  realmName: identitySignInContext.realmName,
+  loginAction: '#set-password',
+  locales: identitySignInContext.locales,
+  texts: identityUpdatePasswordTexts,
 }
 
 /** The texts of the page that adds an authenticator, in English. */
