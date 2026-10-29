@@ -10,7 +10,14 @@ function copyThemeFiles(): Plugin {
   return {
     name: 'copy-theme-files',
     closeBundle() {
-      for (const name of ['theme.properties', 'login.ftl', 'login-otp.ftl', 'messages']) {
+      for (const name of [
+        'theme.properties',
+        'login.ftl',
+        'login-otp.ftl',
+        'login-reset-password.ftl',
+        'login-update-password.ftl',
+        'messages',
+      ]) {
         cpSync(path.resolve(import.meta.dirname, 'keycloak-theme', name), path.join(themeFolder, name), {
           recursive: true,
         })

@@ -1,7 +1,12 @@
 import { cleanup, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, describe, expect, it } from 'vitest'
-import { identitySignInContext, identityTwoStepContext } from '../src/designSystem/fixtures'
+import {
+  identityResetPasswordContext,
+  identitySignInContext,
+  identityTwoStepContext,
+  identityUpdatePasswordContext,
+} from '../src/designSystem/fixtures'
 import { previews } from '../src/designSystem/previews'
 import type { IdentityContext } from '../src/identitySignIn/signInContext'
 import { ThemeModeProvider } from '../src/platform/theme'
@@ -37,6 +42,28 @@ function expectTwoStepPage(container: HTMLElement) {
   )
 }
 
+function expectResetPasswordPage(container: HTMLElement) {
+  expect(screen.getByText('Reset your password')).toBeInTheDocument()
+  const form = container.querySelector('form') as HTMLFormElement
+  expect(form).toHaveAttribute('action', identityResetPasswordContext.loginAction)
+  expect(form).toHaveAttribute('method', 'post')
+  expect(form.querySelector('input[name="username"]')).toHaveValue(identityResetPasswordContext.username)
+  expect(screen.getByRole('link', { name: 'Back to sign in' })).toHaveAttribute(
+    'href',
+    identityResetPasswordContext.loginUrl,
+  )
+}
+
+function expectUpdatePasswordPage(container: HTMLElement) {
+  expect(screen.getByText('Set your password')).toBeInTheDocument()
+  const form = container.querySelector('form') as HTMLFormElement
+  expect(form).toHaveAttribute('action', identityUpdatePasswordContext.loginAction)
+  expect(form).toHaveAttribute('method', 'post')
+  expect(form.querySelector('input[name="password-new"]')).toBeInTheDocument()
+  expect(form.querySelector('input[name="password-confirm"]')).toBeInTheDocument()
+  expect(form.querySelector('input[name="logout-sessions"]')).toHaveValue('on')
+}
+
 describe('the Keycloak theme entry', () => {
   afterEach(() => {
     document.getElementById('axis-sign-in-context')?.remove()
@@ -68,6 +95,34 @@ describe('the Keycloak theme entry', () => {
       </ThemeModeProvider>,
     )
     expectTwoStepPage(preview.container)
+  })
+
+  it('draws the same forgot-password page as the identitySignIn preview', () => {
+    writeContextBlock(identityResetPasswordContext)
+    const theme = render(<SignInEntry context={readSignInContext(document)} />)
+    expectResetPasswordPage(theme.container)
+    cleanup()
+
+    const preview = render(
+      <ThemeModeProvider>
+        <MemoryRouter>{previews.identitySignIn[4].draw()}</MemoryRouter>
+      </ThemeModeProvider>,
+    )
+    expectResetPasswordPage(preview.container)
+  })
+
+  it('draws the same set-password page as the identitySignIn preview', () => {
+    writeContextBlock(identityUpdatePasswordContext)
+    const theme = render(<SignInEntry context={readSignInContext(document)} />)
+    expectUpdatePasswordPage(theme.container)
+    cleanup()
+
+    const preview = render(
+      <ThemeModeProvider>
+        <MemoryRouter>{previews.identitySignIn[5].draw()}</MemoryRouter>
+      </ThemeModeProvider>,
+    )
+    expectUpdatePasswordPage(preview.container)
   })
 
   it('fails with a clear error when the sign-in context is missing', () => {
