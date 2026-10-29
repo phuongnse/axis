@@ -103,7 +103,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     collection, and a `startProcess` action on a form or a detail.
   - *Secondary*: the default grey outline, such as Cancel and Import.
   - *Icon*: a text button with only an icon, for small actions such as
-    Refresh, Choose and Clear.
+    Refresh. Choose and Clear of a `reference` field are bordered and joined.
   - *Destructive*: in `dangerText` at any level, such as Remove row and
     Delete.
   - Ant Design writes the text of text, outlined and danger buttons in the
