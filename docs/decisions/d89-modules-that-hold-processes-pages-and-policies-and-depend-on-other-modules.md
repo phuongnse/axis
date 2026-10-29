@@ -8,6 +8,8 @@ out of a module, and that a module does not depend on other modules. Roles stay
 out. Everything else in D40 holds. Everything here is _(planned for M20)_. See
 [modules](../reference/modules-and-templates.md#processes-pages-policies-and-dependencies).
 
+Role slots in `module.json` and their mapping in an application's `modules` entry are built, with `AXC0292` to `AXC0294`. Policies and task assignees that name a slot are not.
+
 - **New kinds in a module:** a module may also hold `process`, `page` and
   `policy` resources. It still holds no `role`, `site`, `connector`,
   `endpoint`, `trigger` or `webhook`. Those need application bindings, an
