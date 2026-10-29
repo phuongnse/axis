@@ -124,6 +124,23 @@ public sealed class StudioPreviewTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task The_me_route_says_users_is_false_on_the_preview_tenant_for_a_holder_of_the_administrator_role()
+    {
+        using var folder = StudioPublishTests.NewFolder();
+        var main = await _database.CreateDatabaseAsync("studio_preview_users_main", CancellationToken);
+        var preview = await _database.CreateDatabaseAsync("studio_preview_users_preview", CancellationToken);
+        await using var factory = StudioPublishTests.NewFactory(folder.Path, [("a", HostA, main)], preview)
+            .WithWebHostBuilder(builder => builder.UseSetting("Users:AdministratorRole", "author"));
+        using var author = factory.CreateClient().SignedInAs("author");
+
+        using var onMain = await StudioPublishTests.GetJsonAsync(author, "/api/me", HostA);
+        using var onPreview = await StudioPublishTests.GetJsonAsync(author, "/api/me", StudioPublishTests.PreviewHost);
+
+        Assert.True(onMain.RootElement.GetProperty("users").GetBoolean());
+        Assert.False(onPreview.RootElement.GetProperty("users").GetBoolean());
+    }
+
+    [Fact]
     public async Task The_me_route_gives_the_preview_host_to_an_author_only()
     {
         using var folder = StudioPublishTests.NewFolder();

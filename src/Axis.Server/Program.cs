@@ -209,6 +209,7 @@ builder.Services.AddSingleton(FileSettings.Load(builder.Configuration));
 builder.Services.AddSingleton(RecordImportSettings.Load(builder.Configuration));
 builder.Services.AddSingleton(StudioOptions.Load(builder.Configuration, builder.Environment.ContentRootPath));
 builder.Services.AddSingleton(ConsoleSettings.Load(builder.Configuration));
+builder.Services.AddSingleton(UsersSettings.Load(builder.Configuration));
 
 builder.Services.AddScoped<TenantDatabase>();
 builder.Services.AddSingleton<ActiveModelCache>();

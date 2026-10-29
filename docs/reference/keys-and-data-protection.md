@@ -8,7 +8,7 @@ The policy follows the lifecycle terms of NIST SP 800-57. It covers each key fro
 
 - **Generation.** The operator makes the installation key from 32 random bytes, for example with `openssl rand -base64 32`. Axis makes database passwords the same way. The operator makes each client key as an EC P-256 key in PEM form.
 - **Storage.** A secret comes from a file in `/run/secrets` or from the platform's secret store, never from a committed file. Axis keeps each tenant secret encrypted in the platform tables. It keeps no key in code, images or logs.
-- **Holders.** The server, the worker and the admin tool of one installation share its installation key, and every replica holds the same value. A client key's private half stays with Axis. Only its public half goes to the identity provider. A webhook secret, _(planned for M18)_, is shared by exactly two parties.
+- **Holders.** The server, the worker and the admin tool of one installation share its installation key, and every replica holds the same value. A client key's private half stays with Axis. Only its public half goes to the identity provider. A webhook secret, _(planned for M19)_, is shared by exactly two parties.
 - **Use.** Each key has one purpose. The installation key only encrypts stored secrets and data protection keys. A client key only signs client assertions. The [cryptographic inventory](#cryptographic-inventory) lists where each key may and may not be used.
 - **Cryptoperiod.** Axis rotates the installation key at least once a year, and at once when it may have leaked. The framework makes a new data protection key every 90 days. No other key has a set period yet.
 - **Rotation.** Each key rotates on its own path.
@@ -25,7 +25,7 @@ The policy follows the lifecycle terms of NIST SP 800-57. It covers each key fro
 
 ## Cryptographic inventory
 
-Each row is one key, algorithm or certificate. _(planned for M18)_ marks what is not built yet.
+Each row is one key, algorithm or certificate. A _(planned for Mx)_ marker marks what is not built yet.
 
 | Item | Algorithm and size | Used for | Never used for | Lifecycle |
 | --- | --- | --- | --- | --- |
@@ -40,8 +40,8 @@ Each row is one key, algorithm or certificate. _(planned for M18)_ marks what is
 | **Tenant database passwords** | 32 random bytes, shown as 64 lowercase hex characters | Logging in to the tenant's runtime and schema database roles | Anything other than that login | Made at `tenant create` and by `tenant rotate-passwords`. Stored encrypted by the installation key. |
 | **Realm client secrets** | 32 random bytes, shown as 64 lowercase hex characters | The secrets of the three clients of a tenant's realm: the platform client `axis`, which is the tenant's OIDC client secret, `axis-activation` and `axis-users`, see [keeping the realm in step](identity-provider.md#keeping-the-realm-in-step) | Anything other than signing in as those clients | Made at `tenant create`. Stored encrypted by the installation key. A rerun keeps them. |
 | **OIDC client secret, SMTP password and `secret` bindings** | Given by the operator and stored encrypted by the installation key | Calling the identity provider, the mail server and a connector | Anything else. Never printed | Replaced with `tenant oidc set --client-secret`, `tenant email set --password` and `tenant binding set --secret`. |
-| **Webhook signing secret** _(planned for M18)_ | HMAC-SHA256, in the Standard Webhooks format | Signing outgoing webhook calls, see [webhook delivery](integration-resources.md#webhook-delivery) | Anything else | Shared by two parties. The `secret` binding may hold two secrets during a change. |
-| **Connector OAuth2 client secret** _(planned for M18)_ | Stored as a `secret` binding | Asking the authorization server for an access token, see [OAuth2 auth](integration-resources.md#oauth2-auth) | Anything else | Replaced with `tenant binding set --secret`. |
+| **Webhook signing secret** _(planned for M19)_ | HMAC-SHA256, in the Standard Webhooks format | Signing outgoing webhook calls, see [webhook delivery](integration-resources.md#webhook-delivery) | Anything else | Shared by two parties. The `secret` binding may hold two secrets during a change. |
+| **Connector OAuth2 client secret** _(planned for M19)_ | Stored as a `secret` binding | Asking the authorization server for an access token, see [OAuth2 auth](integration-resources.md#oauth2-auth) | Anything else | Replaced with `tenant binding set --secret`. |
 | **Proxy certificate and key** | A publicly trusted certificate, with TLS 1.2 and 1.3 and only the strong cipher suites | Serving HTTPS to clients, see [TLS](installation.md#tls) | Anything else. The Axis hosts hold no TLS key | The operator's proxy holds the key and renews the certificate. The Compose example reads it from `/certs`. |
 | **Server certificates that Axis checks** | PostgreSQL under `VerifyFull`. The identity provider, SMTP and OTLP certificates | Verifying the servers that Axis connects to | Client certificates. Axis presents none | PostgreSQL uses `Root Certificate` for a private authority. The other servers use the system trust store. |
 | **Hashes** | SHA-256 for resource versions, release content, fingerprints, file contents, names shortened to 16 hex characters and the Studio write lock key. SHA-1 only to name module resources as version 5 UUIDs | Identity, integrity and naming | Hiding a secret or a password. Axis hashes no password | No key. A hash change is a code change, see [crypto agility](#crypto-agility). |

@@ -41,7 +41,7 @@ service may need `pg_trgm` on its list of allowed extensions.
 There are three production images: `axis-server`, `axis-worker` and
 `axis-admin`. They hold no sample, no sample extension package, no sample
 module, no development realm, no credential and no source control metadata
-such as `.git`. _(planned for M18)_ A fourth
+such as `.git`. _(planned for M21)_ A fourth
 image, `axis-package-host`, runs the
 [package runners](extension-packages.md#package-runners) in the
 `package-host` container beside the worker. Compose and the Helm chart give
@@ -154,7 +154,7 @@ HTTP address: the identity provider's admin API, at `IdentityProvider:Url`, over
 - **Extension packages are trusted code.** A package runs in the worker's
   process, so installing one means trusting its code. The `url` binding limits
   the client that Axis hands to it, not the package's own code.
-- **Planned.** An OAuth2 `tokenUrl` and an outbound webhook _(planned for M18)_
+- **Planned.** An OAuth2 `tokenUrl` and an outbound webhook _(planned for M19)_
   will name a `url` binding too, and join this table.
 
 ## On premises

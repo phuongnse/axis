@@ -132,6 +132,8 @@ export function serverEnv(baseURL: string): Record<string, string> {
     Studio__PublisherRole: 'publisher',
     // Makes GET /api/me answer studioTest: true for an author, which shows the test controls.
     Studio__Tests: 'true',
+    // Makes GET /api/me answer users: true for the administrator user, who holds this role.
+    Users__AdministratorRole: 'tenant-administrator',
   }
 }
 
