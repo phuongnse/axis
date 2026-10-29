@@ -160,7 +160,7 @@ describe('command line', () => {
     assert.doesNotMatch(result.stdout, /::error/)
   })
 
-  test('reports a --skipped suite as skipped, with no annotation and exit 0', () => {
+  test('reports a --skipped suite as skipped, with a notice and exit 0', () => {
     const report = buildReport({
       suites: ['passing:tests/Sample.Tests', 'absent:web'],
       resultsDir,
@@ -170,7 +170,9 @@ describe('command line', () => {
 
     assert.equal(report.ok, true)
     assert.match(formatSummary(report), /^\| absent \(skipped: not affected by this change\) \| - \| - \| - \| - \|$/m)
-    assert.deepEqual(formatAnnotations(report), [])
+    const notice =
+      "::notice title=absent skipped::absent did not run: no file changed since NexKit's commit can affect it."
+    assert.deepEqual(formatAnnotations(report), [notice])
 
     const result = runCli(['--skipped', 'absent', 'passing:tests/Sample.Tests', 'absent:web'], {
       GITHUB_ACTIONS: 'true',
@@ -178,6 +180,9 @@ describe('command line', () => {
     assert.equal(result.status, 0, result.stderr)
     assert.match(result.stdout, /absent \(skipped: not affected by this change\)/)
     assert.doesNotMatch(result.stdout, /::error/)
+    assert.ok(result.stdout.split('\n').includes(notice), result.stdout)
+
+    assert.doesNotMatch(runCli(['--skipped', 'absent', 'passing:tests/Sample.Tests', 'absent:web']).stdout, /::notice/)
   })
 
   test('exits 1 when a suite failed or is missing', () => {

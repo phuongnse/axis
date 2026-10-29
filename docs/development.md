@@ -112,7 +112,9 @@ a missing base, a git error or an empty change list. A performance test class na
 `scripts/performance.sh` runs it. The class joins its project's performance collection, which runs
 alone, one class at a time. A guard test fails when
 a `*PerformanceTests` class is outside that collection. A skipped suite is listed
-as skipped. Without any of them, as in CI and local runs, every suite runs. Each suite writes a JUnit file to `artifacts/test-results/`. The E2E server output
+as skipped, and on GitHub Actions it gets a notice annotation, so the run's page lists what each check
+skipped. GitHub shows the check's job as passed, because the job decides what to skip only after it
+starts. Without any of them, as in CI and local runs, every suite runs. Each suite writes a JUnit file to `artifacts/test-results/`. The E2E server output
 goes to `artifacts/logs/e2e-server.log`, the E2E worker output to
 `artifacts/logs/e2e-worker.log`, the E2E journey server output to `artifacts/logs/e2e-journey-server.log`, the E2E publisher output to `artifacts/logs/e2e-publisher.log`, and the
 purchasing system stub output to `artifacts/logs/e2e-purchasing.log`. `scripts/test-report.mjs` then prints a
