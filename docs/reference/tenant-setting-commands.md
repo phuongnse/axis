@@ -107,15 +107,27 @@ and the public key as a PEM.
   with code 2.
 - **The key id.** The key id is the [RFC 7638](https://www.rfc-editor.org/rfc/rfc7638) JWK
   thumbprint of the public key, with SHA-256, in base64url. Axis works it out from the key, so the
-  same key always has the same key id. The command prints it, with the public key as a PEM, and the
-  operator uses both at the identity provider. The client assertion carries it as its `kid`.
+  same key always has the same key id. The command prints it, with the public key as a PEM. An operator
+  whose tenant signs in through an outside identity provider uses both there. The client assertion carries it as its `kid`.
 - **Client key rotation.** A tenant holds at most two client keys. After its next refresh the server
-  signs every client assertion with the newest key. Axis has no JWKS address, so the operator
-  registers the public keys at the identity provider. The order is: register the new public key at
-  the identity provider, run `--client-key`, wait for the servers' refresh, then run
-  `--retire-client-key <old kid>`. If the key is added before the identity provider knows it, sign-in
-  fails until it is registered or the new key is retired. Keycloak's admin console imports one public
-  key per client. To let it hold two, give the client a JWKS, set through the admin API or a JWKS URL.
+  signs every client assertion with the newest key. For a tenant that signs in through its own realm,
+  the command registers the keys in the realm itself, see the next bullet. The order is: run
+  `--client-key`, wait for the servers' refresh, then run `--retire-client-key <old kid>`. For a tenant
+  that signs in through an outside identity provider, the operator registers the new public key there
+  first, because Axis has no JWKS address. If the key is added before that identity provider knows it,
+  sign-in fails until it is registered or the new key is retired. Keycloak's admin console imports one
+  public key per client. To let it hold two, give the client a JWKS, set through the admin API or a
+  JWKS URL.
+- **The tenant's own realm.** When the command is given `--profile`, `--client-key` or
+  `--retire-client-key`, and the tenant signs in through its own realm, it updates the realm before it
+  saves the change. The tenant has realm details when it has an activation secret and its authority is
+  its own realm, see [tenant realm](host-settings.md#tenant-realm). The platform client `axis` and every
+  `site-` client of the realm then list every key the tenant will hold after the run, each under its key
+  id. Under `fapi2` they authenticate with `private_key_jwt` and require PAR, PKCE `S256` and
+  DPoP-bound tokens. Under `standard` they use the client secret again and require neither PAR nor
+  DPoP. Activation keeps a site client in step with `axis`, see
+  [keeping the realm in step](identity-provider.md#keeping-the-realm-in-step). A tenant that signs in
+  through an outside identity provider has no realm, so nothing changes there.
 - **Retiring a key.** `--retire-client-key <kid>` removes the key with that key id. When it removes
   the newest key, the other key becomes the one the server signs with.
 - **The tenant after the change.** The checks look at the tenant as it will be after the whole run,
@@ -130,12 +142,16 @@ and the public key as a PEM.
   empty, the client key is empty or not an EC P-256 private key, the tenant would hold a third
   client key, the key is already held, the key id to retire is unknown or blank, or both the secret
   and the key would read standard input. The `version` stays and no audit record is written.
+- **Exit code 1 when the realm cannot be updated.** The command prints `<id> realm failed: <message>`.
+  The message names the identity provider step and its status code, never a body or a secret. The
+  tenant's keys, profile and `version` stay as they were, so running the command again completes the
+  change. The audit record is already written.
 
 - _(planned for M17)_ Every tenant signs in through its realm in
   [Axis's identity provider](identity-provider.md), which `tenant create` sets up. `--authority`, `--client-id`,
   `--client-secret` and `--claim` go, because the realm gives the authority and the clients, and each
-  `identityProvider` resource names its own claims. The audiences, the profile and the client keys stay, and Axis
-  registers a client key in the realm itself.
+  `identityProvider` resource names its own claims. The audiences, the profile and the client keys stay. Axis registers a client key in the realm itself, as
+  `tenant oidc set` does today for a tenant with a realm.
 - _(planned for M17)_ `tenant sign-in set <id>` sets the tenant's
   [platform sign-in](identity-provider.md#platform-sign-in): `--accounts true|false`, and one
   `--provider <name>` for each brokered provider, with its type, its bindings, its claims and its role mapping, as an

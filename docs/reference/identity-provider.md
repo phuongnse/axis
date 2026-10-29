@@ -200,7 +200,9 @@ _(planned for M17)_
   signed the person in into its ID token as the `identity_provider` claim, and each provider gets claim mappers for the
   display name, the email, the locale and each roles claim, and a `username` mapper that names a new user
   `<provider alias>.<subject>`. Each provider names the realm's first-login flow. It touches no other client or
-  provider, so `axis`, `axis-activation`, `axis-users` and anything an operator added stay. Both tenant catalogs carry
+  provider, so `axis`, `axis-activation`, `axis-users` and anything an operator added stay. A site client that the sync
+  creates or updates copies the client authentication and the PAR, PKCE, DPoP and key settings of `axis`, so activation
+  never undoes what `tenant oidc set` wrote. Without an `axis` client it is a plain client with a secret. Both tenant catalogs carry
   the realm's name, the identity provider's address and the activation secret, see
   [tenant realm](host-settings.md#tenant-realm). The server's startup activation calls it, after it activates each
   application folder, for a tenant that has realm details. So does `Axis.Admin` activation, as described below.
@@ -217,8 +219,14 @@ _(planned for M17)_
   Built for `oidc` providers: `issuer` is a `url` binding, and `clientId`, `clientSecret` and `clientKey` are `secret`
   bindings. On a preview tenant activation leaves the provider out with a warning, see
   [preview tenants](#preview-tenants).
-- **Profile:** the realm's clients follow the tenant's sign-in profile. Under `fapi2` Axis registers the client key in
-  the realm itself, see [FAPI 2.0 profile](security.md#fapi-20-profile).
+- **Profile:** built for `tenant oidc set`, which takes `--profile`, `--client-key` and `--retire-client-key`. When the
+  tenant has realm details, the command updates the realm's `axis` client and every `site-` client before it saves the
+  change, see [sign-in settings](tenant-setting-commands.md#sign-in-settings). Each client lists every key the tenant
+  will hold, under its [RFC 7638](https://www.rfc-editor.org/rfc/rfc7638) key id. Under `fapi2` the clients use
+  `client-jwt` with ES256, require PAR, PKCE `S256` and DPoP-bound tokens, see
+  [FAPI 2.0 profile](security.md#fapi-20-profile). Under `standard` they use `client-secret` and require neither PAR nor
+  DPoP. A failure of the identity provider fails the command and changes nothing in the tenant directory. A tenant that
+  signs in through an outside identity provider is unchanged.
 
 ## Preview tenants
 
