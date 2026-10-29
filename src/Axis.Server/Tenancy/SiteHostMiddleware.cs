@@ -6,8 +6,8 @@ using Axis.Tenancy;
 namespace Axis.Server.Tenancy;
 
 /// <summary>
-/// Gives a site its own origin. A host that belongs to a site serves only that site, and the tenant's other hosts
-/// send the site's path to the site's host. See the sites and sign-in section of the identity provider reference.
+/// Gives a site its own origin. A host that belongs to a site serves only that site, at its root, and the tenant's
+/// other hosts send the site's path to the site's host. See the sites and sign-in section of the identity provider reference.
 /// </summary>
 internal sealed class SiteHostMiddleware(
     RequestDelegate next,
@@ -28,12 +28,6 @@ internal sealed class SiteHostMiddleware(
 
         if (tenant.SitePath is { } site)
         {
-            if (context.Request.Path == "/")
-            {
-                context.Response.Redirect($"{context.Request.PathBase}/{site}");
-                return;
-            }
-
             if (!await IsServedAsync(context, resolver, site))
             {
                 await Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "Nothing is served at this path on this host.")
@@ -43,24 +37,27 @@ internal sealed class SiteHostMiddleware(
         }
         else if (SiteHostOf(context, tenant) is { } siteHost)
         {
+            // The site's host serves the site at its root, so the site's path is dropped.
             var request = context.Request;
             var port = request.Host.Port is { } value ? ":" + value : "";
-            context.Response.Redirect($"{request.Scheme}://{siteHost}{port}{request.PathBase}{request.Path}{request.QueryString}");
+            request.Path.StartsWithSegments("/" + FirstSegment(request.Path), StringComparison.OrdinalIgnoreCase, out var rest);
+            var path = rest.HasValue ? rest.Value : "/";
+            context.Response.Redirect($"{request.Scheme}://{siteHost}{port}{request.PathBase}{path}{request.QueryString}");
             return;
         }
 
         await next(context);
     }
 
-    // What a site's host serves: the SPA under the site's path, the web root's files, sign-in, who is signed in, what the
+    // What a site's host serves: the SPA at the root and at the site's pages, except under the paths the platform keeps
+    // for itself (Studio, the account page, the users page), the web root's files, sign-in, who is signed in, what the
     // SPA shell loads on every host, the site's own API and its application's API.
     private async Task<bool> IsServedAsync(HttpContext context, ActiveApplicationResolver resolver, string site)
     {
         var path = context.Request.Path;
         if (!path.StartsWithSegments(_api))
         {
-            return FirstSegment(path) is { } first && string.Equals(first, site, StringComparison.OrdinalIgnoreCase)
-                || IsWebRootFile(path);
+            return FirstSegment(path) is not { } first || !SitePaths.Reserved.Contains(first.ToLowerInvariant()) || IsWebRootFile(path);
         }
 
         if (path.StartsWithSegments("/api/auth") || path == "/api/me" || path == "/api/site" || path.StartsWithSegments("/api/texts") || path == "/api/about")

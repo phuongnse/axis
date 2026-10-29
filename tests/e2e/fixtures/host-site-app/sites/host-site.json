@@ -1,0 +1,13 @@
+{
+  "id": "38e5a7f1-c042-4d69-b8a3-d7019f6e2c54",
+  "kind": "site",
+  "name": "HostSite",
+  "formatVersion": 1,
+  "path": "host-site",
+  "title": { "textKey": "site.title" },
+  "locales": { "default": "en", "fallback": "en", "available": ["en"] },
+  "navigation": [
+    { "page": "Topics", "label": { "textKey": "nav.topics" } },
+    { "page": "Inbox", "label": { "textKey": "nav.inbox" } }
+  ]
+}

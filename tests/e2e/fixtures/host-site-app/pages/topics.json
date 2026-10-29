@@ -1,0 +1,8 @@
+{
+  "id": "a63c1e92-5d07-4b8a-8f34-c19e7b02d845",
+  "kind": "page",
+  "name": "Topics",
+  "formatVersion": 1,
+  "title": { "textKey": "pages.topics.title" },
+  "widgets": [{ "type": "table", "entity": "Topic" }]
+}

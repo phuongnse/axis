@@ -185,7 +185,10 @@ public sealed class ConfigurationTenantCatalog : ITenantCatalog
                 main,
                 tenantSection is null ? null : EmailSettings.Read(tenantSection.GetSection("Email"), $"{TenantOptions.SectionName}:{id}:Email", []),
                 tenantSection is null ? null : Realm(tenantSection, main is not null),
-                tenantSection is null ? null : RealmUsers(tenantSection, main is not null));
+                tenantSection is null ? null : RealmUsers(tenantSection, main is not null),
+                HostSites: settings.SiteHosts.Count == 0
+                    ? null
+                    : new Dictionary<string, string>(settings.SiteHosts.Select(pair => KeyValuePair.Create(pair.Key, pair.Value.ToLowerInvariant())), StringComparer.OrdinalIgnoreCase));
         });
 
     private static TenantOidc? Oidc(IConfigurationSection? section) =>

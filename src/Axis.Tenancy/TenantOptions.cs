@@ -15,6 +15,12 @@ public sealed class TenantSettings
     /// <summary>Request host names for the tenant, matched ignoring letter case and port.</summary>
     public List<string> Hosts { get; } = [];
 
+    /// <summary>
+    /// The path of the site that a host belongs to, keyed by host. Each host is one of <see cref="Hosts"/>, and a host
+    /// that is not here serves the whole tenant. A site has at most one host.
+    /// </summary>
+    public Dictionary<string, string> SiteHosts { get; } = new(StringComparer.OrdinalIgnoreCase);
+
     public string? ConnectionString { get; set; }
 
     /// <summary>

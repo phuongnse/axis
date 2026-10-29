@@ -16,6 +16,42 @@ public sealed class TenantOptionsValidatorTests
     }
 
     [Fact]
+    public void A_host_of_the_tenant_may_belong_to_a_site()
+    {
+        var options = Tenants.Options(("default", ["localhost", "shop.localhost"], Tenants.ConnectionString));
+        options.Tenants["default"].SiteHosts["SHOP.localhost"] = "Shop";
+
+        Assert.Empty(TenantOptionsValidator.Validate(options));
+    }
+
+    [Theory]
+    [InlineData("other.localhost", "shop", "is not one of the tenant's hosts")]
+    [InlineData("shop.localhost", "studio", "not valid or is reserved")]
+    [InlineData("shop.localhost", "1shop", "not valid or is reserved")]
+    [InlineData("shop.localhost", "", "not valid or is reserved")]
+    public void A_site_host_that_is_not_valid_is_named(string host, string path, string expected)
+    {
+        var options = Tenants.Options(("default", ["localhost", "shop.localhost"], Tenants.ConnectionString));
+        options.Tenants["default"].SiteHosts[host] = path;
+
+        var problem = Assert.Single(TenantOptionsValidator.Validate(options));
+
+        Assert.Contains(expected, problem, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_site_with_two_hosts_is_named()
+    {
+        var options = Tenants.Options(("default", ["localhost", "a.localhost", "b.localhost"], Tenants.ConnectionString));
+        options.Tenants["default"].SiteHosts["a.localhost"] = "shop";
+        options.Tenants["default"].SiteHosts["b.localhost"] = "SHOP";
+
+        var problem = Assert.Single(TenantOptionsValidator.Validate(options));
+
+        Assert.Equal("Tenant 'default' gives the site 'shop' more than one host.", problem);
+    }
+
+    [Fact]
     public void No_tenants_is_a_problem()
     {
         var problem = Assert.Single(TenantOptionsValidator.Validate(new TenantOptions()));

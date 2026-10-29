@@ -100,6 +100,7 @@
         "http://localhost:5206/*",
         "http://localhost:5173/*",
         "http://127.0.0.1:5280/*",
+        "http://hostsite.localhost:5280/*",
         "http://preview.localhost:5206/*",
         "http://preview.localhost:5173/*",
         "http://localhost:5280/*",
