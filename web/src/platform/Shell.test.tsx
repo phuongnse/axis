@@ -374,7 +374,9 @@ describe('Shell above narrow width', () => {
     await userEvent.tab()
 
     expect(screen.getByRole('button', { name: 'Language and theme' })).toHaveFocus()
-    expect(await screen.findByRole('tooltip')).toHaveTextContent('Language and theme')
+    await waitFor(() =>
+      expect(screen.getAllByRole('tooltip').map((tooltip) => tooltip.textContent)).toContain('Language and theme'),
+    )
   })
 
   it('stays collapsed while the person follows a navigation link', async () => {

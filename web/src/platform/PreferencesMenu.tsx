@@ -1,6 +1,7 @@
 import { SettingOutlined } from '@ant-design/icons'
-import { Dropdown, theme, type MenuProps } from 'antd'
-import type { CSSProperties } from 'react'
+import { Dropdown, type MenuProps } from 'antd'
+import { useMemo, type CSSProperties } from 'react'
+import { selectedItemTint } from './antTheme'
 import { AxisButton } from './AxisButton'
 import { useText } from './texts'
 import { useDesignTokens, useThemeMode, type ThemeMode } from './themeMode'
@@ -23,8 +24,10 @@ export function PreferencesMenu({
   const t = useText()
   const { mode, toggleMode } = useThemeMode()
   const { colour } = useDesignTokens()
-  const { token } = theme.useToken()
-  const selected: CSSProperties = { color: colour.primaryText, background: token.controlItemBgActive }
+  const selected = useMemo<CSSProperties>(
+    () => ({ color: colour.primaryText, background: selectedItemTint(mode) }),
+    [colour, mode],
+  )
 
   function choice(key: string, label: string, current: boolean) {
     return { key, label, role: 'menuitemradio', 'aria-checked': current, style: current ? selected : undefined }
