@@ -311,7 +311,7 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
             signIn.OidcProfile,
             ClientKeys(signIn, cipher));
 
-        return new TenantEntry(id, hosts, connectionString, SchemaConnectionString: null, oidc, bindings, row.PreviewOf, Email(row, cipher), Realm(row, cipher));
+        return new TenantEntry(id, hosts, connectionString, SchemaConnectionString: null, oidc, bindings, row.PreviewOf, Email(row, cipher), Realm(row, cipher), RealmUsers(row, cipher));
     }
 
     /// <summary>
@@ -336,6 +336,29 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
             baseAddress,
             id,
             SecretValue.Deferred(() => cipher.Decrypt(id, TenantSecretFields.RealmActivationClientSecret, stored).Reveal()));
+    }
+
+    /// <summary>
+    /// What the server needs to list the realm users of a tenant row, or <c>null</c> when the row has none: a preview
+    /// tenant, a row without a users client secret, or a row whose <c>Oidc</c> authority does not end in <c>realms/</c>
+    /// and the tenant id. The realm name is the tenant id. The secret stays encrypted until it is revealed.
+    /// </summary>
+    public static TenantRealmUsers? RealmUsers(TenantRow row, TenantSecretCipher cipher)
+    {
+        ArgumentNullException.ThrowIfNull(row);
+        ArgumentNullException.ThrowIfNull(cipher);
+
+        var id = row.Id;
+        var stored = row.RealmUsersClientSecret;
+        if (row.PreviewOf is not null || stored is not { Length: > 0 } || TenantRealmAddress.BaseOf(row.OidcAuthority, id) is not { } baseAddress)
+        {
+            return null;
+        }
+
+        return new TenantRealmUsers(
+            baseAddress,
+            id,
+            SecretValue.Deferred(() => cipher.Decrypt(id, TenantSecretFields.RealmUsersClientSecret, stored).Reveal()));
     }
 
     /// <summary>The deployment bindings of a tenant keyed by name, ignoring letter case. A secret stays encrypted until it is revealed.</summary>

@@ -11,6 +11,7 @@ public sealed class ConfigurationTenantCatalogTests
     private const string ClientSecret = "oidc-cl13nt-s3cret";
     private const string BindingSecret = "binding-s3cr3t-value";
     private const string ActivationSecret = "activ4tion-cl13nt-s3cret";
+    private const string UsersSecret = "us3rs-cl13nt-s3cret";
 
     public static TheoryData<string, string[], string> InvalidSections() => new()
     {
@@ -411,6 +412,68 @@ public sealed class ConfigurationTenantCatalogTests
 
         Assert.Contains(message, exception.Message, StringComparison.Ordinal);
         Assert.DoesNotContain(ActivationSecret, exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void The_UsersClientSecret_gives_the_entry_its_realm_users_from_the_authority()
+    {
+        var entry = Assert.Single(Load(
+            [
+                .. Valid(),
+                "Tenants:default:Oidc:Authority=https://idp.example.test/auth/realms/default/",
+                $"Tenants:default:Oidc:UsersClientSecret={UsersSecret}",
+            ]).Tenants);
+
+        var users = Assert.IsType<TenantRealmUsers>(entry.RealmUsers);
+        Assert.Equal(new Uri("https://idp.example.test/auth/"), users.BaseAddress);
+        Assert.Equal("default", users.Realm);
+        Assert.Equal(UsersSecret, users.ClientSecret.Reveal());
+        Assert.DoesNotContain(UsersSecret, entry.ToString(), StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void A_blank_UsersClientSecret_gives_no_realm_users_whatever_the_authority(string secret)
+    {
+        var entry = Assert.Single(Load(
+            [
+                .. Valid(),
+                "Tenants:default:Oidc:Authority=https://idp.example.test/realm",
+                $"Tenants:default:Oidc:UsersClientSecret={secret}",
+            ]).Tenants);
+
+        Assert.Null(entry.RealmUsers);
+    }
+
+    [Fact]
+    public void A_preview_tenant_gets_no_realm_users_although_it_copies_the_Oidc_settings_of_its_main_tenant()
+    {
+        var catalog = Load(
+            [
+                .. PreviewPair(),
+                "Tenants:main:Oidc:Authority=https://idp.example.test/realms/main",
+                $"Tenants:main:Oidc:UsersClientSecret={UsersSecret}",
+            ]);
+
+        Assert.NotNull(catalog.Find("main")!.RealmUsers);
+        var preview = catalog.Find("main-preview")!;
+        Assert.NotNull(preview.Oidc);
+        Assert.Null(preview.RealmUsers);
+    }
+
+    [Theory]
+    [InlineData("https://idp.example.test/realm")]
+    [InlineData("https://idp.example.test/realms/")]
+    [InlineData("not-an-address")]
+    public void A_UsersClientSecret_with_a_bad_authority_stops_the_load_and_the_message_holds_no_secret(string authority)
+    {
+        var exception = Assert.Throws<InvalidOperationException>(() => Load(
+            [.. Valid(), $"Tenants:default:Oidc:Authority={authority}", $"Tenants:default:Oidc:UsersClientSecret={UsersSecret}"]));
+
+        Assert.Contains("Tenants:default:Oidc:UsersClientSecret", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("Tenants:default:Oidc:Authority must be an http or https address that ends in /realms/<realm>", exception.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(UsersSecret, exception.Message, StringComparison.Ordinal);
     }
 
     private static string[] PreviewPair() =>

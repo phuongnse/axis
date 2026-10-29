@@ -268,6 +268,9 @@ under `scripts/dev.sh` and the E2E run name the realm `axis` and that secret, so
 the `site-` client of each sample site to the realm. Docker Compose sets the secret blank, so its server skips the update. A Keycloak
 container that already runs keeps the old realm without the client, and the server then fails to start with a `401` at the activation token,
 so run `docker compose rm -sf keycloak` once to recreate it.
+The realm also has the confidential client `axis-users`, with the development secret `axis-users-development-secret`. Its service account holds
+only `view-users` and `query-users`. The `default` tenant's `Oidc:UsersClientSecret` in the Development and E2E settings names that secret, so the
+server's `GET /api/users` lists the realm's users through it. Until the Keycloak container is recreated, as above, that route answers `502`.
 The realm also has the client `axis-fapi` for the `fapi2` sign-in profile. Only an integration
 test host uses it, and it signs in with the development keys in `samples/keycloak`, see
 [FAPI 2.0 profile](reference/security.md#fapi-20-profile).

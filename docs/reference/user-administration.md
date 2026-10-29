@@ -23,8 +23,18 @@ The setting and the shell entry are built. The users page is _(planned for M17)_
 
 ## The users page
 
-_(planned for M17)_
+The server's list route is built. The page itself is _(planned for M17)_.
 
+- **The list route:** `GET /api/users?search=&page=&pageSize=` answers `{ items, totalCount }` for the tenant's realm to an
+  administrator. `page` starts at 1 and defaults to 1. `pageSize` is 1 to 50 and defaults to 50. A value outside these
+  answers `400`. Each item has `id`, `displayName`, `email`, `provider`, `status` and `lastSignedInAt`. `displayName` is
+  the first and last name, or the username when the user has neither. `provider` is `null` for an account, otherwise
+  the alias of the user's first federated identity. `status` is `disabled` when the realm user is disabled, `invited`
+  when the user has no `axis.user_profiles` row, and `active` otherwise. `lastSignedInAt` comes from that row and is
+  `null` without it. A service account is not listed. The route answers `401` with nobody signed in, `403` without
+  `Users:AdministratorRole`, and `404` on a preview tenant and on a tenant that has no users client, such as one that
+  signs in through an outside identity provider. When the identity provider fails, it answers `502` with a fixed
+  title. The server's log names the step and the status code, never a body or a secret.
 - **The list:** every user of the tenant, the people who have signed in and the accounts that are invited. Each row
   has the display name, the email, how the person signs in (the provider's label, or "Account"), the status
   (`invited`, `active` or `disabled`) and the last sign-in. It searches by name or email, and pages.
@@ -104,8 +114,10 @@ _(planned for M17)_
 
 ## Rights of the server
 
-_(planned for M17)_
+The list route is built. Changing accounts is _(planned for M17)_.
 
+- The server reads the realm's users through the realm's users client `axis-users`, with the rights `view-users` and
+  `query-users`, see [tenant realm](host-settings.md#tenant-realm).
 - The server changes accounts through the realm's users client, which has rights over the realm's users only. It
   cannot change the realm's providers, clients or settings. Its secret is stored encrypted in the tenant directory,
   see [keeping the realm in step](identity-provider.md#keeping-the-realm-in-step).

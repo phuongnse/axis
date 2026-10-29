@@ -319,7 +319,8 @@ the operator sets it with
 - **Sign-in.** A preview tenant has no `Oidc` block. It copies its main
   tenant's `Authority`, `ClientId`, `ClientSecret`, `Profile`, `ClientKey`,
   `ClientKeyId` and `Claims`. It does not copy
-  `EndpointAudience` or `ServiceAudience`, so the preview accepts no machine-caller or service account token. A
+  `EndpointAudience`, `ServiceAudience` or `UsersClientSecret`, so the preview accepts no machine-caller or service account token
+  and lists no realm users. A
   preview tenant with its own `Oidc` block stops the start.
 - **Bindings.** The bindings are empty unless the tenant sets some. A preview
   never takes its main tenant's bindings, so it never calls a real system by
@@ -352,6 +353,18 @@ The server's startup activation and `Axis.Admin` activation use it.
   `Tenants:{id}:Realm:ActivationClientSecret` give it. As environment variables
   they are `Tenants__<id>__Realm__Name` and
   `Tenants__<id>__Realm__ActivationClientSecret`.
+- **Users client.** The entry also carries what the server needs to list the
+  realm's users, the secret of the `axis-users` client, with the same address
+  and realm name. Under `configuration`, `Tenants:{id}:Oidc:UsersClientSecret`
+  gives it, as an environment variable `Tenants__<id>__Oidc__UsersClientSecret`.
+  A blank value means the tenant has no users client. The realm name and the
+  identity provider's address both come from `Tenants:{id}:Oidc:Authority`,
+  which must be an http or https address that ends in `/realms/<name>`. A secret
+  with any other authority stops the start, and the message never shows the
+  secret. Under `directory` the server decrypts the stored
+  `realm_users_client_secret`, and the realm name is the tenant id. A tenant
+  with no users client has no users page, see
+  [the users page](user-administration.md#the-users-page).
 - **Blank secret.** A blank `ActivationClientSecret` means the tenant has no
   realm details, and then `Name` and the authority are not checked.
 - **Authority.** With a secret, the tenant needs a `Name`, and
@@ -359,7 +372,8 @@ The server's startup activation and `Axis.Admin` activation use it.
   `/realms/<Name>`. The identity provider's address is the authority without
   that ending. A message names the setting and never shows a value.
 - **Preview tenants.** A preview tenant has no realm details of its own. A
-  `Realm` block on one stops the start.
+  `Realm` block on one stops the start. It has no users client either, so it
+  does not copy `UsersClientSecret` from its main tenant.
 - **Under `directory`.** `tenant create` stores the secret, and the realm name is
   the tenant id. A tenant whose stored authority does not end in
   `realms/<id>` has no realm details, because it signs in with an outside

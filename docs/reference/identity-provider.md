@@ -203,7 +203,7 @@ _(planned for M17)_
   provider, so `axis`, `axis-activation`, `axis-users` and anything an operator added stay. A site client that the sync
   creates or updates copies the client authentication and the PAR, PKCE, DPoP and key settings of `axis`, so activation
   never undoes what `tenant oidc set` wrote. Without an `axis` client it is a plain client with a secret. Both tenant catalogs carry
-  the realm's name, the identity provider's address and the activation secret, see
+  the realm's name, the identity provider's address and the activation secret, and the secret of the `axis-users` client, see
   [tenant realm](host-settings.md#tenant-realm). The server's startup activation calls it, after it activates each
   application folder, for a tenant that has realm details. So does `Axis.Admin` activation, as described below. When the
   identity provider answers 409 Conflict, as when another host syncs the same realm at the same moment, the sync reads
