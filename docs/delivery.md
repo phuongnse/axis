@@ -365,8 +365,12 @@ index. The same split keeps two pull requests from editing the same lines.
   decision takes the next free number and adds its row at the end. A status
   change edits the file and its row together.
 - **Small files.** A doc under `docs/` stays at or under 1,000 lines. A
-  change that takes a doc past that moves whole `##` sections, unchanged, to a
-  new file in the same folder, named after its topic, and links them. A new
+  change that grows a doc past 900 lines splits it, so two changes that each
+  add a few lines to the same doc both still pass. The split moves whole `##`
+  sections, unchanged, to a new file in the same folder, named after its topic,
+  and links them. The base for "grows" is the `NEXKIT_BASE_SHA` commit when
+  NexKit sets it, else the merge base with `origin/main`. With neither, only
+  the 1,000-line limit applies. A new
   topic that needs more than a few sections starts in a file of its own. A
   table that many changes add rows to, such as the
   [diagnostic codes](reference/diagnostic-codes.md), lives in a file of its
@@ -390,8 +394,8 @@ index. The same split keeps two pull requests from editing the same lines.
   table has a valid row for each listed id, that the
   [development users](reference/security.md#development-users) table lists the
   same users and roles as the development realm file, and the size limits:
-  1,000 lines for a doc, 100 for AGENTS.md and 250 for a `SKILL.md` under
-  `.claude/skills/`. A doc fact that
+  1,000 lines for a doc and 900 for a doc a change grows, 100 for AGENTS.md
+  and 250 for a `SKILL.md` under `.claude/skills/`. A doc fact that
   code can check, such as the diagnostic code table, has a unit test that
   compares the two and finds the table under `docs/` by its header, wherever
   it moves.
