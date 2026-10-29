@@ -73,7 +73,7 @@ public sealed class UserCommandTests(KeycloakFixture keycloak, PostgreSqlFixture
         {
             var (_, afterPassword) = await StartLoginAsync(refused);
             Assert.NotEqual(HttpStatusCode.Found, afterPassword.StatusCode);
-            Assert.DoesNotContain("name=\"otp\"", await afterPassword.Content.ReadAsStringAsync(CancellationToken), StringComparison.Ordinal);
+            Assert.DoesNotContain("\"twoStep\"", await afterPassword.Content.ReadAsStringAsync(CancellationToken), StringComparison.Ordinal);
         }
 
         Assert.Equal([Administrator], await AuditActorsAsync("user.disabled", _patId));
@@ -305,9 +305,9 @@ public sealed class UserCommandTests(KeycloakFixture keycloak, PostgreSqlFixture
         var app = CreateClient(cookies: true);
         var (browser, afterPassword) = await StartLoginAsync(app);
         var html = await afterPassword.Content.ReadAsStringAsync(CancellationToken);
-        Assert.True(afterPassword.StatusCode == HttpStatusCode.OK && html.Contains("name=\"otp\"", StringComparison.Ordinal), html);
+        Assert.True(afterPassword.StatusCode == HttpStatusCode.OK && KeycloakSignIn.Page(html) == "twoStep", html);
         using var login = await browser.PostAsync(
-            FormAction(html),
+            KeycloakSignIn.LoginAction(html).AbsoluteUri,
             new Dictionary<string, string>
             {
                 ["otp"] = await NextAuthenticatorCodeAsync(),
@@ -464,13 +464,6 @@ public sealed class UserCommandTests(KeycloakFixture keycloak, PostgreSqlFixture
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
         return body.GetProperty("access_token").GetString()!;
-    }
-
-    private static string FormAction(string html)
-    {
-        var match = System.Text.RegularExpressions.Regex.Match(html, """<form\b[^>]*\baction="(?<action>[^"]+)""");
-        Assert.True(match.Success, html);
-        return WebUtility.HtmlDecode(match.Groups["action"].Value);
     }
 
     /// <summary>
