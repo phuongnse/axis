@@ -435,7 +435,7 @@ public static partial class ApplicationCompiler
                 loaded.UnloadedEntityNames,
                 FindSequence,
                 loaded.UnloadedSequenceNames,
-                moduleReferences,
+                moduleReferences.For(entity),
                 references,
                 RulesFor(entity),
                 IsModuleResource(entity) ? null : declaredModules,
@@ -1099,7 +1099,7 @@ public static partial class ApplicationCompiler
             report(DiagnosticCodes.InvalidConstraint, problem, $"{path}/sequence");
         }
 
-        if (isText && findSequence(sequence) is { } found)
+        if (isText && moduleReferences.Find(sequence, findSequence) is { } found)
         {
             references.Add(owner, $"{path}/sequence", ReferenceRelations.FieldSequence, ResourceNode.Of(found));
         }
@@ -1107,7 +1107,7 @@ public static partial class ApplicationCompiler
         // A sequence file that is in the folder but was not loaded is not reported again; that
         // file's own diagnostics already are.
         if (isText
-            && findSequence(sequence) is null
+            && moduleReferences.Find(sequence, findSequence) is null
             && !unloadedSequenceNames.Contains(sequence)
             && !moduleReferences.ReportUndeclared(sequence, $"{path}/sequence", report))
         {
@@ -1561,7 +1561,7 @@ public static partial class ApplicationCompiler
         {
             if (Fits("target", "reference, references and child-collection", FieldType.Reference, FieldType.References, FieldType.ChildCollection))
             {
-                if (findEntity(target) is { } targetEntity)
+                if (moduleReferences.Find(target, findEntity) is { } targetEntity)
                 {
                     // A child collection's target is checked against the other owners by FindChildOwners.
                     if (type is FieldType.Reference or FieldType.References)
@@ -1782,12 +1782,13 @@ public static partial class ApplicationCompiler
             void Report(string code, string message, string path) =>
                 diagnostics.Add(new Diagnostic(code, message, dataSource.File, path, dataSource.Id));
 
-            var entity = findEntity(dataSource.Entity);
+            var sourceReferences = moduleReferences.For(dataSource);
+            var entity = sourceReferences.Find(dataSource.Entity, findEntity);
             if (entity is null)
             {
                 // An entity file that was not loaded because of its own errors is not reported again.
                 if (!loaded.UnloadedEntityNames.Contains(dataSource.Entity)
-                    && !moduleReferences.ReportUndeclared(dataSource.Entity, "/entity", Report))
+                    && !sourceReferences.ReportUndeclared(dataSource.Entity, "/entity", Report))
                 {
                     Report(
                         DiagnosticCodes.UnknownDataSourceEntity,
@@ -2004,7 +2005,7 @@ public static partial class ApplicationCompiler
                     findEntity,
                     ownersByChildName,
                     loaded.UnloadedEntityNames,
-                    moduleReferences,
+                    sourceReferences,
                     long.MaxValue,
                     Report);
                 CheckValueLabels(parameterField, dataSource, path, references, diagnostics);

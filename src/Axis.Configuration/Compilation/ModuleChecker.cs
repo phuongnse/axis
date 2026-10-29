@@ -11,13 +11,18 @@ using Axis.Configuration.Resources;
 namespace Axis.Configuration.Compilation;
 
 /// <summary>
-/// Checks the <c>modules</c> of an application manifest against the installed module versions,
-/// pins each one and collects the pinned version's files. A module id appears at most once,
-/// matched exactly. A version range has the forms of <see cref="VersionRange"/>. A module with no
-/// installed version is unknown, and a known module with no installed version in its range cannot
-/// be pinned. Otherwise the highest installed version in the range is pinned, and each of its
-/// files is checked as JSON, for a kind a module may hold and against the schema of that kind. The
-/// files come back under <c>modules/&lt;id&gt;/</c>, ready to be stored in the release. The entities,
+/// Checks the <c>modules</c> of an application manifest and of the modules it reaches against the
+/// installed module versions, resolves them flat, pins each one and collects the pinned version's
+/// files. A module id appears at most once in a list, matched exactly. A version range has the forms
+/// of <see cref="VersionRange"/>. A module with no installed version is unknown. Each module id the
+/// application or a pinned module asks for gets one version, the highest installed version that
+/// meets every range that asks for it. When none does, one range gives
+/// <see cref="DiagnosticCodes.NoModuleVersionInRange"/> and several give
+/// <see cref="DiagnosticCodes.ModuleRangeConflict"/>. A cycle between modules, a module that
+/// depends on itself included, gives <see cref="DiagnosticCodes.ModuleDependencyCycle"/>. Each
+/// pinned module's files are checked as JSON, for a kind a module may hold and against the schema
+/// of that kind. The files come back under <c>modules/&lt;id&gt;/</c>, ready to be stored in the
+/// release, once for each module. The entities,
 /// sequences, seeds, events, data sources and forms of a pinned module come back as resources named
 /// <c>&lt;id&gt;/&lt;name&gt;</c>, keeping the ids written in the files. Its rules come back by module,
 /// under their plain names, for <see cref="RuleChecker.CheckModules"/>. Inside a module, a field's
@@ -42,9 +47,10 @@ internal static class ModuleChecker
     };
 
     /// <summary>
-    /// Checks <paramref name="application"/>'s modules and returns the pins of the entries without
-    /// problems, in the order written, the canonical files of the pinned versions that are valid and
-    /// the resources read from those files.
+    /// Checks <paramref name="application"/>'s modules and the modules they depend on, and returns
+    /// the pins of the modules without problems, the application's entries as written and then each
+    /// dependency in the order it is first reached, the canonical files of the pinned versions that
+    /// are valid and the resources read from those files.
     /// </summary>
     public static (IReadOnlyList<PinnedModuleModel> Pins, IReadOnlyList<ResourceContent> Files, ModuleResources Resources) Check(
         ApplicationManifest application,
@@ -52,16 +58,169 @@ internal static class ModuleChecker
         List<Diagnostic> diagnostics,
         ReferenceIndexBuilder references)
     {
-        void Report(string code, string message, string path) =>
-            diagnostics.Add(new Diagnostic(code, message, application.File, path, application.Id));
+        var versionsById = installed
+            .GroupBy(candidate => candidate.Manifest.Id, StringComparer.Ordinal)
+            .ToDictionary(
+                group => group.Key,
+                group => group
+                    .Select(candidate => candidate.Manifest.Version)
+                    .Distinct(StringComparer.Ordinal)
+                    .Order(Comparer<string>.Create(PackageVersions.Compare))
+                    .ToList(),
+                StringComparer.Ordinal);
+
+        var applicationRequests = ReadEntries(
+            application.Modules, application.File, application.Id, null, versionsById, diagnostics);
+
+        // The entries of each module version are read once. Their problems are reported only for the
+        // versions that end up pinned, because a version picked in an earlier round may be replaced.
+        var entriesByVersion = new Dictionary<(string Id, string Version), (List<ModuleRequest> Requests, List<Diagnostic> Problems)>();
+        (List<ModuleRequest> Requests, List<Diagnostic> Problems) EntriesOf(string id, string version)
+        {
+            if (!entriesByVersion.TryGetValue((id, version), out var entries))
+            {
+                var module = installed.First(candidate =>
+                    string.Equals(candidate.Manifest.Id, id, StringComparison.Ordinal)
+                    && string.Equals(candidate.Manifest.Version, version, StringComparison.Ordinal));
+                var problems = new List<Diagnostic>();
+                var requests = ReadEntries(
+                    module.Manifest.Modules, $"{ApplicationLoader.ModulesFolderPrefix}{id}/{ModuleCatalog.ManifestFileName}", null, id, versionsById, problems);
+                entriesByVersion[(id, version)] = entries = (requests, problems);
+            }
+
+            return entries;
+        }
+
+        // Each round walks the graph with the versions picked so far and picks again from every range
+        // that asks. It stops when no pick changes. There is no backtracking, so a graph whose picks
+        // never settle stops at the guard, and each id still changing is reported as a conflict.
+        var picks = new Dictionary<string, string>(StringComparer.Ordinal);
+        var unstable = new HashSet<string>(StringComparer.Ordinal);
+        List<string> order;
+        Dictionary<string, List<ModuleRequest>> requestsById;
+        var maxRounds = installed.Count + 2;
+        for (var round = 1; ; round++)
+        {
+            order = [];
+            requestsById = new Dictionary<string, List<ModuleRequest>>(StringComparer.Ordinal);
+            void Ask(ModuleRequest request)
+            {
+                if (!requestsById.TryGetValue(request.Id, out var asks))
+                {
+                    requestsById[request.Id] = asks = [];
+                    order.Add(request.Id);
+                }
+
+                asks.Add(request);
+            }
+
+            foreach (var request in applicationRequests)
+            {
+                Ask(request);
+            }
+
+            for (var position = 0; position < order.Count; position++)
+            {
+                if (picks.TryGetValue(order[position], out var picked))
+                {
+                    foreach (var request in EntriesOf(order[position], picked).Requests)
+                    {
+                        Ask(request);
+                    }
+                }
+            }
+
+            var next = new Dictionary<string, string>(StringComparer.Ordinal);
+            foreach (var id in order)
+            {
+                var pick = versionsById[id].LastOrDefault(version => requestsById[id].All(request => request.Range.Matches(version)));
+                if (pick is not null)
+                {
+                    next[id] = pick;
+                }
+            }
+
+            if (next.Count == picks.Count && next.All(pair => picks.TryGetValue(pair.Key, out var current) && current == pair.Value))
+            {
+                break;
+            }
+
+            if (round >= maxRounds)
+            {
+                unstable.UnionWith(next.Where(pair => !picks.TryGetValue(pair.Key, out var current) || current != pair.Value).Select(pair => pair.Key));
+                unstable.UnionWith(picks.Keys.Where(id => !next.ContainsKey(id)));
+                foreach (var id in unstable)
+                {
+                    next.Remove(id);
+                }
+
+                picks = next;
+                break;
+            }
+
+            picks = next;
+        }
+
+        foreach (var id in order)
+        {
+            if (picks.TryGetValue(id, out var picked))
+            {
+                diagnostics.AddRange(EntriesOf(id, picked).Problems);
+            }
+            else
+            {
+                ReportUnresolved(id, requestsById[id], versionsById[id], unstable.Contains(id), application, diagnostics);
+            }
+        }
+
+        ReportCycles(applicationRequests, picks, EntriesOf, diagnostics);
 
         var pins = new List<PinnedModuleModel>();
         var files = new List<ResourceContent>();
         var resources = new ModuleResourceCollector();
-        var firstIndexById = new Dictionary<string, int>(StringComparer.Ordinal);
-        for (var index = 0; index < application.Modules.Count; index++)
+        foreach (var id in order)
         {
-            var module = application.Modules[index];
+            if (!picks.TryGetValue(id, out var picked))
+            {
+                continue;
+            }
+
+            var first = requestsById[id][0];
+            pins.Add(new PinnedModuleModel(id, first.RangeText, picked));
+            if (first.Asker is null)
+            {
+                references.Add(application, $"/modules/{first.Index}", ReferenceRelations.Module, new ModuleNode(id));
+            }
+
+            var pinnedModule = installed.First(candidate =>
+                string.Equals(candidate.Manifest.Id, id, StringComparison.Ordinal)
+                && string.Equals(candidate.Manifest.Version, picked, StringComparison.Ordinal));
+            CheckFiles(pinnedModule, files, resources, diagnostics);
+        }
+
+        return (pins, files, resources.ToResources());
+    }
+
+    /// <summary>
+    /// Checks a <c>modules</c> list: a module id appears once, its range is valid and the module has an
+    /// installed version. Returns the entries without problems, in the order written.
+    /// </summary>
+    private static List<ModuleRequest> ReadEntries(
+        IReadOnlyList<ApplicationModuleDefinition> entries,
+        string file,
+        Guid? resourceId,
+        string? asker,
+        Dictionary<string, List<string>> versionsById,
+        List<Diagnostic> diagnostics)
+    {
+        void Report(string code, string message, string path) =>
+            diagnostics.Add(new Diagnostic(code, message, file, path, resourceId));
+
+        var requests = new List<ModuleRequest>();
+        var firstIndexById = new Dictionary<string, int>(StringComparer.Ordinal);
+        for (var index = 0; index < entries.Count; index++)
+        {
+            var module = entries[index];
             var path = $"/modules/{index}";
             if (!firstIndexById.TryAdd(module.Id, index))
             {
@@ -72,12 +231,6 @@ internal static class ModuleChecker
                 continue;
             }
 
-            var versions = installed
-                .Where(candidate => string.Equals(candidate.Manifest.Id, module.Id, StringComparison.Ordinal))
-                .Select(candidate => candidate.Manifest.Version)
-                .Distinct(StringComparer.Ordinal)
-                .Order(Comparer<string>.Create(PackageVersions.Compare))
-                .ToList();
             if (!VersionRange.TryParse(module.Version, out var range))
             {
                 Report(
@@ -86,7 +239,7 @@ internal static class ModuleChecker
                     $"{path}/version");
             }
 
-            if (versions.Count == 0)
+            if (!versionsById.ContainsKey(module.Id))
             {
                 Report(
                     DiagnosticCodes.UnknownModule,
@@ -95,31 +248,117 @@ internal static class ModuleChecker
                 continue;
             }
 
-            if (range is null)
+            if (range is not null)
             {
-                continue;
+                requests.Add(new ModuleRequest(module.Id, asker, file, resourceId, index, module.Version, range));
             }
-
-            var pinned = versions.LastOrDefault(range.Matches);
-            if (pinned is null)
-            {
-                Report(
-                    DiagnosticCodes.NoModuleVersionInRange,
-                    $"No installed version of module '{module.Id}' is in the range '{module.Version}'. The installed versions are {string.Join(", ", versions.Select(version => $"'{version}'"))}.",
-                    $"{path}/version");
-                continue;
-            }
-
-            pins.Add(new PinnedModuleModel(module.Id, module.Version, pinned));
-            references.Add(application, path, ReferenceRelations.Module, new ModuleNode(module.Id));
-            var pinnedModule = installed.First(candidate =>
-                string.Equals(candidate.Manifest.Id, module.Id, StringComparison.Ordinal)
-                && string.Equals(candidate.Manifest.Version, pinned, StringComparison.Ordinal));
-            CheckFiles(pinnedModule, files, resources, diagnostics);
         }
 
-        return (pins, files, resources.ToResources());
+        return requests;
     }
+
+    /// <summary>
+    /// Reports a module that no installed version can be pinned for. One range gives
+    /// <see cref="DiagnosticCodes.NoModuleVersionInRange"/> at its entry. Several give
+    /// <see cref="DiagnosticCodes.ModuleRangeConflict"/>, naming every asker, at the application's
+    /// entry when it asks and otherwise at the first asking module.
+    /// </summary>
+    private static void ReportUnresolved(
+        string id,
+        List<ModuleRequest> requests,
+        List<string> versions,
+        bool unstable,
+        ApplicationManifest application,
+        List<Diagnostic> diagnostics)
+    {
+        var installedVersions = string.Join(", ", versions.Select(version => $"'{version}'"));
+        if (requests.Count == 1 && !unstable)
+        {
+            var only = requests[0];
+            diagnostics.Add(new Diagnostic(
+                DiagnosticCodes.NoModuleVersionInRange,
+                $"No installed version of module '{id}' is in the range '{only.RangeText}'. The installed versions are {installedVersions}.",
+                only.File,
+                $"/modules/{only.Index}/version",
+                only.ResourceId));
+            return;
+        }
+
+        var askers = string.Join(
+            ", ",
+            requests.Select(request => request.Asker is null
+                ? $"the application asks for '{request.RangeText}'"
+                : $"module '{request.Asker}' asks for '{request.RangeText}'"));
+        var at = requests.Find(request => request.Asker is null) ?? requests[0];
+        diagnostics.Add(new Diagnostic(
+            DiagnosticCodes.ModuleRangeConflict,
+            $"No installed version of module '{id}' meets every range that asks for it: {askers}. The installed versions are {installedVersions}.",
+            at.File,
+            $"/modules/{at.Index}/version",
+            at.ResourceId));
+    }
+
+    /// <summary>
+    /// Reports each cycle of the pinned modules once, at the entry that closes it, in the
+    /// <c>module.json</c> of the module that holds the entry. A module that depends on itself is a
+    /// cycle of one.
+    /// </summary>
+    private static void ReportCycles(
+        List<ModuleRequest> applicationRequests,
+        Dictionary<string, string> picks,
+        Func<string, string, (List<ModuleRequest> Requests, List<Diagnostic> Problems)> entriesOf,
+        List<Diagnostic> diagnostics)
+    {
+        const int onStack = 1;
+        const int done = 2;
+        var state = new Dictionary<string, int>(StringComparer.Ordinal);
+        var stack = new List<string>();
+        var reported = new HashSet<string>(StringComparer.Ordinal);
+
+        void Visit(string id)
+        {
+            state[id] = onStack;
+            stack.Add(id);
+            foreach (var entry in entriesOf(id, picks[id]).Requests)
+            {
+                if (!picks.ContainsKey(entry.Id))
+                {
+                    continue;
+                }
+
+                if (!state.TryGetValue(entry.Id, out var seen))
+                {
+                    Visit(entry.Id);
+                }
+                else if (seen == onStack)
+                {
+                    var cycle = stack.Skip(stack.IndexOf(entry.Id)).ToList();
+                    if (reported.Add(string.Join('\n', cycle.Order(StringComparer.Ordinal))))
+                    {
+                        diagnostics.Add(new Diagnostic(
+                            DiagnosticCodes.ModuleDependencyCycle,
+                            $"The modules depend on each other in a cycle: {string.Join(" → ", cycle.Append(entry.Id).Select(name => $"'{name}'"))}.",
+                            entry.File,
+                            $"/modules/{entry.Index}/id"));
+                    }
+                }
+            }
+
+            stack.RemoveAt(stack.Count - 1);
+            state[id] = done;
+        }
+
+        foreach (var request in applicationRequests)
+        {
+            if (picks.ContainsKey(request.Id) && !state.ContainsKey(request.Id))
+            {
+                Visit(request.Id);
+            }
+        }
+    }
+
+    /// <summary>One <c>modules</c> entry without problems, with where it is written. <c>Asker</c> is null for the application.</summary>
+    private sealed record ModuleRequest(string Id, string? Asker, string File, Guid? ResourceId, int Index, string RangeText, VersionRange Range);
 
     /// <summary>Checks each file of a pinned module and adds the valid ones, in canonical form, under <c>modules/&lt;id&gt;/</c>.</summary>
     private static void CheckFiles(

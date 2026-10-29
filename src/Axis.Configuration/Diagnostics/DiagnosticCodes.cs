@@ -277,4 +277,6 @@ public static class DiagnosticCodes
     public const string UnknownSignInProvider = "AXC0289";
     public const string SiteWithoutIdentityProvider = "AXC0290";
     public const string IdentityProviderSplitsUser = "AXC0291";
+    public const string ModuleRangeConflict = "AXC0292";
+    public const string ModuleDependencyCycle = "AXC0293";
 }

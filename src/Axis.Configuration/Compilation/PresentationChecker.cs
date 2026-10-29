@@ -44,7 +44,7 @@ internal static class PresentationChecker
                 form,
                 loaded,
                 findEntity,
-                moduleReferences,
+                moduleReferences.For(form),
                 references,
                 isModule ? [] : rules,
                 isModule ? null : declaredModules,
@@ -86,7 +86,7 @@ internal static class PresentationChecker
         void Report(string code, string message, string path) =>
             diagnostics.Add(new Diagnostic(code, message, form.File, path, form.Id));
 
-        var entity = findEntity(form.Entity);
+        var entity = moduleReferences.Find(form.Entity, findEntity);
         if (entity is not null)
         {
             references.Add(form, "/entity", ReferenceRelations.FormEntity, ResourceNode.Of(entity));
@@ -702,7 +702,7 @@ internal static class PresentationChecker
                     $"{path}/entity");
             }
         }
-        else if (findDataSource(widget.DataSource!) is { } dataSource)
+        else if (moduleReferences.Find(widget.DataSource!, findDataSource) is { } dataSource)
         {
             references.Add(page, $"{path}/dataSource", ReferenceRelations.WidgetDataSource, ResourceNode.Of(dataSource));
             recordEntity = dataSource.Entity;
@@ -859,7 +859,7 @@ internal static class PresentationChecker
 
         // The page schema requires the data source and the measure on a kpi.
         var dataSourceName = widget.DataSource!;
-        if (findDataSource(dataSourceName) is { } dataSource)
+        if (moduleReferences.Find(dataSourceName, findDataSource) is { } dataSource)
         {
             references.Add(page, $"{path}/dataSource", ReferenceRelations.WidgetDataSource, ResourceNode.Of(dataSource));
             CheckParameterBinding(widget, path, page, dataSource, "kpi", false, Report);
@@ -954,7 +954,7 @@ internal static class PresentationChecker
         }
 
         var dataSourceName = widget.DataSource!;
-        if (findDataSource(dataSourceName) is { } dataSource)
+        if (moduleReferences.Find(dataSourceName, findDataSource) is { } dataSource)
         {
             references.Add(page, $"{path}/dataSource", ReferenceRelations.WidgetDataSource, ResourceNode.Of(dataSource));
             CheckParameterBinding(widget, path, page, dataSource, "chart", false, Report);

@@ -3,6 +3,7 @@ using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Loading;
 using Axis.Configuration.Packages;
 using Axis.Configuration.Releases;
+using Axis.Configuration.Resources;
 using Json.Schema;
 
 namespace Axis.Configuration.Modules;
@@ -125,10 +126,13 @@ public sealed class ModuleCatalog
             }
 
             var root = document.RootElement;
-            return new ModuleManifest(
+            var manifest = new ModuleManifest(
                 root.GetProperty("id").GetString()!,
                 root.GetProperty("version").GetString()!,
                 root.GetProperty("label").GetString()!);
+            return root.TryGetProperty("modules", out var modules)
+                ? manifest with { Modules = modules.Deserialize<List<ApplicationModuleDefinition>>(ApplicationLoader.SerializerOptions)! }
+                : manifest;
         }
     }
 

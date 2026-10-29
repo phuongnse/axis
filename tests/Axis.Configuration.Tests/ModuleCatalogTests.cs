@@ -87,6 +87,7 @@ public sealed class ModuleCatalogTests
     [InlineData("""{ "kind": "module", "id": "departments", "version": "1.0.0", "label": "" }""", "/label")]
     [InlineData("""{ "kind": "module", "id": "departments", "version": "1.0.0", "label": "D", "other": 1 }""", "/other")]
     [InlineData("""{ "kind": "module", "id": "departments", "version": "1.0.0", "label": "D", "packages": [{ "id": "x" }] }""", "/packages/0")]
+    [InlineData("""{ "kind": "module", "id": "departments", "version": "1.0.0", "label": "D", "modules": [{ "id": "people", "version": "^1.0.0", "roles": {} }] }""", "/modules/0/roles")]
     public void A_manifest_that_fails_its_schema_is_a_diagnostic_at_the_failing_pointer(string manifest, string path)
     {
         using var root = new TemporaryFolder().With(ManifestFile, manifest);

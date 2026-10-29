@@ -9,8 +9,8 @@ _(planned for Mx)_ are not built yet, and Dn refers to [decisions.md](../decisio
 
 This section follows
 [D40](../decisions/d40-reusable-modules.md). The manifest,
-installation, declaring, pinning and the diagnostics `AXC0200` to `AXC0214`
-are built. A pinned module's files are stored in the release and
+installation, declaring, pinning, dependencies between modules and the diagnostics `AXC0200` to `AXC0214`,
+`AXC0292` and `AXC0293` are built. A pinned module's files are stored in the release and
 checked as JSON, for an allowed kind and against the schema of their kind. A
 pinned module's entities, sequences, seeds, events, data sources and forms join the application
 model, each with an id derived from the application `id` and the name
@@ -62,8 +62,9 @@ calls `IsDepartmentCode`, so a department code must be in capital letters.
 - **Manifest.** `module.json` has `kind: module`, an `id` (lower-case letters,
   digits and `-`, starting with a letter), a SemVer `version`, a `label` and an
   optional `packages`. `packages` has the same shape as in `application.json`,
-  see [Extension packages](extension-packages.md#declaring-packages-in-an-application). A module has no dependencies
-  on other modules. _(planned for M20)_ It gets `roles`, `connectors` and `modules`, see
+  see [Extension packages](extension-packages.md#declaring-packages-in-an-application). An optional `modules`
+  lists the modules it depends on, with the `id` and `version` entries of an application's `modules`, see
+  [dependencies](#processes-pages-policies-and-dependencies). _(planned for M20)_ It gets `roles` and `connectors`, see
   [Processes, pages, policies and dependencies](#processes-pages-policies-and-dependencies).
 - **Kinds a module may hold.** `entity`, `dataSource`, `rule`, `sequence`,
   `form`, `event`, `text` and `seed`. Processes, pages, roles and policies are
@@ -79,6 +80,9 @@ calls `IsDepartmentCode`, so a department code must be in capital letters.
 - **Declaring.** `modules` is optional. Each entry has an `id` and a `version`.
   A range has the same forms as for packages: `1.0.0`, `^1.0.0` or `~1.0.0`.
 - **Pinning.** Compilation picks the highest installed version in each range.
+  It does the same for every module a pinned module depends on, all the way
+  down, and gives each module id one version, see
+  [resolving the graph](#processes-pages-policies-and-dependencies).
   It copies that version's files into the release as `modules/<id>/…`, so the
   content hash covers them. The pinned version is the one in the copied
   `modules/<id>/module.json`. There is no extra release table. A release keeps
@@ -126,7 +130,9 @@ calls `IsDepartmentCode`, so a department code must be in capital letters.
   that declares the module. These calls add no rule-call edge to the reference
   index, and the 8-deep limit counts the rule chain only. A module data source
   filter sees no rules. Module entities come before the application's own entities
-  in the model, in the order of `modules` and then by path. The record API
+  in the model, in the order of the pins and then by path. The pins list the
+  application's `modules` entries as written, and then each module they depend on in the
+  order it is first reached. The record API
   writes a module entity's name as two path segments, `{module id}/{entity
   name}`, for example
   `/api/apps/{app}/entities/departments/Department/records`. See the
@@ -194,7 +200,8 @@ _(planned for M20)_ A module can ship a working feature with its screens,
 permissions, triggers and outside calls, and build on other modules, as
 [D89](../decisions/d89-modules-that-hold-processes-pages-and-policies-and-depend-on-other-modules.md)
 and [D103](../decisions/d103-modules-hold-triggers-scenarios-and-connector-slots.md) agree. It replaces the two limits above: the kinds a module may hold, and no
-dependencies.
+dependencies. Dependencies (the `modules` list without the slot maps), resolving the graph, one
+copy each and what the application names are built. The rest of this section is planned.
 
 ```json
 {
@@ -263,21 +270,34 @@ agrees. An application that declares it maps the slot to one of its own roles:
   slots instead of roles. When it runs for an application, each slot becomes
   the role it maps to, and the scenario runs against the application as
   customized.
-- **Dependencies.** `module.json` gets `modules`, with the shape of an
-  application's `modules` entries. A module names resources and calls rules
+- **Dependencies.** _(built)_ `module.json` has an optional `modules`, with the `id` and
+  `version` entries of an application's `modules`. A bad entry is `AXC0203`,
+  `AXC0204` or `AXC0206`, reported in the `module.json` of the module that
+  holds it. _(planned for M20)_ A module names resources and calls rules
   only of the modules it declares, as `<module id>/<name>` and
   `<module id>:<rule>(…)`. Its entry for a module it depends on maps that
-  module's slots to its own slots.
-- **Resolving the graph.** The application resolves every module it declares
+  module's slots to its own slots, with `roles` and `connectors`.
+- **Resolving the graph.** _(built)_ The application resolves every module it declares
   and every module they declare, flat. Each module id gets one version: the
-  highest installed version that meets every range that asks for it. No such
-  version is a new diagnostic that names every module that asks. A cycle
-  between modules is a new diagnostic.
-- **One copy each.** Each module gets one copy per application, with ids
-  derived from the application. A module that two others depend on is copied
-  once.
-- **What the application names.** The application names resources only of the
-  modules it declares itself, not of the modules they depend on.
+  highest installed version that meets every range that asks for it.
+  When one range asks and no installed version meets it, the diagnostic is
+  `AXC0205`. When two or more ranges ask and no version meets them all, it is
+  `AXC0292`, which names the application or each module that asks, with its
+  range. A cycle between modules, and a module that depends on itself, is
+  `AXC0293`, which names the cycle. The resolution picks again until nothing
+  changes, without backtracking. A graph whose picks never settle is reported as a
+  conflict.
+- **One copy each.** _(built)_ Each module gets one copy per application, with ids
+  derived from the application. A module that two others depend on is pinned
+  and copied once. Rebuilding a stored release resolves the same graph from the
+  module copies it holds.
+- **What the application names.** _(built)_ The application names resources only of the
+  modules it declares itself, not of the modules they depend on. A name under
+  a module that is only a dependency is `AXC0207`, as for an undeclared module,
+  in the places `AXC0207` lists. A process, event, trigger, seed, migration or policy
+  `entity` still resolves to a dependency's resources. A name inside a
+  dependency-only module's own resources that does not resolve keeps its
+  unknown-name code.
 - **Studio.** Studio shows a module's processes, pages and policies read-only,
   as it shows module entities, and never edits a module.
 - **Upgrades.** A module upgrade must still be additive for its entities
