@@ -241,7 +241,9 @@ _(planned for M17)_
   `<provider alias>.<subject>`. Each provider names the realm's first-login flow. It touches no other client or
   provider, so `axis`, `axis-activation`, `axis-users` and anything an operator added stay. A site client that the sync
   creates or updates copies the client authentication and the PAR, PKCE, DPoP and key settings of `axis`, so activation
-  never undoes what `tenant oidc set` wrote. Each site client also carries two attributes that every sync rewrites:
+  never undoes what `tenant oidc set` wrote. It also gives that site client every protocol mapper of `axis`, matched by
+  name with the same type and config, so a sign-in through it carries the same claims. The `identity provider` mapper
+  stays as it is, and a mapper that is removed from `axis` is not removed from the site clients. Each site client also carries two attributes that every sync rewrites:
   `axis.providers`, the aliases of the providers the site allows separated by spaces, and `axis.accounts`, `true` or
   `false`. The sync refuses an alias that is empty or contains a space. It also copies the redirect addresses, web origins and post-logout redirect
   addresses of `axis`. When the tenant has a platform client secret, the site client's secret is base64url of
