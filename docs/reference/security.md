@@ -155,7 +155,7 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place. _(planned f
   - A token that is valid is refused with the reason `providerNotAccepted` when
     the tenant's [platform sign-in](identity-provider.md#platform-sign-in) does
     not accept the provider that signed the person in, or does not accept
-    accounts.
+    accounts, and no active site that shares the tenant's host allows it.
   - A token that is valid, for a sign-in that started on a site, is refused with the reason `providerNotAllowed`
     when the site's `signIn` does not allow the provider that signed the person in, or when the site is no longer
     active. It is checked before `acrNotAccepted` and `providerNotAccepted`. See

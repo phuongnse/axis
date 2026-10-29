@@ -82,6 +82,38 @@ public sealed class SiteSignInTests
         Assert.Equal(accounts, SiteSignIn.Allows(new RealmSiteClient("sales", accounts, ["oidc-a"]), claim));
     }
 
+    [Fact]
+    public void The_allowing_paths_are_those_of_the_sites_that_allow_the_provider()
+    {
+        RealmSiteClient[] sites =
+        [
+            new("sales", Accounts: false, ["oidc-a"]),
+            new("support", Accounts: false, ["oidc-b"]),
+        ];
+
+        Assert.Equal(["sales"], SiteSignIn.AllowingPaths(sites, "oidc-a"));
+    }
+
+    [Fact]
+    public void A_token_without_a_provider_claim_is_allowed_by_the_sites_with_accounts()
+    {
+        RealmSiteClient[] sites =
+        [
+            new("sales", Accounts: true, ["oidc-a"]),
+            new("support", Accounts: false, ["oidc-b"]),
+        ];
+
+        Assert.Equal(["sales"], SiteSignIn.AllowingPaths(sites, null));
+    }
+
+    [Fact]
+    public void No_site_allows_a_provider_outside_every_list()
+    {
+        RealmSiteClient[] sites = [new("sales", Accounts: true, ["oidc-a"]), new("support", Accounts: false, ["oidc-b"])];
+
+        Assert.Empty(SiteSignIn.AllowingPaths(sites, "oidc-c"));
+    }
+
     [Theory]
     [InlineData(null, true, true)]
     [InlineData(null, false, false)]

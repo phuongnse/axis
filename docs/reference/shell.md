@@ -112,7 +112,8 @@ cards.
   above the button, with no reason.
 - **Endpoints.** The page uses these three.
   - `GET /api/sites` gives each site its `application`, `{ "name", "titles" }`, the application's name and its title
-    per locale it has texts for, from the `label` in its `application.json` or its name when it has none, so the home page can group the sites.
+    per locale it has texts for, from the `label` in its `application.json` or its name when it has none, so the home page can group the sites. It lists only the sites that allow the provider of the session, so a person signed in
+    through a provider that one site allows sees that site only.
   - `GET /api/me` adds a boolean `console`, true when the person holds the role `Console:OperatorRole` names, see the
     [operator console](operator-console.md).
   - `GET /api/me` adds a boolean `users`, true when the person holds the role `Users:AdministratorRole` names and the

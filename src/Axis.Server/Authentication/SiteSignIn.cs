@@ -21,7 +21,8 @@ internal sealed record SiteSignInTarget(string Path, string? ProviderHint, strin
 /// Finds out whether a sign-in starts on a site page, so it goes to the realm through the site's own client
 /// (<c>site-&lt;path&gt;</c>). A site that allows exactly one brokered provider and no accounts also names that provider, so
 /// the realm skips its own page. A preview tenant, a <c>fapi2</c> tenant and a tenant without realm details have no
-/// <see cref="TenantOidcSettings.SiteClientKey"/>, so they keep the platform client.
+/// <see cref="TenantOidcSettings.SiteClientKey"/>, so they keep the platform client. It also finds the sites that allow a
+/// provider, for the sign-in on the tenant's host and for the list of sites.
 /// </summary>
 internal sealed class SiteSignIn(ITenantCatalog catalog, TenantSignInSettings settings, ActiveApplicationResolver resolver)
 {
@@ -66,6 +67,14 @@ internal sealed class SiteSignIn(ITenantCatalog catalog, TenantSignInSettings se
         return string.IsNullOrWhiteSpace(identityProvider)
             ? site.Accounts
             : site.Providers.Contains(identityProvider, StringComparer.Ordinal);
+    }
+
+    /// <summary>The paths of the sites in <paramref name="sites"/> that allow <paramref name="identityProvider"/>, see <see cref="Allows"/>.</summary>
+    public static IReadOnlySet<string> AllowingPaths(IEnumerable<RealmSiteClient> sites, string? identityProvider)
+    {
+        ArgumentNullException.ThrowIfNull(sites);
+
+        return sites.Where(site => Allows(site, identityProvider)).Select(site => site.Path).ToHashSet(StringComparer.Ordinal);
     }
 
     /// <summary>The providers of <paramref name="model"/> that <paramref name="site"/> allows. Names are matched ignoring letter case.</summary>
@@ -147,6 +156,38 @@ internal sealed class SiteSignIn(ITenantCatalog catalog, TenantSignInSettings se
         => await FindActiveAsync(tenantId, path, cancellationToken) is { } found
             ? AcceptedAcr(found.Active.Application, found.Active.Site, alias)
             : [];
+
+    /// <summary>
+    /// The paths of the active sites that allow <paramref name="identityProvider"/>, or <c>null</c> when the tenant has no site
+    /// clients and so nothing to check against.
+    /// </summary>
+    public async Task<IReadOnlySet<string>?> AllowingPathsAsync(string tenantId, string? identityProvider, CancellationToken cancellationToken)
+    {
+        if (settings.Find(tenantId)?.SiteClientKey is null)
+        {
+            return null;
+        }
+
+        var plan = RealmBindingFilter.Plan(
+            (await resolver.ListAsync(cancellationToken)).Select(RealmApplication.FromModel),
+            TenantActivationBindings.For(catalog.Find(tenantId)!, allowHttp: false));
+        return AllowingPaths(plan.Plan.Sites, identityProvider);
+    }
+
+    /// <summary>
+    /// Whether an active site that shares the tenant's host allows <paramref name="identityProvider"/>. A site with a host of its
+    /// own is served only there, so it does not count. It is <c>false</c> when the tenant has no site clients.
+    /// </summary>
+    public async Task<bool> AllowedOnTenantHostAsync(string tenantId, string? identityProvider, CancellationToken cancellationToken)
+    {
+        if (await AllowingPathsAsync(tenantId, identityProvider, cancellationToken) is not { } allowing)
+        {
+            return false;
+        }
+
+        var ownHosts = catalog.Find(tenantId)?.HostSites?.Values.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        return allowing.Any(path => ownHosts is null || !ownHosts.Contains(path));
+    }
 
     private async Task<RealmSiteClient?> SiteClientAsync(string tenantId, string path, CancellationToken cancellationToken)
         => (await FindActiveAsync(tenantId, path, cancellationToken))?.Client;

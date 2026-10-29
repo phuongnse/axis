@@ -152,7 +152,8 @@ so Studio edits it, with the identity provider editor of [Studio](studio.md), an
     claim. A sign-in through accounts holds none, and so does a row from before the column, which counts as accounts.
   - `GET /api/sites/{path}` and the texts and pages under it answer `401` for a session whose provider the site does not
     allow. The answer comes after the `401` for no session and before the `404` for an unknown path. The SPA then shows its
-    sign-in card. `GET /api/sites`, the list, is not filtered.
+    sign-in card. `GET /api/sites`, the list, holds only the sites that allow the session's provider, so the home
+    page shows no site the person cannot open. A tenant without site clients is not filtered.
   - A sign-in for a site adds `prompt=login` when the browser holds a session that the site refuses, so the realm asks for
     credentials and does not sign the person in again through the refused provider.
   - A tenant without site clients checks nothing, as its tokens carry no `identity_provider` claim.
@@ -201,6 +202,10 @@ checks of the stored platform sign-in are _(planned for M17)_.
   matches the `identity_provider` claim of the ID token by its alias, `oidc-` and the lower-case issuer binding. A
   `saml` provider has no alias yet, so its sign-ins are refused. A token with no `identity_provider` claim is an
   account sign-in.
+- On the tenant's host, the callback also accepts a provider, or accounts, that an active site on that host allows. A
+  site shares the tenant's host when it has no host of its own. A provider that only a site with its own host allows is
+  still refused there. A sign-in accepted only through a site maps no platform roles, so it opens no Studio, operator
+  console or users page. It keeps the roles that the tenant's roles claim gives.
 - For an accepted provider, the callback reads the values of the ID token claim `axis_roles_<roles claim>`, the user
   attribute that the realm sync writes for each roles claim. It maps each value to author, publisher, operator or
   administrator, and gives the role names that `Studio:AuthorRole`, `Studio:PublisherRole`, `Console:OperatorRole` and
@@ -214,8 +219,10 @@ checks of the stored platform sign-in are _(planned for M17)_.
   sign-in setting.
 - `tenant create` sets accounts on, so a new tenant can sign in its first administrator before any application is
   published, see [the first administrator](user-administration.md#the-first-administrator).
-- On the tenant's host the home page's sign-in also offers the providers of the sites that share the host. After
-  sign-in the home page lists only the sites that allow the provider the person used.
+- On the tenant's host the home page's sign-in also accepts the providers of the sites that share the host. This is
+  built. The realm's sign-in page for the `axis` client is not narrowed, as that client has no `axis.accounts`
+  attribute, so it still shows every provider of the realm and the callback is the control. After sign-in the home page
+  lists only the sites that allow the provider the person used.
 
 ## Users
 
