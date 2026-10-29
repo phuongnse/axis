@@ -1,8 +1,10 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Text;
 using System.Text.Json;
 using Axis.Configuration.Realms;
+using Axis.Configuration.Resources;
 
 namespace Axis.Tenancy.Realms;
 
@@ -14,7 +16,9 @@ namespace Axis.Tenancy.Realms;
 /// <see cref="SiteClientSecret"/> derives from it. Its ID token carries the alias of the
 /// provider that signed the person in as the <c>identity_provider</c> claim. Each provider gets claim mappers for the
 /// display name, the email, the locale and each roles claim, and a <c>username</c> mapper that names a new user after the
-/// provider's alias and the person's subject. Each provider also names the realm's own first-login flow
+/// provider's alias and the person's subject. A provider with labels has the display name <c>${axisProvider.&lt;alias&gt;}</c>, and the
+/// sync writes the label of each platform locale as the realm text of that key through the realm localization API, which
+/// needs the <c>manage-realm</c> right, and removes the label texts (<see cref="LabelKeyPrefix"/>) of providers the realm no longer holds. Each provider also names the realm's own first-login flow
 /// (<see cref="FirstLoginFlowAlias"/>), which always creates a new user and never offers to link one. The sync adds, changes and removes only clients whose id
 /// starts with <see cref="SiteClientPrefix"/> and providers whose alias starts with <see cref="ProviderAliasPrefix"/>,
 /// so <c>axis</c>, <c>axis-activation</c>, <c>axis-users</c> and anything an operator added stay. A removed provider
@@ -27,6 +31,12 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
     public const string SiteClientPrefix = "site-";
     public const string ProviderAliasPrefix = "oidc-";
     public const string IdentityProviderClaim = "identity_provider";
+
+    /// <summary>The start of the realm message key that holds a provider's label.</summary>
+    public const string LabelKeyPrefix = "axisProvider.";
+
+    /// <summary>The realm message key that holds the label of the provider with <paramref name="alias"/>.</summary>
+    public static string LabelKey(string alias) => LabelKeyPrefix + alias;
 
     /// <summary>The user attribute that holds the values of one roles claim of a brokered provider.</summary>
     public static string RolesAttribute(string claim) => $"axis_roles_{claim}";
@@ -72,6 +82,7 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
             {
                 await SyncSiteClientsAsync(token, realmPath, state.Sites, state.PlatformClientSecret, cancellationToken);
                 await SyncProvidersAsync(token, realmPath, providers, cancellationToken);
+                await SyncLabelsAsync(token, realmPath, state.Providers, cancellationToken);
                 return;
             }
             catch (ConflictException) when (attempt < ConflictAttempts)
@@ -370,6 +381,55 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
         }
     }
 
+    /// <summary>
+    /// Writes the label of each provider as a realm text of each platform locale when the stored text differs, and removes the
+    /// texts with a key that starts with <see cref="LabelKeyPrefix"/> and that no provider wants.
+    /// </summary>
+    private async Task SyncLabelsAsync(string token, string realmPath, IReadOnlyList<RealmBrokeredProvider> providers, CancellationToken cancellationToken)
+    {
+        foreach (var locale in PlatformLocales.All)
+        {
+            var localePath = $"{realmPath}/localization/{Uri.EscapeDataString(locale)}";
+            using var listed = await SendAsync(token, HttpMethod.Get, localePath, null, cancellationToken);
+            EnsureSuccess(listed, $"list the texts in '{locale}'");
+            var stored = new Dictionary<string, string>(StringComparer.Ordinal);
+            foreach (var property in (await listed.Content.ReadFromJsonAsync<JsonElement>(cancellationToken)).EnumerateObject())
+            {
+                if (property.Name.StartsWith(LabelKeyPrefix, StringComparison.Ordinal) && property.Value.ValueKind == JsonValueKind.String)
+                {
+                    stored[property.Name] = property.Value.GetString()!;
+                }
+            }
+
+            var desired = new Dictionary<string, string>(StringComparer.Ordinal);
+            foreach (var provider in providers)
+            {
+                if (provider.Labels is { Count: > 0 } labels && labels.TryGetValue(locale, out var label))
+                {
+                    desired[LabelKey(provider.Alias)] = label;
+                }
+            }
+
+            foreach (var (key, label) in desired)
+            {
+                if (stored.TryGetValue(key, out var current) && current == label)
+                {
+                    continue;
+                }
+
+                using var written = await SendAsync(
+                    token, HttpMethod.Put, $"{localePath}/{Uri.EscapeDataString(key)}", label, cancellationToken);
+                EnsureSuccess(written, $"write the label of '{key[LabelKeyPrefix.Length..]}' in '{locale}'");
+            }
+
+            foreach (var key in stored.Keys.Where(key => !desired.ContainsKey(key)))
+            {
+                using var deleted = await SendAsync(token, HttpMethod.Delete, $"{localePath}/{Uri.EscapeDataString(key)}", null, cancellationToken);
+                EnsureSuccess(deleted, $"delete the label of '{key[LabelKeyPrefix.Length..]}' in '{locale}'");
+            }
+        }
+    }
+
     private static Dictionary<string, object?> ProviderRepresentation(RealmBrokeredProvider provider, Dictionary<string, string> endpoints)
     {
         var config = new Dictionary<string, string>
@@ -398,7 +458,7 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
             config["logoutUrl"] = logout;
         }
 
-        return new Dictionary<string, object?>
+        var representation = new Dictionary<string, object?>
         {
             ["alias"] = provider.Alias,
             ["providerId"] = "oidc",
@@ -408,6 +468,12 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
             ["firstBrokerLoginFlowAlias"] = FirstLoginFlowAlias,
             ["config"] = config,
         };
+        if (provider.Labels is { Count: > 0 })
+        {
+            representation["displayName"] = "${" + LabelKey(provider.Alias) + "}";
+        }
+
+        return representation;
     }
 
     /// <summary>Adds or updates the provider's mappers by name and removes every other mapper of the provider.</summary>
@@ -490,7 +556,11 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
     {
         using var request = new HttpRequestMessage(method, new Uri(baseAddress, path));
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
-        if (body is not null)
+        if (body is string text)
+        {
+            request.Content = new StringContent(text, Encoding.UTF8, "text/plain");
+        }
+        else if (body is not null)
         {
             request.Content = JsonContent.Create(body);
         }

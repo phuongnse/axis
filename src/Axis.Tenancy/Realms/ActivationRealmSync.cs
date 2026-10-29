@@ -63,7 +63,8 @@ public static class ActivationRealmSync
             provider.Claims.DisplayName,
             provider.Claims.Email,
             provider.Claims.Locale,
-            provider.RolesClaims);
+            provider.RolesClaims,
+            provider.Labels);
     }
 
     private static string Url(string alias, string name, IReadOnlyDictionary<string, TenantBinding> bindings) =>

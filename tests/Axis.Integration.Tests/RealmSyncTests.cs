@@ -189,6 +189,28 @@ public sealed partial class RealmSyncTests(KeycloakFixture keycloak) : IAsyncLif
     }
 
     [Fact]
+    public async Task A_provider_label_is_written_in_each_locale_and_removed_with_the_provider()
+    {
+        var realm = await NewRealmAsync();
+        var labels = new Dictionary<string, string> { ["en"] = "Company", ["vi"] = "Công ty" };
+        await SyncAsync(realm, _secrets.Activation, State([], [Provider() with { Labels = labels }]));
+
+        var token = await TokenAsync("master", KeycloakFixture.AdminClientId, KeycloakFixture.AdminClientSecret);
+        var key = RealmSync.LabelKey(Alias);
+        Assert.Equal("Company", await LabelAsync(token, realm, "en", key));
+        Assert.Equal("Công ty", await LabelAsync(token, realm, "vi", key));
+
+        await SyncAsync(realm, _secrets.Activation, State([], [Provider() with { Labels = new Dictionary<string, string> { ["en"] = "Firm", ["vi"] = "Hãng" } }]));
+
+        Assert.Equal("Firm", await LabelAsync(token, realm, "en", key));
+
+        await SyncAsync(realm, _secrets.Activation, State([], []));
+
+        Assert.Null(await LabelAsync(token, realm, "en", key));
+        Assert.Null(await LabelAsync(token, realm, "vi", key));
+    }
+
+    [Fact]
     public async Task A_wrong_activation_secret_throws_and_changes_nothing()
     {
         var realm = await NewRealmAsync();
@@ -264,6 +286,9 @@ public sealed partial class RealmSyncTests(KeycloakFixture keycloak) : IAsyncLif
         var clients = await GetJsonAsync(token, $"admin/realms/{realm}/clients?clientId={clientId}");
         return clients.GetArrayLength();
     }
+
+    private async Task<string?> LabelAsync(string token, string realm, string locale, string key) =>
+        (await GetJsonAsync(token, $"admin/realms/{realm}/localization/{locale}")).TryGetProperty(key, out var text) ? text.GetString() : null;
 
     private async Task<JsonElement> GetJsonAsync(string token, string path)
     {

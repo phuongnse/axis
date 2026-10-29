@@ -1,4 +1,5 @@
 using Axis.Configuration.Model;
+using Axis.Configuration.Resources;
 
 namespace Axis.Configuration.Realms;
 
@@ -37,7 +38,10 @@ public static class RealmPlanner
     /// <summary>
     /// Plans the realm for <paramref name="applications"/>. Only <c>oidc</c> providers are planned. Providers that name
     /// the same bindings, ignoring letter case, become one provider. Providers that name the same issuer binding
-    /// with other client bindings, or the same bindings with other claims, are conflicts.
+    /// with other client bindings, or the same bindings with other claims, are conflicts. A provider's label in each
+    /// platform locale comes from the texts of the first application that uses it, in application id order: the text
+    /// of that locale, then of the application's fallback locale, then of the first locale in ordinal order that has the
+    /// key, then the provider's name.
     /// </summary>
     public static RealmPlanResult Build(IReadOnlyList<RealmApplication> applications)
     {
@@ -135,8 +139,28 @@ public static class RealmPlanner
             first.ClientSecretBinding,
             first.ClientKeyBinding,
             ClaimsOf(first),
-            [.. group.Select(member => member.Provider.Roles.Claim).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal)]);
+            [.. group.Select(member => member.Provider.Roles.Claim).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal)],
+            Labels(group[0]));
     }
+
+    private static Dictionary<string, string> Labels(Member member)
+    {
+        var application = member.Application;
+        var provider = member.Provider;
+        var otherLocales = application.Texts.Keys.Order(StringComparer.Ordinal).ToList();
+        return PlatformLocales.All.ToDictionary(
+            locale => locale,
+            locale => provider.LabelTextKey is { } key
+                ? TextOf(application, locale, key)
+                    ?? TextOf(application, application.FallbackLocale, key)
+                    ?? otherLocales.Select(other => TextOf(application, other, key)).FirstOrDefault(text => text is not null)
+                    ?? provider.Name
+                : provider.Name,
+            StringComparer.Ordinal);
+    }
+
+    private static string? TextOf(RealmApplication application, string locale, string key) =>
+        application.Texts.TryGetValue(locale, out var texts) && texts.TryGetValue(key, out var text) ? text : null;
 
     private static RealmConflict ToConflict(RealmConflictKind kind, Member member, Member other) =>
         new(kind, member.Application.ApplicationId, member.Provider, other.Application, other.Provider);
