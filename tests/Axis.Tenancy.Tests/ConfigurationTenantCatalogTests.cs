@@ -330,6 +330,7 @@ public sealed class ConfigurationTenantCatalogTests
                 "Tenants:default:Oidc:Authority=https://idp.example.test/realms/default",
                 "Tenants:default:Realm:Name=default",
                 $"Tenants:default:Realm:ActivationClientSecret={ActivationSecret}",
+                "Tenants:default:Oidc:ClientSecret=pl4tform-cl13nt-s3cret",
             ]).Tenants);
 
         var realm = Assert.IsType<TenantRealmAccess>(entry.Realm);
@@ -337,6 +338,8 @@ public sealed class ConfigurationTenantCatalogTests
         Assert.Equal("default", realm.Name);
         Assert.Equal(ActivationSecret, realm.ActivationClientSecret.Reveal());
         Assert.DoesNotContain(ActivationSecret, entry.ToString(), StringComparison.Ordinal);
+        Assert.Equal("pl4tform-cl13nt-s3cret", realm.PlatformClientSecret!.Reveal());
+        Assert.DoesNotContain("pl4tform-cl13nt-s3cret", entry.ToString(), StringComparison.Ordinal);
     }
 
     [Fact]
