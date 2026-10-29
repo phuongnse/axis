@@ -55,8 +55,10 @@
 # is relative to the repository root. With arguments only the matching specs run, after the setup project.
 # A change is checked in minutes, and the full run stays the check.
 # AXIS_E2E_SHARD, such as 2/3, runs that shard of Playwright, so CI and NexKit's checks can split the suite
-# over several machines. A shard's Playwright results go to playwright-<n>.xml, so no two shards share a
-# file. Without it the whole suite runs.
+# over several machines. Without arguments a shard runs the specs that scripts/lib/e2e-shard.mjs gives it,
+# split by the durations in tests/e2e/spec-durations.json. With arguments Playwright's --shard splits the
+# matching tests. A shard's Playwright results go to playwright-<n>.xml, so no two shards share a file.
+# Without it the whole suite runs.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 source scripts/lib/test-results.sh
@@ -78,7 +80,17 @@ if [ -n "${AXIS_E2E_SHARD:-}" ]; then
     exit 2
   fi
   playwright_suite="playwright-${BASH_REMATCH[1]}"
-  playwright_args=("--shard=$AXIS_E2E_SHARD" ${playwright_args[@]+"${playwright_args[@]}"})
+  if [ "${#playwright_args[@]}" -eq 0 ]; then
+    # Every shard computes the same split, so a failed split stops the run rather than leave specs out.
+    shard_specs="$(node scripts/lib/e2e-shard.mjs "$AXIS_E2E_SHARD")"
+    if [ -z "$shard_specs" ]; then
+      echo "Shard $AXIS_E2E_SHARD has no spec. Use fewer shards." >&2
+      exit 2
+    fi
+    mapfile -t playwright_args <<<"$shard_specs"
+  else
+    playwright_args=("--shard=$AXIS_E2E_SHARD" "${playwright_args[@]}")
+  fi
 fi
 
 image="postgres:18-alpine"
