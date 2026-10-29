@@ -105,7 +105,7 @@ so Studio edits it, with the identity provider editor of [Studio](studio.md), an
 - **Read only by activation:** activation checks the bindings of `oidc` providers against the tenant's, and refuses
   providers that would split a person into two users, see [users](#users). It plans the realm it wants.
   Activation updates the realm, through `Axis.Admin` and the server's startup activation, see
-  [keeping the realm in step](#keeping-the-realm-in-step). The realm's sign-in page shows each `oidc` provider's `label`. A sign-in that starts on a site page reads the providers a site allows, see [sites and sign-in](#sites-and-sign-in). The callback does not check them yet. Studio's blank application creates an `accounts` provider, and New resource creates
+  [keeping the realm in step](#keeping-the-realm-in-step). The realm's sign-in page shows each `oidc` provider's `label`. A sign-in that starts on a site page reads the providers a site allows, see [sites and sign-in](#sites-and-sign-in). The callback refuses a provider that the site does not allow. Studio's blank application creates an `accounts` provider, and New resource creates
   more from an `accounts` starter. Studio edits the kind with the identity provider editor, which does not show a
   binding's value, and a site's `signIn` with a picker of the application's providers.
 
@@ -130,9 +130,13 @@ so Studio edits it, with the identity provider editor of [Studio](studio.md), an
   an ID token whose `aud`, or `azp` when present, is not the client that started the sign-in. A preview tenant, a tenant
   without realm details and a `fapi2` tenant keep the platform client `axis`, and so does a `returnUrl` that opens no
   site. The page's filter is built, see the theme below.
-- _(planned for M17)_ **The callback checks again:** the realm tells the server which provider signed the person in. The server refuses a
-  callback whose provider is not in the site's `signIn`, or whose `acr` the provider does not accept, as any refused
-  callback, see [security](security.md#sign-in-and-the-session). The realm's page is not the control.
+- **The callback checks again:** for a sign-in that started on a site, the callback rebuilds the site's allowed providers
+  from the active release, with the site path saved in the sign-in state. It reads the `identity_provider` claim of the
+  ID token, where no claim means the `accounts` provider. It refuses the token as `providerNotAllowed` when the site
+  does not allow that provider, or when the site is no longer active, see
+  [security](security.md#sign-in-and-the-session). The realm's page is not the control, and a `kc_idp_hint` does not get
+  around the check. The check runs after the token checks and before the platform sign-in check.
+  _(planned for M17)_ The callback also refuses a callback whose `acr` the provider does not accept.
 - _(planned for M17)_ **Sign-in once:** a person signed in through a provider at the realm opens another site that allows it without
   being asked again. A site that does not allow it asks the person to sign in with one it does.
 - **A host of its own:** `tenant host add <id> <host> --site <path>` gives a tenant host to one site, see

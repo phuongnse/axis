@@ -140,4 +140,51 @@ public sealed class SignInRefusalsTests
 
         Assert.Equal(SignInRefusals.InvalidState, reason);
     }
+
+    [Fact]
+    public void A_provider_the_site_does_not_allow_is_provider_not_allowed()
+    {
+        var reason = SignInRefusals.Classify(
+            stateRead: true,
+            otherTenantReadsState: false,
+            providerError: false,
+            new AuthenticationFailureException("The site does not allow the provider."),
+            tokenRejected: false,
+            issuerRejected: false,
+            providerNotAllowed: true);
+
+        Assert.Equal(SignInRefusals.ProviderNotAllowed, reason);
+    }
+
+    [Fact]
+    public void Provider_not_allowed_wins_over_provider_not_accepted()
+    {
+        var reason = SignInRefusals.Classify(
+            stateRead: true,
+            otherTenantReadsState: false,
+            providerError: false,
+            failure: null,
+            tokenRejected: false,
+            issuerRejected: false,
+            providerRefused: true,
+            providerNotAllowed: true);
+
+        Assert.Equal(SignInRefusals.ProviderNotAllowed, reason);
+    }
+
+    [Fact]
+    public void An_unreadable_state_wins_over_a_provider_not_allowed()
+    {
+        var reason = SignInRefusals.Classify(stateRead: false, otherTenantReadsState: false, providerError: false, failure: null, tokenRejected: false, issuerRejected: false, providerNotAllowed: true);
+
+        Assert.Equal(SignInRefusals.InvalidState, reason);
+    }
+
+    [Fact]
+    public void A_rejected_issuer_wins_over_a_provider_not_allowed()
+    {
+        var reason = SignInRefusals.Classify(stateRead: true, otherTenantReadsState: false, providerError: false, failure: null, tokenRejected: false, issuerRejected: true, providerNotAllowed: true);
+
+        Assert.Equal(SignInRefusals.InvalidIssuer, reason);
+    }
 }

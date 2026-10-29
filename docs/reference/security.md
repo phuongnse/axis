@@ -156,6 +156,10 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place. _(planned f
     the tenant's [platform sign-in](identity-provider.md#platform-sign-in) does
     not accept the provider that signed the person in, or does not accept
     accounts.
+  - A token that is valid, for a sign-in that started on a site, is refused with the reason `providerNotAllowed`
+    when the site's `signIn` does not allow the provider that signed the person in, or when the site is no longer
+    active. It is checked before `providerNotAccepted`. See
+    [sites and sign-in](identity-provider.md#sites-and-sign-in).
   - The callback also compares the `issuer` of the provider's metadata with the
     tenant's `Authority`, character for character, after one trailing `/` is
     removed from the `Authority`. Metadata with another issuer creates no
