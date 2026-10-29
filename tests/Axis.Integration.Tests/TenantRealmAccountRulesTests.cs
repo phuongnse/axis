@@ -19,7 +19,7 @@ public sealed partial class TenantRealmAccountRulesTests(KeycloakFixture keycloa
     private const string ClientId = "account-rules";
     private const string RedirectUri = "http://localhost/callback";
     private const string Password = "a-long-enough-password";
-    private const string InvalidCredentials = "Invalid username or password.";
+    private const string InvalidCredentials = "Invalid email, username or password.";
 
     private static readonly TenantRealmSecrets _secrets = new("platform-secret-1", "activation-secret-1", "users-secret-1");
 
@@ -175,7 +175,8 @@ public sealed partial class TenantRealmAccountRulesTests(KeycloakFixture keycloa
             lastName = "Example",
         });
         Assert.Equal(HttpStatusCode.Created, created.StatusCode);
-        Assert.Equal(HttpStatusCode.NoContent, await SetPasswordAsync(realm, created.Headers.Location!.Segments[^1], Password));
+        var userId = created.Headers.Location!.Segments[^1];
+        Assert.Equal(HttpStatusCode.NoContent, await SetPasswordAsync(realm, userId, Password));
 
         var (action, jar) = await OpenLoginPageAsync(realm);
         var (_, wrong, next, _) = await PostLoginAsync(action, jar, email, "not-the-password-1");
@@ -183,7 +184,39 @@ public sealed partial class TenantRealmAccountRulesTests(KeycloakFixture keycloa
 
         // The password step passes: Keycloak moves on to the authenticator step instead of the callback.
         var (status, html, _, location) = await PostLoginAsync(next, jar, email, Password);
-        Assert.True(status == HttpStatusCode.Found, $"{status}\n{await LoginErrorsAsync(realm)}\n{html}");
+        Assert.True(status == HttpStatusCode.Found, $"{status}\n{await LoginErrorsAsync(realm)}\n{await BruteForceStateAsync(realm, userId)}\n{html}");
+        Assert.NotNull(location);
+        Assert.False(location.AbsoluteUri.StartsWith(RedirectUri, StringComparison.Ordinal), location.AbsoluteUri);
+    }
+
+    [Fact]
+    public async Task A_quick_second_failure_does_not_lock_the_account_before_5_failures()
+    {
+        var realm = await NewRealmAsync();
+        await AddClientAsync(realm);
+        await EnableEventsAsync(realm);
+        var userId = await CreateUserAsync(realm, "pat");
+        Assert.Equal(HttpStatusCode.NoContent, await SetPasswordAsync(realm, userId, Password));
+
+        var body = await GetJsonAsync($"admin/realms/{realm}");
+        Assert.Equal(0, body.GetProperty("minimumQuickLoginWaitSeconds").GetInt32());
+        Assert.Equal(0, body.GetProperty("quickLoginCheckMilliSeconds").GetInt32());
+
+        // Widen the quick-login check to an hour, so that two failures in a row are quick logins.
+        using var widen = await SendAsync(HttpMethod.Put, $"admin/realms/{realm}", new { quickLoginCheckMilliSeconds = 3_600_000 });
+        Assert.Equal(HttpStatusCode.NoContent, widen.StatusCode);
+
+        var (action, jar) = await OpenLoginPageAsync(realm);
+        for (var attempt = 0; attempt < 2; attempt++)
+        {
+            var (_, failed, next, _) = await PostLoginAsync(action, jar, "pat", "not-the-password-1");
+            Assert.Contains(InvalidCredentials, failed, StringComparison.Ordinal);
+            action = next;
+        }
+
+        // The password step passes: Keycloak moves on to the authenticator step instead of locking the account.
+        var (status, html, _, location) = await PostLoginAsync(action, jar, "pat", Password);
+        Assert.True(status == HttpStatusCode.Found, $"{status}\n{await LoginErrorsAsync(realm)}\n{await BruteForceStateAsync(realm, userId)}\n{html}");
         Assert.NotNull(location);
         Assert.False(location.AbsoluteUri.StartsWith(RedirectUri, StringComparison.Ordinal), location.AbsoluteUri);
     }
@@ -240,6 +273,14 @@ public sealed partial class TenantRealmAccountRulesTests(KeycloakFixture keycloa
         return lines.Count == 0 ? "LOGIN_ERROR events: none" : string.Join('\n', lines);
     }
 
+    /// <summary>Tells how many sign-ins of the user failed and whether Keycloak locked the account, to explain a failed sign-in.</summary>
+    private async Task<string> BruteForceStateAsync(string realm, string userId)
+    {
+        using var response = await SendAsync(HttpMethod.Get, $"admin/realms/{realm}/attack-detection/brute-force/users/{userId}");
+        var state = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        return $"Brute-force state: {(int)response.StatusCode} {state}";
+    }
+
     private async Task<string> CreateUserAsync(string realm, string username)
     {
         using var response = await SendAsync(HttpMethod.Post, $"admin/realms/{realm}/users", new
@@ -294,8 +335,7 @@ public sealed partial class TenantRealmAccountRulesTests(KeycloakFixture keycloa
         using var response = await _http.SendAsync(request, TestContext.Current.CancellationToken);
         Remember(jar, response);
         var html = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
-        var match = FormActionPattern().Match(html);
-        return (response.StatusCode, html, match.Success ? WebUtility.HtmlDecode(match.Groups["action"].Value) : "", response.Headers.Location);
+        return (response.StatusCode, html, NextFormAction(html), response.Headers.Location);
     }
 
     private static string CookieHeader(Dictionary<string, string> jar) =>
@@ -315,12 +355,22 @@ public sealed partial class TenantRealmAccountRulesTests(KeycloakFixture keycloa
         }
     }
 
+    // The realm's login page is the Axis theme's, which holds its form address in a JSON block. Keycloak's other pages have a form element.
     private static string FormAction(string html)
     {
+        if (html.Contains("id=\"axis-sign-in-context\"", StringComparison.Ordinal))
+        {
+            return KeycloakSignIn.LoginAction(html).AbsoluteUri;
+        }
+
         var match = FormActionPattern().Match(html);
         Assert.True(match.Success, html);
         return WebUtility.HtmlDecode(match.Groups["action"].Value);
     }
+
+    /// <summary>The address the next form on the page posts to, or an empty string when the page has none.</summary>
+    private static string NextFormAction(string html) =>
+        html.Contains("id=\"axis-sign-in-context\"", StringComparison.Ordinal) || FormActionPattern().IsMatch(html) ? FormAction(html) : "";
 
     private async Task<JsonElement> GetJsonAsync(string path)
     {
