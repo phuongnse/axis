@@ -89,6 +89,9 @@ request ends `approved`:
 - `users` maps a user id to its role names. Each role must be a declared
   [`role`](roles-and-policies.md). No identity provider takes part. The runner
   gives each step the user's id and roles, as a session would.
+  _(planned for M24)_ A scenario in a module names role slots of the module
+  instead, and each becomes the role the application maps it to, see
+  [D103](../decisions/d103-modules-hold-triggers-scenarios-and-connector-slots.md).
 - `now` is a date-time with an offset. It fixes the time that expressions,
   filters, sequence numbers and task due dates read, for the whole scenario.
   Timestamps that PostgreSQL writes, such as `created_at`, keep the real clock.
