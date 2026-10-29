@@ -289,7 +289,7 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
     /// <summary>
     /// The platform sign-in of a tenant row with the rows of its providers, or <c>null</c> when none is stored: accounts
     /// off and no provider. An <c>oidc</c> provider's alias is <see cref="RealmSync.ProviderAliasPrefix"/> and the lower-case
-    /// issuer binding, as the realm names it. A <c>saml</c> provider has no alias yet. The providers are in ordinal order of name.
+    /// issuer binding, and a <c>saml</c> provider's is <see cref="RealmSync.SamlProviderAliasPrefix"/> and the lower-case metadata binding, as the realm names them. The providers are in ordinal order of name.
     /// </summary>
     internal static PlatformSignIn? PlatformSignInOf(TenantRow signIn, IEnumerable<TenantPlatformProviderRow> providers)
     {
@@ -303,7 +303,12 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
             signIn.PlatformAccounts,
             [.. rows.Select(provider => new PlatformSignInProvider(
                 provider.Name,
-                provider.Type == "oidc" && Blank(provider.IssuerBinding) is { } issuer ? RealmSync.ProviderAliasPrefix + issuer.ToLowerInvariant() : null,
+                provider.Type switch
+                {
+                    "oidc" when Blank(provider.IssuerBinding) is { } issuer => RealmSync.ProviderAliasPrefix + issuer.ToLowerInvariant(),
+                    "saml" when Blank(provider.MetadataBinding) is { } metadata => RealmSync.SamlProviderAliasPrefix + metadata.ToLowerInvariant(),
+                    _ => null,
+                },
                 Blank(provider.RolesClaim),
                 RoleValues(provider)))]);
     }

@@ -32,13 +32,15 @@ public static class RealmPlanner
 {
     private const string Accounts = "accounts";
     private const string Oidc = "oidc";
+    private const string Saml = "saml";
 
     private static readonly IdentityProviderClaimsModel _defaultClaims = new("name", "email", "locale");
 
     /// <summary>
-    /// Plans the realm for <paramref name="applications"/>. Only <c>oidc</c> providers are planned. Providers that name
-    /// the same bindings, ignoring letter case, become one provider. Providers that name the same issuer binding
-    /// with other client bindings, or the same bindings with other claims, are conflicts. The brokered providers of the
+    /// Plans the realm for <paramref name="applications"/>. Only <c>oidc</c> providers and <c>saml</c> providers with a
+    /// metadata binding are planned. Providers that name the same bindings, ignoring letter case, become one provider.
+    /// <c>oidc</c> providers that name the same issuer binding with other client bindings, and providers of either type
+    /// that name the same bindings with other claims, are conflicts. The brokered providers of the
     /// tenant's platform sign-in, <paramref name="platform"/>, join as one more member that has no sites
     /// (<see cref="RealmApplication.PlatformSignIn"/>). Their ids must be unique. A provider's label in each
     /// platform locale comes from the texts of the first application that uses it, in application id order: the text
@@ -56,7 +58,8 @@ public static class RealmPlanner
 
         var members = applications
             .SelectMany(application => application.Providers
-                .Where(provider => provider is { Type: Oidc, IssuerBinding: not null, ClientIdBinding: not null })
+                .Where(provider => provider is { Type: Oidc, IssuerBinding: not null, ClientIdBinding: not null }
+                    or { Type: Saml, MetadataBinding: not null })
                 .Select(provider => new Member(application, provider)))
             .OrderBy(member => member.Application.ApplicationId)
             .ThenBy(member => member.Provider.Id)
@@ -68,7 +71,9 @@ public static class RealmPlanner
             .ToList();
 
         var conflicts = new List<RealmConflict>();
-        foreach (var issuerGroups in groups.GroupBy(group => group[0].Provider.IssuerBinding!.ToLowerInvariant(), StringComparer.Ordinal))
+        foreach (var issuerGroups in groups
+            .Where(group => group[0].Provider.Type == Oidc)
+            .GroupBy(group => group[0].Provider.IssuerBinding!.ToLowerInvariant(), StringComparer.Ordinal))
         {
             var clashing = issuerGroups.ToList();
             foreach (var group in clashing)
@@ -103,7 +108,7 @@ public static class RealmPlanner
         var aliases = new HashSet<string>(providers.Select(provider => provider.Alias), StringComparer.Ordinal);
 
         var aliasesByProvider = groups
-            .SelectMany(group => group.Select(member => (Key: (member.Application.ApplicationId, member.Provider.Id), Alias: Alias(group[0].Provider))))
+            .SelectMany(group => group.Select(member => (Key: (member.Application.ApplicationId, member.Provider.Id), Alias: AliasOf(group[0].Provider)!)))
             .ToDictionary(entry => entry.Key, entry => entry.Alias);
 
         var sites = applications
@@ -140,14 +145,16 @@ public static class RealmPlanner
     {
         var first = group[0].Provider;
         return new RealmProvider(
-            Alias(first),
-            first.IssuerBinding!,
-            first.ClientIdBinding!,
+            AliasOf(first)!,
+            first.IssuerBinding,
+            first.ClientIdBinding,
             first.ClientSecretBinding,
             first.ClientKeyBinding,
             ClaimsOf(first),
             [.. group.Select(member => member.Provider.Roles.Claim).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal)],
-            Labels(group.FirstOrDefault(member => member.Application.ApplicationId != RealmApplication.PlatformSignInId) ?? group[0]));
+            Labels(group.FirstOrDefault(member => member.Application.ApplicationId != RealmApplication.PlatformSignInId) ?? group[0]),
+            first.Type,
+            first.MetadataBinding);
     }
 
     private static Dictionary<string, string> Labels(Member member)
@@ -172,13 +179,31 @@ public static class RealmPlanner
     private static RealmConflict ToConflict(RealmConflictKind kind, Member member, Member other) =>
         new(kind, member.Application.ApplicationId, member.Provider, other.Application, other.Provider);
 
-    private static string Alias(IdentityProviderModel provider) => "oidc-" + provider.IssuerBinding!.ToLowerInvariant();
+    /// <summary>
+    /// The realm alias of <paramref name="provider"/>: <c>oidc-</c> and the lower-case issuer binding for an <c>oidc</c> provider,
+    /// <c>saml-</c> and the lower-case metadata binding for a <c>saml</c> provider, or <see langword="null"/> for any other
+    /// provider or one without that binding.
+    /// </summary>
+    public static string? AliasOf(IdentityProviderModel provider)
+    {
+        ArgumentNullException.ThrowIfNull(provider);
+
+        return provider switch
+        {
+            { Type: Oidc, IssuerBinding: { } issuer } => "oidc-" + issuer.ToLowerInvariant(),
+            { Type: Saml, MetadataBinding: { } metadata } => "saml-" + metadata.ToLowerInvariant(),
+            _ => null,
+        };
+    }
 
     private static IdentityProviderClaimsModel ClaimsOf(IdentityProviderModel provider) => provider.Claims ?? _defaultClaims;
 
     private static string GroupKey(IdentityProviderModel provider) =>
-        string.Join(
+        provider.Type == Saml
+            ? "saml\n" + provider.MetadataBinding!.ToLowerInvariant()
+            : string.Join(
             '\n',
+            "oidc",
             provider.IssuerBinding!.ToLowerInvariant(),
             provider.ClientIdBinding!.ToLowerInvariant(),
             provider.ClientSecretBinding?.ToLowerInvariant() ?? "",

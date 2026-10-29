@@ -672,7 +672,7 @@ internal sealed class TenantRestore : IAsyncDisposable
         var byName = rows.ToDictionary(binding => binding.Name, StringComparer.OrdinalIgnoreCase);
         foreach (var provider in all.Plan.Providers)
         {
-            if (MissingBinding(byName, provider.IssuerBinding, provider.ClientIdBinding, provider.ClientSecretBinding, provider.ClientKeyBinding) is { } missing)
+            if (MissingBinding(byName, provider.Type, provider.IssuerBinding, provider.ClientIdBinding, provider.ClientSecretBinding, provider.ClientKeyBinding, provider.MetadataBinding) is { } missing)
             {
                 _error.WriteLine($"{_id} warning the identity provider '{provider.Alias}' waits for the binding '{missing}', which has no value");
             }
@@ -681,23 +681,37 @@ internal sealed class TenantRestore : IAsyncDisposable
         var plan = RealmPlanner.Build([.. applications.Select(application => application with
         {
             Providers = [.. application.Providers.Where(provider =>
-                provider.Type != "oidc"
-                || provider.IssuerBinding is null
-                || provider.ClientIdBinding is null
-                || MissingBinding(byName, provider.IssuerBinding, provider.ClientIdBinding, provider.ClientSecretBinding, provider.ClientKeyBinding) is null)],
+                MissingBinding(byName, provider.Type, provider.IssuerBinding, provider.ClientIdBinding, provider.ClientSecretBinding, provider.ClientKeyBinding, provider.MetadataBinding) is null)],
         })]).Plan;
         await ActivationRealmSync.SyncAsync(
             _http, DirectoryTenantCatalog.Realm(row, cipher), DirectoryTenantCatalog.Bindings(_id, rows, cipher), plan, _cancellationToken);
     }
 
-    // The name of the first binding of an oidc provider that has no value or the wrong kind, ignoring letter case, or null when all are set.
+    // The name of the first binding of an oidc or saml provider that has no value or the wrong kind, ignoring letter case, or null when all
+    // are set. A provider that the realm plan leaves out anyway, for lack of an issuer, a client id or a metadata binding, misses none.
     private static string? MissingBinding(
-        Dictionary<string, TenantBindingRow> bindings, string issuer, string clientId, string? clientSecret, string? clientKey)
+        Dictionary<string, TenantBindingRow> bindings,
+        string type,
+        string? issuer,
+        string? clientId,
+        string? clientSecret,
+        string? clientKey,
+        string? metadata)
     {
         bool Has(string name, string kind) =>
             bindings.TryGetValue(name, out var binding)
             && binding.Kind == kind
             && (kind == DeploymentBindingKinds.Secret ? binding.SecretValue is { Length: > 0 } : !string.IsNullOrWhiteSpace(binding.Url));
+
+        if (type == "saml")
+        {
+            return metadata is not null && !Has(metadata, DeploymentBindingKinds.Url) ? metadata : null;
+        }
+
+        if (type != "oidc" || issuer is null || clientId is null)
+        {
+            return null;
+        }
 
         if (!Has(issuer, DeploymentBindingKinds.Url))
         {

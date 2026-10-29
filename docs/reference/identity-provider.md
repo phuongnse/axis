@@ -5,7 +5,7 @@ their organization uses. [D99](../decisions/d99-axis-ships-its-own-identity-prov
 [D100](../decisions/d100-identity-providers-per-application-and-sign-in-per-site.md) lets each application declare how
 its people sign in and each site pick from that. M17 builds it, and each section says whether it is built. The
 `identityProvider` resource, a site's `signIn` and their compile checks are built, and so is the tenant's realm that
-`tenant create` makes. Activation checks the bindings of `oidc` providers and refuses providers that would split a person. Sign-in reads the
+`tenant create` makes. Activation checks the bindings of `oidc` and `saml` providers and refuses providers that would split a person. Sign-in reads the
 `roles` mapping of each provider, activation updates the realm, and a new realm has no accounts, no redirect addresses and no role mappings, so until they do, a tenant signs in through an identity provider that runs outside
 Axis when its `Oidc` block points there, as [security](security.md#sign-in-and-the-session) describes. No command points the block at another provider. Accounts, roles given by an administrator and the
 users page are in [user administration](user-administration.md).
@@ -104,10 +104,10 @@ so Studio edits it, with the identity provider editor of [Studio](studio.md), an
   - A module holds no identity provider, because it holds no bindings, so a module file of this kind is `AXC0202`.
   - A site's `signIn` entry that names no provider is `AXC0289`, see
     [sites and sign-in](#sites-and-sign-in).
-- **Read only by activation:** activation checks the bindings of `oidc` providers against the tenant's, and refuses
+- **Read only by activation:** activation checks the bindings of `oidc` and `saml` providers against the tenant's, and refuses
   providers that would split a person into two users, see [users](#users). It plans the realm it wants.
   Activation updates the realm, through `Axis.Admin` and the server's startup activation, see
-  [keeping the realm in step](#keeping-the-realm-in-step). The realm's sign-in page shows each `oidc` provider's `label`. A sign-in that starts on a site page reads the providers a site allows, see [sites and sign-in](#sites-and-sign-in). The callback refuses a provider that the site does not allow, and a token whose `acr` the provider's list does not accept. Studio's blank application creates an `accounts` provider, and New resource creates
+  [keeping the realm in step](#keeping-the-realm-in-step). The realm's sign-in page shows each `oidc` and `saml` provider's `label`. A sign-in that starts on a site page reads the providers a site allows, see [sites and sign-in](#sites-and-sign-in). The callback refuses a provider that the site does not allow, and a token whose `acr` the provider's list does not accept. Studio's blank application creates an `accounts` provider, and New resource creates
   more from an `accounts` starter. Studio edits the kind with the identity provider editor, which does not show a
   binding's value, and a site's `signIn` with a picker of the application's providers.
 
@@ -198,8 +198,8 @@ checks of the stored platform sign-in are _(planned for M17)_.
 - The sign-in callback of a platform page checks the platform sign-in. It refuses a provider that the platform sign-in
   does not accept, and an account sign-in when accounts are off. The refused callback writes `session.signInRefused`
   with the reason `providerNotAccepted`, see [sign-in and the session](security.md#sign-in-and-the-session). A provider
-  matches the `identity_provider` claim of the ID token by its alias, `oidc-` and the lower-case issuer binding. A
-  `saml` provider has no alias yet, so its sign-ins are refused. A token with no `identity_provider` claim is an
+  matches the `identity_provider` claim of the ID token by its alias: `oidc-` and the lower-case issuer binding, or
+  `saml-` and the lower-case metadata binding. A token with no `identity_provider` claim is an
   account sign-in.
 - For an accepted provider, the callback reads the values of the ID token claim `axis_roles_<roles claim>`, the user
   attribute that the realm sync writes for each roles claim. It maps each value to author, publisher, operator or
@@ -227,20 +227,23 @@ _(planned for M17)_
   so a person is one user across the tenant. Two providers that name the same issuer or metadata binding with other
   client bindings fail activation, because the same person would become two users. Two with the same bindings and
   other `claims` fail too. Both are `AXC0291`, reported before provisioning at `/issuer/binding` or `/claims` of
-  the provider that is activated, and built for `oidc` providers. Activation compares binding names ignoring letter
-  case, reads the providers of the tenant's other active releases, and gives each provider the alias `oidc-` and its
-  lower-case issuer binding. The sharing with the platform sign-in is built: its `oidc` providers join the plan as one
-  more member, so a platform provider that names the same bindings as an application's provider uses its `oidc-`
-  provider. Activation also refuses an application provider that clashes with a stored platform provider, and the
+  the provider that is activated. The client bindings rule is built for `oidc` providers. The `claims` rule is built for
+  `oidc` and `saml` providers, and `saml` providers that name the same metadata binding share one provider. Activation
+  compares binding names ignoring letter case, reads the providers of the tenant's other active releases, and gives
+  each `oidc` provider the alias `oidc-` and its lower-case issuer binding, and each `saml` provider the alias `saml-`
+  and its lower-case metadata binding. The sharing with the platform sign-in is built: its `oidc` and `saml` providers
+  join the plan as one more member, so a platform provider that names the same bindings as an application's provider
+  uses its `oidc-` or `saml-` provider. Activation also refuses an application provider that clashes with a stored platform provider, and the
   message names the platform sign-in. `tenant sign-in set` refuses a platform provider that clashes with an active
   release's provider, or with another platform provider, before it stores anything, see
   [platform sign-in](tenant-setting-commands.md#platform-sign-in).
 - **No automatic linking:** a person who signs in through two providers is two users, even when both give the same
   email. The realm never links them by email, because another provider's email is not proof of who signed in.
-  Built by the realm sync: every `oidc-` provider uses the realm's own first-login flow `axis first login`, whose only
+  Built by the realm sync: every `oidc-` and `saml-` provider uses the realm's own first-login flow `axis first login`, whose only
   step creates a new user, so the realm never shows an "account already exists, link it?" page. A brokered user's
-  username is the provider's alias, a dot and the person's subject, such as `oidc-companyissuer.<sub>`, so two providers
-  never clash on a username. The realm allows two users to share an email. Linking that the person proves on both sides
+  username is the provider's alias, a dot and the person's subject, such as `oidc-companyissuer.<sub>`, or for a `saml`
+  provider its alias, a dot and the NameID, such as `saml-agencymetadata.<NameID>`, so two providers never clash on a
+  username. The realm allows two users to share an email. Linking that the person proves on both sides
   comes later.
 - **Roles:** at sign-in the session gets, for each active application, the roles that the provider's `roles` mapping
   gives, kept by application id. This is built. A provider matches when its alias equals the sign-in's `identity_provider`
@@ -270,13 +273,21 @@ _(planned for M17)_
 - _(planned for M17)_ **Kept in step later:** `tenant host add`, `remove` and `move` do not change the realm yet, so the
   platform client has no redirect addresses until a later part of M17 adds them.
 - **Realm sync:** the realm sync is built. It signs in to the realm as `axis-activation` and makes the realm's
-  `site-<path>` clients and `oidc-` providers match a desired state. Each site client puts the alias of the provider that
+  `site-<path>` clients and `oidc-` and `saml-` providers match a desired state. Each site client puts the alias of the provider that
   signed the person in into its ID token as the `identity_provider` claim, and each provider gets claim mappers for the
   display name, the email, the locale and each roles claim, and a `username` mapper that names a new user
   `<provider alias>.<subject>`. Each provider also gets an `acr` mapper (`oidc-user-session-note-idp-mapper`) that copies the
   upstream `acr` claim into the person's realm session, and each site client an `identity provider acr` mapper that puts
   that session value into its ID token as the `identity_provider_acr` claim. Each provider names the realm's first-login flow. It touches no other client or
-  provider, so `axis`, `axis-activation`, `axis-users` and anything an operator added stay. A site client that the sync
+  provider, so `axis`, `axis-activation`, `axis-users` and anything an operator added stay. A `saml-` provider is
+  imported from its metadata: the sync reads the metadata from the `metadata` binding's address before it changes the
+  realm, and uploads it to Keycloak's import-config endpoint, so an unreachable address changes nothing. The provider
+  asks for a persistent NameID, takes the person's subject from it, and signs its requests with the realm's own key
+  (RSA-SHA256). It gets mappers for the display name, the email, the locale and each roles claim, which read SAML
+  attributes of those names, and a `username` mapper that names a new user `<provider alias>.<NameID>`. It gets no `acr`
+  mapper, so a site sign-in through a `saml` provider whose `acr` list is not empty is refused. The realm publishes
+  the provider's own metadata at `/realms/<realm>/broker/<alias>/endpoint/descriptor`, and the organization
+  registers that address with its provider. A site client that the sync
   creates or updates copies the client authentication and the PAR, PKCE, DPoP and key settings of `axis`, so activation
   never undoes what `tenant oidc set` wrote. It also gives that site client every protocol mapper of `axis`, matched by
   name with the same type and config, so a sign-in through it carries the same claims. The `identity provider` and
@@ -299,8 +310,7 @@ _(planned for M17)_
   locale, then the text of the application's fallback locale, then the first locale in ordinal order that has the key,
   then the provider's name. An application has no fallback locale of its own, so it takes the one of its first site in
   path order, or `en` when it has no site. When several applications share a provider, the label comes from the
-  application with the lowest application id. Labels of `saml` providers are not written, because the plan holds no
-  `saml` provider yet. A tenant created before `manage-realm` was granted needs `tenant create` again, or activation
+  application with the lowest application id. A tenant created before `manage-realm` was granted needs `tenant create` again, or activation
   fails at the label step with a 403.
 - **Brought in step by activation:** activating a release adds, changes and removes the realm's brokered providers,
   their claim mappers and the site clients to match the active releases of the tenant and its platform sign-in. The
@@ -319,7 +329,7 @@ _(planned for M17)_
   set the bindings, see [tenant restore](administration.md#tenant-restore).
 - **Bindings:** a missing binding, or a binding of the wrong kind, fails activation, as for a connector (`AXC0100`).
   Built for `oidc` providers: `issuer` is a `url` binding, and `clientId`, `clientSecret` and `clientKey` are `secret`
-  bindings. On a preview tenant activation leaves the provider out with a warning, see
+  bindings. Built for `saml` providers: `metadata` is a `url` binding, reported at `/metadata/binding`. On a preview tenant activation leaves the provider out with a warning, see
   [preview tenants](#preview-tenants).
 - **Profile:** built for `tenant oidc set`, which takes `--profile`, `--client-key` and `--retire-client-key`. When the
   tenant has realm details, the command updates the realm's `axis` client and every `site-` client before it saves the

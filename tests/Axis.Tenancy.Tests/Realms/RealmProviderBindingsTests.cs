@@ -36,9 +36,29 @@ public sealed class RealmProviderBindingsTests
     }
 
     [Fact]
-    public void A_provider_that_is_not_oidc_misses_none()
+    public void A_provider_that_is_neither_oidc_nor_saml_misses_none()
     {
-        Assert.Null(RealmProviderBindings.Missing(Provider("Absent", "Absent", "Absent") with { Type = "saml" }, Bindings()));
+        Assert.Null(RealmProviderBindings.Missing(Provider("Absent", "Absent", "Absent") with { Type = "accounts" }, Bindings()));
+    }
+
+    [Fact]
+    public void A_saml_provider_misses_its_metadata_binding_unless_it_is_a_url_binding_with_a_value()
+    {
+        var saml = Provider("Absent", "Absent", "Absent") with { Type = "saml", IssuerBinding = null, ClientIdBinding = null, ClientSecretBinding = null, MetadataBinding = "Federation" };
+
+        Assert.Equal("Federation", RealmProviderBindings.Missing(saml, Bindings()));
+        Assert.Equal("Federation", RealmProviderBindings.Missing(saml, new Dictionary<string, TenantBinding>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Federation"] = new("secret", null, new SecretValue("s")),
+        }));
+        Assert.Equal("Federation", RealmProviderBindings.Missing(saml, new Dictionary<string, TenantBinding>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Federation"] = new("url", " ", null),
+        }));
+        Assert.Null(RealmProviderBindings.Missing(saml, new Dictionary<string, TenantBinding>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["Federation"] = new("url", "https://idp.example/metadata", null),
+        }));
     }
 
     private static Dictionary<string, TenantBinding> Bindings() =>

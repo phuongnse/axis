@@ -94,11 +94,61 @@ public sealed class RealmPlannerTests
     }
 
     [Fact]
-    public void Accounts_and_saml_providers_are_not_planned()
+    public void Accounts_and_saml_providers_without_a_metadata_binding_are_not_planned()
     {
         var result = RealmPlanner.Build([Application("Sales", Provider("accounts", "accounts"), Provider("saml", "saml"))]);
 
         Assert.Empty(result.Plan.Providers);
+        Assert.Empty(result.Conflicts);
+    }
+
+    [Fact]
+    public void Saml_providers_that_name_the_same_metadata_binding_in_other_letter_case_share_one_provider()
+    {
+        var result = RealmPlanner.Build([
+            Application("Sales", Saml("Metadata")),
+            Application("Support", Saml("METADATA", name: "partner")),
+        ]);
+
+        var provider = Assert.Single(result.Plan.Providers);
+        Assert.Equal("saml-metadata", provider.Alias);
+        Assert.Equal("saml", provider.Type);
+        Assert.Equal("metadata", provider.MetadataBinding, ignoreCase: true);
+        Assert.Null(provider.IssuerBinding);
+        Assert.Null(provider.ClientIdBinding);
+        Assert.Empty(result.Conflicts);
+        Assert.All(result.Plan.Sites, site => Assert.Equal(["saml-metadata"], site.Providers));
+    }
+
+    [Fact]
+    public void Saml_providers_that_name_the_same_metadata_binding_with_other_claims_conflict()
+    {
+        var result = RealmPlanner.Build([
+            Application("Sales", Saml("Metadata")),
+            Application("Support", Saml("Metadata", claims: new IdentityProviderClaimsModel("cn", "mail", "lang"))),
+        ]);
+
+        Assert.NotEmpty(result.Conflicts);
+        Assert.All(result.Conflicts, conflict => Assert.Equal(RealmConflictKind.Claims, conflict.Kind));
+    }
+
+    [Fact]
+    public void A_platform_saml_provider_shares_one_provider_with_an_application_saml_provider()
+    {
+        var result = RealmPlanner.Build([Application("Sales", Saml("Metadata"))], [Saml("METADATA", name: "platform", rolesClaim: "groups")]);
+
+        var provider = Assert.Single(result.Plan.Providers);
+        Assert.Equal("saml-metadata", provider.Alias);
+        Assert.Equal(["groups", "roles"], provider.RolesClaims);
+        Assert.Empty(result.Conflicts);
+    }
+
+    [Fact]
+    public void A_saml_provider_and_an_oidc_provider_with_the_same_binding_name_do_not_share()
+    {
+        var result = RealmPlanner.Build([Application("Sales", Saml("Same"), Oidc("Same", "Client", "Secret", name: "other"))]);
+
+        Assert.Equal(["oidc-same", "saml-same"], result.Plan.Providers.Select(provider => provider.Alias));
         Assert.Empty(result.Conflicts);
     }
 
@@ -262,6 +312,15 @@ public sealed class RealmPlannerTests
             Type = type,
             Roles = new IdentityProviderRolesModel("roles", new Dictionary<string, string>()),
             Acr = [],
+        };
+
+    private static IdentityProviderModel Saml(
+        string metadata, string name = "agency", string rolesClaim = "roles", IdentityProviderClaimsModel? claims = null) =>
+        Provider(name, "saml") with
+        {
+            MetadataBinding = metadata,
+            Claims = claims ?? _claims,
+            Roles = new IdentityProviderRolesModel(rolesClaim, new Dictionary<string, string>()),
         };
 
     private static IdentityProviderModel Oidc(

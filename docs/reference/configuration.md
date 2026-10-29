@@ -804,8 +804,8 @@ flowchart LR
      for every site whose path another application holds, and changes
      nothing. It then checks the deployment bindings of every connector, and
      of every package operation that a process step uses, against the tenant's,
-     and the bindings of every `oidc` identity provider (`issuer` as `url`;
-     `clientId`, `clientSecret` and `clientKey` as `secret`).
+     and the bindings of every identity provider (`oidc`: `issuer` as `url`,
+     `clientId`, `clientSecret` and `clientKey` as `secret`; `saml`: `metadata` as `url`).
      It returns one `AXC0100` for every binding the tenant lacks or holds with
      another kind, and outside Development one `AXC0101` for every base URL
      binding or package `url` binding that is not `https`, and changes

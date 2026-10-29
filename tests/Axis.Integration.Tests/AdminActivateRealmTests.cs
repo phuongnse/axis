@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
+using System.Xml.Linq;
 using Axis.Configuration.Tests;
 using Axis.Tenancy.Platform;
 using Microsoft.EntityFrameworkCore;
@@ -12,7 +13,7 @@ namespace Axis.Integration.Tests;
 
 /// <summary>
 /// <c>activate</c> on a real Keycloak: after the activation commits, the tenant's realm gets one <c>site-</c> client for each
-/// site and one <c>oidc-</c> provider for each issuer binding of the tenant's applications and of its platform sign-in. A refused
+/// site and one <c>oidc-</c> provider for each issuer binding and one <c>saml-</c> provider for each metadata binding of the tenant's applications and of its platform sign-in. A refused
 /// activation, a preview tenant and a realm failure each leave the realm as it was. <c>tenant sign-in set</c> shares a provider with
 /// the applications that name the same bindings, refuses one that would split a person, and activation keeps a provider that only the
 /// platform sign-in names.
@@ -22,6 +23,7 @@ public sealed partial class AdminActivateRealmTests(KeycloakFixture keycloak, Po
     private const string Issuer = "Issuer";
     private const string Client = "Client";
     private const string Secret = "Secret";
+    private const string Metadata = "Metadata";
 
     private static readonly string[] _mapperNames = ["acr", "display name", "email", "locale", "username"];
 
@@ -62,6 +64,50 @@ public sealed partial class AdminActivateRealmTests(KeycloakFixture keycloak, Po
         var mappers = await MapperNamesAsync(id, "oidc-issuer");
         Assert.All(_mapperNames, name => Assert.Contains(name, mappers));
         await scenario.AssertNoSecretsAsync();
+    }
+
+    [Fact]
+    public async Task Activate_gives_the_realm_a_saml_provider_that_signs_its_requests_and_has_the_saml_mappers()
+    {
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        var id = await CreateTenantWithBindingsAsync(scenario);
+        await SetMetadataBindingAsync(scenario, id);
+        using var folder = Folder(new Application(), ["sales"], provider: false, samlMetadataBinding: Metadata);
+
+        var result = await ActivateAsync(scenario, folder, id);
+
+        Assert.Equal(0, result.Exit);
+        Assert.Equal(["saml-metadata"], await ProviderAliasesAsync(id));
+        var provider = await GetAsync(id, "identity-provider/instances/saml-metadata");
+        Assert.Equal("saml", provider.GetProperty("providerId").GetString());
+        Assert.Equal("true", provider.GetProperty("config").GetProperty("wantAuthnRequestsSigned").GetString());
+        Assert.Equal("${axisProvider.saml-metadata}", provider.GetProperty("displayName").GetString());
+        var mappers = await MapperNamesAsync(id, "saml-metadata");
+        Assert.Equal(["display name", "email", "locale", "roles groups", "username"], mappers.Order(StringComparer.Ordinal));
+        var site = (await GetAsync(id, "clients?clientId=site-sales")).EnumerateArray().Single();
+        Assert.Equal("saml-metadata", site.GetProperty("attributes").GetProperty("axis.providers").GetString());
+        await scenario.AssertNoSecretsAsync();
+    }
+
+    [Fact]
+    public async Task The_realm_publishes_the_metadata_of_a_saml_provider_with_signed_requests_and_a_signing_key()
+    {
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        var id = await CreateTenantWithBindingsAsync(scenario);
+        await SetMetadataBindingAsync(scenario, id);
+        using var folder = Folder(new Application(), ["sales"], provider: false, samlMetadataBinding: Metadata);
+        Assert.Equal(0, (await ActivateAsync(scenario, folder, id)).Exit);
+
+        using var http = new HttpClient(_handler, disposeHandler: false);
+        using var response = await http.GetAsync(new Uri(_baseAddress, $"realms/{id}/broker/saml-metadata/endpoint/descriptor"), CancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var document = XDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
+        var descriptor = document.Descendants().Single(element => element.Name.LocalName == "SPSSODescriptor");
+        Assert.Equal("true", descriptor.Attribute("AuthnRequestsSigned")?.Value);
+        var signing = descriptor.Elements().Single(element => element.Name.LocalName == "KeyDescriptor" && element.Attribute("use")?.Value == "signing");
+        var certificate = signing.Descendants().Single(element => element.Name.LocalName == "X509Certificate");
+        Assert.False(string.IsNullOrWhiteSpace(certificate.Value));
     }
 
     [Fact]
@@ -263,6 +309,13 @@ public sealed partial class AdminActivateRealmTests(KeycloakFixture keycloak, Po
     }
 
     // The issuer is the master realm, which serves a discovery document. An http issuer is allowed for a provider.
+    // The metadata is the SAML descriptor of the master realm, which Keycloak serves for every realm.
+    private async Task SetMetadataBindingAsync(AdminScenario scenario, string id)
+    {
+        var metadata = new Uri(_baseAddress, "realms/master/protocol/saml/descriptor").AbsoluteUri;
+        Assert.Equal(0, (await scenario.RunAsync(["tenant", "binding", "set", id, Metadata, "--url", metadata], extra: AdminScenario.Directory)).Exit);
+    }
+
     private async Task SetBindingsAsync(AdminScenario scenario, string id, string prefix)
     {
         if (prefix.Length == 0)
@@ -283,7 +336,8 @@ public sealed partial class AdminActivateRealmTests(KeycloakFixture keycloak, Po
         scenario.RunAsync(["activate", folder.Path, "--tenant", id], identityProvider: _handler);
 
     internal static TemporaryFolder Folder(
-        Application application, string[] sitePaths, bool provider, string clientBinding = Client, string secretBinding = Secret, bool vietnamese = false)
+        Application application, string[] sitePaths, bool provider, string clientBinding = Client, string secretBinding = Secret, bool vietnamese = false,
+        string? samlMetadataBinding = null)
     {
         var available = vietnamese ? """["en", "vi"]""" : """["en"]""";
         var folder = new TemporaryFolder()
@@ -315,6 +369,15 @@ public sealed partial class AdminActivateRealmTests(KeycloakFixture keycloak, Po
                 { "id": "{{application.SiteId(index)}}", "kind": "site", "name": "Site{{index}}", "formatVersion": 1, "path": "{{sitePaths[index]}}",
                   "title": { "textKey": "site.title" }, "locales": { "default": "en", "fallback": "en", "available": {{available}} },
                   "navigation": [ { "page": "Orders", "label": { "textKey": "nav.orders" } } ] }
+                """);
+        }
+
+        if (samlMetadataBinding is not null)
+        {
+            folder.With("identity-providers/agency.json", $$"""
+                { "id": "{{application.SamlProviderId}}", "kind": "identityProvider", "name": "agency", "formatVersion": 1, "type": "saml",
+                  "label": { "textKey": "provider.company" }, "metadata": { "binding": "{{samlMetadataBinding}}" },
+                  "roles": { "claim": "groups", "values": {} } }
                 """);
         }
 
@@ -419,7 +482,7 @@ public sealed partial class AdminActivateRealmTests(KeycloakFixture keycloak, Po
     private async Task<string[]> ProviderAliasesAsync(string realm)
     {
         var providers = await GetAsync(realm, "identity-provider/instances");
-        return [.. providers.EnumerateArray().Select(provider => provider.GetProperty("alias").GetString()!).Where(alias => alias.StartsWith("oidc-", StringComparison.Ordinal)).Order(StringComparer.Ordinal)];
+        return [.. providers.EnumerateArray().Select(provider => provider.GetProperty("alias").GetString()!).Where(alias => alias.StartsWith("oidc-", StringComparison.Ordinal) || alias.StartsWith("saml-", StringComparison.Ordinal)).Order(StringComparer.Ordinal)];
     }
 
     private async Task<string[]> MapperNamesAsync(string realm, string alias)
@@ -476,6 +539,8 @@ public sealed partial class AdminActivateRealmTests(KeycloakFixture keycloak, Po
         public Guid AccountsId { get; } = Guid.NewGuid();
 
         public Guid ProviderId { get; } = Guid.NewGuid();
+
+        public Guid SamlProviderId { get; } = Guid.NewGuid();
 
         private readonly Guid[] _siteIds = [Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid()];
 
