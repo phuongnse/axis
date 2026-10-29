@@ -222,6 +222,19 @@
       "serviceAccountsEnabled": true
     },
     {
+      "clientId": "axis-users",
+      "name": "Axis users",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "axis-users-development-secret",
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "implicitFlowEnabled": false,
+      "serviceAccountsEnabled": true
+    },
+    {
       "clientId": "axis-fapi",
       "name": "Axis FAPI 2.0",
       "enabled": true,
@@ -672,6 +685,18 @@
           "manage-clients",
           "view-clients",
           "query-clients"
+        ]
+      }
+    },
+    {
+      "id": "axis-users",
+      "username": "service-account-axis-users",
+      "enabled": true,
+      "serviceAccountClientId": "axis-users",
+      "clientRoles": {
+        "realm-management": [
+          "view-users",
+          "query-users"
         ]
       }
     },

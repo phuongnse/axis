@@ -28,6 +28,11 @@ public sealed class KeycloakFixture : IAsyncDisposable
     public const string ActivationClientId = "axis-activation";
 
     public const string ActivationClientSecret = "axis-activation-development-secret";
+
+    /// <summary>The client that the users list signs in as, to read the realm's users.</summary>
+    public const string UsersClientId = "axis-users";
+
+    public const string UsersClientSecret = "axis-users-development-secret";
     public const string PurchasingClientId = "purchasing-system";
     public const string PurchasingClientSecret = "purchasing-system-development-secret";
     public const string ReportingClientId = "reporting-system";

@@ -32,4 +32,28 @@ public static class TenantRealmAddress
         };
         return builder.Uri;
     }
+
+    /// <summary>
+    /// The identity provider's address and the realm's name when <paramref name="authority"/> is an absolute http or
+    /// https address whose path ends in <c>/realms/</c> and a realm name, with at most one trailing slash. Otherwise
+    /// <c>null</c>.
+    /// </summary>
+    public static (Uri BaseAddress, string Realm)? Split(string? authority)
+    {
+        if (string.IsNullOrWhiteSpace(authority)
+            || !Uri.TryCreate(authority.Trim(), UriKind.Absolute, out var uri)
+            || uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps)
+        {
+            return null;
+        }
+
+        var segments = uri.AbsolutePath.TrimEnd('/').Split('/');
+        if (segments.Length < 3 || segments[^2] != "realms" || segments[^1].Length == 0)
+        {
+            return null;
+        }
+
+        var realm = Uri.UnescapeDataString(segments[^1]);
+        return BaseOf(authority, realm) is { } baseAddress ? (baseAddress, realm) : null;
+    }
 }
