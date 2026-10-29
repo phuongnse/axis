@@ -2,9 +2,10 @@
 # The load test, first two parts: builds the three production images, writes the generated application of typical size
 # (tests/Axis.LoadData, seed 1) into its run folder, starts the reference stack of deploy/compose/compose.yaml (two
 # server replicas behind the TLS proxy, one worker, PostgreSQL over TLS), migrates and creates the tenant `load`. It then
-# prepares the realm `load` with 50 users (scripts/lib/load-realm.mjs, which writes artifacts/load/k6/users.json for
-# k6), activates the application in the tenant, which writes the seed records, and runs the placeholder k6 scenario in
-# tests/load through the proxy. Removes the stack at the end, unless --keep is given. Arguments after -- go to k6. The exit code is k6's.
+# prepares the realm `load` with 50 users and a machine caller (scripts/lib/load-realm.mjs, which writes
+# artifacts/load/k6/users.json and caller.json for k6), sets the tenant to accept the caller's tokens, activates the
+# application in the tenant, which writes the seed records, and runs the placeholder k6 scenario in tests/load through
+# the proxy. Removes the stack at the end, unless --keep is given. Arguments after -- go to k6. The exit code is k6's.
 # The files of the run, with the certificates and secret files, are in artifacts/load. See docs/reference/performance.md.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -127,6 +128,8 @@ wait_for 60 "The host $tenant_host" tenant_routed
 
 # The realm comes before the activation, which copies the redirect addresses and mappers of the client to the site's.
 node scripts/lib/load-realm.mjs "$folder" "$AXIS_HTTPS_PORT" "$seed"
+# The tenant accepts the tokens of the machine caller, whose audience is axis-load-endpoints.
+compose --profile admin run --rm --no-TTY admin tenant oidc set load --endpoint-audience axis-load-endpoints
 compose --profile admin run --rm --no-TTY admin activate /apps/load --tenant load
 
 set +e

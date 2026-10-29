@@ -29,6 +29,7 @@ public static class LoadDataGenerator
     private static readonly string[] _editActions = ["read", "create", "update", "delete"];
     private static readonly string[] _readActions = ["read"];
     private static readonly string[] _startActions = ["start"];
+    private static readonly string[] _invokeActions = ["invoke"];
 
     private static readonly string[] _words =
     [
@@ -75,6 +76,7 @@ public static class LoadDataGenerator
             WriteRoles();
             WritePolicies();
             WriteProcesses();
+            WriteEndpoints();
             WritePages();
             WriteSite();
             WriteSeeds();
@@ -225,7 +227,7 @@ public static class LoadDataGenerator
 
         private void WriteRoles()
         {
-            foreach (var role in new[] { "clerk", "reviewer", "auditor" })
+            foreach (var role in new[] { "clerk", "reviewer", "auditor", "load-caller" })
             {
                 WriteFile($"roles/{role}.json", new
                 {
@@ -259,6 +261,9 @@ public static class LoadDataGenerator
                 grants.AddRange(dataSources.Select(dataSource => new { dataSource, actions = _readActions }));
                 WritePolicy($"{role}-access", $"{char.ToUpperInvariant(role[0])}{role[1..]}Access", role, grants);
             }
+
+            // The machine caller of the inbound endpoint. It holds no other grant.
+            WritePolicy("load-caller-access", "LoadCallerAccess", "load-caller", [new { endpoint = "CreateEntity00", actions = _invokeActions }]);
         }
 
         private void WritePolicy(string file, string name, string role, List<object> grants) =>
@@ -283,6 +288,24 @@ public static class LoadDataGenerator
                 }
             }
         }
+
+        /// <summary>The inbound endpoint that creates an Entity00 record and starts its first process without waiting.</summary>
+        private void WriteEndpoints() =>
+            WriteFile("endpoints/create-entity-00.json", new
+            {
+                id = NewId(),
+                kind = "endpoint",
+                name = "CreateEntity00",
+                formatVersion = 1,
+                entity = EntityName(0),
+                process = ProcessName(0, 1),
+                input = new object[]
+                {
+                    new { name = "name", type = "text", required = true, maxLength = 100 },
+                    new { name = "quantity", type = "integer", required = true },
+                },
+                values = new { name = "name", quantity = "quantity" },
+            });
 
         private List<object> ReviewSteps(int index) =>
         [

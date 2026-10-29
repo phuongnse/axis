@@ -76,11 +76,18 @@ to find its own numbers.
   `dotnet run --project tests/Axis.LoadData -- <folder> [--seed <n>]`. It writes 100 seed records
   for each of its 40 entities and refuses a folder that already holds files. `scripts/load.sh`
   writes the application with seed 1 into its run folder and activates it in the tenant `load`,
-  which stores the release and writes the seed records.
+  which stores the release and writes the seed records. The application also declares the inbound
+  endpoint `CreateEntity00`, which creates an `Entity00` record from the inputs `name` and
+  `quantity` and starts `Entity00Process01` on it without `wait`, and the role `load-caller`, whose
+  policy grants `invoke` on that endpoint.
 - **Users.** _(Built.)_ `scripts/load.sh` adds the users `load-user-01` to `load-user-50` to the
   realm of the tenant `load`, each with a password, an authenticator whose secret comes from the
-  seed and the application's roles. It writes their names, passwords and secrets to a file that k6
-  reads. _(Planned for M18.)_ Each virtual user signs in once through the tenant's realm sign-in
+  seed and the application's roles, except `load-caller`. It writes their names, passwords and
+  secrets to a file that k6 reads. It also adds the machine caller, a confidential client
+  `load-caller` whose service account holds the role `load-caller` and whose tokens carry the
+  audience `axis-load-endpoints`. It writes the client id and secret to `caller.json`, next to the
+  users file, and runs `admin tenant oidc set load --endpoint-audience axis-load-endpoints` so that
+  the tenant accepts those tokens. _(Planned for M18.)_ Each virtual user signs in once through the tenant's realm sign-in
   page and keeps its session cookie for the whole run. The test authentication scheme is not used,
   because only test hosts register it.
 - **Output.** It prints each objective with its measured value and exits non-zero when one is
