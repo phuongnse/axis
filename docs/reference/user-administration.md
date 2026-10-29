@@ -4,12 +4,12 @@ Detailed reference for the accounts of [Axis's identity provider](identity-provi
 administrator gives, and the users page where both are managed.
 [D100](../decisions/d100-identity-providers-per-application-and-sign-in-per-site.md) agrees it. M17 builds it, so
 what is not built yet is marked _(planned for M17)_. The account rules are built: every realm that `tenant create` makes
-holds them. The invitations, the users page and the roles are not built yet. The conventions of [architecture.md](../architecture.md)
+holds them. The users page's list is built. The invitations, a user's details, the commands and the roles are not built yet. The conventions of [architecture.md](../architecture.md)
 apply.
 
 ## The administrator role
 
-The setting and the shell entry are built. The users page is _(planned for M17)_.
+The setting, the shell entry and the users page's list are built.
 
 - **An installation-level role,** not a `role` resource, like the author and the operator roles. The setting
   `Users:AdministratorRole` names the roles claim value, see [users settings](host-settings.md#users-settings). With no
@@ -23,7 +23,7 @@ The setting and the shell entry are built. The users page is _(planned for M17)_
 
 ## The users page
 
-The server's list route is built. The page itself is _(planned for M17)_.
+The server's list route and the page's list are built. A user's details and the commands are _(planned for M17)_.
 
 - **The list route:** `GET /api/users?search=&page=&pageSize=` answers `{ items, totalCount }` for the tenant's realm to an
   administrator. `page` starts at 1 and defaults to 1. `pageSize` is 1 to 50 and defaults to 50. A value outside these
@@ -36,8 +36,9 @@ The server's list route is built. The page itself is _(planned for M17)_.
   signs in through an outside identity provider. When the identity provider fails, it answers `502` with a fixed
   title. The server's log names the step and the status code, never a body or a secret.
 - **The list:** every user of the tenant, the people who have signed in and the accounts that are invited. Each row
-  has the display name, the email, how the person signs in (the provider's label, or "Account"), the status
-  (`invited`, `active` or `disabled`) and the last sign-in. It searches by name or email, and pages.
+  has the display name, the email, how the person signs in (the provider's alias as the route sends it, or "Account"), the status
+  (`invited`, `active` or `disabled`) and the last sign-in. It searches by name or email, and pages. The page asks the
+  route for 20 users at a time. A search starts on Enter or on the search button and goes back to page 1.
 - **A user:** opening a row shows the person's roles, for each application and for the platform, and the commands
   below. A field marked `sensitive` and record data are never shown.
 - **Commands:** invite, resend an invitation, disable, enable, reset an account's authenticator, give a role and remove

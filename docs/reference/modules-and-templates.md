@@ -380,5 +380,5 @@ Every resource gets a new UUID `id`. The site JSON is:
 ```
 
 A `name` whose kebab-case form is longer than 60 characters, or is a reserved
-site path (`api`, `health`, `assets`, `studio`, `account`), is refused with `400`, so a
+site path (`api`, `health`, `assets`, `studio`, `account`, `users`), is refused with `400`, so a
 blank application cannot fail with `AXC0024` or a schema error.

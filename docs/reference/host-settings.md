@@ -217,8 +217,8 @@ _(planned for M23)_ One server setting controls the
 ## Users settings
 
 One server setting controls the [users page](user-administration.md), as
-[D100](../decisions/d100-identity-providers-per-application-and-sign-in-per-site.md) agrees. The setting and the shell
-entry are built. The users page itself is _(planned for M17)_.
+[D100](../decisions/d100-identity-providers-per-application-and-sign-in-per-site.md) agrees. The setting, the shell
+entry and the users page's list are built.
 
 - **`Users:AdministratorRole`.** A roles claim value, such as `tenant-administrator`. The environment variable is
   `Users__AdministratorRole`. Only a signed-in user who holds the value, from the

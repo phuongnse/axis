@@ -250,7 +250,7 @@ adds the `agent` user and two `service-desk-lead` users and gives an employee th
 at `/service-desk`. The asset management sample, `samples/apps/asset-management`, adds the `asset-manager` and `auditor` users
 and uses the `employee` user as the holder of assets, in a site at `/asset-management`.
 The request-approval template journey, `tests/e2e/specs/request-approval-journey.spec.ts`,
-adds the `approver` user. The `administrator` user holds the `tenant-administrator` role, so it sees "Users" in the shell, and the E2E shell journey uses it. The [users page](reference/user-administration.md) it links to is _(planned for M17)_. The `author` role lets the authoring API list and read the resources of every sample under
+adds the `approver` user. The `administrator` user holds the `tenant-administrator` role, so it sees "Users" in the shell, and the E2E shell journey uses it. The [users page](reference/user-administration.md) it links to lists the development users, and the E2E users page journey uses it. The `author` role lets the authoring API list and read the resources of every sample under
 `samples/apps/` under `scripts/dev.sh`, and opens the Studio page at http://localhost:5173/studio.
 Each sample declares one `accounts` identity provider in `identity-providers/accounts.json`, because a site needs one. Sign-in does not read it yet.
 Studio saves into those committed folders, so `git checkout -- samples/apps` reverts an edit.
