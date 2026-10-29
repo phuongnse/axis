@@ -18,8 +18,15 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const docsAndSettings = ['docs/', /\.md$/, '.github/', '.nexkit/']
 
 // A safe list names only paths that its suite never reads, so a change to them cannot change the result.
+// The integration tests read no SPA file, except the Keycloak login theme that scripts/integration.sh
+// builds from web/keycloak-theme/ with the Vite configs: they read its sign-in page. The `unaffected_by`
+// lists in .nexkit/config.json name the same paths, which scripts/affected.test.mjs checks.
 export const safeSuites = {
-  integration: [...docsAndSettings, 'tests/e2e/', /^web\/(?!package(-lock)?\.json$)/],
+  integration: [
+    ...docsAndSettings,
+    'tests/e2e/',
+    /^web\/(?!package(-lock)?\.json$|keycloak-theme\/|vite(\.keycloak-theme)?\.config\.ts$)/,
+  ],
   playwright: docsAndSettings,
   'dev-script': docsAndSettings,
   compose: docsAndSettings,
@@ -27,10 +34,12 @@ export const safeSuites = {
   onprem: docsAndSettings,
 }
 
-// NexKit's commits, in the order a check prefers them: the head on which this check last passed,
-// the head of the last round whose checks all passed, and the merge base with the base branch. None
-// is set outside NexKit, so CI and local runs run every suite.
-export const sinceVariables = ['NEXKIT_CHECK_VERIFIED_SHA', 'NEXKIT_VERIFIED_SHA', 'NEXKIT_BASE_SHA']
+// NexKit's commits, in the order a check prefers them: the head on which this check last passed with
+// its current command, then the merge base with the base branch. NEXKIT_VERIFIED_SHA, the head of the
+// last round whose checks all passed, is never used: NexKit does not record which checks or commands
+// that round ran, so a check added or changed since would skip without ever having passed. None is
+// set outside NexKit, so CI and local runs run every suite.
+export const sinceVariables = ['NEXKIT_CHECK_VERIFIED_SHA', 'NEXKIT_BASE_SHA']
 
 /** The first of sinceVariables that env sets, as { name, sha }, or undefined. */
 export function sinceCommit(env) {

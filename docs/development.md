@@ -99,12 +99,18 @@ that adds a source changes this section too.
 ## Test runs and reports
 
 The test, integration and E2E scripts run every suite even when one fails. The exceptions are
-the suites that no change since NexKit's commit can affect. The commit is the first that NexKit sets
-of `NEXKIT_CHECK_VERIFIED_SHA`, the head on which that check last passed, also in a round that NexKit
-stopped or whose other checks failed; `NEXKIT_VERIFIED_SHA`, the head of the last round whose checks
-all passed; and `NEXKIT_BASE_SHA`, the merge base with `main`. The integration tests and
-their scenarios use their safe list. Playwright and the smoke tests use the smaller list of `docs/`,
-Markdown files, the GitHub workflows in `.github/` and NexKit's settings in `.nexkit/`. Under NexKit, a
+the suites that no change since NexKit's commit can affect. The commit is
+`NEXKIT_CHECK_VERIFIED_SHA`, the head on which that check last passed with its current command, also in
+a round that NexKit stopped or whose other checks failed, else `NEXKIT_BASE_SHA`, the merge base with
+`main`. `NEXKIT_VERIFIED_SHA`, the head of the last round whose checks all passed, is never used: NexKit
+does not record which checks or commands that round ran, so a check added or changed since would skip
+without having passed. The integration tests and their scenarios use their safe list, which holds
+the SPA under `web/` but not its package files, the Keycloak login theme in `web/keycloak-theme/` or
+the Vite configs that build it: `scripts/integration.sh` builds that theme, and the tests read its
+sign-in page. Playwright and the smoke tests use the smaller list of `docs/`, Markdown files, the
+GitHub workflows in `.github/` and NexKit's settings in `.nexkit/`. The `unaffected_by` lists of the
+smoke, integration and E2E checks in `.nexkit/config.json` name the same paths, so NexKit can skip such
+a check before it gets a runner, and `scripts/affected.test.mjs` checks that the two agree. Under NexKit, a
 suite that runs in full says which changed path made it run and which commit it compared with. The
 lists are in [`scripts/lib/affected.mjs`](../scripts/lib/affected.mjs), and any doubt runs the suite:
 a missing base, a git error or an empty change list. A performance test class name ends in `PerformanceTests`. In the integration tests such a class stays out of
