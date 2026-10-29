@@ -122,3 +122,4 @@ files agree, title and status included.
 | [D109](decisions/d109-sensitive-fields-and-backups-are-encrypted-and-history-keeps-no-names.md) | Sensitive fields and backups are encrypted, and history keeps no names | **Agreed** |
 | [D110](decisions/d110-security-alerts-and-a-hardening-checklist-for-the-operator.md) | Security alerts and a hardening checklist for the operator | **Agreed** |
 | [D111](decisions/d111-authentication-by-default-and-the-owner-guards-the-security-checks.md) | Authentication by default, and the owner guards the security checks | **Agreed** |
+| [D112](decisions/d112-ci-codeql-and-the-performance-tests-run-on-main-every-few-merges.md) | CI, CodeQL and the performance tests run on main every few merges | **Agreed** |

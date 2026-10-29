@@ -12,10 +12,14 @@ push to `main`.
   runs on demand. CodeQL also scans a person's push to `main` and hand-made
   pull requests, as [D50](d50-sign-in-audit-records-and-security-scanning-in-ci.md)
   says.
+  - [D112](d112-ci-codeql-and-the-performance-tests-run-on-main-every-few-merges.md)
+    replaces this point: NexKit starts them once every 30 of its merges.
 - **NexKit watches them without starting them.** They are in NexKit's
   `autopilot.watch_workflows`, not in `merge.after_workflows`. A failure that
   repeats still opens a `bug` issue, and pull requests that fail the same way
   wait, as for CI.
+  - [D112](d112-ci-codeql-and-the-performance-tests-run-on-main-every-few-merges.md)
+    replaces this point: they are in `merge.after_workflows` with `every`.
 - **CI still runs on `main` after every merge.** It stays in
   `merge.after_workflows`. Its runs on `main` find flaky tests and suites that a
   check skipped, and they let NexKit make a pull request wait while `main`
