@@ -115,3 +115,4 @@ files agree, title and status included.
 | [D102](decisions/d102-built-in-modules-open-to-change-and-bound-by-a-contract.md) | Built-in modules open to change and bound by a contract | **Agreed** |
 | [D103](decisions/d103-modules-hold-triggers-scenarios-and-connector-slots.md) | Modules hold triggers, scenarios and connector slots | **Agreed** |
 | [D104](decisions/d104-codeql-and-the-performance-tests-run-every-night.md) | CodeQL and the performance tests run every night | **Agreed** |
+| [D105](decisions/d105-ci-on-main-runs-every-two-hours-and-four-issues-run-at-once.md) | CI on main runs every two hours, and four issues run at once | **Agreed** |
