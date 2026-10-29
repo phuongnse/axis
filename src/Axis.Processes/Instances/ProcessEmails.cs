@@ -1,15 +1,18 @@
 using System.Text;
 using System.Text.Json.Nodes;
 using Axis.Configuration.Model;
+using Axis.Data.Profiles;
+using Axis.Processes.Work;
+using Axis.Tenancy;
 using Npgsql;
 using NpgsqlTypes;
 
 namespace Axis.Processes.Instances;
 
 /// <summary>
-/// Writes the emails that <c>notify</c> steps with the <c>email</c> channel stage over a connection to a tenant
-/// database: one <c>pending</c> outbox row for each address. It also builds the page link of an email and the
-/// <c>Message-ID</c> of a row.
+/// Writes the emails that <c>notify</c> steps and task escalations with the <c>email</c> channel stage over a
+/// connection to a tenant database: one <c>pending</c> outbox row for each address. It also builds the page link of
+/// an email and the <c>Message-ID</c> of a row.
 /// </summary>
 internal static class ProcessEmails
 {
@@ -42,6 +45,90 @@ internal static class ProcessEmails
         command.Parameters.Add(new NpgsqlParameter("messageIds", NpgsqlDbType.Array | NpgsqlDbType.Text) { Value = emails.Select(e => e.MessageId).ToArray() });
         command.Parameters.Add(new NpgsqlParameter("values", NpgsqlDbType.Array | NpgsqlDbType.Text) { Value = emails.Select(e => e.Values).ToArray() });
         await command.ExecuteNonQueryAsync(cancellationToken);
+    }
+
+    /// <summary>
+    /// Stages the emails of a notification with the <c>email</c> channel, for a <c>notify</c> step or a task escalation:
+    /// one <c>pending</c> outbox row for each address and one queued <c>notification.email</c> item for each row. The
+    /// addresses are those of the <c>user</c> recipients' profiles, then those of the <c>email</c> recipients. An address
+    /// is used once, ignoring letter case, with the locale of its first recipient. A <c>user</c> recipient with no profile
+    /// or no email gets none, and <paramref name="noAddress"/> is called with the user id, never the address. An
+    /// <c>email</c> recipient gets the release's first locale. <paramref name="step"/> is the name of the <c>notify</c>
+    /// step, or of the task step whose escalation notified.
+    /// </summary>
+    internal static async Task StageAsync(
+        WorkItemContext context,
+        ApplicationModel model,
+        ITenantCatalog? tenants,
+        Guid processInstanceId,
+        string step,
+        NewNotification notification,
+        Action<string> noAddress,
+        CancellationToken cancellationToken)
+    {
+        var userIds = notification.Recipients
+            .Where(recipient => recipient.Kind == ProcessNotifications.UserRecipient)
+            .Select(recipient => recipient.Recipient)
+            .ToArray();
+        var contacts = await UserProfiles.FindContactsAsync(context.Connection, context.Transaction, userIds, cancellationToken);
+        var targets = new List<(string Address, string? Locale)>();
+        foreach (var userId in userIds)
+        {
+            if (contacts.TryGetValue(userId, out var contact) && !string.IsNullOrWhiteSpace(contact.Email))
+            {
+                targets.Add((contact.Email, contact.Locale));
+            }
+            else
+            {
+                noAddress(userId);
+            }
+        }
+
+        targets.AddRange(notification.EmailAddresses.Select(address => (address, (string?)null)));
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        targets = [.. targets.Where(target => seen.Add(target.Address))];
+        if (targets.Count == 0)
+        {
+            return;
+        }
+
+        var hosts = tenants?.Find(context.Item.TenantId)?.Hosts;
+        var host = hosts is { Count: > 0 } ? hosts[0] : null;
+        var link = PageLink(model, host, notification.OpenPage, notification.OpenParameters);
+        var values = NotificationTexts.RawValues(notification.Values);
+        var emails = new List<NewEmail>(targets.Count);
+        foreach (var (address, locale) in targets)
+        {
+            var texts = NotificationTexts.ChooseTexts(model, locale);
+            var body = NotificationTexts.Render(texts, notification.BodyKey, values);
+            var id = Guid.CreateVersion7();
+            emails.Add(new NewEmail(
+                id,
+                notification.ApplicationId,
+                notification.ReleaseId,
+                notification.Id,
+                step,
+                address,
+                texts?.Locale,
+                NotificationTexts.Render(texts, notification.SubjectKey, values),
+                link is null ? body : $"{body}\n\n{link}",
+                MessageId(id, host),
+                notification.Values.ToJsonString()));
+        }
+
+        await InsertAsync(context.Transaction, emails, cancellationToken);
+        foreach (var email in emails)
+        {
+            await WorkItemQueue.EnqueueAsync(
+                context.Connection,
+                context.Transaction,
+                context.Item.TenantId,
+                ProcessStarts.NotificationEmailWorkItemKind,
+                DateTimeOffset.UtcNow,
+                cancellationToken,
+                processInstanceId: processInstanceId,
+                emailId: email.Id);
+        }
     }
 
     /// <summary>The <c>Message-ID</c> of the row <paramref name="id"/>: its id at the tenant's host, or at a reserved name when the tenant has none.</summary>
@@ -83,10 +170,10 @@ internal static class ProcessEmails
     }
 }
 
-/// <summary>An email that a <c>notify</c> step stages for one address.</summary>
+/// <summary>An email that a <c>notify</c> step or a task escalation stages for one address.</summary>
 /// <param name="Id">The row's id, a version 7 UUID.</param>
-/// <param name="NotificationId">The id of the step run's notification.</param>
-/// <param name="Step">The name of the <c>notify</c> step.</param>
+/// <param name="NotificationId">The id of the step run's or escalation's notification.</param>
+/// <param name="Step">The name of the <c>notify</c> step, or of the task step whose escalation notified.</param>
 /// <param name="Locale">The locale of the texts the email is rendered in, or null when the release has no texts.</param>
 /// <param name="MessageId">The email's <c>Message-ID</c> header.</param>
 /// <param name="Values">The raw placeholder values of the step run, as JSON text.</param>

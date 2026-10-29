@@ -707,7 +707,15 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
 
         if (notification is not null && step is NotifyStepModel emailStep && emailStep.Channels.Contains(ProcessNotifications.EmailChannel, StringComparer.Ordinal))
         {
-            await StageEmailsAsync(context, instance, model, emailStep, notification, cancellationToken);
+            await ProcessEmails.StageAsync(
+                context,
+                model,
+                tenants,
+                instance.Id,
+                emailStep.Name,
+                notification,
+                userId => LogNoEmailAddress(emailStep.Name, instance.Id, userId),
+                cancellationToken);
         }
 
         await ProcessSteps.InsertHistoryAsync(
@@ -1192,86 +1200,6 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
         }
 
         return payload;
-    }
-
-    /// <summary>
-    /// Stages the emails of a <c>notify</c> step with the <c>email</c> channel: one <c>pending</c> outbox row for each
-    /// address and one queued <c>notification.email</c> item for each row. The addresses are those of the <c>user</c>
-    /// recipients' profiles, then those of the <c>email</c> recipients. An address is used once, ignoring letter case,
-    /// with the locale of its first recipient. A <c>user</c> recipient with no profile or no email gets none, and is logged
-    /// by user id, never by address. An <c>email</c> recipient gets the release's first locale.
-    /// </summary>
-    private async Task StageEmailsAsync(
-        WorkItemContext context,
-        LoadedInstance instance,
-        ApplicationModel model,
-        NotifyStepModel step,
-        NewNotification notification,
-        CancellationToken cancellationToken)
-    {
-        var userIds = notification.Recipients
-            .Where(recipient => recipient.Kind == ProcessNotifications.UserRecipient)
-            .Select(recipient => recipient.Recipient)
-            .ToArray();
-        var contacts = await UserProfiles.FindContactsAsync(context.Connection, context.Transaction, userIds, cancellationToken);
-        var targets = new List<(string Address, string? Locale)>();
-        foreach (var userId in userIds)
-        {
-            if (contacts.TryGetValue(userId, out var contact) && !string.IsNullOrWhiteSpace(contact.Email))
-            {
-                targets.Add((contact.Email, contact.Locale));
-            }
-            else
-            {
-                LogNoEmailAddress(step.Name, instance.Id, userId);
-            }
-        }
-
-        targets.AddRange(notification.EmailAddresses.Select(address => (address, (string?)null)));
-        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        targets = [.. targets.Where(target => seen.Add(target.Address))];
-        if (targets.Count == 0)
-        {
-            return;
-        }
-
-        var hosts = tenants?.Find(context.Item.TenantId)?.Hosts;
-        var host = hosts is { Count: > 0 } ? hosts[0] : null;
-        var link = ProcessEmails.PageLink(model, host, notification.OpenPage, notification.OpenParameters);
-        var values = NotificationTexts.RawValues(notification.Values);
-        var emails = new List<NewEmail>(targets.Count);
-        foreach (var (address, locale) in targets)
-        {
-            var texts = NotificationTexts.ChooseTexts(model, locale);
-            var body = NotificationTexts.Render(texts, step.Body.TextKey, values);
-            var id = Guid.CreateVersion7();
-            emails.Add(new NewEmail(
-                id,
-                instance.ApplicationId,
-                instance.ReleaseId,
-                notification.Id,
-                step.Name,
-                address,
-                texts?.Locale,
-                NotificationTexts.Render(texts, step.Subject.TextKey, values),
-                link is null ? body : $"{body}\n\n{link}",
-                ProcessEmails.MessageId(id, host),
-                notification.Values.ToJsonString()));
-        }
-
-        await ProcessEmails.InsertAsync(context.Transaction, emails, cancellationToken);
-        foreach (var email in emails)
-        {
-            await WorkItemQueue.EnqueueAsync(
-                context.Connection,
-                context.Transaction,
-                context.Item.TenantId,
-                ProcessStarts.NotificationEmailWorkItemKind,
-                DateTimeOffset.UtcNow,
-                cancellationToken,
-                processInstanceId: instance.Id,
-                emailId: email.Id);
-        }
     }
 
     /// <summary>

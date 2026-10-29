@@ -24,7 +24,7 @@ internal static class ProcessNotifications
     /// <summary>The in-app channel, the only one that stores a notification yet.</summary>
     internal const string InAppChannel = "inApp";
 
-    /// <summary>The email channel. A <c>notify</c> step stages emails for it, and a task escalation stores nothing for it yet.</summary>
+    /// <summary>The email channel. A <c>notify</c> step and a task escalation stage emails for it in the email outbox.</summary>
     internal const string EmailChannel = "email";
 
     private const string DateFormat = "yyyy-MM-dd";
@@ -133,7 +133,7 @@ internal static class ProcessNotifications
             addresses);
     }
 
-    /// <summary>Whether <paramref name="notification"/> has a row to store: it has a recipient and goes out on the in-app channel. The email channel stores nothing yet.</summary>
+    /// <summary>Whether <paramref name="notification"/> has a row to store: it has a recipient and goes out on the in-app channel. The email channel has its own outbox rows.</summary>
     internal static bool ShouldStore(NewNotification notification, IReadOnlyList<string> channels) =>
         notification.Recipients.Count > 0 && channels.Contains(InAppChannel, StringComparer.Ordinal);
 

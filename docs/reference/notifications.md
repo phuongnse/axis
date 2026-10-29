@@ -12,8 +12,7 @@ list them and mark them read, their retention, the staging of emails in the
 outbox and their sending over SMTP are built, and so are the dead letter of a
 failed email and the bell in the site shell. The mail settings in the tenant
 directory are built, and so is the mail server in Docker Compose and
-`scripts/dev.sh`. The email channel of a task escalation is _(planned for M18)_,
-as is everything else in this file that says so. The design
+`scripts/dev.sh`. The design
 follows
 [D73](../decisions/d73-in-app-and-email-notifications.md). Dates follow the
 application time zone of
@@ -185,7 +184,8 @@ A text value may hold named placeholders, such as
 
 ## Email
 
-- **Outbox.** For each email recipient, the step's transaction renders the
+- **Outbox.** For each email recipient, the transaction of the step, or of a task
+  escalation with the `email` channel, renders the
   subject and body from the pinned release's texts in the recipient's locale,
   and stores them in `axis.email_outbox` with the address and a stable
   `Message-ID`. It queues one `notification.email` work item per row. The
@@ -194,7 +194,12 @@ A text value may hold named placeholders, such as
   most one email per address, ignoring letter case, with the locale of the
   first recipient that gave it. The row also keeps the raw placeholder values
   of the step run in `values`, so a test scenario can check them. The worker
-  runs the items, as Sending says.
+  runs the items, as Sending says. An escalation stages its emails in its own
+  transaction, so one that rolls back, such as one whose `notify` expression
+  fails, stages none. Its rows name the task step in `step`, and share the
+  `notificationId` of the escalation's history row. The sending, the failure
+  count and the dead letter are the same as for a `notify` step. A dead letter
+  names the task's process instance. A role recipient gets no email.
 - **Sending.** The worker sends each email as plain text over SMTP, outside any
   transaction, with the stored subject, body and `Message-ID`. It uses the
   [mail settings](#mail-settings) of the tenant. One transaction then marks the
@@ -223,7 +228,8 @@ A text value may hold named placeholders, such as
   site. In a test scenario the tenant has no host, so its emails have no link.
 - **Logs.** A `user` recipient without a profile or an email gets no email.
   The step logs it at Information level with the step and the user id,
-  never the address.
+  never the address. An escalation logs it with the task and the escalation
+  index.
 - **Scenarios.** In a test scenario, `advanceTime` runs the `notification.email`
   items with no mail host, so each stays queued and nothing is sent. Each
   scenario user has a profile with the address `<user>@scenario.invalid`, so a

@@ -226,8 +226,8 @@ the parts built in M12,
    ([D70](decisions/d70-processes-without-a-subject-scheduled-jobs-and-delete-triggers.md),
    [D73](decisions/d73-in-app-and-email-notifications.md)).
    The agent's resolve task escalates to the service desk lead when it is late:
-   when it is due, three days after it starts, the lead is notified in-app with
-   the ticket's number. One day later the task is reassigned to the
+   when it is due, three days after it starts, the lead is notified in-app and
+   the assigned agent in-app and by email, with the ticket's number. One day later the task is reassigned to the
    `service-desk-lead` role. When the agent resolves the ticket, the requester is
    notified in-app and by email with the ticket's number and the resolution, and
    the notification opens the ticket detail page
@@ -274,7 +274,8 @@ tickets and the dashboard for the lead, in a site at path `service-desk`. Texts 
 - A requester deletes a draft ticket. An agent's delete is refused.
 - The next weekday morning reminds the lead of overdue tickets, and a deleted
   draft ticket is reported to the lead.
-- A late ticket notifies the lead and is then reassigned to the lead's role. A
+- A late ticket notifies the lead in-app and the agent in-app and by email, and
+  is then reassigned to the lead's role. A
   resolved ticket notifies the requester in-app and by email.
 
 ### Built through Studio

@@ -11,7 +11,7 @@ using Npgsql;
 namespace Axis.Processes.Instances;
 
 /// <summary>
-/// Sends the email a <c>notification.email</c> work item names, which a <c>notify</c> step staged in
+/// Sends the email a <c>notification.email</c> work item names, which a <c>notify</c> step or a task escalation staged in
 /// <c>axis.email_outbox</c>, as plain text over SMTP. The mail settings are the tenant's own <c>Email</c> block when it
 /// has one, otherwise the host's, never a mix of both. With no <c>Smtp:Host</c> nothing is sent: one transaction makes
 /// the item due again after one lease, writes no failure, and the first such item of a tenant logs one warning. The
