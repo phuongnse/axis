@@ -216,14 +216,16 @@ _(planned for M18)_ One server setting controls the
 
 ## Users settings
 
-_(planned for M17)_ One server setting controls the [users page](user-administration.md), as
-[D100](../decisions/d100-identity-providers-per-application-and-sign-in-per-site.md) agrees.
+One server setting controls the [users page](user-administration.md), as
+[D100](../decisions/d100-identity-providers-per-application-and-sign-in-per-site.md) agrees. The setting and the shell
+entry are built. The users page itself is _(planned for M17)_.
 
 - **`Users:AdministratorRole`.** A roles claim value, such as `tenant-administrator`. The environment variable is
   `Users__AdministratorRole`. Only a signed-in user who holds the value, from the
   [platform sign-in](identity-provider.md#platform-sign-in) or given on the users page, may use the users page. It has
-  no default, and with no value nobody may. Application policies play no part. `GET /api/me` answers `users: true`
-  for a user who holds it.
+  no default, and with no value nobody may. The Development settings set it to `tenant-administrator`. Application
+  policies play no part. `GET /api/me` answers `users: true` for a user who holds it, `users: false` for everyone when
+  no value is set, and `users: false` on a preview tenant, which has no users page.
 
 ## Tenancy settings
 

@@ -392,7 +392,7 @@ file, and the realm accepts a code more than once. See [development realm and us
 | `lead-2`           | `service-desk-lead`     | Service desk sample; E2E claim and reassign journey                                                                                           |
 | `asset-manager`    | `asset-manager`         | Asset management sample; E2E asset management journey                                                                                         |
 | `auditor`          | `auditor`               | Asset management sample; E2E asset management journey                                                                                         |
-| `administrator`    | `tenant-administrator`  | The users page _(planned for M17)_                                                                                                            |
+| `administrator`    | `tenant-administrator`  | "Users" in the shell, E2E shell journey; the users page _(planned for M17)_                                                                   |
 
 ## Machine callers
 

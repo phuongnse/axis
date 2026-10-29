@@ -19,9 +19,19 @@ const requester: CurrentUser = {
   studioPreviewHost: null,
   studioTest: false,
   console: false,
+  users: false,
 }
 const author: CurrentUser = { ...requester, id: 'author', displayName: 'Author User', roles: ['author'], studio: true }
 const olga: CurrentUser = { ...requester, id: 'olga', displayName: 'Olga Operator', roles: ['operator'], console: true }
+
+const una: CurrentUser = {
+  ...requester,
+  id: 'una',
+  displayName: 'Una Administrator',
+  roles: ['tenant-administrator'],
+  console: true,
+  users: true,
+}
 
 const sites: SiteListItem[] = [
   {
@@ -125,6 +135,31 @@ describe('AppSwitcher', () => {
 
     expect(menu.getByRole('link', { name: 'Operator console' })).toHaveAttribute('href', '/console')
     expect(menu.queryByRole('link', { name: 'Studio' })).not.toBeInTheDocument()
+  })
+
+  it('lists Users after the operator console for an administrator, and only then', async () => {
+    stubServer(una)
+    renderSwitcher()
+
+    const menu = await openSwitcher()
+
+    expect(menu.getByRole('link', { name: 'Users' })).toHaveAttribute('href', '/users')
+    expect(
+      menu
+        .getAllByRole('menuitem')
+        .slice(-2)
+        .map((item) => item.textContent),
+    ).toEqual(['Operator console', 'Users'])
+  })
+
+  it('lists no Users link for a user who is not an administrator', async () => {
+    stubServer(olga)
+    renderSwitcher()
+
+    const menu = await openSwitcher()
+
+    expect(menu.getByRole('link', { name: 'Operator console' })).toBeInTheDocument()
+    expect(menu.queryByRole('link', { name: 'Users' })).not.toBeInTheDocument()
   })
 
   it('shows the site titles of the locale, and the first title when a site lacks it', async () => {

@@ -650,6 +650,7 @@ const currentUser: CurrentUser = {
   studioPreviewHost: null,
   studioTest: false,
   console: true,
+  users: false,
 }
 
 const purchaseApplication = { name: application, titles: { [locale]: 'Purchase requests' } }

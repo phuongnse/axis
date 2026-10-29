@@ -140,6 +140,27 @@ test('the home page opens a site in its own shell, in light and dark mode', asyn
   }
 })
 
+test('Users is in the app switcher and the welcome band of an administrator only', async ({ page }) => {
+  await useSession(page, 'administrator')
+  await page.goto('/')
+
+  const main = page.getByRole('main')
+  const tile = main.getByRole('link', { name: /^Users/ })
+  await expect(tile).toHaveAttribute('href', '/users')
+  await expect(tile).toContainText('Invite people and give them roles.')
+  await page.getByRole('banner').getByRole('button', { name: 'Switch to', exact: true }).click()
+  await expect(page.getByRole('menuitem', { name: 'Users', exact: true })).toBeVisible()
+
+  await useSession(page, 'author')
+  await page.goto('/')
+
+  await expect(main.getByText('Welcome to Axis', { exact: true })).toBeVisible()
+  await expect(main.getByRole('link', { name: /^Users/ })).toHaveCount(0)
+  await page.getByRole('banner').getByRole('button', { name: 'Switch to', exact: true }).click()
+  await expect(page.getByRole('menuitem', { name: 'Studio', exact: true })).toBeVisible()
+  await expect(page.getByRole('menuitem', { name: 'Users', exact: true })).toHaveCount(0)
+})
+
 test('an unknown site is not found inside the platform shell', async ({ page }) => {
   // The site endpoints need a session, or the page would show the sign-in prompt.
   await useSession(page, 'requester')
