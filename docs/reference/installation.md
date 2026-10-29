@@ -320,7 +320,9 @@ the admin container only.
    admin client secret is the `IdentityProvider__AdminClientSecret` file, so it is in no
    command line. Every `admin` run needs that file, because Compose refuses to start a service whose secret file is
    missing. A new realm has no accounts and no redirect addresses yet, so until a later part of M17 adds them, add
-   them to the realm in the identity provider yourself.
+   them to the realm in the identity provider yourself, before you activate an application. The activation
+   copies the redirect addresses and mappers of the `axis` client to the client of each site, and it does not
+   copy later changes until the next activation.
 5. Activate an application with
    `docker compose run --rm admin activate /apps/<folder>`.
 
@@ -434,7 +436,9 @@ operator uses it. The test then:
    identity host. Checks that its sign-in page contains the Axis theme's `axis-sign-in-context`. Runs `migrate`, starts
    the server and the worker, waits for `/health/ready`, and then starts the publisher.
 3. Runs `tenant create` for two tenants, `one` and `two`, with their own hosts and no `--oidc-*` option. Each
-   command creates the tenant's realm in the identity provider.
+   command creates the tenant's realm in the identity provider. Then adds a redirect address, a `roles` mapper, the four
+   client roles and the accounts `requester` and `author` to the realm of tenant `one` through the identity provider's
+   admin API, because a new realm has none and the activation copies them to the site client.
 4. Activates the leave request sample, `samples/apps/leave-requests`, for both.
    The sample needs the `departments` module, so the test mounts it from
    `artifacts/modules` at `/modules` for the test only. The production images
@@ -451,8 +455,7 @@ operator uses it. The test then:
    `psql`, and checks that the installed publisher runs both to `succeeded`.
    The publisher's log shows `one claim ok` and `two claim ok`, and the
    `publisher` service is still running.
-8. Adds a redirect address, a `roles` mapper, the four client roles and the accounts `requester` and `author` to
-   the realm of tenant `one` through the identity provider's admin API, because a new realm has none. Starts the second replica, with a proxy certificate and a
+8. Starts the second replica, with a proxy certificate and a
    server certificate from the test's authority, and that authority's certificate
    as `server-ca.crt`. Checks that a plain HTTP request to a server port gets no
    HTTP response, and that the servers answer on their own ports over HTTPS for the

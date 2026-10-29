@@ -1,4 +1,5 @@
 import { StrictMode } from 'react'
+import { AddAuthenticatorPage } from '../src/identitySignIn/AddAuthenticatorPage'
 import { ResetPasswordPage } from '../src/identitySignIn/ResetPasswordPage'
 import { SignInPage } from '../src/identitySignIn/SignInPage'
 import type { IdentityContext } from '../src/identitySignIn/signInContext'
@@ -12,6 +13,8 @@ function ThemePage({ context }: { context: IdentityContext }) {
       return <SignInPage context={context} />
     case 'twoStep':
       return <TwoStepPage context={context} />
+    case 'addAuthenticator':
+      return <AddAuthenticatorPage context={context} />
     case 'resetPassword':
       return <ResetPasswordPage context={context} />
     case 'updatePassword':
@@ -19,7 +22,7 @@ function ThemePage({ context }: { context: IdentityContext }) {
   }
 }
 
-/** The theme's page: the shared sign-in, two-step, forgot-password or set-password page with the SPA's theme provider, fed Keycloak's context. */
+/** The theme's page: the shared sign-in, two-step, add-an-authenticator, forgot-password or set-password page with the SPA's theme provider, fed Keycloak's context. */
 export function SignInEntry({ context }: { context: IdentityContext }) {
   return (
     <StrictMode>

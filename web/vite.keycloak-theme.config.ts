@@ -14,6 +14,7 @@ function copyThemeFiles(): Plugin {
         'theme.properties',
         'login.ftl',
         'login-otp.ftl',
+        'login-config-totp.ftl',
         'login-reset-password.ftl',
         'login-update-password.ftl',
         'messages',

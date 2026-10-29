@@ -71,6 +71,7 @@ describe('design-system previews', () => {
         'Two-step verification',
         'Forgot password',
         'Set password',
+        'Add an authenticator',
       ],
     ],
   ])('the %s preview has its states, each in a frame of its own height', (name, captions) => {
