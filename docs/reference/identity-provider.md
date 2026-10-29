@@ -322,6 +322,7 @@ _(planned for M17)_
   form, never saying which one was wrong.
 - A site that allows one brokered provider and no accounts shows its button alone, under one line that names it.
 - Two-step verification asks for the 6-digit code in six boxes, one digit each, with "Back to sign in" and, when Keycloak offers another way to sign in, "Try another way".
+- Add an authenticator, where a person who must add one sees the QR code, the key to type by hand, the 6-digit code in the same six boxes and the device name. The device name is required only when the person already has an authenticator.
 - The theme is built from the SPA's own React components and tokens into a Keycloak theme, so the pages look like the
   rest of Axis. Its texts are message bundles in every locale the platform offers. The "Continue with" labels come
   from the applications' texts, which activation writes to the realm (_built_).
@@ -335,12 +336,16 @@ _(planned for M17)_
   buttons, the form widget's field labels and "Forgot password?" on the password's row. The two-step page is drawn too,
   from its own context with `page` set to `twoStep`: six code boxes, one digit each, and a real
   `<form method="post">` to the login address that posts `otp` and `login`. "Try another way" posts `tryAnotherWay=on`
-  and shows only when Keycloak offers another way to sign in. "Back to sign in" uses Keycloak's restart address. The design system's
+  and shows only when Keycloak offers another way to sign in. "Back to sign in" uses Keycloak's restart address. The page that adds an authenticator is
+  drawn too, from its own context with `page` set to `addAuthenticator`: the QR code (a base64 PNG), the manual key, the secret, the
+  same six code boxes and the device name, in a real `<form method="post">` to the login address that posts `totp`, `totpSecret`,
+  `userLabel` and, when Keycloak gave one, `mode`. It leaves out Keycloak's "Sign out from other devices" box and the cancel button
+  of an app-initiated action. The design system's
   `identitySignIn` preview feeds the components fixtures, see
   [shell design system previews](shell.md#design-system-previews). The Keycloak theme `axis` feeds them a real
-  context: its `login.ftl` and `login-otp.ftl` write Keycloak's data as JSON, with a `page` field of `signIn` or `twoStep`, and a React bundle draws the page. `scripts/build.sh`
+  context: its `login.ftl`, `login-otp.ftl` and `login-config-totp.ftl` write Keycloak's data as JSON, with a `page` field of `signIn`, `twoStep` or `addAuthenticator`, and a React bundle draws the page. `scripts/build.sh`
   builds the theme from `web/keycloak-theme/` into `artifacts/keycloak-theme/axis/login/` and checks its files and
-  fonts. Keycloak's other pages still come from its `keycloak` parent theme. The development realm `axis` uses the theme as
+  fonts. The pages the theme has no template for, such as the password reset, still come from Keycloak's `keycloak` parent theme. The development realm `axis` uses the theme as
   its login theme: Compose, `scripts/dev.sh`, `scripts/e2e.sh` and the Keycloak of the integration tests load it from
   `artifacts/keycloak-theme`, and each builds it first. The realms of `tenant create` name the theme as their login
   theme. The on-premises Compose example loads it from `AXIS_IDENTITY_THEME_DIR`, see

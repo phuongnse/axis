@@ -251,6 +251,7 @@ export const previews: Record<string, readonly PreviewState[]> = {
     { caption: 'Wrong password', draw: () => <IdentitySignIn page="wrongPassword" />, frameHeight: 600 },
     { caption: 'Organization sign-in only', draw: () => <IdentitySignIn page="organizationOnly" />, frameHeight: 600 },
     { caption: 'Two-step verification', draw: () => <IdentitySignIn page="twoStep" />, frameHeight: 600 },
+    { caption: 'Add an authenticator', draw: () => <IdentitySignIn page="addAuthenticator" />, frameHeight: 760 },
   ],
 }
 

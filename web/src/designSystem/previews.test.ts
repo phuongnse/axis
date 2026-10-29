@@ -62,7 +62,10 @@ describe('design-system previews', () => {
   test.each([
     ['shell', ['Application site', 'Navigation collapsed', 'Form page', 'Platform site']],
     ['signIn', ['Signed out', 'Sign-in refused', 'Session ended']],
-    ['identitySignIn', ['Sign in', 'Wrong password', 'Organization sign-in only', 'Two-step verification']],
+    [
+      'identitySignIn',
+      ['Sign in', 'Wrong password', 'Organization sign-in only', 'Two-step verification', 'Add an authenticator'],
+    ],
   ])('the %s preview has its states, each in a frame of its own height', (name, captions) => {
     const states = previews[name]
     expect(states.map(({ caption }) => caption)).toEqual(captions)

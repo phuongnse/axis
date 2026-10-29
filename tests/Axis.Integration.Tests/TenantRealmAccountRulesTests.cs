@@ -80,7 +80,52 @@ public sealed partial class TenantRealmAccountRulesTests(KeycloakFixture keycloa
         using var page = await _http.SendAsync(request, TestContext.Current.CancellationToken);
         var html = await page.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.OK, page.StatusCode);
-        Assert.True(html.Contains("name=\"totp\"", StringComparison.Ordinal) || html.Contains("kc-totp", StringComparison.Ordinal), html);
+        Assert.Equal("addAuthenticator", KeycloakSignIn.Page(html));
+    }
+
+    [Fact]
+    public async Task A_user_who_must_add_an_authenticator_gets_the_Axis_page_and_adds_one_with_its_fields()
+    {
+        var realm = await NewRealmAsync();
+        await AddClientAsync(realm);
+        await EnableEventsAsync(realm);
+        var userId = await CreateUserAsync(realm, "pat", requiredActions: ["CONFIGURE_TOTP"]);
+        Assert.Equal(HttpStatusCode.NoContent, await SetPasswordAsync(realm, userId, Password));
+
+        var (action, jar) = await OpenLoginPageAsync(realm);
+        var (status, loginHtml, _, location) = await PostLoginAsync(action, jar, "pat", Password);
+        Assert.True(status == HttpStatusCode.Found, $"{status}\n{await LoginErrorsAsync(realm)}\n{loginHtml}");
+        using var open = new HttpRequestMessage(HttpMethod.Get, location);
+        open.Headers.Add("Cookie", CookieHeader(jar));
+        using var page = await _http.SendAsync(open, TestContext.Current.CancellationToken);
+        var html = await page.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+        Assert.Equal(HttpStatusCode.OK, page.StatusCode);
+
+        Assert.Equal("addAuthenticator", KeycloakSignIn.Page(html));
+        var qrCode = KeycloakSignIn.Property(html, "qrCode");
+        var manualKey = KeycloakSignIn.Property(html, "manualKey");
+        var secret = KeycloakSignIn.Property(html, "secret");
+        Assert.False(string.IsNullOrEmpty(qrCode), html);
+        Assert.False(string.IsNullOrEmpty(manualKey), html);
+        Assert.False(string.IsNullOrEmpty(secret), html);
+        Assert.Equal(new byte[] { 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A }, Convert.FromBase64String(qrCode)[..8]);
+
+        using var post = new HttpRequestMessage(HttpMethod.Post, KeycloakSignIn.LoginAction(html))
+        {
+            Content = new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["totp"] = DevelopmentTotp.CodeFromSecret(manualKey.Replace(" ", "", StringComparison.Ordinal)),
+                ["totpSecret"] = secret,
+                ["userLabel"] = "Phone",
+            }),
+        };
+        post.Headers.Add("Cookie", CookieHeader(jar));
+        using var added = await _http.SendAsync(post, TestContext.Current.CancellationToken);
+        Assert.True(added.StatusCode == HttpStatusCode.Found, await added.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
+        Assert.StartsWith(RedirectUri, added.Headers.Location!.AbsoluteUri, StringComparison.Ordinal);
+
+        var credentials = await GetJsonAsync($"admin/realms/{realm}/users/{userId}/credentials");
+        Assert.Contains(credentials.EnumerateArray(), credential => credential.GetProperty("type").GetString() == "otp");
     }
 
     [Fact]
@@ -281,7 +326,7 @@ public sealed partial class TenantRealmAccountRulesTests(KeycloakFixture keycloa
         return $"Brute-force state: {(int)response.StatusCode} {state}";
     }
 
-    private async Task<string> CreateUserAsync(string realm, string username)
+    private async Task<string> CreateUserAsync(string realm, string username, string[]? requiredActions = null)
     {
         using var response = await SendAsync(HttpMethod.Post, $"admin/realms/{realm}/users", new
         {
@@ -291,6 +336,7 @@ public sealed partial class TenantRealmAccountRulesTests(KeycloakFixture keycloa
             email = $"{username}@example.test",
             firstName = "Pat",
             lastName = "Example",
+            requiredActions = requiredActions ?? [],
         });
         Assert.Equal(HttpStatusCode.Created, response.StatusCode);
         return response.Headers.Location!.Segments[^1];

@@ -1,7 +1,12 @@
 import { cleanup, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, describe, expect, it } from 'vitest'
-import { identitySignInContext, identityTwoStepContext } from '../src/designSystem/fixtures'
+import {
+  identityAddAuthenticatorContext,
+  identityQrCode,
+  identitySignInContext,
+  identityTwoStepContext,
+} from '../src/designSystem/fixtures'
 import { previews } from '../src/designSystem/previews'
 import type { IdentityContext } from '../src/identitySignIn/signInContext'
 import { ThemeModeProvider } from '../src/platform/theme'
@@ -37,6 +42,16 @@ function expectTwoStepPage(container: HTMLElement) {
   )
 }
 
+function expectAddAuthenticatorPage(container: HTMLElement) {
+  expect(container.querySelector(`img[src="data:image/png;base64,${identityQrCode}"]`)).toBeInTheDocument()
+  expect(screen.getByText(identityAddAuthenticatorContext.manualKey)).toBeInTheDocument()
+  const form = container.querySelector('form') as HTMLFormElement
+  expect(form).toHaveAttribute('action', identityAddAuthenticatorContext.loginAction)
+  expect(form).toHaveAttribute('method', 'post')
+  expect(form.querySelector('input[name="totp"]')).toBeInTheDocument()
+  expect(form.querySelector('input[name="totpSecret"]')).toHaveValue(identityAddAuthenticatorContext.secret)
+}
+
 describe('the Keycloak theme entry', () => {
   afterEach(() => {
     document.getElementById('axis-sign-in-context')?.remove()
@@ -68,6 +83,20 @@ describe('the Keycloak theme entry', () => {
       </ThemeModeProvider>,
     )
     expectTwoStepPage(preview.container)
+  })
+
+  it('draws the same add-an-authenticator page as the identitySignIn preview', () => {
+    writeContextBlock(identityAddAuthenticatorContext)
+    const theme = render(<SignInEntry context={readSignInContext(document)} />)
+    expectAddAuthenticatorPage(theme.container)
+    cleanup()
+
+    const preview = render(
+      <ThemeModeProvider>
+        <MemoryRouter>{previews.identitySignIn[4].draw()}</MemoryRouter>
+      </ThemeModeProvider>,
+    )
+    expectAddAuthenticatorPage(preview.container)
   })
 
   it('fails with a clear error when the sign-in context is missing', () => {

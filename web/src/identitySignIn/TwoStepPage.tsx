@@ -1,6 +1,6 @@
-import { Alert, Button, Flex, Form, Input, Typography } from 'antd'
+import { Alert, Button, Flex, Form, Typography } from 'antd'
 import { useId, useRef } from 'react'
-import { useDesignTokens } from '../platform/themeMode'
+import { CodeField } from './CodeField'
 import { IdentityFrame } from './IdentityFrame'
 import type { TwoStepContext } from './signInContext'
 
@@ -11,10 +11,8 @@ import type { TwoStepContext } from './signInContext'
  */
 export function TwoStepPage({ context }: { context: TwoStepContext }) {
   const { texts, error, loginAction, restartUrl, tryAnotherWay } = context
-  const { colour } = useDesignTokens()
   const formId = useId()
   const [form] = Form.useForm<{ code?: string }>()
-  const code = Form.useWatch('code', form) ?? ''
   const submitRef = useRef<HTMLInputElement>(null)
   return (
     <IdentityFrame title={texts.title} organization={context.realmName} locales={context.locales}>
@@ -30,20 +28,13 @@ export function TwoStepPage({ context }: { context: TwoStepContext }) {
         // Ant Design validates and stops the submit event, so the native post happens here.
         onFinish={() => submitRef.current?.form?.submit()}
       >
-        <Form.Item
-          name="code"
-          label={<span style={{ fontWeight: 500, color: colour.textMuted }}>{texts.code}</span>}
-          rules={[{ required: true, len: 6, message: texts.message }]}
-          validateStatus={error ? 'error' : undefined}
-        >
-          <Input.OTP
-            length={6}
-            formatter={(value) => value.replace(/\D/g, '')}
-            // The field only changes once all six boxes are full, so a deleted digit clears it here.
-            onInput={(cells) => form.setFieldValue('code', cells.join(''))}
-          />
-        </Form.Item>
-        <input type="hidden" name="otp" value={code} />
+        <CodeField
+          form={form}
+          postAs="otp"
+          label={texts.code}
+          requiredMessage={texts.message}
+          invalid={Boolean(error)}
+        />
         <input ref={submitRef} type="hidden" name="login" value="Sign In" />
         <Button type="primary" htmlType="submit" block>
           {texts.verify}

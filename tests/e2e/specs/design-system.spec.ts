@@ -75,6 +75,7 @@ const stateKeys: Record<string, Record<string, (state: Locator) => Locator>> = {
     'Organization sign-in only': (state) =>
       state.getByRole('button', { name: 'Continue with Contoso ID', exact: true }),
     'Two-step verification': (state) => state.getByText('Verification code', { exact: true }),
+    'Add an authenticator': (state) => state.getByText('Device name', { exact: true }),
   },
 }
 
