@@ -1,7 +1,10 @@
 // Prepares the `load` realm of the stack that scripts/load.sh starts, through the identity provider's admin API, as
 // scripts/onprem.test.mjs does for its realms: the redirect addresses of the axis client, the roles mapper and the roles
 // of the generated application. It then adds the users load-user-01 to load-user-50 with a password, an authenticator
-// and all roles, and writes their names, password and authenticator secrets to <folder>/k6/users.json for k6.
+// and all roles but load-caller, and writes their names, password and authenticator secrets to <folder>/k6/users.json
+// for k6. It also adds the machine caller, a confidential client load-caller whose service account holds the role
+// load-caller and whose tokens carry the audience axis-load-endpoints, and writes its client id and secret to
+// <folder>/k6/caller.json.
 // Run it as `node scripts/lib/load-realm.mjs <folder> <https port> <seed>` after `admin tenant create load`, and before
 // the activation, which copies the redirect addresses and mappers of the axis client to the client of the site.
 // Every request goes through curl, so that a test can replace it with a stub.
@@ -15,6 +18,10 @@ import { identityHost, tenantHost } from './load-stack.mjs'
 const root = fileURLToPath(new URL('../..', import.meta.url))
 
 export const loadUserCount = 50
+
+// The machine caller of the inbound endpoint: its client id, which is also the role it holds, and the audience of its tokens.
+export const callerClientId = 'load-caller'
+export const callerAudience = 'axis-load-endpoints'
 
 // The realm of the tenant `load`, and how long the token of the master realm is used. The token lasts 60 seconds.
 const realm = 'load'
@@ -95,9 +102,17 @@ export const prepareLoadRealm = ({ folder: target, port, seed }) => {
   admin('POST', `${clientPath}/protocol-mappers/models`, mapper)
   const roles = JSON.parse(admin('GET', `${clientPath}/roles`))
 
+  // -D - prints the response headers, and the Location header names the new user or client.
+  const createdId = (created, what) => {
+    const location = created.split(/\r?\n/).find((line) => /^location:/i.test(line))
+    if (!location) throw new Error(`creating ${what} gave no Location header\n${created}`)
+    return location.slice(location.indexOf(':') + 1).trim().split('/').pop()
+  }
+
+  // The human users hold every role but the one of the machine caller.
+  const userRoles = roles.filter((role) => role.name !== callerClientId)
   const users = loadUsers(seed, randomBytes(18).toString('hex'))
   for (const { username, password, secret } of users) {
-    // -D - prints the response headers, and the Location header names the new user.
     const created = admin(
       'POST',
       '/users',
@@ -121,15 +136,54 @@ export const prepareLoadRealm = ({ folder: target, port, seed }) => {
       },
       ['-D', '-', '-o', '/dev/null'],
     )
-    const location = created.split(/\r?\n/).find((line) => /^location:/i.test(line))
-    if (!location) throw new Error(`creating ${username} gave no Location header\n${created}`)
-    const userId = location.slice(location.indexOf(':') + 1).trim().split('/').pop()
-    admin('POST', `/users/${userId}/role-mappings/clients/${platformClient.id}`, roles)
+    admin('POST', `/users/${createdId(created, username)}/role-mappings/clients/${platformClient.id}`, userRoles)
   }
 
   const output = join(folder, 'k6/users.json')
   writeFileSync(output, JSON.stringify(users, null, 2))
   chmodSync(output, 0o644)
+
+  // The machine caller copies the mappers of the development realm's purchasing-system client: the roles mapper as it is
+  // and the audience mapper with the audience of the load test.
+  const purchasing = developmentRealm.clients.find((client) => client.clientId === 'purchasing-system')
+  const rolesMapper = purchasing?.protocolMappers.find((item) => item.name === 'roles')
+  const endpointsMapper = purchasing?.protocolMappers.find((item) => item.name === 'axis-endpoints audience')
+  if (!rolesMapper) throw new Error('the development realm has no roles mapper on the purchasing-system client')
+  if (!endpointsMapper) throw new Error('the development realm has no audience mapper on the purchasing-system client')
+  const audienceMapper = {
+    ...endpointsMapper,
+    name: `${callerAudience} audience`,
+    config: { ...endpointsMapper.config, 'included.custom.audience': callerAudience },
+  }
+  const callerSecret = randomBytes(24).toString('hex')
+  const createdClient = admin(
+    'POST',
+    '/clients',
+    {
+      clientId: callerClientId,
+      name: 'Load caller',
+      enabled: true,
+      protocol: 'openid-connect',
+      publicClient: false,
+      clientAuthenticatorType: 'client-secret',
+      secret: callerSecret,
+      standardFlowEnabled: false,
+      directAccessGrantsEnabled: false,
+      serviceAccountsEnabled: true,
+      protocolMappers: [rolesMapper, audienceMapper],
+    },
+    ['-D', '-', '-o', '/dev/null'],
+  )
+  const callerId = createdId(createdClient, callerClientId)
+  const serviceUserId = JSON.parse(admin('GET', `/clients/${callerId}/service-account-user`)).id
+  const callerRoles = roles.filter((role) => role.name === callerClientId)
+  if (callerRoles.length === 0) throw new Error(`the application has no role ${callerClientId}`)
+  admin('POST', `/users/${serviceUserId}/role-mappings/clients/${platformClient.id}`, callerRoles)
+
+  const caller = { clientId: callerClientId, secret: callerSecret }
+  const callerOutput = join(folder, 'k6/caller.json')
+  writeFileSync(callerOutput, JSON.stringify(caller, null, 2))
+  chmodSync(callerOutput, 0o644)
   return users
 }
 

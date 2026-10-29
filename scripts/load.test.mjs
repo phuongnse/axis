@@ -23,13 +23,17 @@ exit 0
   // which is the last argument. Anything else gives no output.
   curl: `#!/usr/bin/env bash
 ${log('curl')}case "$*" in *'%{http_code}'*) printf 401 ;; esac
+# The body arrives on stdin. It is kept in a second log, for the tests that check what a request sends.
+[[ " $* " == *' --data-binary @- '* ]] && { echo "$*"; cat; echo; } >> "$STUB_LOG.body"
 case "\${@: -1}" in
   */openid-connect/token) printf '{"access_token":"stub-token"}' ;;
   *'/clients?clientId=axis') printf '[{"id":"client-1","clientId":"axis","secret":"s"}]' ;;
   */clients/client-1/roles)
     if [[ "$*" != *' -X POST '* ]]; then
-      printf '[{"id":"role-1","name":"clerk"},{"id":"role-2","name":"reviewer"},{"id":"role-3","name":"auditor"}]'
+      printf '[{"id":"role-1","name":"clerk"},{"id":"role-2","name":"reviewer"},{"id":"role-3","name":"auditor"},{"id":"role-4","name":"load-caller"}]'
     fi ;;
+  */clients/caller-1/service-account-user) printf '{"id":"service-user-1"}' ;;
+  */admin/realms/load/clients) printf 'HTTP/2 201\r\nlocation: https://id.axis.test/admin/realms/load/clients/caller-1\r\n\r\n' ;;
   */admin/realms/load/users) printf 'HTTP/2 201\r\nlocation: https://id.axis.test/admin/realms/load/users/user-%s\r\n\r\n' "$RANDOM" ;;
 esac
 exit 0
@@ -37,7 +41,7 @@ exit 0
   // The generator writes the roles of the application into the folder after --.
   dotnet: `#!/usr/bin/env bash
 ${log('dotnet')}if [ "$1" = run ]; then
-  for role in clerk reviewer auditor; do
+  for role in clerk reviewer auditor load-caller; do
     mkdir -p "\${@: -3:1}/roles"
     printf '{"kind":"role","name":"%s"}' "$role" > "\${@: -3:1}/roles/$role.json"
   done
@@ -83,8 +87,11 @@ function runLoad(args = [], extraEnv = {}) {
     const result = spawnSync('bash', ['scripts/load.sh', ...args], { cwd: dir, encoding: 'utf8', timeout: 120_000, env })
     const usersFile = join(dir, 'artifacts/load/k6/users.json')
     const users = existsSync(usersFile) ? JSON.parse(readFileSync(usersFile, 'utf8')) : undefined
+    const callerFile = join(dir, 'artifacts/load/k6/caller.json')
+    const caller = existsSync(callerFile) ? JSON.parse(readFileSync(callerFile, 'utf8')) : undefined
+    const bodies = existsSync(`${env.STUB_LOG}.body`) ? readFileSync(`${env.STUB_LOG}.body`, 'utf8') : ''
     const calls = existsSync(env.STUB_LOG) ? readFileSync(env.STUB_LOG, 'utf8').trimEnd().split('\n') : []
-    return { ...result, calls, dir, users, left: existsSync(join(dir, 'artifacts/load/override.json')) }
+    return { ...result, calls, bodies, dir, users, caller, left: existsSync(join(dir, 'artifacts/load/override.json')) }
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }
@@ -221,6 +228,51 @@ describe('scripts/load.sh writes the application and activates it in the load te
       assert.match(user.secret, /^[A-Z2-7]{32}$/)
     }
     assert.equal(new Set(run.users.map((user) => user.secret)).size, 50)
+  })
+
+  test('the load-caller client with service accounts and the audience mapper is created before the k6 run', () => {
+    const run = runLoad()
+
+    assert.equal(run.status, 0, run.stdout + run.stderr)
+    const post = run.calls.findIndex((call) => / -X POST .*\/admin\/realms\/load\/clients$/.test(call))
+    assert.notEqual(post, -1, run.calls.join('\n'))
+    assert.ok(post < k6Index(run))
+    const body = run.bodies.split('\n').find((line) => line.startsWith('{') && line.includes('"clientId":"load-caller"'))
+    assert.ok(body, run.bodies)
+    const client = JSON.parse(body)
+    assert.equal(client.serviceAccountsEnabled, true)
+    assert.equal(client.publicClient, false)
+    assert.ok(client.secret.length > 0)
+    assert.ok(client.protocolMappers.some((mapper) => mapper.name === 'roles'))
+    assert.ok(client.protocolMappers.some((mapper) => mapper.config['included.custom.audience'] === 'axis-load-endpoints'))
+  })
+
+  test('the tenant accepts the endpoint audience before the k6 run', () => {
+    const run = runLoad()
+
+    assert.equal(run.status, 0, run.stdout + run.stderr)
+    assert.ok(indexOf(run, 'admin tenant oidc set load --endpoint-audience axis-load-endpoints') < k6Index(run))
+  })
+
+  test('--keep leaves caller.json with the client id load-caller and a secret', () => {
+    const run = runLoad(['--keep'])
+
+    assert.equal(run.status, 0, run.stdout + run.stderr)
+    assert.equal(run.caller.clientId, 'load-caller')
+    assert.ok(run.caller.secret.length > 0)
+  })
+
+  test('the load-caller role goes to the service account and not to the 50 users', () => {
+    const run = runLoad()
+
+    assert.equal(run.status, 0, run.stdout + run.stderr)
+    const mappings = run.calls.filter((call) => / -X POST .*\/role-mappings\/clients\/client-1$/.test(call))
+    assert.equal(mappings.length, 51)
+    assert.equal(mappings.filter((call) => call.includes('/users/service-user-1/')).length, 1)
+    const bodies = run.bodies.split('\n').filter((line) => line.startsWith('[{"id":"role-'))
+    assert.equal(bodies.length, 51)
+    assert.equal(bodies.filter((body) => body.includes('role-4')).length, 1)
+    assert.equal(bodies.filter((body) => !body.includes('role-4')).length, 50)
   })
 
   test('the same seed gives the same secrets and another seed gives different ones', () => {

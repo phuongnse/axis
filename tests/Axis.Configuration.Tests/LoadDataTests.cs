@@ -1,5 +1,6 @@
 using System.Text.Json;
 using Axis.Configuration.Compilation;
+using Axis.Configuration.Model;
 using Axis.LoadData;
 
 namespace Axis.Configuration.Tests;
@@ -26,6 +27,13 @@ public sealed class LoadDataTests
         Assert.InRange(model.Pages.Count, 60, 130);
         Assert.InRange(model.Texts.Count, 2, 3);
         Assert.All(model.Texts, texts => Assert.InRange(texts.Texts.Count, 1_500, 3_000));
+
+        var endpoint = Assert.Single(model.Endpoints);
+        Assert.Equal("CreateEntity00", endpoint.Name);
+        var callerPolicy = Assert.Single(model.Policies, policy => policy.Roles.Contains("load-caller"));
+        var grant = Assert.Single(callerPolicy.Grants);
+        Assert.Equal("CreateEntity00", grant.Endpoint?.Name);
+        Assert.Equal([PolicyAction.Invoke], grant.Actions);
     }
 
     [Fact]
