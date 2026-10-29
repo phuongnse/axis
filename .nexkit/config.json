@@ -180,9 +180,7 @@
   "merge": {
     "auto": true,
     "after_workflows": [
-      "ci.yml",
-      "codeql.yml",
-      "performance.yml"
+      "ci.yml"
     ]
   },
   "conflicts": {
@@ -194,7 +192,11 @@
     "enabled": true,
     "scope": null,
     "answer": "recommended",
-    "max_parallel": 3
+    "max_parallel": 3,
+    "watch_workflows": [
+      "codeql.yml",
+      "performance.yml"
+    ]
   },
   "evidence": {
     "artifacts": [

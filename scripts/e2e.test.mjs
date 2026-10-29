@@ -75,6 +75,8 @@ function runE2e(shard) {
     for (const name of [
       'NODE_TEST_CONTEXT',
       'NEXKIT_BASE_SHA',
+      'NEXKIT_VERIFIED_SHA',
+      'NEXKIT_CHECK_VERIFIED_SHA',
       'GITHUB_ACTIONS',
       'GITHUB_STEP_SUMMARY',
       'CI',
