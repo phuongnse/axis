@@ -61,7 +61,7 @@ internal sealed class ScenarioWork : IDisposable
                 handler,
                 timerHandler,
                 resume,
-                new TaskEscalationHandler(models, loggerFactory.CreateLogger<TaskEscalationHandler>()),
+                new TaskEscalationHandler(models, null, loggerFactory.CreateLogger<TaskEscalationHandler>()),
                 new TaskDeadlineHandler(models, loggerFactory.CreateLogger<TaskDeadlineHandler>()),
             ],
             [

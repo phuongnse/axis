@@ -71,6 +71,16 @@
       }
     },
     {
+      "type": "expectNotification",
+      "recipient": {
+        "user": "agent"
+      },
+      "channel": "email",
+      "values": {
+        "number": "SD-2026-00001"
+      }
+    },
+    {
       "type": "expectTask",
       "record": "ticket",
       "step": "resolve",

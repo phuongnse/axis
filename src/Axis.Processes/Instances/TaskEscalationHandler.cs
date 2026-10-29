@@ -6,6 +6,7 @@ using Axis.Data.Records;
 using Axis.Expressions.Evaluation;
 using Axis.Processes.Storage;
 using Axis.Processes.Work;
+using Axis.Tenancy;
 using Microsoft.Extensions.Logging;
 
 namespace Axis.Processes.Instances;
@@ -15,8 +16,8 @@ namespace Axis.Processes.Instances;
 /// as a completion does, so a task that ends cannot also be escalated. A task that is still
 /// <c>open</c> is reassigned to the escalation's <c>reassign</c> target as <c>system</c>, which clears
 /// a claim. The audit record <c>task.reassigned</c> is appended with the escalation's index. The
-/// escalation's <c>notify</c> is evaluated as a <c>notify</c> step evaluates it and stored as an in-app
-/// notification, in the same transaction. The task step gets a history row whose output is
+/// escalation's <c>notify</c> is evaluated as a <c>notify</c> step evaluates it, stored as an in-app
+/// notification and, with the <c>email</c> channel, staged as emails in the email outbox, in the same transaction. The task step gets a history row whose output is
 /// <c>{ "escalation": index }</c>, with the <c>notificationId</c> when there is a notify. The task
 /// stays open and its instance is not changed. A task in any other state, or no task, is left alone and
 /// the item is deleted. A task whose <c>user</c> expression gives no user is left as it is, with a
@@ -24,7 +25,7 @@ namespace Axis.Processes.Instances;
 /// runs. A failure, such as a notify expression that fails, is logged, the whole escalation is rolled
 /// back and the instance is not failed.
 /// </summary>
-internal sealed partial class TaskEscalationHandler(ReleaseModelCache models, ILogger<TaskEscalationHandler> logger) : IWorkItemHandler
+internal sealed partial class TaskEscalationHandler(ReleaseModelCache models, ITenantCatalog? tenants, ILogger<TaskEscalationHandler> logger) : IWorkItemHandler
 {
     public string Kind => ProcessStarts.TaskEscalateWorkItemKind;
 
@@ -120,6 +121,19 @@ internal sealed partial class TaskEscalationHandler(ReleaseModelCache models, IL
             await ProcessNotifications.InsertAsync(context.Transaction, notification, cancellationToken);
         }
 
+        if (notification is not null && escalation.Notify!.Channels.Contains(ProcessNotifications.EmailChannel, StringComparer.Ordinal))
+        {
+            await ProcessEmails.StageAsync(
+                context,
+                release,
+                tenants,
+                task.ProcessInstanceId,
+                task.Step,
+                notification,
+                userId => LogNoEmailAddress(taskId, index, userId),
+                cancellationToken);
+        }
+
         if (reassigned)
         {
             await AuditRecords.AppendAsync(
@@ -210,6 +224,9 @@ internal sealed partial class TaskEscalationHandler(ReleaseModelCache models, IL
 
     [LoggerMessage(LogLevel.Warning, "The subject record of task {TaskId} is missing, so the notify of escalation {Index} was skipped.")]
     private partial void LogNoSubject(Guid taskId, int index);
+
+    [LoggerMessage(LogLevel.Information, "Escalation {Index} of task {TaskId} sends no email to user {UserId}, who has no profile or no email.")]
+    private partial void LogNoEmailAddress(Guid taskId, int index, string userId);
 
     [LoggerMessage(LogLevel.Warning, "Escalation work item {ItemId} names no task or escalation, so it was discarded.")]
     private partial void LogNoEscalation(Guid itemId);
