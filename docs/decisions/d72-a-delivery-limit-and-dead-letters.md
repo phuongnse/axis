@@ -4,8 +4,8 @@ Status: **Agreed**
 
 M14 puts a limit on how often the worker tries a delivery again, and keeps
 what still fails as a dead letter that an operator can see and act on. The
-owner agreed this on 2026-10-25. It is built in M14, except the dead letter of
-one instance in a wait for event step, which is _(planned for M18)_. See
+owner agreed this on 2026-10-25. It is built in M14, and the dead letter of
+one instance in a wait for event step is built in M18. See
 [dead letters](../reference/process-events.md#dead-letters). It ends the "no
 limit on these retries yet" of event delivery.
 

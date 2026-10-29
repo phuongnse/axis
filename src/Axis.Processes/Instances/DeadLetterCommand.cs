@@ -34,7 +34,9 @@ public sealed record DeadLetterResult(DeadLetterOutcome Outcome, DeadLetterRow? 
 /// user's <c>retry</c> grant is the caller's. The row is locked first. A redeliver of an
 /// <c>event.deliver</c> dead letter needs its <c>async</c> trigger in the active release, clears the
 /// target's failure count and its <c>deadLettered</c> receipt, and queues an <c>event.deliver</c> item that names the
-/// trigger, so the handler delivers to that trigger alone. A redeliver of a <c>trigger.fanOut</c> dead
+/// trigger, so the handler delivers to that trigger alone. A redeliver of an <c>event.deliver</c> dead letter of a
+/// waiting instance needs nothing from the active release. It clears the failure count and queues an item that
+/// names the instance, so the handler wakes that instance alone, if it still waits. A redeliver of a <c>trigger.fanOut</c> dead
 /// letter needs its schedule trigger in the active release, clears the occurrence's failure count and queues
 /// the fan-out on the active release. Any other kind cannot be redelivered. A discard closes a dead letter
 /// of any kind. Both set the state, the reason, the user and the time, and append the audit record
@@ -154,10 +156,34 @@ public static class DeadLetterCommand
         DeadLetterRow letter,
         CancellationToken cancellationToken)
     {
-        if (letter.TriggerId is not { } triggerId || letter.EventId is not { } eventId)
+        if (letter.EventId is not { } eventId)
         {
             return DeadLetterOutcome.NotRedeliverable;
         }
+
+        if (letter.TriggerId is null)
+        {
+            // A wake of one waiting instance has no receipt row. The item names the instance, and the
+            // worker wakes it only while it still waits for the event.
+            if (letter.ProcessInstanceId is not { } instanceId)
+            {
+                return DeadLetterOutcome.NotRedeliverable;
+            }
+
+            await DeleteFailureAsync(transaction, DeliveryFailures.EventDeliverKind, $"{instanceId:D}/{eventId:D}", cancellationToken);
+            await WorkItemQueue.EnqueueAsync(
+                connection,
+                transaction,
+                tenantId,
+                ProcessStarts.EventDeliverWorkItemKind,
+                DateTimeOffset.UtcNow,
+                cancellationToken,
+                processInstanceId: instanceId,
+                eventId: eventId);
+            return DeadLetterOutcome.Settled;
+        }
+
+        var triggerId = letter.TriggerId.Value;
 
         // Otherwise the dead letter would be marked redelivered while the worker skips it.
         if (!active.Triggers.Any(trigger => trigger.Id == triggerId && trigger.Type == TriggerType.Event && trigger.Mode == TriggerMode.Async))

@@ -8,7 +8,9 @@ namespace Axis.Integration.Tests;
 /// The limit, backoff and dead letters of event deliveries. StepApp's <c>Announce</c> raises
 /// <c>RequestNoted</c>, and both <c>ApproveNotedRequests</c> and <c>DecideHugeNotedRequests</c> pass
 /// their <c>when</c> for a ratio of a million or more. A PostgreSQL trigger makes the start of
-/// <c>Decide</c> fail for one record, with an error message that quotes the event's ratio. The class
+/// <c>Decide</c> fail for one record, with an error message that quotes the event's ratio. Another one
+/// makes the wake of one waiting <c>WaitEvent</c> instance fail, while a <c>WaitNotedToo</c> instance waits
+/// for the same event. The class
 /// has its own fixture, so that trigger cannot affect <see cref="EventDeliveryTests"/>.
 /// </summary>
 [Collection(CollectionName)]
@@ -78,6 +80,94 @@ public sealed class DeadLetterTests(EventDeliveryFixture fixture) : IClassFixtur
         var started = Assert.Single(await InstancesAsync(tenant, "RoleApprove", delivery.SubjectId));
         Assert.Equal(("started", (Guid?)started), await ReceiptAsync(tenant, delivery.ApproveTriggerId, delivery));
         Assert.Empty(await InstancesAsync(tenant, "Decide", delivery.SubjectId));
+    }
+
+    [Fact]
+    public async Task Failing_wake_of_one_waiting_instance_becomes_an_open_dead_letter_while_the_other_instance_and_the_triggers_get_the_event()
+    {
+        var tenant = fixture.Tenant("a");
+        Assert.True(tenant.Model.TryGetProcess("WaitEvent", out var waitEvent));
+        var subjectId = await tenant.InsertRequestAsync(4_123_456.75m, 4);
+        var failing = await tenant.StartAsync("WaitEvent", subjectId, tenant.FirstReleaseId);
+        // A record has one waiting instance of a process, so the other waits in a second process on the same event.
+        var other = await tenant.StartAsync("WaitNotedToo", subjectId, tenant.FirstReleaseId);
+        await fixture.RunUntilIdleAsync("a", CancellationToken);
+        Assert.Equal(ProcessStarts.Waiting, (await tenant.InstanceAsync(failing)).State);
+        Assert.Equal(ProcessStarts.Waiting, (await tenant.InstanceAsync(other)).State);
+
+        await tenant.ScalarAsync(
+            $$"""
+            CREATE FUNCTION axis.test_injected_wake_failure() RETURNS trigger LANGUAGE plpgsql AS $body$
+            BEGIN
+                IF NEW.process_instance_id = '{{failing:D}}'::uuid THEN
+                    RAISE EXCEPTION 'wake refused';
+                END IF;
+                RETURN NEW;
+            END
+            $body$;
+            CREATE TRIGGER test_injected_wake_failure BEFORE INSERT ON axis.process_event_matches
+                FOR EACH ROW EXECUTE FUNCTION axis.test_injected_wake_failure();
+            """);
+        Guid eventId;
+        try
+        {
+            var announceId = await tenant.StartAsync("Announce", subjectId, tenant.FirstReleaseId);
+            await fixture.RunUntilIdleAsync("a", CancellationToken);
+            eventId = (Guid)(await tenant.ScalarAsync("SELECT id FROM axis.events WHERE process_instance_id = @id", ("id", announceId)))!;
+            for (var failures = 1; failures < Limit; failures++)
+            {
+                Assert.Equal(0L, await tenant.CountAsync("SELECT count(*) FROM axis.dead_letters WHERE event_id = @id", ("id", eventId)));
+                await tenant.ScalarAsync("UPDATE axis.process_work_items SET due_at = now() WHERE event_id = @id", ("id", eventId));
+                await fixture.RunUntilIdleAsync("a", CancellationToken);
+            }
+        }
+        finally
+        {
+            await tenant.ScalarAsync(
+                """
+                DROP TRIGGER test_injected_wake_failure ON axis.process_event_matches;
+                DROP FUNCTION axis.test_injected_wake_failure();
+                """);
+        }
+
+        await using var command = tenant.DataSource.CreateCommand(
+            """
+            SELECT kind, application_id, process_id, process_instance_id, trigger_id, event_id, attempts, last_error, state
+            FROM axis.dead_letters WHERE event_id = @id
+            """);
+        command.Parameters.AddWithValue("id", eventId);
+        await using (var reader = await command.ExecuteReaderAsync(CancellationToken))
+        {
+            Assert.True(await reader.ReadAsync(CancellationToken));
+            Assert.Equal("event.deliver", reader.GetString(0));
+            Assert.Equal(tenant.Model.Manifest.Id, reader.GetGuid(1));
+            Assert.Equal(waitEvent.Id, reader.GetGuid(2));
+            Assert.Equal(failing, reader.GetGuid(3));
+            Assert.True(reader.IsDBNull(4));
+            Assert.Equal(eventId, reader.GetGuid(5));
+            Assert.Equal(Limit, reader.GetInt32(6));
+            Assert.Equal("Npgsql.PostgresException with SQLSTATE P0001", reader.GetString(7));
+            Assert.Equal("open", reader.GetString(8));
+            Assert.False(await reader.ReadAsync(CancellationToken));
+        }
+
+        Assert.Equal(
+            Limit,
+            (int)(await tenant.ScalarAsync(
+                "SELECT attempts FROM axis.delivery_failures WHERE kind = 'event.deliver' AND target = @target",
+                ("target", $"{failing:D}/{eventId:D}")))!);
+        Assert.Equal(ProcessStarts.Waiting, (await tenant.InstanceAsync(failing)).State);
+        Assert.Equal(ProcessStarts.Completed, (await tenant.InstanceAsync(other)).State);
+        Assert.Equal(0L, await tenant.CountAsync("SELECT count(*) FROM axis.process_event_matches WHERE process_instance_id = @id", ("id", failing)));
+        Assert.Equal(1L, await tenant.CountAsync("SELECT count(*) FROM axis.process_event_matches WHERE process_instance_id = @id", ("id", other)));
+        Assert.Single(await InstancesAsync(tenant, "RoleApprove", subjectId));
+        Assert.Single(await InstancesAsync(tenant, "Decide", subjectId));
+        Assert.Equal(
+            2L,
+            await tenant.CountAsync(
+                "SELECT count(*) FROM axis.trigger_starts WHERE source = @source AND outcome = 'started'",
+                ("source", eventId.ToString("D"))));
+        Assert.Equal(0L, await tenant.CountAsync("SELECT count(*) FROM axis.process_work_items WHERE event_id = @id", ("id", eventId)));
     }
 
     [Fact]

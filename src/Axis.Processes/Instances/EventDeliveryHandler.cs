@@ -38,12 +38,17 @@ namespace Axis.Processes.Instances;
 /// history row, the <c>process.stepCompleted</c> audit record and the instance's next
 /// <c>process.step</c> item. A match that already exists skips the wake, so a delivery run again wakes
 /// nothing twice. An instance whose timeout resumed it first is no longer waiting and is skipped. A
-/// failed wake is not counted: its exception leaves the item claimed until its lease expires, and
-/// the item is then tried again. A last transaction
-/// deletes the item. When a trigger failed below the limit it instead makes the item due again
-/// after the shortest backoff among the failed triggers of the pass. An item that names a trigger,
+/// wake that fails is counted like a trigger: after the failed transaction has rolled back, a
+/// transaction of its own counts it in <c>axis.delivery_failures</c> for the instance and the event.
+/// At the limit it writes an <c>open</c> dead letter that names the instance's process and the
+/// instance, with no receipt. A later pass skips an instance that has such a dead letter for the
+/// event. A last transaction
+/// deletes the item. When a trigger or a wake failed below the limit it instead makes the item due again
+/// after the shortest backoff among the failures of the pass. An item that names a trigger,
 /// queued by an operator's redeliver of a dead letter, delivers to that trigger alone, wakes no
-/// instance, and is deleted when the active release no longer has it.
+/// instance, and is deleted when the active release no longer has it. An item that names an instance
+/// wakes that instance alone, delivers to no trigger, skips no instance for a dead letter, and is
+/// deleted when the instance no longer waits for the event.
 /// </summary>
 internal sealed partial class EventDeliveryHandler(ReleaseModelCache models, DeliverySettings settings, ILogger<EventDeliveryHandler> logger) : IDeliveryWorkItemHandler
 {
@@ -86,9 +91,17 @@ internal sealed partial class EventDeliveryHandler(ReleaseModelCache models, Del
                     // read sees the waiting instance or the step sees the occurrence.
                     await RecordEventLock.TakeAsync(transaction, occurrence.SubjectId, cancellationToken);
                     waiting = await FindWaitingAsync(new WorkItemContext(item, connection, transaction), occurrence, cancellationToken);
+                    if (waiting.Count == 0 && item.ProcessInstanceId is { } named)
+                    {
+                        LogNamedInstanceGone(item.Id, named, occurrence.Id);
+                    }
                 }
 
-                delivery = await FindDeliveryAsync(item, connection, transaction, occurrence, waiting.Count > 0, cancellationToken);
+                // An item that names an instance is a redeliver to that instance, so it delivers to no trigger.
+                if (item.ProcessInstanceId is null)
+                {
+                    delivery = await FindDeliveryAsync(item, connection, transaction, occurrence, waiting.Count > 0, cancellationToken);
+                }
             }
 
             if (delivery is null && waiting.Count == 0)
@@ -134,12 +147,28 @@ internal sealed partial class EventDeliveryHandler(ReleaseModelCache models, Del
             }
         }
 
-        // A wake is not counted when it fails: its exception leaves the item claimed, and the item is tried again after its lease.
         foreach (var instance in waiting)
         {
-            if (!await WakeAsync(item, connection, occurrence!, instance, cancellationToken))
+            try
             {
-                return WorkItemOutcome.LostClaim;
+                if (!await WakeAsync(item, connection, occurrence!, instance, cancellationToken))
+                {
+                    return WorkItemOutcome.LostClaim;
+                }
+            }
+            catch (Exception exception) when (exception is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
+            {
+                // The failed transaction is disposed, so it has rolled back and the connection is free.
+                var (held, delay) = await CountWakeFailureAsync(item, connection, occurrence!, instance, exception, cancellationToken);
+                if (!held)
+                {
+                    return WorkItemOutcome.LostClaim;
+                }
+
+                if (delay is { } wait && (backoff is not { } shortest || wait < shortest))
+                {
+                    backoff = wait;
+                }
             }
         }
 
@@ -210,6 +239,56 @@ internal sealed partial class EventDeliveryHandler(ReleaseModelCache models, Del
     }
 
     /// <summary>
+    /// Counts a failed wake of one waiting instance in a transaction of its own. Below the limit it
+    /// returns the backoff after which the item is due again. At the limit it writes the dead letter,
+    /// with no receipt, and returns no backoff. Returns <c>Held</c> as <see langword="false"/> when
+    /// another worker holds the item now, so nothing was written.
+    /// </summary>
+    private async Task<(bool Held, TimeSpan? Delay)> CountWakeFailureAsync(
+        ClaimedWorkItem item,
+        NpgsqlConnection connection,
+        StoredEvent occurrence,
+        WaitingInstance waiting,
+        Exception exception,
+        CancellationToken cancellationToken)
+    {
+        // Only the type and SQLSTATE are kept: the message of the exception can quote a payload value.
+        var error = DeliveryFailures.ErrorText(exception);
+        var target = $"{waiting.Id:D}/{occurrence.Id:D}";
+        int attempts;
+        Guid? deadLetterId = null;
+        await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))
+        {
+            if (!await WorkItemQueue.ExtendLeaseAsync(connection, transaction, item, item.Lease, cancellationToken))
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                LogLostClaim(item.Id, item.EventId);
+                return (false, null);
+            }
+
+            attempts = await DeliveryFailures.CountAsync(transaction, DeliveryFailures.EventDeliverKind, target, error, cancellationToken);
+            if (attempts >= settings.Attempts)
+            {
+                deadLetterId = await DeliveryFailures.InsertWakeDeadLetterAsync(
+                    transaction, occurrence.ApplicationId, waiting.ProcessId, waiting.Id, occurrence.Id, attempts, error, cancellationToken);
+            }
+
+            await transaction.CommitAsync(cancellationToken);
+        }
+
+        if (deadLetterId is { } deadLetter)
+        {
+            AxisMetrics.RecordDeadLetter(item.TenantId, DeliveryFailures.EventDeliverKind);
+            LogWakeDeadLettered(waiting.Id, occurrence.Id, attempts, deadLetter, DeliveryFailures.EventDeliverKind);
+            return (true, null);
+        }
+
+        var delay = DeliveryFailures.Backoff(attempts);
+        LogWakeFailed(waiting.Id, occurrence.Id, error, attempts, settings.Attempts, delay);
+        return (true, delay);
+    }
+
+    /// <summary>
     /// Finds the active release of the occurrence's application and its <c>async</c> triggers on the
     /// event, ignoring letter case. An item that names a trigger keeps that trigger only. Returns
     /// <see langword="null"/> when there is no active release or no such trigger. A missing active
@@ -257,7 +336,9 @@ internal sealed partial class EventDeliveryHandler(ReleaseModelCache models, Del
     /// record, earliest first. A step counts when its event is the occurrence's, ignoring letter case,
     /// in the release the instance is pinned to. Only an instance created at or before the
     /// occurrence's <c>raised_at</c> counts, as a <c>waitEvent</c> step uses only occurrences raised
-    /// at or after the instance's creation.
+    /// at or after the instance's creation. An item that names an instance keeps that instance only.
+    /// Any other item drops an instance that has an <c>event.deliver</c> dead letter for the event, in
+    /// any state, because its wake is the operator's now.
     /// </summary>
     private async Task<IReadOnlyList<WaitingInstance>> FindWaitingAsync(WorkItemContext context, StoredEvent occurrence, CancellationToken cancellationToken)
     {
@@ -276,6 +357,16 @@ internal sealed partial class EventDeliveryHandler(ReleaseModelCache models, Del
             }
         }
 
+        if (context.Item.ProcessInstanceId is { } named)
+        {
+            candidates = [.. candidates.Where(candidate => candidate.Id == named)];
+        }
+        else if (candidates.Count > 0)
+        {
+            var deadLettered = await DeadLetteredInstancesAsync(context, occurrence, candidates, cancellationToken);
+            candidates = [.. candidates.Where(candidate => !deadLettered.Contains(candidate.Id))];
+        }
+
         List<WaitingInstance> waiting = [];
         foreach (var candidate in candidates)
         {
@@ -290,6 +381,33 @@ internal sealed partial class EventDeliveryHandler(ReleaseModelCache models, Del
         }
 
         return waiting;
+    }
+
+    private static async Task<HashSet<Guid>> DeadLetteredInstancesAsync(
+        WorkItemContext context,
+        StoredEvent occurrence,
+        List<WaitingInstance> candidates,
+        CancellationToken cancellationToken)
+    {
+        HashSet<Guid> found = [];
+        await using var command = new NpgsqlCommand(
+            """
+            SELECT process_instance_id
+            FROM axis.dead_letters
+            WHERE kind = @kind AND event_id = @event AND process_instance_id = ANY(@ids)
+            """,
+            context.Connection,
+            context.Transaction);
+        command.Parameters.AddWithValue("kind", DeliveryFailures.EventDeliverKind);
+        command.Parameters.AddWithValue("event", occurrence.Id);
+        command.Parameters.AddWithValue("ids", candidates.Select(candidate => candidate.Id).ToArray());
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            found.Add(reader.GetGuid(0));
+        }
+
+        return found;
     }
 
     /// <summary>
@@ -511,6 +629,15 @@ internal sealed partial class EventDeliveryHandler(ReleaseModelCache models, Del
 
     [LoggerMessage(LogLevel.Warning, "Trigger {Trigger} failed to start for event {EventId} with {Error}, failure {Attempts} of {Limit}. Delivery is due again in {Delay}.")]
     private partial void LogDeliveryFailed(string trigger, Guid eventId, string error, int attempts, int limit, TimeSpan delay);
+
+    [LoggerMessage(LogLevel.Warning, "Wake of process instance {InstanceId} failed for event {EventId} with {Error}, failure {Attempts} of {Limit}. Delivery is due again in {Delay}.")]
+    private partial void LogWakeFailed(Guid instanceId, Guid eventId, string error, int attempts, int limit, TimeSpan delay);
+
+    [LoggerMessage(LogLevel.Warning, "Event delivery to process instance {InstanceId} for event {EventId} failed {Attempts} times and became dead letter {DeadLetterId} of kind {Kind}.")]
+    private partial void LogWakeDeadLettered(Guid instanceId, Guid eventId, int attempts, Guid deadLetterId, string kind);
+
+    [LoggerMessage(LogLevel.Information, "Event delivery work item {ItemId} names process instance {InstanceId}, which no longer waits for event {EventId}, so it was discarded.")]
+    private partial void LogNamedInstanceGone(Guid itemId, Guid instanceId, Guid eventId);
 
     [LoggerMessage(LogLevel.Warning, "Event delivery to trigger {TriggerId} for event {EventId} failed {Attempts} times and became dead letter {DeadLetterId} of kind {Kind}.")]
     private partial void LogDeadLettered(Guid triggerId, Guid eventId, int attempts, Guid deadLetterId, string kind);

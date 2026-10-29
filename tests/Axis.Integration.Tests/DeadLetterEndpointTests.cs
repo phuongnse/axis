@@ -11,7 +11,8 @@ namespace Axis.Integration.Tests;
 /// raises <c>RequestNoted</c>, and both <c>ApproveNotedRequests</c> and <c>DecideHugeNotedRequests</c> pass
 /// their <c>when</c> for a ratio of a million or more. A PostgreSQL trigger makes the start of
 /// <c>Decide</c> fail for one record until the delivery is a dead letter, and is dropped before the
-/// operator acts. <c>maria</c> holds <c>inspect</c> and <c>retry</c> on <c>Decide</c>, <c>ines</c> holds
+/// operator acts. A second PostgreSQL trigger makes the wake of one <c>WaitEvent</c> instance fail the same way.
+/// <c>maria</c> holds <c>inspect</c> and <c>retry</c> on <c>Decide</c> and <c>WaitEvent</c>, <c>ines</c> holds
 /// <c>inspect</c> only, and <c>otto</c> holds neither. The class shares a collection with
 /// <see cref="DeadLetterTests"/>, so the dead letters it makes cannot reach that class's metric listener.
 /// </summary>
@@ -142,6 +143,78 @@ public sealed class DeadLetterEndpointTests(TaskApiFixture fixture) : IClassFixt
     }
 
     [Fact]
+    public async Task A_dead_letter_of_a_waiting_instance_shows_in_the_list_of_its_process_with_the_instance_and_no_trigger()
+    {
+        var letter = await WakeDeadLetterAsync();
+
+        using var list = await ListOkAsync("maria", "?state=open", "WaitEvent");
+
+        var item = FindItem(list, letter.Id);
+        Assert.Equal("event.deliver", item.GetProperty("kind").GetString());
+        Assert.Equal(letter.EventId, item.GetProperty("eventId").GetGuid());
+        Assert.Equal(letter.InstanceId, item.GetProperty("processInstanceId").GetGuid());
+        Assert.Equal(JsonValueKind.Null, item.GetProperty("triggerId").ValueKind);
+        Assert.Equal(Limit, item.GetProperty("attempts").GetInt32());
+        Assert.Equal(["redeliver", "discard"], Commands(item));
+
+        // The dead letter belongs to the instance's process, not to Decide.
+        using var decide = await ListOkAsync("maria", "?state=open");
+        Assert.DoesNotContain(decide.RootElement.GetProperty("items").EnumerateArray(), candidate => candidate.GetProperty("id").GetGuid() == letter.Id);
+    }
+
+    [Fact]
+    public async Task Redelivering_a_dead_letter_of_a_waiting_instance_resumes_it_once()
+    {
+        var letter = await WakeDeadLetterAsync();
+        Assert.Equal("waiting", await InstanceStateAsync(letter.InstanceId));
+
+        using var response = await SendAsync("maria", HttpMethod.Post, $"dead-letters/{letter.Id:D}/redeliver", ReasonBody, "WaitEvent");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
+        Assert.Equal("redelivered", body.RootElement.GetProperty("state").GetString());
+        Assert.Equal(
+            1L,
+            await fixture.AdminCountAsync(
+                Tenant,
+                $"SELECT count(*) FROM axis.process_work_items WHERE kind = 'event.deliver' AND process_instance_id = '{letter.InstanceId:D}' AND event_id = '{letter.EventId:D}'"));
+
+        await fixture.RunUntilIdleAsync(Tenant, CancellationToken);
+
+        Assert.Equal("completed", await InstanceStateAsync(letter.InstanceId));
+        Assert.Equal(1L, await MatchCountAsync(letter.InstanceId));
+        Assert.Equal(
+            0L,
+            await fixture.AdminCountAsync(Tenant, $"SELECT count(*) FROM axis.delivery_failures WHERE target = '{letter.InstanceId:D}/{letter.EventId:D}'"));
+        Assert.Equal(0L, await fixture.AdminCountAsync(Tenant, $"SELECT count(*) FROM axis.process_work_items WHERE event_id = '{letter.EventId:D}'"));
+
+        // A second run changes nothing.
+        await fixture.RunUntilIdleAsync(Tenant, CancellationToken);
+        Assert.Equal("completed", await InstanceStateAsync(letter.InstanceId));
+        Assert.Equal(1L, await MatchCountAsync(letter.InstanceId));
+        Assert.Equal("redelivered", await StateAsync(letter.Id));
+    }
+
+    [Fact]
+    public async Task Discarding_a_dead_letter_of_a_waiting_instance_queues_no_delivery_and_leaves_the_instance_waiting()
+    {
+        var letter = await WakeDeadLetterAsync();
+
+        using var response = await SendAsync("maria", HttpMethod.Post, $"dead-letters/{letter.Id:D}/discard", ReasonBody, "WaitEvent");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal("discarded", await StateAsync(letter.Id));
+        Assert.Equal(
+            0L,
+            await fixture.AdminCountAsync(Tenant, $"SELECT count(*) FROM axis.process_work_items WHERE kind = 'event.deliver' AND event_id = '{letter.EventId:D}'"));
+
+        await fixture.RunUntilIdleAsync(Tenant, CancellationToken);
+
+        Assert.Equal("waiting", await InstanceStateAsync(letter.InstanceId));
+        Assert.Equal(0L, await MatchCountAsync(letter.InstanceId));
+    }
+
+    [Fact]
     public async Task Each_command_writes_an_audit_record_with_the_reason_and_the_user_as_actor()
     {
         var redelivered = await DeadLetterAsync();
@@ -259,9 +332,68 @@ public sealed class DeadLetterEndpointTests(TaskApiFixture fixture) : IClassFixt
         }
     }
 
-    private async Task<JsonDocument> ListOkAsync(string user, string query)
+    /// <summary>
+    /// Starts a <c>WaitEvent</c> instance for a new request with a ratio over a million, makes a PostgreSQL trigger
+    /// refuse its match row, raises <c>RequestNoted</c> and runs the delivery until the wake of that instance is a
+    /// dead letter. The PostgreSQL trigger is dropped before this returns, so a redelivery can wake the instance.
+    /// </summary>
+    private async Task<WakeLetter> WakeDeadLetterAsync()
     {
-        using var response = await SendAsync(user, HttpMethod.Get, $"dead-letters{query}", body: null);
+        var subjectId = await fixture.InsertRequestAsync(Tenant, null, divisor: 4, amount: 4_123_456.75m);
+        var instanceId = await fixture.StartAsync(Tenant, "WaitEvent", subjectId);
+        await fixture.RunUntilIdleAsync(Tenant, CancellationToken);
+        Assert.Equal("waiting", await InstanceStateAsync(instanceId));
+        var name = $"test_injected_wake_failure_{instanceId:N}";
+        await fixture.ScalarAsync(
+            Tenant,
+            $$"""
+            CREATE FUNCTION axis.{{name}}() RETURNS trigger LANGUAGE plpgsql AS $body$
+            BEGIN
+                IF NEW.process_instance_id = '{{instanceId:D}}'::uuid THEN
+                    RAISE EXCEPTION 'refused';
+                END IF;
+                RETURN NEW;
+            END
+            $body$;
+            CREATE TRIGGER {{name}} BEFORE INSERT ON axis.process_event_matches
+                FOR EACH ROW EXECUTE FUNCTION axis.{{name}}();
+            """);
+        try
+        {
+            var announceId = await fixture.StartAsync(Tenant, "Announce", subjectId);
+            await fixture.RunUntilIdleAsync(Tenant, CancellationToken);
+            var eventId = (Guid)(await fixture.ScalarAsync(Tenant, "SELECT id FROM axis.events WHERE process_instance_id = @id", ("id", announceId)))!;
+
+            // The first run failed once. Each later run follows a backoff that the test skips.
+            for (var failures = 1; failures < Limit; failures++)
+            {
+                await fixture.ScalarAsync(Tenant, "UPDATE axis.process_work_items SET due_at = now() WHERE event_id = @id", ("id", eventId));
+                await fixture.RunUntilIdleAsync(Tenant, CancellationToken);
+            }
+
+            var id = (Guid)(await fixture.ScalarAsync(Tenant, "SELECT id FROM axis.dead_letters WHERE event_id = @id", ("id", eventId)))!;
+            return new WakeLetter(id, eventId, instanceId);
+        }
+        finally
+        {
+            await fixture.ScalarAsync(
+                Tenant,
+                $"""
+                DROP TRIGGER {name} ON axis.process_event_matches;
+                DROP FUNCTION axis.{name}();
+                """);
+        }
+    }
+
+    private async Task<string> InstanceStateAsync(Guid instanceId) =>
+        (string)(await fixture.ScalarAsync(Tenant, "SELECT state FROM axis.process_instances WHERE id = @id", ("id", instanceId)))!;
+
+    private async Task<long> MatchCountAsync(Guid instanceId) =>
+        await fixture.AdminCountAsync(Tenant, $"SELECT count(*) FROM axis.process_event_matches WHERE process_instance_id = '{instanceId:D}'");
+
+    private async Task<JsonDocument> ListOkAsync(string user, string query, string process = "Decide")
+    {
+        using var response = await SendAsync(user, HttpMethod.Get, $"dead-letters{query}", body: null, process);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         return JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
     }
@@ -272,10 +404,10 @@ public sealed class DeadLetterEndpointTests(TaskApiFixture fixture) : IClassFixt
     private static string[] Commands(JsonElement item) =>
         [.. item.GetProperty("commands").EnumerateArray().Select(command => command.GetString()!)];
 
-    private async Task<HttpResponseMessage> SendAsync(string user, HttpMethod method, string path, string? body)
+    private async Task<HttpResponseMessage> SendAsync(string user, HttpMethod method, string path, string? body, string process = "Decide")
     {
         using var client = fixture.CreateClient().SignedInAs(user);
-        using var request = RecordApiFixture.Request(method, $"/api/apps/StepApp/processes/Decide/{path}", Host(Tenant), body);
+        using var request = RecordApiFixture.Request(method, $"/api/apps/StepApp/processes/{process}/{path}", Host(Tenant), body);
         return await client.SendAsync(request, CancellationToken);
     }
 
@@ -335,6 +467,8 @@ public sealed class DeadLetterEndpointTests(TaskApiFixture fixture) : IClassFixt
         Assert.True(await reader.ReadAsync(CancellationToken));
         return (reader.GetString(0), reader.IsDBNull(1) ? null : reader.GetGuid(1));
     }
+
+    private sealed record WakeLetter(Guid Id, Guid EventId, Guid InstanceId);
 
     private sealed record Letter(Guid Id, Guid SubjectId, Guid EventId, Guid TriggerId, Guid ApproveTriggerId);
 }
