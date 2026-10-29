@@ -113,7 +113,7 @@ internal static class ProcessStartEndpoints
             return NotFound("The application has no process with this name.");
         }
 
-        if (!PolicyEvaluator.AllowsStart(application, user.Roles, model))
+        if (!PolicyEvaluator.AllowsStart(application, user.RolesIn(application), model))
         {
             return Grants.Forbidden();
         }
@@ -177,7 +177,7 @@ internal static class ProcessStartEndpoints
         // A read filter on a field that is being recomputed decides nothing, so it is refused before the
         // record is looked up. An activation that leaves fields pending holds the start lock exclusively,
         // so the check cannot race it.
-        var read = PolicyEvaluator.Access(application, user.Roles, entity, PolicyAction.Read);
+        var read = PolicyEvaluator.Access(application, user.RolesIn(application), entity, PolicyAction.Read);
         if (read.Filters is { } pendingFilters
             && await RecordCommand.ReadsPendingAsync(connection, transaction, application, entity, pendingFilters, loggerFactory, cancellationToken))
         {

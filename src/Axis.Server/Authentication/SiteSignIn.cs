@@ -106,7 +106,8 @@ internal sealed class SiteSignIn(ITenantCatalog catalog, TenantSignInSettings se
         return levels.Count == 0 ? null : string.Join(' ', levels);
     }
 
-    private static string? AliasOf(IdentityProviderModel provider) =>
+    /// <summary>The realm alias of an <c>oidc</c> provider: <see cref="RealmSync.ProviderAliasPrefix"/> and the lower-case issuer binding, or <c>null</c> for any other provider.</summary>
+    internal static string? AliasOf(IdentityProviderModel provider) =>
         provider is { Type: "oidc", IssuerBinding: { } issuer } ? RealmSync.ProviderAliasPrefix + issuer.ToLowerInvariant() : null;
 
     /// <summary>

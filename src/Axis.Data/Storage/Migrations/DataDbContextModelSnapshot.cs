@@ -427,6 +427,13 @@ namespace Axis.Data.Storage.Migrations
                         .HasColumnType("bytea")
                         .HasColumnName("id_hash");
 
+                    b.Property<string>("ApplicationRoles")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("application_roles")
+                        .HasDefaultValueSql("'{}'::jsonb");
+
                     b.Property<DateTimeOffset?>("AuthenticatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("authenticated_at");

@@ -95,15 +95,15 @@ internal static class DataSourceEndpoints
             return NotFound("The application has no data source with this name.");
         }
 
-        if (!PolicyEvaluator.AllowsRead(application, user.Roles, model)
-            || DataSourceFieldAccess.Read(application, user.Roles, model) is not { } fields)
+        if (!PolicyEvaluator.AllowsRead(application, user.RolesIn(application), model)
+            || DataSourceFieldAccess.Read(application, user.RolesIn(application), model) is not { } fields)
         {
             return Grants.Forbidden();
         }
 
         // AllowsRead found the root entity, so it is in the model.
         var root = application.FindEntity(model.Entity.Id)!;
-        var read = PolicyEvaluator.Access(application, user.Roles, root, PolicyAction.Read);
+        var read = PolicyEvaluator.Access(application, user.RolesIn(application), root, PolicyAction.Read);
         var connection = await database.GetConnectionAsync(cancellationToken);
         if (read.Filters is { } pendingFilters
             && await RecordCommand.ReadsPendingAsync(connection, database.ReadTransaction, application, root, pendingFilters, loggerFactory, cancellationToken))
@@ -202,15 +202,15 @@ internal static class DataSourceEndpoints
             return NotFound("The application has no data source with this name.");
         }
 
-        if (!PolicyEvaluator.AllowsExport(application, user.Roles, model)
-            || DataSourceFieldAccess.Read(application, user.Roles, model) is not { } fields)
+        if (!PolicyEvaluator.AllowsExport(application, user.RolesIn(application), model)
+            || DataSourceFieldAccess.Read(application, user.RolesIn(application), model) is not { } fields)
         {
             return Grants.Forbidden();
         }
 
         // AllowsExport found the root entity, so it is in the model.
         var root = application.FindEntity(model.Entity.Id)!;
-        var read = PolicyEvaluator.Access(application, user.Roles, root, PolicyAction.Read);
+        var read = PolicyEvaluator.Access(application, user.RolesIn(application), root, PolicyAction.Read);
         var connection = await database.GetConnectionAsync(cancellationToken);
         if (read.Filters is { } pendingFilters
             && await RecordCommand.ReadsPendingAsync(connection, database.ReadTransaction, application, root, pendingFilters, loggerFactory, cancellationToken))

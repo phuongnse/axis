@@ -61,7 +61,7 @@ internal static class SiteEndpoints
 
             // The compiler resolves every navigation entry's page, so the lookup always succeeds.
             var readable = active.Site.Navigation
-                .Where(entry => PageAccess.CanRead(active.Application, user.Roles, active.Application.Pages.First(page => page.Id == entry.Page.Id)))
+                .Where(entry => PageAccess.CanRead(active.Application, user.RolesIn(active.Application), active.Application.Pages.First(page => page.Id == entry.Page.Id)))
                 .Select(entry => entry.Page.Name)
                 .ToHashSet(StringComparer.Ordinal);
             return Results.Ok(site with { Navigation = [.. site.Navigation.Where(item => readable.Contains(item.Page))] });
@@ -126,8 +126,8 @@ internal static class SiteEndpoints
 
             // The metadata holds the page's declared name, so the lookup always succeeds.
             var model = active.Application.Pages.First(candidate => candidate.Name == metadata.Name);
-            return PageAccess.CanRead(active.Application, user.Roles, model)
-                ? Results.Ok(PageAccess.Shape(active.Application, user.Roles, model, metadata))
+            return PageAccess.CanRead(active.Application, user.RolesIn(active.Application), model)
+                ? Results.Ok(PageAccess.Shape(active.Application, user.RolesIn(active.Application), model, metadata))
                 : Grants.Forbidden();
         }).WithQueryTimeout(QueryTimeoutSettings.Interactive);
     }

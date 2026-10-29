@@ -102,7 +102,7 @@ internal static class ProcessInspectionEndpoints
             return NotFound("The application has no process with this name.");
         }
 
-        if (!PolicyEvaluator.AllowsInspect(application, user.Roles, model))
+        if (!PolicyEvaluator.AllowsInspect(application, user.RolesIn(application), model))
         {
             return Grants.Forbidden();
         }
@@ -154,7 +154,7 @@ internal static class ProcessInspectionEndpoints
         }
 
         // An instance whose record the user may not read does not exist for them.
-        var read = PolicyEvaluator.Access(application, user.Roles, entity, PolicyAction.Read);
+        var read = PolicyEvaluator.Access(application, user.RolesIn(application), entity, PolicyAction.Read);
         if (!read.Granted)
         {
             return Results.Ok(new ProcessInstanceListResponse([], pageNumber, size, 0));
@@ -185,7 +185,7 @@ internal static class ProcessInspectionEndpoints
 
         // The query reads the display field of every listed instance. The label shows only when the user may
         // read the field and neither the active nor the pinned release marks it sensitive.
-        var readable = PolicyEvaluator.Fields(application, user.Roles, entity, PolicyAction.Read);
+        var readable = PolicyEvaluator.Fields(application, user.RolesIn(application), entity, PolicyAction.Read);
         var pinnedEntities = new Dictionary<Guid, EntityModel?>();
         var items = new List<ProcessInstanceListItem>(result.Items.Count);
         foreach (var item in result.Items)
@@ -262,7 +262,7 @@ internal static class ProcessInspectionEndpoints
             return NotFound("The application has no process with this name.");
         }
 
-        if (!PolicyEvaluator.AllowsInspect(application, user.Roles, model))
+        if (!PolicyEvaluator.AllowsInspect(application, user.RolesIn(application), model))
         {
             return Grants.Forbidden();
         }
@@ -288,7 +288,7 @@ internal static class ProcessInspectionEndpoints
             }
 
             // An instance whose record the user may not read does not exist for them.
-            var read = PolicyEvaluator.Access(application, user.Roles, entity, PolicyAction.Read);
+            var read = PolicyEvaluator.Access(application, user.RolesIn(application), entity, PolicyAction.Read);
             if (!read.Granted)
             {
                 return InstanceNotFound();
@@ -324,14 +324,14 @@ internal static class ProcessInspectionEndpoints
         // A parent or sub-process is named only when the user may inspect its process in the active release.
         // The subject record's read filters do not apply, and no subject id is shown.
         var relatives = await InstanceQueries.RelativesAsync(connection, application.Manifest.Id, row.Id, cancellationToken);
-        var parentProcess = relatives.Parent is { } relatedParent ? InspectableProcess(application, user.Roles, relatedParent.ProcessId) : null;
+        var parentProcess = relatives.Parent is { } relatedParent ? InspectableProcess(application, user.RolesIn(application), relatedParent.ProcessId) : null;
         var parent = relatives.Parent is { } parentRow && parentProcess is not null
             ? new ProcessInstanceParent(parentRow.Id, parentProcess.Name, parentRow.Step)
             : null;
         var subProcesses = new List<ProcessSubProcess>();
         foreach (var child in relatives.Children)
         {
-            if (InspectableProcess(application, user.Roles, child.ProcessId) is { } childProcess)
+            if (InspectableProcess(application, user.RolesIn(application), child.ProcessId) is { } childProcess)
             {
                 subProcesses.Add(new ProcessSubProcess(
                     child.Id,
@@ -355,9 +355,9 @@ internal static class ProcessInspectionEndpoints
 
         // The operator commands do not serve an instance without a subject yet, so the detail
         // offers none of them and no call is resolvable.
-        var allowsResolve = entity is not null && PolicyEvaluator.AllowsResolve(application, user.Roles, model);
+        var allowsResolve = entity is not null && PolicyEvaluator.AllowsResolve(application, user.RolesIn(application), model);
         var commands = new List<string>();
-        if (entity is not null && row.State == ProcessStarts.Failed && PolicyEvaluator.AllowsRetry(application, user.Roles, model))
+        if (entity is not null && row.State == ProcessStarts.Failed && PolicyEvaluator.AllowsRetry(application, user.RolesIn(application), model))
         {
             commands.Add("retry");
         }
@@ -365,7 +365,7 @@ internal static class ProcessInspectionEndpoints
         if (entity is not null
             && row.State is ProcessStarts.Running or ProcessStarts.Waiting
             && !calls.Any(call => call.State is ConnectorCalls.Sending or ConnectorCalls.Unknown)
-            && PolicyEvaluator.AllowsCancel(application, user.Roles, model))
+            && PolicyEvaluator.AllowsCancel(application, user.RolesIn(application), model))
         {
             commands.Add("cancel");
         }
@@ -413,7 +413,7 @@ internal static class ProcessInspectionEndpoints
                     }
 
                     var hidden = call.Input is not null
-                        && (!Readable(application, user.Roles, fields) || Sensitive(pinned, application, fields));
+                        && (!Readable(application, user.RolesIn(application), fields) || Sensitive(pinned, application, fields));
                     var outputs = allowsResolve && call.State == ConnectorCalls.Unknown && row.State == ProcessStarts.Waiting && row.Step == call.Step
                         ? DeclaredOutputs(pinned, call, packages)
                         : null;
