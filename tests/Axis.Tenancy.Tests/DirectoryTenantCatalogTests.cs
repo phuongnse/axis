@@ -206,6 +206,71 @@ public sealed class DirectoryTenantCatalogTests
         Assert.Equal("binding-v4lue", bindings["SECRET"].Secret!.Reveal());
     }
 
+    [Fact]
+    public void The_platform_sign_in_carries_accounts_the_aliases_roles_claims_and_role_values_in_ordinal_order_of_name()
+    {
+        var platform = DirectoryTenantCatalog.PlatformSignInOf(
+            new TenantRow { Id = "acme", PlatformAccounts = true },
+            [
+                new TenantPlatformProviderRow
+                {
+                    TenantId = "acme",
+                    Name = "partner",
+                    Type = "oidc",
+                    IssuerBinding = "partnerIssuer",
+                    RoleValues = "{}",
+                },
+                new TenantPlatformProviderRow
+                {
+                    TenantId = "acme",
+                    Name = "company",
+                    Type = "oidc",
+                    IssuerBinding = "CompanyIssuer",
+                    RolesClaim = "groups",
+                    RoleValues = """{"axis-authors":"author","axis-ops":"operator"}""",
+                },
+                new TenantPlatformProviderRow { TenantId = "acme", Name = "federation", Type = "saml", MetadataBinding = "federationMetadata", RolesClaim = " " },
+            ]);
+
+        Assert.NotNull(platform);
+        Assert.True(platform.Accounts);
+        Assert.Equal(["company", "federation", "partner"], platform.Providers.Select(provider => provider.Name));
+        var company = platform.Providers[0];
+        Assert.Equal("oidc-companyissuer", company.Alias);
+        Assert.Equal("groups", company.RolesClaim);
+        Assert.Equal(new Dictionary<string, string> { ["axis-authors"] = "author", ["axis-ops"] = "operator" }, company.RoleValues);
+        Assert.Null(platform.Providers[1].Alias);
+        Assert.Null(platform.Providers[1].RolesClaim);
+        Assert.Equal("oidc-partnerissuer", platform.Providers[2].Alias);
+        Assert.Empty(platform.Providers[2].RoleValues);
+    }
+
+    [Fact]
+    public void The_platform_sign_in_is_null_when_accounts_are_off_and_no_provider_is_stored()
+    {
+        Assert.Null(DirectoryTenantCatalog.PlatformSignInOf(new TenantRow { Id = "acme", PlatformAccounts = false }, []));
+
+        var accountsOnly = DirectoryTenantCatalog.PlatformSignInOf(new TenantRow { Id = "acme", PlatformAccounts = true }, []);
+        Assert.True(accountsOnly?.Accounts);
+        Assert.Empty(accountsOnly!.Providers);
+
+        var providerOnly = DirectoryTenantCatalog.PlatformSignInOf(
+            new TenantRow { Id = "acme", PlatformAccounts = false },
+            [new TenantPlatformProviderRow { TenantId = "acme", Name = "company", Type = "oidc", IssuerBinding = "companyIssuer" }]);
+        Assert.False(providerOnly?.Accounts);
+        Assert.Single(providerOnly!.Providers);
+    }
+
+    [Fact]
+    public void Role_values_that_are_not_a_json_object_of_strings_map_nothing()
+    {
+        var platform = DirectoryTenantCatalog.PlatformSignInOf(
+            new TenantRow { Id = "acme" },
+            [new TenantPlatformProviderRow { TenantId = "acme", Name = "company", Type = "oidc", IssuerBinding = "companyIssuer", RoleValues = """{"axis-authors":1}""" }]);
+
+        Assert.Empty(platform!.Providers[0].RoleValues);
+    }
+
     private const string ActivationSecret = "activ4tion-cl13nt-s3cret";
     private const string PlatformSecret = "pl4tform-cl13nt-s3cret";
 

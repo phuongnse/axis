@@ -1,9 +1,11 @@
 using Axis.Core.Tenancy;
 using Axis.Data.Audit;
 using Axis.Data.Profiles;
+using Axis.Server.Studio;
 using Axis.Server.Tenancy;
 using Axis.Server.Users;
 using Axis.Tenancy;
+using Axis.Tenancy.Realms;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.OpenIdConnect;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -41,6 +43,12 @@ internal static class TenantSignIn
     /// <c>fapi2</c> the callback's <c>iss</c>.
     /// </summary>
     public const string IssuerRejectedItem = "axis:sign_in_issuer_rejected";
+
+    /// <summary>
+    /// The request item that <c>OnTokenValidated</c> sets when the tenant's platform sign-in does not accept the provider
+    /// of the sign-in, or does not accept accounts.
+    /// </summary>
+    public const string ProviderRefusedItem = "axis:sign_in_provider_refused";
 
     /// <summary>The request item that <c>OnTokenValidated</c> fills with the <see cref="ProfileClaims"/> for <c>OnTicketReceived</c>.</summary>
     public const string ProfileClaimsItem = "axis:sign_in_profile";
@@ -174,6 +182,27 @@ internal sealed partial class TenantSignInOptions(TenantSignInSettings settings,
 
             var displayName = principal.FindFirst(tenant.Claims.DisplayName)?.Value;
             var roles = principal.FindAll(tenant.Claims.Roles).Select(claim => claim.Value);
+            if (tenant.PlatformSignIn is { } platform)
+            {
+                // The roles the tenant's roles claim gives stay, and the roles that the provider's mapping gives are added.
+                var services = context.HttpContext.RequestServices;
+                var mapped = PlatformRoles.Resolve(
+                    platform,
+                    principal.FindFirst(RealmSync.IdentityProviderClaim)?.Value,
+                    name => principal.FindAll(name).Select(claim => claim.Value),
+                    services.GetRequiredService<StudioOptions>(),
+                    services.GetRequiredService<ConsoleSettings>(),
+                    services.GetRequiredService<UsersSettings>());
+                if (mapped is null)
+                {
+                    context.HttpContext.Items[TenantSignIn.ProviderRefusedItem] = true;
+                    context.Fail("The platform sign-in does not accept the provider.");
+                    return Task.CompletedTask;
+                }
+
+                roles = roles.Concat(mapped).Distinct(StringComparer.Ordinal);
+            }
+
             // The email and locale are not session claims. They go to OnTicketReceived in a request item.
             context.HttpContext.Items[TenantSignIn.ProfileClaimsItem] = new ProfileClaims(
                 Blank(principal.FindFirst(tenant.Claims.Email)?.Value),
@@ -219,13 +248,14 @@ internal sealed partial class TenantSignInOptions(TenantSignInSettings settings,
                 var query = httpContext.Request.Query;
                 var tokenRejected = httpContext.Items.ContainsKey(TenantSignIn.TokenRejectedItem);
                 var issuerRejected = httpContext.Items.ContainsKey(TenantSignIn.IssuerRejectedItem);
-                // A rejected token or issuer comes after the state was read, but the failure it leaves carries no properties.
-                var stateRead = context.Properties is not null || tokenRejected || issuerRejected;
+                // A rejected token, issuer or provider comes after the state was read, but the failure it leaves carries no properties.
+                var providerRefused = httpContext.Items.ContainsKey(TenantSignIn.ProviderRefusedItem);
+                var stateRead = context.Properties is not null || tokenRejected || issuerRejected || providerRefused;
                 var otherTenantReadsState = !stateRead
                     && query["state"].ToString() is { Length: > 0 } state
                     && OtherTenantReadsState(httpContext, tenantId, state);
                 var providerError = !string.IsNullOrEmpty(query["error"].ToString());
-                var reason = SignInRefusals.Classify(stateRead, otherTenantReadsState, providerError, context.Failure, tokenRejected, issuerRejected);
+                var reason = SignInRefusals.Classify(stateRead, otherTenantReadsState, providerError, context.Failure, tokenRejected, issuerRejected, providerRefused);
                 await SessionAudit.AppendAsync(
                     httpContext,
                     AuditActions.SessionSignInRefused,

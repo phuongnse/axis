@@ -141,10 +141,10 @@ so Studio edits it, with the identity provider editor of [Studio](studio.md), an
 ## Platform sign-in
 
 `tenant sign-in set` stores the platform sign-in in the tenant directory, and `tenant create` and `tenant restore`
-set accounts on. Both are built. The realm sync is built: `tenant sign-in set` brings the tenant's realm in step, and every
-activation keeps the platform sign-in's providers in it, see
-[keeping the realm in step](#keeping-the-realm-in-step). The server's checks of the stored platform sign-in are
-_(planned for M17)_.
+set accounts on. Both are built. The server's callback for the platform pages reads the stored platform sign-in, see
+below. The realm sync is built: `tenant sign-in set` brings the tenant's realm in step, and every activation keeps the
+platform sign-in's providers in it, see [keeping the realm in step](#keeping-the-realm-in-step). The server's other
+checks of the stored platform sign-in are _(planned for M17)_.
 
 - The home page, Studio, the operator console, the account page and the users page belong to no site. The tenant's
   platform sign-in says which providers they accept.
@@ -153,6 +153,23 @@ _(planned for M17)_.
   [sign-in settings](tenant-setting-commands.md#sign-in-settings).
 - The author, publisher, operator and administrator roles are roles claim values of the platform sign-in, mapped as
   `roles` maps them, or roles that the users page gives.
+- The sign-in callback of a platform page checks the platform sign-in. It refuses a provider that the platform sign-in
+  does not accept, and an account sign-in when accounts are off. The refused callback writes `session.signInRefused`
+  with the reason `providerNotAccepted`, see [sign-in and the session](security.md#sign-in-and-the-session). A provider
+  matches the `identity_provider` claim of the ID token by its alias, `oidc-` and the lower-case issuer binding. A
+  `saml` provider has no alias yet, so its sign-ins are refused. A token with no `identity_provider` claim is an
+  account sign-in.
+- For an accepted provider, the callback reads the values of the ID token claim `axis_roles_<roles claim>`, the user
+  attribute that the realm sync writes for each roles claim. It maps each value to author, publisher, operator or
+  administrator, and gives the role names that `Studio:AuthorRole`, `Studio:PublisherRole`, `Console:OperatorRole` and
+  `Users:AdministratorRole` set. The session keeps the roles that the tenant's roles claim gives, which include the
+  roles of the users page, and the mapped roles are added. The claims come from the `axis` client's token, which the
+  realm sync sets up.
+- A tenant with accounts off and no provider stored has no platform sign-in. It accepts every sign-in and takes roles as
+  the tenant's roles claim gives them. So does a tenant of the `configuration` source. A preview tenant uses its main
+  tenant's platform sign-in.
+- A change made with `tenant sign-in set` reaches the server at the next refresh of the tenant directory, like any other
+  sign-in setting.
 - `tenant create` sets accounts on, so a new tenant can sign in its first administrator before any application is
   published, see [the first administrator](user-administration.md#the-first-administrator).
 - On the tenant's host the home page's sign-in also offers the providers of the sites that share the host. After
