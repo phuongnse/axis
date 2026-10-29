@@ -179,15 +179,15 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place. _(planned f
     [D49](../decisions/d49-several-server-replicas-behind-a-tls-proxy.md).
 - **Session.** The session state is a row of `axis.sessions` in the tenant
   database, see [D84](../decisions/d84-asvs-level-2-and-a-server-side-session.md).
-  - The row holds a hash of the session id, the user id, the display name,
-    the roles, the time of sign-in, the time of the last request and the time
-    of the person's last login at the identity provider, read from the ID
-    token's `auth_time`. A session that was created before that column
-    existed holds no such time. It also holds the lower-case site path of the
-    host that made the session, null for the tenant's own hosts. A session
-    that was created before that column existed holds none, so it counts as a
-    session of the tenant's own hosts. The table never holds the session id itself, or a token, and no token
-    reaches the browser.
+  - The row holds a hash of the session id, the user id, the display name, the
+    roles, the time of sign-in, the time of the last request and the time of the
+    person's last login at the identity provider, read from the ID token's
+    `auth_time`. It also holds the lower-case site path of the host that made the
+    session, null for the tenant's own hosts, and the alias of the provider that
+    signed the person in, from the ID token's `identity_provider` claim, none for
+    accounts. A session from before a column existed holds none of it and counts
+    as a sign-in through accounts on the tenant's own hosts. The table never holds the
+    session id or a token, and none reaches the browser.
   - The cookie is one HttpOnly, SameSite=Lax cookie. It holds only the random
     session id, 256 bits, wrapped and protected by the key ring below. It
     holds no claim. The row's key is the SHA-256 hash of the id.

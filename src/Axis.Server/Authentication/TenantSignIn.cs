@@ -274,7 +274,8 @@ internal sealed partial class TenantSignInOptions(TenantSignInSettings settings,
                 userId,
                 string.IsNullOrWhiteSpace(displayName) ? userId : displayName,
                 roles,
-                authenticatedAt: SignInRecency.TryRead(authTime, out var authenticatedAt) ? authenticatedAt : null);
+                authenticatedAt: SignInRecency.TryRead(authTime, out var authenticatedAt) ? authenticatedAt : null,
+                identityProvider: Blank(principal.FindFirst(RealmSync.IdentityProviderClaim)?.Value));
         };
         // Every profile refuses metadata whose issuer is not the tenant's authority, before the code goes to the token endpoint.
         options.Events.OnAuthorizationCodeReceived = async context =>

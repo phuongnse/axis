@@ -14,7 +14,7 @@ namespace Axis.Server.Authentication;
 /// cookie holds only the key of a session. The key is 32 random bytes in base64url, and the row's key
 /// is the SHA-256 hash of those bytes. The row never holds the key or a token. A request reads the row,
 /// moves its last request time and refuses it once it is past <see cref="Session.IdleTimeout"/> or
-/// <see cref="Session.MaxLifetime"/>. The row holds the site path of the host that made it, null for the tenant's own
+/// <see cref="Session.MaxLifetime"/>. The row holds the alias of the provider that signed the person in, null for accounts. It holds the site path of the host that made it, null for the tenant's own
 /// hosts, and a request on another host of the tenant neither uses nor deletes it. The overloads without an <see cref="HttpContext"/> cannot know the
 /// tenant, so they are not supported.
 /// </summary>
@@ -37,8 +37,8 @@ internal sealed class SessionStore : ITicketStore
         var connection = await httpContext.RequestServices.GetRequiredService<TenantDatabase>().GetConnectionAsync(cancellationToken);
         await using var command = new NpgsqlCommand(
             """
-            INSERT INTO axis.sessions (id_hash, user_id, display_name, roles, signed_in_at, last_request_at, authenticated_at, site_path)
-            VALUES (@hash, @user, @name, @roles, @now, @now, @authenticatedAt, @site)
+            INSERT INTO axis.sessions (id_hash, user_id, display_name, roles, signed_in_at, last_request_at, authenticated_at, site_path, identity_provider)
+            VALUES (@hash, @user, @name, @roles, @now, @now, @authenticatedAt, @site, @identityProvider)
             """,
             connection);
         command.Parameters.AddWithValue("hash", SHA256.HashData(id));
@@ -51,6 +51,10 @@ internal sealed class SessionStore : ITicketStore
             Value = Session.ReadAuthenticatedAt(ticket.Principal) is { } authenticatedAt ? authenticatedAt : DBNull.Value,
         });
         command.Parameters.Add(SiteParameter(tenant));
+        command.Parameters.Add(new NpgsqlParameter("identityProvider", NpgsqlDbType.Text)
+        {
+            Value = (object?)Session.ReadIdentityProvider(ticket.Principal) ?? DBNull.Value,
+        });
         await command.ExecuteNonQueryAsync(cancellationToken);
         return Base64Url.EncodeToString(id);
     }
@@ -81,7 +85,7 @@ internal sealed class SessionStore : ITicketStore
             """
             UPDATE axis.sessions SET last_request_at = @now
             WHERE id_hash = @hash AND site_path IS NOT DISTINCT FROM @site AND signed_in_at > @signedInAfter AND last_request_at > @activeAfter
-            RETURNING user_id, display_name, roles, authenticated_at
+            RETURNING user_id, display_name, roles, authenticated_at, identity_provider
             """,
             connection))
         {
@@ -99,7 +103,8 @@ internal sealed class SessionStore : ITicketStore
                     reader.GetString(1),
                     reader.GetFieldValue<string[]>(2),
                     await reader.IsDBNullAsync(3, cancellationToken) ? null : reader.GetFieldValue<DateTimeOffset>(3),
-                    Base64Url.EncodeToString(hash));
+                    Base64Url.EncodeToString(hash),
+                    await reader.IsDBNullAsync(4, cancellationToken) ? null : reader.GetString(4));
                 // The handler renews a cookie only for a ticket that carries both times.
                 var properties = new AuthenticationProperties { IssuedUtc = now, ExpiresUtc = now + Session.IdleTimeout };
                 return new AuthenticationTicket(principal, properties, Session.Scheme);

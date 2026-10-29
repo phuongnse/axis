@@ -11,7 +11,11 @@ namespace Axis.Server.Authentication;
 /// Where a sign-in for a site goes: the site's path, the provider to send the person to, when there is one, and the
 /// <c>acr_values</c> to ask for, when the site's providers have <c>acr</c> lists.
 /// </summary>
-internal sealed record SiteSignInTarget(string Path, string? ProviderHint, string? AcrValues);
+internal sealed record SiteSignInTarget(string Path, string? ProviderHint, string? AcrValues, RealmSiteClient Client)
+{
+    /// <summary>Whether the site allows the provider that signed the person in, see <see cref="SiteSignIn.Allows"/>.</summary>
+    public bool Allows(string? identityProvider) => SiteSignIn.Allows(Client, identityProvider);
+}
 
 /// <summary>
 /// Finds out whether a sign-in starts on a site page, so it goes to the realm through the site's own client
@@ -116,7 +120,7 @@ internal sealed class SiteSignIn(ITenantCatalog catalog, TenantSignInSettings se
             return null;
         }
 
-        return new SiteSignInTarget(found.Client.Path, ProviderHint(found.Client), AcrValues(found.Active.Application, found.Active.Site));
+        return new SiteSignInTarget(found.Client.Path, ProviderHint(found.Client), AcrValues(found.Active.Application, found.Active.Site), found.Client);
     }
 
     /// <summary>
@@ -125,6 +129,14 @@ internal sealed class SiteSignIn(ITenantCatalog catalog, TenantSignInSettings se
     /// </summary>
     public async Task<bool> AllowsAsync(string tenantId, string path, string? identityProvider, CancellationToken cancellationToken)
         => await SiteClientAsync(tenantId, path, cancellationToken) is { } found && Allows(found, identityProvider);
+
+    /// <summary>
+    /// Whether a session through <paramref name="identityProvider"/> may read the site at <paramref name="path"/>. It is
+    /// <c>true</c> when the tenant has no site clients or no active site has the path, because then there is no sign-in list to
+    /// check against.
+    /// </summary>
+    public async Task<bool> ServesAsync(string tenantId, string path, string? identityProvider, CancellationToken cancellationToken)
+        => await FindActiveAsync(tenantId, path, cancellationToken) is not { } found || Allows(found.Client, identityProvider);
 
     /// <summary>
     /// The levels that the active site at <paramref name="path"/> accepts from the provider with <paramref name="alias"/>. It is

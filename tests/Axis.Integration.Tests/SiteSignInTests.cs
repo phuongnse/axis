@@ -18,8 +18,9 @@ namespace Axis.Integration.Tests;
 /// Sign-in that starts on a site page, against Keycloak. Tenant <c>a</c> has realm details, and its startup activation syncs the
 /// site clients of its application into the realm. In the development realm the application has two sites that allow accounts,
 /// <c>sitesaccounts</c> and <c>sitesother</c>, as that realm has no flow for a brokered provider. In a realm of its own the application
-/// has <c>sitespartner</c> as well, which allows only the brokered provider <c>partner</c>. The tests show the client of each
-/// sign-in, the provider hint and the check of the ID token's audience.
+/// has <c>sitespartner</c> and <c>sitespartner2</c> as well, which allow only the brokered provider <c>partner</c>. The tests show
+/// the client of each sign-in, the provider hint, the check of the ID token's audience, the provider that the session row keeps
+/// and the sites that serve a session through that provider.
 /// </summary>
 public sealed class SiteSignInTests(KeycloakFixture keycloak, PostgreSqlFixture database) : IAsyncLifetime, IClassFixture<PostgreSqlFixture>
 {
@@ -52,6 +53,7 @@ public sealed class SiteSignInTests(KeycloakFixture keycloak, PostgreSqlFixture 
         Assert.Equal(HttpStatusCode.OK, me.StatusCode);
         Assert.Equal(1L, await CountAsync("axis.sessions"));
         Assert.Equal(1L, await CountAsync("axis.audit_records WHERE action = 'session.signedIn'"));
+        Assert.Null(await SessionIdentityProviderAsync());
     }
 
     [Fact]
@@ -177,8 +179,49 @@ public sealed class SiteSignInTests(KeycloakFixture keycloak, PostgreSqlFixture 
             Assert.Equal("/sitespartner", signedIn.Headers.Location!.OriginalString);
             Assert.Equal(1L, await CountAsync("axis.sessions"));
             Assert.Equal(1L, await CountAsync("axis.audit_records WHERE action = 'session.signedIn'"));
+            Assert.Equal("oidc-siteissuer", await SessionIdentityProviderAsync());
             using var me = await host.Client.GetAsync(new Uri("/api/me", UriKind.Relative), CancellationToken);
             Assert.Equal(HttpStatusCode.OK, me.StatusCode);
+        }
+        finally
+        {
+            await realms.DeleteRealmsAsync();
+        }
+    }
+
+    [Fact]
+    public async Task A_session_through_a_provider_opens_a_second_site_that_allows_it_and_a_site_that_does_not_asks_to_sign_in_again()
+    {
+        var baseAddress = await keycloak.BaseAddressAsync();
+        using var realms = await UpstreamRealms.CreateAsync(baseAddress);
+        try
+        {
+            var (host, upstream) = await StartBrokeredAsync(realms, baseAddress);
+            await using var hosted = host;
+            var callback = await realms.LogInAsync(await host.AuthorizeAsync("/sitespartner"), upstream, _callbackAddress);
+            using var signedIn = await host.Client.GetAsync(callback.PathAndQuery, CancellationToken);
+            Assert.Equal(HttpStatusCode.Found, signedIn.StatusCode);
+
+            // The second site allows the same provider, so it serves the session with no new callback.
+            using var allowed = await host.Client.GetAsync(new Uri("/api/sites/sitespartner2", UriKind.Relative), CancellationToken);
+            Assert.Equal(HttpStatusCode.OK, allowed.StatusCode);
+            using var allowedPage = await host.Client.GetAsync(new Uri("/api/sites/sitespartner2/pages/Home", UriKind.Relative), CancellationToken);
+            Assert.Equal(HttpStatusCode.OK, allowedPage.StatusCode);
+
+            // The third site allows only accounts, so every read of it asks for a new sign-in. An unknown site is still 404.
+            foreach (var refused in new[] { "/api/sites/sitesaccounts", "/api/sites/sitesaccounts/pages/Home", "/api/sites/sitesaccounts/texts/en" })
+            {
+                using var response = await host.Client.GetAsync(new Uri(refused, UriKind.Relative), CancellationToken);
+                Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+            }
+
+            using var unknown = await host.Client.GetAsync(new Uri("/api/sites/nosuchsite", UriKind.Relative), CancellationToken);
+            Assert.Equal(HttpStatusCode.NotFound, unknown.StatusCode);
+
+            // The sign-in for the refused site asks the realm for credentials. The sign-in for an allowed site does not.
+            Assert.Equal("login", (await host.SignInQueryAsync("/sitesaccounts"))["prompt"]);
+            Assert.Null((await host.SignInQueryAsync("/sitespartner2"))["prompt"]);
+            Assert.Equal(1L, await CountAsync("axis.sessions"));
         }
         finally
         {
@@ -300,7 +343,7 @@ public sealed class SiteSignInTests(KeycloakFixture keycloak, PostgreSqlFixture 
 
     /// <summary>
     /// An application with the sites <c>sitesaccounts</c> and, as that realm has no flow for a brokered provider, <c>sitesother</c>, which allow
-    /// accounts. With <paramref name="partner"/> it has the site <c>sitespartner</c> too, which allows only the provider <c>partner</c>,
+    /// accounts. With <paramref name="partner"/> it has the sites <c>sitespartner</c> and <c>sitespartner2</c> too, which allow only the provider <c>partner</c>,
     /// and a <paramref name="partnerAcr"/> list is the provider's <c>acr</c>.
     /// </summary>
     private static TemporaryFolder Applications(bool partner, string[]? partnerAcr = null)
@@ -327,6 +370,7 @@ public sealed class SiteSignInTests(KeycloakFixture keycloak, PostgreSqlFixture 
                       "clientSecret": { "binding": "{{SiteSecret}}" }{{acr}} }
                     """)
                 .With("sites/sitespartner.json", Site("3c6b1f52-8d0e-4a47-9c1b-2f7e5a9d4b16", "sitespartner", "partner"))
+                .With("sites/sitespartner2.json", Site("3c6b1f52-8d0e-4a47-9c1b-2f7e5a9d4b18", "sitespartner2", "partner"))
             : folder.With("sites/sitesother.json", Site("3c6b1f52-8d0e-4a47-9c1b-2f7e5a9d4b17", "sitesother", "accounts"));
     }
 
@@ -386,6 +430,9 @@ public sealed class SiteSignInTests(KeycloakFixture keycloak, PostgreSqlFixture 
         });
         return new SiteHost(factory, client, applications, authority);
     }
+
+    private async Task<string?> SessionIdentityProviderAsync() =>
+        await PostgreSqlServer.AdminScalarAsync(_schemaConnection!, "SELECT identity_provider FROM axis.sessions", CancellationToken) as string;
 
     private async Task<long> CountAsync(string from) =>
         (long)(await PostgreSqlServer.AdminScalarAsync(_schemaConnection!, $"SELECT count(*) FROM {from}", CancellationToken))!;

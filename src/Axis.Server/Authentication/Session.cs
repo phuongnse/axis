@@ -38,19 +38,22 @@ internal static class Session
     private const string TenantIdClaim = "axis:tenant_id";
     private const string AuthenticatedAtClaim = "axis:authenticated_at";
     private const string SessionIdClaim = "axis:session_id";
+    private const string IdentityProviderClaim = "axis:identity_provider";
 
     /// <summary>How recent the person's last login at the identity provider must be for the session to end sessions.</summary>
     public static readonly TimeSpan ReauthenticationWindow = TimeSpan.FromMinutes(5);
 
     /// <param name="authenticatedAt">The person's last login at the identity provider, or null when it is not known.</param>
     /// <param name="sessionId">The public id of the stored session, set only for a principal that the store read.</param>
+    /// <param name="identityProvider">The alias of the provider that signed the person in, or null for the tenant's accounts.</param>
     public static ClaimsPrincipal CreatePrincipal(
         string tenantId,
         string userId,
         string displayName,
         IEnumerable<string> roles,
         DateTimeOffset? authenticatedAt = null,
-        string? sessionId = null)
+        string? sessionId = null,
+        string? identityProvider = null)
     {
         List<Claim> claims =
         [
@@ -67,6 +70,11 @@ internal static class Session
         if (sessionId is not null)
         {
             claims.Add(new Claim(SessionIdClaim, sessionId));
+        }
+
+        if (!string.IsNullOrWhiteSpace(identityProvider))
+        {
+            claims.Add(new Claim(IdentityProviderClaim, identityProvider));
         }
 
         return new ClaimsPrincipal(new ClaimsIdentity(claims, Scheme, UserIdClaim, RoleClaim));
@@ -89,6 +97,10 @@ internal static class Session
         long.TryParse(principal.FindFirstValue(AuthenticatedAtClaim), NumberStyles.Integer, CultureInfo.InvariantCulture, out var seconds)
             ? DateTimeOffset.FromUnixTimeSeconds(seconds)
             : null;
+
+    /// <summary>The alias of the provider that signed the person in, or null for a sign-in through the accounts.</summary>
+    public static string? ReadIdentityProvider(ClaimsPrincipal principal) =>
+        principal.FindFirstValue(IdentityProviderClaim) is { Length: > 0 } alias ? alias : null;
 
     /// <summary>The public id of the stored session, or null when the principal did not come from the store.</summary>
     public static string? ReadSessionId(ClaimsPrincipal principal) => principal.FindFirstValue(SessionIdClaim);
