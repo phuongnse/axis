@@ -26,7 +26,7 @@ namespace Axis.Data;
 /// Activation reads the identity providers of the tenant's other active releases and plans the realm from them and the
 /// release (<see cref="ActivationResult.Realm"/>). A provider that names the same issuer binding as another provider with
 /// other client bindings, or the same bindings with other <c>claims</c>, is refused with
-/// <see cref="DiagnosticCodes.IdentityProviderSplitsUser"/> before provisioning. Nothing applies the plan to the realm yet.
+/// <see cref="DiagnosticCodes.IdentityProviderSplitsUser"/> before provisioning. <c>Axis.Admin</c> applies the plan to the realm after the activation commits.
 /// </para>
 /// <para>
 /// It also refuses a module upgrade that drops a module entity or field, or changes a field's type, with

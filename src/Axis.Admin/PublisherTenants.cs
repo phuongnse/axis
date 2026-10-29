@@ -1,3 +1,4 @@
+using Axis.Configuration.Realms;
 using Axis.Configuration.Storage;
 using Axis.Data;
 using Axis.Data.Storage;
@@ -12,7 +13,8 @@ namespace Axis.Admin;
 /// <summary>
 /// One tenant the publisher serves: its id, its schema version, its bindings and how to connect to its database.
 /// <paramref name="HasPreview"/> means the tenant has a preview tenant in any state. <paramref name="Preview"/> is that tenant,
-/// only when the publisher serves it.
+/// only when the publisher serves it. <paramref name="SyncRealm"/> brings the tenant's realm in step after an activation, or is
+/// <c>null</c> when the tenant has no realm details, such as a preview tenant.
 /// </summary>
 internal sealed record PublisherTenant(
     string Id,
@@ -20,7 +22,8 @@ internal sealed record PublisherTenant(
     ActivationBindings Bindings,
     Func<ITenantConnections> Connect,
     bool HasPreview = false,
-    PublisherTenant? Preview = null);
+    PublisherTenant? Preview = null,
+    Func<RealmPlan, Task>? SyncRealm = null);
 
 /// <summary>Where the publisher learns the tenants it serves: the tenant directory or the <c>Tenants</c> configuration section.</summary>
 internal interface IPublisherTenants
@@ -36,7 +39,7 @@ internal interface IPublisherTenants
 }
 
 /// <summary>The active tenants of the directory that are on this build's schema version.</summary>
-internal sealed class DirectoryPublisherTenants(PlatformSettings settings, TimeSpan readInterval) : IPublisherTenants
+internal sealed class DirectoryPublisherTenants(PlatformSettings settings, TimeSpan readInterval, HttpClient http) : IPublisherTenants
 {
     public TimeSpan ReadInterval => readInterval;
 
@@ -52,14 +55,17 @@ internal sealed class DirectoryPublisherTenants(PlatformSettings settings, TimeS
             .Where(row => row.Status == "active" && row.SchemaVersion == TenantSchemaVersion.Current)
             .OrderBy(row => row.Id, StringComparer.Ordinal)
             .ToList();
-        var bindings = await AdminCommands.ReadBindingsAsync(platform, [.. served.Select(row => row.Id)], cancellationToken);
+        var ids = served.Select(row => row.Id).ToList();
+        var bindings = await AdminCommands.ReadBindingsAsync(platform, ids, cancellationToken);
+        var realmBindings = await AdminCommands.ReadRealmBindingsAsync(platform, ids, settings.Cipher, cancellationToken);
         var records = served.ToDictionary(
             row => row.Id,
             row => new PublisherTenant(
                 row.Id,
                 row.SchemaVersion,
                 bindings[row.Id],
-                () => new TenantDatabaseSteps(settings.Cipher, row, row.DatabaseHost, row.DatabasePort, TenantDatabaseTls.From(settings.PlatformConnectionString), CancellationToken.None)),
+                () => new TenantDatabaseSteps(settings.Cipher, row, row.DatabaseHost, row.DatabasePort, TenantDatabaseTls.From(settings.PlatformConnectionString), CancellationToken.None),
+                SyncRealm: TenantReleaseActivation.RealmSync(http, DirectoryTenantCatalog.Realm(row, settings.Cipher), realmBindings[row.Id], CancellationToken.None)),
             StringComparer.Ordinal);
         var previewIds = rows
             .Where(row => row.PreviewOf is not null)
@@ -85,7 +91,8 @@ internal sealed class DirectoryPublisherTenants(PlatformSettings settings, TimeS
 internal sealed class ConfigurationPublisherTenants(
     IReadOnlyList<TenantEntry> entries,
     bool allowHttp,
-    TextWriter output) : IPublisherTenants
+    TextWriter output,
+    HttpClient http) : IPublisherTenants
 {
     private readonly HashSet<string> _waiting = new(StringComparer.Ordinal);
     private readonly HashSet<string> _migrated = new(StringComparer.Ordinal);
@@ -111,7 +118,12 @@ internal sealed class ConfigurationPublisherTenants(
 
             output.WriteLine($"{entry.Id} ready");
             _migrated.Add(entry.Id);
-            _served.Add(new PublisherTenant(entry.Id, TenantSchemaVersion.Current, Bindings(entry), () => new ConfiguredTenantConnections(entry)));
+            _served.Add(new PublisherTenant(
+                entry.Id,
+                TenantSchemaVersion.Current,
+                Bindings(entry),
+                () => new ConfiguredTenantConnections(entry),
+                SyncRealm: TenantReleaseActivation.RealmSync(http, entry.Realm, entry.Bindings, CancellationToken.None)));
         }
 
         var previewIds = entries
