@@ -664,10 +664,12 @@ verification bullet below is _(planned for M18)_.
   under `directory`, the current one and the previous one, and one under
   `configuration`. A tenant under `fapi2` without a key, or with a key without a
   key id, stops the server's start.
-- **Rotation.** The tenant can hold a second key while the identity provider changes over. The
-  operator registers the public keys at the identity provider, and the server signs with the
-  newest key after its next refresh. `tenant oidc set --client-key` and `--retire-client-key`
-  change the keys, see [tenant setting commands](tenant-setting-commands.md#sign-in-settings).
+- **Rotation.** The tenant can hold a second key while the identity provider changes over. The server
+  signs with the newest key after its next refresh. `tenant oidc set --client-key` and `--retire-client-key`
+  change the keys, see [tenant setting commands](tenant-setting-commands.md#sign-in-settings). For a tenant
+  that signs in through its own realm, the command registers each key in the realm's clients and removes a
+  retired one, so the operator only adds, waits for the refresh and retires. For an outside identity provider
+  the operator registers the public keys there.
 - **Verification** _(planned for M18)_. The OpenID Foundation's conformance suite runs by hand
   against the development realm under `fapi2`. Its result is recorded in
   [ASVS](asvs.md). Axis seeks no certification.
