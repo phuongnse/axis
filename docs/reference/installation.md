@@ -89,10 +89,10 @@ file.
 | `ForwardedHeaders:KnownProxies` | `ForwardedHeaders__KnownProxies__0` | server | no | Optional. The IP addresses of your reverse proxies. See [several server replicas](#several-server-replicas). |
 | `ForwardedHeaders:KnownNetworks` | `ForwardedHeaders__KnownNetworks__0` | server | no | Optional. The CIDR ranges of your reverse proxies. |
 | `Admin:ConnectionString` | `Admin__ConnectionString` | admin | yes | A database role with `CREATEDB` and `CREATEROLE`, not a superuser. |
-| `IdentityProvider:Url` | `IdentityProvider__Url` | admin | no | The base address of Axis's identity provider. `tenant create` of a main tenant creates the tenant's realm there. It must be `https`. |
+| `IdentityProvider:Url` | `IdentityProvider__Url` | admin | no | The base address of Axis's identity provider. `tenant create` of a main tenant creates the tenant's realm there, and so does `tenant restore` of a tenant whose realm is missing. It must be `https`. |
 | `IdentityProvider:AdminClientId` | `IdentityProvider__AdminClientId` | admin | no | The client of the identity provider's `master` realm that `tenant create` signs in as. |
-| `IdentityProvider:AdminClientSecret` | `IdentityProvider__AdminClientSecret` | admin | yes | The secret of that client. Only `tenant create` of a main tenant reads it. |
-| none | `AXIS_OIDC_CLIENT_SECRET` | admin | yes | The OIDC client secret of a restored tenant. `tenant restore` and `tenant oidc set --client-secret` read it. `tenant create` does not. |
+| `IdentityProvider:AdminClientSecret` | `IdentityProvider__AdminClientSecret` | admin | yes | The secret of that client. Only `tenant create` of a main tenant and `tenant restore` read it. |
+| none | `AXIS_OIDC_CLIENT_SECRET` | admin | yes | The OIDC client secret of a restored tenant that keeps the archive's sign-in, which a restore under a new realm does not need. `tenant restore` and `tenant oidc set --client-secret` read it. `tenant create` does not. |
 | `Scenarios:ServerConnectionString` | `Scenarios__ServerConnectionString` | publisher | yes | Optional. A database role with `CREATEDB`, not a superuser, that owns no tenant database. It lets the publisher run `test` requests. Empty by default, and a `test` request then fails with `AXC0217`, which names the setting. See [On premises](#on-premises). |
 | `Studio:Tests` | `Studio__Tests` | server | no | Optional. `true` turns on `studioTest`, which shows the test controls in Studio. Off by default. Turn it on together with the publisher's `Scenarios:ServerConnectionString`. |
 | `Extensions:Path` | `Extensions__Path` | server, worker, admin | no | Set to `/extensions`. |

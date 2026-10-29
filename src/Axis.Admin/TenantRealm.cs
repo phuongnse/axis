@@ -1,8 +1,12 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Security.Cryptography;
 using System.Text.Json;
+using Axis.Tenancy;
+using Axis.Tenancy.Platform;
 using Axis.Tenancy.Realms;
+using Microsoft.EntityFrameworkCore;
 
 namespace Axis.Admin;
 
@@ -46,6 +50,71 @@ internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
     ];
 
     private static readonly string[] _usersRoles = ["manage-users", "view-users", "query-users", "query-groups"];
+
+    /// <summary>The address of the identity provider, ending with a slash.</summary>
+    public Uri BaseAddress => admin.BaseAddress;
+
+    /// <summary>
+    /// Makes the realm of a main tenant, named after the tenant id, and points the tenant's sign-in settings at it. The three
+    /// client secrets are generated, or kept when the row holds them already. They and the <c>Oidc</c> block are saved,
+    /// encrypted, before the identity provider is called, so a stop between the two never loses a secret.
+    /// </summary>
+    public async Task EnsureForTenantAsync(PlatformDbContext platform, TenantRow row, TenantSecretCipher cipher, CancellationToken cancellationToken)
+    {
+        var id = row.Id;
+        var changed = false;
+        changed |= Ensure(row.OidcClientSecret, TenantSecretFields.OidcClientSecret, value => row.OidcClientSecret = value);
+        changed |= Ensure(row.RealmActivationClientSecret, TenantSecretFields.RealmActivationClientSecret, value => row.RealmActivationClientSecret = value);
+        changed |= Ensure(row.RealmUsersClientSecret, TenantSecretFields.RealmUsersClientSecret, value => row.RealmUsersClientSecret = value);
+
+        var authority = new Uri(admin.BaseAddress, $"realms/{Uri.EscapeDataString(id)}").ToString();
+        if (row.OidcAuthority != authority || row.OidcClientId != PlatformClientId)
+        {
+            row.OidcAuthority = authority;
+            row.OidcClientId = PlatformClientId;
+            changed = true;
+        }
+
+        if (changed)
+        {
+            row.Version++;
+            await platform.SaveChangesAsync(cancellationToken);
+        }
+
+        var secrets = new TenantRealmSecrets(
+            cipher.Decrypt(id, TenantSecretFields.OidcClientSecret, row.OidcClientSecret).Reveal(),
+            cipher.Decrypt(id, TenantSecretFields.RealmActivationClientSecret, row.RealmActivationClientSecret!).Reveal(),
+            cipher.Decrypt(id, TenantSecretFields.RealmUsersClientSecret, row.RealmUsersClientSecret!).Reveal());
+
+        // The display name is the tenant id until the command takes the organization's name.
+        await EnsureAsync(id, id, secrets, cancellationToken);
+
+        // A secret that is stored is kept, so a rerun never changes it.
+        bool Ensure(byte[]? stored, string field, Action<byte[]> write)
+        {
+            if (stored is { Length: > 0 })
+            {
+                return false;
+            }
+
+            write(cipher.Encrypt(id, field, Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(32))));
+            return true;
+        }
+    }
+
+    /// <summary>Whether the identity provider has the realm: 200 is true and 404 is false. Any other status throws.</summary>
+    public async Task<bool> ExistsAsync(string realm, CancellationToken cancellationToken)
+    {
+        var token = await AdminTokenAsync(cancellationToken);
+        using var response = await SendAsync(token, HttpMethod.Get, $"admin/realms/{Uri.EscapeDataString(realm)}", null, cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return false;
+        }
+
+        EnsureSuccess(response, "read the realm");
+        return true;
+    }
 
     public async Task EnsureAsync(string realm, string displayName, TenantRealmSecrets secrets, CancellationToken cancellationToken)
     {

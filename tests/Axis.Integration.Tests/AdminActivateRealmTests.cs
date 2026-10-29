@@ -183,7 +183,7 @@ public sealed class AdminActivateRealmTests(KeycloakFixture keycloak, PostgreSql
     private Task<AdminResult> ActivateAsync(AdminScenario scenario, TemporaryFolder folder, string id) =>
         scenario.RunAsync(["activate", folder.Path, "--tenant", id], identityProvider: _handler);
 
-    private static TemporaryFolder Folder(
+    internal static TemporaryFolder Folder(
         Application application, string[] sitePaths, bool provider, string clientBinding = Client, string secretBinding = Secret)
     {
         var folder = new TemporaryFolder()
@@ -269,7 +269,7 @@ public sealed class AdminActivateRealmTests(KeycloakFixture keycloak, PostgreSql
     }
 
     // The ids of one application, so a second folder of the same application is the same application.
-    private sealed class Application
+    internal sealed class Application
     {
         public Guid Id { get; } = Guid.NewGuid();
 

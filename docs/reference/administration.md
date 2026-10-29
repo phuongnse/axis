@@ -38,9 +38,9 @@ which host holds which connection. There is no HTTP API for provisioning.
 | `ConnectionStrings:PlatformSchema` | `ConnectionStrings__PlatformSchema` | The role that owns the `platform` schema. The tool writes the tenant directory over it. |
 | `Platform:SecretKey` | `Platform__SecretKey` | The installation key that encrypts the generated passwords and the OIDC client secret, see [platform database](storage.md#platform-database). |
 | `Platform:PreviousSecretKey` | `Platform__PreviousSecretKey` | Optional. The old installation key during a rotation. Every command decrypts with it when `Platform:SecretKey` does not match. `platform rekey` needs it. A malformed value exits with code 2, naming the setting. See [installation key](tenant-setting-commands.md#installation-key). |
-| `IdentityProvider:Url` | `IdentityProvider__Url` | The base address of [Axis's identity provider](identity-provider.md), such as `https://idp.example.com/`. Only `tenant create` of a main tenant reads it. It must be an absolute URL, and `https` outside `Development` and `Testing`. A path in it is kept. |
-| `IdentityProvider:AdminClientId` | `IdentityProvider__AdminClientId` | The client of the identity provider's `master` realm that `tenant create` signs in as, with the client credentials grant, to create a tenant's realm. Only `tenant create` of a main tenant reads it. |
-| `IdentityProvider:AdminClientSecret` | `IdentityProvider__AdminClientSecret` | The secret of that client. Only `tenant create` of a main tenant reads it. It is never stored and never printed. |
+| `IdentityProvider:Url` | `IdentityProvider__Url` | The base address of [Axis's identity provider](identity-provider.md), such as `https://idp.example.com/`. `tenant create` of a main tenant reads it, and `tenant restore` reads it when it is set. `tenant restore` needs it when the archive's tenant signed in through its own realm, see [Tenant restore](#tenant-restore). It must be an absolute URL, and `https` outside `Development` and `Testing`. A path in it is kept. |
+| `IdentityProvider:AdminClientId` | `IdentityProvider__AdminClientId` | The client of the identity provider's `master` realm that `tenant create` signs in as, with the client credentials grant, to create a tenant's realm. `tenant create` of a main tenant reads it, and so does `tenant restore` when it is set. |
+| `IdentityProvider:AdminClientSecret` | `IdentityProvider__AdminClientSecret` | The secret of that client. `tenant create` of a main tenant reads it, and so does `tenant restore` when `IdentityProvider:Url` is set. It is never stored and never printed. |
 | `Tenants` | `Tenants__<id>__...` | The tenants of `Tenancy:Source=configuration`, with each `SchemaConnectionString` and `ConnectionString` and its bindings. Only `publisher` reads them, and only under that source. See [publisher](#publisher). |
 | `DOTNET_ENVIRONMENT` | `DOTNET_ENVIRONMENT` | `Development` lets a `url` binding use `http` and a `secret` binding take its value from a configuration file, as on the server and the worker. Only `publisher` under the configuration source reads that. Every command reads it for the TLS check: outside `Development` and `Testing`, a command exits with code 2, naming the setting, when `Admin:ConnectionString`, `ConnectionStrings:PlatformSchema` or `Scenarios:ServerConnectionString` is set with an `SSL Mode` below `VerifyFull` or none. An unset value is `Production`. |
 | `Scenarios:ServerConnectionString` | `Scenarios__ServerConnectionString` | A database role with `CREATEDB`, not a superuser, that owns no tenant database. Only `publisher` reads it, to run `test` requests. It creates and drops the `axis_scenario_<uuid>` databases of the scenarios. Empty means a `test` request fails with `AXC0217`, which names this setting. A value that is not a connection string exits with code 2. See [database roles](storage.md#database-roles). |
@@ -49,7 +49,7 @@ which host holds which connection. There is no HTTP API for provisioning.
 | `Tenancy:Source` | `Tenancy__Source` | `directory` for the tenant setting commands, which exit with code 2 under any other value. `publisher` reads it too, see [publisher](#publisher). |
 | none | `AXIS_BINDING_SECRET` | The value of the `secret` binding that `tenant binding set --secret` sets. When it is unset, the value comes from standard input. It is never a command-line option. Only that command reads it. |
 | none | `AXIS_SMTP_PASSWORD` | The SMTP password that `tenant email set --password` stores for the tenant. When it is unset, the password comes from the first line of standard input. It is never a command-line option. Only that command reads it. |
-| none | `AXIS_OIDC_CLIENT_SECRET` | The OIDC client secret of a restored tenant. `tenant restore` reads it, and so does `tenant oidc set --client-secret`, which reads the first line of standard input when the variable is not set. `tenant create` does not read it. It is never a command-line option, so it does not appear in a process list. |
+| none | `AXIS_OIDC_CLIENT_SECRET` | The OIDC client secret of a restored tenant that keeps the archive's sign-in. `tenant restore` reads it and needs it only then, because a new realm generates its own client secrets. So does `tenant oidc set --client-secret`, which reads the first line of standard input when the variable is not set. `tenant create` does not read it. It is never a command-line option, so it does not appear in a process list. |
 | none | `PATH` | `tenant backup` and `tenant restore` run `pg_dump` and `pg_restore`, so both must be on `PATH`. Their version must match the database server. A missing tool exits with code 2. |
 
 A missing or invalid setting exits with code 2 before any tenant work. The
@@ -75,11 +75,13 @@ to the tenant database as the schema role, and needs `Tenancy:Source=directory`.
 neither `Admin:ConnectionString` nor `AXIS_OIDC_CLIENT_SECRET`. The tool looks
 for `pg_dump` in the directories of the `PATH` setting.
 
-`tenant restore` reads the settings of `tenant create` except the `IdentityProvider` ones, and
-`AXIS_OIDC_CLIENT_SECRET`, `PATH` to find
+`tenant restore` reads the settings of `tenant create`, `AXIS_OIDC_CLIENT_SECRET`, `PATH` to find
 `pg_restore`, and `Extensions:Path` to check the packages that the archive
 requires. It needs `Extensions:Path` only when the archive requires a package. It
-reads the OIDC authority and client id from the archive, so it takes no
+reads the `IdentityProvider` settings as optional. It needs them only when the archive's tenant
+signed in through its own realm, and a value that is given must still be valid.
+It needs `AXIS_OIDC_CLIENT_SECRET` only when the restored tenant keeps the archive's sign-in.
+It reads the OIDC authority and client id from the archive, so it takes no
 `--oidc-*` option.
 
 A new tenant's database goes on the same database server as
@@ -365,6 +367,7 @@ A tenant in any status except `provisioning` can be backed up, also a
 | `hosts` | The tenant's hosts, in ordinal order. |
 | `oidcAuthority` | The OIDC authority. |
 | `oidcClientId` | The OIDC client id. |
+| `realm` | `true` when the tenant signs in through its own realm in Axis's identity provider, see [identity provider](identity-provider.md). An archive from before the field reads as `false`, and a restore of it keeps its sign-in as it is. |
 | `claimUserId` | The claim name of the user id, or `null` for the default. |
 | `claimDisplayName` | The claim name of the display name, or `null` for the default. |
 | `claimRoles` | The claim name of the roles, or `null` for the default. |
@@ -406,8 +409,14 @@ restores an archive into a new tenant. See [D45](../decisions/d45-tenant-backup-
 | `--tenant <id>` | The id of the new tenant. It follows the rule of `tenant create`. |
 | `--host <host>` | A host of the new tenant. Repeat it for more hosts. At least one is needed. |
 
-The OIDC client secret comes from `AXIS_OIDC_CLIENT_SECRET`, as for
-`tenant create`. The authority and client id come from the manifest.
+The authority and client id come from the manifest. The restored tenant either keeps the archive's sign-in or gets a new realm:
+
+- **Keeps the archive's sign-in.** This is the case when the archive's `realm` is `false`, and when it is `true` and the
+  realm that its authority names exists on the address in `IdentityProvider:Url`. The tenant keeps that realm and its users.
+  The OIDC client secret comes from `AXIS_OIDC_CLIENT_SECRET`.
+- **Gets a new realm.** This is the case when the archive's `realm` is `true` and that realm does not exist there, because it
+  is another installation's or was deleted. The `realm` step creates a realm named after the new tenant id, as `tenant create`
+  does. The tenant's sign-in settings point at it and its client secrets are generated, so `AXIS_OIDC_CLIENT_SECRET` is not used.
 
 **Refusals.** Each refusal happens before anything changes, exits `2` and names
 what is missing:
@@ -425,7 +434,8 @@ what is missing:
   client id.
 - A package version with `required` set to `true` is not installed under
   `Extensions:Path`. The message lists every missing version, not only the first.
-- `AXIS_OIDC_CLIENT_SECRET` is missing.
+- The archive's `realm` is `true` and `IdentityProvider:Url` is not set, or the identity provider cannot say whether the realm exists.
+- The restored tenant keeps the archive's sign-in and `AXIS_OIDC_CLIENT_SECRET` is missing. This one is written to standard error, before any `check` line.
 
 Every failed check is reported, not only the first. Each one is a
 `<id> check failed: <message>` line on standard output, in the order of the list
@@ -445,9 +455,9 @@ it keeps working without the module installed.
 
 **Steps, in order.** Each step writes its own line.
 
-1. `check`: read the archive and make every check above.
+1. `check`: read the archive and make every check above. It asks the identity provider whether the archive's realm exists.
 2. `entry`: write the directory entry with status `provisioning`. It takes the
-   new id and hosts, and everything else from `directory` in the manifest. A
+   new id and hosts, and everything else from `directory` in the manifest. A tenant that gets a new realm has empty sign-in settings until the `realm` step. A
    `secret` binding is restored by name and kind, without a value. A `url` or `storage`
    binding is restored with its value. The check refuses an archive whose `storage` binding has
    a value other than `database`.
@@ -472,12 +482,18 @@ it keeps working without the module installed.
     anyone in. The migrations ran before this step, so an archive older than the
     table has it here.
 11. `role-check`: run the runtime role check of D31 over the runtime role.
-12. `version`: record the schema version and set the entry `suspended`. The step
+12. `realm`: only for a tenant that gets a new realm. Create the realm named after the new tenant id, with the clients `axis`,
+    `axis-activation` and `axis-users`, and save the generated client secrets, encrypted, as `tenant create` does. Then bring
+    the realm in step with the tenant's active releases: a `site-` client for each site, and a brokered provider for each `oidc`
+    identity provider. The archive holds no secret value, so a provider whose bindings have no value yet is left out, with a
+    `<id> warning ...` line on standard error that names the provider and the binding. The next `activate`, publish or
+    server start adds it once the operator has set those bindings.
+13. `version`: record the schema version and set the entry `suspended`. The step
     fails unless the database is on the schema of this build, which catches an
     archive whose manifest does not match its dump.
 
 **Running it again.** On a `provisioning` entry, the same command skips every
-step already done and finishes the rest, as `tenant create` does. A failed
+step already done and finishes the rest, as `tenant create` does. An entry that already holds the secrets of a new realm goes on with the new realm. A failed
 `restore` step restored nothing, so the rerun restores again. A database that
 already holds tables counts as restored, so the rerun does not restore it a
 second time. On an `active` or `suspended` tenant it is refused.
@@ -489,8 +505,11 @@ option or a missing setting.
 **After a restore.** The tenant is `suspended`, and its hosts answer `503`.
 
 1. Set the OIDC client secret and every `secret` binding again. The archive
-   holds none of them.
+   holds none of them. A tenant with a new realm has its client secret already.
 2. Run [`tenant resume <id>`](#tenant-resume).
+
+A tenant with a new realm has no accounts, because the archive carries no account, credential or role mapping. Its people
+need new invitations. A provider that the `realm` step left out comes with the next activation, once its `secret` bindings are set.
 
 Set each `secret` binding with
 [`tenant binding set <id> <name> --secret`](tenant-setting-commands.md#deployment-bindings).
@@ -506,7 +525,8 @@ client secret again, see
 4. Move the hosts from the old tenant to the new one with
    [`tenant host move`](tenant-setting-commands.md#hosts).
 
-The old tenant stays in the directory, because there is no tenant delete.
+The old tenant stays in the directory, because there is no tenant delete. The new tenant keeps the old tenant's realm and its
+users, so its people sign in as before once the hosts move.
 
 **What a restore does to running work.** Work goes back to backup time, see
 [execution](../domain/knowledge.md#execution):
