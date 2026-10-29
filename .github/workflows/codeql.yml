@@ -2,15 +2,13 @@ name: CodeQL
 
 # Scans the C# and TypeScript code. Alerts go to GitHub code scanning, and the owner sets the
 # high-or-critical threshold that fails the check in a repository code scanning rule. NexKit's
-# merges start no push workflow, so main is scanned every night, after a person's push and on demand
-# (D104). NexKit's autopilot watches its runs on main without starting it after its merges.
+# merges start no push workflow, so NexKit starts the scan on main once every 32 of its merges
+# (D112). It also scans a person's push to main, pull requests and on demand.
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
-  schedule:
-    - cron: "17 20 * * *"
   workflow_dispatch:
 
 permissions:
@@ -81,3 +79,26 @@ jobs:
       - uses: github/codeql-action/analyze@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4.39.0
         with:
           category: /language:${{ matrix.language }}
+
+  # NexKit autopilot looks at this run as soon as it ends: a run that NexKit started with
+  # the Actions token sends no workflow_run event, but it may dispatch NexKit's sweep.
+  nexkit-sweep:
+    needs: [analyze]
+    if: always() && github.ref_name == github.event.repository.default_branch
+    runs-on: ubuntu-24.04
+    permissions:
+      actions: write
+    steps:
+      # GitHub's API rejects a dispatch at times with a server error, so a failed dispatch is
+      # tried again after a pause. The job fails only when every try fails.
+      - run: |
+          for attempt in 1 2 3; do
+            if gh workflow run nexkit.yml --repo "$GITHUB_REPOSITORY" --ref "$GITHUB_REF_NAME" \
+              -f command=autopilot -f number=autopilot -f note="after run $GITHUB_RUN_ID"; then
+              exit 0
+            fi
+            if [ "$attempt" -lt 3 ]; then sleep 30; fi
+          done
+          exit 1
+        env:
+          GH_TOKEN: ${{ github.token }}
