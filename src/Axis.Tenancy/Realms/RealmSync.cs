@@ -8,7 +8,9 @@ namespace Axis.Tenancy.Realms;
 /// <summary>
 /// Makes a tenant's realm hold the site clients and brokered <c>oidc</c> providers of a <see cref="RealmState"/>. It
 /// signs in to the realm as <c>axis-activation</c> with the client credentials grant, so it needs no rights in the
-/// master realm. Each site gets a confidential client <c>site-</c> and its path, whose ID token carries the alias of the
+/// master realm. Each site gets a confidential client <c>site-</c> and its path, which copies the redirect addresses, web origins and
+/// post-logout redirect addresses of <c>axis</c> and, when the state holds the platform secret, has the secret that
+/// <see cref="SiteClientSecret"/> derives from it. Its ID token carries the alias of the
 /// provider that signed the person in as the <c>identity_provider</c> claim. Each provider gets claim mappers for the
 /// display name, the email, the locale and each roles claim, and a <c>username</c> mapper that names a new user after the
 /// provider's alias and the person's subject. Each provider also names the realm's own first-login flow
@@ -24,6 +26,8 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
     public const string SiteClientPrefix = "site-";
     public const string ProviderAliasPrefix = "oidc-";
     public const string IdentityProviderClaim = "identity_provider";
+
+    private const string PostLogoutRedirectUrisAttribute = "post.logout.redirect.uris";
 
     /// <summary>The alias of the first-login flow that <c>TenantRealm</c> makes and every provider names.</summary>
     public const string FirstLoginFlowAlias = "axis first login";
@@ -56,7 +60,7 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
         {
             try
             {
-                await SyncSiteClientsAsync(token, realmPath, state.SitePaths, cancellationToken);
+                await SyncSiteClientsAsync(token, realmPath, state.SitePaths, state.PlatformClientSecret, cancellationToken);
                 await SyncProvidersAsync(token, realmPath, providers, cancellationToken);
                 return;
             }
@@ -110,7 +114,7 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
         return body.GetProperty("access_token").GetString()!;
     }
 
-    private async Task SyncSiteClientsAsync(string token, string realmPath, IReadOnlyList<string> sitePaths, CancellationToken cancellationToken)
+    private async Task SyncSiteClientsAsync(string token, string realmPath, IReadOnlyList<string> sitePaths, string? platformSecret, CancellationToken cancellationToken)
     {
         using var listed = await SendAsync(token, HttpMethod.Get, $"{realmPath}/clients?max=1000", null, cancellationToken);
         EnsureSuccess(listed, "list the clients");
@@ -135,7 +139,7 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
             string uuid;
             if (!existing.TryGetValue(clientId, out var current))
             {
-                using var created = await SendAsync(token, HttpMethod.Post, $"{realmPath}/clients", SiteClient(clientId, platformClient, null), cancellationToken);
+                using var created = await SendAsync(token, HttpMethod.Post, $"{realmPath}/clients", SiteClient(clientId, platformClient, null, platformSecret), cancellationToken);
                 EnsureSuccess(created, $"create the client '{clientId}'");
                 uuid = created.Headers.Location?.Segments[^1].TrimEnd('/')
                     ?? throw new InvalidOperationException($"The identity provider step 'find the created client '{clientId}'' found no client.");
@@ -143,7 +147,7 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
             else
             {
                 uuid = current.Uuid;
-                using var updated = await SendAsync(token, HttpMethod.Put, $"{realmPath}/clients/{uuid}", SiteClient(clientId, platformClient, current.Representation), cancellationToken);
+                using var updated = await SendAsync(token, HttpMethod.Put, $"{realmPath}/clients/{uuid}", SiteClient(clientId, platformClient, current.Representation, platformSecret), cancellationToken);
                 EnsureSuccess(updated, $"update the client '{clientId}'");
             }
 
@@ -158,12 +162,14 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
     }
 
     /// <summary>
-    /// The secret is left out, so Keycloak makes one when it creates the client and keeps it on an update. When the realm has
-    /// the platform client <c>axis</c>, the site client takes its client authentication and the settings of its sign-in profile
-    /// and keys (<see cref="RealmClientProfile"/>), so activation never undoes what <c>tenant oidc set</c> wrote. An update
-    /// keeps the other attributes of the existing client, because Keycloak removes the attributes that a client update leaves out.
+    /// When <paramref name="platformSecret"/> is set, the secret is <see cref="SiteClientSecret.Derive"/> of it. Otherwise the secret is
+    /// left out, so Keycloak makes one when it creates the client and keeps it on an update. When the realm has the platform client
+    /// <c>axis</c>, the site client takes its redirect addresses, web origins and post-logout redirect addresses, its client
+    /// authentication and the settings of its sign-in profile and keys (<see cref="RealmClientProfile"/>), so activation never undoes
+    /// what <c>tenant oidc set</c> wrote. An update keeps the other attributes of the existing client, because Keycloak removes the
+    /// attributes that a client update leaves out.
     /// </summary>
-    private static Dictionary<string, object?> SiteClient(string clientId, JsonElement? platformClient, JsonElement? existing)
+    private static Dictionary<string, object?> SiteClient(string clientId, JsonElement? platformClient, JsonElement? existing, string? platformSecret)
     {
         var client = new Dictionary<string, object?>
         {
@@ -177,14 +183,28 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
             ["implicitFlowEnabled"] = false,
             ["serviceAccountsEnabled"] = false,
         };
+        if (platformSecret is not null)
+        {
+            client["secret"] = SiteClientSecret.Derive(platformSecret, clientId);
+        }
+
         if (platformClient is { } platform)
         {
             client["clientAuthenticatorType"] = RealmClientProfile.AuthenticatorTypeOf(platform);
-            client["attributes"] = RealmClientProfile.AttributesFor(platform, existing);
+            client["redirectUris"] = StringArray(platform, "redirectUris");
+            client["webOrigins"] = StringArray(platform, "webOrigins");
+            var attributes = RealmClientProfile.AttributesFor(platform, existing);
+            attributes[PostLogoutRedirectUrisAttribute] = RealmClientProfile.AttributeOf(platform, PostLogoutRedirectUrisAttribute) ?? "";
+            client["attributes"] = attributes;
         }
 
         return client;
     }
+
+    private static string[] StringArray(JsonElement client, string name) =>
+        client.TryGetProperty(name, out var array) && array.ValueKind == JsonValueKind.Array
+            ? [.. array.EnumerateArray().Where(item => item.ValueKind == JsonValueKind.String).Select(item => item.GetString()!)]
+            : [];
 
     private static Dictionary<string, string> SessionNoteConfig() => new()
     {

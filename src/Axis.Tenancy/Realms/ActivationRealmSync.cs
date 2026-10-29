@@ -44,7 +44,7 @@ public static class ActivationRealmSync
         }
 
         return new RealmSync(http, realm.BaseAddress)
-            .SyncAsync(realm.Name, realm.ActivationClientSecret.Reveal(), ToState(plan, bindings), cancellationToken);
+            .SyncAsync(realm.Name, realm.ActivationClientSecret.Reveal(), ToState(plan, bindings) with { PlatformClientSecret = realm.PlatformClientSecret?.Reveal() }, cancellationToken);
     }
 
     private static RealmBrokeredProvider ToProvider(RealmProvider provider, IReadOnlyDictionary<string, TenantBinding> bindings)

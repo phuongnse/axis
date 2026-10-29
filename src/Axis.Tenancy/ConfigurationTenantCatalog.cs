@@ -115,7 +115,7 @@ public sealed class ConfigurationTenantCatalog : ITenantCatalog
         }
 
         return TenantRealmAddress.BaseOf(tenant["Oidc:Authority"], name) is { } baseAddress
-            ? new TenantRealmAccess(baseAddress, name, secret)
+            ? new TenantRealmAccess(baseAddress, name, secret, Secret(tenant["Oidc:ClientSecret"]))
             : null;
     }
 

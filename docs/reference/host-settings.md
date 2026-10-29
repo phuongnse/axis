@@ -343,8 +343,9 @@ the operator sets it with
 ### Tenant realm
 
 A tenant's catalog entry can carry what activation needs to sync the tenant's
-realm: the realm name, the identity provider's address and the secret of the
-`axis-activation` client. See
+realm: the realm name, the identity provider's address, the secret of the
+`axis-activation` client and the secret of the platform client `axis`, from
+which the site client secrets derive. See
 [keeping the realm in step](identity-provider.md#keeping-the-realm-in-step).
 The server's startup activation and `Axis.Admin` activation use it.
 
@@ -352,6 +353,10 @@ The server's startup activation and `Axis.Admin` activation use it.
   `Tenants:{id}:Realm:ActivationClientSecret` give it. As environment variables
   they are `Tenants__<id>__Realm__Name` and
   `Tenants__<id>__Realm__ActivationClientSecret`.
+- **Platform client secret.** Under `configuration` it is
+  `Tenants:{id}:Oidc:ClientSecret`. Under `directory` it is the stored platform
+  secret. It is optional, and a tenant without it keeps the site client secrets
+  that Keycloak makes.
 - **Blank secret.** A blank `ActivationClientSecret` means the tenant has no
   realm details, and then `Name` and the authority are not checked.
 - **Authority.** With a secret, the tenant needs a `Name`, and

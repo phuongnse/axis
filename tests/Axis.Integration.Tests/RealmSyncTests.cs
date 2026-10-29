@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Axis.Admin;
 using Axis.Tenancy.Realms;
 
@@ -93,6 +94,40 @@ public sealed class RealmSyncTests(KeycloakFixture keycloak) : IAsyncLifetime
         Assert.Equal("identity_provider", config.GetProperty("user.session.note").GetString());
         Assert.Equal("identity_provider", config.GetProperty("claim.name").GetString());
         Assert.Equal("true", config.GetProperty("id.token.claim").GetString());
+    }
+
+    [Fact]
+    public async Task A_site_client_copies_the_addresses_of_the_platform_client_and_takes_the_derived_secret()
+    {
+        var realm = await NewRealmAsync();
+        var token = await TokenAsync("master", KeycloakFixture.AdminClientId, KeycloakFixture.AdminClientSecret);
+        var platform = (await GetJsonAsync(token, $"admin/realms/{realm}/clients?clientId=axis"))[0];
+        var platformBody = JsonNode.Parse(platform.GetRawText())!.AsObject();
+        platformBody["redirectUris"] = new JsonArray("https://acme.test/signin-oidc");
+        platformBody["webOrigins"] = new JsonArray("+");
+        var attributes = platformBody["attributes"] as JsonObject ?? [];
+        attributes["post.logout.redirect.uris"] = "https://acme.test/##https://acme.test/x";
+        platformBody["attributes"] = attributes;
+        using (var put = await SendAsync(token, HttpMethod.Put, $"admin/realms/{realm}/clients/{platform.GetProperty("id").GetString()}", platformBody))
+        {
+            Assert.Equal(HttpStatusCode.NoContent, put.StatusCode);
+        }
+
+        var state = State(["purchasing"], []) with { PlatformClientSecret = _secrets.Platform };
+        await SyncAsync(realm, _secrets.Activation, state);
+
+        var site = (await GetJsonAsync(token, $"admin/realms/{realm}/clients?clientId=site-purchasing"))[0];
+        Assert.Equal(["https://acme.test/signin-oidc"], site.GetProperty("redirectUris").EnumerateArray().Select(u => u.GetString()));
+        Assert.Equal(["+"], site.GetProperty("webOrigins").EnumerateArray().Select(u => u.GetString()));
+        Assert.Equal("https://acme.test/##https://acme.test/x", site.GetProperty("attributes").GetProperty("post.logout.redirect.uris").GetString());
+        var uuid = site.GetProperty("id").GetString();
+        var secret = (await GetJsonAsync(token, $"admin/realms/{realm}/clients/{uuid}/client-secret")).GetProperty("value").GetString();
+        Assert.Equal(SiteClientSecret.Derive(_secrets.Platform, "site-purchasing"), secret);
+
+        await SyncAsync(realm, _secrets.Activation, state);
+
+        var again = (await GetJsonAsync(token, $"admin/realms/{realm}/clients/{uuid}/client-secret")).GetProperty("value").GetString();
+        Assert.Equal(secret, again);
     }
 
     [Fact]
