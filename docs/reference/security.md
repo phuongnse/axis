@@ -141,6 +141,10 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place. _(planned f
     with an `auth_time` that is missing or older than 8 hours, is refused with
     the reason `invalidToken`. So is an ID token with a nonce that the sign-in
     did not send, or with an `aud` that is not the tenant's client id.
+  - A token that is valid is refused with the reason `providerNotAccepted` when
+    the tenant's [platform sign-in](identity-provider.md#platform-sign-in) does
+    not accept the provider that signed the person in, or does not accept
+    accounts.
   - The callback also compares the `issuer` of the provider's metadata with the
     tenant's `Authority`, character for character, after one trailing `/` is
     removed from the `Authority`. Metadata with another issuer creates no

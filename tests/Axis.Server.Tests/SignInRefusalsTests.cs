@@ -117,4 +117,27 @@ public sealed class SignInRefusalsTests
 
         Assert.Equal(SignInRefusals.InvalidState, reason);
     }
+
+    [Fact]
+    public void A_refused_provider_is_a_provider_not_accepted()
+    {
+        var reason = SignInRefusals.Classify(
+            stateRead: true,
+            otherTenantReadsState: false,
+            providerError: false,
+            new AuthenticationFailureException("The platform sign-in does not accept the provider."),
+            tokenRejected: false,
+            issuerRejected: false,
+            providerRefused: true);
+
+        Assert.Equal(SignInRefusals.ProviderNotAccepted, reason);
+    }
+
+    [Fact]
+    public void An_unreadable_state_wins_over_a_refused_provider()
+    {
+        var reason = SignInRefusals.Classify(stateRead: false, otherTenantReadsState: false, providerError: false, failure: null, tokenRejected: false, issuerRejected: false, providerRefused: true);
+
+        Assert.Equal(SignInRefusals.InvalidState, reason);
+    }
 }

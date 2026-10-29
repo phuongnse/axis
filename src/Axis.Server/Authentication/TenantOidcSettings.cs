@@ -39,6 +39,12 @@ internal sealed class TenantOidcSettings
     /// <summary>The names of the claims that give the user id, the display name, the roles, the email and the locale.</summary>
     public TenantOidcClaims Claims { get; set; } = new();
 
+    /// <summary>
+    /// The sign-in of the platform pages: whether accounts sign in, which providers are accepted and how their roles claim
+    /// values map to the platform roles. <c>null</c> when the tenant has none stored, which accepts every sign-in.
+    /// </summary>
+    public PlatformSignIn? PlatformSignIn { get; set; }
+
     /// <summary>Reads the Oidc settings of one tenant and checks them.</summary>
     /// <param name="problems">Receives one message for each problem found. The messages hold no secret.</param>
     /// <returns>The settings, or null when there are problems.</returns>
@@ -60,6 +66,7 @@ internal sealed class TenantOidcSettings
             ClientKeys = source.ClientKeys ?? [],
             EndpointAudience = source.EndpointAudience,
             ServiceAudience = source.ServiceAudience,
+            PlatformSignIn = tenant.PlatformSignIn,
             Claims =
             {
                 UserId = source.UserIdClaim ?? "",

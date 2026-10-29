@@ -27,6 +27,12 @@ internal static class SignInRefusals
     /// <summary>The identity provider answered with an error, or refused the code exchange.</summary>
     public const string ProviderError = "providerError";
 
+    /// <summary>
+    /// The ID token is valid, but the tenant's platform sign-in does not accept the provider that signed the person in,
+    /// or does not accept accounts.
+    /// </summary>
+    public const string ProviderNotAccepted = "providerNotAccepted";
+
     /// <summary>Picks the reason for a callback that failed. The checks run in this order.</summary>
     /// <param name="stateRead">Whether this tenant's sign-in client could read the callback's state.</param>
     /// <param name="otherTenantReadsState">Whether another tenant's sign-in client can read the state.</param>
@@ -34,13 +40,15 @@ internal static class SignInRefusals
     /// <param name="failure">The failure the OIDC handler reports.</param>
     /// <param name="tokenRejected">Whether the ID token was rejected for a missing user id or a missing or stale <c>auth_time</c>.</param>
     /// <param name="issuerRejected">Whether the metadata's issuer, or under <c>fapi2</c> the callback's <c>iss</c>, was rejected.</param>
+    /// <param name="providerRefused">Whether the platform sign-in refused the provider, or the account sign-in.</param>
     public static string Classify(
         bool stateRead,
         bool otherTenantReadsState,
         bool providerError,
         Exception? failure,
         bool tokenRejected,
-        bool issuerRejected)
+        bool issuerRejected,
+        bool providerRefused = false)
     {
         if (!stateRead)
         {
@@ -50,6 +58,11 @@ internal static class SignInRefusals
         if (issuerRejected)
         {
             return InvalidIssuer;
+        }
+
+        if (providerRefused)
+        {
+            return ProviderNotAccepted;
         }
 
         // A nonce mismatch is a refused token, not a failure of the provider.
