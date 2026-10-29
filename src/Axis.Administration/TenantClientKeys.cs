@@ -1,6 +1,7 @@
 using System.Buffers.Text;
 using System.Security.Cryptography;
 using System.Text;
+using Axis.Tenancy.Realms;
 
 namespace Axis.Administration;
 
@@ -34,8 +35,7 @@ public static class TenantClientKeys
                 return false;
             }
 
-            var thumbprintInput = $$"""{"crv":"P-256","kty":"EC","x":"{{Base64Url.EncodeToString(parameters.Q.X)}}","y":"{{Base64Url.EncodeToString(parameters.Q.Y)}}"}""";
-            keyId = Base64Url.EncodeToString(SHA256.HashData(Encoding.UTF8.GetBytes(thumbprintInput)));
+            keyId = Describe(parameters).KeyId;
             pkcs8Pem = key.ExportPkcs8PrivateKeyPem();
             publicKeyPem = key.ExportSubjectPublicKeyInfoPem();
             return true;
@@ -45,5 +45,24 @@ public static class TenantClientKeys
             pkcs8Pem = keyId = publicKeyPem = "";
             return false;
         }
+    }
+
+    /// <summary>
+    /// The key id and the public coordinates of an EC P-256 private key, for the realm's clients. The caller has read the PEM
+    /// with <see cref="TryRead"/>.
+    /// </summary>
+    public static RealmClientKey PublicKey(string pem)
+    {
+        using var key = ECDsa.Create();
+        key.ImportFromPem(pem);
+        return Describe(key.ExportParameters(false));
+    }
+
+    private static RealmClientKey Describe(ECParameters parameters)
+    {
+        var x = Base64Url.EncodeToString(parameters.Q.X!);
+        var y = Base64Url.EncodeToString(parameters.Q.Y!);
+        var thumbprintInput = $$"""{"crv":"P-256","kty":"EC","x":"{{x}}","y":"{{y}}"}""";
+        return new RealmClientKey(Base64Url.EncodeToString(SHA256.HashData(Encoding.UTF8.GetBytes(thumbprintInput))), x, y);
     }
 }

@@ -156,7 +156,7 @@ internal static partial class AdminCommands
         new("tenant suspend", AuditMark.OnePerTenant, run => StatusAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.CancellationToken)),
         new("tenant resume", AuditMark.OnePerTenant, run => StatusAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.CancellationToken)),
         new("tenant rotate-passwords", AuditMark.OnePerTenant, run => RotatePasswordsAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.CancellationToken)),
-        new("tenant oidc set", AuditMark.OnePerTenant, run => OidcSetAsync(run.Command.Name, run.Args, run.Configuration, run.Input, run.Output, run.Error, run.CancellationToken)),
+        new("tenant oidc set", AuditMark.OnePerTenant, run => OidcSetAsync(run.Command.Name, run.Args, run.Configuration, run.Input, run.Output, run.Error, run.IdentityProviderHandler, run.CancellationToken)),
         new("tenant email set", AuditMark.OnePerTenant, TenantSettings.EmailSetAsync),
         new("tenant email clear", AuditMark.OnePerTenant, TenantSettings.EmailClearAsync),
         new("tenant session end", AuditMark.OnePerTenant, TenantSettings.SessionEndAsync),
@@ -486,6 +486,7 @@ internal static partial class AdminCommands
         TextReader input,
         TextWriter output,
         TextWriter error,
+        HttpMessageHandler? identityProviderHandler,
         CancellationToken cancellationToken)
     {
         var request = ParseOidcSet(args);
@@ -550,7 +551,8 @@ internal static partial class AdminCommands
                 change = change with { ClientKey = key };
             }
 
-            var result = await TenantSignInSettings.SetAsync(settings.Cipher, settings.PlatformConnectionString, command, id, change, cancellationToken);
+            using var http = IdentityProviderClient(identityProviderHandler);
+            var result = await TenantSignInSettings.SetAsync(settings.Cipher, settings.PlatformConnectionString, command, id, change, http, cancellationToken);
             switch (result.Outcome)
             {
                 case TenantSignInOutcome.Refused:
@@ -560,6 +562,9 @@ internal static partial class AdminCommands
                     // A save failure wraps the database error, whose message is the one that helps the operator.
                     var cause = result.AuditError is DbUpdateException { InnerException: { } inner } ? inner : result.AuditError!;
                     output.WriteLine($"{id} audit failed: {TenantDatabaseSteps.Safe(cause)}");
+                    return 1;
+                case TenantSignInOutcome.RealmFailed:
+                    output.WriteLine($"{id} realm failed: {TenantDatabaseSteps.Safe(result.RealmError!)}");
                     return 1;
                 default:
                     output.WriteLine($"{id} oidc ok");
