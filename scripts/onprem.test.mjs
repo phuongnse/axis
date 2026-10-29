@@ -1,24 +1,26 @@
 // Smoke test for the on-premises installation: installs deploy/compose/compose.yaml from the three
 // production images exactly as docs/reference/installation.md says. It runs against a test PostgreSQL
-// and Keycloak, creates two tenants and their realms in Keycloak, activates the leave request sample and checks each tenant's
+// and the example's own identity provider, creates two tenants and their realms there, activates the leave request sample and checks each tenant's
 // site and sign-in, suspend and resume, an unknown host, and a publish request that the installed
-// publisher runs in each tenant. It then starts a second server replica and a TLS proxy, signs requester in
-// through the proxy, and restarts the first replica. The servers listen on HTTPS only, with a certificate of the
+// publisher runs in each tenant. It then starts a second server replica, signs requester in
+// through the TLS proxy on the Axis theme, and restarts the first replica. The servers listen on HTTPS only, with a certificate of the
 // test authority for the name servers, and the proxy trusts that authority only. With Studio on, it saves a resource through one replica,
 // reads it back through the other, and checks that a stale save answers 409. Requires Docker and openssl, and the
 // sample modules in artifacts/modules, which scripts/smoke.sh installs. Run from scripts/smoke.sh.
 //
-// Everything the test adds lives in an override file in a temporary folder: PostgreSQL over TLS, Keycloak over
-// HTTPS with a certificate authority made for the run, the modules folder and a short refresh interval.
+// Everything the test adds lives in an override file in a temporary folder: PostgreSQL over TLS, the development
+// realm that the identity provider imports, a certificate authority made for the run, the modules folder and a short
+// refresh interval.
 // PostgreSQL serves a certificate of the same authority, every connection string sets SSL Mode=VerifyFull with
 // that authority as Root Certificate, and the test checks in pg_stat_ssl that every Axis connection uses TLS.
 // The production hosts refuse a connection string with a weaker mode.
-// Keycloak imports a copy of the development realm that adds the https redirect addresses of the tenants.
-// The production server refuses an identity provider over plain http, so Keycloak serves https and only
-// the server, the admin tool and the publisher in this test trust the certificate authority, through SSL_CERT_FILE.
+// The identity provider imports a copy of the development realm that adds the https redirect addresses of the tenants.
+// The production server refuses an identity provider over plain http. The proxy serves the identity host over https, and
+// only the server, the admin tool and the publisher in this test trust the certificate authority, through SSL_CERT_FILE.
 // The publisher updates a tenant's realm after it activates a release.
-// Keycloak starts with an admin client, which `tenant create` signs in as to create each tenant's realm. A new realm has
-// no users, so the test points tenant one back at the development realm before the proxy signs the requester in.
+// The identity provider starts with an admin client, which `tenant create` signs in as to create each tenant's realm.
+// A new realm has no users, so the test points tenant one back at the development realm before the proxy signs the
+// requester in.
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import { createHash, createHmac, randomBytes } from 'node:crypto'
@@ -39,16 +41,17 @@ const composeFile = join(root, 'deploy/compose/compose.yaml')
 const scenariosFile = join(root, 'deploy/compose/compose.scenarios.yaml')
 const timeout = 30 * 60 * 1000
 const targets = ['axis-server', 'axis-worker', 'axis-admin']
-const keycloakAuthority = 'https://keycloak:8443/realms/axis'
+const identityHost = 'id.axis.test'
+const identityAuthority = `https://${identityHost}/realms/axis`
 const clientSecret = 'axis-development-secret'
-const adminClientId = 'axis-admin'
-const passThrough = ['AXIS_OIDC_CLIENT_SECRET', 'IdentityProvider__Url', 'IdentityProvider__AdminClientId']
+const passThrough = ['AXIS_OIDC_CLIENT_SECRET']
 const hosts = { one: 'one.axis.test', two: 'two.axis.test' }
 
 const secretFiles = {
   server: ['ConnectionStrings__Platform', 'ConnectionStrings__PlatformSchema', 'Platform__SecretKey'],
   'server-2': ['ConnectionStrings__Platform', 'ConnectionStrings__PlatformSchema', 'Platform__SecretKey'],
   proxy: [],
+  identity: ['IdentityProvider__AdminClientSecret', 'KC_DB_PASSWORD', 'KC_DB_URL', 'KC_DB_USERNAME'],
   worker: ['ConnectionStrings__Platform', 'Platform__SecretKey'],
   admin: ['Admin__ConnectionString', 'ConnectionStrings__PlatformSchema', 'IdentityProvider__AdminClientSecret', 'Platform__SecretKey'],
   publisher: ['ConnectionStrings__PlatformSchema', 'Platform__SecretKey'],
@@ -99,15 +102,15 @@ const openToAll = (dir) => {
   }
 }
 
-// render: the config of the example with every profile on and no variable set but the version. `extraFiles` are
+// render: the config of the example with every profile on and no variable set but the version and the identity host. `extraFiles` are
 // added after compose.yaml with -f.
 const render = (extraFiles = []) => {
-  const env = { ...process.env, AXIS_VERSION: 'x', ...Object.fromEntries(passThrough.map((name) => [name, ''])) }
-  for (const name of Object.keys(env)) if (name.startsWith('AXIS_') && !['AXIS_VERSION', 'AXIS_OIDC_CLIENT_SECRET'].includes(name)) delete env[name]
+  const env = { ...process.env, AXIS_VERSION: 'x', AXIS_IDENTITY_HOST: identityHost, ...Object.fromEntries(passThrough.map((name) => [name, ''])) }
+  for (const name of Object.keys(env)) if (name.startsWith('AXIS_') && !['AXIS_VERSION', 'AXIS_IDENTITY_HOST', 'AXIS_OIDC_CLIENT_SECRET'].includes(name)) delete env[name]
   for (const name of Object.keys(env)) if (name.startsWith('Studio__')) delete env[name]
   const rendered = spawnSync(
     'docker',
-    ['compose', '-f', composeFile, ...extraFiles.flatMap((file) => ['-f', file]), '--profile', 'admin', '--profile', 'proxy', '--profile', 'replicas', 'config', '--format', 'json'],
+    ['compose', '-f', composeFile, ...extraFiles.flatMap((file) => ['-f', file]), '--profile', 'admin', '--profile', 'replicas', 'config', '--format', 'json'],
     { cwd: root, encoding: 'utf8', env },
   )
   assert.equal(rendered.status, 0, rendered.stderr)
@@ -128,14 +131,14 @@ describe('the example holds no secret', () => {
 
   test('the rendered config takes every connection string and the installation key only from secrets files', () => {
     const config = render()
-    assert.deepEqual(Object.keys(config.services).sort(), ['admin', 'proxy', 'publisher', 'server', 'server-2', 'worker'])
+    assert.deepEqual(Object.keys(config.services).sort(), ['admin', 'identity', 'proxy', 'publisher', 'server', 'server-2', 'worker'])
 
     for (const [name, service] of Object.entries(config.services)) {
       for (const [key, value] of Object.entries(service.environment ?? {})) {
         if (passThrough.includes(key)) {
           assert.ok(value === null || value === undefined || value === '', `${name} sets ${key}`)
         } else {
-          assert.doesNotMatch(key, /ConnectionString|SecretKey|Password/, `${name} sets ${key} in its environment`)
+          assert.doesNotMatch(key, /ConnectionString|Secret|Password/i, `${name} sets ${key} in its environment`)
         }
       }
       const secrets = (service.secrets ?? []).map((secret) => secret.source).sort()
@@ -149,7 +152,8 @@ describe('the example holds no secret', () => {
     )
     assert.deepEqual(config.services.admin.profiles, ['admin'])
     assert.equal(config.services.server.profiles, undefined)
-    assert.deepEqual(config.services.proxy.profiles, ['proxy'])
+    assert.equal(config.services.proxy.profiles, undefined, 'the proxy has a profile')
+    assert.equal(config.services.identity.profiles, undefined, 'the identity provider has a profile')
     assert.deepEqual(config.services['server-2'].profiles, ['replicas'])
     assert.equal(config.services.worker.profiles, undefined)
     const publisher = config.services.publisher
@@ -180,7 +184,7 @@ describe('the example holds no secret', () => {
       assert.equal(services[name].environment.Studio__Tests, 'true', `${name} Studio__Tests`)
       assert.equal((services[name].secrets ?? []).some((secret) => secret.source === scenario), false, `${name} has the scenario secret`)
     }
-    for (const name of ['worker', 'admin', 'proxy']) {
+    for (const name of ['worker', 'admin', 'proxy', 'identity']) {
       assert.equal((services[name].secrets ?? []).some((secret) => secret.source === scenario), false, `${name} has the scenario secret`)
       assert.equal(services[name].environment?.Studio__Tests, undefined, `${name} sets Studio__Tests`)
     }
@@ -224,6 +228,52 @@ describe('the example holds no secret', () => {
   })
 })
 
+describe('the identity provider', () => {
+  test('it runs the pinned Keycloak, takes its database and admin client from secret files and publishes no port', () => {
+    const { services } = render()
+    const { identity } = services
+    const fixture = readFileSync(join(root, 'tests/Axis.Integration.Tests/KeycloakFixture.cs'), 'utf8')
+    const pinned = fixture.match(/public const string Image = "([^"]+)";/)?.[1]
+    assert.ok(pinned, 'KeycloakFixture.cs has no Image constant')
+    assert.equal(identity.image, pinned)
+    assert.deepEqual(identity.command, ['start'])
+    assert.deepEqual(identity.ports ?? [], [], 'the identity provider publishes a port')
+    assert.notEqual(identity.read_only, true)
+
+    const environment = identity.environment ?? {}
+    for (const key of ['KC_DB_URL', 'KC_DB_USERNAME', 'KC_DB_PASSWORD', 'KC_BOOTSTRAP_ADMIN_CLIENT_SECRET', 'KC_BOOTSTRAP_ADMIN_PASSWORD', 'KC_HTTP_ENABLED']) {
+      assert.equal(environment[key], undefined, `identity sets ${key} in its environment`)
+    }
+    assert.equal(environment.KC_HOSTNAME, `https://${identityHost}`)
+    assert.equal(environment.KC_BOOTSTRAP_ADMIN_CLIENT_ID, 'axis-admin')
+    assert.equal(environment.KC_PROXY_TRUSTED_ADDRESSES, services.proxy.networks.default.ipv4_address)
+    assert.equal(environment.KC_HTTPS_CERTIFICATE_FILE, '/identity-tls/tls.crt')
+    assert.equal(environment.KC_HTTPS_CERTIFICATE_KEY_FILE, '/identity-tls/tls.key')
+
+    const mounts = (service, target) => (service.volumes ?? []).filter((volume) => volume.target === target)
+    assert.equal(mounts(identity, '/identity-tls').length, 1)
+    assert.equal(mounts(identity, '/identity-tls')[0].read_only, true)
+    assert.equal(mounts(identity, '/identity-tls')[0].source, join(root, 'deploy/compose/identity-tls'))
+    assert.equal(mounts(identity, '/db-ca').length, 1)
+    assert.equal(mounts(identity, '/db-ca')[0].read_only, true)
+    assert.equal(mounts(identity, '/opt/keycloak/themes')[0]?.read_only, true)
+    assert.equal(mounts(identity, '/opt/keycloak/data/password-blacklists')[0]?.read_only, true)
+    for (const [name, service] of Object.entries(services)) {
+      if (name === 'identity') continue
+      assert.equal(mounts(service, '/identity-tls').length, 0, `${name} mounts the identity certificate folder`)
+      assert.equal(mounts(service, '/db-ca').length, 0, `${name} mounts the identity database authority folder`)
+    }
+  })
+
+  test('the admin tool reaches the identity provider at its public address, and the proxy answers to that name', () => {
+    const { admin, proxy } = render().services
+    assert.equal(admin.environment.IdentityProvider__Url, `https://${identityHost}/`)
+    assert.equal(admin.environment.IdentityProvider__AdminClientId, 'axis-admin')
+    assert.ok(proxy.networks.default.aliases.includes(identityHost), 'the proxy has no alias for the identity host')
+    assert.equal(proxy.environment.AXIS_IDENTITY_HOST, identityHost)
+  })
+})
+
 describe('the server certificate', () => {
   test('both servers listen on HTTPS only, and only they mount the certificate folder, read-only', () => {
     const { services } = render()
@@ -243,7 +293,7 @@ describe('the server certificate', () => {
       assert.equal(mounts[0].read_only, true, `${name} mounts /server-tls read-write`)
       assert.equal(mounts[0].source, join(root, 'deploy/compose/server-tls'))
     }
-    for (const name of ['proxy', 'worker', 'publisher', 'admin']) {
+    for (const name of ['proxy', 'worker', 'publisher', 'admin', 'identity']) {
       const service = services[name]
       assert.equal(
         (service.volumes ?? []).some((volume) => volume.target === '/server-tls' || volume.source === join(root, 'deploy/compose/server-tls')),
@@ -277,14 +327,39 @@ describe('the TLS proxy', () => {
     }
   })
 
+  // The lines of the block that opens with `opening`, up to its closing brace.
+  const block = (opening) => {
+    const start = lines.findIndex((line) => line.trim() === opening)
+    assert.ok(start >= 0, `the Caddyfile has no "${opening}" block`)
+    const indent = lines[start].match(/^\s*/)[0].length
+    const end = lines.findIndex((line, i) => i > start && line.trim() === '}' && line.match(/^\s*/)[0].length === indent)
+    return lines.slice(start + 1, end).map((line) => line.trim())
+  }
+
   test('the proxy forwards to the servers on port 8443 over TLS, checks the name servers and trusts only the server authority', () => {
     assert.ok(lines.some((line) => line.trim() === 'dynamic a servers 8443 {'), 'the upstream is not servers on port 8443')
-    assert.ok(lines.some((line) => line.trim() === 'transport http {'), 'the Caddyfile has no transport http block')
+    const servers = block('handle {')
+    assert.ok(servers.includes('transport http {'), 'the servers block has no transport http block')
     for (const directive of ['tls', 'tls_server_name servers', 'tls_trust_pool file /certs/server-ca.crt']) {
-      assert.equal(lines.filter((line) => line.trim() === directive).length, 1, `the Caddyfile does not hold "${directive}" exactly once`)
+      assert.equal(servers.filter((line) => line === directive).length, 1, `the servers block does not hold "${directive}" exactly once`)
     }
+    assert.ok(!servers.includes('tls_server_name identity'), 'the servers block checks the name identity')
     assert.ok(!lines.some((line) => /tls_insecure_skip_verify/.test(line)), 'the Caddyfile skips the verification of the server certificate')
     assert.ok(!lines.some((line) => line.includes('8080')), 'the Caddyfile names port 8080')
+  })
+
+  test('the proxy sends the identity host to identity on port 8443 over TLS, checks the name identity and trusts only the server authority', () => {
+    assert.ok(lines.some((line) => line.trim() === '@identity host {$AXIS_IDENTITY_HOST}'), 'the Caddyfile does not match the identity host')
+    const handle = block('handle @identity {')
+    assert.ok(handle.includes('reverse_proxy identity:8443 {'), 'the identity upstream is not identity on port 8443')
+    for (const directive of ['tls', 'tls_server_name identity', 'tls_trust_pool file /certs/server-ca.crt']) {
+      assert.equal(handle.filter((line) => line === directive).length, 1, `the identity block does not hold "${directive}" exactly once`)
+    }
+    assert.equal(
+      lines.filter((line) => line.trim() === 'tls_trust_pool file /certs/server-ca.crt').length,
+      2,
+      'the trust pool is not /certs/server-ca.crt in both blocks',
+    )
   })
 
   test(':443 is the only site address and nothing serves plain HTTP', () => {
@@ -311,7 +386,7 @@ describe('the Studio folder', () => {
     }
     assert.equal(sources[0], sources[1])
     assert.equal(sources[0], join(root, 'deploy/compose/studio'))
-    for (const name of ['worker', 'publisher', 'admin', 'proxy']) {
+    for (const name of ['worker', 'publisher', 'admin', 'proxy', 'identity']) {
       assert.equal(
         (services[name].volumes ?? []).some((volume) => volume.target === '/studio'),
         false,
@@ -328,7 +403,6 @@ describe('the on-premises installation', () => {
   let env
   let serverPort
   let workerPort
-  let keycloakPort
   let httpsPort
   let server2Port
   let overrideFile
@@ -352,7 +426,7 @@ describe('the on-premises installation', () => {
   }
 
   const dumpLogs = () => {
-    for (const service of ['server', 'server-2', 'proxy', 'worker', 'publisher']) {
+    for (const service of ['server', 'server-2', 'proxy', 'identity', 'worker', 'publisher']) {
       console.log(`--- docker compose logs ${service}`)
       console.log(compose(['logs', '--no-color', service]).stdout)
     }
@@ -450,17 +524,18 @@ describe('the on-premises installation', () => {
   const viaProxy = (path, jar, headers = {}) =>
     tlsRequest(httpsPort, hosts.one, path, { headers: { ...cookieHeader(jar), ...headers } })
 
-  // keycloak: sends a request to Keycloak for a URL on its own origin, which only the containers can resolve.
+  // keycloak: sends a request through the proxy to the identity provider for a URL on the identity host's origin,
+  // which only the containers can resolve. It reaches the proxy on its published port.
   const keycloak = (url, jar, { method = 'GET', form } = {}) => {
     const target = new URL(url)
-    assert.equal(target.origin, 'https://keycloak:8443', `unexpected Keycloak address ${url}`)
+    assert.equal(target.origin, `https://${identityHost}`, `unexpected identity provider address ${url}`)
     const body = form ? new URLSearchParams(form).toString() : undefined
     const headers = { ...cookieHeader(jar) }
     if (body !== undefined) {
       headers['content-type'] = 'application/x-www-form-urlencoded'
       headers['content-length'] = String(Buffer.byteLength(body))
     }
-    return tlsRequest(keycloakPort, target.host, `${target.pathname}${target.search}`, { method, headers, body })
+    return tlsRequest(httpsPort, target.host, `${target.pathname}${target.search}`, { method, headers, body })
   }
 
   // signInViaProxy: signs a Keycloak development user in through the proxy over HTTPS and returns the cookie jar
@@ -478,14 +553,16 @@ describe('the on-premises installation', () => {
     const authorize = new URL(signIn.headers.location)
     assert.equal(authorize.searchParams.get('redirect_uri'), `https://${hosts.one}/api/auth/callback`)
 
-    // Sign the user in at Keycloak: the login page, then its form.
+    // Sign the user in at the identity provider: the login page of the Axis theme, then its form. The theme puts
+    // the form's action in the JSON of the axis-sign-in-context script.
     const keycloakJar = new Map()
     const loginPage = await keycloak(authorize.href, keycloakJar)
     assert.equal(loginPage.status, 200, `the Keycloak login page: ${loginPage.body}`)
     remember(keycloakJar, loginPage)
-    const form = loginPage.body.match(/<form[^>]*id="kc-form-login"[^>]*>/)
-    assert.ok(form, 'the Keycloak login page has no kc-form-login form')
-    const action = form[0].match(/action="([^"]+)"/)[1].replaceAll('&amp;', '&')
+    const context = loginPage.body.match(/<script[^>]*id="axis-sign-in-context"[^>]*>([\s\S]*?)<\/script>/)
+    assert.ok(context, 'the sign-in page does not show the Axis theme')
+    const action = JSON.parse(context[1]).loginAction
+    assert.ok(action, 'the sign-in context has no loginAction')
     const passwordStep = await keycloak(action, keycloakJar, { method: 'POST', form: { username, password: 'axis' } })
     assert.equal(passwordStep.status, 200, `the Keycloak password step: ${passwordStep.body}`)
     remember(keycloakJar, passwordStep)
@@ -525,6 +602,10 @@ describe('the on-premises installation', () => {
       folder = mkdtempSync(join(tmpdir(), 'axis-onprem-'))
       chmodSync(folder, 0o755)
 
+      // The identity provider mounts the Axis theme from artifacts/keycloak-theme, so it is built first.
+      const theme = spawnSync('npm', ['run', 'build:keycloak-theme', '--prefix', 'web'], { cwd: root, encoding: 'utf8' })
+      assert.equal(theme.status, 0, `npm run build:keycloak-theme\n${theme.stdout}${theme.stderr}`)
+
       // Step 1, the images. The three targets are tagged with the version that compose.yaml requires.
       for (const target of targets) await buildImage({ target, version, tag: `${target}:${version}` })
 
@@ -532,7 +613,7 @@ describe('the on-premises installation', () => {
       const secrets = join(folder, 'secrets')
       mkdirSync(secrets)
       chmodSync(secrets, 0o755)
-      const passwords = { schema: password(), platform: password(), admin: password(), postgres: password() }
+      const passwords = { schema: password(), platform: password(), admin: password(), postgres: password(), identity: password() }
       const trust = verifyFull('/run/test-ca/ca.crt')
       const connection = (user, pass) =>
         `Host=postgres;Port=5432;Database=axis_platform;Username=${user};Password=${pass}${trust}`
@@ -545,6 +626,10 @@ describe('the on-premises installation', () => {
       writeFile(join(secrets, 'Platform__SecretKey'), randomBytes(32).toString('base64'))
       adminClientSecret = password()
       writeFile(join(secrets, 'IdentityProvider__AdminClientSecret'), adminClientSecret)
+      // The identity provider's own database, with the same trust as every other connection.
+      writeFile(join(secrets, 'KC_DB_URL'), 'jdbc:postgresql://postgres:5432/axis_identity?sslmode=verify-full&sslrootcert=/db-ca/root.crt')
+      writeFile(join(secrets, 'KC_DB_USERNAME'), 'axis_identity')
+      writeFile(join(secrets, 'KC_DB_PASSWORD'), passwords.identity)
 
       // Step 3, the database roles. This is the SQL of the installation guide.
       const initSql = join(folder, 'init-roles.sql')
@@ -555,20 +640,20 @@ describe('the on-premises installation', () => {
           `CREATE ROLE axis_platform LOGIN PASSWORD '${passwords.platform}';`,
           `CREATE ROLE axis_admin LOGIN PASSWORD '${passwords.admin}' CREATEDB CREATEROLE;`,
           'CREATE DATABASE axis_platform OWNER axis_platform_schema;',
+          `CREATE ROLE axis_identity LOGIN PASSWORD '${passwords.identity}';`,
+          'CREATE DATABASE axis_identity OWNER axis_identity;',
           '',
         ].join('\n'),
       )
 
-      // Step 4, the certificates: a certificate authority, a certificate of Keycloak for the name keycloak,
-      // a certificate of PostgreSQL for the name postgres and a certificate of the proxy for the two tenant hosts.
+      // Step 4, the certificates: a certificate authority, a certificate of the identity provider for the name identity,
+      // a certificate of PostgreSQL for the name postgres and a certificate of the proxy for the two tenant hosts and
+      // the identity host.
       const certs = join(folder, 'certs')
       mkdirSync(certs)
       chmodSync(certs, 0o755)
       const at = (name) => join('certs', name)
-      writeFile(join(folder, 'leaf.ext'), 'subjectAltName=DNS:keycloak\nbasicConstraints=CA:FALSE\n')
       openssl('req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-days', '2', '-subj', '/CN=Axis onprem test CA', '-keyout', at('ca.key'), '-out', at('ca.crt'), '-addext', 'basicConstraints=critical,CA:TRUE', '-addext', 'keyUsage=critical,keyCertSign,cRLSign')
-      openssl('req', '-newkey', 'rsa:2048', '-nodes', '-subj', '/CN=keycloak', '-keyout', at('tls.key'), '-out', at('tls.csr'))
-      openssl('x509', '-req', '-in', at('tls.csr'), '-CA', at('ca.crt'), '-CAkey', at('ca.key'), '-CAcreateserial', '-days', '2', '-extfile', 'leaf.ext', '-out', at('tls.crt'))
       for (const name of readdirSync(certs)) chmodSync(join(certs, name), 0o644)
       caCertificate = readFileSync(join(certs, 'ca.crt'))
       const { serverDir } = issuePostgresCertificate({
@@ -578,11 +663,27 @@ describe('the on-premises installation', () => {
         ca: { certificate: join(certs, 'ca.crt'), key: join(certs, 'ca.key') },
       })
 
+      // The identity provider's folder holds tls.crt and tls.key for the name identity, which is what AXIS_IDENTITY_TLS_DIR names.
+      const identityTls = join(folder, 'identity-tls')
+      mkdirSync(identityTls)
+      chmodSync(identityTls, 0o755)
+      writeFile(join(folder, 'identity.ext'), 'subjectAltName=DNS:identity\nbasicConstraints=CA:FALSE\n')
+      openssl('req', '-newkey', 'rsa:2048', '-nodes', '-subj', '/CN=identity', '-keyout', join('identity-tls', 'tls.key'), '-out', join('certs', 'identity.csr'))
+      openssl('x509', '-req', '-in', join('certs', 'identity.csr'), '-CA', at('ca.crt'), '-CAkey', at('ca.key'), '-CAcreateserial', '-days', '2', '-extfile', 'identity.ext', '-out', join('identity-tls', 'tls.crt'))
+      for (const name of readdirSync(identityTls)) chmodSync(join(identityTls, name), 0o644)
+
+      // The identity provider's database authority, which is what AXIS_IDENTITY_DB_CA_DIR names. KC_DB_URL points at root.crt in it.
+      const identityDbCa = join(folder, 'db-ca')
+      mkdirSync(identityDbCa)
+      chmodSync(identityDbCa, 0o755)
+      writeFileSync(join(identityDbCa, 'root.crt'), readFileSync(join(certs, 'ca.crt')))
+      chmodSync(join(identityDbCa, 'root.crt'), 0o644)
+
       // The proxy's folder holds tls.crt and tls.key, which is what AXIS_TLS_DIR names.
       const tls = join(folder, 'tls')
       mkdirSync(tls)
       chmodSync(tls, 0o755)
-      writeFile(join(folder, 'proxy.ext'), `subjectAltName=DNS:${hosts.one},DNS:${hosts.two}\nbasicConstraints=CA:FALSE\n`)
+      writeFile(join(folder, 'proxy.ext'), `subjectAltName=DNS:${hosts.one},DNS:${hosts.two},DNS:${identityHost}\nbasicConstraints=CA:FALSE\n`)
       openssl('req', '-newkey', 'rsa:2048', '-nodes', '-subj', `/CN=${hosts.one}`, '-keyout', join('tls', 'tls.key'), '-out', join('certs', 'proxy.csr'))
       openssl('x509', '-req', '-in', join('certs', 'proxy.csr'), '-CA', at('ca.crt'), '-CAkey', at('ca.key'), '-CAcreateserial', '-days', '2', '-extfile', 'proxy.ext', '-out', join('tls', 'tls.crt'))
       for (const name of readdirSync(tls)) chmodSync(join(tls, name), 0o644)
@@ -606,8 +707,6 @@ describe('the on-premises installation', () => {
       const realmJson = JSON.parse(readFileSync(join(root, 'samples/keycloak/axis-realm.json'), 'utf8'))
       const client = realmJson.clients.find((candidate) => candidate.clientId === 'axis')
       assert.ok(client, 'the development realm has no axis client')
-      // This install does not mount the Axis theme yet, so the realm keeps Keycloak's own sign-in page.
-      delete realmJson.loginTheme
       const origins = Object.values(hosts).map((host) => `https://${host}/*`)
       client.redirectUris.push(...origins)
       client.attributes['post.logout.redirect.uris'] += `##${origins.join('##')}`
@@ -623,6 +722,8 @@ describe('the on-premises installation', () => {
       workerPort = await freePort()
       httpsPort = await freePort()
       server2Port = await freePort()
+
+      const rendered = render()
 
       // The override file. JSON is valid YAML, so the test writes it as JSON.
       const refresh = { Tenancy__RefreshInterval: '00:00:02' }
@@ -646,22 +747,10 @@ describe('the on-premises installation', () => {
                 `${serverDir}:${serverCertificateMount}:ro`,
               ],
             },
-            keycloak: {
-              image: 'quay.io/keycloak/keycloak:26.4',
-              command: [
-                'start-dev',
-                '--import-realm',
-                '--https-port=8443',
-                '--https-certificate-file=/certs/tls.crt',
-                '--https-certificate-key-file=/certs/tls.key',
-              ],
-              environment: { KC_BOOTSTRAP_ADMIN_CLIENT_ID: adminClientId, KC_BOOTSTRAP_ADMIN_CLIENT_SECRET: adminClientSecret },
-              volumes: [
-                `${realm}:/opt/keycloak/data/import:ro`,
-                `${certs}:/certs:ro`,
-                `${join(root, 'deploy/keycloak/password-blacklists')}:/opt/keycloak/data/password-blacklists:ro`,
-              ],
-              ports: ['127.0.0.1::8443'],
+            // The example's identity provider also imports the development realm.
+            identity: {
+              command: [...rendered.services.identity.command, '--import-realm'],
+              volumes: [`${realm}:/opt/keycloak/data/import:ro`],
             },
             server: serverOverride,
             'server-2': serverOverride,
@@ -682,13 +771,15 @@ describe('the on-premises installation', () => {
         AXIS_SERVER_2_PORT: String(server2Port),
         AXIS_HTTPS_PORT: String(httpsPort),
         AXIS_TLS_DIR: tls,
+        AXIS_IDENTITY_HOST: identityHost,
+        AXIS_IDENTITY_TLS_DIR: identityTls,
+        AXIS_IDENTITY_DB_CA_DIR: identityDbCa,
+        AXIS_IDENTITY_THEME_DIR: join(root, 'artifacts/keycloak-theme'),
         AXIS_SERVER_TLS_DIR: serverTls,
         AXIS_WORKER_HEALTH_PORT: String(workerPort),
         AXIS_STUDIO_DIR: studio,
         Studio__Folders__0: '/studio/leave-requests',
         Studio__AuthorRole: 'author',
-        IdentityProvider__Url: 'https://keycloak:8443/',
-        IdentityProvider__AdminClientId: adminClientId,
       }
       delete env.AXIS_OIDC_CLIENT_SECRET
       assert.ok(statSync(env.AXIS_MODULES_DIR).isDirectory(), 'run scripts/smoke.sh, which installs the sample modules: artifacts/modules is missing')
@@ -697,15 +788,16 @@ describe('the on-premises installation', () => {
   )
 
   after(() => {
-    compose(['down', '-v', '--remove-orphans'], { stdio: 'ignore', env: { ...env, COMPOSE_PROFILES: 'admin,proxy,replicas' } })
+    compose(['down', '-v', '--remove-orphans'], { stdio: 'ignore', env: { ...env, COMPOSE_PROFILES: 'admin,replicas' } })
     if (folder) rmSync(folder, { recursive: true, force: true })
     for (const target of targets) docker(['rmi', '-f', `${target}:${version}`], { stdio: 'ignore' })
   })
 
   test('the guide installs two tenants and serves them', { timeout }, async () => {
     try {
-      // The database server and the identity provider run outside the example.
-      run(['up', '-d', 'postgres', 'keycloak'])
+      // The database server runs outside the example. The identity provider and the proxy that serves it are the
+      // example's own, and start with `up` like the rest.
+      run(['up', '-d', 'postgres'])
 
       // Check over TCP: the initialization server listens only on the Unix socket, so the check
       // succeeds only after the init script has run.
@@ -716,24 +808,20 @@ describe('the on-premises installation', () => {
       }
       assert.ok(ready, `PostgreSQL was not ready after 60 seconds\n${compose(['logs', 'postgres']).stdout}`)
 
-      keycloakPort = run(['port', 'keycloak', '8443']).split('\n')[0].split(':').pop()
-      let discovery = 0
-      for (let i = 0; i < 180 && discovery !== 200; i++) {
-        if (i > 0) await sleep(1000)
-        discovery = await new Promise((resolve) => {
-          const req = https.get(
-            `https://127.0.0.1:${keycloakPort}/realms/axis/.well-known/openid-configuration`,
-            { rejectUnauthorized: false },
-            (response) => {
-              response.resume()
-              resolve(response.statusCode)
-            },
-          )
-          req.setTimeout(5000, () => req.destroy())
-          req.on('error', () => resolve(0))
-        })
-      }
-      assert.equal(discovery, 200, `Keycloak did not serve the axis realm\n${compose(['logs', 'keycloak']).stdout}`)
+      // Start the identity provider and the proxy, and wait until the development realm answers through the proxy on
+      // the identity host. The first start builds Keycloak and imports the realm.
+      run(['up', '-d', 'identity', 'proxy'])
+      const discovery = await waitFor(() => tlsRequest(httpsPort, identityHost, '/realms/axis/.well-known/openid-configuration'), 200, 240)
+      assert.equal(discovery.status, 200, `the identity provider did not serve the axis realm\n${compose(['logs', 'identity']).stdout}`)
+      assert.equal(JSON.parse(discovery.body).issuer, identityAuthority)
+
+      // The sign-in page of a realm shows the Axis theme, and the theme's script answers through the proxy.
+      const page = await tlsRequest(httpsPort, identityHost, '/realms/axis/protocol/openid-connect/auth?client_id=axis&response_type=code&scope=openid&redirect_uri=' + encodeURIComponent(`https://${hosts.one}/api/auth/callback`))
+      assert.equal(page.status, 200, `the sign-in page: ${page.body}`)
+      assert.match(page.body, /id="axis-sign-in-context"/)
+      const stylesheet = page.body.match(/href="([^"]+axis-sign-in\.css)"/)
+      assert.ok(stylesheet, 'the sign-in page links no Axis theme stylesheet')
+      assert.equal((await tlsRequest(httpsPort, identityHost, stylesheet[1])).status, 200, 'the theme stylesheet did not answer 200')
 
       // The guide: step 2, migrate. It runs before the first server start and does nothing then.
       const migrate = admin(['migrate'])
@@ -751,8 +839,8 @@ describe('the on-premises installation', () => {
       // The publisher exits until the server has created the platform tables, so it starts now.
       run(['up', '-d', 'publisher'])
 
-      // Step 4, create two tenants. Each gets a realm of its own in Keycloak. The identity provider address and
-      // admin client id pass through from the shell and the admin client secret is a secret file.
+      // Step 4, create two tenants. Each gets a realm of its own in the identity provider. The compose file points the
+      // admin tool at the identity host, and the admin client secret is a secret file that both sides read.
       for (const [id, host] of Object.entries(hosts)) {
         const create = admin(['tenant', 'create', id, '--host', host])
         assert.equal(create.status, 0, `tenant create ${id}\n${create.stdout}${create.stderr}`)
@@ -809,7 +897,7 @@ describe('the on-premises installation', () => {
         }
         assert.equal(signIn.status, 302, `${host} sign-in: ${signIn.body}`)
         const location = new URL(signIn.headers.location)
-        assert.equal(`${location.origin}${location.pathname}`, `https://keycloak:8443/realms/${id}/protocol/openid-connect/auth`)
+        assert.equal(`${location.origin}${location.pathname}`, `https://${identityHost}/realms/${id}/protocol/openid-connect/auth`)
         assert.equal(location.searchParams.get('client_id'), 'axis')
         assert.equal(location.searchParams.get('redirect_uri'), `https://${host}/api/auth/callback`)
       }
@@ -880,7 +968,7 @@ RETURNING id;`,
 
       // A new realm has no users, so tenant one goes back to the development realm, where the requester and author can sign in.
       const point = admin(
-        ['tenant', 'oidc', 'set', 'one', '--authority', keycloakAuthority, '--client-id', 'axis', '--client-secret'],
+        ['tenant', 'oidc', 'set', 'one', '--authority', identityAuthority, '--client-id', 'axis', '--client-secret'],
         { AXIS_OIDC_CLIENT_SECRET: clientSecret },
       )
       assert.equal(point.status, 0, `tenant oidc set one\n${point.stdout}${point.stderr}`)
@@ -888,17 +976,17 @@ RETURNING id;`,
       for (let i = 0; i < 30; i++) {
         if (i > 0) await sleep(1000)
         const pointed = await server(hosts.one, '/api/auth/sign-in?returnUrl=%2Fleave')
-        if (pointed.status === 302 && pointed.headers.location.startsWith(`${keycloakAuthority}/`)) break
+        if (pointed.status === 302 && pointed.headers.location.startsWith(`${identityAuthority}/`)) break
       }
 
-      // Step 8, a second replica and the TLS proxy. The second replica starts once the first is ready.
+      // Step 8, a second replica and the TLS proxy. The second replica starts once the first is ready. The proxy has
+      // run since the start of the test.
       run(['up', '-d', 'server-2'])
       const ready2 = await waitFor(() => serverRequest(server2Port, 'localhost', '/health/ready'), 200, 120)
       assert.equal(ready2.status, 200, 'the second server never answered /health/ready with 200')
       const site2 = await waitFor(() => serverRequest(server2Port, hosts.one, '/leave'), 200, 60)
       assert.equal(site2.status, 200, 'the second server did not serve /leave')
 
-      run(['up', '-d', 'proxy'])
       const proxied = await waitFor(() => viaProxy('/leave', new Map()), 200, 60)
       assert.equal(proxied.status, 200, 'the proxy did not serve /leave')
 

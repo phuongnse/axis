@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
+import { readFileSync } from 'node:fs'
 import { describe, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 
@@ -165,7 +166,7 @@ describe('the Axis Helm chart', () => {
     assert.doesNotMatch(output, /^\s*(stringData|data):/m)
     assert.doesNotMatch(
       output,
-      /- name: (ConnectionStrings__|Platform__SecretKey|Admin__ConnectionString|AXIS_OIDC_CLIENT_SECRET)/,
+      /- name: (ConnectionStrings__|Platform__SecretKey|Admin__ConnectionString|AXIS_OIDC_CLIENT_SECRET|KC_DB_URL|KC_DB_USERNAME|KC_DB_PASSWORD|KC_BOOTSTRAP_ADMIN_CLIENT_SECRET|IdentityProvider__AdminClientSecret)/,
     )
 
     const worker = find(output, 'Deployment', 'axis-worker')
@@ -269,4 +270,94 @@ describe('the Axis Helm chart', () => {
       assert.doesNotMatch(find(output, kind, name), /ForwardedHeaders__/)
     }
   })
+
+  test('the identity Deployment runs the pinned Keycloak with start, the theme and the password list read-only', () => {
+    const fixture = readFileSync(new URL('../tests/Axis.Integration.Tests/KeycloakFixture.cs', import.meta.url), 'utf8')
+    const pinned = fixture.match(/public const string Image = "([^"]+)";/)?.[1]
+    assert.ok(pinned, 'KeycloakFixture.Image not found')
+
+    const identity = find(renderOk(), 'Deployment', 'axis-identity')
+    assert.match(identity, /replicas: 1\n/)
+    assert.match(identity, new RegExp(`image: "${pinned.replaceAll('.', '\\.')}"`))
+    assert.match(identity, /args:\n\s+- start\n/)
+    assert.match(identity, /exec \/opt\/keycloak\/bin\/kc\.sh "\$@"/)
+    assert.match(identity, /- name: theme\n\s+mountPath: \/opt\/keycloak\/themes\n\s+readOnly: true\n/)
+    assert.match(identity, /- name: theme\n\s+persistentVolumeClaim:\n\s+claimName: axis-keycloak-theme\n/)
+    assert.match(identity, /- name: password-blacklists\n\s+mountPath: \/opt\/keycloak\/data\/password-blacklists\n\s+readOnly: true\n/)
+    assert.match(identity, /- name: password-blacklists\n\s+configMap:\n\s+name: axis-password-blacklists\n/)
+    assert.match(identity, /- name: KC_HOSTNAME\n\s+value: "https:\/\/id\.example\.com"\n/)
+    assert.match(identity, /- name: KC_HTTPS_CERTIFICATE_FILE\n\s+value: \/identity-tls\/tls\.crt\n/)
+    assert.match(identity, /- name: KC_HTTPS_CERTIFICATE_KEY_FILE\n\s+value: \/identity-tls\/tls\.key\n/)
+    assert.doesNotMatch(identity, /KC_HTTP_ENABLED/)
+  })
+
+  test('the identity Deployment has startup, liveness and readiness probes over HTTPS on its management port', () => {
+    const output = renderOk()
+    const identity = find(output, 'Deployment', 'axis-identity')
+    for (const [probe, path] of [
+      ['startupProbe', 'started'],
+      ['livenessProbe', 'live'],
+      ['readinessProbe', 'ready'],
+    ]) {
+      assert.match(identity, new RegExp(`${probe}:\\n\\s+httpGet:\\n\\s+path: /health/${path}\\n\\s+port: management\\n\\s+scheme: HTTPS\\n`))
+    }
+    assert.match(identity, /- name: management\n\s+containerPort: 9000\n/)
+    assert.match(identity, /- name: KC_HEALTH_ENABLED\n\s+value: "true"\n/)
+
+    const service = find(output, 'Service', 'axis-identity')
+    assert.match(service, /ports:\n\s+- name: https\n\s+port: 443\n\s+targetPort: https\n/)
+    assert.doesNotMatch(service, /port: 9000|targetPort: management/)
+  })
+
+  test('the identity secret files and certificate are mounted in the identity pod only, and in no env entry', () => {
+    const output = renderOk()
+    const identity = find(output, 'Deployment', 'axis-identity')
+    for (const file of ['KC_DB_URL', 'KC_DB_USERNAME', 'KC_DB_PASSWORD', 'IdentityProvider__AdminClientSecret']) {
+      assert.match(identity, new RegExp(`- key: "${file}"\\n\\s+path: ${file}\\n`))
+    }
+    assert.match(identity, /name: "axis-identity"\n/)
+    assert.match(identity, /- name: identity-tls\n\s+secret:\n\s+secretName: "axis-identity-tls"\n/)
+    assert.match(identity, /- name: identity-tls\n\s+mountPath: \/identity-tls\n\s+readOnly: true\n/)
+    assert.doesNotMatch(identity, /ConnectionStrings__|Platform__SecretKey|Scenarios__/)
+    assert.doesNotMatch(identity, /- name: (KC_DB_URL|KC_DB_USERNAME|KC_DB_PASSWORD|KC_BOOTSTRAP_ADMIN_CLIENT_SECRET)\n/)
+    for (const [kind, name] of [
+      ['Deployment', 'axis-server'],
+      ['Deployment', 'axis-worker'],
+      ['Deployment', 'axis-publisher'],
+      ['Job', 'axis-migrate'],
+    ]) {
+      assert.doesNotMatch(find(output, kind, name), /identity-tls|axis-identity|KC_DB_|IdentityProvider__AdminClientSecret/)
+    }
+  })
+
+  test('the identity provider trusts forwarded headers only from the listed proxies and networks', () => {
+    const identity = find(renderOk(), 'Deployment', 'axis-identity')
+    assert.match(identity, /- name: KC_PROXY_HEADERS\n\s+value: xforwarded\n/)
+    assert.match(identity, /- name: KC_PROXY_TRUSTED_ADDRESSES\n\s+value: "10\.0\.0\.10,10\.0\.0\.0\/8"\n/)
+
+    const none = find(renderOk('--set', 'forwardedHeaders.knownProxies=null', '--set', 'forwardedHeaders.knownNetworks=null'), 'Deployment', 'axis-identity')
+    assert.doesNotMatch(none, /KC_PROXY_/)
+  })
+
+  test('the database authority volume mounts only when set', () => {
+    const identity = find(renderOk(), 'Deployment', 'axis-identity')
+    assert.match(identity, /- name: db-ca\n\s+mountPath: \/db-ca\n\s+readOnly: true\n/)
+    const without = find(renderOk('--set', 'identity.databaseAuthority.volume=null'), 'Deployment', 'axis-identity')
+    assert.doesNotMatch(without, /db-ca/)
+  })
+
+  for (const [value, set] of [
+    ['identity.hostname', 'identity.hostname='],
+    ['secrets.identityCertificate.name', 'secrets.identityCertificate.name='],
+    ['identity.theme.volume', 'identity.theme.volume=null'],
+    ['identity.passwordBlacklists.volume', 'identity.passwordBlacklists.volume=null'],
+    ['secrets.identityDatabaseUrl.name', 'secrets.identityDatabaseUrl.name='],
+    ['secrets.identityAdminClientSecret.name', 'secrets.identityAdminClientSecret.name='],
+  ]) {
+    test(`a missing ${value} fails and names it`, () => {
+      const result = render('--set', set)
+      assert.notEqual(result.status, 0)
+      assert.match(result.stderr, new RegExp(value.replaceAll('.', '\\.')))
+    })
+  }
 })

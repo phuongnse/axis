@@ -15,6 +15,8 @@ public static class UserProfiles
 
     private const string ContactsSql = """SELECT "user_id", "email", "locale" FROM "axis"."user_profiles" WHERE "user_id" = ANY(@users)""";
 
+    private const string LastSignInsSql = """SELECT "user_id", "last_signed_in_at" FROM "axis"."user_profiles" WHERE "user_id" = ANY(@users)""";
+
     private const string SearchSql =
         """
         SELECT "user_id", "display_name" FROM "axis"."user_profiles"
@@ -112,6 +114,32 @@ public static class UserProfiles
         }
 
         return contacts;
+    }
+
+    /// <summary>
+    /// The last sign-in time of the profiles of <paramref name="userIds"/>, by user id. A user with no profile is not in the result.
+    /// </summary>
+    public static async Task<IReadOnlyDictionary<string, DateTimeOffset>> FindLastSignInsAsync(
+        NpgsqlConnection connection, IReadOnlyCollection<string> userIds, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+        ArgumentNullException.ThrowIfNull(userIds);
+
+        var signIns = new Dictionary<string, DateTimeOffset>(StringComparer.Ordinal);
+        if (userIds.Count == 0)
+        {
+            return signIns;
+        }
+
+        await using var command = new NpgsqlCommand(LastSignInsSql, connection);
+        command.Parameters.Add(new NpgsqlParameter("users", NpgsqlDbType.Array | NpgsqlDbType.Text) { Value = userIds.ToArray() });
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            signIns[reader.GetString(0)] = await reader.GetFieldValueAsync<DateTimeOffset>(1, cancellationToken);
+        }
+
+        return signIns;
     }
 
     /// <summary>

@@ -7,7 +7,8 @@
 #   each up to three times with a wait of 15 and 30 seconds, and runs them read-only against a throwaway
 #   PostgreSQL that serves TLS, with SSL Mode=VerifyFull in their connection strings.
 # - onprem: scripts/onprem.test.mjs installs deploy/compose/compose.yaml from the production images as
-#   docs/reference/installation.md says, against a test PostgreSQL over TLS and Keycloak over HTTPS. Every
+#   docs/reference/installation.md says, against a test PostgreSQL over TLS and the example's own identity
+#   provider, which the TLS proxy serves on a host of its own. Every
 #   connection string sets SSL Mode=VerifyFull, and the test checks that every Axis connection uses TLS. It
 #   creates two tenants, activates the leave request sample, checks each tenant's site and sign-in, suspend
 #   and resume, and an unknown host. It reads the sample modules, which this script installs in artifacts/modules.

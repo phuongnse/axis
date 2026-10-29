@@ -96,6 +96,33 @@
         "tests": { "type": "boolean" }
       }
     },
+    "identity": {
+      "type": "object",
+      "properties": {
+        "image": { "type": "string" },
+        "hostname": { "type": "string" },
+        "resources": { "type": "object" },
+        "service": {
+          "type": "object",
+          "properties": {
+            "type": { "type": "string" },
+            "port": { "type": "integer", "minimum": 1, "maximum": 65535 }
+          }
+        },
+        "theme": {
+          "type": "object",
+          "properties": { "volume": { "$ref": "#/definitions/volume" } }
+        },
+        "passwordBlacklists": {
+          "type": "object",
+          "properties": { "volume": { "$ref": "#/definitions/volume" } }
+        },
+        "databaseAuthority": {
+          "type": "object",
+          "properties": { "volume": { "$ref": "#/definitions/volume" } }
+        }
+      }
+    },
     "forwardedHeaders": {
       "type": "object",
       "properties": {
@@ -110,7 +137,12 @@
         "platformSchemaConnection": { "$ref": "#/definitions/secretReference" },
         "platformSecretKey": { "$ref": "#/definitions/secretReference" },
         "serverCertificate": { "$ref": "#/definitions/tlsSecretReference" },
-        "scenarioServerConnection": { "$ref": "#/definitions/secretReference" }
+        "scenarioServerConnection": { "$ref": "#/definitions/secretReference" },
+        "identityDatabaseUrl": { "$ref": "#/definitions/secretReference" },
+        "identityDatabaseUsername": { "$ref": "#/definitions/secretReference" },
+        "identityDatabasePassword": { "$ref": "#/definitions/secretReference" },
+        "identityAdminClientSecret": { "$ref": "#/definitions/secretReference" },
+        "identityCertificate": { "$ref": "#/definitions/tlsSecretReference" }
       },
       "additionalProperties": false
     }

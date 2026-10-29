@@ -1,6 +1,7 @@
 # Production Compose example: the server, the worker and the publisher run from the production images,
-# and the admin tool runs only on demand. PostgreSQL 18 and the OIDC provider run elsewhere. Tenants come from the
-# tenant directory. Every secret is a file under secrets:, mounted in /run/secrets. This file holds no
+# Axis's identity provider (Keycloak with the Axis theme) runs beside them, and the admin tool runs only on demand.
+# PostgreSQL 18 runs elsewhere and holds the identity provider's own database. Tenants come from the tenant
+# directory. Every secret is a file under secrets:, mounted in /run/secrets. This file holds no
 # password, client secret or key. See docs/reference/installation.md#on-premises for the steps.
 # compose.scenarios.yaml is an optional second file that turns on test scenarios.
 #
@@ -21,6 +22,18 @@
 # AXIS_TLS_DIR          The folder with tls.crt and tls.key for the proxy, mounted read-only at /certs. Default ./tls.
 #                       It also holds server-ca.crt, the one authority certificate that the proxy trusts for the servers.
 # AXIS_HTTPS_PORT       The host port of the proxy. Default 443.
+# AXIS_IDENTITY_HOST    Required. The one public host name of the identity provider. The proxy sends requests for it to
+#                       the identity provider and every other host to the servers. Its certificate must cover this name.
+# AXIS_IDENTITY_TLS_DIR The folder with tls.crt and tls.key of the identity provider, issued for the name `identity`,
+#                       mounted read-only at /identity-tls on the identity provider only. UID 1000 must read both
+#                       files. Default ./identity-tls.
+# AXIS_IDENTITY_DB_CA_DIR  The folder with root.crt, the authority certificate of the PostgreSQL server, mounted
+#                       read-only at /db-ca on the identity provider only. The JDBC URL in KC_DB_URL names it with
+#                       sslrootcert=/db-ca/root.crt. UID 1000 must read it. Default ./db-ca.
+# AXIS_IDENTITY_THEME_DIR  The built Axis login theme, the output of `npm run build:keycloak-theme --prefix web`,
+#                       mounted read-only at /opt/keycloak/themes. Default ./keycloak-theme.
+# AXIS_PASSWORD_BLACKLISTS_DIR  The breached-password list that every realm checks, mounted read-only at
+#                       /opt/keycloak/data/password-blacklists. Default ../keycloak/password-blacklists.
 # AXIS_SERVER_2_PORT    The host port of the second server replica, on 127.0.0.1 only. Default 8081.
 # AXIS_NETWORK_SUBNET   The subnet of the Compose network. Default 172.31.250.0/24. Change it when it overlaps a
 #                       network of the machine.
@@ -29,11 +42,9 @@
 # AXIS_PROXY_ADDRESS    The fixed address of the proxy in the subnet. Both servers trust the forwarded headers
 #                       from this address only. Default 172.31.250.10.
 #
-# Profiles. `proxy` starts the TLS proxy. `replicas` starts the second server, server-2. `admin` is for
-# `docker compose run --rm admin`.
+# Profiles. `replicas` starts the second server, server-2. `admin` is for `docker compose run --rm admin`. The
+# TLS proxy and the identity provider have no profile, so `docker compose up` starts them.
 # AXIS_OIDC_CLIENT_SECRET  Passes through from the shell to `tenant restore` and `tenant oidc set`. It is never stored here.
-# IdentityProvider__Url, IdentityProvider__AdminClientId  Pass through from the shell to `tenant create`, which creates the
-#                       tenant's realm there. The URL must be https. The admin client secret is a secret file.
 # Studio__Folders__0, Studio__AuthorRole, Studio__PublisherRole  Pass through from the shell to both servers.
 #                       Studio stays off without them.
 x-host: &host
@@ -92,12 +103,47 @@ services:
     ports:
       - "127.0.0.1:${AXIS_SERVER_2_PORT:-8081}:8443"
 
-  # Ends TLS with /certs/tls.crt and /certs/tls.key and forwards to every server that answers to `servers`, over
-  # TLS. It trusts only /certs/server-ca.crt for the servers. It holds no secret: the folder is mounted from the host.
+  # Axis's identity provider: Keycloak at the version that development and the tests use, with the Axis theme and
+  # the breached-password list. It keeps its data in its own database on the PostgreSQL server and listens on
+  # HTTPS only, on port 8443, with a certificate for the name `identity`. It publishes no port: the proxy is the
+  # only way in. The database settings come from secret files, which the entrypoint turns into Keycloak's
+  # variables, because Keycloak has no _FILE variables. The admin client axis-admin is the bootstrap client of the
+  # master realm, with the same secret file that the admin tool reads. Keycloak rebuilds itself at start and
+  # writes into its image, so this service has no read-only root file system.
+  identity:
+    image: quay.io/keycloak/keycloak:26.4
+    restart: unless-stopped
+    entrypoint: [bash, /opt/axis/identity-entrypoint.sh]
+    command: [start]
+    environment:
+      KC_DB: postgres
+      KC_HOSTNAME: https://${AXIS_IDENTITY_HOST:?Set AXIS_IDENTITY_HOST}
+      KC_HTTPS_CERTIFICATE_FILE: /identity-tls/tls.crt
+      KC_HTTPS_CERTIFICATE_KEY_FILE: /identity-tls/tls.key
+      KC_PROXY_HEADERS: xforwarded
+      KC_PROXY_TRUSTED_ADDRESSES: ${AXIS_PROXY_ADDRESS:-172.31.250.10}
+      KC_BOOTSTRAP_ADMIN_CLIENT_ID: axis-admin
+    volumes:
+      - ./identity-entrypoint.sh:/opt/axis/identity-entrypoint.sh:ro
+      - ${AXIS_IDENTITY_THEME_DIR:-./keycloak-theme}:/opt/keycloak/themes:ro
+      - ${AXIS_PASSWORD_BLACKLISTS_DIR:-../keycloak/password-blacklists}:/opt/keycloak/data/password-blacklists:ro
+      # The certificate and the private key of the identity provider. No other service mounts them.
+      - ${AXIS_IDENTITY_TLS_DIR:-./identity-tls}:/identity-tls:ro
+      # The authority certificate of the PostgreSQL server, for sslrootcert in KC_DB_URL. Public, so no secret.
+      - ${AXIS_IDENTITY_DB_CA_DIR:-./db-ca}:/db-ca:ro
+    secrets:
+      - KC_DB_URL
+      - KC_DB_USERNAME
+      - KC_DB_PASSWORD
+      - IdentityProvider__AdminClientSecret
+
+  # Ends TLS with /certs/tls.crt and /certs/tls.key. It forwards requests for AXIS_IDENTITY_HOST to the identity
+  # provider and every other host to every server that answers to `servers`, both over TLS. It trusts only
+  # /certs/server-ca.crt for them. The network alias AXIS_IDENTITY_HOST lets the servers, the publisher and the
+  # admin tool reach the identity provider at the same public address as a browser. It holds no secret: the
+  # folder is mounted from the host.
   proxy:
     image: caddy:2.10.2-alpine
-    profiles:
-      - proxy
     restart: unless-stopped
     read_only: true
     tmpfs:
@@ -105,12 +151,16 @@ services:
       - /config
     ports:
       - "${AXIS_HTTPS_PORT:-443}:443"
+    environment:
+      AXIS_IDENTITY_HOST: ${AXIS_IDENTITY_HOST:?Set AXIS_IDENTITY_HOST}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - ${AXIS_TLS_DIR:-./tls}:/certs:ro
     networks:
       default:
         ipv4_address: ${AXIS_PROXY_ADDRESS:-172.31.250.10}
+        aliases:
+          - ${AXIS_IDENTITY_HOST:?Set AXIS_IDENTITY_HOST}
 
   worker:
     <<: *host
@@ -153,10 +203,11 @@ services:
       - admin
     environment:
       <<: *host-environment
-      # No value: these pass through from the shell.
+      # No value: this passes through from the shell.
       AXIS_OIDC_CLIENT_SECRET:
-      IdentityProvider__Url:
-      IdentityProvider__AdminClientId:
+      # `tenant create` creates each tenant's realm in the identity provider, at its public address.
+      IdentityProvider__Url: https://${AXIS_IDENTITY_HOST:?Set AXIS_IDENTITY_HOST}/
+      IdentityProvider__AdminClientId: axis-admin
     volumes:
       - ${AXIS_EXTENSIONS_DIR:-./extensions}:/extensions:ro
       - ${AXIS_MODULES_DIR:-./modules}:/modules:ro
@@ -186,5 +237,11 @@ secrets:
     file: ${AXIS_SECRETS_DIR:-./secrets}/ConnectionStrings__PlatformSchema
   IdentityProvider__AdminClientSecret:
     file: ${AXIS_SECRETS_DIR:-./secrets}/IdentityProvider__AdminClientSecret
+  KC_DB_PASSWORD:
+    file: ${AXIS_SECRETS_DIR:-./secrets}/KC_DB_PASSWORD
+  KC_DB_URL:
+    file: ${AXIS_SECRETS_DIR:-./secrets}/KC_DB_URL
+  KC_DB_USERNAME:
+    file: ${AXIS_SECRETS_DIR:-./secrets}/KC_DB_USERNAME
   Platform__SecretKey:
     file: ${AXIS_SECRETS_DIR:-./secrets}/Platform__SecretKey

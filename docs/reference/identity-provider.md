@@ -208,7 +208,8 @@ _(planned for M17)_
   addresses of `axis`. When the tenant has a platform client secret, the site client's secret is base64url of
   HMAC-SHA256(platform secret, client id), so the server can compute it. Without a platform secret, Keycloak makes the
   secret as before. Without an `axis` client it is a plain client with a secret. Both tenant catalogs carry
-  the realm's name, the identity provider's address, the activation secret and the platform client's secret, see
+  the realm's name, the identity provider's address, the activation secret, the platform client's secret and the secret of
+  the `axis-users` client, see
   [tenant realm](host-settings.md#tenant-realm). The server's startup activation calls it, after it activates each
   application folder, for a tenant that has realm details. So does `Axis.Admin` activation, as described below. When the
   identity provider answers 409 Conflict, as when another host syncs the same realm at the same moment, the sync reads
@@ -281,16 +282,18 @@ _(planned for M17)_
   fonts. Keycloak's other pages still come from its `keycloak` parent theme. The development realm `axis` uses the theme as
   its login theme: Compose, `scripts/dev.sh`, `scripts/e2e.sh` and the Keycloak of the integration tests load it from
   `artifacts/keycloak-theme`, and each builds it first. The realms of `tenant create` name the theme as their login
-  theme. The on-premises install and the Helm chart do not load it yet, so Keycloak there falls back to its built-in
-  theme.
+  theme. The on-premises Compose example loads it from `AXIS_IDENTITY_THEME_DIR`, see
+  [on premises](installation.md#on-premises). The Helm chart loads it from the volume `identity.theme.volume`, see
+  [in the cloud](installation.md#in-the-cloud).
 
 ## Installation
 
-_(planned for M17)_
-
-- Docker Compose, the Helm chart and the on-premises install run Axis's identity provider with its own database on the
-  PostgreSQL server, behind the same TLS proxy as the server, on one host of its own for the installation. The
-  operator upgrades it with Axis, which pins its version.
+- _(built)_ The on-premises Compose example runs Axis's identity provider with its own database on the PostgreSQL
+  server, behind the same TLS proxy as the server, on one host of its own for the installation. It pins the Keycloak
+  version of development and the tests, and the operator upgrades it with Axis. See
+  [on premises](installation.md#on-premises).
+- _(built)_ The Helm chart runs it the same way: one Deployment and a Service, with the theme and the password list
+  from volumes that the operator names. See [in the cloud](installation.md#in-the-cloud).
 - The development realm `axis` stays for `scripts/dev.sh` and the tests, as the `default` tenant's realm, see
   [security](security.md#development-users). Under `scripts/dev.sh` and in the E2E run, the server's startup activation
   keeps it in step through its `axis-activation` client, so the realm holds a `site-` client for each sample site, see
