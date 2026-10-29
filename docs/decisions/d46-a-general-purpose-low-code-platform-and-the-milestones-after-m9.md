@@ -43,6 +43,8 @@ The owner confirmed these points on issue #702 on 2026-10-19.
     Hardening, and M18 Extensibility and operator console.
     - [D99](d99-axis-ships-its-own-identity-provider.md) puts M17 Axis's
       identity provider between M16 and M18.
+    - [D101](d101-the-extensibility-milestone-is-split-into-six.md) splits
+      M18 into M18 to M23.
   - M11 and M12 can run in parallel, and so can M14 and M15.
   - The "Done when" text of each milestone is in the
     [roadmap](../roadmap.md#milestones).
@@ -51,7 +53,9 @@ The owner confirmed these points on issue #702 on 2026-10-19.
     service desk, with SLAs, rework loops and notifications, then asset
     management, with dashboards, many-to-many, files and import.
     [D94](d94-purchase-requests-prove-the-extensibility-milestone.md) makes
-    M18 the exception: it extends the purchase request sample.
+    the extensibility milestones, M19 to M23 since
+    [D101](d101-the-extensibility-milestone-is-split-into-six.md), the
+    exception: they extend the purchase request sample.
   - These samples need no platform code.
 - **How it is planned:**
   - Rolling wave stays as it is. M10 was broken into issues first. A later

@@ -63,11 +63,11 @@ calls `IsDepartmentCode`, so a department code must be in capital letters.
   digits and `-`, starting with a letter), a SemVer `version`, a `label` and an
   optional `packages`. `packages` has the same shape as in `application.json`,
   see [Extension packages](extension-packages.md#declaring-packages-in-an-application). A module has no dependencies
-  on other modules. _(planned for M18)_ It gets `roles` and `modules`, see
+  on other modules. _(planned for M20)_ It gets `roles` and `modules`, see
   [Processes, pages, policies and dependencies](#processes-pages-policies-and-dependencies).
 - **Kinds a module may hold.** `entity`, `dataSource`, `rule`, `sequence`,
   `form`, `event`, `text` and `seed`. Processes, pages, roles and policies are
-  not allowed. _(planned for M18)_ `process`, `page` and `policy` are allowed
+  not allowed. _(planned for M20)_ `process`, `page` and `policy` are allowed
   too. Roles stay out.
 - **Installation.** Modules are installed per installation under
   `Modules:Path/<id>/<version>/`. The server, the worker and the scenario runner
@@ -190,7 +190,7 @@ calls `IsDepartmentCode`, so a department code must be in capital letters.
 
 ### Processes, pages, policies and dependencies
 
-_(planned for M18)_ A module can ship a working feature with its screens and
+_(planned for M20)_ A module can ship a working feature with its screens and
 permissions, and build on other modules, as
 [D89](../decisions/d89-modules-that-hold-processes-pages-and-policies-and-depend-on-other-modules.md)
 agrees. It replaces the two limits above: the kinds a module may hold, and no

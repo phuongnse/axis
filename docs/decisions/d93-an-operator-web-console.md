@@ -2,11 +2,11 @@
 
 Status: **Agreed**
 
-The owner agreed this on 2026-10-25. M18 adds the web console for operators
+The owner agreed this on 2026-10-25. M23 adds the web console for operators
 that [D43](d43-tenant-provisioning-and-migrations-across-tenant-databases.md)
 left for later. D43 holds: there is still no HTTP API for provisioning, and
 the server still holds no admin rights on the database server. Everything here
-is _(planned for M18)_. See [operator console](../reference/operator-console.md).
+is _(planned for M23)_. See [operator console](../reference/operator-console.md).
 
 - **Who it is for:** the platform operator, who keeps a tenant's processes
   and deliveries running. It is not for application administrators.

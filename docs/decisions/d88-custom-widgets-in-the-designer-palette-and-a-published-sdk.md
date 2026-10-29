@@ -2,7 +2,7 @@
 
 Status: **Agreed**
 
-The owner agreed this on 2026-10-25. M18 builds the custom widgets that
+The owner agreed this on 2026-10-25. M22 builds the custom widgets that
 [D8](d8-custom-ui-widgets-are-packaged-react-components.md) agreed and
 deferred, and publishes the SDK that package authors build on. D8 gave the
 rules a custom widget follows but no design. This decision gives that design,
@@ -11,7 +11,7 @@ and D8 keeps its status line. It builds on
 [D58](d58-ant-design-is-a-detail-of-the-spa-without-procomponents.md),
 [D65](d65-a-visual-page-designer-on-a-canvas-drawn-by-the-sites-widgets.md)
 and [D67](d67-live-widget-previews-in-the-design-system.md). Everything here is
-_(planned for M18)_. See [custom widgets](../reference/custom-widgets.md).
+_(planned for M22)_. See [custom widgets](../reference/custom-widgets.md).
 
 - **A widget in a package:**
   - An extension package may hold widgets as well as operations. Its manifest,
