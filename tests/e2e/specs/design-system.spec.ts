@@ -4,6 +4,7 @@ import { readdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { waitForDialog } from '../dialogs'
 import { cellValue, expectShown, fieldLabel, fieldValue } from '../fields'
+import { cardGroups, cardName } from '../../../web/src/designSystem/cardOrder'
 
 // The design-system bundle is a separate build, which scripts/e2e.sh makes with scripts/design-system.sh. The page
 // web/design-system.html is its harness. The bundle answers every API call of the fixture application from fixtures,
@@ -511,14 +512,16 @@ test('the bundle sets window.Axis with one mount for each preview', async ({ pag
 
   const mounts = await page.evaluate(() => Object.keys((window as unknown as { Axis: object }).Axis))
   expect(mounts.sort()).toEqual(Object.keys(previews).sort())
-  // The bundle's first line gives the card width and lists the same previews, in groups.
+  // The bundle's first line names the card of each window.Axis preview, in the order of cardOrder.ts.
   const firstLine = readFileSync(bundleFile, 'utf8').split('\n', 1)[0]
   const header = JSON.parse(/^\/\* @ds-bundle: (\{.*\}) \*\/$/.exec(firstLine)![1]) as {
-    width: number
-    groups: { name: string; previews: string[] }[]
+    format: number
+    namespace: string
+    components: { name: string }[]
   }
-  expect(header.width).toBe(992)
-  expect(header.groups.flatMap((group) => group.previews).sort()).toEqual(mounts)
+  const cards = cardGroups.flatMap((group) => group.previews).map(cardName)
+  expect(header).toEqual({ format: 4, namespace: 'Axis', components: cards.map((name) => ({ name })) })
+  expect(mounts.map(cardName).sort()).toEqual(header.components.map(({ name }) => name).sort())
   await expect(page.locator('[data-preview]')).toHaveCount(Object.keys(previews).length)
   await page.waitForLoadState('networkidle')
   expect(recording.errors).toEqual([])
