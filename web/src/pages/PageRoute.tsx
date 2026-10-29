@@ -5,6 +5,7 @@ import { PageLeaf, type PageLeafProps } from '../platform/PageLeaf'
 import { detailRecordId, readPageParameters } from '../platform/pageParameters'
 import { ProcessInstancePage } from '../platform/ProcessInstancePage'
 import { fetchPage, type ApplicationSite, type PageMetadata } from '../platform/site'
+import { siteAddress } from '../platform/siteLinks'
 import { TaskPage } from '../platform/TaskPage'
 import { useText } from '../platform/texts'
 import { WidgetTree } from '../platform/WidgetTree'
@@ -28,7 +29,8 @@ export function PageRoute({ form }: { form?: FormMode }) {
   // The table that opened the form passes its address, with paging and sorting, in history state.
   // Without it, such as in a new tab, save and cancel go to the site, which opens its first page.
   const from: unknown = (location.state as { from?: unknown } | null)?.from
-  const returnTo = typeof from === 'string' && from.startsWith(`/${site.path}/`) ? from : `/${site.path}`
+  const returnTo =
+    typeof from === 'string' && from.startsWith(siteAddress(site.path, '')) ? from : siteAddress(site.path)
   const pages = useMemo(() => site.navigation.map((entry) => entry.page), [site.navigation])
   // A new page or record starts from a clean state rather than showing the previous one meanwhile.
   return (
@@ -60,12 +62,13 @@ interface Trail {
  */
 function breadcrumbFor(trail: Trail, pageName: string, titleKey: string, t: (key: string) => string): BreadcrumbStep[] {
   const { site, from } = trail
-  const steps: BreadcrumbStep[] = [{ label: t(site.titleKey), to: `/${site.path}` }]
-  if (from?.startsWith(`/${site.path}/`)) {
+  const steps: BreadcrumbStep[] = [{ label: t(site.titleKey), to: siteAddress(site.path) }]
+  if (from?.startsWith(siteAddress(site.path, ''))) {
     const pathname = from.split(/[?#]/, 1)[0].toLowerCase()
     const origin = site.navigation.find(
       (entry) =>
-        entry.page.toLowerCase() !== pageName.toLowerCase() && pathname === `/${site.path}/${entry.page}`.toLowerCase(),
+        entry.page.toLowerCase() !== pageName.toLowerCase() &&
+        pathname === siteAddress(site.path, entry.page).toLowerCase(),
     )
     if (origin) {
       steps.push({ label: t(origin.labelKey), to: from })

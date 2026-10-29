@@ -1,0 +1,17 @@
+{
+  "id": "9c2f4b86-e5a1-4d30-8b7e-1a63f0d9c725",
+  "kind": "text",
+  "name": "TextsEn",
+  "formatVersion": 1,
+  "locale": "en",
+  "texts": {
+    "site.title": "Host site",
+    "nav.topics": "Topics",
+    "nav.inbox": "Inbox",
+    "pages.topics.title": "Topics",
+    "pages.inbox.title": "My tasks",
+    "topic.label": "Topic",
+    "topic.name": "Name",
+    "role.employee": "Employee"
+  }
+}

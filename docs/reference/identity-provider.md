@@ -131,19 +131,23 @@ so Studio edits it, with the identity provider editor of [Studio](studio.md), an
 - _(planned for M17)_ **Sign-in once:** a person signed in through a provider at the realm opens another site that allows it without
   being asked again. A site that does not allow it asks the person to sign in with one it does.
 - **A host of its own:** `tenant host add <id> <host> --site <path>` gives a tenant host to one site, see
-  [hosts](tenant-setting-commands.md#hosts). Both the command and the serving are built. Only the `directory` tenant
-  source has site hosts, so hosts from the `configuration` source serve the whole tenant.
-  - That host serves only the site: the SPA under the site's path, the web root's static files, sign-in
+  [hosts](tenant-setting-commands.md#hosts). Both the command and the serving are built. The `configuration` tenant
+  source gives a host to a site with `Tenants:{id}:SiteHosts`, see [host settings](host-settings.md#tenancy-settings).
+  - That host serves only the site: the SPA at `/` and at the site's pages, except under the paths the platform keeps
+    for itself (`/health`, `/assets`, `/studio`, `/account` and `/users`), the web root's static files, sign-in
     (`/api/auth/*`), `GET /api/me`, the SPA shell's `/api/site`, `/api/texts/{locale}` and `/api/about`,
     `/api/sites/{path}` and below for that site, and `/api/apps/{app}` for the site's application. Everything else is
     a `404` problem there, such as `/api/sites`, other sites and applications, Studio, the users page, the account
     page and `/api/me/sessions`. The refusal comes before authentication, so it renews no session.
+  - `GET /api/site` names the host's site in `hostSite`, and `null` on a host that belongs to no site. The SPA shows
+    that site at `/` and its pages at `/{page}`, so a page opens at `shop.example.test/orders`, and every link it
+    builds has no path prefix. The SPA then has no Studio, account or users routes, so those addresses show the
+    not-found page.
   - A session stays on the host that made it. A person signs in separately on the site's host and on the tenant's other
     hosts, see [the session](security.md#sign-in-and-the-session).
-  - The site keeps its path on its own host, so it opens at `shop.example.test/shop`. `/` on that host redirects to
-    `/{path}`. Serving the site at `/` comes later and needs a change in the SPA.
   - The tenant's other hosts redirect the site's path and anything below it with `302` to the same path and query on
-    the site's host, so the site has one origin. The site's API under `/api` still answers on the other hosts.
+    the site's host, without the site's path (`/shop/orders` becomes `/orders`), so the site has one origin and the
+    old address of a page reaches it. The site's API under `/api` still answers on the other hosts.
   - A site for people outside the organization, such as citizens or customers, should get a host of its own. Sites
     that share a host share an origin, so a script that runs in one could act in the other for a person signed in to
     both.

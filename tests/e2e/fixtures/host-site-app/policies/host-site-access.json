@@ -1,0 +1,8 @@
+{
+  "id": "2d8f6a04-b719-4c53-9e80-a7c3d5f1b692",
+  "kind": "policy",
+  "name": "HostSiteAccess",
+  "formatVersion": 1,
+  "roles": ["employee"],
+  "grants": [{ "entity": "Topic", "actions": ["read", "create", "update", "delete"] }]
+}

@@ -1,4 +1,5 @@
 import { apiFetch } from './api'
+import { siteAddress } from './siteLinks'
 
 /** The page a notification opens, by its declared name, with the raw page parameters. */
 export interface NotificationOpen {
@@ -64,7 +65,7 @@ export async function markAllNotificationsRead(path: string): Promise<void> {
  * for each parameter that is not null.
  */
 export function notificationAddress(sitePath: string, open: NotificationOpen): string {
-  const path = `/${sitePath}/${open.page.toLowerCase()}`
+  const path = siteAddress(sitePath, open.page.toLowerCase())
   const query = new URLSearchParams()
   for (const [name, value] of Object.entries(open.parameters)) {
     if (value !== null && value !== undefined) {

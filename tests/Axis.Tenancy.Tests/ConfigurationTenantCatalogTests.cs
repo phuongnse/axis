@@ -120,6 +120,30 @@ public sealed class ConfigurationTenantCatalogTests
     }
 
     [Fact]
+    public void A_site_host_gives_the_entry_its_host_sites_with_lower_case_paths()
+    {
+        var entry = Assert.Single(Load([.. Valid(), "Tenants:default:Hosts:1=shop.localhost", "Tenants:default:SiteHosts:shop.localhost=Shop"]).Tenants);
+
+        var hostSites = Assert.IsAssignableFrom<IReadOnlyDictionary<string, string>>(entry.HostSites);
+        Assert.Equal("shop", hostSites["SHOP.localhost"]);
+        Assert.Single(hostSites);
+    }
+
+    [Fact]
+    public void A_tenant_without_site_hosts_has_no_host_sites()
+    {
+        Assert.Null(Assert.Single(Load(Valid()).Tenants).HostSites);
+    }
+
+    [Fact]
+    public void A_site_host_that_is_not_a_host_of_the_tenant_stops_the_load()
+    {
+        var exception = Assert.Throws<InvalidOperationException>(() => Load([.. Valid(), "Tenants:default:SiteHosts:shop.localhost=shop"]));
+
+        Assert.Contains("Tenant 'default' gives the host 'shop.localhost' to a site, but it is not one of the tenant's hosts.", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void A_tenant_without_schema_connection_or_oidc_block_has_neither()
     {
         var entry = Assert.Single(Load(Valid()).Tenants);
