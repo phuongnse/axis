@@ -10,9 +10,9 @@ export interface SignInLocale {
   url: string
 }
 
-/** The page's texts. `signInWith` and `providerOnly` hold a `{provider}` placeholder for the provider's label. */
+/** The page's texts. `continueWith` and `providerOnly` hold a `{provider}` placeholder for the provider's label. */
 export interface SignInTexts {
-  signInWith: string
+  continueWith: string
   providerOnly: string
   or: string
   username: string
@@ -22,6 +22,16 @@ export interface SignInTexts {
   forgotPassword: string
   keepSignedIn: string
   signIn: string
+}
+
+/** The texts of the two-step verification page. */
+export interface TwoStepTexts {
+  title: string
+  message: string
+  code: string
+  verify: string
+  tryAnotherWay: string
+  backToSignIn: string
 }
 
 /** What the site that started the sign-in allows. */

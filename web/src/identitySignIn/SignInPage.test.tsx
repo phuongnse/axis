@@ -1,12 +1,13 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { designTokensFor } from '../platform/designTokens'
 import { SignInPage } from './SignInPage'
 import type { SignInContext } from './signInContext'
 
 const context: SignInContext = {
   title: 'Sign in to Axis',
-  realmName: 'contoso',
+  realmName: 'Contoso',
   providers: [{ alias: 'contoso', label: 'Contoso ID', loginUrl: '/broker/contoso' }],
   accounts: true,
   username: 'alex.morgan@contoso.example',
@@ -18,7 +19,7 @@ const context: SignInContext = {
     { label: 'Tiếng Việt', url: '/vi' },
   ],
   texts: {
-    signInWith: 'Sign in with {provider}',
+    continueWith: 'Continue with {provider}',
     providerOnly: 'Your organization signs in only with {provider}.',
     or: 'or',
     username: 'Email or username',
@@ -48,10 +49,57 @@ describe('SignInPage', () => {
     vi.restoreAllMocks()
   })
 
+  it('draws the word Axis beside a 32 px mark', () => {
+    render(<SignInPage context={context} />)
+
+    const word = screen.getByText('Axis', { exact: true })
+    expect(word).toBeVisible()
+    // Ant Design wraps strong text in a span, so the mark is the sibling of that wrapper.
+    const mark = word.closest('.ant-typography')?.previousElementSibling
+    expect(mark).toHaveAttribute('aria-hidden', 'true')
+    expect(mark).toHaveStyle({ width: '32px', height: '32px' })
+  })
+
+  it('names the organization under the title in the muted colour', () => {
+    render(<SignInPage context={context} />)
+
+    const organization = screen.getByText('Contoso', { exact: true })
+    expect(organization).toHaveStyle({ color: designTokensFor('light').colour.textMuted })
+    expect(organization.previousElementSibling).toHaveTextContent('Sign in to Axis')
+  })
+
+  it('draws the field labels at weight 500 in the muted colour', () => {
+    render(<SignInPage context={context} />)
+
+    const style = { fontWeight: '500', color: designTokensFor('light').colour.textMuted }
+    expect(screen.getByText('Email or username')).toHaveStyle(style)
+    expect(screen.getByText('Password', { exact: true })).toHaveStyle(style)
+  })
+
+  it('puts "Forgot password?" on the row of the password label, outside the label', () => {
+    render(<SignInPage context={context} />)
+
+    const label = screen.getByText('Password', { exact: true })
+    const link = screen.getByRole('link', { name: 'Forgot password?' })
+    expect(label.parentElement).toContainElement(link)
+    expect(label).not.toContainElement(link)
+    expect(screen.getByLabelText('Password', { exact: true })).toHaveAttribute('name', 'password')
+  })
+
+  it('draws every provider button as a secondary button, the lone one too', () => {
+    const { rerender } = render(<SignInPage context={twoProviders} />)
+
+    for (const button of screen.getAllByRole('button', { name: /^Continue with / })) {
+      expect(button).toHaveClass('ant-btn-default')
+    }
+    rerender(<SignInPage context={{ ...context, accounts: false }} />)
+    expect(screen.getByRole('button', { name: 'Continue with Contoso ID' })).toHaveClass('ant-btn-default')
+  })
+
   it('lists the provider, then "or" and a form that posts to the login address', () => {
     const { container } = render(<SignInPage context={context} />)
 
-    expect(screen.getByRole('button', { name: 'Sign in with Contoso ID' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Continue with Contoso ID' })).toBeInTheDocument()
     expect(screen.getByText('or')).toBeInTheDocument()
     const element = form(container)
     expect(element.getAttribute('method')).toBe('post')
@@ -73,7 +121,7 @@ describe('SignInPage', () => {
     const { container } = render(<SignInPage context={{ ...context, accounts: false }} />)
 
     expect(screen.getByText('Your organization signs in only with Contoso ID.')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Sign in with Contoso ID' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Continue with Contoso ID' })).toBeInTheDocument()
     expect(screen.queryByText('or')).not.toBeInTheDocument()
     expect(container.querySelector('form')).toBeNull()
     expect(screen.getAllByRole('button')).toHaveLength(1)
@@ -82,15 +130,15 @@ describe('SignInPage', () => {
   it('lists only the providers that the site allows', () => {
     render(<SignInPage context={{ ...twoProviders, site: { providers: ['fabrikam'], accounts: true } }} />)
 
-    expect(screen.getByRole('button', { name: 'Sign in with Fabrikam ID' })).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Sign in with Contoso ID' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Continue with Fabrikam ID' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Continue with Contoso ID' })).not.toBeInTheDocument()
   })
 
   it('shows every provider and the form for a client that belongs to no site', () => {
     const { container } = render(<SignInPage context={twoProviders} />)
 
-    expect(screen.getByRole('button', { name: 'Sign in with Contoso ID' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Sign in with Fabrikam ID' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Continue with Contoso ID' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Continue with Fabrikam ID' })).toBeInTheDocument()
     expect(container.querySelector('form')).not.toBeNull()
   })
 

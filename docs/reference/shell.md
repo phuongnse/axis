@@ -68,7 +68,7 @@ cards.
 - A widget's actions stay in its own toolbar, because a page can hold several widgets and an action belongs to its
   widget, not to the page.
 - The platform home page has no band and no breadcrumb. It has its own welcome band, see the
-  [platform home page](#platform-home-page). The platform's Sessions page has the band, "Axis › Your sessions".
+  [platform home page](#platform-home-page). The platform's Sessions page has the band, "Axis › Your sessions". The users page has the band, "Axis › Users".
 
 ## App switcher and preferences
 
@@ -84,7 +84,7 @@ cards.
   switcher stays in the header.
 - **Users.** The app switcher and the home page's welcome band also offer "Users" to an administrator, after the
   operator console, see [the administrator role](user-administration.md#the-administrator-role). The users page it
-  links to, `/users`, is _(planned for M17)_. On a site's own host the app switcher lists only that site and no tools.
+  links to is `/users`. On a site's own host the app switcher lists only that site and no tools.
 
 ## Platform home page
 

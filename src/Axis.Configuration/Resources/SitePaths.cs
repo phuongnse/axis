@@ -5,7 +5,7 @@ public static class SitePaths
 {
     public const int MaxLength = 60;
 
-    public static readonly IReadOnlySet<string> Reserved = new HashSet<string>(StringComparer.Ordinal) { "api", "health", "assets", "studio", "account" };
+    public static readonly IReadOnlySet<string> Reserved = new HashSet<string>(StringComparer.Ordinal) { "api", "health", "assets", "studio", "account", "users" };
 
     /// <summary>
     /// Whether <paramref name="path"/> follows the <c>path</c> pattern of the site JSON Schema,
