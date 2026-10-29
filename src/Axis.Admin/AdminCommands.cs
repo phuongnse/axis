@@ -152,7 +152,7 @@ internal static partial class AdminCommands
     [
         new("tenant create", AuditMark.OnePerTenant, run => CreateAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.IdentityProviderHandler, run.CancellationToken)),
         new("tenant backup", AuditMark.OnePerTenant, run => BackupAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.CancellationToken)),
-        new("tenant restore", AuditMark.OnePerTenant, run => RestoreAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.CancellationToken)),
+        new("tenant restore", AuditMark.OnePerTenant, run => RestoreAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.IdentityProviderHandler, run.CancellationToken)),
         new("tenant suspend", AuditMark.OnePerTenant, run => StatusAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.CancellationToken)),
         new("tenant resume", AuditMark.OnePerTenant, run => StatusAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.CancellationToken)),
         new("tenant rotate-passwords", AuditMark.OnePerTenant, run => RotatePasswordsAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.CancellationToken)),
@@ -208,7 +208,7 @@ internal static partial class AdminCommands
             return 2;
         }
 
-        var settings = ReadCreateSettings(configuration, needsClientSecret: false, out var problem);
+        var settings = ReadCreateSettings(configuration, readClientSecret: false, out var problem);
         if (settings is null)
         {
             error.WriteLine(problem);
@@ -390,7 +390,7 @@ internal static partial class AdminCommands
             return 2;
         }
 
-        var settings = ReadCreateSettings(configuration, needsClientSecret: false, out var problem);
+        var settings = ReadCreateSettings(configuration, readClientSecret: false, out var problem);
         if (settings is null)
         {
             error.WriteLine(problem);
@@ -721,6 +721,7 @@ internal static partial class AdminCommands
         IConfiguration configuration,
         TextWriter output,
         TextWriter error,
+        HttpMessageHandler? identityProviderHandler,
         CancellationToken cancellationToken)
     {
         var request = ParseTenantRestore(args);
@@ -744,6 +745,8 @@ internal static partial class AdminCommands
             return 2;
         }
 
+        using var http = IdentityProviderClient(identityProviderHandler);
+        var realm = settings.Create.IdentityProvider is null ? null : new TenantRealm(http, settings.Create.IdentityProvider);
         RestorePlan? plan;
         try
         {
@@ -754,7 +757,7 @@ internal static partial class AdminCommands
                 return 2;
             }
 
-            plan = await TenantRestore.PrepareAsync(settings, request, pgRestore, output, cancellationToken);
+            plan = await TenantRestore.PrepareAsync(settings, request, pgRestore, realm, output, error, cancellationToken);
         }
         catch (OperationCanceledException)
         {
@@ -764,7 +767,7 @@ internal static partial class AdminCommands
 
         return plan is null
             ? 2
-            : await new TenantRestore(settings.Create, plan, new TenantAudit(command, settings.Create.PlatformConnectionString), output, cancellationToken).RunAsync();
+            : await new TenantRestore(settings.Create, plan, realm, http, new TenantAudit(command, settings.Create.PlatformConnectionString), output, error, cancellationToken).RunAsync();
     }
 
     private static TenantRestoreRequest? ParseTenantRestore(string[] args)
@@ -1407,13 +1410,27 @@ internal static partial class AdminCommands
     /// <summary>
     /// <c>tenant restore</c> reads the settings of <c>tenant create</c>, and <c>PATH</c> to find <c>pg_restore</c>. It reads
     /// <c>Extensions:Path</c> when the archive requires a package. It never reads <c>Modules:Path</c>, because a missing module refuses nothing.
+    /// The identity provider settings are optional here: only an archive of a tenant with its own realm needs them, which the check step finds out.
+    /// A value that is given must still be valid.
     /// </summary>
     private static RestoreSettings? ReadRestoreSettings(IConfiguration configuration, out string problem)
     {
-        var create = ReadCreateSettings(configuration, needsClientSecret: true, out problem);
+        var create = ReadCreateSettings(configuration, readClientSecret: true, out problem);
         if (create is null)
         {
             return null;
+        }
+
+        if (!string.IsNullOrWhiteSpace(configuration[IdentityProviderUrlSetting]))
+        {
+            var environment = new AdminEnvironment(configuration[DotnetEnvironmentSetting] ?? Environments.Production);
+            var identityProvider = ReadIdentityProvider(configuration, environment, out problem);
+            if (identityProvider is null)
+            {
+                return null;
+            }
+
+            create = create with { IdentityProvider = identityProvider };
         }
 
         var path = configuration[PathSetting];
@@ -1494,14 +1511,15 @@ internal static partial class AdminCommands
     }
 
     /// <summary>
-    /// Reads the settings of <c>tenant create</c>: the common ones, the admin role and, when <paramref name="needsClientSecret"/> is true,
-    /// the OIDC client secret, which <c>tenant restore</c> reads. A command that does not need it never reads it, even when it is set.
+    /// Reads the settings of <c>tenant create</c>: the common ones, the admin role and, when <paramref name="readClientSecret"/> is true,
+    /// the OIDC client secret, which <c>tenant restore</c> reads and requires only when it keeps the archive's sign-in.
+    /// A command that does not read it never does, even when it is set.
     /// </summary>
-    private static CreateSettings? ReadCreateSettings(IConfiguration configuration, bool needsClientSecret, out string problem)
+    private static CreateSettings? ReadCreateSettings(IConfiguration configuration, bool readClientSecret, out string problem)
     {
         problem = "";
         var admin = configuration[AdminSetting];
-        var secret = needsClientSecret ? configuration[ClientSecretSetting] : null;
+        var secret = readClientSecret ? configuration[ClientSecretSetting] : null;
 
         if (string.IsNullOrWhiteSpace(admin))
         {
@@ -1512,12 +1530,6 @@ internal static partial class AdminCommands
         var common = ReadPlatformSettings(configuration, out problem);
         if (common is null)
         {
-            return null;
-        }
-
-        if (needsClientSecret && string.IsNullOrEmpty(secret))
-        {
-            problem = $"The environment variable {ClientSecretSetting} is required.";
             return null;
         }
 

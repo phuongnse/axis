@@ -215,6 +215,10 @@ _(planned for M17)_
   failure of the identity provider fails the step with a line that names the identity provider step and its status
   code, and the new release stays active, see [activate](administration.md#activate). A `validate` and a `test`
   never update the realm. The server's startup activation updates it too, see above.
+- **Brought in step by restore:** `tenant restore` of a tenant that gets a new realm creates the realm as `tenant create`
+  does and brings it in step with the active releases of the restored database. The archive holds no secret value, so a
+  provider whose bindings have no value yet is left out with a warning. The next activation adds it once the operator has
+  set the bindings, see [tenant restore](administration.md#tenant-restore).
 - **Bindings:** a missing binding, or a binding of the wrong kind, fails activation, as for a connector (`AXC0100`).
   Built for `oidc` providers: `issuer` is a `url` binding, and `clientId`, `clientSecret` and `clientKey` are `secret`
   bindings. On a preview tenant activation leaves the provider out with a warning, see
@@ -244,15 +248,19 @@ _(planned for M17)_
 
 - Every page of Axis's identity provider has one frame: the Axis mark above one card in the middle of the page on
   `canvas`, and below it the language links and "© <year> Axis". It follows light and dark mode and the Axis tokens and
-  fonts, as the SPA does.
+  fonts, as the SPA does. The mark is 32 px with the word "Axis" beside it. The card is at most 400 px wide, on
+  `surface` with a `borderSubtle` border, `radius-base` corners and `spacing-xl` padding. Its title, such as "Sign
+  in", has the organization's name under it in `textMuted`.
 - The sign-in page lists the site's brokered providers first, then "or" and the account form when the site allows
   accounts: email or username, password with "Forgot password?", "Keep me signed in" and a full-width Sign in button.
+  The brokered providers' "Continue with" buttons are secondary buttons. A field's label follows the form widget's
+  [field look](form-widget.md), and "Forgot password?" sits on the right of the password's label.
   "Keep me signed in" keeps the realm's session when the browser closes, never past the 8-hour lifetime of
   [sessions](security.md#session-lifetimes-and-re-authentication).
 - A wrong password keeps the username, marks the password and reads "Invalid email, username or password." above the
   form, never saying which one was wrong.
 - A site that allows one brokered provider and no accounts shows its button alone, under one line that names it.
-- Two-step verification asks for the 6-digit code, with "Try another way" and "Back to sign in".
+- Two-step verification asks for the 6-digit code in six boxes, one digit each, with "Try another way" and "Back to sign in".
 - The theme is built from the SPA's own React components and tokens into a Keycloak theme, so the pages look like the
   rest of Axis. Its texts are message bundles in every locale the platform offers. The "Continue with" labels come
   from the applications' texts.
@@ -282,5 +290,7 @@ _(planned for M17)_
   [development realm and users](../development.md#development-realm-and-users). Under Docker Compose it does not,
   because the server's container cannot reach Keycloak at `localhost:8080`.
 - **Backup and restore:** the identity provider's database holds the accounts and their credentials. The operator
-  backs it up with the installation. `tenant backup` does not carry them, so a tenant restored to another
-  installation gets a new realm, and its accounts need new invitations.
+  backs it up with the installation. `tenant backup` does not carry them, so a tenant restored where its realm does
+  not exist gets a new realm, and its accounts need new invitations. This is built: `tenant restore` creates the
+  realm in its `realm` step, see [tenant restore](administration.md#tenant-restore). A tenant restored where its realm
+  exists keeps the realm and its users.

@@ -390,7 +390,8 @@ internal sealed class TenantBackup : IAsyncDisposable
             row.ServiceAudience,
             [.. _plan.Bindings
                 .OrderBy(binding => binding.Name, StringComparer.Ordinal)
-                .Select(binding => new ManifestBinding(binding.Name, binding.Kind, binding.Kind == "secret" ? null : binding.Url))]);
+                .Select(binding => new ManifestBinding(binding.Name, binding.Kind, binding.Kind == "secret" ? null : binding.Url))],
+            DirectoryTenantCatalog.Realm(row, _settings.Cipher) is not null);
 
         return new BackupManifest(
             Format: 1,
@@ -462,6 +463,7 @@ internal sealed record BackupManifest(
     IReadOnlyList<ManifestPackage> Packages,
     IReadOnlyList<ManifestModule> Modules);
 
+/// <summary><paramref name="Realm"/> says that the tenant signs in through its own realm in Axis's identity provider. An archive from before it reads as <c>false</c>.</summary>
 internal sealed record ManifestDirectory(
     string Status,
     string? PreviewOf,
@@ -475,7 +477,8 @@ internal sealed record ManifestDirectory(
     string? ClaimLocale,
     string? EndpointAudience,
     string? ServiceAudience,
-    IReadOnlyList<ManifestBinding> Bindings);
+    IReadOnlyList<ManifestBinding> Bindings,
+    bool Realm = false);
 
 /// <summary>A binding in the manifest. <c>Url</c> holds the value of a <c>url</c> or <c>storage</c> binding and is unset for a <c>secret</c> binding.</summary>
 internal sealed record ManifestBinding(string Name, string Kind, [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Url);
