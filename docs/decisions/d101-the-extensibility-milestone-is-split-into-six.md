@@ -29,6 +29,12 @@ M17 does not change. See the [roadmap](../roadmap.md#milestones).
   extensibility work to finish. Each of M19 to M23 keeps the
   [ASVS](../reference/asvs.md) rows and the load test met for the routes it
   adds.
+  - [D107](d107-the-dependency-scan-runs-now-and-images-are-scanned-and-signed.md)
+    takes the dependency scan out of M18: a hand-made change runs it now.
+  - [D106](d106-a-threat-model-kept-current-like-the-asvs-tracking.md) and
+    [D111](d111-authentication-by-default-and-the-owner-guards-the-security-checks.md)
+    add verification to M18: the threat model, authentication by default with
+    its route test, and fuzz tests.
 - **One journey each:** each of M19 to M23 ends with its own step of the
   purchase request journey of D94, so each milestone still ends with an
   end-to-end journey, as D46 requires. M18 ends with the asset management

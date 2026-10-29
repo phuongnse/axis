@@ -689,6 +689,11 @@ verification bullet below is _(planned for M18)_.
 
 ## Authorization
 
+_(planned for M18)_ The server sets an authorization fallback policy, so a route
+that names no open access needs a signed-in user or a valid caller token. A
+test calls every route with no session and no token, see
+[D111](../decisions/d111-authentication-by-default-and-the-owner-guards-the-security-checks.md).
+
 The `role` and `policy` resources and their compile checks are built. For
 the record API and the data source endpoint, so are the session `401`, the
 matching of roles, grants by action and the `403` without a grant. The record

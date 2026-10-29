@@ -4,7 +4,8 @@ Status: **Agreed**
 
 M10 adds two security baselines. Sign-in, sign-out and refused sign-ins leave
 audit records, and that part is built. CI runs static analysis, which is
-built. Running the dependency scan in CI is _(planned for M18)_. See
+built. Running the dependency scan in CI moves out of M18 to a hand-made change, as
+[D107](d107-the-dependency-scan-runs-now-and-images-are-scanned-and-signed.md) agrees. See
 [audit records](../reference/storage.md#audit-records-and-sequence-counters) and
 [sign-in and the session](../reference/security.md#sign-in-and-the-session) for the
 detail. The ASVS level and its verification stay in M16
@@ -19,6 +20,8 @@ The owner confirmed these points on issue #707 on 2026-10-19.
     `session.signInRefused`.
   - `session.signedIn` and `session.signedOut` record the user id and the
     display name.
+    - [D109](d109-sensitive-fields-and-backups-are-encrypted-and-history-keeps-no-names.md)
+      replaces this point: new records keep the user id and no display name.
   - `session.signInRefused` records the actor `anonymous` and a reason code. It
     records no user. The reason is `otherTenant`, `invalidToken`,
     `invalidState` or `providerError`. `providerError` covers a person who
@@ -26,6 +29,9 @@ The owner confirmed these points on issue #707 on 2026-10-19.
   - Every record holds the client address, after the forwarded headers rules of
     [D49](d49-several-server-replicas-behind-a-tls-proxy.md).
     None holds a token, a cookie or the user agent.
+    - [D109](d109-sensitive-fields-and-backups-are-encrypted-and-history-keeps-no-names.md)
+      shortens the address of new records: the last octet of IPv4 and the last
+      80 bits of IPv6 are removed.
   - A session that expires writes nothing. A sign-out with no session writes
     nothing.
 - **Dependency scanning:**
@@ -39,6 +45,9 @@ The owner confirmed these points on issue #707 on 2026-10-19.
     [dependency updates](../development.md#dependency-updates).
   - CI runs it on its existing triggers and once a week. A finding on the
     weekly run opens no issue. The red run is the signal.
+    - [D107](d107-the-dependency-scan-runs-now-and-images-are-scanned-and-signed.md)
+      runs it now, and a red scan on `main` opens NexKit's `bug` issue for CI
+      on `main`, like any failing check.
   - It is not a NexKit check until a hand-made change to `.nexkit/` adds it.
 - **Static analysis:**
   - One CodeQL workflow scans `csharp` and `javascript-typescript` on a push
