@@ -24,6 +24,14 @@ export interface SignInTexts {
   signIn: string
 }
 
+/** What the site that started the sign-in allows. */
+export interface SignInSite {
+  /** The aliases of the providers the site allows. */
+  providers: string[]
+  /** Whether the site allows accounts of the realm. */
+  accounts: boolean
+}
+
 /** What the identity provider's sign-in page draws. The design system feeds it fixtures, the theme feeds it Keycloak's. */
 export interface SignInContext {
   title: string
@@ -31,6 +39,8 @@ export interface SignInContext {
   providers: SignInProvider[]
   /** Whether people may sign in with an account of the realm, next to or instead of the providers. */
   accounts: boolean
+  /** The providers and accounts that the site of the sign-in allows. Absent for a client that belongs to no site, which shows all. */
+  site?: SignInSite
   username?: string
   /** The message to show above the form. No error means no alert. */
   error?: string

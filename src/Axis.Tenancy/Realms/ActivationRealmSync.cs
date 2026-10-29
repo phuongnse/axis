@@ -10,7 +10,7 @@ namespace Axis.Tenancy.Realms;
 public static class ActivationRealmSync
 {
     /// <summary>
-    /// Resolves <paramref name="plan"/> against <paramref name="bindings"/>: the site paths, and for each provider its
+    /// Resolves <paramref name="plan"/> against <paramref name="bindings"/>: the sites, and for each provider its
     /// issuer, client id, client secret and claims.
     /// </summary>
     /// <exception cref="InvalidOperationException">
@@ -23,7 +23,7 @@ public static class ActivationRealmSync
         ArgumentNullException.ThrowIfNull(bindings);
 
         return new RealmState(
-            [.. plan.Sites.Select(site => site.Path)],
+            [.. plan.Sites],
             [.. plan.Providers.Select(provider => ToProvider(provider, bindings))]);
     }
 

@@ -7,6 +7,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
+using Axis.Configuration.Realms;
 using Axis.Configuration.Tests;
 using Axis.Server.Authentication;
 using Axis.Server.Tenancy;
@@ -271,7 +272,7 @@ public sealed partial class AdminOidcSetRealmTests(KeycloakFixture keycloak, Pos
     {
         var row = await scenario.RowAsync(id);
         var activation = AdminScenario.Cipher.Decrypt(id, TenantSecretFields.RealmActivationClientSecret, row.RealmActivationClientSecret!).Reveal();
-        await new RealmSync(http, _baseAddress).SyncAsync(id, activation, new RealmState(paths, []), CancellationToken);
+        await new RealmSync(http, _baseAddress).SyncAsync(id, activation, new RealmState([.. paths.Select(path => new RealmSiteClient(path, Accounts: true, []))], []), CancellationToken);
     }
 
     private async Task<JsonElement> ClientAsync(HttpClient http, string admin, string realm, string clientId)

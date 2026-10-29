@@ -144,7 +144,7 @@ public sealed class RealmClientProfile(HttpClient http, Uri baseAddress)
     /// <summary>The value of one attribute of a client representation, or <c>null</c> when it has none.</summary>
     internal static string? AttributeOf(JsonElement client, string name) => ReadAttributes(client).GetValueOrDefault(name);
 
-    private static Dictionary<string, string> ReadAttributes(JsonElement client)
+    internal static Dictionary<string, string> ReadAttributes(JsonElement client)
     {
         var attributes = new Dictionary<string, string>(StringComparer.Ordinal);
         if (client.TryGetProperty("attributes", out var element) && element.ValueKind == JsonValueKind.Object)
