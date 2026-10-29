@@ -50,8 +50,8 @@ The volume of /run/secrets. It projects the Kubernetes Secret keys of the named 
 dict of "root" and "entries", the list of entry names the host needs.
 */}}
 {{- define "axis.secretsVolume" -}}
-{{- $files := dict "platformConnection" "ConnectionStrings__Platform" "platformSchemaConnection" "ConnectionStrings__PlatformSchema" "platformSecretKey" "Platform__SecretKey" "scenarioServerConnection" "Scenarios__ServerConnectionString" -}}
-{{- $descriptions := dict "platformConnection" "the Kubernetes Secret that holds the platform connection string" "platformSchemaConnection" "the Kubernetes Secret that holds the platform schema connection string" "platformSecretKey" "the Kubernetes Secret that holds the installation key" "scenarioServerConnection" "the Kubernetes Secret that holds the scenario connection string" -}}
+{{- $files := dict "platformConnection" "ConnectionStrings__Platform" "platformSchemaConnection" "ConnectionStrings__PlatformSchema" "platformSecretKey" "Platform__SecretKey" "scenarioServerConnection" "Scenarios__ServerConnectionString" "identityDatabaseUrl" "KC_DB_URL" "identityDatabaseUsername" "KC_DB_USERNAME" "identityDatabasePassword" "KC_DB_PASSWORD" "identityAdminClientSecret" "IdentityProvider__AdminClientSecret" -}}
+{{- $descriptions := dict "platformConnection" "the Kubernetes Secret that holds the platform connection string" "platformSchemaConnection" "the Kubernetes Secret that holds the platform schema connection string" "platformSecretKey" "the Kubernetes Secret that holds the installation key" "scenarioServerConnection" "the Kubernetes Secret that holds the scenario connection string" "identityDatabaseUrl" "the Kubernetes Secret that holds the JDBC URL of the identity provider's database" "identityDatabaseUsername" "the Kubernetes Secret that holds the identity provider's database user name" "identityDatabasePassword" "the Kubernetes Secret that holds the identity provider's database password" "identityAdminClientSecret" "the Kubernetes Secret that holds the axis-admin client secret" -}}
 name: secrets
 projected:
   # Readable by the non-root user of the image.

@@ -1,5 +1,5 @@
 # Values of the Axis chart. See docs/reference/installation.md.
-# PostgreSQL, the OIDC provider and the source of secrets are external.
+# PostgreSQL and the source of secrets are external. The chart runs Axis's identity provider.
 
 image:
   # Registry prefix of the three images, such as "registry.example.com/axis".
@@ -81,10 +81,44 @@ studio:
   persistence: {}
   tests: false
 
-# Forwarded headers, on the server only. The server reads X-Forwarded-For,
+# Axis's identity provider: one Keycloak pod, always on, with the Axis theme and the breached-password
+# list. It listens on HTTPS only, with the certificate of secrets.identityCertificate. Its database
+# settings and the axis-admin client secret come from the identity secrets below. Clustering Keycloak
+# is not supported, so it always runs one replica. The chart renders no Ingress for it: yours sends the
+# identity host to the Service <release>-identity.
+identity:
+  # The whole image reference of Keycloak. It is not the image.registry and image.tag of Axis's images.
+  # Use the version that development, the tests and the Compose example pin.
+  image: quay.io/keycloak/keycloak:26.4
+  # Required. The one public host name of the identity provider, without a scheme, such as "id.example.com".
+  hostname: ""
+  resources: {}
+  service:
+    type: ClusterIP
+    # The port of the Service. It forwards to the HTTPS port of Keycloak, 8443.
+    port: 443
+  # Required. The built Axis login theme, the output of `npm run build:keycloak-theme --prefix web`,
+  # mounted read-only at /opt/keycloak/themes. Any Kubernetes volume source, for example:
+  #   volume:
+  #     persistentVolumeClaim:
+  #       claimName: axis-keycloak-theme
+  theme:
+    volume: {}
+  # Required. The breached-password list that every realm checks (deploy/keycloak/password-blacklists),
+  # mounted read-only at /opt/keycloak/data/password-blacklists. Same form as theme.volume.
+  passwordBlacklists:
+    volume: {}
+  # Optional. A volume with root.crt, the authority certificate of the PostgreSQL server, mounted
+  # read-only at /db-ca. The JDBC URL in the identityDatabaseUrl Secret names it with
+  # sslrootcert=/db-ca/root.crt. Same form as theme.volume. Not needed when the database
+  # certificate is public and the URL uses sslfactory=org.postgresql.ssl.DefaultJavaSSLFactory.
+  databaseAuthority:
+    volume: {}
+
+# Forwarded headers, on the server and the identity provider. They read X-Forwarded-For,
 # X-Forwarded-Proto and X-Forwarded-Host only from these addresses. Use IP
 # addresses for knownProxies and CIDR ranges for knownNetworks. Empty trusts no
-# proxy.
+# proxy, and the identity provider then sets no proxy headers.
 forwardedHeaders:
   knownProxies: []
   knownNetworks: []
@@ -118,3 +152,24 @@ secrets:
   scenarioServerConnection:
     name: ""
     key: Scenarios__ServerConnectionString
+  # KC_DB_URL, the JDBC URL of the identity provider's own database. Used by the identity provider only.
+  identityDatabaseUrl:
+    name: ""
+    key: KC_DB_URL
+  # KC_DB_USERNAME, the identity provider's database role. Used by the identity provider only.
+  identityDatabaseUsername:
+    name: ""
+    key: KC_DB_USERNAME
+  # KC_DB_PASSWORD, the password of that role. Used by the identity provider only.
+  identityDatabasePassword:
+    name: ""
+    key: KC_DB_PASSWORD
+  # IdentityProvider:AdminClientSecret, the secret of the axis-admin client, the bootstrap client of the
+  # master realm. Used by the identity provider only, which reads it as KC_BOOTSTRAP_ADMIN_CLIENT_SECRET.
+  identityAdminClientSecret:
+    name: ""
+    key: IdentityProvider__AdminClientSecret
+  # The identity provider's HTTPS endpoint: a Kubernetes TLS Secret with tls.crt and tls.key, issued for
+  # the DNS name of the identity Service. Required. Your Ingress must connect over HTTPS and verify it.
+  identityCertificate:
+    name: ""
