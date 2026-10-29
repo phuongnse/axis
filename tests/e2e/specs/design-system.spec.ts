@@ -434,6 +434,50 @@ for (const mode of modes) {
   })
 }
 
+// The WCAG contrast ratio of two colours written as rgb() or rgba().
+function contrast(foreground: string, background: string): number {
+  const luminance = (colour: string) => {
+    const [red, green, blue] = (colour.match(/[\d.]+/g) ?? []).slice(0, 3).map((channel) => {
+      const value = Number(channel) / 255
+      return value <= 0.03928 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4
+    })
+    return 0.2126 * red + 0.7152 * green + 0.0722 * blue
+  }
+  const [lighter, darker] = [luminance(foreground), luminance(background)].sort((a, b) => b - a)
+  return (lighter + 0.05) / (darker + 0.05)
+}
+
+test('the dark table draws the Delete icon and the current page at 4.5:1 or more against their surface', async ({
+  page,
+}) => {
+  const recording = await openHarness(page, '?preview=table&mode=dark')
+  const withData = figure(page, 'With data')
+  const deleteIcon = withData.getByRole('button', { name: 'Delete', exact: true }).first()
+  const currentPage = withData.locator('[aria-current="page"]')
+  await expect(deleteIcon).toBeVisible()
+  await expect(currentPage).toBeVisible()
+
+  // The text colour and the first ancestor with an opaque background, which is the surface the text sits on.
+  const colours = (locator: Locator) =>
+    locator.evaluate((element) => {
+      const alpha = (colour: string) => Number(colour.match(/[\d.]+/g)?.[3] ?? 1)
+      let surface: Element | null = element
+      while (surface && alpha(getComputedStyle(surface).backgroundColor) < 1) {
+        surface = surface.parentElement
+      }
+      return {
+        foreground: getComputedStyle(element).color,
+        background: surface ? getComputedStyle(surface).backgroundColor : '',
+      }
+    })
+
+  for (const text of [deleteIcon, currentPage]) {
+    const { foreground, background } = await colours(text)
+    expect(contrast(foreground, background)).toBeGreaterThanOrEqual(4.5)
+  }
+  expect(recording.errors).toEqual([])
+})
+
 test('the bundle sets window.Axis with one mount for each preview', async ({ page }) => {
   const recording = await openHarness(page, '')
 

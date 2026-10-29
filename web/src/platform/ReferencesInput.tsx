@@ -1,5 +1,6 @@
-import { Button, Flex } from 'antd'
+import { Flex } from 'antd'
 import { useRef, useState } from 'react'
+import { AxisButton } from './AxisButton'
 import { ReferenceLookup } from './ReferenceLookup'
 import type { RecordItem } from './records'
 import type { FieldMetadata } from './site'
@@ -62,20 +63,22 @@ export function ReferencesInput({ field, title, ids, labels, onChange, ariaDescr
             <li key={id} style={{ marginBottom: 4 }}>
               <Flex align="center" gap="small">
                 <span>{labelAt(index)}</span>
-                <Button
+                <AxisButton
+                  role="destructive"
                   size="small"
                   aria-label={`${t('shell.form.removeRow')} ${labelAt(index)}`}
                   onClick={() => remove(index)}
                 >
                   {t('shell.form.removeRow')}
-                </Button>
+                </AxisButton>
               </Flex>
             </li>
           ))}
         </ul>
       )}
       {/* The field's label points at this button, so its own name says what it adds to. */}
-      <Button
+      <AxisButton
+        role="secondary"
         id={field.name}
         ref={add}
         aria-label={`${t('shell.form.add')} ${title}`}
@@ -83,7 +86,7 @@ export function ReferencesInput({ field, title, ids, labels, onChange, ariaDescr
         onClick={() => setOpen(true)}
       >
         {t('shell.form.add')}
-      </Button>
+      </AxisButton>
       <ReferenceLookup field={field} title={title} open={open} onPick={pick} onClose={() => setOpen(false)} />
       <div
         role="status"
