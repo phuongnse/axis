@@ -6,8 +6,8 @@
 // script and inlines it in a page, so the folder must hold exactly one file, axis-design-system.js, and
 // that file must
 // - be at most 6 MB, the cap of the Design System type,
-// - start with the line `/* @ds-bundle: {...} */` that scripts/design-system-header.mjs writes: JSON with the card
-//   `width`, a positive number, and the `groups` of cards, each with a name and the previews it lists, once in all,
+// - start with the line `/* @ds-bundle: {...} */` that scripts/design-system-header.mjs writes: JSON with `format` 4,
+//   the `namespace` Axis, and the `components`, each with the name of one card, every card of the previews once,
 // - parse as a classic script, so it has no `import` declaration and no `import.meta`,
 // - have no dynamic `import(`, which would load code after the script, and
 // - have no literal `</script` or `<!--`, which would end or hide an inlined script.
@@ -16,6 +16,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import vm from 'node:vm'
+import { cardGroups, cardName } from '../web/src/designSystem/cardOrder.ts'
 
 const scriptRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 export const bundleFile = 'axis-design-system.js'
@@ -26,11 +27,11 @@ const megabytes = (bytes) => `${(bytes / 1024 / 1024).toFixed(2)} MB`
 
 const isName = (value) => typeof value === 'string' && value !== ''
 
-/** The problems in the bundle's first line, which hands the Design System artifact the card width and order. */
+/** The problems in the bundle's first line, which hands the Design System artifact its format, namespace and cards. */
 function checkHeader(source) {
   const match = headerPattern.exec(source.split('\n', 1)[0])
   if (!match) {
-    return [`${bundleFile} must start with a line like /* @ds-bundle: {"width":992,"groups":[...]} */.`]
+    return [`${bundleFile} must start with a line like /* @ds-bundle: {"format":4,"namespace":"Axis","components":[...]} */.`]
   }
   let header
   try {
@@ -39,35 +40,39 @@ function checkHeader(source) {
     return [`The @ds-bundle line of ${bundleFile} is not JSON: ${error.message}`]
   }
   const problems = []
-  if (typeof header.width !== 'number' || !(header.width > 0)) {
-    problems.push(`The @ds-bundle line of ${bundleFile} needs a positive number as its width.`)
+  if (header.format !== 4) {
+    problems.push(`The @ds-bundle line of ${bundleFile} needs format 4.`)
   }
-  const { groups } = header
+  if (header.namespace !== 'Axis') {
+    problems.push(`The @ds-bundle line of ${bundleFile} needs the namespace "Axis".`)
+  }
+  const { components } = header
+  const wellFormed =
+    Array.isArray(components) &&
+    components.length > 0 &&
+    components.every((component) => component !== null && isName(component.name))
+  if (!wellFormed) {
+    problems.push(`The @ds-bundle line of ${bundleFile} needs components: a non-empty array of {name} with named cards.`)
+    return problems
+  }
+  const names = components.map((component) => component.name)
   const listed = new Set()
   const repeated = new Set()
-  const wellFormed =
-    Array.isArray(groups) &&
-    groups.length > 0 &&
-    groups.every(
-      (group) =>
-        group !== null &&
-        isName(group.name) &&
-        Array.isArray(group.previews) &&
-        group.previews.length > 0 &&
-        group.previews.every(isName),
-    )
-  if (!wellFormed) {
-    problems.push(
-      `The @ds-bundle line of ${bundleFile} needs groups: a non-empty array of {name, previews} with named previews.`,
-    )
-  } else {
-    for (const preview of groups.flatMap((group) => group.previews)) {
-      if (listed.has(preview)) repeated.add(preview)
-      listed.add(preview)
-    }
-    if (repeated.size > 0) {
-      problems.push(`The @ds-bundle line of ${bundleFile} lists a preview twice: ${[...repeated].join(', ')}.`)
-    }
+  for (const name of names) {
+    if (listed.has(name)) repeated.add(name)
+    listed.add(name)
+  }
+  if (repeated.size > 0) {
+    problems.push(`The @ds-bundle line of ${bundleFile} lists a card twice: ${[...repeated].join(', ')}.`)
+  }
+  const expected = cardGroups.flatMap((group) => group.previews).map(cardName)
+  const missing = expected.filter((name) => !listed.has(name))
+  if (missing.length > 0) {
+    problems.push(`The @ds-bundle line of ${bundleFile} lacks a card for: ${missing.join(', ')}.`)
+  }
+  const unknown = [...new Set(names.filter((name) => !expected.includes(name)))]
+  if (unknown.length > 0) {
+    problems.push(`The @ds-bundle line of ${bundleFile} names a card that matches no preview: ${unknown.join(', ')}.`)
   }
   return problems
 }
