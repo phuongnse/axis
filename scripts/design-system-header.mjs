@@ -2,21 +2,21 @@
 //
 // Usage: node scripts/design-system-header.mjs BUNDLE
 //
-// The line is `/* @ds-bundle: {"width":992,"groups":[{"name":"Field inputs","previews":["field-text",...]},...]} */`.
-// `width` is the width of a card, breakpointTokens.narrowWidth, and `groups` is the order of the cards, from
-// web/src/designSystem/cardOrder.ts. Node runs both TypeScript files directly, as their only import is a type.
+// The line is `/* @ds-bundle: {"format":4,"namespace":"Axis","components":[{"name":"TextField"},...]} */`.
+// `components` lists every card once, named as the artifact's card folders are, in the order of
+// web/src/designSystem/cardOrder.ts. Node runs that file directly, as its only import is a type.
 // The script replaces the line when the bundle already has one.
 import { readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { breakpointTokens } from '../web/src/platform/designTokens.ts'
-import { cardGroups } from '../web/src/designSystem/cardOrder.ts'
+import { cardGroups, cardName } from '../web/src/designSystem/cardOrder.ts'
 
 const marker = '/* @ds-bundle: '
 
-/** The first line of the bundle: the card width and the groups of cards in order. */
+/** The first line of the bundle: the format, the namespace and every card's name, in order. */
 export function bundleHeader() {
-  return `${marker}${JSON.stringify({ width: breakpointTokens.narrowWidth, groups: cardGroups })} */`
+  const components = cardGroups.flatMap((group) => group.previews).map((preview) => ({ name: cardName(preview) }))
+  return `${marker}${JSON.stringify({ format: 4, namespace: 'Axis', components })} */`
 }
 
 /** The bundle's source with the header as its first line, in place of an earlier header. */
