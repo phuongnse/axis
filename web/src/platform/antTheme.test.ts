@@ -72,6 +72,8 @@ describe.each(['light', 'dark'] as const)('the accessible colours of the Ant Des
     expect(config.components?.Pagination).toMatchObject({
       itemActiveColor: colour.primaryText,
       itemActiveColorHover: colour.primaryText,
+      colorPrimary: colour.primaryText,
+      colorPrimaryHover: colour.primaryText,
     })
   })
 
