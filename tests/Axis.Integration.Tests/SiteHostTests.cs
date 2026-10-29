@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text.Json;
 using Axis.Server.Tenancy;
 using Axis.Server.Tests;
 using Axis.Tenancy.Platform;
@@ -35,6 +36,9 @@ public sealed class SiteHostTests(PostgreSqlFixture database) : IClassFixture<Po
         Assert.Equal(HttpStatusCode.NotFound, await StatusAsync(client, "/api/apps/LeaveRequests/tasks", site));
         Assert.Equal(HttpStatusCode.NotFound, await StatusAsync(client, "/api/me/sessions", site));
         Assert.Equal(HttpStatusCode.NotFound, await StatusAsync(client, "/studio", site));
+        Assert.Equal(HttpStatusCode.NotFound, await StatusAsync(client, "/account", site));
+        Assert.Equal(HttpStatusCode.NotFound, await StatusAsync(client, "/users", site));
+        Assert.Equal(HttpStatusCode.NotFound, await StatusAsync(client, "/assets/missing.js", site));
 
         Assert.Equal(HttpStatusCode.OK, await StatusAsync(client, "/api/sites", own));
         Assert.Equal(HttpStatusCode.OK, await StatusAsync(client, "/api/sites/leave", own));
@@ -42,13 +46,13 @@ public sealed class SiteHostTests(PostgreSqlFixture database) : IClassFixture<Po
     }
 
     [Fact]
-    public async Task The_tenants_own_host_redirects_the_site_path_to_the_site_host_and_the_site_host_redirects_the_root_to_its_site()
+    public async Task The_tenants_own_host_redirects_the_site_path_to_the_site_host_without_the_path()
     {
         await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
         var id = await CreateServedTenantAsync(scenario);
         await using var factory = await CreateServerAsync(scenario);
         using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false }).SignedInAs("requester");
-        var target = $"http://{SiteHost(id)}/purchasing/requests?view=open";
+        var target = $"http://{SiteHost(id)}/requests?view=open";
 
         using var moved = await client.SendAsync(Request("/purchasing/requests?view=open", OwnHost(id)), CancellationToken);
         Assert.Equal(HttpStatusCode.Found, moved.StatusCode);
@@ -56,15 +60,43 @@ public sealed class SiteHostTests(PostgreSqlFixture database) : IClassFixture<Po
 
         using var upper = await client.SendAsync(Request("/PURCHASING", OwnHost(id)), CancellationToken);
         Assert.Equal(HttpStatusCode.Found, upper.StatusCode);
-        Assert.Equal($"http://{SiteHost(id)}/PURCHASING", upper.Headers.Location?.ToString());
+        Assert.Equal($"http://{SiteHost(id)}/", upper.Headers.Location?.ToString());
 
         // A site without a host of its own stays on the tenant's host.
         using var other = await client.SendAsync(Request("/leave", OwnHost(id)), CancellationToken);
         Assert.NotEqual(HttpStatusCode.Found, other.StatusCode);
+    }
 
-        using var root = await client.SendAsync(Request("/", SiteHost(id)), CancellationToken);
-        Assert.Equal(HttpStatusCode.Found, root.StatusCode);
-        Assert.Equal("/purchasing", root.Headers.Location?.ToString());
+    [Fact]
+    public async Task A_site_host_serves_the_spa_at_the_root_and_at_unprefixed_pages_and_names_its_site_in_the_site_metadata()
+    {
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        var id = await CreateServedTenantAsync(scenario);
+        await using var factory = await CreateServerAsync(scenario);
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false }).SignedInAs("requester");
+
+        // The test server has no built SPA, so the fallback may answer 404 without a body. The host's refusal is a problem document.
+        Assert.False(await IsRefusedAsync(client, "/", SiteHost(id)));
+        Assert.False(await IsRefusedAsync(client, "/purchaserequests", SiteHost(id)));
+        Assert.False(await IsRefusedAsync(client, "/purchaserequests/new", SiteHost(id)));
+        Assert.True(await IsRefusedAsync(client, "/studio", SiteHost(id)));
+
+        Assert.Equal("purchasing", await HostSiteAsync(client, SiteHost(id)));
+        Assert.Null(await HostSiteAsync(client, OwnHost(id)));
+    }
+
+    private static async Task<bool> IsRefusedAsync(HttpClient client, string path, string host)
+    {
+        using var response = await client.SendAsync(Request(path, host), CancellationToken);
+        return response.StatusCode == HttpStatusCode.NotFound && response.Content.Headers.ContentType?.MediaType == "application/problem+json";
+    }
+
+    private static async Task<string?> HostSiteAsync(HttpClient client, string host)
+    {
+        using var response = await client.SendAsync(Request("/api/site", host), CancellationToken);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
+        return body.RootElement.TryGetProperty("hostSite", out var site) ? site.GetString() : null;
     }
 
     private static string OwnHost(string id) => $"{id}.example.test";

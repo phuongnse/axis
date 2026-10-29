@@ -30,6 +30,7 @@
     <None Include="..\..\samples\templates\request-approval\**\*" Link="SampleTemplates\request-approval\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\tests\e2e\fixtures\e2e-app\**\*" Link="Fixtures\e2e-app\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\tests\e2e\fixtures\subprocess-app\**\*" Link="Fixtures\subprocess-app\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\tests\e2e\fixtures\host-site-app\**\*" Link="Fixtures\host-site-app\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\docs\**\*.md" Link="Docs\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 

@@ -1,7 +1,7 @@
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation } from 'react-router'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../src/Axis.Presentation/Texts/en.json'
 import platformVietnamese from '../../src/Axis.Presentation/Texts/vi.json'
 import { App } from './App'
@@ -17,6 +17,7 @@ import type {
   SiteMetadata,
   WidgetAccess,
 } from './platform/site'
+import { setHostSite } from './platform/siteLinks'
 import { ThemeModeProvider } from './platform/theme'
 
 vi.mock('./platform/navigation')
@@ -362,6 +363,7 @@ function stubServer({
   failingLocale = '',
   e2eSiteStatus = 200,
   recordsStatus = 200,
+  hostSite = null as string | null,
   // `null` answers 401, as when nobody is signed in.
   me = signedInUser as CurrentUser | null,
 } = {}) {
@@ -373,7 +375,7 @@ function stubServer({
       return me === null ? json({ title: 'Sign in to continue.', status: 401 }, 401) : json(me)
     }
     if (input === '/api/site') {
-      return json(siteStatus === 200 ? site : {}, siteStatus)
+      return json(siteStatus === 200 ? { ...site, hostSite } : {}, siteStatus)
     }
     if (input === '/api/sites') {
       return sitesStatus === 200 ? json({ sites }) : json({}, sitesStatus)
@@ -450,6 +452,8 @@ async function findShellRoot(mode: 'light' | 'dark') {
 }
 
 describe('App', () => {
+  afterEach(() => setHostSite(null))
+
   it('shows the server as ready when the readiness check succeeds', async () => {
     stubServer()
 
@@ -914,6 +918,44 @@ describe('App', () => {
 
     expect(await screen.findByRole('heading', { name: 'All notes' })).toBeInTheDocument()
     expect(screen.getByTestId('location')).toHaveTextContent('/e2e/notes')
+  })
+
+  it('serves the site at the root of its own host, with links that have no site prefix', async () => {
+    stubServer({ hostSite: 'e2e' })
+
+    renderApp('/')
+
+    expect(await screen.findByRole('heading', { name: 'All notes' })).toBeInTheDocument()
+    expect(screen.getByTestId('location')).toHaveTextContent(/^\/notes$/)
+    const navigation = within(screen.getByRole('navigation', { name: 'shell.navigation.menu' }))
+    expect(navigation.getByRole('link', { name: 'Notes' })).toHaveAttribute('href', '/notes')
+    expect(navigation.getByRole('link', { name: 'Categories' })).toHaveAttribute('href', '/categories')
+    await userEvent.click(screen.getByRole('button', { name: 'New' }))
+    expect(screen.getByTestId('location')).toHaveTextContent(/^\/noteform\/new$/)
+    const breadcrumb = within(await screen.findByRole('navigation', { name: 'Breadcrumb' }))
+    expect(breadcrumb.getByRole('link', { name: 'E2E notes' })).toHaveAttribute('href', '/')
+    expect(fetch).toHaveBeenCalledWith('/api/sites/e2e/pages/notes', expect.anything())
+  })
+
+  it('keeps the site prefix on a host that belongs to no site', async () => {
+    stubServer({ hostSite: null })
+
+    renderApp('/e2e')
+
+    expect(await screen.findByRole('heading', { name: 'All notes' })).toBeInTheDocument()
+    expect(screen.getByTestId('location')).toHaveTextContent('/e2e/notes')
+    const navigation = within(screen.getByRole('navigation', { name: 'shell.navigation.menu' }))
+    expect(navigation.getByRole('link', { name: 'Notes' })).toHaveAttribute('href', '/e2e/notes')
+    expect(navigation.getByRole('link', { name: 'Categories' })).toHaveAttribute('href', '/e2e/categories')
+  })
+
+  it('shows the not-found page, not Studio, at the platform routes on a site host', async () => {
+    stubServer({ hostSite: 'e2e' })
+
+    renderApp('/studio')
+
+    expect(await screen.findByTestId('not-found')).toHaveTextContent('Page not found')
+    expect(screen.queryByRole('heading', { name: 'Studio' })).not.toBeInTheDocument()
   })
 
   it('shows the records of a table page', async () => {

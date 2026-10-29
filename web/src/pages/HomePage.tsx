@@ -11,6 +11,7 @@ import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { useNarrowWidth } from '../platform/useNarrowWidth'
 import { usePlatform } from './context'
+import { siteAddress } from '../platform/siteLinks'
 
 /** What the page loaded. `null` means that the call answered 401, and `'failed'` that it failed otherwise. */
 interface Loaded {
@@ -196,7 +197,7 @@ function ApplicationCard({ title, sites, locale }: { title: string; sites: SiteL
             {sorted.map((site) => (
               <Link
                 key={site.path}
-                to={`/${site.path}`}
+                to={siteAddress(site.path)}
                 style={{ display: 'flex', alignItems: 'center', gap: spacing.sm, minWidth: 0, padding: spacing.xs }}
               >
                 <SiteMark title={siteTitle(site, locale)} size={24} />

@@ -8,6 +8,7 @@ import { parseTableQuery, recordQuery, tablePageSizes, writeTableQuery } from '.
 import { fetchTasks, type TaskListItem, type TaskPage } from './tasks'
 import { resolveText, useText, useTextCatalogs } from './texts'
 import { useReleaseTexts } from './useReleaseTexts'
+import { siteAddress } from './siteLinks'
 
 interface TaskInboxWidgetProps {
   sitePath: string
@@ -51,7 +52,7 @@ export function TaskInboxWidget({ sitePath, pageName, widget, locale, fallbackLo
   const [searchParams, setSearchParams] = useSearchParams()
   // The server sets the path on every task inbox.
   const tasksPath = widget.tasksPath!
-  const taskPath = `/${sitePath}/${pageName.toLowerCase()}`
+  const taskPath = siteAddress(sitePath, pageName.toLowerCase())
   // The inbox has no sort, so no field is offered as one.
   const query = useMemo(() => parseTableQuery(searchParams, []), [searchParams])
   const requestQuery = recordQuery(query)

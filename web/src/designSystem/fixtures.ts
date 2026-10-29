@@ -909,7 +909,7 @@ export const identityAddAuthenticatorContext: AddAuthenticatorContext = {
   page: 'addAuthenticator',
   title: identityAddAuthenticatorTexts.title,
   realmName: identitySignInContext.realmName,
-  loginAction: '#add-authenticator',
+  loginAction: '#new-authenticator',
   qrCode: identityQrCode,
   manualKey: 'JBSW Y3DP EHPK 3PXP',
   secret: 'fixture-secret',

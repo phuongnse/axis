@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
 import { fetchPage } from './site'
 import { leafWidgets } from './widgetTree'
+import { siteAddress } from './siteLinks'
 
 /** The address of an instance on its inspector page, as the router has it. */
 export function inspectorPath(sitePath: string, page: string, id: string): string {
-  return `/${sitePath}/${page.toLowerCase()}/${id}`
+  return siteAddress(sitePath, `${page.toLowerCase()}/${id}`)
 }
 
 /**

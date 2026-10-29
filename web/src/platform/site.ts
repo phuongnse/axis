@@ -23,6 +23,8 @@ export interface SiteMetadata {
   titleKey: string
   locales: SiteLocales
   navigation: NavigationItem[]
+  /** The lower-case path of the site whose own host serves the SPA, or `null` or missing when the host belongs to no site. */
+  hostSite?: string | null
 }
 
 /** The application of a listed site, with its title per locale it has texts for. */

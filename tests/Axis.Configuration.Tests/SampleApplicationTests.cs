@@ -65,6 +65,16 @@ public sealed class SampleApplicationTests
     }
 
     [Fact]
+    public void Host_site_fixture_application_compiles_without_diagnostics_with_one_site()
+    {
+        var result = ApplicationCompiler.Compile(Path.Combine(AppContext.BaseDirectory, "Fixtures", "host-site-app"));
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+        Assert.Equal("host-site", Assert.Single(result.Model.Sites).Path);
+    }
+
+    [Fact]
     public void Purchase_request_start_condition_message_has_an_English_and_a_Vietnamese_text()
     {
         var result = ApplicationCompiler.Compile(Path.Combine(AppContext.BaseDirectory, "Samples", "purchase-requests"), SamplePackages.Versions);
