@@ -146,6 +146,9 @@ function json(body: unknown, status = 200) {
 
 const namesPath = `${folder}/names`
 
+// The first lookup waits for the schema chunk and two fetches, which is slow while other test files run.
+const slow = { timeout: 5000 }
+
 const applicationNames = {
   locales: ['en'],
   entities: [{ id: entityId, name: 'PurchaseRequest', module: null, fields: [{ name: 'title', type: 'text' }] }],
@@ -686,7 +689,10 @@ describe('StudioPage', () => {
     })
     renderPage(`/studio?app=PurchaseRequests&resource=${textId}&path=%2Ftexts%2Fa.b`)
 
-    await waitFor(() => expect(screen.getByRole('tab', { name: 'JSON' })).toHaveAttribute('aria-selected', 'true'))
+    await waitFor(
+      () => expect(screen.getByRole('tab', { name: 'JSON' })).toHaveAttribute('aria-selected', 'true'),
+      slow,
+    )
     expect(screen.getByRole('textbox', { name: 'JSON' })).toHaveValue(JSON.stringify(textContent, null, 2))
   })
 
@@ -725,14 +731,20 @@ describe('StudioPage', () => {
     try {
       stubServer()
       renderPage(`/studio?app=PurchaseRequests&resource=${entityId}&path=%2Funknown`)
-      await waitFor(() => expect(screen.getByRole('tab', { name: 'JSON' })).toHaveAttribute('aria-selected', 'true'))
+      await waitFor(
+        () => expect(screen.getByRole('tab', { name: 'JSON' })).toHaveAttribute('aria-selected', 'true'),
+        slow,
+      )
 
-      await userEvent.click(await screen.findByRole('button', { name: /AXC0101/ }))
+      await userEvent.click(await screen.findByRole('button', { name: /AXC0101/ }, slow))
 
-      const field = await screen.findByTestId('studio-field-/fields/0/type')
-      await waitFor(() => expect(scrollIntoView).toHaveBeenCalledWith({ block: 'center' }))
+      const field = await screen.findByTestId('studio-field-/fields/0/type', {}, slow)
+      await waitFor(() => expect(scrollIntoView).toHaveBeenCalledWith({ block: 'center' }), slow)
       expect(scrollIntoView.mock.contexts).toEqual([field])
-      await waitFor(() => expect(screen.getByRole('tab', { name: 'Form' })).toHaveAttribute('aria-selected', 'true'))
+      await waitFor(
+        () => expect(screen.getByRole('tab', { name: 'Form' })).toHaveAttribute('aria-selected', 'true'),
+        slow,
+      )
     } finally {
       delete (Element.prototype as Partial<Element>).scrollIntoView
     }
@@ -1326,7 +1338,6 @@ describe('StudioPage publishing', () => {
 })
 
 describe('StudioPage process graph marks', () => {
-  const slow = { timeout: 5000 }
   const processItem: StudioResourceItem = {
     id: purchaseRequestApproval.id,
     kind: 'process',
