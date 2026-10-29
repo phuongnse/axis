@@ -1,8 +1,9 @@
-# Ends TLS and forwards to every server replica over TLS. It checks that the replica's certificate is for the name
-# servers and trusts only the authority certificate /certs/server-ca.crt for it, never the system roots and never
-# tls_insecure_skip_verify. The replicas listen on HTTPS only, on port 8443. It looks up the network alias
+# Ends TLS and routes by host. Requests for the identity host go to the identity provider on identity:8443, and every
+# other host goes to the server replicas. Both hops use TLS. The proxy checks that the certificate is for the name
+# identity or servers and trusts only the authority certificate /certs/server-ca.crt for it, never the system roots
+# and never tls_insecure_skip_verify. The replicas listen on HTTPS only, on port 8443. It looks up the network alias
 # `servers` every five seconds, so a restarted replica rejoins, and it retries a request on the other replica
-# when one is down.
+# when one is down. :443 is the only site address, so Caddy turns on no automatic HTTPS and no HTTP listener.
 # No trusted_proxies is set, so Caddy replaces any X-Forwarded-For, X-Forwarded-Proto and X-Forwarded-Host
 # that a client sends with its own values. The server trusts these headers only from this proxy.
 # TLS is limited to 1.2 and 1.3. On 1.2 only ECDHE ciphers with AES-GCM or ChaCha20-Poly1305 are accepted, so every
@@ -16,16 +17,28 @@
 		protocols tls1.2 tls1.3
 		ciphers TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256 TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256 TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384 TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384 TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305_SHA256 TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305_SHA256
 	}
-	reverse_proxy {
-		dynamic a servers 8443 {
-			refresh 5s
+	@identity host {$AXIS_IDENTITY_HOST}
+	handle @identity {
+		reverse_proxy identity:8443 {
+			transport http {
+				tls
+				tls_server_name identity
+				tls_trust_pool file /certs/server-ca.crt
+			}
 		}
-		transport http {
-			tls
-			tls_server_name servers
-			tls_trust_pool file /certs/server-ca.crt
+	}
+	handle {
+		reverse_proxy {
+			dynamic a servers 8443 {
+				refresh 5s
+			}
+			transport http {
+				tls
+				tls_server_name servers
+				tls_trust_pool file /certs/server-ca.crt
+			}
+			lb_try_duration 10s
+			fail_duration 10s
 		}
-		lb_try_duration 10s
-		fail_duration 10s
 	}
 }
