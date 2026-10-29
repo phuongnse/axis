@@ -18,8 +18,15 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 const docsAndSettings = ['docs/', /\.md$/, '.github/', '.nexkit/']
 
 // A safe list names only paths that its suite never reads, so a change to them cannot change the result.
+// The integration tests read no SPA file, except the Keycloak login theme that scripts/integration.sh
+// builds from web/keycloak-theme/ with the Vite configs: they read its sign-in page. The `unaffected_by`
+// lists in .nexkit/config.json name the same paths, which scripts/affected.test.mjs checks.
 export const safeSuites = {
-  integration: [...docsAndSettings, 'tests/e2e/', /^web\/(?!package(-lock)?\.json$)/],
+  integration: [
+    ...docsAndSettings,
+    'tests/e2e/',
+    /^web\/(?!package(-lock)?\.json$|keycloak-theme\/|vite(\.keycloak-theme)?\.config\.ts$)/,
+  ],
   playwright: docsAndSettings,
   'dev-script': docsAndSettings,
   compose: docsAndSettings,

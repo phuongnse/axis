@@ -7,6 +7,8 @@ import { fileURLToPath } from 'node:url'
 import { after, before, describe, test } from 'node:test'
 import { changedPaths, decideSafe, matches, safeSuites, sinceCommit } from './lib/affected.mjs'
 
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+
 const unreachable = () => assert.fail('The changed paths should not be listed.')
 const smoke = ['dev-script', 'compose', 'images', 'onprem']
 
@@ -114,6 +116,86 @@ describe('sinceCommit', () => {
   })
 })
 
+// NexKit skips a whole check before its job starts when every changed path is in the check's
+// `unaffected_by` (NexKit's nexkit/globs.py). The scripts skip each suite inside the job by the safe
+// lists above. Both must agree, or one would skip what the other runs.
+describe('the unaffected_by lists in .nexkit/config.json', () => {
+  // A NexKit glob: `*` and `?` stay in a segment, and `**`, a whole segment, crosses folders.
+  const globRegExp = (pattern) => {
+    const segments = pattern.split('/')
+    const source = segments
+      .map((segment, index) => {
+        const last = index === segments.length - 1
+        if (segment === '**') return last ? '.*' : '(?:[^/]+/)*'
+        const text = segment.replace(/[.+^${}()|\\]/g, '\\$&').replace(/\*/g, '[^/]*').replace(/\?/g, '[^/]')
+        return last ? text : `${text}/`
+      })
+      .join('')
+    return new RegExp(`^${source}$`)
+  }
+  // The last pattern that matches a path decides, and a `!` pattern takes the path back out.
+  const unaffected = (filePath, patterns) =>
+    patterns.reduce((listed, pattern) => {
+      const negated = pattern.startsWith('!')
+      return globRegExp(negated ? pattern.slice(1) : pattern).test(filePath) ? !negated : listed
+    }, false)
+
+  const config = JSON.parse(readFileSync(path.join(root, '.nexkit/config.json'), 'utf8'))
+  // The suites each check runs. A check skips only when all of them would.
+  const suitesOf = {
+    smoke,
+    integration: ['integration'],
+    'e2e-1': ['playwright'],
+    'e2e-2': ['playwright'],
+    'e2e-3': ['playwright'],
+  }
+  const samples = [
+    'README.md',
+    'docs/delivery.md',
+    'docs/decisions/d105.md',
+    'samples/apps/purchase-requests/README.md',
+    '.github/workflows/ci.yml',
+    '.nexkit/config.json',
+    'tests/e2e/specs/form.spec.ts',
+    'tests/e2e/spec-durations.json',
+    'web/src/App.tsx',
+    'web/package.json',
+    'web/package-lock.json',
+    'web/keycloak-theme/login.ftl',
+    'web/keycloak-theme/messages/messages_en.properties',
+    'web/vite.config.ts',
+    'web/vite.keycloak-theme.config.ts',
+    'src/Axis.Server/Program.cs',
+    'scripts/integration.sh',
+    'scripts/lib/affected.mjs',
+    'samples/apps/purchase-requests/application.json',
+    'compose.yaml',
+  ]
+
+  test('only the checks that run suites with a safe list have one', () => {
+    const listed = config.checks.filter((check) => check.unaffected_by).map((check) => check.name)
+    assert.deepEqual(listed.sort(), Object.keys(suitesOf).sort())
+  })
+
+  for (const [name, suites] of Object.entries(suitesOf)) {
+    test(`${name} skips exactly the paths its suites' safe lists skip`, () => {
+      const patterns = config.checks.find((check) => check.name === name).unaffected_by
+      for (const filePath of samples) {
+        const scripts = suites.every((suite) => matches(filePath, safeSuites[suite]))
+        assert.equal(unaffected(filePath, patterns), scripts, filePath)
+      }
+    })
+  }
+
+  test('the integration tests read the Keycloak theme that their script builds from web/', () => {
+    const theme = ['web/keycloak-theme/login.ftl', 'web/vite.config.ts', 'web/vite.keycloak-theme.config.ts']
+    for (const filePath of theme) {
+      assert.equal(matches(filePath, safeSuites.integration), false, filePath)
+    }
+    assert.equal(matches('web/src/App.tsx', safeSuites.integration), true)
+  })
+})
+
 describe('matches', () => {
   const matchers = ['docs/', 'Dockerfile', /\.md$/]
 
@@ -171,7 +253,6 @@ describe('changedPaths', () => {
 })
 
 describe('check scripts', () => {
-  const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
   let dir
   let env
 

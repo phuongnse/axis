@@ -49,6 +49,12 @@
       "slow": true,
       "results": [
         "artifacts/test-results"
+      ],
+      "unaffected_by": [
+        "docs/**",
+        ".github/**",
+        ".nexkit/**",
+        "**/*.md"
       ]
     },
     {
@@ -58,6 +64,19 @@
       "slow": true,
       "results": [
         "artifacts/test-results"
+      ],
+      "unaffected_by": [
+        "docs/**",
+        ".github/**",
+        ".nexkit/**",
+        "tests/e2e/**",
+        "web/**",
+        "!web/package.json",
+        "!web/package-lock.json",
+        "!web/keycloak-theme/**",
+        "!web/vite.config.ts",
+        "!web/vite.keycloak-theme.config.ts",
+        "**/*.md"
       ]
     },
     {
@@ -69,6 +88,12 @@
         "artifacts/test-results",
         "artifacts/logs",
         "tests/e2e/test-results"
+      ],
+      "unaffected_by": [
+        "docs/**",
+        ".github/**",
+        ".nexkit/**",
+        "**/*.md"
       ]
     },
     {
@@ -80,6 +105,12 @@
         "artifacts/test-results",
         "artifacts/logs",
         "tests/e2e/test-results"
+      ],
+      "unaffected_by": [
+        "docs/**",
+        ".github/**",
+        ".nexkit/**",
+        "**/*.md"
       ]
     },
     {
@@ -91,6 +122,12 @@
         "artifacts/test-results",
         "artifacts/logs",
         "tests/e2e/test-results"
+      ],
+      "unaffected_by": [
+        "docs/**",
+        ".github/**",
+        ".nexkit/**",
+        "**/*.md"
       ]
     }
   ],

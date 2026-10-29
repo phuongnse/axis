@@ -141,7 +141,14 @@ with the reasons. What each one does is in NexKit's
   (`NEXKIT_VERIFIED_SHA`) is never used, because NexKit does not record which
   checks or commands it ran, so a check added or changed since would skip. So
   after `main` moves, a check that passed before reruns its suite only when
-  the new commits can affect it. CI on `main` sets no base and runs every
+  the new commits can affect it.
+  In the automatic review that brings a branch up to date, NexKit goes
+  further: the smoke, integration and E2E checks name the paths they never
+  read in NexKit's [`unaffected_by`][nexkit-unaffected] setting, and a check
+  whose paths did not change since it passed gets no job at all. The round's
+  comment, the run summary and a notice name it as skipped. The lists name
+  the same paths as the safe lists of the scripts, which a test checks.
+  CI on `main` sets no base and runs every
   suite, so a slowdown shows at its next run. The integration performance
   tests, whose class names end in `PerformanceTests`, run neither in NexKit's
   checks nor in CI's integration job, because they depend on the runner's
@@ -422,5 +429,6 @@ issues, pull requests and sub-issues.
 [nexkit-profiles]: https://github.com/phuongnse/nexkit/blob/main/docs/configuration.md#profiles
 [nexkit-auto-merge]: https://github.com/phuongnse/nexkit/blob/main/docs/configuration.md#automatic-merge
 [nexkit-caches]: https://github.com/phuongnse/nexkit/blob/main/docs/configuration.md#caches
+[nexkit-unaffected]: https://github.com/phuongnse/nexkit/blob/main/docs/configuration.md#checks-that-a-change-cannot-affect
 [nexkit-autopilot]: https://github.com/phuongnse/nexkit/blob/main/docs/configuration.md#autopilot
 [nexkit-evidence]: https://github.com/phuongnse/nexkit/blob/main/docs/configuration.md#evidence-from-ci-runs
