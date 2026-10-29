@@ -1,7 +1,5 @@
-import { Button, Flex, Form, Input, Typography } from 'antd'
-import { useId } from 'react'
-import { IdentityFrame } from '../identitySignIn/IdentityFrame'
 import { SignInPage } from '../identitySignIn/SignInPage'
+import { TwoStepPage } from '../identitySignIn/TwoStepPage'
 import { identityInvalid, identitySignInContext, identityTwoStepTexts } from './fixtures'
 
 export type IdentitySignInPage = 'signIn' | 'wrongPassword' | 'organizationOnly' | 'twoStep'
@@ -16,32 +14,13 @@ export function IdentitySignIn({ page }: { page: IdentitySignInPage }) {
     case 'organizationOnly':
       return <SignInPage context={{ ...identitySignInContext, accounts: false }} />
     case 'twoStep':
+      // Two-step verification is a preview-only state until the theme draws it.
       return (
-        <IdentityFrame title={identityTwoStepTexts.twoStepTitle} locales={identitySignInContext.locales}>
-          <TwoStepForm />
-        </IdentityFrame>
+        <TwoStepPage
+          texts={identityTwoStepTexts}
+          organization={identitySignInContext.realmName}
+          locales={identitySignInContext.locales}
+        />
       )
   }
-}
-
-/** Two-step verification is a preview-only state until the theme draws it. */
-function TwoStepForm() {
-  const formId = useId()
-  return (
-    <>
-      <Typography.Paragraph style={{ margin: 0 }}>{identityTwoStepTexts.twoStepMessage}</Typography.Paragraph>
-      <Form name={formId} layout="vertical" requiredMark={false}>
-        <Form.Item name="code" label={identityTwoStepTexts.code}>
-          <Input maxLength={6} inputMode="numeric" autoComplete="one-time-code" />
-        </Form.Item>
-        <Button type="primary" htmlType="submit" block>
-          {identityTwoStepTexts.verify}
-        </Button>
-      </Form>
-      <Flex justify="space-between">
-        <Button type="link">{identityTwoStepTexts.tryAnotherWay}</Button>
-        <Button type="link">{identityTwoStepTexts.backToSignIn}</Button>
-      </Flex>
-    </>
-  )
 }
