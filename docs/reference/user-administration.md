@@ -9,13 +9,13 @@ apply.
 
 ## The administrator role
 
-_(planned for M17)_
+The setting and the shell entry are built. The users page is _(planned for M17)_.
 
 - **An installation-level role,** not a `role` resource, like the author and the operator roles. The setting
   `Users:AdministratorRole` names the roles claim value, see [users settings](host-settings.md#users-settings). With no
   value, nobody may use the users page.
 - **One tenant:** the users page is a platform route, `/users`, on each tenant's hosts, and shows only that tenant. A
-  site's own host does not serve it. A preview tenant has no users page.
+  site's own host does not serve it. A preview tenant has no users page, and `GET /api/me` answers `users: false` there.
 - **In the shell:** the app switcher and the home page's welcome band offer "Users" ("Invite people and give them
   roles.") to a person who holds the role, after Studio and the operator console, see
   [app switcher and preferences](shell.md#app-switcher-and-preferences). `GET /api/me` adds a boolean `users`.

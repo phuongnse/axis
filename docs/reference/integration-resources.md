@@ -31,7 +31,7 @@ reconciles is in [Connector calls](process-execution.md#connector-calls).
 - **No binding resource.** No resource kind declares bindings. A connector
   names one as `{ "binding": "<name>" }`. Where the name is used decides its
   kind: `baseUrl` needs a `url` binding, and `auth` needs a `secret` binding.
-  _(planned for M18)_ An `oauth2` auth's `tokenUrl` needs a `url` binding, and
+  _(planned for M19)_ An `oauth2` auth's `tokenUrl` needs a `url` binding, and
   a [webhook](#webhook-resource) names a `url` and a `secret` binding.
   A package operation names them in the `capabilities` of its manifest:
   `urls` need `url` bindings and `secrets` need `secret` bindings.
@@ -171,7 +171,7 @@ The purchase request sample holds the purchasing system connector in
   - `bearer`, with `token`, a `secret` binding sent as
     `Authorization: Bearer <value>`;
   - `header`, with `name`, the header name, and `value`, a `secret` binding;
-  - `oauth2` _(planned for M18)_, see [OAuth2 auth](#oauth2-auth).
+  - `oauth2` _(planned for M19)_, see [OAuth2 auth](#oauth2-auth).
 - `timeout` is an ISO 8601 duration. It defaults to `PT30S` and is at most
   `PT2M`.
 - `idempotency` names the request header that carries the idempotency key.
@@ -179,16 +179,16 @@ The purchase request sample holds the purchasing system connector in
 - `operations` lists the named operations.
   - `method` is `GET`, `POST`, `PUT`, `PATCH` or `DELETE`.
   - `path` is a path template. `{idempotencyKey}` is the only placeholder.
-    Other placeholders come later. _(planned for M18)_ A `{name}` placeholder
+    Other placeholders come later. _(planned for M19)_ A `{name}` placeholder
     names a `path` input, see [Structured payloads](#structured-payloads).
   - `input` fields are sent as a JSON body. A `GET` sends no body, so a `GET`
-    with `input` fields is a schema error. _(planned for M18)_ An input's `in`
+    with `input` fields is a schema error. _(planned for M19)_ An input's `in`
     may send it in the path, the query or a header instead, and a `GET` may
     have those.
   - `output` fields are read from the JSON response.
   - Input and output field types are the
     [rule parameter types](resource-files.md#resource-file-shape): `text`, `integer`,
-    `decimal`, `boolean`, `date` and `date-time`. _(planned for M18)_ Inputs
+    `decimal`, `boolean`, `date` and `date-time`. _(planned for M19)_ Inputs
     may also be `object` and `list`.
 - `lookup` is optional and set per operation. It names another operation of
   the same connector that finds an earlier call by its idempotency key.
@@ -211,7 +211,7 @@ Docker Compose, `scripts/dev.sh` and the E2E run point them at the
 
 ### OAuth2 auth
 
-_(planned for M18)_ A connector can get its access token from an OAuth2
+_(planned for M19)_ A connector can get its access token from an OAuth2
 authorization server through the client credentials grant, as
 [D91](../decisions/d91-connector-oauth2-and-structured-payloads.md) agrees.
 
@@ -249,7 +249,7 @@ authorization server through the client credentials grant, as
 
 ### Structured payloads
 
-_(planned for M18)_ Inputs can go outside the body and nest, and outputs can
+_(planned for M19)_ Inputs can go outside the body and nest, and outputs can
 come from deep in the response, as
 [D91](../decisions/d91-connector-oauth2-and-structured-payloads.md) agrees.
 Bodies stay JSON.
@@ -680,7 +680,7 @@ The compiler reports these as compile errors, all in one pass. The
 
 ## Outbound webhooks
 
-_(planned for M18)_ A webhook tells another system that an event happened, as
+_(planned for M19)_ A webhook tells another system that an event happened, as
 [D92](../decisions/d92-outbound-webhooks.md) agrees. The author configures it
 in the application, so it is part of the release. There is no API through
 which another system subscribes itself.
