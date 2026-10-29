@@ -23,7 +23,9 @@ namespace Axis.Admin;
 /// same steps with the stored release in place of the compile: it rebuilds the release's model from its stored files, refuses
 /// a release that pins a package version that is not installed with <c>AXC0146</c>, and then activates it with every
 /// activation check, so a migration that the release lacks is <c>AXC0174</c>. It never reads a folder and stores no new
-/// release. A request ends <c>succeeded</c> or <c>failed</c>, with its diagnostics. A <c>publish</c> and a <c>rollback</c> write
+/// release. A <c>publish</c> and a <c>rollback</c> also update the realm of a tenant that has one, after the activation committed: a
+/// realm failure fails the request, and the new release stays active. A preview tenant has no realm, and a <c>validate</c> or a
+/// <c>test</c> never updates one. A request ends <c>succeeded</c> or <c>failed</c>, with its diagnostics. A <c>publish</c> and a <c>rollback</c> write
 /// their audit record in the same transaction, and a <c>validate</c> writes none. A request of another tenant stays queued.
 /// A <c>publish</c> request with target <c>preview</c> runs the same steps on the tenant's preview tenant, with that tenant's
 /// database, schema role and bindings, and writes its history row there. The request itself stays in the tenant's database,
@@ -381,7 +383,8 @@ internal sealed class Publisher(
                 configuration => LoadStoredAsync(configuration, request, tenant.Id),
                 diagnostics,
                 ActivationActor.User(request.RequestedBy, request.RequestedByName, null, null, request.Id),
-                loadStep: "rollback");
+                loadStep: "rollback",
+                syncRealm: tenant.SyncRealm);
             await StopRenewalAsync(renewing, renewal);
             await FinishAsync(tenant.Id, connections, request, rolledBack, diagnostics, audit: true);
             return;
@@ -406,7 +409,8 @@ internal sealed class Publisher(
                 target.Bindings,
                 configuration => ReleaseCompiler.CompileAsync(files, configuration, settings.Packages.Versions, settings.Modules.Modules, CancellationToken.None),
                 diagnostics,
-                ActivationActor.User(request.RequestedBy, request.RequestedByName, request.Label, request.Note, request.Id));
+                ActivationActor.User(request.RequestedBy, request.RequestedByName, request.Label, request.Note, request.Id),
+                syncRealm: target.SyncRealm);
         }
 
         // The renewal stops before the final update, so it cannot extend a lease that the update has just ended.

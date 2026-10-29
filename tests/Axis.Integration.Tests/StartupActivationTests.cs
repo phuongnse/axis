@@ -1,6 +1,8 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Axis.Admin;
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Modules;
 using Axis.Configuration.Releases;
@@ -16,7 +18,7 @@ using Npgsql;
 
 namespace Axis.Integration.Tests;
 
-public sealed class StartupActivationTests(PostgreSqlFixture database) : IClassFixture<PostgreSqlFixture>
+public sealed class StartupActivationTests(PostgreSqlFixture database, KeycloakFixture keycloak) : IClassFixture<PostgreSqlFixture>
 {
     private const string HostA = "a.example.test";
     private const string HostB = "b.example.test";
@@ -502,6 +504,67 @@ public sealed class StartupActivationTests(PostgreSqlFixture database) : IClassF
     }
 
     [Fact]
+    public async Task Start_brings_the_realm_of_a_tenant_with_realm_details_in_step_with_the_sites_of_the_folder()
+    {
+        var (a, b) = (await CreateDatabaseAsync(), await CreateDatabaseAsync());
+        var secrets = new TenantRealmSecrets("platform-1", "activation-1", "users-1");
+        var baseAddress = await keycloak.BaseAddressAsync();
+        var realm = $"t{Guid.NewGuid():N}"[..16];
+        using var http = new HttpClient();
+        using var folder = WithSites(ApplicationFolder(TitleField), "one", "two");
+        try
+        {
+            await new TenantRealm(http, new IdentityProviderAdmin(baseAddress, KeycloakFixture.AdminClientId, KeycloakFixture.AdminClientSecret))
+                .EnsureAsync(realm, "Acme", secrets, CancellationToken);
+
+            await using (var factory = CreateFactory(a, b, folder.Path, new LogCollector(), RealmSettings(baseAddress, realm, secrets.Activation)))
+            {
+                factory.CreateClient().Dispose();
+            }
+
+            var token = await MasterTokenAsync(http, baseAddress);
+            foreach (var path in new[] { "one", "two" })
+            {
+                var clients = await GetJsonAsync(http, baseAddress, token, $"admin/realms/{realm}/clients?clientId=site-{path}");
+                Assert.Equal(1, clients.GetArrayLength());
+            }
+        }
+        finally
+        {
+            await DeleteRealmAsync(http, baseAddress, realm);
+        }
+    }
+
+    [Fact]
+    public async Task A_wrong_activation_secret_stops_the_start_and_neither_the_error_nor_the_log_holds_it()
+    {
+        var (a, b) = (await CreateDatabaseAsync(), await CreateDatabaseAsync());
+        const string WrongSecret = "wrong-activation-secret-never-logged";
+        var baseAddress = await keycloak.BaseAddressAsync();
+        var realm = $"t{Guid.NewGuid():N}"[..16];
+        using var http = new HttpClient();
+        using var folder = WithSites(ApplicationFolder(TitleField), "one", "two");
+        var logs = new LogCollector();
+        try
+        {
+            await new TenantRealm(http, new IdentityProviderAdmin(baseAddress, KeycloakFixture.AdminClientId, KeycloakFixture.AdminClientSecret))
+                .EnsureAsync(realm, "Acme", new TenantRealmSecrets("platform-1", "activation-1", "users-1"), CancellationToken);
+
+            await using var factory = CreateFactory(a, b, folder.Path, logs, RealmSettings(baseAddress, realm, WrongSecret));
+
+            var exception = Assert.ThrowsAny<Exception>(() => factory.CreateClient());
+
+            Assert.Contains("get the activation token", exception.ToString(), StringComparison.Ordinal);
+            Assert.DoesNotContain(WrongSecret, exception.ToString(), StringComparison.Ordinal);
+            Assert.All(logs.Entries, entry => Assert.DoesNotContain(WrongSecret, entry, StringComparison.Ordinal));
+        }
+        finally
+        {
+            await DeleteRealmAsync(http, baseAddress, realm);
+        }
+    }
+
+    [Fact]
     public async Task Without_the_setting_the_server_starts_and_leaves_the_tenant_database_unmigrated()
     {
         var (a, b) = (await CreateDatabaseAsync(), await CreateDatabaseAsync());
@@ -708,6 +771,70 @@ public sealed class StartupActivationTests(PostgreSqlFixture database) : IClassF
 
             builder.ConfigureLogging(logging => logging.AddProvider(logs));
         });
+
+    /// <summary>The settings that give tenant <c>a</c> the realm details of <paramref name="realm"/> in the shared Keycloak.</summary>
+    private static Dictionary<string, string> RealmSettings(Uri baseAddress, string realm, string activationSecret) => new()
+    {
+        ["Tenants:a:Oidc:Authority"] = new Uri(baseAddress, $"realms/{realm}").ToString(),
+        ["Tenants:a:Realm:Name"] = realm,
+        ["Tenants:a:Realm:ActivationClientSecret"] = activationSecret,
+    };
+
+    /// <summary>Gives the folder one site for each path, each opening a table page of notes.</summary>
+    private static TemporaryFolder WithSites(TemporaryFolder folder, params string[] paths)
+    {
+        folder
+            .With("texts/en.json", $$"""
+                { "id": "4b0f6a1e-2c7d-4e3a-9f51-8d2c6b7e0a14", "kind": "text", "name": "TextsEn", "formatVersion": 1, "locale": "en",
+                  "texts": { "role.employee": "Employee", "site.title": "Notes", "nav.notes": "Notes", "notes.title": "Notes" } }
+                """)
+            .With("pages/notes.json", """
+                { "id": "4b0f6a1e-2c7d-4e3a-9f51-8d2c6b7e0a21", "kind": "page", "name": "Notes", "formatVersion": 1,
+                  "title": { "textKey": "notes.title" }, "widgets": [ { "type": "table", "entity": "Note" } ] }
+                """)
+            .With("identity-providers/accounts.json", """{ "id": "4b0f6a1e-2c7d-4e3a-9f51-8d2c6b7e0a22", "kind": "identityProvider", "name": "accounts", "formatVersion": 1, "type": "accounts" }""");
+        foreach (var path in paths)
+        {
+            folder.With($"sites/{path}.json", $$"""
+                { "id": "{{Guid.NewGuid()}}", "kind": "site", "name": "Site{{path}}", "formatVersion": 1, "path": "{{path}}",
+                  "title": { "textKey": "site.title" }, "locales": { "default": "en", "fallback": "en", "available": ["en"] },
+                  "navigation": [ { "page": "Notes", "label": { "textKey": "nav.notes" } } ] }
+                """);
+        }
+
+        return folder;
+    }
+
+    private static async Task<string> MasterTokenAsync(HttpClient http, Uri baseAddress)
+    {
+        using var form = new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["grant_type"] = "client_credentials",
+            ["client_id"] = KeycloakFixture.AdminClientId,
+            ["client_secret"] = KeycloakFixture.AdminClientSecret,
+        });
+        using var response = await http.PostAsync(new Uri(baseAddress, "realms/master/protocol/openid-connect/token"), form, CancellationToken);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
+        return body.GetProperty("access_token").GetString()!;
+    }
+
+    private static async Task<JsonElement> GetJsonAsync(HttpClient http, Uri baseAddress, string token, string path)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(baseAddress, path));
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
+        using var response = await http.SendAsync(request, CancellationToken);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        return await response.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
+    }
+
+    private static async Task DeleteRealmAsync(HttpClient http, Uri baseAddress, string realm)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Delete, new Uri(baseAddress, $"admin/realms/{realm}"));
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", await MasterTokenAsync(http, baseAddress));
+        using var response = await http.SendAsync(request, CancellationToken);
+        Assert.True(response.IsSuccessStatusCode || response.StatusCode == HttpStatusCode.NotFound);
+    }
 
     /// <summary>Starts the server once with <paramref name="folder"/> and returns the active release ids in both tenants.</summary>
     private async Task<Guid?[]> StartAsync(string a, string b, TemporaryFolder folder, LogCollector? logs = null)

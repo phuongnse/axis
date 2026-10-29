@@ -71,6 +71,10 @@ after(() => {
 })
 
 test('the stack runs from source', { timeout }, async () => {
+  // Keycloak mounts the Axis theme from artifacts/keycloak-theme, so it is built first.
+  const theme = spawnSync('npm', ['run', 'build:keycloak-theme', '--prefix', 'web'], { cwd: root, encoding: 'utf8' })
+  assert.equal(theme.status, 0, `the Keycloak theme build exited with ${theme.status}\n${tail(`${theme.stdout}${theme.stderr}`)}`)
+
   // The build runs on its own, so a failed build is not reported as a failed start.
   await runDocker(['compose', '-p', project, 'build'], { env })
 

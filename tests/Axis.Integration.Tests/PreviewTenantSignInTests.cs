@@ -1,6 +1,5 @@
 using System.Net;
 using System.Text.Json;
-using System.Text.RegularExpressions;
 using Axis.Server.Authentication;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -15,7 +14,7 @@ namespace Axis.Integration.Tests;
 /// <c>localhost</c> and has none, so it signs in with those of <c>main</c>. The realm's client accepts redirects only
 /// to <c>http://localhost:5206</c>, so the preview tenant is the one on that host.
 /// </summary>
-public sealed partial class PreviewTenantSignInTests(KeycloakFixture keycloak, PostgreSqlFixture database) : IAsyncLifetime, IClassFixture<PostgreSqlFixture>
+public sealed class PreviewTenantSignInTests(KeycloakFixture keycloak, PostgreSqlFixture database) : IAsyncLifetime, IClassFixture<PostgreSqlFixture>
 {
     private const string MainHost = "main.example.test";
 
@@ -130,8 +129,8 @@ public sealed partial class PreviewTenantSignInTests(KeycloakFixture keycloak, P
         var loginPage = await browser.GetAsync(authorize, CancellationToken);
         var html = await loginPage.Content.ReadAsStringAsync(CancellationToken);
         Assert.True(loginPage.StatusCode == HttpStatusCode.OK, html);
-        var action = WebUtility.HtmlDecode(FormActionPattern().Match(html).Groups["action"].Value);
-        using var loginRequest = new HttpRequestMessage(HttpMethod.Post, new Uri(action))
+        var action = KeycloakSignIn.LoginAction(html);
+        using var loginRequest = new HttpRequestMessage(HttpMethod.Post, action)
         {
             Content = new FormUrlEncodedContent(new Dictionary<string, string>
             {
@@ -163,7 +162,4 @@ public sealed partial class PreviewTenantSignInTests(KeycloakFixture keycloak, P
         request.Headers.Add("Cookie", $"{Session.Scheme}={sessionCookie}");
         return await client.SendAsync(request, CancellationToken);
     }
-
-    [GeneratedRegex("""<form\b[^>]*\baction="(?<action>[^"]+)""")]
-    private static partial Regex FormActionPattern();
 }

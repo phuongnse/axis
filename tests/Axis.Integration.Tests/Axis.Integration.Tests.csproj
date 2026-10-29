@@ -61,6 +61,7 @@
     <None Include="..\..\deploy\keycloak\password-blacklists\axis-breached-passwords.txt" Link="Keycloak\axis-breached-passwords.txt" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\samples\keycloak\axis-fapi-key-1.pem" Link="Keycloak\axis-fapi-key-1.pem" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\samples\keycloak\axis-fapi-key-2.pem" Link="Keycloak\axis-fapi-key-2.pem" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\artifacts\keycloak-theme\**\*" Link="KeycloakTheme\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <Import Project="..\packages\TestPackages.targets" />

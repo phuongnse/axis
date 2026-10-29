@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 
 namespace Axis.Integration.Tests;
@@ -53,8 +54,8 @@ internal static partial class KeycloakSignIn
         var loginPage = await browser.GetAsync(authorize, cancellationToken);
         var html = await loginPage.Content.ReadAsStringAsync(cancellationToken);
         Assert.True(loginPage.StatusCode == HttpStatusCode.OK, html);
-        var action = WebUtility.HtmlDecode(FormActionPattern().Match(html).Groups["action"].Value);
-        using var loginRequest = new HttpRequestMessage(HttpMethod.Post, new Uri(action))
+        var action = LoginAction(html);
+        using var loginRequest = new HttpRequestMessage(HttpMethod.Post, action)
         {
             Content = new FormUrlEncodedContent(new Dictionary<string, string>
             {
@@ -83,7 +84,7 @@ internal static partial class KeycloakSignIn
         var cancellationToken = TestContext.Current.CancellationToken;
         var html = await passwordResponse.Content.ReadAsStringAsync(cancellationToken);
         Assert.True(passwordResponse.StatusCode == HttpStatusCode.OK && html.Contains("id=\"otp\"", StringComparison.Ordinal), html);
-        var action = WebUtility.HtmlDecode(FormActionPattern().Match(html).Groups["action"].Value);
+        var action = WebUtility.HtmlDecode(CodeFormActionPattern().Match(html).Groups["action"].Value);
         // A cookie that the password response sets again replaces the one the browser sent.
         var cookies = cookieHeader.Split("; ").ToDictionary(cookie => cookie.Split('=', 2)[0], cookie => cookie);
         if (passwordResponse.Headers.TryGetValues("Set-Cookie", out var setCookies))
@@ -106,6 +107,19 @@ internal static partial class KeycloakSignIn
         return await browser.SendAsync(request, cancellationToken);
     }
 
+    /// <summary>The address the Axis theme's sign-in form posts to: loginAction of the sign-in context that login.ftl writes as JSON.</summary>
+    public static Uri LoginAction(string html)
+    {
+        var match = SignInContextPattern().Match(html);
+        Assert.True(match.Success, html);
+        using var context = JsonDocument.Parse(match.Groups["context"].Value);
+        return new Uri(context.RootElement.GetProperty("loginAction").GetString()!);
+    }
+
+    // Keycloak's own code page is not themed, so it still has a form element.
     [GeneratedRegex("""<form\b[^>]*\baction="(?<action>[^"]+)""")]
-    private static partial Regex FormActionPattern();
+    private static partial Regex CodeFormActionPattern();
+
+    [GeneratedRegex("""<script type="application/json" id="axis-sign-in-context">(?<context>.*?)</script>""", RegexOptions.Singleline)]
+    private static partial Regex SignInContextPattern();
 }

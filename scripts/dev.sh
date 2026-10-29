@@ -2,7 +2,8 @@
 # Runs Axis locally: PostgreSQL, Keycloak and the purchasing system stub in Docker, the server
 # and the worker under dotnet watch, the publisher and the SPA on Vite, in one terminal. The server starts once
 # PostgreSQL accepts connections, Keycloak's development realm answers and the stub answers. The
-# server signs people in through that realm at /api/auth/sign-in. The SPA does not offer it yet.
+# server signs people in through that realm at /api/auth/sign-in. The SPA does not offer it yet. The realm signs
+# people in on the Axis theme, which this script builds into artifacts/keycloak-theme before Keycloak starts.
 # The worker and the publisher start once the server has migrated the tenant databases. The
 # publisher runs the publish requests of Studio. A change to a JSON file
 # in an application folder that the server activates at startup restarts the server, so that it
@@ -61,6 +62,10 @@ if [ ! -d web/node_modules ] || ! cmp -s web/package-lock.json "$marker"; then
   npm ci --prefix web
   cp web/package-lock.json "$marker"
 fi
+
+# Keycloak's compose service mounts the theme from artifacts/keycloak-theme.
+log "Building the Keycloak theme"
+npm run build:keycloak-theme --prefix web
 
 # The health checks make --wait return once PostgreSQL accepts connections, the realm answers
 # and the purchasing system stub answers. --build rebuilds the stub's image when it changed.
@@ -318,11 +323,15 @@ while :; do
   # set in this subshell only: the schema role is for its steps, and the runtime role is for seeding.
   if [ -z "$publisher" ] && [ -e "$state/server-listening" ]; then
     log "The server has migrated the tenant databases. Starting the publisher."
-    # Bash cannot export a name with a hyphen, so the settings go through env.
+    # Bash cannot export a name with a hyphen, so the settings go through env. The realm settings only let the
+    # tenant catalog pass validation: the server alone brings the realm in step.
     (exec env DOTNET_ENVIRONMENT=Development \
       Extensions__Path="$PWD/artifacts/extensions" \
       Modules__Path="$PWD/artifacts/modules" \
       Tenants__default__Hosts__0=localhost \
+      Tenants__default__Oidc__Authority="http://localhost:$keycloak_port/realms/axis" \
+      Tenants__default__Realm__Name=axis \
+      Tenants__default__Realm__ActivationClientSecret=axis-activation-development-secret \
       Tenants__default__ConnectionString="Host=localhost;Port=$postgres_port;Database=axis;Username=axis_runtime;Password=axis" \
       Tenants__default__SchemaConnectionString="Host=localhost;Port=$postgres_port;Database=axis;Username=axis_schema;Password=axis" \
       Tenants__default__Bindings__PurchasingSystemUrl__Kind=url \
