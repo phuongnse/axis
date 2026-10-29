@@ -329,12 +329,14 @@ sign-out address. This holds under both
 | -------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------- |
 | What starts it       | The callback creates the row in `axis.sessions`                  | A login on the identity provider's page                     |
 | How long it lasts    | 8 hours after sign-in, or 1 hour without requests                | Set at the identity provider                                |
-| What ends it         | Sign-out, expiry, a new sign-in, an operator or a tenant restore | Its own expiry, or the `signOutUrl` that Axis sign-out uses |
+| What ends it         | Sign-out, expiry, a new sign-in, an administrator's disable or authenticator reset, an operator or a tenant restore | Its own expiry, the `signOutUrl` that Axis sign-out uses, or an administrator's disable or authenticator reset |
 
 - **Axis's session.** The lifetimes are those of the
   [session](#sign-in-and-the-session). A new sign-in ends the old session, an
   operator can end it with
-  [`tenant session end`](tenant-setting-commands.md#sessions), and
+  [`tenant session end`](tenant-setting-commands.md#sessions), an administrator's
+  disable or authenticator reset of a user ends every session of that user, see
+  [user administration](user-administration.md#the-users-page), and
   `tenant restore` empties the table.
 - **The identity provider's session.** Its lifetimes are set at the identity
   provider. The development realm sets none, so it keeps Keycloak's defaults.

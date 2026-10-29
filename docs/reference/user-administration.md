@@ -4,7 +4,8 @@ Detailed reference for the accounts of [Axis's identity provider](identity-provi
 administrator gives, and the users page where both are managed.
 [D100](../decisions/d100-identity-providers-per-application-and-sign-in-per-site.md) agrees it. M17 builds it, so
 what is not built yet is marked _(planned for M17)_. The account rules are built: every realm that `tenant create` makes
-holds them. The users page's list is built. The invitations, a user's details, the commands and the roles are not built yet. The conventions of [architecture.md](../architecture.md)
+holds them. The users page's list and the server commands that disable, enable and reset an authenticator are built. The invitations,
+a user's details, the commands' buttons and the roles are not built yet. The conventions of [architecture.md](../architecture.md)
 apply.
 
 ## The administrator role
@@ -23,7 +24,8 @@ The setting, the shell entry and the users page's list are built.
 
 ## The users page
 
-The server's list route and the page's list are built. A user's details and the commands are _(planned for M17)_.
+The server's list route, the page's list and the server routes of three commands are built. A user's details and the buttons that call the
+commands are _(planned for M17)_.
 
 - **The list route:** `GET /api/users?search=&page=&pageSize=` answers `{ items, totalCount }` for the tenant's realm to an
   administrator. `page` starts at 1 and defaults to 1. `pageSize` is 1 to 50 and defaults to 50. A value outside these
@@ -42,7 +44,18 @@ The server's list route and the page's list are built. A user's details and the 
 - **A user:** opening a row shows the person's roles, for each application and for the platform, and the commands
   below. A field marked `sensitive` and record data are never shown.
 - **Commands:** invite, resend an invitation, disable, enable, reset an account's authenticator, give a role and remove
-  a role. Each command asks for confirmation, and each writes an [audit record](#audit).
+  a role. Each command asks for confirmation, and each writes an [audit record](#audit). Disable, enable and reset an
+  authenticator are built as server routes, which the user's details will call. The others are _(planned for M17)_.
+  - `POST /api/users/{id}/disable`, `POST /api/users/{id}/enable` and `POST /api/users/{id}/reset-authenticator` answer
+    `204` and take no body. They take a browser session only, so a service account's bearer token gets `401`.
+  - A request is checked in this order: signed-in user (`401`), `Users:AdministratorRole` (`403`), a tenant with a users
+    client (`404`, as for the list), for disable a login at the identity provider in the last 5 minutes (`403`), for disable
+    not oneself (`409`), then the realm user. A user that the realm does not have answers `404`, and so does a service account.
+    The checks come before the lookup, so a refused caller learns nothing about which ids exist.
+  - Enable and reset an authenticator need no recent login. For a user of a brokered provider, reset an authenticator
+    answers `409` and changes nothing.
+  - The realm steps run first. When the identity provider fails, the route answers `502` with a fixed title, and the
+    server's log names the step and the status code, never a body or a secret. A command that stopped partway can run again.
 - **Fresh sign-in:** giving or removing a platform role, and disabling a person, need a session whose `auth_time` is no
   more than 5 minutes old, as ending sessions does, see
   [session lifetimes and re-authentication](security.md#session-lifetimes-and-re-authentication).
@@ -78,12 +91,12 @@ asks its development users for a code, because each one has an authenticator, an
   and growing by 1 minute with each further 5 failures, up to 15 minutes. This is Keycloak's own temporary lockout, which
   cannot double the wait. The sign-in page shows the same message whether the account is locked, the password is wrong
   or the account does not exist.
-- _(planned for M17)_ **Reset authenticator:** removes the account's authenticator, so its next sign-in asks the person to add one again,
-  and ends the person's sessions.
+- **Reset authenticator:** removes the account's authenticator, so its next sign-in asks the person to add one again,
+  and ends the person's sessions. A user of a brokered provider has no authenticator in the realm, so the reset does not apply to it.
 
 ## Disabled users
 
-_(planned for M17)_
+The server routes are built.
 
 - Disabling a person, an account or a user of a brokered provider, stops every sign-in of theirs to the tenant and
   ends their Axis sessions and their realm sessions at once.
@@ -115,17 +128,18 @@ _(planned for M17)_
 
 ## Rights of the server
 
-The list route is built. Changing accounts is _(planned for M17)_.
+The list route and the disable, enable and reset authenticator routes are built. Inviting accounts is _(planned for M17)_.
 
 - The server reads the realm's users through the realm's users client `axis-users`, with the rights `view-users` and
-  `query-users`, see [tenant realm](host-settings.md#tenant-realm).
+  `query-users`, see [tenant realm](host-settings.md#tenant-realm). The client also holds `manage-users`, which disable, enable
+  and reset an authenticator need.
 - The server changes accounts through the realm's users client, which has rights over the realm's users only. It
   cannot change the realm's providers, clients or settings. Its secret is stored encrypted in the tenant directory,
   see [keeping the realm in step](identity-provider.md#keeping-the-realm-in-step).
 
 ## Audit
 
-_(planned for M17)_
+`user.disabled`, `user.enabled` and `user.authenticatorReset` are built. The others are _(planned for M17)_.
 
 - Each command writes one audit record in the tenant database, with the administrator as actor and the user it acts
   on: `user.invited`, `user.invitationResent`, `user.disabled`, `user.enabled`, `user.authenticatorReset`,

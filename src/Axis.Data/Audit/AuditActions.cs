@@ -58,4 +58,10 @@ public static class AuditActions
     public const string SessionSignedOut = "session.signedOut";
 
     public const string SessionSignInRefused = "session.signInRefused";
+
+    public const string UserDisabled = "user.disabled";
+
+    public const string UserEnabled = "user.enabled";
+
+    public const string UserAuthenticatorReset = "user.authenticatorReset";
 }

@@ -773,6 +773,14 @@ schema of the tenant database.
     - They never hold a token, a cookie or the user agent.
     - A session that expires writes nothing. A sign-out with no session writes
       nothing.
+  - **User actions.** An administrator's command on a user of the tenant's realm
+    writes one action, see [user administration](user-administration.md#audit):
+    `user.disabled`, `user.enabled` or `user.authenticatorReset`. The `actor` is
+    the administrator's user id and `actor_name` their display name. `details`
+    is `{ "userId" }`, the id of the realm user the command acted on.
+    `application_id`, `entity_id`, `record_id` and `process_instance_id` are
+    null. The record commits with the end of the user's Axis sessions, after the
+    realm steps succeeded.
 
   - **Dead letter actions.** A redeliver or a discard of a
     [dead letter](process-events.md#routes) writes `deadLetter.redelivered` or

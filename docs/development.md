@@ -271,6 +271,8 @@ so run `docker compose rm -sf keycloak` once to recreate it.
 The realm also has the confidential client `axis-users`, with the development secret `axis-users-development-secret`. Its service account holds
 only `view-users` and `query-users`. The `default` tenant's `Oidc:UsersClientSecret` in the Development and E2E settings names that secret, so the
 server's `GET /api/users` lists the realm's users through it. Until the Keycloak container is recreated, as above, that route answers `502`.
+The client cannot change users, which the commands to disable, enable and reset the authenticator of a user need, so those routes answer `502` here.
+A realm that `tenant create` makes gives the client `manage-users`.
 The realm also has the client `axis-fapi` for the `fapi2` sign-in profile. Only an integration
 test host uses it, and it signs in with the development keys in `samples/keycloak`, see
 [FAPI 2.0 profile](reference/security.md#fapi-20-profile).
