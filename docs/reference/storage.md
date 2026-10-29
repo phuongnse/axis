@@ -751,13 +751,13 @@ schema of the tenant database.
     | `session.signedOut`     | `POST /api/auth/sign-out` with a session | The user id and the display name | `{ "clientAddress" }`           |
     | `session.signInRefused` | The callback is refused                  | `anonymous`, null                | `{ "reason", "clientAddress" }` |
     - `reason` is one of `otherTenant`, `invalidToken`, `invalidState`,
-      `invalidIssuer`, `providerError`, `providerNotAccepted` or `providerNotAllowed`. `invalidToken` also covers an ID token
+      `invalidIssuer`, `providerError`, `providerNotAccepted`, `providerNotAllowed` or `acrNotAccepted`. `invalidToken` also covers an ID token
       with a nonce that the sign-in did not send. `invalidIssuer` is a callback
       whose provider metadata names an issuer other than the tenant's
       `Authority`, in any profile, or a `fapi2` callback whose `iss` is missing
       or is not the tenant's `Authority`.
       `providerError` covers a person who cancels at the identity provider, and
-      a provider error. `providerNotAccepted` is a valid token whose provider the tenant's platform sign-in does not accept. `providerNotAllowed` is a valid token whose provider the site that started the sign-in does not allow, or a site that is no longer active.
+      a provider error. `providerNotAccepted` is a valid token whose provider the tenant's platform sign-in does not accept. `providerNotAllowed` is a valid token whose provider the site that started the sign-in does not allow, or a site that is no longer active. `acrNotAccepted` is a valid token whose provider the site allows, but whose upstream `acr` the provider's `acr` list does not accept or the token lacks.
     - `application_id`, `entity_id`, `record_id` and `process_instance_id` are
       null.
     - `clientAddress` is always present. It is the address as text, with an

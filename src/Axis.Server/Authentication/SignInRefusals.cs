@@ -39,6 +39,12 @@ internal static class SignInRefusals
     /// </summary>
     public const string ProviderNotAllowed = "providerNotAllowed";
 
+    /// <summary>
+    /// The site allows the provider that signed the person in, but the provider's <c>acr</c> list does not accept the
+    /// <c>acr</c> that the provider signed the person in at, or the token carries none.
+    /// </summary>
+    public const string AcrNotAccepted = "acrNotAccepted";
+
     /// <summary>Picks the reason for a callback that failed. The checks run in this order.</summary>
     /// <param name="stateRead">Whether this tenant's sign-in client could read the callback's state.</param>
     /// <param name="otherTenantReadsState">Whether another tenant's sign-in client can read the state.</param>
@@ -48,6 +54,7 @@ internal static class SignInRefusals
     /// <param name="issuerRejected">Whether the metadata's issuer, or under <c>fapi2</c> the callback's <c>iss</c>, was rejected.</param>
     /// <param name="providerRefused">Whether the platform sign-in refused the provider, or the account sign-in.</param>
     /// <param name="providerNotAllowed">Whether the site that started the sign-in refused the provider, or is no longer active.</param>
+    /// <param name="acrNotAccepted">Whether the provider's <c>acr</c> list did not accept the <c>acr</c> of the site sign-in's token.</param>
     public static string Classify(
         bool stateRead,
         bool otherTenantReadsState,
@@ -56,7 +63,8 @@ internal static class SignInRefusals
         bool tokenRejected,
         bool issuerRejected,
         bool providerRefused = false,
-        bool providerNotAllowed = false)
+        bool providerNotAllowed = false,
+        bool acrNotAccepted = false)
     {
         if (!stateRead)
         {
@@ -71,6 +79,11 @@ internal static class SignInRefusals
         if (providerNotAllowed)
         {
             return ProviderNotAllowed;
+        }
+
+        if (acrNotAccepted)
+        {
+            return AcrNotAccepted;
         }
 
         if (providerRefused)

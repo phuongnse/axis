@@ -23,7 +23,7 @@ public sealed partial class AdminActivateRealmTests(KeycloakFixture keycloak, Po
     private const string Client = "Client";
     private const string Secret = "Secret";
 
-    private static readonly string[] _mapperNames = ["display name", "email", "locale", "username"];
+    private static readonly string[] _mapperNames = ["acr", "display name", "email", "locale", "username"];
 
     private readonly HttpClientHandler _handler = new();
     private readonly List<string> _realms = [];

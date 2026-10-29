@@ -187,4 +187,52 @@ public sealed class SignInRefusalsTests
 
         Assert.Equal(SignInRefusals.InvalidIssuer, reason);
     }
+
+    [Fact]
+    public void An_acr_not_accepted_is_an_acr_not_accepted()
+    {
+        var reason = SignInRefusals.Classify(
+            stateRead: true,
+            otherTenantReadsState: false,
+            providerError: false,
+            new AuthenticationFailureException("The provider does not accept the sign-in's acr."),
+            tokenRejected: false,
+            issuerRejected: false,
+            acrNotAccepted: true);
+
+        Assert.Equal(SignInRefusals.AcrNotAccepted, reason);
+        Assert.Equal("acrNotAccepted", reason);
+    }
+
+    [Fact]
+    public void An_unreadable_state_wins_over_an_acr_not_accepted()
+    {
+        var reason = SignInRefusals.Classify(stateRead: false, otherTenantReadsState: false, providerError: false, failure: null, tokenRejected: false, issuerRejected: false, acrNotAccepted: true);
+
+        Assert.Equal(SignInRefusals.InvalidState, reason);
+    }
+
+    [Fact]
+    public void A_rejected_issuer_wins_over_an_acr_not_accepted()
+    {
+        var reason = SignInRefusals.Classify(stateRead: true, otherTenantReadsState: false, providerError: false, failure: null, tokenRejected: false, issuerRejected: true, acrNotAccepted: true);
+
+        Assert.Equal(SignInRefusals.InvalidIssuer, reason);
+    }
+
+    [Fact]
+    public void A_provider_not_allowed_wins_over_an_acr_not_accepted()
+    {
+        var reason = SignInRefusals.Classify(stateRead: true, otherTenantReadsState: false, providerError: false, failure: null, tokenRejected: false, issuerRejected: false, providerNotAllowed: true, acrNotAccepted: true);
+
+        Assert.Equal(SignInRefusals.ProviderNotAllowed, reason);
+    }
+
+    [Fact]
+    public void An_acr_not_accepted_wins_over_a_provider_not_accepted()
+    {
+        var reason = SignInRefusals.Classify(stateRead: true, otherTenantReadsState: false, providerError: false, failure: null, tokenRejected: false, issuerRejected: false, providerRefused: true, acrNotAccepted: true);
+
+        Assert.Equal(SignInRefusals.AcrNotAccepted, reason);
+    }
 }

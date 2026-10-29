@@ -186,6 +186,64 @@ public sealed class SiteSignInTests(KeycloakFixture keycloak, PostgreSqlFixture 
         }
     }
 
+    [Fact]
+    public async Task A_site_callback_whose_upstream_acr_the_provider_does_not_accept_is_refused()
+    {
+        var baseAddress = await keycloak.BaseAddressAsync();
+        using var realms = await UpstreamRealms.CreateAsync(baseAddress);
+        try
+        {
+            var (host, upstream) = await StartBrokeredAsync(realms, baseAddress, partnerAcr: ["urn:axis:test:high"]);
+            await using var hosted = host;
+
+            var authorize = await host.AuthorizeAsync("/sitespartner");
+            Assert.Equal("urn:axis:test:high", HttpUtility.ParseQueryString(authorize.Query)["acr_values"]);
+            // A new login at the upstream realm gives the acr "1", which the provider's list leaves out.
+            var callback = await realms.LogInAsync(authorize, upstream, _callbackAddress);
+            using var refused = await host.Client.GetAsync(callback.PathAndQuery, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.Found, refused.StatusCode);
+            Assert.Equal("/?signIn=failed", refused.Headers.Location?.OriginalString);
+            Assert.Equal(0L, await CountAsync("axis.sessions"));
+            Assert.Equal(0L, await CountAsync("axis.audit_records WHERE action = 'session.signedIn'"));
+            Assert.Equal("acrNotAccepted", await RefusalReasonAsync());
+            using var me = await host.Client.GetAsync(new Uri("/api/me", UriKind.Relative), CancellationToken);
+            Assert.Equal(HttpStatusCode.Unauthorized, me.StatusCode);
+        }
+        finally
+        {
+            await realms.DeleteRealmsAsync();
+        }
+    }
+
+    [Fact]
+    public async Task A_site_callback_whose_upstream_acr_is_in_the_providers_list_creates_a_session()
+    {
+        var baseAddress = await keycloak.BaseAddressAsync();
+        using var realms = await UpstreamRealms.CreateAsync(baseAddress);
+        try
+        {
+            var (host, upstream) = await StartBrokeredAsync(realms, baseAddress, partnerAcr: ["1"]);
+            await using var hosted = host;
+
+            var authorize = await host.AuthorizeAsync("/sitespartner");
+            Assert.Equal("1", HttpUtility.ParseQueryString(authorize.Query)["acr_values"]);
+            var callback = await realms.LogInAsync(authorize, upstream, _callbackAddress);
+            using var signedIn = await host.Client.GetAsync(callback.PathAndQuery, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.Found, signedIn.StatusCode);
+            Assert.Equal("/sitespartner", signedIn.Headers.Location!.OriginalString);
+            Assert.Equal(1L, await CountAsync("axis.sessions"));
+            Assert.Equal(1L, await CountAsync("axis.audit_records WHERE action = 'session.signedIn'"));
+            using var me = await host.Client.GetAsync(new Uri("/api/me", UriKind.Relative), CancellationToken);
+            Assert.Equal(HttpStatusCode.OK, me.StatusCode);
+        }
+        finally
+        {
+            await realms.DeleteRealmsAsync();
+        }
+    }
+
     public async ValueTask InitializeAsync() =>
         _schemaConnection = await database.CreateDatabaseAsync("sitesignin", CancellationToken);
 
@@ -195,9 +253,9 @@ public sealed class SiteSignInTests(KeycloakFixture keycloak, PostgreSqlFixture 
     /// Starts the server in front of a tenant realm of its own, with the sites of <see cref="Applications"/> and the provider
     /// <c>partner</c> bound to an upstream realm that holds the user <c>pat</c>. The realm's platform client accepts redirects to the
     /// server before the server starts, so the site clients that its activation makes accept them too. Returns the host and the
-    /// upstream realm.
+    /// upstream realm. A <paramref name="partnerAcr"/> list becomes the <c>acr</c> of the provider.
     /// </summary>
-    private async Task<(SiteHost Host, string Upstream)> StartBrokeredAsync(UpstreamRealms realms, Uri baseAddress)
+    private async Task<(SiteHost Host, string Upstream)> StartBrokeredAsync(UpstreamRealms realms, Uri baseAddress, string[]? partnerAcr = null)
     {
         var tenant = realms.NewRealmName();
         using var http = new HttpClient();
@@ -219,7 +277,8 @@ public sealed class SiteSignInTests(KeycloakFixture keycloak, PostgreSqlFixture 
             _realmSecrets.Activation,
             siteIssuer: new Uri(baseAddress, $"realms/{upstream}"),
             siteClient: UpstreamRealms.ClientId,
-            siteSecret: UpstreamRealms.BrokerSecret);
+            siteSecret: UpstreamRealms.BrokerSecret,
+            partnerAcr: partnerAcr);
         await realms.PointBackChannelAtTheContainerAsync(tenant, "oidc-siteissuer", upstream);
         return (host, upstream);
     }
@@ -241,9 +300,10 @@ public sealed class SiteSignInTests(KeycloakFixture keycloak, PostgreSqlFixture 
 
     /// <summary>
     /// An application with the sites <c>sitesaccounts</c> and, as that realm has no flow for a brokered provider, <c>sitesother</c>, which allow
-    /// accounts. With <paramref name="partner"/> it has the site <c>sitespartner</c> too, which allows only the provider <c>partner</c>.
+    /// accounts. With <paramref name="partner"/> it has the site <c>sitespartner</c> too, which allows only the provider <c>partner</c>,
+    /// and a <paramref name="partnerAcr"/> list is the provider's <c>acr</c>.
     /// </summary>
-    private static TemporaryFolder Applications(bool partner)
+    private static TemporaryFolder Applications(bool partner, string[]? partnerAcr = null)
     {
         var folder = new TemporaryFolder()
             .With("application.json", """{ "id": "3c6b1f52-8d0e-4a47-9c1b-2f7e5a9d4b10", "kind": "application", "name": "SiteSignIn", "formatVersion": 1 }""")
@@ -257,13 +317,14 @@ public sealed class SiteSignInTests(KeycloakFixture keycloak, PostgreSqlFixture 
                 """)
             .With("identity-providers/accounts.json", """{ "id": "3c6b1f52-8d0e-4a47-9c1b-2f7e5a9d4b13", "kind": "identityProvider", "name": "accounts", "formatVersion": 1, "type": "accounts" }""")
             .With("sites/sitesaccounts.json", Site("3c6b1f52-8d0e-4a47-9c1b-2f7e5a9d4b15", "sitesaccounts", "accounts"));
+        var acr = partnerAcr is null ? "" : $$""", "acr": [{{string.Join(", ", partnerAcr.Select(level => $"\"{level}\""))}}]""";
         return partner
             ? folder
                 .With("identity-providers/partner.json", $$"""
                     { "id": "3c6b1f52-8d0e-4a47-9c1b-2f7e5a9d4b14", "kind": "identityProvider", "name": "partner", "formatVersion": 1, "type": "oidc",
                       "label": { "textKey": "signIn.partner" },
                       "issuer": { "binding": "{{SiteIssuer}}" }, "clientId": { "binding": "{{SiteClient}}" },
-                      "clientSecret": { "binding": "{{SiteSecret}}" } }
+                      "clientSecret": { "binding": "{{SiteSecret}}" }{{acr}} }
                     """)
                 .With("sites/sitespartner.json", Site("3c6b1f52-8d0e-4a47-9c1b-2f7e5a9d4b16", "sitespartner", "partner"))
             : folder.With("sites/sitesother.json", Site("3c6b1f52-8d0e-4a47-9c1b-2f7e5a9d4b17", "sitesother", "accounts"));
@@ -287,10 +348,11 @@ public sealed class SiteSignInTests(KeycloakFixture keycloak, PostgreSqlFixture 
         IdTokenRewriteHandler? provider = null,
         Uri? siteIssuer = null,
         string siteClient = "site-client-value",
-        string siteSecret = "site-secret-value")
+        string siteSecret = "site-secret-value",
+        string[]? partnerAcr = null)
     {
         var baseAddress = await keycloak.BaseAddressAsync();
-        var applications = Applications(partner);
+        var applications = Applications(partner, partnerAcr);
         var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");

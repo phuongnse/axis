@@ -57,6 +57,12 @@ internal static class TenantSignIn
     /// </summary>
     public const string ProviderNotAllowedItem = "axis:sign_in_provider_not_allowed";
 
+    /// <summary>
+    /// The request item that <c>OnTokenValidated</c> sets when the provider of the site's sign-in has an <c>acr</c> list that does
+    /// not accept the token's <c>identity_provider_acr</c>, or the token has none.
+    /// </summary>
+    public const string AcrNotAcceptedItem = "axis:sign_in_acr_not_accepted";
+
     /// <summary>The request item that <c>OnTokenValidated</c> fills with the <see cref="ProfileClaims"/> for <c>OnTicketReceived</c>.</summary>
     public const string ProfileClaimsItem = "axis:sign_in_profile";
 
@@ -219,6 +225,23 @@ internal sealed partial class TenantSignInOptions(TenantSignInSettings settings,
                 return;
             }
 
+            // A provider with an acr list accepts only a token whose upstream acr is in it.
+            if (sitePath is not null
+                && principal.FindFirst(RealmSync.IdentityProviderClaim)?.Value is { } signingAlias
+                && !string.IsNullOrWhiteSpace(signingAlias)
+                && await context.HttpContext.RequestServices.GetRequiredService<SiteSignIn>().AcceptedAcrAsync(
+                    tenantId,
+                    sitePath,
+                    signingAlias,
+                    context.HttpContext.RequestAborted) is { Count: > 0 } accepted
+                && (principal.FindFirst(RealmSync.IdentityProviderAcrClaim)?.Value is not { } acr
+                    || !accepted.Contains(acr, StringComparer.Ordinal)))
+            {
+                context.HttpContext.Items[TenantSignIn.AcrNotAcceptedItem] = true;
+                context.Fail("The provider does not accept the sign-in's acr.");
+                return;
+            }
+
             var displayName = principal.FindFirst(tenant.Claims.DisplayName)?.Value;
             var roles = principal.FindAll(tenant.Claims.Roles).Select(claim => claim.Value);
             if (tenant.PlatformSignIn is { } platform)
@@ -304,13 +327,14 @@ internal sealed partial class TenantSignInOptions(TenantSignInSettings settings,
                 var issuerRejected = httpContext.Items.ContainsKey(TenantSignIn.IssuerRejectedItem);
                 var providerRefused = httpContext.Items.ContainsKey(TenantSignIn.ProviderRefusedItem);
                 var providerNotAllowed = httpContext.Items.ContainsKey(TenantSignIn.ProviderNotAllowedItem);
+                var acrNotAccepted = httpContext.Items.ContainsKey(TenantSignIn.AcrNotAcceptedItem);
                 // A rejected token, issuer or provider comes after the state was read, but the failure it leaves carries no properties.
-                var stateRead = context.Properties is not null || tokenRejected || issuerRejected || providerRefused || providerNotAllowed;
+                var stateRead = context.Properties is not null || tokenRejected || issuerRejected || providerRefused || providerNotAllowed || acrNotAccepted;
                 var otherTenantReadsState = !stateRead
                     && query["state"].ToString() is { Length: > 0 } state
                     && OtherTenantReadsState(httpContext, tenantId, state);
                 var providerError = !string.IsNullOrEmpty(query["error"].ToString());
-                var reason = SignInRefusals.Classify(stateRead, otherTenantReadsState, providerError, context.Failure, tokenRejected, issuerRejected, providerRefused, providerNotAllowed);
+                var reason = SignInRefusals.Classify(stateRead, otherTenantReadsState, providerError, context.Failure, tokenRejected, issuerRejected, providerRefused, providerNotAllowed, acrNotAccepted);
                 await SessionAudit.AppendAsync(
                     httpContext,
                     AuditActions.SessionSignInRefused,
@@ -344,6 +368,11 @@ internal sealed partial class TenantSignInOptions(TenantSignInSettings settings,
             if (context.Properties.GetParameter<string>(SiteSignIn.ProviderHintParameter) is { Length: > 0 } hint)
             {
                 context.ProtocolMessage.SetParameter("kc_idp_hint", hint);
+            }
+
+            if (context.Properties.GetParameter<string>(SiteSignIn.AcrValuesParameter) is { Length: > 0 } acrValues)
+            {
+                context.ProtocolMessage.AcrValues = acrValues;
             }
 
             return Task.CompletedTask;

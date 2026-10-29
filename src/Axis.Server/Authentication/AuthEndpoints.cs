@@ -56,6 +56,11 @@ internal static class AuthEndpoints
                 // A parameter is not saved in the state, and only the redirect needs the hint.
                 properties.SetParameter(SiteSignIn.ProviderHintParameter, hint);
             }
+
+            if (site.AcrValues is { } acrValues)
+            {
+                properties.SetParameter(SiteSignIn.AcrValuesParameter, acrValues);
+            }
         }
 
         if (reauthenticate)
