@@ -13,7 +13,11 @@ export function SignInPage({ context }: { context: SignInContext }) {
 }
 
 function SignInBody({ context }: { context: SignInContext }) {
-  const { providers, accounts, texts, error } = context
+  const { site, texts, error } = context
+  const providers = site
+    ? context.providers.filter((provider) => site.providers.includes(provider.alias))
+    : context.providers
+  const accounts = context.accounts && (site?.accounts ?? true)
   const only = !accounts && providers.length === 1
   const goTo = (url: string) => window.location.assign(url)
   return (

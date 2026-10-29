@@ -31,6 +31,14 @@ const context: SignInContext = {
   },
 }
 
+const twoProviders: SignInContext = {
+  ...context,
+  providers: [
+    { alias: 'contoso', label: 'Contoso ID', loginUrl: '/broker/contoso' },
+    { alias: 'fabrikam', label: 'Fabrikam ID', loginUrl: '/broker/fabrikam' },
+  ],
+}
+
 function form(container: HTMLElement) {
   return container.querySelector('form') as HTMLFormElement
 }
@@ -68,6 +76,32 @@ describe('SignInPage', () => {
     expect(screen.getByRole('button', { name: 'Sign in with Contoso ID' })).toBeInTheDocument()
     expect(screen.queryByText('or')).not.toBeInTheDocument()
     expect(container.querySelector('form')).toBeNull()
+    expect(screen.getAllByRole('button')).toHaveLength(1)
+  })
+
+  it('lists only the providers that the site allows', () => {
+    render(<SignInPage context={{ ...twoProviders, site: { providers: ['fabrikam'], accounts: true } }} />)
+
+    expect(screen.getByRole('button', { name: 'Sign in with Fabrikam ID' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Sign in with Contoso ID' })).not.toBeInTheDocument()
+  })
+
+  it('shows every provider and the form for a client that belongs to no site', () => {
+    const { container } = render(<SignInPage context={twoProviders} />)
+
+    expect(screen.getByRole('button', { name: 'Sign in with Contoso ID' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Sign in with Fabrikam ID' })).toBeInTheDocument()
+    expect(container.querySelector('form')).not.toBeNull()
+  })
+
+  it('shows no form and no "or" when the site allows no accounts, though the realm does', () => {
+    const { container } = render(
+      <SignInPage context={{ ...twoProviders, site: { providers: ['fabrikam'], accounts: false } }} />,
+    )
+
+    expect(container.querySelector('form')).toBeNull()
+    expect(screen.queryByText('or')).not.toBeInTheDocument()
+    expect(screen.getByText('Your organization signs in only with Fabrikam ID.')).toBeInTheDocument()
     expect(screen.getAllByRole('button')).toHaveLength(1)
   })
 
