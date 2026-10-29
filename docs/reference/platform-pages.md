@@ -6,7 +6,7 @@ person opens, and the users page, which an administrator opens. They are platfor
 so their paths are reserved site paths.
 
 - **Sessions screen.** The platform route `/account` lists the person's live
-  sessions from `GET /api/me/sessions`, newest sign-in first. It sits beside
+  sessions on the tenant's own hosts from `GET /api/me/sessions`, newest sign-in first. It sits beside
   `/studio`, before the site route, so `account` is a reserved site path. A
   signed-out visit shows the sign-in prompt, because the list call is not exempt.
   - A row shows **Signed in** and **Last active**, in the current locale. A

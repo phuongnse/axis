@@ -119,19 +119,20 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place. _(planned f
     [sessions screen](platform-pages.md) at `/account` calls them.
     - The list answers `{ "endAllowed", "sessions": [{ "id", "signedInAt",
       "lastRequestAt", "current" }] }`. It holds only the caller's live
-      sessions, newest sign-in first. `current` marks the session that made
+      sessions of the host that the request came on, newest sign-in first. `current` marks the session that made
       the request. `endAllowed` is true when the session may end sessions now.
     - A session's `id` is the base64url form of the row's `id_hash`. It
       cannot be turned back into a cookie.
     - The two delete routes need the CSRF header and answer `204`. The first
       ends the session with that id, which may be the current one. The second
-      ends all the caller's sessions except the current one.
+      ends all the caller's sessions of the request's host except the current
+      one. Neither touches a session of another host.
     - Both delete routes answer a `403` problem and delete nothing unless the
       session's last login at the identity provider is no more than 5 minutes
       old. A session with no stored login time cannot end sessions. The check
       comes before the lookup of the id.
-    - An id that is not one of the caller's live sessions answers a `404`
-      problem, whoever owns it.
+    - An id that is not one of the caller's live sessions of the request's
+      host answers a `404` problem, whoever owns it.
 - **Audit.** Sign-in writes
   [audit records](storage.md#audit-records-and-sequence-counters)
   in the database of the tenant that the host resolves to, see
@@ -166,7 +167,10 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place. _(planned f
     the roles, the time of sign-in, the time of the last request and the time
     of the person's last login at the identity provider, read from the ID
     token's `auth_time`. A session that was created before that column
-    existed holds no such time. The table never holds the session id itself, or a token, and no token
+    existed holds no such time. It also holds the lower-case site path of the
+    host that made the session, null for the tenant's own hosts. A session
+    that was created before that column existed holds none, so it counts as a
+    session of the tenant's own hosts. The table never holds the session id itself, or a token, and no token
     reaches the browser.
   - The cookie is one HttpOnly, SameSite=Lax cookie. It holds only the random
     session id, 256 bits, wrapped and protected by the key ring below. It
@@ -188,6 +192,12 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place. _(planned f
   - The row has no tenant id, because each tenant has its own database. A
     cookie on another tenant's host finds no row there, so it counts as no
     session.
+  - A session stays on the host that made it. A session made on a site's own
+    host counts as no session on the tenant's own hosts, and the other way
+    round. The refused request leaves the row alone, and a request never
+    deletes a row of another host. A row past a limit that another host meets
+    is left for the worker's cleanup. Sign-out, a new sign-in and an expired
+    session delete only the row of their own host.
   - The cookie is named `__Host-Axis.Session`, with `Secure`, `Path=/` and no
     domain, so the browser refuses it on plain http or from a subdomain. In
     `Development` and `Testing`, which run over plain http, it keeps the name
