@@ -89,6 +89,12 @@ public sealed class TenantRow
     /// </summary>
     public string? PreviewOf { get; set; }
 
+    /// <summary>
+    /// Whether the realm of the tenant allows its own accounts to sign in to the platform. A tenant with no platform provider has
+    /// this on. See <see cref="TenantPlatformProviderRow"/>.
+    /// </summary>
+    public bool PlatformAccounts { get; set; }
+
     /// <summary>The newest migration applied to the tenant database. Empty until the first migration.</summary>
     public string SchemaVersion { get; set; } = "";
 }
