@@ -57,7 +57,7 @@ The owner confirmed these points on issue #702 on 2026-10-19.
     - [D101](d101-the-extensibility-milestone-is-split-into-six.md) splits
       M18 into M18 to M23.
     - [D102](d102-built-in-modules-open-to-change-and-bound-by-a-contract.md)
-      adds M24 Module contracts, M25 Customization layers and M26 The HR
+      adds M24 Module contracts, M25 Customization layers and M26 The workflow
       modules.
   - M11 and M12 can run in parallel, and so can M14 and M15.
   - The "Done when" text of each milestone is in the
