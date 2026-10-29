@@ -12,6 +12,9 @@ on `main` after every merge, and the limit of three issues at once that
   `autopilot.watch_workflows` with CodeQL and the performance workflow, and
   `merge.after_workflows` is empty. A failure that repeats still opens a `bug`
   issue, and pull requests that fail the same way wait, as before.
+  - [D112](d112-ci-codeql-and-the-performance-tests-run-on-main-every-few-merges.md)
+    replaces this point: NexKit starts CI on `main` once every 5 of its
+    merges, because GitHub dropped the schedule.
 - **Four issues run at once,** with autopilot's `max_parallel` at 4.
   - The owner raises it to five only when a day at four shows more merges an
     hour, and check jobs that do not wait longer for a runner.
