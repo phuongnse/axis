@@ -1,17 +1,18 @@
 name: Performance
 
 # The performance tests, whose classes end in PerformanceTests, run here and not in CI's integration
-# job. They depend on the runner's load, so a timing miss marks only this workflow red (D97). A push
-# to main runs it, and NexKit starts it after its merges, because its merge starts no push workflow.
+# job. They depend on the runner's load, so a timing miss marks only this workflow red (D97). It runs
+# every night on main and on demand (D104). NexKit's autopilot watches its runs on main without
+# starting it after its merges, and a finished run starts a sweep through NexKit's workflow_run trigger.
 on:
-  push:
-    branches: [main]
+  schedule:
+    - cron: "43 19 * * *"
   workflow_dispatch:
 
 permissions:
   contents: read
 
-# A run always finishes, so every merge gets a result: a newer one only replaces a run still waiting.
+# A run always finishes: a newer one only replaces a run still waiting.
 concurrency:
   group: performance-${{ github.ref }}
   cancel-in-progress: false
@@ -81,26 +82,3 @@ jobs:
           path: artifacts
           if-no-files-found: ignore
           retention-days: 14
-
-  # NexKit autopilot looks at this run as soon as it ends: a run that NexKit started with
-  # the Actions token sends no workflow_run event, but it may dispatch NexKit's sweep.
-  nexkit-sweep:
-    needs: [performance]
-    if: always() && github.ref_name == github.event.repository.default_branch
-    runs-on: ubuntu-24.04
-    permissions:
-      actions: write
-    steps:
-      # GitHub's API rejects a dispatch at times with a server error, so a failed dispatch is
-      # tried again after a pause. The job fails only when every try fails.
-      - run: |
-          for attempt in 1 2 3; do
-            if gh workflow run nexkit.yml --repo "$GITHUB_REPOSITORY" --ref "$GITHUB_REF_NAME" \
-              -f command=autopilot -f number=autopilot -f note="after run $GITHUB_RUN_ID"; then
-              exit 0
-            fi
-            if [ "$attempt" -lt 3 ]; then sleep 30; fi
-          done
-          exit 1
-        env:
-          GH_TOKEN: ${{ github.token }}

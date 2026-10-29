@@ -25,6 +25,8 @@ detail.
     [D82](d82-performance-slos-and-load-tests.md) that they guard single
     requests on every run of CI on `main`. They still run on every push to
     `main`.
+  - [D104](d104-codeql-and-the-performance-tests-run-every-night.md) replaces
+    the point that they run on every push to `main`: they run every night.
 - **End-to-end tests run without motion.** The SPA turns off its animations
   when the browser asks for reduced motion, and Playwright asks for it. People
   who ask their browser for reduced motion get the same.

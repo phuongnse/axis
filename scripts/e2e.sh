@@ -47,8 +47,8 @@
 # shares the platform database. The worker and the publisher serve the journey tenant too, and the run fails if
 # either log never reports it ready. The setup step signs the author, the requester, the service desk lead,
 # the agent, the approver, the asset manager, the employee and the auditor in on its host.
-# Playwright and the services it starts are skipped when $NEXKIT_BASE_SHA shows that every changed path
-# is under docs/ or is a Markdown file. The smoke tests run in scripts/smoke.sh.
+# Playwright and the services it starts are skipped when every path changed since NexKit's commit (see
+# scripts/lib/affected.mjs) is under docs/ or is a Markdown file. The smoke tests run in scripts/smoke.sh.
 # The design-system bundle is built and checked into artifacts/design-system before Playwright runs. Its spec
 # serves the harness page and the bundle from disk and needs no server.
 # Arguments go to Playwright, for example tests/e2e/specs/studio.spec.ts or --grep 'publishes'. A spec path

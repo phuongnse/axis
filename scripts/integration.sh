@@ -4,8 +4,8 @@
 # every sample template under samples/templates/.
 # The Keycloak theme is built first, because the tests' Keycloak loads it.
 # Each application's scenarios are a suite named scenarios-NAME, written by that test.
-# The integration tests and the scenarios are skipped when $NEXKIT_BASE_SHA shows that every changed
-# path is on the safe list in scripts/lib/affected.mjs. The smoke test of scripts/dev.sh runs in
+# The integration tests and the scenarios are skipped when every path changed since NexKit's commit is
+# on the safe list in scripts/lib/affected.mjs. The smoke test of scripts/dev.sh runs in
 # scripts/smoke.sh.
 # Arguments go to dotnet test, for example --filter-class 'Axis.Integration.Tests.Studio*'. With
 # arguments only the matching integration tests run and the summary lists only them: the scenario suites

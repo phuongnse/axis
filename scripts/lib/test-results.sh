@@ -30,7 +30,7 @@ expect_suite() {
 
 # affected NAME
 # Succeeds unless scripts/lib/affected.mjs shows that the suite NAME cannot be affected by the
-# change since $NEXKIT_BASE_SHA. Any other outcome runs it.
+# change since NexKit's commit. Any other outcome runs it.
 affected() {
   local decision
   decision="$(node "$root/scripts/lib/affected.mjs" "$1")" || decision=run

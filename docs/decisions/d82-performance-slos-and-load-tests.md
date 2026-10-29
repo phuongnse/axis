@@ -50,7 +50,8 @@ detail. The owner agreed these points on 2026-10-25.
   - The `*PerformanceTests` classes stay as they are. They guard single
     requests on every run of CI on `main`.
     - [D97](d97-reliable-test-runs.md) replaces this line: they run in a
-      workflow of their own on every push to `main`.
+      workflow of their own, every night since
+      [D104](d104-codeql-and-the-performance-tests-run-every-night.md).
 - **Scope:** the scenarios cover the routes that exist when M16 starts. A
   milestone that adds a route in a group above adds it to the load test.
 

@@ -98,9 +98,13 @@ with the reasons. What each one does is in NexKit's
 - **There is no push token.** NexKit pushes with the Actions token, so it
   cannot push a merge that brings changes to `.github/workflows/`. The hourly
   driver merges those by hand.
-- **CI runs on `main` after every merge.** NexKit starts the CI, CodeQL and
-  performance workflows on `main` through its `merge.after_workflows` setting, because a
-  merge by NexKit starts no `push` workflow. A run on `main` always finishes:
+- **CI runs on `main` after every merge.** NexKit starts the CI workflow on
+  `main` through its `merge.after_workflows` setting, because a merge by NexKit
+  starts no `push` workflow. The CodeQL and performance workflows run every
+  night instead, and NexKit's `autopilot.watch_workflows` setting watches them
+  without starting them, as
+  [D104](decisions/d104-codeql-and-the-performance-tests-run-every-night.md)
+  agrees. A run on `main` always finishes:
   a newer merge replaces only a run that is still waiting to start, so the
   next run tests both merges. On any other branch a newer push stops the older
   run. CI runs the lint and unit tests, the smoke tests, the integration
@@ -127,13 +131,19 @@ with the reasons. What each one does is in NexKit's
   `e2e-1` to `e2e-3` run the same commands as the CI workflow's three E2E
   shards, so NexKit matches a failed check with the shard that failed on
   `main`.
-  Under NexKit's `NEXKIT_BASE_SHA`, a suite that no changed file can affect is
-  skipped, and any doubt runs it. CI on `main` sets no base and runs every
+  A suite that no file changed since NexKit's commit can affect is skipped,
+  and any doubt runs it. The commit is the one on which that check last
+  passed (`NEXKIT_CHECK_VERIFIED_SHA`), else the last round whose checks all
+  passed (`NEXKIT_VERIFIED_SHA`), else the merge base (`NEXKIT_BASE_SHA`). So
+  after `main` moves, a check that passed before reruns its suite only when
+  the new commits can affect it. CI on `main` sets no base and runs every
   suite, so a slowdown shows after the merge. The integration performance
   tests, whose class names end in `PerformanceTests`, run neither in NexKit's
   checks nor in CI's integration job, because they depend on the runner's
-  load. The performance workflow runs them on `main`, as
-  [D97](decisions/d97-reliable-test-runs.md) says. Which suite skips
+  load. The performance workflow runs them on `main` every night, as
+  [D97](decisions/d97-reliable-test-runs.md) and
+  [D104](decisions/d104-codeql-and-the-performance-tests-run-every-night.md)
+  say. Which suite skips
   when is in [test runs and reports](development.md#test-runs-and-reports).
 - **NexKit restores the dependency caches that CI on `main` saves:** NuGet,
   npm and the Playwright browsers. The entries are in NexKit's
