@@ -8,7 +8,8 @@ import { useText } from './texts'
 
 /**
  * The "Switch to" button in the shell header. Its menu lists the person's sites, then Studio for a
- * user who may use it and the operator console for a user who may use that. It renders nothing
+ * user who may use it, the operator console for a user who may use that and Users for an
+ * administrator. It renders nothing
  * while the user loads, when nobody is signed in, or when loading the user fails. When loading the
  * sites fails, the menu lists only the tools.
  */
@@ -46,6 +47,9 @@ export function AppSwitcher({ locale }: { locale: string }) {
   }
   if (user.console) {
     tools.push({ key: 'console', label: <Link to="/console">{t('shell.appSwitcher.console')}</Link> })
+  }
+  if (user.users) {
+    tools.push({ key: 'users', label: <Link to="/users">{t('shell.appSwitcher.users')}</Link> })
   }
   const items: NonNullable<MenuProps['items']> = [
     ...sites.map((site) => ({

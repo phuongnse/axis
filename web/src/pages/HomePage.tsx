@@ -93,7 +93,7 @@ function ToolTile({ to, icon, title, description }: { to: string; icon: string; 
 function Tools({ user }: { user: CurrentUser }) {
   const t = useText()
   const grid = useHomeGrid()
-  if (!user.studio && !user.console) {
+  if (!user.studio && !user.console && !user.users) {
     return null
   }
   return (
@@ -112,6 +112,14 @@ function Tools({ user }: { user: CurrentUser }) {
           icon="dashboard"
           title={t('shell.appSwitcher.console')}
           description={t('shell.home.console.description')}
+        />
+      )}
+      {user.users && (
+        <ToolTile
+          to="/users"
+          icon="people"
+          title={t('shell.appSwitcher.users')}
+          description={t('shell.home.users.description')}
         />
       )}
     </div>
