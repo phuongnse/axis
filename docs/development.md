@@ -396,8 +396,8 @@ fixtures, only for the API paths of the fixture application. It needs no server,
   bring its own fixtures, on its own paths in the fixture application. The names are `table`, `form`,
   `taskInbox`, `processInspector`, `detail`, `chart-<kind>` for `bar`, `line` and `pie`, `kpi`, `columns`,
   `tabs`, `section`, `states`, `field-<type>` for each field type, and `shell`, `signIn` and `identitySignIn`. The
-  `shell`, `signIn` and `identitySignIn` previews draw each state in a frame of its own height, so the state's menus
-  and dialogs open inside it. The `states` preview draws, once,
+  `shell`, `signIn` and `identitySignIn` previews draw each state in a frame at least as tall as its height, which
+  grows to hold the whole shell, so the state's menus and dialogs open inside it. The `states` preview draws, once,
   the states every widget shares: a table while it loads and a table whose request fails. The `table`,
   `taskInbox`, `detail`, each `chart-<kind>` and `kpi` previews draw "With data" and "Empty". The table's data
   has row and toolbar actions and a long-text row, and the inbox's has an overdue and a claimed task.

@@ -8,6 +8,7 @@ import { MemoryRouter } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { emptyDescription } from '../test/antd'
 import { antLocaleFor, dayjsLocaleFor } from './antLocale'
+import { designTokensFor } from './designTokens'
 import { PreferencesMenu } from './PreferencesMenu'
 import { Shell } from './Shell'
 import { TextProvider } from './TextProvider'
@@ -30,7 +31,7 @@ const navigationTexts = [
       'shell.navigation.menu': 'Menu',
       'shell.navigation.collapse': 'Collapse navigation',
       'shell.navigation.expand': 'Expand navigation',
-      'shell.serverStatus.title': 'Server status',
+      'shell.serverStatus.title': 'Server status:',
       'shell.serverStatus.ready': 'Ready',
       'shell.serverStatus.checking': 'Checking',
       'shell.serverStatus.unavailable': 'Unavailable',
@@ -295,6 +296,20 @@ describe('PreferencesMenu', () => {
     expect(onLocaleChange).toHaveBeenCalledExactlyOnceWith('vi')
   })
 
+  it('draws the current language and theme in primaryText on the selected tint, with a divider between the groups', async () => {
+    localStorage.setItem('axis.themeMode', 'light')
+    renderPreferences()
+
+    const menu = within(await openMenu())
+    const { colour } = designTokensFor('light')
+
+    expect(menu.getByRole('menuitemradio', { name: 'English' })).toHaveStyle({ color: colour.primaryText })
+    expect(menu.getByRole('menuitemradio', { name: 'Light' })).toHaveStyle({ color: colour.primaryText })
+    expect(menu.getByRole('menuitemradio', { name: 'Tiếng Việt' })).not.toHaveStyle({ color: colour.primaryText })
+    expect(menu.getByRole('menuitemradio', { name: 'Dark' })).not.toHaveStyle({ color: colour.primaryText })
+    expect(menu.getAllByRole('separator')).toHaveLength(1)
+  })
+
   it('switches to the dark theme, stores it and marks it as current', async () => {
     localStorage.setItem('axis.themeMode', 'light')
     renderPreferences()
@@ -335,11 +350,31 @@ describe('Shell above narrow width', () => {
     expect(expand).toHaveAttribute('aria-expanded', 'false')
     expect(screen.queryByRole('button', { name: 'Collapse navigation' })).not.toBeInTheDocument()
     await userEvent.hover(screen.getByRole('menuitem', { name: 'Notes' }))
-    expect(await screen.findByRole('tooltip')).toHaveTextContent('Notes')
+    await waitFor(() => expect(screen.getAllByRole('tooltip').map((tooltip) => tooltip.textContent)).toContain('Notes'))
 
     await userEvent.click(expand)
 
     expect(screen.getByRole('button', { name: 'Collapse navigation' })).toHaveAttribute('aria-expanded', 'true')
+  })
+
+  it('names the collapse button in a tooltip on keyboard focus', async () => {
+    renderShell('en', ['/'], notesNavigation)
+
+    await userEvent.tab()
+
+    expect(screen.getByRole('button', { name: 'Collapse navigation' })).toHaveFocus()
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Collapse navigation')
+  })
+
+  it('names the language and theme button in a tooltip on keyboard focus', async () => {
+    renderShell('en', ['/'], notesNavigation)
+
+    await userEvent.tab()
+    await userEvent.tab()
+    await userEvent.tab()
+
+    expect(screen.getByRole('button', { name: 'Language and theme' })).toHaveFocus()
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Language and theme')
   })
 
   it('stays collapsed while the person follows a navigation link', async () => {
@@ -385,7 +420,7 @@ describe('Shell footer', () => {
   it('shows the readiness of the server', async () => {
     renderShell('en', ['/'], notesNavigation)
 
-    expect(within(screen.getByRole('contentinfo')).getByText('Server status')).toBeVisible()
+    expect(within(screen.getByRole('contentinfo')).getByText('Server status:')).toBeVisible()
     expect(await screen.findByTestId('footer-server-status')).toBeInTheDocument()
   })
 })
