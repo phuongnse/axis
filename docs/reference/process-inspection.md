@@ -498,6 +498,9 @@ the instance id and `{callId}` is the call's operation identity. A success is
 
 A `process` grant takes the actions `retry`, `cancel` and `resolve`, as well as
 `start` and `inspect`, see [Authorization](security.md#authorization).
+A [service account](security.md#service-accounts) may run the commands with a
+bearer token, under the grants of its roles. It needs no session and no CSRF
+header. The audit records name it as the actor, by its id and its display name.
 Each is checked
 on its own, and none implies another. The subject record must also be readable
 by the user, by the same rule as a start. A subject record the user may not
@@ -709,8 +712,8 @@ answers matches the [start endpoint](processes.md#start-endpoint).
 
 A request is checked in this order, and the first failure is the response:
 
-1. The CSRF header, `403`.
-2. The session, `401`.
+1. The CSRF header, `403`, for a session request only. A bearer token needs none.
+2. The session or the bearer token, `401`.
 3. The application and the process, `404`.
 4. The matching grant on the process, `403`: `retry`, `cancel` or `resolve`.
 5. The content type, `415`.
@@ -726,7 +729,8 @@ instance. It answers `404` for the instance, the subject record and the call,
 and then the `409` checks.
 
 - **`401`.** Nobody is signed in. The title is the record API's "Sign in to
-  read or write this data.".
+  read or write this data.". A bad bearer token gets `WWW-Authenticate: Bearer`
+  and its own title, as in [process inspection](#process-inspection).
 - **`403`.** The user has no grant for the command on the process. The title
   is the record API's "You have no grant for this action.". The CSRF header
   failure is a `403` too.

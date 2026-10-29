@@ -27,8 +27,8 @@ using Npgsql;
 namespace Axis.Integration.Tests;
 
 /// <summary>
-/// A service account calls the record API, reads data source rows, starts processes and inspects their instances with a
-/// client credentials token from the tenant's identity provider. Tenant
+/// A service account calls the record API, reads data source rows, starts processes, inspects their instances and
+/// resolves, retries and cancels them with the operator commands, with a client credentials token from the tenant's identity provider. Tenant
 /// a at localhost serves the ServiceAccountApp fixture on a real database and expects the audience
 /// <c>axis-services</c>. Tenant b at b.example.test uses Keycloak's master realm, so it has another issuer. Tenant c at
 /// c.example.test uses the development realm but has no service audience. The database of b and c is unreachable, so
@@ -46,6 +46,7 @@ public sealed class ServiceAccountRecordTests(KeycloakFixture keycloak) : IAsync
     private const string ReportStatuses = "/api/apps/ServiceAccountApp/data-sources/ReportStatuses/rows";
     private const string Review = "/api/apps/ServiceAccountApp/processes/Review/instances";
     private const string Escalate = "/api/apps/ServiceAccountApp/processes/Escalate/instances";
+    private const string Publish = "/api/apps/ServiceAccountApp/processes/Publish/instances";
     private const string SignInTitle = "Sign in to read or write this data.";
     private const string TaskSignInTitle = "Sign in to work on tasks.";
     private const string BearerTitle = "A valid bearer token is needed for this request.";
@@ -55,8 +56,19 @@ public sealed class ServiceAccountRecordTests(KeycloakFixture keycloak) : IAsync
     private string? _connectionString;
     private NpgsqlDataSource? _dataSource;
     private ReportTable? _reportTable;
+    private Guid _releaseId;
     private WebApplicationFactory<Program>? _factory;
     private HttpClient? _client;
+
+    // The Publish process calls the Publishing connector, so the release needs its bindings.
+    private static ActivationBindings PublishingBindings { get; } = new(
+        "default",
+        new Dictionary<string, ActivationBinding>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["PublishingUrl"] = new(ActivationBinding.UrlKind, new Uri("https://publishing.example.test")),
+            ["PublishingToken"] = new(ActivationBinding.SecretKind, null),
+        },
+        AllowHttp: false);
 
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
 
@@ -246,11 +258,113 @@ public sealed class ServiceAccountRecordTests(KeycloakFixture keycloak) : IAsync
         using var start = await SendAsync(HttpMethod.Post, Review, "not-a-token", $$"""{ "subjectId": "{{Guid.NewGuid():D}}" }""");
         using var list = await SendAsync(HttpMethod.Get, Review, "not-a-token");
         using var one = await SendAsync(HttpMethod.Get, $"{Review}/{Guid.NewGuid():D}", "not-a-token");
+        var operators = new List<HttpResponseMessage>();
+        foreach (var path in OperatorPaths(Publish, Guid.NewGuid(), Guid.NewGuid()))
+        {
+            operators.Add(await SendAsync(HttpMethod.Post, path, "not-a-token", """{ "reason": "No", "outcome": "failed" }"""));
+        }
 
         await AssertBearerChallengeAsync(rows);
         await AssertBearerChallengeAsync(start);
         await AssertBearerChallengeAsync(list);
         await AssertBearerChallengeAsync(one);
+        foreach (var response in operators)
+        {
+            await AssertBearerChallengeAsync(response);
+            response.Dispose();
+        }
+    }
+
+    [Fact]
+    public async Task A_reporting_token_resolves_retries_and_cancels_instances_and_the_audit_names_it_without_a_csrf_header()
+    {
+        var token = await RequestTokenAsync(KeycloakFixture.ReportingClientId, KeycloakFixture.ReportingClientSecret);
+        var first = await InsertReportAsync("Resolved", "open");
+        var second = await InsertReportAsync("Cancelled", "open");
+        var firstInstance = await StartAsync(token, Publish, first);
+        var secondInstance = await StartAsync(token, Publish, second);
+        var call = await MakeCallUnknownAsync(firstInstance);
+
+        using var resolved = await SendAsync(HttpMethod.Post, $"{Publish}/{firstInstance:D}/calls/{call:D}/resolve", token, """{ "reason": "Checked", "outcome": "failed" }""");
+        Assert.Equal(HttpStatusCode.OK, resolved.StatusCode);
+        using var resolvedBody = await ReadJsonAsync(resolved);
+        Assert.Equal("failed", resolvedBody.RootElement.GetProperty("state").GetString());
+
+        using var retried = await SendAsync(HttpMethod.Post, $"{Publish}/{firstInstance:D}/retry", token, """{ "reason": "Again" }""");
+        Assert.Equal(HttpStatusCode.OK, retried.StatusCode);
+        using var retriedBody = await ReadJsonAsync(retried);
+        Assert.Equal("running", retriedBody.RootElement.GetProperty("state").GetString());
+
+        using var cancelled = await SendAsync(HttpMethod.Post, $"{Publish}/{secondInstance:D}/cancel", token, """{ "reason": "Not needed" }""");
+        Assert.Equal(HttpStatusCode.OK, cancelled.StatusCode);
+        using var cancelledBody = await ReadJsonAsync(cancelled);
+        Assert.Equal("cancelled", cancelledBody.RootElement.GetProperty("state").GetString());
+
+        var firstAudits = await InstanceAuditsAsync(firstInstance);
+        var secondAudits = await InstanceAuditsAsync(secondInstance);
+        foreach (var action in new[] { "connector.callResolved", "process.failed", "process.retried" })
+        {
+            Assert.Contains(action, firstAudits.Select(audit => audit.Action));
+        }
+
+        Assert.Contains("process.cancelled", secondAudits.Select(audit => audit.Action));
+        Assert.All(firstAudits.Concat(secondAudits).Where(audit => audit.Action != "process.started"), audit =>
+        {
+            Assert.Equal("reporting-system", audit.Actor);
+            Assert.Equal("reporting-system", audit.ActorName);
+        });
+
+        foreach (var (report, actions) in new[]
+        {
+            (first, new[] { "connector.callResolved", "process.failed", "process.retried" }),
+            (second, new[] { "process.cancelled" }),
+        })
+        {
+            using var history = await SendAsync(HttpMethod.Get, $"{Reports}/{report:D}/history", token);
+            Assert.Equal(HttpStatusCode.OK, history.StatusCode);
+            using var historyBody = await ReadJsonAsync(history);
+            var items = historyBody.RootElement.GetProperty("items").EnumerateArray().ToList();
+            foreach (var action in actions)
+            {
+                var item = Assert.Single(items, candidate => candidate.GetProperty("action").GetString() == action);
+                Assert.Equal("reporting-system", item.GetProperty("actor").GetString());
+                Assert.Equal("reporting-system", item.GetProperty("actorName").GetString());
+            }
+        }
+    }
+
+    [Fact]
+    public async Task A_service_account_without_the_operator_grants_gets_403_and_a_hidden_subject_gets_404_on_the_operator_commands()
+    {
+        var token = await RequestTokenAsync(KeycloakFixture.ReportingClientId, KeycloakFixture.ReportingClientSecret);
+
+        // Review grants start and inspect only, and the grant check runs before the instance lookup.
+        foreach (var path in OperatorPaths(Review, Guid.NewGuid(), Guid.NewGuid()))
+        {
+            using var denied = await SendAsync(HttpMethod.Post, path, token, """{ "reason": "No", "outcome": "failed" }""");
+            Assert.Equal(HttpStatusCode.Forbidden, denied.StatusCode);
+        }
+
+        var report = await InsertReportAsync("Soon hidden", "open");
+        var instance = await StartAsync(token, Publish, report);
+        await UpdateStatusAsync(report, "hidden");
+        foreach (var path in OperatorPaths(Publish, instance, Guid.NewGuid()))
+        {
+            using var hidden = await SendAsync(HttpMethod.Post, path, token, OperatorBody(path));
+            Assert.Equal(HttpStatusCode.NotFound, hidden.StatusCode);
+        }
+    }
+
+    [Fact]
+    public async Task A_token_of_the_wrong_audience_is_a_401_with_a_bearer_challenge_on_the_operator_commands()
+    {
+        var token = await RequestTokenAsync(KeycloakFixture.PurchasingClientId, KeycloakFixture.PurchasingClientSecret);
+
+        foreach (var path in OperatorPaths(Publish, Guid.NewGuid(), Guid.NewGuid()))
+        {
+            using var response = await SendAsync(HttpMethod.Post, path, token, """{ "reason": "No", "outcome": "failed" }""");
+            await AssertBearerChallengeAsync(response);
+        }
     }
 
     [Fact]
@@ -300,8 +414,9 @@ public sealed class ServiceAccountRecordTests(KeycloakFixture keycloak) : IAsync
 
             var compiled = await ReleaseCompiler.CompileAsync(Path.Combine(AppContext.BaseDirectory, "Fixtures", "ServiceAccountApp"), configuration);
             Assert.Empty(compiled.Diagnostics);
-            var activated = await ReleaseActivator.ActivateAsync(compiled, new ActiveReleaseStore(configuration), data, ActivationBindings.None("default"), OpenInstanceCounter.Instance);
+            var activated = await ReleaseActivator.ActivateAsync(compiled, new ActiveReleaseStore(configuration), data, PublishingBindings, OpenInstanceCounter.Instance);
             Assert.Empty(activated.Diagnostics);
+            _releaseId = compiled.Release!.Id;
             Assert.NotNull(compiled.Model);
             Assert.True(compiled.Model.TryGetEntity("Report", out var report));
             _reportTable = new ReportTable(
@@ -458,6 +573,61 @@ public sealed class ServiceAccountRecordTests(KeycloakFixture keycloak) : IAsync
         Assert.Equal(HttpStatusCode.Created, started.StatusCode);
         using var body = await ReadJsonAsync(started);
         return body.RootElement.GetProperty("id").GetGuid();
+    }
+
+    private async Task<Guid> StartAsync(string token, string route, Guid report)
+    {
+        using var started = await SendAsync(HttpMethod.Post, route, token, $$"""{ "subjectId": "{{report:D}}" }""");
+        Assert.Equal(HttpStatusCode.Created, started.StatusCode);
+        using var body = await ReadJsonAsync(started);
+        return body.RootElement.GetProperty("id").GetGuid();
+    }
+
+    // The test host runs no worker, so the instance stays running on its connector step. This sets the state that a
+    // worker leaves when a call may have reached the other system.
+    private async Task<Guid> MakeCallUnknownAsync(Guid instance)
+    {
+        var call = Guid.CreateVersion7();
+        await using var batch = DataSource.CreateBatch();
+        batch.BatchCommands.Add(new NpgsqlBatchCommand("UPDATE axis.process_instances SET state = 'waiting' WHERE id = @instance")
+        {
+            Parameters = { new NpgsqlParameter("instance", instance) },
+        });
+        batch.BatchCommands.Add(new NpgsqlBatchCommand("DELETE FROM axis.process_work_items WHERE process_instance_id = @instance")
+        {
+            Parameters = { new NpgsqlParameter("instance", instance) },
+        });
+        batch.BatchCommands.Add(new NpgsqlBatchCommand(
+            """
+            INSERT INTO axis.connector_calls (id, process_instance_id, step, staged_revision, release_id, connector, operation, state, attempts)
+            VALUES (@id, @instance, 'send', 1, @release, 'Publishing', 'publish', 'unknown', 0)
+            """)
+        {
+            Parameters = { new NpgsqlParameter("id", call), new NpgsqlParameter("instance", instance), new NpgsqlParameter("release", _releaseId) },
+        });
+        await batch.ExecuteNonQueryAsync(CancellationToken);
+        return call;
+    }
+
+    private static string OperatorBody(string path) =>
+        path.EndsWith("/resolve", StringComparison.Ordinal) ? """{ "reason": "No", "outcome": "failed" }""" : """{ "reason": "No" }""";
+
+    private static string[] OperatorPaths(string route, Guid instance, Guid call) =>
+        [$"{route}/{instance:D}/cancel", $"{route}/{instance:D}/retry", $"{route}/{instance:D}/calls/{call:D}/resolve"];
+
+    private async Task<IReadOnlyList<(string Action, string Actor, string? ActorName)>> InstanceAuditsAsync(Guid instance)
+    {
+        var records = new List<(string, string, string?)>();
+        await using var command = DataSource.CreateCommand(
+            "SELECT action, actor, actor_name FROM axis.audit_records WHERE process_instance_id = @instance ORDER BY occurred_at, id");
+        command.Parameters.AddWithValue("instance", instance);
+        await using var reader = await command.ExecuteReaderAsync(CancellationToken);
+        while (await reader.ReadAsync(CancellationToken))
+        {
+            records.Add((reader.GetString(0), reader.GetString(1), reader.IsDBNull(2) ? null : reader.GetString(2)));
+        }
+
+        return records;
     }
 
     private async Task<IReadOnlyList<(string Actor, string? ActorName)>> ProcessStartAuditsAsync(Guid recordId)

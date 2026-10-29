@@ -1,0 +1,18 @@
+{
+  "id": "a7c3d1e4-5b2f-4e86-9a1d-3c8f6b2e4d0d",
+  "kind": "connector",
+  "name": "Publishing",
+  "formatVersion": 1,
+  "baseUrl": { "binding": "PublishingUrl" },
+  "auth": { "type": "bearer", "token": { "binding": "PublishingToken" } },
+  "idempotency": "Idempotency-Key",
+  "operations": [
+    {
+      "name": "publish",
+      "method": "POST",
+      "path": "/publications",
+      "input": [{ "name": "title", "type": "text", "required": true }],
+      "output": [{ "name": "reference", "type": "text" }]
+    }
+  ]
+}

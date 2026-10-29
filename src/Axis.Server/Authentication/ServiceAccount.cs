@@ -1,7 +1,7 @@
 namespace Axis.Server.Authentication;
 
 /// <summary>
-/// Another system that calls the record, data source, process start and process inspection routes with a bearer token from its tenant's identity provider, as a service
+/// Another system that calls the record, data source, process start, process inspection and operator command routes with a bearer token from its tenant's identity provider, as a service
 /// account under the same policies as a user. A route opts in with <see cref="ServiceAccountRoute"/>. On such a route a
 /// request with a bearer or DPoP token is a service account request: the token is judged against <c>Oidc:ServiceAudience</c>,
 /// the session cookie is never read or renewed, and no CSRF header is needed. Every other route ignores the token.

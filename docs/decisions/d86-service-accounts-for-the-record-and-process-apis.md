@@ -4,8 +4,8 @@ Status: **Agreed**
 
 M16 lets other systems call the record API, the data source endpoint and the
 process API as service accounts, with a bearer token. The record API, the data
-source rows, process start and process inspection are built. The operator
-commands are _(planned for M18)_. Rate limits and the `fapi2` DPoP binding are built. See
+source rows, process start, process inspection and the operator commands are
+built. Rate limits and the `fapi2` DPoP binding are built. See
 [service accounts](../reference/security.md#service-accounts) for the detail.
 The owner agreed these points on 2026-10-25.
 
