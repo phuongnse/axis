@@ -188,13 +188,12 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
       Integer, decimal and money columns sit on the right, in the header and
       in every cell, in tabular figures, see **Shown values** in
       [frontend.md](frontend.md).
-    - _(planned)_ A reference column is 240px wide.
-    - Each row has a remove row button: a red trash icon button with its
-      name as a tooltip. An add button below the table appends a row with
-      every child field `null`. Rows cannot be reordered.
-      _(planned)_ Add row sits above the table on the right, outlined at the
-      *main* level of [buttons](frontend.md). When a row is added, focus moves
-      to its first input.
+    - A reference column is 240px wide.
+    - Each row has a remove row button: a trash icon button in `dangerText`,
+      with its name as a tooltip on hover and on focus. Add row sits above the
+      table on the right, outlined at the *main* level of
+      [buttons](frontend.md). It appends a row with every child field `null`,
+      and focus moves to the row's first input. Rows cannot be reordered.
     - When rows were added, removed or edited, the form sends the whole row
       list, as [record-api.md](record-api.md#child-rows-computed-fields-and-validations) describes. Each row holds its
       non-null child fields in declaration order, without its computed fields. Rows are compared by value
@@ -202,8 +201,8 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
       undone leaves the collection out of the body.
     - A key `/values/<collection>/<index>/<field>` for an existing row and a
       child field shows its messages under that cell. A key
-      `/values/<collection>` shows under the table. _(planned)_ A cell's
-      message stays inline under the cell's input, and the cells of a row line
+      `/values/<collection>` shows under the table. A cell's message stays
+      inline under the cell's input, 4px below it, and the cells of a row line
       up at the top, so the row's other inputs never move. The message is
       left-aligned, even in a right-aligned number cell. Any other key inside the
       collection, such as a whole row, shows above the form. Adding or
