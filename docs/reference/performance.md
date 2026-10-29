@@ -5,7 +5,8 @@ test that measures them. The conventions of [architecture.md](../architecture.md
 marked _(planned for Mx)_ are not built yet, and Dn refers to [decisions.md](../decisions.md).
 
 The design follows [D82](../decisions/d82-performance-slos-and-load-tests.md). All of this page is
-_(planned for M18)_, except [resource-demanding routes](#resource-demanding-routes), which is built. The per-request budgets of the `*PerformanceTests` classes are built. They
+_(planned for M18)_, except [resource-demanding routes](#resource-demanding-routes) and the
+[script](#load-test) of the load test, which are built. The per-request budgets of the `*PerformanceTests` classes are built. They
 run in the performance workflow, as [D97](../decisions/d97-reliable-test-runs.md) says. See
 [testing](../architecture.md#testing).
 
@@ -63,8 +64,12 @@ to find its own numbers.
 
 ## Load test
 
-- **Script.** `scripts/load.sh` runs k6 in a container against the Docker Compose stack with two
-  server replicas. It needs Docker. See [development](../development.md#scripts).
+- **Script.** _(Built.)_ `scripts/load.sh` builds the production images and starts the Docker Compose
+  stack with two server replicas, one worker and PostgreSQL over TLS, as in
+  [several server replicas](installation.md#several-server-replicas). It starts `server` and
+  then `server-2`, runs `admin migrate`, creates the tenant `load` and runs the placeholder k6
+  scenario in a container through the proxy. It removes the stack at the end, unless `--keep` is
+  given. It needs Docker. See [development](../development.md#scripts).
 - **Data.** It creates a tenant with a generated application of
   [typical size](../domain/knowledge.md#typical-application-size), and records in every entity.
   `tests/Axis.LoadData` writes that application from a seed, so the same seed gives the same files:
