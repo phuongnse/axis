@@ -5,10 +5,13 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
+import { cardGroups, cardName } from '../web/src/designSystem/cardOrder.ts'
 import { checkDesignSystemBundle } from './check-design-system.mjs'
 
 const script = fileURLToPath(new URL('./check-design-system.mjs', import.meta.url))
-const header = `/* @ds-bundle: ${JSON.stringify({ width: 992, groups: [{ name: 'Data widgets', previews: ['table'] }] })} */\n`
+const components = cardGroups.flatMap((group) => group.previews).map((preview) => ({ name: cardName(preview) }))
+const headerLine = (fields) => `/* @ds-bundle: ${JSON.stringify(fields)} */\n`
+const header = headerLine({ format: 4, namespace: 'Axis', components })
 const valid = header + 'var Axis = (function () { return { table: function () {} } })()\n'
 
 let root
@@ -60,34 +63,60 @@ describe('checkDesignSystemBundle', () => {
     assert.match(problems[0], /is not JSON/)
   })
 
-  test('fails a @ds-bundle line without a width', () => {
-    write('axis-design-system.js', `/* @ds-bundle: {"groups":[{"name":"A","previews":["a"]}]} */\nvar Axis = 1\n`)
+  for (const format of [undefined, 3]) {
+    test(`fails a @ds-bundle line with format ${format}`, () => {
+      write('axis-design-system.js', headerLine({ format, namespace: 'Axis', components }) + 'var Axis = 1\n')
+
+      const { problems } = checkDesignSystemBundle(root)
+
+      assert.deepEqual(problems, ['The @ds-bundle line of axis-design-system.js needs format 4.'])
+    })
+  }
+
+  test('fails a @ds-bundle line with another namespace', () => {
+    write('axis-design-system.js', headerLine({ format: 4, namespace: 'Other', components }) + 'var Axis = 1\n')
+
+    const { problems } = checkDesignSystemBundle(root)
+
+    assert.deepEqual(problems, ['The @ds-bundle line of axis-design-system.js needs the namespace "Axis".'])
+  })
+
+  test('fails a @ds-bundle line with no components', () => {
+    write('axis-design-system.js', headerLine({ format: 4, namespace: 'Axis', components: [] }) + 'var Axis = 1\n')
 
     const { problems } = checkDesignSystemBundle(root)
 
     assert.equal(problems.length, 1)
-    assert.match(problems[0], /positive number as its width/)
+    assert.match(problems[0], /needs components/)
   })
 
-  test('fails a @ds-bundle line with no groups', () => {
-    write('axis-design-system.js', `/* @ds-bundle: {"width":992,"groups":[]} */\nvar Axis = 1\n`)
+  test('fails a card that the bundle leaves out', () => {
+    const withoutTable = components.filter(({ name }) => name !== 'Table')
+    write('axis-design-system.js', headerLine({ format: 4, namespace: 'Axis', components: withoutTable }) + 'var Axis = 1\n')
 
     const { problems } = checkDesignSystemBundle(root)
 
-    assert.equal(problems.length, 1)
-    assert.match(problems[0], /needs groups/)
+    assert.deepEqual(problems, ['The @ds-bundle line of axis-design-system.js lacks a card for: Table.'])
   })
 
-  test('fails a preview that two groups list', () => {
-    const groups = [
-      { name: 'A', previews: ['table', 'form'] },
-      { name: 'B', previews: ['table'] },
-    ]
-    write('axis-design-system.js', `/* @ds-bundle: ${JSON.stringify({ width: 992, groups })} */\nvar Axis = 1\n`)
+  test('fails a card that the bundle names twice', () => {
+    const withTableTwice = [...components, { name: 'Table' }]
+    write('axis-design-system.js', headerLine({ format: 4, namespace: 'Axis', components: withTableTwice }) + 'var Axis = 1\n')
 
     const { problems } = checkDesignSystemBundle(root)
 
-    assert.deepEqual(problems, ['The @ds-bundle line of axis-design-system.js lists a preview twice: table.'])
+    assert.deepEqual(problems, ['The @ds-bundle line of axis-design-system.js lists a card twice: Table.'])
+  })
+
+  test('fails a card name that matches no preview', () => {
+    const withUnknown = [...components, { name: 'Nope' }]
+    write('axis-design-system.js', headerLine({ format: 4, namespace: 'Axis', components: withUnknown }) + 'var Axis = 1\n')
+
+    const { problems } = checkDesignSystemBundle(root)
+
+    assert.deepEqual(problems, [
+      'The @ds-bundle line of axis-design-system.js names a card that matches no preview: Nope.',
+    ])
   })
 
   test('fails an HTML file next to the script', () => {
