@@ -8,7 +8,7 @@ only gate before a merge, and the same kind of model writes and reviews the code
 add checks that need no judgment, and put a person on the one kind of change that can weaken
 them.
 
-- **Authentication by default** _(planned for M18)_:
+- **Authentication by default**:
   - The server sets an authorization fallback policy that requires a signed-in user or a valid
     caller token. A route that must be open says so, such as `/health`, `GET /api/site`,
     `GET /api/texts/{locale}` and the sign-in routes.

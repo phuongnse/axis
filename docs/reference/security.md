@@ -723,10 +723,28 @@ verification bullet below is _(planned for M18)_.
 
 ## Authorization
 
-_(planned for M18)_ The server sets an authorization fallback policy, so a route
-that names no open access needs a signed-in user or a valid caller token. A
-test calls every route with no session and no token, see
+The server sets an authorization fallback policy, so a route that is not on the
+open list needs a session or a valid caller token. A request with neither is
+refused before the route runs, so it never opens a tenant database. The policy
+only requires an authenticated user, because the request's scheme already picks
+the session, the service account or the endpoint caller. It follows
 [D111](../decisions/d111-authentication-by-default-and-the-owner-guards-the-security-checks.md).
+
+- **The open list.** Seven routes need no session: `/health/live`,
+  `/health/ready`, `GET /api/site`, `GET /api/texts/{locale}`,
+  `GET /api/auth/sign-in`, `POST /api/auth/sign-out` and the SPA's pages. The
+  static files stay public. The OIDC handler answers the sign-in callback inside
+  authentication, so it is outside the routes.
+- **The answers.** A session route answers `401` with the title "Sign in to read
+  or write this data.". A service account route with a token keeps its bearer
+  answer. An inbound endpoint route keeps its `WWW-Authenticate: Bearer`
+  challenge and its title. The answer is problem details, never an empty body.
+  An anonymous request for a file path that matches no route and no file answers
+  `401`, not `404`.
+- **The test.** `AuthorizationRouteTests` calls every route with no session and
+  no token and expects a `401` or `403` problem off the open list, and a bearer
+  challenge on each inbound endpoint route. It also checks that the routes marked
+  open are exactly that list, so a route added later is checked automatically.
 
 The `role` and `policy` resources and their compile checks are built. For
 the record API and the data source endpoint, so are the session `401`, the
