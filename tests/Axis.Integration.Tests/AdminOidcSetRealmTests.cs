@@ -348,7 +348,7 @@ public sealed partial class AdminOidcSetRealmTests(KeycloakFixture keycloak, Pos
 
         var html = await page.Content.ReadAsStringAsync(CancellationToken);
         Assert.True(page.StatusCode == HttpStatusCode.OK, html);
-        var afterPassword = await PostAsync(browser, FormAction(html), cookies, new Dictionary<string, string>
+        var afterPassword = await PostAsync(browser, KeycloakSignIn.LoginAction(html).AbsoluteUri, cookies, new Dictionary<string, string>
         {
             ["username"] = username,
             ["password"] = password,

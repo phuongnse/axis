@@ -24,8 +24,8 @@ internal sealed record TenantRealmSecrets(string Platform, string Activation, st
 /// turns sign-in by email off, so an account's username is its email. It gets a first-login flow of its own for brokered
 /// users, <see cref="RealmSync.FirstLoginFlowAlias"/>, whose only step creates a new user. It also gets three clients: the platform client
 /// <c>axis</c>, <c>axis-activation</c> with rights over the realm's providers and clients, and <c>axis-users</c> with
-/// rights over its users only. The identity provider must hold the breached-password list file. A second run updates
-/// what the first made. An error names the step and the status code,
+/// rights over its users only. The realm uses the Axis theme <see cref="LoginTheme"/> as its login theme. The identity provider
+/// must hold the theme and the breached-password list file. A second run updates what the first made, and sets the theme again. An error names the step and the status code,
 /// never a response body or a secret.
 /// </summary>
 internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
@@ -34,6 +34,9 @@ internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
     public const string PlatformClientId = "axis";
     public const string ActivationClientId = "axis-activation";
     public const string UsersClientId = "axis-users";
+
+    /// <summary>The Axis sign-in theme that the realm uses as its login theme. The identity provider holds it in its <c>themes</c> folder.</summary>
+    public const string LoginTheme = "axis";
 
     /// <summary>The file in the identity provider's <c>data/password-blacklists</c> folder that the password policy names.</summary>
     public const string BreachedPasswordList = "axis-breached-passwords.txt";
@@ -176,6 +179,7 @@ internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
         {
             ["enabled"] = true,
             ["displayName"] = displayName,
+            ["loginTheme"] = LoginTheme,
             ["ssoSessionMaxLifespan"] = SessionMaxLifespanSeconds,
             ["ssoSessionMaxLifespanRememberMe"] = SessionMaxLifespanSeconds,
             ["registrationAllowed"] = false,
