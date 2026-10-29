@@ -99,10 +99,12 @@ that adds a source changes this section too.
 ## Test runs and reports
 
 The test, integration and E2E scripts run every suite even when one fails. The exceptions are
-the suites that no change since NexKit's commit can affect. The commit is the first that NexKit sets
-of `NEXKIT_CHECK_VERIFIED_SHA`, the head on which that check last passed, also in a round that NexKit
-stopped or whose other checks failed; `NEXKIT_VERIFIED_SHA`, the head of the last round whose checks
-all passed; and `NEXKIT_BASE_SHA`, the merge base with `main`. The integration tests and
+the suites that no change since NexKit's commit can affect. The commit is
+`NEXKIT_CHECK_VERIFIED_SHA`, the head on which that check last passed with its current command, also in
+a round that NexKit stopped or whose other checks failed, else `NEXKIT_BASE_SHA`, the merge base with
+`main`. `NEXKIT_VERIFIED_SHA`, the head of the last round whose checks all passed, is never used: NexKit
+does not record which checks or commands that round ran, so a check added or changed since would skip
+without having passed. The integration tests and
 their scenarios use their safe list. Playwright and the smoke tests use the smaller list of `docs/`,
 Markdown files, the GitHub workflows in `.github/` and NexKit's settings in `.nexkit/`. Under NexKit, a
 suite that runs in full says which changed path made it run and which commit it compared with. The

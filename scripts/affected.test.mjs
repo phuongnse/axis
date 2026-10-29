@@ -93,14 +93,16 @@ describe('decideSafe', () => {
 })
 
 describe('sinceCommit', () => {
-  test("prefers the check's own passed commit, then the last green round, then the merge base", () => {
+  test("prefers the check's own passed commit, then the merge base", () => {
     const all = { NEXKIT_CHECK_VERIFIED_SHA: 'check', NEXKIT_VERIFIED_SHA: 'round', NEXKIT_BASE_SHA: 'base' }
     assert.deepEqual(sinceCommit(all), { name: 'NEXKIT_CHECK_VERIFIED_SHA', sha: 'check' })
-    assert.deepEqual(sinceCommit({ ...all, NEXKIT_CHECK_VERIFIED_SHA: '' }), {
-      name: 'NEXKIT_VERIFIED_SHA',
-      sha: 'round',
-    })
     assert.deepEqual(sinceCommit({ NEXKIT_BASE_SHA: 'base' }), { name: 'NEXKIT_BASE_SHA', sha: 'base' })
+  })
+
+  test('never compares with the last green round, which may not have run this check or its command', () => {
+    const noOwnCommit = { NEXKIT_CHECK_VERIFIED_SHA: '', NEXKIT_VERIFIED_SHA: 'round', NEXKIT_BASE_SHA: 'base' }
+    assert.deepEqual(sinceCommit(noOwnCommit), { name: 'NEXKIT_BASE_SHA', sha: 'base' })
+    assert.equal(sinceCommit({ NEXKIT_VERIFIED_SHA: 'round' }), undefined)
   })
 
   test('gives no commit outside NexKit', () => {

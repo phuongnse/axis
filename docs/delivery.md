@@ -136,8 +136,10 @@ with the reasons. What each one does is in NexKit's
   `main`.
   A suite that no file changed since NexKit's commit can affect is skipped,
   and any doubt runs it. The commit is the one on which that check last
-  passed (`NEXKIT_CHECK_VERIFIED_SHA`), else the last round whose checks all
-  passed (`NEXKIT_VERIFIED_SHA`), else the merge base (`NEXKIT_BASE_SHA`). So
+  passed with its current command (`NEXKIT_CHECK_VERIFIED_SHA`), else the
+  merge base (`NEXKIT_BASE_SHA`). The last green round
+  (`NEXKIT_VERIFIED_SHA`) is never used, because NexKit does not record which
+  checks or commands it ran, so a check added or changed since would skip. So
   after `main` moves, a check that passed before reruns its suite only when
   the new commits can affect it. CI on `main` sets no base and runs every
   suite, so a slowdown shows at its next run. The integration performance
