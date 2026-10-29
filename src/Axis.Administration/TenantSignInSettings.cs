@@ -1,5 +1,6 @@
 using Axis.Tenancy;
 using Axis.Tenancy.Platform;
+using Axis.Tenancy.Realms;
 using Microsoft.EntityFrameworkCore;
 
 namespace Axis.Administration;
@@ -26,11 +27,13 @@ public enum TenantSignInOutcome
     Changed,
     Refused,
     AuditFailed,
+    RealmFailed,
 }
 
 /// <summary>
 /// The result of a change. <paramref name="Refusal"/> holds the message of a refusal, <paramref name="AuditError"/> the error of a
-/// record that could not be written and <paramref name="Changed"/> the names of the settings that were changed.
+/// record that could not be written, <paramref name="RealmError"/> the error of a realm that could not be updated and
+/// <paramref name="Changed"/> the names of the settings that were changed.
 /// <paramref name="AddedKeyId"/> and <paramref name="AddedPublicKeyPem"/> describe the client key that was added, if any.
 /// </summary>
 public sealed record TenantSignInResult(
@@ -39,7 +42,8 @@ public sealed record TenantSignInResult(
     Exception? AuditError,
     IReadOnlyList<string> Changed,
     string? AddedKeyId = null,
-    string? AddedPublicKeyPem = null);
+    string? AddedPublicKeyPem = null,
+    Exception? RealmError = null);
 
 /// <summary>
 /// Changes the sign-in settings of a main tenant in the tenant directory. The command line and a later web console both call
@@ -123,12 +127,19 @@ public static class TenantSignInSettings
     /// first, and the checks look at the tenant as it will be after the whole change. The record names a key id and never a key.
     /// A database error propagates.
     /// </summary>
+    /// <remarks>
+    /// When <paramref name="identityProvider"/> is given, the change sets the profile or the client keys and the tenant signs in
+    /// through its own realm, the realm's <c>axis</c> and site clients are updated with <see cref="RealmClientProfile"/> after
+    /// the record and before the row is saved. A realm that cannot be updated saves nothing, so running the command again
+    /// completes the change. A tenant that signs in through an outside identity provider has no realm to update.
+    /// </remarks>
     public static async Task<TenantSignInResult> SetAsync(
         TenantSecretCipher cipher,
         string platformConnectionString,
         string command,
         string tenantId,
         TenantSignInChange change,
+        HttpClient? identityProvider = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(cipher);
@@ -307,6 +318,25 @@ public static class TenantSignInSettings
             row.OidcClientKey = stored.Count > 0 ? stored[0].Encrypted : null;
             row.OidcPreviousClientKeyId = stored.Count > 1 ? stored[1].KeyId : null;
             row.OidcPreviousClientKey = stored.Count > 1 ? stored[1].Encrypted : null;
+        }
+
+        if (identityProvider is not null
+            && (change.Profile is not null || change.ClientKey is not null || change.RetireClientKeyId is not null)
+            && DirectoryTenantCatalog.Realm(row, cipher) is { } realm)
+        {
+            try
+            {
+                var realmKeys = keys
+                    .Select(key => TenantClientKeys.PublicKey(
+                        key.Encrypted is null ? pkcs8Pem! : cipher.Decrypt(tenantId, TenantSecretFields.OidcClientKey, key.Encrypted).Reveal()))
+                    .ToList();
+                await new RealmClientProfile(identityProvider, realm.BaseAddress).ApplyAsync(
+                    realm.Name, realm.ActivationClientSecret.Reveal(), row.OidcProfile ?? TenantSignInProfiles.Standard, realmKeys, cancellationToken);
+            }
+            catch (Exception exception) when (exception is InvalidOperationException or HttpRequestException)
+            {
+                return new TenantSignInResult(TenantSignInOutcome.RealmFailed, null, null, [], RealmError: exception);
+            }
         }
 
         row.Version++;

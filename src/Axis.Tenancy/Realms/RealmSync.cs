@@ -78,7 +78,7 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
         }
     }
 
-    private async Task<string> ActivationTokenAsync(string realm, string activationSecret, CancellationToken cancellationToken)
+    internal async Task<string> ActivationTokenAsync(string realm, string activationSecret, CancellationToken cancellationToken)
     {
         using var content = new FormUrlEncodedContent(new Dictionary<string, string>
         {
@@ -97,56 +97,77 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
     {
         using var listed = await SendAsync(token, HttpMethod.Get, $"{realmPath}/clients?max=1000", null, cancellationToken);
         EnsureSuccess(listed, "list the clients");
-        var existing = new Dictionary<string, string>(StringComparer.Ordinal);
+        var existing = new Dictionary<string, (string Uuid, JsonElement Representation)>(StringComparer.Ordinal);
+        JsonElement? platformClient = null;
         foreach (var client in (await listed.Content.ReadFromJsonAsync<JsonElement>(cancellationToken)).EnumerateArray())
         {
             var clientId = client.GetProperty("clientId").GetString()!;
             if (clientId.StartsWith(SiteClientPrefix, StringComparison.Ordinal))
             {
-                existing[clientId] = client.GetProperty("id").GetString()!;
+                existing[clientId] = (client.GetProperty("id").GetString()!, client);
+            }
+            else if (clientId == RealmClientProfile.PlatformClientId)
+            {
+                platformClient = client;
             }
         }
 
         var desired = new HashSet<string>(sitePaths.Select(SiteClientId), StringComparer.Ordinal);
         foreach (var clientId in desired)
         {
-            var uuid = existing.GetValueOrDefault(clientId);
-            if (uuid is null)
+            string uuid;
+            if (!existing.TryGetValue(clientId, out var current))
             {
-                using var created = await SendAsync(token, HttpMethod.Post, $"{realmPath}/clients", SiteClient(clientId), cancellationToken);
+                using var created = await SendAsync(token, HttpMethod.Post, $"{realmPath}/clients", SiteClient(clientId, platformClient, null), cancellationToken);
                 EnsureSuccess(created, $"create the client '{clientId}'");
                 uuid = created.Headers.Location?.Segments[^1].TrimEnd('/')
                     ?? throw new InvalidOperationException($"The identity provider step 'find the created client '{clientId}'' found no client.");
             }
             else
             {
-                using var updated = await SendAsync(token, HttpMethod.Put, $"{realmPath}/clients/{uuid}", SiteClient(clientId), cancellationToken);
+                uuid = current.Uuid;
+                using var updated = await SendAsync(token, HttpMethod.Put, $"{realmPath}/clients/{uuid}", SiteClient(clientId, platformClient, current.Representation), cancellationToken);
                 EnsureSuccess(updated, $"update the client '{clientId}'");
             }
 
             await EnsureSessionNoteMapperAsync(token, realmPath, uuid, clientId, cancellationToken);
         }
 
-        foreach (var (clientId, uuid) in existing.Where(pair => !desired.Contains(pair.Key)))
+        foreach (var (clientId, (uuid, _)) in existing.Where(pair => !desired.Contains(pair.Key)))
         {
             using var deleted = await SendAsync(token, HttpMethod.Delete, $"{realmPath}/clients/{uuid}", null, cancellationToken);
             EnsureSuccess(deleted, $"delete the client '{clientId}'");
         }
     }
 
-    /// <summary>The secret is left out, so Keycloak makes one when it creates the client and keeps it on an update.</summary>
-    private static Dictionary<string, object?> SiteClient(string clientId) => new()
+    /// <summary>
+    /// The secret is left out, so Keycloak makes one when it creates the client and keeps it on an update. When the realm has
+    /// the platform client <c>axis</c>, the site client takes its client authentication and the settings of its sign-in profile
+    /// and keys (<see cref="RealmClientProfile"/>), so activation never undoes what <c>tenant oidc set</c> wrote. An update
+    /// keeps the other attributes of the existing client, because Keycloak removes the attributes that a client update leaves out.
+    /// </summary>
+    private static Dictionary<string, object?> SiteClient(string clientId, JsonElement? platformClient, JsonElement? existing)
     {
-        ["clientId"] = clientId,
-        ["enabled"] = true,
-        ["protocol"] = "openid-connect",
-        ["publicClient"] = false,
-        ["clientAuthenticatorType"] = "client-secret",
-        ["standardFlowEnabled"] = true,
-        ["directAccessGrantsEnabled"] = false,
-        ["implicitFlowEnabled"] = false,
-        ["serviceAccountsEnabled"] = false,
-    };
+        var client = new Dictionary<string, object?>
+        {
+            ["clientId"] = clientId,
+            ["enabled"] = true,
+            ["protocol"] = "openid-connect",
+            ["publicClient"] = false,
+            ["clientAuthenticatorType"] = "client-secret",
+            ["standardFlowEnabled"] = true,
+            ["directAccessGrantsEnabled"] = false,
+            ["implicitFlowEnabled"] = false,
+            ["serviceAccountsEnabled"] = false,
+        };
+        if (platformClient is { } platform)
+        {
+            client["clientAuthenticatorType"] = RealmClientProfile.AuthenticatorTypeOf(platform);
+            client["attributes"] = RealmClientProfile.AttributesFor(platform, existing);
+        }
+
+        return client;
+    }
 
     private static Dictionary<string, string> SessionNoteConfig() => new()
     {
@@ -400,7 +421,7 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
             ["user.attribute"] = attribute,
         });
 
-    private async Task<HttpResponseMessage> SendAsync(string token, HttpMethod method, string path, object? body, CancellationToken cancellationToken)
+    internal async Task<HttpResponseMessage> SendAsync(string token, HttpMethod method, string path, object? body, CancellationToken cancellationToken)
     {
         using var request = new HttpRequestMessage(method, new Uri(baseAddress, path));
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token);
@@ -412,7 +433,7 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
         return await http.SendAsync(request, cancellationToken);
     }
 
-    private static void EnsureSuccess(HttpResponseMessage response, string step)
+    internal static void EnsureSuccess(HttpResponseMessage response, string step)
     {
         if (!response.IsSuccessStatusCode)
         {

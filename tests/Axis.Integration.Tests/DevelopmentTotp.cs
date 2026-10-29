@@ -26,7 +26,10 @@ internal static class DevelopmentTotp
     }
 
     /// <summary>The 6-digit code of the user at <paramref name="at"/>, or now.</summary>
-    public static string Code(string username, DateTimeOffset? at = null)
+    public static string Code(string username, DateTimeOffset? at = null) => CodeFromSecret(Secret(username), at);
+
+    /// <summary>The 6-digit code for a Base32 secret at <paramref name="at"/>, or now.</summary>
+    public static string CodeFromSecret(string base32, DateTimeOffset? at = null)
     {
         var counter = (at ?? DateTimeOffset.UtcNow).ToUnixTimeSeconds() / Period;
         var message = new byte[8];
@@ -37,7 +40,7 @@ internal static class DevelopmentTotp
         }
 
 #pragma warning disable CA5350 // RFC 6238 and the realm's OTP policy (HmacSHA1) use SHA-1.
-        var hash = HMACSHA1.HashData(DecodeBase32(Secret(username)), message);
+        var hash = HMACSHA1.HashData(DecodeBase32(base32), message);
 #pragma warning restore CA5350
         var offset = hash[^1] & 0x0f;
         var binary = ((hash[offset] & 0x7f) << 24) | (hash[offset + 1] << 16) | (hash[offset + 2] << 8) | hash[offset + 3];
