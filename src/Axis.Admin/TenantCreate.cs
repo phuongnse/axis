@@ -1,4 +1,3 @@
-using System.Security.Cryptography;
 using Axis.Processes.Storage;
 using Axis.Tenancy;
 using Axis.Tenancy.Platform;
@@ -199,51 +198,7 @@ internal sealed class TenantCreate : IAsyncDisposable
         _steps ??= new TenantDatabaseSteps(_settings.Cipher, _row!, _admin.Host!, _admin.Port, TenantDatabaseTls.From(_admin.ConnectionString), _cancellationToken);
 
     // Saves the secrets and the Oidc block before the realm exists, so a stop between the two never loses a secret.
-    private async Task RealmAsync()
-    {
-        var row = _row!;
-        var admin = _settings.IdentityProvider!;
-        var cipher = _settings.Cipher;
-
-        var changed = false;
-        changed |= Ensure(row.OidcClientSecret, TenantSecretFields.OidcClientSecret, value => row.OidcClientSecret = value);
-        changed |= Ensure(row.RealmActivationClientSecret, TenantSecretFields.RealmActivationClientSecret, value => row.RealmActivationClientSecret = value);
-        changed |= Ensure(row.RealmUsersClientSecret, TenantSecretFields.RealmUsersClientSecret, value => row.RealmUsersClientSecret = value);
-
-        var authority = new Uri(admin.BaseAddress, $"realms/{Uri.EscapeDataString(_id)}").ToString();
-        if (row.OidcAuthority != authority || row.OidcClientId != TenantRealm.PlatformClientId)
-        {
-            row.OidcAuthority = authority;
-            row.OidcClientId = TenantRealm.PlatformClientId;
-            changed = true;
-        }
-
-        if (changed)
-        {
-            row.Version++;
-            await _platform.SaveChangesAsync(_cancellationToken);
-        }
-
-        var secrets = new TenantRealmSecrets(
-            cipher.Decrypt(_id, TenantSecretFields.OidcClientSecret, row.OidcClientSecret).Reveal(),
-            cipher.Decrypt(_id, TenantSecretFields.RealmActivationClientSecret, row.RealmActivationClientSecret!).Reveal(),
-            cipher.Decrypt(_id, TenantSecretFields.RealmUsersClientSecret, row.RealmUsersClientSecret!).Reveal());
-
-        // The display name is the tenant id until the command takes the organization's name.
-        await _realm!.EnsureAsync(_id, _id, secrets, _cancellationToken);
-
-        // A secret that is stored is kept, so a rerun never changes it.
-        bool Ensure(byte[]? stored, string field, Action<byte[]> write)
-        {
-            if (stored is { Length: > 0 })
-            {
-                return false;
-            }
-
-            write(cipher.Encrypt(_id, field, Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(32))));
-            return true;
-        }
-    }
+    private Task RealmAsync() => _realm!.EnsureForTenantAsync(_platform, _row!, _settings.Cipher, _cancellationToken);
 
     private async Task ActivateAsync()
     {
