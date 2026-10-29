@@ -25,8 +25,8 @@ const modes = ['light', 'dark'] as const
 const figure = (page: Page | FrameLocator, caption: string) => page.getByRole('figure', { name: caption, exact: true })
 
 // Each preview and a locator for its widget. The table and the kpi also draw an empty state, so they are looked up in
-// the "With data" figure. A field preview's first state is its typical one.
-const previews: Record<string, (page: Page) => Locator> = {
+// the "With data" figure. A field preview's first state is its editable one.
+const previews: Record<string, (page: Page | FrameLocator) => Locator> = {
   table: (page) => figure(page, 'With data').getByRole('columnheader', { name: 'Title', exact: true }),
   form: (page) => page.getByRole('button', { name: 'Save', exact: true }).first(),
   taskInbox: (page) => page.getByRole('link', { name: 'Review the request', exact: true }).first(),
@@ -35,19 +35,19 @@ const previews: Record<string, (page: Page) => Locator> = {
   'chart-bar': (page) => page.getByRole('img', { name: 'Requests by status', exact: true }).locator('svg'),
   'chart-line': (page) => page.getByRole('img', { name: 'Requests by status', exact: true }).locator('svg'),
   'chart-pie': (page) => page.getByRole('img', { name: 'Requests by status', exact: true }).locator('svg'),
-  kpi: (page) => page.getByRole('figure', { name: 'With data', exact: true }).getByTestId('kpi-value'),
+  kpi: (page) => figure(page, 'With data').getByTestId('kpi-value'),
   columns: (page) => page.getByRole('region', { name: 'Tasks', exact: true }),
   tabs: (page) => page.getByRole('tab', { name: 'Requests', exact: true }),
   section: (page) => page.getByRole('region', { name: 'Tasks', exact: true }),
   states: (page) => page.getByRole('alert').filter({ hasText: 'The records could not be loaded.' }),
-  'field-text': (page) => figure(page, 'Typical').getByLabel(fieldLabel('Title')),
-  'field-integer': (page) => figure(page, 'Typical').getByLabel(fieldLabel('Quantity')),
-  'field-decimal': (page) => figure(page, 'Typical').getByLabel(fieldLabel('Amount')),
-  'field-boolean': (page) => figure(page, 'Typical').getByLabel(fieldLabel('Urgent')),
-  'field-date': (page) => figure(page, 'Typical').getByLabel(fieldLabel('Needed on')),
-  'field-date-time': (page) => figure(page, 'Typical').getByLabel(fieldLabel('Submitted at')),
-  'field-enum': (page) => figure(page, 'Typical').getByLabel(fieldLabel('Status')),
-  'field-reference': (page) => figure(page, 'Typical').getByLabel(fieldLabel('Category')),
+  'field-text': (page) => figure(page, 'Editable').getByLabel(fieldLabel('Title')),
+  'field-integer': (page) => figure(page, 'Editable').getByLabel(fieldLabel('Quantity')),
+  'field-decimal': (page) => figure(page, 'Editable').getByLabel(fieldLabel('Amount')),
+  'field-boolean': (page) => figure(page, 'Editable').getByLabel(fieldLabel('Urgent')),
+  'field-date': (page) => figure(page, 'Editable').getByLabel(fieldLabel('Needed on')),
+  'field-date-time': (page) => figure(page, 'Editable').getByLabel(fieldLabel('Submitted at')),
+  'field-enum': (page) => figure(page, 'Editable').getByLabel(fieldLabel('Status')),
+  'field-reference': (page) => figure(page, 'Editable').getByLabel(fieldLabel('Category')),
   'field-child-collection': (page) =>
     figure(page, 'Reference and computed cells').getByRole('columnheader', { name: 'Description', exact: true }),
   shell: (page) => figure(page, 'Application site').getByRole('menu'),
@@ -157,54 +157,70 @@ async function openHarness(
 
 for (const [name, widget] of Object.entries(previews)) {
   for (const mode of modes) {
-    test(`the ${name} preview mounts its widget from the bundle in ${mode} mode with no error`, async ({ page }) => {
-      const recording = await openHarness(page, `?preview=${name}&mode=${mode}`)
+    test(`the ${name} preview mounts its widget in a 992px frame sandboxed without allow-forms in ${mode} mode with no error`, async ({
+      page,
+    }) => {
+      const query = `?preview=${name}&mode=${mode}`
+      const recording = await openHarness(page, query, { sandboxed: true, frameWidth: 992 })
+      const frame = page.frameLocator('iframe')
 
-      await expect(widget(page)).toBeVisible()
+      await expect(widget(frame)).toBeVisible()
       if (name === 'states') {
         // The loading state's request never finishes, so its table stays busy.
         await expect(
-          page.getByRole('figure', { name: 'Loading', exact: true }).locator('[aria-busy="true"]').first(),
+          figure(frame, 'Loading').locator('[aria-busy="true"]').first(),
         ).toBeVisible()
       }
       const emptyText = emptyTextOf(name)
       if (emptyText !== undefined) {
         await expect(
-          page
-            .getByRole('figure', { name: 'Empty', exact: true })
+          figure(frame, 'Empty')
             .getByText(emptyText, { exact: true })
             .filter({ visible: true })
             .first(),
         ).toBeVisible()
       }
-      const withData = page.getByRole('figure', { name: 'With data', exact: true })
+      const withData = figure(frame, 'With data')
       if (name === 'table') {
         await expect(withData.getByRole('link').first()).toBeVisible()
         await expect(withData.getByRole('button', { name: 'New request', exact: true })).toBeVisible()
+        // The table folds the row actions into the "…" menu, so the delete action is not a button of the row.
+        const many = figure(frame, 'Many row actions')
+        await expect(many.getByRole('button', { name: 'Actions', exact: true }).first()).toBeVisible()
+        await expect(many.getByRole('button', { name: 'Delete', exact: true })).toHaveCount(0)
       }
       if (name === 'taskInbox') {
         await expect(withData.getByText('Overdue', { exact: true })).toBeVisible()
         await expect(withData.getByText('Claimed by you', { exact: true })).toBeVisible()
       }
       if (name === 'processInspector') {
-        await expect(page.getByRole('cell', { name: 'Failed', exact: true }).first()).toBeVisible()
-        await expect(page.getByRole('button', { name: 'Redeliver', exact: true })).toBeVisible()
-        await expect(page.getByRole('button', { name: 'Discard', exact: true })).toBeVisible()
+        await expect(frame.getByRole('cell', { name: 'Failed', exact: true }).first()).toBeVisible()
+        await expect(frame.getByRole('button', { name: 'Redeliver', exact: true })).toBeVisible()
+        await expect(frame.getByRole('button', { name: 'Discard', exact: true })).toBeVisible()
       }
       await page.waitForLoadState('networkidle')
 
       if (name.startsWith('field-')) {
-        await expect(page.getByRole('button', { name: 'Save', exact: true })).toHaveCount(0)
-        await expect(page.getByRole('button', { name: 'Submit for approval', exact: true })).toHaveCount(0)
+        await expect(frame.getByRole('button', { name: 'Save', exact: true })).toHaveCount(0)
+        await expect(frame.getByRole('button', { name: 'Submit for approval', exact: true })).toHaveCount(0)
         // The history card's title is not an ARIA heading, so the test id and the text are checked.
-        await expect(page.getByTestId('record-history')).toHaveCount(0)
-        await expect(page.getByText('History', { exact: true })).toHaveCount(0)
+        await expect(frame.getByTestId('record-history')).toHaveCount(0)
+        await expect(frame.getByText('History', { exact: true })).toHaveCount(0)
       }
 
+      // A card never scrolls sideways at 992px.
+      const preview = page.frame({ url: (url) => url.pathname === '/design-system.html' })!
+      expect(
+        await preview.evaluate(
+          () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+        ),
+      ).toBe(true)
+
       expect(recording.errors).toEqual([])
-      // The fixtures answer every API call, so nothing but the harness and the bundle is requested.
+      // The fixtures answer every API call, so nothing but the page, the harness and the bundle is requested.
       expect(recording.requests.filter((url) => !url.startsWith('data:'))).toEqual([
-        `${harnessUrl}?preview=${name}&mode=${mode}`,
+        `${origin}/sandboxed.html`,
+        `${harnessUrl}${query}`,
         bundleUrl,
       ])
     })
@@ -213,16 +229,16 @@ for (const [name, widget] of Object.entries(previews)) {
 
 for (const name of Object.keys(previews).filter((key) => key.startsWith('field-') && key !== 'field-child-collection')) {
   for (const mode of modes) {
-    test(`the ${name} preview draws its required, read-only and error states in ${mode} mode`, async ({ page }) => {
+    test(`the ${name} preview draws its read-only and required states in ${mode} mode`, async ({ page }) => {
       const recording = await openHarness(page, `?preview=${name}&mode=${mode}`)
 
-      // The required mark is a hidden element after the label text, so screen readers skip it.
-      await expect(
-        figure(page, 'Required').locator('label').first().locator('span[aria-hidden="true"]').last(),
-      ).toHaveText('*')
       await expect(figure(page, 'Read-only').getByTestId(/^field-value-/)).toBeVisible()
       await expect(figure(page, 'Read-only').getByRole('textbox')).toHaveCount(0)
-      await expect(figure(page, 'Validation error').getByRole('alert')).toHaveText('This value is not valid.')
+      const required = figure(page, 'Required, help text and error')
+      // The required mark is a hidden element after the label text, so screen readers skip it.
+      await expect(required.locator('label').first().locator('span[aria-hidden="true"]').last()).toHaveText('*')
+      await expect(required.getByText('A short note that explains the field.', { exact: true })).toBeVisible()
+      await expect(required.getByRole('alert')).toHaveText('This value is not valid.')
       expect(recording.errors).toEqual([])
     })
   }
@@ -252,7 +268,7 @@ for (const mode of modes) {
 }
 
 for (const mode of modes) {
-  test(`the form preview draws its validation, read-only and wizard states in ${mode} mode`, async ({ page }) => {
+  test(`the form preview draws its validation, read-only, wizard, columns and many-steps states in ${mode} mode`, async ({ page }) => {
     const recording = await openHarness(page, `?preview=form&mode=${mode}`)
 
     await expect(figure(page, 'Validation errors').getByTestId('field-error-title')).toHaveText('Enter a title.')
@@ -263,6 +279,18 @@ for (const mode of modes) {
     await expect(wizard.getByTestId('form-steps')).toBeVisible()
     await wizard.getByRole('button', { name: 'Next', exact: true }).click()
     await expect(wizard.locator('#quantity')).toBeVisible()
+    // Fields of several widths share rows, and some of them show messages.
+    const columns = figure(page, 'Fields in columns, with errors')
+    await expect(columns.getByTestId('field-error-title')).toHaveText('Enter a title.')
+    await expect(columns.getByTestId('field-error-amount')).toHaveText('This value is not valid.')
+    const top = async (field: string) => (await columns.locator(`label[for="${field}"]`).boundingBox())!.y
+    expect(await top('title')).toBe(await top('status'))
+    // A wizard with seven steps shows the number of each step.
+    const many = figure(page, 'Many steps')
+    const steps = many.getByTestId('form-steps')
+    await expect(steps).toBeVisible()
+    await expect(steps.locator('li')).toHaveCount(7)
+    await expect(steps.getByText('2', { exact: true })).toBeVisible()
     expect(recording.errors).toEqual([])
   })
 }
@@ -355,7 +383,7 @@ for (const mode of modes) {
 
 test('the field-date-time preview opens its date picker', async ({ page }) => {
   const recording = await openHarness(page, '?preview=field-date-time&mode=light')
-  await figure(page, 'Typical').getByLabel(fieldLabel('Submitted at')).click()
+  await figure(page, 'Editable').getByLabel(fieldLabel('Submitted at')).click()
 
   await expect(page.getByRole('button', { name: 'Next month', exact: true })).toBeVisible()
   expect(recording.errors).toEqual([])
@@ -363,7 +391,7 @@ test('the field-date-time preview opens its date picker', async ({ page }) => {
 
 test('the field-reference preview lists the fixture categories in its lookup', async ({ page }) => {
   const recording = await openHarness(page, '?preview=field-reference&mode=light')
-  await figure(page, 'Typical')
+  await figure(page, 'Editable')
     .getByTestId('reference-category')
     .getByRole('button', { name: 'Choose', exact: true })
     .click()
@@ -483,6 +511,14 @@ test('the bundle sets window.Axis with one mount for each preview', async ({ pag
 
   const mounts = await page.evaluate(() => Object.keys((window as unknown as { Axis: object }).Axis))
   expect(mounts.sort()).toEqual(Object.keys(previews).sort())
+  // The bundle's first line gives the card width and lists the same previews, in groups.
+  const firstLine = readFileSync(bundleFile, 'utf8').split('\n', 1)[0]
+  const header = JSON.parse(/^\/\* @ds-bundle: (\{.*\}) \*\/$/.exec(firstLine)![1]) as {
+    width: number
+    groups: { name: string; previews: string[] }[]
+  }
+  expect(header.width).toBe(992)
+  expect(header.groups.flatMap((group) => group.previews).sort()).toEqual(mounts)
   await expect(page.locator('[data-preview]')).toHaveCount(Object.keys(previews).length)
   await page.waitForLoadState('networkidle')
   expect(recording.errors).toEqual([])

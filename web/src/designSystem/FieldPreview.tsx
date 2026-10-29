@@ -10,6 +10,8 @@ interface FieldPreviewProps {
   type: PreviewFieldType
   required?: boolean
   readOnly?: boolean
+  /** The text key of the help text under the label. */
+  helpKey?: string
   /** The record whose value the input starts with. A caller passes a module-level constant. */
   record?: RecordItem
   /** The messages to show, by JSON Pointer. A caller passes a module-level constant. */
@@ -21,10 +23,11 @@ export function FieldPreview({
   type,
   required = false,
   readOnly = false,
+  helpKey,
   record = savedRecord,
   problem,
 }: FieldPreviewProps) {
-  const entity = useMemo(() => entityWithField(type, required), [type, required])
+  const entity = useMemo(() => entityWithField(type, required, helpKey ?? null), [type, required, helpKey])
   const sections = useMemo(() => sectionsOf(entity, null, readOnly ? new Set() : undefined), [entity, readOnly])
   const form = useRecordForm(entity, sections, locale)
   const { start, showProblem, version } = form

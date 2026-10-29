@@ -110,8 +110,12 @@ export const entity: EntityMetadata = {
 }
 
 /** The entity cut down to one field, so a preview shows only that field's input. */
-export function entityWithField(type: PreviewFieldType, required = false): EntityMetadata {
-  return { ...entity, fields: [{ ...fields[type], required }] }
+export function entityWithField(
+  type: PreviewFieldType,
+  required = false,
+  helpKey: string | null = null,
+): EntityMetadata {
+  return { ...entity, fields: [{ ...fields[type], required, helpKey }] }
 }
 
 const widgetBase: WidgetMetadata = {
@@ -168,6 +172,32 @@ export const tableWidget: WidgetMetadata = {
       visibleWhen: null,
     },
     { type: 'delete', labelKey: 'request.delete', recordsPath: requestsPath, visibleWhen: null },
+  ],
+}
+
+/** The request table with four row actions besides Open, so the table folds them into its "…" menu. */
+export const manyActionsTableWidget: WidgetMetadata = {
+  ...tableWidget,
+  rowActions: [
+    ...tableWidget.rowActions.slice(0, 1),
+    {
+      type: 'navigate',
+      page: 'Request',
+      labelKey: 'request.edit',
+      parameters: {},
+      record: 'id',
+      opensForm: true,
+      paths: {},
+      visibleWhen: null,
+    },
+    {
+      type: 'startProcess',
+      process: 'Approve',
+      labelKey: 'request.submit',
+      instancesPath,
+      visibleWhen: null,
+    },
+    ...tableWidget.rowActions.slice(1),
   ],
 }
 
@@ -237,10 +267,38 @@ export const formWidget: EntityWidgetMetadata = {
 export const detailWidget: EntityWidgetMetadata = { ...formWidget, type: 'detail', detail: { record: 'request' } }
 
 /** The form with a name of its own, so its state and save answers are its own fixtures. */
-const namedForm = (name: string, steps: FormMetadata['steps'] = []): EntityWidgetMetadata => ({
+const namedForm = (
+  name: string,
+  steps: FormMetadata['steps'] = [],
+  sections: FormMetadata['sections'] = form.sections,
+): EntityWidgetMetadata => ({
   ...formWidget,
-  form: { ...form, name, steps },
+  form: { ...form, name, steps, sections },
 })
+
+/** The sections of the form, with each field at a width, so fields of several widths share rows. */
+const columnsSections: FormMetadata['sections'] = [
+  {
+    name: 'general',
+    titleKey: 'request.section.general',
+    fields: [
+      { name: 'title', readOnly: false, width: 8 },
+      { name: 'status', readOnly: false, width: 4 },
+      { name: 'category', readOnly: false, width: 6 },
+      { name: 'urgent', readOnly: false, width: 6 },
+    ],
+  },
+  {
+    name: 'details',
+    titleKey: 'request.section.details',
+    fields: [
+      { name: 'quantity', readOnly: false, width: 4 },
+      { name: 'amount', readOnly: false, width: 4 },
+      { name: 'neededOn', readOnly: false, width: 4 },
+      { name: 'submittedAt', readOnly: false, width: 6 },
+    ],
+  },
+]
 
 /** The form whose save the fixture answers with a validation problem, so its messages show. */
 export const invalidRequestForm = namedForm('InvalidRequestForm')
@@ -252,19 +310,57 @@ export const wizardRequestForm = namedForm('WizardRequestForm', [
   { titleKey: 'request.section.details', sections: ['details'] },
 ])
 
+/** The form with fields of several widths on shared rows, whose save the fixture answers with messages. */
+export const columnsRequestForm = namedForm('ColumnsRequestForm', [], columnsSections)
+
+/** The fields of the many-steps form, one in each section and each step. */
+const manyStepsFields = [
+  fields.text,
+  fields.reference,
+  fields.enum,
+  fields.integer,
+  fields.decimal,
+  fields.date,
+  fields['date-time'],
+]
+
+/** The form with seven wizard steps, one field each, so the steps bar shows numbers. */
+export const manyStepsRequestForm = namedForm(
+  'ManyStepsRequestForm',
+  manyStepsFields.map(({ name, labelKey }) => ({ titleKey: labelKey ?? name, sections: [name] })),
+  manyStepsFields.map(({ name, labelKey }) => ({
+    name,
+    titleKey: labelKey ?? name,
+    fields: [{ name, readOnly: false }],
+  })),
+)
+
 const noStateAnswer = () => ({ sections: [], fields: {}, errors: {}, defaults: {} })
+
+/** A save that fails with the given messages, by JSON Pointer. */
+const validationFailed = (errors: Record<string, string[]>) => () =>
+  new Response(JSON.stringify({ title: 'Validation failed', errors }), {
+    status: 400,
+    headers: { 'Content-Type': 'application/json' },
+  })
 
 /** The answers only the validation errors state uses: no state, and a save that fails on two fields. */
 export const invalidFormRoutes: Record<string, () => unknown> = {
   [formStatePath('InvalidRequestForm')]: noStateAnswer,
-  [`${requestsPath}?form=InvalidRequestForm`]: () =>
-    new Response(
-      JSON.stringify({
-        title: 'Validation failed',
-        errors: { '/values/title': ['preview.error.title'], '/values/quantity': ['preview.error.field'] },
-      }),
-      { status: 400, headers: { 'Content-Type': 'application/json' } },
-    ),
+  [`${requestsPath}?form=InvalidRequestForm`]: validationFailed({
+    '/values/title': ['preview.error.title'],
+    '/values/quantity': ['preview.error.field'],
+  }),
+}
+
+/** The answers only the columns state uses: no state, and a save that fails on three fields. */
+export const columnsFormRoutes: Record<string, () => unknown> = {
+  [formStatePath('ColumnsRequestForm')]: noStateAnswer,
+  [`${requestsPath}?form=ColumnsRequestForm`]: validationFailed({
+    '/values/title': ['preview.error.title'],
+    '/values/amount': ['preview.error.field'],
+    '/values/neededOn': ['preview.error.field'],
+  }),
 }
 
 /** The answers only the read-only state uses: the form state locks the amount. */
@@ -280,6 +376,11 @@ export const lockedFormRoutes: Record<string, () => unknown> = {
 /** The answers only the wizard state uses: no state, as the steps are the only difference. */
 export const wizardFormRoutes: Record<string, () => unknown> = {
   [formStatePath('WizardRequestForm')]: noStateAnswer,
+}
+
+/** The answers only the many-steps state uses: no state, as the number of steps is the only difference. */
+export const manyStepsFormRoutes: Record<string, () => unknown> = {
+  [formStatePath('ManyStepsRequestForm')]: noStateAnswer,
 }
 
 /** The detail widget over a record whose values are all empty, so the Lines table has no rows. */
@@ -740,6 +841,7 @@ export const siteTexts: Record<string, string> = {
   'request.section.details': 'Details',
   'request.new': 'New request',
   'request.open': 'Open',
+  'request.edit': 'Edit',
   'request.delete': 'Delete',
   'request.submit': 'Submit for approval',
   'request.task.review': 'Review the request',
@@ -750,6 +852,7 @@ export const siteTexts: Record<string, string> = {
   'kpi.requests': 'Requests',
   'preview.requests': 'Requests',
   'preview.tasks': 'Tasks',
+  'preview.help': 'A short note that explains the field.',
   'preview.error.field': 'This value is not valid.',
   'preview.error.title': 'Enter a title.',
   'preview.error.unitPrice': 'Unit price cannot be negative.',
