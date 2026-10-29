@@ -289,6 +289,7 @@ sessions.MapTaskEndpoints();
 sessions.MapNotificationEndpoints();
 sessions.MapDataSourceEndpoints();
 sessions.MapUserEndpoints();
+sessions.MapUserCommandEndpoints();
 sessions.MapAboutEndpoints();
 sessions.MapSessionEndpoints();
 sessions.MapUserPickerEndpoints();
