@@ -206,7 +206,8 @@ _(planned for M17)_
   addresses of `axis`. When the tenant has a platform client secret, the site client's secret is base64url of
   HMAC-SHA256(platform secret, client id), so the server can compute it. Without a platform secret, Keycloak makes the
   secret as before. Without an `axis` client it is a plain client with a secret. Both tenant catalogs carry
-  the realm's name, the identity provider's address, the activation secret and the platform client's secret, see
+  the realm's name, the identity provider's address, the activation secret, the platform client's secret and the secret of
+  the `axis-users` client, see
   [tenant realm](host-settings.md#tenant-realm). The server's startup activation calls it, after it activates each
   application folder, for a tenant that has realm details. So does `Axis.Admin` activation, as described below. When the
   identity provider answers 409 Conflict, as when another host syncs the same realm at the same moment, the sync reads
