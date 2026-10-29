@@ -187,6 +187,7 @@ builder.Services.AddAuthentication(EndpointCaller.RequestScheme)
     .AddSession(plainHttpAllowed)
     .AddTenantSignIn(oidcTenants, sessionCookiePolicy, allowHttp: plainHttpAllowed)
     .AddEndpointCallers(oidcTenants, allowHttp: plainHttpAllowed);
+builder.Services.AddRouteAuthorization();
 
 // Off unless folders are listed, which is the Production default.
 var startupFolders = builder.Configuration.GetSection(StartupActivationOptions.SectionName).Get<string[]>() ?? [];
@@ -271,10 +272,13 @@ app.UseStaticFiles(new StaticFileOptions
     },
 });
 
-// Open routes have no limit. Every other route has one, and a route that sets its own partition overrides its group's.
-var open = app.MapGroup(string.Empty).WithoutRateLimit();
-open.MapHealthEndpoints();
-open.MapPresentationEndpoints();
+// After the static files, so they stay public, and after the limiter, so anonymous requests are counted. Without
+// this call WebApplication adds it before tenant resolution and authentication.
+app.UseAuthorization();
+
+// Open routes have no limit and need no session. Every other route has a limit and needs a session or a token, and a route
+// that sets its own partition overrides its group's.
+app.MapOpenRoutes();
 
 var sessions = app.MapGroup(string.Empty).WithRateLimit(Partition.Session);
 sessions.MapSiteEndpoints();
@@ -295,11 +299,8 @@ sessions.MapAboutEndpoints();
 sessions.MapSessionEndpoints();
 sessions.MapUserPickerEndpoints();
 sessions.MapStudioEndpoints();
-sessions.MapAuthEndpoints();
 
 app.MapGroup(string.Empty).WithBearerRateLimit().MapInboundEndpoints();
-
-app.MapFallbackToFile("index.html").WithoutRateLimit();
 
 app.Run();
 

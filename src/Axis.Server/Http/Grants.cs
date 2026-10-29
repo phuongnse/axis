@@ -6,7 +6,8 @@ namespace Axis.Server.Http;
 /// The problems of a request that is not allowed. A request without a session is a 401, and one
 /// whose user holds no grant for it is a 403, as is a write to a record outside the user's filters
 /// for the action and a write of a field no grant for the action covers. A request whose access depends on a field that is being recomputed is a 409. Each has one fixed title for every route, which names no application, entity,
-/// data source, action or filter.
+/// data source, action or filter. A request without a session or a token to a route that is not open gets its 401
+/// from the authorization fallback, see <see cref="RouteAuthorization"/>.
 /// </summary>
 internal static class Grants
 {
@@ -28,6 +29,15 @@ internal static class Grants
         return Results.Problem(
             statusCode: StatusCodes.Status401Unauthorized,
             title: "A valid bearer token is needed for this request.");
+    }
+
+    /// <summary>The 401 of an inbound endpoint call without a valid bearer token, with the tenant's <c>WWW-Authenticate</c> challenge.</summary>
+    public static IResult EndpointTokenRequired(HttpContext context)
+    {
+        BearerChallenge.Write(context);
+        return Results.Problem(
+            statusCode: StatusCodes.Status401Unauthorized,
+            title: "A valid bearer token is needed to call this endpoint.");
     }
 
     public static IResult Forbidden() =>

@@ -441,13 +441,7 @@ internal static class InboundEndpoints
         return caller.Succeeded ? EndpointCaller.Read(caller.Principal) : null;
     }
 
-    private static IResult Unauthorized(HttpRequest request)
-    {
-        BearerChallenge.Write(request.HttpContext);
-        return Results.Problem(
-            statusCode: StatusCodes.Status401Unauthorized,
-            title: "A valid bearer token is needed to call this endpoint.");
-    }
+    private static IResult Unauthorized(HttpRequest request) => Grants.EndpointTokenRequired(request.HttpContext);
 
     private static IResult NotFound() =>
         Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "No endpoint exists with this name.");
