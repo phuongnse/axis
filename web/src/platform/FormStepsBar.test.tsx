@@ -15,6 +15,16 @@ describe('FormStepsBar', () => {
     expect(items[1]).toHaveAttribute('aria-current', 'step')
   })
 
+  it('shows a check mark in place of the number for a finished step below seven steps', () => {
+    render(<FormStepsBar titles={['Basics', 'Extras', 'Review']} current={1} />)
+
+    const items = screen.getAllByRole('listitem')
+    expect(items[0].querySelector('.anticon-check')).toBeInTheDocument()
+    expect(within(items[0]).queryByText('1')).toBeNull()
+    expect(items[1].querySelector('.anticon-check')).toBeNull()
+    expect(within(items[1]).getByText('2')).toBeInTheDocument()
+  })
+
   it('shows only the current title from seven steps, and each other step as a number with its title', () => {
     render(<FormStepsBar titles={sevenTitles} current={2} />)
 
@@ -27,9 +37,15 @@ describe('FormStepsBar', () => {
       }
       const item = items[index]
       expect(within(item).getByText(title)).toHaveStyle({ position: 'absolute', width: '1px' })
-      expect(within(item).getByText(String(index + 1))).toHaveAttribute('aria-hidden', 'true')
       expect(item.querySelector('[tabindex]')).toHaveAttribute('tabindex', '0')
       expect(item).not.toHaveAttribute('aria-current')
+      if (index < 2) {
+        expect(item.querySelector('.anticon-check')).toHaveAttribute('aria-hidden', 'true')
+        expect(within(item).queryByText(String(index + 1))).toBeNull()
+      } else {
+        expect(within(item).getByText(String(index + 1))).toHaveAttribute('aria-hidden', 'true')
+        expect(item.querySelector('.anticon-check')).toBeNull()
+      }
     })
   })
 })

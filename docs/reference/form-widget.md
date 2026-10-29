@@ -92,10 +92,11 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
     - **Help text.** A field whose entity field has
       [`help`](resource-files.md#resource-file-shape) shows it between the
       label and the input, at 12px with a 20px line height in `textMuted`,
-      tied to the input with `aria-describedby`. _(planned for M18)_ It sits
-      4px under the label and `spacing-xs` (8px) above the input. A file input and a read-only
-      value show it but are not tied to it. A message under the input never replaces it. It is one
-      or two short lines: longer guidance belongs on the page or the section.
+      tied to the input with `aria-describedby`. It sits 4px under the label
+      and `spacing-xs` (8px) above the input. A file input and a read-only
+      value show it but are not tied to it. A message under the input never
+      replaces it. It is one or two short lines: longer guidance belongs on
+      the page or the section.
       Only a form shows it, not a table or a detail.
     - **Validation messages.** A message is 14px at a 20px line height, 4px
       under its input, followed by a whole field gap (`spacing-lg`, 24px)
