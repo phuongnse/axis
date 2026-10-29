@@ -36,6 +36,7 @@ public interface ITenantCatalog
 /// <param name="PreviewOf">The id of the main tenant when this is a preview tenant, otherwise <c>null</c>.</param>
 /// <param name="Email">The tenant's own mail settings, which replace the host's whole, or <c>null</c> when the tenant uses the host's. Both sources have them.</param>
 /// <param name="Realm">What activation needs to sync the tenant's realm, or <c>null</c> when the source holds none for this tenant. Both sources have it, and a preview tenant has none.</param>
+/// <param name="RealmUsers">What the server needs to list the tenant's realm users, or <c>null</c> when the source holds none for this tenant. Both sources have it, and a preview tenant has none.</param>
 public sealed record TenantEntry(
     string Id,
     IReadOnlyList<string> Hosts,
@@ -45,7 +46,8 @@ public sealed record TenantEntry(
     IReadOnlyDictionary<string, TenantBinding> Bindings,
     string? PreviewOf = null,
     EmailSettings? Email = null,
-    TenantRealmAccess? Realm = null);
+    TenantRealmAccess? Realm = null,
+    TenantRealmUsers? RealmUsers = null);
 
 /// <summary>
 /// What activation needs to sync a tenant's realm: the address of the identity provider, the realm's name and the
@@ -57,6 +59,15 @@ public sealed record TenantEntry(
 /// <param name="ActivationClientSecret">The secret of the <c>axis-activation</c> client.</param>
 /// <param name="PlatformClientSecret">The secret of the platform client <c>axis</c>, from which the site client secrets derive (<see cref="Realms.SiteClientSecret"/>), or <c>null</c> when the tenant has none.</param>
 public sealed record TenantRealmAccess(Uri BaseAddress, string Name, SecretValue ActivationClientSecret, SecretValue? PlatformClientSecret = null);
+
+/// <summary>
+/// What the server needs to list a tenant's realm users: the address of the identity provider, the realm's name and the
+/// secret of its <c>axis-users</c> client. The secret is a <see cref="SecretValue"/>, so the text form never shows it.
+/// </summary>
+/// <param name="BaseAddress">The identity provider's address, always ending with a slash, so a path joins onto it.</param>
+/// <param name="Realm">The realm's name.</param>
+/// <param name="ClientSecret">The secret of the <c>axis-users</c> client.</param>
+public sealed record TenantRealmUsers(Uri BaseAddress, string Realm, SecretValue ClientSecret);
 
 /// <summary>How one tenant signs people in. A value the source leaves blank is <c>null</c>.</summary>
 /// <param name="Profile">The sign-in profile as the source wrote it, or <c>null</c> when unset, which counts as <c>standard</c>. See <see cref="TenantSignInProfiles"/>.</param>

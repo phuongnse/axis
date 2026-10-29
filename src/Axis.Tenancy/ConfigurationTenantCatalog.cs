@@ -60,6 +60,7 @@ public sealed class ConfigurationTenantCatalog : ITenantCatalog
             }
 
             AddRealmProblems(section.GetSection(id), id, settings.PreviewOf, problems);
+            AddRealmUsersProblems(section.GetSection(id), id, settings.PreviewOf, problems);
         }
 
         if (!environment.IsDevelopment())
@@ -104,6 +105,29 @@ public sealed class ConfigurationTenantCatalog : ITenantCatalog
         {
             problems.Add($"Tenant '{id}' sets {prefix}:Realm:ActivationClientSecret, so {prefix}:Oidc:Authority must be an http or https address that ends in /realms/{Uri.EscapeDataString(name)}.");
         }
+    }
+
+    // A blank UsersClientSecret means the tenant has no users client. With a secret, the Oidc authority must end in
+    // /realms/<realm>. A preview tenant's own Oidc block is rejected already. A message names a setting and never holds a value.
+    private static void AddRealmUsersProblems(IConfigurationSection tenant, string id, string? previewOf, List<string> problems)
+    {
+        if (!string.IsNullOrWhiteSpace(previewOf) || Blank(tenant["Oidc:UsersClientSecret"]) is null || TenantRealmAddress.Split(tenant["Oidc:Authority"]) is not null)
+        {
+            return;
+        }
+
+        var prefix = $"{TenantOptions.SectionName}:{id}";
+        problems.Add($"Tenant '{id}' sets {prefix}:Oidc:UsersClientSecret, so {prefix}:Oidc:Authority must be an http or https address that ends in /realms/<realm>.");
+    }
+
+    private static TenantRealmUsers? RealmUsers(IConfigurationSection tenant, bool preview)
+    {
+        if (preview || Secret(tenant["Oidc:UsersClientSecret"]) is not { } secret || TenantRealmAddress.Split(tenant["Oidc:Authority"]) is not { } address)
+        {
+            return null;
+        }
+
+        return new TenantRealmUsers(address.BaseAddress, address.Realm, secret);
     }
 
     private static TenantRealmAccess? Realm(IConfigurationSection tenant, bool preview)
@@ -160,7 +184,8 @@ public sealed class ConfigurationTenantCatalog : ITenantCatalog
                 bindings,
                 main,
                 tenantSection is null ? null : EmailSettings.Read(tenantSection.GetSection("Email"), $"{TenantOptions.SectionName}:{id}:Email", []),
-                tenantSection is null ? null : Realm(tenantSection, main is not null));
+                tenantSection is null ? null : Realm(tenantSection, main is not null),
+                tenantSection is null ? null : RealmUsers(tenantSection, main is not null));
         });
 
     private static TenantOidc? Oidc(IConfigurationSection? section) =>
