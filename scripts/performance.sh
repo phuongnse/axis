@@ -9,6 +9,9 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 source scripts/lib/test-results.sh
 
+# The tests' Keycloak loads the Axis theme from the test output, which copies artifacts/keycloak-theme.
+npm run build:keycloak-theme --prefix web
+
 filter=("$@")
 [ "$#" -gt 0 ] || filter=(--filter-class '*PerformanceTests')
 run_suite performance tests/Axis.Integration.Tests dotnet test --project tests/Axis.Integration.Tests -c Release \

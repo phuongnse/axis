@@ -2,7 +2,8 @@
 # End-to-end tests: real server, real PostgreSQL and the built SPA in Chromium (requires Docker).
 # Keycloak runs with the development realm from samples/keycloak, and Playwright starts the
 # server only once the realm answers. The server signs people in through that realm at
-# /api/auth/sign-in. The SPA does not offer it yet.
+# /api/auth/sign-in. The SPA does not offer it yet. The realm signs people in on the Axis theme, which this script
+# builds into artifacts/keycloak-theme and mounts read-only before Keycloak starts.
 # The server starts with six applications active: the generic E2E test application in
 # tests/e2e/fixtures/e2e-app, the purchase request sample in samples/apps/purchase-requests, the
 # leave request sample in samples/apps/leave-requests, the service desk sample in
@@ -132,10 +133,13 @@ if affected playwright; then
     -v "$PWD/samples/postgres/init-roles.sql:/docker-entrypoint-initdb.d/init-roles.sql:ro" "$image" >/dev/null
   port="$(docker port "$container" 5432/tcp | head -n1 | sed 's/.*://')"
 
-  # Keycloak starts now and imports the realm while PostgreSQL and the build get ready.
+  # Keycloak starts now and imports the realm while PostgreSQL and the build get ready. It mounts the folder of the
+  # theme, so the rebuild in scripts/build.sh later is fine.
+  npm run build:keycloak-theme --prefix web
   docker run -d --name "$keycloak_container" \
     -e KC_BOOTSTRAP_ADMIN_USERNAME=admin -e KC_BOOTSTRAP_ADMIN_PASSWORD=admin \
-    -v "$PWD/samples/keycloak:/opt/keycloak/data/import:ro" -p 127.0.0.1::8080 \
+    -v "$PWD/samples/keycloak:/opt/keycloak/data/import:ro" \
+    -v "$PWD/artifacts/keycloak-theme:/opt/keycloak/themes:ro" -p 127.0.0.1::8080 \
     "$keycloak_image" start-dev --import-realm >/dev/null
   keycloak_port="$(docker port "$keycloak_container" 8080/tcp | head -n1 | sed 's/.*://')"
 

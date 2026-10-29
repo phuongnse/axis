@@ -3,7 +3,7 @@ import type { APIRequest, APIRequestContext, Page } from "@playwright/test";
 import { csrfHeaders } from "../csrf";
 import { sessionFile, useSession, type SampleUser } from "../sessions";
 import { expectShown, fieldValue } from "../fields";
-import { logInAtKeycloak } from "../keycloak";
+import { logInAtKeycloak, signInUsername } from "../keycloak";
 
 // Each journey checks what a user sees in the browser, then sends the same request straight to the
 // API, so a hidden button never stands in for the server's check. No session is set for the whole
@@ -144,7 +144,7 @@ async function managerTaskId(
 
 /** Signs in as `user` on the Keycloak login page. */
 async function logIn(page: Page, user: SampleUser) {
-  await expect(page.locator("#username")).toBeVisible();
+  await expect(signInUsername(page)).toBeVisible();
   await logInAtKeycloak(page, user);
 }
 

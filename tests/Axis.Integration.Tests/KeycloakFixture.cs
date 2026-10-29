@@ -6,8 +6,9 @@ namespace Axis.Integration.Tests;
 
 /// <summary>
 /// One real Keycloak container with the development realm, shared by the whole run. It starts the
-/// first time a test needs it, so a run that needs no Keycloak never starts one. It also holds the breached-password
-/// list that the realms made by <c>TenantRealm</c> name in their password policy. The fixture removes
+/// first time a test needs it, so a run that needs no Keycloak never starts one. It loads the Axis theme, which the
+/// realm uses as its login theme, from the test output. Build the theme first with
+/// <c>npm run build:keycloak-theme --prefix web</c>. It also holds the breached-password list that the realms made by <c>TenantRealm</c> name in their password policy. The fixture removes
 /// the container when the run ends. A test may create and delete a realm of its own, but must not change the
 /// <c>axis</c> realm.
 /// </summary>
@@ -71,10 +72,18 @@ public sealed class KeycloakFixture : IAsyncDisposable
 
     private static async Task<KeycloakContainer> StartContainerAsync()
     {
+        var theme = new DirectoryInfo(Path.Combine(AppContext.BaseDirectory, "KeycloakTheme"));
+        if (!File.Exists(Path.Combine(theme.FullName, "axis", "login", "login.ftl")))
+        {
+            throw new InvalidOperationException(
+                "The Axis Keycloak theme is missing from the test output. Run 'npm run build:keycloak-theme --prefix web' and build the tests again.");
+        }
+
         // The builder already runs start-dev, and the command adds --import-realm to it.
         var container = new KeycloakBuilder(Image)
             .WithResourceMapping(new FileInfo(Path.Combine(AppContext.BaseDirectory, "Keycloak", "axis-realm.json")), "/opt/keycloak/data/import/")
             .WithResourceMapping(new FileInfo(Path.Combine(AppContext.BaseDirectory, "Keycloak", "axis-breached-passwords.txt")), "/opt/keycloak/data/password-blacklists/")
+            .WithResourceMapping(theme, "/opt/keycloak/themes/")
             .WithCommand("--import-realm")
             .WithEnvironment("KC_BOOTSTRAP_ADMIN_CLIENT_ID", AdminClientId)
             .WithEnvironment("KC_BOOTSTRAP_ADMIN_CLIENT_SECRET", AdminClientSecret)

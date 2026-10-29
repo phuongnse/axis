@@ -33,10 +33,11 @@ ${log('dotnet')}case "$*" in
 esac
 exec sleep 60
 `,
-  // Playwright waits until the worker and the publisher have reported ready, as the real run does,
-  // then writes one passing test to its JUnit file.
+  // The theme build exits at once. Playwright waits until the worker and the publisher have reported
+  // ready, as the real run does, then writes one passing test to its JUnit file.
   npm: `#!/usr/bin/env bash
-${log('npm')}for _ in $(seq 1 100); do
+${log('npm')}if [ "$1 $2" = "run build:keycloak-theme" ]; then exit 0; fi
+for _ in $(seq 1 100); do
   if grep -q 'journey is ready' "$AXIS_E2E_WORKER_LOG" 2>/dev/null &&
     grep -q 'journey ready' "$PWD/artifacts/logs/e2e-publisher.log" 2>/dev/null; then break; fi
   sleep 0.1
@@ -98,7 +99,7 @@ function runE2e(shard) {
 }
 
 const playwrightCall = (run) => {
-  const calls = run.calls.filter((call) => call.startsWith('npm '))
+  const calls = run.calls.filter((call) => call.startsWith('npm test '))
   assert.equal(calls.length, 1, run.calls.join('\n'))
   return calls[0]
 }
@@ -134,6 +135,18 @@ describe('scripts/e2e.sh runs Playwright, or one shard of it with AXIS_E2E_SHARD
     assert.doesNotMatch(playwrightCall(run), /--shard/)
     assert.ok(run.results('playwright'))
     for (const suite of smokeSuites) assert.ok(!run.results(suite), suite)
+  })
+
+  test('the theme is built before Keycloak starts, and Keycloak mounts it read-only', () => {
+    const run = runE2e()
+
+    assert.equal(run.status, 0, run.stdout + run.stderr)
+    const build = run.calls.findIndex((call) => call.startsWith('npm run build:keycloak-theme '))
+    const keycloak = run.calls.findIndex(
+      (call) => call.startsWith('docker run ') && call.includes('/opt/keycloak/themes:ro'),
+    )
+    assert.ok(build >= 0, run.calls.join('\n'))
+    assert.ok(keycloak > build, run.calls.join('\n'))
   })
 
   for (const shard of ['4/3', '0/3', 'abc']) {

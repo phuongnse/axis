@@ -1,7 +1,7 @@
 import { expect, test } from '../test'
 import type { Page } from '@playwright/test'
 import { chooseTheme } from '../shell'
-import { logInAtKeycloak } from '../keycloak'
+import { logInAtKeycloak, signInUsername } from '../keycloak'
 
 // The platform home page stays open while nobody is signed in, and is then the sign-in card. Every application page
 // needs a session and shows the sign-in prompt, and only a click on a Sign in button starts sign-in.
@@ -60,7 +60,7 @@ test('a person who cancels at the Keycloak login page lands on the home page wit
   const signIn = page.getByRole('main').getByRole('button', { name: 'Sign in', exact: true })
   await page.goto('/')
   await signIn.click()
-  await page.locator('#username').waitFor()
+  await signInUsername(page).waitFor()
   const state = new URL(page.url()).searchParams.get('state')
   // The realm's login form has no cancel button. This is the answer Keycloak sends when a person cancels.
   await page.goto(`/api/auth/callback?error=access_denied&state=${encodeURIComponent(state!)}`)

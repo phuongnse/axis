@@ -606,6 +606,8 @@ describe('the on-premises installation', () => {
       const realmJson = JSON.parse(readFileSync(join(root, 'samples/keycloak/axis-realm.json'), 'utf8'))
       const client = realmJson.clients.find((candidate) => candidate.clientId === 'axis')
       assert.ok(client, 'the development realm has no axis client')
+      // This install does not mount the Axis theme yet, so the realm keeps Keycloak's own sign-in page.
+      delete realmJson.loginTheme
       const origins = Object.values(hosts).map((host) => `https://${host}/*`)
       client.redirectUris.push(...origins)
       client.attributes['post.logout.redirect.uris'] += `##${origins.join('##')}`

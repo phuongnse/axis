@@ -1,6 +1,5 @@
 using System.Net;
 using System.Text.Json;
-using System.Text.RegularExpressions;
 using Axis.Configuration.Tests;
 using Axis.Server.Authentication;
 using Axis.Tenancy;
@@ -14,7 +13,7 @@ namespace Axis.Integration.Tests;
 /// <c>tenant create --preview-of</c> under the tenant directory. A preview tenant has its own hosts, database and
 /// bindings, and no sign-in settings of its own: the directory gives it those of its main tenant.
 /// </summary>
-public sealed partial class AdminPreviewTenantTests(PostgreSqlFixture database, KeycloakFixture keycloak) : IClassFixture<PostgreSqlFixture>
+public sealed class AdminPreviewTenantTests(PostgreSqlFixture database, KeycloakFixture keycloak) : IClassFixture<PostgreSqlFixture>
 {
     private const string BindingValue = "not-a-url-SECRET123";
 
@@ -236,8 +235,8 @@ public sealed partial class AdminPreviewTenantTests(PostgreSqlFixture database, 
         var loginPage = await browser.GetAsync(authorize, CancellationToken);
         var html = await loginPage.Content.ReadAsStringAsync(CancellationToken);
         Assert.True(loginPage.StatusCode == HttpStatusCode.OK, html);
-        var action = WebUtility.HtmlDecode(FormActionPattern().Match(html).Groups["action"].Value);
-        using var loginRequest = new HttpRequestMessage(HttpMethod.Post, new Uri(action))
+        var action = KeycloakSignIn.LoginAction(html);
+        using var loginRequest = new HttpRequestMessage(HttpMethod.Post, action)
         {
             Content = new FormUrlEncodedContent(new Dictionary<string, string>
             {
@@ -258,7 +257,4 @@ public sealed partial class AdminPreviewTenantTests(PostgreSqlFixture database, 
         Assert.Equal(HttpStatusCode.Found, signedIn.StatusCode);
         Assert.Contains(signedIn.Headers.GetValues("Set-Cookie"), cookie => cookie.StartsWith($"{Session.Scheme}=", StringComparison.Ordinal));
     }
-
-    [GeneratedRegex("""<form\b[^>]*\baction="(?<action>[^"]+)""")]
-    private static partial Regex FormActionPattern();
 }
