@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
-# The load test, first part: builds the three production images, starts the reference stack of
-# deploy/compose/compose.yaml (two server replicas behind the TLS proxy, one worker, PostgreSQL over TLS), migrates,
-# creates the tenant `load` and runs the placeholder k6 scenario in tests/load through the proxy. Removes the stack
-# at the end, unless --keep is given. Arguments after -- go to k6. The exit code is k6's.
+# The load test, first two parts: builds the three production images, writes the generated application of typical size
+# (tests/Axis.LoadData, seed 1) into its run folder, starts the reference stack of deploy/compose/compose.yaml (two
+# server replicas behind the TLS proxy, one worker, PostgreSQL over TLS), migrates and creates the tenant `load`. It then
+# prepares the realm `load` with 50 users (scripts/lib/load-realm.mjs, which writes artifacts/load/k6/users.json for
+# k6), activates the application in the tenant, which writes the seed records, and runs the placeholder k6 scenario in
+# tests/load through the proxy. Removes the stack at the end, unless --keep is given. Arguments after -- go to k6. The exit code is k6's.
 # The files of the run, with the certificates and secret files, are in artifacts/load. See docs/reference/performance.md.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -20,6 +22,7 @@ done
 source scripts/lib/retry.sh
 
 version=0.0.0-load
+seed=1
 tenant_host=load.axis.test
 identity_host=id.axis.test
 root="$PWD"
@@ -32,6 +35,9 @@ done
 
 rm -rf "$folder"
 node scripts/lib/load-stack.mjs "$folder"
+dotnet run --project tests/Axis.LoadData -c Release -- "$folder/apps/load" --seed "$seed"
+# The containers read the application as another user.
+chmod -R a+rX "$folder/apps"
 
 export AXIS_VERSION="$version"
 export AXIS_SECRETS_DIR="$folder/secrets"
@@ -118,6 +124,10 @@ wait_for 120 'The second server' server_ready "$AXIS_SERVER_2_PORT"
 compose --profile admin run --rm --no-TTY admin migrate
 compose --profile admin run --rm --no-TTY admin tenant create load --host "$tenant_host"
 wait_for 60 "The host $tenant_host" tenant_routed
+
+# The realm comes before the activation, which copies the redirect addresses and mappers of the client to the site's.
+node scripts/lib/load-realm.mjs "$folder" "$AXIS_HTTPS_PORT" "$seed"
+compose --profile admin run --rm --no-TTY admin activate /apps/load --tenant load
 
 set +e
 compose --profile load run --rm --no-TTY k6 run ${k6_args[@]+"${k6_args[@]}"} /scripts/placeholder.js

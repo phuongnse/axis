@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { describe, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
+import { loadUsers } from './lib/load-realm.mjs'
 
 // Runs scripts/load.sh in a temporary copy of the files it needs, with docker, npm and curl replaced by stubs that log
 // their calls. The real node and openssl write the certificates, the secret files and the override file.
@@ -18,9 +19,29 @@ const stubs = {
 ${log('docker')}if [ -n "\${STUB_FAIL_K6:-}" ] && [[ "$*" == *"run --rm --no-TTY k6"* ]]; then exit 3; fi
 exit 0
 `,
-  // The tenant answers 401, as the wait for its host expects.
+  // The tenant answers 401, as the wait for its host expects. The admin API of the identity provider answers by the URL,
+  // which is the last argument. Anything else gives no output.
   curl: `#!/usr/bin/env bash
 ${log('curl')}case "$*" in *'%{http_code}'*) printf 401 ;; esac
+case "\${@: -1}" in
+  */openid-connect/token) printf '{"access_token":"stub-token"}' ;;
+  *'/clients?clientId=axis') printf '[{"id":"client-1","clientId":"axis","secret":"s"}]' ;;
+  */clients/client-1/roles)
+    if [[ "$*" != *' -X POST '* ]]; then
+      printf '[{"id":"role-1","name":"clerk"},{"id":"role-2","name":"reviewer"},{"id":"role-3","name":"auditor"}]'
+    fi ;;
+  */admin/realms/load/users) printf 'HTTP/2 201\r\nlocation: https://id.axis.test/admin/realms/load/users/user-%s\r\n\r\n' "$RANDOM" ;;
+esac
+exit 0
+`,
+  // The generator writes the roles of the application into the folder after --.
+  dotnet: `#!/usr/bin/env bash
+${log('dotnet')}if [ "$1" = run ]; then
+  for role in clerk reviewer auditor; do
+    mkdir -p "\${@: -3:1}/roles"
+    printf '{"kind":"role","name":"%s"}' "$role" > "\${@: -3:1}/roles/$role.json"
+  done
+fi
 exit 0
 `,
   npm: `#!/usr/bin/env bash
@@ -34,6 +55,8 @@ function runLoad(args = [], extraEnv = {}) {
     for (const file of [
       'scripts/load.sh',
       'scripts/lib/load-stack.mjs',
+      'scripts/lib/load-realm.mjs',
+      'samples/keycloak/axis-realm.json',
       'scripts/lib/postgres-tls.mjs',
       'scripts/lib/retry.sh',
       'deploy/compose/compose.yaml',
@@ -58,8 +81,10 @@ function runLoad(args = [], extraEnv = {}) {
     for (const name of Object.keys(env)) if (name.startsWith('AXIS_') && !['AXIS_RETRY_DELAY_SECONDS'].includes(name)) delete env[name]
 
     const result = spawnSync('bash', ['scripts/load.sh', ...args], { cwd: dir, encoding: 'utf8', timeout: 120_000, env })
+    const usersFile = join(dir, 'artifacts/load/k6/users.json')
+    const users = existsSync(usersFile) ? JSON.parse(readFileSync(usersFile, 'utf8')) : undefined
     const calls = existsSync(env.STUB_LOG) ? readFileSync(env.STUB_LOG, 'utf8').trimEnd().split('\n') : []
-    return { ...result, calls, dir, left: existsSync(join(dir, 'artifacts/load/override.json')) }
+    return { ...result, calls, dir, users, left: existsSync(join(dir, 'artifacts/load/override.json')) }
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }
@@ -146,5 +171,63 @@ describe('scripts/load.sh starts the reference stack and runs the placeholder sc
 
     assert.equal(run.status, 3, run.stdout + run.stderr)
     assert.ok(indexOf(run, ' down -v ') > k6Index(run))
+  })
+})
+
+describe('scripts/load.sh writes the application and activates it in the load tenant', () => {
+  const activate = 'admin activate /apps/load --tenant load'
+
+  test('the generator runs with seed 1 into the run folder before the activation', () => {
+    const run = runLoad()
+
+    assert.equal(run.status, 0, run.stdout + run.stderr)
+    const generator = indexOf(run, 'run --project tests/Axis.LoadData')
+    assert.match(run.calls[generator], / -- \S+\/artifacts\/load\/apps\/load --seed 1$/)
+    assert.ok(generator < indexOf(run, activate))
+  })
+
+  test('the activation comes after tenant create and before the k6 run', () => {
+    const run = runLoad()
+
+    assert.equal(run.status, 0, run.stdout + run.stderr)
+    assert.ok(indexOf(run, 'admin tenant create load') < indexOf(run, activate))
+    assert.ok(indexOf(run, activate) < k6Index(run))
+  })
+
+  test('the realm is prepared and 50 users are created before the activation', () => {
+    const run = runLoad()
+
+    assert.equal(run.status, 0, run.stdout + run.stderr)
+    const activation = indexOf(run, activate)
+    const posts = run.calls.map((call, index) => ({ call, index })).filter(({ call }) => / -X POST .*\/admin\/realms\/load\/users$/.test(call))
+    assert.equal(posts.length, 50)
+    for (const { index } of posts) assert.ok(index < activation)
+    assert.ok(indexOf(run, ' -X PUT ') < activation)
+    assert.ok(indexOf(run, '/protocol-mappers/models') < activation)
+    for (const call of run.calls.filter((call) => call.startsWith('curl ') && call.includes('/admin/realms/'))) {
+      assert.match(call, / -H @\S+\/realm\/authorization /, call)
+      assert.doesNotMatch(call, /stub-token/, call)
+    }
+  })
+
+  test('--keep leaves users.json with 50 users, each with a password and a distinct authenticator secret', () => {
+    const run = runLoad(['--keep'])
+
+    assert.equal(run.status, 0, run.stdout + run.stderr)
+    assert.equal(run.users.length, 50)
+    run.users.forEach((user, index) => assert.equal(user.username, `load-user-${String(index + 1).padStart(2, '0')}`))
+    for (const user of run.users) {
+      assert.ok(user.password.length > 0)
+      assert.match(user.secret, /^[A-Z2-7]{32}$/)
+    }
+    assert.equal(new Set(run.users.map((user) => user.secret)).size, 50)
+  })
+
+  test('the same seed gives the same secrets and another seed gives different ones', () => {
+    assert.deepEqual(loadUsers(1, 'p'), loadUsers(1, 'p'))
+    assert.notDeepEqual(
+      loadUsers(1, 'p').map((user) => user.secret),
+      loadUsers(2, 'p').map((user) => user.secret),
+    )
   })
 })

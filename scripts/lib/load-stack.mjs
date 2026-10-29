@@ -105,7 +105,7 @@ export const writeLoadStack = (target, { proxyAddress = '172.31.250.10' } = {}) 
     ].join('\n'),
   )
 
-  for (const name of ['extensions', 'modules', 'studio', 'apps']) folderOf(name)
+  for (const name of ['extensions', 'modules', 'studio', 'apps', 'k6']) folderOf(name)
 
   // Every host reads the authority certificate that its connection strings name.
   const trustVolume = `${trust}:/run/test-ca:ro`
@@ -130,8 +130,8 @@ export const writeLoadStack = (target, { proxyAddress = '172.31.250.10' } = {}) 
         k6: {
           profiles: ['load'],
           image: k6Image,
-          environment: { ...authorityFile, AXIS_LOAD_URL: `https://${tenantHost}` },
-          volumes: [`${join(root, 'tests/load')}:/scripts:ro`, trustVolume],
+          environment: { ...authorityFile, AXIS_LOAD_URL: `https://${tenantHost}`, AXIS_LOAD_USERS: '/load/users.json' },
+          volumes: [`${join(root, 'tests/load')}:/scripts:ro`, `${join(folder, 'k6')}:/load:ro`, trustVolume],
           extra_hosts: [`${tenantHost}:${proxyAddress}`],
         },
       },

@@ -6,7 +6,7 @@ marked _(planned for Mx)_ are not built yet, and Dn refers to [decisions.md](../
 
 The design follows [D82](../decisions/d82-performance-slos-and-load-tests.md). All of this page is
 _(planned for M18)_, except [resource-demanding routes](#resource-demanding-routes) and the
-[script](#load-test) of the load test, which are built. The per-request budgets of the `*PerformanceTests` classes are built. They
+[script](#load-test), [data](#load-test) and users of the load test, which are built. The per-request budgets of the `*PerformanceTests` classes are built. They
 run in the performance workflow, as [D97](../decisions/d97-reliable-test-runs.md) says. See
 [testing](../architecture.md#testing).
 
@@ -70,14 +70,19 @@ to find its own numbers.
   then `server-2`, runs `admin migrate`, creates the tenant `load` and runs the placeholder k6
   scenario in a container through the proxy. It removes the stack at the end, unless `--keep` is
   given. It needs Docker. See [development](../development.md#scripts).
-- **Data.** It creates a tenant with a generated application of
+- **Data.** _(Built.)_ It creates a tenant with a generated application of
   [typical size](../domain/knowledge.md#typical-application-size), and records in every entity.
   `tests/Axis.LoadData` writes that application from a seed, so the same seed gives the same files:
   `dotnet run --project tests/Axis.LoadData -- <folder> [--seed <n>]`. It writes 100 seed records
-  for each of its 40 entities and refuses a folder that already holds files.
-- **Users.** Each virtual user signs in once through the development realm's sign-in page and keeps
-  its session cookie for the whole run. The test authentication scheme is not used, because only
-  test hosts register it.
+  for each of its 40 entities and refuses a folder that already holds files. `scripts/load.sh`
+  writes the application with seed 1 into its run folder and activates it in the tenant `load`,
+  which stores the release and writes the seed records.
+- **Users.** _(Built.)_ `scripts/load.sh` adds the users `load-user-01` to `load-user-50` to the
+  realm of the tenant `load`, each with a password, an authenticator whose secret comes from the
+  seed and the application's roles. It writes their names, passwords and secrets to a file that k6
+  reads. _(Planned for M18.)_ Each virtual user signs in once through the tenant's realm sign-in
+  page and keeps its session cookie for the whole run. The test authentication scheme is not used,
+  because only test hosts register it.
 - **Output.** It prints each objective with its measured value and exits non-zero when one is
   missed. The k6 summary is kept as a CI artifact.
 - **When it runs.** CI runs it once a week and on demand. It never gates a merge, and it is not a
