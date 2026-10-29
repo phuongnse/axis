@@ -205,7 +205,9 @@ _(planned for M17)_
   never undoes what `tenant oidc set` wrote. Without an `axis` client it is a plain client with a secret. Both tenant catalogs carry
   the realm's name, the identity provider's address and the activation secret, see
   [tenant realm](host-settings.md#tenant-realm). The server's startup activation calls it, after it activates each
-  application folder, for a tenant that has realm details. So does `Axis.Admin` activation, as described below.
+  application folder, for a tenant that has realm details. So does `Axis.Admin` activation, as described below. When the
+  identity provider answers 409 Conflict, as when another host syncs the same realm at the same moment, the sync reads
+  the realm again and repeats, up to three attempts, and then fails as before.
 - **Brought in step by activation:** activating a release adds, changes and removes the realm's brokered providers,
   their claim mappers and the site clients to match the active releases of the tenant and its platform sign-in. A
   provider that nothing names any more is removed. Its users stay, but cannot sign in through it.
