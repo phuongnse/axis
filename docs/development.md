@@ -100,8 +100,8 @@ that adds a source changes this section too.
 
 The test, integration and E2E scripts run every suite even when one fails. The exceptions are
 the suites that no change since NexKit's commit can affect. The commit is
-`NEXKIT_CHECK_VERIFIED_SHA`, the head on which that check last passed with its current command, also in
-a round that NexKit stopped or whose other checks failed, else `NEXKIT_BASE_SHA`, the merge base with
+`NEXKIT_CHECK_VERIFIED_SHA`, the head on which that check last passed with its current command and
+setup, also in a round that NexKit stopped or whose other checks failed, else `NEXKIT_BASE_SHA`, the merge base with
 `main`. `NEXKIT_VERIFIED_SHA`, the head of the last round whose checks all passed, is never used: NexKit
 does not record which checks or commands that round ran, so a check added or changed since would skip
 without having passed. The integration tests and their scenarios use their safe list, which holds
