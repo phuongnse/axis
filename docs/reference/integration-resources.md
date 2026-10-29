@@ -580,6 +580,9 @@ the caller's id.
 - **Entity and process.** `entity` names the entity of the record the call
   creates. It is not a child entity. `process` names the process the call
   starts on that record, and its subject entity is `entity`.
+  _(planned for M20)_ They may name a module entity and process of a module
+  the application declares, as `<module id>/<name>`, see
+  [D103](../decisions/d103-modules-hold-triggers-scenarios-and-connector-slots.md).
 - **Input.** `input` lists the typed input fields of the call's body.
   - Their types are the
     [entity field types](resource-files.md#entity-field-types-and-constraints), including

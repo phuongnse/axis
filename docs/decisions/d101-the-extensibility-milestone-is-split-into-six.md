@@ -18,6 +18,8 @@ M17 does not change. See the [roadmap](../roadmap.md#milestones).
     endpoint call.
   - M20 Modules with processes, pages and policies:
     [D89](d89-modules-that-hold-processes-pages-and-policies-and-depend-on-other-modules.md).
+    [D103](d103-modules-hold-triggers-scenarios-and-connector-slots.md) renames it
+    Modules that ship working features and adds triggers and connector slots.
   - M21 Package runners: [D90](d90-extension-packages-run-out-of-process.md).
   - M22 Custom widgets and the published SDK:
     [D88](d88-custom-widgets-in-the-designer-palette-and-a-published-sdk.md).
