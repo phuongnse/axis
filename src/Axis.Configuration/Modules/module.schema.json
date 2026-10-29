@@ -19,9 +19,22 @@
     "roles": {
       "type": "array",
       "items": { "$ref": "#/$defs/roleSlot" }
+    },
+    "modules": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/module" }
     }
   },
   "$defs": {
+    "module": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$", "maxLength": 100 },
+        "version": { "type": "string", "minLength": 1 }
+      }
+    },
     "roleSlot": {
       "type": "object",
       "additionalProperties": false,

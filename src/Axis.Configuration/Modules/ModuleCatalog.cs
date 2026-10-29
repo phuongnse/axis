@@ -130,6 +130,11 @@ public sealed class ModuleCatalog
                 root.GetProperty("id").GetString()!,
                 root.GetProperty("version").GetString()!,
                 root.GetProperty("label").GetString()!);
+            if (root.TryGetProperty("modules", out var modules))
+            {
+                manifest = manifest with { Modules = modules.Deserialize<List<ApplicationModuleDefinition>>(ApplicationLoader.SerializerOptions)! };
+            }
+
             if (!root.TryGetProperty("roles", out var rolesElement))
             {
                 return manifest;

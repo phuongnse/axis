@@ -298,7 +298,7 @@ internal static class PolicyChecker
         switch (kind)
         {
             case "dataSource":
-                if (findDataSource(name) is { } dataSource)
+                if (moduleReferences.Find(name, findDataSource) is { } dataSource)
                 {
                     references.Add(policy, $"{path}/dataSource", ReferenceRelations.Grant, ResourceNode.Of(dataSource));
                 }
