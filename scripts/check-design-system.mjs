@@ -6,6 +6,8 @@
 // script and inlines it in a page, so the folder must hold exactly one file, axis-design-system.js, and
 // that file must
 // - be at most 6 MB, the cap of the Design System type,
+// - start with the line `/* @ds-bundle: {...} */` that scripts/design-system-header.mjs writes: JSON with the card
+//   `width`, a positive number, and the `groups` of cards, each with a name and the previews it lists, once in all,
 // - parse as a classic script, so it has no `import` declaration and no `import.meta`,
 // - have no dynamic `import(`, which would load code after the script, and
 // - have no literal `</script` or `<!--`, which would end or hide an inlined script.
@@ -18,8 +20,57 @@ import vm from 'node:vm'
 const scriptRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 export const bundleFile = 'axis-design-system.js'
 export const maxBytes = 6 * 1024 * 1024
+export const headerPattern = /^\/\* @ds-bundle: (\{.*\}) \*\/$/
 
 const megabytes = (bytes) => `${(bytes / 1024 / 1024).toFixed(2)} MB`
+
+const isName = (value) => typeof value === 'string' && value !== ''
+
+/** The problems in the bundle's first line, which hands the Design System artifact the card width and order. */
+function checkHeader(source) {
+  const match = headerPattern.exec(source.split('\n', 1)[0])
+  if (!match) {
+    return [`${bundleFile} must start with a line like /* @ds-bundle: {"width":992,"groups":[...]} */.`]
+  }
+  let header
+  try {
+    header = JSON.parse(match[1])
+  } catch (error) {
+    return [`The @ds-bundle line of ${bundleFile} is not JSON: ${error.message}`]
+  }
+  const problems = []
+  if (typeof header.width !== 'number' || !(header.width > 0)) {
+    problems.push(`The @ds-bundle line of ${bundleFile} needs a positive number as its width.`)
+  }
+  const { groups } = header
+  const listed = new Set()
+  const repeated = new Set()
+  const wellFormed =
+    Array.isArray(groups) &&
+    groups.length > 0 &&
+    groups.every(
+      (group) =>
+        group !== null &&
+        isName(group.name) &&
+        Array.isArray(group.previews) &&
+        group.previews.length > 0 &&
+        group.previews.every(isName),
+    )
+  if (!wellFormed) {
+    problems.push(
+      `The @ds-bundle line of ${bundleFile} needs groups: a non-empty array of {name, previews} with named previews.`,
+    )
+  } else {
+    for (const preview of groups.flatMap((group) => group.previews)) {
+      if (listed.has(preview)) repeated.add(preview)
+      listed.add(preview)
+    }
+    if (repeated.size > 0) {
+      problems.push(`The @ds-bundle line of ${bundleFile} lists a preview twice: ${[...repeated].join(', ')}.`)
+    }
+  }
+  return problems
+}
 
 /** Checks the folder and returns the size of the bundle in bytes, or 0 when there is none, and the problems found. */
 export function checkDesignSystemBundle(folder) {
@@ -40,6 +91,7 @@ export function checkDesignSystemBundle(folder) {
   if (bytes > maxBytes) {
     problems.push(`${bundleFile} is ${megabytes(bytes)}, over the ${megabytes(maxBytes)} cap.`)
   }
+  problems.push(...checkHeader(source))
   try {
     new vm.Script(source, { filename: bundleFile })
   } catch (error) {

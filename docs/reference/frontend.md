@@ -987,9 +987,9 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   ([D96](../decisions/d96-rules-from-the-design-system-review.md)). Below it is narrow width: columns stack in file order, tab
   headers scroll, a row's actions fold into one menu and the shell navigation collapses. Its value is one token in
   `web/src/platform/designTokens.ts` as `breakpointTokens.narrowWidth`. The narrow-width hook reads it, and the
-  design-system bundle reads it too _(planned)_. Studio's page designer previews the narrow layout at 375 px, see
-  [Studio](studio.md). Every platform table, including form line items and the reference lookup,
-  scrolls sideways inside its widget, so the page never does. The shell header keeps the site title, the
+  design-system bundle writes it as its card width, see [widget previews](../development.md#widget-previews).
+  Studio's page designer previews the narrow layout at 375 px, see [Studio](studio.md). Every platform table,
+  including form line items and the reference lookup, scrolls sideways inside its widget, so the page never does. The shell header keeps the site title, the
   account button and a **Menu** button (`shell.navigation.menu`) with `aria-expanded`. It opens a panel with
   the navigation and the language and theme menu, while the app switcher stays in the header. Escape or
   following a link closes it, and Escape returns focus to the button. There is no per-widget setting until a sample needs one, see

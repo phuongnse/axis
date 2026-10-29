@@ -417,15 +417,14 @@ fixtures, only for the API paths of the fixture application. It needs no server,
   has row and toolbar actions and a long-text row, and the inbox's has an overdue and a claimed task.
   `processInspector` draws one state with a failed instance and an open dead letter. A
   `field-<type>` preview draws the input the form widget uses for that field type,
-  with its label and the fixture value, laid out as on a form, in four states: Typical, Required, Read-only, and
-  Validation error, which shows a fixed message under the input. _(planned)_ It draws three states instead, as
+  with its label and the fixture value, laid out as on a form, in three states, as
   [D96](decisions/d96-rules-from-the-design-system-review.md) agrees: Editable, Read-only, and Required, help text
   and error, which shows the required mark, a help text and a fixed message at once. `field-child-collection` draws line items with a
   reference cell and a computed cell, in four states: Reference and computed cells, Cell error, Read-only, and Empty.
   The `form` preview draws Validation errors, which submits the form once when it mounts to a fixture that answers
-  with a validation problem, Read-only by a condition, and Wizard steps. _(planned)_ It adds Fields in columns, with
-  errors, where fields of several widths share rows and some show messages, and Many steps, with seven steps or more,
-  so the steps bar shows numbers. The `table` preview draws With data, Empty and Many row actions, which folds a
+  with a validation problem, Read-only by a condition, Wizard steps, Fields in columns, with errors, where fields of
+  several widths share rows and some show messages, and Many steps, a wizard with seven steps, so the steps bar shows
+  numbers. The `table` preview draws With data, Empty and Many row actions, which folds a
   row's actions into the "…" menu. The `kpi` preview's comparison is last month's total. A field preview has no Save, Cancel or action
   buttons and no history, which only the `form` preview shows. Its input works as on a form, and nothing is saved. A mounted widget follows
   `data-theme` on the root element of the page.
@@ -434,27 +433,32 @@ fixtures, only for the API paths of the fixture application. It needs no server,
   artifact draws each card in a frame sandboxed without `allow-forms`, where the browser blocks a form's own
   submission before its submit event fires. The bundle therefore fires a form's submit event itself, for a click on
   a submit button, Enter in an input and `requestSubmit()`, and cancels the browser's submission.
-- _(planned)_ The artifact lays out every card at 992 px, the [narrow width](reference/frontend.md) breakpoint, with
-  `width=992` in the card's marker, and scales it to fit its frame. So every card shares one scale and shows the
-  desktop layout.
-- _(planned)_ The cards come in six groups, in this order: Field inputs (each `field-<type>`), Data widgets (`table`,
-  `form`, `detail`), Charts and KPIs (each `chart-<kind>`, `kpi`), Process widgets (`taskInbox`,
-  `processInspector`), Containers (`columns`, `tabs`, `section`) and Shared states (`states`). _(planned)_ A seventh
-  group, Shell, comes last, see [shell](reference/shell.md#design-system-previews).
-  `scripts/design-system.sh` writes the card order as the bundle's first line, `/* @ds-bundle: {...} */`, so a sync
-  keeps it.
+- The bundle's first line is `/* @ds-bundle: {...} */`, and the Design System artifact reads it. Its `width` is
+  992, the [narrow width](reference/frontend.md) breakpoint, which the line takes from `breakpointTokens.narrowWidth`.
+  The artifact lays out every card at that width and scales it to fit its frame, so every card shares one scale and
+  shows the desktop layout. A card never scrolls sideways at that width. The states of a card share one
+  `minmax(0, 1fr)` column, so a wide table scrolls inside its widget, as it does on a page.
+- The line's `groups` are the order of the cards, in seven groups: Field inputs (each `field-<type>`), Data widgets
+  (`table`, `form`, `detail`), Charts and KPIs (each `chart-<kind>`, `kpi`), Process widgets (`taskInbox`,
+  `processInspector`), Containers (`columns`, `tabs`, `section`), Shared states (`states`) and Shell (`shell`,
+  `signIn`, `identitySignIn`, see [shell](reference/shell.md#design-system-previews)). Each group has a `name` and
+  its `previews`, and every preview is in one group. The order is `web/src/designSystem/cardOrder.ts`.
+  `scripts/design-system.sh` writes the line with `scripts/design-system-header.mjs` after the build, so a sync keeps
+  it, and `scripts/check-design-system.mjs` rejects a bundle without a valid line.
 - `web/design-system.html` is the harness. After `scripts/design-system.sh`, open it from disk. With no
   query it mounts every preview. `?preview=<name>&mode=light|dark` mounts one preview in that mode. The
   Vite dev server does not serve the previews.
 
-`tests/e2e/specs/design-system.spec.ts` mounts each preview from the bundle in the harness, in both modes,
-and fails on a console error or on a request other than the harness and the bundle. It also checks that
+`tests/e2e/specs/design-system.spec.ts` mounts each preview from the bundle in the harness, in both modes, in a 992 px
+frame sandboxed without `allow-forms`. It fails on a console error, on a request other than the page that holds the
+frame, the harness and the bundle, and on sideways scroll. It also checks that
 changing `data-theme` redraws a table, that a mounted form follows `--primary` on the root element and redraws when
 it changes, that a validation message follows `--dangerText`, and that no fixture reaches the server's web root. It
 checks that a field preview has no Save button and no history, and that the `states` preview shows a busy widget and
-the load error alert. For each field type except the child collection, it checks in both modes that the required,
-read-only and error states show. It checks the child collection's reference, computed, error, read-only and empty
-states, and the form's validation, read-only and wizard states. It mounts the shell, sign-in and identity sign-in previews in a
+the load error alert. For each field type except the child collection, it checks in both modes that the read-only state
+and the required mark, the help text and the message of the third state show. It checks the child collection's reference, computed, error, read-only and empty
+states, the form's validation, read-only, wizard, columns and many-steps states, and the table's row actions folded into its
+menu. It checks that the first line of the bundle lists the previews of `window.Axis`. It mounts the shell, sign-in and identity sign-in previews in a
 992 px frame sandboxed without `allow-forms`, and checks a key element of each state. It checks that the Form page's breadcrumb links to Requests. It opens the date-time picker and the reference lookup
 and adds a child collection row. It mounts the `form` preview in a frame sandboxed like the artifact's and checks its
 validation messages and a save. It finds each data preview's empty text under its "Empty" caption, the table's row
