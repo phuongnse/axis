@@ -20,12 +20,18 @@ export function IdentityFrame({
 }) {
   const { colour, spacing, radius } = useDesignTokens()
   const [year] = useState(() => new Date().getFullYear())
+  // A design-system frame sets --shell-min-height to its own height, so the page fills it.
   return (
     <Flex
       vertical
       align="center"
       gap={spacing.md}
-      style={{ paddingBlock: spacing.lg, background: colour.canvas, minHeight: '100%' }}
+      style={{
+        paddingBlock: spacing.lg,
+        background: colour.canvas,
+        minHeight: 'var(--shell-min-height, 100%)',
+        boxSizing: 'border-box',
+      }}
     >
       <Flex align="center" gap={spacing.xs}>
         <SiteMark title="Axis" size={32} />

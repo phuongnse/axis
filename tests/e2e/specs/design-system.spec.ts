@@ -348,6 +348,52 @@ for (const [name, keys] of Object.entries(stateKeys)) {
   }
 }
 
+for (const [name, keys] of Object.entries(stateKeys)) {
+  for (const mode of modes) {
+    test(`the ${name} preview shows every state's caption above its frame at 992px in ${mode} mode`, async ({
+      page,
+    }) => {
+      const recording = await openHarness(page, `?preview=${name}&mode=${mode}`, {
+        sandboxed: true,
+        frameWidth: 992,
+      })
+      const frame = page.frameLocator('iframe')
+      const captions = Object.keys(keys)
+
+      for (const [caption, key] of Object.entries(keys)) {
+        await expect(key(figure(frame, caption))).toBeVisible()
+      }
+      const boxOf = async (locator: Locator) => {
+        const box = await locator.boundingBox()
+        if (!box) {
+          throw new Error('A caption, frame or drawn page has no box')
+        }
+        return box
+      }
+      const bottom = (box: { y: number; height: number }) => box.y + box.height
+
+      for (const [index, caption] of captions.entries()) {
+        const state = figure(frame, caption)
+        await expect(state.locator('figcaption')).toBeVisible()
+        const captionBox = await boxOf(state.locator('figcaption'))
+        const figureBox = await boxOf(state)
+        const frameBox = await boxOf(state.locator(':scope > div'))
+        const pageBox = await boxOf(state.locator(':scope > div > :first-child'))
+
+        expect(frameBox.y).toBeGreaterThanOrEqual(bottom(captionBox))
+        expect(bottom(frameBox)).toBeLessThanOrEqual(bottom(figureBox))
+        expect(pageBox.y).toBeGreaterThanOrEqual(frameBox.y)
+        expect(bottom(pageBox)).toBeLessThanOrEqual(bottom(frameBox))
+        if (index < captions.length - 1) {
+          const nextCaptionBox = await boxOf(figure(frame, captions[index + 1]).locator('figcaption'))
+          expect(bottom(frameBox)).toBeLessThanOrEqual(nextCaptionBox.y)
+        }
+      }
+      expect(recording.errors).toEqual([])
+    })
+  }
+}
+
 for (const mode of modes) {
   test(`the shell preview's Form page breadcrumb links back to Requests in ${mode} mode`, async ({ page }) => {
     const recording = await openHarness(page, `?preview=shell&mode=${mode}`, { sandboxed: true, frameWidth: 992 })

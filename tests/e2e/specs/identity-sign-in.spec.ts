@@ -27,7 +27,7 @@ for (const { mode, canvas } of [
     await page.goto('/')
     await page.getByRole('main').getByRole('button', { name: 'Sign in', exact: true }).click()
 
-    await expect(page.getByRole('heading', { name: 'Sign in to Axis', exact: true })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Sign in', exact: true })).toBeVisible()
     await expect(page.getByText(/^© \d{4} Axis$/)).toBeVisible()
     await expect(page.locator('#root > div')).toHaveCSS('background-color', canvas)
 

@@ -792,7 +792,7 @@ export const identitySignInTexts: SignInTexts = {
 
 /** What the identity provider's sign-in page draws in the design system. */
 export const identitySignInContext: SignInContext = {
-  title: 'Sign in to Axis',
+  title: 'Sign in',
   realmName: 'Contoso',
   providers: [{ alias: 'contoso', label: 'Contoso ID', loginUrl: '#contoso' }],
   accounts: true,
