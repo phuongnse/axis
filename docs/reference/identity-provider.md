@@ -76,7 +76,8 @@ so Studio edits it, with the identity provider editor of [Studio](studio.md), an
   - `saml`: a provider that the realm brokers to over SAML 2.0. `metadata` is a `url` binding, the address of the
     provider's metadata. The realm signs its requests with a key of its own and publishes its own metadata for the
     organization to register.
-- **`label`:** the text of the "Continue with" button, as a text key of the application.
+- **`label`:** the text of the "Continue with" button, as a text key of the application. Activation writes it to the
+  realm in every platform locale, see [keeping the realm in step](#keeping-the-realm-in-step).
 - **`claims`:** the claims that give the display name, the email and the locale, by default `name`, `email` and
   `locale`. The realm links a person to the provider by the provider's own subject, and the user id that Axis keeps is
   always the realm's `sub`, see [users](#users).
@@ -104,7 +105,7 @@ so Studio edits it, with the identity provider editor of [Studio](studio.md), an
 - **Read only by activation:** activation checks the bindings of `oidc` providers against the tenant's, and refuses
   providers that would split a person into two users, see [users](#users). It plans the realm it wants.
   Activation updates the realm, through `Axis.Admin` and the server's startup activation, see
-  [keeping the realm in step](#keeping-the-realm-in-step). Sign-in does not read the resource yet. Studio's blank application creates an `accounts` provider, and New resource creates
+  [keeping the realm in step](#keeping-the-realm-in-step). The realm's sign-in page shows each `oidc` provider's `label`. The rest of sign-in does not read the resource yet. Studio's blank application creates an `accounts` provider, and New resource creates
   more from an `accounts` starter. Studio edits the kind with the identity provider editor, which does not show a
   binding's value, and a site's `signIn` with a picker of the application's providers.
 
@@ -210,10 +211,12 @@ _(planned for M17)_
 _(planned for M17)_
 
 - **Created by `Axis.Admin`:** `tenant create` creates the tenant's realm, its platform client `axis`, and two clients
-  that Axis's hosts use to change the realm: `axis-activation`, with rights over the realm's providers and clients, for
-  activation, and `axis-users`, with rights over its users only, for the users page. It stores their secrets and the
+  that Axis's hosts use to change the realm: `axis-activation`, with rights over the realm's providers and clients, and
+  `manage-realm` for the providers' label texts, which Keycloak requires for realm texts and which also covers every
+  realm setting, for activation, and `axis-users`, with rights over its users only, for the users page. It stores their secrets and the
   platform client's secret encrypted in the tenant directory and points the tenant's `Oidc` block at the realm. A
-  second run updates the realm, brings it up to the account rules and sets its login theme to `axis` again. It also creates the first-login flow
+  second run updates the realm, brings it up to the account rules and sets its login theme to `axis` again. It turns on language support in the realm, with `en` and `vi` and `en` as the default, so
+  `kc_locale` and the theme's language links work. It also creates the first-login flow
   `axis first login` for brokered users and allows two users to share an email, which turns sign-in by email off: an
   account's username is its email, see [accounts](user-administration.md#accounts). Only `Axis.Admin` holds the identity provider's admin rights over every realm, from the
   `IdentityProvider` settings of its own, see [administration](administration.md#settings).
@@ -242,6 +245,16 @@ _(planned for M17)_
   application folder, for a tenant that has realm details. So does `Axis.Admin` activation, as described below. When the
   identity provider answers 409 Conflict, as when another host syncs the same realm at the same moment, the sync reads
   the realm again and repeats, up to three attempts, and then fails as before.
+- **Provider labels:** a brokered provider's `displayName` in the realm is the message key `${axisProvider.<alias>}`.
+  The sync writes the key's text for `en` and `vi` through the realm's localization API, changing only texts that
+  differ, and removes the `axisProvider.` texts of providers that the realm no longer holds. The theme's `login.ftl`
+  resolves the key with `advancedMsg`. Activation takes a label from the texts of the application: the text of the
+  locale, then the text of the application's fallback locale, then the first locale in ordinal order that has the key,
+  then the provider's name. An application has no fallback locale of its own, so it takes the one of its first site in
+  path order, or `en` when it has no site. When several applications share a provider, the label comes from the
+  application with the lowest application id. Labels of `saml` providers are not written, because the plan holds no
+  `saml` provider yet. A tenant created before `manage-realm` was granted needs `tenant create` again, or activation
+  fails at the label step with a 403.
 - **Brought in step by activation:** activating a release adds, changes and removes the realm's brokered providers,
   their claim mappers and the site clients to match the active releases of the tenant and its platform sign-in. A
   provider that nothing names any more is removed. Its users stay, but cannot sign in through it.
@@ -299,7 +312,7 @@ _(planned for M17)_
 - Two-step verification asks for the 6-digit code in six boxes, one digit each, with "Back to sign in" and, when Keycloak offers another way to sign in, "Try another way".
 - The theme is built from the SPA's own React components and tokens into a Keycloak theme, so the pages look like the
   rest of Axis. Its texts are message bundles in every locale the platform offers. The "Continue with" labels come
-  from the applications' texts.
+  from the applications' texts, which activation writes to the realm (_built_).
 - _(built)_ The sign-in page is drawn by shared React components in `web/src/identitySignIn/` from a sign-in context:
   title, providers, accounts, site, username, error, login address, remember-me, forgot-password address, locales and
   texts. When the sign-in goes through a site client, which carries `axis.accounts`, `site` holds that site's

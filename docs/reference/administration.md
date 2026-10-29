@@ -212,9 +212,9 @@ with code 2.
   of `axis-activation` and `axis-users`. It saves the entry's `Oidc` authority and client id `axis` at the same
   time. A stop between the save and the call never loses a secret. The realm's name is the tenant id, and its display
   name is the tenant id too. The step signs in to the `master` realm with the admin client, creates the realm
-  with sessions of at most 8 hours and the three clients, and gives the activation and users clients their rights, see
-  [keeping the realm in step](identity-provider.md#keeping-the-realm-in-step). A failure names the step of the
-  identity provider and its status code, never a response body or a secret.
+  with sessions of at most 8 hours, `en` and `vi` and the three clients, and gives the activation client `manage-realm`
+  among its rights, see [keeping the realm in step](identity-provider.md#keeping-the-realm-in-step). A failure names
+  the step of the identity provider and its status code, never a response body or a secret.
 - `roles` saves each generated password, encrypted, before it creates the role.
   It never alters a role that exists. A role that exists with no password
   stored for this tenant fails the step.

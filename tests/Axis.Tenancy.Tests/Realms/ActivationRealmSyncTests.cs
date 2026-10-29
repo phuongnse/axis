@@ -86,7 +86,8 @@ public sealed class ActivationRealmSyncTests
             clientSecretBinding,
             ClientKeyBinding: null,
             new IdentityProviderClaimsModel("display", "mail", "lang"),
-            ["groups", "roles"]);
+            ["groups", "roles"],
+            new Dictionary<string, string> { ["en"] = "Partner", ["vi"] = "Đối tác" });
 
     private static Dictionary<string, TenantBinding> Bindings() =>
         new(StringComparer.OrdinalIgnoreCase)

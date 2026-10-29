@@ -3,7 +3,9 @@
      "</", which keeps the script element closed. Message texts take {0} because Keycloak formats them with
      MessageFormat, and the page replaces the literal {provider} that passes here. A client that carries the attribute
      axis.accounts belongs to a site, so the context then holds a "site" object with the providers (axis.providers, a
-     space-separated list of aliases) and the accounts flag that the site allows. Other clients get no "site". -->
+     space-separated list of aliases) and the accounts flag that the site allows. Other clients get no "site". A
+     provider's display name is plain text or a realm message key such as ${axisProvider.oidc-issuer}, which activation
+     writes for each language, so advancedMsg gives the label in the page's language. -->
 <!DOCTYPE html>
 <html lang="${(locale.currentLanguageTag)!'en'}">
 <head>
@@ -24,7 +26,7 @@
         <#list social.providers as p>
       {
         "alias": "${p.alias?json_string?no_esc}",
-        "label": "${p.displayName?json_string?no_esc}",
+        "label": "${advancedMsg(p.displayName)?json_string?no_esc}",
         "loginUrl": "${p.loginUrl?json_string?no_esc}"
       }<#sep>,</#sep>
         </#list>
