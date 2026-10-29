@@ -72,8 +72,8 @@ const stateKeys: Record<string, Record<string, (state: Locator) => Locator>> = {
     'Sign in': (state) => state.getByLabel('Email or username', { exact: true }),
     'Wrong password': (state) => state.getByText('Invalid email, username or password.', { exact: true }),
     'Organization sign-in only': (state) =>
-      state.getByRole('button', { name: 'Sign in with Contoso ID', exact: true }),
-    'Two-step verification': (state) => state.getByLabel('Verification code', { exact: true }),
+      state.getByRole('button', { name: 'Continue with Contoso ID', exact: true }),
+    'Two-step verification': (state) => state.getByText('Verification code', { exact: true }),
   },
 }
 

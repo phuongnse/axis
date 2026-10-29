@@ -16,7 +16,7 @@ function writeContextBlock() {
 }
 
 function expectSignInPage(container: HTMLElement) {
-  expect(screen.getByRole('button', { name: 'Sign in with Contoso ID' })).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Continue with Contoso ID' })).toBeInTheDocument()
   const form = container.querySelector('form') as HTMLFormElement
   expect(form).toHaveAttribute('action', identitySignInContext.loginAction)
   expect(form).toHaveAttribute('method', 'post')

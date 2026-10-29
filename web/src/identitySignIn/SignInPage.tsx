@@ -1,12 +1,13 @@
 import { Alert, Button, Checkbox, Divider, Flex, Form, Input, Typography } from 'antd'
 import { useId, useRef } from 'react'
+import { useDesignTokens } from '../platform/themeMode'
 import { IdentityFrame } from './IdentityFrame'
 import type { SignInContext } from './signInContext'
 
 /** The identity provider's sign-in page: the providers first, then the account form when accounts are allowed. */
 export function SignInPage({ context }: { context: SignInContext }) {
   return (
-    <IdentityFrame title={context.title} locales={context.locales}>
+    <IdentityFrame title={context.title} organization={context.realmName} locales={context.locales}>
       <SignInBody context={context} />
     </IdentityFrame>
   )
@@ -28,8 +29,8 @@ function SignInBody({ context }: { context: SignInContext }) {
         </Typography.Paragraph>
       )}
       {providers.map((provider) => (
-        <Button key={provider.alias} type={only ? 'primary' : 'default'} block onClick={() => goTo(provider.loginUrl)}>
-          {texts.signInWith.replace('{provider}', provider.label)}
+        <Button key={provider.alias} type="default" block onClick={() => goTo(provider.loginUrl)}>
+          {texts.continueWith.replace('{provider}', provider.label)}
         </Button>
       ))}
       {accounts && providers.length > 0 && <Divider plain>{texts.or}</Divider>}
@@ -41,7 +42,9 @@ function SignInBody({ context }: { context: SignInContext }) {
 
 function AccountForm({ context }: { context: SignInContext }) {
   const { username, error, loginAction, rememberMe, forgotPasswordUrl, texts } = context
+  const { colour } = useDesignTokens()
   const formId = useId()
+  const labelStyle = { fontWeight: 500, color: colour.textMuted }
   const credentialRef = useRef<HTMLInputElement>(null)
   return (
     <Form
@@ -54,24 +57,27 @@ function AccountForm({ context }: { context: SignInContext }) {
       // Ant Design validates and stops the submit event, so the native post happens here.
       onFinish={() => credentialRef.current?.form?.submit()}
     >
-      <Form.Item name="username" label={texts.username} rules={[{ required: true, message: texts.usernameRequired }]}>
+      <Form.Item
+        name="username"
+        label={<span style={labelStyle}>{texts.username}</span>}
+        rules={[{ required: true, message: texts.usernameRequired }]}
+      >
         <Input name="username" autoComplete="username" />
       </Form.Item>
+      {/* The link sits beside the label, not inside it, so the label's name stays "Password". */}
+      <Flex justify="space-between" align="baseline" style={{ paddingBottom: 8 }}>
+        <label htmlFor={`${formId}_password`} style={labelStyle}>
+          {texts.password}
+        </label>
+        {forgotPasswordUrl && <Typography.Link href={forgotPasswordUrl}>{texts.forgotPassword}</Typography.Link>}
+      </Flex>
       <Form.Item
         name="password"
-        label={texts.password}
         rules={[{ required: true, message: texts.passwordRequired }]}
         validateStatus={error ? 'error' : undefined}
       >
         <Input.Password name="password" autoComplete="current-password" />
       </Form.Item>
-      {forgotPasswordUrl && (
-        <Flex justify="flex-end">
-          <Button type="link" href={forgotPasswordUrl}>
-            {texts.forgotPassword}
-          </Button>
-        </Flex>
-      )}
       {rememberMe && (
         <Form.Item name="rememberMe" valuePropName="checked">
           <Checkbox name="rememberMe">{texts.keepSignedIn}</Checkbox>
