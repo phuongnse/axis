@@ -220,7 +220,10 @@ triggers of the active release:
    names a trigger, one queued by a [redeliver](#dead-letters), keeps only that
    trigger and wakes no instance. When the active release
    does not have it as an `async` trigger on the event, the item is deleted
-   with no other write, and the worker logs a warning.
+   with no other write, and the worker logs a warning. An item that names an
+   instance, queued by the redeliver of a wake, wakes only that instance and
+   delivers to no trigger. It is deleted with no other write when the instance
+   no longer waits for the event.
 2. For each trigger, one transaction does this:
    1. It checks the item's claim and extends its lease.
    2. It inserts a receipt into `axis.trigger_starts`, keyed by the trigger,
@@ -266,8 +269,12 @@ makes a repeat after a crash do nothing. Every occurrence already gets an
 `event.deliver` item, so an occurrence with no trigger, or in an application
 with no active release, still wakes its waiting instances. Step 1's early
 delete then happens only when there is no trigger and no waiting instance. A
-failed wake is not counted and does not become a dead letter: the item stays
-claimed and is tried again after its lease expires. Delivering 100 occurrences
+failed wake is counted for the instance and the occurrence, as a failed trigger
+is: the other instances and triggers of the pass are still delivered, and the
+item is then due again after the backoff. After `Worker:DeliveryAttempts`
+failures the wake becomes a dead letter, see [Dead letters](#dead-letters). A
+later pass of the item skips an instance that has such a dead letter for the
+event. Delivering 100 occurrences
 that each wake one waiting instance, and running the steps they wake, finishes
 within 30 s, and `EventWakePerformanceTests` fails past that. The lookup for
 waiting instances reaches the instances of a record by an index and never reads
@@ -494,9 +501,9 @@ process without a subject when a record is deleted:
 Deliveries that keep failing stop after a limit and are kept as dead letters, see
 [D72](../decisions/d72-a-delivery-limit-and-dead-letters.md). The counting, the
 backoff, the limit, the two tables, the log, the metric and the
-[routes](#routes) are built for the start of an `async` trigger from
-`event.deliver`, for `trigger.fanOut` and for `notification.email`.
-_(Planned for M18)_ The waiting-instance target is not built yet.
+[routes](#routes) are built for the start of an `async` trigger and the wake of
+a waiting instance from `event.deliver`, for `trigger.fanOut` and for
+`notification.email`.
 
 **What counts.** Three kinds of work item deliver something, and each
 failure is counted for its own target:
@@ -534,6 +541,16 @@ receipts write it, such as `2026-01-01T05:00:00Z`. The count belongs to the
 occurrence, so a failure in any batch adds to it. The stored cursor is kept while
 the item backs off. The dead letter names the application, the trigger's process,
 the trigger and `occurrence_at`.
+
+For the wake of a waiting instance, the failure is counted under the kind
+`event.deliver` and the target `{processInstanceId}/{eventId}`. The dead letter
+names the application, the instance's process, the instance in
+`process_instance_id` and the occurrence in `event_id`, and has no `trigger_id`.
+No receipt is written, because `axis.trigger_starts` is keyed by trigger. The
+dead letter itself stands for it: a pass of the item skips an instance that has
+an `event.deliver` dead letter for the occurrence, in any state, so a discarded
+wake is not tried again. Other waiting instances and the `async` triggers of the
+occurrence still get it.
 
 For an email, the failure is counted under the kind `notification.email` and
 the target `{emailId}`, the id of its row in `axis.email_outbox`. At the limit
@@ -587,8 +604,11 @@ Content-Type: application/json
   check whether the user may read the event's record, because a dead letter
   holds ids and a fixed error text, never a record value.
 - **Redeliver** clears the target's count, removes a `deadLettered` receipt,
-  and queues the delivery again for that target only. **Discard** closes the
-  dead letter. Either one on a dead letter that is not `open` is a `409`.
+  and queues the delivery again for that target only. For a waiting instance,
+  that is an `event.deliver` item that names the event and the instance and needs
+  nothing from the active release: it wakes the instance once if it still waits
+  for the event, and otherwise does nothing. **Discard** closes the dead letter
+  and leaves the instance waiting. Either one on a dead letter that is not `open` is a `409`.
 - The audit records are `deadLetter.redelivered` and `deadLetter.discarded`,
   with the reason, see [audit records](storage.md#audit-records-and-sequence-counters).
 - The [process inspector widget](process-inspector-widget.md) lists the open
