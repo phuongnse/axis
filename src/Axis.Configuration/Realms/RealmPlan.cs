@@ -22,6 +22,10 @@ public sealed record RealmSiteClient(string Path, bool Accounts, IReadOnlyList<s
 /// </summary>
 /// <param name="Alias">The stable alias: <c>oidc-</c> and the lower-case issuer binding name.</param>
 /// <param name="RolesClaims">The distinct roles claims of the providers that share it, in ordinal order.</param>
+/// <param name="Labels">
+/// The text of the provider's "Continue with" label for each platform locale, from the texts of the first application
+/// that uses the provider. Every platform locale has a label.
+/// </param>
 public sealed record RealmProvider(
     string Alias,
     string IssuerBinding,
@@ -29,4 +33,5 @@ public sealed record RealmProvider(
     string? ClientSecretBinding,
     string? ClientKeyBinding,
     IdentityProviderClaimsModel Claims,
-    IReadOnlyList<string> RolesClaims);
+    IReadOnlyList<string> RolesClaims,
+    IReadOnlyDictionary<string, string> Labels);

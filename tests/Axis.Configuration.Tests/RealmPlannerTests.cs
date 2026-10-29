@@ -102,6 +102,74 @@ public sealed class RealmPlannerTests
         Assert.Empty(result.Conflicts);
     }
 
+    [Fact]
+    public void An_oidc_provider_gets_its_label_in_each_platform_locale_from_the_texts_of_the_application()
+    {
+        var application = Application("Sales", Oidc("Issuer", "Client", "Secret") with { LabelTextKey = "provider.company" }) with
+        {
+            Texts = Texts(("en", "Company"), ("vi", "Công ty")),
+        };
+
+        var provider = Assert.Single(RealmPlanner.Build([application]).Plan.Providers);
+
+        Assert.Equal(new Dictionary<string, string> { ["en"] = "Company", ["vi"] = "Công ty" }, provider.Labels);
+    }
+
+    [Fact]
+    public void A_locale_whose_texts_lack_the_label_key_takes_the_text_of_the_fallback_locale()
+    {
+        var application = Application("Sales", Oidc("Issuer", "Client", "Secret") with { LabelTextKey = "provider.company" }) with
+        {
+            Texts = Texts(("en", "Company")),
+            FallbackLocale = "en",
+        };
+
+        var provider = Assert.Single(RealmPlanner.Build([application]).Plan.Providers);
+
+        Assert.Equal("Company", provider.Labels["vi"]);
+    }
+
+    [Fact]
+    public void A_label_without_text_in_the_locale_or_the_fallback_locale_takes_the_first_locale_that_has_it_and_then_the_provider_name()
+    {
+        var provider = Oidc("Issuer", "Client", "Secret") with { LabelTextKey = "provider.company" };
+        var withOtherLocale = Application("Sales", provider) with { Texts = Texts(("fr", "Société")), FallbackLocale = "en" };
+        var withoutTexts = Application("Hr", Oidc("OtherIssuer", "Client", "Secret") with { LabelTextKey = "provider.company" });
+
+        var plan = RealmPlanner.Build([withOtherLocale, withoutTexts]).Plan;
+
+        Assert.Equal("Société", plan.Providers.Single(entry => entry.Alias == "oidc-issuer").Labels["en"]);
+        Assert.Equal("company", plan.Providers.Single(entry => entry.Alias == "oidc-otherissuer").Labels["vi"]);
+    }
+
+    [Fact]
+    public void A_provider_shared_by_two_applications_takes_its_label_from_the_application_with_the_lower_id()
+    {
+        var lower = Application("Sales", Oidc("Issuer", "Client", "Secret") with { LabelTextKey = "provider.company" }) with
+        {
+            ApplicationId = new Guid("00000000-0000-0000-0000-000000000001"),
+            Texts = Texts(("en", "Sales company"), ("vi", "Công ty bán hàng")),
+        };
+        var higher = Application("Hr", Oidc("Issuer", "Client", "Secret") with { LabelTextKey = "provider.company" }) with
+        {
+            ApplicationId = new Guid("00000000-0000-0000-0000-000000000002"),
+            Texts = Texts(("en", "Hr company"), ("vi", "Công ty nhân sự")),
+        };
+
+        foreach (var applications in new[] { new[] { lower, higher }, [higher, lower] })
+        {
+            var provider = Assert.Single(RealmPlanner.Build(applications).Plan.Providers);
+
+            Assert.Equal("Sales company", provider.Labels["en"]);
+            Assert.Equal("Công ty bán hàng", provider.Labels["vi"]);
+        }
+    }
+
+    private static Dictionary<string, IReadOnlyDictionary<string, string>> Texts(params (string Locale, string Label)[] labels) =>
+        labels.ToDictionary(
+            label => label.Locale,
+            label => (IReadOnlyDictionary<string, string>)new Dictionary<string, string> { ["provider.company"] = label.Label });
+
     private static RealmApplication Application(string name, params IdentityProviderModel[] providers) =>
         Application(name, [new RealmApplicationSite($"{name.ToLowerInvariant()}-site", null)], providers);
 

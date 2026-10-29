@@ -72,6 +72,8 @@ public sealed class RealmSyncTests
             ("GET", "/admin/realms/r/clients/u1/protocol-mappers/models") => Json(HttpStatusCode.OK, "[]"),
             ("POST", "/admin/realms/r/clients/u1/protocol-mappers/models") => new HttpResponseMessage(HttpStatusCode.Created),
             ("GET", "/admin/realms/r/identity-provider/instances") => Json(HttpStatusCode.OK, "[]"),
+            ("GET", "/admin/realms/r/localization/en") => Json(HttpStatusCode.OK, "{}"),
+            ("GET", "/admin/realms/r/localization/vi") => Json(HttpStatusCode.OK, "{}"),
             _ => throw new InvalidOperationException($"Unexpected request {method} {path}."),
         };
 
