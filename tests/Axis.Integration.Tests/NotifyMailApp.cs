@@ -3,7 +3,7 @@ using Axis.Data.Profiles;
 
 namespace Axis.Integration.Tests;
 
-/// <summary>The copy of StepApp with the process <c>NotifyMail</c> that the notify and email tests share.</summary>
+/// <summary>The copies of StepApp with the process <c>NotifyMail</c> that the notify and email tests share, and the escalation processes of the email tests.</summary>
 internal static class NotifyMailApp
 {
     /// <summary>The address <c>NotifyMail</c> notifies in <see cref="ActivateAsync"/> unless the test gives another.</summary>
@@ -37,6 +37,29 @@ internal static class NotifyMailApp
             ("processes/notify-mail.json", process),
             ("texts/vi.json", texts),
             ("sites/steps.json", site));
+    }
+
+    /// <summary>
+    /// Activates a copy of StepApp with two copies of the process EscalateNotify, whose first escalation notifies the
+    /// department manager of the request. <c>EscalateMail</c> notifies by <c>inApp</c> and <c>email</c>, and
+    /// <c>EscalateInApp</c> by <c>inApp</c> only. Both give the <c>amount</c> value as <c>amount / divisor</c>, so a request with
+    /// a divisor of 0 makes the escalation's notify fail.
+    /// </summary>
+    internal static async Task<(Guid ReleaseId, ApplicationModel Model)> ActivateEscalationMailAsync(
+        ProcessStepFixture fixture,
+        CancellationToken cancellationToken)
+    {
+        var process = await File.ReadAllTextAsync(Path.Combine(ProcessStepFixture.StepAppFolder, "processes", "escalate-notify.json"), cancellationToken);
+        process = process
+            .Replace("""{ "role": "reviewer" }""", """{ "user": "department.manager" }""", StringComparison.Ordinal)
+            .Replace("\"amount\": \"amount\"", "\"amount\": \"amount / divisor\"", StringComparison.Ordinal);
+        string Copy(string id, string name, string channels) => process
+            .Replace("4f04e7a2-6a94-4145-b160-10b1fed8a17d", id, StringComparison.Ordinal)
+            .Replace("\"name\": \"EscalateNotify\"", $"\"name\": \"{name}\"", StringComparison.Ordinal)
+            .Replace("""["inApp"]""", channels, StringComparison.Ordinal);
+        return await fixture.ActivateCopyWithFilesAsync(
+            ("processes/escalate-mail.json", Copy("4f04e7a2-6a94-4145-b160-10b1fed8a1a1", "EscalateMail", """["inApp", "email"]""")),
+            ("processes/escalate-in-app.json", Copy("4f04e7a2-6a94-4145-b160-10b1fed8a1a2", "EscalateInApp", """["inApp"]""")));
     }
 
     /// <summary>Stores the profile of the user <paramref name="userId"/> with a name, <paramref name="locale"/> and <paramref name="email"/>.</summary>

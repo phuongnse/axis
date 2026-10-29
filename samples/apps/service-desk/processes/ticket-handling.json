@@ -100,6 +100,31 @@
           "reassign": {
             "role": "service-desk-lead"
           }
+        },
+        {
+          "after": "P3D",
+          "notify": {
+            "to": [
+              {
+                "user": "assignedAgent"
+              }
+            ],
+            "channels": [
+              "inApp",
+              "email"
+            ],
+            "message": {
+              "subject": {
+                "textKey": "ticket.late.subject"
+              },
+              "body": {
+                "textKey": "ticket.late.body"
+              },
+              "values": {
+                "number": "number"
+              }
+            }
+          }
         }
       ],
       "outcomes": [

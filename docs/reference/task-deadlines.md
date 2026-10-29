@@ -17,7 +17,7 @@ the `claimed_by` and `claimed_at` columns are built, and so are release by a
 are built: the inbox marks, and Claim, Release and the Reassign dialog on the
 task page. The shape of `escalations` and its checks are built, and the compiler
 holds them in the model. The `task.escalate` work item and the runs of
-`reassign` and of `notify` are built. The `email` channel is _(planned for M18)_.
+`reassign` and of `notify` are built, with its `inApp` and `email` channels.
 
 ## Escalations and deadline
 
@@ -92,7 +92,9 @@ A task step may add `escalations` and a `deadline`:
   record, with its pending computed fields and at the transaction's time, as a
   `notify` step is, and the notification stores the task's pinned release. It
   stores one in-app notification row for each user and role recipient when the
-  `inApp` channel is listed, and nothing for `email`. An escalation that only has
+  `inApp` channel is listed. When the `email` channel is listed it stages
+  emails in the email outbox, as a `notify` step does, see
+  [email](notifications.md#email). An escalation that only has
   `notify` leaves the task, its assignee and its deadline as they are, and
   writes the history row with the `notificationId`. An escalation with both
   `reassign` and `notify` does both in one transaction. The notification adds no

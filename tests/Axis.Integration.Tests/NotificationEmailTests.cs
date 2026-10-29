@@ -17,7 +17,7 @@ using Npgsql;
 namespace Axis.Integration.Tests;
 
 /// <summary>
-/// The worker sends the emails that <c>notify</c> steps staged, over SMTP to a real Mailpit. Each test stages its emails
+/// The worker sends the emails that <c>notify</c> steps and task escalations staged, over SMTP to a real Mailpit. Each test stages its emails
 /// with the fixture's runner, which runs only steps, and sends them with a worker of its own, built with the mail
 /// settings under test. Every test uses addresses of its own, since Mailpit keeps the emails of the whole run.
 /// </summary>
@@ -280,6 +280,57 @@ public sealed class NotificationEmailTests(ProcessStepFixture fixture, MailpitFi
         Assert.Equal("sent", Assert.Single(await EmailsAsync(title)).State);
     }
 
+    [Fact]
+    public async Task Escalation_with_the_email_channel_stages_one_email_for_the_manager_and_the_worker_sends_it_and_marks_it_sent()
+    {
+        var (releaseId, model) = await NotifyMailApp.ActivateEscalationMailAsync(fixture, CancellationToken);
+        var (title, address, instanceId) = await StageEscalationAsync("EscalateMail", divisor: 4, releaseId, model);
+        await using var worker = Worker(new LogCollector(), await MailpitSettingsAsync("Email"));
+
+        await RunUntilIdleAsync(worker);
+
+        var message = Assert.Single(await mailpit.MessagesToAsync(address, CancellationToken));
+        Assert.Equal($"Request {title}", message.Subject);
+        Assert.EndsWith($"https://{fixture.Tenant}.example.test/steps/tasks", message.Text.TrimEnd(), StringComparison.Ordinal);
+        var (state, step, notificationId, itemCount) = await OutboxAsync(address, instanceId);
+        Assert.Equal(("sent", "decide", 0L), (state, step, itemCount));
+        var escalated = Assert.Single(await fixture.HistoryAsync(instanceId), row => row.Output is not null && row.Output.Contains("escalation", StringComparison.Ordinal));
+        Assert.Equal(notificationId, System.Text.Json.Nodes.JsonNode.Parse(escalated.Output!)!["notificationId"]!.GetValue<Guid>());
+    }
+
+    [Fact]
+    public async Task Escalation_with_only_the_inApp_channel_stores_the_notification_and_stages_no_email()
+    {
+        var (releaseId, model) = await NotifyMailApp.ActivateEscalationMailAsync(fixture, CancellationToken);
+        var (title, address, instanceId) = await StageEscalationAsync("EscalateInApp", divisor: 4, releaseId, model);
+        await using var worker = Worker(new LogCollector(), await MailpitSettingsAsync("Email"));
+
+        await RunUntilIdleAsync(worker);
+
+        Assert.Equal(1L, await fixture.CountAsync("SELECT count(*) FROM axis.notifications WHERE \"values\"->>'title' = @title", ("title", title)));
+        Assert.Equal(0L, await fixture.CountAsync("SELECT count(*) FROM axis.email_outbox WHERE address = @address", ("address", address)));
+        Assert.Equal(0L, await fixture.CountAsync("SELECT count(*) FROM axis.process_work_items WHERE kind = 'notification.email' AND process_instance_id = @id", ("id", instanceId)));
+        Assert.Empty(await mailpit.MessagesToAsync(address, CancellationToken));
+    }
+
+    [Fact]
+    public async Task Escalation_whose_notify_fails_stages_no_email_or_notification_and_leaves_the_task_open_with_its_assignee()
+    {
+        var (releaseId, model) = await NotifyMailApp.ActivateEscalationMailAsync(fixture, CancellationToken);
+        var (title, address, instanceId) = await StageEscalationAsync("EscalateMail", divisor: 0, releaseId, model);
+        var manager = (await fixture.TasksAsync(instanceId)).Single().Assignee;
+        await using var worker = Worker(new LogCollector(), await MailpitSettingsAsync("Email"));
+
+        await RunUntilIdleAsync(worker);
+
+        Assert.Equal(0L, await fixture.CountAsync("SELECT count(*) FROM axis.email_outbox WHERE address = @address", ("address", address)));
+        Assert.Equal(0L, await fixture.CountAsync("SELECT count(*) FROM axis.notifications WHERE \"values\"->>'title' = @title", ("title", title)));
+        Assert.DoesNotContain(await fixture.HistoryAsync(instanceId), row => row.Output is not null && row.Output.Contains("escalation", StringComparison.Ordinal));
+        var task = Assert.Single(await fixture.TasksAsync(instanceId));
+        Assert.Equal(("open", "user", manager), (task.State, task.AssigneeKind, task.Assignee));
+        Assert.Empty(await mailpit.MessagesToAsync(address, CancellationToken));
+    }
+
     /// <summary>
     /// A directory catalog loaded from a platform database whose tenant has its own mail settings, which point at the Mailpit
     /// server that needs a password. The tenant's database is the fixture's.
@@ -352,6 +403,47 @@ public sealed class NotificationEmailTests(ProcessStepFixture fixture, MailpitFi
         }
 
         return (title, subjectId, instanceId);
+    }
+
+    /// <summary>
+    /// Starts a request of the process <paramref name="process"/>, whose department manager has a profile with a new address,
+    /// runs its steps to the task and makes the task's first escalation due. Returns the request's title, the manager's address
+    /// and the instance.
+    /// </summary>
+    private async Task<(string Title, string Address, Guid InstanceId)> StageEscalationAsync(
+        string process,
+        long divisor,
+        Guid releaseId,
+        ApplicationModel model)
+    {
+        var manager = $"mgr.{Guid.NewGuid():N}";
+        var address = UniqueAddress();
+        await NotifyMailApp.UpsertProfileAsync(fixture, manager, "en", address, CancellationToken);
+        var department = await fixture.InsertDepartmentAsync(manager);
+        var subjectId = await fixture.InsertRequestAsync(500m, divisor, department);
+        var instanceId = await fixture.StartAsync(process, subjectId, releaseId, model);
+        while (await fixture.RunNextStepAsync(CancellationToken))
+        {
+        }
+
+        await fixture.ScalarAsync(
+            "UPDATE axis.process_work_items SET due_at = now() - interval '1 minute' WHERE process_instance_id = @i AND kind = 'task.escalate' AND escalation = 0",
+            ("i", instanceId));
+        return ($"Request {subjectId:N}", address, instanceId);
+    }
+
+    /// <summary>The state, step and notification id of the one outbox row for <paramref name="address"/>, and the number of its <c>notification.email</c> items still queued for <paramref name="instanceId"/>.</summary>
+    private async Task<(string State, string Step, Guid NotificationId, long Items)> OutboxAsync(string address, Guid instanceId)
+    {
+        await using var command = fixture.DataSource.CreateCommand(
+            "SELECT state, step, notification_id, (SELECT count(*) FROM axis.process_work_items WHERE kind = 'notification.email' AND process_instance_id = @instance) FROM axis.email_outbox WHERE address = @address");
+        command.Parameters.AddWithValue("address", address);
+        command.Parameters.AddWithValue("instance", instanceId);
+        await using var reader = await command.ExecuteReaderAsync(CancellationToken);
+        Assert.True(await reader.ReadAsync(CancellationToken));
+        var row = (reader.GetString(0), reader.GetString(1), reader.GetGuid(2), reader.GetInt64(3));
+        Assert.False(await reader.ReadAsync(CancellationToken));
+        return row;
     }
 
     /// <summary>A worker over the fixture's tenant database that has the given settings, with the host never started. It runs in Development unless told otherwise, since Mailpit has no TLS.</summary>
