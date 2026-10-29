@@ -10,7 +10,8 @@ namespace Axis.Server.Users;
 /// holds the publisher role). It also says whether Studio shows the test controls: the user may use Studio and
 /// <c>Studio:Tests</c> is on. For a user of Studio it also gives the host of the tenant's preview tenant, when the
 /// server serves one. It also says whether the user may use the operator console: the user holds the role that
-/// <c>Console:OperatorRole</c> names.
+/// <c>Console:OperatorRole</c> names. It also says whether the user may administer users: the user holds the role that
+/// <c>Users:AdministratorRole</c> names and the tenant is not a preview tenant, which has no users page.
 /// </summary>
 internal static class UserEndpoints
 {
@@ -21,7 +22,7 @@ internal static class UserEndpoints
 
     // It takes the request rather than the context, so it binds as a route handler and its result is written.
     private static async Task<IResult> GetCurrentUserAsync(
-        HttpRequest request, StudioOptions studio, ConsoleSettings console, ITenantCatalog catalog, ITenantContextAccessor tenants) =>
+        HttpRequest request, StudioOptions studio, ConsoleSettings console, UsersSettings users, ITenantCatalog catalog, ITenantContextAccessor tenants) =>
         await CurrentUsers.FindAsync(request.HttpContext) is { } user
             ? Results.Ok(new CurrentUserMeResponse(
                 user.Id,
@@ -32,8 +33,12 @@ internal static class UserEndpoints
                 studio.AllowsTests(user.Roles),
                 studio.AllowsCreate(user.Roles),
                 PreviewHost(studio.Allows(user.Roles), catalog, tenants),
-                console.Allows(user.Roles)))
+                console.Allows(user.Roles),
+                users.Allows(user.Roles) && !IsPreview(catalog, tenants)))
             : Results.Problem(statusCode: StatusCodes.Status401Unauthorized, title: "Nobody is signed in.");
+
+    private static bool IsPreview(ITenantCatalog catalog, ITenantContextAccessor tenants) =>
+        tenants.Current is { } tenant && catalog.Find(tenant.TenantId)?.PreviewOf is not null;
 
     private static string? PreviewHost(bool studioUser, ITenantCatalog catalog, ITenantContextAccessor tenants) =>
         studioUser && tenants.Current is { } tenant && StudioPreview.Find(catalog, tenant.TenantId)?.Hosts is [var host, ..] ? host : null;
@@ -46,6 +51,7 @@ internal sealed record CurrentUserResponse(string Id, string DisplayName, IReadO
 /// The answer of <c>GET /api/me</c>: the current user, whether they may use Studio, publish from it, see its test controls and create applications in it, and the host of
 /// the tenant's preview tenant. <c>StudioPreviewHost</c> is <c>null</c> when the user may not use Studio or the tenant has
 /// no served preview tenant. <c>Console</c> is true when the user holds the operator console role.
+/// <c>Users</c> is true when the user holds the administrator role and the tenant is not a preview tenant.
 /// </summary>
 internal sealed record CurrentUserMeResponse(
-    string Id, string DisplayName, IReadOnlyList<string> Roles, bool Studio, bool StudioPublisher, bool StudioTest, bool StudioCreate, string? StudioPreviewHost, bool Console);
+    string Id, string DisplayName, IReadOnlyList<string> Roles, bool Studio, bool StudioPublisher, bool StudioTest, bool StudioCreate, string? StudioPreviewHost, bool Console, bool Users);

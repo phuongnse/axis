@@ -40,6 +40,7 @@ const texts: Record<string, Record<string, string>> = {
     'shell.appSwitcher.label': 'Switch to',
     'shell.appSwitcher.studio': 'Studio',
     'shell.appSwitcher.console': 'Operator console',
+    'shell.appSwitcher.users': 'Users',
     'shell.preferences.label': 'Language and theme',
     'shell.theme.label': 'Theme',
     'shell.theme.light': 'Light',
@@ -51,6 +52,7 @@ const texts: Record<string, Record<string, string>> = {
     'shell.home.subtitle': 'Open an application below to start working.',
     'shell.home.studio.description': 'Build and publish applications.',
     'shell.home.console.description': 'See what failed and run the commands that fix it.',
+    'shell.home.users.description': 'Invite people and give them roles.',
     'shell.home.applications.title': 'Applications',
     'shell.home.applications.site': 'site',
     'shell.home.applications.sites': 'sites',
@@ -112,6 +114,7 @@ const signedInUser: CurrentUser = {
   studioPreviewHost: null,
   studioTest: false,
   console: false,
+  users: false,
 }
 
 const e2eSite: ApplicationSite = {
@@ -612,6 +615,26 @@ describe('App', () => {
       if (consoleTile) {
         expect(consoleTile).toHaveAttribute('href', '/console')
         expect(consoleTile).toHaveTextContent('See what failed and run the commands that fix it.')
+      }
+      unmount()
+    }
+  })
+
+  it('shows the Users tile after the operator console tile, only when the person administers users', async () => {
+    for (const users of [true, false]) {
+      stubServer({ me: { ...signedInUser, console: true, users } })
+
+      const { unmount } = renderApp()
+
+      await screen.findByText('Welcome to Axis')
+      const main = within(screen.getByRole('main'))
+      const usersTile = main.queryByRole('link', { name: /^Users/ })
+      expect(usersTile !== null).toBe(users)
+      if (usersTile) {
+        expect(usersTile).toHaveAttribute('href', '/users')
+        expect(usersTile).toHaveTextContent('Invite people and give them roles.')
+        const tiles = within(usersTile.parentElement!).getAllByRole('link')
+        expect(tiles.map((tile) => tile.getAttribute('href'))).toEqual(['/console', '/users'])
       }
       unmount()
     }

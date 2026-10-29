@@ -66,22 +66,23 @@ cards, which is _(planned)_.
 ## App switcher and preferences
 
 - **App switcher.** An icon button named "Switch to" opens a menu of the person's sites, by title, then the tools of
-  their roles: Studio for an author and the operator console for an operator. It replaces the Studio link beside the
+  their roles: Studio for an author, the operator console for an operator and Users for an administrator. It replaces the Studio link beside the
   account button. With nobody signed in it is not shown.
 - **Language and theme.** An icon button named "Language and theme" opens one menu with the site's languages and the
   light and dark themes, the current ones selected. It replaces the locale switch and the theme toggle in the header,
   for signed-in people and for nobody signed in alike. At narrow width it sits in the Menu panel, while the app
   switcher stays in the header.
-- **Users.** _(planned for M17)_ The app switcher and the home page's welcome band also offer the users page to an
-  administrator, after the operator console, see [the administrator role](user-administration.md#the-administrator-role).
-  On a site's own host the app switcher lists only that site and no tools.
+- **Users.** The app switcher and the home page's welcome band also offer "Users" to an administrator, after the
+  operator console, see [the administrator role](user-administration.md#the-administrator-role). The users page it
+  links to, `/users`, is _(planned for M17)_. On a site's own host the app switcher lists only that site and no tools.
 
 ## Platform home page
 
 - **Signed in.** The page goes from the highest level to the lowest.
   - A welcome band on `surface`: "Welcome to Axis" and "Open an application below to start working.", and under them
-    the tools of the person's roles, Studio for an author ("Build and publish applications.") and the operator console
-    for an operator ("See what failed and run the commands that fix it."), each a tile with its icon beside its title
+    the tools of the person's roles, Studio for an author ("Build and publish applications."), the operator console
+    for an operator ("See what failed and run the commands that fix it.") and Users for an administrator ("Invite
+    people and give them roles."), each a tile with its icon beside its title
     and description, aligned to the top.
   - "Applications" with their number, then one card per application across the page, in title order: the
     application's mark, its title and the number of its sites, over its sites. Each site is a row with its mark and
@@ -98,6 +99,8 @@ cards, which is _(planned)_.
     per locale it has texts for, from the `label` in its `application.json` or its name when it has none, so the home page can group the sites.
   - `GET /api/me` adds a boolean `console`, true when the person holds the role `Console:OperatorRole` names, see the
     [operator console](operator-console.md).
+  - `GET /api/me` adds a boolean `users`, true when the person holds the role `Users:AdministratorRole` names and the
+    tenant is not a preview tenant, see [users settings](host-settings.md#users-settings).
   - `GET /api/about` answers a signed-in person with `{ "version" }`, the server's informational version, the one the
     images carry. Without a session it answers `401`, like every other `/api` path that needs one.
 
