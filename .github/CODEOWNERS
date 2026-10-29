@@ -1,0 +1,9 @@
+# The files that define the security checks. A pull request that changes one
+# needs the owner's review, see docs/decisions/d111-authentication-by-default-and-the-owner-guards-the-security-checks.md.
+/tests/Axis.Server.Tests/AuthorizationRouteTests.cs @phuongnse
+/src/Axis.Server/Authentication/RouteAuthorization.cs @phuongnse
+/scripts/scan-accepted.json @phuongnse
+/scripts/scan.mjs @phuongnse
+/scripts/check-docs.mjs @phuongnse
+/scripts/check-raw-html.mjs @phuongnse
+/scripts/check-prototype-pollution.mjs @phuongnse

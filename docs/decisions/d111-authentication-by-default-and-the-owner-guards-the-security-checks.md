@@ -24,7 +24,7 @@ them.
   [ASVS](../reference/asvs.md#other-evidence) page, and each finding becomes a threat model row
   of [D106](d106-a-threat-model-kept-current-like-the-asvs-tracking.md).
 - **The owner guards the security checks:**
-  - A hand-made change adds `.github/CODEOWNERS`, which names the owner for the files that define
+  - `.github/CODEOWNERS`, added by a hand-made change, names the owner for the files that define
     the security checks: the route inventory tests and their shared helper, the fallback
     policy's open list, `scripts/scan-accepted.json`, `scripts/scan.mjs`,
     `scripts/check-docs.mjs`, `scripts/check-raw-html.mjs` and
