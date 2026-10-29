@@ -345,6 +345,19 @@ describe('DetailWidget', () => {
     expect(fieldItem('Done')).toHaveTextContent('Yes')
   })
 
+  it('shows labels and values at body size, with values in the text colour', async () => {
+    stubFetch({ status: 200, body: noteJson('Buy paper') })
+
+    renderDetail()
+
+    expect(await screen.findByText('Title')).toBeInTheDocument()
+    const label = screen.getByText('Title', { selector: 'dt' })
+    expect(label).toHaveStyle({ fontSize: '14px', lineHeight: '22px' })
+    const value = fieldItem('Title').querySelector('dd')!
+    expect(value).toHaveTextContent('Buy paper')
+    expect(value).toHaveStyle({ fontSize: '14px', lineHeight: '22px' })
+  })
+
   it('shows the rows of a child collection in a read-only table', async () => {
     stubFetch({ status: 200, body: noteJson('Buy paper') })
 

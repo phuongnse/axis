@@ -725,6 +725,7 @@ describe('FormWidget', () => {
     const { container } = renderForm(null, helpWidget)
 
     expect(await screen.findByText('Shown on the list.')).toHaveAttribute('id', 'title-help')
+    expect(screen.getByText('Shown on the list.')).toHaveStyle({ marginTop: '-4px', marginBottom: '8px' })
     expect(screen.getByRole('textbox', { name: 'Title' })).toHaveAttribute('aria-describedby', 'title-help')
     expect(container.querySelector('#priority-help')).toBeNull()
     expect(screen.getByLabelText('Priority')).not.toHaveAttribute('aria-describedby')

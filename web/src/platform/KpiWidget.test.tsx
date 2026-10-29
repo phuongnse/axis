@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
@@ -122,6 +122,17 @@ describe('KpiWidget', () => {
     expect(requested()).toEqual([rowsPath])
   })
 
+  it('hides the comparison colon in transparent text, and sets the comparison value in tabular figures', async () => {
+    stubRows(totalRow('{"openCount":12.50,"urgentCount":3}'))
+
+    renderKpi(withComparison)
+
+    const comparison = await screen.findByTestId('kpi-comparison')
+    expect(comparison).toHaveTextContent(/^Urgent: 3$/)
+    expect(within(comparison).getByText(':', { selector: 'span span' })).toHaveStyle({ color: 'rgba(0, 0, 0, 0)' })
+    expect(within(comparison).getByText('3')).toHaveStyle({ fontVariantNumeric: 'tabular-nums' })
+  })
+
   it('asks for the row with the value of each bound page parameter under the data source parameter name', async () => {
     const requested = stubRows(totalRow('{"openCount":12.50,"urgentCount":3}'))
 
@@ -202,6 +213,7 @@ describe('KpiWidget', () => {
     expect(dash).toHaveAttribute('aria-hidden', 'true')
     expect(screen.getByTestId('kpi-measure')).toContainElement(dash)
     expect(dash.parentElement).toHaveStyle({ fontStyle: 'italic' })
+    expect(dash).toHaveStyle({ fontWeight: '400' })
     // The hidden text stays in the accessibility tree but is clipped out of sight.
     expect(screen.getByText('No value')).toHaveStyle({ position: 'absolute', width: '1px' })
   })

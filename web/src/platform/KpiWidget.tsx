@@ -77,7 +77,9 @@ export function KpiWidget({ sitePath, widget, locale, pageValues }: KpiWidgetPro
       // The dash is for the eye and the platform text is for assistive technology.
       return (
         <span style={emptyStyle}>
-          <span aria-hidden="true">—</span>
+          <span aria-hidden="true" style={{ fontWeight: 400 }}>
+            —
+          </span>
           <span style={visuallyHidden}>{t('shell.kpi.empty')}</span>
         </span>
       )
@@ -113,8 +115,12 @@ export function KpiWidget({ sitePath, widget, locale, pageValues }: KpiWidgetPro
         </div>
         {comparison && (
           <div data-testid="kpi-comparison">
-            <span style={{ color: colour.textMuted }}>{t(comparison.labelKey)}: </span>
-            {display(comparison.measure)}
+            <span style={{ color: colour.textMuted }}>
+              {t(comparison.labelKey)}
+              {/* Transparent, not hidden, for the same reason as the label's colon. */}
+              <span style={{ color: 'transparent' }}>: </span>
+            </span>
+            <span style={{ fontVariantNumeric: 'tabular-nums' }}>{display(comparison.measure)}</span>
           </div>
         )}
         {navigate && canvas.active && (
