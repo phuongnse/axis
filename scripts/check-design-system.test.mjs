@@ -8,7 +8,8 @@ import { fileURLToPath } from 'node:url'
 import { checkDesignSystemBundle } from './check-design-system.mjs'
 
 const script = fileURLToPath(new URL('./check-design-system.mjs', import.meta.url))
-const valid = 'var Axis = (function () { return { table: function () {} } })()\n'
+const header = `/* @ds-bundle: ${JSON.stringify({ width: 992, groups: [{ name: 'Data widgets', previews: ['table'] }] })} */\n`
+const valid = header + 'var Axis = (function () { return { table: function () {} } })()\n'
 
 let root
 
@@ -32,6 +33,63 @@ describe('checkDesignSystemBundle', () => {
     assert.equal(bytes, Buffer.byteLength(valid))
   })
 
+  test('fails a bundle with no @ds-bundle line first', () => {
+    write('axis-design-system.js', valid.slice(header.length))
+
+    const { problems } = checkDesignSystemBundle(root)
+
+    assert.equal(problems.length, 1)
+    assert.match(problems[0], /must start with a line like \/\* @ds-bundle/)
+  })
+
+  test('fails a @ds-bundle line that comes second', () => {
+    write('axis-design-system.js', `var Axis = 1\n${header}`)
+
+    const { problems } = checkDesignSystemBundle(root)
+
+    assert.equal(problems.length, 1)
+    assert.match(problems[0], /must start with a line/)
+  })
+
+  test('fails a @ds-bundle line that is not JSON', () => {
+    write('axis-design-system.js', `/* @ds-bundle: {width: 992} */\nvar Axis = 1\n`)
+
+    const { problems } = checkDesignSystemBundle(root)
+
+    assert.equal(problems.length, 1)
+    assert.match(problems[0], /is not JSON/)
+  })
+
+  test('fails a @ds-bundle line without a width', () => {
+    write('axis-design-system.js', `/* @ds-bundle: {"groups":[{"name":"A","previews":["a"]}]} */\nvar Axis = 1\n`)
+
+    const { problems } = checkDesignSystemBundle(root)
+
+    assert.equal(problems.length, 1)
+    assert.match(problems[0], /positive number as its width/)
+  })
+
+  test('fails a @ds-bundle line with no groups', () => {
+    write('axis-design-system.js', `/* @ds-bundle: {"width":992,"groups":[]} */\nvar Axis = 1\n`)
+
+    const { problems } = checkDesignSystemBundle(root)
+
+    assert.equal(problems.length, 1)
+    assert.match(problems[0], /needs groups/)
+  })
+
+  test('fails a preview that two groups list', () => {
+    const groups = [
+      { name: 'A', previews: ['table', 'form'] },
+      { name: 'B', previews: ['table'] },
+    ]
+    write('axis-design-system.js', `/* @ds-bundle: ${JSON.stringify({ width: 992, groups })} */\nvar Axis = 1\n`)
+
+    const { problems } = checkDesignSystemBundle(root)
+
+    assert.deepEqual(problems, ['The @ds-bundle line of axis-design-system.js lists a preview twice: table.'])
+  })
+
   test('fails an HTML file next to the script', () => {
     write('axis-design-system.js', valid)
     write('index.html', '<!doctype html>')
@@ -50,7 +108,7 @@ describe('checkDesignSystemBundle', () => {
   })
 
   test('fails an import declaration', () => {
-    write('axis-design-system.js', "import x from 'y'\nvar Axis = x\n")
+    write('axis-design-system.js', header + "import x from 'y'\nvar Axis = x\n")
 
     const { problems } = checkDesignSystemBundle(root)
 
@@ -59,7 +117,7 @@ describe('checkDesignSystemBundle', () => {
   })
 
   test('fails import.meta', () => {
-    write('axis-design-system.js', 'var Axis = import.meta.url\n')
+    write('axis-design-system.js', header + 'var Axis = import.meta.url\n')
 
     const { problems } = checkDesignSystemBundle(root)
 
@@ -67,7 +125,7 @@ describe('checkDesignSystemBundle', () => {
   })
 
   test('fails a dynamic import', () => {
-    write('axis-design-system.js', "var Axis = import('./a.js')\n")
+    write('axis-design-system.js', header + "var Axis = import('./a.js')\n")
 
     const { problems } = checkDesignSystemBundle(root)
 
@@ -75,7 +133,7 @@ describe('checkDesignSystemBundle', () => {
   })
 
   test('fails a literal </script', () => {
-    write('axis-design-system.js', "var Axis = '</script>'\n")
+    write('axis-design-system.js', header + "var Axis = '</script>'\n")
 
     const { problems } = checkDesignSystemBundle(root)
 
@@ -83,7 +141,7 @@ describe('checkDesignSystemBundle', () => {
   })
 
   test('fails a literal <!--', () => {
-    write('axis-design-system.js', "var Axis = '<!--'\n")
+    write('axis-design-system.js', header + "var Axis = '<!--'\n")
 
     const { problems } = checkDesignSystemBundle(root)
 
@@ -91,7 +149,7 @@ describe('checkDesignSystemBundle', () => {
   })
 
   test('fails a script over 6 MB', () => {
-    write('axis-design-system.js', `var Axis = '${'a'.repeat(6 * 1024 * 1024)}'\n`)
+    write('axis-design-system.js', header + `var Axis = '${'a'.repeat(6 * 1024 * 1024)}'\n`)
 
     const { problems } = checkDesignSystemBundle(root)
 
@@ -113,7 +171,7 @@ describe('check-design-system.mjs', () => {
   })
 
   test('exits 1 and names the problem for an invalid folder', () => {
-    write('axis-design-system.js', "var Axis = '<!--'\n")
+    write('axis-design-system.js', header + "var Axis = '<!--'\n")
 
     const result = run(root)
 

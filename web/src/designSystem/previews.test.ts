@@ -1,9 +1,10 @@
 import { describe, expect, test } from 'vitest'
+import { cardGroups } from './cardOrder'
 import { fixtureScopes, routes } from './fixtures'
 import { previews } from './previews'
 
 function hasEmptyState(name: string): boolean {
-  return ['table', 'taskInbox', 'detail', 'kpi'].includes(name) || name.startsWith('chart-')
+  return ['taskInbox', 'detail', 'kpi'].includes(name) || name.startsWith('chart-')
 }
 
 describe('design-system previews', () => {
@@ -22,6 +23,41 @@ describe('design-system previews', () => {
       expect(states.map(({ caption }) => caption)).toEqual(['With data', 'Empty'])
     },
   )
+
+  test('the table preview draws its data, its empty state and a row with many actions', () => {
+    expect(previews.table.map(({ caption }) => caption)).toEqual(['With data', 'Empty', 'Many row actions'])
+  })
+
+  test('the form preview has its five states', () => {
+    expect(previews.form.map(({ caption }) => caption)).toEqual([
+      'Validation errors',
+      'Read-only by a condition',
+      'Wizard steps',
+      'Fields in columns, with errors',
+      'Many steps',
+    ])
+  })
+
+  test.each(
+    Object.entries(previews).filter(([name]) => name.startsWith('field-') && name !== 'field-child-collection'),
+  )('the %s preview has the three states of a field', (_, states) => {
+    expect(states.map(({ caption }) => caption)).toEqual(['Editable', 'Read-only', 'Required, help text and error'])
+  })
+
+  test('the card groups are the seven agreed groups and list every preview once', () => {
+    expect(cardGroups.map(({ name }) => name)).toEqual([
+      'Field inputs',
+      'Data widgets',
+      'Charts and KPIs',
+      'Process widgets',
+      'Containers',
+      'Shared states',
+      'Shell',
+    ])
+    const listed = cardGroups.flatMap(({ previews: group }) => group)
+    expect(new Set(listed).size).toBe(listed.length)
+    expect([...listed].sort()).toEqual(Object.keys(previews).sort())
+  })
 
   test.each([
     ['shell', ['Application site', 'Navigation collapsed', 'Form page', 'Platform site']],

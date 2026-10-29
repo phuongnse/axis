@@ -9,8 +9,8 @@ endpoints and the widgets are in [frontend](frontend.md), and sign-in and the se
 [D98](../decisions/d98-rules-from-the-shell-review.md) agrees everything on this page. The [layout](#layout) and the
 [navigation icons](#navigation-icons), the [page header](#page-header), the
 [app switcher and preferences](#app-switcher-and-preferences), the [platform home page](#platform-home-page) and
-[session ended](#session-ended) are built, and so are the design system's shell previews, except the Shell group of
-cards, which is _(planned)_.
+[session ended](#session-ended) are built, and so are the design system's shell previews and their Shell group of
+cards.
 
 ## Layout
 
@@ -128,7 +128,7 @@ cards, which is _(planned)_.
 
 ## Design system previews
 
-- _(planned)_ The design system has a seventh group of cards, Shell, after Shared states, with three previews:
+- The design system has a seventh group of cards, Shell, after Shared states, with three previews:
   - `shell`: Application site, Navigation collapsed, Form page and Platform site.
   - `signIn`: Signed out, Sign-in refused and Session ended.
   - `identitySignIn`: the sign-in page of [Axis's identity provider](identity-provider.md#theme), in Sign in, Wrong
