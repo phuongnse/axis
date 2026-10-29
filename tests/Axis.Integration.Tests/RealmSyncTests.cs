@@ -3,7 +3,9 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
 using Axis.Admin;
+using Axis.Configuration.Realms;
 using Axis.Tenancy.Realms;
 
 namespace Axis.Integration.Tests;
@@ -15,7 +17,7 @@ namespace Axis.Integration.Tests;
 /// provider at the realm's first-login flow and gives it a username mapper, and changes
 /// nothing when it cannot sign in as <c>axis-activation</c>.
 /// </summary>
-public sealed class RealmSyncTests(KeycloakFixture keycloak) : IAsyncLifetime
+public sealed partial class RealmSyncTests(KeycloakFixture keycloak) : IAsyncLifetime
 {
     private const string Alias = "oidc-companyissuer";
 
@@ -131,6 +133,62 @@ public sealed class RealmSyncTests(KeycloakFixture keycloak) : IAsyncLifetime
     }
 
     [Fact]
+    public async Task A_site_client_holds_its_allowed_providers_and_accounts_flag_and_a_second_sync_updates_both()
+    {
+        var realm = await NewRealmAsync();
+        await SyncAsync(realm, _secrets.Activation, new RealmState(
+            [new RealmSiteClient("purchasing", Accounts: true, [Alias]), new RealmSiteClient("service-desk", Accounts: false, [Alias])],
+            [Provider()]));
+
+        var token = await TokenAsync("master", KeycloakFixture.AdminClientId, KeycloakFixture.AdminClientSecret);
+        var purchasing = (await GetJsonAsync(token, $"admin/realms/{realm}/clients?clientId=site-purchasing"))[0].GetProperty("attributes");
+        Assert.Equal(Alias, purchasing.GetProperty(RealmSync.ProvidersAttribute).GetString());
+        Assert.Equal("true", purchasing.GetProperty(RealmSync.AccountsAttribute).GetString());
+        var serviceDesk = (await GetJsonAsync(token, $"admin/realms/{realm}/clients?clientId=site-service-desk"))[0].GetProperty("attributes");
+        Assert.Equal("false", serviceDesk.GetProperty(RealmSync.AccountsAttribute).GetString());
+
+        await SyncAsync(realm, _secrets.Activation, new RealmState(
+            [new RealmSiteClient("purchasing", Accounts: false, []), new RealmSiteClient("service-desk", Accounts: false, [Alias])],
+            [Provider()]));
+
+        var changed = (await GetJsonAsync(token, $"admin/realms/{realm}/clients?clientId=site-purchasing"))[0].GetProperty("attributes");
+        Assert.Equal("false", changed.GetProperty(RealmSync.AccountsAttribute).GetString());
+        // Keycloak stores an empty attribute as no attribute.
+        Assert.True(!changed.TryGetProperty(RealmSync.ProvidersAttribute, out var providers) || string.IsNullOrEmpty(providers.GetString()));
+    }
+
+    [Fact]
+    public async Task The_sign_in_page_of_a_site_client_carries_the_providers_and_accounts_flag_of_the_site()
+    {
+        var realm = await NewRealmAsync();
+        await SyncAsync(realm, _secrets.Activation, new RealmState([new RealmSiteClient("purchasing", Accounts: false, [Alias])], [Provider()]));
+        var token = await TokenAsync("master", KeycloakFixture.AdminClientId, KeycloakFixture.AdminClientSecret);
+        var site = (await GetJsonAsync(token, $"admin/realms/{realm}/clients?clientId=site-purchasing"))[0];
+        // The site client copies the redirect addresses of the platform client, which has none here, so give it one.
+        var body = JsonNode.Parse(site.GetRawText())!.AsObject();
+        body["redirectUris"] = new JsonArray("http://localhost/cb");
+        using (var put = await SendAsync(token, HttpMethod.Put, $"admin/realms/{realm}/clients/{site.GetProperty("id").GetString()}", body))
+        {
+            Assert.Equal(HttpStatusCode.NoContent, put.StatusCode);
+        }
+
+        using var browserHandler = new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false };
+        using var browser = new HttpClient(browserHandler);
+        var page = await browser.GetAsync(
+            new Uri(_baseAddress, $"realms/{realm}/protocol/openid-connect/auth?client_id=site-purchasing&response_type=code&scope=openid&redirect_uri={Uri.EscapeDataString("http://localhost/cb")}"),
+            TestContext.Current.CancellationToken);
+        var html = await page.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+
+        Assert.True(page.StatusCode == HttpStatusCode.OK, html);
+        var match = SignInContextPattern().Match(html);
+        Assert.True(match.Success, html);
+        using var context = JsonDocument.Parse(match.Groups["context"].Value);
+        var siteContext = context.RootElement.GetProperty("site");
+        Assert.Equal([Alias], siteContext.GetProperty("providers").EnumerateArray().Select(p => p.GetString()));
+        Assert.False(siteContext.GetProperty("accounts").GetBoolean());
+    }
+
+    [Fact]
     public async Task A_wrong_activation_secret_throws_and_changes_nothing()
     {
         var realm = await NewRealmAsync();
@@ -174,10 +232,14 @@ public sealed class RealmSyncTests(KeycloakFixture keycloak) : IAsyncLifetime
             () => SyncAsync(realm, _secrets.Activation, State(["purchasing", "purchasing"], [])));
     }
 
+    [GeneratedRegex("""<script type="application/json" id="axis-sign-in-context">(?<context>.*?)</script>""", RegexOptions.Singleline)]
+    private static partial Regex SignInContextPattern();
+
     private RealmBrokeredProvider Provider() =>
         new(Alias, new Uri(_baseAddress, "realms/master"), "company-client", "company-secret", "name", "email", "locale", ["groups"]);
 
-    private static RealmState State(string[] sitePaths, RealmBrokeredProvider[] providers) => new(sitePaths, providers);
+    private static RealmState State(string[] sitePaths, RealmBrokeredProvider[] providers) =>
+        new([.. sitePaths.Select(path => new RealmSiteClient(path, Accounts: true, []))], providers);
 
     private async Task<string> NewRealmAsync()
     {
