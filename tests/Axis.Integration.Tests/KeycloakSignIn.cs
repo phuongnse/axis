@@ -83,8 +83,8 @@ internal static partial class KeycloakSignIn
     {
         var cancellationToken = TestContext.Current.CancellationToken;
         var html = await passwordResponse.Content.ReadAsStringAsync(cancellationToken);
-        Assert.True(passwordResponse.StatusCode == HttpStatusCode.OK && html.Contains("id=\"otp\"", StringComparison.Ordinal), html);
-        var action = WebUtility.HtmlDecode(CodeFormActionPattern().Match(html).Groups["action"].Value);
+        Assert.True(passwordResponse.StatusCode == HttpStatusCode.OK && Page(html) == "twoStep", html);
+        var action = LoginAction(html);
         // A cookie that the password response sets again replaces the one the browser sent.
         var cookies = cookieHeader.Split("; ").ToDictionary(cookie => cookie.Split('=', 2)[0], cookie => cookie);
         if (passwordResponse.Headers.TryGetValues("Set-Cookie", out var setCookies))
@@ -95,7 +95,7 @@ internal static partial class KeycloakSignIn
             }
         }
 
-        using var request = new HttpRequestMessage(HttpMethod.Post, new Uri(action))
+        using var request = new HttpRequestMessage(HttpMethod.Post, action)
         {
             Content = new FormUrlEncodedContent(new Dictionary<string, string>
             {
@@ -107,18 +107,22 @@ internal static partial class KeycloakSignIn
         return await browser.SendAsync(request, cancellationToken);
     }
 
-    /// <summary>The address the Axis theme's sign-in form posts to: loginAction of the sign-in context that login.ftl writes as JSON.</summary>
-    public static Uri LoginAction(string html)
+    /// <summary>The address the Axis theme's form posts to: loginAction of the context that login.ftl or login-otp.ftl writes as JSON.</summary>
+    public static Uri LoginAction(string html) => new(Property(html, "loginAction")!);
+
+    /// <summary>The page the Axis theme draws: "signIn" for the password, "twoStep" for the code.</summary>
+    public static string Page(string html) => Property(html, "page")!;
+
+    /// <summary>The error that the context shows above the form, or null when it has none.</summary>
+    public static string? Error(string html) => Property(html, "error");
+
+    private static string? Property(string html, string name)
     {
         var match = SignInContextPattern().Match(html);
         Assert.True(match.Success, html);
         using var context = JsonDocument.Parse(match.Groups["context"].Value);
-        return new Uri(context.RootElement.GetProperty("loginAction").GetString()!);
+        return context.RootElement.TryGetProperty(name, out var value) ? value.GetString() : null;
     }
-
-    // Keycloak's own code page is not themed, so it still has a form element.
-    [GeneratedRegex("""<form\b[^>]*\baction="(?<action>[^"]+)""")]
-    private static partial Regex CodeFormActionPattern();
 
     [GeneratedRegex("""<script type="application/json" id="axis-sign-in-context">(?<context>.*?)</script>""", RegexOptions.Singleline)]
     private static partial Regex SignInContextPattern();
