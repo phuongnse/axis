@@ -79,6 +79,7 @@ public sealed class AdminTenantStatusTests(PostgreSqlFixture database) : IClassF
         var ids = new[] { scenario.NewTenantId(), scenario.NewTenantId() }.Order(StringComparer.Ordinal).ToArray();
         Assert.Equal(0, (await scenario.CreateAsync(ids[0], "b.example.test", "a.example.test")).Exit);
         Assert.Equal(0, (await scenario.CreateAsync(ids[1], "c.example.test")).Exit);
+        Assert.Equal(0, (await scenario.RunAsync(["tenant", "host", "add", ids[1], "d.example.test", "--site", "shop"], extra: AdminScenario.Directory)).Exit);
         Assert.Equal(0, (await scenario.RunAsync(["tenant", "suspend", ids[1]])).Exit);
         var first = await scenario.RowAsync(ids[0]);
         var second = await scenario.RowAsync(ids[1]);
@@ -89,7 +90,7 @@ public sealed class AdminTenantStatusTests(PostgreSqlFixture database) : IClassF
         Assert.Equal(3, result.Output.Length);
         Assert.Equal(["id", "status", "hosts", "schema version", "preview of"], Cells(result.Output[0]));
         Assert.Equal([ids[0], "active", "a.example.test,b.example.test", first.SchemaVersion, "-"], Cells(result.Output[1]));
-        Assert.Equal([ids[1], "suspended", "c.example.test", second.SchemaVersion, "-"], Cells(result.Output[2]));
+        Assert.Equal([ids[1], "suspended", "c.example.test,d.example.test (shop)", second.SchemaVersion, "-"], Cells(result.Output[2]));
 
         await scenario.AssertNoSecretsAsync();
     }
