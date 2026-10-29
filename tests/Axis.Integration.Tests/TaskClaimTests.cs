@@ -180,7 +180,7 @@ public sealed class TaskClaimTests(TaskApiFixture fixture) : IClassFixture<TaskA
         {
             using var response = await PostAsync(client, task, action, TenantA);
             using var problem = await RecordApiFixture.ReadProblemAsync(response, HttpStatusCode.Unauthorized);
-            Assert.Equal("Sign in to work on tasks.", problem.RootElement.GetProperty("title").GetString());
+            Assert.Equal("Sign in to read or write this data.", problem.RootElement.GetProperty("title").GetString());
         }
     }
 

@@ -268,14 +268,14 @@ public sealed class NotificationEndpointTests(TaskApiFixture fixture) : IClassFi
         using (var list = await SendAsync(anonymous, Notifications))
         {
             using var problem = await RecordApiFixture.ReadProblemAsync(list, HttpStatusCode.Unauthorized);
-            Assert.Equal("Sign in to read notifications.", problem.RootElement.GetProperty("title").GetString());
+            Assert.Equal("Sign in to read or write this data.", problem.RootElement.GetProperty("title").GetString());
         }
 
         foreach (var path in new[] { $"{Notifications}/{id:D}/read", $"{Notifications}/read-all" })
         {
             using var response = await PostAsync(anonymous, path);
             using var problem = await RecordApiFixture.ReadProblemAsync(response, HttpStatusCode.Unauthorized);
-            Assert.Equal("Sign in to read notifications.", problem.RootElement.GetProperty("title").GetString());
+            Assert.Equal("Sign in to read or write this data.", problem.RootElement.GetProperty("title").GetString());
         }
 
         using var maria = fixture.CreateClient().SignedInAs("maria");

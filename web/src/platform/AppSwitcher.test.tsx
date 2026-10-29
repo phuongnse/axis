@@ -56,7 +56,7 @@ function json(body: unknown, status = 200) {
 function stubServer(current: CurrentUser | null, listed: SiteListItem[] = sites) {
   const fetchMock = vi.fn(async (input: string) => {
     if (current === null) {
-      return json({ title: 'Nobody is signed in.' }, 401)
+      return json({ title: 'Sign in to read or write this data.' }, 401)
     }
     if (input === '/api/me') {
       return json(current)

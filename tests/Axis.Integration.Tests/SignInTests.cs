@@ -193,8 +193,8 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
         var otherTenant = await GetMeWithCookieAsync(cookieless, HostB, signIn.SessionCookie);
 
         Assert.Equal(HttpStatusCode.OK, sameTenant.StatusCode);
-        Assert.Equal(HttpStatusCode.Unauthorized, otherTenant.StatusCode);
-        Assert.Equal("application/problem+json", otherTenant.Content.Headers.ContentType?.MediaType);
+        using var problem = await RecordApiFixture.ReadProblemAsync(otherTenant, HttpStatusCode.Unauthorized);
+        Assert.Equal("Sign in to read or write this data.", problem.RootElement.GetProperty("title").GetString());
     }
 
     [Fact]

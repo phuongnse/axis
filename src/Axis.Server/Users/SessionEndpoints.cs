@@ -3,6 +3,7 @@ using System.Security.Claims;
 using Axis.Core.Tenancy;
 using Axis.Data.Storage;
 using Axis.Server.Authentication;
+using Axis.Server.Http;
 using Axis.Server.Tenancy;
 using Microsoft.AspNetCore.Authentication;
 
@@ -29,7 +30,7 @@ internal static class SessionEndpoints
     {
         if (await SignedInAsync(httpContext) is not { } caller)
         {
-            return NobodyIsSignedIn();
+            return Grants.SignInRequired();
         }
 
         var now = clock.GetUtcNow();
@@ -50,7 +51,7 @@ internal static class SessionEndpoints
     {
         if (await SignedInAsync(httpContext) is not { } caller)
         {
-            return NobodyIsSignedIn();
+            return Grants.SignInRequired();
         }
 
         // The check comes first, so a caller who may not end sessions learns nothing about which ids exist.
@@ -71,7 +72,7 @@ internal static class SessionEndpoints
     {
         if (await SignedInAsync(httpContext) is not { } caller)
         {
-            return NobodyIsSignedIn();
+            return Grants.SignInRequired();
         }
 
         if (!Session.MayEndSessions(caller.Principal, clock.GetUtcNow()))
@@ -81,7 +82,7 @@ internal static class SessionEndpoints
 
         if (Session.ReadSessionId(caller.Principal) is not { } currentId || Decode(currentId) is not { } keep)
         {
-            return NobodyIsSignedIn();
+            return Grants.SignInRequired();
         }
 
         var connection = await database.GetConnectionAsync(cancellationToken);
@@ -98,9 +99,6 @@ internal static class SessionEndpoints
 
     private static byte[]? Decode(string id) =>
         Base64Url.IsValid(id) ? Base64Url.DecodeFromChars(id) : null;
-
-    private static IResult NobodyIsSignedIn() =>
-        Results.Problem(statusCode: StatusCodes.Status401Unauthorized, title: "Nobody is signed in.");
 
     private static IResult LoginNeeded() =>
         Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: "Log in again at the identity provider to end sessions.");

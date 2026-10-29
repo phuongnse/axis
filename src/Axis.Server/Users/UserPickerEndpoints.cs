@@ -32,7 +32,7 @@ internal static class UserPickerEndpoints
     {
         if (await CurrentUsers.FindAsync(httpContext) is not { } user)
         {
-            return Results.Problem(statusCode: StatusCodes.Status401Unauthorized, title: "Sign in to work on tasks.");
+            return Grants.SignInRequired();
         }
 
         if (await resolver.ResolveReleaseAsync(app, cancellationToken) is not { } active)

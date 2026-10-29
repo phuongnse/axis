@@ -199,9 +199,12 @@ public sealed class OwnSessionsTests(PostgreSqlFixture database) : IAsyncLifetim
         var others = await SendAsync(client, HttpMethod.Delete, "/api/me/sessions", cookie: null);
         var noCsrf = await SendAsync(client, HttpMethod.Delete, "/api/me/sessions", requester, csrf: false);
 
-        Assert.Equal(HttpStatusCode.Unauthorized, list.StatusCode);
-        Assert.Equal(HttpStatusCode.Unauthorized, one.StatusCode);
-        Assert.Equal(HttpStatusCode.Unauthorized, others.StatusCode);
+        foreach (var response in new[] { list, one, others })
+        {
+            using var problem = await RecordApiFixture.ReadProblemAsync(response, HttpStatusCode.Unauthorized);
+            Assert.Equal("Sign in to read or write this data.", problem.RootElement.GetProperty("title").GetString());
+        }
+
         Assert.Equal(HttpStatusCode.Forbidden, noCsrf.StatusCode);
         Assert.Equal(1L, await CountAsync());
     }

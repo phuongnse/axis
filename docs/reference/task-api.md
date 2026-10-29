@@ -234,7 +234,7 @@ is a `403` before any of these checks.
   ```json
   {
     "type": "https://tools.ietf.org/html/rfc9110#section-15.5.2",
-    "title": "Sign in to work on tasks.",
+    "title": "Sign in to read or write this data.",
     "status": 401
   }
   ```

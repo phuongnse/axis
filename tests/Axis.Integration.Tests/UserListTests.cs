@@ -109,7 +109,8 @@ public sealed class UserListTests(KeycloakFixture keycloak) : IAsyncLifetime
         using var unauthorized = await StudioPublishTests.SendAsync(nobody, HttpMethod.Get, "/api/users", HostA);
 
         Assert.Equal(HttpStatusCode.Forbidden, forbidden.StatusCode);
-        Assert.Equal(HttpStatusCode.Unauthorized, unauthorized.StatusCode);
+        using var problem = await RecordApiFixture.ReadProblemAsync(unauthorized, HttpStatusCode.Unauthorized);
+        Assert.Equal("Sign in to read or write this data.", problem.RootElement.GetProperty("title").GetString());
     }
 
     [Fact]

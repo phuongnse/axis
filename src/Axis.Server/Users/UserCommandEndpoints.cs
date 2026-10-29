@@ -51,7 +51,7 @@ internal static partial class UserCommandEndpoints
         var authenticated = await httpContext.AuthenticateAsync(Session.Scheme);
         if (!authenticated.Succeeded || Session.Read(authenticated.Principal) is not { } caller)
         {
-            return Results.Problem(statusCode: StatusCodes.Status401Unauthorized, title: "Nobody is signed in.");
+            return Grants.SignInRequired();
         }
 
         if (!services.GetRequiredService<UsersSettings>().Allows(caller.Roles))
