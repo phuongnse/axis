@@ -1,6 +1,7 @@
 import { CloseOutlined, DeleteOutlined, SearchOutlined } from '@ant-design/icons'
-import { Button, ConfigProvider, Flex, Form, Input, Space, Table, Tooltip, type TableColumnsType } from 'antd'
-import { useMemo, useRef, useState, type CSSProperties } from 'react'
+import { ConfigProvider, Flex, Form, Input, Space, Table, type TableColumnsType } from 'antd'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { AxisButton } from './AxisButton'
 import { compactFormTheme } from './antTheme'
 import { EmptyDash } from './EmptyValue'
 import { FieldInput } from './FieldInput'
@@ -42,6 +43,8 @@ const numberStyle: CSSProperties = { textAlign: 'right', fontVariantNumeric: 'ta
 // The height of an input, with the text centred in it, so a plain cell lines up with the inputs in its row.
 const plainCellStyle: CSSProperties = { minHeight: 32, display: 'flex', alignItems: 'center' }
 const plainNumberStyle: CSSProperties = { ...plainCellStyle, justifyContent: 'flex-end', ...numberStyle }
+// A cell's message sits under its input and stays left-aligned, even in a number column.
+const cellMessageStyle: CSSProperties = { display: 'block', marginTop: 4, textAlign: 'left' }
 
 /** The reference cell whose lookup is open. */
 interface OpenLookup {
@@ -51,10 +54,11 @@ interface OpenLookup {
 
 /**
  * Edits the rows of a child collection as a table: one column per child field, each editable cell the
- * same input the form uses for that field type, a remove button per row and an add button below. A
- * reference cell shows the label of the record it points to, with a search icon button that opens the
- * reference lookup. A computed cell and every cell of a read-only collection show their value as plain
- * text, with no input. A read-only collection has no add or remove buttons.
+ * same input the form uses for that field type, a remove button per row and an add button above the
+ * table on the right. The first input of an added row takes focus. A reference cell shows the label of
+ * the record it points to, with a search icon button that opens the reference lookup. A computed cell
+ * and every cell of a read-only collection show their value as plain text, with no input. A read-only
+ * collection has no add or remove buttons.
  */
 export function ChildCollectionTable({
   field,
@@ -71,6 +75,9 @@ export function ChildCollectionTable({
   const keys = useRef(new WeakMap<RecordRow, number>())
   const nextKey = useRef(0)
   const [lookup, setLookup] = useState<OpenLookup | null>(null)
+  // The client key of an added row, until its first input has taken focus.
+  const pendingFocus = useRef<number | null>(null)
+  const container = useRef<HTMLDivElement>(null)
   const keyOf = (row: RecordRow) => {
     let key = keys.current.get(row)
     if (key === undefined) {
@@ -94,8 +101,22 @@ export function ChildCollectionTable({
       ),
     )
   }
-  const add = () =>
-    onChange([...rows, Object.fromEntries(childFields.map((child) => [child.name, null]))], [...aligned, {}])
+  const add = () => {
+    const row: RecordRow = Object.fromEntries(childFields.map((child) => [child.name, null]))
+    const key = nextKey.current++
+    keys.current.set(row, key)
+    pendingFocus.current = key
+    onChange([...rows, row], [...aligned, {}])
+  }
+  // Runs after every render, because the parent may pass the added row on a later render than the click.
+  useEffect(() => {
+    const key = pendingFocus.current
+    if (key === null) return
+    const row = container.current?.querySelector(`tr[data-row-key="${key}"]`)
+    if (!row) return
+    pendingFocus.current = null
+    row.querySelector<HTMLElement>('input:not([tabindex="-1"]), textarea, button')?.focus()
+  })
   const remove = (index: number) =>
     onChange(
       rows.filter((_row, at) => at !== index),
@@ -113,10 +134,12 @@ export function ChildCollectionTable({
       return {
         key: child.name,
         title: label,
-        // The inputs keep a usable width when the table scrolls sideways.
-        width: 160,
+        // The inputs keep a usable width when the table scrolls sideways. A reference cell has two buttons.
+        width: child.type === 'reference' ? 240 : 160,
         // Numbers sit on the right, in the header and the cells.
         align: isNumeric(child.type) ? ('right' as const) : undefined,
+        // Cells line up at the top, so a message under one cell never moves the other inputs of its row.
+        onCell: () => ({ style: { verticalAlign: 'top' as const } }),
         render: (_value: unknown, row: RecordRow, index: number) => {
           const cellErrors = errors[`${index}/${child.name}`]
           const shown = formatValue(child, row[child.name] ?? null, aligned[index] ?? {}, { locale, text: t }, row)
@@ -125,7 +148,9 @@ export function ChildCollectionTable({
               validateStatus={cellErrors ? 'error' : undefined}
               help={
                 cellErrors && (
-                  <span data-testid={`field-error-${field.name}-${index}-${child.name}`}>{cellErrors.join(' ')}</span>
+                  <span data-testid={`field-error-${field.name}-${index}-${child.name}`} style={cellMessageStyle}>
+                    {cellErrors.join(' ')}
+                  </span>
                 )
               }
             >
@@ -150,21 +175,21 @@ export function ChildCollectionTable({
                 // The label cannot be typed. The record is chosen in the lookup, and its id is sent.
                 <Space.Compact block data-testid={`reference-${field.name}-${index}-${child.name}`}>
                   <Input readOnly aria-label={`${label} ${index + 1}`} value={aligned[index]?.[child.name] ?? ''} />
-                  <Tooltip title={t('shell.form.choose')}>
-                    <Button
-                      aria-label={`${t('shell.form.choose')} ${label} ${index + 1}`}
-                      icon={<SearchOutlined />}
-                      onClick={() => setLookup({ index, field: child })}
-                    />
-                  </Tooltip>
+                  <AxisButton
+                    role="icon"
+                    nameKey="shell.form.choose"
+                    nameSuffix={`${label} ${index + 1}`}
+                    icon={<SearchOutlined />}
+                    onClick={() => setLookup({ index, field: child })}
+                  />
                   {!child.required && row[child.name] != null && (
-                    <Tooltip title={t('shell.form.clear')}>
-                      <Button
-                        aria-label={`${t('shell.form.clear')} ${label} ${index + 1}`}
-                        icon={<CloseOutlined />}
-                        onClick={() => edit(index, child.name, null)}
-                      />
-                    </Tooltip>
+                    <AxisButton
+                      role="icon"
+                      nameKey="shell.form.clear"
+                      nameSuffix={`${label} ${index + 1}`}
+                      icon={<CloseOutlined />}
+                      onClick={() => edit(index, child.name, null)}
+                    />
                   )}
                 </Space.Compact>
               ) : (
@@ -187,21 +212,28 @@ export function ChildCollectionTable({
   if (!readOnly) {
     columns.push({
       key: removeColumnKey,
+      onCell: () => ({ style: { verticalAlign: 'top' as const } }),
       render: (_value: unknown, _row: RecordRow, index: number) => (
-        <Tooltip title={t('shell.form.removeRow')}>
-          <Button
-            danger
-            aria-label={t('shell.form.removeRow')}
-            icon={<DeleteOutlined />}
-            onClick={() => remove(index)}
-          />
-        </Tooltip>
+        <AxisButton
+          role="icon"
+          destructive
+          nameKey="shell.form.removeRow"
+          icon={<DeleteOutlined />}
+          onClick={() => remove(index)}
+        />
       ),
     })
   }
 
   return (
-    <Flex vertical gap="small">
+    <Flex vertical gap="small" ref={container}>
+      {!readOnly && (
+        <Flex justify="end">
+          <AxisButton role="main" onClick={add}>
+            {t('shell.form.addRow')}
+          </AxisButton>
+        </Flex>
+      )}
       {/* A cell's item needs no space below it, as the table rows already space the inputs. */}
       <ConfigProvider theme={compactFormTheme}>
         <Table<RecordRow>
@@ -212,11 +244,6 @@ export function ChildCollectionTable({
           pagination={false}
         />
       </ConfigProvider>
-      {!readOnly && (
-        <Flex>
-          <Button onClick={add}>{t('shell.form.addRow')}</Button>
-        </Flex>
-      )}
       {lookup?.field.target && (
         <ReferenceLookup
           field={lookup.field}

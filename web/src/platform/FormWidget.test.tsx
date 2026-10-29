@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import platformVietnamese from '../../../src/Axis.Presentation/Texts/vi.json'
 import { formItem, hasFieldError, isRequiredLabel } from '../test/antd'
+import { designTokensFor } from './designTokens'
 import { FormWidget } from './FormWidget'
 import type { EntityWidgetMetadata, FieldMetadata, FieldType } from './site'
 import { TextProvider } from './TextProvider'
@@ -1158,7 +1159,7 @@ describe('FormWidget', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Add row' }))
 
     const remove = screen.getByRole('button', { name: 'Remove' })
-    expect(remove).toHaveClass('ant-btn-dangerous')
+    expect(remove).toHaveStyle({ color: designTokensFor('light').colour.dangerText })
     expect(remove.querySelector('.anticon-delete')).not.toBeNull()
   })
 
