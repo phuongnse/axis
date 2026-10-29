@@ -10,7 +10,7 @@ import { assetManagement, journeyApplications, journeyURL } from '../server-sett
 import { csrfHeaders } from '../csrf'
 import { cellValue, expectShown, fieldLabel } from '../fields'
 import { useJourneySession } from '../sessions'
-import { createResource, openFormTab } from '../studio-resources'
+import { createResource, openFormTab, openTab } from '../studio-resources'
 
 // Typing the sample one key at a time is slow, and the journey server is shared with other specs.
 test.setTimeout(300_000)
@@ -49,6 +49,9 @@ const scenarios = [
   ['NegativeCostIsRefused', 'scenarios/negative-cost-is-refused.json'],
   ['UserWithoutARoleIsDenied', 'scenarios/user-without-a-role-is-denied.json'],
 ] as const
+
+const jsonScenarios = [['AssetWithMaintenanceAndSoftware', 'scenarios/asset-with-maintenance-and-software.json']] as const
+const allScenarios = [...scenarios, ...jsonScenarios]
 
 const sixParts = (file: string) => file === 'application.json' || /^(roles|sequences|entities|seeds|texts)\//.test(file)
 
@@ -1004,9 +1007,29 @@ test.describe('the author builds the asset management application with Studio on
     })
   }
 
+  for (const [name, file] of jsonScenarios) {
+    test(`the author writes the ${name} scenario through the JSON view`, async ({ page }) => {
+      await useJourneySession(page, 'author')
+      await page.goto(`${journeyURL}/studio?app=AssetManagement`)
+
+      await createResource(page, 'scenario', name)
+      await expect(page.getByTestId('studio-resource-details')).toContainText(file)
+
+      // The scenario editor cannot add a child-collection value, so the sample is pasted into the JSON view.
+      await openTab(page, 'JSON')
+      const json = page.getByRole('textbox', { name: 'JSON', exact: true })
+      const content = await sample<Record<string, unknown>>(file)
+      content.id = (JSON.parse(await json.inputValue()) as { id: string }).id
+      await json.fill(JSON.stringify(content, null, 2))
+
+      const diagnostics = await save(page)
+      expect(diagnostics.filter((diagnostic) => diagnostic.file === file && diagnostic.severity === 'error')).toEqual([])
+    })
+  }
+
   test('the built policies and scenarios match the sample', async () => {
     compareApplicationFolders(assetManagement, built, {
-      files: [...policies, ...scenarios.map(([, file]) => file)],
+      files: [...policies, ...allScenarios.map(([, file]) => file)],
     })
   })
 
@@ -1132,7 +1155,7 @@ test.describe('the author builds the asset management application with Studio on
     expect(diagnostics.filter((diagnostic) => diagnostic.severity === 'error')).toEqual([])
   })
 
-  test('the author runs the five test scenarios from Studio', async ({ page }) => {
+  test('the author runs the six test scenarios from Studio', async ({ page }) => {
     await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio?app=AssetManagement`)
     await page.getByTestId('studio-run-tests').click()
@@ -1141,9 +1164,9 @@ test.describe('the author builds the asset management application with Studio on
     await expect(page.getByTestId('studio-request-status')).toHaveAttribute('data-status', 'succeeded', {
       timeout: 240_000,
     })
-    await expect(page.getByTestId('studio-test-result')).toHaveCount(scenarios.length)
+    await expect(page.getByTestId('studio-test-result')).toHaveCount(allScenarios.length)
     await expect(page.locator('[data-testid="studio-test-result"][data-outcome="passed"]')).toHaveCount(
-      scenarios.length,
+      allScenarios.length,
     )
   })
 

@@ -317,19 +317,19 @@ Studio, publishes it and takes one ticket through the process on the site.
 ## Fourth application: asset management
 
 A fourth application, of a shape none of the first three has, is a register
-of the company's assets with a dashboard. A Playwright journey builds it only
-through Studio. It lives as configuration in
+of the company's assets with a dashboard. A Playwright journey builds it through
+Studio, and writes one scenario through the JSON view. It lives as configuration in
 `samples/apps/asset-management/`. It is not platform code. It proves the data
 modeling of M15: files, money, labelled enum values, many-to-many, references
 from child rows, import and export. Those parts are built. See
 [D81](decisions/d81-asset-management-as-the-fourth-sample-application.md).
 
-The folder holds the data, security, pages, dashboard, five scenarios of its
-access rules, a warranty reminder process and its weekday trigger. It is active
-in development, Compose and E2E. The Studio journey builds the whole folder,
-compares it with the sample, runs its scenarios from Studio, publishes it and
-uses its site to register, import and export assets. Only the import,
-attachment and maintenance scenarios are _(planned for M18)_.
+The folder holds the data, security, pages, dashboard, six scenarios that cover
+its access rules and a maintenance entry, a warranty reminder process and its
+weekday trigger. It is active in development, Compose and E2E. The Studio
+journey builds the whole folder, compares it with the sample, runs its scenarios
+from Studio, publishes it and uses its site to register, import and export
+assets. Only the import and attachment scenarios are _(planned for M18)_.
 
 ### Data
 
@@ -381,11 +381,11 @@ SPA serves its bundle there. Texts are in `en` and `vi`.
 ### Scenarios the application must pass
 
 - Built: an asset is registered, an employee and an auditor cannot write, a
-  negative cost is refused, and a user without a role is denied.
+  negative cost is refused, an asset with a maintenance entry with a vendor, and
+  software is recorded, and a user without a role is denied.
 - _(planned for M18)_ An import of valid assets, and an import whose dry run
   reports a bad row and writes nothing.
-- _(planned for M18)_ An asset with an attachment, a maintenance entry with a
-  vendor, and software.
+- _(planned for M18)_ An asset with an attachment.
 - _(planned for M18)_ Denied access for an employee to another holder's asset,
   to its attachment's download and to an export, and for an auditor to an
   import.

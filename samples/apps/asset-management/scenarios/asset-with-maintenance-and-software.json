@@ -1,0 +1,93 @@
+{
+  "id": "7665a608-97a9-40e1-8acc-067b34fb08f6",
+  "kind": "scenario",
+  "name": "AssetWithMaintenanceAndSoftware",
+  "formatVersion": 1,
+  "now": "2026-10-01T09:00:00Z",
+  "users": {
+    "asset-manager": [
+      "asset-manager"
+    ]
+  },
+  "steps": [
+    {
+      "type": "createRecord",
+      "entity": "Vendor",
+      "as": "asset-manager",
+      "save": "vendor",
+      "values": {
+        "name": "Contoso Repairs"
+      }
+    },
+    {
+      "type": "createRecord",
+      "entity": "Software",
+      "as": "asset-manager",
+      "save": "software",
+      "values": {
+        "name": "Microsoft Office"
+      }
+    },
+    {
+      "type": "createRecord",
+      "entity": "Asset",
+      "as": "asset-manager",
+      "save": "asset",
+      "values": {
+        "name": "Dell Latitude 7440",
+        "currency": "USD",
+        "purchaseCost": 1500,
+        "maintenance": [
+          {
+            "date": "2026-09-15",
+            "vendor": "vendor",
+            "currency": "USD",
+            "cost": 120,
+            "note": "Battery replaced"
+          }
+        ],
+        "software": [
+          "software"
+        ]
+      }
+    },
+    {
+      "type": "expectRecord",
+      "record": "asset",
+      "values": {
+        "maintenance": [
+          {
+            "date": "2026-09-15",
+            "vendor": "vendor",
+            "currency": "USD",
+            "cost": 120,
+            "note": "Battery replaced"
+          }
+        ],
+        "software": [
+          "software"
+        ]
+      }
+    },
+    {
+      "type": "createRecord",
+      "entity": "Asset",
+      "as": "asset-manager",
+      "values": {
+        "name": "Dell Latitude 7440",
+        "currency": "USD",
+        "maintenance": [
+          {
+            "date": "2026-09-15",
+            "vendor": "vendor",
+            "currency": "USD",
+            "cost": -1
+          }
+        ]
+      },
+      "expect": {
+        "invalid": "maintenance/0/cost"
+      }
+    }
+  ]
+}

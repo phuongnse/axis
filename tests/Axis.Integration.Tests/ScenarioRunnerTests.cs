@@ -1095,7 +1095,7 @@ public sealed class ScenarioRunnerTests
             ["purchase-requests"] = ("PurchaseRequests", "5"),
             ["leave-requests"] = ("LeaveRequests", "5"),
             ["service-desk"] = ("ServiceDesk", "12"),
-            ["asset-management"] = ("AssetManagement", "5"),
+            ["asset-management"] = ("AssetManagement", "6"),
         };
         if (suites.TryGetValue(application, out var expected))
         {
