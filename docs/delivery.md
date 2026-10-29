@@ -105,16 +105,15 @@ with the reasons. What each one does is in NexKit's
 - **There is no push token.** NexKit pushes with the Actions token, so it
   cannot push a merge that brings changes to `.github/workflows/`. The hourly
   driver merges those by hand.
-- **CI runs on `main` every two hours.** A merge by NexKit starts no `push`
-  workflow, so CI runs on a schedule, on a person's push and on demand. The
-  CodeQL and performance workflows run every night. NexKit's
-  `autopilot.watch_workflows` setting watches all three on `main` without
-  starting them, and `merge.after_workflows` is empty, as
-  [D104](decisions/d104-codeql-and-the-performance-tests-run-every-night.md)
-  and
-  [D105](decisions/d105-ci-on-main-runs-every-two-hours-and-four-issues-run-at-once.md)
-  agree. A run on `main` always finishes: a newer run replaces only one that
-  is still waiting to start. On any other branch a newer push stops the older
+- **CI runs on `main` once every 5 merges.** A merge by NexKit starts no
+  `push` workflow, so NexKit's `merge.after_workflows` setting starts CI on
+  `main` once every 5 of its merges, CodeQL once every 32 and the performance
+  workflow once every 62, as
+  [D112](decisions/d112-ci-codeql-and-the-performance-tests-run-on-main-every-few-merges.md)
+  agrees. None of them has a schedule. CI also runs on a person's push and on
+  demand. Each of the three ends with a job that starts a NexKit sweep, so a
+  failure is noticed when its run ends. A CI run on `main` always finishes: a
+  newer run replaces only one that is still waiting to start. On any other branch a newer push stops the older
   run. CI runs the lint and unit tests, the smoke tests, the integration
   tests and three shards of the E2E tests as six parallel jobs, so a run takes
   as long as its slowest job.
@@ -157,9 +156,9 @@ with the reasons. What each one does is in NexKit's
   suite, so a slowdown shows at its next run. The integration performance
   tests, whose class names end in `PerformanceTests`, run neither in NexKit's
   checks nor in CI's integration job, because they depend on the runner's
-  load. The performance workflow runs them on `main` every night, as
+  load. The performance workflow runs them on `main` once every 62 merges, as
   [D97](decisions/d97-reliable-test-runs.md) and
-  [D104](decisions/d104-codeql-and-the-performance-tests-run-every-night.md)
+  [D112](decisions/d112-ci-codeql-and-the-performance-tests-run-on-main-every-few-merges.md)
   say. Which suite skips
   when is in [test runs and reports](development.md#test-runs-and-reports).
 - **NexKit restores the dependency caches that CI on `main` saves:** NuGet,

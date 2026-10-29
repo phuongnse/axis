@@ -216,7 +216,20 @@
   },
   "merge": {
     "auto": true,
-    "after_workflows": []
+    "after_workflows": [
+      {
+        "workflow": "ci.yml",
+        "every": 5
+      },
+      {
+        "workflow": "codeql.yml",
+        "every": 32
+      },
+      {
+        "workflow": "performance.yml",
+        "every": 62
+      }
+    ]
   },
   "conflicts": {
     "auto_resolve": true,
@@ -228,11 +241,7 @@
     "scope": null,
     "answer": "recommended",
     "max_parallel": 4,
-    "watch_workflows": [
-      "ci.yml",
-      "codeql.yml",
-      "performance.yml"
-    ]
+    "watch_workflows": []
   },
   "evidence": {
     "artifacts": [
