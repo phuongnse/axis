@@ -5,8 +5,10 @@
 # prepares the realm `load` with 50 users and a machine caller (scripts/lib/load-realm.mjs, which writes
 # artifacts/load/k6/users.json and caller.json for k6), sets the tenant to accept the caller's tokens, activates the
 # application in the tenant, which writes the seed records, and runs the k6 scenario tests/load/objectives.js through
-# the proxy: 50 users sign in through the realm and loop over the reads and writes of the objectives. Removes the stack
-# at the end, unless --keep is given. Arguments after -- go to k6. The exit code is k6's.
+# the proxy: 50 users sign in through the realm and loop over the reads and writes of the objectives. k6 writes its summary
+# to artifacts/load-results, which scripts/lib/load-objectives.mjs checks against the objectives. The exit code is the
+# checker's when it fails, otherwise k6's, and k6's when k6 wrote no summary. Removes the stack at the end, unless --keep
+# is given. Arguments after -- go to k6.
 # The files of the run, with the certificates and secret files, are in artifacts/load. See docs/reference/performance.md.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -29,6 +31,7 @@ tenant_host=load.axis.test
 identity_host=id.axis.test
 root="$PWD"
 folder="$root/artifacts/load"
+results="$root/artifacts/load-results"
 
 npm run build:keycloak-theme --prefix web
 for target in axis-server axis-worker axis-admin; do
@@ -133,8 +136,18 @@ node scripts/lib/load-realm.mjs "$folder" "$AXIS_HTTPS_PORT" "$seed"
 compose --profile admin run --rm --no-TTY admin tenant oidc set load --endpoint-audience axis-load-endpoints
 compose --profile admin run --rm --no-TTY admin activate /apps/load --tenant load
 
+# The grafana/k6 image does not run as the host user, so the folder must be writable by all.
+mkdir -p "$results"
+chmod a+rwx "$results"
+rm -f "$results/summary.json"
+
 set +e
-compose --profile load run --rm --no-TTY k6 run ${k6_args[@]+"${k6_args[@]}"} /scripts/objectives.js
+compose --profile load run --rm --no-TTY -v "$results:/results" k6 run --summary-export=/results/summary.json ${k6_args[@]+"${k6_args[@]}"} /scripts/objectives.js
 status=$?
 set -e
+if [ ! -f "$results/summary.json" ]; then
+  echo "k6 wrote no summary to $results/summary.json" >&2
+  exit "$status"
+fi
+node scripts/lib/load-objectives.mjs "$results/summary.json" || exit $?
 exit "$status"

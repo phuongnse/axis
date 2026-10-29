@@ -115,7 +115,9 @@ to find its own numbers.
   endpoint `CreateEntity00` in every fifth iteration of each user, so the calls stay under the default of
   `RateLimits:Bearer`. The test authentication scheme is not used,
   because only test hosts register it.
-- **Output.** It prints each objective with its measured value and exits non-zero when one is
-  missed. The k6 summary is kept as a CI artifact.
+- **Output.** _(Built.)_ k6 writes its summary to `artifacts/load-results/summary.json`, and the
+  cleanup keeps that folder. `scripts/lib/load-objectives.mjs` prints each objective with its
+  measured value and exits non-zero when one is missed or a metric is missing from the summary. The
+  k6 summary is kept as a CI artifact _(planned with the weekly run)_.
 - **When it runs.** CI runs it once a week and on demand. It never gates a merge, and it is not a
   NexKit check, because a run on a shared CI machine varies too much to block a pull request.

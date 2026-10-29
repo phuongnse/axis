@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { describe, test } from 'node:test'
@@ -13,10 +13,25 @@ const root = fileURLToPath(new URL('..', import.meta.url))
 
 const log = (name) => `echo "${name} $*" >> "$STUB_LOG"\n`
 
+const summaryJson = ({ reads = 241, writes = 412, errors = 0.0002 } = {}) =>
+  JSON.stringify({
+    metrics: {
+      'http_req_duration{objective:reads}': { 'p(95)': reads },
+      'http_req_duration{objective:writes}': { 'p(95)': writes },
+      server_errors: { value: errors },
+    },
+  })
+
 const stubs = {
-  // STUB_FAIL_K6 makes the k6 call fail with status 3.
+  // The k6 call exits with STUB_K6_STATUS (default 0). When STUB_SUMMARY is set, it writes that summary into the folder
+  // mounted at /results, as k6 does with --summary-export.
   docker: `#!/usr/bin/env bash
-${log('docker')}if [ -n "\${STUB_FAIL_K6:-}" ] && [[ "$*" == *"run --rm --no-TTY k6"* ]]; then exit 3; fi
+${log('docker')}if [[ "$*" == *" k6 run "* ]]; then
+  for arg in "$@"; do
+    if [ -n "\${STUB_SUMMARY:-}" ] && [[ "$arg" == *:/results ]]; then printf '%s' "$STUB_SUMMARY" > "\${arg%:/results}/summary.json"; fi
+  done
+  exit "\${STUB_K6_STATUS:-0}"
+fi
 exit 0
 `,
   // The tenant answers 401, as the wait for its host expects. The admin API of the identity provider answers by the URL,
@@ -53,13 +68,14 @@ ${log('npm')}exit 0
 `,
 }
 
-function runLoad(args = [], extraEnv = {}) {
+function runLoad(args = [], extraEnv = {}, setup = () => {}) {
   const dir = mkdtempSync(join(tmpdir(), 'axis-load-'))
   try {
     for (const file of [
       'scripts/load.sh',
       'scripts/lib/load-stack.mjs',
       'scripts/lib/load-realm.mjs',
+      'scripts/lib/load-objectives.mjs',
       'samples/keycloak/axis-realm.json',
       'scripts/lib/postgres-tls.mjs',
       'scripts/lib/retry.sh',
@@ -70,6 +86,7 @@ function runLoad(args = [], extraEnv = {}) {
       mkdirSync(dirname(join(dir, file)), { recursive: true })
       copyFileSync(join(root, file), join(dir, file))
     }
+    setup(dir)
     const bin = join(dir, 'bin')
     mkdirSync(bin)
     for (const [name, body] of Object.entries(stubs)) {
@@ -92,7 +109,20 @@ function runLoad(args = [], extraEnv = {}) {
     const caller = existsSync(callerFile) ? JSON.parse(readFileSync(callerFile, 'utf8')) : undefined
     const bodies = existsSync(`${env.STUB_LOG}.body`) ? readFileSync(`${env.STUB_LOG}.body`, 'utf8') : ''
     const calls = existsSync(env.STUB_LOG) ? readFileSync(env.STUB_LOG, 'utf8').trimEnd().split('\n') : []
-    return { ...result, calls, bodies, dir, users, caller, left: existsSync(join(dir, 'artifacts/load/override.json')) }
+    const resultsFolder = join(dir, 'artifacts/load-results')
+    const results = existsSync(resultsFolder)
+    const resultsMode = results ? statSync(resultsFolder).mode & 0o777 : undefined
+    return {
+      ...result,
+      calls,
+      bodies,
+      dir,
+      users,
+      caller,
+      left: existsSync(join(dir, 'artifacts/load/override.json')),
+      results,
+      resultsMode,
+    }
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }
@@ -104,7 +134,7 @@ const indexOf = (run, text) => {
   assert.notEqual(index, -1, `no call includes "${text}"\n${run.calls.join('\n')}`)
   return index
 }
-const k6Index = (run) => indexOf(run, 'run --rm --no-TTY k6')
+const k6Index = (run) => indexOf(run, ' k6 run ')
 
 describe('scripts/load.sh starts the reference stack and runs the objectives scenario', () => {
   test('every compose call names compose.yaml and the load override, and server starts before server-2', () => {
@@ -161,24 +191,74 @@ describe('scripts/load.sh starts the reference stack and runs the objectives sce
     assert.match(run.stdout, /down -v --remove-orphans/)
   })
 
-  test('arguments after -- go to k6 before the script', () => {
+  test('arguments after -- go to k6 after the summary flag and before the script', () => {
     const run = runLoad(['--', '--vus', '5'])
 
     assert.equal(run.status, 0, run.stdout + run.stderr)
-    assert.match(run.calls[k6Index(run)], / k6 run --vus 5 \/scripts\/objectives\.js$/)
+    assert.match(run.calls[k6Index(run)], / -v \S+\/artifacts\/load-results:\/results /)
+    assert.match(run.calls[k6Index(run)], / k6 run --summary-export=\/results\/summary\.json --vus 5 \/scripts\/objectives\.js$/)
   })
 
-  test('without arguments after --, k6 gets the script alone', () => {
+  test('without arguments after --, k6 gets the summary flag and the script', () => {
     const run = runLoad()
 
-    assert.match(run.calls[k6Index(run)], / k6 run \/scripts\/objectives\.js$/)
+    assert.match(run.calls[k6Index(run)], / -v \S+\/artifacts\/load-results:\/results /)
+    assert.match(run.calls[k6Index(run)], / k6 run --summary-export=\/results\/summary\.json \/scripts\/objectives\.js$/)
   })
 
-  test('a failing k6 run gives its exit code, and the stack is still removed', () => {
-    const run = runLoad([], { STUB_FAIL_K6: '1' })
+  test('a failing k6 run that writes no summary gives its exit code, and the stack is still removed', () => {
+    const run = runLoad([], { STUB_K6_STATUS: '3' })
 
     assert.equal(run.status, 3, run.stdout + run.stderr)
     assert.ok(indexOf(run, ' down -v ') > k6Index(run))
+  })
+
+  test('a summary that meets the objectives gives exit code 0, prints them and removes the stack', () => {
+    const run = runLoad([], { STUB_SUMMARY: summaryJson() })
+
+    assert.equal(run.status, 0, run.stdout + run.stderr)
+    assert.match(run.stdout, /Reads p95 241 ms, objective under 300 ms: met/)
+    assert.match(run.stdout, /Writes p95 412 ms, objective under 500 ms: met/)
+    assert.match(run.stdout, /Server errors 0.02%, objective under 0.1%: met/)
+    assert.ok(indexOf(run, ' down -v ') > k6Index(run))
+  })
+
+  test('a summary that misses an objective gives exit code 1, names it and removes the stack', () => {
+    const run = runLoad([], { STUB_SUMMARY: summaryJson({ reads: 400 }) })
+
+    assert.equal(run.status, 1, run.stdout + run.stderr)
+    assert.match(run.stdout, /Reads p95 400 ms, objective under 300 ms: missed/)
+    assert.ok(indexOf(run, ' down -v ') > k6Index(run))
+  })
+
+  test('a missed objective gives exit code 1 even when k6 also fails', () => {
+    const run = runLoad([], { STUB_SUMMARY: summaryJson({ reads: 400 }), STUB_K6_STATUS: '99' })
+
+    assert.equal(run.status, 1, run.stdout + run.stderr)
+  })
+
+  test('a summary that meets the objectives gives k6 exit code when k6 fails', () => {
+    const run = runLoad([], { STUB_SUMMARY: summaryJson(), STUB_K6_STATUS: '99' })
+
+    assert.equal(run.status, 99, run.stdout + run.stderr)
+  })
+
+  test('a summary left by an earlier run is removed before k6 runs', () => {
+    const run = runLoad([], {}, (dir) => {
+      mkdirSync(join(dir, 'artifacts/load-results'), { recursive: true })
+      writeFileSync(join(dir, 'artifacts/load-results/summary.json'), summaryJson({ reads: 400 }))
+    })
+
+    assert.equal(run.status, 0, run.stdout + run.stderr)
+    assert.doesNotMatch(run.stdout, /Reads p95/)
+  })
+
+  test('without --keep, artifacts/load-results stays and anyone can write to it', () => {
+    const run = runLoad([], { STUB_SUMMARY: summaryJson() })
+
+    assert.equal(run.status, 0, run.stdout + run.stderr)
+    assert.equal(run.results, true)
+    assert.equal(run.resultsMode, 0o777)
   })
 })
 
