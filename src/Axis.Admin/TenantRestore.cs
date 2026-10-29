@@ -4,9 +4,13 @@ using System.Formats.Tar;
 using System.Globalization;
 using System.Text.Json;
 using Axis.Configuration.Packages;
+using Axis.Configuration.Realms;
+using Axis.Configuration.Releases;
+using Axis.Configuration.Storage;
 using Axis.Processes.Storage;
 using Axis.Tenancy;
 using Axis.Tenancy.Platform;
+using Axis.Tenancy.Realms;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
@@ -15,8 +19,10 @@ namespace Axis.Admin;
 /// <summary>
 /// <c>tenant restore</c>: checks the archive, writes a directory entry as <c>provisioning</c>, creates the database roles and
 /// the database, restores the dump with <c>pg_restore</c> as the schema role, grants and migrates it, gives every work item
-/// the new tenant id, empties the sessions, checks the runtime role and sets the entry <c>suspended</c>. A rerun on a <c>provisioning</c> entry skips what is done, and a database that already
-/// holds tables counts as restored. Each step writes one line that names the tenant and never a password, a database host or a
+/// the new tenant id, empties the sessions, checks the runtime role and sets the entry <c>suspended</c>. When the archive's
+/// tenant signed in through a realm that this installation's identity provider does not have, the restored tenant gets a new
+/// realm in its own <c>realm</c> step, in step with its active releases. Otherwise it keeps the archive's sign-in. A rerun on a
+/// <c>provisioning</c> entry skips what is done, and a database that already holds tables counts as restored. Each step writes one line that names the tenant and never a password, a database host or a
 /// connection string. The dump goes to <c>pg_restore</c> on its standard input, so no copy of the business data is left on disk.
 /// </summary>
 internal sealed class TenantRestore : IAsyncDisposable
@@ -38,22 +44,39 @@ internal sealed class TenantRestore : IAsyncDisposable
     private readonly CreateSettings _settings;
     private readonly RestorePlan _plan;
     private readonly TenantAudit _audit;
+    private readonly TenantRealm? _realm;
+    private readonly HttpClient _http;
     private readonly TextWriter _output;
+    private readonly TextWriter _error;
     private readonly CancellationToken _cancellationToken;
     private readonly string _id;
     private readonly PlatformDbContext _platform;
     private readonly NpgsqlConnectionStringBuilder _admin;
 
+    private bool _newRealm;
+
     private TenantRow? _row;
     private TenantProvisioning? _provisioning;
     private TenantDatabaseSteps? _steps;
 
-    public TenantRestore(CreateSettings settings, RestorePlan plan, TenantAudit audit, TextWriter output, CancellationToken cancellationToken)
+    public TenantRestore(
+        CreateSettings settings,
+        RestorePlan plan,
+        TenantRealm? realm,
+        HttpClient http,
+        TenantAudit audit,
+        TextWriter output,
+        TextWriter error,
+        CancellationToken cancellationToken)
     {
         _settings = settings;
         _plan = plan;
+        _realm = realm;
+        _http = http;
         _audit = audit;
         _output = output;
+        _error = error;
+        _newRealm = plan.NewRealm;
         _cancellationToken = cancellationToken;
         _id = plan.Request.Id;
         _admin = settings.Admin;
@@ -62,16 +85,20 @@ internal sealed class TenantRestore : IAsyncDisposable
 
     /// <summary>
     /// The <c>check</c> step: reads the archive and checks everything that can be checked before any tenant work. It writes one
-    /// <c>check</c> line and returns null when the command must exit 2.
+    /// <c>check</c> line and returns null when the command must exit 2. It asks the identity provider whether the realm of the archive
+    /// exists here. When the restore keeps the archive's sign-in, it also needs <c>AXIS_OIDC_CLIENT_SECRET</c>, and a missing one is
+    /// written to <paramref name="error"/> before any <c>check ok</c> line.
     /// </summary>
     public static async Task<RestorePlan?> PrepareAsync(
         RestoreSettings settings,
         TenantRestoreRequest request,
         string pgRestore,
+        TenantRealm? realm,
         TextWriter output,
+        TextWriter error,
         CancellationToken cancellationToken)
     {
-        var refusal = await CheckAsync(settings, request, cancellationToken);
+        var refusal = await CheckAsync(settings, request, realm, cancellationToken);
         if (refusal.Problems.Count > 0)
         {
             foreach (var problem in refusal.Problems)
@@ -82,8 +109,14 @@ internal sealed class TenantRestore : IAsyncDisposable
             return null;
         }
 
+        if (!refusal.NewRealm && string.IsNullOrEmpty(settings.Create.OidcClientSecret))
+        {
+            error.WriteLine($"The environment variable {AdminCommands.ClientSecretSetting} is required.");
+            return null;
+        }
+
         output.WriteLine($"{request.Id} check ok");
-        return new RestorePlan(request with { File = Path.GetFullPath(request.File) }, refusal.Manifest!, pgRestore);
+        return new RestorePlan(request with { File = Path.GetFullPath(request.File) }, refusal.Manifest!, pgRestore, refusal.NewRealm);
     }
 
     public async Task<int> RunAsync()
@@ -112,6 +145,7 @@ internal sealed class TenantRestore : IAsyncDisposable
                 && await Step("work", RetagWorkAsync)
                 && await Step("sessions", EmptySessionsAsync)
                 && await Step("role-check", () => Steps.CheckRuntimeRoleAsync())
+                && (!_newRealm || await Step("realm", RealmAsync))
                 && await Step("version", SuspendAsync))
             {
                 return 0;
@@ -145,7 +179,8 @@ internal sealed class TenantRestore : IAsyncDisposable
     private static PlatformDbContext NewPlatform(string connectionString) =>
         new(new DbContextOptionsBuilder<PlatformDbContext>().UseNpgsql(connectionString).Options);
 
-    private static async Task<CheckResult> CheckAsync(RestoreSettings settings, TenantRestoreRequest request, CancellationToken cancellationToken)
+    private static async Task<CheckResult> CheckAsync(
+        RestoreSettings settings, TenantRestoreRequest request, TenantRealm? realm, CancellationToken cancellationToken)
     {
         var problems = new List<string>();
         var manifest = ReadManifest(request.File);
@@ -231,6 +266,28 @@ internal sealed class TenantRestore : IAsyncDisposable
             problems.Add("the archive is of a preview tenant, so create the preview again with tenant create --preview-of");
         }
 
+        // A tenant that signed in through its own realm gets a new one where that realm does not exist. Any other archive keeps its sign-in.
+        var newRealm = false;
+        if (trusted && !preview && manifest!.Directory.Realm)
+        {
+            if (realm is null)
+            {
+                problems.Add($"the setting {AdminCommands.IdentityProviderUrlSetting} is required, to find out whether the realm of the archive exists");
+            }
+            else
+            {
+                try
+                {
+                    newRealm = !await RealmExistsAsync(realm, manifest, cancellationToken);
+                }
+                catch (Exception exception) when (exception is HttpRequestException or InvalidOperationException or JsonException
+                    || (exception is TaskCanceledException && !cancellationToken.IsCancellationRequested))
+                {
+                    problems.Add($"the identity provider could not tell whether the realm of the archive exists: {Safe(exception)}");
+                }
+            }
+        }
+
         if (trusted)
         {
             var required = manifest!.Packages.Where(package => package.Required).ToList();
@@ -259,7 +316,14 @@ internal sealed class TenantRestore : IAsyncDisposable
             }
         }
 
-        return new CheckResult(manifest, problems);
+        return new CheckResult(manifest, problems, newRealm);
+    }
+
+    // The realm of the archive is the realm its authority names, on this installation's identity provider.
+    private static async Task<bool> RealmExistsAsync(TenantRealm realm, BackupManifest manifest, CancellationToken cancellationToken)
+    {
+        var archiveBase = TenantRealmAddress.BaseOf(manifest.Directory.OidcAuthority, manifest.TenantId);
+        return archiveBase is null || (archiveBase == realm.BaseAddress && await realm.ExistsAsync(manifest.TenantId, cancellationToken));
     }
 
     // Text from the archive goes into a message, so a control character cannot start a fake output line.
@@ -336,6 +400,12 @@ internal sealed class TenantRestore : IAsyncDisposable
                 return 2;
             }
 
+            // A realm that an earlier run made is this tenant's own, so a rerun goes on with it, also when the archive's realm bears the same name.
+            if (_row?.RealmActivationClientSecret is { Length: > 0 })
+            {
+                _newRealm = true;
+            }
+
             var taken = await _platform.TenantHosts.AnyAsync(
                 host => host.TenantId != _id && keys.Contains(host.Host.ToLower()),
                 _cancellationToken);
@@ -346,10 +416,12 @@ internal sealed class TenantRestore : IAsyncDisposable
             }
 
             await using var transaction = await _platform.Database.BeginTransactionAsync(_cancellationToken);
-            var secret = _settings.Cipher.Encrypt(_id, TenantSecretFields.OidcClientSecret, _settings.OidcClientSecret!);
             if (_row is null)
             {
-                _row = new TenantRow { Id = _id, Status = Provisioning };
+                // A new realm gives the sign-in settings in the realm step, as tenant create does.
+                _row = _newRealm
+                    ? new TenantRow { Id = _id, Status = Provisioning, OidcAuthority = "", OidcClientId = "", OidcClientSecret = [] }
+                    : new TenantRow { Id = _id, Status = Provisioning };
                 _platform.Tenants.Add(_row);
             }
             else
@@ -366,9 +438,13 @@ internal sealed class TenantRestore : IAsyncDisposable
             _row.DatabaseName = $"axis_{_id}";
             _row.SchemaUser = $"axis_{_id}_schema";
             _row.RuntimeUser = $"axis_{_id}_runtime";
-            _row.OidcAuthority = directory.OidcAuthority;
-            _row.OidcClientId = directory.OidcClientId;
-            _row.OidcClientSecret = secret;
+            if (!_newRealm)
+            {
+                _row.OidcAuthority = directory.OidcAuthority;
+                _row.OidcClientId = directory.OidcClientId;
+                _row.OidcClientSecret = _settings.Cipher.Encrypt(_id, TenantSecretFields.OidcClientSecret, _settings.OidcClientSecret!);
+            }
+
             _row.ClaimUserId = directory.ClaimUserId;
             _row.ClaimDisplayName = directory.ClaimDisplayName;
             _row.ClaimRoles = directory.ClaimRoles;
@@ -558,6 +634,81 @@ internal sealed class TenantRestore : IAsyncDisposable
         await command.ExecuteNonQueryAsync(_cancellationToken);
     }
 
+    // Makes the realm of the restored tenant and brings it in step with the tenant's active releases. The archive holds no secret value, so a
+    // provider whose bindings have none yet is left out with a warning. The next activation adds it once the operator has set them.
+    private async Task RealmAsync()
+    {
+        var row = _row!;
+        var cipher = _settings.Cipher;
+        await _realm!.EnsureForTenantAsync(_platform, row, cipher, _cancellationToken);
+
+        var applications = new List<RealmApplication>();
+        var connection = await Steps.SchemaConnectionAsync();
+        await using (var configuration = new ConfigurationDbContext(new DbContextOptionsBuilder<ConfigurationDbContext>().UseNpgsql(connection).Options))
+        {
+            var store = new ActiveReleaseStore(configuration);
+            foreach (var active in await store.ListAsync(_cancellationToken))
+            {
+                if (await store.GetReleaseAsync(active.ReleaseId, _cancellationToken) is { } stored)
+                {
+                    applications.Add(RealmApplication.FromRelease(active.Name, stored));
+                }
+            }
+        }
+
+        var all = RealmPlanner.Build(applications);
+        if (all.Conflicts.Count > 0)
+        {
+            throw new InvalidOperationException("the active releases name identity providers that cannot share one realm");
+        }
+
+        var rows = await _platform.TenantBindings.AsNoTracking().Where(binding => binding.TenantId == _id).ToListAsync(_cancellationToken);
+        var byName = rows.ToDictionary(binding => binding.Name, StringComparer.OrdinalIgnoreCase);
+        foreach (var provider in all.Plan.Providers)
+        {
+            if (MissingBinding(byName, provider.IssuerBinding, provider.ClientIdBinding, provider.ClientSecretBinding, provider.ClientKeyBinding) is { } missing)
+            {
+                _error.WriteLine($"{_id} warning the identity provider '{provider.Alias}' waits for the binding '{missing}', which has no value");
+            }
+        }
+
+        var plan = RealmPlanner.Build([.. applications.Select(application => application with
+        {
+            Providers = [.. application.Providers.Where(provider =>
+                provider.Type != "oidc"
+                || provider.IssuerBinding is null
+                || provider.ClientIdBinding is null
+                || MissingBinding(byName, provider.IssuerBinding, provider.ClientIdBinding, provider.ClientSecretBinding, provider.ClientKeyBinding) is null)],
+        })]).Plan;
+        await ActivationRealmSync.SyncAsync(
+            _http, DirectoryTenantCatalog.Realm(row, cipher), DirectoryTenantCatalog.Bindings(_id, rows, cipher), plan, _cancellationToken);
+    }
+
+    // The name of the first binding of an oidc provider that has no value or the wrong kind, ignoring letter case, or null when all are set.
+    private static string? MissingBinding(
+        Dictionary<string, TenantBindingRow> bindings, string issuer, string clientId, string? clientSecret, string? clientKey)
+    {
+        bool Has(string name, string kind) =>
+            bindings.TryGetValue(name, out var binding)
+            && binding.Kind == kind
+            && (kind == DeploymentBindingKinds.Secret ? binding.SecretValue is { Length: > 0 } : !string.IsNullOrWhiteSpace(binding.Url));
+
+        if (!Has(issuer, DeploymentBindingKinds.Url))
+        {
+            return issuer;
+        }
+
+        foreach (var name in new[] { clientId, clientSecret, clientKey })
+        {
+            if (name is not null && !Has(name, DeploymentBindingKinds.Secret))
+            {
+                return name;
+            }
+        }
+
+        return null;
+    }
+
     private async Task SuspendAsync()
     {
         var version = await Steps.ReadSchemaVersionAsync();
@@ -597,8 +748,11 @@ internal sealed class TenantRestore : IAsyncDisposable
 
     private void Failed(string step, string message) => _output.WriteLine($"{_id} {step} failed: {message}");
 
-    private sealed record CheckResult(BackupManifest? Manifest, IReadOnlyList<string> Problems);
+    private sealed record CheckResult(BackupManifest? Manifest, IReadOnlyList<string> Problems, bool NewRealm);
 }
 
-/// <summary>What the <c>check</c> step found: the request with the archive's full path, the manifest and the path of <c>pg_restore</c>.</summary>
-internal sealed record RestorePlan(TenantRestoreRequest Request, BackupManifest Manifest, string PgRestore);
+/// <summary>
+/// What the <c>check</c> step found: the request with the archive's full path, the manifest, the path of <c>pg_restore</c> and whether
+/// the tenant gets a new realm (<paramref name="NewRealm"/>) or keeps the archive's sign-in.
+/// </summary>
+internal sealed record RestorePlan(TenantRestoreRequest Request, BackupManifest Manifest, string PgRestore, bool NewRealm);

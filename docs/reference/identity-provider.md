@@ -215,6 +215,10 @@ _(planned for M17)_
   failure of the identity provider fails the step with a line that names the identity provider step and its status
   code, and the new release stays active, see [activate](administration.md#activate). A `validate` and a `test`
   never update the realm. The server's startup activation updates it too, see above.
+- **Brought in step by restore:** `tenant restore` of a tenant that gets a new realm creates the realm as `tenant create`
+  does and brings it in step with the active releases of the restored database. The archive holds no secret value, so a
+  provider whose bindings have no value yet is left out with a warning. The next activation adds it once the operator has
+  set the bindings, see [tenant restore](administration.md#tenant-restore).
 - **Bindings:** a missing binding, or a binding of the wrong kind, fails activation, as for a connector (`AXC0100`).
   Built for `oidc` providers: `issuer` is a `url` binding, and `clientId`, `clientSecret` and `clientKey` are `secret`
   bindings. On a preview tenant activation leaves the provider out with a warning, see
@@ -281,5 +285,7 @@ _(planned for M17)_
   [development realm and users](../development.md#development-realm-and-users). Under Docker Compose it does not,
   because the server's container cannot reach Keycloak at `localhost:8080`.
 - **Backup and restore:** the identity provider's database holds the accounts and their credentials. The operator
-  backs it up with the installation. `tenant backup` does not carry them, so a tenant restored to another
-  installation gets a new realm, and its accounts need new invitations.
+  backs it up with the installation. `tenant backup` does not carry them, so a tenant restored where its realm does
+  not exist gets a new realm, and its accounts need new invitations. This is built: `tenant restore` creates the
+  realm in its `realm` step, see [tenant restore](administration.md#tenant-restore). A tenant restored where its realm
+  exists keeps the realm and its users.
