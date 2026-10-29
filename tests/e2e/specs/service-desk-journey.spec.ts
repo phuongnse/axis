@@ -876,6 +876,16 @@ test.describe('the author builds the service desk with Studio only', () => {
           },
         },
         { after: 'P4D', reassign: { role: 'service-desk-lead' } },
+        {
+          after: 'P3D',
+          notify: {
+            to: { user: 'assignedAgent' },
+            channels: ['In-app', 'Email'],
+            subject: 'ticket.late.subject',
+            body: 'ticket.late.body',
+            values: [['number', 'number']],
+          },
+        },
       ],
       outcomes: [{ name: 'resolve', label: 'task.resolve', next: 'markResolved' }],
     })

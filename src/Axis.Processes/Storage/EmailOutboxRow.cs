@@ -1,9 +1,9 @@
 namespace Axis.Processes.Storage;
 
 /// <summary>
-/// A row of <c>axis.email_outbox</c>: one rendered email for one address, which a <c>notify</c> step with the
-/// <c>email</c> channel staged. The step queues one <c>notification.email</c> work item for the row in the same
-/// transaction. Times use the database clock.
+/// A row of <c>axis.email_outbox</c>: one rendered email for one address, which a <c>notify</c> step or a task
+/// escalation with the <c>email</c> channel staged. It queues one <c>notification.email</c> work item for the row in the
+/// same transaction. Times use the database clock.
 /// </summary>
 public sealed class EmailOutboxRow
 {
@@ -15,10 +15,10 @@ public sealed class EmailOutboxRow
     /// <summary>The release the notifying instance is pinned to. It gave the texts.</summary>
     public required Guid ReleaseId { get; init; }
 
-    /// <summary>The id of the notification the step stored for its in-app recipients. All the emails of one step run share it.</summary>
+    /// <summary>The id of the notification the step or escalation stored for its in-app recipients. All the emails of one step run or escalation share it.</summary>
     public required Guid NotificationId { get; init; }
 
-    /// <summary>The name of the <c>notify</c> step.</summary>
+    /// <summary>The name of the <c>notify</c> step, or of the task step whose escalation notified.</summary>
     public required string Step { get; init; }
 
     /// <summary>The address the email goes to.</summary>
