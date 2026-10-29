@@ -5,8 +5,8 @@ test that measures them. The conventions of [architecture.md](../architecture.md
 marked _(planned for Mx)_ are not built yet, and Dn refers to [decisions.md](../decisions.md).
 
 The design follows [D82](../decisions/d82-performance-slos-and-load-tests.md). All of this page is
-_(planned for M18)_, except [resource-demanding routes](#resource-demanding-routes) and the
-[script](#load-test), [data](#load-test) and users of the load test, which are built. The per-request budgets of the `*PerformanceTests` classes are built. They
+_(planned for M18)_, except [resource-demanding routes](#resource-demanding-routes), the routes of the
+[objectives](#objectives) and the [script](#load-test), [data](#load-test) and [users](#load-test) of the load test, which are built. The per-request budgets of the `*PerformanceTests` classes are built. They
 run in the performance workflow, as [D97](../decisions/d97-reliable-test-runs.md) says. See
 [testing](../architecture.md#testing).
 
@@ -46,6 +46,23 @@ the [reference environment](#reference-environment).
 | Worker | Due work items: process steps, connector calls, event delivery                                                                                               | p95 claimed within 5 s of its due time | The [worker metrics](process-execution.md#worker-metrics) |
 | Errors | Every request of the run                                                                                                                                     | Under 0.1% answer `5xx`               | `http.server.request.duration`, by status code |
 
+The load test sends these routes, and a test fails when this list and `tests/load/objectives.js` differ:
+
+| Group  | Route                                                      |
+| ------ | ---------------------------------------------------------- |
+| Reads  | `GET /api/apps/{app}/entities/{entity}/records`            |
+| Reads  | `GET /api/apps/{app}/entities/{entity}/records/{id}`       |
+| Reads  | `GET /api/apps/{app}/data-sources/{dataSource}/rows`       |
+| Reads  | `GET /api/sites/{path}`                                    |
+| Reads  | `GET /api/sites/{path}/pages/{page}`                       |
+| Reads  | `GET /api/apps/{app}/tasks`                                |
+| Writes | `POST /api/apps/{app}/entities/{entity}/records`           |
+| Writes | `PATCH /api/apps/{app}/entities/{entity}/records/{id}`     |
+| Writes | `DELETE /api/apps/{app}/entities/{entity}/records/{id}`    |
+| Writes | `POST /api/apps/{app}/processes/{process}/instances`       |
+| Writes | `POST /api/apps/{app}/tasks/{id}/complete`                 |
+| Writes | `POST /api/apps/{app}/endpoints/{name}`                    |
+
 - **Same metrics in production.** Each objective uses a metric that the hosts already export, so an
   operator can watch the same numbers on a running installation. Axis builds no alerting.
 - **New routes.** A milestone that adds a route in one of the groups adds it to the load test, and
@@ -67,8 +84,12 @@ to find its own numbers.
 - **Script.** _(Built.)_ `scripts/load.sh` builds the production images and starts the Docker Compose
   stack with two server replicas, one worker and PostgreSQL over TLS, as in
   [several server replicas](installation.md#several-server-replicas). It starts `server` and
-  then `server-2`, runs `admin migrate`, creates the tenant `load` and runs the placeholder k6
-  scenario in a container through the proxy. It removes the stack at the end, unless `--keep` is
+  then `server-2`, runs `admin migrate`, creates the tenant `load` and runs the k6
+  scenario `tests/load/objectives.js` in a container through the proxy: 50 users, each in a loop over the routes of the
+  [objectives](#objectives), with a pause of about 1 s an iteration. Every request goes through one helper that tags it with
+  its objective (`reads`, `writes` or `signIn`) and its route. The run fails, with a non-zero exit code, when reads miss p95
+  under 300 ms, writes miss p95 under 500 ms, the rate of `5xx` answers, the `server_errors` metric, is 0.1% or more, or
+  fewer than 99% of its checks pass. The sign-in pages and the token request are tagged `signIn`, so they count toward no objective. It removes the stack at the end, unless `--keep` is
   given. It needs Docker. See [development](../development.md#scripts).
 - **Data.** _(Built.)_ It creates a tenant with a generated application of
   [typical size](../domain/knowledge.md#typical-application-size), and records in every entity.
@@ -87,8 +108,12 @@ to find its own numbers.
   `load-caller` whose service account holds the role `load-caller` and whose tokens carry the
   audience `axis-load-endpoints`. It writes the client id and secret to `caller.json`, next to the
   users file, and runs `admin tenant oidc set load --endpoint-audience axis-load-endpoints` so that
-  the tenant accepts those tokens. _(Planned for M18.)_ Each virtual user signs in once through the tenant's realm sign-in
-  page and keeps its session cookie for the whole run. The test authentication scheme is not used,
+  the tenant accepts those tokens. _(Built.)_ Each virtual user signs in once through the tenant's realm sign-in
+  page, with its password and then its authenticator code, and keeps its session cookie for the whole run. It works on the
+  entity `Entity{i}`, with `i` from its number modulo 40. An iteration starts the process `Entity{i}Process00` on a record
+  and completes the review task of the record it started in the iteration before. The machine caller calls the
+  endpoint `CreateEntity00` in every fifth iteration of each user, so the calls stay under the default of
+  `RateLimits:Bearer`. The test authentication scheme is not used,
   because only test hosts register it.
 - **Output.** It prints each objective with its measured value and exits non-zero when one is
   missed. The k6 summary is kept as a CI artifact.

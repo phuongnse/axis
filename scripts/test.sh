@@ -21,8 +21,8 @@ run_suite web web npm test --prefix web -- \
 
 # The report, smoke test selection, link check, docs structure check, locator check, raw HTML check, prototype pollution check, bundle budget check,
 # font check, design-system bundle check, dependency scan, setup retries, image build retries, E2E shard
-# split, load script, E2E folder comparison, hang guard, dialog and drag helpers, TOTP function, Compose status helper, dev script stop helper and
-# Helm chart scripts' own tests.
+# split, load script, E2E folder comparison, hang guard, dialog and drag helpers, TOTP function, load test routes and TOTP module, Compose status
+# helper, dev script stop helper and Helm chart scripts' own tests.
 node --test scripts/test-report.test.mjs || status=1
 node --test scripts/affected.test.mjs || status=1
 node --test scripts/check-links.test.mjs || status=1
@@ -48,6 +48,8 @@ node --test tests/e2e/dialogs.test.ts || status=1
 node --test tests/e2e/design-drag.test.ts || status=1
 node --test tests/e2e/policy-violations.test.ts || status=1
 node --test tests/e2e/totp.test.ts || status=1
+node --test tests/load/objectives.test.mjs || status=1
+node --test tests/load/totp.test.mjs || status=1
 HELM="$helm" node --test scripts/helm.test.mjs || status=1
 
 finish_report

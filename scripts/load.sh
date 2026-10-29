@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
-# The load test, first two parts: builds the three production images, writes the generated application of typical size
+# The load test, first three parts: builds the three production images, writes the generated application of typical size
 # (tests/Axis.LoadData, seed 1) into its run folder, starts the reference stack of deploy/compose/compose.yaml (two
 # server replicas behind the TLS proxy, one worker, PostgreSQL over TLS), migrates and creates the tenant `load`. It then
 # prepares the realm `load` with 50 users and a machine caller (scripts/lib/load-realm.mjs, which writes
 # artifacts/load/k6/users.json and caller.json for k6), sets the tenant to accept the caller's tokens, activates the
-# application in the tenant, which writes the seed records, and runs the placeholder k6 scenario in tests/load through
-# the proxy. Removes the stack at the end, unless --keep is given. Arguments after -- go to k6. The exit code is k6's.
+# application in the tenant, which writes the seed records, and runs the k6 scenario tests/load/objectives.js through
+# the proxy: 50 users sign in through the realm and loop over the reads and writes of the objectives. Removes the stack
+# at the end, unless --keep is given. Arguments after -- go to k6. The exit code is k6's.
 # The files of the run, with the certificates and secret files, are in artifacts/load. See docs/reference/performance.md.
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -133,7 +134,7 @@ compose --profile admin run --rm --no-TTY admin tenant oidc set load --endpoint-
 compose --profile admin run --rm --no-TTY admin activate /apps/load --tenant load
 
 set +e
-compose --profile load run --rm --no-TTY k6 run ${k6_args[@]+"${k6_args[@]}"} /scripts/placeholder.js
+compose --profile load run --rm --no-TTY k6 run ${k6_args[@]+"${k6_args[@]}"} /scripts/objectives.js
 status=$?
 set -e
 exit "$status"
