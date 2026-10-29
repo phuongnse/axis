@@ -468,6 +468,7 @@ export function useRecordForm(
             />
             <AxisButton
               role="icon"
+              joined
               nameKey="shell.form.choose"
               icon={<SearchOutlined />}
               onClick={() => setLookup(field.name)}
@@ -475,6 +476,7 @@ export function useRecordForm(
             {!field.required && value !== null && (
               <AxisButton
                 role="icon"
+                joined
                 nameKey="shell.form.clear"
                 icon={<CloseOutlined />}
                 onClick={() => clear(field)}

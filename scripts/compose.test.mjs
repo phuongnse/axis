@@ -43,14 +43,13 @@ const compose = (args, options = {}) =>
     ...options,
   })
 
-before(async () => {
+// The ports are picked right before the stack starts. A port picked earlier, while the image builds, can be taken
+// by another process, and then Docker cannot bind it.
+const pickPorts = async () => {
   const serverPort = await freePort()
   const postgresPort = await freePort()
   const keycloakPort = await freePort()
   const purchasingPort = await freePort()
-  studioApps = mkdtempSync(join(tmpdir(), 'axis-studio-apps-'))
-  // The server's user, UID 1654 on Linux, writes the folder.
-  chmodSync(studioApps, 0o777)
   env = {
     ...process.env,
     AXIS_SERVER_PORT: String(serverPort),
@@ -63,6 +62,12 @@ before(async () => {
   baseUrl = `http://localhost:${serverPort}`
   keycloakUrl = `http://localhost:${keycloakPort}`
   purchasingUrl = `http://localhost:${purchasingPort}`
+}
+
+before(() => {
+  studioApps = mkdtempSync(join(tmpdir(), 'axis-studio-apps-'))
+  // The server's user, UID 1654 on Linux, writes the folder.
+  chmodSync(studioApps, 0o777)
 })
 
 after(() => {
@@ -78,6 +83,7 @@ test('the stack runs from source', { timeout }, async () => {
   // The build runs on its own, so a failed build is not reported as a failed start.
   await runDocker(['compose', '-p', project, 'build'], { env })
 
+  await pickPorts()
   const up = compose(['up', '-d', '--wait'], { stdio: 'inherit' })
   if (up.status !== 0) {
     const ps = compose(['ps', '--all', '--format', 'json'])
