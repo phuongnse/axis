@@ -588,7 +588,17 @@ export function useRecordForm(
                       }
                     >
                       {field.helpKey && (
-                        <div id={helpId} style={{ fontSize: 12, lineHeight: '20px', color: colour.textMuted }}>
+                        // The label has Ant Design's 8px padding below it, so this pulls the help 4px under it.
+                        <div
+                          id={helpId}
+                          style={{
+                            fontSize: 12,
+                            lineHeight: '20px',
+                            color: colour.textMuted,
+                            marginTop: -4,
+                            marginBottom: spacing.xs,
+                          }}
+                        >
                           {t(field.helpKey)}
                         </div>
                       )}

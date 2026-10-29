@@ -1,3 +1,4 @@
+import { CheckOutlined } from '@ant-design/icons'
 import { Tooltip, Typography } from 'antd'
 import type { CSSProperties } from 'react'
 import { useDesignTokens } from './themeMode'
@@ -8,9 +9,10 @@ const titleWidth = 160
 const circleSize = 24
 
 /**
- * The steps of a wizard in a row: a numbered circle and a title for each, with a line to the next. From seven steps,
- * only the current title shows, and the other steps show their number with the title on hover, on focus and to
- * assistive technology. The current step is marked with `aria-current`, and the bar wraps when it does not fit.
+ * The steps of a wizard in a row: a numbered circle and a title for each, with a line to the next. A finished step
+ * shows a check mark in place of its number. From seven steps, only the current title shows, and the other steps show
+ * their number, or a check mark when finished, with the title on hover, on focus and to assistive technology. The
+ * current step is marked with `aria-current`, and the bar wraps when it does not fit.
  */
 export function FormStepsBar({ titles, current }: { titles: string[]; current: number }) {
   const { colour, spacing } = useDesignTokens()
@@ -31,7 +33,9 @@ export function FormStepsBar({ titles, current }: { titles: string[]; current: n
     >
       {titles.map((title, index) => {
         const isCurrent = index === current
-        const outline = index < current ? colour.primaryText : colour.textMuted
+        const finished = index < current
+        const outline = finished ? colour.primaryText : colour.textMuted
+        const mark = finished ? <CheckOutlined aria-hidden /> : index + 1
         const circle: CSSProperties = {
           position: 'relative',
           display: 'inline-flex',
@@ -56,13 +60,13 @@ export function FormStepsBar({ titles, current }: { titles: string[]; current: n
             {numbered && !isCurrent ? (
               <Tooltip title={title} trigger={['hover', 'focus']}>
                 <span tabIndex={0} style={circle}>
-                  <span aria-hidden>{index + 1}</span>
+                  <span aria-hidden>{mark}</span>
                   <span style={visuallyHidden}>{title}</span>
                 </span>
               </Tooltip>
             ) : (
               <span aria-hidden style={circle}>
-                {index + 1}
+                {mark}
               </span>
             )}
             {(!numbered || isCurrent) && (

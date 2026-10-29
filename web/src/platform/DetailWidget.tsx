@@ -61,7 +61,7 @@ export function DetailWidget({ widget, sitePath, recordId, locale }: DetailWidge
   const navigate = useNavigate()
   const location = useLocation()
   const canvas = useCanvasActions()
-  const { spacing, colour } = useDesignTokens()
+  const { spacing, colour, type } = useDesignTokens()
   const narrow = useNarrowWidth()
   const { entity } = widget
   const sections = useMemo(() => sectionsOf(entity, widget.form), [entity, widget.form])
@@ -249,10 +249,12 @@ export function DetailWidget({ widget, sitePath, recordId, locale }: DetailWidge
                 key={field.name}
                 style={{ gridColumn: `span ${narrow || width < 1 || width > 12 ? 12 : width}`, minWidth: 0 }}
               >
-                <dt style={{ fontWeight: 500, color: colour.textMuted }}>
+                <dt style={{ fontWeight: 500, color: colour.textMuted, fontSize: type.fontSize, lineHeight: '22px' }}>
                   {field.labelKey ? t(field.labelKey) : field.name}
                 </dt>
-                <dd style={{ margin: '6px 0 0' }}>{valueOf(field)}</dd>
+                <dd style={{ margin: '6px 0 0', fontSize: type.fontSize, lineHeight: '22px', color: colour.text }}>
+                  {valueOf(field)}
+                </dd>
               </div>
             ))}
           </dl>
