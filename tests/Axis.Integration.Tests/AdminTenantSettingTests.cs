@@ -212,6 +212,82 @@ public sealed class AdminTenantSettingTests(PostgreSqlFixture database) : IClass
     }
 
     [Fact]
+    public async Task A_host_added_with_a_site_keeps_one_host_per_site_and_the_last_host_that_is_no_sites_stays()
+    {
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        var id = scenario.NewTenantId();
+        var other = scenario.NewTenantId();
+        var plain = $"{id}.example.test";
+        Assert.Equal(0, (await scenario.CreateAsync(id, plain)).Exit);
+        Assert.Equal(0, (await scenario.CreateAsync(other, $"{other}.example.test")).Exit);
+
+        var add = await scenario.RunAsync(["tenant", "host", "add", id, "shop.example.test", "--site", "Shop"], extra: AdminScenario.Directory);
+        Assert.Equal(0, add.Exit);
+        Assert.Equal([$"{id} host ok"], add.Output);
+        Assert.Equal(new Dictionary<string, string> { ["shop.example.test"] = "shop" }, await scenario.SitesAsync(id));
+
+        var before = await scenario.SnapshotAsync();
+        var records = (await RecordsAsync(scenario)).Count;
+        var duplicate = await scenario.RunAsync(["tenant", "host", "add", id, "shop2.example.test", "--site", "SHOP"], extra: AdminScenario.Directory);
+        var invalid = await scenario.RunAsync(["tenant", "host", "add", id, "invalid.example.test", "--site", "1shop"], extra: AdminScenario.Directory);
+        var reserved = await scenario.RunAsync(["tenant", "host", "add", id, "reserved.example.test", "--site", "api"], extra: AdminScenario.Directory);
+        var usage = await scenario.RunAsync(["tenant", "host", "add", id, "usage.example.test", "--site"], extra: AdminScenario.Directory);
+        Assert.All([duplicate, invalid, reserved], result =>
+        {
+            Assert.Equal(2, result.Exit);
+            Assert.Empty(result.Output);
+            Assert.Single(result.Error);
+        });
+        Assert.Equal(2, usage.Exit);
+        Assert.Equal(before, await scenario.SnapshotAsync());
+        Assert.Equal(records, (await RecordsAsync(scenario)).Count);
+
+        // The last host that is no site's stays, and the host of a site can go.
+        var lastPlain = await scenario.RunAsync(["tenant", "host", "remove", id, plain], extra: AdminScenario.Directory);
+        Assert.Equal(2, lastPlain.Exit);
+        Assert.Single(lastPlain.Error);
+        Assert.Equal(before, await scenario.SnapshotAsync());
+
+        // A move keeps the site, and a tenant that already has the site refuses it.
+        var moved = await scenario.RunAsync(["tenant", "host", "move", "shop.example.test", "--to", other], extra: AdminScenario.Directory);
+        Assert.Equal(0, moved.Exit);
+        Assert.Equal(new Dictionary<string, string> { ["shop.example.test"] = "shop" }, await scenario.SitesAsync(other));
+        Assert.Empty(await scenario.SitesAsync(id));
+        Assert.Equal(0, (await scenario.RunAsync(["tenant", "host", "add", id, "shop3.example.test", "--site", "shop"], extra: AdminScenario.Directory)).Exit);
+        var clash = await scenario.RunAsync(["tenant", "host", "move", "shop3.example.test", "--to", other], extra: AdminScenario.Directory);
+        Assert.Equal(2, clash.Exit);
+        Assert.Single(clash.Error);
+        Assert.Equal(new Dictionary<string, string> { ["shop3.example.test"] = "shop" }, await scenario.SitesAsync(id));
+
+        // Removing the site's host succeeds, and the last host that is no site's then stays.
+        Assert.Equal(0, (await scenario.RunAsync(["tenant", "host", "remove", id, "SHOP3.example.test"], extra: AdminScenario.Directory)).Exit);
+        Assert.Equal([plain], await scenario.HostsAsync(id));
+        Assert.Equal(2, (await scenario.RunAsync(["tenant", "host", "remove", id, plain], extra: AdminScenario.Directory)).Exit);
+
+        await scenario.AssertNoSecretsAsync();
+    }
+
+    [Fact]
+    public async Task Removing_the_last_host_that_is_no_sites_is_refused_while_a_site_host_remains()
+    {
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        var id = scenario.NewTenantId();
+        Assert.Equal(0, (await scenario.CreateAsync(id, "a.example.test")).Exit);
+        Assert.Equal(0, (await scenario.RunAsync(["tenant", "host", "add", id, "s.example.test", "--site", "shop"], extra: AdminScenario.Directory)).Exit);
+        var before = await scenario.SnapshotAsync();
+
+        var plain = await scenario.RunAsync(["tenant", "host", "remove", id, "a.example.test"], extra: AdminScenario.Directory);
+        Assert.Equal(2, plain.Exit);
+        Assert.Single(plain.Error);
+        Assert.Equal(before, await scenario.SnapshotAsync());
+
+        Assert.Equal(0, (await scenario.RunAsync(["tenant", "host", "remove", id, "s.example.test"], extra: AdminScenario.Directory)).Exit);
+        var last = await scenario.RunAsync(["tenant", "host", "remove", id, "a.example.test"], extra: AdminScenario.Directory);
+        Assert.Equal(2, last.Exit);
+        Assert.Equal(["a.example.test"], await scenario.HostsAsync(id));
+    }
+
+    [Fact]
     public async Task Every_command_exits_2_under_the_configuration_source_and_changes_nothing()
     {
         await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
@@ -258,6 +334,7 @@ public sealed class AdminTenantSettingTests(PostgreSqlFixture database) : IClass
             ("tenant binding remove {id} Alpha", ["binding:Alpha"], (1, 0)),
             ("tenant host add {id} extra.example.test", ["host:extra.example.test"], (1, 0)),
             ("tenant host remove {id} extra.example.test", ["host:extra.example.test"], (1, 0)),
+            ("tenant host add {id} site.example.test --site Shop", ["host:site.example.test", "site:shop"], (1, 0)),
             ("tenant host move {id}.example.test --to {other}", [$"host:{id}.example.test", $"from:{id}"], (1, 1)),
         })
         {

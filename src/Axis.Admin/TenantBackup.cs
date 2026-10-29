@@ -93,7 +93,7 @@ internal sealed class TenantBackup : IAsyncDisposable
         }
 
         TenantRow? row;
-        string[] hosts;
+        (string Host, string? SitePath)[] hostRows;
         BackupBinding[] bindings;
         try
         {
@@ -105,10 +105,10 @@ internal sealed class TenantBackup : IAsyncDisposable
                 return null;
             }
 
-            hosts = await platform.TenantHosts.AsNoTracking()
+            hostRows = [.. (await platform.TenantHosts.AsNoTracking()
                 .Where(host => host.TenantId == request.Id)
-                .Select(host => host.Host)
-                .ToArrayAsync(cancellationToken);
+                .Select(host => new { host.Host, host.SitePath })
+                .ToArrayAsync(cancellationToken)).Select(host => (host.Host, host.SitePath))];
 
             // The projection never reads SecretValue, so a secret binding value is never in memory here.
             bindings = await platform.TenantBindings.AsNoTracking()
@@ -141,7 +141,9 @@ internal sealed class TenantBackup : IAsyncDisposable
             return null;
         }
 
-        return new BackupPlan(row, hosts, bindings, pgDump, outPath);
+        string[] hosts = [.. hostRows.Select(host => host.Host)];
+        ManifestSite[] sites = [.. hostRows.Where(host => host.SitePath is not null).Select(host => new ManifestSite(host.SitePath!, host.Host))];
+        return new BackupPlan(row, hosts, sites, bindings, pgDump, outPath);
     }
 
     public async Task<int> RunAsync()
@@ -391,7 +393,8 @@ internal sealed class TenantBackup : IAsyncDisposable
             [.. _plan.Bindings
                 .OrderBy(binding => binding.Name, StringComparer.Ordinal)
                 .Select(binding => new ManifestBinding(binding.Name, binding.Kind, binding.Kind == "secret" ? null : binding.Url))],
-            DirectoryTenantCatalog.Realm(row, _settings.Cipher) is not null);
+            DirectoryTenantCatalog.Realm(row, _settings.Cipher) is not null,
+            [.. _plan.Sites.OrderBy(site => site.Path, StringComparer.Ordinal)]);
 
         return new BackupManifest(
             Format: 1,
@@ -447,7 +450,7 @@ internal sealed class TenantBackup : IAsyncDisposable
 }
 
 /// <summary>What the checks before the backup found: the directory entry, with no secret binding value, and the resolved paths.</summary>
-internal sealed record BackupPlan(TenantRow Row, string[] Hosts, BackupBinding[] Bindings, string PgDump, string OutPath);
+internal sealed record BackupPlan(TenantRow Row, string[] Hosts, IReadOnlyList<ManifestSite> Sites, BackupBinding[] Bindings, string PgDump, string OutPath);
 
 /// <summary>A binding of the tenant as the backup reads it. A <c>secret</c> binding has no value here.</summary>
 internal sealed record BackupBinding(string Name, string Kind, string? Url);
@@ -463,7 +466,10 @@ internal sealed record BackupManifest(
     IReadOnlyList<ManifestPackage> Packages,
     IReadOnlyList<ManifestModule> Modules);
 
-/// <summary><paramref name="Realm"/> says that the tenant signs in through its own realm in Axis's identity provider. An archive from before it reads as <c>false</c>.</summary>
+/// <summary>
+/// <paramref name="Realm"/> says that the tenant signs in through its own realm in Axis's identity provider. An archive from before it reads as <c>false</c>.
+/// <paramref name="Sites"/> lists the hosts that belong to a site, and <paramref name="Hosts"/> still lists every host. An archive from before it reads as null.
+/// </summary>
 internal sealed record ManifestDirectory(
     string Status,
     string? PreviewOf,
@@ -478,7 +484,11 @@ internal sealed record ManifestDirectory(
     string? EndpointAudience,
     string? ServiceAudience,
     IReadOnlyList<ManifestBinding> Bindings,
-    bool Realm = false);
+    bool Realm = false,
+    IReadOnlyList<ManifestSite>? Sites = null);
+
+/// <summary>A host that belongs to the site at <paramref name="Path"/> in the manifest.</summary>
+internal sealed record ManifestSite(string Path, string Host);
 
 /// <summary>A binding in the manifest. <c>Url</c> holds the value of a <c>url</c> or <c>storage</c> binding and is unset for a <c>secret</c> binding.</summary>
 internal sealed record ManifestBinding(string Name, string Kind, [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Url);
