@@ -10,9 +10,15 @@ import { choiceLabel, type ConnectChoice, connectChoices, connectEdit } from './
 import { buildProcessGraph, type ProcessGraphTransition, transitionName, transitionPointer } from './processGraph'
 import { ProcessStepPanel } from './ProcessEditor'
 import { ProcessPalette } from './ProcessPalette'
-import { addStep, entryLabel, insertInto, type Added, type PaletteEntry } from './processPalette'
+import { addStep, entryLabel, insertInto, moved, type Added, type PaletteEntry } from './processPalette'
 import type { ChangeHandler } from './SchemaForm'
 import StudioProcessGraph from './StudioProcessGraph'
+
+function nameAt(list: unknown[], index: number): string {
+  const step: unknown = list[index]
+  const name = typeof step === 'object' && step !== null ? (step as { name?: unknown }).name : undefined
+  return typeof name === 'string' && name !== '' ? name : `/steps/${index}`
+}
 
 /**
  * The Design tab of a process: the graph of the draft, and beside it the card of the selected step, which is the one
@@ -20,7 +26,8 @@ import StudioProcessGraph from './StudioProcessGraph'
  * draws the graph again. With an edge selected, the panel offers Remove transition above the card, which clears the
  * transition's target and keeps its branch or outcome. Removing a step leaves the transitions that named it, for the
  * checker to report. Delete in the canvas removes the selected edge, or else the selected step. A hidden live region
- * says what was removed. With no step selected, the panel says so. The canvas comes first, so Tab reaches its edges
+ * says what was removed. Move up and Move down on the card are one edit each, and the live region says where the step
+ * went. With no step selected, the panel says so. The canvas comes first, so Tab reaches its edges
  * and nodes before the panel. A drag from a step's handle to another step sets a transition. A step with one `next`
  * sets it at once. A decision or a task opens a menu at the drop point that lists its branches, `otherwise` or
  * outcomes, and a new branch or outcome. Escape, a click outside the menu or any other edit closes it and changes
@@ -87,6 +94,18 @@ export default function StudioProcessDesign({
     )
     selectStep(null)
     setAnnouncement(`${t('shell.studio.process.removedStep')} ${name || `/steps/${index}`}`)
+  }
+
+  function moveStep(index: number, offset: number) {
+    const to = index + offset
+    const next = moved(steps, index, offset)
+    onChange('/steps', next)
+    selectStep(to)
+    const place =
+      to === 0
+        ? t('shell.studio.process.movedToStart')
+        : `${t('shell.studio.process.movedAfter')} ${nameAt(next, to - 1)}`
+    setAnnouncement(`${t('shell.studio.process.stepAdded')} ${nameAt(next, to)} ${place}`)
   }
 
   function removeTransition(transition: ProcessGraphTransition) {
@@ -279,7 +298,7 @@ export default function StudioProcessDesign({
                     value={draft}
                     index={selected}
                     onChange={onChange}
-                    onSelect={selectStep}
+                    onMove={(offset) => moveStep(selected, offset)}
                     onRemove={() => removeStep(selected)}
                   />
                 </Flex>

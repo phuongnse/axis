@@ -632,6 +632,8 @@
   "shell.studio.process.stepAdded": "Bước",
   "shell.studio.process.addedAfter": "đã thêm sau",
   "shell.studio.process.added": "đã thêm",
+  "shell.studio.process.movedAfter": "đã chuyển đến sau",
+  "shell.studio.process.movedToStart": "đã chuyển lên đầu",
   "shell.studio.process.endOnTransition": "Không thể chèn bước kết thúc vào một chuyển tiếp",
   "shell.studio.process.removeTransition": "Xóa chuyển tiếp",
   "shell.studio.process.moveUp": "Chuyển lên",

@@ -632,6 +632,8 @@
   "shell.studio.process.stepAdded": "Step",
   "shell.studio.process.addedAfter": "added after",
   "shell.studio.process.added": "added",
+  "shell.studio.process.movedAfter": "moved after",
+  "shell.studio.process.movedToStart": "moved to the start",
   "shell.studio.process.endOnTransition": "An end step cannot be inserted into a transition",
   "shell.studio.process.removeTransition": "Remove transition",
   "shell.studio.process.moveUp": "Move up",

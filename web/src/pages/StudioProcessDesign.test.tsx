@@ -209,3 +209,34 @@ describe('the palette of the process designer', () => {
     expect(announcement()).toBeEmptyDOMElement()
   })
 })
+
+describe('moving a step', () => {
+  const [submit, resolve, check, done] = initial.steps
+
+  it('moves a step to the start with one change, keeps it selected and says so', async () => {
+    const calls = renderDesign(1)
+    await userEvent.click(screen.getByRole('button', { name: 'Move up' }))
+
+    expect(calls.changes).toEqual([['/steps', [resolve, submit, check, done]]])
+    expect(calls.selected.at(-1)).toBe(0)
+    expect(announcement()).toHaveTextContent(/^Step resolve moved to the start$/)
+  })
+
+  it('moves a step down and names the step that is now before it', async () => {
+    const calls = renderDesign(1)
+    await userEvent.click(screen.getByRole('button', { name: 'Move down' }))
+
+    expect(calls.changes).toEqual([['/steps', [submit, check, resolve, done]]])
+    expect(calls.selected.at(-1)).toBe(2)
+    expect(announcement()).toHaveTextContent(/^Step resolve moved after check$/)
+  })
+
+  it('moves a step up past another and names the step that is now before it', async () => {
+    const calls = renderDesign(2)
+    await userEvent.click(screen.getByRole('button', { name: 'Move up' }))
+
+    expect(calls.changes).toEqual([['/steps', [submit, check, resolve, done]]])
+    expect(calls.selected.at(-1)).toBe(1)
+    expect(announcement()).toHaveTextContent(/^Step check moved after submit$/)
+  })
+})
