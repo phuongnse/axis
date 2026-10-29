@@ -453,7 +453,7 @@ bindings work. Status rules and publishing are built too.
     [rate limits](reference/headers-and-rate-limits.md#rate-limits).
   - Axis is checked against ASVS 5.0 Level 2, tracked in [ASVS](reference/asvs.md).
     The final sign-off is _(planned for M18)_.
-  - Authentication by default (D111) is built, see [authorization](reference/security.md#authorization).
+  - Authentication by default (D111) and `.github/CODEOWNERS` are built, see [authorization](reference/security.md#authorization).
     _(Planned for M18.)_ A threat model (D106), see [ASVS](reference/asvs.md#other-evidence).
   - _(Planned for M18.)_ Performance objectives and the weekly load test are in
     [performance](reference/performance.md).
