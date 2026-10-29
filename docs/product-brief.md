@@ -28,8 +28,8 @@ through Studio, without editing JSON or code. Files stay the source of truth
 (D5). No domain gets platform code. See [D46](decisions/d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9.md).
 
 _(planned for M24 to M26)_ Axis ships built-in modules: standard processes,
-such as HR, that a business builds its application from instead of starting
-from scratch. A business changes any part of a module in a layer of its own
+such as approvals, a service desk or an asset register, that a business
+builds its application from instead of starting from scratch. A business changes any part of a module in a layer of its own
 application, while the module's contract, bound to its data, holds on every
 write. See [D102](decisions/d102-built-in-modules-open-to-change-and-bound-by-a-contract.md).
 
