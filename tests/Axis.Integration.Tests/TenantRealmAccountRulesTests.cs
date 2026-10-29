@@ -96,6 +96,7 @@ public sealed partial class TenantRealmAccountRulesTests(KeycloakFixture keycloa
         {
             var (_, failed, next, _) = await PostLoginAsync(action, jar, "pat", "not-the-password-1");
             Assert.Contains(InvalidCredentials, failed, StringComparison.Ordinal);
+            await WaitForFailuresAsync(realm, userId, attempt + 1, locked: attempt + 1 == 5);
             action = next;
         }
 
@@ -181,6 +182,7 @@ public sealed partial class TenantRealmAccountRulesTests(KeycloakFixture keycloa
         var (action, jar) = await OpenLoginPageAsync(realm);
         var (_, wrong, next, _) = await PostLoginAsync(action, jar, email, "not-the-password-1");
         Assert.Contains(InvalidCredentials, wrong, StringComparison.Ordinal);
+        await WaitForFailuresAsync(realm, userId, 1, locked: false);
 
         // The password step passes: Keycloak moves on to the authenticator step instead of the callback.
         var (status, html, _, location) = await PostLoginAsync(next, jar, email, Password);
@@ -211,6 +213,7 @@ public sealed partial class TenantRealmAccountRulesTests(KeycloakFixture keycloa
         {
             var (_, failed, next, _) = await PostLoginAsync(action, jar, "pat", "not-the-password-1");
             Assert.Contains(InvalidCredentials, failed, StringComparison.Ordinal);
+            await WaitForFailuresAsync(realm, userId, attempt + 1, locked: false);
             action = next;
         }
 
@@ -279,6 +282,35 @@ public sealed partial class TenantRealmAccountRulesTests(KeycloakFixture keycloa
         using var response = await SendAsync(HttpMethod.Get, $"admin/realms/{realm}/attack-detection/brute-force/users/{userId}");
         var state = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
         return $"Brute-force state: {(int)response.StatusCode} {state}";
+    }
+
+    /// <summary>Waits until Keycloak has counted the failed sign-ins, which it does after the response has gone back.</summary>
+    private async Task WaitForFailuresAsync(string realm, string userId, int failures, bool locked)
+    {
+        var path = $"admin/realms/{realm}/attack-detection/brute-force/users/{userId}";
+        var deadline = DateTimeOffset.UtcNow.AddSeconds(30);
+        while (true)
+        {
+            using var response = await SendAsync(HttpMethod.Get, path);
+            var state = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
+            if (response.StatusCode == HttpStatusCode.OK)
+            {
+                using var attack = JsonDocument.Parse(state);
+                if (attack.RootElement.GetProperty("numFailures").GetInt32() == failures
+                    && attack.RootElement.GetProperty("disabled").GetBoolean() == locked)
+                {
+                    return;
+                }
+            }
+
+            if (DateTimeOffset.UtcNow >= deadline)
+            {
+                Assert.Fail(
+                    $"Expected {failures} failed sign-ins with disabled {locked}. Last brute-force state: {(int)response.StatusCode} {state}\n{await LoginErrorsAsync(realm)}");
+            }
+
+            await Task.Delay(50, TestContext.Current.CancellationToken);
+        }
     }
 
     private async Task<string> CreateUserAsync(string realm, string username)
