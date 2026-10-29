@@ -145,6 +145,71 @@ namespace Axis.Tenancy.Platform.Migrations
                     b.ToTable("tenant_hosts", "platform");
                 });
 
+            modelBuilder.Entity("Axis.Tenancy.Platform.TenantPlatformProviderRow", b =>
+                {
+                    b.Property<string>("TenantId")
+                        .HasColumnType("text")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("Name")
+                        .HasColumnType("text")
+                        .HasColumnName("name");
+
+                    b.Property<string>("ClaimDisplayName")
+                        .HasColumnType("text")
+                        .HasColumnName("claim_display_name");
+
+                    b.Property<string>("ClaimEmail")
+                        .HasColumnType("text")
+                        .HasColumnName("claim_email");
+
+                    b.Property<string>("ClaimLocale")
+                        .HasColumnType("text")
+                        .HasColumnName("claim_locale");
+
+                    b.Property<string>("ClientIdBinding")
+                        .HasColumnType("text")
+                        .HasColumnName("client_id_binding");
+
+                    b.Property<string>("ClientKeyBinding")
+                        .HasColumnType("text")
+                        .HasColumnName("client_key_binding");
+
+                    b.Property<string>("ClientSecretBinding")
+                        .HasColumnType("text")
+                        .HasColumnName("client_secret_binding");
+
+                    b.Property<string>("IssuerBinding")
+                        .HasColumnType("text")
+                        .HasColumnName("issuer_binding");
+
+                    b.Property<string>("MetadataBinding")
+                        .HasColumnType("text")
+                        .HasColumnName("metadata_binding");
+
+                    b.Property<string>("RoleValues")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("role_values");
+
+                    b.Property<string>("RolesClaim")
+                        .HasColumnType("text")
+                        .HasColumnName("roles_claim");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("type");
+
+                    b.HasKey("TenantId", "Name")
+                        .HasName("pk_tenant_platform_providers");
+
+                    b.ToTable("tenant_platform_providers", "platform", t =>
+                        {
+                            t.HasCheckConstraint("ck_tenant_platform_providers_type", "type IN ('oidc', 'saml')");
+                        });
+                });
+
             modelBuilder.Entity("Axis.Tenancy.Platform.TenantRow", b =>
                 {
                     b.Property<string>("Id")
@@ -230,6 +295,10 @@ namespace Axis.Tenancy.Platform.Migrations
                         .HasColumnType("text")
                         .HasDefaultValue("standard")
                         .HasColumnName("oidc_profile");
+
+                    b.Property<bool>("PlatformAccounts")
+                        .HasColumnType("boolean")
+                        .HasColumnName("platform_accounts");
 
                     b.Property<string>("PreviewOf")
                         .HasColumnType("text")
@@ -348,6 +417,16 @@ namespace Axis.Tenancy.Platform.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_tenant_hosts_tenants_tenant_id");
+                });
+
+            modelBuilder.Entity("Axis.Tenancy.Platform.TenantPlatformProviderRow", b =>
+                {
+                    b.HasOne("Axis.Tenancy.Platform.TenantRow", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_tenant_platform_providers_tenants_tenant_id");
                 });
 
             modelBuilder.Entity("Axis.Tenancy.Platform.TenantRow", b =>

@@ -12,7 +12,7 @@ password rotation, [`tenant rotate-passwords`](#database-passwords), is built. T
 built, see [installation key](#installation-key). The
 [deployment binding](#deployment-bindings) and [host](#hosts) commands are built too. So is
 [`tenant oidc set`](#sign-in-settings), with its client key options, and the
-[mail settings](#mail-settings) commands. So is ending [sessions](#sessions).
+[mail settings](#mail-settings) commands. So is ending [sessions](#sessions), and so is storing the [platform sign-in](#platform-sign-in).
 
 ## Common rules
 
@@ -152,11 +152,53 @@ and the public key as a PEM.
   `--client-secret` and `--claim` go, because the realm gives the authority and the clients, and each
   `identityProvider` resource names its own claims. The audiences, the profile and the client keys stay. Axis registers a client key in the realm itself, as
   `tenant oidc set` does today for a tenant with a realm.
-- _(planned for M17)_ `tenant sign-in set <id>` sets the tenant's
-  [platform sign-in](identity-provider.md#platform-sign-in): `--accounts true|false`, and one
-  `--provider <name>` for each brokered provider, with its type, its bindings, its claims and its role mapping, as an
-  `identityProvider` resource gives them. A run replaces the whole platform sign-in, brings the realm in step, and
-  writes one platform audit record. A platform sign-in with no provider and no accounts exits with code 2.
+
+### Platform sign-in
+
+`tenant sign-in set <id>` stores the tenant's [platform sign-in](identity-provider.md#platform-sign-in) in the
+tenant directory: whether the accounts of the tenant's realm may sign in, and the brokered providers that the home
+page, Studio and the operator console accept.
+
+| Option                         | Meaning                                                                                                              |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------- |
+| `--accounts true\|false`       | Whether realm accounts may sign in. Required, once                                                                   |
+| `--provider <name>`            | Starts one brokered provider. The options below belong to the provider that came last                                |
+| `--type oidc\|saml`            | The provider's type. Required                                                                                        |
+| `--issuer <binding>`           | `oidc`: the binding that holds the issuer. Required                                                                  |
+| `--client-id <binding>`        | `oidc`: the binding that holds the client id. Required                                                               |
+| `--client-secret <binding>`    | `oidc`: the binding that holds the client secret. Exactly one of this and `--client-key`                             |
+| `--client-key <binding>`       | `oidc`: the binding that holds the client key. Exactly one of this and `--client-secret`                             |
+| `--metadata <binding>`         | `saml`: the binding that holds the metadata. Required. An `oidc` provider takes none                                 |
+| `--claim <name>=<claim>`       | The provider's claim for `displayName`, `email` or `locale`. May repeat                                              |
+| `--roles-claim <claim>`        | The claim that holds the person's roles                                                                              |
+| `--role <value>=<role>`        | Maps a value of the roles claim to `author`, `publisher`, `operator` or `administrator`. May repeat                  |
+
+A successful run prints `<id> sign-in ok`. The options are named after the fields of the
+[`identityProvider` resource](identity-provider.md#identity-provider-resource), and the per-type rules are those of the
+resource.
+
+- **A binding name, never a value.** `--client-secret` here takes the name of a secret
+  [deployment binding](#deployment-bindings). `tenant oidc set --client-secret` takes no value and reads a secret.
+  The command does not check that the binding exists, because activation does, and an operator may set the binding
+  after the sign-in.
+- **A whole replacement.** A run replaces the tenant's whole platform sign-in: accounts and every provider. A provider
+  left out of the run is removed. It raises the tenant `version`.
+- **Any status.** The command works on a tenant in any status, including `provisioning` and `suspended`, because the
+  platform sign-in needs neither the tenant's database nor its roles. It needs `ConnectionStrings:PlatformSchema` and
+  not `Admin:ConnectionString` or `Platform:SecretKey`.
+- **Audit.** One [platform audit record](#platform-audit-records) names `accounts` and then `provider:<name>` for each
+  provider, in the order given. It never holds a value, a binding name, a claim or a role.
+- **Exit code 2, nothing changes.** `Tenancy:Source` is not `directory`, the tenant is unknown, the tenant is a preview
+  tenant, which has no sign-in of its own, `--accounts` is missing or given twice, there is no provider and accounts are
+  off, a provider name is blank or given twice (letter case ignored), a type is not `oidc` or `saml` (accounts are the
+  flag, not a type), an `oidc` provider lacks the issuer or the client id or has neither or both of the client secret
+  and the client key, a `saml` provider lacks the metadata or names an issuer or a client binding, a binding or claim is
+  blank or a claim name is unknown or repeated, a role value is repeated, or a role is not one of the four. The
+  `version` stays and no audit record is written.
+- **Stored, not used yet.** `tenant create` and `tenant restore` set accounts on, and a migration set it on for the
+  tenants that existed. Nothing reads the platform sign-in yet. _(planned for M17)_ A run also brings the realm in step,
+  and the server checks the sign-in against it. `tenant backup` does not carry the providers, so a restored tenant has
+  accounts on and no provider until the command runs again.
 
 ## Mail settings
 
@@ -326,7 +368,7 @@ keys. It can be rotated without signing anyone out.
   truncate with SQLSTATE `23001`, as it does for the audit table of a tenant database. The table is
   built. `PlatformAuditRecords.WriteAsync` in `Axis.Administration` writes one record.
 - **What writes it.** Every `Axis.Admin` command that acts on a tenant: `tenant create`,
-  `tenant suspend`, `tenant resume`, `tenant rotate-passwords`, `tenant oidc set`, `tenant backup`,
+  `tenant suspend`, `tenant resume`, `tenant rotate-passwords`, `tenant oidc set`, `tenant sign-in set`, `tenant backup`,
   `tenant restore`, `migrate` and `activate` are built. So is `tenant session end`. `tenant backup` writes one because an
   archive holds a tenant's data. `tenant binding set`, `tenant binding remove`, `tenant host add`,
   `tenant host remove` and `tenant host move` are built and write one each. So are `tenant email set`
@@ -343,7 +385,8 @@ keys. It can be rotated without signing anyone out.
   `tenant oidc set` and `tenant session end` are the exceptions. The record of `tenant rotate-passwords` names both roles,
   `axis_<id>_runtime` and `axis_<id>_schema`, and never a password. The record of `tenant oidc set`
   names the [settings](#sign-in-settings) it was given and never a value. `tenant oidc set` writes
-  its record after its checks and before the change. The record of `tenant session end` holds
+  its record after its checks and before the change. The record of `tenant sign-in set` names `accounts` and
+  `provider:<name>`, and never a value. The record of `tenant session end` holds
   `user:<user>` or `all`, and is written after its checks and before the delete.
   The binding and host commands differ: each is one small transaction that writes its record and
   makes its change together, so a record means the change was made. A command that is refused or

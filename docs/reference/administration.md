@@ -7,7 +7,7 @@ activate releases, rotate the installation key, and back up and restore tenants.
 and
 [D45](../decisions/d45-tenant-backup-and-restore.md).
 The commands are `tenant create`, `tenant suspend`, `tenant resume`, `tenant rotate-passwords`,
-`tenant list`, `tenant backup`, `tenant restore`, `tenant oidc set`, `tenant binding list|set|remove`,
+`tenant list`, `tenant backup`, `tenant restore`, `tenant oidc set`, `tenant sign-in set`, `tenant binding list|set|remove`,
 `tenant host add|remove|move`, `tenant email set|clear`, `tenant session end`, `migrate`, `activate`, `platform rekey`, `publisher` and `version`.
 `platform rekey` is in [installation key](tenant-setting-commands.md#installation-key). The
 commands that change a tenant after it is created are in

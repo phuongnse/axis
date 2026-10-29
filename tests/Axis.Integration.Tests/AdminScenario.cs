@@ -189,6 +189,13 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
         return await context.Tenants.AsNoTracking().SingleAsync(tenant => tenant.Id == id, CancellationToken);
     }
 
+    /// <summary>The platform providers of a tenant, ordered by name.</summary>
+    public async Task<List<TenantPlatformProviderRow>> PlatformProvidersAsync(string id)
+    {
+        await using var context = NewContext();
+        return await context.TenantPlatformProviders.AsNoTracking().Where(provider => provider.TenantId == id).OrderBy(provider => provider.Name).ToListAsync(CancellationToken);
+    }
+
     public async Task<string[]> HostsAsync(string id)
     {
         await using var context = NewContext();
@@ -275,6 +282,7 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
         var tenants = await context.Tenants.AsNoTracking().OrderBy(tenant => tenant.Id).ToListAsync(CancellationToken);
         var hosts = await context.TenantHosts.AsNoTracking().OrderBy(host => host.Host).ToListAsync(CancellationToken);
         var bindings = await context.TenantBindings.AsNoTracking().OrderBy(binding => binding.TenantId).ThenBy(binding => binding.Name).ToListAsync(CancellationToken);
+        var providers = await context.TenantPlatformProviders.AsNoTracking().OrderBy(provider => provider.TenantId).ThenBy(provider => provider.Name).ToListAsync(CancellationToken);
         return string.Join(
             '\n',
             tenants.Select(t => string.Join(
@@ -284,9 +292,13 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
                 Convert.ToHexString(t.OidcClientSecret), t.OidcProfile, t.ClaimUserId, t.ClaimDisplayName, t.ClaimRoles, t.ClaimEmail, t.ClaimLocale,
                 t.EndpointAudience, t.ServiceAudience, t.OidcClientKeyId, Convert.ToHexString(t.OidcClientKey ?? []), t.OidcPreviousClientKeyId,
                 Convert.ToHexString(t.OidcPreviousClientKey ?? []), t.SchemaVersion, t.PreviewOf, t.SmtpHost, t.SmtpPort, t.SmtpUseTls, t.SmtpUserName,
-                Convert.ToHexString(t.SmtpPassword ?? []), t.EmailFrom))
+                Convert.ToHexString(t.SmtpPassword ?? []), t.EmailFrom, t.PlatformAccounts))
             .Concat(hosts.Select(host => $"{host.TenantId}|{host.Host}|{host.SitePath}"))
-            .Concat(bindings.Select(binding => $"{binding.TenantId}|{binding.Name}|{binding.Kind}|{binding.Url}")));
+            .Concat(bindings.Select(binding => $"{binding.TenantId}|{binding.Name}|{binding.Kind}|{binding.Url}"))
+            .Concat(providers.Select(p => string.Join(
+                '|',
+                p.TenantId, p.Name, p.Type, p.IssuerBinding, p.ClientIdBinding, p.ClientSecretBinding, p.ClientKeyBinding, p.MetadataBinding,
+                p.ClaimDisplayName, p.ClaimEmail, p.ClaimLocale, p.RolesClaim, p.RoleValues))));
     }
 
     /// <summary>Sets the schema version recorded for a tenant, as if its database were on another schema.</summary>
