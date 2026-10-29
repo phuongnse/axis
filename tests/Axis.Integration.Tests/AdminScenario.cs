@@ -39,7 +39,7 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
 
     public string Platform { get; } = platform;
 
-    /// <summary>The OIDC client secret that <c>tenant restore</c> and <c>tenant oidc set</c> get, for tests that check it never leaks.</summary>
+    /// <summary>The OIDC client secret that <c>tenant restore</c> gets, for tests that check it never leaks.</summary>
     public string ClientSecret => _clientSecret;
 
     /// <summary>The secret of the admin client of the identity provider, which <c>tenant create</c> gets by default.</summary>
@@ -215,6 +215,25 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
     {
         await using var context = NewContext();
         return await context.TenantBindings.AsNoTracking().CountAsync(binding => binding.TenantId == id, CancellationToken);
+    }
+
+    /// <summary>
+    /// Points the sign-in of a tenant at another realm in the directory, as the operator does without <c>tenant oidc set</c>. The tenant's
+    /// own realm has no users, so a test that signs a person in points the tenant at the development realm.
+    /// </summary>
+    public async Task PointSignInAsync(string id, Uri authority, string clientId, string? clientSecret = null)
+    {
+        await using var context = NewContext();
+        var row = await context.Tenants.SingleAsync(tenant => tenant.Id == id, CancellationToken);
+        row.OidcAuthority = authority.ToString();
+        row.OidcClientId = clientId;
+        if (clientSecret is not null)
+        {
+            row.OidcClientSecret = Cipher.Encrypt(id, TenantSecretFields.OidcClientSecret, clientSecret);
+        }
+
+        row.Version++;
+        await context.SaveChangesAsync(CancellationToken);
     }
 
     /// <summary>Sets the endpoint audience of a tenant in the directory, as the operator does without <c>tenant oidc set</c>.</summary>

@@ -19,7 +19,7 @@ The policy follows the lifecycle terms of NIST SP 800-57. It covers each key fro
   - Rotate the installation key with `platform rekey`.
   - Rotate the database passwords with `tenant rotate-passwords`.
   - Add a new client key, and retire the old one.
-  - Set new values with `tenant oidc set --client-secret`, `tenant email set --password` and `tenant binding set --secret`.
+  - Set new values with `tenant email set --password` and `tenant binding set --secret`. No command changes the OIDC client secret of a tenant, which `tenant create` and `tenant restore` set.
   - End every session with `tenant session end <id> --all`.
 - **Destruction.** Remove `Platform:PreviousSecretKey` from every host once rekey has run. Destroy the old installation key once no host holds it. Retire a client key once the identity provider no longer needs it. The server never deletes a data protection key.
 
@@ -39,7 +39,7 @@ Each row is one key, algorithm or certificate. A _(planned for Mx)_ marker marks
 | **Identity provider keys** | Set by the identity provider | Signing the identity provider's own tokens | Anything Axis signs | Delegated to the identity provider. |
 | **Tenant database passwords** | 32 random bytes, shown as 64 lowercase hex characters | Logging in to the tenant's runtime and schema database roles | Anything other than that login | Made at `tenant create` and by `tenant rotate-passwords`. Stored encrypted by the installation key. |
 | **Realm client secrets** | 32 random bytes, shown as 64 lowercase hex characters | The secrets of the three clients of a tenant's realm: the platform client `axis`, which is the tenant's OIDC client secret, `axis-activation` and `axis-users`, see [keeping the realm in step](identity-provider.md#keeping-the-realm-in-step) | Anything other than signing in as those clients | Made at `tenant create`. Stored encrypted by the installation key. A rerun keeps them. |
-| **OIDC client secret, SMTP password and `secret` bindings** | Given by the operator and stored encrypted by the installation key | Calling the identity provider, the mail server and a connector | Anything else. Never printed | Replaced with `tenant oidc set --client-secret`, `tenant email set --password` and `tenant binding set --secret`. |
+| **OIDC client secret, SMTP password and `secret` bindings** | Given by the operator and stored encrypted by the installation key | Calling the identity provider, the mail server and a connector | Anything else. Never printed | The OIDC client secret is set by `tenant create` and `tenant restore`, and no command replaces it. The SMTP password and `secret` bindings are replaced with `tenant email set --password` and `tenant binding set --secret`. |
 | **Webhook signing secret** _(planned for M19)_ | HMAC-SHA256, in the Standard Webhooks format | Signing outgoing webhook calls, see [webhook delivery](integration-resources.md#webhook-delivery) | Anything else | Shared by two parties. The `secret` binding may hold two secrets during a change. |
 | **Connector OAuth2 client secret** _(planned for M19)_ | Stored as a `secret` binding | Asking the authorization server for an access token, see [OAuth2 auth](integration-resources.md#oauth2-auth) | Anything else | Replaced with `tenant binding set --secret`. |
 | **Proxy certificate and key** | A publicly trusted certificate, with TLS 1.2 and 1.3 and only the strong cipher suites | Serving HTTPS to clients, see [TLS](installation.md#tls) | Anything else. The Axis hosts hold no TLS key | The operator's proxy holds the key and renews the certificate. The Compose example reads it from `/certs`. |
@@ -57,7 +57,7 @@ Each row is one key, algorithm or certificate. A _(planned for Mx)_ marker marks
 - **New keys may use new algorithms.** The framework writes each data protection key's algorithm into the key. A new key can use a new algorithm while the old keys still decrypt.
 - **Stored values name no algorithm.** An encrypted value holds a nonce, the ciphertext and a tag. Nothing in it names its form. So a change of form is a code change. A release reads the old form and writes the new one, and rekey moves every value in one transaction.
 - **Token algorithms are lists.** The token checks take their algorithms from one list each in the server code, `EndpointCaller.Algorithms` and `DpopProof.Algorithms`. Changing a list is a code change.
-- **Passwords and secrets change through commands.** `tenant rotate-passwords`, `tenant oidc set`, `tenant email set` and `tenant binding set` replace them. See [tenant setting commands](tenant-setting-commands.md).
+- **Passwords and secrets change through commands.** `tenant rotate-passwords`, `tenant email set` and `tenant binding set` replace them. See [tenant setting commands](tenant-setting-commands.md).
 - **No post-quantum algorithm.** Axis uses no post-quantum algorithm. Adopting one would be a code change to the cipher and to the token checks.
 
 ## Data classification

@@ -37,14 +37,7 @@ public sealed class AdminPreviewTenantTests(PostgreSqlFixture database, Keycloak
         Assert.Equal(0, (await scenario.CreateAsync(main, "main.example.test")).Exit);
 
         // The tenant's own realm has no users, so it is pointed at the development realm.
-        var created = await scenario.RunAsync(
-            ["tenant", "oidc", "set", main, "--authority", authority.ToString(), "--client-id", KeycloakFixture.ClientId, "--client-secret"],
-            extra: new Dictionary<string, string?>
-            {
-                ["Tenancy:Source"] = "directory",
-                ["AXIS_OIDC_CLIENT_SECRET"] = KeycloakFixture.ClientSecret,
-            });
-        Assert.Equal(0, created.Exit);
+        await scenario.PointSignInAsync(main, authority, KeycloakFixture.ClientId, KeycloakFixture.ClientSecret);
 
         var result = await scenario.RunAsync(
             AdminScenario.PreviewArgs(preview, main, "localhost", "PurchasingSystemUrl=https://purchasing.example.test"),

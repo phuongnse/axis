@@ -49,7 +49,7 @@ which host holds which connection. There is no HTTP API for provisioning.
 | `Tenancy:Source` | `Tenancy__Source` | `directory` for the tenant setting commands, which exit with code 2 under any other value. `publisher` reads it too, see [publisher](#publisher). |
 | none | `AXIS_BINDING_SECRET` | The value of the `secret` binding that `tenant binding set --secret` sets. When it is unset, the value comes from standard input. It is never a command-line option. Only that command reads it. |
 | none | `AXIS_SMTP_PASSWORD` | The SMTP password that `tenant email set --password` stores for the tenant. When it is unset, the password comes from the first line of standard input. It is never a command-line option. Only that command reads it. |
-| none | `AXIS_OIDC_CLIENT_SECRET` | The OIDC client secret of a restored tenant that keeps the archive's sign-in. `tenant restore` reads it and needs it only then, because a new realm generates its own client secrets. So does `tenant oidc set --client-secret`, which reads the first line of standard input when the variable is not set. `tenant create` does not read it. It is never a command-line option, so it does not appear in a process list. |
+| none | `AXIS_OIDC_CLIENT_SECRET` | The OIDC client secret of a restored tenant that keeps the archive's sign-in. `tenant restore` reads it and needs it only then, because a new realm generates its own client secrets. `tenant create` does not read it. It is never a command-line option, so it does not appear in a process list. |
 | none | `PATH` | `tenant backup` and `tenant restore` run `pg_dump` and `pg_restore`, so both must be on `PATH`. Their version must match the database server. A missing tool exits with code 2. |
 
 A missing or invalid setting exits with code 2 before any tenant work. The
@@ -228,7 +228,7 @@ with code 2.
   role of the database server could connect to the tenant database.
 - The command sets no claim names, endpoint audience or service audience. They stay empty, so the
   hosts use their defaults. [`tenant oidc set`](tenant-setting-commands.md#sign-in-settings) sets
-  them later. It sets no deployment binding either, except the
+  the audiences later. It sets no deployment binding either, except the
   `url` bindings that `--binding` gives a preview tenant.
 
 **Names.** The role and database names come from the id. PostgreSQL names hold
@@ -504,17 +504,15 @@ option or a missing setting.
 
 **After a restore.** The tenant is `suspended`, and its hosts answer `503`.
 
-1. Set the OIDC client secret and every `secret` binding again. The archive
-   holds none of them. A tenant with a new realm has its client secret already.
+1. Set every `secret` binding again. The archive holds none of them. The restore takes the OIDC client
+   secret from `AXIS_OIDC_CLIENT_SECRET`, and a tenant with a new realm has its client secret already.
 2. Run [`tenant resume <id>`](#tenant-resume).
 
 A tenant with a new realm has no accounts, because the archive carries no account, credential or role mapping. Its people
 need new invitations. A provider that the `realm` step left out comes with the next activation, once its `secret` bindings are set.
 
 Set each `secret` binding with
-[`tenant binding set <id> <name> --secret`](tenant-setting-commands.md#deployment-bindings).
-[`tenant oidc set --client-secret`](tenant-setting-commands.md#sign-in-settings) sets the OIDC
-client secret again, see
+[`tenant binding set <id> <name> --secret`](tenant-setting-commands.md#deployment-bindings), see
 [tenant setting commands](tenant-setting-commands.md).
 
 **Restoring over an existing tenant.** There is no in-place overwrite.

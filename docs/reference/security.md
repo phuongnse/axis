@@ -80,7 +80,8 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place. _(planned f
   use the development realm's secret. Under
   `Tenancy:Source=directory`, the client secret is stored encrypted in the
   tenant directory and decrypted only when the sign-in client is set up, see
-  [platform database](storage.md#platform-database).
+  [platform database](storage.md#platform-database). `tenant create` and `tenant restore` set it,
+  and no command changes it afterwards.
 - **Endpoints.**
   - `GET /api/auth/sign-in?returnUrl=` redirects to the tenant's identity
     provider. `returnUrl` must start with a single `/`. A value that does
@@ -674,8 +675,8 @@ verification bullet below is _(planned for M18)_.
   signs with the newest key after its next refresh. `tenant oidc set --client-key` and `--retire-client-key`
   change the keys, see [tenant setting commands](tenant-setting-commands.md#sign-in-settings). For a tenant
   that signs in through its own realm, the command registers each key in the realm's clients and removes a
-  retired one, so the operator only adds, waits for the refresh and retires. For an outside identity provider
-  the operator registers the public keys there.
+  retired one, so the operator only adds, waits for the refresh and retires. A tenant that still signs in
+  through an outside identity provider, such as a restored one, has the operator register the public keys there.
 - **Verification** _(planned for M18)_. The OpenID Foundation's conformance suite runs by hand
   against the development realm under `fapi2`. Its result is recorded in
   [ASVS](asvs.md). Axis seeks no certification.
