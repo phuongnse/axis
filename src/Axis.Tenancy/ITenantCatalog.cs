@@ -38,6 +38,7 @@ public interface ITenantCatalog
 /// <param name="Realm">What activation needs to sync the tenant's realm, or <c>null</c> when the source holds none for this tenant. Both sources have it, and a preview tenant has none.</param>
 /// <param name="RealmUsers">What the server needs to list the tenant's realm users, or <c>null</c> when the source holds none for this tenant. Both sources have it, and a preview tenant has none.</param>
 /// <param name="PlatformSignIn">The tenant's platform sign-in, or <c>null</c> when none is stored, which accepts every sign-in and takes roles as the tenant's roles claim gives them. The <c>configuration</c> source has none. A preview tenant has its main tenant's.</param>
+/// <param name="HostSites">The lower-case site path of each host that belongs to a site, keyed by host and matched ignoring letter case, or <c>null</c> when the source gives no host to a site. A host of no site is not in it.</param>
 public sealed record TenantEntry(
     string Id,
     IReadOnlyList<string> Hosts,
@@ -49,7 +50,8 @@ public sealed record TenantEntry(
     EmailSettings? Email = null,
     TenantRealmAccess? Realm = null,
     TenantRealmUsers? RealmUsers = null,
-    PlatformSignIn? PlatformSignIn = null);
+    PlatformSignIn? PlatformSignIn = null,
+    IReadOnlyDictionary<string, string>? HostSites = null);
 
 /// <summary>
 /// The sign-in of the platform pages (home, Studio, the operator console, the account page and the users page): whether
