@@ -27,23 +27,25 @@ export function ShellFooter() {
     return () => controller.abort()
   }, [])
 
+  const copyright = `© ${year} Axis${version != null ? ` · v${version}` : ''}`
+
   return (
     <Layout.Footer
       style={{
-        paddingBlock: spacing.sm,
+        paddingBlock: spacing.xs,
         paddingInline: spacing.lg,
         background: colour.surface,
         borderTop: `1px solid ${colour.borderSubtle}`,
       }}
     >
       <Flex justify="space-between" align="center" gap={spacing.md} wrap>
-        <Typography.Text type="secondary">{`© ${year} Axis${version != null ? ` · v${version}` : ''}`}</Typography.Text>
+        <Typography.Text style={{ color: colour.textMuted }}>{copyright}</Typography.Text>
         <Flex align="center" gap={spacing.sm}>
-          <Typography.Text type="secondary">{t('shell.serverStatus.title')}</Typography.Text>
+          <Typography.Text style={{ color: colour.textMuted }}>{t('shell.serverStatus.title')}</Typography.Text>
           <Badge
             data-testid="footer-server-status"
             status={statusBadge[status]}
-            text={t(`shell.serverStatus.${status}`)}
+            text={<span style={{ color: colour.textMuted }}>{t(`shell.serverStatus.${status}`)}</span>}
           />
         </Flex>
       </Flex>

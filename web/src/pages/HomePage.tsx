@@ -1,8 +1,9 @@
-import { Alert, Button, Card, Empty, Flex, Spin, Tag, Typography } from 'antd'
+import { Alert, Button, Card, Empty, Flex, Spin, Typography } from 'antd'
 import { createElement, useEffect, useId, useMemo, useState, type CSSProperties, type ReactNode } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { startSignIn } from '../platform/api'
 import { fetchCurrentUser, type CurrentUser } from '../platform/currentUser'
+import { colourTokens } from '../platform/designTokens'
 import { navigationIcon } from '../platform/navigationIcons'
 import { SiteMark } from '../platform/SiteMark'
 import { applicationTitle, fetchSites, siteTitle, type SiteListItem } from '../platform/site'
@@ -27,28 +28,27 @@ function useHomeGrid(): CSSProperties {
   }
 }
 
-/** The padding of the welcome band that puts its content in line with the content of the cards below it. */
-function useBandInset() {
-  const { spacing } = useDesignTokens()
-  // The content area's padding, the card's border and the card's padding.
-  return `calc(${spacing.lg}px + 1px + ${spacing.lg}px)`
-}
-
 export function SignInCard() {
   const t = useText()
   const [searchParams] = useSearchParams()
-  const { spacing } = useDesignTokens()
+  const { colour, spacing } = useDesignTokens()
   const signInFailed = searchParams.get('signIn') === 'failed'
 
   return (
     <Flex justify="center" align="center" style={{ paddingBlock: spacing.xl }}>
-      <Card style={{ width: '100%', maxWidth: 400 }}>
+      <Card
+        data-testid="sign-in-card"
+        style={{ width: '100%', maxWidth: 420, border: `1px solid ${colour.borderSubtle}` }}
+        styles={{ body: { padding: spacing.xl } }}
+      >
         <Flex vertical gap={spacing.md}>
-          <SiteMark title="Axis" size={40} />
+          <SiteMark title="Axis" size={48} />
           <Typography.Title level={4} style={{ margin: 0 }}>
             {t('shell.home.signIn.title')}
           </Typography.Title>
-          <Typography.Paragraph style={{ margin: 0 }}>{t('shell.home.signIn.message')}</Typography.Paragraph>
+          <Typography.Paragraph style={{ margin: 0, color: colour.textMuted }}>
+            {t('shell.home.signIn.message')}
+          </Typography.Paragraph>
           {signInFailed && (
             <Alert
               data-testid="sign-in-failed"
@@ -77,14 +77,29 @@ function ToolTile({ to, icon, title, description }: { to: string; icon: string; 
         alignItems: 'flex-start',
         gap: spacing.sm,
         padding: spacing.md,
+        background: colour.surface,
         border: `1px solid ${colour.borderSubtle}`,
         borderRadius: radius.base,
       }}
     >
-      {createElement(navigationIcon(icon), { 'aria-hidden': true, style: { fontSize: 20, marginBlockStart: 2 } })}
+      <span
+        data-testid="tool-icon"
+        style={{
+          display: 'grid',
+          placeItems: 'center',
+          flex: 'none',
+          width: 32,
+          height: 32,
+          background: colour.primary,
+          color: colourTokens.surface.light,
+          borderRadius: radius.base,
+        }}
+      >
+        {createElement(navigationIcon(icon), { 'aria-hidden': true, style: { fontSize: 20 } })}
+      </span>
       <Flex vertical>
         <Typography.Text strong>{title}</Typography.Text>
-        <Typography.Text type="secondary">{description}</Typography.Text>
+        <Typography.Text style={{ color: colour.textMuted }}>{description}</Typography.Text>
       </Flex>
     </Link>
   )
@@ -128,16 +143,14 @@ function Tools({ user }: { user: CurrentUser }) {
 
 function WelcomeBand({ user }: { user: CurrentUser | 'failed' }) {
   const t = useText()
-  const { colour, spacing } = useDesignTokens()
-  const inset = useBandInset()
+  const { colour, radius, spacing } = useDesignTokens()
   return (
     <div
       style={{
-        // Negative margins reach the edges of the content area, whose padding is spacing.lg.
-        margin: `-${spacing.lg}px -${spacing.lg}px 0`,
-        padding: `${spacing.md}px ${inset}`,
         background: colour.surface,
-        borderBottom: `1px solid ${colour.borderSubtle}`,
+        border: `1px solid ${colour.borderSubtle}`,
+        borderRadius: radius.base,
+        padding: spacing.lg,
       }}
     >
       <Flex vertical gap={spacing.md}>
@@ -145,7 +158,7 @@ function WelcomeBand({ user }: { user: CurrentUser | 'failed' }) {
           <Typography.Title level={4} style={{ margin: 0 }}>
             {t('shell.home.title')}
           </Typography.Title>
-          <Typography.Text type="secondary">{t('shell.home.subtitle')}</Typography.Text>
+          <Typography.Text style={{ color: colour.textMuted }}>{t('shell.home.subtitle')}</Typography.Text>
         </Flex>
         {user !== 'failed' && <Tools user={user} />}
       </Flex>
@@ -155,36 +168,39 @@ function WelcomeBand({ user }: { user: CurrentUser | 'failed' }) {
 
 function ApplicationCard({ title, sites, locale }: { title: string; sites: SiteListItem[]; locale: string }) {
   const t = useText()
-  const { spacing } = useDesignTokens()
+  const { colour, spacing } = useDesignTokens()
   const grid = useHomeGrid()
   const headingId = useId()
   const count = sites.length
   const sorted = [...sites].sort((a, b) => siteTitle(a, locale).localeCompare(siteTitle(b, locale), locale))
 
   return (
-    <Card styles={{ body: { padding: spacing.lg } }}>
+    <Card styles={{ body: { padding: spacing.md } }}>
       <section aria-labelledby={headingId}>
         <Flex vertical gap={spacing.md}>
-          <Flex align="center" gap={spacing.sm}>
-            <SiteMark title={title} />
-            <Flex vertical>
-              <Typography.Text strong id={headingId}>
-                {title}
-              </Typography.Text>
-              <Typography.Text type="secondary">
-                {`${count} ${t(count === 1 ? 'shell.home.applications.site' : 'shell.home.applications.sites')}`}
-              </Typography.Text>
-            </Flex>
+          <Flex
+            data-testid="application-card-header"
+            align="center"
+            gap={spacing.sm}
+            style={{ paddingBottom: spacing.sm, borderBottom: `1px solid ${colour.divider}` }}
+          >
+            <SiteMark title={title} size={32} />
+            <Typography.Title level={5} id={headingId} style={{ margin: 0 }}>
+              {title}
+            </Typography.Title>
+            <Typography.Text style={{ color: colour.textMuted, marginInlineStart: 'auto' }}>
+              {`${count} ${t(count === 1 ? 'shell.home.applications.site' : 'shell.home.applications.sites')}`}
+            </Typography.Text>
           </Flex>
           <div data-testid="home-grid" style={grid}>
             {sorted.map((site) => (
               <Link
                 key={site.path}
                 to={`/${site.path}`}
-                style={{ display: 'flex', alignItems: 'center', gap: spacing.sm, minWidth: 0 }}
+                style={{ display: 'flex', alignItems: 'center', gap: spacing.sm, minWidth: 0, padding: spacing.xs }}
               >
                 <SiteMark title={siteTitle(site, locale)} size={24} />
-                <Typography.Text ellipsis style={{ color: 'inherit' }}>
+                <Typography.Text ellipsis style={{ color: colour.text }}>
                   {siteTitle(site, locale)}
                 </Typography.Text>
               </Link>
@@ -198,7 +214,7 @@ function ApplicationCard({ title, sites, locale }: { title: string; sites: SiteL
 
 function Applications({ sites, locale }: { sites: SiteListItem[] | 'failed'; locale: string }) {
   const t = useText()
-  const { spacing } = useDesignTokens()
+  const { colour, spacing } = useDesignTokens()
   const groups = useMemo(() => {
     if (sites === 'failed') {
       return []
@@ -234,7 +250,7 @@ function Applications({ sites, locale }: { sites: SiteListItem[] | 'failed'; loc
         <Typography.Title level={5} style={{ margin: 0 }}>
           {t('shell.home.applications.title')}
         </Typography.Title>
-        {sites !== 'failed' && <Tag>{groups.length}</Tag>}
+        {sites !== 'failed' && <Typography.Text style={{ color: colour.textMuted }}>{groups.length}</Typography.Text>}
       </Flex>
       {body}
     </Flex>

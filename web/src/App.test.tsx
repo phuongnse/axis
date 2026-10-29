@@ -6,6 +6,7 @@ import platformEnglish from '../../src/Axis.Presentation/Texts/en.json'
 import platformVietnamese from '../../src/Axis.Presentation/Texts/vi.json'
 import { App } from './App'
 import { apiFetch, signInUrl } from './platform/api'
+import { designTokensFor } from './platform/designTokens'
 import { assignLocation } from './platform/navigation'
 import type { CurrentUser } from './platform/currentUser'
 import type {
@@ -32,7 +33,7 @@ const texts: Record<string, Record<string, string>> = {
     'shell.title': 'Axis',
     'shell.nav.home': 'Home',
     'shell.home.title': 'Welcome to Axis',
-    'shell.serverStatus.title': 'Server status',
+    'shell.serverStatus.title': 'Server status:',
     'shell.serverStatus.checking': 'Checking',
     'shell.serverStatus.ready': 'Ready',
     'shell.serverStatus.unavailable': 'Unavailable',
@@ -74,7 +75,7 @@ const texts: Record<string, Record<string, string>> = {
   vi: {
     'shell.nav.home': 'Trang chủ',
     'shell.home.title': 'Chào mừng đến với Axis',
-    'shell.serverStatus.title': 'Trạng thái máy chủ',
+    'shell.serverStatus.title': 'Trạng thái máy chủ:',
     'shell.preferences.label': 'Ngôn ngữ và giao diện',
     'shell.locale.label': 'Ngôn ngữ',
     'shell.locale.en': 'English',
@@ -503,7 +504,7 @@ describe('App', () => {
     await choosePreference('Language and theme', 'Tiếng Việt')
 
     expect(await screen.findByText('Chào mừng đến với Axis')).toBeInTheDocument()
-    expect(within(screen.getByRole('contentinfo')).getByText('Trạng thái máy chủ')).toBeInTheDocument()
+    expect(within(screen.getByRole('contentinfo')).getByText('Trạng thái máy chủ:')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Ngôn ngữ và giao diện' })).toBeInTheDocument()
     expect(localStorage.getItem('axis.locale')).toBe('vi')
   })
@@ -579,6 +580,20 @@ describe('App', () => {
     expect(screen.queryByTestId('server-status')).not.toBeInTheDocument()
   })
 
+  it('draws each application card with a header row of its title, its site count and a rule under it', async () => {
+    stubServer()
+
+    renderApp()
+
+    const desk = await screen.findByRole('region', { name: 'Service desk' })
+    const { colour } = designTokensFor('light')
+    expect(within(desk).getByRole('heading', { level: 5, name: 'Service desk' })).toBeInTheDocument()
+    expect(within(desk).getByText('2 sites')).toHaveStyle({ color: colour.textMuted })
+    expect(within(desk).getByTestId('application-card-header')).toHaveStyle({
+      borderBottom: `1px solid ${colour.divider}`,
+    })
+  })
+
   it('opens a site from its application card', async () => {
     stubServer()
 
@@ -650,6 +665,20 @@ describe('App', () => {
     expect(screen.queryByText('Sign in to Axis')).not.toBeInTheDocument()
   })
 
+  it('draws each tool tile with a 32 px primary square for its icon', async () => {
+    stubServer({ me: { ...signedInUser, studio: true, console: true } })
+
+    renderApp()
+
+    await screen.findByRole('heading', { name: 'Welcome to Axis' })
+    const { colour } = designTokensFor('light')
+    const icons = screen.getAllByTestId('tool-icon')
+    expect(icons).toHaveLength(2)
+    for (const icon of icons) {
+      expect(icon).toHaveStyle({ width: '32px', height: '32px', backgroundColor: colour.primary })
+    }
+  })
+
   it('keeps the applications heading and shows an error when the sites cannot be loaded', async () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {})
     stubServer({ sitesStatus: 500 })
@@ -690,6 +719,14 @@ describe('App', () => {
     expect(screen.queryByTestId('sign-in-failed')).not.toBeInTheDocument()
     expect(screen.queryByText('Welcome to Axis')).not.toBeInTheDocument()
     expect(assignLocation).not.toHaveBeenCalled()
+  })
+
+  it('keeps the sign-in card at most 420 px wide', async () => {
+    stubServer({ me: null })
+
+    renderApp()
+
+    expect(await screen.findByTestId('sign-in-card')).toHaveStyle({ maxWidth: '420px' })
   })
 
   it('shows the sign-in card when the sites answer 401 though the user loaded', async () => {

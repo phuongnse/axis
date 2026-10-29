@@ -114,10 +114,10 @@ test('switching the locale changes the texts and survives a reload', async ({ pa
   await chooseLanguage(page, 'Tiếng Việt')
 
   await expect(page.getByRole('main').getByText('Đăng nhập vào Axis', { exact: true })).toBeVisible()
-  await expect(page.getByRole('contentinfo').getByText('Trạng thái máy chủ', { exact: true })).toBeVisible()
+  await expect(page.getByRole('contentinfo').getByText('Trạng thái máy chủ:', { exact: true })).toBeVisible()
   await page.reload()
   await expect(page.getByRole('main').getByText('Đăng nhập vào Axis', { exact: true })).toBeVisible()
-  await expect(page.getByRole('contentinfo').getByText('Trạng thái máy chủ', { exact: true })).toBeVisible()
+  await expect(page.getByRole('contentinfo').getByText('Trạng thái máy chủ:', { exact: true })).toBeVisible()
   await expectChosen(page, 'Tiếng Việt', 'Ngôn ngữ và giao diện')
 })
 

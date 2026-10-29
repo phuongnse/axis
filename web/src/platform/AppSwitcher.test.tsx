@@ -187,6 +187,44 @@ describe('AppSwitcher', () => {
     warn.mockRestore()
   })
 
+  it('names the button in a tooltip on keyboard focus', async () => {
+    stubServer(requester)
+    renderSwitcher()
+
+    await screen.findByRole('button', { name: 'Switch to' })
+    await userEvent.tab()
+
+    expect(screen.getByRole('button', { name: 'Switch to' })).toHaveFocus()
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Switch to')
+  })
+
+  it('shows the sites under the heading Sites and the tools under the heading Tools', async () => {
+    stubServer(author)
+    renderSwitcher()
+
+    const menu = await openSwitcher()
+    const sites = menu.getByText('Sites')
+    const tools = menu.getByText('Tools')
+
+    expect(sites.compareDocumentPosition(menu.getByRole('link', { name: 'E2E notes' }))).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    )
+    expect(tools.compareDocumentPosition(menu.getByRole('link', { name: 'Studio' }))).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    )
+    expect(sites.compareDocumentPosition(tools) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('shows no Tools heading when the person has no tools', async () => {
+    stubServer(requester)
+    renderSwitcher()
+
+    const menu = await openSwitcher()
+
+    expect(menu.getByText('Sites')).toBeInTheDocument()
+    expect(menu.queryByText('Tools')).not.toBeInTheDocument()
+  })
+
   it('renders nothing when loading the user fails', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const fetchMock = stubServer(requester)
