@@ -3,8 +3,7 @@
 Status: **Agreed**
 
 M14 lets a process tell people what happened, in the site and by email. The
-owner agreed this on 2026-10-25. It is built in M14, except Mailpit in Docker
-Compose and `scripts/dev.sh`, which is _(planned for M18)_. See
+owner agreed this on 2026-10-25. It is built in M14. See
 [notifications](../reference/notifications.md). It replaces the "Axis has no
 user directory" reason of the audit actor point of
 [D23](d23-sign-in-through-oidc-and-the-bff-session.md): Axis keeps a profile of

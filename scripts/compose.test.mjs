@@ -20,6 +20,7 @@ let env
 let baseUrl
 let keycloakUrl
 let purchasingUrl
+let mailpitUrl
 let studioApps
 
 const freePort = () =>
@@ -50,18 +51,23 @@ const pickPorts = async () => {
   const postgresPort = await freePort()
   const keycloakPort = await freePort()
   const purchasingPort = await freePort()
+  const mailpitSmtpPort = await freePort()
+  const mailpitWebPort = await freePort()
   env = {
     ...process.env,
     AXIS_SERVER_PORT: String(serverPort),
     AXIS_POSTGRES_PORT: String(postgresPort),
     AXIS_KEYCLOAK_PORT: String(keycloakPort),
     AXIS_PURCHASING_PORT: String(purchasingPort),
+    AXIS_MAILPIT_SMTP_PORT: String(mailpitSmtpPort),
+    AXIS_MAILPIT_WEB_PORT: String(mailpitWebPort),
     AXIS_STUDIO_APPS_DIR: studioApps,
   }
   // The sample's tenant host is localhost.
   baseUrl = `http://localhost:${serverPort}`
   keycloakUrl = `http://localhost:${keycloakPort}`
   purchasingUrl = `http://localhost:${purchasingPort}`
+  mailpitUrl = `http://localhost:${mailpitWebPort}`
 }
 
 before(() => {
@@ -83,8 +89,16 @@ test('the stack runs from source', { timeout }, async () => {
   // The build runs on its own, so a failed build is not reported as a failed start.
   await runDocker(['compose', '-p', project, 'build'], { env })
 
-  await pickPorts()
-  const up = compose(['up', '-d', '--wait'], { stdio: 'inherit' })
+  // A port that was free when it was picked can be taken before Docker binds it. Docker then fails the start with a
+  // bind error, so the start is tried again on new ports. Any other failure is reported at once.
+  let up
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    await pickPorts()
+    up = compose(['up', '-d', '--wait'])
+    process.stdout.write(`${up.stdout ?? ''}${up.stderr ?? ''}`)
+    if (up.status === 0 || !/port is already allocated|address already in use|ports are not available/i.test(up.stderr ?? '')) break
+    compose(['down', '-v', '--remove-orphans'], { stdio: 'ignore' })
+  }
   if (up.status !== 0) {
     const ps = compose(['ps', '--all', '--format', 'json'])
     const containers = parsePs(ps.stdout ?? '')
@@ -95,10 +109,10 @@ test('the stack runs from source', { timeout }, async () => {
       const log = inspect.status === 0 ? (JSON.parse(inspect.stdout).Log ?? []) : []
       lastChecks[service] = log.at(-1)?.Output ?? ''
     }
-    for (const service of ['server', 'worker', 'publisher', 'keycloak', 'purchasing', 'postgres']) {
+    for (const service of ['server', 'worker', 'publisher', 'keycloak', 'purchasing', 'mailpit', 'postgres']) {
       compose(['logs', service], { stdio: 'inherit' })
     }
-    assert.fail(`docker compose up exited with ${up.status}\n${describeNotReady(containers, lastChecks)}`)
+    assert.fail(`docker compose up exited with ${up.status}\n${tail(up.stderr ?? '', 2000)}\n${describeNotReady(containers, lastChecks)}`)
   }
 
   // /health is not mapped: it falls through to the SPA page, so only /health/ready proves the server.
@@ -125,6 +139,11 @@ test('the stack runs from source', { timeout }, async () => {
   // The purchasing system stub answers.
   const purchasing = await fetch(`${purchasingUrl}/health`)
   assert.equal(purchasing.status, 200)
+
+  // Mailpit runs and its web page answers. The worker sends its emails there.
+  assert.match(compose(['ps', '--services', '--status', 'running']).stdout, /^mailpit$/m)
+  const mailpit = await fetch(`${mailpitUrl}/readyz`)
+  assert.equal(mailpit.status, 200)
 
   // Activation ran as axis_schema, so that role owns the database and the schemas it created.
   const psql = (sql) =>
@@ -222,8 +241,16 @@ test('a broken application folder stops the server', { timeout }, async () => {
   }
 })
 
-test('the default ports are 5206, 5432, 8080 and 5207 on 127.0.0.1', () => {
-  const { AXIS_SERVER_PORT, AXIS_POSTGRES_PORT, AXIS_KEYCLOAK_PORT, AXIS_PURCHASING_PORT, ...rest } = env
+test('the default ports are 5206, 5432, 8080, 5207, 1025 and 8025 on 127.0.0.1', () => {
+  const {
+    AXIS_SERVER_PORT,
+    AXIS_POSTGRES_PORT,
+    AXIS_KEYCLOAK_PORT,
+    AXIS_PURCHASING_PORT,
+    AXIS_MAILPIT_SMTP_PORT,
+    AXIS_MAILPIT_WEB_PORT,
+    ...rest
+  } = env
   const config = compose(['--env-file', '/dev/null', 'config', '--format', 'json'], { env: rest })
   assert.equal(config.status, 0, config.stderr)
   const { services } = JSON.parse(config.stdout)
@@ -233,6 +260,19 @@ test('the default ports are 5206, 5432, 8080 and 5207 on 127.0.0.1', () => {
   assert.deepEqual(published('postgres'), ['127.0.0.1:5432->5432'])
   assert.deepEqual(published('keycloak'), ['127.0.0.1:8080->8080'])
   assert.deepEqual(published('purchasing'), ['127.0.0.1:5207->8080'])
+  assert.deepEqual(published('mailpit'), ['127.0.0.1:1025->1025', '127.0.0.1:8025->8025'])
+})
+
+test('the worker sends email to mailpit', () => {
+  const config = compose(['config', '--format', 'json'])
+  assert.equal(config.status, 0, config.stderr)
+  const { services } = JSON.parse(config.stdout)
+  const { environment } = services.worker
+  assert.equal(environment.Email__Smtp__Host, 'mailpit')
+  assert.equal(environment.Email__Smtp__Port, '1025')
+  assert.equal(environment.Email__Smtp__UseTls, 'false')
+  assert.ok(environment.Email__From)
+  assert.ok(services.worker.depends_on.mailpit)
 })
 
 test('the server creates its applications in artifacts/studio-apps, which git ignores', () => {

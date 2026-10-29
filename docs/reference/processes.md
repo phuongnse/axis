@@ -11,8 +11,7 @@ work, and the tables. The rest of the process reference is in these files:
 - [task-deadlines.md](task-deadlines.md): task escalations, deadlines, claim
   and reassign. All are built.
 - [notifications.md](notifications.md): the `notify` operation and in-app and
-  email notifications. All are built, except Mailpit in Docker Compose and
-  `scripts/dev.sh`, _(planned for M18)_.
+  email notifications. All are built.
 - [process-execution.md](process-execution.md): execution, connector calls,
   package operations and the worker settings.
 - [process-events.md](process-events.md): raised events, triggers and

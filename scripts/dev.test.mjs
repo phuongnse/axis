@@ -205,6 +205,8 @@ describe('scripts/dev.sh', { concurrency: false }, () => {
       postgres: await freePort(),
       keycloak: await freePort(),
       purchasing: await freePort(),
+      mailpitSmtp: await freePort(),
+      mailpitWeb: await freePort(),
       server: await freePort(),
       web: await freePort(),
       workerHealth: await freePort(),
@@ -215,6 +217,8 @@ describe('scripts/dev.sh', { concurrency: false }, () => {
       AXIS_POSTGRES_PORT: String(ports.postgres),
       AXIS_KEYCLOAK_PORT: String(ports.keycloak),
       AXIS_PURCHASING_PORT: String(ports.purchasing),
+      AXIS_MAILPIT_SMTP_PORT: String(ports.mailpitSmtp),
+      AXIS_MAILPIT_WEB_PORT: String(ports.mailpitWeb),
       AXIS_SERVER_PORT: String(ports.server),
       AXIS_WEB_PORT: String(ports.web),
       Health__Urls: `http://127.0.0.1:${ports.workerHealth}`,
@@ -261,6 +265,10 @@ describe('scripts/dev.sh', { concurrency: false }, () => {
     // The purchasing system stub answers on its port.
     const purchasing = await fetch(`http://localhost:${ports.purchasing}/health`)
     assert.equal(purchasing.status, 200)
+
+    // Mailpit's web page answers on its port.
+    const mailpit = await fetch(`http://localhost:${ports.mailpitWeb}/readyz`)
+    assert.equal(mailpit.status, 200)
 
     // The preview tenant default-preview resolves by its host. The request goes to 127.0.0.1 with the
     // Host header, because Node does not always resolve *.localhost. An unknown host is not a tenant.
@@ -320,6 +328,16 @@ describe('scripts/dev.sh', { concurrency: false }, () => {
     assert.ok(procs.some((p) => /Axis\.Worker/.test(p.command)), `No worker process in:\n${JSON.stringify(procs)}`)
     assert.ok(procs.some((p) => /Axis\.Admin/.test(p.command)), `No publisher process in:\n${JSON.stringify(procs)}`)
 
+    // The worker runs with its mail settings pointing at Mailpit. /proc exists on Linux only.
+    const workerProc = procs.find((p) => /Axis\.Worker/.test(p.command) && !/dotnet[- ]watch/.test(p.command))
+    assert.ok(workerProc, `No worker process in:\n${JSON.stringify(procs)}`)
+    if (fs.existsSync(`/proc/${workerProc.pid}/environ`)) {
+      const workerEnv = fs.readFileSync(`/proc/${workerProc.pid}/environ`, 'utf8').split('\0')
+      assert.ok(workerEnv.includes('Email__Smtp__Host=localhost'), 'The worker has no Email__Smtp__Host=localhost')
+      assert.ok(workerEnv.includes(`Email__Smtp__Port=${ports.mailpitSmtp}`), 'The worker has the wrong Email__Smtp__Port')
+      assert.ok(workerEnv.includes('Email__Smtp__UseTls=false'), 'The worker has no Email__Smtp__UseTls=false')
+    }
+
     interrupt(run)
     assert.equal(await exitsWithin(run, 60_000), 130, `${run.stdout}\n${run.stderr}`)
     await sleep(500)
@@ -332,6 +350,7 @@ describe('scripts/dev.sh', { concurrency: false }, () => {
     assert.match(services, /postgres/)
     assert.match(services, /keycloak/)
     assert.match(services, /purchasing/)
+    assert.match(services, /mailpit/)
   })
 
   it('skips the install on the second run', async () => {

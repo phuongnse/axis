@@ -196,8 +196,10 @@ and `deploy/helm/axis/`, see [installation](reference/installation.md).
 
 To run Axis, run `docker compose up --build`. It builds Axis from source and starts
 PostgreSQL, Keycloak with the `axis` development realm at http://localhost:8080, the server
-with the purchase request, leave request, service desk and asset management samples at http://localhost:5206, the worker, the publisher, and the purchasing
-system stub at http://localhost:5207. The stub, in `tests/Axis.PurchasingStub`, stands in for
+with the purchase request, leave request, service desk and asset management samples at http://localhost:5206, the worker, the publisher, Mailpit
+at http://localhost:8025, and the purchasing
+system stub at http://localhost:5207. Mailpit is a local mail server that keeps every email. Its web page shows the
+emails that the worker sends. The stub, in `tests/Axis.PurchasingStub`, stands in for
 the purchasing system that the sample calls when a request is approved. It needs only
 Docker. The images hold the `departments` sample module in `/modules`.
 Compose also starts one publisher, `axis-admin publisher`, which runs the
@@ -207,18 +209,18 @@ It serves the tenants `default` and `default-preview`, so it runs preview reques
 `docker compose logs worker` shows the worker output and `docker compose logs publisher` shows the publisher output. `docker compose ps` shows the worker
 healthy once its `/health/ready` passes, and `docker compose up --wait` waits for that. The server has 5 minutes and the worker 6 minutes to become healthy before `docker compose up --wait` fails. The worker's
 health address `http://127.0.0.1:5208` stays inside its container. The Keycloak admin console login is
-`admin` / `admin`. Set `AXIS_SERVER_PORT`, `AXIS_POSTGRES_PORT`, `AXIS_KEYCLOAK_PORT` and
-`AXIS_PURCHASING_PORT` to change the host ports (5206, 5432, 8080 and 5207). All four ports
+`admin` / `admin`. Set `AXIS_SERVER_PORT`, `AXIS_POSTGRES_PORT`, `AXIS_KEYCLOAK_PORT`,
+`AXIS_PURCHASING_PORT`, `AXIS_MAILPIT_SMTP_PORT` and `AXIS_MAILPIT_WEB_PORT` to change the host ports
+(5206, 5432, 8080, 5207, 1025 and 8025). All six ports
 are published on `127.0.0.1` only. The server creates Studio's new applications in
 `artifacts/studio-apps`, which the checkout mounts at `/studio-apps`. Set `AXIS_STUDIO_APPS_DIR`
 to move that folder. On Linux the server runs as UID 1654, so create the folder first and make it
 writable by that UID. Docker creates a missing folder as root.
 
-Compose runs no mail server, so the worker logs one warning per tenant and sends no email, and the
-emails of `notify` steps stay queued. Set `Email__Smtp__Host`, `Email__Smtp__Port`,
-`Email__Smtp__UseTls` and `Email__From` on the worker to turn sending on. Only the Development
-environment, which Compose runs, sends email with `Email__Smtp__UseTls` off. See
-[mail settings](reference/notifications.md#mail-settings).
+The worker sends the emails of `notify` steps to Mailpit. Compose sets `Email__Smtp__Host` to
+`mailpit`, `Email__Smtp__Port` to 1025, `Email__Smtp__UseTls` to `false` and `Email__From` to
+`axis@localhost` on the worker. Only the Development environment, which Compose runs, sends email
+with `Email__Smtp__UseTls` off. See [mail settings](reference/notifications.md#mail-settings).
 
 ## Database roles
 
@@ -293,9 +295,9 @@ works on a fresh clone:
   `web/package-lock.json` changed since the last install. It installs no
   Playwright browser.
 - It builds the Keycloak theme into `artifacts/keycloak-theme`, which the Compose `keycloak` service mounts.
-- It starts PostgreSQL, Keycloak and the purchasing system stub with Docker
+- It starts PostgreSQL, Keycloak, Mailpit and the purchasing system stub with Docker
   Compose. It waits until PostgreSQL accepts connections, Keycloak's `axis`
-  realm answers and the stub answers. The first run builds the stub's image.
+  realm answers, Mailpit answers and the stub answers. The first run builds the stub's image.
 - It builds the sample extension package, `samples/packages/PaymentReferences`, into
   `artifacts/extensions`, where the Development settings of the server and the worker
   point `Extensions:Path`. The purchase request sample declares the package, so it
@@ -321,11 +323,12 @@ works on a fresh clone:
   databases. Each line starts with `[server]`, `[worker]` or `[web]`, and the
   script's own messages start with `[dev]`. The SPA proxies `/api` and `/health`
   to the server.
-- It starts no mail server, so the worker logs one warning per tenant and sends no email, and the
-  emails of `notify` steps stay queued. Export `Email__Smtp__Host`, `Email__Smtp__Port`,
-  `Email__Smtp__UseTls` and `Email__From` to turn sending on. The script runs Development, the only
-  environment that sends email with `Email__Smtp__UseTls` off. See
-  [mail settings](reference/notifications.md#mail-settings).
+- It starts Mailpit with the stack, and the worker sends the emails of `notify` steps to it. The
+  script sets `Email__Smtp__Host` to `localhost`, `Email__Smtp__Port` to the SMTP port of Mailpit,
+  `Email__Smtp__UseTls` to `false` and `Email__From` to `axis@localhost` for the worker's process
+  only. An exported `Email__*` setting replaces each one, so a developer can try a real mail server.
+  The script runs Development, the only environment that sends email with `Email__Smtp__UseTls`
+  off. See [mail settings](reference/notifications.md#mail-settings).
 - It also runs one publisher, `axis-admin publisher`, with
   its lines starting with `[publisher]`. It starts once the server has
   migrated the tenant databases. It runs from the built `Axis.Admin.dll`, not under
@@ -356,8 +359,9 @@ works on a fresh clone:
   configuration does not activate, the server exits on its own and the script stops
   with a non-zero code.
 - `AXIS_POSTGRES_PORT`, `AXIS_KEYCLOAK_PORT`, `AXIS_PURCHASING_PORT`,
-  `AXIS_SERVER_PORT` and `AXIS_WEB_PORT` move the five ports. The defaults are
-  5432, 8080, 5207, 5206 and 5173. When `AXIS_POSTGRES_PORT` is set, the script points the server's
+  `AXIS_MAILPIT_SMTP_PORT`, `AXIS_MAILPIT_WEB_PORT`, `AXIS_SERVER_PORT` and `AXIS_WEB_PORT` move the
+  seven ports. The defaults are 5432, 8080, 5207, 1025, 8025, 5206 and 5173. Mailpit's web page is
+  at http://localhost:8025. When `AXIS_POSTGRES_PORT` is set, the script points the server's
   connection strings and the worker's `Tenants__default__ConnectionString` at
   that port. When `AXIS_KEYCLOAK_PORT` is set, it points the server's
   `Tenants__default__Oidc__Authority` at Keycloak on that port. When
@@ -371,7 +375,7 @@ works on a fresh clone:
   to the console only. Set `OTEL_EXPORTER_OTLP_ENDPOINT` for the server and the worker to
   export traces, metrics and logs. See [telemetry export](reference/host-settings.md#telemetry-export).
 - Ctrl+C stops the server, the worker, the publisher and the SPA. PostgreSQL keeps running with
-  its data, and Keycloak and the purchasing system stub keep running. Run
+  its data, and Keycloak, Mailpit and the purchasing system stub keep running. Run
   `docker compose down` to stop them.
   If any of the four exits on its own, the others stop too and the script
   exits non-zero.
