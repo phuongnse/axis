@@ -97,6 +97,41 @@ public sealed class DirectoryTenantBindingsTests(PostgreSqlFixture database) : I
     }
 
     [Fact]
+    public async Task A_directory_entry_and_its_activation_bindings_carry_the_stored_platform_providers_of_a_main_tenant_only()
+    {
+        var tenantDatabase = await database.CreateDatabaseAsync("bindings_tenant", CancellationToken);
+        var platform = await database.CreateDatabaseAsync("bindings_platform", CancellationToken);
+        await SeedPlatformAsync(platform, new SeededTenant("a", tenantDatabase, "a.example.test", []), new SeededTenant("b", tenantDatabase, "b.example.test", []));
+        await using (var context = new PlatformDbContext(new DbContextOptionsBuilder<PlatformDbContext>().UseNpgsql(platform).Options))
+        {
+            await context.Tenants.Where(tenant => tenant.Id == "b").ExecuteUpdateAsync(set => set.SetProperty(tenant => tenant.PreviewOf, "a"), CancellationToken);
+            context.TenantPlatformProviders.Add(new TenantPlatformProviderRow
+            {
+                TenantId = "a",
+                Name = "Partner",
+                Type = "oidc",
+                IssuerBinding = "PartnerIssuer",
+                ClientIdBinding = "PartnerClient",
+                ClientSecretBinding = "PartnerSecret",
+                RolesClaim = "groups",
+                RoleValues = """{"admins":"administrator"}""",
+            });
+            await context.SaveChangesAsync(CancellationToken);
+        }
+
+        await GrantPlatformAsync(platform);
+        var catalog = await DirectoryTenantCatalog.LoadAsync(PostgreSqlServer.RuntimeConnectionString(platform), _cipher, CancellationToken);
+
+        var provider = Assert.Single(catalog.Find("a")!.PlatformProviders!);
+        Assert.Equal(("Partner", "oidc", "PartnerIssuer", "PartnerClient", "PartnerSecret"), (provider.Name, provider.Type, provider.IssuerBinding, provider.ClientIdBinding, provider.ClientSecretBinding));
+        Assert.Equal("groups", provider.Roles.Claim);
+        Assert.Equal("administrator", provider.Roles.Values["admins"]);
+        Assert.Equal(provider, Assert.Single(TenantActivationBindings.For(catalog.Find("a")!, allowHttp: false).PlatformProviders));
+        Assert.Null(catalog.Find("b")!.PlatformProviders);
+        Assert.Empty(TenantActivationBindings.For(catalog.Find("b")!, allowHttp: false).PlatformProviders);
+    }
+
+    [Fact]
     public async Task Activating_a_release_with_the_bindings_of_a_directory_entry_that_lacks_one_fails_naming_the_tenant_and_the_binding()
     {
         var tenantDatabase = await database.CreateDatabaseAsync("bindings_tenant", CancellationToken);

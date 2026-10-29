@@ -810,8 +810,8 @@ flowchart LR
      another kind, and outside Development one `AXC0101` for every base URL
      binding or package `url` binding that is not `https`, and changes
      nothing. It then reads the identity providers of the tenant's other
-     active releases and returns `AXC0291` for a provider that would make one
-     person two users, see [users](identity-provider.md#users), and changes
+     active releases and of its platform sign-in and returns `AXC0291` for a
+     provider that would make one person two users, see [users](identity-provider.md#users), and changes
      nothing. It then provisions the entity tables (see
      [Storage](storage.md#storage)); when provisioning returns diagnostics, they are
      returned and the active release is untouched. Only then is the release
