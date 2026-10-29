@@ -43,6 +43,9 @@ The owner confirmed these points on issue #707 on 2026-10-19.
 - **Static analysis:**
   - One CodeQL workflow scans `csharp` and `javascript-typescript` on a push
     to `main` and on pull requests. Its alerts go to GitHub code scanning.
+    - [D104](d104-codeql-and-the-performance-tests-run-every-night.md) adds a
+      scan of `main` every night, because a merge by NexKit starts no push
+      workflow.
   - A new alert of high or critical severity fails the check. The owner sets
     this threshold in a repository code scanning rule, because CodeQL does not
     fail a run on alerts by itself.

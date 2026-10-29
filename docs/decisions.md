@@ -114,3 +114,4 @@ files agree, title and status included.
 | [D101](decisions/d101-the-extensibility-milestone-is-split-into-six.md) | The extensibility milestone is split into six | **Agreed** |
 | [D102](decisions/d102-built-in-modules-open-to-change-and-bound-by-a-contract.md) | Built-in modules open to change and bound by a contract | **Agreed** |
 | [D103](decisions/d103-modules-hold-triggers-scenarios-and-connector-slots.md) | Modules hold triggers, scenarios and connector slots | **Agreed** |
+| [D104](decisions/d104-codeql-and-the-performance-tests-run-every-night.md) | CodeQL and the performance tests run every night | **Agreed** |
