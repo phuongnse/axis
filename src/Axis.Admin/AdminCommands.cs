@@ -65,6 +65,7 @@ internal static partial class AdminCommands
                tenant resume <id>
                tenant rotate-passwords <id>
                tenant oidc set <id> [--authority <url>] [--client-id <id>] [--client-secret] [--claim <name>=<claim>]... [--endpoint-audience <value>] [--service-audience <value>] [--profile standard|fapi2] [--client-key] [--retire-client-key <kid>]
+               tenant sign-in set <id> --accounts true|false [--provider <name> --type oidc|saml [--issuer <binding>] [--client-id <binding>] [--client-secret <binding>] [--client-key <binding>] [--metadata <binding>] [--claim <name>=<claim>]... [--roles-claim <claim>] [--role <value>=<role>]...]...
                tenant email set <id> --host <host> --from <address> [--port <n>] [--tls true|false] [--user-name <name>] [--password]
                tenant email clear <id>
                tenant session end <id> --user <user>
@@ -157,6 +158,7 @@ internal static partial class AdminCommands
         new("tenant resume", AuditMark.OnePerTenant, run => StatusAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.CancellationToken)),
         new("tenant rotate-passwords", AuditMark.OnePerTenant, run => RotatePasswordsAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.CancellationToken)),
         new("tenant oidc set", AuditMark.OnePerTenant, run => OidcSetAsync(run.Command.Name, run.Args, run.Configuration, run.Input, run.Output, run.Error, run.IdentityProviderHandler, run.CancellationToken)),
+        new("tenant sign-in set", AuditMark.OnePerTenant, TenantSettings.SignInSetAsync),
         new("tenant email set", AuditMark.OnePerTenant, TenantSettings.EmailSetAsync),
         new("tenant email clear", AuditMark.OnePerTenant, TenantSettings.EmailClearAsync),
         new("tenant session end", AuditMark.OnePerTenant, TenantSettings.SessionEndAsync),

@@ -420,8 +420,8 @@ internal sealed class TenantRestore : IAsyncDisposable
             {
                 // A new realm gives the sign-in settings in the realm step, as tenant create does.
                 _row = _newRealm
-                    ? new TenantRow { Id = _id, Status = Provisioning, OidcAuthority = "", OidcClientId = "", OidcClientSecret = [] }
-                    : new TenantRow { Id = _id, Status = Provisioning };
+                    ? new TenantRow { Id = _id, Status = Provisioning, OidcAuthority = "", OidcClientId = "", OidcClientSecret = [], PlatformAccounts = true }
+                    : new TenantRow { Id = _id, Status = Provisioning, PlatformAccounts = true };
                 _platform.Tenants.Add(_row);
             }
             else

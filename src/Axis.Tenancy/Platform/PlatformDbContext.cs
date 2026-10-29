@@ -3,8 +3,9 @@ using Microsoft.EntityFrameworkCore;
 namespace Axis.Tenancy.Platform;
 
 /// <summary>
-/// The <c>platform</c> schema of the platform database: the tenant directory, which holds the tenants, their hosts
-/// and their deployment bindings, the data protection keys of the server and the append-only platform audit records.
+/// The <c>platform</c> schema of the platform database: the tenant directory, which holds the tenants, their hosts,
+/// their deployment bindings and their platform sign-in providers, the data protection keys of the server and the
+/// append-only platform audit records.
 /// The caller supplies the connection to the platform database.
 /// </summary>
 public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> options) : DbContext(options)
@@ -18,6 +19,8 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
     public DbSet<TenantHostRow> TenantHosts => Set<TenantHostRow>();
 
     public DbSet<TenantBindingRow> TenantBindings => Set<TenantBindingRow>();
+
+    public DbSet<TenantPlatformProviderRow> TenantPlatformProviders => Set<TenantPlatformProviderRow>();
 
     public DbSet<DataProtectionKeyRow> DataProtectionKeys => Set<DataProtectionKeyRow>();
 
@@ -79,6 +82,7 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
             tenant.Property(t => t.RealmUsersClientSecret).HasColumnName("realm_users_client_secret").HasColumnType("bytea");
             tenant.Property(t => t.EmailFrom).HasColumnName("email_from");
             tenant.Property(t => t.SchemaVersion).HasColumnName("schema_version").HasDefaultValue("");
+            tenant.Property(t => t.PlatformAccounts).HasColumnName("platform_accounts");
             tenant.Property(t => t.PreviewOf).HasColumnName("preview_of");
             tenant.HasIndex(t => t.PreviewOf).IsUnique().HasDatabaseName("ix_tenants_preview_of");
             tenant.HasOne<TenantRow>()
@@ -95,6 +99,11 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
                 .WithOne()
                 .HasForeignKey(binding => binding.TenantId)
                 .HasConstraintName("fk_tenant_bindings_tenants_tenant_id")
+                .OnDelete(DeleteBehavior.Cascade);
+            tenant.HasMany<TenantPlatformProviderRow>()
+                .WithOne()
+                .HasForeignKey(provider => provider.TenantId)
+                .HasConstraintName("fk_tenant_platform_providers_tenants_tenant_id")
                 .OnDelete(DeleteBehavior.Cascade);
         });
 
@@ -117,6 +126,27 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
             binding.Property(b => b.Kind).HasColumnName("kind");
             binding.Property(b => b.Url).HasColumnName("url");
             binding.Property(b => b.SecretValue).HasColumnName("secret_value").HasColumnType("bytea");
+        });
+
+        modelBuilder.Entity<TenantPlatformProviderRow>(provider =>
+        {
+            provider.ToTable("tenant_platform_providers", table => table.HasCheckConstraint(
+                "ck_tenant_platform_providers_type",
+                "type IN ('oidc', 'saml')"));
+            provider.HasKey(p => new { p.TenantId, p.Name }).HasName("pk_tenant_platform_providers");
+            provider.Property(p => p.TenantId).HasColumnName("tenant_id");
+            provider.Property(p => p.Name).HasColumnName("name");
+            provider.Property(p => p.Type).HasColumnName("type");
+            provider.Property(p => p.IssuerBinding).HasColumnName("issuer_binding");
+            provider.Property(p => p.ClientIdBinding).HasColumnName("client_id_binding");
+            provider.Property(p => p.ClientSecretBinding).HasColumnName("client_secret_binding");
+            provider.Property(p => p.ClientKeyBinding).HasColumnName("client_key_binding");
+            provider.Property(p => p.MetadataBinding).HasColumnName("metadata_binding");
+            provider.Property(p => p.ClaimDisplayName).HasColumnName("claim_display_name");
+            provider.Property(p => p.ClaimEmail).HasColumnName("claim_email");
+            provider.Property(p => p.ClaimLocale).HasColumnName("claim_locale");
+            provider.Property(p => p.RolesClaim).HasColumnName("roles_claim");
+            provider.Property(p => p.RoleValues).HasColumnName("role_values").HasColumnType("jsonb");
         });
 
         modelBuilder.Entity<DataProtectionKeyRow>(key =>

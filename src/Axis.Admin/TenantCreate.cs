@@ -135,7 +135,7 @@ internal sealed class TenantCreate : IAsyncDisposable
             if (_row is null)
             {
                 // A preview tenant has no sign-in settings of its own. A main tenant gets them in the realm step.
-                _row = new TenantRow { Id = _id, Status = Provisioning, OidcAuthority = "", OidcClientId = "", OidcClientSecret = [] };
+                _row = new TenantRow { Id = _id, Status = Provisioning, OidcAuthority = "", OidcClientId = "", OidcClientSecret = [], PlatformAccounts = true };
                 _platform.Tenants.Add(_row);
             }
             else

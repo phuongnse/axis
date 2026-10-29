@@ -122,7 +122,8 @@ so Studio edits it, with the identity provider editor of [Studio](studio.md), an
   - The compiled site carries the providers it allows.
 - _(planned for M17)_ **A client for each site:** activation gives each site a client of the tenant's realm. A sign-in starts for the site
   that `returnUrl` opens, through that site's client, and the realm's page shows only that site's providers. With one
-  provider and no accounts, the server sends the person straight to it.
+  provider and no accounts, the server sends the person straight to it. The page's filter is built, see the theme below.
+  Starting a sign-in through the site's client is not.
 - _(planned for M17)_ **The callback checks again:** the realm tells the server which provider signed the person in. The server refuses a
   callback whose provider is not in the site's `signIn`, or whose `acr` the provider does not accept, as any refused
   callback, see [security](security.md#sign-in-and-the-session). The realm's page is not the control.
@@ -139,7 +140,9 @@ so Studio edits it, with the identity provider editor of [Studio](studio.md), an
 
 ## Platform sign-in
 
-_(planned for M17)_
+`tenant sign-in set` stores the platform sign-in in the tenant directory, and `tenant create` and `tenant restore`
+set accounts on. Both are built. Nothing reads the stored platform sign-in yet. The realm sync and the server's checks
+are _(planned for M17)_.
 
 - The home page, Studio, the operator console, the account page and the users page belong to no site. The tenant's
   platform sign-in says which providers they accept.
@@ -202,7 +205,9 @@ _(planned for M17)_
   `<provider alias>.<subject>`. Each provider names the realm's first-login flow. It touches no other client or
   provider, so `axis`, `axis-activation`, `axis-users` and anything an operator added stay. A site client that the sync
   creates or updates copies the client authentication and the PAR, PKCE, DPoP and key settings of `axis`, so activation
-  never undoes what `tenant oidc set` wrote. It also copies the redirect addresses, web origins and post-logout redirect
+  never undoes what `tenant oidc set` wrote. Each site client also carries two attributes that every sync rewrites:
+  `axis.providers`, the aliases of the providers the site allows separated by spaces, and `axis.accounts`, `true` or
+  `false`. The sync refuses an alias that is empty or contains a space. It also copies the redirect addresses, web origins and post-logout redirect
   addresses of `axis`. When the tenant has a platform client secret, the site client's secret is base64url of
   HMAC-SHA256(platform secret, client id), so the server can compute it. Without a platform secret, Keycloak makes the
   secret as before. Without an `axis` client it is a plain client with a secret. Both tenant catalogs carry
@@ -271,8 +276,11 @@ _(planned for M17)_
   rest of Axis. Its texts are message bundles in every locale the platform offers. The "Continue with" labels come
   from the applications' texts.
 - _(built)_ The sign-in page is drawn by shared React components in `web/src/identitySignIn/` from a sign-in context:
-  title, providers, accounts, username, error, login address, remember-me, forgot-password address, locales and
-  texts. The account form is a real `<form method="post">` to the login address. The design system's
+  title, providers, accounts, site, username, error, login address, remember-me, forgot-password address, locales and
+  texts. When the sign-in goes through a site client, which carries `axis.accounts`, `site` holds that site's
+  providers and accounts flag. The page then lists only those providers, and shows the account form only when the realm
+  and the site both allow accounts. A client without `axis.accounts`, such as `axis`, has no `site`, so the page shows
+  every provider and the form as before. The account form is a real `<form method="post">` to the login address. The design system's
   `identitySignIn` preview feeds the components fixtures, see
   [shell design system previews](shell.md#design-system-previews). The Keycloak theme `axis` feeds them a real
   context: its `login.ftl` writes Keycloak's sign-in data as JSON and a React bundle draws the page. `scripts/build.sh`
@@ -281,8 +289,8 @@ _(planned for M17)_
   its login theme: Compose, `scripts/dev.sh`, `scripts/e2e.sh` and the Keycloak of the integration tests load it from
   `artifacts/keycloak-theme`, and each builds it first. The realms of `tenant create` name the theme as their login
   theme. The on-premises Compose example loads it from `AXIS_IDENTITY_THEME_DIR`, see
-  [on premises](installation.md#on-premises). The Helm chart does not load it yet, so Keycloak there falls back to its
-  built-in theme.
+  [on premises](installation.md#on-premises). The Helm chart loads it from the volume `identity.theme.volume`, see
+  [in the cloud](installation.md#in-the-cloud).
 
 ## Installation
 
@@ -290,7 +298,8 @@ _(planned for M17)_
   server, behind the same TLS proxy as the server, on one host of its own for the installation. It pins the Keycloak
   version of development and the tests, and the operator upgrades it with Axis. See
   [on premises](installation.md#on-premises).
-- _(planned for M17)_ The Helm chart runs it the same way.
+- _(built)_ The Helm chart runs it the same way: one Deployment and a Service, with the theme and the password list
+  from volumes that the operator names. See [in the cloud](installation.md#in-the-cloud).
 - The development realm `axis` stays for `scripts/dev.sh` and the tests, as the `default` tenant's realm, see
   [security](security.md#development-users). Under `scripts/dev.sh` and in the E2E run, the server's startup activation
   keeps it in step through its `axis-activation` client, so the realm holds a `site-` client for each sample site, see
