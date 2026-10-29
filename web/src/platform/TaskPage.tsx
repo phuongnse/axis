@@ -24,6 +24,7 @@ import { useText, useTextCatalogs } from './texts'
 import { useReleaseTexts } from './useReleaseTexts'
 import { useFormSteps } from './useFormSteps'
 import { sectionsOf, useRecordForm } from './useRecordForm'
+import { siteAddress } from './siteLinks'
 
 interface TaskPageProps {
   sitePath: string
@@ -70,7 +71,7 @@ export function TaskPage({ sitePath, pageName, widget, taskId, locale, fallbackL
   const navigate = useNavigate()
   // The server sets the path on every task inbox.
   const tasksPath = widget.tasksPath!
-  const inboxPath = `/${sitePath}/${pageName.toLowerCase()}`
+  const inboxPath = siteAddress(sitePath, pageName.toLowerCase())
   const [task, setTask] = useState<TaskState>()
   // Set when completing answered that another completion came first.
   const [decided, setDecided] = useState(false)

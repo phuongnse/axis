@@ -138,8 +138,11 @@ so Studio edits it, with the identity provider editor of [Studio](studio.md), an
     `/api/sites/{path}` and below for that site, and `/api/apps/{app}` for the site's application. Everything else is
     a `404` problem there, such as `/api/sites`, other sites and applications, Studio, the users page, the account
     page and `/api/me/sessions`. The refusal comes before authentication, so it renews no session.
-  - The site keeps its path on its own host, so it opens at `shop.example.test/shop`. `/` on that host redirects to
-    `/{path}`. Serving the site at `/` comes later and needs a change in the SPA.
+  - When `GET /api/site` names the host's site in `hostSite`, the SPA shows the site at `/` and its pages at
+    `/{page}`, so a page opens at `shop.example.test/orders`, and every link it builds has no path prefix. The SPA
+    then has no Studio, account or users routes, so those addresses show the not-found page. The server does not send
+    `hostSite` yet, and `/` on that host still redirects to `/{path}`, so for now the site opens at
+    `shop.example.test/shop`.
   - The tenant's other hosts redirect the site's path and anything below it with `302` to the same path and query on
     the site's host, so the site has one origin. The site's API under `/api` still answers on the other hosts.
   - A site for people outside the organization, such as citizens or customers, should get a host of its own. Sites

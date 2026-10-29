@@ -6,6 +6,7 @@ import { AxisButton } from './AxisButton'
 import { fetchCurrentUser, type CurrentUser } from './currentUser'
 import { fetchSites, siteTitle, type SiteListItem } from './site'
 import { useText } from './texts'
+import { siteAddress } from './siteLinks'
 
 /**
  * The "Switch to" button in the shell header. Its menu lists the person's sites, then Studio for a
@@ -60,7 +61,7 @@ export function AppSwitcher({ locale }: { locale: string }) {
       label: t('shell.appSwitcher.sites'),
       children: sites.map((site) => ({
         key: `site:${site.path}`,
-        label: <Link to={`/${site.path}`}>{siteTitle(site, locale)}</Link>,
+        label: <Link to={siteAddress(site.path)}>{siteTitle(site, locale)}</Link>,
       })),
     })
   }

@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Outlet, Route, Routes } from 'react-router'
+import { Route, Routes } from 'react-router'
 import { AccountPage } from './pages/AccountPage'
 import { HomePage } from './pages/HomePage'
 import { ShellError } from './pages/LocaleLoadFailed'
 import { NotFoundPage } from './pages/NotFoundPage'
 import { PageRoute } from './pages/PageRoute'
-import { PlatformContext, type Platform, type PlatformTexts } from './pages/context'
+import { PlatformContext, usePlatform, type Platform, type PlatformTexts } from './pages/context'
 import { PlatformShellRoute } from './pages/PlatformShellRoute'
 import { SiteIndex, SiteRoute } from './pages/SiteRoute'
 import { StudioPage } from './pages/StudioPage'
@@ -14,6 +14,7 @@ import { readStoredLocale } from './platform/locale'
 import { SignInPrompt } from './platform/SignInPrompt'
 import { TextProvider } from './platform/TextProvider'
 import { fetchSite, type SiteMetadata } from './platform/site'
+import { setHostSite } from './platform/siteLinks'
 import { fetchTexts, type TextMap } from './platform/texts'
 
 interface LoadedPlatform {
@@ -31,6 +32,7 @@ function PlatformRoot({ development }: { development: boolean }) {
     const controller = new AbortController()
     async function load() {
       const site = await fetchSite(controller.signal)
+      setHostSite(site.hostSite ?? null)
       const locale = readStoredLocale(site.locales.available, site.locales.default)
       const [fallbackTexts, texts] = await Promise.all([
         fetchTexts(site.locales.fallback, controller.signal),
@@ -70,7 +72,7 @@ function PlatformRoot({ development }: { development: boolean }) {
   }
   return (
     <PlatformContext.Provider value={platform}>
-      <Outlet />
+      <PlatformRoutes />
       <TextProvider catalogs={catalogs} development={development}>
         <SignInPrompt />
       </TextProvider>
@@ -78,44 +80,17 @@ function PlatformRoot({ development }: { development: boolean }) {
   )
 }
 
-/** The routes of the SPA. The caller provides the router, so tests can start at any address. */
-export function App({ development }: { development: boolean }) {
-  return (
-    <Routes>
-      <Route element={<PlatformRoot development={development} />}>
-        <Route
-          index
-          element={
-            <PlatformShellRoute>
-              <HomePage />
-            </PlatformShellRoute>
-          }
-        />
-        <Route
-          path="studio"
-          element={
-            <PlatformShellRoute>
-              <StudioPage />
-            </PlatformShellRoute>
-          }
-        />
-        <Route
-          path="account"
-          element={
-            <PlatformShellRoute>
-              <AccountPage />
-            </PlatformShellRoute>
-          }
-        />
-        <Route
-          path="users"
-          element={
-            <PlatformShellRoute>
-              <UsersPage />
-            </PlatformShellRoute>
-          }
-        />
-        <Route path=":site" element={<SiteRoute />}>
+/**
+ * The routes of the platform. On the host of a site the SPA serves that site at `/` and its pages at `/{page}`, and
+ * nothing else, as the server serves nothing else there. Elsewhere it serves the platform's own routes and every site
+ * under `/{site}`.
+ */
+function PlatformRoutes() {
+  const { hostSite } = usePlatform().site
+  if (hostSite) {
+    return (
+      <Routes>
+        <Route element={<SiteRoute path={hostSite} />}>
           <Route index element={<SiteIndex />} />
           <Route path=":page" element={<PageRoute />} />
           <Route path=":page/new" element={<PageRoute form="new" />} />
@@ -129,7 +104,66 @@ export function App({ development }: { development: boolean }) {
             </PlatformShellRoute>
           }
         />
+      </Routes>
+    )
+  }
+  return (
+    <Routes>
+      <Route
+        index
+        element={
+          <PlatformShellRoute>
+            <HomePage />
+          </PlatformShellRoute>
+        }
+      />
+      <Route
+        path="studio"
+        element={
+          <PlatformShellRoute>
+            <StudioPage />
+          </PlatformShellRoute>
+        }
+      />
+      <Route
+        path="account"
+        element={
+          <PlatformShellRoute>
+            <AccountPage />
+          </PlatformShellRoute>
+        }
+      />
+      <Route
+        path="users"
+        element={
+          <PlatformShellRoute>
+            <UsersPage />
+          </PlatformShellRoute>
+        }
+      />
+      <Route path=":site" element={<SiteRoute />}>
+        <Route index element={<SiteIndex />} />
+        <Route path=":page" element={<PageRoute />} />
+        <Route path=":page/new" element={<PageRoute form="new" />} />
+        <Route path=":page/:id" element={<PageRoute form="edit" />} />
       </Route>
+      <Route
+        path="*"
+        element={
+          <PlatformShellRoute>
+            <NotFoundPage />
+          </PlatformShellRoute>
+        }
+      />
+    </Routes>
+  )
+}
+
+/** The routes of the SPA. The caller provides the router, so tests can start at any address. */
+export function App({ development }: { development: boolean }) {
+  return (
+    <Routes>
+      <Route path="*" element={<PlatformRoot development={development} />} />
     </Routes>
   )
 }
