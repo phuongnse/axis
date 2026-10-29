@@ -191,7 +191,8 @@ internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
             ["actionTokenGeneratedByUserLifespan"] = PasswordResetLifespanSeconds,
             ["passwordPolicy"] = PasswordPolicy,
             // Keycloak's temporary lockout: 1 minute after 5 failures in a row, 1 minute more with each further 5, up to 15.
-            // The quick-login check would lock an account after 2 failures within a second, so it is off.
+            // The quick-login check would lock an account after 2 failures within a second, so it is off and its wait is 0,
+            // which means that a hit of it never locks an account before 5 failures.
             ["bruteForceProtected"] = true,
             ["permanentLockout"] = false,
             ["maxTemporaryLockouts"] = 0,
@@ -199,6 +200,7 @@ internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
             ["waitIncrementSeconds"] = 60,
             ["maxFailureWaitSeconds"] = 900,
             ["quickLoginCheckMilliSeconds"] = 0,
+            ["minimumQuickLoginWaitSeconds"] = 0,
             ["otpPolicyType"] = "totp",
             ["otpPolicyDigits"] = 6,
             ["otpPolicyPeriod"] = 30,
