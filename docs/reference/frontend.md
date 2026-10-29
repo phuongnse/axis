@@ -100,10 +100,10 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     or Next, one per screen.
   - *Main*: outlined in `primaryText`. The main action of a region: a table's
     first toolbar action, such as New request _(planned)_, Add row of a child
-    collection _(planned)_, and a `startProcess` action on a form or a detail.
+    collection, and a `startProcess` action on a form or a detail.
   - *Secondary*: the default grey outline, such as Cancel and Import.
   - *Icon*: a text button with only an icon, for small actions such as
-    Refresh, Choose and Clear _(planned)_.
+    Refresh, Choose and Clear.
   - *Destructive*: in `dangerText` at any level, such as Remove row and
     Delete _(planned)_.
   - Ant Design writes the text of text, outlined and danger buttons in the

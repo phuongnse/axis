@@ -35,6 +35,15 @@ describe('the icon-only button', () => {
     expect(await screen.findByRole('tooltip')).toHaveTextContent('Add a row')
   })
 
+  it('appends its suffix to the accessible name but shows the name alone as a tooltip', async () => {
+    renderIn('light', <AxisButton role="icon" icon={<PlusOutlined />} nameKey="test.add" nameSuffix="Category 2" />)
+
+    await userEvent.tab()
+
+    expect(screen.getByRole('button', { name: 'Add a row Category 2' })).toHaveFocus()
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(/^Add a row$/)
+  })
+
   it('draws a destructive icon in dangerText', () => {
     renderIn('dark', <AxisButton role="icon" destructive icon={<PlusOutlined />} nameKey="test.add" />)
 
