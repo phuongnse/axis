@@ -32,7 +32,7 @@ public sealed class PlatformMigrationTests(PostgreSqlFixture database) : IClassF
             platform,
             "SELECT table_name FROM information_schema.tables WHERE table_schema = 'platform' ORDER BY table_name");
 
-        Assert.Equal(["__platform_migrations", "audit_records", "data_protection_keys", "tenant_bindings", "tenant_hosts", "tenants"], tables);
+        Assert.Equal(["__platform_migrations", "audit_records", "data_protection_keys", "tenant_bindings", "tenant_hosts", "tenant_platform_providers", "tenants"], tables);
     }
 
     [Theory]
@@ -140,6 +140,19 @@ public sealed class PlatformMigrationTests(PostgreSqlFixture database) : IClassF
     }
 
     [Fact]
+    public async Task The_platform_sign_in_migration_turns_accounts_on_for_a_tenant_that_exists()
+    {
+        var platform = await database.CreateDatabaseAsync("platform", TestContext.Current.CancellationToken);
+        await using var context = new PlatformDbContext(new DbContextOptionsBuilder<PlatformDbContext>().UseNpgsql(platform).Options);
+        await context.GetService<IMigrator>().MigrateAsync("20261028164050_AddTenantRealmClientSecrets", TestContext.Current.CancellationToken);
+        await ExecuteAsync(platform, InsertTenant("one"));
+
+        await context.Database.MigrateAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal(true, await ScalarAsync(platform, "SELECT platform_accounts FROM platform.tenants WHERE id = 'one'"));
+    }
+
+    [Fact]
     public async Task Two_hosts_that_differ_only_in_letter_case_cannot_both_be_stored()
     {
         var platform = await StartServerAsync(directory: true);
@@ -206,7 +219,7 @@ public sealed class PlatformMigrationTests(PostgreSqlFixture database) : IClassF
             }));
         using var client = factory.CreateClient();
 
-        Assert.Equal(["__platform_migrations", "audit_records", "data_protection_keys", "tenant_bindings", "tenant_hosts", "tenants"], probe.Tables);
+        Assert.Equal(["__platform_migrations", "audit_records", "data_protection_keys", "tenant_bindings", "tenant_hosts", "tenant_platform_providers", "tenants"], probe.Tables);
     }
 
     private async Task<string> StartServerAsync(bool directory)
