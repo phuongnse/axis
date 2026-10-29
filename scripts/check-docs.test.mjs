@@ -11,6 +11,7 @@ import {
   checkDocs,
   maxAgentsLines,
   maxDocLines,
+  maxGrownDocLines,
   maxSkillLines,
   realmFile,
 } from './check-docs.mjs'
@@ -24,6 +25,10 @@ function write(file, text) {
   mkdirSync(path.dirname(path.join(root, file)), { recursive: true })
   writeFileSync(path.join(root, file), text)
 }
+
+const git = (...args) => spawnSync('git', args, { cwd: root, encoding: 'utf8' })
+
+const doc = (n) => '# Guide\n' + 'line\n'.repeat(n - 1)
 
 const index = (...rows) =>
   ['# Decisions', '', '| Decision | Title | Status |', '| --- | --- | --- |', ...rows].join('\n') + '\n'
@@ -46,7 +51,7 @@ beforeEach(() => {
 
 afterEach(() => rmSync(root, { recursive: true, force: true }))
 
-const messages = () => checkDocs(root).map(({ file, line, message }) => `${file}:${line}: ${message}`)
+const messages = (options) => checkDocs(root, options).map(({ file, line, message }) => `${file}:${line}: ${message}`)
 
 describe('checkDocs', () => {
   test('passes on matching docs', () => {
@@ -67,6 +72,44 @@ describe('checkDocs', () => {
     assert.equal(found.length, 2)
     assert.match(found[0], /^docs\/reference\/guide\.md:1001: 1001 lines, over the limit of 1000/)
     assert.match(found[1], /^AGENTS\.md:101: 101 lines, over the limit of 100/)
+  })
+
+  test('reports a doc over 1,000 lines once, with or without a base', () => {
+    write('docs/reference/guide.md', doc(maxDocLines + 1))
+
+    for (const options of [undefined, { baseLineCount: () => maxDocLines + 1 }]) {
+      const found = messages(options)
+      assert.equal(found.length, 1)
+      assert.match(found[0], /^docs\/reference\/guide\.md:1001: 1001 lines, over the limit of 1000/)
+    }
+  })
+
+  test('reports a doc that a change grows past 900 lines', () => {
+    write('docs/reference/guide.md', doc(910))
+
+    const found = messages({ baseLineCount: () => 880 })
+    assert.equal(found.length, 1)
+    assert.match(found[0], /^docs\/reference\/guide\.md:901: 910 lines, up from 880.*move whole ## sections/)
+  })
+
+  test('passes a doc over 900 lines that a change does not grow', () => {
+    write('docs/reference/guide.md', doc(950))
+
+    assert.deepEqual(messages({ baseLineCount: () => 950 }), [])
+  })
+
+  test('passes a doc over 900 lines that a change shrinks', () => {
+    write('docs/reference/guide.md', doc(940))
+
+    assert.deepEqual(messages({ baseLineCount: () => 960 }), [])
+  })
+
+  test('reports a doc over 900 lines that is missing at the base', () => {
+    write('docs/reference/guide.md', doc(maxGrownDocLines + 1))
+
+    const found = messages({ baseLineCount: () => 0 })
+    assert.equal(found.length, 1)
+    assert.match(found[0], /^docs\/reference\/guide\.md:901: 901 lines, up from 0/)
   })
 
   test('passes on a skill at its size limit', () => {
@@ -400,10 +443,30 @@ describe('CLI', () => {
   test('prints each problem with file and line and exits 1', () => {
     write('docs/reference/orphan.md', '# Orphan\n')
 
-    const result = spawnSync(process.execPath, [script, '--root', root], { encoding: 'utf8' })
+    const result = spawnSync(process.execPath, [script, '--root', root], {
+      encoding: 'utf8',
+      env: { ...process.env, NEXKIT_BASE_SHA: '' },
+    })
 
     assert.equal(result.status, 1)
     assert.equal(result.stderr, 'docs/README.md:1: does not list docs/reference/orphan.md\n')
+  })
+
+  test('fails a committed doc that a change grows past 900 lines', () => {
+    write('docs/reference/guide.md', doc(880))
+    git('init', '-q')
+    git('add', '-A')
+    git('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-qm', 'base')
+    const base = git('rev-parse', 'HEAD').stdout.trim()
+    write('docs/reference/guide.md', doc(910))
+
+    const result = spawnSync(process.execPath, [script, '--root', root], {
+      encoding: 'utf8',
+      env: { ...process.env, NEXKIT_BASE_SHA: base },
+    })
+
+    assert.equal(result.status, 1)
+    assert.match(result.stderr, /^docs\/reference\/guide\.md:901: 910 lines, up from 880/)
   })
 
   test('passes on the repository', () => {
