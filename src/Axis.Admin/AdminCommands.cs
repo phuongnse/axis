@@ -8,6 +8,7 @@ using Axis.Configuration.Packages;
 using Axis.Data;
 using Axis.Tenancy;
 using Axis.Tenancy.Platform;
+using Axis.Tenancy.Realms;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.FileProviders;
@@ -252,7 +253,7 @@ internal static partial class AdminCommands
     }
 
     // The client for the identity provider. A test passes its own handler, which the client does not dispose.
-    private static HttpClient IdentityProviderClient(HttpMessageHandler? handler) =>
+    internal static HttpClient IdentityProviderClient(HttpMessageHandler? handler) =>
         handler is null
             ? new HttpClient { Timeout = TimeSpan.FromSeconds(60) }
             : new HttpClient(handler, disposeHandler: false);
@@ -1233,6 +1234,7 @@ internal static partial class AdminCommands
             .Where(tenant => ids.Contains(tenant.Id) && tenant.PreviewOf != null)
             .Select(tenant => tenant.Id)
             .ToListAsync(cancellationToken);
+        var platformRows = await platform.TenantPlatformProviders.AsNoTracking().Where(provider => ids.Contains(provider.TenantId)).ToListAsync(cancellationToken);
         var bindings = new Dictionary<string, ActivationBindings>(StringComparer.Ordinal);
         foreach (var id in ids)
         {
@@ -1244,7 +1246,10 @@ internal static partial class AdminCommands
                         binding.Kind,
                         binding.Kind == DeploymentBindingKinds.Url ? new Uri(binding.Url!, UriKind.Absolute) : null),
                     StringComparer.OrdinalIgnoreCase);
-            bindings[id] = new ActivationBindings(id, named, AllowHttp: false, IsPreview: previewIds.Contains(id));
+            bindings[id] = new ActivationBindings(id, named, AllowHttp: false, IsPreview: previewIds.Contains(id))
+            {
+                PlatformProviders = PlatformSignInProviders.From(platformRows.Where(provider => provider.TenantId == id)),
+            };
         }
 
         return bindings;

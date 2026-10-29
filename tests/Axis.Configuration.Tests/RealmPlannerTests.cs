@@ -102,6 +102,70 @@ public sealed class RealmPlannerTests
         Assert.Empty(result.Conflicts);
     }
 
+    [Fact]
+    public void A_platform_provider_shares_one_provider_with_an_application_provider_that_names_the_same_bindings_in_other_letter_case()
+    {
+        var application = Application("Sales", Oidc("CompanyIssuer", "CompanyClient", "CompanySecret"));
+        var platform = Oidc("COMPANYISSUER", "companyclient", "companysecret", name: "platform", rolesClaim: "groups");
+
+        var result = RealmPlanner.Build([application], [platform]);
+
+        var provider = Assert.Single(result.Plan.Providers);
+        Assert.Equal("oidc-companyissuer", provider.Alias);
+        Assert.Equal(["groups", "roles"], provider.RolesClaims);
+        Assert.Empty(result.Conflicts);
+        var site = Assert.Single(result.Plan.Sites);
+        Assert.Equal(["oidc-companyissuer"], site.Providers);
+    }
+
+    [Fact]
+    public void A_provider_that_only_the_platform_names_is_planned_and_belongs_to_no_site()
+    {
+        var application = Application("Sales", Oidc("IssuerA", "ClientA", "SecretA"));
+
+        var result = RealmPlanner.Build([application], [Oidc("IssuerB", "ClientB", "SecretB", name: "platform")]);
+
+        Assert.Equal(["oidc-issuera", "oidc-issuerb"], result.Plan.Providers.Select(provider => provider.Alias));
+        Assert.Equal(["oidc-issuera"], Assert.Single(result.Plan.Sites).Providers);
+        Assert.Empty(result.Conflicts);
+    }
+
+    [Fact]
+    public void A_platform_provider_with_other_client_bindings_than_an_application_provider_is_a_conflict_for_the_platform()
+    {
+        var application = Application("Sales", Oidc("Issuer", "Client", "Secret"));
+        var platform = Oidc("Issuer", "OtherClient", "OtherSecret", name: "platform");
+
+        var result = RealmPlanner.Build([application], [platform]);
+
+        Assert.All(result.Conflicts, conflict => Assert.Equal(RealmConflictKind.ClientBindings, conflict.Kind));
+        var conflict = Assert.Single(result.Conflicts, conflict => conflict.ApplicationId == RealmApplication.PlatformSignInId);
+        Assert.Equal("platform", conflict.Provider.Name);
+        Assert.Equal("Sales", conflict.Other.Name);
+        Assert.Contains(result.Conflicts, conflict => conflict.ApplicationId == application.ApplicationId && conflict.Other.ApplicationId == RealmApplication.PlatformSignInId);
+    }
+
+    [Fact]
+    public void A_platform_provider_with_the_same_bindings_and_other_claims_is_a_claims_conflict_for_the_platform()
+    {
+        var application = Application("Sales", Oidc("Issuer", "Client", "Secret"));
+        var platform = Oidc("Issuer", "Client", "Secret", name: "platform", claims: new IdentityProviderClaimsModel("fullName", "email", "locale"));
+
+        var result = RealmPlanner.Build([application], [platform]);
+
+        Assert.All(result.Conflicts, conflict => Assert.Equal(RealmConflictKind.Claims, conflict.Kind));
+        Assert.Contains(result.Conflicts, conflict => conflict.ApplicationId == RealmApplication.PlatformSignInId);
+    }
+
+    [Fact]
+    public void Two_platform_providers_with_the_same_issuer_binding_and_other_client_bindings_are_a_conflict()
+    {
+        var result = RealmPlanner.Build([], [Oidc("Issuer", "ClientA", "Secret", name: "a"), Oidc("Issuer", "ClientB", "Secret", name: "b")]);
+
+        Assert.Equal(2, result.Conflicts.Count);
+        Assert.All(result.Conflicts, conflict => Assert.Equal(RealmApplication.PlatformSignInId, conflict.Other.ApplicationId));
+    }
+
     private static RealmApplication Application(string name, params IdentityProviderModel[] providers) =>
         Application(name, [new RealmApplicationSite($"{name.ToLowerInvariant()}-site", null)], providers);
 

@@ -155,7 +155,10 @@ internal sealed class ConfigurationPublisherTenants(
                 binding.Kind == DeploymentBindingKinds.Url ? new Uri(binding.Url!, UriKind.Absolute) : null);
         }
 
-        return new ActivationBindings(tenant.Id, bindings, AllowHttp: allowHttp, IsPreview: tenant.PreviewOf is not null);
+        return new ActivationBindings(tenant.Id, bindings, AllowHttp: allowHttp, IsPreview: tenant.PreviewOf is not null)
+        {
+            PlatformProviders = tenant.PlatformProviders ?? [],
+        };
     }
 
     // Every context must be fully migrated, because the server migrates them one after the other. A database that cannot be

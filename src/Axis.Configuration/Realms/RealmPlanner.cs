@@ -37,11 +37,18 @@ public static class RealmPlanner
     /// <summary>
     /// Plans the realm for <paramref name="applications"/>. Only <c>oidc</c> providers are planned. Providers that name
     /// the same bindings, ignoring letter case, become one provider. Providers that name the same issuer binding
-    /// with other client bindings, or the same bindings with other claims, are conflicts.
+    /// with other client bindings, or the same bindings with other claims, are conflicts. The brokered providers of the
+    /// tenant's platform sign-in, <paramref name="platform"/>, join as one more member that has no sites
+    /// (<see cref="RealmApplication.PlatformSignIn"/>). Their ids must be unique.
     /// </summary>
-    public static RealmPlanResult Build(IReadOnlyList<RealmApplication> applications)
+    public static RealmPlanResult Build(IReadOnlyList<RealmApplication> applications, IReadOnlyList<IdentityProviderModel>? platform = null)
     {
         ArgumentNullException.ThrowIfNull(applications);
+
+        if (platform is { Count: > 0 })
+        {
+            applications = [.. applications, RealmApplication.PlatformSignIn(platform)];
+        }
 
         var members = applications
             .SelectMany(application => application.Providers

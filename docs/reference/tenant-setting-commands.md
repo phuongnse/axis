@@ -179,13 +179,16 @@ resource.
 
 - **A binding name, never a value.** `--client-secret` here takes the name of a secret
   [deployment binding](#deployment-bindings). `tenant oidc set --client-secret` takes no value and reads a secret.
-  The command does not check that the binding exists, because activation does, and an operator may set the binding
-  after the sign-in.
+  Before it stores anything, the command checks each `oidc` provider against the tenant's bindings: the issuer must be
+  a `url` binding, the client id, the client secret and the client key `secret` bindings, and each must exist and hold
+  a value. A `saml` provider's metadata binding is not checked. For a tenant that has a realm, an `oidc` provider
+  needs `--client-secret`, because the realm sync refuses a provider without one.
 - **A whole replacement.** A run replaces the tenant's whole platform sign-in: accounts and every provider. A provider
   left out of the run is removed. It raises the tenant `version`.
 - **Any status.** The command works on a tenant in any status, including `provisioning` and `suspended`, because the
-  platform sign-in needs neither the tenant's database nor its roles. It needs `ConnectionStrings:PlatformSchema` and
-  not `Admin:ConnectionString` or `Platform:SecretKey`.
+  platform sign-in needs neither the tenant's roles nor, for a tenant that has no schema version yet, its database.
+  It needs `ConnectionStrings:PlatformSchema` and `Platform:SecretKey`, and not `Admin:ConnectionString`. The key
+  decrypts the schema password, to read the tenant's active releases, and the binding values for the realm sync.
 - **Audit.** One [platform audit record](#platform-audit-records) names `accounts` and then `provider:<name>` for each
   provider, in the order given. It never holds a value, a binding name, a claim or a role.
 - **Exit code 2, nothing changes.** `Tenancy:Source` is not `directory`, the tenant is unknown, the tenant is a preview
@@ -194,11 +197,25 @@ resource.
   flag, not a type), an `oidc` provider lacks the issuer or the client id or has neither or both of the client secret
   and the client key, a `saml` provider lacks the metadata or names an issuer or a client binding, a binding or claim is
   blank or a claim name is unknown or repeated, a role value is repeated, or a role is not one of the four. The
-  `version` stays and no audit record is written.
-- **Stored, not used yet.** `tenant create` and `tenant restore` set accounts on, and a migration set it on for the
-  tenants that existed. Nothing reads the platform sign-in yet. _(planned for M17)_ A run also brings the realm in step,
-  and the server checks the sign-in against it. `tenant backup` does not carry the providers, so a restored tenant has
-  accounts on and no provider until the command runs again.
+  `version` stays and no audit record is written. The same exit code 2 comes when an `oidc` provider names a binding
+  that is missing, of the wrong kind or without a value, when the tenant has a realm and an `oidc` provider has no
+  `--client-secret`, and when a provider would make one person two users. A provider splits a person when it names the
+  same issuer binding as a provider of an active release with other client bindings, or the same bindings with other
+  claims, ignoring letter case. The same holds between two platform providers. The message starts with `AXC0291` and
+  names the provider and the other side, see [users](identity-provider.md#users). The command reads the active releases
+  only when the tenant has a schema version. Without one, it checks against no releases.
+- **The realm.** After it commits, the command brings the tenant's realm in step with the active releases and the new
+  platform sign-in, as [activation does](identity-provider.md#keeping-the-realm-in-step). A platform provider that names
+  the same bindings as an application's provider, ignoring letter case, uses the same `oidc-` provider. A tenant
+  without realm details skips the sync, but not the checks. When the identity provider fails, the command prints
+  `<id> realm failed:` and the identity provider step and its status, and exits with code 1. The stored sign-in stays,
+  and the next activation brings the realm in step. An activation that runs between the command's checks and its commit
+  can still leave a clashing pair, which the next activation of that application refuses.
+- **Used by activation.** `tenant create` and `tenant restore` set accounts on, and a migration set it on for the
+  tenants that existed. Every activation, `Axis.Admin` `activate`, `publish` and `rollback` and the server's startup
+  activation, keeps the stored platform providers in the realm. The server's checks of the sign-in against the realm are
+  _(planned for M17)_. `tenant backup` does not carry the providers, so a restored tenant has accounts on and no provider
+  until the command runs again.
 
 ## Mail settings
 

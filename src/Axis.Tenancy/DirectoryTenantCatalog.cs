@@ -1,4 +1,6 @@
+using Axis.Configuration.Model;
 using Axis.Tenancy.Platform;
+using Axis.Tenancy.Realms;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
@@ -184,6 +186,7 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
         List<TenantRow> tenants;
         List<TenantHostRow> hosts;
         List<TenantBindingRow> bindings;
+        List<TenantPlatformProviderRow> platformProviders;
         try
         {
             var options = new DbContextOptionsBuilder<PlatformDbContext>().UseNpgsql(platformConnectionString).Options;
@@ -195,6 +198,9 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
             var ids = tenants.Where(IsActive).Select(tenant => tenant.Id).ToArray();
             bindings = await context.TenantBindings.AsNoTracking()
                 .Where(binding => ids.Contains(binding.TenantId))
+                .ToListAsync(cancellationToken);
+            platformProviders = await context.TenantPlatformProviders.AsNoTracking()
+                .Where(provider => ids.Contains(provider.TenantId))
                 .ToListAsync(cancellationToken);
         }
         catch (Exception exception) when (exception is NpgsqlException or InvalidOperationException)
@@ -230,7 +236,8 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
                 bindings.Where(binding => binding.TenantId == row.Id),
                 cipher,
                 tls,
-                row.PreviewOf is null ? null : byId[row.PreviewOf])),
+                row.PreviewOf is null ? null : byId[row.PreviewOf],
+                row.PreviewOf is null ? PlatformSignInProviders.From(platformProviders.Where(provider => provider.TenantId == row.Id)) : null)),
             hosts.Where(host => !activeIds.Contains(host.TenantId)).Select(host => host.Host),
             active.ToDictionary(row => row.Id, DatabaseKey, StringComparer.Ordinal),
             active.ToDictionary(row => row.Id, row => row.SchemaVersion, StringComparer.Ordinal),
@@ -275,7 +282,8 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
         IEnumerable<TenantBindingRow> bindingRows,
         TenantSecretCipher cipher,
         TenantDatabaseTls tls,
-        TenantRow? main)
+        TenantRow? main,
+        IReadOnlyList<IdentityProviderModel>? platformProviders)
     {
         var id = row.Id;
         var bindings = Bindings(id, bindingRows, cipher);
@@ -311,7 +319,7 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
             signIn.OidcProfile,
             ClientKeys(signIn, cipher));
 
-        return new TenantEntry(id, hosts, connectionString, SchemaConnectionString: null, oidc, bindings, row.PreviewOf, Email(row, cipher), Realm(row, cipher), RealmUsers(row, cipher));
+        return new TenantEntry(id, hosts, connectionString, SchemaConnectionString: null, oidc, bindings, row.PreviewOf, Email(row, cipher), Realm(row, cipher), RealmUsers(row, cipher), platformProviders);
     }
 
     /// <summary>

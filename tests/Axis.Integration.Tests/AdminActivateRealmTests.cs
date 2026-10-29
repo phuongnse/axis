@@ -10,8 +10,10 @@ namespace Axis.Integration.Tests;
 
 /// <summary>
 /// <c>activate</c> on a real Keycloak: after the activation commits, the tenant's realm gets one <c>site-</c> client for each
-/// site and one <c>oidc-</c> provider for each issuer binding of the tenant's applications. A refused activation, a preview
-/// tenant and a realm failure each leave the realm as it was.
+/// site and one <c>oidc-</c> provider for each issuer binding of the tenant's applications and of its platform sign-in. A refused
+/// activation, a preview tenant and a realm failure each leave the realm as it was. <c>tenant sign-in set</c> shares a provider with
+/// the applications that name the same bindings, refuses one that would split a person, and activation keeps a provider that only the
+/// platform sign-in names.
 /// </summary>
 public sealed class AdminActivateRealmTests(KeycloakFixture keycloak, PostgreSqlFixture database) : IClassFixture<PostgreSqlFixture>, IAsyncLifetime
 {
@@ -143,6 +145,81 @@ public sealed class AdminActivateRealmTests(KeycloakFixture keycloak, PostgreSql
         Assert.DoesNotContain(result.Output, line => line.Contains(" seed ", StringComparison.Ordinal));
         await scenario.AssertNoSecretsAsync();
     }
+
+    [Fact]
+    public async Task A_platform_provider_with_the_bindings_of_an_application_provider_in_other_letter_case_shares_its_realm_provider()
+    {
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        var id = await CreateTenantWithBindingsAsync(scenario);
+        using (var folder = Folder(new Application(), ["sales"], provider: true))
+        {
+            Assert.Equal(0, (await ActivateAsync(scenario, folder, id)).Exit);
+        }
+
+        Assert.Equal(["oidc-issuer"], await ProviderAliasesAsync(id));
+
+        var result = await SetPlatformProviderAsync(scenario, id, "issuer", "client", "secret");
+
+        Assert.Equal(0, result.Exit);
+        Assert.Equal([$"{id} sign-in ok"], result.Output);
+        Assert.Equal(["oidc-issuer"], await ProviderAliasesAsync(id));
+        Assert.Equal(["site-sales"], await SiteClientsAsync(id));
+        await scenario.AssertNoSecretsAsync();
+    }
+
+    [Fact]
+    public async Task A_platform_provider_that_clashes_with_an_active_application_provider_exits_with_2_and_changes_neither_the_directory_nor_the_realm()
+    {
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        var id = await CreateTenantWithBindingsAsync(scenario);
+        using (var folder = Folder(new Application(), ["sales"], provider: true))
+        {
+            Assert.Equal(0, (await ActivateAsync(scenario, folder, id)).Exit);
+        }
+
+        await SetBindingsAsync(scenario, id, "Other");
+        var version = (await scenario.RowAsync(id)).Version;
+        var clients = await SiteClientsAsync(id);
+        var providers = await ProviderAliasesAsync(id);
+
+        var result = await SetPlatformProviderAsync(scenario, id, Issuer, "OtherClient", "OtherSecret");
+
+        Assert.Equal(2, result.Exit);
+        Assert.Empty(result.Output);
+        Assert.Contains(result.Error, line => line.StartsWith("AXC0291 ", StringComparison.Ordinal));
+        Assert.Equal(version, (await scenario.RowAsync(id)).Version);
+        Assert.Empty(await scenario.PlatformProvidersAsync(id));
+        Assert.Equal(clients, await SiteClientsAsync(id));
+        Assert.Equal(providers, await ProviderAliasesAsync(id));
+        await scenario.AssertNoSecretsAsync();
+    }
+
+    [Fact]
+    public async Task Activating_an_application_without_oidc_providers_keeps_the_provider_that_only_the_platform_sign_in_names()
+    {
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        var id = await CreateTenantWithBindingsAsync(scenario);
+        var issuer = new Uri(_baseAddress, "realms/master").AbsoluteUri;
+        Assert.Equal(0, (await scenario.RunAsync(["tenant", "binding", "set", id, "PlatformIssuer", "--url", issuer], extra: AdminScenario.Directory)).Exit);
+        Assert.Equal(0, (await SetPlatformProviderAsync(scenario, id, "PlatformIssuer", Client, Secret)).Exit);
+        Assert.Equal(["oidc-platformissuer"], await ProviderAliasesAsync(id));
+
+        using var folder = Folder(new Application(), ["sales"], provider: false);
+        var result = await ActivateAsync(scenario, folder, id);
+
+        Assert.Equal(0, result.Exit);
+        Assert.Equal(["oidc-platformissuer"], await ProviderAliasesAsync(id));
+        Assert.Equal(["site-sales"], await SiteClientsAsync(id));
+    }
+
+    private Task<AdminResult> SetPlatformProviderAsync(AdminScenario scenario, string id, string issuer, string clientId, string clientSecret) =>
+        scenario.RunAsync(
+            [
+                "tenant", "sign-in", "set", id, "--accounts", "true",
+                "--provider", "partner", "--type", "oidc", "--issuer", issuer, "--client-id", clientId, "--client-secret", clientSecret,
+            ],
+            identityProvider: _handler,
+            extra: AdminScenario.Directory);
 
     // Creates the tenant with its realm in the real Keycloak, and gives it the bindings of the first application.
     private async Task<string> CreateTenantWithBindingsAsync(AdminScenario scenario)

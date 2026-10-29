@@ -14,6 +14,17 @@ public sealed record RealmApplication(
     IReadOnlyList<RealmApplicationSite> Sites,
     IReadOnlyList<IdentityProviderModel> Providers)
 {
+    /// <summary>The id of the platform sign-in as a planner member. It is no application's id.</summary>
+    public static readonly Guid PlatformSignInId = Guid.Empty;
+
+    /// <summary>The platform sign-in of a tenant as a planner member: the fixed id, the name <c>platform sign-in</c> and no sites.</summary>
+    public static RealmApplication PlatformSignIn(IReadOnlyList<IdentityProviderModel> providers)
+    {
+        ArgumentNullException.ThrowIfNull(providers);
+
+        return new RealmApplication(PlatformSignInId, "platform sign-in", [], providers);
+    }
+
     /// <summary>Reads a compiled application.</summary>
     public static RealmApplication FromModel(ApplicationModel model)
     {

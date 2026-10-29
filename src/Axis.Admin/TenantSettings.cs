@@ -1,8 +1,12 @@
 using System.Globalization;
 using Axis.Administration;
+using Axis.Configuration.Realms;
+using Axis.Configuration.Releases;
+using Axis.Configuration.Storage;
 using Axis.Data.Storage;
 using Axis.Tenancy;
 using Axis.Tenancy.Platform;
+using Axis.Tenancy.Realms;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Hosting;
 using Npgsql;
@@ -192,13 +196,53 @@ internal static class TenantSettings
             return Usage(run);
         }
 
-        var (setup, exit) = await PrepareAsync(run, needsCipher: false);
+        // The key decrypts the schema password, to read the active releases, and the binding values, for the realm sync.
+        var (setup, exit) = await PrepareAsync(run, needsCipher: true);
         if (setup is null)
         {
             return exit;
         }
 
         var id = run.Args[3];
+        TenantRow? row;
+        IReadOnlyDictionary<string, TenantBinding> bindings = new Dictionary<string, TenantBinding>(StringComparer.OrdinalIgnoreCase);
+        RealmPlan? plan = null;
+        try
+        {
+            await using var platform = NewContext(setup.Connection);
+            row = await platform.Tenants.AsNoTracking().SingleOrDefaultAsync(tenant => tenant.Id == id, run.CancellationToken);
+
+            // An unknown tenant, a preview tenant and a change that is not well formed go straight to the library, which refuses them.
+            if (row is { PreviewOf: null } && TenantPlatformSignIn.Problem(change) is null)
+            {
+                // A secret binding without a value counts as missing.
+                var rows = await platform.TenantBindings.AsNoTracking().Where(binding => binding.TenantId == id).ToListAsync(run.CancellationToken);
+                bindings = DirectoryTenantCatalog.Bindings(
+                    id, rows.Where(binding => binding.Kind != DeploymentBindingKinds.Secret || binding.SecretValue is { Length: > 0 }), setup.Cipher!);
+
+                // The tenant of a restore or a create may have no tables to read yet: it checks against no releases.
+                var applications = row.SchemaVersion == "" ? [] : await ReadApplicationsAsync(setup, row, run.CancellationToken);
+                var (problem, planned) = TenantPlatformSignIn.PlanRealm(id, change, bindings, applications, DirectoryTenantCatalog.Realm(row, setup.Cipher!) is not null);
+                if (problem is not null)
+                {
+                    run.Error.WriteLine(problem);
+                    return 2;
+                }
+
+                plan = planned;
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            run.Error.WriteLine("The command was canceled before any tenant work.");
+            return 1;
+        }
+        catch (Exception exception) when (exception is NpgsqlException or InvalidOperationException)
+        {
+            run.Output.WriteLine($"{id} sign-in failed: {TenantDatabaseSteps.Safe(exception)}");
+            return 1;
+        }
+
         TenantSettingResult result;
         try
         {
@@ -211,7 +255,43 @@ internal static class TenantSettings
             return 1;
         }
 
+        if (result.Outcome != TenantSettingOutcome.Changed || plan is null || DirectoryTenantCatalog.Realm(row!, setup.Cipher!) is not { } realm)
+        {
+            return Print(run, id, "sign-in", result);
+        }
+
+        // The stored sign-in stays when the identity provider fails: the next activation brings the realm in step.
+        try
+        {
+            using var http = AdminCommands.IdentityProviderClient(run.IdentityProviderHandler);
+            await ActivationRealmSync.SyncAsync(http, realm, bindings, plan, run.CancellationToken);
+        }
+        catch (Exception exception) when (exception is HttpRequestException or InvalidOperationException or OperationCanceledException)
+        {
+            run.Output.WriteLine($"{id} realm failed: {TenantDatabaseSteps.Safe(exception)}");
+            return 1;
+        }
+
         return Print(run, id, "sign-in", result);
+    }
+
+    // The tenant's active releases as the realm planner reads them.
+    private static async Task<List<RealmApplication>> ReadApplicationsAsync(Setup setup, TenantRow row, CancellationToken cancellationToken)
+    {
+        var applications = new List<RealmApplication>();
+        await using var steps = new TenantDatabaseSteps(setup.Cipher!, row, row.DatabaseHost, row.DatabasePort, TenantDatabaseTls.From(setup.Connection), cancellationToken);
+        var connection = await steps.SchemaConnectionAsync();
+        await using var configuration = new ConfigurationDbContext(new DbContextOptionsBuilder<ConfigurationDbContext>().UseNpgsql(connection).Options);
+        var store = new ActiveReleaseStore(configuration);
+        foreach (var active in await store.ListAsync(cancellationToken))
+        {
+            if (await store.GetReleaseAsync(active.ReleaseId, cancellationToken) is { } stored)
+            {
+                applications.Add(RealmApplication.FromRelease(active.Name, stored));
+            }
+        }
+
+        return applications;
     }
 
     public static async Task<int> EmailClearAsync(AdminRun run)

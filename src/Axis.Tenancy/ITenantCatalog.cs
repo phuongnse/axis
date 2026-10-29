@@ -1,3 +1,5 @@
+using Axis.Configuration.Model;
+
 namespace Axis.Tenancy;
 
 /// <summary>
@@ -37,6 +39,7 @@ public interface ITenantCatalog
 /// <param name="Email">The tenant's own mail settings, which replace the host's whole, or <c>null</c> when the tenant uses the host's. Both sources have them.</param>
 /// <param name="Realm">What activation needs to sync the tenant's realm, or <c>null</c> when the source holds none for this tenant. Both sources have it, and a preview tenant has none.</param>
 /// <param name="RealmUsers">What the server needs to list the tenant's realm users, or <c>null</c> when the source holds none for this tenant. Both sources have it, and a preview tenant has none.</param>
+/// <param name="PlatformProviders">The brokered providers of the tenant's platform sign-in, which activation keeps in the realm, or <c>null</c> when the source holds none. Only the <c>directory</c> source has them, and a preview tenant has none of its own.</param>
 public sealed record TenantEntry(
     string Id,
     IReadOnlyList<string> Hosts,
@@ -47,7 +50,8 @@ public sealed record TenantEntry(
     string? PreviewOf = null,
     EmailSettings? Email = null,
     TenantRealmAccess? Realm = null,
-    TenantRealmUsers? RealmUsers = null);
+    TenantRealmUsers? RealmUsers = null,
+    IReadOnlyList<IdentityProviderModel>? PlatformProviders = null);
 
 /// <summary>
 /// What activation needs to sync a tenant's realm: the address of the identity provider, the realm's name and the

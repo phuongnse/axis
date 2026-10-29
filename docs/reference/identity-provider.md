@@ -141,8 +141,10 @@ so Studio edits it, with the identity provider editor of [Studio](studio.md), an
 ## Platform sign-in
 
 `tenant sign-in set` stores the platform sign-in in the tenant directory, and `tenant create` and `tenant restore`
-set accounts on. Both are built. Nothing reads the stored platform sign-in yet. The realm sync and the server's checks
-are _(planned for M17)_.
+set accounts on. Both are built. The realm sync is built: `tenant sign-in set` brings the tenant's realm in step, and every
+activation keeps the platform sign-in's providers in it, see
+[keeping the realm in step](#keeping-the-realm-in-step). The server's checks of the stored platform sign-in are
+_(planned for M17)_.
 
 - The home page, Studio, the operator console, the account page and the users page belong to no site. The tenant's
   platform sign-in says which providers they accept.
@@ -168,7 +170,12 @@ _(planned for M17)_
   other `claims` fail too. Both are `AXC0291`, reported before provisioning at `/issuer/binding` or `/claims` of
   the provider that is activated, and built for `oidc` providers. Activation compares binding names ignoring letter
   case, reads the providers of the tenant's other active releases, and gives each provider the alias `oidc-` and its
-  lower-case issuer binding.
+  lower-case issuer binding. The sharing with the platform sign-in is built: its `oidc` providers join the plan as one
+  more member, so a platform provider that names the same bindings as an application's provider uses its `oidc-`
+  provider. Activation also refuses an application provider that clashes with a stored platform provider, and the
+  message names the platform sign-in. `tenant sign-in set` refuses a platform provider that clashes with an active
+  release's provider, or with another platform provider, before it stores anything, see
+  [platform sign-in](tenant-setting-commands.md#platform-sign-in).
 - **No automatic linking:** a person who signs in through two providers is two users, even when both give the same
   email. The realm never links them by email, because another provider's email is not proof of who signed in.
   Built by the realm sync: every `oidc-` provider uses the realm's own first-login flow `axis first login`, whose only
@@ -218,14 +225,16 @@ _(planned for M17)_
   identity provider answers 409 Conflict, as when another host syncs the same realm at the same moment, the sync reads
   the realm again and repeats, up to three attempts, and then fails as before.
 - **Brought in step by activation:** activating a release adds, changes and removes the realm's brokered providers,
-  their claim mappers and the site clients to match the active releases of the tenant and its platform sign-in. A
-  provider that nothing names any more is removed. Its users stay, but cannot sign in through it.
+  their claim mappers and the site clients to match the active releases of the tenant and its platform sign-in. The
+  stored platform providers are always part of the plan, so a provider that only the platform sign-in names stays in
+  the realm. A provider that nothing names any more is removed. Its users stay, but cannot sign in through it.
   Built for `Axis.Admin`: `activate`, and the publisher's `publish`, `publish` with target `preview` and `rollback`
   update the realm inside their `activate` step, after the activation has committed. A tenant without an activation
   secret, such as a preview tenant or one that signs in through an outside identity provider, skips the update. A
   failure of the identity provider fails the step with a line that names the identity provider step and its status
   code, and the new release stays active, see [activate](administration.md#activate). A `validate` and a `test`
-  never update the realm. The server's startup activation updates it too, see above.
+  never update the realm. The server's startup activation updates it too, see above. `tenant sign-in set` brings the
+  realm in step after it stores the platform sign-in, see [platform sign-in](tenant-setting-commands.md#platform-sign-in).
 - **Brought in step by restore:** `tenant restore` of a tenant that gets a new realm creates the realm as `tenant create`
   does and brings it in step with the active releases of the restored database. The archive holds no secret value, so a
   provider whose bindings have no value yet is left out with a warning. The next activation adds it once the operator has
