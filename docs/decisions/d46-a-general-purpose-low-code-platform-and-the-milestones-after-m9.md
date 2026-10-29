@@ -16,6 +16,10 @@ The owner confirmed these points on issue #702 on 2026-10-19.
     every designer write the same resources through the authoring API.
   - No domain gets platform code. Samples are only the means to prove the
     platform.
+    - [D102](d102-built-in-modules-open-to-change-and-bound-by-a-contract.md)
+      adds built-in modules: configuration that Axis maintains for real
+      businesses, still not platform code. The samples become built-in
+      modules over time.
 - **Scope:**
   - Visual page and form designers, and a process designer, move into scope.
   - Custom widgets stay after the designers
@@ -29,9 +33,16 @@ The owner confirmed these points on issue #702 on 2026-10-19.
     no compatibility code and no `formatVersion` bump.
   - The same pull request updates the schema, the compiler, the samples, the
     scenarios and the tests.
+    - [D102](d102-built-in-modules-open-to-change-and-bound-by-a-contract.md)
+      adds the built-in modules to that list.
   - A development or test database whose stored releases use an older format
     is reset, not upgraded.
   - Docs and milestone names never number a second version.
+  - [D102](d102-built-in-modules-open-to-change-and-bound-by-a-contract.md)
+    says what follows the first production release: a format version for
+    each kind and converters that rewrite older files, with no compatibility
+    code in the engines. No production release comes before the
+    customization layers of M25.
 - **Milestones after M9:**
   - They replace the earlier single Hardening milestone. They follow the vertical
     slice: create an application, then its data and UI, logic and workflow,
@@ -45,6 +56,9 @@ The owner confirmed these points on issue #702 on 2026-10-19.
       identity provider between M16 and M18.
     - [D101](d101-the-extensibility-milestone-is-split-into-six.md) splits
       M18 into M18 to M23.
+    - [D102](d102-built-in-modules-open-to-change-and-bound-by-a-contract.md)
+      adds M24 Module contracts, M25 Customization layers and M26 The HR
+      modules.
   - M11 and M12 can run in parallel, and so can M14 and M15.
   - The "Done when" text of each milestone is in the
     [roadmap](../roadmap.md#milestones).

@@ -37,6 +37,8 @@ M17 does not change. See the [roadmap](../roadmap.md#milestones).
   its journey redelivers a webhook's dead letter. The readiness check of
   [D68](d68-issues-of-several-milestones-run-at-once.md) still decides when
   each one is broken down.
+  - [D102](d102-built-in-modules-open-to-change-and-bound-by-a-contract.md)
+    puts M24 to M26, the built-in modules, after M20 and before M21 and M22.
 
 _Why:_ M18 held six designs and the work carried over from M16, so one
 milestone would stay open while most of its parts were long done, and its docs
