@@ -116,7 +116,7 @@ public sealed class UserCommandTests(KeycloakFixture keycloak, PostgreSqlFixture
         using var page = await browser.GetAsync(afterPassword.Headers.Location!);
         var html = await page.Content.ReadAsStringAsync(CancellationToken);
         Assert.Equal(HttpStatusCode.OK, page.StatusCode);
-        Assert.Contains("name=\"totp\"", html, StringComparison.Ordinal);
+        Assert.Equal("addAuthenticator", KeycloakSignIn.Page(html));
         Assert.Equal([Administrator], await AuditActorsAsync("user.authenticatorReset", _patId));
     }
 

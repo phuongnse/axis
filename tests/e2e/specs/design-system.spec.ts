@@ -77,6 +77,7 @@ const stateKeys: Record<string, Record<string, (state: Locator) => Locator>> = {
     'Two-step verification': (state) => state.getByText('Verification code', { exact: true }),
     'Forgot password': (state) => state.getByRole('button', { name: 'Send link', exact: true }),
     'Set password': (state) => state.getByLabel('Confirm password', { exact: true }),
+    'Add an authenticator': (state) => state.getByText('Device name', { exact: true }),
   },
 }
 

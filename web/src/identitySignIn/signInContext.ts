@@ -55,6 +55,21 @@ export interface UpdatePasswordTexts {
   setPassword: string
 }
 
+/** The texts of the page that adds an authenticator. */
+export interface AddAuthenticatorTexts {
+  title: string
+  message: string
+  /** The alternative text of the QR code image. */
+  qrCode: string
+  /** The line above the key to type by hand. */
+  manualKey: string
+  code: string
+  codeRequired: string
+  deviceName: string
+  deviceNameRequired: string
+  submit: string
+}
+
 /** What the site that started the sign-in allows. */
 export interface SignInSite {
   /** The aliases of the providers the site allows. */
@@ -101,6 +116,29 @@ export interface TwoStepContext {
   texts: TwoStepTexts
 }
 
+/** What the page that adds an authenticator draws: the QR code, the key to type by hand, the code and the device name. */
+export interface AddAuthenticatorContext {
+  page: 'addAuthenticator'
+  title: string
+  realmName: string
+  /** The message to show above the form. No error means no alert. */
+  error?: string
+  /** Where the form posts `totp`, `totpSecret`, `userLabel` and `mode`. */
+  loginAction: string
+  /** The QR code as a base64 PNG. */
+  qrCode: string
+  /** The secret in groups, for a person to type by hand. */
+  manualKey: string
+  /** The secret that the form posts back as `totpSecret`. */
+  secret: string
+  /** Keycloak's mode, `qr` or `manual`, which the form posts back when Keycloak gave one. */
+  mode?: string
+  /** Whether the person already has an authenticator, so that the device name is required. */
+  deviceNameRequired: boolean
+  locales: SignInLocale[]
+  texts: AddAuthenticatorTexts
+}
+
 /** What the "Forgot password?" page draws: the email or username that Keycloak sends a link to. */
 export interface ResetPasswordContext {
   page: 'resetPassword'
@@ -132,4 +170,5 @@ export interface UpdatePasswordContext {
 }
 
 /** What the page of the identity provider's theme draws, told apart by `page`. */
-export type IdentityContext = SignInContext | TwoStepContext | ResetPasswordContext | UpdatePasswordContext
+export type IdentityContext =
+  SignInContext | TwoStepContext | AddAuthenticatorContext | ResetPasswordContext | UpdatePasswordContext

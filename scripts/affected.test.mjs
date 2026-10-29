@@ -269,6 +269,7 @@ describe("the unaffected_by lists in .nexkit/config.json", () => {
     const theme = [
       "web/keycloak-theme/login.ftl",
       "web/keycloak-theme/login-otp.ftl",
+      "web/keycloak-theme/login-config-totp.ftl",
       "web/vite.config.ts",
       "web/vite.keycloak-theme.config.ts",
     ];

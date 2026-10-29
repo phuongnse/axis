@@ -2,6 +2,8 @@ import { cleanup, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
+  identityAddAuthenticatorContext,
+  identityQrCode,
   identityResetPasswordContext,
   identitySignInContext,
   identityTwoStepContext,
@@ -64,6 +66,16 @@ function expectUpdatePasswordPage(container: HTMLElement) {
   expect(form.querySelector('input[name="logout-sessions"]')).toHaveValue('on')
 }
 
+function expectAddAuthenticatorPage(container: HTMLElement) {
+  expect(container.querySelector(`img[src="data:image/png;base64,${identityQrCode}"]`)).toBeInTheDocument()
+  expect(screen.getByText(identityAddAuthenticatorContext.manualKey)).toBeInTheDocument()
+  const form = container.querySelector('form') as HTMLFormElement
+  expect(form).toHaveAttribute('action', identityAddAuthenticatorContext.loginAction)
+  expect(form).toHaveAttribute('method', 'post')
+  expect(form.querySelector('input[name="totp"]')).toBeInTheDocument()
+  expect(form.querySelector('input[name="totpSecret"]')).toHaveValue(identityAddAuthenticatorContext.secret)
+}
+
 describe('the Keycloak theme entry', () => {
   afterEach(() => {
     document.getElementById('axis-sign-in-context')?.remove()
@@ -123,6 +135,20 @@ describe('the Keycloak theme entry', () => {
       </ThemeModeProvider>,
     )
     expectUpdatePasswordPage(preview.container)
+  })
+
+  it('draws the same add-an-authenticator page as the identitySignIn preview', () => {
+    writeContextBlock(identityAddAuthenticatorContext)
+    const theme = render(<SignInEntry context={readSignInContext(document)} />)
+    expectAddAuthenticatorPage(theme.container)
+    cleanup()
+
+    const preview = render(
+      <ThemeModeProvider>
+        <MemoryRouter>{previews.identitySignIn[6].draw()}</MemoryRouter>
+      </ThemeModeProvider>,
+    )
+    expectAddAuthenticatorPage(preview.container)
   })
 
   it('fails with a clear error when the sign-in context is missing', () => {
