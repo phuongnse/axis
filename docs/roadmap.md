@@ -49,6 +49,9 @@
 | **M21** | Package runners | Planned | Outside Development, package operations run in the package runners of `Axis.PackageHost`, with an empty environment, a read-only file system, CPU and memory limits, one network route through an egress proxy, and a kill at the operation's timeout. The journey: the payment reference package of purchase requests runs in the package host. See [D90](decisions/d90-extension-packages-run-out-of-process.md). |
 | **M22** | Custom widgets and the published SDK | Planned | An extension package holds custom widgets that the SPA loads through an import map, and the page designer offers them in its palette with a property panel. `Axis.Extensions` and `@axis/widgets-sdk` are published, with a package template and a test harness. The journey: the author drags the "budget usage" widget onto a purchase request page in Studio. It waits for M20. See [D88](decisions/d88-custom-widgets-in-the-designer-palette-and-a-published-sdk.md). |
 | **M23** | Operator console | Planned | The platform operator sees a tenant's failed work, dead letters, webhook deliveries, schedules and publishing at `/console`, and retries, cancels, resolves, redelivers and discards with a reason. The journey: the operator redelivers the dead letter of the failed webhook and sees it delivered. It waits for M19. See [D93](decisions/d93-an-operator-web-console.md). |
+| **M24** | Module contracts | Planned | A module declares a contract on its entities: a lifecycle of states and transitions with guards, core validations, the effects of a transition and a grant ceiling. The engine checks it on every write, whatever makes the write. Contract scenarios run on every publish of an application that uses the module, and a failing one stops the publish. An application relaxes a named point of a module's contract with a reason, and its release is marked off-standard. The journey: a process change that moves a module record to a state without meeting its guard is refused, and a relax entry lets it through with the off-standard mark. It follows M20. See [D102](decisions/d102-built-in-modules-open-to-change-and-bound-by-a-contract.md). |
+| **M25** | Customization layers | Planned | An application changes a module through a layer under `customizations/<module id>/` that names elements by name and holds only its changes. Compilation applies the layer and checks the contract. A module ships migrations, and a module build fails when an element is gone without one. An upgrade merges the layer three ways, property by property, and Studio shows the conflicts. Studio writes the layer and marks what it changed. An application ejects a module. The journey: an author adds a step to a module's process in Studio, the module is upgraded and the step stays, and a property both changed is resolved in Studio. It follows M24. See [D102](decisions/d102-built-in-modules-open-to-change-and-bound-by-a-contract.md). |
+| **M26** | The HR modules | Planned | The built-in modules `organization`, `employees` and `leave` under `modules/`, with contracts drawn from the rules of two or three real businesses, and a built-in HR application under `applications/`. The `departments` sample module and the leave request sample become them. The journey: two businesses customize `leave` differently, one counts working days and adds a director's approval for staff on probation, the other refuses a request that overlaps a stock count period of its own, and the contract holds for both. It follows M25. See [D102](decisions/d102-built-in-modules-open-to-change-and-bound-by-a-contract.md). |
 
 M3 is complete. See the closed
 [M3 milestone](https://github.com/phuongnse/axis/milestone/3?closed=1) on
@@ -118,21 +121,31 @@ stay in this order.
 - **A general-purpose low-code platform.** An author creates, configures, tests,
   publishes and runs an application through Studio, without editing JSON or
   code.
-- **No domain gets platform code.** Samples only prove the platform.
-- **Order.** M10 to M16 and M18 to M23 follow the vertical slice: create an
+- **No domain gets platform code.** Samples prove the platform. Built-in
+  modules _(planned for M26)_ serve real businesses as configuration, not
+  platform code, see
+  [D102](decisions/d102-built-in-modules-open-to-change-and-bound-by-a-contract.md).
+- **Order.** M10 to M16 and M18 to M26 follow the vertical slice: create an
   application, then its data and UI, logic and workflow, permissions, try it
   out, validate and test, publish and operate. Each ends with an end-to-end
   journey. M17 gives every tenant Axis's own identity provider before
   extensibility, so every sign-in looks and works the same, see
   [D99](decisions/d99-axis-ships-its-own-identity-provider.md).
 - **Parallel work.** M11 and M12 can run in parallel, and so can M14 and M15.
-  M18, M19, M20 and M21 can run in parallel. M22 waits for M20 and M23 for
-  M19, see [D101](decisions/d101-the-extensibility-milestone-is-split-into-six.md).
+  M18, M19 and M20 can run in parallel, see
+  [D101](decisions/d101-the-extensibility-milestone-is-split-into-six.md).
+  M24, M25 and M26 follow M20, one after the other, and M21 and M22 come
+  after them, see
+  [D102](decisions/d102-built-in-modules-open-to-change-and-bound-by-a-contract.md).
+  M23 waits for M19.
 - **Proving it is general.** From M11 on, each milestone extends a sample of a
   new shape: a service desk, then asset management. Neither needs platform
   code.
   M19 to M23 extend the purchase request sample instead, as
   [D94](decisions/d94-purchase-requests-prove-the-extensibility-milestone.md)
+  agrees. From M26 the samples become built-in modules that real businesses
+  customize, as
+  [D102](decisions/d102-built-in-modules-open-to-change-and-bound-by-a-contract.md)
   agrees.
 - **Planning.** A milestone is broken into issues when it passes the readiness
   check of [D68](decisions/d68-issues-of-several-milestones-run-at-once.md).
