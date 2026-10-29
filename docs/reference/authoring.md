@@ -639,7 +639,7 @@ This route has its own order of checks. The first failure is the response:
    - a `name` that does not match `^[A-Za-z][A-Za-z0-9]*$` or is longer than 60
      characters;
    - a `name` whose [kebab-case](#writes) form is longer than 60 characters, or
-     is a reserved site path: `api`, `health`, `assets`, `studio` or `account`;
+     is a reserved site path: `api`, `health`, `assets`, `studio`, `account` or `users`;
    - a `template` that is not a string.
 7. An unknown template, `404`. It is an `id` that no installed template has.
 8. A write lock that cannot be taken, `503`. See [Versions](#versions).

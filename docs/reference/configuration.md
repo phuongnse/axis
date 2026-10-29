@@ -85,7 +85,7 @@ flowchart LR
      [Entity logic](resource-files.md#entity-logic) for why these limits exist.
    - **Sites and pages.** A site belongs to one application. Its `path` is
      lower-case letters, digits and hyphens, starting with a letter. A path
-     reserved by the platform (`api`, `health`, `assets`, `studio`, `account`), or one that an
+     reserved by the platform (`api`, `health`, `assets`, `studio`, `account`, `users`), or one that an
      earlier site of the application already uses in path order, is
      `AXC0024` at `/path`. A reserved path is not also checked for
      duplicates. The `default` and `fallback` locales must be in

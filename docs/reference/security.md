@@ -115,7 +115,7 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place. _(planned f
   - `GET /api/me/sessions`, `DELETE /api/me/sessions/{id}` and
     `DELETE /api/me/sessions` let a person see and end their own sessions.
     They need a session, not a service account's bearer token. The shell's
-    [sessions screen](frontend.md) at `/account` calls them.
+    [sessions screen](platform-pages.md) at `/account` calls them.
     - The list answers `{ "endAllowed", "sessions": [{ "id", "signedInAt",
       "lastRequestAt", "current" }] }`. It holds only the caller's live
       sessions, newest sign-in first. `current` marks the session that made
@@ -351,7 +351,7 @@ sign-out address. This holds under both
   when the session's stored `auth_time` is no more than 5 minutes old, with
   no clock skew allowed. Otherwise the shell sends the person to
   `GET /api/auth/sign-in?reauthenticate=true`, which makes the identity
-  provider ask for credentials again. The [sessions screen](frontend.md)
+  provider ask for credentials again. The [sessions screen](platform-pages.md)
   offers this as its **Sign in again** button and returns to `/account`. A person who
   signed in before the column existed has no stored time and must sign in again first.
 - **The check at the callback.** The callback refuses an ID token whose
@@ -392,7 +392,7 @@ file, and the realm accepts a code more than once. See [development realm and us
 | `lead-2`           | `service-desk-lead`     | Service desk sample; E2E claim and reassign journey                                                                                           |
 | `asset-manager`    | `asset-manager`         | Asset management sample; E2E asset management journey                                                                                         |
 | `auditor`          | `auditor`               | Asset management sample; E2E asset management journey                                                                                         |
-| `administrator`    | `tenant-administrator`  | "Users" in the shell, E2E shell journey; the users page _(planned for M17)_                                                                   |
+| `administrator`    | `tenant-administrator`  | "Users" in the shell, E2E shell journey; E2E users page journey                                                                              |
 
 ## Machine callers
 
