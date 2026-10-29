@@ -10,7 +10,7 @@ import { NotifyFields } from './NotifyFields'
 import { OperationPanel } from './OperationPanel'
 import { operationJsonOnlyKeys } from './operationKeys'
 import { Expression, NamePicker } from './ProcessFields'
-import { requiredStepKeys } from './processPalette'
+import { moved, requiredStepKeys } from './processPalette'
 import { stepTypes, withType } from './processStepSchema'
 import { ReferencePicker } from './ReferencePicker'
 import { SchemaForm, type ChangeHandler } from './SchemaForm'
@@ -62,13 +62,6 @@ function stepNames(steps: unknown[]): string[] {
       ),
     ),
   ]
-}
-
-/** The steps with the step at `index` swapped with its neighbour `offset` places away. */
-function moved(steps: unknown[], index: number, offset: number): unknown[] {
-  const next = [...steps]
-  ;[next[index], next[index + offset]] = [next[index + offset], next[index]]
-  return next
 }
 
 /**
@@ -240,21 +233,21 @@ function Subject({ value, onChange }: { value: Content; onChange: ChangeHandler 
 
 /**
  * The card of one step of a process, as the Form tab shows it, for the Design tab's side panel. Move up and Move down
- * select the step at its new place. Remove calls `onRemove`, which owns the removal, the selection and what is said.
+ * call `onMove`, and Remove calls `onRemove`. Each owns the change, the selection and what is said.
  */
 export function ProcessStepPanel({
   schema,
   value,
   index,
   onChange,
-  onSelect,
+  onMove,
   onRemove,
 }: {
   schema: JsonSchema
   value: Content
   index: number
   onChange: ChangeHandler
-  onSelect: (index: number | null) => void
+  onMove: (offset: number) => void
   onRemove: () => void
 }) {
   const steps = Array.isArray(value.steps) ? value.steps : []
@@ -268,10 +261,7 @@ export function ProcessStepPanel({
       entity={text(value.entity)}
       names={stepNames(steps)}
       last={index === steps.length - 1}
-      onMove={(offset) => {
-        onChange('/steps', moved(steps, index, offset))
-        onSelect(index + offset)
-      }}
+      onMove={onMove}
       onRemove={onRemove}
       onChange={onChange}
     />

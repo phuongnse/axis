@@ -9,11 +9,11 @@ sections marked _(planned for Mx)_ are not built yet, and Dn refers to
 
 The design follows [D74](../decisions/d74-a-visual-process-designer.md). The
 Design tab, the canvas, the existing step panels, remove, undo, Tab and Enter,
-the diagnostic marks and the live region for removals are _(built)_. The
+the diagnostic marks, the live region for removals and the live region for moves are _(built)_. The
 palette, the transitions and the live region for adds and transitions are
 _(built)_. The schema-driven type picker, the timer panel, the sub-process panel, the
 `notify` panel, the deadline and escalations of a task and the wait for event
-panel are _(built)_. The live region for moves is _(planned for M18)_.
+panel are _(built)_.
 
 - **Design tab** _(built)_. A process opens on a Design tab, next to its Form
   and JSON tabs. The three tabs edit one draft.
@@ -98,8 +98,9 @@ panel are _(built)_. The live region for moves is _(planned for M18)_.
   - One Undo reverses each removal.
 - **Property panel (existing panels)** _(built)_. Selecting a node opens the
   step's card of the Form tab beside the canvas, with Move up, Move down and
-  Remove. Removing the selected step clears the selection. An edit in the
-  panel redraws the graph. With no step selected, the panel says "Select a step
+  Remove. Removing the selected step clears the selection. Each move is one
+  change of `steps`, so one Undo reverses it. An edit in the panel redraws the
+  graph. With no step selected, the panel says "Select a step
   on the canvas."
 - **Property panel (`createRecord`)** _(built)_. The operation picker offers
   `createRecord`. Its panel has an entity picker and one `set` row for each
@@ -165,14 +166,17 @@ panel are _(built)_. The live region for moves is _(planned for M18)_.
   card. Enter or Space on an edge selects that edge. Delete or Backspace
   removes the selection. Each edge has a name made of its two steps and its
   branch or outcome, such as "financeCheck to markApproved · otherwise".
-- **Screen readers** _(partly built)_. Every add, move and remove has a
-  keyboard way, and a live region says what changed. Removals, adds and
-  transitions are _(built)_: a hidden live region says "Removed step remind",
-  "Removed transition financeCheck to markApproved", "Step remind added after
-  resolve" (or "Step remind added" for an unconnected step), "An end step cannot
-  be inserted into a transition" or "submit now goes to done". A choice from the
+- **Screen readers** _(built)_. Every add, move and remove has a keyboard way,
+  and a live region says what changed. Removals, adds, moves and transitions
+  are _(built)_: a hidden live region says "Removed step remind", "Removed
+  transition financeCheck to markApproved", "Step remind added after resolve"
+  (or "Step remind added" for an unconnected step), "An end step cannot be
+  inserted into a transition" or "submit now goes to done". A choice from the
   transition menu names its branch or outcome, such as "managerApproval ·
-  approve now goes to done". Moves are _(planned for M18)_.
+  approve now goes to done". A move names the step now before the moved step,
+  such as "Step financeCheck moved after submit". A step moved to the first
+  place in `steps` says "Step financeCheck moved to the start". That place is
+  the top of the list, not the process's `start` step.
 - **Diagnostics** _(built)_. Marks work as on the graph: a marked node has an
   error-coloured border, "has diagnostics" in its text label, and
   `data-marked`.

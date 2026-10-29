@@ -88,6 +88,13 @@ function stepsOf(content: Content): unknown[] {
   return Array.isArray(content.steps) ? content.steps : []
 }
 
+/** The steps with the step at `index` swapped with its neighbour `offset` places away. */
+export function moved(steps: unknown[], index: number, offset: number): unknown[] {
+  const next = [...steps]
+  ;[next[index], next[index + offset]] = [next[index + offset], next[index]]
+  return next
+}
+
 /** The steps with a new, unconnected step of the entry at the end. */
 export function addStep(content: Content, entry: PaletteEntry): Added {
   const steps = stepsOf(content)

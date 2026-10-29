@@ -252,6 +252,34 @@ test.describe('Studio edits a process in the process editor', () => {
     }
   })
 
+  test('an author moves a step up on the Design tab, hears where it went and undoes the move', async ({ page }) => {
+    await useSession(page, 'author')
+    const id = await processId(page)
+    const target = path.join(copy, file)
+    const original = await readFile(target, 'utf8')
+
+    try {
+      const content = JSON.parse(original) as { steps: { name: string }[] }
+      const moved = content.steps.findIndex((step) => step.name === 'financeCheck')
+      expect(moved).toBeGreaterThan(0)
+      const before = moved === 1 ? 'moved to the start' : `moved after ${content.steps[moved - 2].name}`
+      await page.goto(`${server.url}/studio?app=PurchaseRequests&resource=${id}`)
+
+      await page.getByTestId(`studio-graph-node-${moved}`).click()
+      await page
+        .getByTestId(`studio-step-${moved}`)
+        .getByRole('button', { name: 'Move up', exact: true })
+        .click()
+      await expect(page.getByTestId('studio-process-announcement')).toHaveText(`Step financeCheck ${before}`)
+      await expect(page.getByTestId(`studio-step-${moved - 1}`)).toContainText('financeCheck')
+
+      await page.getByRole('button', { name: 'Undo', exact: true }).click()
+      await expect(page.getByTestId(`studio-graph-node-${moved}`)).toHaveAccessibleName(/^financeCheck · /)
+    } finally {
+      await writeFile(target, original)
+    }
+  })
+
   test('an author drags a type onto an edge, inserts another after it by keyboard and finds both wired in the saved file', async ({
     page,
   }) => {
