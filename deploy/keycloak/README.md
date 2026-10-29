@@ -8,6 +8,9 @@ create` fails at its realm step.
 Realms made by `tenant create` name the login theme `axis`, which `npm run build:keycloak-theme --prefix web` builds into
 `artifacts/keycloak-theme`. Mount it at `/opt/keycloak/themes/`. Without it, Keycloak shows its own sign-in page.
 
+The on-premises Compose example in `deploy/compose/` mounts both: the password list from this folder and the theme
+from `AXIS_IDENTITY_THEME_DIR`, see [on premises](../../docs/reference/installation.md#on-premises).
+
 The list comes from the top 1,000,000 passwords of the Xato 10 million password list in
 [SecLists](https://github.com/danielmiessler/SecLists/blob/master/Passwords/Common-Credentials/xato-net-10-million-passwords-1000000.txt)
 (MIT licence). It keeps only the entries of 12 to 128 characters, because the realm's length rule refuses shorter

@@ -276,16 +276,17 @@ _(planned for M17)_
   fonts. Keycloak's other pages still come from its `keycloak` parent theme. The development realm `axis` uses the theme as
   its login theme: Compose, `scripts/dev.sh`, `scripts/e2e.sh` and the Keycloak of the integration tests load it from
   `artifacts/keycloak-theme`, and each builds it first. The realms of `tenant create` name the theme as their login
-  theme. The on-premises install and the Helm chart do not load it yet, so Keycloak there falls back to its built-in
-  theme.
+  theme. The on-premises Compose example loads it from `AXIS_IDENTITY_THEME_DIR`, see
+  [on premises](installation.md#on-premises). The Helm chart does not load it yet, so Keycloak there falls back to its
+  built-in theme.
 
 ## Installation
 
-_(planned for M17)_
-
-- Docker Compose, the Helm chart and the on-premises install run Axis's identity provider with its own database on the
-  PostgreSQL server, behind the same TLS proxy as the server, on one host of its own for the installation. The
-  operator upgrades it with Axis, which pins its version.
+- _(built)_ The on-premises Compose example runs Axis's identity provider with its own database on the PostgreSQL
+  server, behind the same TLS proxy as the server, on one host of its own for the installation. It pins the Keycloak
+  version of development and the tests, and the operator upgrades it with Axis. See
+  [on premises](installation.md#on-premises).
+- _(planned for M17)_ The Helm chart runs it the same way.
 - The development realm `axis` stays for `scripts/dev.sh` and the tests, as the `default` tenant's realm, see
   [security](security.md#development-users). Under `scripts/dev.sh` and in the E2E run, the server's startup activation
   keeps it in step through its `axis-activation` client, so the realm holds a `site-` client for each sample site, see
