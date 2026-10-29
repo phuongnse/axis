@@ -6,6 +6,7 @@ import { SignInPage } from './SignInPage'
 import type { SignInContext } from './signInContext'
 
 const context: SignInContext = {
+  page: 'signIn',
   title: 'Sign in to Axis',
   realmName: 'Contoso',
   providers: [{ alias: 'contoso', label: 'Contoso ID', loginUrl: '/broker/contoso' }],
