@@ -26,13 +26,13 @@
       "name": "build",
       "run": "scripts/build.sh",
       "timeout_minutes": 10,
-      "group": "fast"
+      "group": "build-lint"
     },
     {
       "name": "lint",
       "run": "scripts/lint.sh",
       "timeout_minutes": 10,
-      "group": "fast"
+      "group": "build-lint"
     },
     {
       "name": "test",

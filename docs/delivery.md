@@ -124,7 +124,7 @@ with the reasons. What each one does is in NexKit's
   `test-results-performance`.
 - **NexKit's checks skip suites that a change cannot affect.** NexKit runs the
   checks in seven jobs at once, with `parallel_checks` on: the build and lint
-  in one job, the group `fast`, and the unit tests, the smoke tests, the
+  in one job, the group `build-lint`, and the unit tests, the smoke tests, the
   integration tests and each of three E2E shards in their own. A check round
   then takes about as long as its slowest job, instead of all of them in a
   row, which took 20 to 50 minutes. A check gets a job of its own when
