@@ -6,8 +6,7 @@ their organization uses. [D99](../decisions/d99-axis-ships-its-own-identity-prov
 its people sign in and each site pick from that. M17 builds it, and each section says whether it is built. The
 `identityProvider` resource, a site's `signIn` and their compile checks are built, and so is the tenant's realm that
 `tenant create` makes. Activation checks the bindings of `oidc` providers and refuses providers that would split a person. Sign-in does
-not read them yet, activation through `Axis.Admin` updates the realm but the server's startup activation does not yet,
-and a new realm has no accounts, no redirect addresses and no role mappings, so until they do, a tenant signs in through an identity provider that runs outside
+not read them yet, activation updates the realm, and a new realm has no accounts, no redirect addresses and no role mappings, so until they do, a tenant signs in through an identity provider that runs outside
 Axis, which `tenant oidc set` points its `Oidc` block at, as [security](security.md#sign-in-and-the-session) describes. Accounts, roles given by an administrator and the
 users page are in [user administration](user-administration.md).
 
@@ -104,7 +103,7 @@ so Studio edits it, with the identity provider editor of [Studio](studio.md), an
     [sites and sign-in](#sites-and-sign-in).
 - **Read only by activation:** activation checks the bindings of `oidc` providers against the tenant's, and refuses
   providers that would split a person into two users, see [users](#users). It plans the realm it wants.
-  Activation through `Axis.Admin` updates the realm, and the server's startup activation does not yet, see
+  Activation updates the realm, through `Axis.Admin` and the server's startup activation, see
   [keeping the realm in step](#keeping-the-realm-in-step). Sign-in does not read the resource yet. Studio's blank application creates an `accounts` provider, and New resource creates
   more from an `accounts` starter. Studio edits the kind with the identity provider editor, which does not show a
   binding's value, and a site's `signIn` with a picker of the application's providers.
@@ -203,7 +202,8 @@ _(planned for M17)_
   `<provider alias>.<subject>`. Each provider names the realm's first-login flow. It touches no other client or
   provider, so `axis`, `axis-activation`, `axis-users` and anything an operator added stay. Both tenant catalogs carry
   the realm's name, the identity provider's address and the activation secret, see
-  [tenant realm](host-settings.md#tenant-realm).
+  [tenant realm](host-settings.md#tenant-realm). The server's startup activation calls it, after it activates each
+  application folder, for a tenant that has realm details. So does `Axis.Admin` activation, as described below.
 - **Brought in step by activation:** activating a release adds, changes and removes the realm's brokered providers,
   their claim mappers and the site clients to match the active releases of the tenant and its platform sign-in. A
   provider that nothing names any more is removed. Its users stay, but cannot sign in through it.
@@ -212,7 +212,7 @@ _(planned for M17)_
   secret, such as a preview tenant or one that signs in through an outside identity provider, skips the update. A
   failure of the identity provider fails the step with a line that names the identity provider step and its status
   code, and the new release stays active, see [activate](administration.md#activate). A `validate` and a `test`
-  never update the realm. The server's startup activation does not update the realm yet.
+  never update the realm. The server's startup activation updates it too, see above.
 - **Bindings:** a missing binding, or a binding of the wrong kind, fails activation, as for a connector (`AXC0100`).
   Built for `oidc` providers: `issuer` is a `url` binding, and `clientId`, `clientSecret` and `clientKey` are `secret`
   bindings. On a preview tenant activation leaves the provider out with a warning, see
@@ -268,7 +268,10 @@ _(planned for M17)_
   PostgreSQL server, behind the same TLS proxy as the server, on one host of its own for the installation. The
   operator upgrades it with Axis, which pins its version.
 - The development realm `axis` stays for `scripts/dev.sh` and the tests, as the `default` tenant's realm, see
-  [security](security.md#development-users). Activation keeps it in step as any realm.
+  [security](security.md#development-users). Under `scripts/dev.sh` and in the E2E run, the server's startup activation
+  keeps it in step through its `axis-activation` client, so the realm holds a `site-` client for each sample site, see
+  [development realm and users](../development.md#development-realm-and-users). Under Docker Compose it does not,
+  because the server's container cannot reach Keycloak at `localhost:8080`.
 - **Backup and restore:** the identity provider's database holds the accounts and their credentials. The operator
   backs it up with the installation. `tenant backup` does not carry them, so a tenant restored to another
   installation gets a new realm, and its accounts need new invitations.

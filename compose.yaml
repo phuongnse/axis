@@ -80,6 +80,8 @@ services:
       # The preview tenant default-preview. Its other settings are in appsettings.Development.json.
       Tenants__default-preview__ConnectionString: Host=postgres;Port=5432;Database=axis_preview;Username=axis_preview_runtime;Password=axis
       Tenants__default-preview__SchemaConnectionString: Host=postgres;Port=5432;Database=axis_preview;Username=axis_preview_schema;Password=axis
+      # Blank, so startup activation skips the realm update: the container cannot reach Keycloak at localhost:8080.
+      Tenants__default__Realm__ActivationClientSecret: ""
       ActivateOnStartup__0: /samples/apps/purchase-requests
       ActivateOnStartup__1: /samples/apps/leave-requests
       ActivateOnStartup__2: /samples/apps/service-desk

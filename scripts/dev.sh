@@ -323,11 +323,15 @@ while :; do
   # set in this subshell only: the schema role is for its steps, and the runtime role is for seeding.
   if [ -z "$publisher" ] && [ -e "$state/server-listening" ]; then
     log "The server has migrated the tenant databases. Starting the publisher."
-    # Bash cannot export a name with a hyphen, so the settings go through env.
+    # Bash cannot export a name with a hyphen, so the settings go through env. The realm settings only let the
+    # tenant catalog pass validation: the server alone brings the realm in step.
     (exec env DOTNET_ENVIRONMENT=Development \
       Extensions__Path="$PWD/artifacts/extensions" \
       Modules__Path="$PWD/artifacts/modules" \
       Tenants__default__Hosts__0=localhost \
+      Tenants__default__Oidc__Authority="http://localhost:$keycloak_port/realms/axis" \
+      Tenants__default__Realm__Name=axis \
+      Tenants__default__Realm__ActivationClientSecret=axis-activation-development-secret \
       Tenants__default__ConnectionString="Host=localhost;Port=$postgres_port;Database=axis;Username=axis_runtime;Password=axis" \
       Tenants__default__SchemaConnectionString="Host=localhost;Port=$postgres_port;Database=axis;Username=axis_schema;Password=axis" \
       Tenants__default__Bindings__PurchasingSystemUrl__Kind=url \

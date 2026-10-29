@@ -344,7 +344,7 @@ A tenant's catalog entry can carry what activation needs to sync the tenant's
 realm: the realm name, the identity provider's address and the secret of the
 `axis-activation` client. See
 [keeping the realm in step](identity-provider.md#keeping-the-realm-in-step).
-Activation does not use it yet.
+The server's startup activation and `Axis.Admin` activation use it.
 
 - **Under `configuration`.** The tenant settings `Tenants:{id}:Realm:Name` and
   `Tenants:{id}:Realm:ActivationClientSecret` give it. As environment variables
