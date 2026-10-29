@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation, useNavigate } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -18,6 +18,7 @@ import { hostileMarkup } from '../test/hostile'
 import { designTokensFor } from './designTokens'
 import { TableWidget } from './TableWidget'
 import { TextProvider } from './TextProvider'
+import { ThemeModeProvider } from './theme'
 import { narrowWidthQuery } from './useNarrowWidth'
 
 function field(name: string, type: FieldType, labelKey: string | null): FieldMetadata {
@@ -267,6 +268,18 @@ function renderWidget(search = '', widget: WidgetMetadata = noteWidget, pageValu
       </TextProvider>
       <CurrentLocation />
     </MemoryRouter>,
+  )
+}
+
+function renderWidgetInDark(widget: WidgetMetadata) {
+  return render(
+    <ThemeModeProvider initialMode="dark">
+      <MemoryRouter initialEntries={['/e2e/notes']}>
+        <TextProvider catalogs={catalogs} development={false}>
+          <TableWidget sitePath="e2e" widget={widget} locale="en" />
+        </TextProvider>
+      </MemoryRouter>
+    </ThemeModeProvider>,
   )
 }
 
@@ -1109,6 +1122,28 @@ describe('TableWidget', () => {
       expect(within(row).queryByRole('link')).not.toBeInTheDocument()
     })
 
+    it('draws the delete icon in dangerText and names it on keyboard focus in dark mode', async () => {
+      stubRecords()
+      renderWidgetInDark({ ...noteWidget, rowActions: [remove] })
+
+      const row = await screen.findByRole('row', { name: /Buy paper/ })
+      const button = within(row).getByRole('button', { name: 'Delete note' })
+      expect(button).toHaveStyle({ color: designTokensFor('dark').colour.dangerText })
+      act(() => button.focus())
+
+      expect(await screen.findByRole('tooltip')).toHaveTextContent('Delete note')
+    })
+
+    it('names the Actions menu on keyboard focus', async () => {
+      stubRecords()
+      renderWidget('', { ...noteWidget, rowActions: [open, close, edit, remove] })
+
+      const row = await screen.findByRole('row', { name: /Buy paper/ })
+      act(() => within(row).getByRole('button', { name: 'Actions' }).focus())
+
+      expect(await screen.findByRole('tooltip')).toHaveTextContent('Actions')
+    })
+
     it('folds three or more other actions into one Actions menu with the delete marked danger', async () => {
       stubRecords()
 
@@ -1176,6 +1211,57 @@ describe('TableWidget', () => {
       renderWidget()
 
       expect(await screen.findByRole('button', { name: 'Refresh' })).toBeInTheDocument()
+    })
+
+    it('names Refresh on keyboard focus', async () => {
+      stubRecords()
+      renderWidget()
+
+      const refresh = await screen.findByRole('button', { name: 'Refresh' })
+      act(() => refresh.focus())
+
+      expect(await screen.findByRole('tooltip')).toHaveTextContent('Refresh')
+    })
+
+    it('draws the first toolbar action as the main action and the others as secondary in dark mode', async () => {
+      stubRecords()
+      const main: NavigateAction = { ...open, record: null, labelKey: 'note.add' }
+      const other: NavigateAction = { ...main, labelKey: 'note.close' }
+
+      renderWidgetInDark({ ...noteWidget, toolbarActions: [main, other] })
+
+      await screen.findByRole('row', { name: /Buy paper/ })
+      const { colour } = designTokensFor('dark')
+      expect(screen.getByRole('button', { name: 'Add note' })).toHaveStyle({
+        color: colour.primaryText,
+        borderColor: colour.primaryText,
+      })
+      expect(screen.getByRole('button', { name: 'Close note' }).style.color).toBe('')
+    })
+
+    it('makes the first shown toolbar action the main one when an earlier action is hidden', async () => {
+      stubRecords()
+      const hidden: NavigateAction = { ...open, record: null, labelKey: 'note.add' }
+      const shown: NavigateAction = {
+        ...open,
+        page: 'TicketDetail',
+        labelKey: 'note.details',
+        record: null,
+        opensForm: false,
+        parameters: { kind: "'all'" },
+      }
+
+      renderWidgetInDark({
+        ...noteWidget,
+        access: { actions: ['read'], createFields: [], updateFields: [] },
+        toolbarActions: [hidden, shown],
+      })
+
+      await screen.findByRole('row', { name: /Buy paper/ })
+      expect(screen.queryByRole('button', { name: 'Add note' })).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Details' })).toHaveStyle({
+        color: designTokensFor('dark').colour.primaryText,
+      })
     })
 
     it('puts the first toolbar action last, after Refresh, Import and Export', async () => {

@@ -1,6 +1,7 @@
 import { CloseOutlined, SearchOutlined } from '@ant-design/icons'
-import { Button, Col, Form, Input, Row, Space, Tooltip, Typography } from 'antd'
+import { Col, Form, Input, Row, Space, Typography } from 'antd'
 import { Fragment, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { AxisButton } from './AxisButton'
 import { ChildCollectionTable } from './ChildCollectionTable'
 import { NotSet } from './EmptyValue'
 import { FieldInput } from './FieldInput'
@@ -465,17 +466,19 @@ export function useRecordForm(
               aria-describedby={helpId}
               value={typeof label === 'string' ? label : ''}
             />
-            <Tooltip title={t('shell.form.choose')}>
-              <Button
-                aria-label={t('shell.form.choose')}
-                icon={<SearchOutlined />}
-                onClick={() => setLookup(field.name)}
-              />
-            </Tooltip>
+            <AxisButton
+              role="icon"
+              nameKey="shell.form.choose"
+              icon={<SearchOutlined />}
+              onClick={() => setLookup(field.name)}
+            />
             {!field.required && value !== null && (
-              <Tooltip title={t('shell.form.clear')}>
-                <Button aria-label={t('shell.form.clear')} icon={<CloseOutlined />} onClick={() => clear(field)} />
-              </Tooltip>
+              <AxisButton
+                role="icon"
+                nameKey="shell.form.clear"
+                icon={<CloseOutlined />}
+                onClick={() => clear(field)}
+              />
             )}
           </Space.Compact>
         )

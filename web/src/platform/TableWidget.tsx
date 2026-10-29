@@ -572,7 +572,7 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
                   'aria-label': t('shell.table.rowActions'),
                 }}
               >
-                <Tooltip title={t('shell.table.rowActions')}>
+                <Tooltip title={t('shell.table.rowActions')} trigger={['hover', 'focus']}>
                   <Button
                     type="text"
                     size="small"
@@ -587,18 +587,17 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
             <Flex gap="small">
               {list.map(({ action, index, run }) =>
                 action.type === 'delete' ? (
-                  <Tooltip key={index} title={t(action.labelKey)}>
-                    <Button
-                      type="text"
-                      size="small"
-                      danger
-                      icon={<DeleteOutlined />}
-                      aria-label={t(action.labelKey)}
-                      disabled={disabled(action)}
-                      onClick={run}
-                      {...canvas.props(`rowActions/${index}`)}
-                    />
-                  </Tooltip>
+                  <AxisButton
+                    key={index}
+                    role="icon"
+                    nameKey={action.labelKey}
+                    destructive
+                    size="small"
+                    icon={<DeleteOutlined />}
+                    disabled={disabled(action)}
+                    onClick={run}
+                    {...canvas.props(`rowActions/${index}`)}
+                  />
                 ) : (
                   <Button
                     key={index}
@@ -710,20 +709,18 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
           />
         )}
         <Flex gap="small" style={{ marginInlineStart: 'auto' }}>
-          <Tooltip title={t('shell.table.refresh')}>
-            <Button
-              type="text"
-              icon={<ReloadOutlined />}
-              aria-label={t('shell.table.refresh')}
-              onClick={() => {
-                if (!canvas.active) {
-                  // The same URL is requested again, so the table shows busy meanwhile.
-                  setState((current) => ({ ...current, url: undefined }))
-                  setReloads((count) => count + 1)
-                }
-              }}
-            />
-          </Tooltip>
+          <AxisButton
+            role="icon"
+            nameKey="shell.table.refresh"
+            icon={<ReloadOutlined />}
+            onClick={() => {
+              if (!canvas.active) {
+                // The same URL is requested again, so the table shows busy meanwhile.
+                setState((current) => ({ ...current, url: undefined }))
+                setReloads((count) => count + 1)
+              }
+            }}
+          />
           {canImport && (
             <AxisButton role="secondary" onClick={() => !canvas.active && setImporting(true)}>
               {t('shell.table.import')}
@@ -740,18 +737,21 @@ export function TableWidget({ sitePath, widget, locale, pageValues }: TableWidge
                 onClick: ({ key }) => !canvas.active && void runExport(key as ExportFormat),
               }}
             >
-              <Button loading={exporting}>{t('shell.table.export')}</Button>
+              <AxisButton role="secondary" loading={exporting}>
+                {t('shell.table.export')}
+              </AxisButton>
             </Dropdown>
           )}
-          {/* The first toolbar action is the main action, so it comes last. */}
+          {/* The first shown toolbar action is the main action, so it comes last. */}
           {[...toolbarButtons.slice(1), ...toolbarButtons.slice(0, 1)].map(({ action, path, index }) => (
-            <Button
+            <AxisButton
               key={index}
+              role={index === toolbarButtons[0]?.index ? 'main' : 'secondary'}
               onClick={() => navigate(path, { state: { from } })}
               {...canvas.props(`toolbarActions/${index}`)}
             >
               {t(action.labelKey)}
-            </Button>
+            </AxisButton>
           ))}
         </Flex>
       </Flex>
