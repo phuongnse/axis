@@ -115,7 +115,7 @@ and Dn refers to [decisions.md](../decisions.md). The rest of the frontend is in
     this build does not know is left out. A button opens the same reason dialog
     as Cancel and Retry, with the same rules for the reason, and posts it to
     `{deadLettersPath}/{id}/redeliver` or `…/discard`. Redeliver, with a send
-    icon, and Discard, with a red trash icon, are icon buttons with their names
+    icon, and Discard, with a trash icon in `dangerText`, are icon buttons with their names
     as tooltips, and both still open the reason dialog. On success, the dialog
     closes and the list is requested again, so a settled dead letter leaves
     it. On a `400`, `403`, `404` or `409`, the dialog shows the problem's title,

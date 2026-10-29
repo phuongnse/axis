@@ -594,6 +594,16 @@ describe('FormWidget', () => {
     expect(clear.querySelector('.anticon-close')).not.toBeNull()
   })
 
+  it('names Choose on keyboard focus', async () => {
+    stubFetch({ status: 200, body: noteJson('Buy paper', 1) })
+    renderForm(noteId)
+    await screen.findByLabelText('Category')
+
+    act(() => screen.getByRole('button', { name: 'Choose' }).focus())
+
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Choose')
+  })
+
   it('shows the history of a saved record below the form', async () => {
     stubFetch({ status: 200, body: noteJson('Buy paper', 1) })
 

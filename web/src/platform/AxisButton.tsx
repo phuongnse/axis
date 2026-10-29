@@ -1,12 +1,14 @@
 import { Button, Tooltip, type ButtonProps } from 'antd'
-import type { CSSProperties, ReactNode } from 'react'
+import type { CSSProperties, ReactNode, Ref } from 'react'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
 
 /** The level of an action. Each level has one style, so the same kind of action always looks the same. */
 export type ButtonRole = 'finish' | 'main' | 'secondary' | 'icon' | 'destructive'
 
-type Base = Omit<ButtonProps, 'type' | 'color' | 'variant' | 'danger' | 'role' | 'icon'>
+type Base = Omit<ButtonProps, 'type' | 'color' | 'variant' | 'danger' | 'role' | 'icon'> & {
+  ref?: Ref<HTMLButtonElement>
+}
 
 export type AxisButtonProps =
   | (Base & { role: Exclude<ButtonRole, 'icon'>; icon?: never })

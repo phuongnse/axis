@@ -1,13 +1,15 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { act, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation } from 'react-router'
 import { describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
+import { designTokensFor } from './designTokens'
 import { isSignInNeeded } from './signInNeeded'
 import { assignLocation } from './navigation'
 import { ProcessInspectorWidget } from './ProcessInspectorWidget'
 import type { WidgetMetadata } from './site'
 import { TextProvider } from './TextProvider'
+import { ThemeModeProvider } from './theme'
 
 vi.mock('./navigation')
 
@@ -149,6 +151,18 @@ function renderWidget(search = '') {
       </TextProvider>
       <CurrentSearch />
     </MemoryRouter>,
+  )
+}
+
+function renderWidgetInDark() {
+  return render(
+    <ThemeModeProvider initialMode="dark">
+      <MemoryRouter initialEntries={['/e2e/inspector']}>
+        <TextProvider catalogs={catalogs} development={false}>
+          <ProcessInspectorWidget sitePath="e2e" pageName="Inspector" widget={inspectorWidget} locale="en" />
+        </TextProvider>
+      </MemoryRouter>
+    </ThemeModeProvider>,
   )
 }
 
@@ -334,6 +348,18 @@ describe('ProcessInspectorWidget', () => {
     await user.click(within(row).getByRole('button', { name: 'Discard' }))
     const dialog = await screen.findByRole('dialog')
     expect(within(dialog).getByText('Discard', { selector: '.ant-modal-title' })).toBeInTheDocument()
+  })
+
+  it('draws Discard in dangerText and names it on keyboard focus in dark mode', async () => {
+    stubInstances()
+    renderWidgetInDark()
+
+    const row = await screen.findByRole('row', { name: /event\.deliver/ })
+    const discard = within(row).getByRole('button', { name: 'Discard' })
+    expect(discard).toHaveStyle({ color: designTokensFor('dark').colour.dangerText })
+    act(() => discard.focus())
+
+    expect(await screen.findByRole('tooltip')).toHaveTextContent('Discard')
   })
 
   it('shows the empty text when no dead letter is open', async () => {

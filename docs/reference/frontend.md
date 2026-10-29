@@ -99,26 +99,26 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   - *Finish*: solid primary. The one action that finishes a task, such as Save
     or Next, one per screen.
   - *Main*: outlined in `primaryText`. The main action of a region: a table's
-    first toolbar action, such as New request _(planned)_, Add row of a child
+    first toolbar action that is shown, such as New request, Add row of a child
     collection, and a `startProcess` action on a form or a detail.
   - *Secondary*: the default grey outline, such as Cancel and Import.
   - *Icon*: a text button with only an icon, for small actions such as
     Refresh, Choose and Clear.
   - *Destructive*: in `dangerText` at any level, such as Remove row and
-    Delete _(planned)_.
+    Delete.
   - Ant Design writes the text of text, outlined and danger buttons in the
     fill colours `primary` and `danger`, which fail contrast on a dark
     surface, so Axis writes them in `primaryText` and `dangerText`. One shared
     Axis button, `AxisButton` in `web/src/platform/`, takes the role, and each
     widget names a role, never an Ant Design button type. The table's toolbar,
-    row action and field buttons _(planned)_ move to it in later parts.
+    its icon buttons and the reference, set and file field buttons use it.
   - **Icon-only buttons.** Only for actions repeated on every row, or where
     space is tight. Main toolbar actions keep their text. Every icon-only
     button shows its name as a tooltip on hover and on keyboard focus, and has
     the same text as its accessible name, from the text resources.
     Configuration never names an icon, so the platform gives an icon only to
     an action whose meaning it knows. At narrow width row actions fold into a
-    menu of text entries, so touch users lose nothing _(planned)_.
+    menu of text entries, so touch users lose nothing.
 - **Selected and current states**. The selected tab, the active
   menu entry and the current page of a pagination use `primaryText`.
   Destructive menu entries use `dangerText`.
@@ -580,7 +580,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     named by the platform text `shell.table.refresh` ("Refresh", in `vi` "Làm
     mới"), which loads the current page of rows again. Then come the secondary
     actions, Import, Export and the toolbar actions after the first, and last
-    the first toolbar action, as the table's main action, see **Buttons**. The
+    the first shown toolbar action, as the table's main action, see **Buttons**. The
     toolbar always shows, also when the table has no search or toolbar action.
   - **Search.** A table whose rows can be searched shows a search box above
     the rows, on the left, with the toolbar buttons on the right. An entity
@@ -755,7 +755,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
       are buttons in the row. At narrow width, a row's actions fold into one
       menu button labelled by the platform text `shell.table.rowActions`.
       With one or two actions besides the open link, they show in
-      the row: a `delete` is a red trash icon named by its label, and any other
+      the row: a `delete` is a trash icon in `dangerText`, named by its label, and any other
       action a small text button. With three or more, or at narrow width, they
       fold into one "…" icon button named `shell.table.rowActions`, which
       opens a menu of text entries, a delete entry in `dangerText`. The count
