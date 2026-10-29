@@ -1,5 +1,9 @@
 using System.Text.Json;
+using Axis.Configuration.Diagnostics;
+using Axis.Configuration.Realms;
+using Axis.Tenancy;
 using Axis.Tenancy.Platform;
+using Axis.Tenancy.Realms;
 using Microsoft.EntityFrameworkCore;
 
 namespace Axis.Administration;
@@ -125,26 +129,91 @@ public static class TenantPlatformSignIn
 
                 // A delete in the database, so that a provider with the same key as a new one never clashes in the change tracker.
                 await platform.TenantPlatformProviders.Where(provider => provider.TenantId == tenantId).ExecuteDeleteAsync(token);
-                platform.TenantPlatformProviders.AddRange(change.Providers.Select(provider => new TenantPlatformProviderRow
-                {
-                    TenantId = tenantId,
-                    Name = provider.Name,
-                    Type = provider.Type,
-                    IssuerBinding = provider.Issuer,
-                    ClientIdBinding = provider.ClientId,
-                    ClientSecretBinding = provider.ClientSecret,
-                    ClientKeyBinding = provider.ClientKey,
-                    MetadataBinding = provider.Metadata,
-                    ClaimDisplayName = Claim(provider, "displayName"),
-                    ClaimEmail = Claim(provider, "email"),
-                    ClaimLocale = Claim(provider, "locale"),
-                    RolesClaim = provider.RolesClaim,
-                    RoleValues = JsonSerializer.Serialize(provider.RoleValues.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal)),
-                }));
+                platform.TenantPlatformProviders.AddRange(change.Providers.Select(provider => ToRow(tenantId, provider)));
                 return null;
             },
             Conflict,
             cancellationToken);
+    }
+
+    /// <summary>The row the directory stores for <paramref name="provider"/>.</summary>
+    public static TenantPlatformProviderRow ToRow(string tenantId, TenantPlatformProvider provider)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(tenantId);
+        ArgumentNullException.ThrowIfNull(provider);
+
+        return new TenantPlatformProviderRow
+        {
+            TenantId = tenantId,
+            Name = provider.Name,
+            Type = provider.Type,
+            IssuerBinding = provider.Issuer,
+            ClientIdBinding = provider.ClientId,
+            ClientSecretBinding = provider.ClientSecret,
+            ClientKeyBinding = provider.ClientKey,
+            MetadataBinding = provider.Metadata,
+            ClaimDisplayName = Claim(provider, "displayName"),
+            ClaimEmail = Claim(provider, "email"),
+            ClaimLocale = Claim(provider, "locale"),
+            RolesClaim = provider.RolesClaim,
+            RoleValues = JsonSerializer.Serialize(provider.RoleValues.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal)),
+        };
+    }
+
+    /// <summary>
+    /// Checks the change against the tenant's bindings and active releases before anything is stored, and plans the realm the change
+    /// leads to. Every <c>oidc</c> provider must name bindings the tenant has, of the right kind and with a value, and when the tenant
+    /// has a realm (<paramref name="hasRealm"/>) a <c>--client-secret</c>, which the realm sync needs. A provider that would split a
+    /// person against a provider of <paramref name="applications"/>, or against another platform provider, is refused with
+    /// <see cref="DiagnosticCodes.IdentityProviderSplitsUser"/>. The providers of <paramref name="applications"/> whose bindings the tenant
+    /// lacks are left out of the plan, the way activation leaves them out. A message names options, providers and bindings, never a value.
+    /// </summary>
+    /// <param name="bindings">The tenant's bindings. A secret binding without a value is left out.</param>
+    public static (string? Problem, RealmPlan Plan) PlanRealm(
+        string tenantId,
+        TenantPlatformSignInChange change,
+        IReadOnlyDictionary<string, TenantBinding> bindings,
+        IReadOnlyList<RealmApplication> applications,
+        bool hasRealm)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(tenantId);
+        ArgumentNullException.ThrowIfNull(change);
+        ArgumentNullException.ThrowIfNull(bindings);
+        ArgumentNullException.ThrowIfNull(applications);
+
+        var platform = PlatformSignInProviders.From(change.Providers.Select(provider => ToRow(tenantId, provider)));
+        foreach (var provider in platform.Where(provider => provider.Type == "oidc"))
+        {
+            if (RealmProviderBindings.Missing(provider, bindings) is { } missing)
+            {
+                return ($"The provider '{provider.Name}': the binding '{missing}' is missing, is of the wrong kind or has no value.", new RealmPlan([], []));
+            }
+
+            if (hasRealm && provider.ClientSecretBinding is null)
+            {
+                return ($"The provider '{provider.Name}': the realm needs --client-secret.", new RealmPlan([], []));
+            }
+        }
+
+        var planned = RealmPlanner.Build(
+            [.. applications.Select(application => application with
+            {
+                Providers = [.. application.Providers.Where(provider => RealmProviderBindings.Missing(provider, bindings) is null)],
+            })],
+            platform);
+        var split = planned.Conflicts.FirstOrDefault(conflict => conflict.ApplicationId == RealmApplication.PlatformSignInId);
+        if (split is not null)
+        {
+            var other = split.Other.ApplicationId == RealmApplication.PlatformSignInId
+                ? $"the provider '{split.OtherProvider.Name}' of the platform sign-in"
+                : $"the provider '{split.OtherProvider.Name}' of the application '{split.Other.Name}'";
+            var what = split.Kind == RealmConflictKind.ClientBindings
+                ? $"names the issuer binding '{split.Provider.IssuerBinding}' with other client bindings than {other}. Use the same client bindings."
+                : $"names the same bindings as {other} but other claims. Use the same claims.";
+            return ($"{DiagnosticCodes.IdentityProviderSplitsUser} The provider '{split.Provider.Name}' {what} The same person would become two users.", planned.Plan);
+        }
+
+        return (null, planned.Plan);
     }
 
     private static string? Claim(TenantPlatformProvider provider, string name) =>

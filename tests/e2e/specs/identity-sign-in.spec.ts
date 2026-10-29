@@ -1,5 +1,6 @@
 import { expect, test } from '../test'
-import { logInAtKeycloak, signInUsername, submitPassword } from '../keycloak'
+import { totp, totpSecret } from '../totp'
+import { signInUsername, submitCode, submitPassword } from '../keycloak'
 
 // The development realm signs people in on the Axis theme. The theme reads prefers-color-scheme, because the origin of
 // Keycloak has no stored mode. The canvas colours are the canvas token of web/src/platform/designTokens.ts.
@@ -31,7 +32,14 @@ for (const { mode, canvas } of [
     await expect(page.getByText(/^© \d{4} Axis$/)).toBeVisible()
     await expect(page.locator('#root > div')).toHaveCSS('background-color', canvas)
 
-    await logInAtKeycloak(page, 'requester')
+    await submitPassword(page, 'requester', 'axis')
+
+    // Keycloak switches to the language of the user once the password is right, and requester prefers Vietnamese.
+    await expect(page.getByRole('heading', { name: 'Xác minh hai bước', exact: true })).toBeVisible()
+    await expect(page.locator('#root > div')).toHaveCSS('background-color', canvas)
+    await expect(page.locator('#root form').first().locator('input:not([type="hidden"])')).toHaveCount(6)
+
+    await submitCode(page, totp(totpSecret('requester')))
 
     await expect(page).toHaveURL(`${baseURL}/`)
     await expect(page.getByRole('banner').getByRole('button', { name: 'Requester User', exact: true })).toBeVisible()

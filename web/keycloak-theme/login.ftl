@@ -18,6 +18,7 @@
   <div id="root"></div>
   <script type="application/json" id="axis-sign-in-context">
   {
+    "page": "signIn",
     "title": "${msg("axisSignInTitle")?json_string?no_esc}",
     "realmName": "${((realm.displayName)?has_content?then(realm.displayName, realm.name))?json_string?no_esc}",
     "providers": [

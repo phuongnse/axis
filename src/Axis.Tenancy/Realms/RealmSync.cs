@@ -14,7 +14,8 @@ namespace Axis.Tenancy.Realms;
 /// master realm. Each site gets a confidential client <c>site-</c> and its path, which carries the attributes <c>axis.providers</c> (the aliases of the providers the site allows, separated by spaces) and <c>axis.accounts</c> (<c>true</c> or <c>false</c>), and which copies the redirect addresses, web origins and
 /// post-logout redirect addresses of <c>axis</c> and, when the state holds the platform secret, has the secret that
 /// <see cref="SiteClientSecret"/> derives from it. Its ID token carries the alias of the
-/// provider that signed the person in as the <c>identity_provider</c> claim. Each provider gets claim mappers for the
+/// provider that signed the person in as the <c>identity_provider</c> claim. Each site client also copies the protocol mappers of
+/// <c>axis</c> by name, except one named <c>identity provider</c>, and never removes a mapper. Each provider gets claim mappers for the
 /// display name, the email, the locale and each roles claim, and a <c>username</c> mapper that names a new user after the
 /// provider's alias and the person's subject. A provider with labels has the display name <c>${axisProvider.&lt;alias&gt;}</c>, and the
 /// sync writes the label of each platform locale as the realm text of that key through the realm localization API, which
@@ -162,6 +163,7 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
             }
         }
 
+        var platformMappers = PlatformMappers(platformClient);
         var desired = sites.ToDictionary(site => SiteClientId(site.Path), StringComparer.Ordinal);
         foreach (var (clientId, site) in desired)
         {
@@ -181,6 +183,7 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
             }
 
             await EnsureSessionNoteMapperAsync(token, realmPath, uuid, clientId, cancellationToken);
+            await EnsurePlatformMappersAsync(token, realmPath, uuid, clientId, platformMappers, cancellationToken);
         }
 
         foreach (var (clientId, (uuid, _)) in existing.Where(pair => !desired.ContainsKey(pair.Key)))
@@ -302,6 +305,112 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
         }
 
         return desired.All(pair => config.TryGetProperty(pair.Key, out var value) && value.GetString() == pair.Value);
+    }
+
+    /// <summary>The protocol mappers of the platform client except the one the sync keeps as it is, or none without the client.</summary>
+    private static List<(string Name, string Protocol, string Type, Dictionary<string, string> Config)> PlatformMappers(JsonElement? platformClient)
+    {
+        var mappers = new List<(string Name, string Protocol, string Type, Dictionary<string, string> Config)>();
+        if (platformClient is not { } platform
+            || !platform.TryGetProperty("protocolMappers", out var array)
+            || array.ValueKind != JsonValueKind.Array)
+        {
+            return mappers;
+        }
+
+        foreach (var mapper in array.EnumerateArray())
+        {
+            var name = mapper.GetProperty("name").GetString()!;
+            if (name == SessionNoteMapperName)
+            {
+                continue;
+            }
+
+            var protocol = mapper.TryGetProperty("protocol", out var protocolValue) && protocolValue.ValueKind == JsonValueKind.String
+                ? protocolValue.GetString()!
+                : "openid-connect";
+            var config = new Dictionary<string, string>(StringComparer.Ordinal);
+            if (mapper.TryGetProperty("config", out var configValue) && configValue.ValueKind == JsonValueKind.Object)
+            {
+                foreach (var entry in configValue.EnumerateObject())
+                {
+                    config[entry.Name] = entry.Value.ValueKind == JsonValueKind.String ? entry.Value.GetString()! : entry.Value.GetRawText();
+                }
+            }
+
+            mappers.Add((name, protocol, mapper.GetProperty("protocolMapper").GetString()!, config));
+        }
+
+        return mappers;
+    }
+
+    /// <summary>
+    /// A client update does not replace protocol mappers, so this creates each mapper of <paramref name="platformMappers"/> that the
+    /// client lacks and updates one whose type or config differs. It never removes a mapper.
+    /// </summary>
+    private async Task EnsurePlatformMappersAsync(
+        string token,
+        string realmPath,
+        string uuid,
+        string clientId,
+        List<(string Name, string Protocol, string Type, Dictionary<string, string> Config)> platformMappers,
+        CancellationToken cancellationToken)
+    {
+        if (platformMappers.Count == 0)
+        {
+            return;
+        }
+
+        var mappersPath = $"{realmPath}/clients/{uuid}/protocol-mappers/models";
+        using var listed = await SendAsync(token, HttpMethod.Get, mappersPath, null, cancellationToken);
+        EnsureSuccess(listed, $"list the mappers of the client '{clientId}'");
+        var existing = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
+        foreach (var mapper in (await listed.Content.ReadFromJsonAsync<JsonElement>(cancellationToken)).EnumerateArray())
+        {
+            existing.TryAdd(mapper.GetProperty("name").GetString()!, mapper);
+        }
+
+        foreach (var (name, protocol, type, config) in platformMappers)
+        {
+            var representation = new Dictionary<string, object?>
+            {
+                ["name"] = name,
+                ["protocol"] = protocol,
+                ["protocolMapper"] = type,
+                ["config"] = config,
+            };
+            if (!existing.TryGetValue(name, out var current))
+            {
+                using var created = await SendAsync(token, HttpMethod.Post, mappersPath, representation, cancellationToken);
+                EnsureSuccess(created, $"create the mapper '{name}' of the client '{clientId}'");
+            }
+            else if (current.GetProperty("protocolMapper").GetString() != type || !ConfigEquals(current, config))
+            {
+                representation["id"] = current.GetProperty("id").GetString();
+                using var updated = await SendAsync(token, HttpMethod.Put, $"{mappersPath}/{representation["id"]}", representation, cancellationToken);
+                EnsureSuccess(updated, $"update the mapper '{name}' of the client '{clientId}'");
+            }
+        }
+    }
+
+    private static bool ConfigEquals(JsonElement mapper, Dictionary<string, string> desired)
+    {
+        var count = 0;
+        if (mapper.TryGetProperty("config", out var config) && config.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var entry in config.EnumerateObject())
+            {
+                var value = entry.Value.ValueKind == JsonValueKind.String ? entry.Value.GetString() : entry.Value.GetRawText();
+                if (!desired.TryGetValue(entry.Name, out var expected) || expected != value)
+                {
+                    return false;
+                }
+
+                count++;
+            }
+        }
+
+        return count == desired.Count;
     }
 
     private async Task<Dictionary<string, string>> ReadDiscoveryAsync(RealmBrokeredProvider provider, CancellationToken cancellationToken)

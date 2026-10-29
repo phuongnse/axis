@@ -154,8 +154,9 @@ so Studio edits it, with the identity provider editor of [Studio](studio.md), an
 
 `tenant sign-in set` stores the platform sign-in in the tenant directory, and `tenant create` and `tenant restore`
 set accounts on. Both are built. The server's callback for the platform pages reads the stored platform sign-in, see
-below. The realm sync does not add the platform's providers to the realm yet, so no real person can sign in through one
-until it does _(planned for M17)_.
+below. The realm sync is built: `tenant sign-in set` brings the tenant's realm in step, and every activation keeps the
+platform sign-in's providers in it, see [keeping the realm in step](#keeping-the-realm-in-step). The server's other
+checks of the stored platform sign-in are _(planned for M17)_.
 
 - The home page, Studio, the operator console, the account page and the users page belong to no site. The tenant's
   platform sign-in says which providers they accept.
@@ -198,7 +199,12 @@ _(planned for M17)_
   other `claims` fail too. Both are `AXC0291`, reported before provisioning at `/issuer/binding` or `/claims` of
   the provider that is activated, and built for `oidc` providers. Activation compares binding names ignoring letter
   case, reads the providers of the tenant's other active releases, and gives each provider the alias `oidc-` and its
-  lower-case issuer binding.
+  lower-case issuer binding. The sharing with the platform sign-in is built: its `oidc` providers join the plan as one
+  more member, so a platform provider that names the same bindings as an application's provider uses its `oidc-`
+  provider. Activation also refuses an application provider that clashes with a stored platform provider, and the
+  message names the platform sign-in. `tenant sign-in set` refuses a platform provider that clashes with an active
+  release's provider, or with another platform provider, before it stores anything, see
+  [platform sign-in](tenant-setting-commands.md#platform-sign-in).
 - **No automatic linking:** a person who signs in through two providers is two users, even when both give the same
   email. The realm never links them by email, because another provider's email is not proof of who signed in.
   Built by the realm sync: every `oidc-` provider uses the realm's own first-login flow `axis first login`, whose only
@@ -237,7 +243,9 @@ _(planned for M17)_
   `<provider alias>.<subject>`. Each provider names the realm's first-login flow. It touches no other client or
   provider, so `axis`, `axis-activation`, `axis-users` and anything an operator added stay. A site client that the sync
   creates or updates copies the client authentication and the PAR, PKCE, DPoP and key settings of `axis`, so activation
-  never undoes what `tenant oidc set` wrote. Each site client also carries two attributes that every sync rewrites:
+  never undoes what `tenant oidc set` wrote. It also gives that site client every protocol mapper of `axis`, matched by
+  name with the same type and config, so a sign-in through it carries the same claims. The `identity provider` mapper
+  stays as it is, and a mapper that is removed from `axis` is not removed from the site clients. Each site client also carries two attributes that every sync rewrites:
   `axis.providers`, the aliases of the providers the site allows separated by spaces, and `axis.accounts`, `true` or
   `false`. The sync refuses an alias that is empty or contains a space. It also copies the redirect addresses, web origins and post-logout redirect
   addresses of `axis`. When the tenant has a platform client secret, the site client's secret is base64url of
@@ -260,14 +268,16 @@ _(planned for M17)_
   `saml` provider yet. A tenant created before `manage-realm` was granted needs `tenant create` again, or activation
   fails at the label step with a 403.
 - **Brought in step by activation:** activating a release adds, changes and removes the realm's brokered providers,
-  their claim mappers and the site clients to match the active releases of the tenant and its platform sign-in. A
-  provider that nothing names any more is removed. Its users stay, but cannot sign in through it.
+  their claim mappers and the site clients to match the active releases of the tenant and its platform sign-in. The
+  stored platform providers are always part of the plan, so a provider that only the platform sign-in names stays in
+  the realm. A provider that nothing names any more is removed. Its users stay, but cannot sign in through it.
   Built for `Axis.Admin`: `activate`, and the publisher's `publish`, `publish` with target `preview` and `rollback`
   update the realm inside their `activate` step, after the activation has committed. A tenant without an activation
   secret, such as a preview tenant or one that signs in through an outside identity provider, skips the update. A
   failure of the identity provider fails the step with a line that names the identity provider step and its status
   code, and the new release stays active, see [activate](administration.md#activate). A `validate` and a `test`
-  never update the realm. The server's startup activation updates it too, see above.
+  never update the realm. The server's startup activation updates it too, see above. `tenant sign-in set` brings the
+  realm in step after it stores the platform sign-in, see [platform sign-in](tenant-setting-commands.md#platform-sign-in).
 - **Brought in step by restore:** `tenant restore` of a tenant that gets a new realm creates the realm as `tenant create`
   does and brings it in step with the active releases of the restored database. The archive holds no secret value, so a
   provider whose bindings have no value yet is left out with a warning. The next activation adds it once the operator has
@@ -313,7 +323,7 @@ _(planned for M17)_
 - A wrong password keeps the username, marks the password and reads "Invalid email, username or password." above the
   form, never saying which one was wrong.
 - A site that allows one brokered provider and no accounts shows its button alone, under one line that names it.
-- Two-step verification asks for the 6-digit code in six boxes, one digit each, with "Try another way" and "Back to sign in".
+- Two-step verification asks for the 6-digit code in six boxes, one digit each, with "Back to sign in" and, when Keycloak offers another way to sign in, "Try another way".
 - The theme is built from the SPA's own React components and tokens into a Keycloak theme, so the pages look like the
   rest of Axis. Its texts are message bundles in every locale the platform offers. The "Continue with" labels come
   from the applications' texts, which activation writes to the realm (_built_).
@@ -324,13 +334,15 @@ _(planned for M17)_
   and the site both allow accounts. A client without `axis.accounts`, such as `axis`, has no `site`, so the page shows
   every provider and the form as before. The account form is a real `<form method="post">` to the login address. The components draw the frame (the 32 px mark
   with the word "Axis", the 400 px card and the organization's name under the title), the "Continue with" secondary
-  buttons, the form widget's field labels and "Forgot password?" on the password's row. A shared two-step page with six
-  code boxes exists too, but only the preview draws it. The design system's
+  buttons, the form widget's field labels and "Forgot password?" on the password's row. The two-step page is drawn too,
+  from its own context with `page` set to `twoStep`: six code boxes, one digit each, and a real
+  `<form method="post">` to the login address that posts `otp` and `login`. "Try another way" posts `tryAnotherWay=on`
+  and shows only when Keycloak offers another way to sign in. "Back to sign in" uses Keycloak's restart address. The design system's
   `identitySignIn` preview feeds the components fixtures, see
   [shell design system previews](shell.md#design-system-previews). The Keycloak theme `axis` feeds them a real
-  context: its `login.ftl` writes Keycloak's sign-in data as JSON and a React bundle draws the page. `scripts/build.sh`
+  context: its `login.ftl` and `login-otp.ftl` write Keycloak's data as JSON, with a `page` field of `signIn` or `twoStep`, and a React bundle draws the page. `scripts/build.sh`
   builds the theme from `web/keycloak-theme/` into `artifacts/keycloak-theme/axis/login/` and checks its files and
-  fonts. Keycloak's other pages, two-step verification included, still come from its `keycloak` parent theme. The development realm `axis` uses the theme as
+  fonts. Keycloak's other pages still come from its `keycloak` parent theme. The development realm `axis` uses the theme as
   its login theme: Compose, `scripts/dev.sh`, `scripts/e2e.sh` and the Keycloak of the integration tests load it from
   `artifacts/keycloak-theme`, and each builds it first. The realms of `tenant create` name the theme as their login
   theme. The on-premises Compose example loads it from `AXIS_IDENTITY_THEME_DIR`, see

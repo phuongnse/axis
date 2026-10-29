@@ -64,37 +64,30 @@ with the reasons. What each one does is in NexKit's
 - **Issues run in parallel unless one needs another.** Marks follow the rules
   of NexKit's [`request` skill][nexkit-request]. The milestone's docs sweep is
   marked *blocked by* every other issue of the milestone, with no reason line
-  for each. At most four issues run at once, with `max_parallel` at 4, as
-  [D105](decisions/d105-ci-on-main-runs-every-two-hours-and-four-issues-run-at-once.md)
-  agrees.
-  Pull requests that must be up to date merge one at a time, about one per
-  check round. Each merge sends every waiting pull request through another
-  round, and only one of them merges after it, so more issues at once mostly
-  spend runner jobs, usage limits and `conflicts.max_rounds` on rounds that
-  merge nothing. Each round of checks takes eight runner jobs, of the twenty
-  that GitHub Free runs at once.
+  for each. At most three issues run at once, with `max_parallel` at 3, as
+  [D113](decisions/d113-branches-need-not-be-up-to-date-and-three-issues-run-at-once.md)
+  agrees. Each round of checks takes eight runner jobs, of the twenty that
+  GitHub Free runs at once.
 - **NexKit merges a pull request once it passes,** with
   [`merge.auto`][nexkit-auto-merge] on, because the AI review and the checks
   are the gate Axis relies on. The owner turns the setting off to decide each
   merge again, and then only the owner merges. The switch is in `.nexkit/`, so
   changing it is a hand-made pull request.
-- **NexKit resolves conflicts with `main` by itself, and brings a pull
-  request up to date before it merges,** with `conflicts.auto_resolve` on.
-  The rules on `main` want a branch to be up to date, so a pull request's
-  checks always ran on the `main` it merges into, and two pull requests that
-  pass alone cannot break `main` together. When the update merges cleanly and
-  the pull request's own change is the one the review approved, only the
-  checks run again, not the AI review. When `main` moves while a round runs
-  its checks, NexKit stops that round and starts the update at once, so no
-  runner finishes checks that could not lead to a merge. `conflicts.max_rounds`
-  is 6 instead of 3, so a pull request that falls behind several merges in a
-  row still merges by itself.
+- **NexKit resolves conflicts with `main` by itself,** with
+  `conflicts.auto_resolve` on. The rules on `main` do not want a branch to be
+  up to date, as
+  [D113](decisions/d113-branches-need-not-be-up-to-date-and-three-issues-run-at-once.md)
+  agrees, so a pull request merges once its checks pass on its own branch,
+  and a merge does not send the waiting pull requests through another round.
+  Two pull requests that pass alone can break `main` together, and CI on
+  `main` finds it. `conflicts.max_rounds` is 6 instead of 3, so a pull request
+  that conflicts with several merges in a row still merges by itself.
 - **A second Claude subscription takes over at the usage limit.** NexKit
   pauses only when both are at their limit.
 - **A parent issue closes when its last part does,** with
   `close_parent_issues` on.
 - **The rules on `main` let NexKit merge.** They require NexKit's own checks
-  on a branch that is up to date, and no approval from a person. They do not require the CI workflow, which
+  and no approval from a person, and not a branch that is up to date. They do not require the CI workflow, which
   runs on pushes to `main` and to hand-made branches but not on NexKit's
   branches. NexKit's checks run the same scripts there.
   - [D111](decisions/d111-authentication-by-default-and-the-owner-guards-the-security-checks.md) adds one approval, by a hand-made `.github/CODEOWNERS` and

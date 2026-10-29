@@ -19,6 +19,8 @@ public sealed class AdminTenantSignInSetTests(PostgreSqlFixture database) : ICla
         await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
         var id = scenario.NewTenantId();
         Assert.Equal(0, (await scenario.CreateAsync(id, $"{id}.example.test")).Exit);
+        await SetBindingsAsync(scenario, id, "CompanyIssuer", "CompanyClientId", "CompanySecret");
+        await SetBindingsAsync(scenario, id, "I", "C", "S");
         var before = await scenario.RowAsync(id);
 
         var first = await scenario.RunAsync(
@@ -56,7 +58,7 @@ public sealed class AdminTenantSignInSetTests(PostgreSqlFixture database) : ICla
         Assert.All(values, value => Assert.DoesNotContain(value, record.Text, StringComparison.Ordinal));
 
         var second = await scenario.RunAsync(
-            ["tenant", "sign-in", "set", id, "--accounts", "false", "--provider", "other", "--type", "oidc", "--issuer", "I", "--client-id", "C", "--client-key", "K"],
+            ["tenant", "sign-in", "set", id, "--accounts", "false", "--provider", "other", "--type", "oidc", "--issuer", "I", "--client-id", "C", "--client-secret", "S"],
             extra: _directory);
 
         Assert.Equal(0, second.Exit);
@@ -64,7 +66,7 @@ public sealed class AdminTenantSignInSetTests(PostgreSqlFixture database) : ICla
         Assert.False(replaced.PlatformAccounts);
         Assert.Equal(row.Version + 1, replaced.Version);
         var remaining = Assert.Single(await scenario.PlatformProvidersAsync(id));
-        Assert.Equal(("other", "K", null, "{}"), (remaining.Name, remaining.ClientKeyBinding, remaining.ClientSecretBinding, remaining.RoleValues));
+        Assert.Equal(("other", "S", null, "{}"), (remaining.Name, remaining.ClientSecretBinding, remaining.ClientKeyBinding, remaining.RoleValues));
         Assert.Equal(["accounts", "provider:other"], (await scenario.AuditRecordsAsync())[^1].Changed);
 
         // The same provider name again is a replacement, not a clash.
@@ -74,6 +76,48 @@ public sealed class AdminTenantSignInSetTests(PostgreSqlFixture database) : ICla
 
         Assert.Equal(0, third.Exit);
         Assert.Equal("saml", Assert.Single(await scenario.PlatformProvidersAsync(id)).Type);
+        await scenario.AssertNoSecretsAsync();
+    }
+
+    [Fact]
+    public async Task A_platform_provider_naming_a_binding_the_tenant_lacks_exits_with_2_and_stores_nothing()
+    {
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        var id = scenario.NewTenantId();
+        Assert.Equal(0, (await scenario.CreateAsync(id, $"{id}.example.test")).Exit);
+        Assert.Equal(0, (await scenario.RunAsync(["tenant", "binding", "set", id, "CompanyIssuer", "--url", "https://idp.example.test/realms/company"], extra: _directory)).Exit);
+        Assert.Equal(0, (await scenario.RunAsync(["tenant", "binding", "set", id, "WrongKind", "--url", "https://idp.example.test/"], extra: _directory)).Exit);
+        Assert.Equal(0, (await scenario.RunAsync(["tenant", "binding", "set", id, "CompanyClientId", "--secret"], input: "client-id-value", extra: _directory)).Exit);
+        var version = (await scenario.RowAsync(id)).Version;
+        var snapshot = await scenario.SnapshotAsync();
+        var records = (await scenario.AuditRecordsAsync()).Count;
+        var requests = scenario.IdentityProvider.Paths.Count;
+        string[] oidc = ["tenant", "sign-in", "set", id, "--accounts", "true", "--provider", "company", "--type", "oidc"];
+
+        var refusals = new[]
+        {
+            // CompanySecret is missing.
+            await scenario.RunAsync([.. oidc, "--issuer", "CompanyIssuer", "--client-id", "CompanyClientId", "--client-secret", "CompanySecret"], extra: _directory),
+            // WrongKind is a url binding, not a secret.
+            await scenario.RunAsync([.. oidc, "--issuer", "CompanyIssuer", "--client-id", "CompanyClientId", "--client-secret", "WrongKind"], extra: _directory),
+            // The realm needs a client secret, and a key is not enough.
+            await scenario.RunAsync([.. oidc, "--issuer", "CompanyIssuer", "--client-id", "CompanyClientId", "--client-key", "CompanyClientId"], extra: _directory),
+        };
+
+        Assert.All(refusals, refusal =>
+        {
+            Assert.Equal(2, refusal.Exit);
+            Assert.Empty(refusal.Output);
+            Assert.NotEmpty(refusal.Error);
+        });
+        Assert.Contains("'CompanySecret'", refusals[0].Error[0], StringComparison.Ordinal);
+        Assert.Contains("'WrongKind'", refusals[1].Error[0], StringComparison.Ordinal);
+        Assert.Contains("--client-secret", refusals[2].Error[0], StringComparison.Ordinal);
+        Assert.Equal(version, (await scenario.RowAsync(id)).Version);
+        Assert.Empty(await scenario.PlatformProvidersAsync(id));
+        Assert.Equal(snapshot, await scenario.SnapshotAsync());
+        Assert.Equal(records, (await scenario.AuditRecordsAsync()).Count);
+        Assert.Equal(requests, scenario.IdentityProvider.Paths.Count);
         await scenario.AssertNoSecretsAsync();
     }
 
@@ -149,5 +193,12 @@ public sealed class AdminTenantSignInSetTests(PostgreSqlFixture database) : ICla
 
         Assert.True((await scenario.RowAsync(id)).PlatformAccounts);
         Assert.Empty(await scenario.PlatformProvidersAsync(id));
+    }
+
+    private static async Task SetBindingsAsync(AdminScenario scenario, string id, string issuer, string clientId, string clientSecret)
+    {
+        Assert.Equal(0, (await scenario.RunAsync(["tenant", "binding", "set", id, issuer, "--url", "https://idp.example.test/realms/company"], extra: _directory)).Exit);
+        Assert.Equal(0, (await scenario.RunAsync(["tenant", "binding", "set", id, clientId, "--secret"], input: $"{clientId}-value-{id}", extra: _directory)).Exit);
+        Assert.Equal(0, (await scenario.RunAsync(["tenant", "binding", "set", id, clientSecret, "--secret"], input: $"{clientSecret}-value-{id}", extra: _directory)).Exit);
     }
 }

@@ -26,7 +26,7 @@ public sealed class DevelopmentRealmSecondStepTests(KeycloakFixture keycloak) : 
 
         var html = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        Assert.Contains("id=\"otp\"", html, StringComparison.Ordinal);
+        Assert.Equal("twoStep", KeycloakSignIn.Page(html));
         Assert.Null(response.Headers.Location);
     }
 
@@ -40,7 +40,8 @@ public sealed class DevelopmentRealmSecondStepTests(KeycloakFixture keycloak) : 
 
         var html = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
         Assert.True(response.StatusCode == HttpStatusCode.OK, html);
-        Assert.Contains("id=\"otp\"", html, StringComparison.Ordinal);
+        Assert.Equal("twoStep", KeycloakSignIn.Page(html));
+        Assert.False(string.IsNullOrEmpty(KeycloakSignIn.Error(html)), html);
         Assert.Null(response.Headers.Location);
     }
 

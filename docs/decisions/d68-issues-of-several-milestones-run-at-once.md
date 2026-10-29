@@ -35,6 +35,9 @@ milestone.
   - The owner raised the limit to four on 2026-10-29, once CI on `main` no
     longer ran after every merge, see
     [D105](d105-ci-on-main-runs-every-two-hours-and-four-issues-run-at-once.md).
+  - The owner lowered the limit to three on 2026-10-29, when branches no
+    longer had to be up to date, see
+    [D113](d113-branches-need-not-be-up-to-date-and-three-issues-run-at-once.md).
 - **Turned on in steps:** NexKit is upgraded first with the milestone scope
   unchanged, and the scope changes in a pull request of its own, so a problem
   points to one of the two.

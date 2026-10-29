@@ -5,12 +5,12 @@ import config from './vite.config.ts'
 
 const themeFolder = path.resolve(import.meta.dirname, '../artifacts/keycloak-theme/axis/login')
 
-// Copies what Keycloak reads as it is: the theme's properties, its template and its message bundles.
+// Copies what Keycloak reads as it is: the theme's properties, its templates and its message bundles.
 function copyThemeFiles(): Plugin {
   return {
     name: 'copy-theme-files',
     closeBundle() {
-      for (const name of ['theme.properties', 'login.ftl', 'messages']) {
+      for (const name of ['theme.properties', 'login.ftl', 'login-otp.ftl', 'messages']) {
         cpSync(path.resolve(import.meta.dirname, 'keycloak-theme', name), path.join(themeFolder, name), {
           recursive: true,
         })

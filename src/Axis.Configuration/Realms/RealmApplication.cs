@@ -18,6 +18,17 @@ public sealed record RealmApplication(
     IReadOnlyList<RealmApplicationSite> Sites,
     IReadOnlyList<IdentityProviderModel> Providers)
 {
+    /// <summary>The id of the platform sign-in as a planner member. It is no application's id.</summary>
+    public static readonly Guid PlatformSignInId = Guid.Empty;
+
+    /// <summary>The platform sign-in of a tenant as a planner member: the fixed id, the name <c>platform sign-in</c> and no sites.</summary>
+    public static RealmApplication PlatformSignIn(IReadOnlyList<IdentityProviderModel> providers)
+    {
+        ArgumentNullException.ThrowIfNull(providers);
+
+        return new RealmApplication(PlatformSignInId, "platform sign-in", [], providers);
+    }
+
     /// <summary>The texts of the application: locale, then text key, then text. When resources of one locale share a key, the first wins.</summary>
     public IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> Texts { get; init; } =
         new Dictionary<string, IReadOnlyDictionary<string, string>>();
