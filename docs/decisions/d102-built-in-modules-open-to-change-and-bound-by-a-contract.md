@@ -8,7 +8,7 @@ applications. Every business has rules of its own that no module author can
 foresee. A business must be able to add them anywhere, without writing its
 process from scratch, while the values at the core of the module and of the
 platform still hold. M24 builds the contracts, M25 the customization layers,
-and M26 the first built-in domain, see the [roadmap](../roadmap.md#milestones).
+and M26 the first built-in modules, see the [roadmap](../roadmap.md#milestones).
 Everything here is _(planned for M24 to M26)_.
 
 - **Four layers:**
@@ -25,7 +25,7 @@ Everything here is _(planned for M24 to M26)_.
   - The business's customization: a layer over the modules, in the
     business's own application.
 - **Composing:** a larger application declares more modules, for example
-  `organization`, `employees`, `leave` and `purchasing`. There is no
+  `organization`, `approvals` and `assets`. There is no
   application inside an application. Two applications share no module data,
   as [D40](d40-reusable-modules.md) says. They talk through events and
   endpoints. Sharing data between applications would need a decision of its
@@ -118,15 +118,22 @@ Everything here is _(planned for M24 to M26)_.
   marks what the layer changed, shows the contract read-only, writes the
   layer, and lists the conflicts after an upgrade. Modules themselves are
   still not edited in Studio.
-- **The first domain is HR:** `organization`, `employees` and `leave`. Every
-  business needs it, its rules differ from one business to the next, and
-  labour law gives it module invariants, such as annual leave of at least the
-  legal minimum. The contract of each module is drawn from the rules of two or
-  three real businesses, which the owner names when M26 is planned.
+- **The first built-in modules are workflow modules:** `organization`,
+  `approvals`, `service-desk` and `assets`, in M26. Each business sets their
+  rules itself, so they need no review against the law, and they are the
+  internal applications that a first customer needs. The owner moved HR
+  behind them on 2026-10-29: `employees` and `leave` come in a later
+  milestone, once a practitioner can review their legal rules, such as annual
+  leave of at least the legal minimum. The contracts are refined with the
+  first businesses that use the modules.
 - **Samples:** the samples become built-in modules and applications over
-  time, starting with `departments` as `organization` and leave requests as
-  `leave` in M26. `samples/` then keeps only the fixtures for platform
-  features that no built-in module uses.
+  time, starting in M26 with `departments` as `organization`, the
+  `request-approval` template as `approvals`, the service desk as
+  `service-desk` and asset management as `assets`. The purchase request
+  sample stays for the journeys of
+  [D94](d94-purchase-requests-prove-the-extensibility-milestone.md), and leave
+  requests stay until the HR modules. `samples/` then keeps only the fixtures
+  for platform features that no built-in module uses.
 - **Format after the first production release:** until then, the one-format
   rule of
   [D46](d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9.md)
