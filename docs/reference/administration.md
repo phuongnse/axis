@@ -327,7 +327,7 @@ archive of one tenant. See [D45](../decisions/d45-tenant-backup-and-restore.md).
 
 The archive is one tar file with two entries: `manifest.json` and `tenant.dump`.
 It holds no secret. No database password, OIDC client secret or `secret` binding
-value is ever in it, so it can be stored like any data file.
+value is ever in it, so it can be stored like any data file. _(planned for M27)_ The archive is encrypted with a backup key that the operator keeps outside the installation, and `tenant restore` needs the same key, see [D109](../decisions/d109-sensitive-fields-and-backups-are-encrypted-and-history-keeps-no-names.md).
 
 **Steps, in order.**
 

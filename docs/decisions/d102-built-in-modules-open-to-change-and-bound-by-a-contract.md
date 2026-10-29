@@ -148,6 +148,9 @@ Everything here is _(planned for M24 to M26)_.
   M21 and M22, as
   [D101](d101-the-extensibility-milestone-is-split-into-six.md)'s order now
   reads.
+  - [D109](d109-sensitive-fields-and-backups-are-encrypted-and-history-keeps-no-names.md)
+    makes M26 wait for M27, which encrypts sensitive fields, because the
+    built-in applications of M26 are the first that a customer runs.
 - **Example, leave requests:**
   - The contract: a request moves from `submitted` to `approved` only with a
     decision by someone other than the requester, and an approval writes one

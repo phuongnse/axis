@@ -721,7 +721,7 @@ schema of the tenant database.
   | `id`                  | `uuid`                           | A version 7 UUID                                                                                                                                                                                                                                 |
   | `occurred_at`         | `timestamptz`                    | When the action happened: the transaction time, `now()`, so the audit records of one transaction share it                                                                                                                                        |
   | `actor`               | `text`                           | A user id, or `system` for the worker. The record API and the process start endpoint need a session, so they never write `anonymous`. Only process starts from before M4, with nobody signed in, have it. `session.signInRefused` also writes it |
-  | `actor_name`          | `text`, null                     | The actor's display name at the time of the action. It is null for `system` and `anonymous`, and for audit records written before it was added                                                                                                   |
+  | `actor_name`          | `text`, null                     | The actor's display name at the time of the action. It is null for `system` and `anonymous`, and for audit records written before it was added. _(planned for M27)_ Null in new rows: a history view reads the name from the user's profile, see [D109](../decisions/d109-sensitive-fields-and-backups-are-encrypted-and-history-keeps-no-names.md)                                                                                                   |
   | `action`              | `text`                           | The action, such as `record.created`                                                                                                                                                                                                             |
   | `application_id`      | `uuid`, null for session actions | The application `id`. A session action belongs to no application                                                                                                                                                                                 |
   | `entity_id`           | `uuid`, null                     | The entity `id`, when the action concerns a record                                                                                                                                                                                               |
@@ -763,6 +763,8 @@ schema of the tenant database.
     - `clientAddress` is always present. It is the address as text, with an
       IPv4-mapped IPv6 address written as IPv4, or `null` when the server sees
       no address.
+      _(planned for M27)_ New records drop the last octet of IPv4 and the last
+      80 bits of IPv6, see [D109](../decisions/d109-sensitive-fields-and-backups-are-encrypted-and-history-keeps-no-names.md).
     - A `session.signedIn` or `session.signedOut` record commits before its
       action takes effect. If it cannot be written, the callback fails and
       creates no session, or sign-out fails with a `500` and the session stays.
