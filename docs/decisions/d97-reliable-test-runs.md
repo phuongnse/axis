@@ -27,6 +27,8 @@ detail.
     `main`.
   - [D104](d104-codeql-and-the-performance-tests-run-every-night.md) replaces
     the point that they run on every push to `main`: they run every night.
+    - [D112](d112-ci-codeql-and-the-performance-tests-run-on-main-every-few-merges.md) replaces
+      the nightly run: NexKit starts them once every 62 of its merges.
 - **End-to-end tests run without motion.** The SPA turns off its animations
   when the browser asks for reduced motion, and Playwright asks for it. People
   who ask their browser for reduced motion get the same.
