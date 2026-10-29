@@ -3,6 +3,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Security.Cryptography;
 using System.Text.Json;
+using Axis.Configuration.Resources;
 using Axis.Tenancy;
 using Axis.Tenancy.Platform;
 using Axis.Tenancy.Realms;
@@ -20,10 +21,12 @@ internal sealed record TenantRealmSecrets(string Platform, string Activation, st
 /// Creates a tenant's realm in Axis's identity provider through its admin API, or brings an existing one up to date.
 /// The realm gets its display name, sessions of at most 8 hours and the account rules: an authenticator code at every
 /// sign-in, passwords of 12 to 128 characters that are not on the breached-password list, a wait after 5 failed sign-ins,
-/// a password reset link that lasts 30 minutes and no self-registration. It allows two users to share an email, which
+/// a password reset link that lasts 30 minutes and no self-registration. It offers the platform locales
+/// (<see cref="PlatformLocales"/>) on its sign-in pages. It allows two users to share an email, which
 /// turns sign-in by email off, so an account's username is its email. It gets a first-login flow of its own for brokered
 /// users, <see cref="RealmSync.FirstLoginFlowAlias"/>, whose only step creates a new user. It also gets three clients: the platform client
-/// <c>axis</c>, <c>axis-activation</c> with rights over the realm's providers and clients, and <c>axis-users</c> with
+/// <c>axis</c>, <c>axis-activation</c> with rights over the realm's providers and clients and over the realm's texts (<c>manage-realm</c>, which
+/// Keycloak requires for them and which also covers every realm setting), and <c>axis-users</c> with
 /// rights over its users only. The realm uses the Axis theme <see cref="LoginTheme"/> as its login theme. The identity provider
 /// must hold the theme and the breached-password list file. A second run updates what the first made, and sets the theme again. An error names the step and the status code,
 /// never a response body or a secret.
@@ -50,6 +53,7 @@ internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
     private static readonly string[] _activationRoles =
     [
         "manage-identity-providers", "view-identity-providers", "manage-clients", "view-clients", "query-clients",
+        "manage-realm",
     ];
 
     private static readonly string[] _usersRoles = ["manage-users", "view-users", "query-users", "query-groups"];
@@ -205,6 +209,9 @@ internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
             ["otpPolicyDigits"] = 6,
             ["otpPolicyPeriod"] = 30,
             ["otpPolicyAlgorithm"] = "HmacSHA1",
+            ["internationalizationEnabled"] = true,
+            ["supportedLocales"] = PlatformLocales.All,
+            ["defaultLocale"] = PlatformLocales.Fallback,
         };
         if (realm is not null)
         {

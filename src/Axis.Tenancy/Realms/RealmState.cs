@@ -16,6 +16,8 @@ public sealed record RealmState(
 /// <summary>
 /// A brokered <c>oidc</c> provider. The alias starts with <see cref="RealmSync.ProviderAliasPrefix"/>. The claims name
 /// where the provider puts the person's display name, email and locale, and the claims that hold roles.
+/// <paramref name="Labels"/> holds the text of the "Continue with" label for each locale. When it is empty or null, the
+/// provider has no label and the sign-in page shows its alias.
 /// </summary>
 public sealed record RealmBrokeredProvider(
     string Alias,
@@ -25,4 +27,5 @@ public sealed record RealmBrokeredProvider(
     string DisplayNameClaim,
     string EmailClaim,
     string LocaleClaim,
-    IReadOnlyList<string> RolesClaims);
+    IReadOnlyList<string> RolesClaims,
+    IReadOnlyDictionary<string, string>? Labels = null);

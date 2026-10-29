@@ -2,6 +2,8 @@ using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Text.Json.Nodes;
+using System.Text.RegularExpressions;
 using Axis.Configuration.Tests;
 using Axis.Tenancy.Platform;
 using Microsoft.EntityFrameworkCore;
@@ -15,7 +17,7 @@ namespace Axis.Integration.Tests;
 /// the applications that name the same bindings, refuses one that would split a person, and activation keeps a provider that only the
 /// platform sign-in names.
 /// </summary>
-public sealed class AdminActivateRealmTests(KeycloakFixture keycloak, PostgreSqlFixture database) : IClassFixture<PostgreSqlFixture>, IAsyncLifetime
+public sealed partial class AdminActivateRealmTests(KeycloakFixture keycloak, PostgreSqlFixture database) : IClassFixture<PostgreSqlFixture>, IAsyncLifetime
 {
     private const string Issuer = "Issuer";
     private const string Client = "Client";
@@ -60,6 +62,26 @@ public sealed class AdminActivateRealmTests(KeycloakFixture keycloak, PostgreSql
         var mappers = await MapperNamesAsync(id, "oidc-issuer");
         Assert.All(_mapperNames, name => Assert.Contains(name, mappers));
         await scenario.AssertNoSecretsAsync();
+    }
+
+    [Fact]
+    public async Task The_sign_in_page_of_the_realm_shows_the_label_of_the_provider_in_the_language_of_the_page()
+    {
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        var id = await CreateTenantWithBindingsAsync(scenario);
+        using var folder = Folder(new Application(), ["sales"], provider: true, vietnamese: true);
+
+        var result = await ActivateAsync(scenario, folder, id);
+
+        Assert.Equal(0, result.Exit);
+        var provider = (await GetAsync(id, "identity-provider/instances/oidc-issuer"));
+        Assert.Equal("${axisProvider.oidc-issuer}", provider.GetProperty("displayName").GetString());
+        var context = await SignInContextAsync(id, "site-sales", "vi");
+        Assert.Equal("Tiếp tục với {provider}", context.GetProperty("texts").GetProperty("continueWith").GetString());
+        var label = context.GetProperty("providers").EnumerateArray().Single(entry => entry.GetProperty("alias").GetString() == "oidc-issuer");
+        Assert.Equal("Công ty", label.GetProperty("label").GetString());
+        var english = await SignInContextAsync(id, "site-sales", "en");
+        Assert.Equal("Company", english.GetProperty("providers").EnumerateArray().Single().GetProperty("label").GetString());
     }
 
     [Fact]
@@ -261,8 +283,9 @@ public sealed class AdminActivateRealmTests(KeycloakFixture keycloak, PostgreSql
         scenario.RunAsync(["activate", folder.Path, "--tenant", id], identityProvider: _handler);
 
     internal static TemporaryFolder Folder(
-        Application application, string[] sitePaths, bool provider, string clientBinding = Client, string secretBinding = Secret)
+        Application application, string[] sitePaths, bool provider, string clientBinding = Client, string secretBinding = Secret, bool vietnamese = false)
     {
+        var available = vietnamese ? """["en", "vi"]""" : """["en"]""";
         var folder = new TemporaryFolder()
             .With("application.json", $$"""{ "id": "{{application.Id}}", "kind": "application", "name": "{{application.Name}}", "formatVersion": 1 }""")
             .With("entities/order.json", $$"""
@@ -278,11 +301,19 @@ public sealed class AdminActivateRealmTests(KeycloakFixture keycloak, PostgreSql
                   "title": { "textKey": "orders.title" }, "widgets": [ { "type": "table", "entity": "Order" } ] }
                 """)
             .With("identity-providers/accounts.json", $$"""{ "id": "{{application.AccountsId}}", "kind": "identityProvider", "name": "accounts", "formatVersion": 1, "type": "accounts" }""");
+        if (vietnamese)
+        {
+            folder.With("texts/vi.json", $$"""
+                { "id": "{{application.ViTextId}}", "kind": "text", "name": "TextsVi", "formatVersion": 1, "locale": "vi",
+                  "texts": { "site.title": "Bán hàng", "nav.orders": "Đơn hàng", "orders.title": "Đơn hàng", "provider.company": "Công ty" } }
+                """);
+        }
+
         for (var index = 0; index < sitePaths.Length; index++)
         {
             folder.With($"sites/site{index}.json", $$"""
                 { "id": "{{application.SiteId(index)}}", "kind": "site", "name": "Site{{index}}", "formatVersion": 1, "path": "{{sitePaths[index]}}",
-                  "title": { "textKey": "site.title" }, "locales": { "default": "en", "fallback": "en", "available": ["en"] },
+                  "title": { "textKey": "site.title" }, "locales": { "default": "en", "fallback": "en", "available": {{available}} },
                   "navigation": [ { "page": "Orders", "label": { "textKey": "nav.orders" } } ] }
                 """);
         }
@@ -296,6 +327,88 @@ public sealed class AdminActivateRealmTests(KeycloakFixture keycloak, PostgreSql
                 """)
             : folder;
     }
+
+    // Opens the realm's sign-in page for a site client the way a browser does, and reads the context the page carries.
+    private async Task<JsonElement> SignInContextAsync(string realm, string clientId, string locale)
+    {
+        using var http = new HttpClient(_handler, disposeHandler: false);
+        var admin = await TokenAsync(http, "master", KeycloakFixture.AdminClientId, KeycloakFixture.AdminClientSecret);
+        var sites = await GetAsync(realm, $"clients?clientId={clientId}");
+        var site = sites[0];
+        // The site client copies the redirect addresses of the platform client, which has none here, so give it one.
+        var body = JsonNode.Parse(site.GetRawText())!.AsObject();
+        body["redirectUris"] = new JsonArray("http://localhost/cb");
+        using (var put = new HttpRequestMessage(HttpMethod.Put, new Uri(_baseAddress, $"admin/realms/{realm}/clients/{site.GetProperty("id").GetString()}")))
+        {
+            put.Headers.Authorization = new AuthenticationHeaderValue("Bearer", admin);
+            put.Content = JsonContent.Create(body);
+            using var updated = await http.SendAsync(put, CancellationToken);
+            Assert.Equal(HttpStatusCode.NoContent, updated.StatusCode);
+        }
+
+        using var browserHandler = new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false };
+        using var browser = new HttpClient(browserHandler);
+        var address = new Uri(
+            _baseAddress,
+            $"realms/{realm}/protocol/openid-connect/auth?client_id={clientId}&response_type=code&scope=openid&redirect_uri={Uri.EscapeDataString("http://localhost/cb")}");
+        var (html, cookies) = await OpenPageAsync(browser, address, cookie: null);
+        var context = ReadContext(html);
+
+        // The page offers a link for each language, which carries kc_locale. Following it is how a person changes the language.
+        if (locale != "en")
+        {
+            var link = context.GetProperty("locales").EnumerateArray()
+                .Select(entry => entry.GetProperty("url").GetString()!)
+                .Single(url => url.Contains($"kc_locale={locale}", StringComparison.Ordinal));
+            (html, _) = await OpenPageAsync(browser, new Uri(_baseAddress, link), cookies);
+            context = ReadContext(html);
+        }
+
+        return context;
+    }
+
+    // Opens a page without following redirects by the client, so the session cookies carry over by hand.
+    private static async Task<(string Html, string Cookie)> OpenPageAsync(HttpClient browser, Uri address, string? cookie)
+    {
+        var cookies = cookie ?? "";
+        for (var hop = 0; hop < 3; hop++)
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, address);
+            if (cookies.Length > 0)
+            {
+                request.Headers.Add("Cookie", cookies);
+            }
+
+            using var response = await browser.SendAsync(request, CancellationToken);
+            if (response.Headers.TryGetValues("Set-Cookie", out var set))
+            {
+                cookies = string.Join("; ", set.Select(header => header.Split(';')[0]));
+            }
+
+            if (response.Headers.Location is { } next)
+            {
+                address = new Uri(address, next);
+                continue;
+            }
+
+            var html = await response.Content.ReadAsStringAsync(CancellationToken);
+            Assert.True(response.StatusCode == HttpStatusCode.OK, html);
+            return (html, cookies);
+        }
+
+        throw new InvalidOperationException("The sign-in page redirected more than twice.");
+    }
+
+    private static JsonElement ReadContext(string html)
+    {
+        var match = SignInContextPattern().Match(html);
+        Assert.True(match.Success, html);
+        using var document = JsonDocument.Parse(match.Groups["context"].Value);
+        return document.RootElement.Clone();
+    }
+
+    [GeneratedRegex("""<script type="application/json" id="axis-sign-in-context">(?<context>.*?)</script>""", RegexOptions.Singleline)]
+    private static partial Regex SignInContextPattern();
 
     private async Task<string[]> SiteClientsAsync(string realm)
     {
@@ -355,6 +468,8 @@ public sealed class AdminActivateRealmTests(KeycloakFixture keycloak, PostgreSql
         public Guid EntityId { get; } = Guid.NewGuid();
 
         public Guid TextId { get; } = Guid.NewGuid();
+
+        public Guid ViTextId { get; } = Guid.NewGuid();
 
         public Guid PageId { get; } = Guid.NewGuid();
 
