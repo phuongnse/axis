@@ -59,7 +59,7 @@
       </#if>
     ],
     "texts": {
-      "signInWith": "${msg("axisSignInWith", "{provider}")?json_string?no_esc}",
+      "continueWith": "${msg("axisContinueWith", "{provider}")?json_string?no_esc}",
       "providerOnly": "${msg("axisProviderOnly", "{provider}")?json_string?no_esc}",
       "or": "${msg("axisOr")?json_string?no_esc}",
       "username": "${msg("axisUsername")?json_string?no_esc}",
