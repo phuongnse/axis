@@ -1,3 +1,4 @@
+using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text.Json;
@@ -14,7 +15,9 @@ namespace Axis.Tenancy.Realms;
 /// (<see cref="FirstLoginFlowAlias"/>), which always creates a new user and never offers to link one. The sync adds, changes and removes only clients whose id
 /// starts with <see cref="SiteClientPrefix"/> and providers whose alias starts with <see cref="ProviderAliasPrefix"/>,
 /// so <c>axis</c>, <c>axis-activation</c>, <c>axis-users</c> and anything an operator added stay. A removed provider
-/// keeps its users in the realm. An error names the step and the status code, never a response body or a secret.
+/// keeps its users in the realm. An error names the step and the status code, never a response body or a secret. A 409
+/// from the identity provider, which another sync of the same realm at the same time can cause, makes the sync read the
+/// realm again and repeat, up to three attempts.
 /// </summary>
 public sealed class RealmSync(HttpClient http, Uri baseAddress)
 {
@@ -25,6 +28,7 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
     /// <summary>The alias of the first-login flow that <c>TenantRealm</c> makes and every provider names.</summary>
     public const string FirstLoginFlowAlias = "axis first login";
 
+    private const int ConflictAttempts = 3;
     private const string ActivationClientId = "axis-activation";
     private const string UserAttributeMapper = "oidc-user-attribute-idp-mapper";
     private const string UsernameMapper = "oidc-username-idp-mapper";
@@ -48,8 +52,21 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
             providers.Add((provider, await ReadDiscoveryAsync(provider, cancellationToken)));
         }
 
-        await SyncSiteClientsAsync(token, realmPath, state.SitePaths, cancellationToken);
-        await SyncProvidersAsync(token, realmPath, providers, cancellationToken);
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                await SyncSiteClientsAsync(token, realmPath, state.SitePaths, cancellationToken);
+                await SyncProvidersAsync(token, realmPath, providers, cancellationToken);
+                return;
+            }
+            catch (ConflictException) when (attempt < ConflictAttempts)
+            {
+                // Another sync of the same realm wrote at the same moment. Read the realm again, so a create that
+                // lost the race turns into an update, and wait a little longer each time with some jitter.
+                await Task.Delay(TimeSpan.FromMilliseconds((200 * attempt) + Random.Shared.Next(0, 200)), cancellationToken);
+            }
+        }
     }
 
     private static void Validate(RealmState state)
@@ -437,7 +454,12 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
     {
         if (!response.IsSuccessStatusCode)
         {
-            throw new InvalidOperationException($"The identity provider step '{step}' failed with status {(int)response.StatusCode}.");
+            var message = $"The identity provider step '{step}' failed with status {(int)response.StatusCode}.";
+            throw response.StatusCode == HttpStatusCode.Conflict
+                ? new ConflictException(message)
+                : new InvalidOperationException(message);
         }
     }
+
+    private sealed class ConflictException(string message) : InvalidOperationException(message);
 }
