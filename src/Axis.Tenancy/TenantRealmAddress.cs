@@ -1,7 +1,7 @@
 namespace Axis.Tenancy;
 
 /// <summary>Reads the identity provider's address out of a tenant's <c>Oidc</c> authority.</summary>
-internal static class TenantRealmAddress
+public static class TenantRealmAddress
 {
     /// <summary>
     /// The address of the identity provider, ending with a slash, when <paramref name="authority"/> is an absolute http
