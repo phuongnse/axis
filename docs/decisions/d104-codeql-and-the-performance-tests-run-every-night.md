@@ -21,6 +21,8 @@ push to `main`.
   check skipped, and they let NexKit make a pull request wait while `main`
   fails the same way. A schedule for CI is a later choice, once flaky failures
   on `main` are rare.
+  - [D105](d105-ci-on-main-runs-every-two-hours-and-four-issues-run-at-once.md)
+    replaces this point: CI runs on `main` every two hours.
 
 _Why:_ `main` wants pull requests up to date, and NexKit squash-merges them, so
 the tree it merges is the tree its checks just passed. A run after every merge

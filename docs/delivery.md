@@ -64,13 +64,15 @@ with the reasons. What each one does is in NexKit's
 - **Issues run in parallel unless one needs another.** Marks follow the rules
   of NexKit's [`request` skill][nexkit-request]. The milestone's docs sweep is
   marked *blocked by* every other issue of the milestone, with no reason line
-  for each. At most three issues run at once, with `max_parallel` at 3.
+  for each. At most four issues run at once, with `max_parallel` at 4, as
+  [D105](decisions/d105-ci-on-main-runs-every-two-hours-and-four-issues-run-at-once.md)
+  agrees.
   Pull requests that must be up to date merge one at a time, about one per
   check round. Each merge sends every waiting pull request through another
   round, and only one of them merges after it, so more issues at once mostly
   spend runner jobs, usage limits and `conflicts.max_rounds` on rounds that
-  merge nothing. Each round takes three runner jobs, and CI on `main` takes
-  more after each merge.
+  merge nothing. Each round of checks takes eight runner jobs, of the twenty
+  that GitHub Free runs at once.
 - **NexKit merges a pull request once it passes,** with
   [`merge.auto`][nexkit-auto-merge] on, because the AI review and the checks
   are the gate Axis relies on. The owner turns the setting off to decide each
@@ -98,15 +100,16 @@ with the reasons. What each one does is in NexKit's
 - **There is no push token.** NexKit pushes with the Actions token, so it
   cannot push a merge that brings changes to `.github/workflows/`. The hourly
   driver merges those by hand.
-- **CI runs on `main` after every merge.** NexKit starts the CI workflow on
-  `main` through its `merge.after_workflows` setting, because a merge by NexKit
-  starts no `push` workflow. The CodeQL and performance workflows run every
-  night instead, and NexKit's `autopilot.watch_workflows` setting watches them
-  without starting them, as
+- **CI runs on `main` every two hours.** A merge by NexKit starts no `push`
+  workflow, so CI runs on a schedule, on a person's push and on demand. The
+  CodeQL and performance workflows run every night. NexKit's
+  `autopilot.watch_workflows` setting watches all three on `main` without
+  starting them, and `merge.after_workflows` is empty, as
   [D104](decisions/d104-codeql-and-the-performance-tests-run-every-night.md)
-  agrees. A run on `main` always finishes:
-  a newer merge replaces only a run that is still waiting to start, so the
-  next run tests both merges. On any other branch a newer push stops the older
+  and
+  [D105](decisions/d105-ci-on-main-runs-every-two-hours-and-four-issues-run-at-once.md)
+  agree. A run on `main` always finishes: a newer run replaces only one that
+  is still waiting to start. On any other branch a newer push stops the older
   run. CI runs the lint and unit tests, the smoke tests, the integration
   tests and three shards of the E2E tests as six parallel jobs, so a run takes
   as long as its slowest job.
@@ -137,7 +140,7 @@ with the reasons. What each one does is in NexKit's
   passed (`NEXKIT_VERIFIED_SHA`), else the merge base (`NEXKIT_BASE_SHA`). So
   after `main` moves, a check that passed before reruns its suite only when
   the new commits can affect it. CI on `main` sets no base and runs every
-  suite, so a slowdown shows after the merge. The integration performance
+  suite, so a slowdown shows at its next run. The integration performance
   tests, whose class names end in `PerformanceTests`, run neither in NexKit's
   checks nor in CI's integration job, because they depend on the runner's
   load. The performance workflow runs them on `main` every night, as
