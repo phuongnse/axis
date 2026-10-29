@@ -291,6 +291,8 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place. _(planned f
   - `GET /api/me/sessions`, `DELETE /api/me/sessions/{id}` and
     `DELETE /api/me/sessions`.
 
+  Every one of these `401`s has the title "Sign in to read or write this data.".
+
   Inbound endpoints under `/api/apps/{app}/endpoints/` are the exception.
   They take a bearer token and no session, see
   [Machine callers](#machine-callers).

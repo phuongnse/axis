@@ -48,7 +48,6 @@ public sealed class ServiceAccountRecordTests(KeycloakFixture keycloak) : IAsync
     private const string Escalate = "/api/apps/ServiceAccountApp/processes/Escalate/instances";
     private const string Publish = "/api/apps/ServiceAccountApp/processes/Publish/instances";
     private const string SignInTitle = "Sign in to read or write this data.";
-    private const string TaskSignInTitle = "Sign in to work on tasks.";
     private const string BearerTitle = "A valid bearer token is needed for this request.";
 
     private readonly PostgreSqlFixture _database = new();
@@ -226,12 +225,12 @@ public sealed class ServiceAccountRecordTests(KeycloakFixture keycloak) : IAsync
         using var complete = await SendAsync(HttpMethod.Post, $"/api/apps/ServiceAccountApp/tasks/{Guid.NewGuid():D}/complete", token, "{}", csrf: true);
         using var formState = await SendAsync(HttpMethod.Post, "/api/apps/ServiceAccountApp/forms/Anything/state", token, "{}", csrf: true);
 
-        foreach (var (response, title) in new[] { (tasks, TaskSignInTitle), (complete, TaskSignInTitle), (formState, SignInTitle) })
+        foreach (var response in new[] { tasks, complete, formState })
         {
             var body = await response.Content.ReadAsStringAsync(CancellationToken);
             Assert.True(response.StatusCode == HttpStatusCode.Unauthorized, $"{response.StatusCode}: {body}");
             using var problem = JsonDocument.Parse(body);
-            Assert.Equal(title, problem.RootElement.GetProperty("title").GetString());
+            Assert.Equal(SignInTitle, problem.RootElement.GetProperty("title").GetString());
             Assert.False(response.Headers.Contains("WWW-Authenticate"));
         }
     }

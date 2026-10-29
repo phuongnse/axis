@@ -103,7 +103,7 @@ internal static class TaskEndpoints
     {
         if (await CurrentUsers.FindAsync(httpContext) is not { } user)
         {
-            return SignInRequired();
+            return Grants.SignInRequired();
         }
 
         if (await resolver.ResolveReleaseAsync(app, cancellationToken) is not { } active)
@@ -166,7 +166,7 @@ internal static class TaskEndpoints
     {
         if (await CurrentUsers.FindAsync(httpContext) is not { } user)
         {
-            return SignInRequired();
+            return Grants.SignInRequired();
         }
 
         if (await resolver.ResolveReleaseAsync(app, cancellationToken) is not { } active)
@@ -210,7 +210,7 @@ internal static class TaskEndpoints
     {
         if (await CurrentUsers.FindAsync(request.HttpContext) is not { } user)
         {
-            return SignInRequired();
+            return Grants.SignInRequired();
         }
 
         // A release change under the start lock sends the completion back to resolution, so every check runs on the new release.
@@ -272,7 +272,7 @@ internal static class TaskEndpoints
     {
         if (await CurrentUsers.FindAsync(request.HttpContext) is not { } user)
         {
-            return SignInRequired();
+            return Grants.SignInRequired();
         }
 
         if (await resolver.ResolveReleaseAsync(app, cancellationToken) is not { } active)
@@ -362,7 +362,7 @@ internal static class TaskEndpoints
     {
         if (await CurrentUsers.FindAsync(httpContext) is not { } user)
         {
-            return SignInRequired();
+            return Grants.SignInRequired();
         }
 
         if (await resolver.ResolveReleaseAsync(app, cancellationToken) is not { } active)
@@ -417,7 +417,7 @@ internal static class TaskEndpoints
     {
         if (await CurrentUsers.FindAsync(request.HttpContext) is not { } user)
         {
-            return SignInRequired();
+            return Grants.SignInRequired();
         }
 
         if (await resolver.ResolveReleaseAsync(app, cancellationToken) is not { } active)
@@ -733,9 +733,6 @@ internal static class TaskEndpoints
         var labelled = entity.DisplayField is { } displayField && (readable is null || readable.Contains(displayField));
         return new TaskSubject(entity.Name, task.SubjectId, labelled ? labels.GetValueOrDefault((task.ReleaseId, task.SubjectId)) : null);
     }
-
-    private static IResult SignInRequired() =>
-        Results.Problem(statusCode: StatusCodes.Status401Unauthorized, title: "Sign in to work on tasks.");
 
     private static IResult ApplicationNotFound() =>
         Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "No application is active under this name.");

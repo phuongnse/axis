@@ -204,7 +204,8 @@ public sealed class TaskReassignTests(TaskApiFixture fixture) : IClassFixture<Ta
         }
 
         using var anonymous = await GetUsersAsync(fixture.CreateClient(), TenantA, "?search=zelda");
-        await RecordApiFixture.ReadProblemAsync(anonymous, HttpStatusCode.Unauthorized);
+        using var anonymousProblem = await RecordApiFixture.ReadProblemAsync(anonymous, HttpStatusCode.Unauthorized);
+        Assert.Equal("Sign in to read or write this data.", anonymousProblem.RootElement.GetProperty("title").GetString());
     }
 
     [Fact]

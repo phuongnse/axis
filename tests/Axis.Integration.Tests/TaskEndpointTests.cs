@@ -155,7 +155,7 @@ public sealed class TaskEndpointTests(TaskApiFixture fixture) : IClassFixture<Ta
         {
             using var response = await SendAsync(client, path, TenantA);
             using var problem = await RecordApiFixture.ReadProblemAsync(response, HttpStatusCode.Unauthorized);
-            Assert.Equal("Sign in to work on tasks.", problem.RootElement.GetProperty("title").GetString());
+            Assert.Equal("Sign in to read or write this data.", problem.RootElement.GetProperty("title").GetString());
         }
     }
 

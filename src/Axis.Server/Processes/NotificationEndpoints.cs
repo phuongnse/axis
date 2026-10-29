@@ -52,7 +52,7 @@ internal static class NotificationEndpoints
     {
         if (await CurrentUsers.FindAsync(httpContext) is not { } user)
         {
-            return SignInRequired();
+            return Grants.SignInRequired();
         }
 
         if (await resolver.ResolveReleaseAsync(app, cancellationToken) is not { } active)
@@ -117,7 +117,7 @@ internal static class NotificationEndpoints
     {
         if (await CurrentUsers.FindAsync(httpContext) is not { } user)
         {
-            return SignInRequired();
+            return Grants.SignInRequired();
         }
 
         if (await resolver.ResolveReleaseAsync(app, cancellationToken) is not { } active)
@@ -147,7 +147,7 @@ internal static class NotificationEndpoints
     {
         if (await CurrentUsers.FindAsync(httpContext) is not { } user)
         {
-            return SignInRequired();
+            return Grants.SignInRequired();
         }
 
         if (await resolver.ResolveReleaseAsync(app, cancellationToken) is not { } active)
@@ -166,9 +166,6 @@ internal static class NotificationEndpoints
         using var document = JsonDocument.Parse(json ?? "{}");
         return document.RootElement.Clone();
     }
-
-    private static IResult SignInRequired() =>
-        Results.Problem(statusCode: StatusCodes.Status401Unauthorized, title: "Sign in to read notifications.");
 
     private static IResult ApplicationNotFound() =>
         Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "No application is active under this name.");

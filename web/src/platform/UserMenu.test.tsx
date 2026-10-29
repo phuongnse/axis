@@ -53,7 +53,7 @@ function json(body: unknown, status = 200) {
 function stubServer(current: CurrentUser | null) {
   const fetchMock = vi.fn(async (input: string, _init?: RequestInit) => {
     if (input === '/api/me') {
-      return current === null ? json({ title: 'Nobody is signed in.' }, 401) : json(current)
+      return current === null ? json({ title: 'Sign in to read or write this data.' }, 401) : json(current)
     }
     if (input === '/api/auth/sign-out') {
       return json({ signOutUrl })

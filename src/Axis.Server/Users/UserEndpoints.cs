@@ -50,7 +50,7 @@ internal static partial class UserEndpoints
     {
         if (await CurrentUsers.FindAsync(request.HttpContext) is not { } user)
         {
-            return Results.Problem(statusCode: StatusCodes.Status401Unauthorized, title: "Nobody is signed in.");
+            return Grants.SignInRequired();
         }
 
         if (!users.Allows(user.Roles))
@@ -121,7 +121,7 @@ internal static partial class UserEndpoints
                 PreviewHost(studio.Allows(user.Roles), catalog, tenants),
                 console.Allows(user.Roles),
                 users.Allows(user.Roles) && !IsPreview(catalog, tenants)))
-            : Results.Problem(statusCode: StatusCodes.Status401Unauthorized, title: "Nobody is signed in.");
+            : Grants.SignInRequired();
 
     private static bool IsPreview(ITenantCatalog catalog, ITenantContextAccessor tenants) =>
         tenants.Current is { } tenant && catalog.Find(tenant.TenantId)?.PreviewOf is not null;

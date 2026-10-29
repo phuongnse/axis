@@ -343,7 +343,7 @@ public sealed class TaskCompletionTests(TaskApiFixture fixture) : IClassFixture<
     }
 
     [Theory]
-    [InlineData(null, Valid, "application/json", HttpStatusCode.Unauthorized, "Sign in to work on tasks.", "")]
+    [InlineData(null, Valid, "application/json", HttpStatusCode.Unauthorized, "Sign in to read or write this data.", "")]
     [InlineData("otto", Valid, "application/json", HttpStatusCode.Forbidden, "This task is assigned to someone else.", "")]
     [InlineData("maria", Valid, "text/plain", HttpStatusCode.UnsupportedMediaType, "The request body must be application/json.", "")]
     [InlineData("maria", """{ "outcome": "nope" }""", "application/json", HttpStatusCode.BadRequest, null, "/outcome")]
