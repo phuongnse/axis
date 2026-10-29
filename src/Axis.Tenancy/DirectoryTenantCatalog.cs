@@ -1,4 +1,6 @@
+using System.Text.Json;
 using Axis.Tenancy.Platform;
+using Axis.Tenancy.Realms;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
@@ -135,7 +137,7 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
     /// <summary>
     /// The ids of the tenants of this catalog that <paramref name="previous"/> does not hold, or holds on other
     /// sign-in settings, in ordinal order. A tenant whose OIDC authority, client id, encrypted client secret,
-    /// endpoint audience, claim names, sign-in profile or encrypted client keys differ counts, and nothing is decrypted to compare.
+    /// endpoint audience, claim names, sign-in profile, encrypted client keys or platform sign-in differ counts, and nothing is decrypted to compare.
     /// </summary>
     public IReadOnlyList<string> OidcChanges(DirectoryTenantCatalog previous)
     {
@@ -184,6 +186,7 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
         List<TenantRow> tenants;
         List<TenantHostRow> hosts;
         List<TenantBindingRow> bindings;
+        List<TenantPlatformProviderRow> platformProviders;
         try
         {
             var options = new DbContextOptionsBuilder<PlatformDbContext>().UseNpgsql(platformConnectionString).Options;
@@ -196,6 +199,7 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
             bindings = await context.TenantBindings.AsNoTracking()
                 .Where(binding => ids.Contains(binding.TenantId))
                 .ToListAsync(cancellationToken);
+            platformProviders = await context.TenantPlatformProviders.AsNoTracking().ToListAsync(cancellationToken);
         }
         catch (Exception exception) when (exception is NpgsqlException or InvalidOperationException)
         {
@@ -228,13 +232,17 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
                 row,
                 [.. hosts.Where(host => host.TenantId == row.Id)],
                 bindings.Where(binding => binding.TenantId == row.Id),
+                platformProviders.Where(provider => provider.TenantId == (row.PreviewOf ?? row.Id)),
                 cipher,
                 tls,
                 row.PreviewOf is null ? null : byId[row.PreviewOf])),
             hosts.Where(host => !activeIds.Contains(host.TenantId)).Select(host => host.Host),
             active.ToDictionary(row => row.Id, DatabaseKey, StringComparer.Ordinal),
             active.ToDictionary(row => row.Id, row => row.SchemaVersion, StringComparer.Ordinal),
-            active.ToDictionary(row => row.Id, row => OidcKey(row.PreviewOf is null ? row : byId[row.PreviewOf], row.PreviewOf is not null), StringComparer.Ordinal));
+            active.ToDictionary(row => row.Id, row => OidcKey(
+                row.PreviewOf is null ? row : byId[row.PreviewOf],
+                row.PreviewOf is not null,
+                platformProviders.Where(provider => provider.TenantId == (row.PreviewOf ?? row.Id))), StringComparer.Ordinal));
     }
 
     private static bool IsActive(TenantRow row) => row.Status == "active";
@@ -244,10 +252,10 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
         $"{row.DatabaseHost}\n{row.DatabasePort}\n{row.DatabaseName}\n{row.RuntimeUser}\n{Convert.ToBase64String(row.RuntimePassword)}";
 
     // Compares the stored encrypted client secret and client keys, so nothing is decrypted to tell whether the sign-in
-    // settings changed.
+    // settings changed. The platform sign-in counts, so `tenant sign-in set` rebuilds the scheme's options at the next refresh.
     // A preview tenant is keyed by the settings of its main tenant, without the endpoint and service audiences it never
     // takes, so a change to the main tenant's sign-in reaches the preview at the next refresh.
-    private static string OidcKey(TenantRow signIn, bool preview) =>
+    private static string OidcKey(TenantRow signIn, bool preview, IEnumerable<TenantPlatformProviderRow> platformProviders) =>
         string.Join(
             '\n',
             signIn.OidcAuthority,
@@ -264,15 +272,62 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
             signIn.OidcClientKeyId,
             signIn.OidcClientKey is null ? null : Convert.ToBase64String(signIn.OidcClientKey),
             signIn.OidcPreviousClientKeyId,
-            signIn.OidcPreviousClientKey is null ? null : Convert.ToBase64String(signIn.OidcPreviousClientKey));
+            signIn.OidcPreviousClientKey is null ? null : Convert.ToBase64String(signIn.OidcPreviousClientKey),
+            signIn.PlatformAccounts,
+            string.Join(
+                '\n',
+                PlatformSignInOf(signIn, platformProviders)?.Providers.Select(provider => string.Join(
+                    '\t',
+                    provider.Name,
+                    provider.Alias,
+                    provider.RolesClaim,
+                    string.Join(',', provider.RoleValues.OrderBy(pair => pair.Key, StringComparer.Ordinal).Select(pair => $"{pair.Key}={pair.Value}"))))
+                    ?? []));
+
+    /// <summary>
+    /// The platform sign-in of a tenant row with the rows of its providers, or <c>null</c> when none is stored: accounts
+    /// off and no provider. An <c>oidc</c> provider's alias is <see cref="RealmSync.ProviderAliasPrefix"/> and the lower-case
+    /// issuer binding, as the realm names it. A <c>saml</c> provider has no alias yet. The providers are in ordinal order of name.
+    /// </summary>
+    internal static PlatformSignIn? PlatformSignInOf(TenantRow signIn, IEnumerable<TenantPlatformProviderRow> providers)
+    {
+        var rows = providers.OrderBy(provider => provider.Name, StringComparer.Ordinal).ToList();
+        if (!signIn.PlatformAccounts && rows.Count == 0)
+        {
+            return null;
+        }
+
+        return new PlatformSignIn(
+            signIn.PlatformAccounts,
+            [.. rows.Select(provider => new PlatformSignInProvider(
+                provider.Name,
+                provider.Type == "oidc" && Blank(provider.IssuerBinding) is { } issuer ? RealmSync.ProviderAliasPrefix + issuer.ToLowerInvariant() : null,
+                Blank(provider.RolesClaim),
+                RoleValues(provider)))]);
+    }
+
+    private static Dictionary<string, string> RoleValues(TenantPlatformProviderRow provider)
+    {
+        try
+        {
+            return JsonSerializer.Deserialize<Dictionary<string, string>>(provider.RoleValues) ?? [];
+        }
+        catch (JsonException)
+        {
+            // Nothing maps, so the provider's people get no platform role.
+            return [];
+        }
+    }
 
     // A preview tenant signs people in with the sign-in settings of its main tenant, whatever the main tenant's status,
     // and decrypts the client secret under the main tenant's id. It never takes the main tenant's EndpointAudience or
-    // ServiceAudience, so it accepts no machine-caller or service account bearer token. Its bindings are only its own.
+    // ServiceAudience, so it accepts no machine-caller or service account bearer token. Its bindings are only its own. It also
+    // takes the main tenant's platform sign-in, whose provider rows the caller passes.
     private static TenantEntry Entry(
         TenantRow row,
         IReadOnlyList<TenantHostRow> hostRows,
         IEnumerable<TenantBindingRow> bindingRows,
+        IEnumerable<TenantPlatformProviderRow> platformProviders,
         TenantSecretCipher cipher,
         TenantDatabaseTls tls,
         TenantRow? main)
@@ -328,6 +383,7 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
             Email(row, cipher),
             Realm(row, cipher),
             RealmUsers(row, cipher),
+            PlatformSignInOf(signIn, platformProviders),
             hostSites);
     }
 

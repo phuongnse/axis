@@ -37,6 +37,7 @@ public interface ITenantCatalog
 /// <param name="Email">The tenant's own mail settings, which replace the host's whole, or <c>null</c> when the tenant uses the host's. Both sources have them.</param>
 /// <param name="Realm">What activation needs to sync the tenant's realm, or <c>null</c> when the source holds none for this tenant. Both sources have it, and a preview tenant has none.</param>
 /// <param name="RealmUsers">What the server needs to list the tenant's realm users, or <c>null</c> when the source holds none for this tenant. Both sources have it, and a preview tenant has none.</param>
+/// <param name="PlatformSignIn">The tenant's platform sign-in, or <c>null</c> when none is stored, which accepts every sign-in and takes roles as the tenant's roles claim gives them. The <c>configuration</c> source has none. A preview tenant has its main tenant's.</param>
 /// <param name="HostSites">The lower-case site path of each host that belongs to a site, keyed by host and matched ignoring letter case, or <c>null</c> when the source gives no host to a site. A host of no site is not in it.</param>
 public sealed record TenantEntry(
     string Id,
@@ -49,7 +50,23 @@ public sealed record TenantEntry(
     EmailSettings? Email = null,
     TenantRealmAccess? Realm = null,
     TenantRealmUsers? RealmUsers = null,
+    PlatformSignIn? PlatformSignIn = null,
     IReadOnlyDictionary<string, string>? HostSites = null);
+
+/// <summary>
+/// The sign-in of the platform pages (home, Studio, the operator console, the account page and the users page): whether
+/// accounts sign in and which brokered providers are accepted.
+/// </summary>
+/// <param name="Accounts">Whether a person with an account of the realm may sign in.</param>
+/// <param name="Providers">The accepted providers.</param>
+public sealed record PlatformSignIn(bool Accounts, IReadOnlyList<PlatformSignInProvider> Providers);
+
+/// <summary>One brokered provider that the platform sign-in accepts.</summary>
+/// <param name="Name">The provider's name in the platform sign-in.</param>
+/// <param name="Alias">The alias the realm gives the provider, which is the <c>identity_provider</c> claim of its sign-ins, or <c>null</c> for a provider the realm gives no alias yet (<c>saml</c>).</param>
+/// <param name="RolesClaim">The provider's roles claim, or <c>null</c> when it has none.</param>
+/// <param name="RoleValues">Maps a value of the roles claim to <c>author</c>, <c>publisher</c>, <c>operator</c> or <c>administrator</c>.</param>
+public sealed record PlatformSignInProvider(string Name, string? Alias, string? RolesClaim, IReadOnlyDictionary<string, string> RoleValues);
 
 /// <summary>
 /// What activation needs to sync a tenant's realm: the address of the identity provider, the realm's name and the

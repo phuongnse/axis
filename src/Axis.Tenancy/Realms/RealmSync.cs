@@ -28,6 +28,9 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
     public const string ProviderAliasPrefix = "oidc-";
     public const string IdentityProviderClaim = "identity_provider";
 
+    /// <summary>The user attribute that holds the values of one roles claim of a brokered provider.</summary>
+    public static string RolesAttribute(string claim) => $"axis_roles_{claim}";
+
     /// <summary>The attribute of a site client that holds the aliases of the providers the site allows, separated by spaces.</summary>
     public const string ProvidersAttribute = "axis.providers";
 
@@ -425,7 +428,7 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
         };
         foreach (var claim in provider.RolesClaims)
         {
-            desired[$"roles {claim}"] = AttributeMapper(claim, $"axis_roles_{claim}");
+            desired[$"roles {claim}"] = AttributeMapper(claim, RolesAttribute(claim));
         }
 
         using var listed = await SendAsync(token, HttpMethod.Get, $"{instancePath}/mappers", null, cancellationToken);
