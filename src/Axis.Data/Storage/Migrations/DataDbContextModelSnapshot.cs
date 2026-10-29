@@ -449,6 +449,10 @@ namespace Axis.Data.Storage.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("signed_in_at");
 
+                    b.Property<string>("SitePath")
+                        .HasColumnType("text")
+                        .HasColumnName("site_path");
+
                     b.Property<string>("UserId")
                         .IsRequired()
                         .HasColumnType("text")

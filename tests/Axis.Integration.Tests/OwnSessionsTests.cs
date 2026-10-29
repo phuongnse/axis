@@ -134,6 +134,26 @@ public sealed class OwnSessionsTests(PostgreSqlFixture database) : IAsyncLifetim
     }
 
     [Fact]
+    public async Task A_session_of_a_site_host_is_not_listed_and_the_callers_deletes_leave_it()
+    {
+        using var client = CreateClient();
+        var caller = await SignInAsync(client, "requester", authenticatedMinutesAgo: 0);
+        var site = await SignInAsync(client, "requester", authenticatedMinutesAgo: 0);
+        var siteId = (await ListAsync(client, site)).Sessions.Single(session => session.Current).Id;
+        await SetSitePathAsync(siteId, "purchasing");
+
+        var listed = Assert.Single((await ListAsync(client, caller)).Sessions);
+        var endOne = await SendAsync(client, HttpMethod.Delete, $"/api/me/sessions/{siteId}", caller);
+        var endOthers = await SendAsync(client, HttpMethod.Delete, "/api/me/sessions", caller);
+
+        Assert.True(listed.Current);
+        Assert.NotEqual(siteId, listed.Id);
+        Assert.Equal(HttpStatusCode.NotFound, endOne.StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, endOthers.StatusCode);
+        Assert.Equal(2L, await CountAsync());
+    }
+
+    [Fact]
     public async Task A_recent_caller_ends_one_session_then_all_the_others_and_the_current_session_stays()
     {
         using var client = CreateClient();
@@ -278,6 +298,16 @@ public sealed class OwnSessionsTests(PostgreSqlFixture database) : IAsyncLifetim
         }
 
         return hashes;
+    }
+
+    private async Task SetSitePathAsync(string id, string sitePath)
+    {
+        await using var connection = new NpgsqlConnection(_connectionString);
+        await connection.OpenAsync(CancellationToken);
+        await using var command = new NpgsqlCommand("UPDATE axis.sessions SET site_path = @site WHERE id_hash = @hash", connection);
+        command.Parameters.AddWithValue("site", sitePath);
+        command.Parameters.AddWithValue("hash", Base64Url.DecodeFromChars(id));
+        Assert.Equal(1, await command.ExecuteNonQueryAsync(CancellationToken));
     }
 
     private async Task<long> CountAsync()

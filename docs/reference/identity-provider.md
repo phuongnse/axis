@@ -138,6 +138,8 @@ so Studio edits it, with the identity provider editor of [Studio](studio.md), an
     `/api/sites/{path}` and below for that site, and `/api/apps/{app}` for the site's application. Everything else is
     a `404` problem there, such as `/api/sites`, other sites and applications, Studio, the users page, the account
     page and `/api/me/sessions`. The refusal comes before authentication, so it renews no session.
+  - A session stays on the host that made it. A person signs in separately on the site's host and on the tenant's other
+    hosts, see [the session](security.md#sign-in-and-the-session).
   - The site keeps its path on its own host, so it opens at `shop.example.test/shop`. `/` on that host redirects to
     `/{path}`. Serving the site at `/` comes later and needs a change in the SPA.
   - The tenant's other hosts redirect the site's path and anything below it with `302` to the same path and query on

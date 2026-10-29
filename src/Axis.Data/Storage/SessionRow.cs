@@ -25,4 +25,10 @@ public sealed class SessionRow
     /// session created before the column existed.
     /// </summary>
     public DateTimeOffset? AuthenticatedAt { get; init; }
+
+    /// <summary>
+    /// The lower-case site path of the host that made the session. It is null for the tenant's own hosts and for a session
+    /// created before the column existed.
+    /// </summary>
+    public string? SitePath { get; init; }
 }
