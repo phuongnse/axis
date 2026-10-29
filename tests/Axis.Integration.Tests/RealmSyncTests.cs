@@ -15,7 +15,8 @@ namespace Axis.Integration.Tests;
 /// <see cref="TenantRealm"/> made match a desired state. It changes only clients that start with <c>site-</c> and
 /// providers that start with <c>oidc-</c>, puts the provider's alias into each site client's ID token, points each
 /// provider at the realm's first-login flow and gives it a username mapper, and changes
-/// nothing when it cannot sign in as <c>axis-activation</c>.
+/// nothing when it cannot sign in as <c>axis-activation</c>. A site client also holds a copy of each protocol mapper of
+/// <c>axis</c>, and a second sync leaves one copy of each mapper.
 /// </summary>
 public sealed partial class RealmSyncTests(KeycloakFixture keycloak) : IAsyncLifetime
 {
@@ -96,6 +97,47 @@ public sealed partial class RealmSyncTests(KeycloakFixture keycloak) : IAsyncLif
         Assert.Equal("identity_provider", config.GetProperty("user.session.note").GetString());
         Assert.Equal("identity_provider", config.GetProperty("claim.name").GetString());
         Assert.Equal("true", config.GetProperty("id.token.claim").GetString());
+    }
+
+    [Fact]
+    public async Task A_site_client_copies_the_protocol_mappers_of_the_platform_client_once()
+    {
+        var realm = await NewRealmAsync();
+        var token = await TokenAsync("master", KeycloakFixture.AdminClientId, KeycloakFixture.AdminClientSecret);
+        var platform = (await GetJsonAsync(token, $"admin/realms/{realm}/clients?clientId=axis"))[0];
+        var rolesConfig = new Dictionary<string, string>
+        {
+            ["usermodel.clientRoleMapping.clientId"] = "axis",
+            ["claim.name"] = "roles",
+            ["multivalued"] = "true",
+            ["jsonType.label"] = "String",
+            ["id.token.claim"] = "true",
+            ["access.token.claim"] = "true",
+            ["userinfo.token.claim"] = "true",
+        };
+        using (var created = await SendAsync(token, HttpMethod.Post, $"admin/realms/{realm}/clients/{platform.GetProperty("id").GetString()}/protocol-mappers/models", new
+        {
+            name = "roles",
+            protocol = "openid-connect",
+            protocolMapper = "oidc-usermodel-client-role-mapper",
+            config = rolesConfig,
+        }))
+        {
+            Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        }
+
+        var state = State(["purchasing"], []);
+        await SyncAsync(realm, _secrets.Activation, state);
+        await SyncAsync(realm, _secrets.Activation, state);
+
+        var site = (await GetJsonAsync(token, $"admin/realms/{realm}/clients?clientId=site-purchasing"))[0];
+        var mappers = site.GetProperty("protocolMappers").EnumerateArray().ToList();
+        var roles = Assert.Single(mappers, mapper => mapper.GetProperty("name").GetString() == "roles");
+        Assert.Equal("oidc-usermodel-client-role-mapper", roles.GetProperty("protocolMapper").GetString());
+        Assert.Equal(
+            rolesConfig,
+            roles.GetProperty("config").EnumerateObject().ToDictionary(entry => entry.Name, entry => entry.Value.GetString()!));
+        Assert.Single(mappers, mapper => mapper.GetProperty("name").GetString() == "identity provider");
     }
 
     [Fact]
