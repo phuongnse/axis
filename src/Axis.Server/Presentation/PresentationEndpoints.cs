@@ -1,3 +1,4 @@
+using Axis.Core.Tenancy;
 using Axis.Presentation.Sites;
 using Axis.Presentation.Texts;
 
@@ -8,7 +9,8 @@ internal static class PresentationEndpoints
 {
     public static void MapPresentationEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapGet("/api/site", (ISiteMetadataProvider sites) => Results.Ok(sites.GetSite()));
+        endpoints.MapGet("/api/site", (ISiteMetadataProvider sites, ITenantContextAccessor tenants) =>
+            Results.Ok(sites.GetSite() with { HostSite = tenants.Current?.SitePath }));
 
         endpoints.MapGet("/api/texts/{locale}", (string locale, ITextResourceProvider texts) =>
             texts.GetTexts(locale) is { } found

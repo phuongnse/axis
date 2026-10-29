@@ -294,6 +294,13 @@ As environment variables they are `Tenancy__Source`,
   with the key. See [D49](../decisions/d49-several-server-replicas-behind-a-tls-proxy.md).
 - **`ActivateOnStartup`.** It must be empty under `directory`, see
   [startup activation](#startup-activation).
+- **Site hosts.** Under `configuration`, `Tenants:{id}:SiteHosts:{host}` gives one
+  of the tenant's `Hosts` to the site with the path it holds, as the environment variable
+  `Tenants__<id>__SiteHosts__<host>`. That host then serves only the site, see
+  [sites and sign-in](identity-provider.md#sites-and-sign-in). A host that is not
+  one of the tenant's `Hosts`, a path that is not a valid site path or is reserved, and two
+  hosts for one site stop the start. Under `directory`, `tenant host add --site` gives it. The E2E server
+  uses this for its site host.
 
 ### Preview tenants
 

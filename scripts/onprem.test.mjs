@@ -910,6 +910,7 @@ describe('the on-premises installation', () => {
       }
 
       // Each tenant has its own sign-in: a redirect to the authorization endpoint of its own realm that returns to its own host.
+      // The return URL opens the active site "leave", so the sign-in uses that site's client in the realm.
       for (const [id, host] of Object.entries(hosts)) {
         let signIn
         // The server fetches the OIDC metadata when it first needs it, so the first try can fail.
@@ -921,7 +922,7 @@ describe('the on-premises installation', () => {
         assert.equal(signIn.status, 302, `${host} sign-in: ${signIn.body}`)
         const location = new URL(signIn.headers.location)
         assert.equal(`${location.origin}${location.pathname}`, `https://${identityHost}/realms/${id}/protocol/openid-connect/auth`)
-        assert.equal(location.searchParams.get('client_id'), 'axis')
+        assert.equal(location.searchParams.get('client_id'), 'site-leave')
         assert.equal(location.searchParams.get('redirect_uri'), `https://${host}/api/auth/callback`)
       }
 

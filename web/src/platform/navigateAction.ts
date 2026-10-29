@@ -1,5 +1,6 @@
 import { fetchRecord, type FieldValue, type RecordItem } from './records'
 import type { NavigateAction } from './site'
+import { siteAddress } from './siteLinks'
 
 /** What a navigate expression reads: the id of a record and its field values, or a data source row's columns. */
 export interface NavigateScope {
@@ -56,7 +57,7 @@ function addressOf(
   action: NavigateAction,
   valueOf: (expression: string) => FieldValue | undefined,
 ): string | null {
-  let path = `/${sitePath}/${action.page.toLowerCase()}`
+  let path = siteAddress(sitePath, action.page.toLowerCase())
   if (action.record !== null) {
     const id = valueOf(action.record)
     if (typeof id !== 'string' || id === '') {

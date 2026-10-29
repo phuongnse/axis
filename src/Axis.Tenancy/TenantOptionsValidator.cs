@@ -1,3 +1,5 @@
+using Axis.Configuration.Resources;
+
 namespace Axis.Tenancy;
 
 /// <summary>Checks the tenant configuration before the server starts.</summary>
@@ -39,6 +41,7 @@ public static class TenantOptionsValidator
             }
 
             AddBindingProblems(tenantId, settings, problems);
+            AddSiteHostProblems(tenantId, settings, problems);
 
             foreach (var host in hosts.Where(host => !string.IsNullOrWhiteSpace(host)))
             {
@@ -51,6 +54,28 @@ public static class TenantOptionsValidator
 
         AddPreviewProblems(options, problems);
         return problems;
+    }
+
+    private static void AddSiteHostProblems(string tenantId, TenantSettings? settings, List<string> problems)
+    {
+        var siteHosts = settings?.SiteHosts ?? [];
+        foreach (var (host, path) in siteHosts.OrderBy(pair => pair.Key, StringComparer.Ordinal))
+        {
+            if (!(settings?.Hosts ?? []).Contains(host, StringComparer.OrdinalIgnoreCase))
+            {
+                problems.Add($"Tenant '{tenantId}' gives the host '{host}' to a site, but it is not one of the tenant's hosts.");
+            }
+
+            if (!SitePaths.IsValid(path) || SitePaths.Reserved.Contains(path.ToLowerInvariant()))
+            {
+                problems.Add($"Tenant '{tenantId}' gives the host '{host}' a site path that is not valid or is reserved.");
+            }
+        }
+
+        foreach (var group in siteHosts.GroupBy(pair => pair.Value?.ToLowerInvariant()).Where(group => group.Key is not null && group.Count() > 1))
+        {
+            problems.Add($"Tenant '{tenantId}' gives the site '{group.Key}' more than one host.");
+        }
     }
 
     // A tenant whose PreviewOf is its own id is a preview tenant, so the second rule refuses it.

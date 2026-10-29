@@ -2,6 +2,7 @@ import { defineConfig, devices } from '@playwright/test'
 import {
   assetManagement,
   e2eApp,
+  hostSiteApp,
   journeyServerEnv,
   journeyURL,
   leaveRequests,
@@ -29,6 +30,7 @@ const environment = {
   ActivateOnStartup__3: serviceDesk,
   ActivateOnStartup__4: assetManagement,
   ActivateOnStartup__5: subprocessApp,
+  ActivateOnStartup__6: hostSiteApp,
 }
 const isShellName = (name: string) => /^[A-Za-z_][A-Za-z0-9_]*$/.test(name)
 const hyphenated = Object.entries(environment).filter(([name]) => !isShellName(name))

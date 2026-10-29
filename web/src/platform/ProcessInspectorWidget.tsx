@@ -15,6 +15,7 @@ import { markCurrentPage } from './pagination'
 import type { WidgetMetadata } from './site'
 import { parseTableQuery, recordQuery, tablePageSizes, writeTableQuery } from './tableQuery'
 import { useText } from './texts'
+import { siteAddress } from './siteLinks'
 
 interface ProcessInspectorWidgetProps {
   sitePath: string
@@ -60,7 +61,7 @@ export function ProcessInspectorWidget({ sitePath, pageName, widget, locale }: P
   const [searchParams, setSearchParams] = useSearchParams()
   // The server sets the path on every process inspector.
   const instancesPath = widget.instancesPath!
-  const instancePath = `/${sitePath}/${pageName.toLowerCase()}`
+  const instancePath = siteAddress(sitePath, pageName.toLowerCase())
   // The list has no sort, so no field is offered as one. A state the API does not know is dropped,
   // so the server never answers it with a 400.
   const query = useMemo(() => {

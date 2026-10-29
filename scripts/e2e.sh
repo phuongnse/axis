@@ -4,11 +4,12 @@
 # server only once the realm answers. The server signs people in through that realm at
 # /api/auth/sign-in. The SPA does not offer it yet. The realm signs people in on the Axis theme, which this script
 # builds into artifacts/keycloak-theme and mounts read-only before Keycloak starts.
-# The server starts with six applications active: the generic E2E test application in
+# The server starts with seven applications active: the generic E2E test application in
 # tests/e2e/fixtures/e2e-app, the purchase request sample in samples/apps/purchase-requests, the
 # leave request sample in samples/apps/leave-requests, the service desk sample in
 # samples/apps/service-desk, the asset management sample in samples/apps/asset-management and the
-# sub-process fixture in tests/e2e/fixtures/subprocess-app.
+# sub-process fixture in tests/e2e/fixtures/subprocess-app and the host site fixture in tests/e2e/fixtures/host-site-app.
+# The host site's site has the host hostsite.localhost, one of the main tenant's hosts, which serves only that site.
 # A spec can activate another folder during the run: tests/e2e/activate.ts starts the built server
 # once more on a spare port with that folder in ActivateOnStartup, waits until it is ready and
 # stops it. The main server then serves the new release. The release-pinning spec activates

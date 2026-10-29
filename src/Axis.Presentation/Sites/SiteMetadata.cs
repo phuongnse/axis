@@ -2,7 +2,8 @@ namespace Axis.Presentation.Sites;
 
 /// <summary>What the SPA needs to build its shell: name, title, locales and navigation.</summary>
 /// <param name="TitleKey">Text key of the site title.</param>
-public sealed record SiteMetadata(string Name, string TitleKey, SiteLocales Locales, IReadOnlyList<NavigationItem> Navigation);
+/// <param name="HostSite">The lower-case path of the site whose own host the request came on, or <c>null</c> when the host belongs to no site. The SPA then shows that site at <c>/</c>.</param>
+public sealed record SiteMetadata(string Name, string TitleKey, SiteLocales Locales, IReadOnlyList<NavigationItem> Navigation, string? HostSite = null);
 
 /// <summary>The locales a site offers, with the one shown first and the one used for missing texts.</summary>
 public sealed record SiteLocales(string Default, string Fallback, IReadOnlyList<string> Available);

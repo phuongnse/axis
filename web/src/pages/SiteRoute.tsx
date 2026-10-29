@@ -10,6 +10,7 @@ import { LocaleLoadFailed, ShellError } from './LocaleLoadFailed'
 import { NotFoundPage } from './NotFoundPage'
 import { platformTextsFor, useApplicationSite, usePlatform, type SiteOutlet } from './context'
 import { PlatformShellRoute } from './PlatformShellRoute'
+import { siteAddress } from '../platform/siteLinks'
 
 interface LoadedSite {
   site: ApplicationSite
@@ -19,11 +20,12 @@ interface LoadedSite {
   platformTexts: TextMap
 }
 
-/** Opens the application site named by the `:site` segment. */
-export function SiteRoute() {
+/** Opens the application site named by the `:site` segment, or the site `path` names when the host belongs to that site. */
+export function SiteRoute({ path }: { path?: string }) {
   const { site = '' } = useParams()
+  const sitePath = path ?? site
   // A new site starts from a clean state rather than showing the previous site meanwhile.
-  return <SiteShell key={site} path={site} />
+  return <SiteShell key={sitePath} path={sitePath} />
 }
 
 function SiteShell({ path }: { path: string }) {
@@ -136,7 +138,7 @@ function SiteShell({ path }: { path: string }) {
         titleKey={site.titleKey}
         navigation={site.navigation.map((item) => ({
           key: item.page,
-          path: `/${site.path}/${item.page.toLowerCase()}`,
+          path: siteAddress(site.path, item.page.toLowerCase()),
           labelKey: item.labelKey,
           icon: item.icon,
         }))}
@@ -156,5 +158,5 @@ function SiteShell({ path }: { path: string }) {
 export function SiteIndex() {
   const site = useApplicationSite()
   const first = site.navigation[0]
-  return first ? <Navigate to={`/${site.path}/${first.page.toLowerCase()}`} replace /> : <NotFoundPage />
+  return first ? <Navigate to={siteAddress(site.path, first.page.toLowerCase())} replace /> : <NotFoundPage />
 }
