@@ -35,7 +35,7 @@ export const safeSuites = {
 }
 
 // NexKit's commits, in the order a check prefers them: the head on which this check last passed with
-// its current command, then the merge base with the base branch. NEXKIT_VERIFIED_SHA, the head of the
+// its current command and setup, then the merge base with the base branch. NEXKIT_VERIFIED_SHA, the head of the
 // last round whose checks all passed, is never used: NexKit does not record which checks or commands
 // that round ran, so a check added or changed since would skip without ever having passed. None is
 // set outside NexKit, so CI and local runs run every suite.
