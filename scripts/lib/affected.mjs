@@ -13,17 +13,18 @@ import { fileURLToPath } from 'node:url'
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..')
 
 // A matcher is a directory prefix (ends in "/"), an exact path, or a RegExp.
-// No smoke suite or Playwright reads docs/ or Markdown files.
-const docsOnly = ['docs/', /\.md$/]
+// No suite reads the docs, Markdown files, the GitHub workflows or NexKit's settings. NexKit itself
+// drops a check's passed commit when the check's command in .nexkit/config.json changes.
+const docsAndSettings = ['docs/', /\.md$/, '.github/', '.nexkit/']
 
 // A safe list names only paths that its suite never reads, so a change to them cannot change the result.
 export const safeSuites = {
-  integration: ['docs/', 'tests/e2e/', /\.md$/, /^web\/(?!package(-lock)?\.json$)/],
-  playwright: docsOnly,
-  'dev-script': docsOnly,
-  compose: docsOnly,
-  images: docsOnly,
-  onprem: docsOnly,
+  integration: [...docsAndSettings, 'tests/e2e/', /^web\/(?!package(-lock)?\.json$)/],
+  playwright: docsAndSettings,
+  'dev-script': docsAndSettings,
+  compose: docsAndSettings,
+  images: docsAndSettings,
+  onprem: docsAndSettings,
 }
 
 // NexKit's commits, in the order a check prefers them: the head on which this check last passed,
@@ -78,7 +79,13 @@ export function main(args, env = process.env, stderr = process.stderr) {
   const since = sinceCommit(env)
   if (Object.hasOwn(safeSuites, name)) {
     const decision = decideSafe({ base: since?.sha, matchers: safeSuites[name], listChanged: changedPaths })
-    if (decision.run) return 'run'
+    if (decision.run) {
+      // Outside NexKit every suite runs, so only a run under NexKit says why.
+      if (since) {
+        stderr.write(`Running ${name} in full: ${decision.reason} Compared with ${since.sha} (${since.name}).\n`)
+      }
+      return 'run'
+    }
     stderr.write(`Skipping ${name}: every path changed since ${since.sha} (${since.name}) is on its safe list.\n`)
     return 'skip'
   }
