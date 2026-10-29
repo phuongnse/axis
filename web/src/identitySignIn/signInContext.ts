@@ -44,6 +44,7 @@ export interface SignInSite {
 
 /** What the identity provider's sign-in page draws. The design system feeds it fixtures, the theme feeds it Keycloak's. */
 export interface SignInContext {
+  page: 'signIn'
   title: string
   realmName: string
   providers: SignInProvider[]
@@ -61,3 +62,23 @@ export interface SignInContext {
   locales: SignInLocale[]
   texts: SignInTexts
 }
+
+/** What the two-step verification page draws: the 6-digit code that follows the password. */
+export interface TwoStepContext {
+  page: 'twoStep'
+  title: string
+  realmName: string
+  /** The message to show above the form. No error means no alert. */
+  error?: string
+  /** Where the code form posts `otp` and `login`, and where "Try another way" posts `tryAnotherWay=on`. */
+  loginAction: string
+  /** Where "Back to sign in" restarts the sign-in. */
+  restartUrl: string
+  /** Whether Keycloak offers another way to sign in, which shows "Try another way". */
+  tryAnotherWay: boolean
+  locales: SignInLocale[]
+  texts: TwoStepTexts
+}
+
+/** What the page of the identity provider's theme draws, told apart by `page`. */
+export type IdentityContext = SignInContext | TwoStepContext

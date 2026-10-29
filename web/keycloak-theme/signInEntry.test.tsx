@@ -1,17 +1,18 @@
 import { cleanup, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router'
 import { afterEach, describe, expect, it } from 'vitest'
-import { identitySignInContext } from '../src/designSystem/fixtures'
+import { identitySignInContext, identityTwoStepContext } from '../src/designSystem/fixtures'
 import { previews } from '../src/designSystem/previews'
+import type { IdentityContext } from '../src/identitySignIn/signInContext'
 import { ThemeModeProvider } from '../src/platform/theme'
 import { readSignInContext } from './readSignInContext'
 import { SignInEntry } from './signInEntry'
 
-function writeContextBlock() {
+function writeContextBlock(context: IdentityContext = identitySignInContext) {
   const block = document.createElement('script')
   block.type = 'application/json'
   block.id = 'axis-sign-in-context'
-  block.textContent = JSON.stringify(identitySignInContext)
+  block.textContent = JSON.stringify(context)
   document.body.append(block)
 }
 
@@ -21,6 +22,19 @@ function expectSignInPage(container: HTMLElement) {
   expect(form).toHaveAttribute('action', identitySignInContext.loginAction)
   expect(form).toHaveAttribute('method', 'post')
   expect(form.querySelector('input[name="username"]')).toHaveValue(identitySignInContext.username)
+}
+
+function expectTwoStepPage(container: HTMLElement) {
+  expect(screen.getByText('Two-step verification')).toBeInTheDocument()
+  const form = container.querySelector('form') as HTMLFormElement
+  expect(form).toHaveAttribute('action', identityTwoStepContext.loginAction)
+  expect(form).toHaveAttribute('method', 'post')
+  expect(form.querySelectorAll('input:not([type="hidden"])')).toHaveLength(6)
+  expect(form.querySelector('input[name="otp"]')).toBeInTheDocument()
+  expect(screen.getByRole('link', { name: 'Back to sign in' })).toHaveAttribute(
+    'href',
+    identityTwoStepContext.restartUrl,
+  )
 }
 
 describe('the Keycloak theme entry', () => {
@@ -40,6 +54,20 @@ describe('the Keycloak theme entry', () => {
       </ThemeModeProvider>,
     )
     expectSignInPage(preview.container)
+  })
+
+  it('draws the same two-step page as the identitySignIn preview', () => {
+    writeContextBlock(identityTwoStepContext)
+    const theme = render(<SignInEntry context={readSignInContext(document)} />)
+    expectTwoStepPage(theme.container)
+    cleanup()
+
+    const preview = render(
+      <ThemeModeProvider>
+        <MemoryRouter>{previews.identitySignIn[3].draw()}</MemoryRouter>
+      </ThemeModeProvider>,
+    )
+    expectTwoStepPage(preview.container)
   })
 
   it('fails with a clear error when the sign-in context is missing', () => {

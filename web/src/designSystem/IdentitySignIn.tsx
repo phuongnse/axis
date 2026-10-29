@@ -1,6 +1,6 @@
 import { SignInPage } from '../identitySignIn/SignInPage'
 import { TwoStepPage } from '../identitySignIn/TwoStepPage'
-import { identityInvalid, identitySignInContext, identityTwoStepTexts } from './fixtures'
+import { identityInvalid, identitySignInContext, identityTwoStepContext } from './fixtures'
 
 export type IdentitySignInPage = 'signIn' | 'wrongPassword' | 'organizationOnly' | 'twoStep'
 
@@ -14,13 +14,6 @@ export function IdentitySignIn({ page }: { page: IdentitySignInPage }) {
     case 'organizationOnly':
       return <SignInPage context={{ ...identitySignInContext, accounts: false }} />
     case 'twoStep':
-      // Two-step verification is a preview-only state until the theme draws it.
-      return (
-        <TwoStepPage
-          texts={identityTwoStepTexts}
-          organization={identitySignInContext.realmName}
-          locales={identitySignInContext.locales}
-        />
-      )
+      return <TwoStepPage context={identityTwoStepContext} />
   }
 }

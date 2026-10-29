@@ -18,7 +18,7 @@ import type {
   WidgetMetadata,
 } from '../platform/site'
 import type { TaskPage } from '../platform/tasks'
-import type { SignInContext, SignInTexts, TwoStepTexts } from '../identitySignIn/signInContext'
+import type { SignInContext, SignInTexts, TwoStepContext, TwoStepTexts } from '../identitySignIn/signInContext'
 
 /** The fixture application. Its name is also the marker that tells a design-system build from the production SPA. */
 export const application = 'DesignSystemSample'
@@ -792,6 +792,7 @@ export const identitySignInTexts: SignInTexts = {
 
 /** What the identity provider's sign-in page draws in the design system. */
 export const identitySignInContext: SignInContext = {
+  page: 'signIn',
   title: 'Sign in',
   realmName: 'Contoso',
   providers: [{ alias: 'contoso', label: 'Contoso ID', loginUrl: '#contoso' }],
@@ -810,7 +811,7 @@ export const identitySignInContext: SignInContext = {
 /** The message of the sign-in page after a wrong password. */
 export const identityInvalid = 'Invalid email, username or password.'
 
-/** The texts of the preview-only two-step verification page. */
+/** The texts of the two-step verification page, in English. */
 export const identityTwoStepTexts: TwoStepTexts = {
   title: 'Two-step verification',
   message: 'Enter the 6-digit code from your authenticator app.',
@@ -818,6 +819,18 @@ export const identityTwoStepTexts: TwoStepTexts = {
   verify: 'Verify',
   tryAnotherWay: 'Try another way',
   backToSignIn: 'Back to sign in',
+}
+
+/** What the identity provider's two-step verification page draws in the design system. */
+export const identityTwoStepContext: TwoStepContext = {
+  page: 'twoStep',
+  title: identityTwoStepTexts.title,
+  realmName: identitySignInContext.realmName,
+  loginAction: '#verify',
+  restartUrl: '#sign-in',
+  tryAnotherWay: true,
+  locales: identitySignInContext.locales,
+  texts: identityTwoStepTexts,
 }
 
 /** The site texts, in English. */
