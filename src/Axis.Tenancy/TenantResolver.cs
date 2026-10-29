@@ -18,7 +18,7 @@ public sealed class TenantResolver(ITenantCatalog catalog)
         var entry = catalog.FindByHost(host);
         if (entry is not null)
         {
-            tenant = new TenantContext(entry.Id);
+            tenant = new TenantContext(entry.Id, entry.HostSites?.GetValueOrDefault(host));
         }
 
         return tenant is not null;

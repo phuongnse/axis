@@ -226,7 +226,7 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
         return new DirectoryTenantCatalog(
             active.Select(row => Entry(
                 row,
-                [.. hosts.Where(host => host.TenantId == row.Id).Select(host => host.Host)],
+                [.. hosts.Where(host => host.TenantId == row.Id)],
                 bindings.Where(binding => binding.TenantId == row.Id),
                 cipher,
                 tls,
@@ -271,7 +271,7 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
     // ServiceAudience, so it accepts no machine-caller or service account bearer token. Its bindings are only its own.
     private static TenantEntry Entry(
         TenantRow row,
-        IReadOnlyList<string> hosts,
+        IReadOnlyList<TenantHostRow> hostRows,
         IEnumerable<TenantBindingRow> bindingRows,
         TenantSecretCipher cipher,
         TenantDatabaseTls tls,
@@ -311,7 +311,24 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
             signIn.OidcProfile,
             ClientKeys(signIn, cipher));
 
-        return new TenantEntry(id, hosts, connectionString, SchemaConnectionString: null, oidc, bindings, row.PreviewOf, Email(row, cipher), Realm(row, cipher), RealmUsers(row, cipher));
+        var hostSites = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var host in hostRows.Where(host => host.SitePath is not null))
+        {
+            hostSites[host.Host] = host.SitePath!;
+        }
+
+        return new TenantEntry(
+            id,
+            [.. hostRows.Select(host => host.Host)],
+            connectionString,
+            SchemaConnectionString: null,
+            oidc,
+            bindings,
+            row.PreviewOf,
+            Email(row, cipher),
+            Realm(row, cipher),
+            RealmUsers(row, cipher),
+            hostSites);
     }
 
     /// <summary>

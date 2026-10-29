@@ -264,9 +264,9 @@ successful run of either command prints `<id> email ok`.
 - Every host command exits with code 2 for a tenant that is still `provisioning`, as the binding
   commands do.
 - A move raises the `version` of both tenants.
-- _(planned for M17)_ A host that belongs to a site serves only that site, and the tenant's other hosts send the
-  site's path to it, see [sites and sign-in](identity-provider.md#sites-and-sign-in). Until then, the server does
-  not read `site_path`, and a site host serves the whole tenant.
+- A host that belongs to a site serves only that site, and the tenant's other hosts redirect the site's path to it,
+  see [sites and sign-in](identity-provider.md#sites-and-sign-in). Only the `directory` tenant source has site
+  hosts.
 
 ## Sessions
 

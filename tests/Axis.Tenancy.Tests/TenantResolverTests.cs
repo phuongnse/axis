@@ -40,4 +40,25 @@ public sealed class TenantResolverTests
         Assert.False(resolver.IsUnavailable(null));
         Assert.False(_resolver.IsUnavailable("a.example.test"));
     }
+
+    [Fact]
+    public void A_site_host_resolves_its_tenant_with_the_site_path_and_another_host_of_the_tenant_resolves_none()
+    {
+        var catalog = new DirectoryTenantCatalog([new TenantEntry(
+            "t",
+            ["t.example.test", "shop.example.test"],
+            new SecretValue(Tenants.ConnectionString),
+            null,
+            null,
+            new Dictionary<string, TenantBinding>(),
+            HostSites: new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) { ["shop.example.test"] = "shop" })]);
+        var resolver = new TenantResolver(catalog);
+
+        Assert.True(resolver.TryResolve("SHOP.example.test", out var site));
+        Assert.Equal("t", site.TenantId);
+        Assert.Equal("shop", site.SitePath);
+        Assert.True(resolver.TryResolve("t.example.test", out var own));
+        Assert.Equal("t", own.TenantId);
+        Assert.Null(own.SitePath);
+    }
 }

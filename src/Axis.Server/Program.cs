@@ -237,6 +237,10 @@ if (!forwardedHeaders.IsEmpty)
 // checked against the resolved tenant.
 app.UseTenantResolution();
 
+// Right after tenant resolution and before the CSRF check and authentication, so a request that a site's host refuses
+// or redirects does no sign-in work and renews no session.
+app.UseSiteHosts();
+
 // After tenant resolution, so the warning for a 403 carries the tenant, and before the CSRF check, so that refusal is logged.
 app.UseRefusedRequestLog();
 
