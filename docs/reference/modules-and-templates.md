@@ -63,12 +63,12 @@ calls `IsDepartmentCode`, so a department code must be in capital letters.
   digits and `-`, starting with a letter), a SemVer `version`, a `label` and an
   optional `packages`. `packages` has the same shape as in `application.json`,
   see [Extension packages](extension-packages.md#declaring-packages-in-an-application). A module has no dependencies
-  on other modules. _(planned for M20)_ It gets `roles` and `modules`, see
+  on other modules. _(planned for M20)_ It gets `roles`, `connectors` and `modules`, see
   [Processes, pages, policies and dependencies](#processes-pages-policies-and-dependencies).
 - **Kinds a module may hold.** `entity`, `dataSource`, `rule`, `sequence`,
   `form`, `event`, `text` and `seed`. Processes, pages, roles and policies are
-  not allowed. _(planned for M20)_ `process`, `page` and `policy` are allowed
-  too. Roles stay out.
+  not allowed. _(planned for M20)_ `process`, `page`, `policy` and `trigger`
+  are allowed too. _(planned for M24)_ So is `scenario`. Roles stay out.
 - **Installation.** Modules are installed per installation under
   `Modules:Path/<id>/<version>/`. The server, the worker and the scenario runner
   read them. The scenario runner gets a `--modules` option for the folder.
@@ -190,10 +190,10 @@ calls `IsDepartmentCode`, so a department code must be in capital letters.
 
 ### Processes, pages, policies and dependencies
 
-_(planned for M20)_ A module can ship a working feature with its screens and
-permissions, and build on other modules, as
+_(planned for M20)_ A module can ship a working feature with its screens,
+permissions, triggers and outside calls, and build on other modules, as
 [D89](../decisions/d89-modules-that-hold-processes-pages-and-policies-and-depend-on-other-modules.md)
-agrees. It replaces the two limits above: the kinds a module may hold, and no
+and [D103](../decisions/d103-modules-hold-triggers-scenarios-and-connector-slots.md) agree. It replaces the two limits above: the kinds a module may hold, and no
 dependencies.
 
 ```json
@@ -219,8 +219,10 @@ agrees. An application that declares it maps the slot to one of its own roles:
 ]
 ```
 
-- **Kinds.** A module may also hold `process`, `page` and `policy`. It still
-  holds no `role`, `site`, `connector`, `endpoint`, `trigger` or `webhook`.
+- **Kinds.** A module may also hold `process`, `page`, `policy` and
+  `trigger`, and _(planned for M24)_ `scenario`, as
+  [D103](../decisions/d103-modules-hold-triggers-scenarios-and-connector-slots.md) agrees. It still holds no `role`, `site`, `identityProvider`,
+  `connector`, `endpoint` or `webhook`.
 - **Role slots.** `roles` in `module.json` lists the module's role slots, each
   with a `name` and a `label`. Module policies and the assignees of module
   tasks name a slot. Naming anything else is a new diagnostic.
@@ -236,9 +238,31 @@ agrees. An application that declares it maps the slot to one of its own roles:
   `{ "page": "departments/Departments" }`.
 - **Processes.** A module process works on an entity of its own module. Its
   steps name resources of its own module, and call operations of the module's
-  `packages`. It has no `callConnector` step. The application starts it from
-  a trigger, a `startProcess` action or a sub-process step, by the name
+  `packages`. Its `callConnector` steps name a connector slot of the module,
+  see Connector slots below. The application starts it from a trigger, a
+  `startProcess` action, a sub-process step or an endpoint, by the name
   `<module id>/<name>`. It is pinned with the rest of the release.
+- **Triggers.** A module trigger starts a process of its own module. It
+  reacts to an event or an entity of its own module, or of a module it
+  declares. A schedule trigger runs in the time zone of each application that
+  uses the module, and each application's copy has its own occurrences.
+- **Connector slots.** `connectors` in `module.json` lists the module's
+  connector slots. Each has a `name`, a `label` and `operations`, each with a
+  `name` and typed `input` and `output` fields in the shape of a
+  [connector operation](integration-resources.md#connector-resource). Each
+  `modules` entry of an application has `connectors`, which maps every slot to
+  a connector the application declares, as
+  `"connectors": { "orders": "PurchasingSystem" }`. The connector must have
+  each operation of the slot by name, every input of the slot with the same
+  type, no required input the slot lacks, and every output of the slot with
+  the same type. An unmapped slot, an unknown connector and each mismatch are
+  new diagnostics. The application's connector keeps its base URL, auth,
+  bindings, timeout, idempotency header and lookup. A depending module maps
+  the connector slots of a module it depends on to its own slots.
+- **Scenarios** _(planned for M24)_. A module scenario gives its users role
+  slots instead of roles. When it runs for an application, each slot becomes
+  the role it maps to, and the scenario runs against the application as
+  customized.
 - **Dependencies.** `module.json` gets `modules`, with the shape of an
   application's `modules` entries. A module names resources and calls rules
   only of the modules it declares, as `<module id>/<name>` and

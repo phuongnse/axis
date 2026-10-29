@@ -12,6 +12,9 @@ out. Everything else in D40 holds. Everything here is _(planned for M20)_. See
   `policy` resources. It still holds no `role`, `site`, `connector`,
   `endpoint`, `trigger` or `webhook`. Those need application bindings, an
   inbound surface or a site, which a module cannot know.
+  - [D103](d103-modules-hold-triggers-scenarios-and-connector-slots.md) replaces
+    this point: a module also holds triggers and scenarios, and names the
+    connectors it calls through connector slots.
 - **Role slots instead of roles:**
   - `module.json` declares `roles`, a list of role slots, each with a `name`
     and a `label`.
