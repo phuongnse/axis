@@ -5,7 +5,8 @@
 // Each suite NAME has its results in DIR/NAME.xml. CWD is the directory, relative to
 // the root, that the suite's relative file paths start from. The Markdown summary is
 // appended to $GITHUB_STEP_SUMMARY when it is set and printed otherwise. On GitHub Actions
-// every failed test also gets an ::error annotation. When the summary goes to that file,
+// every failed test also gets an ::error annotation, and every skipped suite a ::notice one, so
+// the run's page lists what a check skipped. When the summary goes to that file,
 // the failed tests are also listed on stdout, for the job log. A suite named by --skipped
 // did not run and has no results file. It is reported as skipped. Exits 1 when any other
 // suite has failed tests or no results file.
@@ -233,10 +234,15 @@ export function formatSummary(report) {
 const escapeData = (text) => text.replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A')
 const escapeProperty = (text) => escapeData(text).replace(/:/g, '%3A').replace(/,/g, '%2C')
 
-/** GitHub Actions workflow commands: one ::error per failed test or missing results file. */
+/** GitHub Actions workflow commands: one ::error per failed test or missing results file, and one
+ * ::notice per suite skipped because the change cannot affect it. */
 export function formatAnnotations(report) {
   const lines = []
   for (const suite of report.suites) {
+    if (suite.unaffected) {
+      const message = `${suite.name} did not run: no file changed since NexKit's commit can affect it.`
+      lines.push(`::notice title=${escapeProperty(`${suite.name} skipped`)}::${escapeData(message)}`)
+    }
     if (suite.missing) {
       lines.push(`::error title=${escapeProperty(suite.name)}::${escapeData(`${suite.name} wrote no test results.`)}`)
     }
