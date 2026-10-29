@@ -19,6 +19,8 @@ import type {
 } from '../platform/site'
 import type { TaskPage } from '../platform/tasks'
 import type {
+  AddAuthenticatorContext,
+  AddAuthenticatorTexts,
   ResetPasswordContext,
   ResetPasswordTexts,
   SignInContext,
@@ -883,6 +885,37 @@ export const identityUpdatePasswordContext: UpdatePasswordContext = {
   loginAction: '#set-password',
   locales: identitySignInContext.locales,
   texts: identityUpdatePasswordTexts,
+}
+
+/** The texts of the page that adds an authenticator, in English. */
+export const identityAddAuthenticatorTexts: AddAuthenticatorTexts = {
+  title: 'Add an authenticator',
+  message: 'Scan the QR code with your authenticator app, then enter the 6-digit code it shows.',
+  qrCode: 'QR code for your authenticator app',
+  manualKey: 'Cannot scan it? Enter this key instead.',
+  code: 'Verification code',
+  codeRequired: 'Enter the 6-digit code from your authenticator app.',
+  deviceName: 'Device name',
+  deviceNameRequired: 'Enter a name for this device.',
+  submit: 'Add authenticator',
+}
+
+/** A small PNG with a QR-like pattern. It shows the layout of the page and does not scan. */
+export const identityQrCode =
+  'iVBORw0KGgoAAAANSUhEUgAAAGQAAABkCAAAAABVicqIAAAEYUlEQVR42u2a25LbMAxD+f8/jV5siQeUrERZTR86yUMnu43NUCQBEN7QP3jFN8g3yH8SJJav35/788/1Nv5ed/24vG4viK5b6g4R15UvQuwHuT55Rbs+3vM6FaQdkq6s+t1fXDcNMi3afa8Wwg/Rbza57v0geb+7JJmVjgZptY5WeQQ/EkS9o6630YrzaSZDU7Hs6rOhGmR23VYQhd32DqnQySCt0ixRtKk5FiTa9N2T3+Kpfu5HmdyAZcCFsT+TSQfJntXdaSdrAiwRB/1oTZBIjmYoDmdCfsPvztUkMUVt2CWr0qEWZpAeQTqbSVh1+qB8VpM5CoPm88pwjP4xCjeeB4pNGPBnQfpwk0ky1qlMkgobrJSavB1kqYkw7tLs0H6sVgRc7CU6rLvaeKOT9UYqn+iunEJRVG4EseHqwJRcBXrP2ifXtG4T8GGi6oMqJ8tLSmy01QmS9NX/v4eYHVcn1vbFFUMXCS2QY68eOQeqfP9MRNDU/StTeyWpR+1pJSS0os2OCyqEWh6ypOqhsHxxQZZoOC7X1CJtZBmCNQrI4n7cBR68uzjX2UkhYhfFKr5rlzFhRZrVpP8Q6FDIB3aUhDaLoBTPg3yoCTsv0NeJ9UjEmyQbYHlcIxZzIHKM8miyhgQ2NuvYwtYtQity2TKdHRDeXR8TBcY9HrfPnaoeAkaWJ+Nr33hGBpAmQDn4XNwLwQc6JUXsAlYqRAC7iCjQqGVHkrXZdE5MzTGMdTcITPQMXMbMCh9sEKoSHyUMg9GM93hMawINjXPrDRZkHKKWd1w58knhC+OwiVJyuXEjJpMapuCKk1but4kYbnhkW8tFBskrYMKMhQ8uHtjehw0Lq2m4kQPkiKeaBIsQhhSZpKnJCjAxByycFiogkQK9MYFgOSvQ4WXmS01ATCBBKl/Xp/AnuO3L+be+ddOPXOV1d6KRbWDcVx9ghQ1mpO2cAdOQ2JWE92x0EpvApfYbohVwMw2SsGVpCGLCD5AriCmMQDBPcWt94HhfasrohStW1B1s1VtQMWx+bwju7BbogICvCtdTVE1bQaqfwhq7xnMi2gxi6IcABsbeI7Fpo5OfqB1RKnMVyu7wrpsKRQcWjnJ7WOHxJCRWbqrJzIB9K+564tBo2ywQISUhMFDzUWhsHZfMSTcYk2yXk/l725Ztrb8Fmq0v+0FUHKNhXXOJsJj4pWVL8gLRO0W4w7vv3Blq4JZcd7kCrrprYT7LMsICZjtBYGv7xEZHI3MvIzrTqd4tvDG96bRw9w6ySNrOBHu+SCVOhP44b7cmpG7mRlKGoopnPlkdV33gJx87IJZVZqeF/RGmwzocGSqxT4LQDvAnpsRh4tcm1PuewgeB/D5hEDRfsV8/Aix+SJRNjgbZ0x6/zsSXfNg0rrSolbVPWmWaiSJUzbKFc093Fb8izFSTfB3ScuJfSiK/J0bVzMU1/S4NbmCVb8ZOzxq0yvsy1Xxg2lE0D4s5Et8/KfkG+QZ5//ULrcxm3U9sM1QAAAAASUVORK5CYII='
+
+/** What the page that adds an authenticator draws in the design system. */
+export const identityAddAuthenticatorContext: AddAuthenticatorContext = {
+  page: 'addAuthenticator',
+  title: identityAddAuthenticatorTexts.title,
+  realmName: identitySignInContext.realmName,
+  loginAction: '#new-authenticator',
+  qrCode: identityQrCode,
+  manualKey: 'JBSW Y3DP EHPK 3PXP',
+  secret: 'fixture-secret',
+  deviceNameRequired: false,
+  locales: identitySignInContext.locales,
+  texts: identityAddAuthenticatorTexts,
 }
 
 /** The site texts, in English. */
