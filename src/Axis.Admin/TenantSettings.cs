@@ -184,6 +184,36 @@ internal static class TenantSettings
         return Print(run, id, "email", result);
     }
 
+    public static async Task<int> SignInSetAsync(AdminRun run)
+    {
+        var change = ParseSignInSet(run.Args);
+        if (change is null)
+        {
+            return Usage(run);
+        }
+
+        var (setup, exit) = await PrepareAsync(run, needsCipher: false);
+        if (setup is null)
+        {
+            return exit;
+        }
+
+        var id = run.Args[3];
+        TenantSettingResult result;
+        try
+        {
+            await using var platform = NewContext(setup.Connection);
+            result = await TenantPlatformSignIn.SetAsync(platform, run.Command.Name, id, change, run.CancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            run.Error.WriteLine("The command was canceled before any tenant work.");
+            return 1;
+        }
+
+        return Print(run, id, "sign-in", result);
+    }
+
     public static async Task<int> EmailClearAsync(AdminRun run)
     {
         if (run.Args.Length != 4 || !IsName(run.Args[3]))
@@ -471,6 +501,120 @@ internal static class TenantSettings
         return host is null || from is null
             ? null
             : new EmailSetRequest(withPassword, new TenantEmailChange(host, port, useTls, userName, null, from));
+    }
+
+    private sealed class ProviderBuilder(string name)
+    {
+        public string Name { get; } = name;
+
+        public string? Type { get; set; }
+
+        public string? Issuer { get; set; }
+
+        public string? ClientId { get; set; }
+
+        public string? ClientSecret { get; set; }
+
+        public string? ClientKey { get; set; }
+
+        public string? Metadata { get; set; }
+
+        public string? RolesClaim { get; set; }
+
+        public List<KeyValuePair<string, string>> Claims { get; } = [];
+
+        public List<KeyValuePair<string, string>> RoleValues { get; } = [];
+
+        public TenantPlatformProvider? Build() =>
+            Type is null
+                ? null
+                : new TenantPlatformProvider(Name, Type, Issuer, ClientId, ClientSecret, ClientKey, Metadata, Claims, RolesClaim, RoleValues);
+    }
+
+    // Duplicates, unknown options, a missing value and a provider option before any --provider are all usage errors. The
+    // usage text never echoes an argument. The rules about the values are in TenantPlatformSignIn.
+    private static TenantPlatformSignInChange? ParseSignInSet(string[] args)
+    {
+        if (args.Length < 4 || !IsName(args[3]))
+        {
+            return null;
+        }
+
+        bool? accounts = null;
+        var builders = new List<ProviderBuilder>();
+        for (var i = 4; i < args.Length; i++)
+        {
+            if (i + 1 >= args.Length || !IsName(args[i + 1]))
+            {
+                return null;
+            }
+
+            var option = args[i];
+            var value = args[++i];
+            if (option == "--accounts")
+            {
+                if (accounts is not null || !bool.TryParse(value, out var parsed))
+                {
+                    return null;
+                }
+
+                accounts = parsed;
+                continue;
+            }
+
+            if (option == "--provider")
+            {
+                builders.Add(new ProviderBuilder(value));
+                continue;
+            }
+
+            if (builders.Count == 0)
+            {
+                return null;
+            }
+
+            var provider = builders[^1];
+            switch (option)
+            {
+                case "--type" when provider.Type is null:
+                    provider.Type = value;
+                    break;
+                case "--issuer" when provider.Issuer is null:
+                    provider.Issuer = value;
+                    break;
+                case "--client-id" when provider.ClientId is null:
+                    provider.ClientId = value;
+                    break;
+                case "--client-secret" when provider.ClientSecret is null:
+                    provider.ClientSecret = value;
+                    break;
+                case "--client-key" when provider.ClientKey is null:
+                    provider.ClientKey = value;
+                    break;
+                case "--metadata" when provider.Metadata is null:
+                    provider.Metadata = value;
+                    break;
+                case "--roles-claim" when provider.RolesClaim is null:
+                    provider.RolesClaim = value;
+                    break;
+                case "--claim" or "--role":
+                    var separator = value.IndexOf('=', StringComparison.Ordinal);
+                    if (separator < 1)
+                    {
+                        return null;
+                    }
+
+                    (option == "--claim" ? provider.Claims : provider.RoleValues).Add(new(value[..separator], value[(separator + 1)..]));
+                    break;
+                default:
+                    return null;
+            }
+        }
+
+        var providers = builders.Select(builder => builder.Build()).ToList();
+        return accounts is null || providers.Contains(null)
+            ? null
+            : new TenantPlatformSignInChange(accounts.Value, providers!);
     }
 
     private static int Print(AdminRun run, string id, string what, TenantSettingResult result)

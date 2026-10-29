@@ -139,7 +139,9 @@ so Studio edits it, with the identity provider editor of [Studio](studio.md), an
 
 ## Platform sign-in
 
-_(planned for M17)_
+`tenant sign-in set` stores the platform sign-in in the tenant directory, and `tenant create` and `tenant restore`
+set accounts on. Both are built. Nothing reads the stored platform sign-in yet. The realm sync and the server's checks
+are _(planned for M17)_.
 
 - The home page, Studio, the operator console, the account page and the users page belong to no site. The tenant's
   platform sign-in says which providers they accept.
