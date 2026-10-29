@@ -18,6 +18,9 @@ on `main` after every merge, and the limit of three issues at once that
 - **Four issues run at once,** with autopilot's `max_parallel` at 4.
   - The owner raises it to five only when a day at four shows more merges an
     hour, and check jobs that do not wait longer for a runner.
+  - [D113](d113-branches-need-not-be-up-to-date-and-three-issues-run-at-once.md)
+    replaces this point: three issues run at once, and branches need not be
+    up to date.
 
 _Why:_ `main` wants pull requests up to date, and NexKit squash-merges them, so
 the tree it merges is the tree its checks just passed. CI after every merge
