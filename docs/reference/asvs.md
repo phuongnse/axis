@@ -45,9 +45,10 @@ The design follows [D84](../decisions/d84-asvs-level-2-and-a-server-side-session
   [FAPI 2.0 profile](security.md#fapi-20-profile).
 - **Dependency scan and static analysis.** `scripts/scan.sh` and the CodeQL workflow, see
   [development](../development.md#scripts).
-- **Threat model** _(planned for M18)_. What can go wrong in Axis's own design, with the rules of
-  this page, see [D106](../decisions/d106-a-threat-model-kept-current-like-the-asvs-tracking.md). Once a year the owner records here a rating of Axis against
-  the Threat Assessment practice of OWASP SAMM.
+- **Threat model.** What can go wrong in Axis's own design, see [the threat model](threat-model.md)
+  and [D106](../decisions/d106-a-threat-model-kept-current-like-the-asvs-tracking.md). Its threat
+  rows are _(planned for M18)_. Once a year the owner records here a rating of Axis against the
+  Threat Assessment practice of OWASP SAMM _(planned for M18)_.
 - **Penetration test.** An independent tester's report, with its date, before the first
   customer's installation, see [D111](../decisions/d111-authentication-by-default-and-the-owner-guards-the-security-checks.md).
 

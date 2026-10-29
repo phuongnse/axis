@@ -13,6 +13,10 @@
 //   (docs/reference/asvs-5.0.0.json), with no unknown or repeated id, a status from the list and some
 //   evidence. A Met row names only test classes that exist. A Gap row links the GitHub issue that
 //   closes it.
+// - docs/reference/threat-model.md, when it exists, has a threat table with the same header in each
+//   scope section, with a unique id on the whole page, a status and a rating from the lists, and
+//   evidence. A Mitigated row names only test classes that exist, a Gap row links the GitHub issue
+//   that closes it, and an Accepted row gives a date.
 // - docs/reference/security.md, when it exists with samples/keycloak/axis-realm.json, has a '### Development users'
 //   table that lists the same users with the same axis roles as the realm's users, except service accounts, and
 //   each realm user's id is its username.
@@ -36,16 +40,22 @@ export const maxAgentsLines = 100
 export const maxSkillLines = 250
 export const asvsListFile = 'docs/reference/asvs-5.0.0.json'
 export const asvsStatuses = ['Met', 'Gap', 'Delegated', 'Not applicable']
+export const threatStatuses = ['Mitigated', 'Gap', 'Delegated', 'Accepted']
+export const threatRatings = ['Low', 'Medium', 'High', 'Critical']
 
 const decisionFilePattern = /^d(\d+)-([a-z0-9-]+)\.md$/
 const decisionTitlePattern = /^# D(\d+)\. (.+)$/
 const statusPattern = /^Status: \*\*((?:Agreed|Proposed)\b[^*]*)\*\*$/
 const decisionRowPattern = /^\| \[D(\d+)\]\(decisions\/([^)]+)\) \| (.+?) \| \*\*(.+?)\*\* \|$/
 const asvsFile = 'docs/reference/asvs.md'
+const threatModelFile = 'docs/reference/threat-model.md'
+const threatHeader = '| Id | Threat | Boundary | Category | Rating | Status | Evidence |'
+const threatSeparator = '| --- | --- | --- | --- | --- | --- | --- |'
 const securityFile = 'docs/reference/security.md'
 export const realmFile = 'samples/keycloak/axis-realm.json'
 const developmentUsersHeading = '### Development users'
 const issueLinkPattern = /\]\(https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/issues\/\d+\)/
+const isoDatePattern = /\b\d{4}-\d{2}-\d{2}\b/
 const cellSeparator = /(?<!\\)\|/
 const testClassPattern = /`([A-Z]\w*Tests)`/g
 const classPattern = /\bclass\s+(\w+)/g
@@ -78,8 +88,22 @@ const splitLines = (text) => text.replace(/\n$/, '').split('\n')
 const countLines = (text) => splitLines(text).length
 const lines = (file) => splitLines(readFileSync(file, 'utf8'))
 
+/** Returns a function that gives the names of the classes declared under tests/ and samples/, read once. */
+function testClassLookup(root) {
+  let classes
+  return () => {
+    if (!classes) {
+      classes = new Set()
+      for (const file of [...sourceFiles(path.join(root, 'tests')), ...sourceFiles(path.join(root, 'samples'))]) {
+        for (const match of readFileSync(file, 'utf8').matchAll(classPattern)) classes.add(match[1])
+      }
+    }
+    return classes
+  }
+}
+
 /** Checks the requirements table of the ASVS page against the committed list of ASVS ids. */
-function checkAsvs(root, asvs, report) {
+function checkAsvs(root, asvs, report, testClasses) {
   const listPath = path.join(root, asvsListFile)
   if (!existsSync(listPath)) {
     report(asvs, 1, `missing ${asvsListFile}: the requirements table is checked against it`)
@@ -91,16 +115,6 @@ function checkAsvs(root, asvs, report) {
   const text = lines(asvs)
   const heading = text.findIndex((line) => line === '## Requirements') + 1
   const seen = new Map()
-  let classes
-  const testClasses = () => {
-    if (!classes) {
-      classes = new Set()
-      for (const file of [...sourceFiles(path.join(root, 'tests')), ...sourceFiles(path.join(root, 'samples'))]) {
-        for (const match of readFileSync(file, 'utf8').matchAll(classPattern)) classes.add(match[1])
-      }
-    }
-    return classes
-  }
 
   for (let i = Math.max(heading, 0); i < text.length; i++) {
     const cells = text[i].split(cellSeparator)
@@ -128,6 +142,42 @@ function checkAsvs(root, asvs, report) {
 
   for (const { id, level } of list) {
     if (!seen.has(id)) report(asvs, Math.max(heading, 1), `${id} (Level ${level}) has no row in the requirements table`)
+  }
+}
+
+/** Checks every threat table of the threat model page, with an id unique across the whole page. */
+function checkThreatModel(file, report, testClasses) {
+  const text = lines(file)
+  const seen = new Map()
+  for (let header = 0; header < text.length; header++) {
+    if (text[header].trim() !== threatHeader) continue
+    for (let i = header + 1; i < text.length && text[i].startsWith('|'); i++) {
+      const raw = text[i].split(cellSeparator)
+      if (/^:?-+:?$/.test(raw[1].trim())) continue
+      const cells = raw.slice(1, 8).map((cell) => cell.trim())
+      const id = cells[0].replace(/^`(.*)`$/, '$1')
+      const [rating, status, evidence] = cells.slice(4)
+      const rawEvidence = raw[7] ?? ''
+      const line = i + 1
+      if (seen.has(id)) report(file, line, `${id} has a row already, on line ${seen.get(id)}`)
+      else seen.set(id, line)
+      const statusName = /^\*\*(.+)\*\*$/.exec(status)?.[1]
+      if (!threatStatuses.includes(statusName)) {
+        report(file, line, `${id} status '${status}' is not one of ${threatStatuses.map((name) => `**${name}**`).join(', ')}`)
+      }
+      if (rating === '') report(file, line, `${id} has no rating: one of ${threatRatings.join(', ')}`)
+      else if (!threatRatings.includes(rating)) report(file, line, `${id} rating '${rating}' is not one of ${threatRatings.join(', ')}`)
+      if (evidence === '') report(file, line, `${id} has no evidence`)
+      else if (statusName === 'Mitigated') {
+        for (const match of rawEvidence.matchAll(testClassPattern)) {
+          if (!testClasses().has(match[1])) report(file, line, `${id} names the test class ${match[1]}, which no .cs file under tests/ or samples/ declares`)
+        }
+      } else if (statusName === 'Gap' && !issueLinkPattern.test(rawEvidence)) {
+        report(file, line, `${id} is a Gap and links no issue: link the GitHub issue that closes it`)
+      } else if (statusName === 'Accepted' && !isoDatePattern.test(rawEvidence)) {
+        report(file, line, `${id} is Accepted and gives no date: give the date the owner accepted it, as YYYY-MM-DD`)
+      }
+    }
   }
 }
 
@@ -236,8 +286,12 @@ export function checkDocs(root, { baseLineCount } = {}) {
     }
   }
 
+  const testClasses = testClassLookup(root)
   const asvs = path.join(root, asvsFile)
-  if (existsSync(asvs)) checkAsvs(root, asvs, report)
+  if (existsSync(asvs)) checkAsvs(root, asvs, report, testClasses)
+
+  const threatModel = path.join(root, threatModelFile)
+  if (existsSync(threatModel)) checkThreatModel(threatModel, report, testClasses)
 
   if (existsSync(path.join(root, securityFile)) && existsSync(path.join(root, realmFile))) {
     checkDevelopmentUsers(root, report)
@@ -331,7 +385,7 @@ function main(args) {
   )
   for (const { file, line, message } of problems) process.stderr.write(`${file}:${line}: ${message}\n`)
   if (problems.length > 0) return 1
-  console.log('The docs map, the decisions index, the ASVS table, the development users and the doc and skill sizes are in order.')
+  console.log('The docs map, the decisions index, the ASVS table, the threat model table, the development users and the doc and skill sizes are in order.')
   return 0
 }
 
