@@ -10,4 +10,10 @@ public sealed record ApplicationModuleDefinition
 
     /// <summary>The version range as written: <c>1.2.0</c>, <c>^1.2.0</c> or <c>~1.2.0</c>.</summary>
     public required string Version { get; init; }
+
+    /// <summary>
+    /// The mapping from each role slot of the module to a role of the application, as written: the
+    /// key is a slot name and the value a role name. The compiler checks it against the pinned version.
+    /// </summary>
+    public IReadOnlyDictionary<string, string> Roles { get; init; } = new Dictionary<string, string>();
 }

@@ -9,8 +9,9 @@ _(planned for Mx)_ are not built yet, and Dn refers to [decisions.md](../decisio
 
 This section follows
 [D40](../decisions/d40-reusable-modules.md). The manifest,
-installation, declaring, pinning, dependencies between modules and the diagnostics `AXC0200` to `AXC0214`,
-`AXC0292` and `AXC0293` are built. A pinned module's files are stored in the release and
+installation, declaring, pinning, dependencies between modules, the diagnostics `AXC0200` to `AXC0214`,
+`AXC0295` and `AXC0296`, and the
+role slots with their mapping, `AXC0292` to `AXC0294`, are built. A pinned module's files are stored in the release and
 checked as JSON, for an allowed kind and against the schema of their kind. A
 pinned module's entities, sequences, seeds, events, data sources and forms join the application
 model, each with an id derived from the application `id` and the name
@@ -61,10 +62,11 @@ calls `IsDepartmentCode`, so a department code must be in capital letters.
 
 - **Manifest.** `module.json` has `kind: module`, an `id` (lower-case letters,
   digits and `-`, starting with a letter), a SemVer `version`, a `label` and an
-  optional `packages`. `packages` has the same shape as in `application.json`,
-  see [Extension packages](extension-packages.md#declaring-packages-in-an-application). An optional `modules`
+  optional `packages`, `roles` and `modules`. `packages` has the same shape as in `application.json`,
+  see [Extension packages](extension-packages.md#declaring-packages-in-an-application).
+  `roles` lists the role slots, see Role slots below. `modules`
   lists the modules it depends on, with the `id` and `version` entries of an application's `modules`, see
-  [dependencies](#processes-pages-policies-and-dependencies). _(planned for M20)_ It gets `roles` and `connectors`, see
+  [dependencies](#processes-pages-policies-and-dependencies). _(planned for M20)_ It gets `connectors`, see
   [Processes, pages, policies and dependencies](#processes-pages-policies-and-dependencies).
 - **Kinds a module may hold.** `entity`, `dataSource`, `rule`, `sequence`,
   `form`, `event`, `text` and `seed`. Processes, pages, roles and policies are
@@ -187,12 +189,15 @@ calls `IsDepartmentCode`, so a department code must be in capital letters.
 | `AXC0206` | A module id appears twice in `modules`. Reported at `/modules/{i}/id` of each later entry. |
 | `AXC0207` | A field's `target` or `sequence`, a data source's or form's `entity`, a widget's or policy grant's `dataSource`, or a qualified rule call `<module id>:<name>(…)` names a module that `modules` does not declare. Reported at `/fields/{i}/target`, `/fields/{i}/sequence`, `/entity`, `/widgets/{i}/dataSource`, `/grants/{i}/dataSource` or the expression's pointer. A reference under a declared module that could not be pinned is not reported again. |
 | `AXC0208` | A field's `target` or `sequence` in a module entity, the `entity` of a module event, data source or form, or the `target` of a module data source parameter, contains `/`. Reported at that property in `modules/<id>/…`. |
-| `AXC0209` | A module text key lacks the `<id>.` prefix. Reported at `/texts/{key}` of the module text. |
+| `AXC0209` | A module text key lacks the `<id>.` prefix. Reported at `/texts/{key}` of the module text, and at `/roles/{i}/label/textKey` of `modules/<id>/module.json` for a role slot label. |
 | `AXC0210` | An application locale has no text from a declared module. The message names the locale. Reported in `application.json` at `/modules/{i}`. |
 | `AXC0211` | An application text key starts with the `<id>.` prefix of a declared module. Reported at `/texts/{key}`. |
 | `AXC0212` | An application file sits under `modules/`, which releases reserve. Reported at that file, with an empty path. |
 | `AXC0213` | The pinned version drops a module entity, drops one of its fields or changes a field's `type`, compared with the active release. The message names the module and both versions, and `none` when the module is removed. Reported at activation, at `/fields/{i}/type` of the module entity file in the release for a type change and at `/fields` for a dropped field. A dropped entity, or a removed module, is reported at the entity file of the active release, with an empty path. |
 | `AXC0214` | A `migration`'s `entity` names a module entity, that is, it contains `/`. Reported at compile, at `/entity`. |
+| `AXC0292` | A role slot of the pinned module version has no key in the entry's `roles`. The message names the slot, the module and the version. Reported in `application.json` at `/modules/{i}/roles`, or at `/modules/{i}` when the entry has no `roles`. |
+| `AXC0293` | A role slot is mapped to a name that is not a role the application declares. Reported at `/modules/{i}/roles/{slot}`, with `~` written `~0` and `/` written `~1`. A role whose file failed its own schema is not reported again. |
+| `AXC0294` | A key in the entry's `roles` is not a role slot of the pinned module version. The message lists the slots, or says there are none. Reported at `/modules/{i}/roles/{key}`, escaped the same way. |
 
 ### Processes, pages, policies and dependencies
 
@@ -221,8 +226,8 @@ agrees. An application that declares it maps the slot to one of its own roles:
 
 ```json
 "modules": [
-  { "id": "departments", "version": "^1.1.0", "roles": { "manager": "Manager" } },
-  { "id": "department-budgets", "version": "^1.0.0", "roles": { "approver": "Manager" } }
+  { "id": "departments", "version": "^1.1.0", "roles": { "manager": "department-manager" } },
+  { "id": "department-budgets", "version": "^1.0.0", "roles": { "approver": "department-manager" } }
 ]
 ```
 
@@ -231,12 +236,20 @@ agrees. An application that declares it maps the slot to one of its own roles:
   [D103](../decisions/d103-modules-hold-triggers-scenarios-and-connector-slots.md) agrees. It still holds no `role`, `site`, `identityProvider`,
   `connector`, `endpoint` or `webhook`.
 - **Role slots.** `roles` in `module.json` lists the module's role slots, each
-  with a `name` and a `label`. Module policies and the assignees of module
-  tasks name a slot. Naming anything else is a new diagnostic.
+  with a `name`, written like a role name, and a `label`. Slot names are unique
+  in the module, ignoring letter case, or the version fails at host start with
+  `AXC0200` at `/roles/{i}/name`. A label's text key starts with `<module id>.`,
+  or `AXC0209` is reported at `/roles/{i}/label/textKey` of `module.json`.
+  Declaring slots is built. _(planned for M20)_ Module policies and the
+  assignees of module tasks name a slot. Naming anything else is a new
+  diagnostic.
 - **Mapping slots.** Each `modules` entry of an application has `roles`, which
   maps every slot of that module to a role the application declares. A slot
-  left unmapped, or mapped to an undeclared role, is a new diagnostic. After
-  the mapping, a user who holds the role holds the slot.
+  left unmapped is `AXC0292`, a slot mapped to an undeclared role is `AXC0293`
+  and a key that is no slot of the pinned version is `AXC0294`. Slot and role
+  names are matched exactly. The compiled model keeps the map of each pinned
+  module. _(planned for M20)_ After the mapping, a user who holds the role
+  holds the slot.
 - **Module policies.** A module policy grants only on resources of its own
   module.
 - **Pages.** A module page is named `<module id>/<name>`. Its widgets name
@@ -282,9 +295,9 @@ agrees. An application that declares it maps the slot to one of its own roles:
   highest installed version that meets every range that asks for it.
   When one range asks and no installed version meets it, the diagnostic is
   `AXC0205`. When two or more ranges ask and no version meets them all, it is
-  `AXC0292`, which names the application or each module that asks, with its
+  `AXC0295`, which names the application or each module that asks, with its
   range. A cycle between modules, and a module that depends on itself, is
-  `AXC0293`, which names the cycle. The resolution picks again until nothing
+  `AXC0296`, which names the cycle. The resolution picks again until nothing
   changes, without backtracking. A graph whose picks never settle is reported as a
   conflict.
 - **One copy each.** _(built)_ Each module gets one copy per application, with ids

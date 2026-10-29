@@ -130,9 +130,36 @@ public sealed class ModuleCatalog
                 root.GetProperty("id").GetString()!,
                 root.GetProperty("version").GetString()!,
                 root.GetProperty("label").GetString()!);
-            return root.TryGetProperty("modules", out var modules)
-                ? manifest with { Modules = modules.Deserialize<List<ApplicationModuleDefinition>>(ApplicationLoader.SerializerOptions)! }
-                : manifest;
+            if (root.TryGetProperty("modules", out var modules))
+            {
+                manifest = manifest with { Modules = modules.Deserialize<List<ApplicationModuleDefinition>>(ApplicationLoader.SerializerOptions)! };
+            }
+
+            if (!root.TryGetProperty("roles", out var rolesElement))
+            {
+                return manifest;
+            }
+
+            var slots = new List<ModuleRoleSlot>();
+            var firstIndexByName = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            foreach (var slotElement in rolesElement.EnumerateArray())
+            {
+                var name = slotElement.GetProperty("name").GetString()!;
+                if (!firstIndexByName.TryAdd(name, slots.Count))
+                {
+                    problems.Add(new Diagnostic(
+                        DiagnosticCodes.ModuleManifestInvalid,
+                        $"The role slot '{name}' repeats the name of the slot at '/roles/{firstIndexByName[name]}', ignoring letter case. Name each slot once.",
+                        file,
+                        $"/roles/{slots.Count}/name"));
+                }
+
+                slots.Add(new ModuleRoleSlot(
+                    name,
+                    new TextReference(slotElement.GetProperty("label").GetProperty("textKey").GetString()!)));
+            }
+
+            return problems.Count > 0 ? null : manifest with { Roles = slots };
         }
     }
 

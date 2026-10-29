@@ -1,6 +1,7 @@
 using System.Runtime.Versioning;
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Modules;
+using Axis.Configuration.Resources;
 
 namespace Axis.Configuration.Tests;
 
@@ -87,6 +88,8 @@ public sealed class ModuleCatalogTests
     [InlineData("""{ "kind": "module", "id": "departments", "version": "1.0.0", "label": "" }""", "/label")]
     [InlineData("""{ "kind": "module", "id": "departments", "version": "1.0.0", "label": "D", "other": 1 }""", "/other")]
     [InlineData("""{ "kind": "module", "id": "departments", "version": "1.0.0", "label": "D", "packages": [{ "id": "x" }] }""", "/packages/0")]
+    [InlineData("""{ "kind": "module", "id": "departments", "version": "1.0.0", "label": "D", "roles": [{ "name": "Approver", "label": { "textKey": "departments.a" } }] }""", "/roles/0/name")]
+    [InlineData("""{ "kind": "module", "id": "departments", "version": "1.0.0", "label": "D", "roles": [{ "name": "approver" }] }""", "/roles/0")]
     [InlineData("""{ "kind": "module", "id": "departments", "version": "1.0.0", "label": "D", "modules": [{ "id": "people", "version": "^1.0.0", "roles": {} }] }""", "/modules/0/roles")]
     public void A_manifest_that_fails_its_schema_is_a_diagnostic_at_the_failing_pointer(string manifest, string path)
     {
@@ -111,6 +114,42 @@ public sealed class ModuleCatalogTests
 
         Assert.Empty(catalog.Diagnostics);
         Assert.Single(catalog.Modules);
+    }
+
+    [Fact]
+    public void A_manifest_may_declare_role_slots()
+    {
+        using var root = new TemporaryFolder().With(
+            ManifestFile,
+            """{ "kind": "module", "id": "departments", "version": "1.0.0", "label": "Departments", "roles": [{ "name": "approver", "label": { "textKey": "departments.approver" } }] }""");
+
+        var catalog = ModuleCatalog.Load(root.Path);
+
+        Assert.Empty(catalog.Diagnostics);
+        var slot = Assert.Single(Assert.Single(catalog.Modules).Manifest.Roles);
+        Assert.Equal(new ModuleRoleSlot("approver", new TextReference("departments.approver")), slot);
+    }
+
+    [Theory]
+    [InlineData("approver")]
+    [InlineData("Approver")]
+    public void Two_role_slots_with_the_same_name_leave_the_version_out(string second)
+    {
+        using var root = new TemporaryFolder().With(
+            ManifestFile,
+            $$"""
+            { "kind": "module", "id": "departments", "version": "1.0.0", "label": "Departments",
+              "roles": [ { "name": "approver", "label": { "textKey": "departments.a" } },
+                         { "name": "{{second}}", "label": { "textKey": "departments.b" } } ] }
+            """);
+
+        var catalog = ModuleCatalog.Load(root.Path);
+
+        Assert.Empty(catalog.Modules);
+        var diagnostic = Assert.Single(catalog.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.ModuleManifestInvalid, ManifestFile, "/roles/1/name"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
     }
 
     [Fact]

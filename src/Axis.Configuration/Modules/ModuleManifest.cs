@@ -8,5 +8,8 @@ namespace Axis.Configuration.Modules;
 /// </summary>
 public sealed record ModuleManifest(string Id, string Version, string Label)
 {
+    /// <summary>The role slots of the module. Names are unique, ignoring letter case.</summary>
+    public IReadOnlyList<ModuleRoleSlot> Roles { get; init; } = [];
+
     public IReadOnlyList<ApplicationModuleDefinition> Modules { get; init; } = [];
 }
