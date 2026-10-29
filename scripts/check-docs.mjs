@@ -16,10 +16,13 @@
 // - docs/reference/security.md, when it exists with samples/keycloak/axis-realm.json, has a '### Development users'
 //   table that lists the same users with the same axis roles as the realm's users, except service accounts, and
 //   each realm user's id is its username.
-// - A doc under docs/ has at most 1,000 lines, AGENTS.md at most 100 and a SKILL.md under
+// - A doc under docs/ has at most 1,000 lines, and a change that grows a doc past 900 lines fails.
+//   The base for "grows" is NEXKIT_BASE_SHA, else the merge base with origin/main. With neither,
+//   only the 1,000 limit applies. AGENTS.md has at most 100 lines and a SKILL.md under
 //   .claude/skills/ at most 250, so agents can read what they need without reading whole books.
 //
 // Prints one line per problem on stderr as file:line and exits 1 when there is any.
+import { execFileSync } from 'node:child_process'
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -28,6 +31,7 @@ import { slugify } from './check-links.mjs'
 const scriptRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 
 export const maxDocLines = 1000
+export const maxGrownDocLines = 900
 export const maxAgentsLines = 100
 export const maxSkillLines = 250
 export const asvsListFile = 'docs/reference/asvs-5.0.0.json'
@@ -70,7 +74,9 @@ function sourceFiles(directory) {
   return files
 }
 
-const lines = (file) => readFileSync(file, 'utf8').replace(/\n$/, '').split('\n')
+const splitLines = (text) => text.replace(/\n$/, '').split('\n')
+const countLines = (text) => splitLines(text).length
+const lines = (file) => splitLines(readFileSync(file, 'utf8'))
 
 /** Checks the requirements table of the ASVS page against the committed list of ASVS ids. */
 function checkAsvs(root, asvs, report) {
@@ -178,7 +184,7 @@ function checkDevelopmentUsers(root, report) {
 }
 
 /** Checks the docs under root and returns the problems as { file, line, message }. */
-export function checkDocs(root) {
+export function checkDocs(root, { baseLineCount } = {}) {
   const problems = []
   const docs = path.join(root, 'docs')
   const relative = (file) => path.relative(root, file).split(path.sep).join('/')
@@ -188,7 +194,16 @@ export function checkDocs(root) {
   for (const file of files) {
     const count = lines(file).length
     if (count > maxDocLines) {
-      report(file, maxDocLines + 1, `${count} lines, over the limit of ${maxDocLines}: move whole sections to a new file`)
+      report(file, maxDocLines + 1, `${count} lines, over the limit of ${maxDocLines}: move whole ## sections to a new file`)
+    } else if (baseLineCount && count > maxGrownDocLines) {
+      const before = baseLineCount(relative(file))
+      if (count > before) {
+        report(
+          file,
+          maxGrownDocLines + 1,
+          `${count} lines, up from ${before}, over ${maxGrownDocLines} for a change that grows a doc: move whole ## sections to a new file`,
+        )
+      }
     }
   }
   const agents = path.join(root, 'AGENTS.md')
@@ -285,10 +300,35 @@ export function checkDocs(root) {
   return problems
 }
 
+/** Runs git in root and returns its output, or undefined when git fails. */
+function git(root, args) {
+  try {
+    return execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })
+  } catch {
+    return undefined
+  }
+}
+
+/** Returns a counter of a doc's lines at the base commit, or undefined when no base commit can be read. */
+export function gitBaseLineCount(root, env = process.env) {
+  const mergeBase = git(root, ['merge-base', 'HEAD', 'origin/main'])?.trim()
+  const sha = [env.NEXKIT_BASE_SHA, mergeBase].find(
+    (ref) => ref && git(root, ['rev-parse', '--verify', '--quiet', `${ref}^{commit}`]),
+  )
+  if (!sha) return undefined
+  return (rel) => {
+    const text = git(root, ['show', `${sha}:./${rel}`])
+    return text === undefined ? 0 : countLines(text)
+  }
+}
+
 function main(args) {
   const rootIndex = args.indexOf('--root')
   const root = rootIndex >= 0 ? path.resolve(args[rootIndex + 1]) : scriptRoot
-  const problems = checkDocs(root).sort((a, b) => (a.file === b.file ? a.line - b.line : a.file < b.file ? -1 : 1))
+  const baseLineCount = gitBaseLineCount(root)
+  const problems = checkDocs(root, { baseLineCount }).sort((a, b) =>
+    a.file === b.file ? a.line - b.line : a.file < b.file ? -1 : 1,
+  )
   for (const { file, line, message } of problems) process.stderr.write(`${file}:${line}: ${message}\n`)
   if (problems.length > 0) return 1
   console.log('The docs map, the decisions index, the ASVS table, the development users and the doc and skill sizes are in order.')
