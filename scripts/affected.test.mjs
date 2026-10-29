@@ -82,6 +82,11 @@ describe('decideSafe', () => {
     }
   })
 
+  test('skips every suite when a change touches only the GitHub workflows, NexKit settings or docs', () => {
+    const paths = ['.github/workflows/ci.yml', '.nexkit/config.json', 'docs/delivery.md']
+    for (const name of Object.keys(safeSuites)) assert.equal(runs(name, paths), false, name)
+  })
+
   test('runs every smoke suite when a docs change also touches another path', () => {
     for (const name of smoke) assert.equal(runs(name, ['docs/x.md', 'compose.yaml']), true, name)
   })
@@ -264,6 +269,16 @@ exit 0
     assert.equal(result.status, 0, result.stdout + result.stderr)
     assert.ok(result.stdout.includes('Axis.Integration.Tests (skipped: not affected by this change)'), result.stdout)
     assert.match(result.stderr, /since def \(NEXKIT_CHECK_VERIFIED_SHA\)/)
+  })
+
+  test('integration.sh says which changed path makes it run in full', () => {
+    const result = run('scripts/integration.sh', 'src/Axis.Engine/Foo.cs', { NEXKIT_CHECK_VERIFIED_SHA: 'def' })
+
+    assert.match(
+      result.stderr,
+      /Running integration in full: src\/Axis\.Engine\/Foo\.cs changed\. Compared with def \(NEXKIT_CHECK_VERIFIED_SHA\)\./,
+    )
+    integrationCall(dotnetCalls())
   })
 
   test('integration.sh leaves the performance tests out under NexKit', () => {
