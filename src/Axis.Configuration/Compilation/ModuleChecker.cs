@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using System.Globalization;
 using System.Text.Json;
 using Axis.Configuration.Diagnostics;
@@ -23,7 +24,8 @@ namespace Axis.Configuration.Compilation;
 /// under their plain names, for <see cref="RuleChecker.CheckModules"/>. Inside a module, a field's
 /// <c>target</c> or <c>sequence</c>, an event's, data source's or form's <c>entity</c> and a data source
 /// parameter's <c>target</c> name a resource of the same module without <c>/</c>, and are rewritten to
-/// the qualified name.
+/// the qualified name. The <c>roles</c> of an entry must map each role slot of the pinned version to
+/// a role of the application, and the pin keeps that map.
 /// </summary>
 internal static class ModuleChecker
 {
@@ -50,7 +52,9 @@ internal static class ModuleChecker
         ApplicationManifest application,
         IReadOnlyCollection<InstalledModule> installed,
         List<Diagnostic> diagnostics,
-        ReferenceIndexBuilder references)
+        ReferenceIndexBuilder references,
+        IReadOnlyList<RoleResource> roles,
+        IReadOnlySet<string> unloadedRoleNames)
     {
         void Report(string code, string message, string path) =>
             diagnostics.Add(new Diagnostic(code, message, application.File, path, application.Id));
@@ -110,16 +114,95 @@ internal static class ModuleChecker
                 continue;
             }
 
-            pins.Add(new PinnedModuleModel(module.Id, module.Version, pinned));
             references.Add(application, path, ReferenceRelations.Module, new ModuleNode(module.Id));
             var pinnedModule = installed.First(candidate =>
                 string.Equals(candidate.Manifest.Id, module.Id, StringComparison.Ordinal)
                 && string.Equals(candidate.Manifest.Version, pinned, StringComparison.Ordinal));
+            var slotRoles = CheckRoleSlots(application, index, module, pinnedModule.Manifest, roles, unloadedRoleNames, diagnostics);
+            pins.Add(new PinnedModuleModel(module.Id, module.Version, pinned) { Roles = slotRoles });
             CheckFiles(pinnedModule, files, resources, diagnostics);
         }
 
         return (pins, files, resources.ToResources());
     }
+
+    /// <summary>
+    /// Checks the <c>roles</c> mapping of a module entry against the role slots of its pinned
+    /// version, and the prefix of each slot label. Returns the slots mapped to a role, by slot name.
+    /// Names are matched exactly. A mapped role that failed its own schema is not reported again.
+    /// </summary>
+    private static IReadOnlyDictionary<string, string> CheckRoleSlots(
+        ApplicationManifest application,
+        int index,
+        ApplicationModuleDefinition entry,
+        ModuleManifest manifest,
+        IReadOnlyList<RoleResource> roles,
+        IReadOnlySet<string> unloadedRoleNames,
+        List<Diagnostic> diagnostics)
+    {
+        var path = $"/modules/{index}";
+        void Report(string code, string message, string at) =>
+            diagnostics.Add(new Diagnostic(code, message, application.File, at, application.Id));
+
+        for (var slotIndex = 0; slotIndex < manifest.Roles.Count; slotIndex++)
+        {
+            var textKey = manifest.Roles[slotIndex].Label.TextKey;
+            if (!textKey.StartsWith($"{manifest.Id}.", StringComparison.Ordinal))
+            {
+                diagnostics.Add(new Diagnostic(
+                    DiagnosticCodes.ModuleTextKeyWithoutPrefix,
+                    $"The text key '{textKey}' lacks the prefix '{manifest.Id}.'. Start each text key of the module with it.",
+                    $"modules/{manifest.Id}/{ModuleCatalog.ManifestFileName}",
+                    $"/roles/{slotIndex}/label/textKey"));
+            }
+        }
+
+        var slotNames = manifest.Roles.Select(slot => slot.Name).ToHashSet(StringComparer.Ordinal);
+        var roleNames = roles.Select(role => role.Name).ToHashSet(StringComparer.Ordinal);
+        var mapped = new Dictionary<string, string>(StringComparer.Ordinal);
+        var rolesPath = entry.Roles.Count > 0 ? $"{path}/roles" : path;
+        foreach (var slot in manifest.Roles)
+        {
+            if (!entry.Roles.ContainsKey(slot.Name))
+            {
+                Report(
+                    DiagnosticCodes.UnmappedModuleRoleSlot,
+                    $"The role slot '{slot.Name}' of module '{manifest.Id}' {manifest.Version} is not mapped. Map it to a role of the application under 'roles'.",
+                    rolesPath);
+            }
+        }
+
+        foreach (var (key, roleName) in entry.Roles)
+        {
+            var keyPath = $"{path}/roles/{Escape(key)}";
+            if (!slotNames.Contains(key))
+            {
+                Report(
+                    DiagnosticCodes.UnknownModuleRoleSlot,
+                    slotNames.Count == 0
+                        ? $"The module '{manifest.Id}' {manifest.Version} has no role slots, so '{key}' maps nothing."
+                        : $"The module '{manifest.Id}' {manifest.Version} has no role slot '{key}'. Its slots are {string.Join(", ", manifest.Roles.Select(slot => $"'{slot.Name}'"))}.",
+                    keyPath);
+            }
+            else if (roleNames.Contains(roleName))
+            {
+                mapped[key] = roleName;
+            }
+            else if (!unloadedRoleNames.Contains(roleName))
+            {
+                Report(
+                    DiagnosticCodes.UnknownModuleSlotRole,
+                    $"The role slot '{key}' is mapped to '{roleName}', but the application declares no role with that name.",
+                    keyPath);
+            }
+        }
+
+        return mapped.Count == 0 ? ReadOnlyDictionary<string, string>.Empty : mapped;
+    }
+
+    /// <summary>Escapes a key as an RFC 6901 JSON Pointer segment.</summary>
+    private static string Escape(string segment) =>
+        segment.Replace("~", "~0", StringComparison.Ordinal).Replace("/", "~1", StringComparison.Ordinal);
 
     /// <summary>Checks each file of a pinned module and adds the valid ones, in canonical form, under <c>modules/&lt;id&gt;/</c>.</summary>
     private static void CheckFiles(

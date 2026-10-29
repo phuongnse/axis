@@ -3,6 +3,7 @@ using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Loading;
 using Axis.Configuration.Packages;
 using Axis.Configuration.Releases;
+using Axis.Configuration.Resources;
 using Json.Schema;
 
 namespace Axis.Configuration.Modules;
@@ -125,10 +126,35 @@ public sealed class ModuleCatalog
             }
 
             var root = document.RootElement;
-            return new ModuleManifest(
+            var manifest = new ModuleManifest(
                 root.GetProperty("id").GetString()!,
                 root.GetProperty("version").GetString()!,
                 root.GetProperty("label").GetString()!);
+            if (!root.TryGetProperty("roles", out var rolesElement))
+            {
+                return manifest;
+            }
+
+            var slots = new List<ModuleRoleSlot>();
+            var firstIndexByName = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            foreach (var slotElement in rolesElement.EnumerateArray())
+            {
+                var name = slotElement.GetProperty("name").GetString()!;
+                if (!firstIndexByName.TryAdd(name, slots.Count))
+                {
+                    problems.Add(new Diagnostic(
+                        DiagnosticCodes.ModuleManifestInvalid,
+                        $"The role slot '{name}' repeats the name of the slot at '/roles/{firstIndexByName[name]}', ignoring letter case. Name each slot once.",
+                        file,
+                        $"/roles/{slots.Count}/name"));
+                }
+
+                slots.Add(new ModuleRoleSlot(
+                    name,
+                    new TextReference(slotElement.GetProperty("label").GetProperty("textKey").GetString()!)));
+            }
+
+            return problems.Count > 0 ? null : manifest with { Roles = slots };
         }
     }
 

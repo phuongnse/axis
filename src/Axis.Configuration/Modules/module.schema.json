@@ -15,9 +15,29 @@
     "packages": {
       "type": "array",
       "items": { "$ref": "#/$defs/package" }
+    },
+    "roles": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/roleSlot" }
     }
   },
   "$defs": {
+    "roleSlot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "label"],
+      "properties": {
+        "name": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$", "maxLength": 60 },
+        "label": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["textKey"],
+          "properties": {
+            "textKey": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    },
     "package": {
       "type": "object",
       "additionalProperties": false,
