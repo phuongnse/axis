@@ -6,7 +6,6 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-using System.Text.RegularExpressions;
 using Axis.Configuration.Realms;
 using Axis.Configuration.Tests;
 using Axis.Server.Authentication;
@@ -29,7 +28,7 @@ namespace Axis.Integration.Tests;
 /// a <c>fapi2</c> tenant signs in through its realm with PAR, <c>private_key_jwt</c> and DPoP. A realm that cannot be updated
 /// leaves the tenant as it was.
 /// </summary>
-public sealed partial class AdminOidcSetRealmTests(KeycloakFixture keycloak, PostgreSqlFixture database) : IClassFixture<PostgreSqlFixture>, IAsyncLifetime
+public sealed class AdminOidcSetRealmTests(KeycloakFixture keycloak, PostgreSqlFixture database) : IClassFixture<PostgreSqlFixture>, IAsyncLifetime
 {
     private const string TokenPath = "/protocol/openid-connect/token";
     private const string ParPath = "/protocol/openid-connect/ext/par/request";
@@ -326,7 +325,7 @@ public sealed partial class AdminOidcSetRealmTests(KeycloakFixture keycloak, Pos
     }
 
     /// <summary>
-    /// Starts sign-in on the server and logs in at the tenant realm's own login form, which uses Keycloak's default theme.
+    /// Starts sign-in on the server and logs in at the tenant realm's own login form, which uses the Axis theme.
     /// Returns the callback address that the realm sends the browser to, which has not been called.
     /// </summary>
     private static async Task<Uri> LogInAtRealmAsync(HttpClient client, string realm, string username, string password, string otpSecret)
@@ -356,8 +355,8 @@ public sealed partial class AdminOidcSetRealmTests(KeycloakFixture keycloak, Pos
             ["credentialId"] = "",
         });
         var codePage = await afterPassword.Content.ReadAsStringAsync(CancellationToken);
-        Assert.True(afterPassword.StatusCode == HttpStatusCode.OK && codePage.Contains("name=\"otp\"", StringComparison.Ordinal), codePage);
-        var login = await PostAsync(browser, FormAction(codePage), cookies, new Dictionary<string, string>
+        Assert.True(afterPassword.StatusCode == HttpStatusCode.OK && KeycloakSignIn.Page(codePage) == "twoStep", codePage);
+        var login = await PostAsync(browser, KeycloakSignIn.LoginAction(codePage).AbsoluteUri, cookies, new Dictionary<string, string>
         {
             ["otp"] = DevelopmentTotp.CodeFromSecret(otpSecret),
             ["login"] = "Sign In",
@@ -398,16 +397,6 @@ public sealed partial class AdminOidcSetRealmTests(KeycloakFixture keycloak, Pos
 
         return response;
     }
-
-    private static string FormAction(string html)
-    {
-        var match = FormActionPattern().Match(html);
-        Assert.True(match.Success, html);
-        return WebUtility.HtmlDecode(match.Groups["action"].Value);
-    }
-
-    [GeneratedRegex("""<form\b[^>]*\baction="(?<action>[^"]+)""")]
-    private static partial Regex FormActionPattern();
 
     /// <summary>Answers every request with a server error, as an identity provider that is down would.</summary>
     private sealed class FailingHandler : HttpMessageHandler

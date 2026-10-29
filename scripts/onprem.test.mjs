@@ -586,11 +586,15 @@ describe('the on-premises installation', () => {
     assert.equal(passwordStep.status, 200, `the Keycloak password step: ${passwordStep.body}`)
     remember(keycloakJar, passwordStep)
 
-    // The password is followed by the code form.
-    const codeForm = passwordStep.body.match(/<form[^>]*id="kc-otp-login-form"[^>]*>/)
-    assert.ok(codeForm, 'the Keycloak password step has no kc-otp-login-form form')
-    const codeAction = codeForm[0].match(/action="([^"]+)"/)[1].replaceAll('&amp;', '&')
-    const login = await keycloak(codeAction, keycloakJar, { method: 'POST', form: { otp: developmentCode(username) } })
+    // The password is followed by the two-step page of the Axis theme, which carries the code form's action too.
+    const codeContext = passwordStep.body.match(/<script[^>]*id="axis-sign-in-context"[^>]*>([\s\S]*?)<\/script>/)
+    assert.ok(codeContext, 'the Keycloak password step does not show the Axis theme')
+    const codePage = JSON.parse(codeContext[1])
+    assert.equal(codePage.page, 'twoStep', 'the Keycloak password step is not the two-step page')
+    const login = await keycloak(codePage.loginAction, keycloakJar, {
+      method: 'POST',
+      form: { otp: developmentCode(username), login: 'Sign In' },
+    })
     assert.equal(login.status, 302, `the Keycloak login: ${login.body}`)
     const callback = new URL(login.headers.location)
     assert.equal(`${callback.origin}${callback.pathname}`, `https://${hosts.one}/api/auth/callback`)

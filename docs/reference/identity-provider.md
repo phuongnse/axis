@@ -239,7 +239,9 @@ _(planned for M17)_
   `<provider alias>.<subject>`. Each provider names the realm's first-login flow. It touches no other client or
   provider, so `axis`, `axis-activation`, `axis-users` and anything an operator added stay. A site client that the sync
   creates or updates copies the client authentication and the PAR, PKCE, DPoP and key settings of `axis`, so activation
-  never undoes what `tenant oidc set` wrote. Each site client also carries two attributes that every sync rewrites:
+  never undoes what `tenant oidc set` wrote. It also gives that site client every protocol mapper of `axis`, matched by
+  name with the same type and config, so a sign-in through it carries the same claims. The `identity provider` mapper
+  stays as it is, and a mapper that is removed from `axis` is not removed from the site clients. Each site client also carries two attributes that every sync rewrites:
   `axis.providers`, the aliases of the providers the site allows separated by spaces, and `axis.accounts`, `true` or
   `false`. The sync refuses an alias that is empty or contains a space. It also copies the redirect addresses, web origins and post-logout redirect
   addresses of `axis`. When the tenant has a platform client secret, the site client's secret is base64url of
@@ -317,7 +319,7 @@ _(planned for M17)_
 - A wrong password keeps the username, marks the password and reads "Invalid email, username or password." above the
   form, never saying which one was wrong.
 - A site that allows one brokered provider and no accounts shows its button alone, under one line that names it.
-- Two-step verification asks for the 6-digit code in six boxes, one digit each, with "Try another way" and "Back to sign in".
+- Two-step verification asks for the 6-digit code in six boxes, one digit each, with "Back to sign in" and, when Keycloak offers another way to sign in, "Try another way".
 - The theme is built from the SPA's own React components and tokens into a Keycloak theme, so the pages look like the
   rest of Axis. Its texts are message bundles in every locale the platform offers. The "Continue with" labels come
   from the applications' texts, which activation writes to the realm (_built_).
@@ -328,13 +330,15 @@ _(planned for M17)_
   and the site both allow accounts. A client without `axis.accounts`, such as `axis`, has no `site`, so the page shows
   every provider and the form as before. The account form is a real `<form method="post">` to the login address. The components draw the frame (the 32 px mark
   with the word "Axis", the 400 px card and the organization's name under the title), the "Continue with" secondary
-  buttons, the form widget's field labels and "Forgot password?" on the password's row. A shared two-step page with six
-  code boxes exists too, but only the preview draws it. The design system's
+  buttons, the form widget's field labels and "Forgot password?" on the password's row. The two-step page is drawn too,
+  from its own context with `page` set to `twoStep`: six code boxes, one digit each, and a real
+  `<form method="post">` to the login address that posts `otp` and `login`. "Try another way" posts `tryAnotherWay=on`
+  and shows only when Keycloak offers another way to sign in. "Back to sign in" uses Keycloak's restart address. The design system's
   `identitySignIn` preview feeds the components fixtures, see
   [shell design system previews](shell.md#design-system-previews). The Keycloak theme `axis` feeds them a real
-  context: its `login.ftl` writes Keycloak's sign-in data as JSON and a React bundle draws the page. `scripts/build.sh`
+  context: its `login.ftl` and `login-otp.ftl` write Keycloak's data as JSON, with a `page` field of `signIn` or `twoStep`, and a React bundle draws the page. `scripts/build.sh`
   builds the theme from `web/keycloak-theme/` into `artifacts/keycloak-theme/axis/login/` and checks its files and
-  fonts. Keycloak's other pages, two-step verification included, still come from its `keycloak` parent theme. The development realm `axis` uses the theme as
+  fonts. Keycloak's other pages still come from its `keycloak` parent theme. The development realm `axis` uses the theme as
   its login theme: Compose, `scripts/dev.sh`, `scripts/e2e.sh` and the Keycloak of the integration tests load it from
   `artifacts/keycloak-theme`, and each builds it first. The realms of `tenant create` name the theme as their login
   theme. The on-premises Compose example loads it from `AXIS_IDENTITY_THEME_DIR`, see
