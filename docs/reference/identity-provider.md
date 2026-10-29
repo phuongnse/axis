@@ -33,8 +33,8 @@ _(planned for M17)_
 - The realm holds the account rules of [accounts](user-administration.md#accounts): an authenticator code at every
   sign-in, passwords of 12 to 128 characters that are not on the breached-password list, a wait after 5 failed
   sign-ins, a password reset link of 30 minutes and no self-registration.
-- _(planned for M17)_ The realm also has its people, its brokered identity providers, a client for each site and the
-  Axis theme.
+- The realm's login theme is the Axis theme `axis`, see [theme](#theme).
+- _(planned for M17)_ The realm also has its people, its brokered identity providers and a client for each site.
 - _(planned for M17)_ The realm's display name is the organization's name, which every sign-in page shows under its
   title. Until `tenant create` takes that name, the display name is the tenant id.
 - A preview tenant has no realm. It signs people in through its main tenant's realm, see
@@ -185,7 +185,7 @@ _(planned for M17)_
   that Axis's hosts use to change the realm: `axis-activation`, with rights over the realm's providers and clients, for
   activation, and `axis-users`, with rights over its users only, for the users page. It stores their secrets and the
   platform client's secret encrypted in the tenant directory and points the tenant's `Oidc` block at the realm. A
-  second run updates the realm and brings it up to the account rules. It also creates the first-login flow
+  second run updates the realm, brings it up to the account rules and sets its login theme to `axis` again. It also creates the first-login flow
   `axis first login` for brokered users and allows two users to share an email, which turns sign-in by email off: an
   account's username is its email, see [accounts](user-administration.md#accounts). Only `Axis.Admin` holds the identity provider's admin rights over every realm, from the
   `IdentityProvider` settings of its own, see [administration](administration.md#settings).
@@ -265,8 +265,9 @@ _(planned for M17)_
   builds the theme from `web/keycloak-theme/` into `artifacts/keycloak-theme/axis/login/` and checks its files and
   fonts. Keycloak's other pages still come from its `keycloak` parent theme. The development realm `axis` uses the theme as
   its login theme: Compose, `scripts/dev.sh`, `scripts/e2e.sh` and the Keycloak of the integration tests load it from
-  `artifacts/keycloak-theme`, and each builds it first. The on-premises install, the Helm chart and the realms of
-  `tenant create` do not use it yet.
+  `artifacts/keycloak-theme`, and each builds it first. The realms of `tenant create` name the theme as their login
+  theme. The on-premises install and the Helm chart do not load it yet, so Keycloak there falls back to its built-in
+  theme.
 
 ## Installation
 

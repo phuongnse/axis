@@ -19,7 +19,7 @@ public sealed partial class TenantRealmAccountRulesTests(KeycloakFixture keycloa
     private const string ClientId = "account-rules";
     private const string RedirectUri = "http://localhost/callback";
     private const string Password = "a-long-enough-password";
-    private const string InvalidCredentials = "Invalid username or password.";
+    private const string InvalidCredentials = "Invalid email, username or password.";
 
     private static readonly TenantRealmSecrets _secrets = new("platform-secret-1", "activation-secret-1", "users-secret-1");
 
@@ -294,8 +294,7 @@ public sealed partial class TenantRealmAccountRulesTests(KeycloakFixture keycloa
         using var response = await _http.SendAsync(request, TestContext.Current.CancellationToken);
         Remember(jar, response);
         var html = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
-        var match = FormActionPattern().Match(html);
-        return (response.StatusCode, html, match.Success ? WebUtility.HtmlDecode(match.Groups["action"].Value) : "", response.Headers.Location);
+        return (response.StatusCode, html, NextFormAction(html), response.Headers.Location);
     }
 
     private static string CookieHeader(Dictionary<string, string> jar) =>
@@ -315,12 +314,22 @@ public sealed partial class TenantRealmAccountRulesTests(KeycloakFixture keycloa
         }
     }
 
+    // The realm's login page is the Axis theme's, which holds its form address in a JSON block. Keycloak's other pages have a form element.
     private static string FormAction(string html)
     {
+        if (html.Contains("id=\"axis-sign-in-context\"", StringComparison.Ordinal))
+        {
+            return KeycloakSignIn.LoginAction(html).AbsoluteUri;
+        }
+
         var match = FormActionPattern().Match(html);
         Assert.True(match.Success, html);
         return WebUtility.HtmlDecode(match.Groups["action"].Value);
     }
+
+    /// <summary>The address the next form on the page posts to, or an empty string when the page has none.</summary>
+    private static string NextFormAction(string html) =>
+        html.Contains("id=\"axis-sign-in-context\"", StringComparison.Ordinal) || FormActionPattern().IsMatch(html) ? FormAction(html) : "";
 
     private async Task<JsonElement> GetJsonAsync(string path)
     {
