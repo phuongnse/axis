@@ -1,0 +1,8 @@
+{
+  "id": "0b7a4c11-3d52-4e8a-9a60-5c1f7e2d9a0b",
+  "kind": "entity",
+  "name": "Tag",
+  "formatVersion": 1,
+  "displayField": "name",
+  "fields": [{ "name": "name", "type": "text", "required": true }]
+}

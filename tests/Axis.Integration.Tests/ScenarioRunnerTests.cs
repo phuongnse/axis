@@ -183,6 +183,39 @@ public sealed class ScenarioRunnerTests
     }
 
     [Fact]
+    public async Task Saved_aliases_in_a_reference_a_references_field_and_a_child_row_become_ids_and_expectRecord_matches_them()
+    {
+        using var folder = Application(
+            Scenario("Aliases", Clerk, """
+                { "type": "createRecord", "entity": "Tag", "as": "requester", "save": "red", "values": { "name": "Red" } },
+                { "type": "createRecord", "entity": "Tag", "as": "requester", "save": "blue", "values": { "name": "Blue" } },
+                {
+                  "type": "createRecord", "entity": "Note", "as": "requester", "save": "note",
+                  "values": { "title": "Desk", "tag": "red", "tags": ["red", "blue"], "lines": [{ "text": "Leg", "tag": "blue" }] }
+                },
+                {
+                  "type": "expectRecord", "record": "note",
+                  "values": { "tag": "red", "tags": ["red", "blue"], "lines": [{ "text": "Leg", "tag": "blue" }] }
+                },
+                { "type": "updateRecord", "record": "note", "as": "requester", "values": { "tag": "blue", "tags": ["blue"] } },
+                { "type": "expectRecord", "record": "note", "values": { "tag": "blue", "tags": ["blue"] } }
+                """),
+            Scenario("Wrong", Clerk, """
+                { "type": "createRecord", "entity": "Tag", "as": "requester", "save": "red", "values": { "name": "Red" } },
+                { "type": "createRecord", "entity": "Tag", "as": "requester", "save": "blue", "values": { "name": "Blue" } },
+                { "type": "createRecord", "entity": "Note", "as": "requester", "save": "note", "values": { "title": "Desk", "tag": "red" } },
+                { "type": "expectRecord", "record": "note", "values": { "tag": "blue" } }
+                """));
+
+        var aliases = await RunAsync(folder, "Aliases");
+        var wrong = await RunAsync(folder, "Wrong");
+
+        Assert.True(aliases.Passed, aliases.Failure);
+        Assert.False(wrong.Passed);
+        Assert.StartsWith("Step 4 (expectRecord): field 'tag' expected", wrong.Failure);
+    }
+
+    [Fact]
     public async Task A_create_by_a_user_without_a_create_grant_passes_with_expect_denied()
     {
         using var folder = Application(Scenario("DeniedExpected", Reader, """

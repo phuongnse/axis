@@ -19,6 +19,8 @@ namespace Axis.Scenarios.Runner;
 /// <c>createRecord</c> steps saved under an alias. A step that fails throws <see cref="StepFailedException"/>.
 /// <c>startProcess</c> and <c>completeTask</c> apply the checks of the process start and task API
 /// without the HTTP layer. The runner runs the process steps that become due after each action.
+/// An alias in a reference value, a references item or a child row becomes the saved record's id
+/// before a record action runs and before <c>expectRecord</c> compares.
 /// </summary>
 internal sealed class ScenarioSteps(
     NpgsqlConnection connection,
@@ -68,7 +70,7 @@ internal sealed class ScenarioSteps(
     private async Task CreateAsync(ScenarioStepDefinition step, CancellationToken cancellationToken)
     {
         var entity = Entity(step.Entity);
-        var body = Body(version: null, step.Values);
+        var body = Body(version: null, Resolve(entity, step.Values));
         var result = await RecordCommand.CreateAsync(
             connection, ScenarioRunner.TenantId, model, releaseId, entity, Actor(step), _ => Task.FromResult<byte[]?>(body), null, loggerFactory, cancellationToken);
         Check(step, Action(result, RecordCommandOutcome.Written));
@@ -84,7 +86,7 @@ internal sealed class ScenarioSteps(
         var stored = await RecordQueries.GetAsync(connection, model, entity, id, cancellationToken);
 
         // A record that no longer exists still goes to the record command, which answers NotFound.
-        var body = Body(stored?.Version ?? 1, step.Values);
+        var body = Body(stored?.Version ?? 1, Resolve(entity, step.Values));
         var result = await RecordCommand.UpdateAsync(
             connection, ScenarioRunner.TenantId, model, releaseId, entity, id, Actor(step), _ => Task.FromResult<byte[]?>(body), null, loggerFactory, cancellationToken);
         Check(step, Action(result, RecordCommandOutcome.Written));
@@ -103,7 +105,7 @@ internal sealed class ScenarioSteps(
         var (entity, id) = Saved(step.Record);
         var stored = await RecordQueries.GetAsync(connection, model, entity, id, cancellationToken)
             ?? throw new StepFailedException($"record '{step.Record}' does not exist");
-        if (RecordExpectation.FirstDifference(model, entity, stored.Values, step.Values ?? new Dictionary<string, JsonElement>()) is { } difference)
+        if (RecordExpectation.FirstDifference(model, entity, stored.Values, Resolve(entity, step.Values) ?? new Dictionary<string, JsonElement>()) is { } difference)
         {
             throw new StepFailedException(difference);
         }
@@ -180,7 +182,7 @@ internal sealed class ScenarioSteps(
         var body = new Dictionary<string, object?> { ["outcome"] = step.Outcome };
         if (step.Values is { } values)
         {
-            body["values"] = values;
+            body["values"] = Resolve(entity, values);
             body["version"] = (await RecordQueries.GetAsync(connection, model, entity, id, cancellationToken))?.Version ?? 1;
         }
 
@@ -447,6 +449,53 @@ internal sealed class ScenarioSteps(
         step.As is { } user && scenario.Users.TryGetValue(user, out var roles)
             ? (user, roles)
             : throw new StepFailedException($"user '{step.As}' is not a user of the scenario");
+
+    // Replaces each alias in a reference value, a references item or a child row with the saved record's id.
+    // A string in UUID form is an id already, and a string that is no saved alias stays for the record command to refuse.
+    private Dictionary<string, JsonElement>? Resolve(EntityModel entity, IReadOnlyDictionary<string, JsonElement>? values)
+    {
+        if (values is null)
+        {
+            return null;
+        }
+
+        var resolved = new Dictionary<string, JsonElement>(values.Count);
+        foreach (var (key, value) in values)
+        {
+            resolved[key] = entity.TryGetField(key, out var field) ? ResolveValue(field, value) : value;
+        }
+
+        return resolved;
+    }
+
+    private JsonElement ResolveValue(FieldModel field, JsonElement value)
+    {
+        switch (field.Type)
+        {
+            case FieldType.Reference:
+                return ResolveId(value);
+            case FieldType.References when value.ValueKind == JsonValueKind.Array:
+                return JsonSerializer.SerializeToElement(value.EnumerateArray().Select(ResolveId).ToList());
+            case FieldType.ChildCollection when value.ValueKind == JsonValueKind.Array:
+                var child = model.Entities.Single(candidate => candidate.Id == field.Target!.Id);
+                var rows = value.EnumerateArray()
+                    .Select(row => row.ValueKind == JsonValueKind.Object
+                        ? JsonSerializer.SerializeToElement(Resolve(child, row.EnumerateObject().ToDictionary(property => property.Name, property => property.Value)))
+                        : row)
+                    .ToList();
+                return JsonSerializer.SerializeToElement(rows);
+            default:
+                return value;
+        }
+    }
+
+    private JsonElement ResolveId(JsonElement value) =>
+        value.ValueKind == JsonValueKind.String
+            && value.GetString() is { } text
+            && !(text.Length == 36 && Guid.TryParseExact(text, "D", out _))
+            && _saved.TryGetValue(text, out var saved)
+                ? JsonSerializer.SerializeToElement(saved.Id.ToString("D"))
+                : value;
 
     private static byte[] Body(long? version, IReadOnlyDictionary<string, JsonElement>? values)
     {

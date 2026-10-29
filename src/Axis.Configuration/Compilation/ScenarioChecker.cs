@@ -10,7 +10,7 @@ namespace Axis.Configuration.Compilation;
 /// user assignee and user recipient is a user of the scenario, and an assignee or recipient role is
 /// a declared role. A
 /// <c>createRecord</c> step names a loaded root entity. A record alias is saved by one step and
-/// used only by later steps. The record's entity is the one its <c>createRecord</c> step names, and
+/// used only by later steps, as a record reference of a step or as a reference value of a later step. The record's entity is the one its <c>createRecord</c> step names, and
 /// it resolves the rest of a step: a process of <c>startProcess</c> or <c>expectInstance</c> is a
 /// process over that entity, a task step of <c>completeTask</c> or <c>expectTask</c> is a task step
 /// of such a process, and an outcome is an outcome of it. The <c>values</c> of a step name fields of
@@ -167,13 +167,6 @@ internal static class ScenarioChecker
                 if (step.Type == ScenarioStepDefinition.CreateRecord)
                 {
                     entity = ResolveEntity(scenario, step.Entity!, $"{path}/entity", findEntity, childOwnerOf, unloadedEntityNames, references, Report);
-                    if (step.Save is { } save && !aliases.TryAdd(save, entity))
-                    {
-                        Report(
-                            DiagnosticCodes.DuplicateScenarioRecord,
-                            $"The alias '{save}' is already saved by an earlier step. Each alias is saved once.",
-                            $"{path}/save");
-                    }
                 }
                 else if (step.Record is { } record && !aliases.TryGetValue(record, out entity))
                 {
@@ -187,7 +180,16 @@ internal static class ScenarioChecker
 
                 if (step.Values is { } values && entity is not null)
                 {
-                    CheckValues(entity, values, $"{path}/values", findEntity, Report);
+                    CheckValues(entity, values, $"{path}/values", findEntity, aliases, Report);
+                }
+
+                // The alias is saved after the values are checked, so a step cannot use its own alias.
+                if (step.Type == ScenarioStepDefinition.CreateRecord && step.Save is { } save && !aliases.TryAdd(save, entity))
+                {
+                    Report(
+                        DiagnosticCodes.DuplicateScenarioRecord,
+                        $"The alias '{save}' is already saved by an earlier step. Each alias is saved once.",
+                        $"{path}/save");
                 }
             }
         }
@@ -332,13 +334,15 @@ internal static class ScenarioChecker
     /// <summary>
     /// Checks <paramref name="values"/> against <paramref name="entity"/>: each key names a field and
     /// each value fits the field's type. A child collection is an array of objects, checked against
-    /// the child entity.
+    /// the child entity. A reference, and each item of a references field, is a UUID or the alias of a
+    /// record of the field's target entity.
     /// </summary>
     private static void CheckValues(
         EntityResource entity,
         IEnumerable<KeyValuePair<string, JsonElement>> values,
         string path,
         Func<string, EntityResource?> findEntity,
+        Dictionary<string, EntityResource?> aliases,
         Action<string, string, string> report)
     {
         foreach (var (key, value) in values)
@@ -361,7 +365,28 @@ internal static class ScenarioChecker
 
             if (type == FieldType.ChildCollection)
             {
-                CheckCollection(field, value, valuePath, findEntity, report);
+                CheckCollection(field, value, valuePath, findEntity, aliases, report);
+            }
+            else if (type == FieldType.Reference)
+            {
+                CheckReference(field, value, valuePath, findEntity, aliases, report);
+            }
+            else if (type == FieldType.References)
+            {
+                if (value.ValueKind != JsonValueKind.Array)
+                {
+                    report(
+                        DiagnosticCodes.InvalidScenarioValue,
+                        $"The value is not a valid {field.Type} for the field '{field.Name}'. Use an array of ids or aliases.",
+                        valuePath);
+                    continue;
+                }
+
+                var itemIndex = 0;
+                foreach (var item in value.EnumerateArray())
+                {
+                    CheckReference(field, item, $"{valuePath}/{itemIndex++}", findEntity, aliases, report);
+                }
             }
             else if (!FieldValues.TryRead(type, field.Values, value, out _))
             {
@@ -374,11 +399,58 @@ internal static class ScenarioChecker
         }
     }
 
+    /// <summary>
+    /// Checks one reference: a UUID, or the alias of a record an earlier step saved. The alias's entity
+    /// must be the field's target. An alias over an unknown entity is not reported again.
+    /// </summary>
+    private static void CheckReference(
+        FieldDefinition field,
+        JsonElement value,
+        string path,
+        Func<string, EntityResource?> findEntity,
+        Dictionary<string, EntityResource?> aliases,
+        Action<string, string, string> report)
+    {
+        if (value.ValueKind != JsonValueKind.String)
+        {
+            report(
+                DiagnosticCodes.InvalidScenarioValue,
+                $"The value is not a valid {field.Type} for the field '{field.Name}'. Use a UUID or the alias of a saved record.",
+                path);
+            return;
+        }
+
+        if (FieldValues.TryRead(FieldType.Reference, null, value, out _))
+        {
+            return;
+        }
+
+        var text = value.GetString()!;
+        if (!aliases.TryGetValue(text, out var aliasEntity))
+        {
+            report(
+                DiagnosticCodes.InvalidScenarioValue,
+                $"The value '{text}' is not a UUID or the alias of a record an earlier step saved.",
+                path);
+        }
+        else if (aliasEntity is not null
+            && field.Target is { } target
+            && findEntity(target) is { } targetEntity
+            && !ReferenceEquals(targetEntity, aliasEntity))
+        {
+            report(
+                DiagnosticCodes.InvalidScenarioValue,
+                $"The record '{text}' is of the entity '{aliasEntity.Name}', but the field '{field.Name}' references '{targetEntity.Name}'.",
+                path);
+        }
+    }
+
     private static void CheckCollection(
         FieldDefinition field,
         JsonElement value,
         string path,
         Func<string, EntityResource?> findEntity,
+        Dictionary<string, EntityResource?> aliases,
         Action<string, string, string> report)
     {
         if (value.ValueKind != JsonValueKind.Array)
@@ -404,7 +476,7 @@ internal static class ScenarioChecker
             }
             else if (child is not null)
             {
-                CheckValues(child, item.EnumerateObject().Select(property => KeyValuePair.Create(property.Name, property.Value)), itemPath, findEntity, report);
+                CheckValues(child, item.EnumerateObject().Select(property => KeyValuePair.Create(property.Name, property.Value)), itemPath, findEntity, aliases, report);
             }
         }
     }
