@@ -30,6 +30,8 @@ public sealed class SiteSignInTests(KeycloakFixture keycloak, PostgreSqlFixture 
     // The realm's client accepts redirects to http://localhost:5206/*, the development server, and so do the site clients.
     private static readonly Uri _serverAddress = new("http://localhost:5206");
 
+    private static readonly string _callbackAddress = new Uri(_serverAddress, TenantSignIn.CallbackPath).AbsoluteUri;
+
     private static readonly TenantRealmSecrets _realmSecrets = new("platform-1", "activation-1", "users-1");
 
     private string? _schemaConnection;
@@ -117,18 +119,118 @@ public sealed class SiteSignInTests(KeycloakFixture keycloak, PostgreSqlFixture 
         Assert.Equal("/?signIn=failed", refused.Headers.Location?.OriginalString);
         Assert.Equal(0L, await CountAsync("axis.sessions"));
         Assert.Equal(0L, await CountAsync("axis.audit_records WHERE action = 'session.signedIn'"));
-        var details = (string)(await PostgreSqlServer.AdminScalarAsync(
-            _schemaConnection!, "SELECT details::text FROM axis.audit_records WHERE action = 'session.signInRefused'", CancellationToken))!;
-        using var document = JsonDocument.Parse(details);
-        Assert.Equal("invalidToken", document.RootElement.GetProperty("reason").GetString());
+        Assert.Equal("invalidToken", await RefusalReasonAsync());
         using var me = await host.Client.GetAsync(new Uri("/api/me", UriKind.Relative), CancellationToken);
         Assert.Equal(HttpStatusCode.Unauthorized, me.StatusCode);
+    }
+
+    [Fact]
+    public async Task A_site_callback_through_a_provider_the_site_does_not_allow_is_refused_even_when_kc_idp_hint_forces_it()
+    {
+        var baseAddress = await keycloak.BaseAddressAsync();
+        using var realms = await UpstreamRealms.CreateAsync(baseAddress);
+        try
+        {
+            var (host, upstream) = await StartBrokeredAsync(realms, baseAddress);
+            await using var hosted = host;
+            var authorize = await host.AuthorizeAsync("/sitesaccounts");
+            var query = HttpUtility.ParseQueryString(authorize.Query);
+            Assert.Equal("site-sitesaccounts", query["client_id"]);
+            Assert.Null(query["kc_idp_hint"]);
+
+            // The site allows accounts only, but the browser forces the brokered provider on the realm's authorize address.
+            var forced = new Uri($"{authorize.AbsoluteUri}&kc_idp_hint=oidc-siteissuer");
+            var callback = await realms.LogInAsync(forced, upstream, _callbackAddress);
+            using var refused = await host.Client.GetAsync(callback.PathAndQuery, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.Found, refused.StatusCode);
+            Assert.Equal("/?signIn=failed", refused.Headers.Location?.OriginalString);
+            Assert.Equal(0L, await CountAsync("axis.sessions"));
+            Assert.Equal(0L, await CountAsync("axis.audit_records WHERE action = 'session.signedIn'"));
+            Assert.Equal("providerNotAllowed", await RefusalReasonAsync());
+            using var me = await host.Client.GetAsync(new Uri("/api/me", UriKind.Relative), CancellationToken);
+            Assert.Equal(HttpStatusCode.Unauthorized, me.StatusCode);
+        }
+        finally
+        {
+            await realms.DeleteRealmsAsync();
+        }
+    }
+
+    [Fact]
+    public async Task A_site_callback_through_a_provider_the_site_allows_creates_a_session()
+    {
+        var baseAddress = await keycloak.BaseAddressAsync();
+        using var realms = await UpstreamRealms.CreateAsync(baseAddress);
+        try
+        {
+            var (host, upstream) = await StartBrokeredAsync(realms, baseAddress);
+            await using var hosted = host;
+
+            // The site allows only the provider, so the server names it in the authorize address itself.
+            var authorize = await host.AuthorizeAsync("/sitespartner");
+            Assert.Equal("oidc-siteissuer", HttpUtility.ParseQueryString(authorize.Query)["kc_idp_hint"]);
+            var callback = await realms.LogInAsync(authorize, upstream, _callbackAddress);
+            using var signedIn = await host.Client.GetAsync(callback.PathAndQuery, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.Found, signedIn.StatusCode);
+            Assert.Equal("/sitespartner", signedIn.Headers.Location!.OriginalString);
+            Assert.Equal(1L, await CountAsync("axis.sessions"));
+            Assert.Equal(1L, await CountAsync("axis.audit_records WHERE action = 'session.signedIn'"));
+            using var me = await host.Client.GetAsync(new Uri("/api/me", UriKind.Relative), CancellationToken);
+            Assert.Equal(HttpStatusCode.OK, me.StatusCode);
+        }
+        finally
+        {
+            await realms.DeleteRealmsAsync();
+        }
     }
 
     public async ValueTask InitializeAsync() =>
         _schemaConnection = await database.CreateDatabaseAsync("sitesignin", CancellationToken);
 
     public ValueTask DisposeAsync() => ValueTask.CompletedTask;
+
+    /// <summary>
+    /// Starts the server in front of a tenant realm of its own, with the sites of <see cref="Applications"/> and the provider
+    /// <c>partner</c> bound to an upstream realm that holds the user <c>pat</c>. The realm's platform client accepts redirects to the
+    /// server before the server starts, so the site clients that its activation makes accept them too. Returns the host and the
+    /// upstream realm.
+    /// </summary>
+    private async Task<(SiteHost Host, string Upstream)> StartBrokeredAsync(UpstreamRealms realms, Uri baseAddress)
+    {
+        var tenant = realms.NewRealmName();
+        using var http = new HttpClient();
+        await new TenantRealm(http, new IdentityProviderAdmin(baseAddress, KeycloakFixture.AdminClientId, KeycloakFixture.AdminClientSecret))
+            .EnsureAsync(tenant, "Acme", _realmSecrets, CancellationToken);
+        var clients = await realms.GetJsonAsync($"admin/realms/{tenant}/clients?clientId={TenantRealm.PlatformClientId}");
+        var platform = clients[0].Deserialize<Dictionary<string, JsonElement>>()!;
+        platform["redirectUris"] = JsonSerializer.SerializeToElement(new[] { $"{_serverAddress.AbsoluteUri}*" });
+        using var updated = await realms.SendAsync(HttpMethod.Put, $"admin/realms/{tenant}/clients/{platform["id"].GetString()}", platform);
+        Assert.Equal(HttpStatusCode.NoContent, updated.StatusCode);
+
+        var upstream = await realms.NewUpstreamRealmAsync();
+        await realms.AddUpstreamUserAsync(upstream);
+        var host = await StartAsync(
+            partner: true,
+            new Uri(baseAddress, $"realms/{tenant}"),
+            tenant,
+            _realmSecrets.Platform,
+            _realmSecrets.Activation,
+            siteIssuer: new Uri(baseAddress, $"realms/{upstream}"),
+            siteClient: UpstreamRealms.ClientId,
+            siteSecret: UpstreamRealms.BrokerSecret);
+        await realms.PointBackChannelAtTheContainerAsync(tenant, "oidc-siteissuer", upstream);
+        return (host, upstream);
+    }
+
+    private async Task<string> RefusalReasonAsync()
+    {
+        var details = (string)(await PostgreSqlServer.AdminScalarAsync(
+            _schemaConnection!, "SELECT details::text FROM axis.audit_records WHERE action = 'session.signInRefused'", CancellationToken))!;
+        using var document = JsonDocument.Parse(details);
+        return document.RootElement.GetProperty("reason").GetString()!;
+    }
 
     private static string Site(string id, string path, string provider) =>
         $$"""
@@ -182,7 +284,10 @@ public sealed class SiteSignInTests(KeycloakFixture keycloak, PostgreSqlFixture 
         string realm,
         string platformSecret,
         string activationSecret,
-        IdTokenRewriteHandler? provider = null)
+        IdTokenRewriteHandler? provider = null,
+        Uri? siteIssuer = null,
+        string siteClient = "site-client-value",
+        string siteSecret = "site-secret-value")
     {
         var baseAddress = await keycloak.BaseAddressAsync();
         var applications = Applications(partner);
@@ -199,11 +304,11 @@ public sealed class SiteSignInTests(KeycloakFixture keycloak, PostgreSqlFixture 
             builder.UseSetting("Tenants:a:Realm:Name", realm);
             builder.UseSetting("Tenants:a:Realm:ActivationClientSecret", activationSecret);
             builder.UseSetting($"Tenants:a:Bindings:{SiteIssuer}:Kind", "url");
-            builder.UseSetting($"Tenants:a:Bindings:{SiteIssuer}:Value", new Uri(baseAddress, "realms/master").AbsoluteUri);
+            builder.UseSetting($"Tenants:a:Bindings:{SiteIssuer}:Value", (siteIssuer ?? new Uri(baseAddress, "realms/master")).AbsoluteUri);
             builder.UseSetting($"Tenants:a:Bindings:{SiteClient}:Kind", "secret");
-            builder.UseSetting($"Tenants:a:Bindings:{SiteClient}:Value", "site-client-value");
+            builder.UseSetting($"Tenants:a:Bindings:{SiteClient}:Value", siteClient);
             builder.UseSetting($"Tenants:a:Bindings:{SiteSecret}:Kind", "secret");
-            builder.UseSetting($"Tenants:a:Bindings:{SiteSecret}:Value", "site-secret-value");
+            builder.UseSetting($"Tenants:a:Bindings:{SiteSecret}:Value", siteSecret);
             builder.UseSetting("ActivateOnStartup:0", applications.Path);
             if (provider is not null)
             {
@@ -254,6 +359,17 @@ public sealed class SiteSignInTests(KeycloakFixture keycloak, PostgreSqlFixture 
             var authorize = challenge.Headers.Location!;
             Assert.StartsWith($"{authority}/protocol/openid-connect/auth?", authorize.AbsoluteUri, StringComparison.Ordinal);
             return HttpUtility.ParseQueryString(authorize.Query);
+        }
+
+        /// <summary>
+        /// Starts a sign-in with <paramref name="returnUrl"/> on the server and returns the realm's authorize address. The
+        /// server's client keeps the correlation and nonce cookies for the callback.
+        /// </summary>
+        public async Task<Uri> AuthorizeAsync(string returnUrl)
+        {
+            using var challenge = await client.GetAsync(new Uri($"/api/auth/sign-in?returnUrl={Uri.EscapeDataString(returnUrl)}", UriKind.Relative), CancellationToken);
+            Assert.Equal(HttpStatusCode.Found, challenge.StatusCode);
+            return challenge.Headers.Location!;
         }
 
         public async ValueTask DisposeAsync()

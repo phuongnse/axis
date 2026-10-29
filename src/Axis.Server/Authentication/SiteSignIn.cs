@@ -45,24 +45,52 @@ internal sealed class SiteSignIn(ITenantCatalog catalog, TenantSignInSettings se
     }
 
     /// <summary>
+    /// Whether <paramref name="site"/> allows the provider that signed the person in. A token without the
+    /// <c>identity_provider</c> claim comes from the <c>accounts</c> provider. Aliases are compared exactly.
+    /// </summary>
+    public static bool Allows(RealmSiteClient site, string? identityProvider)
+    {
+        ArgumentNullException.ThrowIfNull(site);
+
+        return string.IsNullOrWhiteSpace(identityProvider)
+            ? site.Accounts
+            : site.Providers.Contains(identityProvider, StringComparer.Ordinal);
+    }
+
+    /// <summary>
     /// The site that <paramref name="returnUrl"/> opens in the current tenant, or <c>null</c> when the tenant signs in through the
     /// platform client or the address opens no active site.
     /// </summary>
     public async Task<SiteSignInTarget?> FindAsync(string tenantId, string returnUrl, CancellationToken cancellationToken)
     {
-        if (settings.Find(tenantId)?.SiteClientKey is null
-            || FirstSegment(returnUrl) is not { } segment
-            || await resolver.ResolveBySitePathAsync(segment, cancellationToken) is not { } active)
+        if (FirstSegment(returnUrl) is not { } segment || await SiteClientAsync(tenantId, segment, cancellationToken) is not { } found)
         {
             return null;
         }
 
-        var path = active.Site.Path;
+        return new SiteSignInTarget(found.Path, ProviderHint(found));
+    }
+
+    /// <summary>
+    /// Whether the active site at <paramref name="path"/> allows <paramref name="identityProvider"/>. It is <c>false</c> when
+    /// the site is no longer active, or when the tenant has no site clients.
+    /// </summary>
+    public async Task<bool> AllowsAsync(string tenantId, string path, string? identityProvider, CancellationToken cancellationToken)
+        => await SiteClientAsync(tenantId, path, cancellationToken) is { } found && Allows(found, identityProvider);
+
+    // Rebuilds the site's client from the active release with the same plan that the realm sync uses.
+    private async Task<RealmSiteClient?> SiteClientAsync(string tenantId, string path, CancellationToken cancellationToken)
+    {
+        if (settings.Find(tenantId)?.SiteClientKey is null
+            || await resolver.ResolveBySitePathAsync(path, cancellationToken) is not { } active)
+        {
+            return null;
+        }
+
+        var activePath = active.Site.Path;
         var plan = RealmBindingFilter.Plan(
             (await resolver.ListAsync(cancellationToken)).Select(RealmApplication.FromModel),
             TenantActivationBindings.For(catalog.Find(tenantId)!, allowHttp: false));
-        return plan.Plan.Sites.FirstOrDefault(site => string.Equals(site.Path, path, StringComparison.Ordinal)) is { } found
-            ? new SiteSignInTarget(path, ProviderHint(found))
-            : null;
+        return plan.Plan.Sites.FirstOrDefault(site => string.Equals(site.Path, activePath, StringComparison.Ordinal));
     }
 }

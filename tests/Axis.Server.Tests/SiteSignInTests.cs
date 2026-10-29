@@ -54,6 +54,32 @@ public sealed class SiteSignInTests
         Assert.Null(SiteSignIn.ProviderHint(new RealmSiteClient("sales", Accounts: false, ["oidc-a", "oidc-b"])));
     }
 
+    [Fact]
+    public void A_site_allows_a_provider_in_its_list()
+    {
+        Assert.True(SiteSignIn.Allows(new RealmSiteClient("sales", Accounts: false, ["oidc-a", "oidc-b"]), "oidc-b"));
+    }
+
+    [Theory]
+    [InlineData("oidc-c")]
+    [InlineData("OIDC-A")]
+    [InlineData("accounts")]
+    public void A_site_does_not_allow_a_provider_outside_its_list(string alias)
+    {
+        Assert.False(SiteSignIn.Allows(new RealmSiteClient("sales", Accounts: true, ["oidc-a", "oidc-b"]), alias));
+    }
+
+    [Theory]
+    [InlineData(true, null)]
+    [InlineData(true, "")]
+    [InlineData(true, " ")]
+    [InlineData(false, null)]
+    [InlineData(false, "")]
+    public void A_token_without_a_provider_claim_comes_from_accounts(bool accounts, string? claim)
+    {
+        Assert.Equal(accounts, SiteSignIn.Allows(new RealmSiteClient("sales", accounts, ["oidc-a"]), claim));
+    }
+
     [Theory]
     [InlineData(null, true, true)]
     [InlineData(null, false, false)]

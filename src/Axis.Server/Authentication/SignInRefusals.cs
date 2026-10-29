@@ -33,6 +33,12 @@ internal static class SignInRefusals
     /// </summary>
     public const string ProviderNotAccepted = "providerNotAccepted";
 
+    /// <summary>
+    /// The ID token is valid, but the site that started the sign-in does not allow the provider that signed the person in,
+    /// or is no longer active.
+    /// </summary>
+    public const string ProviderNotAllowed = "providerNotAllowed";
+
     /// <summary>Picks the reason for a callback that failed. The checks run in this order.</summary>
     /// <param name="stateRead">Whether this tenant's sign-in client could read the callback's state.</param>
     /// <param name="otherTenantReadsState">Whether another tenant's sign-in client can read the state.</param>
@@ -41,6 +47,7 @@ internal static class SignInRefusals
     /// <param name="tokenRejected">Whether the ID token was rejected for a missing user id or a missing or stale <c>auth_time</c>.</param>
     /// <param name="issuerRejected">Whether the metadata's issuer, or under <c>fapi2</c> the callback's <c>iss</c>, was rejected.</param>
     /// <param name="providerRefused">Whether the platform sign-in refused the provider, or the account sign-in.</param>
+    /// <param name="providerNotAllowed">Whether the site that started the sign-in refused the provider, or is no longer active.</param>
     public static string Classify(
         bool stateRead,
         bool otherTenantReadsState,
@@ -48,7 +55,8 @@ internal static class SignInRefusals
         Exception? failure,
         bool tokenRejected,
         bool issuerRejected,
-        bool providerRefused = false)
+        bool providerRefused = false,
+        bool providerNotAllowed = false)
     {
         if (!stateRead)
         {
@@ -58,6 +66,11 @@ internal static class SignInRefusals
         if (issuerRejected)
         {
             return InvalidIssuer;
+        }
+
+        if (providerNotAllowed)
+        {
+            return ProviderNotAllowed;
         }
 
         if (providerRefused)

@@ -51,6 +51,12 @@ internal static class TenantSignIn
     /// </summary>
     public const string ProviderRefusedItem = "axis:sign_in_provider_refused";
 
+    /// <summary>
+    /// The request item that <c>OnTokenValidated</c> sets when the site that started the sign-in does not allow the provider of
+    /// the sign-in, or is no longer active.
+    /// </summary>
+    public const string ProviderNotAllowedItem = "axis:sign_in_provider_not_allowed";
+
     /// <summary>The request item that <c>OnTokenValidated</c> fills with the <see cref="ProfileClaims"/> for <c>OnTicketReceived</c>.</summary>
     public const string ProfileClaimsItem = "axis:sign_in_profile";
 
@@ -165,20 +171,20 @@ internal sealed partial class TenantSignInOptions(TenantSignInSettings settings,
 
             return Task.CompletedTask;
         };
-        options.Events.OnTokenValidated = context =>
+        options.Events.OnTokenValidated = async context =>
         {
             var principal = context.Principal;
+            string? sitePath = null;
+            context.Properties?.Items.TryGetValue(SiteSignIn.SitePathItem, out sitePath);
             // The token must be for the client that started the sign-in, so a token for another site's client is refused.
-            var expectedClient = context.Properties?.Items.TryGetValue(SiteSignIn.SitePathItem, out var sitePath) == true && sitePath is not null
-                ? SiteSignIn.ClientId(sitePath)
-                : tenant.ClientId;
+            var expectedClient = sitePath is not null ? SiteSignIn.ClientId(sitePath) : tenant.ClientId;
             if (principal is null
                 || !principal.FindAll("aud").Any(claim => claim.Value == expectedClient)
                 || principal.FindFirst("azp") is { } authorizedParty && authorizedParty.Value != expectedClient)
             {
                 context.HttpContext.Items[TenantSignIn.TokenRejectedItem] = true;
                 context.Fail("The ID token is not for the client that started the sign-in.");
-                return Task.CompletedTask;
+                return;
             }
 
             var userId = principal.FindFirst(tenant.Claims.UserId)?.Value;
@@ -186,7 +192,7 @@ internal sealed partial class TenantSignInOptions(TenantSignInSettings settings,
             {
                 context.HttpContext.Items[TenantSignIn.TokenRejectedItem] = true;
                 context.Fail("The ID token has no user id claim.");
-                return Task.CompletedTask;
+                return;
             }
 
             // MapInboundClaims is false, so the claim keeps the name that the token gives it.
@@ -196,7 +202,21 @@ internal sealed partial class TenantSignInOptions(TenantSignInSettings settings,
             {
                 context.HttpContext.Items[TenantSignIn.TokenRejectedItem] = true;
                 context.Fail("The ID token's auth_time is missing or older than the session's lifetime.");
-                return Task.CompletedTask;
+                return;
+            }
+
+            // A sign-in that started on a site is allowed only through a provider of that site's signIn. The realm's page
+            // and a kc_idp_hint only narrow the choice, so the callback checks again with the active release.
+            if (sitePath is not null
+                && !await context.HttpContext.RequestServices.GetRequiredService<SiteSignIn>().AllowsAsync(
+                    tenantId,
+                    sitePath,
+                    principal.FindFirst(RealmSync.IdentityProviderClaim)?.Value,
+                    context.HttpContext.RequestAborted))
+            {
+                context.HttpContext.Items[TenantSignIn.ProviderNotAllowedItem] = true;
+                context.Fail("The site does not allow the provider.");
+                return;
             }
 
             var displayName = principal.FindFirst(tenant.Claims.DisplayName)?.Value;
@@ -216,7 +236,7 @@ internal sealed partial class TenantSignInOptions(TenantSignInSettings settings,
                 {
                     context.HttpContext.Items[TenantSignIn.ProviderRefusedItem] = true;
                     context.Fail("The platform sign-in does not accept the provider.");
-                    return Task.CompletedTask;
+                    return;
                 }
 
                 roles = roles.Concat(mapped).Distinct(StringComparer.Ordinal);
@@ -232,7 +252,6 @@ internal sealed partial class TenantSignInOptions(TenantSignInSettings settings,
                 string.IsNullOrWhiteSpace(displayName) ? userId : displayName,
                 roles,
                 authenticatedAt: SignInRecency.TryRead(authTime, out var authenticatedAt) ? authenticatedAt : null);
-            return Task.CompletedTask;
         };
         // Every profile refuses metadata whose issuer is not the tenant's authority, before the code goes to the token endpoint.
         options.Events.OnAuthorizationCodeReceived = async context =>
@@ -283,14 +302,15 @@ internal sealed partial class TenantSignInOptions(TenantSignInSettings settings,
                 var query = httpContext.Request.Query;
                 var tokenRejected = httpContext.Items.ContainsKey(TenantSignIn.TokenRejectedItem);
                 var issuerRejected = httpContext.Items.ContainsKey(TenantSignIn.IssuerRejectedItem);
-                // A rejected token, issuer or provider comes after the state was read, but the failure it leaves carries no properties.
                 var providerRefused = httpContext.Items.ContainsKey(TenantSignIn.ProviderRefusedItem);
-                var stateRead = context.Properties is not null || tokenRejected || issuerRejected || providerRefused;
+                var providerNotAllowed = httpContext.Items.ContainsKey(TenantSignIn.ProviderNotAllowedItem);
+                // A rejected token, issuer or provider comes after the state was read, but the failure it leaves carries no properties.
+                var stateRead = context.Properties is not null || tokenRejected || issuerRejected || providerRefused || providerNotAllowed;
                 var otherTenantReadsState = !stateRead
                     && query["state"].ToString() is { Length: > 0 } state
                     && OtherTenantReadsState(httpContext, tenantId, state);
                 var providerError = !string.IsNullOrEmpty(query["error"].ToString());
-                var reason = SignInRefusals.Classify(stateRead, otherTenantReadsState, providerError, context.Failure, tokenRejected, issuerRejected, providerRefused);
+                var reason = SignInRefusals.Classify(stateRead, otherTenantReadsState, providerError, context.Failure, tokenRejected, issuerRejected, providerRefused, providerNotAllowed);
                 await SessionAudit.AppendAsync(
                     httpContext,
                     AuditActions.SessionSignInRefused,
