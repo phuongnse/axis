@@ -45,6 +45,9 @@ Each row is one key, algorithm or certificate. A _(planned for Mx)_ marker marks
 | **Proxy certificate and key** | A publicly trusted certificate, with TLS 1.2 and 1.3 and only the strong cipher suites | Serving HTTPS to clients, see [TLS](installation.md#tls) | Anything else. The Axis hosts hold no TLS key | The operator's proxy holds the key and renews the certificate. The Compose example reads it from `/certs`. |
 | **Server certificates that Axis checks** | PostgreSQL under `VerifyFull`. The identity provider, SMTP and OTLP certificates | Verifying the servers that Axis connects to | Client certificates. Axis presents none | PostgreSQL uses `Root Certificate` for a private authority. The other servers use the system trust store. |
 | **Hashes** | SHA-256 for resource versions, release content, fingerprints, file contents, names shortened to 16 hex characters and the Studio write lock key. SHA-1 only to name module resources as version 5 UUIDs | Identity, integrity and naming | Hiding a secret or a password. Axis hashes no password | No key. A hash change is a code change, see [crypto agility](#crypto-agility). |
+| **Tenant data key** and **lookup key** _(planned for M27)_ | AES-256-GCM for the data key, HMAC-SHA256 for the lookup key, 32 bytes each | Encrypting the values of `sensitive` fields, bound to the tenant, entity, record and field; the lookup key makes the exact lookup of a field that declares one, see [D109](../decisions/d109-sensitive-fields-and-backups-are-encrypted-and-history-keeps-no-names.md) | Secrets, files and any other value | Made with the tenant and stored encrypted by the installation key. A command rotates the data key and re-encrypts the tenant's values. |
+| **Backup key** _(planned for M27)_ | AES-256-GCM | Encrypting a tenant backup archive, see [D109](../decisions/d109-sensitive-fields-and-backups-are-encrypted-and-history-keeps-no-names.md) | Anything else. It is never the installation key | Given to the admin tool by the operator and kept outside the installation. A lost key loses its archives. |
+| **Image signatures** _(planned for M28)_ | cosign keyless signing through the release workflow's GitHub identity | Signing Axis's images and their SBOMs, see [D107](../decisions/d107-the-dependency-scan-runs-now-and-images-are-scanned-and-signed.md) | Anything else | One short-lived certificate per signing, recorded in the public transparency log. |
 | **Random values** | The system's random generator, `RandomNumberGenerator`, for nonces, session ids, passwords and the backup name suffix | Values that must not be guessed | None beyond the uses listed | No key. |
 
 ### Crypto agility
@@ -61,7 +64,7 @@ Each row is one key, algorithm or certificate. A _(planned for Mx)_ marker marks
 
 Axis sorts its data into five levels, from the most protected to the least. Each level sets the rules for its data. Each rule names the control that meets it and the test that checks the control.
 
-Axis encrypts only the secrets, and only in the platform tables. For all other data, the operator's PostgreSQL or disk encryption protects data at rest.
+Axis encrypts only the secrets, and only in the platform tables. For all other data, the operator's PostgreSQL or disk encryption protects data at rest. _(planned for M27)_ Axis also encrypts the values of `sensitive` fields and tenant backup archives, see [D109](../decisions/d109-sensitive-fields-and-backups-are-encrypted-and-history-keeps-no-names.md).
 
 | Level | What it holds |
 | --- | --- |
@@ -84,7 +87,7 @@ Axis encrypts only the secrets, and only in the platform tables. For all other d
 
 ### Restricted
 
-- **Encryption at rest.** Axis encrypts none of this data. The operator's PostgreSQL or disk encryption protects it. A `sensitive` flag encrypts nothing. Test: none, because the control is the operator's.
+- **Encryption at rest.** Axis encrypts none of this data. The operator's PostgreSQL or disk encryption protects it. A `sensitive` flag encrypts nothing. Test: none, because the control is the operator's. _(planned for M27)_ A `sensitive` field's value is encrypted with AES-256-GCM under its tenant's data key, and a backup archive under the operator's backup key, see [D109](../decisions/d109-sensitive-fields-and-backups-are-encrypted-and-history-keeps-no-names.md).
 - **Encryption in transit.** Every connection uses TLS, see [TLS](installation.md#tls). Test: `DatabaseTlsRequirementTests`.
 - **Integrity.** A file's SHA-256 is stored with it. Each change to a record writes an audit record in the same transaction, see [Business](#business). Test: `FileUploadTests` for the file hash and `AuditRecordTests` for the audit record.
 - **Retention.** Axis sets no period for records or user profiles. A pending file is purged after 24 hours, and a deleted file is purged by the worker's sweep. An attached file lasts as long as its record. The operator keeps and removes backup archives. Test: `FileCleanUpTests`.
@@ -92,7 +95,7 @@ Axis encrypts only the secrets, and only in the platform tables. For all other d
 - **Access to logs.** Logs and telemetry hold no field value, user id or address, so reading them reveals none of this data. Who reads the logs is the operator's choice, see [logs](../architecture.md#logs). Test: `TraceCorrelationTests`.
 - **Access control.** Policies and field grants decide who reads and writes each field. A write to a field that no grant covers is refused, and a read leaves the field out. Test: `RecordFieldPolicyTests`.
 - **Masking in process inspection.** A `sensitive` field's input is hidden in process inspection. The flag hides nothing else. The record API still shows the field to users whose grants cover it, and the database holds the value in clear. See [sensitive fields](roles-and-policies.md#sensitive-fields). Test: `ProcessInstanceDetailTests`.
-- **Privacy.** Axis names no regulation. The application owner marks personal data `sensitive`, and sets retention and access in the application to match the rules that apply. Test: none.
+- **Privacy.** Axis names no regulation. The application owner marks personal data `sensitive`, and sets retention and access in the application to match the rules that apply. Test: none. _(planned for M27)_ The owner marks sensitive personal data `sensitive`, such as health, finances, identity numbers and biometrics. Basic personal data, such as a name or an email, may stay in a Business field, so it can be searched. New history rows keep the user id and no display name, and session audit records keep a shortened client address, see [D109](../decisions/d109-sensitive-fields-and-backups-are-encrypted-and-history-keeps-no-names.md).
 
 ### Business
 
