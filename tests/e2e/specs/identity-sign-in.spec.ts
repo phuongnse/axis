@@ -56,3 +56,22 @@ test('a wrong password shows the sign-in error and keeps the username', async ({
   await expect(page.getByRole('alert')).toContainText('Invalid email, username or password.')
   await expect(signInUsername(page)).toHaveValue('requester')
 })
+
+for (const { mode, canvas } of [
+  { mode: 'light', canvas: 'rgb(245, 245, 245)' },
+  { mode: 'dark', canvas: 'rgb(0, 0, 0)' },
+] as const) {
+  // The development realm has no mail server, so the test opens the page and does not submit it.
+  test(`"Forgot password?" opens the Axis forgot-password page in ${mode} mode`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme: mode })
+
+    await page.goto('/')
+    await page.getByRole('main').getByRole('button', { name: 'Sign in', exact: true }).click()
+    await page.getByRole('link', { name: 'Forgot password?', exact: true }).click()
+
+    await expect(page.getByRole('heading', { name: 'Reset your password', exact: true })).toBeVisible()
+    await expect(page.locator('#root > div')).toHaveCSS('background-color', canvas)
+    await expect(page.locator('#root form input[name="username"]')).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Back to sign in', exact: true })).toBeVisible()
+  })
+}

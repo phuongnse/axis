@@ -322,6 +322,12 @@ _(planned for M17)_
   form, never saying which one was wrong.
 - A site that allows one brokered provider and no accounts shows its button alone, under one line that names it.
 - Two-step verification asks for the 6-digit code in six boxes, one digit each, with "Back to sign in" and, when Keycloak offers another way to sign in, "Try another way".
+- "Forgot password?" opens a page that asks for the email or username, with a "Send link" button and "Back to sign in".
+  Keycloak sends the link, and the page after "Send link" is still Keycloak's own.
+- The page that sets a password, which an invitation and a reset link both open, asks for "New password" and "Confirm
+  password" and has no way back, because it is a required step. The browser checks only that both fields are filled
+  and match. Keycloak checks the password rules and its error shows above the form. Setting a password signs the
+  person out on other devices, as Keycloak does by default.
 - The theme is built from the SPA's own React components and tokens into a Keycloak theme, so the pages look like the
   rest of Axis. Its texts are message bundles in every locale the platform offers. The "Continue with" labels come
   from the applications' texts, which activation writes to the realm (_built_).
@@ -335,10 +341,13 @@ _(planned for M17)_
   buttons, the form widget's field labels and "Forgot password?" on the password's row. The two-step page is drawn too,
   from its own context with `page` set to `twoStep`: six code boxes, one digit each, and a real
   `<form method="post">` to the login address that posts `otp` and `login`. "Try another way" posts `tryAnotherWay=on`
-  and shows only when Keycloak offers another way to sign in. "Back to sign in" uses Keycloak's restart address. The design system's
+  and shows only when Keycloak offers another way to sign in. "Back to sign in" uses Keycloak's restart address. The "Forgot password?" page (`page` of `resetPassword`) is a
+  real `<form method="post">` to the login address that posts `username`, and its "Back to sign in" uses `url.loginUrl`.
+  The page that sets a password (`page` of `updatePassword`) posts `password-new`, `password-confirm` and a hidden
+  `logout-sessions=on`. The page after "Send link" is still Keycloak's. The design system's
   `identitySignIn` preview feeds the components fixtures, see
   [shell design system previews](shell.md#design-system-previews). The Keycloak theme `axis` feeds them a real
-  context: its `login.ftl` and `login-otp.ftl` write Keycloak's data as JSON, with a `page` field of `signIn` or `twoStep`, and a React bundle draws the page. `scripts/build.sh`
+  context: its `login.ftl`, `login-otp.ftl`, `login-reset-password.ftl` and `login-update-password.ftl` write Keycloak's data as JSON, with a `page` field of `signIn`, `twoStep`, `resetPassword` or `updatePassword`, and a React bundle draws the page. `scripts/build.sh`
   builds the theme from `web/keycloak-theme/` into `artifacts/keycloak-theme/axis/login/` and checks its files and
   fonts. Keycloak's other pages still come from its `keycloak` parent theme. The development realm `axis` uses the theme as
   its login theme: Compose, `scripts/dev.sh`, `scripts/e2e.sh` and the Keycloak of the integration tests load it from

@@ -2,6 +2,7 @@
   "realm": "axis",
   "enabled": true,
   "loginTheme": "axis",
+  "resetPasswordAllowed": true,
   "internationalizationEnabled": true,
   "supportedLocales": ["en", "vi"],
   "defaultLocale": "en",

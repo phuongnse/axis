@@ -1,15 +1,30 @@
 import { StrictMode } from 'react'
+import { ResetPasswordPage } from '../src/identitySignIn/ResetPasswordPage'
 import { SignInPage } from '../src/identitySignIn/SignInPage'
 import type { IdentityContext } from '../src/identitySignIn/signInContext'
 import { TwoStepPage } from '../src/identitySignIn/TwoStepPage'
+import { UpdatePasswordPage } from '../src/identitySignIn/UpdatePasswordPage'
 import { ThemeModeProvider } from '../src/platform/theme'
 
-/** The theme's page: the shared sign-in or two-step page with the SPA's theme provider, fed Keycloak's context. */
+function ThemePage({ context }: { context: IdentityContext }) {
+  switch (context.page) {
+    case 'signIn':
+      return <SignInPage context={context} />
+    case 'twoStep':
+      return <TwoStepPage context={context} />
+    case 'resetPassword':
+      return <ResetPasswordPage context={context} />
+    case 'updatePassword':
+      return <UpdatePasswordPage context={context} />
+  }
+}
+
+/** The theme's page: the shared sign-in, two-step, forgot-password or set-password page with the SPA's theme provider, fed Keycloak's context. */
 export function SignInEntry({ context }: { context: IdentityContext }) {
   return (
     <StrictMode>
       <ThemeModeProvider>
-        {context.page === 'twoStep' ? <TwoStepPage context={context} /> : <SignInPage context={context} />}
+        <ThemePage context={context} />
       </ThemeModeProvider>
     </StrictMode>
   )
