@@ -240,7 +240,7 @@
     "enabled": true,
     "scope": null,
     "answer": "recommended",
-    "max_parallel": 4,
+    "max_parallel": 3,
     "watch_workflows": []
   },
   "evidence": {
