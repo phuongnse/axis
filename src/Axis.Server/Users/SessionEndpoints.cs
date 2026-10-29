@@ -1,5 +1,6 @@
 using System.Buffers.Text;
 using System.Security.Claims;
+using Axis.Core.Tenancy;
 using Axis.Data.Storage;
 using Axis.Server.Authentication;
 using Axis.Server.Tenancy;
@@ -8,7 +9,8 @@ using Microsoft.AspNetCore.Authentication;
 namespace Axis.Server.Users;
 
 /// <summary>
-/// A person's own sessions. <c>GET /api/me/sessions</c> lists the live ones, <c>DELETE /api/me/sessions/{id}</c> ends one and
+/// A person's own sessions on the host of the request, which in practice are the sessions of the tenant's own hosts.
+/// <c>GET /api/me/sessions</c> lists the live ones, <c>DELETE /api/me/sessions/{id}</c> ends one and
 /// <c>DELETE /api/me/sessions</c> ends all but the current one. Ending needs a login at the identity provider in the last
 /// <see cref="Session.ReauthenticationWindow"/>, checked before the id is looked up. The routes take a session only, so a
 /// service account's bearer token gets a 401. A session's id is the base64url form of the row's hash, which cannot be turned
@@ -23,7 +25,7 @@ internal static class SessionEndpoints
         endpoints.MapDelete("/api/me/sessions", EndOthersAsync);
     }
 
-    private static async Task<IResult> ListAsync(HttpContext httpContext, TenantDatabase database, TimeProvider clock, CancellationToken cancellationToken)
+    private static async Task<IResult> ListAsync(HttpContext httpContext, TenantDatabase database, ITenantContextAccessor tenants, TimeProvider clock, CancellationToken cancellationToken)
     {
         if (await SignedInAsync(httpContext) is not { } caller)
         {
@@ -33,7 +35,7 @@ internal static class SessionEndpoints
         var now = clock.GetUtcNow();
         var currentId = Session.ReadSessionId(caller.Principal);
         var connection = await database.GetConnectionAsync(cancellationToken);
-        var sessions = (await OwnSessions.ListAsync(connection, caller.User.Id, now, cancellationToken))
+        var sessions = (await OwnSessions.ListAsync(connection, caller.User.Id, tenants.Current?.SitePath, now, cancellationToken))
             .Select(entry =>
             {
                 var id = Base64Url.EncodeToString(entry.IdHash);
@@ -44,7 +46,7 @@ internal static class SessionEndpoints
     }
 
     private static async Task<IResult> EndOneAsync(
-        string id, HttpContext httpContext, TenantDatabase database, TimeProvider clock, CancellationToken cancellationToken)
+        string id, HttpContext httpContext, TenantDatabase database, ITenantContextAccessor tenants, TimeProvider clock, CancellationToken cancellationToken)
     {
         if (await SignedInAsync(httpContext) is not { } caller)
         {
@@ -59,13 +61,13 @@ internal static class SessionEndpoints
         }
 
         var connection = await database.GetConnectionAsync(cancellationToken);
-        return Decode(id) is { } hash && await OwnSessions.EndOneAsync(connection, caller.User.Id, hash, now, cancellationToken) > 0
+        return Decode(id) is { } hash && await OwnSessions.EndOneAsync(connection, caller.User.Id, tenants.Current?.SitePath, hash, now, cancellationToken) > 0
             ? Results.NoContent()
             : Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "The person has no live session with this id.");
     }
 
     private static async Task<IResult> EndOthersAsync(
-        HttpContext httpContext, TenantDatabase database, TimeProvider clock, CancellationToken cancellationToken)
+        HttpContext httpContext, TenantDatabase database, ITenantContextAccessor tenants, TimeProvider clock, CancellationToken cancellationToken)
     {
         if (await SignedInAsync(httpContext) is not { } caller)
         {
@@ -83,7 +85,7 @@ internal static class SessionEndpoints
         }
 
         var connection = await database.GetConnectionAsync(cancellationToken);
-        await OwnSessions.EndOthersAsync(connection, caller.User.Id, keep, cancellationToken);
+        await OwnSessions.EndOthersAsync(connection, caller.User.Id, tenants.Current?.SitePath, keep, cancellationToken);
         return Results.NoContent();
     }
 

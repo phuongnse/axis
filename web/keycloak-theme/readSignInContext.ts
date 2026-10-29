@@ -1,6 +1,6 @@
 import type { IdentityContext } from '../src/identitySignIn/signInContext'
 
-/** Reads the context that login.ftl or login-otp.ftl writes as JSON into `#axis-sign-in-context`. */
+/** Reads the context that login.ftl, login-otp.ftl, login-reset-password.ftl or login-update-password.ftl writes as JSON into `#axis-sign-in-context`. */
 export function readSignInContext(document: Document): IdentityContext {
   const element = document.getElementById('axis-sign-in-context')
   if (!element) {

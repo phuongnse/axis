@@ -11,7 +11,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>${msg("axisSignInTitle")}</title>
+  <title>${msg("axisPageTitle")}</title>
   <link rel="stylesheet" href="${url.resourcesPath}/assets/axis-sign-in.css">
 </head>
 <body>

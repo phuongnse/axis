@@ -14,7 +14,8 @@ namespace Axis.Server.Authentication;
 /// cookie holds only the key of a session. The key is 32 random bytes in base64url, and the row's key
 /// is the SHA-256 hash of those bytes. The row never holds the key or a token. A request reads the row,
 /// moves its last request time and refuses it once it is past <see cref="Session.IdleTimeout"/> or
-/// <see cref="Session.MaxLifetime"/>. The overloads without an <see cref="HttpContext"/> cannot know the
+/// <see cref="Session.MaxLifetime"/>. The row holds the site path of the host that made it, null for the tenant's own
+/// hosts, and a request on another host of the tenant neither uses nor deletes it. The overloads without an <see cref="HttpContext"/> cannot know the
 /// tenant, so they are not supported.
 /// </summary>
 internal sealed class SessionStore : ITicketStore
@@ -36,8 +37,8 @@ internal sealed class SessionStore : ITicketStore
         var connection = await httpContext.RequestServices.GetRequiredService<TenantDatabase>().GetConnectionAsync(cancellationToken);
         await using var command = new NpgsqlCommand(
             """
-            INSERT INTO axis.sessions (id_hash, user_id, display_name, roles, signed_in_at, last_request_at, authenticated_at)
-            VALUES (@hash, @user, @name, @roles, @now, @now, @authenticatedAt)
+            INSERT INTO axis.sessions (id_hash, user_id, display_name, roles, signed_in_at, last_request_at, authenticated_at, site_path)
+            VALUES (@hash, @user, @name, @roles, @now, @now, @authenticatedAt, @site)
             """,
             connection);
         command.Parameters.AddWithValue("hash", SHA256.HashData(id));
@@ -49,6 +50,7 @@ internal sealed class SessionStore : ITicketStore
         {
             Value = Session.ReadAuthenticatedAt(ticket.Principal) is { } authenticatedAt ? authenticatedAt : DBNull.Value,
         });
+        command.Parameters.Add(SiteParameter(tenant));
         await command.ExecuteNonQueryAsync(cancellationToken);
         return Base64Url.EncodeToString(id);
     }
@@ -70,7 +72,7 @@ internal sealed class SessionStore : ITicketStore
         // Sign-in refuses the session that the request already carries, so it gets a new id.
         if (httpContext.Items.ContainsKey(Session.SigningInItem))
         {
-            await DeleteAsync(connection, hash, cancellationToken);
+            await DeleteAsync(connection, hash, tenant, cancellationToken);
             return null;
         }
 
@@ -78,7 +80,7 @@ internal sealed class SessionStore : ITicketStore
         await using (var update = new NpgsqlCommand(
             """
             UPDATE axis.sessions SET last_request_at = @now
-            WHERE id_hash = @hash AND signed_in_at > @signedInAfter AND last_request_at > @activeAfter
+            WHERE id_hash = @hash AND site_path IS NOT DISTINCT FROM @site AND signed_in_at > @signedInAfter AND last_request_at > @activeAfter
             RETURNING user_id, display_name, roles, authenticated_at
             """,
             connection))
@@ -87,6 +89,7 @@ internal sealed class SessionStore : ITicketStore
             update.Parameters.AddWithValue("hash", hash);
             update.Parameters.AddWithValue("signedInAfter", now - Session.MaxLifetime);
             update.Parameters.AddWithValue("activeAfter", now - Session.IdleTimeout);
+            update.Parameters.Add(SiteParameter(tenant));
             await using var reader = await update.ExecuteReaderAsync(cancellationToken);
             if (await reader.ReadAsync(cancellationToken))
             {
@@ -103,21 +106,21 @@ internal sealed class SessionStore : ITicketStore
             }
         }
 
-        // No row, or one past a limit. Deleting is harmless when there is no row.
-        await DeleteAsync(connection, hash, cancellationToken);
+        // No row, or one past a limit. Deleting is harmless when there is no row, and it leaves a row of another host alone.
+        await DeleteAsync(connection, hash, tenant, cancellationToken);
         return null;
     }
 
     public async Task RemoveAsync(string key, HttpContext httpContext, CancellationToken cancellationToken)
     {
-        if (httpContext.RequestServices.GetRequiredService<ITenantContextAccessor>().Current is null
+        if (httpContext.RequestServices.GetRequiredService<ITenantContextAccessor>().Current is not { } tenant
             || Hash(key) is not { } hash)
         {
             return;
         }
 
         var connection = await httpContext.RequestServices.GetRequiredService<TenantDatabase>().GetConnectionAsync(cancellationToken);
-        await DeleteAsync(connection, hash, cancellationToken);
+        await DeleteAsync(connection, hash, tenant, cancellationToken);
     }
 
     public Task<string> StoreAsync(AuthenticationTicket ticket) => throw new NotSupportedException();
@@ -137,10 +140,17 @@ internal sealed class SessionStore : ITicketStore
             : null;
     }
 
-    private static async Task DeleteAsync(NpgsqlConnection connection, byte[] hash, CancellationToken cancellationToken)
+    /// <summary>The site of the host that the request came on, null for the tenant's own hosts.</summary>
+    private static NpgsqlParameter SiteParameter(TenantContext tenant) =>
+        new("site", NpgsqlDbType.Text) { Value = (object?)tenant.SitePath ?? DBNull.Value };
+
+    private static async Task DeleteAsync(NpgsqlConnection connection, byte[] hash, TenantContext tenant, CancellationToken cancellationToken)
     {
-        await using var command = new NpgsqlCommand("DELETE FROM axis.sessions WHERE id_hash = @hash", connection);
+        await using var command = new NpgsqlCommand(
+            "DELETE FROM axis.sessions WHERE id_hash = @hash AND site_path IS NOT DISTINCT FROM @site",
+            connection);
         command.Parameters.AddWithValue("hash", hash);
+        command.Parameters.Add(SiteParameter(tenant));
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 }
