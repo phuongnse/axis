@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Axis.Configuration.Model;
 using Axis.Tenancy.Platform;
 using Axis.Tenancy.Realms;
 using Microsoft.EntityFrameworkCore;
@@ -235,7 +236,8 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
                 platformProviders.Where(provider => provider.TenantId == (row.PreviewOf ?? row.Id)),
                 cipher,
                 tls,
-                row.PreviewOf is null ? null : byId[row.PreviewOf])),
+                row.PreviewOf is null ? null : byId[row.PreviewOf],
+                row.PreviewOf is null ? PlatformSignInProviders.From(platformProviders.Where(provider => provider.TenantId == row.Id)) : null)),
             hosts.Where(host => !activeIds.Contains(host.TenantId)).Select(host => host.Host),
             active.ToDictionary(row => row.Id, DatabaseKey, StringComparer.Ordinal),
             active.ToDictionary(row => row.Id, row => row.SchemaVersion, StringComparer.Ordinal),
@@ -330,7 +332,8 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
         IEnumerable<TenantPlatformProviderRow> platformProviders,
         TenantSecretCipher cipher,
         TenantDatabaseTls tls,
-        TenantRow? main)
+        TenantRow? main,
+        IReadOnlyList<IdentityProviderModel>? realmProviders)
     {
         var id = row.Id;
         var bindings = Bindings(id, bindingRows, cipher);
@@ -384,6 +387,7 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
             Realm(row, cipher),
             RealmUsers(row, cipher),
             PlatformSignInOf(signIn, platformProviders),
+            realmProviders,
             hostSites);
     }
 

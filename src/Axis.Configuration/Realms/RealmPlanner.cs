@@ -38,14 +38,21 @@ public static class RealmPlanner
     /// <summary>
     /// Plans the realm for <paramref name="applications"/>. Only <c>oidc</c> providers are planned. Providers that name
     /// the same bindings, ignoring letter case, become one provider. Providers that name the same issuer binding
-    /// with other client bindings, or the same bindings with other claims, are conflicts. A provider's label in each
+    /// with other client bindings, or the same bindings with other claims, are conflicts. The brokered providers of the
+    /// tenant's platform sign-in, <paramref name="platform"/>, join as one more member that has no sites
+    /// (<see cref="RealmApplication.PlatformSignIn"/>). Their ids must be unique. A provider's label in each
     /// platform locale comes from the texts of the first application that uses it, in application id order: the text
     /// of that locale, then of the application's fallback locale, then of the first locale in ordinal order that has the
-    /// key, then the provider's name.
+    /// key, then the provider's name. The platform sign-in has no texts, so it gives the label only when no application uses the provider.
     /// </summary>
-    public static RealmPlanResult Build(IReadOnlyList<RealmApplication> applications)
+    public static RealmPlanResult Build(IReadOnlyList<RealmApplication> applications, IReadOnlyList<IdentityProviderModel>? platform = null)
     {
         ArgumentNullException.ThrowIfNull(applications);
+
+        if (platform is { Count: > 0 })
+        {
+            applications = [.. applications, RealmApplication.PlatformSignIn(platform)];
+        }
 
         var members = applications
             .SelectMany(application => application.Providers
@@ -140,7 +147,7 @@ public static class RealmPlanner
             first.ClientKeyBinding,
             ClaimsOf(first),
             [.. group.Select(member => member.Provider.Roles.Claim).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal)],
-            Labels(group[0]));
+            Labels(group.FirstOrDefault(member => member.Application.ApplicationId != RealmApplication.PlatformSignInId) ?? group[0]));
     }
 
     private static Dictionary<string, string> Labels(Member member)

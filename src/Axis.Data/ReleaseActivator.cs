@@ -23,8 +23,9 @@ namespace Axis.Data;
 /// errors.
 /// </para>
 /// <para>
-/// Activation reads the identity providers of the tenant's other active releases and plans the realm from them and the
-/// release (<see cref="ActivationResult.Realm"/>). A provider that names the same issuer binding as another provider with
+/// Activation reads the identity providers of the tenant's other active releases and plans the realm from them, the
+/// release and the tenant's platform sign-in (<see cref="ActivationBindings.PlatformProviders"/>, <see cref="ActivationResult.Realm"/>),
+/// so a provider that only the platform sign-in names stays in the realm. A provider that names the same issuer binding as another provider with
 /// other client bindings, or the same bindings with other <c>claims</c>, is refused with
 /// <see cref="DiagnosticCodes.IdentityProviderSplitsUser"/> before provisioning. <c>Axis.Admin</c> applies the plan to the realm after the activation commits.
 /// </para>
@@ -203,7 +204,7 @@ public static class ReleaseActivator
         return RealmPlanner.Build([.. applications.Select(application => application with
         {
             Providers = [.. application.Providers.Where(provider => IsBound(provider, bindings))],
-        })]);
+        })], [.. bindings.PlatformProviders.Where(provider => IsBound(provider, bindings))]);
     }
 
     // Whether the tenant has every binding of an oidc provider with the right kind, ignoring letter case.
@@ -228,7 +229,9 @@ public static class ReleaseActivator
     private static Diagnostic SplitsUser(RealmConflict conflict)
     {
         var provider = conflict.Provider;
-        var other = $"the provider '{conflict.OtherProvider.Name}' of the application '{conflict.Other.Name}'";
+        var other = conflict.Other.ApplicationId == RealmApplication.PlatformSignInId
+            ? $"the provider '{conflict.OtherProvider.Name}' of the platform sign-in"
+            : $"the provider '{conflict.OtherProvider.Name}' of the application '{conflict.Other.Name}'";
         return conflict.Kind == RealmConflictKind.ClientBindings
             ? new Diagnostic(
                 DiagnosticCodes.IdentityProviderSplitsUser,
