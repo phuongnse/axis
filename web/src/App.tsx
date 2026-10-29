@@ -9,6 +9,7 @@ import { PlatformContext, type Platform, type PlatformTexts } from './pages/cont
 import { PlatformShellRoute } from './pages/PlatformShellRoute'
 import { SiteIndex, SiteRoute } from './pages/SiteRoute'
 import { StudioPage } from './pages/StudioPage'
+import { UsersPage } from './pages/UsersPage'
 import { readStoredLocale } from './platform/locale'
 import { SignInPrompt } from './platform/SignInPrompt'
 import { TextProvider } from './platform/TextProvider'
@@ -103,6 +104,14 @@ export function App({ development }: { development: boolean }) {
           element={
             <PlatformShellRoute>
               <AccountPage />
+            </PlatformShellRoute>
+          }
+        />
+        <Route
+          path="users"
+          element={
+            <PlatformShellRoute>
+              <UsersPage />
             </PlatformShellRoute>
           }
         />

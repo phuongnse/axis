@@ -926,27 +926,10 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
     has its own button. It sends the browser to `/api/auth/sign-in` with the current path and query string as
     `returnUrl`, so the person comes back there, but to `/` from the sign-in page `/?signIn=failed`.
   - With someone signed in, it shows their display name. Its menu holds
-    **Sessions**, which opens the sessions screen below, and **Sign out**, which
+    **Sessions**, which opens the [sessions screen](platform-pages.md), and **Sign out**, which
     ends the session and then sends the browser to the identity provider's sign-out page.
-  - **Sessions screen.** The platform route `/account` lists the person's live
-    sessions from `GET /api/me/sessions`, newest sign-in first. It sits beside
-    `/studio`, before the site route, so `account` is a reserved site path. A
-    signed-out visit shows the sign-in prompt, because the list call is not exempt.
-    - A row shows **Signed in** and **Last active**, in the current locale. A
-      **This session** tag marks the session in use now. It has no **End**
-      button, because the person ends it with **Sign out**, which also ends the
-      identity provider's session.
-    - Every other row has an **End** button (`DELETE /api/me/sessions/{id}`).
-      **End all other sessions** (`DELETE /api/me/sessions`) is disabled when no
-      other session exists. After a `204` or a `403`, the screen loads the list
-      again. Any other answer shows an error message.
-    - When `endAllowed` is `false`, both kinds of button are disabled, and a
-      message with a **Sign in again** button shows. The button goes to
-      `/api/auth/sign-in?returnUrl=%2Faccount&reauthenticate=true`, so the person
-      logs in again and returns to `/account`. A `403` means the 5-minute window
-      just closed, so the reloaded list shows this state.
-    - Its texts are `shell.account.sessions`, the menu entry, and
-      `shell.account.sessions.*` for the screen.
+  - The **sessions screen** at `/account` and the **users page** at `/users` are platform routes beside `/studio`,
+    before the site route, so `account` and `users` are reserved site paths. See [platform pages](platform-pages.md).
   - A `401` from any API call shows the **sign-in prompt**, a dialog titled "Your session has ended"
     with a short message and a **Sign in** button. It shows when a signed-out person
     opens an application page, and over the current page when a session ends
