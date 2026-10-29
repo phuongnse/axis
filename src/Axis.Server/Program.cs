@@ -164,6 +164,8 @@ if (directorySource)
 // Every problem details answer carries the request's trace id.
 builder.Services.AddProblemDetails(options => options.CustomizeProblemDetails = ProblemTraceId.Apply);
 builder.Services.AddServerTelemetry(builder.Configuration, builder.Environment);
+// The clients that startup activation uses to bring a tenant's realm in step.
+builder.Services.AddHttpClient();
 builder.Services.AddTenancy(tenants);
 builder.Services.AddExtensionPackages(builder.Configuration, builder.Environment);
 builder.Services.AddModules(builder.Configuration, builder.Environment);
