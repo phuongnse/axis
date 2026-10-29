@@ -49,12 +49,14 @@ public sealed record TenantEntry(
 
 /// <summary>
 /// What activation needs to sync a tenant's realm: the address of the identity provider, the realm's name and the
-/// secret of its <c>axis-activation</c> client. The secret is a <see cref="SecretValue"/>, so the text form never shows it.
+/// secret of its <c>axis-activation</c> client, and the secret of the platform client <c>axis</c>. The secrets are <see cref="SecretValue"/>,
+/// so the text form never shows them.
 /// </summary>
 /// <param name="BaseAddress">The identity provider's address, always ending with a slash, so a path joins onto it.</param>
 /// <param name="Name">The realm's name.</param>
 /// <param name="ActivationClientSecret">The secret of the <c>axis-activation</c> client.</param>
-public sealed record TenantRealmAccess(Uri BaseAddress, string Name, SecretValue ActivationClientSecret);
+/// <param name="PlatformClientSecret">The secret of the platform client <c>axis</c>, from which the site client secrets derive (<see cref="Realms.SiteClientSecret"/>), or <c>null</c> when the tenant has none.</param>
+public sealed record TenantRealmAccess(Uri BaseAddress, string Name, SecretValue ActivationClientSecret, SecretValue? PlatformClientSecret = null);
 
 /// <summary>How one tenant signs people in. A value the source leaves blank is <c>null</c>.</summary>
 /// <param name="Profile">The sign-in profile as the source wrote it, or <c>null</c> when unset, which counts as <c>standard</c>. See <see cref="TenantSignInProfiles"/>.</param>

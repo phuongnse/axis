@@ -335,7 +335,10 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
         return new TenantRealmAccess(
             baseAddress,
             id,
-            SecretValue.Deferred(() => cipher.Decrypt(id, TenantSecretFields.RealmActivationClientSecret, stored).Reveal()));
+            SecretValue.Deferred(() => cipher.Decrypt(id, TenantSecretFields.RealmActivationClientSecret, stored).Reveal()),
+            row.OidcClientSecret is { Length: > 0 } platform
+                ? SecretValue.Deferred(() => cipher.Decrypt(id, TenantSecretFields.OidcClientSecret, platform).Reveal())
+                : null);
     }
 
     /// <summary>The deployment bindings of a tenant keyed by name, ignoring letter case. A secret stays encrypted until it is revealed.</summary>
