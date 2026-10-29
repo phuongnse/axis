@@ -265,18 +265,25 @@ successful run of either command prints `<id> email ok`.
 ## Hosts
 
 - `tenant host add <id> <host>` adds a host. A host already used by any tenant exits with code 2.
-- `tenant host remove <id> <host>` removes a host. Removing a tenant's last host exits with code 2.
+- `tenant host add <id> <host> --site <path>` gives the host to one site of the tenant. The path is stored in lower
+  case in `platform.tenant_hosts.site_path`. A path with bad syntax, or a reserved path such as `api`, exits with
+  code 2. The command does not check that a release has the site. A site has at most one host per tenant, so a
+  second `--site` host for the same path exits with code 2. The audit record lists `host:<host>` and `site:<path>`.
+- `tenant host remove <id> <host>` removes a host. Removing a tenant's last host exits with code 2. So does
+  removing the tenant's last host that belongs to no site. Removing a site's host succeeds.
 - `tenant host move <host> --to <id>` moves a host to another tenant in one transaction. It is the
   last step of restoring over an existing tenant, see
   [tenant restore](administration.md#tenant-restore). A move may leave the source tenant with no
-  hosts. Only `tenant host remove` refuses to remove a last host.
+  hosts. Only `tenant host remove` refuses to remove a last host. A move keeps the host's site, and it exits with
+  code 2 when the target tenant already has a host for that site.
+- `tenant backup` and `tenant restore` keep the host's site, and `tenant list` shows it, see
+  [tenant backup](administration.md#tenant-backup) and [tenant list](administration.md#tenant-list).
 - Every host command exits with code 2 for a tenant that is still `provisioning`, as the binding
   commands do.
 - A move raises the `version` of both tenants.
-- _(planned for M17)_ `tenant host add <id> <host> --site <path>` gives the host to one site of the tenant. The host
-  then serves only that site, and the tenant's other hosts send the site's path to it, see
-  [sites and sign-in](identity-provider.md#sites-and-sign-in). A tenant keeps at least one host that is no site's,
-  so `tenant host remove` refuses to remove the last of those.
+- _(planned for M17)_ A host that belongs to a site serves only that site, and the tenant's other hosts send the
+  site's path to it, see [sites and sign-in](identity-provider.md#sites-and-sign-in). Until then, the server does
+  not read `site_path`, and a site host serves the whole tenant.
 
 ## Sessions
 

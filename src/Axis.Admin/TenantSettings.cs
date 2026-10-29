@@ -373,7 +373,22 @@ internal static class TenantSettings
         }
     }
 
-    public static Task<int> HostAddAsync(AdminRun run) => HostAsync(run, TenantHostCommands.AddAsync);
+    public static async Task<int> HostAddAsync(AdminRun run)
+    {
+        var args = run.Args;
+        var withSite = args.Length == 7 && args[5] == "--site" && IsName(args[6]);
+        if (!(args.Length == 5 || withSite) || !IsName(args[3]) || !IsName(args[4]))
+        {
+            return Usage(run);
+        }
+
+        var sitePath = withSite ? args[6] : null;
+        return await ChangeAsync(
+            run,
+            args[3],
+            "host",
+            (platform, command) => TenantHostCommands.AddAsync(platform, command, args[3], args[4], sitePath, run.CancellationToken));
+    }
 
     public static Task<int> HostRemoveAsync(AdminRun run) => HostAsync(run, TenantHostCommands.RemoveAsync);
 

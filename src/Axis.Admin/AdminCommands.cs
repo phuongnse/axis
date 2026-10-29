@@ -77,7 +77,7 @@ internal static partial class AdminCommands
                tenant binding set <id> <name> --storage database
                tenant binding set <id> <name> --secret
                tenant binding remove <id> <name>
-               tenant host add <id> <host>
+               tenant host add <id> <host> [--site <path>]
                tenant host remove <id> <host>
                tenant host move <host> --to <id>
                platform rekey

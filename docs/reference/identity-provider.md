@@ -129,8 +129,8 @@ so Studio edits it, with the identity provider editor of [Studio](studio.md), an
   callback, see [security](security.md#sign-in-and-the-session). The realm's page is not the control.
 - _(planned for M17)_ **Sign-in once:** a person signed in through a provider at the realm opens another site that allows it without
   being asked again. A site that does not allow it asks the person to sign in with one it does.
-- _(planned for M17)_ **A host of its own:** `tenant host add <id> <host> --site <path>` gives a tenant host to one site, see
-  [hosts](tenant-setting-commands.md#hosts).
+- **A host of its own:** `tenant host add <id> <host> --site <path>` gives a tenant host to one site, see
+  [hosts](tenant-setting-commands.md#hosts). The command is built. _(planned for M17)_ The serving below is not.
   - That host serves only the site, at `/`. Platform pages and other sites are `404` there, and its session cookie
     reaches nothing else.
   - The tenant's other hosts send the site's path to its own host, so the site has one origin.
