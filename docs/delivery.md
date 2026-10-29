@@ -107,8 +107,8 @@ with the reasons. What each one does is in NexKit's
   driver merges those by hand.
 - **CI runs on `main` once every 5 merges.** A merge by NexKit starts no
   `push` workflow, so NexKit's `merge.after_workflows` setting starts CI on
-  `main` once every 5 of its merges, and the CodeQL and performance workflows
-  once every 30, as
+  `main` once every 5 of its merges, CodeQL once every 32 and the performance
+  workflow once every 62, as
   [D112](decisions/d112-ci-codeql-and-the-performance-tests-run-on-main-every-few-merges.md)
   agrees. None of them has a schedule. CI also runs on a person's push and on
   demand. Each of the three ends with a job that starts a NexKit sweep, so a
@@ -156,7 +156,7 @@ with the reasons. What each one does is in NexKit's
   suite, so a slowdown shows at its next run. The integration performance
   tests, whose class names end in `PerformanceTests`, run neither in NexKit's
   checks nor in CI's integration job, because they depend on the runner's
-  load. The performance workflow runs them on `main` once every 30 merges, as
+  load. The performance workflow runs them on `main` once every 62 merges, as
   [D97](decisions/d97-reliable-test-runs.md) and
   [D112](decisions/d112-ci-codeql-and-the-performance-tests-run-on-main-every-few-merges.md)
   say. Which suite skips

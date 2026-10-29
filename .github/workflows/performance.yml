@@ -2,7 +2,7 @@ name: Performance
 
 # The performance tests, whose classes end in PerformanceTests, run here and not in CI's integration
 # job. They depend on the runner's load, so a timing miss marks only this workflow red (D97). NexKit
-# starts it on main once every 30 of its merges (D112), and it also runs on demand.
+# starts it on main once every 62 of its merges (D112), and it also runs on demand.
 on:
   workflow_dispatch:
 

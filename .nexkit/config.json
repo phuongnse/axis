@@ -223,11 +223,11 @@
       },
       {
         "workflow": "codeql.yml",
-        "every": 30
+        "every": 32
       },
       {
         "workflow": "performance.yml",
-        "every": 30
+        "every": 62
       }
     ]
   },

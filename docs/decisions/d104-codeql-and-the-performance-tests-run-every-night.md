@@ -13,7 +13,8 @@ push to `main`.
   pull requests, as [D50](d50-sign-in-audit-records-and-security-scanning-in-ci.md)
   says.
   - [D112](d112-ci-codeql-and-the-performance-tests-run-on-main-every-few-merges.md)
-    replaces this point: NexKit starts them once every 30 of its merges.
+    replaces this point: NexKit starts CodeQL once every 32 of its merges and
+    the performance workflow once every 62.
 - **NexKit watches them without starting them.** They are in NexKit's
   `autopilot.watch_workflows`, not in `merge.after_workflows`. A failure that
   repeats still opens a `bug` issue, and pull requests that fail the same way
