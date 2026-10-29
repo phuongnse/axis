@@ -67,6 +67,9 @@ to find its own numbers.
   server replicas. It needs Docker. See [development](../development.md#scripts).
 - **Data.** It creates a tenant with a generated application of
   [typical size](../domain/knowledge.md#typical-application-size), and records in every entity.
+  `tests/Axis.LoadData` writes that application from a seed, so the same seed gives the same files:
+  `dotnet run --project tests/Axis.LoadData -- <folder> [--seed <n>]`. It writes 100 seed records
+  for each of its 40 entities and refuses a folder that already holds files.
 - **Users.** Each virtual user signs in once through the development realm's sign-in page and keeps
   its session cookie for the whole run. The test authentication scheme is not used, because only
   test hosts register it.

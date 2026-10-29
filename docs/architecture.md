@@ -111,6 +111,7 @@ web/                      React + TypeScript SPA (Vite), Ant Design
 tests/
   Axis.<Module>.Tests/    unit tests per module (Axis.Server.Tests, Axis.Configuration.Tests, Axis.Data.Tests, Axis.Expressions.Tests, Axis.Tenancy.Tests)
   Axis.Integration.Tests/ PostgreSQL (Testcontainers) and API integration tests
+  Axis.LoadData/          generator of the load test's typical-size application with seeds
   Axis.PurchasingStub/    purchasing system stub for tests, scripts/dev.sh and Docker Compose
   packages/               test-only extension package, built as three versions; covers the capability limits
   e2e/                    Playwright journeys against the running server
@@ -132,8 +133,7 @@ Projects are created when the first issue needs them. The solution holds
 `Axis.Configuration`, `Axis.Data`, `Axis.Expressions` (the parser, type
 checker, interpreter and SQL translation), `Axis.Extensions` (the contracts
 for extension packages), `Axis.Policy` (the evaluation of entity, data source and process grants, record filters and field sets),
-`Axis.Presentation` (the platform site, its texts and the
-shapes of application site metadata), `Axis.Processes` (work items, the
+`Axis.Presentation` (the platform site, its texts and the shapes of application site metadata), `Axis.Processes` (work items, the
 `decision`, `task`, `operation`, `end` and `timer` steps, the task API, the record command, connector calls, package operations, events, triggers and schedules, and inbound endpoint starts), `Axis.Scenarios.Runner` (the library that runs an application's test scenarios), `Axis.Scenarios` (the console host over it), `Axis.Tenancy`, `Axis.Administration` (the library behind the `Axis.Admin` commands), `Axis.Worker`, the test projects, the sample extension package
 `PaymentReferences` with its `PaymentReferences.Tests`, and `web/`.
 

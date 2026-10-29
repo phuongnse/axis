@@ -25,6 +25,7 @@
     <Project Path="tests/Axis.Data.Tests/Axis.Data.Tests.csproj" />
     <Project Path="tests/Axis.Expressions.Tests/Axis.Expressions.Tests.csproj" />
     <Project Path="tests/Axis.Integration.Tests/Axis.Integration.Tests.csproj" />
+    <Project Path="tests/Axis.LoadData/Axis.LoadData.csproj" />
     <Project Path="tests/Axis.PurchasingStub/Axis.PurchasingStub.csproj" />
     <Project Path="tests/Axis.Server.Tests/Axis.Server.Tests.csproj" />
     <Project Path="tests/Axis.Tenancy.Tests/Axis.Tenancy.Tests.csproj" />
