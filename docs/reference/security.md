@@ -498,7 +498,7 @@ systems.
   `/api/apps/{app}/endpoints/`, and the session everywhere else.
   [Service accounts](#service-accounts) send bearer tokens with another
   audience to the record API, to data source rows, and to process start and
-  inspection. The operator commands follow _(planned for M18)_. The task API
+  inspection, and to the operator commands. The task API
   stays closed to bearer tokens.
 - **Clock.** The expiry is checked against the server's clock service, with
   the usual 5 minutes of clock skew, so tests can replace the clock.
@@ -533,11 +533,10 @@ systems.
 It follows
 [D86](../decisions/d86-service-accounts-for-the-record-and-process-apis.md).
 A service account lets another system read and write records, read data
-source rows, and start and inspect processes, under the same policies as a
+source rows, start, inspect and operate processes, under the same policies as a
 user. It replaces the point of D27 that accepts bearer tokens only on endpoint
-routes. The record API, data source rows, process start and process inspection
-take service accounts now. The operator commands are _(planned for M18)_ and
-stay session-only until then.
+routes. The record API, data source rows, process start, process inspection and
+the operator commands take service accounts now.
 
 - **What it is.** A client of the tenant's identity provider that gets
   access tokens through the client credentials grant. Axis issues no API key.
@@ -561,7 +560,7 @@ stay session-only until then.
   - `POST /api/apps/{app}/processes/{process}/instances`;
   - the instance list and one instance of
     [process inspection](process-inspection.md);
-  - the operator commands retry, cancel and resolve _(planned for M18)_.
+  - the operator commands retry, cancel and resolve.
 
   The server marks each of these routes, so the choice of scheme, the CSRF
   exemption and the test of every route read the same mark and no path is

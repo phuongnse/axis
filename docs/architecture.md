@@ -440,12 +440,11 @@ bindings work. Status rules and publishing are built too.
   - See [Sign-in and the session](reference/security.md#sign-in-and-the-session).
   - Other systems call inbound endpoints with a bearer token instead of the
     session. See [Machine callers](reference/security.md#machine-callers).
-  - Service accounts call the record API, data source rows, process start and
-    process inspection with a bearer token (D86). See
+  - Service accounts call the record API, data source rows, process start,
+    process inspection and the operator commands with a bearer token (D86). See
     [service accounts](reference/security.md#service-accounts).
   - The session state is in the tenant database, so sign-out revokes it at once
-    (D84). A tenant can turn on the FAPI 2.0 profile (D83). Service accounts also
-    run the operator commands (D86), _(planned for M18)_. See
+    (D84). A tenant can turn on the FAPI 2.0 profile (D83). See
     [service accounts](reference/security.md#service-accounts) and
     [FAPI 2.0 profile](reference/security.md#fapi-20-profile).
 - **Hardening (D82, D84, D85).**

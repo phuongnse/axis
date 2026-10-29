@@ -712,8 +712,8 @@ schema of the tenant database.
   and the commit of a [record import](import-export.md#import) writes one per
   import, and so do [process steps](process-execution.md#running-a-step) and
   [task completions](task-api.md#completing-a-task). So
-  do the [operator commands](process-inspection.md#operator-commands), with the user as
-  actor. The BFF session writes them too for sign-in, sign-out and a refused
+  do the [operator commands](process-inspection.md#operator-commands), with the user or
+  service account as actor. The BFF session writes them too for sign-in, sign-out and a refused
   sign-in, see the session actions below.
 
   | Column                | Type                             | Meaning                                                                                                                                                                                                                                          |

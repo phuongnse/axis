@@ -8,6 +8,7 @@ using Axis.Core.Tenancy;
 using Axis.Policy;
 using Axis.Processes.Instances;
 using Axis.Server.Applications;
+using Axis.Server.Authentication;
 using Axis.Server.Http;
 using Axis.Server.Records;
 using Axis.Server.Tenancy;
@@ -16,10 +17,12 @@ using Axis.Server.Users;
 namespace Axis.Server.Processes;
 
 /// <summary>
-/// The endpoints for a user who may operate on the instances of a process. A cancel at
+/// The endpoints for a user or a service account that may operate on the instances of a process. The caller is
+/// the session user or, on these routes, a service account with a bearer token, and its id and name are the
+/// actor of the records a command writes. A cancel at
 /// <c>POST /api/apps/{app}/processes/{process}/instances/{id}/cancel</c> ends a <c>running</c> or
 /// <c>waiting</c> instance as <c>cancelled</c> and answers 200 with the instance. A request is
-/// checked in order: session (401), application and process (404), the user's <c>cancel</c> grant
+/// checked in order: session or service account bearer token (401), application and process (404), the user's <c>cancel</c> grant
 /// on the process (403), content type (415), then the body (400), which is exactly
 /// <c>{ "reason": "&lt;text&gt;" }</c> with a reason of 1 to 500 characters. An <c>id</c> that is
 /// not a hyphenated UUID is a 404, as is an instance of another process or one whose subject
@@ -71,9 +74,12 @@ internal static class ProcessOperatorEndpoints
 
     public static void MapProcessOperatorEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapPost("/api/apps/{app}/processes/{process}/instances/{id}/cancel", CancelAsync);
-        endpoints.MapPost("/api/apps/{app}/processes/{process}/instances/{id}/retry", RetryAsync);
-        endpoints.MapPost("/api/apps/{app}/processes/{process}/instances/{id}/calls/{callId}/resolve", ResolveAsync);
+        endpoints.MapPost("/api/apps/{app}/processes/{process}/instances/{id}/cancel", CancelAsync)
+            .WithMetadata(ServiceAccountRoute.Instance);
+        endpoints.MapPost("/api/apps/{app}/processes/{process}/instances/{id}/retry", RetryAsync)
+            .WithMetadata(ServiceAccountRoute.Instance);
+        endpoints.MapPost("/api/apps/{app}/processes/{process}/instances/{id}/calls/{callId}/resolve", ResolveAsync)
+            .WithMetadata(ServiceAccountRoute.Instance);
     }
 
     private static async Task<IResult> CancelAsync(
@@ -88,7 +94,7 @@ internal static class ProcessOperatorEndpoints
     {
         if (await CurrentUsers.FindAsync(request.HttpContext) is not { } user)
         {
-            return Grants.SignInRequired();
+            return Grants.SignInRequired(request.HttpContext);
         }
 
         if (await resolver.ResolveReleaseAsync(app, cancellationToken) is not { } active)
@@ -174,7 +180,7 @@ internal static class ProcessOperatorEndpoints
     {
         if (await CurrentUsers.FindAsync(request.HttpContext) is not { } user)
         {
-            return Grants.SignInRequired();
+            return Grants.SignInRequired(request.HttpContext);
         }
 
         // A release change under the start lock sends the request back to resolution, so every check runs on the new release.
@@ -298,7 +304,7 @@ internal static class ProcessOperatorEndpoints
     {
         if (await CurrentUsers.FindAsync(request.HttpContext) is not { } user)
         {
-            return Grants.SignInRequired();
+            return Grants.SignInRequired(request.HttpContext);
         }
 
         // A release change under the start lock sends the request back to resolution, so every check runs on the new release.

@@ -1,0 +1,19 @@
+{
+  "id": "a7c3d1e4-5b2f-4e86-9a1d-3c8f6b2e4d0e",
+  "kind": "process",
+  "name": "Publish",
+  "formatVersion": 1,
+  "entity": "Report",
+  "start": "send",
+  "steps": [
+    {
+      "name": "send",
+      "type": "operation",
+      "operation": "callConnector",
+      "connector": { "name": "Publishing", "operation": "publish" },
+      "input": { "title": "title" },
+      "next": "done"
+    },
+    { "name": "done", "type": "end" }
+  ]
+}

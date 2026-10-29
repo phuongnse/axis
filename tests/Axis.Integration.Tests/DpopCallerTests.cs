@@ -172,6 +172,16 @@ public sealed class DpopCallerTests(KeycloakFixture keycloak) : IAsyncLifetime
 
         Assert.Contains(bearerRoutes, route => EndpointCaller.IsEndpointPath(new PathString(route.Path)));
         Assert.Contains(bearerRoutes, route => route.Endpoint.Metadata.GetMetadata<ServiceAccountRoute>() is not null);
+        foreach (var operatorRoute in new[]
+        {
+            "POST /api/apps/{app}/processes/{process}/instances/{id}/cancel",
+            "POST /api/apps/{app}/processes/{process}/instances/{id}/retry",
+            "POST /api/apps/{app}/processes/{process}/instances/{id}/calls/{callId}/resolve",
+        })
+        {
+            Assert.Contains(bearerRoutes, route => route.Name == operatorRoute);
+        }
+
         var accepted = new List<string>();
         foreach (var route in bearerRoutes)
         {
