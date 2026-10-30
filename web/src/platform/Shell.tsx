@@ -220,9 +220,7 @@ export function Shell({ titleKey, navigation, locales, locale, onLocaleChange, n
                     top: 48,
                     maxHeight: 'calc(100vh - 48px)',
                     overflowY: 'auto',
-                    // Proposed: a thin scrollbar in the border colour, so it takes little room beside the entries.
-                    scrollbarWidth: 'thin',
-                    scrollbarColor: `${colour.border} transparent`,
+                    // Proposed: its scrollbar is the page's own, as the colour scheme draws it, so the two match.
                   }}
                 >
                   {pageSidebar ? (
