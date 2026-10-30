@@ -929,16 +929,18 @@ test.describe("Studio edits a process in the process editor", () => {
 
     try {
       const content = JSON.parse(original) as {
-        steps: { name: string; input: Record<string, unknown> }[];
+        steps: { name: string; input?: Record<string, unknown> }[];
       };
       const index = content.steps.findIndex(
         (step) => step.name === "createPurchaseOrder",
       );
       expect(index).toBeGreaterThanOrEqual(0);
       const before = await diagnostics(page);
-      // The sample already maps the lines, so the author starts without that mapping.
-      const lines = content.steps[index].input.lines;
-      delete content.steps[index].input.lines;
+
+      // The sample already maps the lines. The author starts without that mapping and adds it.
+      const mapped = content.steps[index].input?.lines;
+      expect(mapped).toBeDefined();
+      delete content.steps[index].input?.lines;
       await writeFile(target, JSON.stringify(content, null, 2));
 
       await page.goto(
@@ -988,7 +990,7 @@ test.describe("Studio edits a process in the process editor", () => {
       const saved = JSON.parse(await readFile(target, "utf8")) as {
         steps: { input: Record<string, unknown> }[];
       };
-      expect(saved.steps[index].input.lines).toEqual(lines);
+      expect(saved.steps[index].input.lines).toEqual(mapped);
     } finally {
       await writeFile(target, original);
     }

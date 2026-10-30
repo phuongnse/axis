@@ -541,7 +541,7 @@ public static partial class ApplicationCompiler
         bool NamesDeclaredModule(string name) =>
             name.IndexOf('/', StringComparison.Ordinal) < 0 || declaredModules.Contains(ModuleIdOf(name));
 
-        // A raise event step never maps a sensitive field's value into an event that a webhook names.
+        // A raise event step or an endpoint never maps a sensitive field's value into an event that a webhook names.
         var webhookEvents = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var webhook in loaded.Webhooks)
         {
@@ -665,6 +665,9 @@ public static partial class ApplicationCompiler
             loaded.UnloadedEntityNames,
             FindProcess,
             loaded.UnloadedProcessNames,
+            FindEvent,
+            loaded.UnloadedEventNames,
+            webhookEvents,
             (field, path, report) => CheckField(field, path, FindEntity, ownersByChildName, loaded.UnloadedEntityNames, moduleReferences, maxFileSize, report),
             moduleReferences,
             references,
@@ -822,7 +825,7 @@ public static partial class ApplicationCompiler
             Connectors = loaded.Connectors.Select(ConnectorChecker.Build).ToList(),
             IdentityProviders = loaded.IdentityProviders.Select(IdentityProviderChecker.Build).ToList(),
             Events = allEvents.Select(@event => EventChecker.Build(eventsByName[@event.Name], FindEntity)).ToList(),
-            Endpoints = loaded.Endpoints.Select(endpoint => EndpointChecker.Build(endpoint, FindEntity, FindProcess)).ToList(),
+            Endpoints = loaded.Endpoints.Select(endpoint => EndpointChecker.Build(endpoint, FindEntity, FindProcess, FindEvent)).ToList(),
             Triggers = loaded.Triggers.Select(trigger => TriggerChecker.Build(
                 IsModuleResource(trigger) ? trigger with { Id = ModuleResourceIds.Derive(applicationId, trigger.Id) } : trigger,
                 FindEntity,
