@@ -59,6 +59,8 @@ apply: sections marked _(planned for Mx)_ are not built yet, and Dn refers to
     `axis.notifications` (one row per in-app notification and recipient),
     `axis.notification_reads` (one row per notification and user who read it),
     `axis.email_outbox` (one row per staged email),
+    `axis.webhook_deliveries` (one row per occurrence and webhook, which a
+    `raiseEvent` step staged),
     `axis.process_start_receipts` (the stored response of each
     `Idempotency-Key` of a start), `axis.endpoint_receipts` (the record and
     instance of each endpoint call's `Idempotency-Key`, unique per
@@ -174,7 +176,7 @@ apply: sections marked _(planned for Mx)_ are not built yet, and Dn refers to
   | `date-time`        | `timestamp with time zone`                                                                                                           |
   | `enum`             | `text`; the values are recorded, not enforced by a `CHECK`                                                                           |
   | `reference`        | `uuid` with a foreign key to the target table's `id`                                                                                 |
-  | `child-collection` | No column on the owner table. See [Child tables and computed columns](#child-tables-and-computed-columns)                            |
+  | `child-collection` | No column on the owner table. See [Child tables and computed columns](child-tables-and-computed-columns.md#child-tables-and-computed-columns)                            |
   | `money`            | `numeric(p,s)`, as `decimal` with its defaults. The currency is the field's or the `currencyField` column's                          |
   | `file`             | `uuid` with a foreign key to `axis.files`. See [file fields](file-fields.md#storage-and-clean-up)                                    |
   | `references`       | No column on the owner table. A junction table holds `owner_id`, `target_id` and `position`, see [Schema planning](#schema-planning) |
@@ -353,7 +355,7 @@ What each database role may do:
 | Objects                                                                                                                                                                                                                                                                                                                                                                                                          | Schema database role                                             | Runtime database role                                             |
 | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------------- |
 | `entities` tables                                                                                                                                                                                                                                                                                                                                                                                                | Owns them                                                        | Read and write rows                                               |
-| `axis` tables that runtime writes: `process_*`, `connector_calls`, `package_calls`, `events`, `notifications`, `notification_reads`, `email_outbox`, the receipts, `trigger_schedules`, `trigger_starts`, `delivery_failures`, `dead_letters`, `audit_records`, `user_profiles`, `sequence_counters`, `computed_field_errors`, `pending_computed_fields`, `sessions`, `given_roles`, `record_imports`, `files`, `file_contents` | Owns them                                                        | Read and write rows                                               |
+| `axis` tables that runtime writes: `process_*`, `connector_calls`, `package_calls`, `events`, `notifications`, `notification_reads`, `email_outbox`, `webhook_deliveries`, the receipts, `trigger_schedules`, `trigger_starts`, `delivery_failures`, `dead_letters`, `audit_records`, `user_profiles`, `sequence_counters`, `computed_field_errors`, `pending_computed_fields`, `sessions`, `given_roles`, `record_imports`, `files`, `file_contents` | Owns them                                                        | Read and write rows                                               |
 | Tables that activation writes: `active_releases`, `active_sites`, `provisioned_entities`, `provisioned_enum_values`, `applied_migrations`, `release_computed_fingerprints`, the `__*_migrations` tables                                                                                                                                                                                                          | Owns them                                                        | Read only                                                         |
 | Release tables: `releases`, `release_resources`, `release_packages`                                                                                                                                                                                                                                                                                                                                              | Insert and read. The trigger refuses update, delete and truncate | Read only                                                         |
 | `publish_requests`                                                                                                                                                                                                                                                                                                                                                                                               | Owns it. The publisher changes the status and the lease          | `SELECT` and `INSERT` only. It never updates or deletes a request |
@@ -673,34 +675,6 @@ access. It returns diagnostics, SQL statements and the new records to write.
   made before `position` existed is not migrated. See
   [D78](../decisions/d78-references-from-child-rows-and-many-to-many.md).
 
-## Child tables and computed columns
-
-Child tables and computed columns are built (D17). The planning rules of
-child tables are in [Schema planning](#schema-planning).
-
-- **Child table.** The entity that a `child-collection` field names has a
-  table with the usual names. Besides `id` (`uuid`) and its field columns, it
-  has two system columns:
-
-  | Column     | Type               | Meaning                                                                                                                              |
-  | ---------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
-  | `owner_id` | `uuid NOT NULL`    | The owner record's `id`. A foreign key to the owner table's `id` with `ON DELETE CASCADE`, named `fk_` + table + `_` + hash as usual |
-  | `position` | `integer NOT NULL` | The row's order in the collection, the zero-based index in the array                                                                 |
-
-  Rows are deleted with their owner.
-
-- **No version.** A child table has no `version` column. Its rows live under
-  the owner's version, and a write to the rows increments the owner's
-  `version`.
-- **Computed column.** A computed field is an ordinary
-  column of its type. It is never `NOT NULL`, because a computed field cannot
-  be `required`. It is written in the same transaction as the record, and for
-  a child row before the owner's computed fields.
-- **Existing rows.** A computed field added to a table that has rows is
-  filled at activation through
-  [Recomputing computed fields](migrations.md#recomputing-computed-fields). A row whose
-  expression fails gets `NULL` and an error row, and activation goes on.
-
 ## Audit records and sequence counters
 
 `Axis.Data` owns both tables (D21). They are system tables in the `axis`
@@ -783,6 +757,14 @@ schema of the tenant database.
     `entity_id`, `record_id` and `process_instance_id` are null, and so is `application_id`, except that a role
     action on an application role holds it. A platform role action adds `"platform": true` to `details` and its `role` is the kind.
     A role action commits with the row it changes. An invitation commits with its given roles before the email is sent, and a resend with the move of the given roles. The others commit with the end of the user's Axis sessions, after the realm steps succeeded.
+
+  - **Webhook actions.** Each [webhook](process-events.md#webhook-delivery) request
+    that a receiver answers `2xx` writes `webhook.delivered`, with actor `system`.
+    The `application_id`, the event's `entity_id`, the subject `record_id` and the
+    `process_instance_id` of the raising instance are set, so the delivery shows
+    in the record's history. The `details` are
+    `{ "webhookId", "webhook", "eventId", "statusCode" }`. They never hold the
+    body, the URL or a payload value.
 
   - **Dead letter actions.** A redeliver or a discard of a
     [dead letter](process-events.md#routes) writes `deadLetter.redelivered` or

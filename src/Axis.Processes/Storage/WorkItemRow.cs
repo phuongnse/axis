@@ -50,6 +50,9 @@ public sealed class WorkItemRow
     /// <summary>The outbox email a <c>notification.email</c> item sends, or <see langword="null"/> for other work. It has no foreign key.</summary>
     public Guid? EmailId { get; init; }
 
+    /// <summary>The webhook delivery a <c>webhook.deliver</c> item sends, or <see langword="null"/> for other work. It has no foreign key.</summary>
+    public Guid? WebhookDeliveryId { get; init; }
+
     /// <summary>The schedule trigger a <c>trigger.schedule</c> or <c>trigger.fanOut</c> item runs, or <see langword="null"/> for other work.</summary>
     public Guid? TriggerId { get; init; }
 

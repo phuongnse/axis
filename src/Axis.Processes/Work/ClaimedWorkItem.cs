@@ -19,6 +19,7 @@ namespace Axis.Processes.Work;
 /// <param name="Revision">The instance revision a <c>process.timer</c> item resumes at, or <see langword="null"/> for other work.</param>
 /// <param name="Escalation">The zero-based index of the escalation a <c>task.escalate</c> item runs, or <see langword="null"/> for other work.</param>
 /// <param name="EmailId">The outbox email a <c>notification.email</c> item sends, or <see langword="null"/> for other work.</param>
+/// <param name="WebhookDeliveryId">The webhook delivery a <c>webhook.deliver</c> item sends, or <see langword="null"/> for other work.</param>
 /// <param name="ClaimDelay">How long after its due time the item was claimed, by the clock of the claim.</param>
 public sealed record ClaimedWorkItem(
     Guid Id,
@@ -41,4 +42,5 @@ public sealed record ClaimedWorkItem(
     long? Revision = null,
     int? Escalation = null,
     Guid? EmailId = null,
-    TimeSpan ClaimDelay = default);
+    TimeSpan ClaimDelay = default,
+    Guid? WebhookDeliveryId = null);

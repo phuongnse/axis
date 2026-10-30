@@ -105,7 +105,7 @@ One transaction then does the rest:
    the occurrence, with the instance of step 5 as the one that raised it, or no
    instance when the endpoint has no `process`, and the active release, runs the `sync` event triggers, queues the `event.deliver`
    work item and stages the event's
-   [webhook deliveries](integration-resources.md#webhook-delivery). A run-time
+   [webhook deliveries](outbound-webhooks.md#webhook-delivery). A run-time
    error in an expression is a `400` keyed `/event/fields/<key>`. See
    [D115](../decisions/d115-an-inbound-endpoint-call-raises-an-event.md).
 7. It writes the audit records `record.created` and, with a `process`, `process.started`.

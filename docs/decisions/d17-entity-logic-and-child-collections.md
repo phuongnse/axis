@@ -4,7 +4,7 @@ Status: **Agreed**
 
 Entities get logic and owned rows in M2. See
 [configuration](../reference/resource-files.md#entity-logic),
-[storage](../reference/storage.md#child-tables-and-computed-columns) and the
+[storage](../reference/child-tables-and-computed-columns.md#child-tables-and-computed-columns) and the
 [record API](../reference/record-api.md#child-rows-computed-fields-and-validations).
 
 - **Named rules:** a `rule` resource holds a named expression with typed

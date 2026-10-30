@@ -711,7 +711,7 @@ validation calls the rules of its own module, see [modules](modules-and-template
     fit the column gets the message a body value would get. See
     [the record API](record-api.md#child-rows-computed-fields-and-validations)
     and
-    [Child tables and computed columns](storage.md#child-tables-and-computed-columns).
+    [Child tables and computed columns](child-tables-and-computed-columns.md#child-tables-and-computed-columns).
 - **Child collections.** The field type `child-collection` needs a `target`
   that names the child entity. Its rows are read and written only through the
   owner record, as

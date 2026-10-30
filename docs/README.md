@@ -26,7 +26,8 @@ Detailed behaviour, one topic per file. Sections marked _(planned for Mx)_ are n
 | [Diagnostic codes](reference/diagnostic-codes.md)                      | The shape of a diagnostic and the table of every `AXCnnnn` code                       |
 | [Resource files](reference/resource-files.md)                          | The resource file shape, schema keywords, entity fields, entity logic, sequences      |
 | [Roles and policies](reference/roles-and-policies.md)                  | The `role` and `policy` resources, the record creator, sensitive fields               |
-| [Connectors, events and endpoints](reference/integration-resources.md) | Connectors and deployment bindings, the `event`, `trigger`, `endpoint` and `webhook` resources |
+| [Connectors, events and endpoints](reference/integration-resources.md) | Connectors and deployment bindings, the `event`, `trigger` and `endpoint` resources |
+| [Outbound webhooks](reference/outbound-webhooks.md)                    | The `webhook` resource, its compile checks, and the signed delivery of an event       |
 | [Modules and templates](reference/modules-and-templates.md)            | Reusable modules and application templates                                            |
 | [Extension packages](reference/extension-packages.md)                  | Custom C# code: manifest, contracts, installation, loading, capabilities              |
 | [Test scenarios](reference/test-scenarios.md)                          | The `scenario` resource and how scenarios run                                         |
@@ -37,6 +38,7 @@ Detailed behaviour, one topic per file. Sections marked _(planned for Mx)_ are n
 | [Import and export](reference/import-export.md)                        | Exporting records to CSV and spreadsheets, and importing them under policies          |
 | [Inbound endpoint calls](reference/inbound-endpoints.md)               | How another system calls an inbound endpoint: checks, responses, idempotency          |
 | [Processes](reference/processes.md)                                    | The `process` resource, steps, compile checks, start endpoint, states, process tables |
+| [Process states](reference/process-states.md)                          | The states of a process instance and of a task                                        |
 | [Task API](reference/task-api.md)                                      | Listing, reading and completing tasks                                                 |
 | [Process execution](reference/process-execution.md)                    | How the worker runs steps, connector calls, package operations, worker settings       |
 | [Process events and triggers](reference/process-events.md)             | Events, triggers, delivery, schedules, scheduled jobs, delete triggers, dead letters  |
@@ -53,6 +55,7 @@ Detailed behaviour, one topic per file. Sections marked _(planned for Mx)_ are n
 | [Detail, chart and KPI widgets](reference/detail-chart-kpi-widgets.md) | The SPA widgets that show one record, a chart and a KPI tile                          |
 | [Custom widgets](reference/custom-widgets.md)                          | Widgets from extension packages: manifest, page shape, loading, the SDK, the palette  |
 | [Storage](reference/storage.md)                                        | Physical names, column types, database roles, schema planning, audit, release history |
+| [Child collections in storage](reference/child-tables-and-computed-columns.md) | How child tables and computed columns are stored                              |
 | [Migrations](reference/migrations.md)                                  | `migration` resources and recomputing stored computed fields                          |
 | [Security](reference/security.md)                                      | Sign-in and the session, machine callers, service accounts, the FAPI 2.0 profile, authorization, development users |
 | [Axis's identity provider](reference/identity-provider.md)           | The identity provider Axis ships: realms, the `identityProvider` resource, sign-in per site, platform sign-in, the Axis theme, installation |

@@ -49,6 +49,8 @@ public static class AuditActions
 
     public const string OperationCallResolved = "operation.callResolved";
 
+    public const string WebhookDelivered = "webhook.delivered";
+
     public const string DeadLetterRedelivered = "deadLetter.redelivered";
 
     public const string DeadLetterDiscarded = "deadLetter.discarded";

@@ -66,6 +66,7 @@ public static class ProcessesServiceCollectionExtensions
         services.AddSingleton(email);
         services.AddSingleton(new EmailSecuritySettings(allowPlainSmtp));
         services.AddSingleton<IExternalWorkItemHandler, NotificationEmailHandler>();
+        services.AddSingleton<IExternalWorkItemHandler, WebhookDeliveryHandler>();
         return services;
     }
 }

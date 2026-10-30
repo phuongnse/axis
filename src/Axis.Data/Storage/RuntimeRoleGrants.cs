@@ -36,6 +36,7 @@ public static class RuntimeRoleGrants
         "notifications",
         "notification_reads",
         "email_outbox",
+        "webhook_deliveries",
         "endpoint_receipts",
         "process_start_receipts",
         "trigger_schedules",

@@ -251,6 +251,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
         var restagesCall = false;
         var restagesPackageCall = false;
         NewEvent? occurrence = null;
+        Guid raisedEventId = Guid.Empty;
         NewNotification? notification = null;
         EntityModel? created = null;
         List<KeyValuePair<FieldModel, object?>>? creation = null;
@@ -389,6 +390,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
                     instance.SubjectId!.Value,
                     await PayloadAsync(evaluate, raiseStep, instance, input),
                     instance.Id);
+                raisedEventId = raised.Id;
                 state = ProcessStarts.Running;
                 nextStep = following.Name;
                 decision = null;
@@ -697,6 +699,10 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
                 DateTimeOffset.UtcNow,
                 cancellationToken,
                 eventId: occurrence.Id);
+
+            // The webhooks are those of the pinned release, which compiled the step and checked that no
+            // sensitive value reaches a payload. A step that rolls back stages none.
+            await WebhookDeliveries.StageAsync(context, model, raisedEventId, occurrence.Id, instance.ApplicationId, instance.ReleaseId, cancellationToken);
         }
 
         // A notification with no recipient has no in-app row.

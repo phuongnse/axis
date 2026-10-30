@@ -128,7 +128,7 @@ A task step may add `escalations` and a `deadline`:
 
 ## Task states
 
-The task states of [processes.md](processes.md#task-states) gain `expired`: the
+The task states of [processes.md](process-states.md#task-states) gain `expired`: the
 deadline passed before a decision, and the instance moved on. An expired task
 leaves every inbox and cannot be completed. The task API answers a completion
 of it with the `409` it gives for a completed task. An expired task reads with
