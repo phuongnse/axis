@@ -94,6 +94,10 @@ function CompactBand({
     <div
       style={{
         margin: `-${pad}px -${pad}px 0`,
+        // Proposed: the compact band, which holds the page's actions, stays under the shell's header as the page scrolls.
+        position: 'sticky',
+        top: 48,
+        zIndex: 9,
         // 48 px with its rule, as the shell's header and Studio's application row, so their rules line up.
         padding: `0 ${pad}px`,
         minHeight: 48,

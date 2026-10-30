@@ -120,6 +120,10 @@ export function Shell({ titleKey, navigation, locales, locale, onLocaleChange, n
         <Layout style={{ minHeight: 'var(--shell-min-height, 100vh)' }}>
           <Layout.Header
             style={{
+              // Proposed: the header stays at the top while the page scrolls under it.
+              position: 'sticky',
+              top: 0,
+              zIndex: 10,
               display: 'flex',
               alignItems: 'center',
               gap: spacing.sm,
@@ -208,18 +212,29 @@ export function Shell({ titleKey, navigation, locales, locale, onLocaleChange, n
                 trigger={null}
                 style={{ background: colour.surface, borderInlineEnd: `1px solid ${colour.borderSubtle}` }}
               >
-                {pageSidebar ? (
-                  <div ref={setPageSidebarSlot} />
-                ) : (
-                  <nav aria-label={t('shell.navigation.menu')}>
-                    <Menu
-                      mode="inline"
-                      style={{ borderInlineEnd: 'none' }}
-                      selectedKeys={activeKey ? [activeKey] : []}
-                      items={items}
-                    />
-                  </nav>
-                )}
+                {/* Proposed: the sidebar's background runs the page's height, and its navigation stays under the header
+                    while the page scrolls, with a scroll of its own when it is taller than the window. */}
+                <div
+                  style={{
+                    position: 'sticky',
+                    top: 48,
+                    maxHeight: 'calc(100vh - 48px)',
+                    overflowY: 'auto',
+                  }}
+                >
+                  {pageSidebar ? (
+                    <div ref={setPageSidebarSlot} />
+                  ) : (
+                    <nav aria-label={t('shell.navigation.menu')}>
+                      <Menu
+                        mode="inline"
+                        style={{ borderInlineEnd: 'none' }}
+                        selectedKeys={activeKey ? [activeKey] : []}
+                        items={items}
+                      />
+                    </nav>
+                  )}
+                </div>
               </Layout.Sider>
             )}
             <Layout.Content style={{ padding: contentPadding }}>
