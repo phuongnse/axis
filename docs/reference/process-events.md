@@ -300,11 +300,11 @@ events about a record for a `waitEvent` step.
 | `id` | `uuid` | A version 7 UUID, the event's id |
 | `application_id` | `uuid` | The application |
 | `event` | `text` | The event's name |
-| `release_id` | `uuid` | The release the raising instance is pinned to |
+| `release_id` | `uuid` | The release the raising instance is pinned to, or the active release for an event an inbound endpoint raises |
 | `entity_id` | `uuid` | The event's entity |
 | `subject_id` | `uuid` | The record the occurrence names |
 | `payload` | `jsonb` | The evaluated payload fields |
-| `process_instance_id` | `uuid` | The instance that raised the event |
+| `process_instance_id` | `uuid`, null _(planned for M19)_ | The instance that raised the event. _(planned for M19)_ For an event an [inbound endpoint](inbound-endpoints.md) raises, the instance the call started, or null when the endpoint has no `process` |
 | `raised_at` | `timestamptz` | The start of the step's transaction, `now()` |
 
 `axis.process_event_matches` holds one row for each use of an event occurrence by
@@ -584,7 +584,7 @@ item's instance, since the outbox row does not record it.
 | `id` | `uuid` | A version 7 UUID |
 | `kind` | `text` | `event.deliver`, `trigger.fanOut` or `notification.email` |
 | `application_id` | `uuid` | The application |
-| `process_id` | `uuid` | The process whose grants govern it: the trigger's process, the waiting instance's process or the process that sent the email |
+| `process_id` | `uuid`, null _(planned for M19)_ | The process whose grants govern it: the trigger's process, the waiting instance's process or the process that sent the email. _(planned for M19)_ For a webhook delivery, the process of the instance that raised the event, or null when an endpoint without a `process` raised it. No process's routes list such a dead letter, and the [operator console](operator-console.md) shows it |
 | `event_id`, `trigger_id`, `process_instance_id`, `email_id` | `uuid`, null | What failed, as the kind needs |
 | `occurrence_at` | `timestamptz`, null | The schedule occurrence, for a fan-out |
 | `attempts` | `integer` | The failures counted |

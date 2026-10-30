@@ -464,7 +464,7 @@ Run and the Test results list, the read-only view of a module entity, and the re
   | `policy`      | Generic form                                                    | Nothing                                                               |
   | `dataSource`  | Generic form                                                    | Nothing                                                               |
   | `connector`   | Typed editor                                                    | Nothing                                                               |
-  | `endpoint`    | Generic form, typed rows for `values`                           | Nothing                                                               |
+  | `endpoint`    | Generic form, typed rows for `values` and, _(planned for M19)_, the `event`'s `fields` | Nothing                                                    |
   | `event`       | Generic form                                                    | Nothing                                                               |
   | `trigger`     | Generic form                                                    | Nothing                                                               |
   | `migration`   | Generic form                                                    | The `changes` list, because each change's fields depend on its `type` |
