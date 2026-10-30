@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json.Nodes;
 using Axis.Configuration.Tests;
+using Axis.Data;
 using Axis.Data.Audit;
 using Axis.Data.Records;
 using Axis.Processes.Instances;
@@ -32,9 +33,6 @@ public sealed class ScheduleTriggerTests(ScheduleTriggerFixture fixture) : IClas
         ComputedBackfill.WorkItemKind,
         RecordImports.CommitWorkItemKind,
         RecordImports.CheckWorkItemKind,
-
-        // Until webhook dead letters land, a failing delivery retries without end and writes no dead letter.
-        ProcessStarts.WebhookDeliverWorkItemKind,
     ];
 
     private static readonly DateTimeOffset _occurrence = DateTimeOffset.Parse("2026-01-01T05:00:00Z");
@@ -530,6 +528,32 @@ public sealed class ScheduleTriggerTests(ScheduleTriggerFixture fixture) : IClas
                 {
                     await DropFailureAsync(tenant, "test_injected_fan_out_failure");
                 }
+            },
+            [ProcessStarts.WebhookDeliverWorkItemKind] = async () =>
+            {
+                // The worker holds no binding for the webhook's url, so the send fails. The release is the last one this test activates.
+                var bindings = new Dictionary<string, ActivationBinding>(ProcessStepFixture.StepAppBindings("k").Bindings, StringComparer.OrdinalIgnoreCase)
+                {
+                    ["HookUrl"] = new(ActivationBinding.UrlKind, new Uri("https://hooks.example.test/axis")),
+                    ["HookSecret"] = new(ActivationBinding.SecretKind, null),
+                };
+                var (releaseId, model) = await tenant.ActivateCopyWithFilesAsync(
+                    new ActivationBindings("k", bindings, AllowHttp: false),
+                    ("webhooks/hook.json", """
+                        {
+                          "id": "0b4b1a64-3c3f-4a7d-8c0e-5d1d9a7a1c03",
+                          "kind": "webhook",
+                          "name": "Hook",
+                          "formatVersion": 1,
+                          "event": "RequestNoted",
+                          "url": { "binding": "HookUrl" },
+                          "secret": { "binding": "HookSecret" },
+                          "timeout": "PT5S"
+                        }
+                        """));
+                var subjectId = await tenant.InsertRequestAsync(500m, 4);
+                await tenant.StartAsync("Announce", subjectId, releaseId, model);
+                await ScheduleTriggerFixture.RunUntilIdleAsync("k", runner, CancellationToken);
             },
         };
 

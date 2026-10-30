@@ -15,6 +15,9 @@ namespace Axis.Integration.Tests;
 /// </summary>
 public sealed class WebhookDeliveryTests(WebhookDeliveryFixture fixture) : IClassFixture<WebhookDeliveryFixture>
 {
+    /// <summary>The default of <c>Worker:DeliveryAttempts</c>, which the fixture's workers use.</summary>
+    private const int DefaultAttempts = 5;
+
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
 
     [Fact]
@@ -216,6 +219,137 @@ public sealed class WebhookDeliveryTests(WebhookDeliveryFixture fixture) : IClas
         Assert.Equal(
             ["The url binding 'HookOneUrl' is not an https URL. Only Development allows http.", "The url binding 'HookTwoUrl' is not an https URL. Only Development allows http."],
             (await fixture.Tenant.ScalarAsync("SELECT string_agg(last_error, '|' ORDER BY last_error) FROM axis.delivery_failures WHERE kind = 'webhook.deliver'") as string)!.Split('|'));
+    }
+
+    [Fact]
+    public async Task A_delivery_that_fails_the_limit_becomes_an_open_dead_letter_of_the_raising_process_and_the_other_webhook_still_delivers()
+    {
+        await fixture.ClearDeliveriesAsync();
+        fixture.Receiver.Respond(WebhookDeliveryFixture.OnePath, 500, 500, 500, 500, 500);
+        var (_, instanceId) = await RaiseAsync(500m, 4);
+        var eventId = await EventIdAsync(instanceId);
+
+        await RunDeliveriesUntilNoItemAsync();
+
+        Assert.Equal(DefaultAttempts, RequestsOf(WebhookDeliveryFixture.OnePath, eventId).Count);
+        Assert.Single(RequestsOf(WebhookDeliveryFixture.TwoPath, eventId));
+        Assert.Equal((1, 200, 1), await DeliveryAsync(eventId, "delivered", WebhookDeliveryFixture.TwoPath));
+        Assert.Equal((DefaultAttempts, 500, 1), await DeliveryAsync(eventId, "pending", WebhookDeliveryFixture.OnePath));
+
+        var processId = (Guid)(await fixture.Tenant.ScalarAsync("SELECT process_id FROM axis.process_instances WHERE id = @instance", ("instance", instanceId)))!;
+        var hookOne = HookId("HookOne");
+        await using var command = fixture.Tenant.DataSource.CreateCommand(
+            """
+            SELECT id, kind, application_id, process_id, process_instance_id, event_id, webhook_id, trigger_id, email_id, attempts, last_error, state
+            FROM axis.dead_letters WHERE kind = 'webhook.deliver'
+            """);
+        await using var reader = await command.ExecuteReaderAsync(CancellationToken);
+        Assert.True(await reader.ReadAsync(CancellationToken));
+        Assert.Equal(
+            ("webhook.deliver", fixture.Model.Manifest.Id, processId, instanceId, eventId, hookOne, DefaultAttempts, "HTTP 500", "open"),
+            (reader.GetString(1), reader.GetGuid(2), reader.GetGuid(3), reader.GetGuid(4), reader.GetGuid(5), reader.GetGuid(6), reader.GetInt32(9), reader.GetString(10), reader.GetString(11)));
+        Assert.True(reader.IsDBNull(7));
+        Assert.True(reader.IsDBNull(8));
+        Assert.False(await reader.ReadAsync(CancellationToken));
+
+        Assert.Equal(0L, await fixture.Tenant.CountAsync("SELECT count(*) FROM axis.process_work_items WHERE kind = 'webhook.deliver'"));
+        Assert.Equal(1L, await fixture.Tenant.CountAsync("SELECT count(*) FROM axis.delivery_failures WHERE kind = 'webhook.deliver' AND attempts = @attempts AND last_error = 'HTTP 500'", ("attempts", DefaultAttempts)));
+        Assert.DoesNotContain(fixture.Receiver.BaseUrl, (string)(await fixture.Tenant.ScalarAsync("SELECT last_error FROM axis.dead_letters WHERE kind = 'webhook.deliver'"))!, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Redelivering_a_webhook_dead_letter_after_the_receiver_recovers_sends_it_once_with_the_same_webhook_id()
+    {
+        await fixture.ClearDeliveriesAsync();
+        fixture.Receiver.Respond(WebhookDeliveryFixture.OnePath, 500, 500, 500, 500, 500);
+        var (_, instanceId) = await RaiseAsync(500m, 4);
+        var eventId = await EventIdAsync(instanceId);
+        await RunDeliveriesUntilNoItemAsync();
+        var (deadLetterId, processId) = await OpenDeadLetterAsync(eventId);
+        Assert.Equal(DefaultAttempts, RequestsOf(WebhookDeliveryFixture.OnePath, eventId).Count);
+
+        var result = await SettleAsync(processId, deadLetterId, redeliver: true);
+
+        Assert.Equal(DeadLetterOutcome.Settled, result.Outcome);
+        Assert.Equal("redelivered", result.DeadLetter!.State);
+        var deliveryId = (Guid)(await fixture.Tenant.ScalarAsync("SELECT id FROM axis.webhook_deliveries WHERE event_id = @event AND webhook_id = @webhook", ("event", eventId), ("webhook", HookId("HookOne"))))!;
+        Assert.Equal(0L, await fixture.Tenant.CountAsync("SELECT count(*) FROM axis.delivery_failures WHERE kind = 'webhook.deliver' AND target = @target", ("target", deliveryId.ToString("D"))));
+        Assert.Equal(1L, await fixture.Tenant.CountAsync("SELECT count(*) FROM axis.process_work_items WHERE kind = 'webhook.deliver' AND webhook_delivery_id = @id AND due_at <= now() AND claim_token IS NULL", ("id", deliveryId)));
+
+        Assert.Equal(WorkItemOutcome.Completed, await fixture.RunDeliveryAsync(CancellationToken));
+        Assert.Null(await fixture.RunDeliveryAsync(CancellationToken));
+
+        var requests = RequestsOf(WebhookDeliveryFixture.OnePath, eventId);
+        Assert.Equal(DefaultAttempts + 1, requests.Count);
+        Assert.All(requests, request => Assert.Equal($"{eventId:D}_{HookId("HookOne"):D}", request.Headers["webhook-id"]));
+        Assert.Equal(DefaultAttempts + 1, (await DeliveryAsync(eventId, "delivered", WebhookDeliveryFixture.OnePath)).Attempts);
+        Assert.Equal(0L, await fixture.Tenant.CountAsync("SELECT count(*) FROM axis.process_work_items WHERE kind = 'webhook.deliver'"));
+    }
+
+    [Fact]
+    public async Task Discarding_a_webhook_dead_letter_leaves_no_item_and_sends_nothing_more()
+    {
+        await fixture.ClearDeliveriesAsync();
+        fixture.Receiver.Respond(WebhookDeliveryFixture.OnePath, 500, 500, 500, 500, 500);
+        var (_, instanceId) = await RaiseAsync(500m, 4);
+        var eventId = await EventIdAsync(instanceId);
+        await RunDeliveriesUntilNoItemAsync();
+        var (deadLetterId, processId) = await OpenDeadLetterAsync(eventId);
+        var sent = fixture.Receiver.Requests.Count;
+
+        var result = await SettleAsync(processId, deadLetterId, redeliver: false);
+
+        Assert.Equal(DeadLetterOutcome.Settled, result.Outcome);
+        Assert.Equal("discarded", result.DeadLetter!.State);
+        Assert.Equal(0L, await fixture.Tenant.CountAsync("SELECT count(*) FROM axis.process_work_items WHERE kind = 'webhook.deliver'"));
+        await fixture.MakeDueAsync();
+        Assert.Null(await fixture.RunDeliveryAsync(CancellationToken));
+        Assert.Equal(sent, fixture.Receiver.Requests.Count);
+        Assert.Equal(DefaultAttempts, (await DeliveryAsync(eventId, "pending", WebhookDeliveryFixture.OnePath)).Attempts);
+    }
+
+    /// <summary>Runs every due delivery item and makes the rescheduled ones due, round after round, until none is left.</summary>
+    private async Task RunDeliveriesUntilNoItemAsync()
+    {
+        for (var round = 0; round < DefaultAttempts + 2; round++)
+        {
+            await fixture.MakeDueAsync();
+            while (await fixture.RunDeliveryAsync(CancellationToken) is not null)
+            {
+            }
+
+            if (await fixture.Tenant.CountAsync("SELECT count(*) FROM axis.process_work_items WHERE kind = 'webhook.deliver'") == 0)
+            {
+                return;
+            }
+        }
+
+        Assert.Fail("A webhook delivery item was still queued after every attempt.");
+    }
+
+    private Guid HookId(string name) => Assert.Single(fixture.Model.Webhooks, webhook => webhook.Name == name).Id;
+
+    private async Task<(Guid DeadLetterId, Guid ProcessId)> OpenDeadLetterAsync(Guid eventId)
+    {
+        await using var command = fixture.Tenant.DataSource.CreateCommand(
+            "SELECT id, process_id FROM axis.dead_letters WHERE kind = 'webhook.deliver' AND event_id = @event AND state = 'open'");
+        command.Parameters.AddWithValue("event", eventId);
+        await using var reader = await command.ExecuteReaderAsync(CancellationToken);
+        Assert.True(await reader.ReadAsync(CancellationToken));
+        return (reader.GetGuid(0), reader.GetGuid(1));
+    }
+
+    private async Task<DeadLetterResult> SettleAsync(Guid processId, Guid deadLetterId, bool redeliver)
+    {
+        await using var connection = await fixture.Tenant.DataSource.OpenConnectionAsync(CancellationToken);
+        await using var transaction = await connection.BeginTransactionAsync(CancellationToken);
+        var result = redeliver
+            ? await DeadLetterCommand.RedeliverAsync(
+                connection, transaction, fixture.Tenant.Tenant, fixture.Model, fixture.ReleaseId, processId, deadLetterId, "maria", "Maria", "The receiver is back.", CancellationToken)
+            : await DeadLetterCommand.DiscardAsync(
+                connection, transaction, fixture.Tenant.Tenant, fixture.Model, processId, deadLetterId, "maria", "Maria", "The receiver is retired.", CancellationToken);
+        await transaction.CommitAsync(CancellationToken);
+        return result;
     }
 
     /// <summary>Inserts a request, starts <c>Announce</c> for it and, unless <paramref name="run"/> is off, runs its step.</summary>

@@ -21,7 +21,7 @@ public static class DeadLetters
     public static IReadOnlyList<string> States { get; } = [Open, Redelivered, Discarded];
 
     internal const string Columns =
-        "id, kind, event_id, trigger_id, process_instance_id, email_id, occurrence_at, attempts, last_error, state, reason, settled_by, created_at, settled_at";
+        "id, kind, event_id, trigger_id, process_instance_id, email_id, occurrence_at, attempts, last_error, state, reason, settled_by, created_at, settled_at, webhook_id";
 
     /// <summary>
     /// Reads one page of the dead letters of the process, newest first, and the number of them on every
@@ -81,7 +81,8 @@ public static class DeadLetters
             reader.IsDBNull(10) ? null : reader.GetString(10),
             reader.IsDBNull(11) ? null : reader.GetString(11),
             reader.GetFieldValue<DateTimeOffset>(12),
-            reader.IsDBNull(13) ? null : reader.GetFieldValue<DateTimeOffset>(13));
+            reader.IsDBNull(13) ? null : reader.GetFieldValue<DateTimeOffset>(13),
+            reader.IsDBNull(14) ? null : reader.GetGuid(14));
 
     private static void AddFilter(NpgsqlCommand command, Guid applicationId, Guid processId, string? state)
     {
@@ -106,7 +107,8 @@ public sealed record DeadLetterRow(
     string? Reason,
     string? SettledBy,
     DateTimeOffset CreatedAt,
-    DateTimeOffset? SettledAt);
+    DateTimeOffset? SettledAt,
+    Guid? WebhookId);
 
 /// <summary>One page of dead letters, and the number of them on every page.</summary>
 public sealed record DeadLetterPage(IReadOnlyList<DeadLetterRow> Items, long TotalCount);

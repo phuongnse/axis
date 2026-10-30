@@ -37,8 +37,8 @@ A delete starts a process without a subject through a delete trigger
 See [Delete triggers](#delete-triggers).
 
 Deliveries to `async` triggers and schedule fan-outs that keep failing back off,
-stop after a limit and become dead letters, and so do failed emails
-([D72](../decisions/d72-a-delivery-limit-and-dead-letters.md)). See
+stop after a limit and become dead letters, and so do failed emails and
+failed webhook deliveries ([D72](../decisions/d72-a-delivery-limit-and-dead-letters.md)). See
 [Dead letters](#dead-letters).
 
 ## Raise event step
@@ -322,17 +322,17 @@ stored occurrence in `axis.events`, so every attempt sends the same bytes.
 4. Any other answer, a `3xx`, a timeout or a network error runs one transaction
    that counts the failure, adds one to the row's `attempts`, stores the status
    code of the answer, or null when there was none, and makes the item due after
-   the backoff of the count.
+   the backoff of the count. At `Worker:DeliveryAttempts` failures it writes a dead
+letter and deletes the item instead, see [Dead letters](#dead-letters).
 
 **Backoff.** A failure is counted in `axis.delivery_failures` under the kind
 `webhook.deliver` and the target `{deliveryId}`, the id of the row. The wait is
 the event delivery backoff of [Dead letters](#dead-letters): 30 seconds doubled
-for each earlier failure, at most one hour. The count has no limit yet, so a
-delivery that keeps failing retries every hour and writes no dead letter. The
+for each earlier failure, at most one hour. At `Worker:DeliveryAttempts`
+failures, default 5, the delivery becomes a dead letter of the kind
+`webhook.deliver`, and the other webhooks of the occurrence still deliver. The
 last error is a fixed text such as `HTTP 500`, `HTTP 302 (redirects are not
 followed)` or the exception type, and never holds a body, a URL or a secret.
-_(planned for M19)_ At `Worker:DeliveryAttempts` failures the delivery becomes a
-dead letter.
 
 **Test scenarios.** A [test scenario](test-scenarios.md) never sends a webhook.
 `advanceTime` does not run `webhook.deliver` items, so the deliveries a scenario
@@ -582,10 +582,10 @@ Deliveries that keep failing stop after a limit and are kept as dead letters, se
 [D72](../decisions/d72-a-delivery-limit-and-dead-letters.md). The counting, the
 backoff, the limit, the two tables, the log, the metric and the
 [routes](#routes) are built for the start of an `async` trigger and the wake of
-a waiting instance from `event.deliver`, for `trigger.fanOut` and for
-`notification.email`.
+a waiting instance from `event.deliver`, for `trigger.fanOut`, for
+`notification.email` and for `webhook.deliver`.
 
-**What counts.** Three kinds of work item deliver something, and each
+**What counts.** Four kinds of work item deliver something, and each
 failure is counted for its own target:
 
 | Kind | Target |
@@ -593,6 +593,7 @@ failure is counted for its own target:
 | `event.deliver` | One occurrence and one `async` trigger, or one occurrence and one waiting instance |
 | `trigger.fanOut` | One occurrence of a schedule trigger |
 | `notification.email` | One email in the outbox |
+| `webhook.deliver` | One occurrence and one webhook |
 
 **Counting.** When a delivery's transaction fails, a separate transaction
 adds one to the target's count in `axis.delivery_failures`, with the error as
@@ -641,8 +642,14 @@ the instance whose `notify` step staged the email, that instance in
 item's instance, since the outbox row does not record it.
 
 For a webhook delivery, the failure is counted under the kind `webhook.deliver`
-and the target `{deliveryId}`, and no limit applies yet, see
-[Webhook delivery](#webhook-delivery).
+and the target `{deliveryId}`, the id of its row in `axis.webhook_deliveries`,
+see [Webhook delivery](#webhook-delivery). At the limit the item is deleted and
+the row stays `pending`, so nothing more is sent until an operator redelivers.
+The dead letter names the application, the process of the instance that raised
+the event, that instance in `process_instance_id`, the occurrence in `event_id`
+and the webhook in `webhook_id`. The process is read through the row's
+instance. Other webhooks of the occurrence have their own rows and items, so
+they still deliver.
 
 **The counter.** `axis.delivery_failures` holds one row per target:
 
@@ -659,10 +666,10 @@ and the target `{deliveryId}`, and no limit applies yet, see
 | Column | Type | Meaning |
 | --- | --- | --- |
 | `id` | `uuid` | A version 7 UUID |
-| `kind` | `text` | `event.deliver`, `trigger.fanOut` or `notification.email` |
+| `kind` | `text` | `event.deliver`, `trigger.fanOut`, `notification.email` or `webhook.deliver` |
 | `application_id` | `uuid` | The application |
-| `process_id` | `uuid`, null _(planned for M19)_ | The process whose grants govern it: the trigger's process, the waiting instance's process or the process that sent the email. _(planned for M19)_ For a webhook delivery, the process of the instance that raised the event, or null when an endpoint without a `process` raised it. No process's routes list such a dead letter, and the [operator console](operator-console.md) shows it |
-| `event_id`, `trigger_id`, `process_instance_id`, `email_id` | `uuid`, null | What failed, as the kind needs |
+| `process_id` | `uuid`, null _(planned for M19)_ | The process whose grants govern it: the trigger's process, the waiting instance's process, the process that sent the email or the process of the instance that raised the webhook's event. _(planned for M19)_ A webhook delivery of an event that an endpoint without a `process` raised has a null process. No process's routes list such a dead letter, and the [operator console](operator-console.md) shows it |
+| `event_id`, `trigger_id`, `process_instance_id`, `email_id`, `webhook_id` | `uuid`, null | What failed, as the kind needs |
 | `occurrence_at` | `timestamptz`, null | The schedule occurrence, for a fan-out |
 | `attempts` | `integer` | The failures counted |
 | `last_error` | `text` | A fixed text. It holds no value, body, address or exception message. For a database error it is the exception type with its SQLSTATE, as `Npgsql.PostgresException with SQLSTATE P0001`, and for another error just the exception type |
@@ -705,8 +712,8 @@ optional `state` is `open`, `redelivered` or `discarded`. Any other value is a
 `400` keyed `state`, and without it every state is listed. A request is checked
 in this order: session (`401`), application and process (`404`), the `inspect`
 grant (`403`), then the query (`400`). Each item has `id`, `kind`, `eventId`,
-`triggerId`, `processInstanceId`, `emailId`, `occurrenceAt`, `attempts`,
-`lastError`, `state`, `reason`, `settledBy`, `createdAt`, `settledAt` and
+`triggerId`, `processInstanceId`, `emailId`, `webhookId`, `occurrenceAt`,
+`attempts`, `lastError`, `state`, `reason`, `settledBy`, `createdAt`, `settledAt` and
 `commands`, with times in UTC and null for what its kind lacks. `commands` is
 `["redeliver", "discard"]` for an `open` dead letter when the user holds the
 `retry` grant, and empty otherwise.
@@ -738,6 +745,13 @@ with empty `commands`.
   email and queues a `notification.email` item for the same row and instance.
   The worker then sends it as before, even when the instance was cancelled
   meanwhile.
+- **`webhook.deliver`.** A redeliver needs nothing from the active release,
+  since the delivery is staged on the release that holds the webhook. It clears
+  the count of the delivery and queues a `webhook.deliver` item for the same row
+  of `axis.webhook_deliveries`, found by `event_id` and `webhook_id`. The worker
+  then sends it once, with the same `webhook-id` so the receiver can drop a
+  duplicate. A row that is missing is a `409` titled "This kind of dead letter
+  cannot be redelivered.". Discard sends nothing more.
 - **Other kinds.** A redeliver of a kind that is not built is a `409` titled
   "This kind of dead letter cannot be redelivered.". Discard closes a dead
   letter of any kind.

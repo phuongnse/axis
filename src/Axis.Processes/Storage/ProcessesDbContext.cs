@@ -429,6 +429,7 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
             letter.Property(l => l.TriggerId).HasColumnName("trigger_id");
             letter.Property(l => l.ProcessInstanceId).HasColumnName("process_instance_id");
             letter.Property(l => l.EmailId).HasColumnName("email_id");
+            letter.Property(l => l.WebhookId).HasColumnName("webhook_id");
             letter.Property(l => l.OccurrenceAt).HasColumnName("occurrence_at");
             letter.Property(l => l.Attempts).HasColumnName("attempts");
             letter.Property(l => l.LastError).HasColumnName("last_error");

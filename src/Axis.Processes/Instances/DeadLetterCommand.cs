@@ -38,8 +38,10 @@ public sealed record DeadLetterResult(DeadLetterOutcome Outcome, DeadLetterRow? 
 /// waiting instance needs nothing from the active release. It clears the failure count and queues an item that
 /// names the instance, so the handler wakes that instance alone, if it still waits. A redeliver of a <c>trigger.fanOut</c> dead
 /// letter needs its schedule trigger in the active release, clears the occurrence's failure count and queues
-/// the fan-out on the active release. Any other kind cannot be redelivered. A discard closes a dead letter
-/// of any kind. Both set the state, the reason, the user and the time, and append the audit record
+/// the fan-out on the active release. A redeliver of a <c>webhook.deliver</c> dead letter needs nothing from the
+/// active release. It clears the failure count and queues an item for the staged delivery of the occurrence and the
+/// webhook, which the handler sends again with the same <c>webhook-id</c>. Any other kind cannot be redelivered. A
+/// discard closes a dead letter of any kind. Both set the state, the reason, the user and the time, and append the audit record
 /// <c>deadLetter.redelivered</c> or <c>deadLetter.discarded</c>. The command never commits or rolls back.
 /// A result other than <see cref="DeadLetterOutcome.Settled"/> wrote nothing, but the row may be locked.
 /// </summary>
@@ -114,6 +116,7 @@ public static class DeadLetterCommand
                 DeliveryFailures.EventDeliverKind => await RedeliverEventAsync(connection, transaction, tenantId, active, letter, cancellationToken),
                 DeliveryFailures.TriggerFanOutKind => await RedeliverFanOutAsync(connection, transaction, tenantId, active, activeReleaseId, letter, cancellationToken),
                 DeliveryFailures.NotificationEmailKind => await RedeliverEmailAsync(connection, transaction, tenantId, letter, cancellationToken),
+                DeliveryFailures.WebhookDeliverKind => await RedeliverWebhookAsync(connection, transaction, tenantId, letter, cancellationToken),
                 _ => DeadLetterOutcome.NotRedeliverable,
             };
             if (refused != DeadLetterOutcome.Settled)
@@ -271,6 +274,47 @@ public static class DeadLetterCommand
             cancellationToken,
             processInstanceId: instanceId,
             emailId: emailId);
+        return DeadLetterOutcome.Settled;
+    }
+
+    private static async Task<DeadLetterOutcome> RedeliverWebhookAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction transaction,
+        string tenantId,
+        DeadLetterRow letter,
+        CancellationToken cancellationToken)
+    {
+        if (letter.EventId is not { } eventId || letter.WebhookId is not { } webhookId)
+        {
+            return DeadLetterOutcome.NotRedeliverable;
+        }
+
+        Guid deliveryId;
+        await using (var find = new NpgsqlCommand(
+            "SELECT id FROM axis.webhook_deliveries WHERE event_id = @event AND webhook_id = @webhook",
+            connection,
+            transaction))
+        {
+            find.Parameters.AddWithValue("event", eventId);
+            find.Parameters.AddWithValue("webhook", webhookId);
+            if (await find.ExecuteScalarAsync(cancellationToken) is not Guid found)
+            {
+                return DeadLetterOutcome.NotRedeliverable;
+            }
+
+            deliveryId = found;
+        }
+
+        // The staged row names the release that holds the webhook, so sending it needs nothing from the active release.
+        await DeleteFailureAsync(transaction, DeliveryFailures.WebhookDeliverKind, deliveryId.ToString("D"), cancellationToken);
+        await WorkItemQueue.EnqueueAsync(
+            connection,
+            transaction,
+            tenantId,
+            ProcessStarts.WebhookDeliverWorkItemKind,
+            DateTimeOffset.UtcNow,
+            cancellationToken,
+            webhookDeliveryId: deliveryId);
         return DeadLetterOutcome.Settled;
     }
 

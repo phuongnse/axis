@@ -105,10 +105,11 @@ The delivery is built, apart from the parts marked _(planned for M19)_.
   receiver can move to the new secret before the old one is removed.
 - **Outcomes.** A `2xx` delivers. Anything else, a `3xx`, a timeout or a
   network error is retried with the
-  [event delivery backoff](process-events.md#webhook-delivery). A failing
-  delivery keeps retrying at the capped backoff of one hour, without end.
-  _(planned for M19)_ At the event delivery limit that M14 adds, the delivery
-  becomes a dead letter that an operator redelivers or discards.
+  [event delivery backoff](process-events.md#webhook-delivery). At
+  `Worker:DeliveryAttempts` failures the delivery stops and becomes a
+  [dead letter](process-events.md#dead-letters) of the kind `webhook.deliver`
+  that an operator redelivers or discards. A redeliver keeps the same
+  `webhook-id`. The other webhooks of the occurrence still deliver.
 - **Rules of a connector call.** `https` only outside Development, and no
   redirects: a `3xx` fails the attempt. The request is cancelled after the
   webhook's `timeout`.

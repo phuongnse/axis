@@ -213,6 +213,7 @@ export interface DeadLetterItem {
   triggerId: string | null
   processInstanceId: string | null
   emailId: string | null
+  webhookId: string | null
   occurrenceAt: string | null
   attempts: number
   lastError: string

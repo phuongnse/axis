@@ -207,6 +207,40 @@ internal static class DeliveryFailures
         return id;
     }
 
+    /// <summary>Writes an <c>open</c> dead letter for one occurrence sent to one webhook and returns its id.</summary>
+    internal static async Task<Guid> InsertWebhookDeadLetterAsync(
+        NpgsqlTransaction transaction,
+        Guid applicationId,
+        Guid processId,
+        Guid processInstanceId,
+        Guid eventId,
+        Guid webhookId,
+        int attempts,
+        string error,
+        CancellationToken cancellationToken)
+    {
+        var id = Guid.CreateVersion7();
+        await using var command = new NpgsqlCommand(
+            """
+            INSERT INTO axis.dead_letters (id, kind, application_id, process_id, process_instance_id, event_id, webhook_id, attempts, last_error, state, created_at)
+            VALUES (@id, @kind, @application, @process, @instance, @event, @webhook, @attempts, @error, @state, now())
+            """,
+            Connection(transaction),
+            transaction);
+        command.Parameters.AddWithValue("id", id);
+        command.Parameters.AddWithValue("kind", WebhookDeliverKind);
+        command.Parameters.AddWithValue("application", applicationId);
+        command.Parameters.AddWithValue("process", processId);
+        command.Parameters.AddWithValue("instance", processInstanceId);
+        command.Parameters.AddWithValue("event", eventId);
+        command.Parameters.AddWithValue("webhook", webhookId);
+        command.Parameters.AddWithValue("attempts", attempts);
+        command.Parameters.AddWithValue("error", error);
+        command.Parameters.AddWithValue("state", Open);
+        await command.ExecuteNonQueryAsync(cancellationToken);
+        return id;
+    }
+
     private static NpgsqlConnection Connection(NpgsqlTransaction transaction) =>
         transaction.Connection ?? throw new ArgumentException("The transaction is completed.", nameof(transaction));
 }
