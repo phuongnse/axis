@@ -3,7 +3,8 @@
 # Keycloak runs with the development realm from samples/keycloak, and Playwright starts the
 # server only once the realm answers. Keycloak imports the organization realm company too. It listens on
 # AXIS_E2E_KEYCLOAK_PORT (default 8180) inside and outside its container, so the axis realm reaches the company
-# realm at the address the browser uses. The server signs people in through that realm at
+# realm at the address the browser uses. This script then adds the axis first login flow to the axis realm through the
+# admin API, before the server starts. The server signs people in through that realm at
 # /api/auth/sign-in. The SPA does not offer it yet. The realm signs people in on the Axis theme, which this script
 # builds into artifacts/keycloak-theme and mounts read-only before Keycloak starts.
 # The server starts with seven applications active: the generic E2E test application in
@@ -262,6 +263,10 @@ if affected playwright; then
     } >&2
     exit 1
   fi
+
+  # The realm sync names the axis first login flow on every brokered provider, and the import of axis-realm.json cannot
+  # hold it. This adds it through the admin API before Playwright starts the server.
+  node scripts/lib/development-realm.mjs "http://127.0.0.1:$keycloak_port"
 
   export AXIS_E2E_SERVER_LOG="$root/artifacts/logs/e2e-server.log"
   export AXIS_E2E_JUNIT="$results_dir/$playwright_suite.xml"
