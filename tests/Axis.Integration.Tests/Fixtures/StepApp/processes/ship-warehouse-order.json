@@ -1,0 +1,20 @@
+{
+  "id": "7c3e5f0a-52d1-4b8e-9a64-0d2f7e1b8c35",
+  "kind": "process",
+  "name": "ShipWarehouseOrder",
+  "formatVersion": 1,
+  "entity": "Request",
+  "start": "shipOrder",
+  "steps": [
+    {
+      "name": "shipOrder",
+      "type": "operation",
+      "operation": "callConnector",
+      "connector": { "name": "Warehouse", "operation": "shipOrder" },
+      "input": { "warehouse": "'north'", "reference": "title", "amount": "amount" },
+      "output": { "orderNumber": "comment" },
+      "next": "done"
+    },
+    { "name": "done", "type": "end" }
+  ]
+}

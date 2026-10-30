@@ -67,6 +67,8 @@ public sealed record ConnectorOperationModel(
 /// <summary>
 /// An input or output field of a compiled connector operation, with a scalar field type. For an
 /// input, <paramref name="In"/> is where a call sends it: <c>body</c>, <c>path</c>, <c>query</c> or
-/// <c>header</c>.
+/// <c>header</c>. For an output, <paramref name="Source"/> is a JSON Pointer into the response body,
+/// and null means the top-level property of <paramref name="Name"/>.
 /// </summary>
-public sealed record ConnectorFieldModel(string Name, FieldType Type, bool Required, string In = "body");
+public sealed record ConnectorFieldModel(
+    string Name, FieldType Type, bool Required, string In = "body", string? Source = null);

@@ -33,7 +33,7 @@ public sealed class ConnectorInputLocationTests(ConnectorCallFixture fixture) : 
     public async Task A_post_sends_its_path_input_in_the_path_and_only_its_body_inputs_in_the_json_body()
     {
         var tenant = fixture.Tenant("a");
-        var (subjectId, instanceId) = await fixture.StageAsync("a", CancellationToken, "ShipOrder");
+        var (subjectId, instanceId) = await fixture.StageAsync("a", CancellationToken, "ShipWarehouseOrder");
         var callId = await CallIdAsync(tenant, instanceId);
 
         Assert.Equal(WorkItemOutcome.Completed, await fixture.RunCallAsync("a", CancellationToken));

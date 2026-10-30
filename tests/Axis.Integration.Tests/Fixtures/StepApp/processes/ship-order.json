@@ -1,18 +1,18 @@
 {
-  "id": "b14ccae1-0afe-4dc8-ad9f-3bb4803e3e45",
+  "id": "cc0b19ba-cc09-4374-bea1-97fbfe791141",
   "kind": "process",
   "name": "ShipOrder",
   "formatVersion": 1,
   "entity": "Request",
-  "start": "shipOrder",
+  "start": "createShipment",
   "steps": [
     {
-      "name": "shipOrder",
+      "name": "createShipment",
       "type": "operation",
       "operation": "callConnector",
-      "connector": { "name": "Warehouse", "operation": "shipOrder" },
-      "input": { "warehouse": "'north'", "reference": "title", "amount": "amount" },
-      "output": { "orderNumber": "comment" },
+      "connector": { "name": "Shipping", "operation": "createShipment" },
+      "input": { "reference": "title" },
+      "output": { "orderNumber": "title", "trackingNumber": "comment" },
       "next": "done"
     },
     { "name": "done", "type": "end" }

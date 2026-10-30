@@ -17,4 +17,7 @@ public sealed record ConnectorFieldDefinition
     /// <c>header</c>. An output has no <c>in</c>.
     /// </summary>
     public string In { get; init; } = "body";
+
+    /// <summary>For an output only: a JSON Pointer into the response body, or null to read the top-level property of <see cref="Name"/>.</summary>
+    public string? Source { get; init; }
 }

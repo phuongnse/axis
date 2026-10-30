@@ -185,7 +185,11 @@ The purchase request sample holds the purchasing system connector in
   - `input` fields are sent as a JSON body, unless an input's `in` sends it in
     the path, the query or a header. A `GET` sends no body, so it may have
     `path`, `query` and `header` inputs but no `body` input.
-  - `output` fields are read from the JSON response.
+  - `output` fields are read from the JSON response. An output is read from
+    the top-level property of its name, unless it has a `source`, a JSON
+    Pointer ([RFC 6901](https://www.rfc-editor.org/rfc/rfc6901)) into the
+    response body, see [Structured payloads](#structured-payloads). `source` is
+    allowed on outputs only.
   - Input and output field types are the
     [rule parameter types](resource-files.md#resource-file-shape): `text`, `integer`,
     `decimal`, `boolean`, `date` and `date-time`. _(planned for M19)_ Inputs
@@ -193,7 +197,8 @@ The purchase request sample holds the purchasing system connector in
 - `lookup` is optional and set per operation. It names another operation of
   the same connector that finds an earlier call by its idempotency key.
   - The lookup is a `GET` whose `path` holds `{idempotencyKey}`.
-  - It has no inputs, and the same outputs as the operation it serves.
+  - It has no inputs, and the same outputs as the operation it serves, each
+    with the same `source`.
   - A `200` means found, and its body gives the output. A `404` means not
     found. Anything else is a failed lookup.
 - The worker never follows a redirect. A `3xx` response fails the call, so
@@ -276,9 +281,8 @@ The token request and the cache are built. The resend after a `401` is not.
 
 Inputs go outside the body, as
 [D91](../decisions/d91-connector-oauth2-and-structured-payloads.md) agrees.
-_(planned for M19)_ Inputs can also nest, and outputs can come from deep in
-the response. The `lines` input and the `source` output in the example are
-still planned. Bodies stay JSON.
+_(planned for M19)_ Inputs can also nest. The `lines` input in the example is
+still planned. Bodies stay JSON. An output's `source` is built.
 
 ```json
 {
@@ -317,9 +321,21 @@ still planned. Bodies stay JSON.
   input's items are objects with `fields`. Nesting goes four levels deep at
   most. The step maps them as in
   [Step shape](process-execution.md#step-shape).
-- **`source`.** _(planned for M19)_ An output field may name a JSON Pointer into the response
-  body. Without it, the output is read from the top-level property of its
-  name. Outputs stay scalar, because they write subject fields.
+- **`source`.** _(built)_ An output field may name a JSON Pointer
+  ([RFC 6901](https://www.rfc-editor.org/rfc/rfc6901)) into the response body,
+  such as `/shipment/tracking/number`. Without it, the output is read from the
+  top-level property of its name. Outputs stay scalar, because they write
+  subject fields.
+  - A token reads an object property by its exact name, and an array element by
+    its index, such as `/items/0/sku`. Write `~0` for `~` and `~1` for `/` in a
+    token.
+  - A `source` must start with `/`, and every `~` must be followed by `0` or
+    `1`, otherwise it is `AXC0311`. The empty pointer is refused, because it
+    names the whole body, which is never a scalar.
+  - When the `source` names nothing in a `2xx` body, a required output leaves
+    the call `unknown`, as a missing top-level output does. An optional output
+    writes nothing.
+  - A lookup's outputs need the same `source` as the operation it serves.
 - **Later.** Writing a list from the response into a child collection, and
   bodies that are not JSON.
 

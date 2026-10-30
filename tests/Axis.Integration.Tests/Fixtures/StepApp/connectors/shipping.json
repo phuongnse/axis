@@ -1,0 +1,21 @@
+{
+  "id": "2ee8baaf-c25c-4e9a-ba4a-d599aff102c9",
+  "kind": "connector",
+  "name": "Shipping",
+  "formatVersion": 1,
+  "baseUrl": { "binding": "PurchasingUrl" },
+  "timeout": "PT1S",
+  "auth": { "type": "bearer", "token": { "binding": "PurchasingToken" } },
+  "operations": [
+    {
+      "name": "createShipment",
+      "method": "POST",
+      "path": "/shipments",
+      "input": [{ "name": "reference", "type": "text", "required": true }],
+      "output": [
+        { "name": "orderNumber", "type": "text", "required": true },
+        { "name": "trackingNumber", "type": "text", "required": true, "source": "/shipment/tracking/number" }
+      ]
+    }
+  ]
+}

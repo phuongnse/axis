@@ -497,10 +497,136 @@ public sealed class ConnectorCompilerTests
         Assert.Empty(result.Diagnostics);
     }
 
+    [Fact]
+    public void An_output_source_that_is_not_a_json_pointer_is_reported_at_its_path()
+    {
+        using var folder = Folder().With("connectors/purchasing-system.json", Connector("""
+            "operations": [
+              { "name": "ship", "method": "POST", "path": "/shipments",
+                "output": [
+                  { "name": "plain", "type": "text" },
+                  { "name": "number", "type": "text", "source": "shipment/number" },
+                  { "name": "bad", "type": "text", "source": "/a~2b" },
+                  { "name": "empty", "type": "text", "source": "" },
+                  { "name": "trailing", "type": "text", "source": "/a~" }
+                ] }
+            ]
+            """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Equal(
+            [
+                (DiagnosticCodes.InvalidOutputSource, "/operations/0/output/1/source"),
+                (DiagnosticCodes.InvalidOutputSource, "/operations/0/output/2/source"),
+                (DiagnosticCodes.InvalidOutputSource, "/operations/0/output/3/source"),
+                (DiagnosticCodes.InvalidOutputSource, "/operations/0/output/4/source"),
+            ],
+            result.Diagnostics.Select(diagnostic => (diagnostic.Code, diagnostic.Path)));
+        Assert.Contains("does not start with '/'", result.Diagnostics[0].Message, StringComparison.Ordinal);
+        Assert.Contains("'~2'", result.Diagnostics[1].Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void An_output_source_with_valid_escapes_or_an_array_index_is_valid()
+    {
+        using var folder = Folder().With("connectors/purchasing-system.json", Connector("""
+            "operations": [
+              { "name": "ship", "method": "POST", "path": "/shipments",
+                "output": [
+                  { "name": "escaped", "type": "text", "source": "/a~0b~1c" },
+                  { "name": "item", "type": "text", "source": "/items/0/sku" }
+                ] }
+            ]
+            """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+    }
+
+    [Fact]
+    public void A_compiled_output_keeps_its_source_and_a_plain_one_has_none()
+    {
+        using var folder = Folder().With("connectors/purchasing-system.json", Connector("""
+            "operations": [
+              { "name": "ship", "method": "POST", "path": "/shipments",
+                "output": [
+                  { "name": "orderNumber", "type": "text", "required": true },
+                  { "name": "trackingNumber", "type": "text", "source": "/shipment/tracking/number" }
+                ] }
+            ]
+            """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.Equal(
+            [
+                new ConnectorFieldModel("orderNumber", FieldType.Text, true),
+                new ConnectorFieldModel("trackingNumber", FieldType.Text, false, Source: "/shipment/tracking/number"),
+            ],
+            Assert.Single(Assert.Single(result.Model!.Connectors).Operations).Output);
+        Assert.Null(result.Model.Connectors[0].Operations[0].Output[0].Source);
+    }
+
+    [Fact]
+    public void A_lookup_whose_output_source_differs_from_its_operations_is_invalid()
+    {
+        using var folder = Folder().With("connectors/purchasing-system.json", Connector("""
+            "operations": [
+              { "name": "create", "method": "POST", "path": "/orders", "lookup": "find",
+                "output": [{ "name": "tracking", "type": "text", "source": "/shipment/tracking/number" }] },
+              { "name": "find", "method": "GET", "path": "/orders/{idempotencyKey}",
+                "output": [{ "name": "tracking", "type": "text", "source": "/tracking" }] }
+            ]
+            """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.InvalidOperationLookup, "/operations/0/lookup"), (diagnostic.Code, diagnostic.Path));
+        Assert.Contains("has other outputs", diagnostic.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_lookup_whose_output_lacks_the_source_of_its_operation_is_invalid()
+    {
+        using var folder = Folder().With("connectors/purchasing-system.json", Connector("""
+            "operations": [
+              { "name": "create", "method": "POST", "path": "/orders", "lookup": "find",
+                "output": [{ "name": "tracking", "type": "text", "source": "/tracking" }] },
+              { "name": "find", "method": "GET", "path": "/orders/{idempotencyKey}", "output": [{ "name": "tracking", "type": "text" }] }
+            ]
+            """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Equal(DiagnosticCodes.InvalidOperationLookup, Assert.Single(result.Diagnostics).Code);
+    }
+
+    [Fact]
+    public void A_lookup_whose_output_source_matches_its_operations_is_valid()
+    {
+        using var folder = Folder().With("connectors/purchasing-system.json", Connector("""
+            "operations": [
+              { "name": "create", "method": "POST", "path": "/orders", "lookup": "find",
+                "output": [{ "name": "tracking", "type": "text", "source": "/shipment/tracking/number" }] },
+              { "name": "find", "method": "GET", "path": "/orders/{idempotencyKey}",
+                "output": [{ "name": "tracking", "type": "text", "source": "/shipment/tracking/number" }] }
+            ]
+            """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+    }
+
     [Theory]
     [InlineData("""{ "name": "find", "method": "GET", "path": "/orders", "input": [{ "name": "number", "type": "text", "in": "cookie" }] }""")]
     [InlineData("""{ "name": "find", "method": "GET", "path": "/orders", "output": [{ "name": "number", "type": "text", "in": "query" }] }""")]
     [InlineData("""{ "name": "find", "method": "HEAD", "path": "/orders" }""")]
+    [InlineData("""{ "name": "ship", "method": "POST", "path": "/orders", "input": [{ "name": "number", "type": "text", "source": "/number" }] }""")]
     [InlineData("""{ "name": "find", "method": "GET", "path": "orders" }""")]
     [InlineData("""{ "name": "find", "method": "GET", "path": "/orders", "output": [{ "name": "number", "type": "enum" }] }""")]
     [InlineData("""{ "name": "find", "method": "GET", "path": "/orders", "retries": 3 }""")]
