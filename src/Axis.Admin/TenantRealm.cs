@@ -94,8 +94,8 @@ internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
             cipher.Decrypt(id, TenantSecretFields.RealmActivationClientSecret, row.RealmActivationClientSecret!).Reveal(),
             cipher.Decrypt(id, TenantSecretFields.RealmUsersClientSecret, row.RealmUsersClientSecret!).Reveal());
 
-        // The display name is the tenant id until the command takes the organization's name.
-        await EnsureAsync(id, id, secrets, mail.For(DirectoryTenantCatalog.Email(row, cipher)), cancellationToken);
+        // The realm has no display name until the command takes the organization's name, so the pages name Axis, never the tenant id.
+        await EnsureAsync(id, string.Empty, secrets, mail.For(DirectoryTenantCatalog.Email(row, cipher)), cancellationToken);
 
         // A secret that is stored is kept, so a rerun never changes it.
         bool Ensure(byte[]? stored, string field, Action<byte[]> write)
