@@ -887,8 +887,7 @@ to show where a resource is used and what it uses.
 | `text entry` | Text | `/texts/{key}` | Text key |
 | `package` | Application | `/packages/{i}` | Extension package |
 | `module` | Application | `/modules/{i}` | Module |
-| `field target` | Entity, data source, page | `/fields/{i}/target`, `/parameters/{i}/target` | Entity |
-| `field target` | Endpoint | `/input/{i}/target` | Entity |
+| `field target` | Entity, data source, page, endpoint | `/fields/{i}/target`, `/parameters/{i}/target`, and `/input/{i}/target` of an endpoint | Entity |
 | `field sequence` | Entity | `/fields/{i}/sequence` | Sequence |
 | `rule call` | Entity, data source, rule, process, policy | `/validations/{i}/expression`, `/filter`, `/expression`, `/startCondition/expression`, `/steps/{i}/branches/{j}/when`, `/steps/{i}/set/{field}`, `/steps/{i}/input/{key}`, `/steps/{i}/fields/{key}`, `/steps/{i}/assignee/user`, `/steps/{i}/to/{j}/user`, `/steps/{i}/to/{j}/email`, `/steps/{i}/message/values/{key}`, `/grants/{i}/filter` | Rule |
 | `rule call` | Trigger | `/when` of a data change trigger | Rule |
@@ -917,6 +916,7 @@ to show where a resource is used and what it uses.
 | `event entity` | Event | `/entity` | Entity |
 | `endpoint entity` | Endpoint | `/entity` | Entity |
 | `endpoint process` | Endpoint | `/process` | Process |
+| `endpoint event` | Endpoint | `/event/name` | Event |
 | `trigger process` | Trigger | `/process` | Process |
 | `trigger event` | Trigger | `/event` | Event |
 | `trigger entity` | Trigger | `/entity` | Entity |

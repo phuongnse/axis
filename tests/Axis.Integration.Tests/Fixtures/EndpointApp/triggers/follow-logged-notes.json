@@ -1,0 +1,10 @@
+{
+  "id": "2f8d6a41-9c07-4e5b-b3d8-1a4c7e0f6b92",
+  "kind": "trigger",
+  "name": "FollowLoggedNotes",
+  "formatVersion": 1,
+  "type": "event",
+  "event": "NoteLogged",
+  "mode": "async",
+  "process": "FollowNote"
+}

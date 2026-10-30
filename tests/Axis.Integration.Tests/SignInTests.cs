@@ -23,12 +23,14 @@ namespace Axis.Integration.Tests;
 /// session it leaves. Tenant a is served at localhost and tenant b at b.example.test, and both sign
 /// in at the same realm. The test drives Keycloak's login form as a browser would. Each tenant has a
 /// migrated database, where sign-in and sign-out write their audit records. The server sits behind
-/// a listed proxy, so every request carries the client address 203.0.113.7.
+/// a listed proxy, so every request carries the client address 203.0.113.7. A record keeps the address with its last part
+/// removed.
 /// </summary>
 public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixture database) : IAsyncLifetime, IClassFixture<PostgreSqlFixture>
 {
     private const string Proxy = "10.0.0.5";
     private const string ClientAddress = "203.0.113.7";
+    private const string ShortenedClientAddress = "203.0.113.0";
     private const string UserAgent = "AxisAuditProbe/1.0";
     private const string HostB = "b.example.test";
     private const string ProfileSelect = "SELECT user_id, display_name, email, locale, first_signed_in_at, last_signed_in_at FROM axis.user_profiles";
@@ -38,6 +40,7 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
     private static readonly Uri _serverAddress = new("http://localhost:5206");
 
     private readonly List<string> _serverResponses = [];
+    private string _clientAddress = ClientAddress;
     private readonly Dictionary<string, string> _databases = [];
     private Uri? _authority;
     private WebApplicationFactory<Program>? _factory;
@@ -259,9 +262,31 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
         Assert.Equal("Requester User", record.ActorName);
         Assert.Null(record.ApplicationId);
         using var details = JsonDocument.Parse(record.Details);
-        Assert.Equal(ClientAddress, details.RootElement.GetProperty("clientAddress").GetString());
+        Assert.Equal(ShortenedClientAddress, details.RootElement.GetProperty("clientAddress").GetString());
         Assert.False(details.RootElement.TryGetProperty("reason", out _));
         Assert.Empty(await ReadAuditAsync("b"));
+    }
+
+    [Theory]
+    [InlineData("203.0.113.7", "203.0.113.0")]
+    [InlineData("2001:db8:1:2:3:4:5:6", "2001:db8:1::")]
+    public async Task Session_audit_records_keep_the_client_address_with_its_last_part_removed(string forwarded, string expected)
+    {
+        _clientAddress = forwarded;
+        using var client = CreateClient();
+
+        await SignInAsync(client, "requester", "/");
+        var signOut = await SendAsync(client, HttpMethod.Post, "/api/auth/sign-out");
+        var refused = await SendAsync(client, HttpMethod.Get, "/api/auth/callback?code=x&state=not-a-state");
+
+        Assert.Equal(HttpStatusCode.OK, signOut.StatusCode);
+        AssertRedirectedToSignInPage(refused);
+        foreach (var action in new[] { "session.signedIn", "session.signedOut", "session.signInRefused" })
+        {
+            var record = Assert.Single(await ReadAuditAsync("a", action));
+            using var details = JsonDocument.Parse(record.Details);
+            Assert.Equal(expected, details.RootElement.GetProperty("clientAddress").GetString());
+        }
     }
 
     [Fact]
@@ -282,7 +307,7 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
         Assert.Equal("requester", record.Actor);
         Assert.Equal("Requester User", record.ActorName);
         using var details = JsonDocument.Parse(record.Details);
-        Assert.Equal(ClientAddress, details.RootElement.GetProperty("clientAddress").GetString());
+        Assert.Equal(ShortenedClientAddress, details.RootElement.GetProperty("clientAddress").GetString());
     }
 
     [Fact]
@@ -317,7 +342,7 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
         Assert.Null(record.ApplicationId);
         using var details = JsonDocument.Parse(record.Details);
         Assert.Equal("otherTenant", details.RootElement.GetProperty("reason").GetString());
-        Assert.Equal(ClientAddress, details.RootElement.GetProperty("clientAddress").GetString());
+        Assert.Equal(ShortenedClientAddress, details.RootElement.GetProperty("clientAddress").GetString());
         Assert.Empty(await ReadAuditAsync("a"));
     }
 
@@ -732,7 +757,7 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
     private async Task<HttpResponseMessage> SendAsync(HttpClient client, HttpMethod method, string path, bool csrfHeader = true)
     {
         using var request = new HttpRequestMessage(method, new Uri(path, UriKind.Relative));
-        request.Headers.Add("X-Forwarded-For", ClientAddress);
+        request.Headers.Add("X-Forwarded-For", _clientAddress);
         request.Headers.UserAgent.ParseAdd(UserAgent);
         if (csrfHeader && method != HttpMethod.Get)
         {

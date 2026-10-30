@@ -2,9 +2,10 @@ namespace Axis.Configuration.Resources;
 
 /// <summary>
 /// An <c>endpoint</c> resource: an inbound call that creates a record of an entity from typed
-/// input fields and starts a process on it. The schema checks its shape, that each input field
+/// input fields and starts a process on it, and may name an event about that record with the
+/// payload that <see cref="Event"/> gives. The schema checks its shape, that each input field
 /// has only the properties an input takes, and that <see cref="Output"/> and <see cref="Wait"/>
-/// come together. Its entity, process, input fields, mapping, output and wait are checked by
+/// come together. Its entity, process, event, input fields, mapping, output and wait are checked by
 /// <see cref="Compilation.ApplicationCompiler"/>.
 /// </summary>
 public sealed record EndpointResource : Resource
@@ -14,6 +15,9 @@ public sealed record EndpointResource : Resource
 
     /// <summary>The name of the process the call starts on the new record.</summary>
     public required string Process { get; init; }
+
+    /// <summary>The event the call is to raise about the new record, or null when it names none.</summary>
+    public EndpointEventDefinition? Event { get; init; }
 
     /// <summary>The typed input fields of the call's body, in declaration order. The list may be empty.</summary>
     public required IReadOnlyList<EndpointInputDefinition> Input { get; init; }

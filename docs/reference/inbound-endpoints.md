@@ -100,10 +100,11 @@ One transaction then does the rest:
 5. It inserts the instance, pinned to the active release, with its first
    work item, as the [process start](processes.md#start-endpoint) does. An
    instance already running for the record is a `409`.
-6. _(planned for M19)_ With an `event`, it raises the event for the new record,
+6. With an `event`, it raises the event for the new record,
    as a [raise event step](process-events.md#raise-event-step) does: it stores
-   the occurrence, with the instance of step 5 as the one that raised it, or no
-   instance when the endpoint has no `process`, and the active release, runs the `sync` event triggers, queues the `event.deliver`
+   the occurrence, with the instance of step 5 as the one that raised it, or
+   _(planned for M19)_ no instance when the endpoint has no `process`, and the
+   active release, runs the `sync` event triggers, queues the `event.deliver`
    work item and stages the event's
    [webhook deliveries](outbound-webhooks.md#webhook-delivery). A run-time
    error in an expression is a `400` keyed `/event/fields/<key>`. See
@@ -304,3 +305,12 @@ state of an instance that an endpoint call started.
   `state`. `output` is there only when the instance is `completed`.
 - **Output as contract.** The output values are read as the endpoint's
   contract, outside field grants, as the call's own `201` does.
+
+## Editing in Studio
+
+- **Endpoint `event`** _(built)_. The [Studio](studio.md) endpoint form shows the
+  `event` as a picker of the application's events. The event's `fields` show as
+  rows of a payload field and an expression, and **Add mapping** lists the
+  payload fields that have no row. Clearing the picker removes the whole
+  `event`. Picking another event keeps the rows. A value that is not an object
+  is left to the JSON view.

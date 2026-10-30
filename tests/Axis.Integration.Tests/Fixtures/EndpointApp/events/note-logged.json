@@ -1,0 +1,11 @@
+{
+  "id": "6d1f3c52-8b0e-4a79-9f24-5c3e7a18d0b1",
+  "kind": "event",
+  "name": "NoteLogged",
+  "formatVersion": 1,
+  "entity": "Note",
+  "fields": [
+    { "name": "title", "type": "text" },
+    { "name": "share", "type": "decimal" }
+  ]
+}

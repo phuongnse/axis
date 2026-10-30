@@ -463,7 +463,7 @@ Run and the Test results list, the read-only views of a module entity, a module 
   | `policy`      | Generic form                                                    | Nothing                                                               |
   | `dataSource`  | Generic form                                                    | Nothing                                                               |
   | `connector`   | Typed editor                                                    | Nothing                                                               |
-  | `endpoint`    | Generic form, typed rows for `values` and, _(planned for M19)_, the `event`'s `fields` | Nothing                                                    |
+  | `endpoint`    | Generic form, typed rows for `values` and the `event`'s `fields`                       | Nothing                                                    |
   | `event`       | Generic form                                                    | Nothing                                                               |
   | `trigger`     | Generic form                                                    | Nothing                                                               |
   | `webhook`     | Generic form                                                    | Nothing                                                               |
@@ -666,25 +666,25 @@ Run and the Test results list, the read-only views of a module entity, a module 
         box. A key the step's operation forbids is not shown as rows. It says
         to edit it in the JSON view, and a diagnostic path inside it opens the
         JSON view.
-  - **Connector editor** _(built)_. The Form tab shows the base URL binding,
-    the auth type with its secret binding, `timeout`, `idempotency`, and the
-    operations as a list. The JSON view stays as a second view of the same
-    draft.
-    - **Bindings.** A binding is a name box, labelled as a URL or a secret
-      binding. It is not a pick from a list, because no route lists a tenant's
-      binding names. No value of a binding is shown or stored: the editor
-      reads and writes only the resource and schema routes, and the values stay
-      in tenant settings.
-    - **Auth.** Choosing a type removes the keys the new type forbids, such as
-      `token` for `header`, and adds the keys it requires, with an empty name.
-      Clearing the type removes `auth`.
-    - **Operations.** A card per operation shows its name, method, path and
-      `lookup`, which is picked from the connector's other operations. Its
-      input and output fields are rows of name, type and required. Operations
-      and rows can be added and removed. A `GET` with a body row keeps it and
-      shows a hint, and the compiler reports the error. There is no `in` picker.
-    - **Unknown keys.** A key the editor does not show, in the file, in an
-      operation or in `auth`, is saved unchanged.
+  - **Connector editor** _(built)_. The Form tab shows the base URL binding, the auth type with its bindings, `timeout`,
+    `idempotency`, and the operations as a list. The JSON view stays as a second view of the same draft.
+    - **Bindings.** A binding is a name box, labelled as a URL or a secret binding. It is not a pick from a list,
+      because no route lists a tenant's binding names. No value of a binding is shown or stored: the editor reads and
+      writes only the resource and schema routes, and the values stay in tenant settings.
+    - **Auth.** Choosing a type removes the keys the new type forbids, such as `token` for `header`, and adds the keys
+      it requires, with an empty name. Clearing the type removes `auth`. `oauth2` shows a token URL box (a URL binding),
+      a client id and a client secret (secret bindings), and Scope and Audience boxes that remove their key when empty.
+      See [OAuth2 auth](integration-resources.md#oauth2-auth).
+    - **Operations.** A card per operation shows its name, method, path and `lookup`, which is picked from the
+      connector's other operations. Its input and output fields are rows of name, type and required. Operations and rows
+      can be added and removed. A `GET` with a body row keeps it and shows a hint, and the compiler reports the error.
+    - **Placement and nesting.** A scalar input has a Placement choice of `body`, `path`, `query` or `header`, which
+      shows `body` when the file has no `in` key and removes the key when chosen. `object` and `list` inputs show nested
+      field rows instead, down to four levels with the input as level 1. Choosing one adds `fields` and removes `in`,
+      and a scalar type removes `fields`. The compiler reports placement and path errors after the save. See [structured
+      payloads](integration-resources.md#structured-payloads).
+    - **Output source.** An optional Source box holds a JSON Pointer into the response. An empty box removes `source`.
+    - **Unknown keys.** A key the editor does not show, in the file, in an operation or in `auth`, is saved unchanged.
   - **Identity provider editor** _(built)_. The Form tab shows the
     provider's name and `type`, then the fields of that type. The JSON view
     stays as a second view of the same draft. See

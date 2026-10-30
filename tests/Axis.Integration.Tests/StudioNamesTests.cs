@@ -179,8 +179,11 @@ public sealed class StudioNamesTests : IAsyncLifetime
         Assert.Equal(JsonValueKind.Null, Named(names, "pages", "MyTasks").GetProperty("module").ValueKind);
 
         var policies = names.GetProperty("policies").EnumerateArray().ToList();
-        Assert.Equal(["DepartmentManagerAccess", "EmployeeAccess"], policies.Select(policy => policy.GetProperty("name").GetString()));
-        Assert.All(policies, policy => Assert.Equal(JsonValueKind.Null, policy.GetProperty("module").ValueKind));
+        Assert.Equal(
+            [("DepartmentManagerAccess", null), ("EmployeeAccess", null), ("departments/ManagerAccess", "departments")],
+            policies
+                .Select(policy => (policy.GetProperty("name").GetString()!, policy.GetProperty("module").GetString()))
+                .OrderBy(policy => policy.Item1, StringComparer.Ordinal));
     }
 
     [Fact]

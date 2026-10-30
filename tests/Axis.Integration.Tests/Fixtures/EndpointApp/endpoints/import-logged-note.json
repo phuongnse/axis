@@ -1,0 +1,24 @@
+{
+  "id": "71c4e9a3-5b2d-4f60-8e17-d3a9b0c6f528",
+  "kind": "endpoint",
+  "name": "ImportLoggedNote",
+  "formatVersion": 1,
+  "entity": "Note",
+  "process": "Close",
+  "input": [
+    { "name": "title", "type": "text", "required": true, "maxLength": 50 },
+    { "name": "quantity", "type": "integer" }
+  ],
+  "values": {
+    "title": "title",
+    "quantity": "quantity",
+    "status": "'open'"
+  },
+  "event": {
+    "name": "NoteLogged",
+    "fields": {
+      "title": "title",
+      "share": "100 / (quantity - 1)"
+    }
+  }
+}

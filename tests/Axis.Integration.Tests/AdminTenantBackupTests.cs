@@ -62,7 +62,7 @@ public sealed class AdminTenantBackupTests(AdminBackupFixture fixture) : IClassF
         Assert.Matches(@"^1\.\d+\.\d+$", package.GetProperty("version").GetString()!);
         var module = root.GetProperty("modules").EnumerateArray().Single();
         Assert.Equal("departments", module.GetProperty("id").GetString());
-        Assert.Equal("1.0.0", module.GetProperty("version").GetString());
+        Assert.Equal("1.1.0", module.GetProperty("version").GetString());
 
         var directory = root.GetProperty("directory");
         Assert.Equal("active", directory.GetProperty("status").GetString());

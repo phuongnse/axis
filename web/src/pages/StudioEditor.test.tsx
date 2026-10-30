@@ -583,6 +583,68 @@ describe('StudioEditor for an endpoint', () => {
     expect(screen.getAllByTestId('studio-field-/values')).toHaveLength(1)
     expect(screen.getByTestId('studio-field-/values/status')).toBeInTheDocument()
   })
+
+  const namesWithEvent = {
+    ...namesWithEntity,
+    events: [
+      {
+        id: 'ev1',
+        name: 'PaymentReceived',
+        entity: 'PurchaseRequest',
+        fields: [
+          { name: 'amount', type: 'decimal' },
+          { name: 'reference', type: 'text' },
+          { name: 'note', type: 'text' },
+        ],
+      },
+    ],
+  } as unknown as StudioNames
+
+  it('shows the event of an endpoint on the Form tab with no JSON view', async () => {
+    stubResource(endpointItem, { ...endpointContent, event: { name: 'PaymentReceived', fields: { amount: 'amount' } } })
+    renderResource(endpointItem, namesWithEvent)
+
+    expect(await screen.findByTestId('studio-field-/entity', {}, slow)).toBeInTheDocument()
+    expect(screen.queryByTestId('studio-json-only')).toBeNull()
+    expect(screen.getAllByTestId('studio-field-/event/name')).toHaveLength(1)
+    expect(screen.getByTestId('studio-field-/event/fields/amount')).toBeInTheDocument()
+  })
+
+  it('picks an event, maps its fields and saves the event as one add', async () => {
+    const { fetchMock } = stubResource(endpointItem, endpointContent)
+    renderResource(endpointItem, namesWithEvent)
+
+    await screen.findByTestId('studio-field-/entity', {}, slow)
+    await userEvent.click(screen.getByRole('combobox', { name: 'Event' }))
+    await chooseOption('PaymentReceived')
+    await userEvent.click(screen.getByRole('combobox', { name: 'Add mapping Event fields' }))
+    await chooseOption('amount')
+    await userEvent.click(screen.getByRole('combobox', { name: 'Add mapping Event fields' }))
+    await chooseOption('reference')
+    await userEvent.click(
+      within(screen.getByTestId('studio-field-/event/fields/amount')).getByRole('combobox', { name: 'Event field' }),
+    )
+    await chooseOption('note')
+    await userEvent.click(
+      within(screen.getByTestId('studio-field-/event/fields/reference')).getByRole('button', { name: 'Remove' }),
+    )
+
+    const row = screen.getByTestId('studio-field-/event/fields/note')
+    let view: EditorView | null = null
+    // The editor chunk loads after the row shows a read-only box.
+    await waitFor(() => {
+      view = EditorView.findFromDOM(within(row).getByRole('textbox', { name: 'Expression' }))
+      expect(view).not.toBeNull()
+    }, slow)
+    const editor = view as unknown as EditorView
+    act(() => editor.dispatch({ changes: { from: 0, to: editor.state.doc.length, insert: 'trim(title)' } }))
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }))
+
+    await screen.findByTestId('studio-saved')
+    expect(sentPatch(fetchMock)).toEqual([
+      { op: 'add', path: '/event', value: { name: 'PaymentReceived', fields: { note: 'trim(title)' } } },
+    ])
+  })
 })
 
 const processId = purchaseRequestApproval.id

@@ -1262,7 +1262,7 @@ internal static class ProcessChecker
     /// Like the overload without outputs, and also gives the parsed expression and its check result
     /// when the expression type-checks, and null for both otherwise.
     /// </summary>
-    private static ExpressionDiagnostic? CheckExpression(
+    internal static ExpressionDiagnostic? CheckExpression(
         Resource process,
         string expression,
         ExpressionScope scope,
@@ -2119,14 +2119,10 @@ internal static class ProcessChecker
     }
 
     /// <summary>
-    /// Checks a <c>raiseEvent</c> step: its event is loaded, unless its file was not loaded because
-    /// of its own errors, ignoring letter case, and the event is about <paramref name="entity"/>.
-    /// Only when the event is found are its <c>fields</c> checked: each key names a payload field of
-    /// the event, ignoring letter case, that no earlier key names, and each expression fits the
-    /// field's type over <paramref name="scope"/>. Every payload field then has a key. The
-    /// expressions and the event's entity are not checked when the subject entity is unknown, and
-    /// the event's entity is not checked when the event's own entity is unknown. When
-    /// <paramref name="webhookEvents"/> holds the event, no expression reads a sensitive field.
+    /// Checks a <c>raiseEvent</c> step with <see cref="RaiseEventChecks"/>: its event is about the
+    /// process's <paramref name="entity"/> and its <c>fields</c> are checked over
+    /// <paramref name="scope"/>. A sensitive field that an expression reads is refused when
+    /// <paramref name="webhookEvents"/> holds the event.
     /// </summary>
     private static void CheckRaiseEvent(
         ProcessResource process,
@@ -2142,88 +2138,27 @@ internal static class ProcessChecker
         Action<string, string, string> report)
     {
         var path = $"/steps/{index}";
-        var eventName = step.Event!;
-        if (findEvent(eventName) is not { } @event)
-        {
-            // An event file that was not loaded because of its own errors is not reported again.
-            if (!unloadedEventNames.Contains(eventName))
-            {
-                report(
-                    DiagnosticCodes.UnknownStepEvent,
-                    $"The event '{eventName}' was not found. No loaded event has that name.",
-                    $"{path}/event");
-            }
-
-            return;
-        }
-
-        references.Add(process, $"{path}/event", ReferenceRelations.RaisedEvent, ResourceNode.Of(@event));
-
-        if (entity is not null && findEntity(@event.Entity) is { } eventEntity && !ReferenceEquals(eventEntity, entity))
-        {
-            report(
-                DiagnosticCodes.StepEventOverOtherEntity,
-                $"The event '{@event.Name}' is about the entity '{eventEntity.Name}'. A step can raise only an event about the process's entity '{entity.Name}'.",
-                $"{path}/event");
-        }
-
-        // The key that first named each payload field, by the field's declared name.
-        var namedBy = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var (key, expression) in step.Fields!)
-        {
-            var keyPath = $"{path}/fields/{key}";
-            var field = @event.Fields.FirstOrDefault(candidate => string.Equals(candidate.Name, key, StringComparison.OrdinalIgnoreCase));
-            if (field is null)
-            {
-                report(
-                    DiagnosticCodes.UnknownEventPayloadField,
-                    $"The field '{key}' was not found. The event '{@event.Name}' has no payload field with that name.",
-                    keyPath);
-                continue;
-            }
-
-            if (!namedBy.TryAdd(field.Name, key))
-            {
-                report(
-                    DiagnosticCodes.UnknownEventPayloadField,
-                    $"The field '{field.Name}' is already given by '{namedBy[field.Name]}' in this step.",
-                    keyPath);
-                continue;
-            }
-
-            // The expression cannot be checked without the entity, nor against a field type that
-            // the event check already reports.
-            if (scope is null || !EventChecker.IsScalar(FieldTypes.Parse(field.Type)))
-            {
-                continue;
-            }
-
-            var problem = CheckExpression(process, expression, scope, ExpressionScopes.TypeOf(field.Type), keyPath, references, out var node, out var check);
-            if (problem is not null)
-            {
-                report(problem.Code, problem.Message, keyPath);
-            }
-            else if (entity is not null
-                && webhookEvents?.Contains(@event.Name) == true
-                && SensitiveReads.Find(node!, check!, entity, scope, findEntity) is var (readEntity, readField))
-            {
-                report(
-                    DiagnosticCodes.SensitiveWebhookEventValue,
-                    $"The field '{key}' reads the sensitive field '{readEntity}.{readField}'. The event '{@event.Name}' has a webhook, so it never carries a sensitive value.",
-                    keyPath);
-            }
-        }
-
-        foreach (var field in @event.Fields)
-        {
-            if (!namedBy.ContainsKey(field.Name))
-            {
-                report(
-                    DiagnosticCodes.MissingEventPayloadField,
-                    $"The field '{field.Name}' is a payload field of the event '{@event.Name}', but the step does not give it.",
-                    $"{path}/fields");
-            }
-        }
+        RaiseEventChecks.Check(
+            process,
+            step.Event!,
+            step.Fields!,
+            $"{path}/event",
+            $"{path}/fields",
+            ReferenceRelations.RaisedEvent,
+            "step",
+            "A step can raise only an event about the process's entity '{0}'.",
+            entity,
+            scope,
+            findEntity,
+            findEvent,
+            unloadedEventNames.Contains,
+            webhookEvents,
+            (node, check) => entity is not null && scope is not null
+                && SensitiveReads.Find(node, check, entity, scope, findEntity) is var (readEntity, readField)
+                    ? $"the sensitive field '{readEntity}.{readField}'"
+                    : null,
+            references,
+            report);
     }
 
     /// <summary>Finds the first field of <paramref name="entity"/> with <paramref name="name"/>, ignoring letter case.</summary>

@@ -33,6 +33,7 @@ import { loadKindSchema, type JsonSchema } from '../platform/studioSchemas'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { ConnectorEditor } from './ConnectorEditor'
+import { EndpointEvent } from './EndpointEvent'
 import { EndpointValues } from './EndpointValues'
 import { FormSteps } from './FormSteps'
 import { EntityDesigner } from './EntityDesigner'
@@ -164,7 +165,7 @@ function Drawn({ onDrawn, children }: { onDrawn: (drawn: boolean) => void; child
  * beside the card of the selected step. A click on a node or an edge selects a step, which is not written to the URL, and a path into a step selects it too.
  * A step that a diagnostic path names is marked on the graph. An entity opens in the entity designer, which shows its header, a table of its fields with the
  * settings of each field's type, and its validations. An endpoint keeps the generic form and shows its `values` as rows
- * of a field of its entity and an expression. When the server does not answer, the draft stays, and the resource loads
+ * of a field of its entity and an expression, and its event as a picker with the event's `fields` as rows. When the server does not answer, the draft stays, and the resource loads
  * again after the reconnect unless the draft has changes. When an entity's loaded field was renamed or removed, Save asks one question per field first, and the answers
  * add a `renameField` or `dropField` migration that is saved with the entity in one changes call.
  */
@@ -484,7 +485,7 @@ export function StudioEditor({
     if (item.kind !== 'endpoint' || !schema) {
       return undefined
     }
-    const { values: _values, ...properties } = schema.properties ?? {}
+    const { values: _values, event: _event, ...properties } = schema.properties ?? {}
     return { ...schema, properties, required: schema.required?.filter((name) => name !== 'values') }
   }, [item.kind, schema])
 
@@ -896,6 +897,7 @@ export function StudioEditor({
                       <Flex vertical gap="middle">
                         <SchemaForm schema={endpointSchema} value={draft} onChange={change} />
                         <EndpointValues fields={endpointFields} values={draft.values} onChange={change} />
+                        <EndpointEvent events={names?.events} value={draft.event} onChange={change} />
                       </Flex>
                     ) : siteSchema ? (
                       <Flex vertical gap="middle">

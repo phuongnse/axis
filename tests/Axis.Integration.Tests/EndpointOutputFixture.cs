@@ -150,6 +150,25 @@ public sealed class EndpointOutputFixture : IAsyncLifetime
         return await command.ExecuteScalarAsync() is Guid id ? id : null;
     }
 
+    /// <summary>Runs <paramref name="sql"/>, a <c>SELECT count(*)</c>, with the named parameters.</summary>
+    public async Task<long> CountAsync(string sql, params (string Name, object Value)[] parameters)
+    {
+        await using var command = DataSource.CreateCommand(sql);
+        foreach (var (name, value) in parameters)
+        {
+            command.Parameters.AddWithValue(name, value);
+        }
+
+        return (long)(await command.ExecuteScalarAsync())!;
+    }
+
+    /// <summary>Runs <paramref name="sql"/>, which returns nothing.</summary>
+    public async Task ExecuteAsync(string sql)
+    {
+        await using var command = DataSource.CreateCommand(sql);
+        await command.ExecuteNonQueryAsync();
+    }
+
     /// <summary>The id of the one task of the instance <paramref name="instanceId"/>.</summary>
     public async Task<Guid> TaskIdAsync(Guid instanceId)
     {

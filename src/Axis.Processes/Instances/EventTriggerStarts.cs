@@ -34,7 +34,15 @@ internal static class EventTriggerStarts
             return null;
         }
 
-        var (releaseId, model) = active;
+        return Find(active.ReleaseId, active.Model, eventName, mode);
+    }
+
+    /// <summary>
+    /// Finds the triggers of <paramref name="mode"/> on the event in <paramref name="model"/>, ignoring letter
+    /// case. The triggers are empty when the release does not declare the event or no such trigger listens.
+    /// </summary>
+    internal static EventTriggers Find(Guid releaseId, ApplicationModel model, string eventName, TriggerMode mode)
+    {
         var declared = model.Events.FirstOrDefault(candidate => string.Equals(candidate.Name, eventName, StringComparison.OrdinalIgnoreCase));
         List<TriggerModel> triggers = declared is null
             ? []
