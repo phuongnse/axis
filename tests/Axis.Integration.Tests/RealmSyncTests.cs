@@ -84,6 +84,48 @@ public sealed partial class RealmSyncTests(KeycloakFixture keycloak) : IAsyncLif
     }
 
     [Fact]
+    public async Task A_site_client_puts_the_roles_attributes_of_the_providers_its_site_allows_into_the_id_token()
+    {
+        var realm = await NewRealmAsync();
+        await SyncAsync(realm, _secrets.Activation, new RealmState([new RealmSiteClient("purchasing", Accounts: true, [Alias])], [Provider()]));
+
+        var token = await TokenAsync("master", KeycloakFixture.AdminClientId, KeycloakFixture.AdminClientSecret);
+        var mappers = await SiteMappersAsync(token, realm);
+        var mapper = Assert.Single(mappers, m => m.GetProperty("name").GetString() == "axis_roles_groups");
+        Assert.Equal("oidc-usermodel-attribute-mapper", mapper.GetProperty("protocolMapper").GetString());
+        var config = mapper.GetProperty("config");
+        Assert.Equal("axis_roles_groups", config.GetProperty("user.attribute").GetString());
+        Assert.Equal("axis_roles_groups", config.GetProperty("claim.name").GetString());
+        Assert.Equal("true", config.GetProperty("multivalued").GetString());
+        Assert.Equal("String", config.GetProperty("jsonType.label").GetString());
+        Assert.Equal("true", config.GetProperty("id.token.claim").GetString());
+        Assert.Equal("false", config.GetProperty("access.token.claim").GetString());
+        Assert.Equal("false", config.GetProperty("userinfo.token.claim").GetString());
+
+        // A claim that no provider of the site names any more loses its mapper, and the other mappers stay.
+        await SyncAsync(
+            realm,
+            _secrets.Activation,
+            new RealmState([new RealmSiteClient("purchasing", Accounts: true, [Alias])], [Provider() with { RolesClaims = ["roles"] }]));
+        var names = (await SiteMappersAsync(token, realm)).Select(m => m.GetProperty("name").GetString()).ToList();
+        Assert.DoesNotContain("axis_roles_groups", names);
+        Assert.Contains("axis_roles_roles", names);
+        Assert.Contains("identity provider", names);
+
+        // A provider that the site does not allow adds no mapper.
+        await SyncAsync(realm, _secrets.Activation, new RealmState([new RealmSiteClient("purchasing", Accounts: true, [])], [Provider()]));
+        Assert.DoesNotContain(await SiteMappersAsync(token, realm), m => m.GetProperty("name").GetString()!.StartsWith("axis_roles_", StringComparison.Ordinal));
+    }
+
+    private async Task<List<JsonElement>> SiteMappersAsync(string token, string realm)
+    {
+        var clients = await GetJsonAsync(token, $"admin/realms/{realm}/clients?clientId=site-purchasing");
+        var uuid = clients[0].GetProperty("id").GetString();
+        var mappers = await GetJsonAsync(token, $"admin/realms/{realm}/clients/{uuid}/protocol-mappers/models");
+        return [.. mappers.EnumerateArray()];
+    }
+
+    [Fact]
     public async Task A_site_client_puts_the_provider_alias_into_the_id_token()
     {
         var realm = await NewRealmAsync();
