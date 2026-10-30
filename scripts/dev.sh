@@ -2,7 +2,8 @@
 # Runs Axis locally: PostgreSQL, Keycloak, Mailpit and the purchasing system stub in Docker, the server
 # and the worker under dotnet watch, the publisher and the SPA on Vite, in one terminal. The server starts once
 # PostgreSQL accepts connections, Keycloak's development realm answers and the stub answers. The
-# server signs people in through that realm at /api/auth/sign-in. The SPA does not offer it yet. The realm signs
+# server signs people in through that realm at /api/auth/sign-in. Before the server starts, this script adds the axis first
+# login flow to the realm through the admin API. The SPA does not offer it yet. The realm signs
 # people in on the Axis theme, which this script builds into artifacts/keycloak-theme before Keycloak starts.
 # The worker and the publisher start once the server has migrated the tenant databases. The
 # publisher runs the publish requests of Studio. A change to a JSON file
@@ -83,6 +84,11 @@ log "Starting PostgreSQL on port $postgres_port, Keycloak on port $keycloak_port
 AXIS_POSTGRES_PORT="$postgres_port" AXIS_KEYCLOAK_PORT="$keycloak_port" AXIS_PURCHASING_PORT="$purchasing_port" \
   AXIS_MAILPIT_SMTP_PORT="$mailpit_smtp_port" AXIS_MAILPIT_WEB_PORT="$mailpit_web_port" \
   docker compose up -d --build --wait --wait-timeout 180 postgres keycloak purchasing mailpit
+
+# The realm sync names the axis first login flow on every brokered provider, and the import of axis-realm.json cannot
+# hold it. A Keycloak container that this script reuses gets the flow here too, and a realm that has it is not changed.
+log "Adding the axis first login flow to the axis realm"
+node scripts/lib/development-realm.mjs "http://localhost:$keycloak_port"
 schema_connection=""
 # Bash cannot export a name with a hyphen, like Tenants__default-preview__ConnectionString. These
 # overrides reach the server and the worker through env instead.

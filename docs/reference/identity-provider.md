@@ -366,13 +366,16 @@ _(planned for M17)_
 
 ## Preview tenants
 
-_(planned for M17)_
-
-- A preview tenant signs people in through its main tenant's realm and platform sign-in. Its bindings are empty by
-  default, so its sites' brokered providers are left out and an author tries the application through the platform
-  sign-in.
-- On a preview tenant each site accepts the platform sign-in, and a person holds the application roles the main
-  tenant's users page gives them.
+- A preview tenant signs people in through its main tenant's realm and platform client `axis`. A sign-in that starts on
+  a site's page goes there too, and it sends no provider hint (`kc_idp_hint`) and no `acr_values`. Its bindings are
+  empty by default, so its sites' brokered providers are left out and an author tries the application through the
+  platform sign-in.
+- On a preview tenant each site accepts the platform sign-in. The callback runs no site check, and `GET /api/sites` is
+  not filtered by provider.
+- A session on a preview tenant reads the roles that the main tenant's users page gave the person, application and
+  platform roles, from the main tenant's database at every request, see
+  [user administration](user-administration.md#roles). A change applies at the person's next request. When the main
+  tenant is not served, the session reads none of them and the request does not fail.
 
 ## Theme
 
