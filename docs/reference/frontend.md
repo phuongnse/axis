@@ -201,7 +201,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
 
   | Method and path | Response |
   | --- | --- |
-  | `GET /api/sites` | `{ "sites": [ { "path", "titleKey", "titles", "application": { "name", "titles" } } ] }`, every site of every active application, in path order. `application.titles` holds the application's title for each locale it has texts for: the text of the `label` in its `application.json`, or its name when it has no label. |
+  | `GET /api/sites` | `{ "sites": [ { "path", "titleKey", "titles", "application": { "name", "titles" } } ] }`, every site of every active application, in path order. `application.titles` holds the application's title for each locale it has texts for: the text of the `label` in its `application.json`, or its name when it has no label. _(Planned for M17: `application.descriptions` and each site's `descriptions`, per locale or `null`, see [descriptions](shell.md#application-and-site-descriptions).)_ |
   | `GET /api/sites/{path}` | `{ "path", "titleKey", "locales": { "default", "fallback", "available" }, "navigation": [ { "page", "labelKey", "icon" } ], "notificationsPath" }`. `icon` is an Axis icon name, or `null` for an entry with none |
   | `GET /api/sites/{path}/texts/{locale}` | `{ "locale", "texts" }`, the active release's texts for one locale, in the shape of the platform texts. Optional `?release={releaseId}` serves any stored release of the site's application. An unknown id, a non-UUID or another application's release answers `404`. |
   | `GET /api/sites/{path}/pages/{page}` | the page metadata shown below |

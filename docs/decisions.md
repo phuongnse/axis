@@ -124,3 +124,4 @@ files agree, title and status included.
 | [D111](decisions/d111-authentication-by-default-and-the-owner-guards-the-security-checks.md) | Authentication by default, and the owner guards the security checks | **Agreed** |
 | [D112](decisions/d112-ci-codeql-and-the-performance-tests-run-on-main-every-few-merges.md) | CI, CodeQL and the performance tests run on main every few merges | **Agreed** |
 | [D113](decisions/d113-branches-need-not-be-up-to-date-and-three-issues-run-at-once.md) | Branches need not be up to date, and three issues run at once | **Agreed** |
+| [D114](decisions/d114-rules-from-the-sign-in-and-home-page-review.md) | Rules from the sign-in and home page review | **Agreed** |

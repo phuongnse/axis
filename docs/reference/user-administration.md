@@ -19,7 +19,7 @@ The setting, the shell entry and the users page's list are built.
   value, nobody may use the users page.
 - **One tenant:** the users page is a platform route, `/users`, on each tenant's hosts, and shows only that tenant. A
   site's own host does not serve it. A preview tenant has no users page, and `GET /api/me` answers `users: false` there.
-- **In the shell:** the app switcher and the home page's welcome band offer "Users" ("Invite people and give them
+- **In the shell:** the app switcher and the home page's tools offer "Users" ("Invite people and give them
   roles.") to a person who holds the role, after Studio and the operator console, see
   [app switcher and preferences](shell.md#app-switcher-and-preferences). `GET /api/me` adds a boolean `users`.
 - **Application policies play no part.** The role gives the users page and nothing in an application.

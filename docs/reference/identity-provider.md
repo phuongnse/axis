@@ -35,8 +35,10 @@ _(planned for M17)_
   sign-ins, a password reset link of 30 minutes and no self-registration.
 - The realm's login theme is the Axis theme `axis`, see [theme](#theme).
 - _(planned for M17)_ The realm also has its people, its brokered identity providers and a client for each site.
-- _(planned for M17)_ The realm's display name is the organization's name, which every sign-in page shows under its
-  title. Until `tenant create` takes that name, the display name is the tenant id.
+- _(planned for M17)_ The realm's display name is the organization's name, which every sign-in page shows above its
+  card, see [theme](#theme). Until `tenant create` takes that name, the realm has no display name and the pages name
+  Axis, never the tenant id
+  ([D114](../decisions/d114-rules-from-the-sign-in-and-home-page-review.md)).
 - A preview tenant has no realm. It signs people in through its main tenant's realm, see
   [preview tenants](#preview-tenants).
 
@@ -381,11 +383,15 @@ _(planned for M17)_
 
 _(planned for M17)_
 
-- Every page of Axis's identity provider has one frame: the Axis mark above one card in the middle of the page on
-  `canvas`, and below it the language links and "© <year> Axis". It follows light and dark mode and the Axis tokens and
-  fonts, as the SPA does. The mark is 32 px with the word "Axis" beside it. The card is at most 400 px wide, on
-  `surface` with a `borderSubtle` border, `radius-base` corners and `spacing-xl` padding. Its title, such as "Sign
-  in", has the organization's name under it in `textMuted`.
+- Every page of Axis's identity provider has one frame: the organization's mark and name above one card in the middle
+  of the page on `canvas`, and below it the language links and "© <year> Axis". It follows light and dark mode and the
+  Axis tokens and fonts, as the SPA does. The mark is 32 px, the first letter of the name on a `primary` tile as a
+  site's mark is, with the name beside it. The name is the realm's display name, and Axis while the realm has none.
+  The card is at most 400 px wide, on `surface` with a `borderSubtle` border, `radius-base` corners and `spacing-xl`
+  padding. Its title, such as "Sign in", names the step and does not repeat the organization's name. Axis's own
+  sign-in card draws the same heading, see [platform home page](shell.md#platform-home-page). _(The organization's
+  heading is planned for M17, [D114](../decisions/d114-rules-from-the-sign-in-and-home-page-review.md). Today the
+  pages show the Axis mark, and the organization's name under the card's title.)_
 - The sign-in page lists the site's brokered providers first, then "or" and the account form when the site allows
   accounts: email or username, password with "Forgot password?", "Keep me signed in" and a full-width Sign in button.
   The brokered providers' "Continue with" buttons are secondary buttons. A field's label follows the form widget's
