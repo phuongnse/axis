@@ -300,4 +300,6 @@ public static class DiagnosticCodes
     public const string MissingWebhookBinding = "AXC0314";
     public const string InvalidWebhookTimeout = "AXC0315";
     public const string SensitiveWebhookEventValue = "AXC0316";
+    public const string ConnectorInputTooDeep = "AXC0317";
+    public const string StructuredInputExpression = "AXC0318";
 }

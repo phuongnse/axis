@@ -1023,6 +1023,29 @@ public sealed class ProcessCompilerTests
         Assert.Equal(new RetryPolicyModel(10, TimeSpan.FromMinutes(1)), call.Retry);
     }
 
+    [Fact]
+    public void A_connector_call_that_gives_a_list_input_a_plain_expression_is_refused()
+    {
+        var connector = Purchasing.Replace(
+            """{ "name": "note", "type": "text" }""",
+            """{ "name": "note", "type": "text" }, { "name": "lines", "type": "list", "fields": [{ "name": "sku", "type": "text" }] }""");
+        using var folder = Folder(
+            Process("Order", $$"""
+                [
+                  { "name": "call", "type": "operation", "operation": "callConnector", {{CallCreateOrder}}
+                    "input": { "reference": "status", "amount": "amount", "lines": "status" }, "next": "done" },
+                  { "name": "done", "type": "end" }
+                ]
+                """, start: "call"),
+            connector);
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.StructuredInputExpression, "/steps/0/input/lines"), (diagnostic.Code, diagnostic.Path));
+        Assert.Null(result.Model);
+    }
+
     [Theory]
     [InlineData(
         """ "connector": { "name": "Billing", "operation": "createOrder" }, """ + CreateOrderInput,

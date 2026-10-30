@@ -194,8 +194,8 @@ The purchase request sample holds the purchasing system connector in
     allowed on outputs only.
   - Input and output field types are the
     [rule parameter types](resource-files.md#resource-file-shape): `text`, `integer`,
-    `decimal`, `boolean`, `date` and `date-time`. _(planned for M19)_ Inputs
-    may also be `object` and `list`.
+    `decimal`, `boolean`, `date` and `date-time`. Inputs may also be `object` and
+    `list`, see [Structured payloads](#structured-payloads).
 - `lookup` is optional and set per operation. It names another operation of
   the same connector that finds an earlier call by its idempotency key.
   - The lookup is a `GET` whose `path` holds `{idempotencyKey}`.
@@ -287,8 +287,9 @@ This auth is built.
 
 Inputs go outside the body, as
 [D91](../decisions/d91-connector-oauth2-and-structured-payloads.md) agrees.
-_(planned for M19)_ Inputs can also nest. The `lines` input in the example is
-still planned. Bodies stay JSON. An output's `source` is built.
+Inputs can also nest: declaring an `object` or `list` input is built, and the
+`lines` input in the example compiles. A step cannot map one yet, which is
+_(planned for M19)_. Bodies stay JSON. An output's `source` is built.
 
 ```json
 {
@@ -329,10 +330,19 @@ still planned. Bodies stay JSON. An output's `source` is built.
 - **`GET`.** A `GET` may have `path`, `query` and `header` inputs, but no
   `body` input. The JSON body of any other method holds only the `body`
   inputs.
-- **`object` and `list`.** _(planned for M19)_ An `object` input has nested `fields`. A `list`
-  input's items are objects with `fields`. Nesting goes four levels deep at
-  most. The step maps them as in
-  [Step shape](process-execution.md#step-shape).
+- **`object` and `list`.** _(built)_ An `object` input has nested `fields`. A `list`
+  input's items are objects with `fields`. Both need at least one nested field,
+  and a scalar input has none. A nested field takes no `in`. Only inputs may be
+  `object` or `list`: outputs, module connector slots and package fields stay
+  scalar.
+  - Nesting goes four levels deep at most, and the input is level 1. An `object`
+    or `list` among the `fields` of a level-4 one is `AXC0317`. An `object` or
+    `list` goes only in the body, so one with another `in` is `AXC0312`.
+  - A nested field name repeats an earlier name of the same `fields`, ignoring
+    letter case, is `AXC0096`.
+  - _(planned for M19)_ The step maps them as in
+    [Step shape](process-execution.md#step-shape). Until then, a step that gives
+    one a plain expression is `AXC0318`.
 - **`source`.** _(built)_ An output field may name a JSON Pointer
   ([RFC 6901](https://www.rfc-editor.org/rfc/rfc6901)) into the response body,
   such as `/shipment/tracking/number`. Without it, the output is read from the

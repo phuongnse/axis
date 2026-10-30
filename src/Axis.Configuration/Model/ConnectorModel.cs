@@ -65,10 +65,15 @@ public sealed record ConnectorOperationModel(
     string? Lookup);
 
 /// <summary>
-/// An input or output field of a compiled connector operation, with a scalar field type. For an
+/// An input or output field of a compiled connector operation. An output has a scalar field type,
+/// and so does an input unless it is an <c>object</c> or a <c>list</c>. For an
 /// input, <paramref name="In"/> is where a call sends it: <c>body</c>, <c>path</c>, <c>query</c> or
 /// <c>header</c>. For an output, <paramref name="Source"/> is a JSON Pointer into the response body,
 /// and null means the top-level property of <paramref name="Name"/>.
 /// </summary>
 public sealed record ConnectorFieldModel(
-    string Name, FieldType Type, bool Required, string In = "body", string? Source = null);
+    string Name, FieldType Type, bool Required, string In = "body", string? Source = null)
+{
+    /// <summary>The nested fields of an <c>object</c> or <c>list</c> input in declaration order, or null for any other field.</summary>
+    public IReadOnlyList<ConnectorFieldModel>? Fields { get; init; }
+}
