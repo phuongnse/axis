@@ -10,15 +10,17 @@ import {
   type StudioResourceItem,
 } from '../platform/studio'
 import { useText } from '../platform/texts'
+import { starterKinds } from '../platform/studioStarters'
 import { useDesignTokens } from '../platform/themeMode'
-import type { StudioView } from './studioViews'
+import { studioKindGroups, type StudioView } from './studioViews'
 
 /**
  * Proposed: the first view of an open application, which says what to do next rather than what the application
  * holds. An application with no entity yet starts with the steps that build one, each a link to where it is done.
  * Then what needs attention: the folder's errors first, as they stop Publish, then its warnings, each opening the
- * resource at the place it names. Then the live release, and whether the folder has changes it does not have yet.
- * It shows no counts: the sidebar already lists the resources.
+ * resource at the place it names. Then the live release, and a line when the folder has changes it does not have yet.
+ * Last, every kind the application has no resource of, as the sidebar leaves such a kind out: one line each, the kind
+ * as a link to its list, where New resource… starts with it, and what it is for. It shows no counts.
  */
 export function StudioOverview({
   locale,
@@ -76,7 +78,60 @@ export function StudioOverview({
       {(!starting || published) && releases !== undefined && (
         <Release releases={releases} locale={locale} history={addressOf({ name: 'releases' })} />
       )}
+      <More resources={resources} skip={starting ? startKinds : []} addressOf={addressOf} />
     </Flex>
+  )
+}
+
+/** The kinds that Get started already leads to. */
+const startKinds = ['entity', 'page', 'site']
+
+/** Every kind the application has no resource of yet, by the sidebar's groups, each a link to its list. */
+function More({
+  resources,
+  skip,
+  addressOf,
+}: {
+  resources: readonly StudioResourceItem[]
+  skip: readonly string[]
+  addressOf: (target: StudioView) => string
+}) {
+  const t = useText()
+  const { colour, spacing } = useDesignTokens()
+  const present = new Set(resources.map((item) => item.kind))
+  const groups = studioKindGroups
+    .map((group) => ({
+      key: group.key,
+      kinds: group.kinds
+        .map((entry) => entry.kind)
+        .filter((kind) => starterKinds.includes(kind) && !present.has(kind) && !skip.includes(kind)),
+    }))
+    .filter((group) => group.kinds.length > 0)
+  if (groups.length === 0) {
+    return null
+  }
+  return (
+    <Panel title={t('shell.studio.overview.more.title')} testId="studio-overview-more">
+      <Typography.Text style={{ color: colour.textMuted }}>{t('shell.studio.overview.more.message')}</Typography.Text>
+      {groups.map((group) => (
+        <Flex key={group.key} vertical gap={spacing.xs}>
+          <Typography.Text strong>{t(`shell.studio.nav.${group.key}`)}</Typography.Text>
+          <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'grid', gap: spacing.xs }}>
+            {group.kinds.map((kind) => (
+              <li key={kind}>
+                <Link to={addressOf({ name: 'kind', kind })} style={{ color: colour.primaryText }}>
+                  {t(`shell.studio.kind.${kind}`)}
+                </Link>
+                <Typography.Text style={{ color: colour.textMuted }}>
+                  {' · '}
+                  {t(`shell.studio.overview.kind.${kind}`)}
+                </Typography.Text>
+              </li>
+            ))}
+          </ul>
+        </Flex>
+      ))}
+    </Panel>
   )
 }
 
@@ -194,7 +249,6 @@ function Release({
       )
     } else {
       const time = formatValue({ name: 'activatedAt', type: 'date-time' }, live.activatedAt, {}, { locale, text: t })
-      const changed = folderDiffers(releases)
       body = (
         <>
           <Flex vertical>
@@ -208,12 +262,11 @@ function Release({
                 .replace('{actor}', live.actorName ?? live.actor)}
             </Typography.Text>
           </Flex>
-          <Typography.Text
-            data-testid="studio-overview-changes"
-            style={{ color: changed ? colour.warningText : colour.textMuted }}
-          >
-            {t(changed ? 'shell.studio.overview.release.changes' : 'shell.studio.overview.release.upToDate')}
-          </Typography.Text>
+          {folderDiffers(releases) && (
+            <Typography.Text data-testid="studio-overview-changes" style={{ color: colour.warningText }}>
+              {t('shell.studio.overview.release.changes')}
+            </Typography.Text>
+          )}
           <Link to={history} style={{ color: colour.primaryText, alignSelf: 'flex-start' }}>
             {t('shell.studio.overview.release.history')}
           </Link>

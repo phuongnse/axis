@@ -28,10 +28,13 @@ type Problem = 'exists' | 'invalid' | 'failed'
 export function StudioNewResource({
   application,
   resources,
+  kind: listKind,
   onCreated,
 }: {
   application: string
   resources: StudioResourceItem[]
+  /** Proposed: the kind of the list the button sits on. The dialog starts with it chosen when it has a starter. */
+  kind?: string
   onCreated: (item: StudioResourceItem, diagnostics: StudioDiagnostic[]) => void
 }) {
   const t = useText()
@@ -45,7 +48,7 @@ export function StudioNewResource({
   const label = t(isText ? 'shell.studio.newResource.locale' : 'shell.studio.newResource.name')
 
   function show() {
-    setKind(undefined)
+    setKind(listKind !== undefined && starterKinds.includes(listKind) ? listKind : undefined)
     setValue('')
     setProblem(undefined)
     setOpen(true)

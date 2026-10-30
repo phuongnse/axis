@@ -559,7 +559,12 @@ function StudioWorkspace() {
                     onChange={(event) => setSearch(event.target.value)}
                   />
                   <div style={{ flex: 1 }} />
-                  <StudioNewResource application={application} resources={resources} onCreated={onCreated} />
+                  <StudioNewResource
+                    application={application}
+                    resources={resources}
+                    kind={view.name === 'kind' ? view.kind : undefined}
+                    onCreated={onCreated}
+                  />
                 </Flex>
                 <StudioResourceRows
                   items={listed}
