@@ -777,12 +777,12 @@ schema of the tenant database.
       nothing.
   - **User actions.** An administrator's command on a user of the tenant's realm
     writes one action, see [user administration](user-administration.md#audit):
-    `user.disabled`, `user.enabled`, `user.authenticatorReset`, `user.roleGiven` or `user.roleRemoved`. The `actor` is
+    `user.invited`, `user.invitationResent`, `user.disabled`, `user.enabled`, `user.authenticatorReset`, `user.roleGiven` or `user.roleRemoved`. The `actor` is
     the administrator's user id and `actor_name` their display name. `details`
-    is `{ "userId" }`, the id of the realm user the command acted on, and a role action adds `role`.
+    is `{ "userId" }`, the id of the realm user the command acted on, and a role action adds `role`. An invitation adds `email`, a resend adds `previousUserId` (the id before the realm user was created again), and no record holds the invitation link.
     `entity_id`, `record_id` and `process_instance_id` are null, and so is `application_id`, except that a role
     action on an application role holds it. A platform role action adds `"platform": true` to `details` and its `role` is the kind.
-    A role action commits with the row it changes. The others commit with the end of the user's Axis sessions, after the realm steps succeeded.
+    A role action commits with the row it changes. An invitation commits with its given roles before the email is sent, and a resend with the move of the given roles. The others commit with the end of the user's Axis sessions, after the realm steps succeeded.
 
   - **Dead letter actions.** A redeliver or a discard of a
     [dead letter](process-events.md#routes) writes `deadLetter.redelivered` or
