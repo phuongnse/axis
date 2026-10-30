@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Net.Mail;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
@@ -11,9 +12,9 @@ namespace Axis.Tenancy.Realms;
 /// credentials grant. That client's service account views, queries and manages users, and nothing else in the realm.
 /// It reads one page of users with the number of all users that match the search, and for each user on the page the
 /// alias of the first federated identity. It also finds one user, disables or enables a user, ends a user's realm
-/// sessions and removes a user's authenticators. It also invites a person: it creates an account with the required actions of
-/// the invitation, asks the realm to email the link, reads what a resend needs and deletes a user. An error names the step and the status code, never a response body
-/// or a secret.
+/// sessions and removes a user's authenticators. It also invites a person: it finds an account by email, creates an account with
+/// the required actions of the invitation, asks the realm to email the link, reads what a resend needs and deletes a user. It
+/// also normalises an email address. An error names the step and the status code, never a response body or a secret.
 /// </summary>
 public sealed class RealmUsers(HttpClient http, TenantRealmUsers access)
 {
@@ -169,9 +170,24 @@ public sealed class RealmUsers(HttpClient http, TenantRealmUsers access)
         return location[(location.LastIndexOf('/') + 1)..];
     }
 
+    /// <summary>
+    /// Trims and lower-cases an email address and returns it, or <c>null</c> when it is empty or not a plain address such as
+    /// <c>name@example.test</c>. The realm stores the username and email in lower case.
+    /// </summary>
+    public static string? NormalizeEmail(string? value)
+    {
+        var email = value?.Trim().ToLowerInvariant();
+        return email is not null && MailAddress.TryCreate(email, out var address) && address.Address == email ? email : null;
+    }
+
     /// <summary>Whether an account, a user with no federated identity, uses this email. A user of a brokered provider does not count.</summary>
     /// <exception cref="InvalidOperationException">An identity provider step answered an error status.</exception>
-    public async Task<bool> AccountUsesEmailAsync(string email, CancellationToken cancellationToken)
+    public async Task<bool> AccountUsesEmailAsync(string email, CancellationToken cancellationToken) =>
+        await FindAccountIdByEmailAsync(email, cancellationToken) is not null;
+
+    /// <summary>The id of the first account, a user with no federated identity, whose email is exactly this one, or <c>null</c> when there is none.</summary>
+    /// <exception cref="InvalidOperationException">An identity provider step answered an error status.</exception>
+    public async Task<string?> FindAccountIdByEmailAsync(string email, CancellationToken cancellationToken)
     {
         var token = await TokenAsync(cancellationToken);
         var usersPath = $"admin/realms/{Uri.EscapeDataString(access.Realm)}/users";
@@ -181,21 +197,30 @@ public sealed class RealmUsers(HttpClient http, TenantRealmUsers access)
         var matches = (await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken)).EnumerateArray().ToList();
         foreach (var match in matches)
         {
-            if (await ProviderAliasAsync(token, usersPath, match.GetProperty("id").GetString()!, cancellationToken) is null)
+            var id = match.GetProperty("id").GetString()!;
+            if (await ProviderAliasAsync(token, usersPath, id, cancellationToken) is null)
             {
-                return true;
+                return id;
             }
         }
 
-        return false;
+        return null;
     }
 
-    /// <summary>Asks the realm to email the user a link that sets a password and adds an authenticator, and that leads to <paramref name="redirectUri"/>.</summary>
+    /// <summary>
+    /// Asks the realm to email the user a link that sets a password and adds an authenticator, and that leads to
+    /// <paramref name="redirectUri"/>. A <c>null</c> address names none, for a caller that has no address the realm accepts.
+    /// </summary>
     /// <exception cref="InvalidOperationException">An identity provider step answered an error status.</exception>
-    public async Task SendInvitationAsync(string userId, Uri redirectUri, CancellationToken cancellationToken)
+    public async Task SendInvitationAsync(string userId, Uri? redirectUri, CancellationToken cancellationToken)
     {
         var token = await TokenAsync(cancellationToken);
-        var query = $"lifespan={InvitationLifespanSeconds}&client_id={PlatformClientId}&redirect_uri={Uri.EscapeDataString(redirectUri.AbsoluteUri)}";
+        var query = $"lifespan={InvitationLifespanSeconds}&client_id={PlatformClientId}";
+        if (redirectUri is not null)
+        {
+            query += $"&redirect_uri={Uri.EscapeDataString(redirectUri.AbsoluteUri)}";
+        }
+
         using var response = await SendAsync(token, HttpMethod.Put, $"{UserPath(userId)}/execute-actions-email?{query}", _invitationActions, cancellationToken);
         EnsureSuccess(response, "send the invitation");
     }

@@ -73,8 +73,9 @@ Detailed behaviour, one topic per file. Sections marked _(planned for Mx)_ are n
 | [Process designer](reference/process-designer.md)                      | The Design tab of the process editor: palette, transitions, removes, keyboard         |
 | [Authoring API](reference/authoring.md)                                | The API that Studio uses to read, write and publish application folders               |
 | [Host settings](reference/host-settings.md)                            | Startup activation and the server, Studio, tenancy, data and file, admin, rate limit and telemetry settings |
-| [Administration](reference/administration.md)                          | The `Axis.Admin` commands: tenants, backup, restore, migrate, activate, publisher     |
+| [Administration](reference/administration.md)                          | The `Axis.Admin` commands: create a tenant, backup, restore, migrate, activate, publisher |
 | [Tenant setting commands](reference/tenant-setting-commands.md)        | The `Axis.Admin` commands that change bindings, sign-in settings, mail settings and hosts, rotate keys and passwords, end sessions, and the platform audit records |
+| [Tenant status commands](reference/tenant-status-commands.md)           | The `Axis.Admin` commands that suspend and resume a tenant and list the tenants       |
 | [Installation](reference/installation.md)                              | Production images and installs on premises and in the cloud                           |
 
 ## Working on Axis
