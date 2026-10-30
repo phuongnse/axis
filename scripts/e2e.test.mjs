@@ -60,6 +60,11 @@ function runE2e(shard, args = []) {
       copyFileSync(join(root, file), join(dir, file))
     }
     mkdirSync(join(dir, 'samples/apps/purchase-requests'), { recursive: true })
+    // The script that adds the axis first login flow logs its arguments instead of calling Keycloak.
+    writeFileSync(
+      join(dir, 'scripts/lib/development-realm.mjs'),
+      "import { appendFileSync } from 'node:fs'\nappendFileSync(process.env.STUB_LOG, `development-realm ${process.argv.slice(2).join(' ')}\\n`)\n",
+    )
     // A long serial journey and two short specs: the split gives the journey the first shard.
     mkdirSync(join(dir, 'tests/e2e/specs'), { recursive: true })
     writeFileSync(join(dir, 'tests/e2e/specs/journey.spec.ts'), "test.describe.configure({ mode: 'serial' })\n")
@@ -170,6 +175,16 @@ describe('scripts/e2e.sh runs Playwright, or one shard of it with AXIS_E2E_SHARD
     )
     assert.ok(build >= 0, run.calls.join('\n'))
     assert.ok(keycloak > build, run.calls.join('\n'))
+  })
+
+  test('the axis first login flow is added through the Keycloak address before Playwright starts', () => {
+    const run = runE2e()
+
+    assert.equal(run.status, 0, run.stdout + run.stderr)
+    const realm = run.calls.indexOf('development-realm http://127.0.0.1:8180')
+    const playwright = run.calls.findIndex((call) => call.startsWith('npm test '))
+    assert.ok(realm >= 0, run.calls.join('\n'))
+    assert.ok(playwright > realm, run.calls.join('\n'))
   })
 
   for (const shard of ['4/3', '0/3', 'abc']) {
