@@ -78,4 +78,4 @@ _(planned for Mx)_ are not built yet, and Dn refers to [decisions.md](../decisio
   - A module entity, such as `departments/Department`, opens in the designer
     read-only, from the [module resource route](authoring.md#routes). Every input is
     off, and it has no Add field, Remove, Move, Add validation, Save or Delete
-    button, no JSON tab and no Uses or Used by lists. A label shows its text key.
+    button, no JSON tab and no Uses or Used by lists. A label shows its text key. The read-only notice has the alert role.

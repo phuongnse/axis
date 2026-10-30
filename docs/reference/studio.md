@@ -13,7 +13,7 @@ agrees. The route, the link, the application picker, New application, New resour
 search, the editor, the reference pickers, the Uses and Used by lists, the delete
 button and its warning, the diagnostics panel, Validate, Preview and Publish with
 the request status and the preview links, the Releases list with Roll back, Run tests,
-Run and the Test results list, the read-only view of a module entity, and the reconnect message are built.
+Run and the Test results list, the read-only views of a module entity, a module process and a module policy, and the reconnect message are built.
 
 - **Route.** `/studio` is a platform route, outside every site. The header
   lists Studio in the app switcher only when `GET /api/me` answers `studio: true`. A person
@@ -22,7 +22,7 @@ Run and the Test results list, the read-only view of a module entity, and the re
 - **Address.** The picked application and the selected resource are in the
   address, as `/studio?app=PurchaseRequests&resource=<id>`, so a reload keeps
   them. A Used by entry or a diagnostic that opens a resource at a path adds
-  `&path=<path>`. The id of a module entity opens it too, as `&resource=<id>`,
+  `&path=<path>`. The id of a module entity, process or policy opens it too, as `&resource=<id>`,
   when the id is not one of the folder's own resources.
 - **New application.** A **New application** button shows beside the picker
   when `GET /api/me` answers `studioCreate: true`. It also shows when Studio
@@ -65,10 +65,10 @@ Run and the Test results list, the read-only view of a module entity, and the re
 - **Resource list.** The list groups the resources by kind. The kind shows as
   written in the files, such as `entity`, without translation. A search box
   filters it by name and `id`, ignoring letter case. Selecting a resource shows
-  its name, kind, `id` and file, and opens it in the editor below. A **Module
-  entities** group below the kinds lists each entity of the modules the application
-  uses, by its `<module>/<name>` name. It is built from the application's names,
-  and the search box filters it too.
+  its name, kind, `id` and file, and opens it in the editor below. **Module entities**, **Module processes** and
+  **Module policies** groups below the kinds list those of the modules the application uses, by `<module>/<name>`, from
+  the application's names, and the search box filters them too. A module process opens as its graph alone, with no palette, connect handle, step panel or delete,
+  and a module policy as a read-only table of its grants. Each view shows its read-only notice with the alert role. Module pages have no view yet _(planned)_.
 - **Editor.** The editor shows one resource in two views of the same draft.
   - A form is built from the JSON Schema of the resource's kind. The SPA
     bundles the schemas in `src/Axis.Configuration/Schemas`, the files the

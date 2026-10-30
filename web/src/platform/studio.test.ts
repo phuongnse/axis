@@ -7,12 +7,14 @@ import {
   filterResources,
   folderDiffers,
   groupByKind,
+  moduleResources,
   previewSiteUrl,
   putStudioTexts,
   releaseRows,
   ServerUnreachableError,
   type StudioReleaseItem,
   type StudioReleases,
+  type StudioNames,
   type StudioResourceItem,
   waitForServer,
 } from './studio'
@@ -219,6 +221,56 @@ describe('groupByKind', () => {
 
   it('returns no group for no resources', () => {
     expect(groupByKind([])).toEqual([])
+  })
+})
+
+describe('moduleResources', () => {
+  const names = {
+    entities: [
+      { id: 'own-entity', name: 'Request', module: null },
+      { id: 'checklists-entity', name: 'checklists/Checklist', module: 'checklists' },
+    ],
+    processes: [
+      { id: 'own-process', name: 'Approve', module: null },
+      { id: 'checklists-process', name: 'checklists/ChecklistReview', module: 'checklists' },
+    ],
+    policies: [
+      { id: 'own-policy', name: 'Access', module: null },
+      { id: 'checklists-policy', name: 'checklists/ChecklistAccess', module: 'checklists' },
+    ],
+    pages: [{ id: 'checklists-page', name: 'checklists/Checklists', module: 'checklists', parameters: [] }],
+  } as unknown as StudioNames
+
+  it('returns the entities, processes and policies of modules with their module id', () => {
+    const groups = moduleResources(names, '')
+
+    expect(groups.map((group) => group.kind)).toEqual(['entity', 'process', 'policy'])
+    expect(groups.flatMap((group) => group.items)).toEqual([
+      { id: 'checklists-entity', kind: 'entity', name: 'checklists/Checklist', module: 'checklists' },
+      { id: 'checklists-process', kind: 'process', name: 'checklists/ChecklistReview', module: 'checklists' },
+      { id: 'checklists-policy', kind: 'policy', name: 'checklists/ChecklistAccess', module: 'checklists' },
+    ])
+  })
+
+  it('leaves out the application own resources and the pages', () => {
+    const ids = moduleResources(names, '').flatMap((group) => group.items.map((item) => item.id))
+
+    expect(ids).not.toContain('own-entity')
+    expect(ids).not.toContain('own-process')
+    expect(ids).not.toContain('own-policy')
+    expect(ids).not.toContain('checklists-page')
+  })
+
+  it('applies the search to the name and the id, ignoring letter case and spaces, and drops empty groups', () => {
+    expect(moduleResources(names, '  REVIEW ').map((group) => group.items.map((item) => item.id))).toEqual([
+      ['checklists-process'],
+    ])
+    expect(moduleResources(names, 'CHECKLISTS-POLICY').map((group) => group.kind)).toEqual(['policy'])
+    expect(moduleResources(names, 'nothing')).toEqual([])
+  })
+
+  it('returns no group before the names are loaded', () => {
+    expect(moduleResources(null, '')).toEqual([])
   })
 })
 
