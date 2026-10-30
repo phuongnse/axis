@@ -90,7 +90,7 @@ public sealed class ModuleCatalogTests
     [InlineData("""{ "kind": "module", "id": "departments", "version": "1.0.0", "label": "D", "packages": [{ "id": "x" }] }""", "/packages/0")]
     [InlineData("""{ "kind": "module", "id": "departments", "version": "1.0.0", "label": "D", "roles": [{ "name": "Approver", "label": { "textKey": "departments.a" } }] }""", "/roles/0/name")]
     [InlineData("""{ "kind": "module", "id": "departments", "version": "1.0.0", "label": "D", "roles": [{ "name": "approver" }] }""", "/roles/0")]
-    [InlineData("""{ "kind": "module", "id": "departments", "version": "1.0.0", "label": "D", "modules": [{ "id": "people", "version": "^1.0.0", "roles": {} }] }""", "/modules/0/roles")]
+    [InlineData("""{ "kind": "module", "id": "departments", "version": "1.0.0", "label": "D", "modules": [{ "id": "people", "version": "^1.0.0", "roles": { "manager": "" } }] }""", "/modules/0/roles/manager")]
     public void A_manifest_that_fails_its_schema_is_a_diagnostic_at_the_failing_pointer(string manifest, string path)
     {
         using var root = new TemporaryFolder().With(ManifestFile, manifest);
