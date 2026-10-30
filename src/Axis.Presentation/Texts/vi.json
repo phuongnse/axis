@@ -310,6 +310,7 @@
   "shell.studio.kind": "Loại",
   "shell.studio.moduleEntities": "Thực thể của mô-đun",
   "shell.studio.moduleProcesses": "Quy trình của mô-đun",
+  "shell.studio.modulePages": "Trang của mô-đun",
   "shell.studio.modulePolicies": "Chính sách của mô-đun",
   "shell.studio.moduleRoles": "Vai trò",
   "shell.studio.moduleGrants.target": "Đối tượng",

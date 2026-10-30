@@ -21,7 +21,8 @@ server stores a publish request in the tenant database, and a separate
 [publisher](administration.md#publisher) runs it. The server never activates in
 its own process, and
 [D47](../decisions/d47-publishing-from-studio.md) agrees this.
-The `changes` route writes several files in one call, see [Changes](#changes).
+The `changes` route writes several files in one call, see [Changes](#changes). The draft page metadata routes are in
+[draft-page-metadata.md](draft-page-metadata.md).
 
 The [names](#names) route feeds Studio's reference pickers, the
 [text write](#text-writes) route helps its label texts and the
@@ -78,7 +79,8 @@ in the application. File names and names can change.
 | `GET /api/studio/apps/{application}/policy-matrix` | `200` with what each role may do on each target, see [Policy matrix](#policy-matrix) |
 | `PUT /api/studio/apps/{application}/texts/{key}` | `200` with `{ resources: [{ id, locale, version }], diagnostics }`. The body is `application/json`, `{ texts: { <locale>: <text> } }`, see [Text writes](#text-writes) |
 | `POST /api/studio/apps/{application}/expressions/check` | `200` with `{ type, diagnostics }`. The body is `application/json`, `{ resourceId, path, expression }`, see [Expression check](#expression-check) |
-| `POST /api/studio/apps/{application}/resources/{id}/page-metadata` | `200` with `{ page, diagnostics }`, or `{ widget, diagnostics }` for a form. The body is the full draft page or form as `application/json`, see [Draft page metadata](#draft-page-metadata) |
+| `POST /api/studio/apps/{application}/resources/{id}/page-metadata` | `200` with `{ page, diagnostics }`, or `{ widget, diagnostics }` for a form. The body is the full draft page or form as `application/json`, see [Draft page metadata](draft-page-metadata.md) |
+| `GET /api/studio/apps/{application}/modules/{module}/resources/{id}/page-metadata` | `200` with `{ page, diagnostics }` for a page of the module version that the application pins, see [Draft page metadata](draft-page-metadata.md) |
 
 `file` is the path of the resource's file relative to the application folder,
 written with `/`. `id` is in the hyphenated 8-4-4-4-12 hex form, in either
@@ -224,7 +226,7 @@ requests or releases exist.
 Every error is problem details
 (`application/problem+json`). The titles are fixed and never contain text
 from the request. The rows for List applications, List resources, Read, Module resource, Create, Patch, Delete, Changes, Diagnostics, Names,
-Text write, Expression check, Draft page metadata, Resource references, Text key references, Release history, Validate, Publish, Preview, Rollback and Request status are built.
+Text write, Expression check, Draft page metadata, Module page metadata, Resource references, Text key references, Release history, Validate, Publish, Preview, Rollback and Request status are built.
 
 | Route | `401` | `403` | `404` | `409` |
 | --- | --- | --- | --- | --- |
@@ -243,6 +245,7 @@ Text write, Expression check, Draft page metadata, Resource references, Text key
 | Text write | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application | A text resource whose `texts` is not an object |
 | Expression check | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application, or an unknown `resourceId` | Not used |
 | Draft page metadata | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application, or a resource that is neither a page nor a form | Not used |
+| Module page metadata | No session | No author role, or no `Studio:Folders` | Unknown application, module or resource, or a resource that is not a page | Not used |
 | Validate | No session | No author role, no `Studio:Folders`, or no CSRF header | Unknown application | The manifest has no UUID `id` |
 | Publish | No session | No author role, no publisher role, no `Studio:Folders`, or no CSRF header | Unknown application | The manifest has no UUID `id` |
 | Request status | No session | No author role, or no `Studio:Folders` | Unknown application or request | Not used |
@@ -505,59 +508,6 @@ Studio's expression editor can show errors as the author types. The body is
   files. The compile stops once every check has run, so it builds no reference
   index, names, policy matrix, model or content hash. Nothing is cached, so the
   next check sees an edit on disk.
-
-## Draft page metadata
-
-`POST .../resources/{id}/page-metadata` answers the metadata
-that an unsaved page would have, so the page designer's canvas can draw the
-draft ([D65](../decisions/d65-a-visual-page-designer-on-a-canvas-drawn-by-the-sites-widgets.md)).
-It also answers an unsaved form, see **A draft form**.
-The `{id}` names the saved page.
-
-- **The body.** The full draft page, as the file would hold it. Its `id` and
-  `kind` must equal those of the saved file, or the answer is `400`.
-- **The compile.** The server compiles the saved folder in memory with the
-  draft in place of the saved file. It takes no lock, touches no database and
-  reads no records, so nothing is written.
-- **The answer.** `{ page, diagnostics }`. `page` has the shape of
-  [`GET /api/sites/{path}/pages/{page}`](frontend.md), with every widget kept.
-  Policies play no part, as in every authoring route. `access` lists every
-  action the target accepts and every field a user may write. The record paths
-  are as the compiled page has them, but the canvas answers the widgets' data
-  calls from placeholder data.
-- **A draft form.** A form body is the full draft form with the saved `id` and
-  `kind`
-  ([D66](../decisions/d66-a-visual-form-designer-for-form-resources.md)). The
-  answer is `{ widget, diagnostics }`. `widget` has the shape of a `form`
-  widget that names this form, see **Form metadata** in
-  [form-widget.md](form-widget.md): `entity` with all its fields, `form`,
-  `actions: []`, and an `access` that lists every action and writable field.
-  Each section, field and step also carries `path`, such as `/sections/0`,
-  `/sections/0/fields/1` and `/steps/0`. It has no expressions, and its
-  diagnostics are those of the form. Any error in the compile, in the form
-  or in another file, answers `widget: null`.
-- **Widget paths.** Each widget also carries `path`, its JSON Pointer in the
-  draft, such as `/widgets/0/columns/1/widgets/0`.
-- **Diagnostics.** Only those whose `resourceId` is the page, shaped as in
-  [Diagnostics](#diagnostics).
-- **A draft with errors.** It still answers `200`. A widget that does not
-  compile is `{ type, path, placeholder: true }`, and the rest of the page is
-  drawn as usual. Only an error turns a widget into a placeholder: a warning
-  leaves it drawn. A placeholder's `type` is the draft's `type`, or null when
-  that is not a string. A container whose widgets all fail is one placeholder.
-  A column or tab whose widgets all fail stays in its container, holding
-  placeholders. A page that cannot be read at all answers `page: null` with
-  its diagnostics. That is the case when a file other than the page has an
-  error, when the page has an error outside its widgets (its name, title or
-  parameters, or an empty `widgets` list) and when no top-level widget compiles.
-  The `diagnostics` are those of the draft as sent, so they match what a save
-  would show.
-- **A denied caller.** A caller with no session gets `401`. A caller with no
-  author role, no `Studio:Folders` or no CSRF header gets `403`, before any
-  lookup, so the answer says nothing about which applications or resources
-  exist. An unknown application, an unknown resource or a resource that is
-  neither a page nor a form gets `404`.
-- **Speed.** It answers within 500 ms on a typical application. `StudioPageMetadataPerformanceTests` fails when the best of three attempts of any timed post takes 500 ms or more.
 
 ## Writes
 
