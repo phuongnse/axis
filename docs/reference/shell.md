@@ -9,9 +9,8 @@ endpoints and the widgets are in [frontend](frontend.md), and sign-in and the se
 [D98](../decisions/d98-rules-from-the-shell-review.md) agrees this page, and
 [D114](../decisions/d114-rules-from-the-sign-in-and-home-page-review.md) changes some of its rules: the organization
 heading on the sign-in card, sign-in that starts at once, the shell that fills the window, the menus, the theme that
-follows the system and the home page. D98's rules are built, and so are the design system's shell previews and their
-Shell group of cards. D114's rules are marked _(planned for M17)_ until they are built; each such mark says what the
-SPA does today.
+follows the system and the home page. D98's and D114's rules are built, and so are the design system's shell previews and
+their Shell group of cards.
 
 ## Layout
 
@@ -97,10 +96,6 @@ SPA does today.
   links to is `/users`. On a site's own host the app switcher lists only that site and no tools.
 
 ## Platform home page
-
-_(The page as [D114](../decisions/d114-rules-from-the-sign-in-and-home-page-review.md) agrees it is planned for M17.
-Today it shows D98's welcome band with the tools, then a card per application across the page with the number of
-applications and of its sites.)_
 
 - **Signed in.** The page has two parts, each under a `heading5` title with no count beside it: "Applications", then
   "Tools", as people use the applications most.

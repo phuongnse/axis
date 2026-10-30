@@ -1,7 +1,7 @@
 import { expect, test } from '../test'
 import { logInAtKeycloak } from '../keycloak'
 
-// A person signs in from the home page, opens a site from its application card, uses the navigation, opens a form
+// A person signs in from the home page, opens a site from its application tile, uses the navigation, opens a form
 // with the table's main action and returns through the breadcrumb. Below 992 px there is no sidebar, so the journey
 // opens and closes the Menu panel instead of collapsing it.
 for (const { name, width } of [
@@ -16,7 +16,7 @@ for (const { name, width } of [
     const main = page.getByRole('main')
     await logInAtKeycloak(page, 'requester')
 
-    await expect(main.getByText('Welcome to Axis', { exact: true })).toBeVisible()
+    await expect(main.getByRole('heading', { name: 'Applications', exact: true })).toBeVisible()
     await main.getByRole('link', { name: 'E2E notes', exact: true }).click()
     await expect(page).toHaveURL(/\/e2e\/notes$/)
 

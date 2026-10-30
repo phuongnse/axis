@@ -755,17 +755,21 @@ const requestPage: PageMetadata = {
 const currentUser: CurrentUser = {
   id: '3f8e9d0c-1b2a-4c3d-8e4f-5a6b7c8d9e0f',
   displayName: 'Alex Morgan',
-  roles: ['Author', 'Operator'],
+  roles: ['Author', 'Operator', 'Administrator'],
   studio: true,
   studioPublisher: false,
   studioCreate: false,
   studioPreviewHost: null,
   studioTest: false,
   console: true,
-  users: false,
+  users: true,
 }
 
-const purchaseApplication = { name: application, titles: { [locale]: 'Purchase requests' }, descriptions: null }
+const purchaseApplication = {
+  name: application,
+  titles: { [locale]: 'Purchase requests' },
+  descriptions: { [locale]: "Runs the company's purchases, from the request to approval and ordering." },
+}
 const serviceApplication = { name: 'ServiceDesk', titles: { [locale]: 'Service desk' }, descriptions: null }
 
 /** Three sites in two applications, for the platform home page's cards. */
@@ -774,7 +778,7 @@ const listedSites: SiteListItem[] = [
     path: sitePath,
     titleKey: 'site.title',
     titles: { [locale]: 'Purchase requests' },
-    descriptions: null,
+    descriptions: { [locale]: 'Request purchases and take them through approval.' },
     application: purchaseApplication,
   },
   {
