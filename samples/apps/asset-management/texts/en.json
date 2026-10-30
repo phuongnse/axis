@@ -5,7 +5,10 @@
   "formatVersion": 1,
   "locale": "en",
   "texts": {
+    "application.title": "Asset management",
+    "application.description": "Keeps track of the company's assets, who holds them and their upkeep.",
     "site.title": "Asset management",
+    "site.description": "Register assets and see where they are and who holds them.",
     "nav.assets": "Assets",
     "nav.dashboard": "Dashboard",
     "pages.assets.title": "Assets",

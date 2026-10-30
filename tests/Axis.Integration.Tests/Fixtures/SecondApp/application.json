@@ -3,5 +3,6 @@
   "kind": "application",
   "name": "SecondApp",
   "formatVersion": 1,
-  "label": { "textKey": "app.title" }
+  "label": { "textKey": "app.title" },
+  "description": { "textKey": "app.description" }
 }

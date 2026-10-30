@@ -16,6 +16,7 @@
   "shell.appSwitcher.users": "Người dùng",
   "shell.preferences.label": "Ngôn ngữ và giao diện",
   "shell.theme.label": "Giao diện",
+  "shell.theme.system": "Theo hệ thống",
   "shell.theme.light": "Sáng",
   "shell.theme.dark": "Tối",
   "shell.locale.label": "Ngôn ngữ",

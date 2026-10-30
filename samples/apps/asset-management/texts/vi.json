@@ -5,7 +5,10 @@
   "formatVersion": 1,
   "locale": "vi",
   "texts": {
+    "application.title": "Quản lý tài sản",
+    "application.description": "Theo dõi tài sản của công ty, người đang giữ và việc bảo trì.",
     "site.title": "Quản lý tài sản",
+    "site.description": "Đăng ký tài sản và xem tài sản ở đâu, ai đang giữ.",
     "nav.assets": "Tài sản",
     "nav.dashboard": "Tổng quan",
     "pages.assets.title": "Tài sản",

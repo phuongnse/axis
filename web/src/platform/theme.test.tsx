@@ -1,13 +1,98 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { act, render, screen, waitFor } from '@testing-library/react'
 import { Modal, theme } from 'antd'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ThemeModeProvider } from './theme'
 import { useThemeMode } from './themeMode'
 import { reducedMotionQuery } from './useReducedMotion'
+import { darkSchemeQuery } from './useSystemThemeMode'
 
 function Mode() {
   return <output>{useThemeMode().mode}</output>
 }
+
+/** Stubs matchMedia for the dark-scheme query, which the test changes with `setDark`. Other queries do not match. */
+function stubColourScheme(dark: boolean) {
+  let matches = dark
+  const listeners = new Set<(event: MediaQueryListEvent) => void>()
+  vi.stubGlobal('matchMedia', (query: string) => ({
+    get matches() {
+      return query === darkSchemeQuery && matches
+    },
+    media: query,
+    onchange: null,
+    addListener() {},
+    removeListener() {},
+    addEventListener(_type: string, listener: (event: MediaQueryListEvent) => void) {
+      if (query === darkSchemeQuery) {
+        listeners.add(listener)
+      }
+    },
+    removeEventListener(_type: string, listener: (event: MediaQueryListEvent) => void) {
+      listeners.delete(listener)
+    },
+    dispatchEvent: () => false,
+  }))
+  return {
+    setDark(next: boolean) {
+      matches = next
+      act(() => {
+        for (const listener of listeners) {
+          listener({ matches: next, media: darkSchemeQuery } as MediaQueryListEvent)
+        }
+      })
+    },
+  }
+}
+
+describe('ThemeModeProvider and the system setting', () => {
+  beforeEach(() => localStorage.clear())
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('follows a change of the system setting when nothing is stored', () => {
+    const scheme = stubColourScheme(false)
+    render(
+      <ThemeModeProvider>
+        <Mode />
+      </ThemeModeProvider>,
+    )
+    expect(screen.getByRole('status')).toHaveTextContent('light')
+
+    scheme.setDark(true)
+
+    expect(screen.getByRole('status')).toHaveTextContent('dark')
+  })
+
+  it('keeps a stored light mode when the system setting changes to dark', () => {
+    localStorage.setItem('axis.themeMode', 'light')
+    const scheme = stubColourScheme(false)
+    render(
+      <ThemeModeProvider>
+        <Mode />
+      </ThemeModeProvider>,
+    )
+
+    scheme.setDark(true)
+
+    expect(screen.getByRole('status')).toHaveTextContent('light')
+  })
+
+  it('keeps a stored dark mode when the system setting changes to light', () => {
+    localStorage.setItem('axis.themeMode', 'dark')
+    const scheme = stubColourScheme(true)
+    render(
+      <ThemeModeProvider>
+        <Mode />
+      </ThemeModeProvider>,
+    )
+
+    scheme.setDark(false)
+
+    expect(screen.getByRole('status')).toHaveTextContent('dark')
+  })
+})
 
 describe('ThemeModeProvider', () => {
   it('starts in the stored mode', () => {

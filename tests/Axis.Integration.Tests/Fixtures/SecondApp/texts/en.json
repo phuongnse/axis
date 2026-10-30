@@ -6,7 +6,9 @@
   "locale": "en",
   "texts": {
     "app.title": "Second application",
+    "app.description": "Tracks the second team's tasks.",
     "site.title": "Second",
+    "site.description": "See and finish your tasks.",
     "nav.tasks": "Tasks",
     "tasks.title": "Tasks",
     "role.employee": "Employee"

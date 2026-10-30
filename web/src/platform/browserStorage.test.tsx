@@ -7,8 +7,9 @@ import { useThemeMode } from './themeMode'
 
 const storageApi = /\b(localStorage|sessionStorage|indexedDB)\b|document\.cookie|\bcaches\b/
 
-function ToggleMode() {
-  return <button onClick={useThemeMode().toggleMode}>Toggle</button>
+function ChooseDark() {
+  const { choose } = useThemeMode()
+  return <button onClick={() => choose('dark')}>Dark</button>
 }
 
 describe('browser storage', () => {
@@ -44,10 +45,10 @@ describe('browser storage', () => {
 
     render(
       <ThemeModeProvider>
-        <ToggleMode />
+        <ChooseDark />
       </ThemeModeProvider>,
     )
-    await userEvent.click(screen.getByRole('button', { name: 'Toggle' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Dark' }))
     storeLocale('vi')
 
     expect(Object.keys(localStorage).sort()).toEqual(['axis.locale', 'axis.themeMode'])

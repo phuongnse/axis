@@ -10,7 +10,7 @@ public sealed class SiteEndpointTests(RecordApiFixture fixture) : IClassFixture<
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
 
     [Fact]
-    public async Task List_has_the_sites_of_every_active_application_in_the_tenant_with_their_titles()
+    public async Task List_has_the_sites_of_every_active_application_in_the_tenant_with_their_titles_and_descriptions()
     {
         using var listInA = await GetJsonAsync("/api/sites", HostA);
         using var listInB = await GetJsonAsync("/api/sites", HostB);
@@ -18,7 +18,7 @@ public sealed class SiteEndpointTests(RecordApiFixture fixture) : IClassFixture<
         var sitesInA = listInA.RootElement.GetProperty("sites").EnumerateArray().ToList();
         Assert.Equal(["records", "second"], sitesInA.Select(site => site.GetProperty("path").GetString()));
         var records = sitesInA[0];
-        Assert.Equal(["path", "titleKey", "titles", "application"], records.EnumerateObject().Select(property => property.Name));
+        Assert.Equal(["path", "titleKey", "titles", "descriptions", "application"], records.EnumerateObject().Select(property => property.Name));
         Assert.Equal("site.title", records.GetProperty("titleKey").GetString());
         Assert.Equal(
             [("en", "Records"), ("vi", "Hồ sơ")],
@@ -38,6 +38,16 @@ public sealed class SiteEndpointTests(RecordApiFixture fixture) : IClassFixture<
         Assert.Equal(
             [("en", "Second application")],
             secondApplication.GetProperty("titles").EnumerateObject().Select(property => (property.Name, property.Value.GetString())));
+
+        // RecordsApp has no descriptions. SecondApp has both, in the one locale it has texts for.
+        Assert.Equal(JsonValueKind.Null, records.GetProperty("descriptions").ValueKind);
+        Assert.Equal(JsonValueKind.Null, recordsApplication.GetProperty("descriptions").ValueKind);
+        Assert.Equal(
+            [("en", "See and finish your tasks.")],
+            sitesInA[1].GetProperty("descriptions").EnumerateObject().Select(property => (property.Name, property.Value.GetString())));
+        Assert.Equal(
+            [("en", "Tracks the second team's tasks.")],
+            secondApplication.GetProperty("descriptions").EnumerateObject().Select(property => (property.Name, property.Value.GetString())));
 
         var sitesInB = listInB.RootElement.GetProperty("sites").EnumerateArray().ToList();
         Assert.Equal(["records"], sitesInB.Select(site => site.GetProperty("path").GetString()));

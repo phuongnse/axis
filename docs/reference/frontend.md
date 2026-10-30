@@ -201,7 +201,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
 
   | Method and path | Response |
   | --- | --- |
-  | `GET /api/sites` | `{ "sites": [ { "path", "titleKey", "titles", "application": { "name", "titles" } } ] }`, every site of every active application, in path order. `application.titles` holds the application's title for each locale it has texts for: the text of the `label` in its `application.json`, or its name when it has no label. _(Planned for M17: `application.descriptions` and each site's `descriptions`, per locale or `null`, see [descriptions](shell.md#application-and-site-descriptions).)_ |
+  | `GET /api/sites` | `{ "sites": [ { "path", "titleKey", "titles", "descriptions", "application": { "name", "titles", "descriptions" } } ] }`, every site of every active application, in path order. `application.titles` holds the application's title for each locale it has texts for: the text of the `label` in its `application.json`, or its name when it has no label. `descriptions` holds the text of the `description` for each locale, the site's for its available locales and the application's for each locale it has texts for, or is `null` when there is no description, see [descriptions](shell.md#application-and-site-descriptions). |
   | `GET /api/sites/{path}` | `{ "path", "titleKey", "locales": { "default", "fallback", "available" }, "navigation": [ { "page", "labelKey", "icon" } ], "notificationsPath" }`. `icon` is an Axis icon name, or `null` for an entry with none |
   | `GET /api/sites/{path}/texts/{locale}` | `{ "locale", "texts" }`, the active release's texts for one locale, in the shape of the platform texts. Optional `?release={releaseId}` serves any stored release of the site's application. An unknown id, a non-UUID or another application's release answers `404`. |
   | `GET /api/sites/{path}/pages/{page}` | the page metadata shown below. The page of a module is `GET /api/sites/{path}/pages/{module id}/{name}`, two path segments as the record API writes a module entity. Its `name` is `{module id}/{name}` and its title and labels resolve from the module's texts |
@@ -906,7 +906,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
 - **Process inspector widget**. A page whose widget is a `processInspector` lists the instances of
   one process and opens one. See [process-inspector-widget.md](process-inspector-widget.md).
 - **Locale.** The shell header has a language and theme menu, in the Menu panel at narrow width. It lists the
-  site's locales and Light and Dark. The chosen locale is kept in `localStorage` under `axis.locale`, like the
+  site's locales and System, Light and Dark. The chosen locale is kept in `localStorage` under `axis.locale`, like the
   theme mode under `axis.themeMode`. These are the only keys the SPA keeps in browser storage. Sign-out clears
   both through `Clear-Site-Data`, so the next sign-in starts in the system theme and the site's default locale.
   One key serves every site: a site starts in the stored locale when it offers it, and in its default locale

@@ -15,6 +15,7 @@
       "maxLength": 60
     },
     "title": { "$ref": "#/$defs/textReference" },
+    "description": { "$ref": "#/$defs/textReference" },
     "locales": {
       "type": "object",
       "additionalProperties": false,

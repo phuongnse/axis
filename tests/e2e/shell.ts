@@ -6,8 +6,8 @@ async function choose(page: Page, item: string) {
   await page.getByRole('menuitemradio', { name: item, exact: true }).click()
 }
 
-/** Picks Light or Dark in the header's "Language and theme" menu. */
-export async function chooseTheme(page: Page, theme: 'Light' | 'Dark') {
+/** Picks System, Light or Dark in the header's "Language and theme" menu. */
+export async function chooseTheme(page: Page, theme: 'System' | 'Light' | 'Dark') {
   await choose(page, theme)
 }
 

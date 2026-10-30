@@ -45,6 +45,7 @@ const texts: Record<string, Record<string, string>> = {
     'shell.appSwitcher.users': 'Users',
     'shell.preferences.label': 'Language and theme',
     'shell.theme.label': 'Theme',
+    'shell.theme.system': 'System',
     'shell.theme.light': 'Light',
     'shell.theme.dark': 'Dark',
     'shell.locale.label': 'Language',
@@ -91,20 +92,23 @@ const sites: SiteListItem[] = [
     path: 'e2e',
     titleKey: 'site.title',
     titles: { en: 'E2E notes', vi: 'Ghi chú E2E' },
-    application: { name: 'E2eNotes', titles: { en: 'E2E notes', vi: 'Ghi chú E2E' } },
+    descriptions: null,
+    application: { name: 'E2eNotes', titles: { en: 'E2E notes', vi: 'Ghi chú E2E' }, descriptions: null },
   },
   // Listed out of title order, so the tests see the sort.
   {
     path: 'desk-staff',
     titleKey: 'site.title',
     titles: { en: 'Staff desk' },
-    application: { name: 'ServiceDesk', titles: { en: 'Service desk' } },
+    descriptions: null,
+    application: { name: 'ServiceDesk', titles: { en: 'Service desk' }, descriptions: null },
   },
   {
     path: 'desk-customers',
     titleKey: 'site.title',
     titles: { en: 'Customer portal' },
-    application: { name: 'ServiceDesk', titles: { en: 'Service desk' } },
+    descriptions: null,
+    application: { name: 'ServiceDesk', titles: { en: 'Service desk' }, descriptions: null },
   },
 ]
 

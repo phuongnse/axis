@@ -11,6 +11,9 @@ public sealed record SiteResource : Resource
 
     public required TextReference Title { get; init; }
 
+    /// <summary>The site's description, or null when it has none.</summary>
+    public TextReference? Description { get; init; }
+
     public required SiteLocales Locales { get; init; }
 
     public required IReadOnlyList<NavigationEntry> Navigation { get; init; }

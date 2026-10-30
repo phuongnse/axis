@@ -5,7 +5,10 @@
   "formatVersion": 1,
   "locale": "vi",
   "texts": {
+    "application.title": "Hỗ trợ nội bộ",
+    "application.description": "Xử lý các yêu cầu hỗ trợ nội bộ của công ty.",
     "site.title": "Hỗ trợ nội bộ",
+    "site.description": "Tạo phiếu hỗ trợ và theo dõi đến khi được giải quyết.",
     "nav.myTickets": "Yêu cầu của tôi",
     "nav.myTasks": "Nhiệm vụ của tôi",
     "nav.allTickets": "Tất cả yêu cầu",
