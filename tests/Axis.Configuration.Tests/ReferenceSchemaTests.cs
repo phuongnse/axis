@@ -67,6 +67,7 @@ public sealed class ReferenceSchemaTests
         (ReferenceRelations.TriggerEvent, "trigger", "properties/event", "event"),
         (ReferenceRelations.TriggerEntity, "trigger", "properties/entity", "entity"),
         (ReferenceRelations.TriggerDataSource, "trigger", "properties/dataSource", "dataSource"),
+        (ReferenceRelations.WebhookEvent, "webhook", "properties/event", "event"),
         (ReferenceRelations.MigrationEntity, "migration", "properties/entity", "entity"),
         (ReferenceRelations.ScenarioEntity, "scenario", "properties/steps/items/properties/entity", "entity"),
         (ReferenceRelations.ScenarioProcess, "scenario", "properties/steps/items/properties/process", "process"),

@@ -20,6 +20,7 @@ public sealed class ReleaseActivatorTests(DataDatabaseFixture database) : IClass
     private readonly string _name = $"App{Guid.NewGuid():N}";
     private readonly string _sitePath = $"site-{Guid.NewGuid():N}";
     private readonly Guid _connectorId = Guid.NewGuid();
+    private readonly Guid _webhookId = Guid.NewGuid();
 
     private const string NumberField = """{ "name": "number", "type": "text", "required": true, "maxLength": 20 }""";
     private const string NoteField = """{ "name": "note", "type": "text" }""";
@@ -231,6 +232,88 @@ public sealed class ReleaseActivatorTests(DataDatabaseFixture database) : IClass
             ],
             result.Diagnostics.Select(diagnostic => (diagnostic.Code, diagnostic.Path, diagnostic.Severity)).Order());
         Assert.Equal(compiled.Release?.Id, (await FindActiveAsync(_applicationId))?.ReleaseId);
+    }
+
+    [Fact]
+    public async Task Every_webhook_binding_a_tenant_lacks_is_reported_and_nothing_is_activated()
+    {
+        using var folder = WebhookFolder();
+        var compiled = await CompileAsync(folder);
+
+        var result = await ActivateAsync(compiled, ActivationBindings.None("acme"));
+
+        Assert.Equal(
+            [
+                (DiagnosticCodes.MissingDeploymentBinding, "webhooks/order-placed-chat.json", "/secret/binding", _webhookId, DiagnosticSeverity.Error),
+                (DiagnosticCodes.MissingDeploymentBinding, "webhooks/order-placed-chat.json", "/url/binding", _webhookId, DiagnosticSeverity.Error),
+            ],
+            result.Diagnostics.Select(diagnostic => (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.ResourceId, diagnostic.Severity)).Order());
+        Assert.Null(await FindActiveAsync(_applicationId));
+    }
+
+    [Fact]
+    public async Task On_a_preview_tenant_every_missing_webhook_binding_is_a_warning_and_the_release_is_activated()
+    {
+        using var folder = WebhookFolder();
+        var compiled = await CompileAsync(folder);
+
+        var result = await ActivateAsync(compiled, ActivationBindings.None("acme") with { IsPreview = true });
+
+        Assert.Equal(
+            [
+                (DiagnosticCodes.MissingDeploymentBinding, "/secret/binding", DiagnosticSeverity.Warning),
+                (DiagnosticCodes.MissingDeploymentBinding, "/url/binding", DiagnosticSeverity.Warning),
+            ],
+            result.Diagnostics.Select(diagnostic => (diagnostic.Code, diagnostic.Path, diagnostic.Severity)).Order());
+        Assert.Equal(compiled.Release?.Id, (await FindActiveAsync(_applicationId))?.ReleaseId);
+    }
+
+    [Theory]
+    [InlineData("/url/binding", ActivationBinding.SecretKind, ActivationBinding.SecretKind)]
+    [InlineData("/secret/binding", ActivationBinding.UrlKind, ActivationBinding.UrlKind)]
+    public async Task A_webhook_binding_of_another_kind_is_an_error_and_the_release_is_not_activated(string path, string urlKind, string secretKind)
+    {
+        using var folder = WebhookFolder();
+        var compiled = await CompileAsync(folder);
+        var bindings = new Dictionary<string, ActivationBinding>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["ChatUrl"] = BindingOfKind(urlKind),
+            ["ChatSecret"] = BindingOfKind(secretKind),
+        };
+
+        var result = await ActivateAsync(compiled, new ActivationBindings("acme", bindings, AllowHttp: false));
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.MissingDeploymentBinding, path), (diagnostic.Code, diagnostic.Path));
+        Assert.Null(await FindActiveAsync(_applicationId));
+    }
+
+    [Theory]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    public async Task A_webhook_url_that_is_not_https_is_an_error_unless_http_is_allowed(bool allowHttp, bool expectedError)
+    {
+        using var folder = WebhookFolder();
+        var compiled = await CompileAsync(folder);
+        var bindings = new Dictionary<string, ActivationBinding>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["ChatUrl"] = new(ActivationBinding.UrlKind, new Uri("http://chat.example.test/hook")),
+            ["ChatSecret"] = new(ActivationBinding.SecretKind, null),
+        };
+
+        var result = await ActivateAsync(compiled, new ActivationBindings("acme", bindings, AllowHttp: allowHttp));
+
+        if (expectedError)
+        {
+            var diagnostic = Assert.Single(result.Diagnostics);
+            Assert.Equal((DiagnosticCodes.InsecureBaseUrl, "/url/binding"), (diagnostic.Code, diagnostic.Path));
+            Assert.Null(await FindActiveAsync(_applicationId));
+        }
+        else
+        {
+            Assert.Empty(result.Diagnostics);
+            Assert.Equal(compiled.Release?.Id, (await FindActiveAsync(_applicationId))?.ReleaseId);
+        }
     }
 
     [Theory]
@@ -787,6 +870,20 @@ public sealed class ReleaseActivatorTests(DataDatabaseFixture database) : IClass
         $$"""
         { "id": "{{id}}", "kind": "entity", "name": "Order", "formatVersion": 1, "fields": [ {{string.Join(", ", fields)}} ] }
         """;
+
+    private static ActivationBinding BindingOfKind(string kind) =>
+        new(kind, kind == ActivationBinding.UrlKind ? new Uri("https://chat.example.test/hook") : null);
+
+    /// <summary>An application with the event <c>OrderPlaced</c> about <c>Order</c> and a webhook for it.</summary>
+    private TemporaryFolder WebhookFolder() =>
+        ApplicationFolder(_applicationId, _name, _orderId, NumberField)
+            .With("events/order-placed.json", $$"""
+                { "id": "{{Guid.NewGuid()}}", "kind": "event", "name": "OrderPlaced", "formatVersion": 1, "entity": "Order", "fields": [] }
+                """)
+            .With("webhooks/order-placed-chat.json", $$"""
+                { "id": "{{_webhookId}}", "kind": "webhook", "name": "OrderPlacedChat", "formatVersion": 1, "event": "OrderPlaced",
+                  "url": { "binding": "ChatUrl" }, "secret": { "binding": "ChatSecret" } }
+                """);
 
     private static string PurchasingConnector(Guid id) =>
         $$"""

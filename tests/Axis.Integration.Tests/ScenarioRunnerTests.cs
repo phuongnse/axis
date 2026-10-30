@@ -121,6 +121,31 @@ public sealed class ScenarioRunnerTests
     }
 
     [Fact]
+    public async Task A_webhook_gets_a_url_binding_and_a_secret_binding_and_its_scenario_activates_and_passes()
+    {
+        using var folder = Application(Scenario("WebhookSetup", Clerk, """
+            { "type": "createRecord", "entity": "Note", "as": "requester", "save": "note", "values": { "title": "Desk", "quantity": 3 } },
+            { "type": "expectRecord", "record": "note", "values": { "title": "Desk", "quantity": 3 } }
+            """))
+            .With("events/note-closed.json", $$"""
+                { "id": "{{Guid.NewGuid()}}", "kind": "event", "name": "NoteClosed", "formatVersion": 1, "entity": "Note", "fields": [] }
+                """)
+            .With("webhooks/note-closed-chat.json", $$"""
+                { "id": "{{Guid.NewGuid()}}", "kind": "webhook", "name": "NoteClosedChat", "formatVersion": 1, "event": "NoteClosed",
+                  "url": { "binding": "ChatUrl" }, "secret": { "binding": "ChatSecret" } }
+                """);
+
+        var bindings = ScenarioBindings.ForActivation(ApplicationCompiler.Compile(folder.Path).Model!).Bindings;
+        var result = await RunAsync(folder, "WebhookSetup");
+
+        Assert.Equal(2, bindings.Count);
+        Assert.Equal(ActivationBinding.UrlKind, bindings["ChatUrl"].Kind);
+        Assert.Equal(ActivationBinding.SecretKind, bindings["ChatSecret"].Kind);
+        Assert.True(result.Passed, result.Failure);
+        Assert.False(await DatabaseExistsAsync(result.Database));
+    }
+
+    [Fact]
     public void An_oauth2_connector_gets_a_url_binding_for_its_token_url_and_secret_bindings_for_its_client_id_and_secret()
     {
         using var folder = Application().With("connectors/purchasing-system.json", OAuthConnector);

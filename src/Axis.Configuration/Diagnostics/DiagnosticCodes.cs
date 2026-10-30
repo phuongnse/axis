@@ -296,4 +296,8 @@ public static class DiagnosticCodes
     public const string ConnectorBindingKind = "AXC0310";
     public const string InvalidOutputSource = "AXC0311";
     public const string MisplacedConnectorInput = "AXC0312";
+    public const string UnknownWebhookEvent = "AXC0313";
+    public const string MissingWebhookBinding = "AXC0314";
+    public const string InvalidWebhookTimeout = "AXC0315";
+    public const string SensitiveWebhookEventValue = "AXC0316";
 }

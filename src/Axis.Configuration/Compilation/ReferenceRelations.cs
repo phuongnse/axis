@@ -38,6 +38,7 @@ public static class ReferenceRelations
     public const string TriggerEvent = "trigger event";
     public const string TriggerEntity = "trigger entity";
     public const string TriggerDataSource = "trigger data source";
+    public const string WebhookEvent = "webhook event";
     public const string MigrationEntity = "migration entity";
     public const string ScenarioEntity = "scenario entity";
     public const string ScenarioProcess = "scenario process";

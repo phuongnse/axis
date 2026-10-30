@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Axis webhook",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "kind", "name", "formatVersion", "event"],
+  "properties": {
+    "id": { "$ref": "#/$defs/id" },
+    "kind": { "const": "webhook" },
+    "name": { "$ref": "#/$defs/name" },
+    "formatVersion": { "const": 1 },
+    "event": { "$ref": "#/$defs/qualifiedName", "x-axis-reference": "event" },
+    "url": { "$ref": "#/$defs/binding" },
+    "secret": { "$ref": "#/$defs/binding" },
+    "timeout": { "type": "string" }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+    },
+    "name": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9]*$",
+      "maxLength": 60
+    },
+    "qualifiedName": {
+      "type": "string",
+      "pattern": "^([A-Za-z][A-Za-z0-9]*|[a-z][a-z0-9-]*/[A-Za-z][A-Za-z0-9]*)$",
+      "maxLength": 121
+    },
+    "binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["binding"],
+      "properties": {
+        "binding": { "$ref": "#/$defs/name" }
+      }
+    }
+  }
+}

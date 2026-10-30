@@ -21,7 +21,7 @@ internal sealed class ScenarioBindings : IDeploymentBindings
     /// <summary>
     /// The bindings activation checks: a <c>url</c> binding for each connector base URL, <c>oauth2</c> token URL and package
     /// <c>url</c> capability, and a <c>secret</c> binding for each connector auth (an <c>oauth2</c> auth adds its client id) and package
-    /// <c>secret</c> capability the application names. An <c>oidc</c> identity provider adds a <c>url</c> binding for
+    /// <c>secret</c> capability the application names. A webhook adds a <c>url</c> binding and a <c>secret</c> binding. An <c>oidc</c> identity provider adds a <c>url</c> binding for
     /// its <c>issuer</c> and <c>secret</c> bindings for its client id and its client secret or key. A <c>saml</c>
     /// provider adds a <c>url</c> binding for its <c>metadata</c>.
     /// </summary>
@@ -42,6 +42,12 @@ internal sealed class ScenarioBindings : IDeploymentBindings
                     bindings[oauth.ClientIdBinding] = secret;
                 }
             }
+        }
+
+        foreach (var webhook in model.Webhooks)
+        {
+            bindings[webhook.UrlBinding] = url;
+            bindings[webhook.SecretBinding] = secret;
         }
 
         foreach (var provider in model.IdentityProviders)

@@ -32,7 +32,7 @@ reconciles is in [Connector calls](process-execution.md#connector-calls).
   names one as `{ "binding": "<name>" }`. Where the name is used decides its
   kind: `baseUrl` needs a `url` binding, and `auth` needs a `secret` binding.
   An `oauth2` auth's `tokenUrl` needs a `url` binding, and its `clientId` and
-  `clientSecret` need `secret` bindings. _(planned for M19)_ A
+  `clientSecret` need `secret` bindings. A
   [webhook](#webhook-resource) names a `url` and a `secret` binding.
   A package operation names them in the `capabilities` of its manifest:
   `urls` need `url` bindings and `secrets` need `secret` bindings.
@@ -66,7 +66,8 @@ reconciles is in [Connector calls](process-execution.md#connector-calls).
   binding.
 - **Activation check.** Activating a release for a tenant fails when a
   binding the release uses is missing for that tenant, or is of the wrong
-  kind (`AXC0100`). The release uses the bindings of its connectors, the
+  kind (`AXC0100`). The release uses the bindings of its connectors and its
+  webhooks, the
   `capabilities` of each package operation that a process step uses, and the
   `fileStorage` binding of its application manifest, which must be a `storage`
   binding, reported at `/fileStorage/binding`. The
@@ -105,7 +106,8 @@ reconciles is in [Connector calls](process-execution.md#connector-calls).
   [file fields](file-fields.md#storage-and-clean-up) and
   [D76](../decisions/d76-file-money-and-enum-label-field-types.md).
 - **HTTPS.** A `url` binding may use `http` only in Development. Elsewhere it
-  must be `https`. Activation checks each connector's base URL binding and
+  must be `https`. Activation checks each connector's base URL binding, each
+  webhook's `url` binding and
   each `url` binding that a package operation step declares (`AXC0101`). The
   call checks it again: a worker outside Development never sends a call to an
   `http` URL, and fails the call instead. A package call is retried instead,
@@ -781,10 +783,12 @@ The compiler reports these as compile errors, all in one pass. The
 
 ## Outbound webhooks
 
-_(planned for M19)_ A webhook tells another system that an event happened, as
+A webhook tells another system that an event happened, as
 [D92](../decisions/d92-outbound-webhooks.md) agrees. The author configures it
 in the application, so it is part of the release. There is no API through
-which another system subscribes itself.
+which another system subscribes itself. The webhook resource, its compile
+checks and the activation check of its bindings are built. Webhook delivery is
+_(planned for M19)_.
 
 ### Webhook resource
 
@@ -808,20 +812,31 @@ A webhook that tells a chat system when a note is closed, in
   module the application declares. Only events raise webhooks. A record change
   raises one when a process raises an event for it.
 - `url` is a `url` binding and `secret` is a `secret` binding, checked at
-  activation as a connector's are. On a
+  activation as a connector's are: a missing binding or one of the wrong kind
+  is `AXC0100` at `/url/binding` or `/secret/binding`, and an `http` URL
+  outside Development is `AXC0101`. On a
   [preview tenant](host-settings.md#preview-tenants) a missing binding is a
   warning, and the delivery fails at run time.
 - `timeout` is an ISO 8601 duration. It defaults to `PT10S` and is at most
   `PT30S`.
-- An unknown event, a missing binding name and a timeout out of range are each
-  a new diagnostic.
+- An unknown event is `AXC0313` at `/event`. A missing `url` or `secret` is
+  `AXC0314` at `/url` or `/secret`. A `timeout` that is not a positive ISO 8601
+  duration of at most `PT30S` is `AXC0315` at `/timeout`. The schema leaves
+  `url` and `secret` optional, so a missing one has this code and not the
+  schema error `AXC0004`.
 - An event that has a webhook may not carry a value read from a field marked
-  `sensitive`. A [raise event step](process-events.md#raise-event-step), or an
-  [endpoint's event](#endpoint-resource), that maps one into its payload is a
+  `sensitive`. A [raise event step](process-events.md#raise-event-step) that
+  maps one into its payload, directly or through a reference path, is `AXC0316`
+  at `/steps/{i}/fields/{key}`. A step that maps it into an event that no
+  webhook names compiles. _(planned for M19)_ An
+  [endpoint's event](#endpoint-resource) that maps one into its payload is a
   new diagnostic.
-- A module holds no webhook.
+- A module holds no webhook. A file of kind `webhook` in a module is
+  `AXC0202` at `/kind`.
 
 ### Webhook delivery
+
+_(planned for M19)_ Nothing here is built yet.
 
 - **Staged with the event.** Raising the event stages one delivery for each
   webhook of the event, in the same transaction. The worker sends it later,

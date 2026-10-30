@@ -74,7 +74,9 @@ internal static class ProcessChecker
     /// holds the pages that failed to load. <paramref name="textValues"/> gives the value of a text key
     /// in each locale that has it. <paramref name="findProcess"/> finds a process by name, ignoring letter case.
     /// <paramref name="roleSlots"/> is set for the processes of a module: a task's assignee and an escalation's
-    /// <c>reassign</c> then name one of the module's role slots, not a role.
+    /// <c>reassign</c> then name one of the module's role slots, not a role. <paramref name="webhookEvents"/>
+    /// holds the names of the events that a webhook names, and a <c>raiseEvent</c> step never maps a
+    /// sensitive field's value into one of them.
     /// </summary>
     public static void Check(
         IReadOnlyList<ProcessResource> processes,
@@ -102,7 +104,8 @@ internal static class ProcessChecker
         IReadOnlySet<string> modules,
         List<Diagnostic> diagnostics,
         Func<string, ModuleConnectorSlot?>? findSlot = null,
-        (string ModuleId, IReadOnlySet<string> Slots)? roleSlots = null)
+        (string ModuleId, IReadOnlySet<string> Slots)? roleSlots = null,
+        IReadOnlySet<string>? webhookEvents = null)
     {
         foreach (var process in processes)
         {
@@ -205,7 +208,8 @@ internal static class ProcessChecker
                 references,
                 Report,
                 diagnostics,
-                findSlot);
+                findSlot,
+                webhookEvents);
 
             CheckSubProcesses(process, entity, scope, findEntity, findProcess, unloadedProcessNames, moduleReferences, references, Report);
 
@@ -310,7 +314,8 @@ internal static class ProcessChecker
             references,
             report,
             diagnostics,
-            findSlot);
+            findSlot,
+            null);
 
         CheckTimers(process, scope, references, report);
 
@@ -1295,7 +1300,8 @@ internal static class ProcessChecker
         ReferenceIndexBuilder references,
         Action<string, string, string> report,
         List<Diagnostic> diagnostics,
-        Func<string, ModuleConnectorSlot?>? findSlot)
+        Func<string, ModuleConnectorSlot?>? findSlot,
+        IReadOnlySet<string>? webhookEvents)
     {
         for (var index = 0; index < process.Steps.Count; index++)
         {
@@ -1322,7 +1328,7 @@ internal static class ProcessChecker
                 // A process without a subject has no record to raise an event about, which is reported already.
                 if (process.Entity is not null)
                 {
-                    CheckRaiseEvent(process, step, index, entity, scope, findEntity, findEvent, unloadedEventNames, references, report);
+                    CheckRaiseEvent(process, step, index, entity, scope, findEntity, findEvent, unloadedEventNames, webhookEvents, references, report);
                 }
 
                 continue;
@@ -1995,7 +2001,8 @@ internal static class ProcessChecker
     /// the event, ignoring letter case, that no earlier key names, and each expression fits the
     /// field's type over <paramref name="scope"/>. Every payload field then has a key. The
     /// expressions and the event's entity are not checked when the subject entity is unknown, and
-    /// the event's entity is not checked when the event's own entity is unknown.
+    /// the event's entity is not checked when the event's own entity is unknown. When
+    /// <paramref name="webhookEvents"/> holds the event, no expression reads a sensitive field.
     /// </summary>
     private static void CheckRaiseEvent(
         ProcessResource process,
@@ -2006,6 +2013,7 @@ internal static class ProcessChecker
         Func<string, EntityResource?> findEntity,
         Func<string, EventResource?> findEvent,
         IReadOnlySet<string> unloadedEventNames,
+        IReadOnlySet<string>? webhookEvents,
         ReferenceIndexBuilder references,
         Action<string, string, string> report)
     {
@@ -2066,10 +2074,19 @@ internal static class ProcessChecker
                 continue;
             }
 
-            var problem = CheckExpression(process, expression, scope, ExpressionScopes.TypeOf(field.Type), keyPath, references);
+            var problem = CheckExpression(process, expression, scope, ExpressionScopes.TypeOf(field.Type), keyPath, references, out var node, out var check);
             if (problem is not null)
             {
                 report(problem.Code, problem.Message, keyPath);
+            }
+            else if (entity is not null
+                && webhookEvents?.Contains(@event.Name) == true
+                && SensitiveReads.Find(node!, check!, entity, scope, findEntity) is var (readEntity, readField))
+            {
+                report(
+                    DiagnosticCodes.SensitiveWebhookEventValue,
+                    $"The field '{key}' reads the sensitive field '{readEntity}.{readField}'. The event '{@event.Name}' has a webhook, so it never carries a sensitive value.",
+                    keyPath);
             }
         }
 

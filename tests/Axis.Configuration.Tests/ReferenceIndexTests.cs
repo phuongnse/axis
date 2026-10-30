@@ -365,7 +365,7 @@ public sealed class ReferenceIndexTests
     }
 
     [Fact]
-    public void A_clean_folder_gives_the_event_endpoint_trigger_migration_and_scenario_edges()
+    public void A_clean_folder_gives_the_event_endpoint_trigger_webhook_migration_and_scenario_edges()
     {
         using var packages = new TemporaryFolder().Install("1.0.0");
         using var folder = FullFolder();
@@ -406,6 +406,9 @@ public sealed class ReferenceIndexTests
                 (ReferenceRelations.TriggerDataSource, "/dataSource", "LargeOrders"),
             },
             EdgesFrom(result, "Nightly"));
+        Assert.Equal(
+            [(ReferenceRelations.WebhookEvent, "/event", "OrderChecked")],
+            EdgesFrom(result, "OnCheckedChat"));
         Assert.Equal(
             [(ReferenceRelations.MigrationEntity, "/entity", "Order")],
             EdgesFrom(result, "RenameQty"));
@@ -578,7 +581,7 @@ public sealed class ReferenceIndexTests
             .Where(field => field.IsLiteral)
             .Select(field => (string)field.GetRawConstantValue()!)
             .ToList();
-        Assert.Equal(41, expected.Count);
+        Assert.Equal(42, expected.Count);
 
         var relations = new HashSet<string>();
         using (var packages = new TemporaryFolder().Install("1.0.0"))
@@ -791,7 +794,7 @@ public sealed class ReferenceIndexTests
 
     /// <summary>
     /// <see cref="ProcessFolder"/> with an endpoint that has a reference input, the three trigger types,
-    /// a migration and a scenario with a user role, an assignee role and a connector and a package stub.
+    /// a webhook, a migration and a scenario with a user role, an assignee role and a connector and a package stub.
     /// </summary>
     private static TemporaryFolder FullFolder() =>
         ProcessFolder()
@@ -812,6 +815,10 @@ public sealed class ReferenceIndexTests
             .With("triggers/nightly.json", """
                 { "id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaa03", "kind": "trigger", "name": "Nightly", "formatVersion": 1, "type": "schedule",
                   "schedule": "0 6 * * *", "timeZone": "Europe/Berlin", "dataSource": "LargeOrders", "process": "OrderReview" }
+                """)
+            .With("webhooks/on-checked-chat.json", """
+                { "id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaa04", "kind": "webhook", "name": "OnCheckedChat", "formatVersion": 1,
+                  "event": "OrderChecked", "url": { "binding": "ChatUrl" }, "secret": { "binding": "ChatSecret" } }
                 """)
             .With("migrations/rename-qty.json", """
                 { "id": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbb01", "kind": "migration", "name": "RenameQty", "formatVersion": 1, "entity": "Order",

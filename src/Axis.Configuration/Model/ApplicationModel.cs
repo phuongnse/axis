@@ -59,6 +59,9 @@ public sealed record ApplicationModel
     /// <summary>The application's triggers, in path order.</summary>
     public IReadOnlyList<TriggerModel> Triggers { get; init; } = [];
 
+    /// <summary>The application's webhooks, in path order.</summary>
+    public IReadOnlyList<WebhookModel> Webhooks { get; init; } = [];
+
     /// <summary>The application's migrations, in ordinal order of their file path.</summary>
     public IReadOnlyList<MigrationModel> Migrations { get; init; } = [];
 
