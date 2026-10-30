@@ -1,0 +1,11 @@
+{
+  "id": "5d0c2f7a-8b3e-4c61-a9d4-7e1f3b6a2c58",
+  "kind": "identityProvider",
+  "name": "company",
+  "formatVersion": 1,
+  "type": "oidc",
+  "label": { "textKey": "provider.company" },
+  "issuer": { "binding": "CompanyIssuer" },
+  "clientId": { "binding": "CompanyClientId" },
+  "clientSecret": { "binding": "CompanyClientSecret" }
+}
