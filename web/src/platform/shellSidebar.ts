@@ -9,6 +9,8 @@ export interface ShellSidebar {
   slot: HTMLElement | null
   collapsed: boolean
   claim: (claimed: boolean) => void
+  /** The padding round the page area: `spacing-lg`, or `spacing-md` for a workspace that claimed the sidebar. */
+  contentPadding: number
 }
 
 export const ShellSidebarContext = createContext<ShellSidebar | null>(null)

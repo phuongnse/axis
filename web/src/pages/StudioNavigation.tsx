@@ -1,13 +1,14 @@
 import { DownOutlined, PlusOutlined } from '@ant-design/icons'
-import { Dropdown, Flex, Menu, Typography, type MenuProps } from 'antd'
-import { createElement } from 'react'
+import { ConfigProvider, Dropdown, Flex, Menu, Typography, type MenuProps } from 'antd'
+import { createElement, useContext } from 'react'
 import { createPortal } from 'react-dom'
 import { navigationIcon } from '../platform/navigationIcons'
 import { useShellSidebar } from '../platform/shellSidebar'
 import { SiteMark } from '../platform/SiteMark'
-import type { StudioApplication, StudioResourceItem } from '../platform/studio'
+import { studioApplicationTitle, type StudioApplication, type StudioResourceItem } from '../platform/studio'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
+import { PlatformContext } from './context'
 import { StudioNewApplication } from './StudioNewApplication'
 import { groupedKinds, studioKindGroups, studioViewKey, type StudioView } from './studioViews'
 
@@ -42,6 +43,9 @@ export function StudioNavigation({
   const t = useText()
   const { slot, collapsed } = useShellSidebar()
   const { colour, spacing } = useDesignTokens()
+  const locale = useContext(PlatformContext)?.current.locale ?? 'en'
+  const current = applications.find((app) => app.name === application)
+  const currentTitle = current ? studioApplicationTitle(current, locale) : application
 
   const counts = new Map<string, number>()
   for (const item of resources) {
@@ -106,7 +110,7 @@ export function StudioNavigation({
       menu={{
         selectedKeys: [application],
         items: [
-          ...applications.map((app) => ({ key: app.name, label: app.name })),
+          ...applications.map((app) => ({ key: app.name, label: studioApplicationTitle(app, locale) })),
           ...(canCreate
             ? [
                 { type: 'divider' as const },
@@ -133,11 +137,11 @@ export function StudioNavigation({
           cursor: 'pointer',
         }}
       >
-        <SiteMark title={application} size={28} />
+        <SiteMark title={currentTitle} size={28} />
         {!collapsed && (
           <>
             <Typography.Text strong ellipsis style={{ flex: 1, textAlign: 'start' }}>
-              {application}
+              {currentTitle}
             </Typography.Text>
             <DownOutlined aria-hidden style={{ color: colour.textMuted, fontSize: 12 }} />
           </>
@@ -151,14 +155,19 @@ export function StudioNavigation({
       <div style={{ padding: spacing.xs, borderBottom: `1px solid ${colour.borderSubtle}` }}>
         <StudioNewApplication onCreated={onApplicationCreated} trigger={switcher} />
       </div>
-      <Menu
-        mode="inline"
-        inlineCollapsed={collapsed}
-        style={{ borderInlineEnd: 'none' }}
-        selectedKeys={[studioViewKey(view)]}
-        items={items}
-        onClick={pick}
-      />
+      {/* Proposed: a workspace's navigation is compact, with 32 px entries. */}
+      <ConfigProvider
+        theme={{ components: { Menu: { itemHeight: 32, itemMarginBlock: 2, groupTitleLineHeight: 1.4 } } }}
+      >
+        <Menu
+          mode="inline"
+          inlineCollapsed={collapsed}
+          style={{ borderInlineEnd: 'none' }}
+          selectedKeys={[studioViewKey(view)]}
+          items={items}
+          onClick={pick}
+        />
+      </ConfigProvider>
     </nav>
   )
 

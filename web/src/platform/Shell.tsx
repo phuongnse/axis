@@ -72,9 +72,11 @@ export function Shell({ titleKey, navigation, locales, locale, onLocaleChange, n
   // Proposed: a page with its own navigation claims the sidebar and draws in `pageSidebarSlot`.
   const [pageSidebar, setPageSidebar] = useState(false)
   const [pageSidebarSlot, setPageSidebarSlot] = useState<HTMLElement | null>(null)
+  // Proposed: a page with its own navigation is a workspace, drawn compact: spacing-md round its content.
+  const contentPadding = pageSidebar ? spacing.md : spacing.lg
   const sidebarContext = useMemo(
-    () => ({ slot: pageSidebarSlot, collapsed: collapsed && !narrow, claim: setPageSidebar }),
-    [pageSidebarSlot, collapsed, narrow],
+    () => ({ slot: pageSidebarSlot, collapsed: collapsed && !narrow, claim: setPageSidebar, contentPadding }),
+    [pageSidebarSlot, collapsed, narrow, contentPadding],
   )
   const hasSidebar = navigation.length > 1 || pageSidebar
   const sidebar = hasSidebar && !narrow
@@ -220,7 +222,7 @@ export function Shell({ titleKey, navigation, locales, locale, onLocaleChange, n
                 )}
               </Layout.Sider>
             )}
-            <Layout.Content style={{ padding: spacing.lg }}>
+            <Layout.Content style={{ padding: contentPadding }}>
               <ShellSidebarContext.Provider value={sidebarContext}>{children}</ShellSidebarContext.Provider>
             </Layout.Content>
           </Layout>

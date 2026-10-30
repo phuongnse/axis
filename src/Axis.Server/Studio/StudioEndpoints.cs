@@ -101,7 +101,37 @@ internal static class StudioEndpoints
         }
 
         return Results.Ok(new StudioApplicationListResponse(
-            [.. StudioFolder.Applications(options).Select(name => new StudioApplicationItem(name))]));
+            [.. StudioFolder.Applications(options).Select(name => DescribeApplication(options, name))]));
+    }
+
+    /// <summary>
+    /// Proposed: an application of the list with its title and description per locale, from the `label` and
+    /// `description` of its manifest and its text resources, so Studio lists it as the home page does. A key that no
+    /// text holds, or a folder that does not load, leaves the name and no description.
+    /// </summary>
+    private static StudioApplicationItem DescribeApplication(StudioOptions options, string name)
+    {
+        if (StudioFolder.Find(options, name) is not { } folder)
+        {
+            return new StudioApplicationItem(name);
+        }
+
+        var loaded = Axis.Configuration.Loading.ApplicationLoader.Load(folder);
+        var manifest = loaded.Application;
+        var titles = new Dictionary<string, string>(StringComparer.Ordinal);
+        var descriptions = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var text in loaded.Texts)
+        {
+            titles[text.Locale] = manifest?.Label is { } label && text.Texts.TryGetValue(label.TextKey, out var title)
+                ? title
+                : name;
+            if (manifest?.Description is { } description && text.Texts.TryGetValue(description.TextKey, out var line))
+            {
+                descriptions[text.Locale] = line;
+            }
+        }
+
+        return new StudioApplicationItem(name, titles, descriptions.Count > 0 ? descriptions : null);
     }
 
     private static async Task<IResult> ListAsync(
@@ -799,7 +829,10 @@ internal static class StudioEndpoints
 internal sealed record StudioApplicationListResponse(IReadOnlyList<StudioApplicationItem> Items);
 
 /// <summary>One application in the list: the <c>name</c> in its manifest.</summary>
-internal sealed record StudioApplicationItem(string Name);
+internal sealed record StudioApplicationItem(
+    string Name,
+    IReadOnlyDictionary<string, string>? Titles = null,
+    IReadOnlyDictionary<string, string>? Descriptions = null);
 
 /// <summary>The resources of a Studio folder, sorted by file.</summary>
 internal sealed record StudioResourceListResponse(IReadOnlyList<StudioResourceItem> Items);

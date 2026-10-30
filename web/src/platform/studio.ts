@@ -106,6 +106,22 @@ export async function checkStudioExpression(
 /** An application in the list of `GET /api/studio/apps`. */
 export interface StudioApplication {
   name: string
+  /** Proposed: the application's title per locale, from its `label`, as the home page shows it. */
+  titles?: Record<string, string> | null
+  /** Proposed: the application's description per locale, or none when it declares none. */
+  descriptions?: Record<string, string> | null
+}
+
+/** Proposed: the application's title in `locale`, else in its first locale, else its name. */
+export function studioApplicationTitle(app: StudioApplication, locale: string): string {
+  const titles = app.titles ?? {}
+  return titles[locale] ?? Object.values(titles)[0] ?? app.name
+}
+
+/** Proposed: the application's description in `locale`, else in its first locale, or undefined. */
+export function studioApplicationDescription(app: StudioApplication, locale: string): string | undefined {
+  const descriptions = app.descriptions ?? {}
+  return descriptions[locale] ?? Object.values(descriptions)[0]
 }
 
 /** An application template in the list of `GET /api/studio/templates`. `title` and `description` hold `en` and `vi`. */

@@ -2,16 +2,48 @@
  "/api/studio/apps": {
   "items": [
    {
-    "name": "PurchaseRequests"
+    "name": "PurchaseRequests",
+    "titles": {
+     "en": "Purchase requests",
+     "vi": "Yêu cầu mua hàng"
+    },
+    "descriptions": {
+     "en": "Runs the company's purchases, from the request to approval and ordering.",
+     "vi": "Quản lý việc mua hàng của công ty, từ yêu cầu đến duyệt và đặt hàng."
+    }
    },
    {
-    "name": "LeaveRequests"
+    "name": "LeaveRequests",
+    "titles": {
+     "en": "Leave requests",
+     "vi": "Đơn nghỉ phép"
+    },
+    "descriptions": {
+     "en": "Handles leave, from the request to the manager's decision.",
+     "vi": "Quản lý nghỉ phép, từ lúc xin đến khi quản lý quyết định."
+    }
    },
    {
-    "name": "ServiceDesk"
+    "name": "ServiceDesk",
+    "titles": {
+     "en": "Service desk",
+     "vi": "Hỗ trợ dịch vụ"
+    },
+    "descriptions": {
+     "en": "Handles internal support requests, from raising them to solving them.",
+     "vi": "Quản lý yêu cầu hỗ trợ nội bộ, từ lúc gửi đến khi giải quyết."
+    }
    },
    {
-    "name": "AssetManagement"
+    "name": "AssetManagement",
+    "titles": {
+     "en": "Asset management",
+     "vi": "Quản lý tài sản"
+    },
+    "descriptions": {
+     "en": "Keeps the company's assets and their history in one place.",
+     "vi": "Quản lý tài sản của công ty và lịch sử của chúng ở một nơi."
+    }
    }
   ]
  },

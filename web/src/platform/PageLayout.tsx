@@ -1,6 +1,7 @@
 import { Breadcrumb, Flex, Typography } from 'antd'
-import type { ReactNode } from 'react'
+import { useContext, type ReactNode } from 'react'
 import { Link } from 'react-router'
+import { ShellSidebarContext } from './shellSidebar'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
 
@@ -28,8 +29,10 @@ export function PageLayout({
   actions?: ReactNode
   children: ReactNode
 }) {
+  const { spacing } = useDesignTokens()
+  const compact = (useContext(ShellSidebarContext)?.contentPadding ?? spacing.lg) < spacing.lg
   const title4 = (
-    <Typography.Title level={4} style={{ margin: 0 }}>
+    <Typography.Title level={compact ? 5 : 4} style={{ margin: 0 }}>
       {title}
     </Typography.Title>
   )
@@ -43,7 +46,7 @@ export function PageLayout({
   )
 
   return (
-    <Flex vertical gap="middle">
+    <Flex vertical gap={compact ? 'small' : 'middle'}>
       {breadcrumb ? <HeaderBand steps={breadcrumb}>{heading}</HeaderBand> : heading}
       {children}
     </Flex>
@@ -53,18 +56,21 @@ export function PageLayout({
 function HeaderBand({ steps, children }: { steps: readonly BreadcrumbStep[]; children: ReactNode }) {
   const t = useText()
   const { colour, spacing } = useDesignTokens()
+  // Proposed: in a workspace, whose page area has spacing-md round it, the band is compact too.
+  const pad = useContext(ShellSidebarContext)?.contentPadding ?? spacing.lg
+  const compact = pad < spacing.lg
 
   return (
     <div
       style={{
-        // Negative margins reach the edges of the content area, whose padding is spacing.lg.
-        margin: `-${spacing.lg}px -${spacing.lg}px 0`,
-        padding: `${spacing.lg}px ${spacing.lg}px ${spacing.md}px`,
+        // Negative margins reach the edges of the content area, whose padding is `pad`.
+        margin: `-${pad}px -${pad}px 0`,
+        padding: compact ? `${spacing.sm}px ${pad}px` : `${spacing.lg}px ${spacing.lg}px ${spacing.md}px`,
         background: colour.surface,
         borderBottom: `1px solid ${colour.borderSubtle}`,
       }}
     >
-      <Flex vertical gap={spacing.xs}>
+      <Flex vertical gap={compact ? 0 : spacing.xs}>
         <Breadcrumb
           aria-label={t('shell.breadcrumb.label')}
           items={steps.map((step) => ({

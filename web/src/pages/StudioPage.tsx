@@ -1,5 +1,5 @@
 import { Alert, Button, Descriptions, Flex, Input, Result, Tag, Typography } from 'antd'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { fetchCurrentUser } from '../platform/currentUser'
 import { forbidden } from '../platform/inspection'
@@ -12,6 +12,8 @@ import {
   type ModuleResourceItem,
   moduleResources,
   resourceTitle,
+  studioApplicationDescription,
+  studioApplicationTitle,
   ServerUnreachableError,
   type StudioApplication,
   type StudioDiagnostic,
@@ -35,7 +37,9 @@ import { StudioNavigation } from './StudioNavigation'
 import type { StudioView } from './studioViews'
 import { StudioReferences } from './StudioReferences'
 import { PageLayout, type BreadcrumbStep } from '../platform/PageLayout'
+import { HomeTile } from '../platform/HomeTile'
 import { SiteMark } from '../platform/SiteMark'
+import { PlatformContext } from './context'
 import { useDesignTokens } from '../platform/themeMode'
 
 /** The read-only view of a module resource, by its kind. */
@@ -137,6 +141,7 @@ function StudioWorkspace() {
   // Proposed: `view` and `kind` pick the part of the workspace the sidebar opened; an open resource wins.
   const view: StudioView = parseView(params.get('view'), params.get('kind'))
   const [actionsSlot, setActionsSlot] = useState<HTMLDivElement | null>(null)
+  const locale = useContext(PlatformContext)?.current.locale ?? 'en'
   const [apps, setApps] = useState<AppsState>()
   const [folder, setFolder] = useState<FolderState>()
   const [search, setSearch] = useState('')
@@ -335,17 +340,20 @@ function StudioWorkspace() {
         breadcrumb={[{ label: 'Axis', to: '/' }, { label: t('shell.studio.title') }]}
         actions={canCreate ? <StudioNewApplication primary onCreated={onApplicationCreated} /> : undefined}
       >
-        <StudioApplicationTiles applications={apps} onPick={pickApplication} />
+        <StudioApplicationTiles applications={apps} />
       </PageLayout>
     )
   }
 
   const kindView = view.name === 'kind' ? view.kind : (selected?.kind ?? selectedModuleItem?.kind)
+  // Proposed: the application is named by its title, as on the home page, never by its technical name.
+  const openApp = apps.find((app) => app.name === application)
+  const appTitle = openApp ? studioApplicationTitle(openApp, locale) : application
   const steps: BreadcrumbStep[] = [
     { label: t('shell.studio.title'), to: '/studio' },
-    { label: application, to: `/studio?app=${encodeURIComponent(application)}` },
+    { label: appTitle, to: `/studio?app=${encodeURIComponent(application)}` },
   ]
-  let title = application
+  let title = appTitle
   if (selected) {
     if (selected.kind !== 'application') {
       steps.push({
@@ -367,11 +375,11 @@ function StudioWorkspace() {
   } else if (view.name === 'releases') {
     title = t('shell.studio.nav.releases')
   }
-  if (steps.length > 2 || title !== application) {
+  if (steps.length > 2 || title !== appTitle) {
     steps.push({ label: title })
   } else {
     steps.pop()
-    steps.push({ label: application })
+    steps.push({ label: appTitle })
   }
 
   function kindLabel(kind: string) {
@@ -551,7 +559,9 @@ function StudioWorkspace() {
               </Flex>
             ) : view.name === 'overview' ? (
               <section data-testid="studio-diagnostics">
-                <Typography.Title level={4}>{t('shell.studio.diagnostics')}</Typography.Title>
+                <Typography.Title level={5} style={{ marginTop: 0 }}>
+                  {t('shell.studio.diagnostics')}
+                </Typography.Title>
                 {loaded.diagnostics.length === 0 ? (
                   <Typography.Text type="secondary">{t('shell.studio.noDiagnostics')}</Typography.Text>
                 ) : (
@@ -596,49 +606,31 @@ function parseView(view: string | null, kind: string | null): StudioView {
   return { name: 'overview' }
 }
 
-/** Proposed: Studio's applications as tiles in a three-column grid, each its mark and name, which opens it. */
-function StudioApplicationTiles({
-  applications,
-  onPick,
-}: {
-  applications: readonly StudioApplication[]
-  onPick: (name: string) => void
-}) {
-  const { colour, spacing, radius } = useDesignTokens()
+/**
+ * Proposed: Studio's applications as the home page shows them: one tile across the page each, its mark, its title and
+ * its description, and the whole tile opens it.
+ */
+function StudioApplicationTiles({ applications }: { applications: readonly StudioApplication[] }) {
+  const { spacing } = useDesignTokens()
+  const locale = useContext(PlatformContext)?.current.locale ?? 'en'
+  const sorted = [...applications].sort((a, b) =>
+    studioApplicationTitle(a, locale).localeCompare(studioApplicationTitle(b, locale), locale),
+  )
   return (
-    <div
-      style={{
-        display: 'grid',
-        gridTemplateColumns: `repeat(auto-fit, minmax(max(0px, calc((100% - ${2 * spacing.md}px) / 3)), 1fr))`,
-        gap: spacing.md,
-      }}
-    >
-      {applications.map((app) => (
-        <button
-          key={app.name}
-          type="button"
-          data-testid={`studio-application-${app.name}`}
-          onClick={() => onPick(app.name)}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: spacing.sm,
-            padding: spacing.md,
-            background: colour.surface,
-            border: `1px solid ${colour.borderSubtle}`,
-            borderRadius: radius.base,
-            cursor: 'pointer',
-            font: 'inherit',
-            textAlign: 'start',
-          }}
-        >
-          <SiteMark title={app.name} size={32} />
-          <Typography.Text strong style={{ color: colour.primaryText }}>
-            {app.name}
-          </Typography.Text>
-        </button>
-      ))}
-    </div>
+    <Flex vertical gap={spacing.md}>
+      {sorted.map((app) => {
+        const title = studioApplicationTitle(app, locale)
+        return (
+          <HomeTile
+            key={app.name}
+            to={`/studio?app=${encodeURIComponent(app.name)}`}
+            mark={<SiteMark title={title} size={32} />}
+            title={title}
+            description={studioApplicationDescription(app, locale)}
+          />
+        )
+      })}
+    </Flex>
   )
 }
 
@@ -674,7 +666,7 @@ function StudioResourceRows({
             justifyContent: 'space-between',
             gap: spacing.md,
             width: '100%',
-            padding: `${spacing.sm}px ${spacing.md}px`,
+            padding: `${spacing.xs}px ${spacing.md}px`,
             background: 'transparent',
             border: 'none',
             borderTop: index === 0 ? 'none' : `1px solid ${colour.divider}`,
