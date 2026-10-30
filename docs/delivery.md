@@ -105,7 +105,9 @@ with the reasons. What each one does is in NexKit's
   [D112](decisions/d112-ci-codeql-and-the-performance-tests-run-on-main-every-few-merges.md)
   agrees. None of them has a schedule. CI also runs on a person's push and on
   demand. Each of the three ends with a job that starts a NexKit sweep, so a
-  failure is noticed when its run ends. A CI run on `main` always finishes: a
+  failure is noticed when its run ends. A dispatch that GitHub's API keeps
+  rejecting leaves a warning on the run and does not fail it, so that run waits
+  for the next sweep. A CI run on `main` always finishes: a
   newer run replaces only one that is still waiting to start. On any other branch a newer push stops the older
   run. CI runs the lint and unit tests, the smoke tests, the integration
   tests and three shards of the E2E tests as six parallel jobs, so a run takes
