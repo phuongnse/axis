@@ -41,6 +41,7 @@ const names: StudioNames = {
     {
       id: 'p1',
       name: 'Approval',
+      module: null,
       entity: 'Order',
       parameters: [],
       steps: [
@@ -51,6 +52,7 @@ const names: StudioNames = {
     {
       id: 'p2',
       name: 'Shipping',
+      module: null,
       entity: 'Order',
       parameters: [],
       steps: [{ name: 'dispatch', type: 'task', outcomes: ['ship'] }],
@@ -66,6 +68,7 @@ const names: StudioNames = {
   sequences: [],
   forms: [],
   pages: [],
+  policies: [],
   texts: [],
 }
 

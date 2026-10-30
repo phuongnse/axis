@@ -1,0 +1,9 @@
+{
+  "id": "71121379-5b73-404d-b01c-8a945beb4776",
+  "kind": "process",
+  "name": "ItemReview",
+  "formatVersion": 1,
+  "entity": "Item",
+  "start": "done",
+  "steps": [{ "name": "done", "type": "end" }]
+}

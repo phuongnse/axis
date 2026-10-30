@@ -17,9 +17,10 @@ public sealed record DefinedNames(
     IReadOnlyList<DefinedResource> Sequences,
     IReadOnlyList<DefinedResource> Forms,
     IReadOnlyList<DefinedPage> Pages,
+    IReadOnlyList<DefinedPolicy> Policies,
     IReadOnlyList<DefinedText> Texts)
 {
-    public static DefinedNames Empty { get; } = new([], [], [], [], [], [], [], [], [], [], [], []);
+    public static DefinedNames Empty { get; } = new([], [], [], [], [], [], [], [], [], [], [], [], []);
 }
 
 /// <summary>An entity and its fields. <paramref name="Module"/> is the module id, or null for the application's own.</summary>
@@ -47,13 +48,15 @@ public sealed record DefinedTyped(string Name, string Type);
 public sealed record DefinedColumn(string Name, string? Type);
 
 /// <summary>
-/// A process and its steps. <paramref name="Entity"/> is the subject entity, or null for a process without a subject.
+/// A process and its steps. <paramref name="Module"/> is the module id, or null for the application's own.
+/// <paramref name="Entity"/> is the subject entity, or null for a process without a subject.
 /// <paramref name="Parameters"/> are the parameters of a process without a subject, in file order, and empty for a
 /// process with a subject.
 /// </summary>
 public sealed record DefinedProcess(
     Guid Id,
     string Name,
+    string? Module,
     string? Entity,
     IReadOnlyList<DefinedTyped> Parameters,
     IReadOnlyList<DefinedStep> Steps);
@@ -81,8 +84,11 @@ public sealed record DefinedEvent(Guid Id, string Name, string Entity, IReadOnly
 /// <summary>A role, sequence or form.</summary>
 public sealed record DefinedResource(Guid Id, string Name);
 
-/// <summary>A page and the parameters it declares.</summary>
-public sealed record DefinedPage(Guid Id, string Name, IReadOnlyList<DefinedPageParameter> Parameters);
+/// <summary>A page and the parameters it declares. <paramref name="Module"/> is the module id, or null for the application's own.</summary>
+public sealed record DefinedPage(Guid Id, string Name, string? Module, IReadOnlyList<DefinedPageParameter> Parameters);
+
+/// <summary>A policy. <paramref name="Module"/> is the module id, or null for the application's own.</summary>
+public sealed record DefinedPolicy(Guid Id, string Name, string? Module);
 
 /// <summary>A page parameter: its name, its type and whether a link must give it.</summary>
 public sealed record DefinedPageParameter(string Name, string Type, bool Required);

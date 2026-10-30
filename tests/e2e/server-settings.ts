@@ -15,6 +15,10 @@ export const serviceDesk = path.resolve(repoRoot, 'samples', 'apps', 'service-de
 export const assetManagement = path.resolve(repoRoot, 'samples', 'apps', 'asset-management')
 /** A parent process that starts a child sub-process that waits on a 24-hour timer. Neither has a subject. */
 export const subprocessApp = path.resolve(import.meta.dirname, 'fixtures', 'subprocess-app')
+/** An application that pins the fixture module `checklists`. It is never activated, so Studio compiles it only in memory. */
+export const moduleApp = path.resolve(import.meta.dirname, 'fixtures', 'module-app')
+/** The fixture module `checklists`, which a spec installs as `checklists/1.0.0` under its own `Modules:Path`. */
+export const checklistsModule = path.resolve(import.meta.dirname, 'fixtures', 'modules', 'checklists')
 /** An application with a site that has a host of its own, see `hostSiteHost`. */
 export const hostSiteApp = path.resolve(import.meta.dirname, 'fixtures', 'host-site-app')
 /** The host of the site `host-site`. It is one of the default tenant's hosts, and the browser resolves any `*.localhost` name to the loopback address. */

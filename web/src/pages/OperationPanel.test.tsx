@@ -65,6 +65,7 @@ const names: StudioNames = {
   sequences: [],
   forms: [],
   pages: [],
+  policies: [],
   texts: [],
 }
 

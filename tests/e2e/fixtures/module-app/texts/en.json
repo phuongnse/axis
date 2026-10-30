@@ -1,0 +1,14 @@
+{
+  "id": "fa278808-42f0-4dfb-a40f-8e71be2179c5",
+  "kind": "text",
+  "name": "TextsEn",
+  "formatVersion": 1,
+  "locale": "en",
+  "texts": {
+    "site.title": "Module app",
+    "nav.items": "Items",
+    "pages.items.title": "Items",
+    "item.review": "Review",
+    "role.employee": "Employee"
+  }
+}

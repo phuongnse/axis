@@ -1,0 +1,11 @@
+{
+  "id": "4e445503-3116-44cc-a16e-e2e24fc54144",
+  "kind": "text",
+  "name": "TextsEn",
+  "formatVersion": 1,
+  "locale": "en",
+  "texts": {
+    "checklists.roles.reviewer": "Reviewer",
+    "checklists.pages.checklists.title": "Checklists"
+  }
+}

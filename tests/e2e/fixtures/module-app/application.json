@@ -1,0 +1,7 @@
+{
+  "id": "66d7b633-031a-44c3-87eb-f367e0af085c",
+  "kind": "application",
+  "name": "ModuleApp",
+  "formatVersion": 1,
+  "modules": [{ "id": "checklists", "version": "^1.0.0", "roles": { "reviewer": "employee" } }]
+}
