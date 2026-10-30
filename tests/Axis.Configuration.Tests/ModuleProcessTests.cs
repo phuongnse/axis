@@ -177,6 +177,45 @@ public sealed class ModuleProcessTests
     }
 
     [Fact]
+    public void An_endpoint_can_create_a_record_of_a_declared_module_and_start_its_process()
+    {
+        using var modules = Modules();
+        using var folder = Application().With("endpoints/Import.json", Endpoint("approvals/Approval", "approvals/Review"));
+
+        var compiled = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        Assert.Empty(compiled.Diagnostics);
+        var endpoint = Assert.Single(compiled.Model!.Endpoints);
+        var entityId = ModuleResourceIds.Derive(Guid.Parse(ApplicationId), Guid.Parse("5c1d2f0e-7a3b-4c8d-9e21-3b6a8f4d1c21"));
+        var processId = ModuleResourceIds.Derive(Guid.Parse(ApplicationId), Guid.Parse(ProcessId));
+        Assert.Equal(new EntityReference(entityId, "approvals/Approval"), endpoint.Entity);
+        Assert.Equal(new ProcessReference(processId, "approvals/Review"), endpoint.Process);
+    }
+
+    [Theory]
+    [InlineData("other")]
+    [InlineData("departments")]
+    public void An_endpoint_that_names_an_entity_and_a_process_of_a_module_it_does_not_declare_is_axc0207(string module)
+    {
+        using var modules = Modules();
+        modules.With("departments/1.0.0/processes/Onboard.json", """
+            { "id": "5c1d2f0e-7a3b-4c8d-9e21-3b6a8f4d1c34", "kind": "process", "name": "Onboard", "formatVersion": 1,
+              "entity": "Department", "start": "done", "steps": [ { "name": "done", "type": "end" } ] }
+            """);
+        using var folder = Application().With("endpoints/Import.json", Endpoint($"{module}/Department", $"{module}/Onboard"));
+
+        var compiled = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        Assert.Equal(
+            [
+                (ExpressionDiagnosticCodes.UndeclaredModuleReference, "endpoints/Import.json", "/entity"),
+                (ExpressionDiagnosticCodes.UndeclaredModuleReference, "endpoints/Import.json", "/process"),
+            ],
+            compiled.Diagnostics.Select(diagnostic => (diagnostic.Code, diagnostic.File, diagnostic.Path)).Order().ToArray());
+        Assert.Null(compiled.Model);
+    }
+
+    [Fact]
     public void A_process_inspector_that_names_a_process_of_an_undeclared_module_is_axc0207()
     {
         using var modules = Modules();
@@ -249,6 +288,12 @@ public sealed class ModuleProcessTests
                   ] }
                 """);
     }
+
+    private static string Endpoint(string entity, string process) => $$"""
+        { "id": "44444444-4444-4444-8444-444444444471", "kind": "endpoint", "name": "Import", "formatVersion": 1,
+          "entity": "{{entity}}", "process": "{{process}}",
+          "input": [ { "name": "title", "type": "text" } ], "values": { "title": "title" } }
+        """;
 
     private static string Process(string form = "ApprovalForm", string extraStep = "", string start = "review") => $$"""
         { "id": "{{ProcessId}}", "kind": "process", "name": "Review", "formatVersion": 1,

@@ -8,7 +8,9 @@ namespace Axis.Configuration.Compilation;
 
 /// <summary>
 /// Checks the endpoints of an application and builds the checked ones. An endpoint names a loaded
-/// root entity and a loaded process whose subject entity is that entity. Its input fields have
+/// root entity and a loaded process whose subject entity is that entity. Either name may be
+/// <c>&lt;module id&gt;/&lt;name&gt;</c> of a module the application declares, and a name under a
+/// module it does not declare is <c>AXC0207</c>. Its input fields have
 /// unique names, ignoring letter case, and the type properties of an entity field. A
 /// child-collection input targets a child entity. Each <c>values</c> key names a field of the
 /// entity, ignoring letter case and at most once, that is not computed and has no
@@ -37,6 +39,7 @@ internal static class EndpointChecker
         Func<string, ProcessResource?> findProcess,
         IReadOnlySet<string> unloadedProcessNames,
         Action<FieldDefinition, string, Action<string, string, string>> checkInputField,
+        ModuleReferences moduleReferences,
         ReferenceIndexBuilder references,
         List<Diagnostic> diagnostics)
     {
@@ -45,11 +48,12 @@ internal static class EndpointChecker
             void Report(string code, string message, string path) =>
                 diagnostics.Add(new Diagnostic(code, message, endpoint.File, path, endpoint.Id));
 
-            var entity = findEntity(endpoint.Entity);
+            var entity = moduleReferences.Find(endpoint.Entity, findEntity);
             if (entity is null)
             {
                 // An entity file that was not loaded because of its own errors is not reported again.
-                if (!unloadedEntityNames.Contains(endpoint.Entity))
+                if (!unloadedEntityNames.Contains(endpoint.Entity)
+                    && !moduleReferences.ReportUndeclared(endpoint.Entity, "/entity", Report))
                 {
                     Report(
                         DiagnosticCodes.UnknownEndpointEntity,
@@ -70,10 +74,11 @@ internal static class EndpointChecker
                     "/entity");
             }
 
-            var process = findProcess(endpoint.Process);
+            var process = moduleReferences.Find(endpoint.Process, findProcess);
             if (process is null)
             {
-                if (!unloadedProcessNames.Contains(endpoint.Process))
+                if (!unloadedProcessNames.Contains(endpoint.Process)
+                    && !moduleReferences.ReportUndeclared(endpoint.Process, "/process", Report))
                 {
                     Report(
                         DiagnosticCodes.UnknownEndpointProcess,

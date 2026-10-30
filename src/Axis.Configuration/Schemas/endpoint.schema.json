@@ -9,8 +9,8 @@
     "kind": { "const": "endpoint" },
     "name": { "$ref": "#/$defs/name" },
     "formatVersion": { "const": 1 },
-    "entity": { "$ref": "#/$defs/name", "x-axis-reference": "entity" },
-    "process": { "$ref": "#/$defs/name", "x-axis-reference": "process" },
+    "entity": { "$ref": "#/$defs/qualifiedName", "x-axis-reference": "entity" },
+    "process": { "$ref": "#/$defs/qualifiedName", "x-axis-reference": "process" },
     "input": {
       "type": "array",
       "items": { "$ref": "#/$defs/input" }
@@ -42,6 +42,11 @@
       "type": "string",
       "pattern": "^[A-Za-z][A-Za-z0-9]*$",
       "maxLength": 60
+    },
+    "qualifiedName": {
+      "type": "string",
+      "pattern": "^([A-Za-z][A-Za-z0-9]*|[a-z][a-z0-9-]*/[A-Za-z][A-Za-z0-9]*)$",
+      "maxLength": 121
     },
     "input": {
       "type": "object",
