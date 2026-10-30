@@ -127,6 +127,63 @@ public sealed class ModuleProcessRunTests(ModuleProcessFixture fixture) : IClass
             await fixture.Steps.CountAsync("SELECT count(*) FROM axis.process_instances WHERE subject_id = @id", ("id", order)));
     }
 
+    [Fact]
+    public async Task An_endpoint_creates_a_module_record_and_starts_the_module_process_once_per_idempotency_key()
+    {
+        var title = $"Imported {Guid.NewGuid():N}";
+        var key = Guid.NewGuid().ToString("N");
+
+        var (recordId, instanceId) = await ImportAsync("review-importer", title, key);
+        var (repeatedRecordId, repeatedInstanceId) = await ImportAsync("review-importer", title, key);
+
+        Assert.Equal((recordId, instanceId), (repeatedRecordId, repeatedInstanceId));
+        Assert.Equal(1L, await fixture.CountReviewsAsync(title));
+        Assert.True(fixture.Steps.Model.TryGetProcess("reviews/Close", out var close));
+        Assert.Equal(
+            1L,
+            await fixture.Steps.CountAsync(
+                "SELECT count(*) FROM axis.process_instances WHERE process_id = @process AND subject_id = @record",
+                ("process", close.Id),
+                ("record", recordId)));
+        await fixture.Steps.RunUntilIdleAsync(CancellationToken);
+        Assert.Equal("completed", (await fixture.Steps.InstanceAsync(instanceId)).State);
+        Assert.Equal("closed", await fixture.ReviewStateAsync(recordId));
+    }
+
+    [Fact]
+    public async Task A_caller_without_the_invoke_grant_cannot_call_the_endpoint_and_no_record_is_written()
+    {
+        var title = $"Denied {Guid.NewGuid():N}";
+        using var client = fixture.CreateClient().CallingAs("outsider-system");
+
+        using var request = Request(
+            HttpMethod.Post,
+            "/api/apps/ModuleProcessApp/endpoints/ImportReview",
+            ModuleProcessFixture.Host,
+            $$"""{ "input": { "title": "{{title}}" } }""");
+        using var response = await client.SendAsync(request, CancellationToken);
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        Assert.Equal(0L, await fixture.CountReviewsAsync(title));
+    }
+
+    /// <summary>Calls the endpoint <c>ImportReview</c> as <paramref name="caller"/> and returns the new record and instance.</summary>
+    private async Task<(Guid RecordId, Guid InstanceId)> ImportAsync(string caller, string title, string key)
+    {
+        using var client = fixture.CreateClient().CallingAs(caller);
+        using var request = Request(
+            HttpMethod.Post,
+            "/api/apps/ModuleProcessApp/endpoints/ImportReview",
+            ModuleProcessFixture.Host,
+            $$"""{ "input": { "title": "{{title}}" } }""");
+        request.Headers.Add("Idempotency-Key", key);
+        using var response = await client.SendAsync(request, CancellationToken);
+        var content = await response.Content.ReadAsStringAsync(CancellationToken);
+        Assert.True(response.StatusCode == HttpStatusCode.Created, content);
+        using var body = JsonDocument.Parse(content);
+        return (body.RootElement.GetProperty("recordId").GetGuid(), body.RootElement.GetProperty("instanceId").GetGuid());
+    }
+
     private static async Task<Guid> StartAsync(HttpClient client, string process, Guid subject)
     {
         using var request = Request(

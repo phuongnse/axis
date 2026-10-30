@@ -638,6 +638,7 @@ public static partial class ApplicationCompiler
             FindProcess,
             loaded.UnloadedProcessNames,
             (field, path, report) => CheckField(field, path, FindEntity, ownersByChildName, loaded.UnloadedEntityNames, moduleReferences, maxFileSize, report),
+            moduleReferences,
             references,
             diagnostics);
         TriggerChecker.Check(
