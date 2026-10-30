@@ -6,7 +6,7 @@ administrator gives, and the users page where both are managed.
 what is not built yet is marked _(planned for M17)_. The account rules are built: every realm that `tenant create` makes
 holds them. The users page's list and the server commands that disable, enable and reset an authenticator are built, and so are
 the server routes that give and remove an application or a platform role. A user's roles panel with the Give and Remove
-buttons is built too. The invitations and the buttons of the other commands are not built yet. The conventions of [architecture.md](../architecture.md)
+buttons is built too. The server routes that invite an account and resend an invitation are built. The buttons of the invitations and of the other commands are not built yet. The conventions of [architecture.md](../architecture.md)
 apply.
 
 ## The administrator role
@@ -26,7 +26,7 @@ The setting, the shell entry and the users page's list are built.
 ## The users page
 
 The server's list route, the page's list, a user's roles panel with its Give and Remove buttons, and the server routes of
-five commands are built. The invitations and the buttons of disable, enable and reset an authenticator are _(planned for M17)_.
+seven commands are built. The buttons of invite, resend an invitation, disable, enable and reset an authenticator are _(planned for M17)_.
 
 - **The list route:** `GET /api/users?search=&page=&pageSize=` answers `{ items, totalCount }` for the tenant's realm to an
   administrator. `page` starts at 1 and defaults to 1. `pageSize` is 1 to 50 and defaults to 50. A value outside these
@@ -61,8 +61,8 @@ five commands are built. The invitations and the buttons of disable, enable and 
   `sensitive` and record data are never shown.
 - **Commands:** invite, resend an invitation, disable, enable, reset an account's authenticator, give a role and remove
   a role. Each command asks for confirmation, and each writes an [audit record](#audit). Disable, enable, reset an
-  authenticator, and give and remove an application or a platform role are built as server routes. The roles panel calls
-  give and remove. The invitations and the buttons of disable, enable and reset an authenticator are _(planned for M17)_.
+  authenticator, give and remove an application or a platform role, invite and resend an invitation are built as server routes.
+  The roles panel calls give and remove. The buttons of invite, resend an invitation, disable, enable and reset an authenticator are _(planned for M17)_.
   - `POST /api/users/{id}/disable`, `POST /api/users/{id}/enable` and `POST /api/users/{id}/reset-authenticator` answer
     `204` and take no body. They take a browser session only, so a service account's bearer token gets `401`.
   - A request is checked in this order: signed-in user (`401`), `Users:AdministratorRole` (`403`), a tenant with a users
@@ -80,6 +80,19 @@ five commands are built. The invitations and the buttons of disable, enable and 
     body are a login at the identity provider in the last 5 minutes (`403`) and, for remove of the administrator role on
     oneself, `409`. Giving a role the person holds, or removing one they do not hold, answers `204`, changes nothing and
     writes no audit record. A change to an application role needs no recent login.
+  - `POST /api/users/invite` takes the JSON body `{ "email": "...", "displayName": "...", "roles": [{ "applicationId": "<uuid>",
+    "role": "<name>" }] }`, where `roles` is optional and each role is as in the give-role route. It answers `201` with
+    `{ "id": "<realm user id>" }`. `POST /api/users/{id}/resend-invitation` takes no body and answers `204`. Both take a
+    browser session only. Invite checks in the order of the routes above (`401`, `403`, `404`), then reads the body and answers
+    `400` with a fixed title for a malformed body, a blank display name, an email that is not an address, and a role that the
+    give-role route refuses. The email is trimmed and lower-cased. A platform role then needs a login at the identity provider
+    in the last 5 minutes (`403`), and an email that an account already uses answers `409`. A user of a brokered provider does
+    not use the email. Invite creates the realm user, commits the given roles and the audit records, and only then emails
+    the link, so a failed email answers `502` and the account stays `invited`. The administrator resends the invitation then.
+    The whole display name is the user's first name, and the last name stays empty. The link leads to the tenant's home, the
+    scheme and host of the request. Resend checks in the same order up to the realm user (`404`, also for a service account)
+    and answers `409` for a user of a brokered provider, for a person who has signed in, and for a user with a password, even
+    one who never signed in to Axis. It needs no recent login, because it gives no new right.
   - Enable and reset an authenticator need no recent login. For a user of a brokered provider, reset an authenticator
     answers `409` and changes nothing.
   - The realm steps run first. When the identity provider fails, the route answers `502` with a fixed title, and the
@@ -96,11 +109,14 @@ Every realm that `tenant create` makes holds the rules for a second step, passwo
 no self-registration, and a second run of the command brings an existing realm in step. The development `axis` realm
 asks its development users for a code, because each one has an authenticator, and it keeps Keycloak's other defaults.
 
-- _(planned for M17)_ **Invitation:** an administrator invites a person by email and display name, and may give roles at once. The realm
+- **Invitation:** an administrator invites a person by email and display name, and may give roles at once. The realm
   creates the account as `invited` and sends an email through the tenant's
   [mail settings](tenant-setting-commands.md#mail-settings), with a link that lasts 72 hours. Following it, the person
-  sets a password and adds an authenticator app, and the account becomes `active`. An administrator can resend an
-  invitation, which ends the old link.
+  sets a password and adds an authenticator app, and the account becomes `active` after the first sign-in. An administrator can resend an
+  invitation. The identity provider cannot revoke a link it issued, so the resend deletes the realm user and creates it
+  again with a new id, which ends the old link. The given roles move to the new id. If the resend stops between the delete and
+  the create, the person has no account and the administrator invites them again. The routes are built, see
+  [the users page](#the-users-page). Their buttons are _(planned for M17)_.
 - **Username:** an account's username is its email, and it signs in with its email. The realm allows two users to
   share an email, because a person who signs in through two brokered providers becomes two users, and Keycloak then
   looks accounts up by username only. The sign-in form asks for a "Username". A brokered user's username is the
@@ -163,7 +179,7 @@ _(planned for M17)_
 
 ## Rights of the server
 
-The list route, the disable, enable and reset authenticator routes and the give and remove role routes are built. Inviting accounts is _(planned for M17)_.
+The list route, the disable, enable and reset authenticator routes, the give and remove role routes and the invite and resend routes are built.
 
 - The server reads the realm's users through the realm's users client `axis-users`, with the rights `view-users` and
   `query-users`, see [tenant realm](host-settings.md#tenant-realm). The client also holds `manage-users`, which disable, enable
@@ -174,11 +190,13 @@ The list route, the disable, enable and reset authenticator routes and the give 
 
 ## Audit
 
-`user.disabled`, `user.enabled`, `user.authenticatorReset`, and `user.roleGiven` and `user.roleRemoved` are built. The others are _(planned for M17)_.
+All the actions below are built.
 
 - Each command writes one audit record in the tenant database, with the administrator as actor and the user it acts
   on: `user.invited`, `user.invitationResent`, `user.disabled`, `user.enabled`, `user.authenticatorReset`,
-  `user.roleGiven` and `user.roleRemoved`. A role record names the application in its application id, or for a platform role has no application and says
+  `user.roleGiven` and `user.roleRemoved`. `details` holds `userId` and, for an invitation, `email`. A resend writes the new user
+  id in `userId` and the old one in `previousUserId`, because the id changes. A role given at invite time writes a `user.roleGiven`
+  record too. A role record names the application in its application id, or for a platform role has no application and says
   `platform: true` in its details, and holds the role (the kind, for a platform role) in its details. Giving a role the person holds, or removing one they do
   not hold, is not a change and writes no record. No
   record holds a password, a code or an invitation link.

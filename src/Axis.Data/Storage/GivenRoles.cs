@@ -6,7 +6,7 @@ namespace Axis.Data.Storage;
 /// <summary>
 /// Gives and removes the roles that an administrator gives a person, as rows of <c>axis.given_roles</c>. A null application id
 /// is a platform role, whose row holds its kind. Both steps run in the caller's transaction and report whether they changed a
-/// row, so a repeat is not a change. A read lists the roles of one person.
+/// row, so a repeat is not a change. A move gives every role of one person to another id. A read lists the roles of one person.
 /// </summary>
 public static class GivenRoles
 {
@@ -44,6 +44,19 @@ public static class GivenRoles
         command.Parameters.Add(new NpgsqlParameter("application", NpgsqlDbType.Uuid) { Value = (object?)applicationId ?? DBNull.Value });
         command.Parameters.AddWithValue("role", role);
         return await command.ExecuteNonQueryAsync(cancellationToken) > 0;
+    }
+
+    /// <summary>Gives every role of <paramref name="fromUserId"/> to <paramref name="toUserId"/>, which holds none, and returns how many rows moved.</summary>
+    public static async Task<int> MoveAsync(
+        NpgsqlTransaction transaction, string fromUserId, string toUserId, CancellationToken cancellationToken = default)
+    {
+        await using var command = new NpgsqlCommand(
+            "UPDATE axis.given_roles SET user_id = @to WHERE user_id = @from",
+            transaction.Connection,
+            transaction);
+        command.Parameters.AddWithValue("from", fromUserId);
+        command.Parameters.AddWithValue("to", toUserId);
+        return await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
     /// <summary>Removes the role of the person in the application, or the platform role with no application, and returns whether they held it.</summary>

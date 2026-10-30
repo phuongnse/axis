@@ -11,12 +11,21 @@ namespace Axis.Tenancy.Realms;
 /// credentials grant. That client's service account views, queries and manages users, and nothing else in the realm.
 /// It reads one page of users with the number of all users that match the search, and for each user on the page the
 /// alias of the first federated identity. It also finds one user, disables or enables a user, ends a user's realm
-/// sessions and removes a user's authenticators. An error names the step and the status code, never a response body
+/// sessions and removes a user's authenticators. It also invites a person: it creates an account with the required actions of
+/// the invitation, asks the realm to email the link, reads what a resend needs and deletes a user. An error names the step and the status code, never a response body
 /// or a secret.
 /// </summary>
 public sealed class RealmUsers(HttpClient http, TenantRealmUsers access)
 {
     private const string UsersClientId = "axis-users";
+
+    /// <summary>The client whose redirect addresses the realm accepts as the place an invitation link leads to.</summary>
+    public const string PlatformClientId = "axis";
+
+    /// <summary>How long an invitation link works: 72 hours.</summary>
+    public const int InvitationLifespanSeconds = 259200;
+
+    private static readonly string[] _invitationActions = ["UPDATE_PASSWORD", "CONFIGURE_TOTP"];
 
     /// <summary>
     /// Reads the users that match <paramref name="search"/> in the name, username or email, or every user when it is
@@ -127,6 +136,95 @@ public sealed class RealmUsers(HttpClient http, TenantRealmUsers access)
         }
     }
 
+    /// <summary>
+    /// Creates an account for the invitation, with its email as the username and the required actions of a password and an
+    /// authenticator, and returns its id. The realm sends nothing yet. <paramref name="firstName"/> holds the whole display name.
+    /// </summary>
+    /// <exception cref="RealmUserConflictException">The realm already has a user with this username.</exception>
+    /// <exception cref="InvalidOperationException">An identity provider step answered another error status.</exception>
+    public async Task<string> CreateInvitedAsync(string email, string? firstName, string? lastName, CancellationToken cancellationToken)
+    {
+        var token = await TokenAsync(cancellationToken);
+        using var response = await SendAsync(
+            token,
+            HttpMethod.Post,
+            $"admin/realms/{Uri.EscapeDataString(access.Realm)}/users",
+            new
+            {
+                username = email,
+                email,
+                firstName,
+                lastName,
+                enabled = true,
+                requiredActions = _invitationActions,
+            },
+            cancellationToken);
+        if (response.StatusCode == HttpStatusCode.Conflict)
+        {
+            throw new RealmUserConflictException();
+        }
+
+        EnsureSuccess(response, "create the invited user");
+        var location = response.Headers.Location?.ToString() ?? throw new InvalidOperationException("The identity provider step 'create the invited user' answered no location.");
+        return location[(location.LastIndexOf('/') + 1)..];
+    }
+
+    /// <summary>Whether an account, a user with no federated identity, uses this email. A user of a brokered provider does not count.</summary>
+    /// <exception cref="InvalidOperationException">An identity provider step answered an error status.</exception>
+    public async Task<bool> AccountUsesEmailAsync(string email, CancellationToken cancellationToken)
+    {
+        var token = await TokenAsync(cancellationToken);
+        var usersPath = $"admin/realms/{Uri.EscapeDataString(access.Realm)}/users";
+        using var response = await GetAsync(
+            token, $"{usersPath}?email={Uri.EscapeDataString(email)}&exact=true&briefRepresentation=true", cancellationToken);
+        EnsureSuccess(response, "search the users by email");
+        var matches = (await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken)).EnumerateArray().ToList();
+        foreach (var match in matches)
+        {
+            if (await ProviderAliasAsync(token, usersPath, match.GetProperty("id").GetString()!, cancellationToken) is null)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>Asks the realm to email the user a link that sets a password and adds an authenticator, and that leads to <paramref name="redirectUri"/>.</summary>
+    /// <exception cref="InvalidOperationException">An identity provider step answered an error status.</exception>
+    public async Task SendInvitationAsync(string userId, Uri redirectUri, CancellationToken cancellationToken)
+    {
+        var token = await TokenAsync(cancellationToken);
+        var query = $"lifespan={InvitationLifespanSeconds}&client_id={PlatformClientId}&redirect_uri={Uri.EscapeDataString(redirectUri.AbsoluteUri)}";
+        using var response = await SendAsync(token, HttpMethod.Put, $"{UserPath(userId)}/execute-actions-email?{query}", _invitationActions, cancellationToken);
+        EnsureSuccess(response, "send the invitation");
+    }
+
+    /// <summary>Reads the fields of a user that a resend carries over and whether the user has a password.</summary>
+    /// <exception cref="InvalidOperationException">An identity provider step answered an error status.</exception>
+    public async Task<RealmInvitee> ReadInviteeAsync(string userId, CancellationToken cancellationToken)
+    {
+        var token = await TokenAsync(cancellationToken);
+        var path = UserPath(userId);
+        using var read = await GetAsync(token, path, cancellationToken);
+        EnsureSuccess(read, "read the user");
+        var user = await read.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
+        using var listed = await GetAsync(token, $"{path}/credentials", cancellationToken);
+        EnsureSuccess(listed, "list the credentials of the user");
+        var credentials = (await listed.Content.ReadFromJsonAsync<JsonElement>(cancellationToken)).EnumerateArray();
+        return new RealmInvitee(
+            Text(user, "email"), Text(user, "firstName"), Text(user, "lastName"), credentials.Any(credential => Text(credential, "type") == "password"));
+    }
+
+    /// <summary>Deletes the user from the realm, which ends every link and session of the user.</summary>
+    /// <exception cref="InvalidOperationException">An identity provider step answered an error status.</exception>
+    public async Task DeleteAsync(string userId, CancellationToken cancellationToken)
+    {
+        var token = await TokenAsync(cancellationToken);
+        using var response = await SendAsync(token, HttpMethod.Delete, UserPath(userId), null, cancellationToken);
+        EnsureSuccess(response, "delete the user");
+    }
+
     private string UserPath(string userId) =>
         $"admin/realms/{Uri.EscapeDataString(access.Realm)}/users/{Uri.EscapeDataString(userId)}";
 
@@ -184,3 +282,9 @@ public sealed record RealmUser(string Id, string Username, string? FirstName, st
 
 /// <summary>The state of one realm user that a command needs. <c>ProviderAlias</c> is the alias of the first federated identity, or <c>null</c> for an account.</summary>
 public sealed record RealmUserState(string Id, bool Enabled, string? ProviderAlias);
+
+/// <summary>The fields of an invited user that a resend carries over, and whether the user has set a password.</summary>
+public sealed record RealmInvitee(string? Email, string? FirstName, string? LastName, bool HasPassword);
+
+/// <summary>The realm already has a user with the username an invitation asked for.</summary>
+public sealed class RealmUserConflictException() : InvalidOperationException("The identity provider step 'create the invited user' failed with status 409.");

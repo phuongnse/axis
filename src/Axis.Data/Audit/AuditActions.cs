@@ -59,6 +59,10 @@ public static class AuditActions
 
     public const string SessionSignInRefused = "session.signInRefused";
 
+    public const string UserInvited = "user.invited";
+
+    public const string UserInvitationResent = "user.invitationResent";
+
     public const string UserDisabled = "user.disabled";
 
     public const string UserEnabled = "user.enabled";
