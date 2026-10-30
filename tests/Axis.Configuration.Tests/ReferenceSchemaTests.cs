@@ -63,6 +63,7 @@ public sealed class ReferenceSchemaTests
         (ReferenceRelations.EventEntity, "event", "properties/entity", "entity"),
         (ReferenceRelations.EndpointEntity, "endpoint", "properties/entity", "entity"),
         (ReferenceRelations.EndpointProcess, "endpoint", "properties/process", "process"),
+        (ReferenceRelations.EndpointEvent, "endpoint", "properties/event/properties/name", "event"),
         (ReferenceRelations.TriggerProcess, "trigger", "properties/process", "process"),
         (ReferenceRelations.TriggerEvent, "trigger", "properties/event", "event"),
         (ReferenceRelations.TriggerEntity, "trigger", "properties/entity", "entity"),

@@ -34,6 +34,7 @@ public static class ReferenceRelations
     public const string EventEntity = "event entity";
     public const string EndpointEntity = "endpoint entity";
     public const string EndpointProcess = "endpoint process";
+    public const string EndpointEvent = "endpoint event";
     public const string TriggerProcess = "trigger process";
     public const string TriggerEvent = "trigger event";
     public const string TriggerEntity = "trigger entity";

@@ -381,6 +381,7 @@ public sealed class ReferenceIndexTests
             {
                 (ReferenceRelations.EndpointEntity, "/entity", "Order"),
                 (ReferenceRelations.EndpointProcess, "/process", "OrderReview"),
+                (ReferenceRelations.EndpointEvent, "/event/name", "OrderChecked"),
                 (ReferenceRelations.FieldTarget, "/input/0/target", "Customer"),
             },
             EdgesFrom(result, "ImportOrder"));
@@ -581,7 +582,7 @@ public sealed class ReferenceIndexTests
             .Where(field => field.IsLiteral)
             .Select(field => (string)field.GetRawConstantValue()!)
             .ToList();
-        Assert.Equal(42, expected.Count);
+        Assert.Equal(43, expected.Count);
 
         var relations = new HashSet<string>();
         using (var packages = new TemporaryFolder().Install("1.0.0"))
@@ -793,7 +794,7 @@ public sealed class ReferenceIndexTests
                 """));
 
     /// <summary>
-    /// <see cref="ProcessFolder"/> with an endpoint that has a reference input, the three trigger types,
+    /// <see cref="ProcessFolder"/> with an endpoint that has a reference input and an event, the three trigger types,
     /// a webhook, a migration and a scenario with a user role, an assignee role and a connector and a package stub.
     /// </summary>
     private static TemporaryFolder FullFolder() =>
@@ -801,6 +802,7 @@ public sealed class ReferenceIndexTests
             .With("endpoints/import-order.json", """
                 { "id": "99999999-9999-4999-8999-999999999901", "kind": "endpoint", "name": "ImportOrder", "formatVersion": 1,
                   "entity": "Order", "process": "OrderReview",
+                  "event": { "name": "OrderChecked", "fields": { "count": "1" } },
                   "input": [ { "name": "customer", "type": "reference", "target": "Customer" } ],
                   "values": { "customer": "customer" } }
                 """)
