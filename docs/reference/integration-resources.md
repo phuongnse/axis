@@ -579,7 +579,10 @@ the caller's id.
 
 - **Entity and process.** `entity` names the entity of the record the call
   creates. It is not a child entity. `process` names the process the call
-  starts on that record, and its subject entity is `entity`.
+  starts on that record, and its subject entity is `entity`. _(planned for
+  M19)_ `process` is optional when the endpoint has an `event`. Without it,
+  the call creates the record and raises the event, and the event's triggers
+  start the work. An endpoint has a `process`, an `event` or both.
   They may name a module entity and process of a module the application
   declares, as `<module id>/<name>`. The call then writes the record into the
   application's copy of the module's table and starts the module process on it,
@@ -617,7 +620,9 @@ the caller's id.
     `sensitive` counts as reading that field, so an event that has a
     [webhook](#webhook-resource) may not carry it.
 - **Output.** `output` is optional. It lists field names of `entity` that a
-  `201` returns when the instance completes within `wait`.
+  `201` returns when the instance completes within `wait`. _(planned for M19)_
+  An endpoint without a `process` answers `201` as soon as it commits, and has
+  no `output` or `wait`.
 - **Wait.** `wait` is an ISO 8601 duration, more than zero and at most
   `PT30S`. It is how long the call waits for the instance to complete.
 - **Together.** `output` and `wait` are declared together, or neither is.
@@ -706,7 +711,8 @@ The compiler reports these as compile errors, all in one pass. The
   about `entity` (`AXC0126`), and `fields` names each payload field once
   (`AXC0127` at `/event/fields/{key}` and `AXC0128` at `/event/fields`). Each
   expression is checked as a `values` expression, against its payload field's
-  type.
+  type. The schema needs `process`, `event` or both, and refuses `output` and
+  `wait` without `process`, so breaking either is `AXC0004`.
 
 ## Outbound webhooks
 
