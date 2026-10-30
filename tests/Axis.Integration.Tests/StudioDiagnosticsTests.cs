@@ -48,6 +48,10 @@ public sealed class StudioDiagnosticsTests : IAsyncLifetime
             builder.UseSetting($"Tenants:{Tenant}:Bindings:PurchasingSystemUrl:Value", "https://purchasing.example.test");
             builder.UseSetting($"Tenants:{Tenant}:Bindings:PurchasingSystemToken:Kind", "secret");
             builder.UseSetting($"Tenants:{Tenant}:Bindings:PurchasingSystemToken:Value", "studio-test-token");
+            foreach (var (key, value) in CompanyBindings.Settings(Tenant))
+            {
+                builder.UseSetting(key, value);
+            }
             builder.UseSetting("Extensions:Path", SamplePackages.Path);
             builder.UseSetting("ActivateOnStartup:0", folder.Path);
             builder.UseSetting("Studio:Folders:0", folder.Path);

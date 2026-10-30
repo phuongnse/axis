@@ -44,6 +44,7 @@ public sealed class PurchaseRequestActivationTests(DataDatabaseFixture database)
             ["PurchasingSystemUrl"] = new(ActivationBinding.UrlKind, new Uri("https://purchasing.example.test")),
             ["PurchasingSystemToken"] = new(ActivationBinding.SecretKind, null),
         };
+        CompanyBindings.AddTo(bindings);
 
         var activated = await ActivateAsync(compiled, new ActivationBindings("acme", bindings, AllowHttp: false));
 

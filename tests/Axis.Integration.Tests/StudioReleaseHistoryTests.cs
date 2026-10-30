@@ -102,14 +102,13 @@ public sealed class StudioReleaseHistoryTests : IAsyncLifetime
         await using var data = DataDatabaseFixture.CreateContext(connection);
         var compiled = await ReleaseCompiler.CompileAsync(folder, configuration, SamplePackages.Versions, CancellationToken);
         Assert.DoesNotContain(compiled.Diagnostics, diagnostic => diagnostic.Severity == Axis.Configuration.Diagnostics.DiagnosticSeverity.Error);
-        var bindings = new ActivationBindings(
-            Tenant,
-            new Dictionary<string, ActivationBinding>
-            {
-                ["PurchasingSystemUrl"] = new(ActivationBinding.UrlKind, new Uri("https://purchasing.example.test")),
-                ["PurchasingSystemToken"] = new(ActivationBinding.SecretKind, null),
-            },
-            AllowHttp: false);
+        var deploymentBindings = new Dictionary<string, ActivationBinding>
+        {
+            ["PurchasingSystemUrl"] = new(ActivationBinding.UrlKind, new Uri("https://purchasing.example.test")),
+            ["PurchasingSystemToken"] = new(ActivationBinding.SecretKind, null),
+        };
+        CompanyBindings.AddTo(deploymentBindings);
+        var bindings = new ActivationBindings(Tenant, deploymentBindings, AllowHttp: false);
         var result = await ReleaseActivator.ActivateAsync(
             compiled, new ActiveReleaseStore(configuration), data, bindings, OpenInstanceCounter.Instance,
             ReleaseActivator.DefaultInlineRecomputeLimit, actor, CancellationToken);
@@ -129,6 +128,10 @@ public sealed class StudioReleaseHistoryTests : IAsyncLifetime
             builder.UseSetting($"Tenants:{Tenant}:Bindings:PurchasingSystemUrl:Value", "https://purchasing.example.test");
             builder.UseSetting($"Tenants:{Tenant}:Bindings:PurchasingSystemToken:Kind", "secret");
             builder.UseSetting($"Tenants:{Tenant}:Bindings:PurchasingSystemToken:Value", "studio-test-token");
+            foreach (var (key, value) in CompanyBindings.Settings(Tenant))
+            {
+                builder.UseSetting(key, value);
+            }
             builder.UseSetting("Extensions:Path", SamplePackages.Path);
             builder.UseSetting("ActivateOnStartup:0", folder);
             builder.UseSetting("Studio:Folders:0", folder);

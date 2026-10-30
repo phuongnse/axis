@@ -231,6 +231,10 @@ public sealed class StudioPublishTests : IAsyncLifetime
                 builder.UseSetting($"Tenants:{tenant}:Bindings:PurchasingSystemUrl:Value", "https://purchasing.example.test");
                 builder.UseSetting($"Tenants:{tenant}:Bindings:PurchasingSystemToken:Kind", "secret");
                 builder.UseSetting($"Tenants:{tenant}:Bindings:PurchasingSystemToken:Value", "studio-test-token");
+                foreach (var (key, value) in CompanyBindings.Settings(tenant))
+                {
+                    builder.UseSetting(key, value);
+                }
                 builder.UseTestOidc(tenant);
             }
 
@@ -274,6 +278,10 @@ public sealed class StudioPublishTests : IAsyncLifetime
             ["Extensions:Path"] = SamplePackages.Path,
             ["Modules:Path"] = SampleModules.Path,
         };
+        foreach (var (key, value) in CompanyBindings.Settings(tenant))
+        {
+            settings[key] = value;
+        }
         if (previewConnectionString is not null)
         {
             var preview = $"{tenant}-preview";
