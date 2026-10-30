@@ -5,8 +5,9 @@
   "formatVersion": 1,
   "locale": "en",
   "texts": {
+    "application.description": "Keeps the company's assets and their history in one place.",
     "application.title": "Asset management",
-    "site.description": "Track the company's assets, who holds them, their maintenance and their software.",
+    "site.description": "Register assets, hand them to people and plan their maintenance.",
     "site.title": "Asset management",
     "nav.assets": "Assets",
     "nav.dashboard": "Dashboard",

@@ -20,7 +20,11 @@ public sealed record SiteListItem(
 /// <summary>The application of a listed site.</summary>
 /// <param name="Name">The application's declared name.</param>
 /// <param name="Titles">The application's title in each locale it has texts for. It is the label's text, or the name when the application has no label.</param>
-public sealed record SiteApplication(string Name, IReadOnlyDictionary<string, string> Titles);
+/// <param name="Descriptions">Proposed: what the application as a whole is for, in each locale it has texts for, or null when it declares none.</param>
+public sealed record SiteApplication(
+    string Name,
+    IReadOnlyDictionary<string, string> Titles,
+    IReadOnlyDictionary<string, string>? Descriptions = null);
 
 /// <summary>What the SPA needs to build an application site's shell: title, locales and navigation.</summary>
 /// <param name="TitleKey">Text key of the site title.</param>

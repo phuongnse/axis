@@ -4,6 +4,12 @@ namespace Axis.Configuration.Resources;
 public sealed record ApplicationManifest : Resource
 {
     /// <summary>
+    /// Proposed: one line that says what the application as a whole is for, which the platform home page shows under
+    /// its title. Each site's own description says what that site does.
+    /// </summary>
+    public TextReference? Description { get; init; }
+
+    /// <summary>
     /// The application's IANA time zone id, such as <c>Asia/Ho_Chi_Minh</c>, or null for UTC. It decides the date that
     /// <c>today()</c> and <c>toDate</c> give and the year of a sequence number.
     /// </summary>

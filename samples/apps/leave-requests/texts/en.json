@@ -5,6 +5,7 @@
   "formatVersion": 1,
   "locale": "en",
   "texts": {
+    "application.description": "Handles leave, from the request to the manager's decision.",
     "application.title": "Leave requests",
     "site.description": "Ask for leave and follow your manager's decision.",
     "site.title": "Leave",

@@ -5,6 +5,7 @@
   "formatVersion": 1,
   "locale": "vi",
   "texts": {
+    "application.description": "Quản lý yêu cầu hỗ trợ nội bộ, từ lúc gửi đến khi giải quyết.",
     "application.title": "Hỗ trợ dịch vụ",
     "site.description": "Gửi yêu cầu hỗ trợ và theo dõi đến khi được giải quyết.",
     "site.title": "Hỗ trợ nội bộ",

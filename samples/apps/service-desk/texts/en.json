@@ -5,6 +5,7 @@
   "formatVersion": 1,
   "locale": "en",
   "texts": {
+    "application.description": "Handles internal support requests, from raising them to solving them.",
     "application.title": "Service desk",
     "site.description": "Raise tickets and follow them until they are solved.",
     "site.title": "Service desk",

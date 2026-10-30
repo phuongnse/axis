@@ -5,6 +5,7 @@
   "formatVersion": 1,
   "locale": "en",
   "texts": {
+    "application.description": "Runs the company's purchases, from the request to approval and ordering.",
     "application.title": "Purchase requests",
     "site.description": "Request purchases and take them through approval.",
     "site.title": "Purchasing",

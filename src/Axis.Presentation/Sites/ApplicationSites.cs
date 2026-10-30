@@ -38,9 +38,15 @@ public static class ApplicationSites
             site.Path,
             site.Title.TextKey,
             titles,
-            new SiteApplication(application.Manifest.Name, applicationTitles),
+            new SiteApplication(application.Manifest.Name, applicationTitles, ApplicationDescriptions(application)),
             descriptions);
     }
+
+    /// <summary>Proposed: the application's description in each locale it has texts for, or null when it declares none.</summary>
+    private static Dictionary<string, string>? ApplicationDescriptions(ApplicationModel application) =>
+        application.Manifest.Description is { } description
+            ? application.Texts.ToDictionary(text => text.Locale, text => text.Texts[description.TextKey], StringComparer.Ordinal)
+            : null;
 
     public static ApplicationSite Describe(ApplicationModel application, SiteModel site)
     {

@@ -5,6 +5,7 @@
   "formatVersion": 1,
   "locale": "vi",
   "texts": {
+    "application.description": "Quản lý việc mua hàng của công ty, từ yêu cầu đến duyệt và đặt hàng.",
     "application.title": "Yêu cầu mua hàng",
     "site.description": "Tạo yêu cầu mua hàng và đưa chúng qua các bước duyệt.",
     "site.title": "Mua hàng",

@@ -5,6 +5,7 @@
   "formatVersion": 1,
   "locale": "vi",
   "texts": {
+    "application.description": "Quản lý nghỉ phép, từ lúc xin đến khi quản lý quyết định.",
     "application.title": "Đơn nghỉ phép",
     "site.description": "Xin nghỉ phép và theo dõi quyết định của quản lý.",
     "site.title": "Nghỉ phép",

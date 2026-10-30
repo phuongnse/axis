@@ -765,8 +765,16 @@ const currentUser: CurrentUser = {
   users: false,
 }
 
-const purchaseApplication = { name: application, titles: { [locale]: 'Purchase requests' } }
-const serviceApplication = { name: 'ServiceDesk', titles: { [locale]: 'Service desk' } }
+const purchaseApplication = {
+  name: application,
+  titles: { [locale]: 'Purchase requests' },
+  descriptions: { [locale]: "Runs the company's purchases, from the request to approval and ordering." },
+}
+const serviceApplication = {
+  name: 'ServiceDesk',
+  titles: { [locale]: 'Service desk' },
+  descriptions: { [locale]: 'Handles internal support requests, from raising them to solving them.' },
+}
 
 /** Three sites in two applications, for the platform home page's cards. */
 const listedSites: SiteListItem[] = [

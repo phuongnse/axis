@@ -7,7 +7,14 @@ import { colourTokens } from '../platform/designTokens'
 import { navigationIcon } from '../platform/navigationIcons'
 import { OrganizationHeading } from '../platform/OrganizationHeading'
 import { SiteMark } from '../platform/SiteMark'
-import { applicationTitle, fetchSites, siteDescription, siteTitle, type SiteListItem } from '../platform/site'
+import {
+  applicationDescription,
+  applicationTitle,
+  fetchSites,
+  siteDescription,
+  siteTitle,
+  type SiteListItem,
+} from '../platform/site'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { useNarrowWidth } from '../platform/useNarrowWidth'
@@ -217,19 +224,20 @@ function Tools({ user }: { user: CurrentUser }) {
 interface ApplicationGroup {
   name: string
   title: string
+  description?: string
   sites: SiteListItem[]
 }
 
 /**
- * Proposed: an application is one tile with its mark and title, over its sites. Each site is a link with its own mark,
- * its title and, when it declares one, the line that says what it is for, as an application often has several sites
- * for different people.
+ * Proposed: an application is one tile with its mark, its title and what it is for as a whole, over its sites. Each
+ * site is a link with its own mark, its title and what that site does, as an application often has several sites for
+ * different people. Both descriptions are optional.
  */
 function ApplicationTile({ group, locale }: { group: ApplicationGroup; locale: string }) {
   const { colour, spacing } = useDesignTokens()
   const sorted = [...group.sites].sort((a, b) => siteTitle(a, locale).localeCompare(siteTitle(b, locale), locale))
   return (
-    <HomeTile mark={<SiteMark title={group.title} size={32} />} title={group.title}>
+    <HomeTile mark={<SiteMark title={group.title} size={32} />} title={group.title} description={group.description}>
       <Flex
         vertical
         gap={spacing.sm}
@@ -274,6 +282,7 @@ function Applications({ sites, locale }: { sites: SiteListItem[] | 'failed'; loc
         byName.set(site.application.name, {
           name: site.application.name,
           title: applicationTitle(site.application, locale),
+          description: applicationDescription(site.application, locale),
           sites: [site],
         })
       }
