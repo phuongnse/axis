@@ -20,10 +20,11 @@ WORKDIR /src/web
 COPY web/package.json web/package-lock.json ./
 RUN npm ci
 COPY web/ ./
-# The build bundles the configuration schemas, and the type check also reads the platform texts and the sample process that web tests import.
+# The build bundles the configuration schemas, and the type check also reads the platform texts, the sample process and the Studio test fixture that web tests import.
 COPY src/Axis.Configuration/Schemas/ /src/src/Axis.Configuration/Schemas/
 COPY src/Axis.Presentation/Texts/ /src/src/Axis.Presentation/Texts/
 COPY samples/apps/purchase-requests/processes/purchase-request-approval.json /src/samples/apps/purchase-requests/processes/
+COPY tests/e2e/fixtures/studio-connector-oauth2.json /src/tests/e2e/fixtures/
 RUN npm run build
 
 # The server, published with the SPA in its web root, the worker, the admin tool and the sample extension package.
