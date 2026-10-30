@@ -16,7 +16,9 @@ namespace Axis.Tenancy.Realms;
 /// <see cref="SiteClientSecret"/> derives from it. Its ID token carries the alias of the
 /// provider that signed the person in as the <c>identity_provider</c> claim, and the <c>acr</c> that the provider signed the person in at as the
 /// <c>identity_provider_acr</c> claim, when the provider sent one. Each site client also copies the protocol mappers of
-/// <c>axis</c> by name, except the two named <c>identity provider</c> and <c>identity provider acr</c>, and never removes a mapper. Each
+/// <c>axis</c> by name, except the two named <c>identity provider</c> and <c>identity provider acr</c> and those that start with <c>axis_roles_</c>, and never removes a mapper it copied. It
+/// gives each site client one mapper for each roles claim of the providers its site allows, named <see cref="RolesAttribute"/>, which puts that user attribute into the ID token, and
+/// removes a mapper whose name starts with <c>axis_roles_</c> that the site no longer needs. Each
 /// provider gets claim mappers for the display name, the email, the locale and each roles claim, an <c>acr</c> mapper that copies the
 /// provider's <c>acr</c> claim into the person's realm session, and a <c>username</c> mapper that names a new user after the
 /// provider's alias and the person's subject. A <c>saml</c> provider is imported from its metadata, which the sync reads
@@ -51,7 +53,7 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
     public static string LabelKey(string alias) => LabelKeyPrefix + alias;
 
     /// <summary>The user attribute that holds the values of one roles claim of a brokered provider.</summary>
-    public static string RolesAttribute(string claim) => $"axis_roles_{claim}";
+    public static string RolesAttribute(string claim) => $"{RolesMapperPrefix}{claim}";
 
     /// <summary>The attribute of a site client that holds the aliases of the providers the site allows, separated by spaces.</summary>
     public const string ProvidersAttribute = "axis.providers";
@@ -71,6 +73,8 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
     private const string SamlUserAttributeMapper = "saml-user-attribute-idp-mapper";
     private const string SamlUsernameMapper = "saml-username-idp-mapper";
     private const string UsernameMapperName = "username";
+    private const string RolesMapperPrefix = "axis_roles_";
+    private const string ClientAttributeMapper = "oidc-usermodel-attribute-mapper";
     private const string SessionNoteMapper = "oidc-usersessionmodel-note-mapper";
     private const string SessionNoteMapperName = "identity provider";
     private const string AcrSessionNoteMapperName = "identity provider acr";
@@ -101,7 +105,7 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
         {
             try
             {
-                await SyncSiteClientsAsync(token, realmPath, state.Sites, state.PlatformClientSecret, cancellationToken);
+                await SyncSiteClientsAsync(token, realmPath, state.Sites, state.Providers, state.PlatformClientSecret, cancellationToken);
                 await SyncProvidersAsync(token, realmPath, providers, cancellationToken);
                 await SyncLabelsAsync(token, realmPath, state.Providers, cancellationToken);
                 return;
@@ -170,7 +174,7 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
         return body.GetProperty("access_token").GetString()!;
     }
 
-    private async Task SyncSiteClientsAsync(string token, string realmPath, IReadOnlyList<RealmSiteClient> sites, string? platformSecret, CancellationToken cancellationToken)
+    private async Task SyncSiteClientsAsync(string token, string realmPath, IReadOnlyList<RealmSiteClient> sites, IReadOnlyList<RealmBrokeredProvider> providers, string? platformSecret, CancellationToken cancellationToken)
     {
         using var listed = await SendAsync(token, HttpMethod.Get, $"{realmPath}/clients?max=1000", null, cancellationToken);
         EnsureSuccess(listed, "list the clients");
@@ -211,6 +215,7 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
             await EnsureSessionNoteMapperAsync(token, realmPath, uuid, clientId, SessionNoteMapperName, SessionNoteConfig(IdentityProviderClaim, IdentityProviderClaim), cancellationToken);
             await EnsureSessionNoteMapperAsync(token, realmPath, uuid, clientId, AcrSessionNoteMapperName, SessionNoteConfig(AcrNote, IdentityProviderAcrClaim), cancellationToken);
             await EnsurePlatformMappersAsync(token, realmPath, uuid, clientId, platformMappers, cancellationToken);
+            await EnsureRolesMappersAsync(token, realmPath, uuid, clientId, RolesClaimsOf(site, providers), cancellationToken);
         }
 
         foreach (var (clientId, (uuid, _)) in existing.Where(pair => !desired.ContainsKey(pair.Key)))
@@ -218,6 +223,18 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
             using var deleted = await SendAsync(token, HttpMethod.Delete, $"{realmPath}/clients/{uuid}", null, cancellationToken);
             EnsureSuccess(deleted, $"delete the client '{clientId}'");
         }
+    }
+
+    /// <summary>The roles claims of the providers that <paramref name="site"/> allows, each once, in ordinal order.</summary>
+    private static List<string> RolesClaimsOf(RealmSiteClient site, IReadOnlyList<RealmBrokeredProvider> providers)
+    {
+        var claims = providers
+            .Where(provider => site.Providers.Contains(provider.Alias, StringComparer.Ordinal))
+            .SelectMany(provider => provider.RolesClaims)
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+        claims.Sort(StringComparer.Ordinal);
+        return claims;
     }
 
     /// <summary>
@@ -354,7 +371,7 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
         foreach (var mapper in array.EnumerateArray())
         {
             var name = mapper.GetProperty("name").GetString()!;
-            if (name is SessionNoteMapperName or AcrSessionNoteMapperName)
+            if (name is SessionNoteMapperName or AcrSessionNoteMapperName || name.StartsWith(RolesMapperPrefix, StringComparison.Ordinal))
             {
                 continue;
             }
@@ -423,6 +440,71 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
                 using var updated = await SendAsync(token, HttpMethod.Put, $"{mappersPath}/{representation["id"]}", representation, cancellationToken);
                 EnsureSuccess(updated, $"update the mapper '{name}' of the client '{clientId}'");
             }
+        }
+    }
+
+    /// <summary>
+    /// Gives the client one mapper named <see cref="RolesAttribute"/> for each of <paramref name="claims"/>, which puts that user
+    /// attribute into the ID token under the same name, and removes every other mapper whose name starts with
+    /// <see cref="RolesMapperPrefix"/>. It leaves all other mappers as they are.
+    /// </summary>
+    private async Task EnsureRolesMappersAsync(
+        string token,
+        string realmPath,
+        string uuid,
+        string clientId,
+        IReadOnlyList<string> claims,
+        CancellationToken cancellationToken)
+    {
+        var mappersPath = $"{realmPath}/clients/{uuid}/protocol-mappers/models";
+        using var listed = await SendAsync(token, HttpMethod.Get, mappersPath, null, cancellationToken);
+        EnsureSuccess(listed, $"list the mappers of the client '{clientId}'");
+        var existing = new Dictionary<string, JsonElement>(StringComparer.Ordinal);
+        foreach (var mapper in (await listed.Content.ReadFromJsonAsync<JsonElement>(cancellationToken)).EnumerateArray())
+        {
+            existing.TryAdd(mapper.GetProperty("name").GetString()!, mapper);
+        }
+
+        var wanted = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var claim in claims)
+        {
+            var name = RolesAttribute(claim);
+            wanted.Add(name);
+            var config = new Dictionary<string, string>
+            {
+                ["user.attribute"] = name,
+                ["claim.name"] = name,
+                ["multivalued"] = "true",
+                ["jsonType.label"] = "String",
+                ["id.token.claim"] = "true",
+                ["access.token.claim"] = "false",
+                ["userinfo.token.claim"] = "false",
+                ["introspection.token.claim"] = "false",
+            };
+            var representation = new Dictionary<string, object?>
+            {
+                ["name"] = name,
+                ["protocol"] = "openid-connect",
+                ["protocolMapper"] = ClientAttributeMapper,
+                ["config"] = config,
+            };
+            if (!existing.TryGetValue(name, out var current))
+            {
+                using var created = await SendAsync(token, HttpMethod.Post, mappersPath, representation, cancellationToken);
+                EnsureSuccess(created, $"create the mapper '{name}' of the client '{clientId}'");
+            }
+            else if (current.GetProperty("protocolMapper").GetString() != ClientAttributeMapper || !ConfigEquals(current, config))
+            {
+                representation["id"] = current.GetProperty("id").GetString();
+                using var updated = await SendAsync(token, HttpMethod.Put, $"{mappersPath}/{representation["id"]}", representation, cancellationToken);
+                EnsureSuccess(updated, $"update the mapper '{name}' of the client '{clientId}'");
+            }
+        }
+
+        foreach (var (name, mapper) in existing.Where(pair => pair.Key.StartsWith(RolesMapperPrefix, StringComparison.Ordinal) && !wanted.Contains(pair.Key)))
+        {
+            using var deleted = await SendAsync(token, HttpMethod.Delete, $"{mappersPath}/{mapper.GetProperty("id").GetString()}", null, cancellationToken);
+            EnsureSuccess(deleted, $"delete the mapper '{name}' of the client '{clientId}'");
         }
     }
 

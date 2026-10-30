@@ -60,8 +60,9 @@ public sealed partial class UpstreamRealms : IDisposable
     /// <summary>
     /// Makes a realm that plays the company's issuer. Its frontend address is the container's mapped address, so the
     /// <c>iss</c> of a token that the tenant realm fetches from inside the container matches the issuer that the sync stored.
+    /// A <paramref name="groups"/> value becomes the <c>groups</c> claim of every token, whoever signs in.
     /// </summary>
-    public async Task<string> NewUpstreamRealmAsync()
+    public async Task<string> NewUpstreamRealmAsync(string? groups = null)
     {
         var realm = NewRealmName();
         using var created = await SendAsync(HttpMethod.Post, "admin/realms", new
@@ -80,6 +81,7 @@ public sealed partial class UpstreamRealms : IDisposable
             secret = BrokerSecret,
             standardFlowEnabled = true,
             redirectUris = _anyRedirect,
+            protocolMappers = groups is null ? Array.Empty<object>() : [GroupsClaim(groups)],
         });
         Assert.Equal(HttpStatusCode.Created, client.StatusCode);
         return realm;
@@ -88,9 +90,10 @@ public sealed partial class UpstreamRealms : IDisposable
     /// <summary>
     /// Makes a realm that plays a company's SAML issuer, with the same frontend address as <see cref="NewUpstreamRealmAsync"/>. Its one
     /// client is the tenant realm's service provider, <paramref name="entityId"/>, which accepts unsigned requests and posts its response
-    /// to <paramref name="assertionConsumerUrl"/>. It sends the user's first name as <c>name</c> and the user's email as <c>email</c>.
+    /// to <paramref name="assertionConsumerUrl"/>. It sends the user's first name as <c>name</c> and the user's email as <c>email</c>,
+    /// and a <paramref name="groups"/> value as the attribute <c>groups</c>.
     /// </summary>
-    public async Task<string> NewUpstreamSamlRealmAsync(string entityId, string assertionConsumerUrl)
+    public async Task<string> NewUpstreamSamlRealmAsync(string entityId, string assertionConsumerUrl, string? groups = null)
     {
         var realm = NewRealmName();
         using var created = await SendAsync(HttpMethod.Post, "admin/realms", new
@@ -114,7 +117,9 @@ public sealed partial class UpstreamRealms : IDisposable
                 ["saml.force.post.binding"] = "true",
                 ["saml_name_id_format"] = "persistent",
             },
-            protocolMappers = new[] { SamlAttribute("name", "firstName"), SamlAttribute("email", "email") },
+            protocolMappers = groups is null
+                ? new[] { SamlAttribute("name", "firstName"), SamlAttribute("email", "email") }
+                : [SamlAttribute("name", "firstName"), SamlAttribute("email", "email"), SamlGroups(groups)],
         });
         Assert.Equal(HttpStatusCode.Created, client.StatusCode);
         return realm;
@@ -122,6 +127,35 @@ public sealed partial class UpstreamRealms : IDisposable
 
     /// <summary>The address of the SAML metadata of the <paramref name="upstream"/> realm, which the tenant realm's provider imports.</summary>
     public Uri SamlMetadata(string upstream) => new(_baseAddress, $"realms/{upstream}/protocol/saml/descriptor");
+
+    private static object GroupsClaim(string groups) => new
+    {
+        name = "groups",
+        protocol = "openid-connect",
+        protocolMapper = "oidc-hardcoded-claim-mapper",
+        config = new Dictionary<string, string>
+        {
+            ["claim.name"] = "groups",
+            ["claim.value"] = groups,
+            ["jsonType.label"] = "String",
+            ["id.token.claim"] = "true",
+            ["access.token.claim"] = "true",
+            ["userinfo.token.claim"] = "true",
+        },
+    };
+
+    private static object SamlGroups(string groups) => new
+    {
+        name = "groups",
+        protocol = "saml",
+        protocolMapper = "saml-hardcode-attribute-mapper",
+        config = new Dictionary<string, string>
+        {
+            ["attribute.name"] = "groups",
+            ["attribute.value"] = groups,
+            ["attribute.nameformat"] = "Basic",
+        },
+    };
 
     private static object SamlAttribute(string name, string property) => new
     {

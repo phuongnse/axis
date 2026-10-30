@@ -196,6 +196,78 @@ public sealed class SiteSignInTests(KeycloakFixture keycloak, PostgreSqlFixture 
     }
 
     [Fact]
+    public async Task A_site_sign_in_through_a_saml_provider_gives_the_roles_that_the_roles_mapping_names()
+    {
+        var baseAddress = await keycloak.BaseAddressAsync();
+        using var realms = await UpstreamRealms.CreateAsync(baseAddress);
+        try
+        {
+            var (host, upstream) = await StartSamlAsync(realms, baseAddress, groups: "purchasing-managers");
+            await using var hosted = host;
+
+            var authorize = await host.AuthorizeAsync("/sitesagency");
+            var callback = await realms.LogInAsync(authorize, upstream, _callbackAddress);
+            using var signedIn = await host.Client.GetAsync(callback.PathAndQuery, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.Found, signedIn.StatusCode);
+            Assert.Equal("/sitesagency", signedIn.Headers.Location!.OriginalString);
+            Assert.Equal("""{"3c6b1f52-8d0e-4a47-9c1b-2f7e5a9d4b10": ["buyer"]}""", await SessionApplicationRolesAsync());
+        }
+        finally
+        {
+            await realms.DeleteRealmsAsync();
+        }
+    }
+
+    [Fact]
+    public async Task A_site_sign_in_through_an_oidc_provider_gives_the_roles_that_the_roles_mapping_names()
+    {
+        var baseAddress = await keycloak.BaseAddressAsync();
+        using var realms = await UpstreamRealms.CreateAsync(baseAddress);
+        try
+        {
+            var (host, upstream) = await StartBrokeredAsync(realms, baseAddress, groups: "purchasing-managers");
+            await using var hosted = host;
+
+            var authorize = await host.AuthorizeAsync("/sitespartner");
+            var callback = await realms.LogInAsync(authorize, upstream, _callbackAddress);
+            using var signedIn = await host.Client.GetAsync(callback.PathAndQuery, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.Found, signedIn.StatusCode);
+            Assert.Equal("/sitespartner", signedIn.Headers.Location!.OriginalString);
+            Assert.Equal("""{"3c6b1f52-8d0e-4a47-9c1b-2f7e5a9d4b10": ["buyer"]}""", await SessionApplicationRolesAsync());
+        }
+        finally
+        {
+            await realms.DeleteRealmsAsync();
+        }
+    }
+
+    [Fact]
+    public async Task A_site_sign_in_with_a_roles_value_that_the_mapping_does_not_list_gives_no_role()
+    {
+        var baseAddress = await keycloak.BaseAddressAsync();
+        using var realms = await UpstreamRealms.CreateAsync(baseAddress);
+        try
+        {
+            var (host, upstream) = await StartBrokeredAsync(realms, baseAddress, groups: "visitors");
+            await using var hosted = host;
+
+            var authorize = await host.AuthorizeAsync("/sitespartner");
+            var callback = await realms.LogInAsync(authorize, upstream, _callbackAddress);
+            using var signedIn = await host.Client.GetAsync(callback.PathAndQuery, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.Found, signedIn.StatusCode);
+            Assert.Equal(1L, await CountAsync("axis.sessions"));
+            Assert.Equal("{}", await SessionApplicationRolesAsync());
+        }
+        finally
+        {
+            await realms.DeleteRealmsAsync();
+        }
+    }
+
+    [Fact]
     public async Task A_site_callback_through_a_saml_provider_the_site_does_not_allow_is_refused()
     {
         var baseAddress = await keycloak.BaseAddressAsync();
@@ -365,10 +437,10 @@ public sealed class SiteSignInTests(KeycloakFixture keycloak, PostgreSqlFixture 
     /// server before the server starts, so the site clients that its activation makes accept them too. Returns the host and the
     /// upstream realm. A <paramref name="partnerAcr"/> list becomes the <c>acr</c> of the provider.
     /// </summary>
-    private async Task<(SiteHost Host, string Upstream)> StartBrokeredAsync(UpstreamRealms realms, Uri baseAddress, string[]? partnerAcr = null)
+    private async Task<(SiteHost Host, string Upstream)> StartBrokeredAsync(UpstreamRealms realms, Uri baseAddress, string[]? partnerAcr = null, string? groups = null)
     {
         var tenant = await NewTenantRealmAsync(realms, baseAddress);
-        var upstream = await realms.NewUpstreamRealmAsync();
+        var upstream = await realms.NewUpstreamRealmAsync(groups);
         await realms.AddUpstreamUserAsync(upstream);
         var host = await StartAsync(
             partner: true,
@@ -379,7 +451,8 @@ public sealed class SiteSignInTests(KeycloakFixture keycloak, PostgreSqlFixture 
             siteIssuer: new Uri(baseAddress, $"realms/{upstream}"),
             siteClient: UpstreamRealms.ClientId,
             siteSecret: UpstreamRealms.BrokerSecret,
-            partnerAcr: partnerAcr);
+            partnerAcr: partnerAcr,
+            roles: groups is not null);
         await realms.PointBackChannelAtTheContainerAsync(tenant, "oidc-siteissuer", upstream);
         return (host, upstream);
     }
@@ -388,11 +461,11 @@ public sealed class SiteSignInTests(KeycloakFixture keycloak, PostgreSqlFixture 
     /// Starts the server in front of a tenant realm of its own, with the sites of <see cref="Applications"/> and the <c>saml</c> provider
     /// <c>agency</c> bound to the metadata of an upstream SAML realm that holds the user <c>pat</c>. Returns the host and the upstream realm.
     /// </summary>
-    private async Task<(SiteHost Host, string Upstream)> StartSamlAsync(UpstreamRealms realms, Uri baseAddress)
+    private async Task<(SiteHost Host, string Upstream)> StartSamlAsync(UpstreamRealms realms, Uri baseAddress, string? groups = null)
     {
         var tenant = await NewTenantRealmAsync(realms, baseAddress);
         var entityId = $"{baseAddress.AbsoluteUri}realms/{tenant}";
-        var upstream = await realms.NewUpstreamSamlRealmAsync(entityId, $"{entityId}/broker/saml-agencymetadata/endpoint");
+        var upstream = await realms.NewUpstreamSamlRealmAsync(entityId, $"{entityId}/broker/saml-agencymetadata/endpoint", groups);
         await realms.AddUpstreamUserAsync(upstream);
         var host = await StartAsync(
             partner: false,
@@ -400,7 +473,8 @@ public sealed class SiteSignInTests(KeycloakFixture keycloak, PostgreSqlFixture 
             tenant,
             _realmSecrets.Platform,
             _realmSecrets.Activation,
-            samlMetadata: realms.SamlMetadata(upstream));
+            samlMetadata: realms.SamlMetadata(upstream),
+            roles: groups is not null);
         return (host, upstream);
     }
 
@@ -438,15 +512,17 @@ public sealed class SiteSignInTests(KeycloakFixture keycloak, PostgreSqlFixture 
     /// An application with the sites <c>sitesaccounts</c> and, as that realm has no flow for a brokered provider, <c>sitesother</c>, which allow
     /// accounts. With <paramref name="partner"/> it has the sites <c>sitespartner</c> and <c>sitespartner2</c> too, which allow only the provider <c>partner</c>,
     /// and a <paramref name="partnerAcr"/> list is the provider's <c>acr</c>. With <paramref name="saml"/> it has the <c>saml</c> provider
-    /// <c>agency</c> and the site <c>sitesagency</c>, which allows only it.
+    /// <c>agency</c> and the site <c>sitesagency</c>, which allows only it. With <paramref name="roles"/> both providers map the value
+    /// <c>purchasing-managers</c> of the claim <c>groups</c> to the role <c>buyer</c>.
     /// </summary>
-    private static TemporaryFolder Applications(bool partner, string[]? partnerAcr = null, bool saml = false)
+    private static TemporaryFolder Applications(bool partner, string[]? partnerAcr = null, bool saml = false, bool roles = false)
     {
+        var rolesMapping = roles ? """, "roles": { "claim": "groups", "values": { "purchasing-managers": "buyer" } }""" : "";
         var folder = new TemporaryFolder()
             .With("application.json", """{ "id": "3c6b1f52-8d0e-4a47-9c1b-2f7e5a9d4b10", "kind": "application", "name": "SiteSignIn", "formatVersion": 1 }""")
             .With("texts/en.json", """
                 { "id": "3c6b1f52-8d0e-4a47-9c1b-2f7e5a9d4b11", "kind": "text", "name": "TextsEn", "formatVersion": 1, "locale": "en",
-                  "texts": { "site.title": "Home", "nav.home": "Home", "pages.home.title": "Home", "signIn.partner": "Continue with Partner", "signIn.agency": "Continue with Agency" } }
+                  "texts": { "site.title": "Home", "nav.home": "Home", "pages.home.title": "Home", "signIn.partner": "Continue with Partner", "signIn.agency": "Continue with Agency", "role.buyer": "Buyer" } }
                 """)
             .With("pages/home.json", """
                 { "id": "3c6b1f52-8d0e-4a47-9c1b-2f7e5a9d4b12", "kind": "page", "name": "Home", "formatVersion": 1,
@@ -454,12 +530,17 @@ public sealed class SiteSignInTests(KeycloakFixture keycloak, PostgreSqlFixture 
                 """)
             .With("identity-providers/accounts.json", """{ "id": "3c6b1f52-8d0e-4a47-9c1b-2f7e5a9d4b13", "kind": "identityProvider", "name": "accounts", "formatVersion": 1, "type": "accounts" }""")
             .With("sites/sitesaccounts.json", Site("3c6b1f52-8d0e-4a47-9c1b-2f7e5a9d4b15", "sitesaccounts", "accounts"));
+        if (roles)
+        {
+            folder.With("roles/buyer.json", """{ "id": "3c6b1f52-8d0e-4a47-9c1b-2f7e5a9d4b1b", "kind": "role", "name": "buyer", "formatVersion": 1, "label": { "textKey": "role.buyer" } }""");
+        }
+
         if (saml)
         {
             folder
                 .With("identity-providers/agency.json", $$"""
                     { "id": "3c6b1f52-8d0e-4a47-9c1b-2f7e5a9d4b19", "kind": "identityProvider", "name": "agency", "formatVersion": 1, "type": "saml",
-                      "label": { "textKey": "signIn.agency" }, "metadata": { "binding": "{{SamlMetadata}}" } }
+                      "label": { "textKey": "signIn.agency" }, "metadata": { "binding": "{{SamlMetadata}}" }{{rolesMapping}} }
                     """)
                 .With("sites/sitesagency.json", Site("3c6b1f52-8d0e-4a47-9c1b-2f7e5a9d4b1a", "sitesagency", "agency"));
         }
@@ -471,7 +552,7 @@ public sealed class SiteSignInTests(KeycloakFixture keycloak, PostgreSqlFixture 
                     { "id": "3c6b1f52-8d0e-4a47-9c1b-2f7e5a9d4b14", "kind": "identityProvider", "name": "partner", "formatVersion": 1, "type": "oidc",
                       "label": { "textKey": "signIn.partner" },
                       "issuer": { "binding": "{{SiteIssuer}}" }, "clientId": { "binding": "{{SiteClient}}" },
-                      "clientSecret": { "binding": "{{SiteSecret}}" }{{acr}} }
+                      "clientSecret": { "binding": "{{SiteSecret}}" }{{acr}}{{rolesMapping}} }
                     """)
                 .With("sites/sitespartner.json", Site("3c6b1f52-8d0e-4a47-9c1b-2f7e5a9d4b16", "sitespartner", "partner"))
                 .With("sites/sitespartner2.json", Site("3c6b1f52-8d0e-4a47-9c1b-2f7e5a9d4b18", "sitespartner2", "partner"))
@@ -498,10 +579,11 @@ public sealed class SiteSignInTests(KeycloakFixture keycloak, PostgreSqlFixture 
         string siteClient = "site-client-value",
         string siteSecret = "site-secret-value",
         string[]? partnerAcr = null,
-        Uri? samlMetadata = null)
+        Uri? samlMetadata = null,
+        bool roles = false)
     {
         var baseAddress = await keycloak.BaseAddressAsync();
-        var applications = Applications(partner, partnerAcr, saml: samlMetadata is not null);
+        var applications = Applications(partner, partnerAcr, saml: samlMetadata is not null, roles);
         var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
@@ -544,6 +626,9 @@ public sealed class SiteSignInTests(KeycloakFixture keycloak, PostgreSqlFixture 
 
     private async Task<string?> SessionIdentityProviderAsync() =>
         await PostgreSqlServer.AdminScalarAsync(_schemaConnection!, "SELECT identity_provider FROM axis.sessions", CancellationToken) as string;
+
+    private async Task<string> SessionApplicationRolesAsync() =>
+        (string)(await PostgreSqlServer.AdminScalarAsync(_schemaConnection!, "SELECT application_roles::text FROM axis.sessions", CancellationToken))!;
 
     private async Task<long> CountAsync(string from) =>
         (long)(await PostgreSqlServer.AdminScalarAsync(_schemaConnection!, $"SELECT count(*) FROM {from}", CancellationToken))!;
