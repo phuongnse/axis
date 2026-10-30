@@ -580,14 +580,13 @@ flowchart LR
 | P71 | A person cannot correct their profile. | Personal data | Unawareness | Low | **Delegated** | The identity provider. Each sign-in rewrites the profile from its claims, see [user profiles](notifications.md#user-profiles). |
 | P72 | Notifications are kept longer than needed. | Personal data | Non-compliance | Medium | **Mitigated** | `NotificationRetentionTests` (notifications over the retention days are deleted with their reads, and newer ones stay). |
 | P73 | Logs, telemetry and backup archives are kept longer than needed. | Personal data | Non-compliance | Medium | **Delegated** | The operator keeps and removes them, see [log inventory](log-inventory.md#logs) and [Restricted](keys-and-data-protection.md#restricted). |
+| P101 | Session audit records keep the full client address forever. | Personal data | Identifying | Medium | **Mitigated** | `ClientAddressTests` (IPv4 loses its last octet and IPv6 its last 80 bits) and `SignInTests` (sign-in, sign-out and refused sign-in records hold the shortened address). |
 
 Non-repudiation does not apply as a privacy threat. The audit records exist so that a person cannot deny
 a business action, see P3, P12 and P20. What they keep about a person is in the list below.
 
 Open, waiting for an issue:
 
-- (Identifying, Medium) session audit records keep the full client address forever, _(planned for M27)_,
-  [D109](../decisions/d109-sensitive-fields-and-backups-are-encrypted-and-history-keeps-no-names.md).
 - (Identifying, Medium) audit records keep the actor's display name, `actor_name`, forever, _(planned for
   M27)_, [D109](../decisions/d109-sensitive-fields-and-backups-are-encrypted-and-history-keeps-no-names.md).
 - (Data disclosure, High) a database login, a dump or a replica reads personal data and `sensitive` fields
