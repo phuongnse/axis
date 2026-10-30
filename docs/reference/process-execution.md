@@ -841,6 +841,7 @@ release cannot be loaded is counted without `axis.application` and
 | --- | --- | --- | --- |
 | `axis.work_items.due` | gauge | items | `axis.tenant`, `axis.work_item.kind` |
 | `axis.work_items.oldest_due_age` | gauge | s | `axis.tenant`, `axis.work_item.kind`. Stuck work shows here |
+| `axis.work_items.claim_delay` | histogram | s | `axis.tenant`, `axis.work_item.kind`. The claim time minus the item's due time |
 | `axis.work_items.duration` | histogram | s | `axis.tenant`, `axis.work_item.kind`, `axis.outcome`: `completed`, `failed` or `fenced` |
 | `axis.process.instances.ended` | counter | `{instance}` | `axis.tenant`, `axis.application`, `axis.process`, `axis.outcome`: the end state, `completed` or `failed` |
 | `axis.calls.attempts` | counter | `{attempt}` | `axis.tenant`, `axis.application`, `axis.connector` or `axis.package`, `axis.operation`, `axis.outcome`: the [call outcome](#call-outcomes) class, `succeeded`, `retryable`, `failed` or `unknown` |
@@ -852,7 +853,10 @@ The gauges are read every `Worker:MetricsInterval` by a loop that is separate
 from the work loop, so a hung item does not stop it and it does not slow the
 work. A metrics scrape never queries a tenant database. An item counts as due
 once its `due_at` has passed, claimed or not, so a hung item keeps aging. The
-age and the due time use the clock of the claim. Every kind the worker handles
+age, the claim delay and the due time use the clock of the claim. The claim delay
+is recorded once per claim, so an item that is claimed again after its lease
+expired records again, and that delay includes the time the first worker held
+the item. Every kind the worker handles
 reports 0 when nothing is due, and so does every application with an active
 release when nothing is pending. A kind with due items that the worker has no
 handler for reports its real count. `axis.computed.pending_fields` adds up the

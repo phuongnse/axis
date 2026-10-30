@@ -100,7 +100,13 @@ public sealed partial class WorkItemRunner
         try
         {
             await using var connection = await _connections.OpenConnectionAsync(cancellationToken);
-            return await WorkItemQueue.ClaimAsync(connection, tenantId, _kinds, lease, cancellationToken, InQueueOrder);
+            var item = await WorkItemQueue.ClaimAsync(connection, tenantId, _kinds, lease, cancellationToken, InQueueOrder);
+            if (item is not null)
+            {
+                AxisMetrics.RecordClaimDelay(item.TenantId, item.Kind, item.ClaimDelay);
+            }
+
+            return item;
         }
         finally
         {

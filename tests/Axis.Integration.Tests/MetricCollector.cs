@@ -58,6 +58,27 @@ internal sealed class MetricCollector : IDisposable
         return value;
     }
 
+    /// <summary>
+    /// The sum of the latest histogram point of <paramref name="name"/> that has every one of
+    /// <paramref name="tags"/>, or <see langword="null"/> when there is none.
+    /// </summary>
+    public double? HistogramSum(string name, params (string Key, string Value)[] tags)
+    {
+        double? sum = null;
+        foreach (var metric in Metrics.Where(metric => metric.Name == name))
+        {
+            foreach (var point in metric.MetricPoints)
+            {
+                if (Matches(point, tags))
+                {
+                    sum = point.GetHistogramSum();
+                }
+            }
+        }
+
+        return sum;
+    }
+
     private static bool Matches(MetricPoint point, (string Key, string Value)[] tags)
     {
         var pointTags = new Dictionary<string, object?>();
