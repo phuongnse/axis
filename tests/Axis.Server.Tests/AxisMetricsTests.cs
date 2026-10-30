@@ -19,6 +19,7 @@ public sealed class AxisMetricsTests
     {
         ["axis.work_items.duration"] = ["axis.tenant", "axis.work_item.kind", "axis.outcome"],
         ["axis.process.instances.ended"] = ["axis.tenant", "axis.application", "axis.process", "axis.outcome"],
+        ["axis.work_items.claim_delay"] = ["axis.tenant", "axis.work_item.kind"],
         ["axis.work_items.due"] = ["axis.tenant", "axis.work_item.kind"],
         ["axis.work_items.oldest_due_age"] = ["axis.tenant", "axis.work_item.kind"],
         ["axis.computed.pending_fields"] = ["axis.tenant", "axis.application"],
@@ -69,6 +70,7 @@ public sealed class AxisMetricsTests
         }
 
         AxisMetrics.RecordWorkItem("default", "process.step", "completed", TimeSpan.FromMilliseconds(5));
+        AxisMetrics.RecordClaimDelay("default", "process.step", TimeSpan.FromSeconds(2));
         AxisMetrics.RecordInstanceEnded("default", "PurchaseRequests", "PurchaseRequestApproval", "completed");
         AxisMetrics.RecordInstanceEnded("default", null, null, "failed");
         AxisMetrics.RecordCallAttempt("default", "PurchaseRequests", AxisTelemetry.ConnectorTag, "PurchasingSystem", "createOrder", "succeeded");

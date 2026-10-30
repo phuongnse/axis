@@ -16,6 +16,9 @@ public static class AxisMetrics
     /// <summary>The duration of one work item run, in seconds, by tenant, kind and outcome.</summary>
     public const string WorkItemDuration = "axis.work_items.duration";
 
+    /// <summary>How long after its due time a work item was claimed, in seconds, by tenant and kind.</summary>
+    public const string WorkItemClaimDelay = "axis.work_items.claim_delay";
+
     /// <summary>The work items whose due time has passed, by tenant and kind. A claimed item counts until it is done.</summary>
     public const string WorkItemsDue = "axis.work_items.due";
 
@@ -70,6 +73,15 @@ public static class AxisMetrics
             HistogramBucketBoundaries = [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10, 30, 60],
         });
 
+    private static readonly Histogram<double> _workItemClaimDelays = Meter.CreateHistogram(
+        WorkItemClaimDelay,
+        "s",
+        "How long after its due time a work item was claimed.",
+        advice: new InstrumentAdvice<double>
+        {
+            HistogramBucketBoundaries = [0.1, 0.25, 0.5, 1, 2, 3, 4, 5, 6, 7.5, 10, 15, 30, 60, 300, 900],
+        });
+
     private static readonly Counter<long> _endedInstances = Meter.CreateCounter<long>(
         InstancesEnded,
         "{instance}",
@@ -97,6 +109,13 @@ public static class AxisMetrics
             new KeyValuePair<string, object?>(AxisTelemetry.TenantTag, tenant),
             new KeyValuePair<string, object?>(AxisTelemetry.WorkItemKindTag, kind),
             new KeyValuePair<string, object?>(AxisTelemetry.OutcomeTag, outcome));
+
+    /// <summary>Records how long after its due time a work item of <paramref name="kind"/> was claimed.</summary>
+    public static void RecordClaimDelay(string tenant, string kind, TimeSpan delay) =>
+        _workItemClaimDelays.Record(
+            delay.TotalSeconds,
+            new KeyValuePair<string, object?>(AxisTelemetry.TenantTag, tenant),
+            new KeyValuePair<string, object?>(AxisTelemetry.WorkItemKindTag, kind));
 
     /// <summary>Counts one interactive read that ran past the query timeout. A <see langword="null"/> application is left out.</summary>
     public static void RecordQueryTimeout(string tenant, string? application)

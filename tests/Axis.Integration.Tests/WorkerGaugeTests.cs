@@ -12,7 +12,8 @@ namespace Axis.Integration.Tests;
 
 /// <summary>
 /// The worker reads the due work items of a tenant database into the <c>axis.work_items.due</c> and
-/// <c>axis.work_items.oldest_due_age</c> gauges. The tenant ids are unique, because tests share the process
+/// <c>axis.work_items.oldest_due_age</c> gauges, and the claim of an item records how late it was in the
+/// <c>axis.work_items.claim_delay</c> histogram. The tenant ids are unique, because tests share the process
 /// and its meters.
 /// </summary>
 public sealed class WorkerGaugeTests(PostgreSqlFixture database) : IClassFixture<PostgreSqlFixture>
@@ -99,6 +100,21 @@ public sealed class WorkerGaugeTests(PostgreSqlFixture database) : IClassFixture
                 }
             }
         }
+    }
+
+    [Fact]
+    public async Task A_work_item_due_ten_seconds_ago_records_a_claim_delay_of_at_least_ten_seconds()
+    {
+        var tenant = $"claim-delay-{Guid.NewGuid():N}";
+        var connectionString = await CreateTenantDatabaseAsync("worker_claim_delay");
+        await ExecuteAsync(connectionString, $"INSERT INTO axis.process_work_items (id, tenant_id, kind, due_at) VALUES (gen_random_uuid(), '{tenant}', '{IdleKind}', now() - interval '10 seconds')");
+        await using var services = BuildWorker(tenant, connectionString);
+        using var collector = new MetricCollector();
+
+        var claimed = await services.GetRequiredService<WorkItemRunner>().ClaimAsync(tenant, TimeSpan.FromMinutes(5), CancellationToken);
+
+        Assert.NotNull(claimed);
+        Assert.True(collector.HistogramSum("axis.work_items.claim_delay", ("axis.tenant", tenant), ("axis.work_item.kind", IdleKind)) >= 10);
     }
 
     private static ServiceProvider BuildWorker(string tenant, string connectionString)

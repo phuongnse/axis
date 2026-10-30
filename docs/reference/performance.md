@@ -17,14 +17,14 @@ one caller cannot use up the server, and none builds a response that takes longe
 caller's or a proxy's timeout, because long work is asynchronous: the route answers `202` and the
 caller polls.
 
-| Route | Why it is heavy | What limits it |
-| --- | --- | --- |
-| Exports of [records and data source rows](import-export.md#export) | One query reads up to every matching row | `Data:ExportQueryTimeout` (a `503` past it), `Data:ExportMaxRows` (the file stops there), rows streamed to a temporary file, so memory stays low, and `RateLimits:Session` |
-| [Imports](import-export.md#import) | A large file is parsed, checked and written | `Data:ImportMaxBytes` (a `413`), `202` and then a status poll, the worker's dry run and commit, `Data:ImportMaxRows`, a cap of 1,000 entries and 100 MiB when an `xlsx` workbook unpacks, and `RateLimits:Session` |
-| [File uploads](file-fields.md#upload) | Large request bodies | `Files:MaxSize` and the field's `maxSize` (a `413`) and `RateLimits:Session` |
-| Record lists, data source rows, search and lookups | Filters and sorts over large tables | `Data:QueryTimeout` (a `503`), a `pageSize` of at most 100 and `RateLimits:Session` |
-| [Inbound endpoint](inbound-endpoints.md#the-call) calls with `wait` | The call holds a connection to the caller while it waits | `wait` of at most `PT30S`, no database connection held while waiting, a `202` when the instance is not done, and `RateLimits:Bearer` |
-| Studio validate, publish, preview, test and rollback, see [publishing](authoring.md#publishing) | A request checks and builds a whole application, and may run migrations | A `202` and a status poll, one request at a time for a tenant and application, see [the publisher](administration.md#publisher), a time limit of 10 minutes for `test`, and `RateLimits:Publishing` |
+| Route                                                                                           | Why it is heavy                                                         | What limits it                                                                                                                                                                                                     |
+| ----------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Exports of [records and data source rows](import-export.md#export)                              | One query reads up to every matching row                                | `Data:ExportQueryTimeout` (a `503` past it), `Data:ExportMaxRows` (the file stops there), rows streamed to a temporary file, so memory stays low, and `RateLimits:Session`                                         |
+| [Imports](import-export.md#import)                                                              | A large file is parsed, checked and written                             | `Data:ImportMaxBytes` (a `413`), `202` and then a status poll, the worker's dry run and commit, `Data:ImportMaxRows`, a cap of 1,000 entries and 100 MiB when an `xlsx` workbook unpacks, and `RateLimits:Session` |
+| [File uploads](file-fields.md#upload)                                                           | Large request bodies                                                    | `Files:MaxSize` and the field's `maxSize` (a `413`) and `RateLimits:Session`                                                                                                                                       |
+| Record lists, data source rows, search and lookups                                              | Filters and sorts over large tables                                     | `Data:QueryTimeout` (a `503`), a `pageSize` of at most 100 and `RateLimits:Session`                                                                                                                                |
+| [Inbound endpoint](inbound-endpoints.md#the-call) calls with `wait`                             | The call holds a connection to the caller while it waits                | `wait` of at most `PT30S`, no database connection held while waiting, a `202` when the instance is not done, and `RateLimits:Bearer`                                                                               |
+| Studio validate, publish, preview, test and rollback, see [publishing](authoring.md#publishing) | A request checks and builds a whole application, and may run migrations | A `202` and a status poll, one request at a time for a tenant and application, see [the publisher](administration.md#publisher), a time limit of 10 minutes for `test`, and `RateLimits:Publishing`                |
 
 - **Settings.** The `Data:*` and `Files:MaxSize` settings are in
   [data settings](host-settings.md#data-settings). The rate limits are per replica, see
@@ -39,29 +39,29 @@ caller polls.
 Each objective is a 95th percentile over one load test run, at 50 concurrent users per tenant, in
 the [reference environment](#reference-environment).
 
-| Group  | Routes                                                                                                                                                       | Objective                             | Metric                                         |
-| ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------- | ---------------------------------------------- |
-| Reads  | Record lists and single records, data source rows, site and page metadata, the task list                                                                     | p95 under 300 ms                      | `http.server.request.duration`, by route       |
-| Writes | Record create, update and delete, process start, task complete, an inbound endpoint call without `wait`                                                      | p95 under 500 ms                      | `http.server.request.duration`, by route       |
-| Worker | Due work items: process steps, connector calls, event delivery                                                                                               | p95 claimed within 5 s of its due time | The [worker metrics](process-execution.md#worker-metrics) |
-| Errors | Every request of the run                                                                                                                                     | Under 0.1% answer `5xx`               | `http.server.request.duration`, by status code |
+| Group  | Routes                                                                                                  | Objective                              | Metric                                                                                       |
+| ------ | ------------------------------------------------------------------------------------------------------- | -------------------------------------- | -------------------------------------------------------------------------------------------- |
+| Reads  | Record lists and single records, data source rows, site and page metadata, the task list                | p95 under 300 ms                       | `http.server.request.duration`, by route                                                     |
+| Writes | Record create, update and delete, process start, task complete, an inbound endpoint call without `wait` | p95 under 500 ms                       | `http.server.request.duration`, by route                                                     |
+| Worker | Due work items: process steps, connector calls, event delivery                                          | p95 claimed within 5 s of its due time | `axis.work_items.claim_delay`, see the [worker metrics](process-execution.md#worker-metrics) |
+| Errors | Every request of the run                                                                                | Under 0.1% answer `5xx`                | `http.server.request.duration`, by status code                                               |
 
 The load test sends these routes, and a test fails when this list and `tests/load/objectives.js` differ:
 
-| Group  | Route                                                      |
-| ------ | ---------------------------------------------------------- |
-| Reads  | `GET /api/apps/{app}/entities/{entity}/records`            |
-| Reads  | `GET /api/apps/{app}/entities/{entity}/records/{id}`       |
-| Reads  | `GET /api/apps/{app}/data-sources/{dataSource}/rows`       |
-| Reads  | `GET /api/sites/{path}`                                    |
-| Reads  | `GET /api/sites/{path}/pages/{page}`                       |
-| Reads  | `GET /api/apps/{app}/tasks`                                |
-| Writes | `POST /api/apps/{app}/entities/{entity}/records`           |
-| Writes | `PATCH /api/apps/{app}/entities/{entity}/records/{id}`     |
-| Writes | `DELETE /api/apps/{app}/entities/{entity}/records/{id}`    |
-| Writes | `POST /api/apps/{app}/processes/{process}/instances`       |
-| Writes | `POST /api/apps/{app}/tasks/{id}/complete`                 |
-| Writes | `POST /api/apps/{app}/endpoints/{name}`                    |
+| Group  | Route                                                   |
+| ------ | ------------------------------------------------------- |
+| Reads  | `GET /api/apps/{app}/entities/{entity}/records`         |
+| Reads  | `GET /api/apps/{app}/entities/{entity}/records/{id}`    |
+| Reads  | `GET /api/apps/{app}/data-sources/{dataSource}/rows`    |
+| Reads  | `GET /api/sites/{path}`                                 |
+| Reads  | `GET /api/sites/{path}/pages/{page}`                    |
+| Reads  | `GET /api/apps/{app}/tasks`                             |
+| Writes | `POST /api/apps/{app}/entities/{entity}/records`        |
+| Writes | `PATCH /api/apps/{app}/entities/{entity}/records/{id}`  |
+| Writes | `DELETE /api/apps/{app}/entities/{entity}/records/{id}` |
+| Writes | `POST /api/apps/{app}/processes/{process}/instances`    |
+| Writes | `POST /api/apps/{app}/tasks/{id}/complete`              |
+| Writes | `POST /api/apps/{app}/endpoints/{name}`                 |
 
 - **Same metrics in production.** Each objective uses a metric that the hosts already export, so an
   operator can watch the same numbers on a running installation. Axis builds no alerting.

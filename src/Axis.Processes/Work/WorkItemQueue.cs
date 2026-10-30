@@ -23,7 +23,7 @@ public static class WorkItemQueue
               WHERE {ClaimFilterSql}
               ORDER BY due_at, id LIMIT 1 FOR UPDATE SKIP LOCKED) c
         WHERE w.id = c.id
-        RETURNING {ClaimedColumnsSql}
+        RETURNING {ClaimedColumnsSql}, {ClaimDelaySql}
         """;
 
     // The scenario runner claims in queue order. A due time comes from the clock, which can step back
@@ -35,7 +35,7 @@ public static class WorkItemQueue
               WHERE {ClaimFilterSql}
               ORDER BY seq LIMIT 1 FOR UPDATE SKIP LOCKED) c
         WHERE w.id = c.id
-        RETURNING {ClaimedColumnsSql}
+        RETURNING {ClaimedColumnsSql}, {ClaimDelaySql}
         """;
 
     private const string ClaimFilterSql = $"""
@@ -44,6 +44,8 @@ public static class WorkItemQueue
         """;
 
     private const string ClaimedColumnsSql = "w.id, w.tenant_id, w.kind, w.claim_token, w.lease_expires_at, w.process_instance_id, w.connector_call_id, w.event_id, w.package_call_id, w.trigger_id, w.release_id, w.occurrence_at, w.cursor, w.entity_id, w.trace_id, w.span_id, w.task_id, w.revision, w.escalation, w.email_id";
+
+    private const string ClaimDelaySql = $"extract(epoch FROM {SqlTranslator.NowSql} - w.due_at)::double precision";
 
     internal const string ReadDueSql = $"""
         SELECT kind, count(*), extract(epoch FROM {SqlTranslator.NowSql} - min(due_at))::double precision
@@ -162,7 +164,8 @@ public static class WorkItemQueue
             await reader.IsDBNullAsync(16, cancellationToken) ? null : reader.GetGuid(16),
             await reader.IsDBNullAsync(17, cancellationToken) ? null : reader.GetInt64(17),
             await reader.IsDBNullAsync(18, cancellationToken) ? null : reader.GetInt32(18),
-            await reader.IsDBNullAsync(19, cancellationToken) ? null : reader.GetGuid(19));
+            await reader.IsDBNullAsync(19, cancellationToken) ? null : reader.GetGuid(19),
+            TimeSpan.FromSeconds(reader.GetDouble(20)));
     }
 
     /// <summary>
