@@ -1,0 +1,13 @@
+{
+  "id": "a5d2f8b1-6c37-4e09-b4a2-7f1c3e9d5b03",
+  "kind": "policy",
+  "name": "ClerkAccess",
+  "formatVersion": 1,
+  "roles": ["clerk"],
+  "grants": [
+    { "entity": "followups/Followup", "actions": ["read", "create", "delete"] },
+    { "entity": "followups/FollowupDeletion", "actions": ["read"] },
+    { "entity": "reviews/Review", "actions": ["read"] },
+    { "process": "FlagReview", "actions": ["start"] }
+  ]
+}

@@ -24,7 +24,7 @@ namespace Axis.Configuration.Compilation;
 /// pinned module's files are checked as JSON, for a kind a module may hold and against the schema
 /// of that kind. The files come back under <c>modules/&lt;id&gt;/</c>, ready to be stored in the
 /// release, once for each module. The entities,
-/// sequences, seeds, events, data sources, forms, pages, processes and policies of a pinned module come back as resources named
+/// sequences, seeds, events, data sources, forms, pages, processes, policies and triggers of a pinned module come back as resources named
 /// <c>&lt;id&gt;/&lt;name&gt;</c>, keeping the ids written in the files. Its rules come back by module,
 /// under their plain names, for <see cref="RuleChecker.CheckModules"/>. Inside a module, a field's
 /// <c>target</c> or <c>sequence</c>, an event's, data source's or form's <c>entity</c> and a data source
@@ -37,7 +37,10 @@ namespace Axis.Configuration.Compilation;
 /// value that contains <c>/</c> is <see cref="DiagnosticCodes.QualifiedModuleReference"/>. A
 /// process's subject <c>entity</c>, and its steps' <c>form</c>, <c>event</c>, sub-process <c>process</c> and
 /// create-record <c>entity</c>, are rewritten the same way. Only an <c>entity</c> and an <c>event</c> may name a
-/// declared module, a <c>form</c> and a <c>process</c> never do. A
+/// declared module, a <c>form</c> and a <c>process</c> never do. A trigger's <c>process</c> is rewritten like a
+/// sub-process, and its <c>event</c> and <c>entity</c> like a process's. A module may hold a trigger of type
+/// <c>event</c> or <c>dataChange</c>, and a <c>schedule</c> trigger is <see cref="DiagnosticCodes.ModuleKindNotAllowed"/>
+/// at <c>/type</c>. A
 /// policy's grants name only the module's own resources, so each grant's <c>entity</c> and
 /// <c>dataSource</c> is qualified with the module id as written, and <see cref="PolicyChecker"/> reports
 /// one that is not a plain name. The <c>roles</c> of an entry must map each role slot of the pinned version to
@@ -62,6 +65,7 @@ internal static class ModuleChecker
         ResourceKinds.Text,
         ResourceKinds.Seed,
         ResourceKinds.Policy,
+        ResourceKinds.Trigger,
     };
 
     /// <summary>
@@ -623,7 +627,27 @@ internal static class ModuleChecker
             return false;
         }
 
-        return SchemaDiagnostics.Validate(schema, root, DiagnosticCodes.SchemaViolation, path, resourceId, diagnostics);
+        if (!SchemaDiagnostics.Validate(schema, root, DiagnosticCodes.SchemaViolation, path, resourceId, diagnostics))
+        {
+            return false;
+        }
+
+        // A schedule runs in the application's time zone, D103, which a module schedule trigger cannot use yet.
+        if (kindElement.GetString() == ResourceKinds.Trigger
+            && root.TryGetProperty("type", out var type)
+            && type.ValueKind == JsonValueKind.String
+            && type.GetString() == "schedule")
+        {
+            diagnostics.Add(new Diagnostic(
+                DiagnosticCodes.ModuleKindNotAllowed,
+                "A module may hold a trigger of type 'event' or 'dataChange'. A module schedule trigger is not supported yet.",
+                path,
+                "/type",
+                resourceId));
+            return false;
+        }
+
+        return true;
     }
 
     private static Guid? ReadResourceId(JsonElement root) =>
@@ -634,7 +658,7 @@ internal static class ModuleChecker
             ? value
             : null;
 
-    /// <summary>Collects the entities, sequences, seeds, rules, events, data sources, forms, pages, processes, policies and texts of the pinned modules, in the order of the pins and then by path.</summary>
+    /// <summary>Collects the entities, sequences, seeds, rules, events, data sources, forms, pages, processes, policies, triggers and texts of the pinned modules, in the order of the pins and then by path.</summary>
     private sealed class ModuleResourceCollector
     {
         private readonly List<EntityResource> _entities = [];
@@ -647,6 +671,7 @@ internal static class ModuleChecker
         private readonly List<PageResource> _pages = [];
         private readonly List<ProcessResource> _processes = [];
         private readonly List<PolicyResource> _policies = [];
+        private readonly List<TriggerResource> _triggers = [];
         private readonly List<ModuleText> _texts = [];
         private readonly HashSet<string> _unloadedEntityNames = new(StringComparer.OrdinalIgnoreCase);
         private readonly HashSet<string> _unloadedSequenceNames = new(StringComparer.OrdinalIgnoreCase);
@@ -671,6 +696,7 @@ internal static class ModuleChecker
                 _pages,
                 _policies,
                 _processes,
+                _triggers,
                 _texts,
                 _unloadedEntityNames,
                 _unloadedSequenceNames,
@@ -721,7 +747,7 @@ internal static class ModuleChecker
             }
         }
 
-        /// <summary>Reads a file that passed its schema, if it is an entity, a sequence, a seed, a rule, an event, a data source, a form, a page, a process, a policy or a text.</summary>
+        /// <summary>Reads a file that passed its schema, if it is an entity, a sequence, a seed, a rule, an event, a data source, a form, a page, a process, a policy, a trigger or a text.</summary>
         public void Add(string moduleId, IReadOnlySet<string> declared, string file, JsonElement root, List<Diagnostic> diagnostics)
         {
             switch (root.GetProperty("kind").GetString())
@@ -776,6 +802,18 @@ internal static class ModuleChecker
                 case ResourceKinds.Process:
                     var process = root.Deserialize<ProcessResource>(ApplicationLoader.SerializerOptions)! with { File = file };
                     _processes.Add(Qualify(moduleId, declared, process, diagnostics));
+                    break;
+                case ResourceKinds.Trigger:
+                    var trigger = root.Deserialize<TriggerResource>(ApplicationLoader.SerializerOptions)! with { File = file };
+
+                    // The process is always the module's own. The event or entity is the module's own or a declared module's.
+                    _triggers.Add(trigger with
+                    {
+                        Name = $"{moduleId}/{trigger.Name}",
+                        Process = Rewrite(moduleId, _noModules, trigger.Process, trigger.File, trigger.Id, "/process", _unloadedProcessNames, diagnostics)!,
+                        Event = Rewrite(moduleId, declared, trigger.Event, trigger.File, trigger.Id, "/event", _unloadedEventNames, diagnostics),
+                        Entity = Rewrite(moduleId, declared, trigger.Entity, trigger.File, trigger.Id, "/entity", _unloadedEntityNames, diagnostics),
+                    });
                     break;
                 case ResourceKinds.Policy:
                     var policy = root.Deserialize<PolicyResource>(ApplicationLoader.SerializerOptions)! with { File = file };
@@ -982,7 +1020,7 @@ internal static class ModuleChecker
 }
 
 /// <summary>
-/// The entities, sequences, seeds, events, data sources, forms, pages, processes, policies and texts of the pinned modules, named <c>&lt;id&gt;/&lt;name&gt;</c> and
+/// The entities, sequences, seeds, events, data sources, forms, pages, processes, policies, triggers and texts of the pinned modules, named <c>&lt;id&gt;/&lt;name&gt;</c> and
 /// carrying the ids written in the module files. The rules come by module, in pin order, each in path
 /// order and under its plain name. <c>DeclaredModules</c> maps each pinned module to the ids in its
 /// manifest's <c>modules</c>, and <c>RoleSlots</c> to the names of the slots in its manifest's <c>roles</c>,
@@ -1002,6 +1040,7 @@ internal sealed record ModuleResources(
     IReadOnlyList<PageResource> Pages,
     IReadOnlyList<PolicyResource> Policies,
     IReadOnlyList<ProcessResource> Processes,
+    IReadOnlyList<TriggerResource> Triggers,
     IReadOnlyList<ModuleText> Texts,
     IReadOnlySet<string> UnloadedEntityNames,
     IReadOnlySet<string> UnloadedSequenceNames,

@@ -1,0 +1,19 @@
+{
+  "id": "c7e3a1d5-2b84-4f96-8a0d-1e5b9c3f7a05",
+  "kind": "process",
+  "name": "LogDeletion",
+  "formatVersion": 1,
+  "parameters": [{ "name": "title", "type": "text" }],
+  "start": "log",
+  "steps": [
+    {
+      "name": "log",
+      "type": "operation",
+      "operation": "createRecord",
+      "entity": "FollowupDeletion",
+      "set": { "title": "title" },
+      "next": "done"
+    },
+    { "name": "done", "type": "end" }
+  ]
+}
