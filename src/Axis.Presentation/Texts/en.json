@@ -1030,6 +1030,7 @@
   "shell.studio.newResource.exists": "A resource with this name or locale already exists.",
   "shell.studio.newResource.invalid": "This name or locale is not allowed. A name uses letters and digits and starts with a letter. A role name uses lower-case letters, digits and hyphens. A locale looks like en or pt-BR.",
   "shell.studio.newResource.failed": "The resource could not be created.",
+  "shell.studio.allApplications": "All applications",
   "shell.studio.newApplication.button": "New application…",
   "shell.studio.newApplication.title": "New application",
   "shell.studio.newApplication.name": "Name",

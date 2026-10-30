@@ -353,10 +353,9 @@ function StudioWorkspace() {
   // Proposed: the application is named by its title, as on the home page, never by its technical name.
   const openApp = apps.find((app) => app.name === application)
   const appTitle = openApp ? studioApplicationTitle(openApp, locale) : application
-  const steps: BreadcrumbStep[] = [
-    { label: t('shell.studio.title'), to: '/studio' },
-    { label: appTitle, to: `/studio?app=${encodeURIComponent(application)}` },
-  ]
+  // Proposed: the band names only what the sidebar does not: the kind as a link to its list, then the title. Studio and
+  // the application head the sidebar, where its menu leads back to every application.
+  const steps: BreadcrumbStep[] = []
   let title = appTitle
   if (selected) {
     if (selected.kind !== 'application') {
@@ -379,12 +378,7 @@ function StudioWorkspace() {
   } else if (view.name === 'releases') {
     title = t('shell.studio.nav.releases')
   }
-  if (steps.length > 2 || title !== appTitle) {
-    steps.push({ label: title })
-  } else {
-    steps.pop()
-    steps.push({ label: appTitle })
-  }
+  steps.push({ label: title })
 
   function kindLabel(kind: string) {
     const key = `shell.studio.kind.${kind}`

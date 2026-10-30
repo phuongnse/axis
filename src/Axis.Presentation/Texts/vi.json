@@ -1030,6 +1030,7 @@
   "shell.studio.newResource.exists": "Đã có tài nguyên với tên hoặc ngôn ngữ này.",
   "shell.studio.newResource.invalid": "Tên hoặc ngôn ngữ này không được phép. Tên dùng chữ cái và chữ số và bắt đầu bằng chữ cái. Tên vai trò dùng chữ cái thường, chữ số và dấu gạch nối. Ngôn ngữ có dạng en hoặc pt-BR.",
   "shell.studio.newResource.failed": "Không thể tạo tài nguyên.",
+  "shell.studio.allApplications": "Tất cả ứng dụng",
   "shell.studio.newApplication.button": "Ứng dụng mới…",
   "shell.studio.newApplication.title": "Ứng dụng mới",
   "shell.studio.newApplication.name": "Tên",
