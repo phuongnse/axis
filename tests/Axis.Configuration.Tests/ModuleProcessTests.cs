@@ -3,6 +3,7 @@ using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Model;
 using Axis.Configuration.Modules;
 using Axis.Configuration.Releases;
+using Axis.Expressions.Diagnostics;
 
 namespace Axis.Configuration.Tests;
 
@@ -129,6 +130,124 @@ public sealed class ModuleProcessTests
             (DiagnosticCodes.UnknownTaskForm, "processes/Audit.json", "/steps/0/form"),
             (diagnostic.Code, diagnostic.File, diagnostic.Path));
         Assert.Null(compiled.Model);
+    }
+
+    [Fact]
+    public void An_application_trigger_action_and_sub_process_step_can_name_a_process_of_a_declared_module()
+    {
+        using var modules = Modules();
+        using var folder = WithProcessReferences(Application(), "approvals/Review", dataSource: true);
+
+        var compiled = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        Assert.Empty(compiled.Diagnostics);
+        var processId = ModuleResourceIds.Derive(Guid.Parse(ApplicationId), Guid.Parse(ProcessId));
+        var reference = new ProcessReference(processId, "approvals/Review");
+        Assert.Equal(reference, Assert.Single(compiled.Model!.Triggers).Process);
+        var widget = Assert.Single(Assert.Single(compiled.Model.Pages, page => page.Name == "Reviews").Widgets);
+        var action = Assert.IsType<StartProcessActionModel>(Assert.Single(widget.RowActions));
+        Assert.Equal(reference, action.Process);
+        var parent = Assert.Single(compiled.Model.Processes, process => process.Name == "Parent");
+        var step = Assert.IsType<SubProcessStepModel>(parent.Steps[0]);
+        Assert.Equal((processId, "approvals/Review"), (step.ProcessId, step.Process));
+    }
+
+    [Theory]
+    [InlineData("other/Review")]
+    [InlineData("departments/Onboard")]
+    public void An_application_reference_to_a_process_of_a_module_it_does_not_declare_is_axc0207(string name)
+    {
+        using var modules = Modules();
+        modules.With("departments/1.0.0/processes/Onboard.json", """
+            { "id": "5c1d2f0e-7a3b-4c8d-9e21-3b6a8f4d1c34", "kind": "process", "name": "Onboard", "formatVersion": 1,
+              "entity": "Department", "start": "done", "steps": [ { "name": "done", "type": "end" } ] }
+            """);
+        using var folder = WithProcessReferences(Application(), name, dataSource: false);
+
+        var compiled = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        Assert.Equal(
+            [
+                (ExpressionDiagnosticCodes.UndeclaredModuleReference, "pages/Reviews.json", "/widgets/0/rowActions/0/process"),
+                (ExpressionDiagnosticCodes.UndeclaredModuleReference, "processes/Parent.json", "/steps/0/process"),
+                (ExpressionDiagnosticCodes.UndeclaredModuleReference, "triggers/Nightly.json", "/process"),
+            ],
+            compiled.Diagnostics.Select(diagnostic => (diagnostic.Code, diagnostic.File, diagnostic.Path)).Order().ToArray());
+        Assert.Null(compiled.Model);
+    }
+
+    [Fact]
+    public void A_process_inspector_that_names_a_process_of_an_undeclared_module_is_axc0207()
+    {
+        using var modules = Modules();
+        using var folder = Application().With("pages/Inspect.json", """
+            { "id": "44444444-4444-4444-8444-444444444461", "kind": "page", "name": "Inspect", "formatVersion": 1,
+              "title": { "textKey": "invoice.title" },
+              "widgets": [ { "type": "processInspector", "process": "departments/Onboard" } ] }
+            """);
+
+        var compiled = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        var diagnostic = Assert.Single(compiled.Diagnostics);
+        Assert.Equal(
+            (ExpressionDiagnosticCodes.UndeclaredModuleReference, "pages/Inspect.json", "/widgets/0/process"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+    }
+
+    [Fact]
+    public void An_application_policy_can_grant_a_process_of_a_declared_module()
+    {
+        using var modules = Modules();
+        using var folder = Application()
+            .With("roles/manager.json", """
+                { "id": "44444444-4444-4444-8444-444444444401", "kind": "role", "name": "manager", "formatVersion": 1, "label": { "textKey": "invoice.title" } }
+                """)
+            .With("policies/ReviewAccess.json", """
+                { "id": "44444444-4444-4444-8444-444444444402", "kind": "policy", "name": "ReviewAccess", "formatVersion": 1,
+                  "roles": ["manager"], "grants": [ { "process": "approvals/Review", "actions": ["start"] } ] }
+                """);
+
+        var compiled = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        Assert.Empty(compiled.Diagnostics);
+        var grant = Assert.Single(Assert.Single(compiled.Model!.Policies).Grants);
+        Assert.Equal(new ProcessReference(ModuleResourceIds.Derive(Guid.Parse(ApplicationId), Guid.Parse(ProcessId)), "approvals/Review"), grant.Process);
+    }
+
+    /// <summary>
+    /// Adds a schedule trigger, a page with a row action and an application process with a sub-process step that each name
+    /// <paramref name="name"/>. With <paramref name="dataSource"/>, the trigger and the page read the module's
+    /// approvals through a data source, as a trigger that starts a process for each row needs.
+    /// </summary>
+    private static TemporaryFolder WithProcessReferences(TemporaryFolder folder, string name, bool dataSource)
+    {
+        var source = dataSource ? """ "dataSource": "Approvals", """ : "";
+        return folder
+            .With("texts/en.json", """
+                { "id": "55555555-5555-4555-8555-555555555555", "kind": "text", "name": "TextsEn", "formatVersion": 1, "locale": "en",
+                  "texts": { "invoice.title": "Invoice", "audit.check": "Check", "audit.close": "Close", "reviews.title": "Reviews", "reviews.start": "Start review" } }
+                """)
+            .With("data-sources/Approvals.json", """
+                { "id": "44444444-4444-4444-8444-444444444421", "kind": "dataSource", "name": "Approvals", "formatVersion": 1,
+                  "entity": "approvals/Approval", "fields": [ { "name": "title", "path": "title" } ] }
+                """)
+            .With("triggers/Nightly.json", $$"""
+                { "id": "44444444-4444-4444-8444-444444444431", "kind": "trigger", "name": "Nightly", "formatVersion": 1,
+                  "type": "schedule", "schedule": "0 6 * * *", "timeZone": "Europe/Berlin",{{source}} "process": "{{name}}" }
+                """)
+            .With("pages/Reviews.json", $$"""
+                { "id": "44444444-4444-4444-8444-444444444441", "kind": "page", "name": "Reviews", "formatVersion": 1,
+                  "title": { "textKey": "reviews.title" },
+                  "widgets": [ { "type": "table", "dataSource": "Approvals",
+                    "rowActions": [ { "type": "startProcess", "process": "{{name}}", "label": { "textKey": "reviews.start" } } ] } ] }
+                """)
+            .With("processes/Parent.json", $$"""
+                { "id": "44444444-4444-4444-8444-444444444451", "kind": "process", "name": "Parent", "formatVersion": 1,
+                  "entity": "approvals/Approval", "start": "run", "steps": [
+                    { "name": "run", "type": "subProcess", "process": "{{name}}", "next": "done" },
+                    { "name": "done", "type": "end" }
+                  ] }
+                """);
     }
 
     private static string Process(string form = "ApprovalForm", string extraStep = "", string start = "review") => $$"""

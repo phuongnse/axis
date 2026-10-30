@@ -10,8 +10,9 @@ namespace Axis.Configuration.Compilation;
 
 /// <summary>
 /// Checks the triggers of an application and builds the checked ones. A trigger names a loaded
-/// process. An event trigger, in async or sync mode, names a loaded event about the process's
-/// subject entity, and its <c>when</c> is a boolean that sees only the event's payload fields. A data
+/// process, which may be a process of a module that the application declares, as <c>module/Name</c>.
+/// A name under a module that the application does not declare is <c>AXC0207</c>. An event trigger,
+/// in async or sync mode, names a loaded event about the process's subject entity, and its <c>when</c> is a boolean that sees only the event's payload fields. A data
 /// change trigger names the process's subject entity, any <c>fields</c> are non-computed fields of it,
 /// and its <c>when</c> is a boolean over the watched record with the scope of a process condition.
 /// A delete trigger lists only <c>delete</c> in <c>on</c>, has no <c>fields</c> and names a process
@@ -40,6 +41,7 @@ internal static class TriggerChecker
         IReadOnlySet<string> unloadedDataSourceNames,
         IEnumerable<ExpressionRule> rules,
         IReadOnlySet<string> modules,
+        ModuleReferences moduleReferences,
         ReferenceIndexBuilder references,
         List<Diagnostic> diagnostics)
     {
@@ -48,12 +50,12 @@ internal static class TriggerChecker
             void Report(string code, string message, string path) =>
                 diagnostics.Add(new Diagnostic(code, message, trigger.File, path, trigger.Id));
 
-            var process = findProcess(trigger.Process);
+            var process = moduleReferences.Find(trigger.Process, findProcess);
             if (process is not null)
             {
                 references.Add(trigger, "/process", ReferenceRelations.TriggerProcess, ResourceNode.Of(process));
             }
-            else if (!unloadedProcessNames.Contains(trigger.Process))
+            else if (!unloadedProcessNames.Contains(trigger.Process) && !moduleReferences.ReportUndeclared(trigger.Process, "/process", Report))
             {
                 // A process file that was not loaded because of its own errors is not reported again.
                 Report(

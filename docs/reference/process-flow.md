@@ -135,6 +135,9 @@ A `subProcess` step starts another process and waits until it ends:
   itself through sub-process steps, directly or through others. Each step that
   closes such a loop is `AXC0251` at `/steps/{i}/process`, naming the chain,
   such as `'A' → 'B' → 'A'`. A process that starts itself is `'A' → 'A'`.
+  `process` may also name `<module id>/<name>`, a process of a module that
+  `application.json` declares. A module that it does not declare, or that only
+  another module depends on, is `AXC0207` at `/steps/{i}/process`.
 - `subject` is an expression that gives a reference to a record of the child's
   subject entity. It may be left out when the child's subject entity is the
   parent's. The child then runs for the same record. A missing `subject` is
