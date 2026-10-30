@@ -5,7 +5,9 @@
      axis.accounts belongs to a site, so the context then holds a "site" object with the providers (axis.providers, a
      space-separated list of aliases) and the accounts flag that the site allows. Other clients get no "site". A
      provider's display name is plain text or a realm message key such as ${axisProvider.oidc-issuer}, which activation
-     writes for each language, so advancedMsg gives the label in the page's language. -->
+     writes for each language, so advancedMsg gives the label in the page's language. The "realmName" is the realm's
+     display name. Keycloak's realm.displayName falls back to the realm id, so the context leaves it out when the
+     display name is empty or equals the id, and the page then names Axis, never the tenant id. -->
 <!DOCTYPE html>
 <html lang="${(locale.currentLanguageTag)!'en'}">
 <head>
@@ -20,7 +22,9 @@
   {
     "page": "signIn",
     "title": "${msg("axisSignInTitle")?json_string?no_esc}",
-    "realmName": "${((realm.displayName)?has_content?then(realm.displayName, realm.name))?json_string?no_esc}",
+    <#if (realm.displayName)?has_content && realm.displayName != realm.name>
+    "realmName": "${realm.displayName?json_string?no_esc}",
+    </#if>
     "providers": [
       <#if social?? && social.providers??>
         <#list social.providers as p>

@@ -16,7 +16,9 @@
   {
     "page": "addAuthenticator",
     "title": "${msg("axisAddAuthenticatorTitle")?json_string?no_esc}",
-    "realmName": "${((realm.displayName)?has_content?then(realm.displayName, realm.name))?json_string?no_esc}",
+    <#if (realm.displayName)?has_content && realm.displayName != realm.name>
+    "realmName": "${realm.displayName?json_string?no_esc}",
+    </#if>
     <#if messagesPerField.existsError('totp','userLabel')>
     "error": "${messagesPerField.getFirstError('totp','userLabel')?json_string?no_esc}",
     <#elseif message?? && message.type == 'error'>

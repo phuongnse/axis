@@ -16,7 +16,9 @@
   {
     "page": "twoStep",
     "title": "${msg("axisTwoStepTitle")?json_string?no_esc}",
-    "realmName": "${((realm.displayName)?has_content?then(realm.displayName, realm.name))?json_string?no_esc}",
+    <#if (realm.displayName)?has_content && realm.displayName != realm.name>
+    "realmName": "${realm.displayName?json_string?no_esc}",
+    </#if>
     <#if messagesPerField.existsError('totp')>
     "error": "${messagesPerField.get('totp')?json_string?no_esc}",
     <#elseif message?? && message.type == 'error'>

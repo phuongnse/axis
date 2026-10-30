@@ -763,6 +763,20 @@ describe('App', () => {
     expect(await screen.findByTestId('sign-in-card')).toHaveStyle({ maxWidth: '420px' })
   })
 
+  it('draws the 32 px Axis heading above the sign-in card and no mark inside it', async () => {
+    stubServer({ me: null })
+
+    renderApp()
+
+    const card = await screen.findByTestId('sign-in-card')
+    const heading = screen.getByTestId('organization-heading')
+    expect(within(heading).getByText('Axis', { exact: true })).toBeVisible()
+    expect(heading.querySelector('[aria-hidden="true"]')).toHaveStyle({ width: '32px', height: '32px' })
+    expect(card.contains(heading)).toBe(false)
+    expect(heading.compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(card.querySelector('[aria-hidden="true"]')).toBeNull()
+  })
+
   it('shows the sign-in card when the sites answer 401 though the user loaded', async () => {
     stubServer({ sitesStatus: 401 })
 

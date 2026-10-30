@@ -1,11 +1,11 @@
 import { Button, Card, Flex, Typography } from 'antd'
 import type { ReactNode } from 'react'
 import { useState } from 'react'
-import { SiteMark } from '../platform/SiteMark'
+import { OrganizationHeading } from '../platform/OrganizationHeading'
 import { useDesignTokens } from '../platform/themeMode'
 import type { SignInLocale } from './signInContext'
 
-/** The frame of the identity provider's pages: the Axis mark above one card, with the language links and the copyright line below. */
+/** The frame of the identity provider's pages: the organization's mark and name above one card, with the language links and the copyright line below. */
 export function IdentityFrame({
   title,
   organization,
@@ -13,8 +13,8 @@ export function IdentityFrame({
   children,
 }: {
   title: string
-  /** The organization's name, shown under the title. */
-  organization: string
+  /** The organization's name for the heading above the card. Absent means Axis. */
+  organization?: string
   locales: SignInLocale[]
   children: ReactNode
 }) {
@@ -33,12 +33,7 @@ export function IdentityFrame({
         boxSizing: 'border-box',
       }}
     >
-      <Flex align="center" gap={spacing.xs}>
-        <SiteMark title="Axis" size={32} />
-        <Typography.Text strong style={{ fontSize: 20 }}>
-          Axis
-        </Typography.Text>
-      </Flex>
+      <OrganizationHeading name={organization} />
       <Card
         style={{
           width: '100%',
@@ -50,12 +45,9 @@ export function IdentityFrame({
         styles={{ body: { padding: spacing.xl } }}
       >
         <Flex vertical gap={spacing.md}>
-          <Flex vertical gap={4}>
-            <Typography.Title level={4} style={{ margin: 0 }}>
-              {title}
-            </Typography.Title>
-            <Typography.Text style={{ color: colour.textMuted }}>{organization}</Typography.Text>
-          </Flex>
+          <Typography.Title level={4} style={{ margin: 0 }}>
+            {title}
+          </Typography.Title>
           {children}
         </Flex>
       </Card>
