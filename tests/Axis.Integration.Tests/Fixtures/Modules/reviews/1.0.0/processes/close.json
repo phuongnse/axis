@@ -1,0 +1,18 @@
+{
+  "id": "5d9a7c32-6e4f-4b8c-9f3a-9c3e2a7d4b03",
+  "kind": "process",
+  "name": "Close",
+  "formatVersion": 1,
+  "entity": "Review",
+  "start": "close",
+  "steps": [
+    {
+      "name": "close",
+      "type": "operation",
+      "operation": "updateRecord",
+      "set": { "state": "'closed'" },
+      "next": "done"
+    },
+    { "name": "done", "type": "end" }
+  ]
+}

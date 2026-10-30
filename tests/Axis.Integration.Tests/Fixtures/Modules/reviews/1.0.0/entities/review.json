@@ -1,0 +1,11 @@
+{
+  "id": "5d9a7c32-6e4f-4b8c-9f3a-9c3e2a7d4b01",
+  "kind": "entity",
+  "name": "Review",
+  "formatVersion": 1,
+  "displayField": "title",
+  "fields": [
+    { "name": "title", "type": "text", "required": true, "maxLength": 100 },
+    { "name": "state", "type": "text", "maxLength": 20 }
+  ]
+}

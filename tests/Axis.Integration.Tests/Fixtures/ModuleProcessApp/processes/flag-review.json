@@ -1,0 +1,19 @@
+{
+  "id": "9b4d6e83-2a5c-4f17-8d60-3e7a1c9b5f04",
+  "kind": "process",
+  "name": "FlagReview",
+  "formatVersion": 1,
+  "entity": "reviews/Review",
+  "start": "flag",
+  "steps": [
+    {
+      "name": "flag",
+      "type": "operation",
+      "operation": "raiseEvent",
+      "event": "reviews/ReviewFlagged",
+      "fields": { "title": "title" },
+      "next": "done"
+    },
+    { "name": "done", "type": "end" }
+  ]
+}

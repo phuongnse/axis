@@ -1,0 +1,7 @@
+{
+  "id": "9b4d6e83-2a5c-4f17-8d60-3e7a1c9b5f01",
+  "kind": "application",
+  "name": "ModuleProcessApp",
+  "formatVersion": 1,
+  "modules": [{ "id": "reviews", "version": "^1.0.0" }]
+}
