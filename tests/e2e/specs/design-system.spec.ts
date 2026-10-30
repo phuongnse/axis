@@ -398,6 +398,39 @@ for (const [name, keys] of Object.entries(stateKeys)) {
 }
 
 for (const mode of modes) {
+  test(`the identitySignIn preview's Sign in state shows the organization's heading in ${mode} mode`, async ({
+    page,
+  }) => {
+    const recording = await openHarness(page, `?preview=identitySignIn&mode=${mode}`, {
+      sandboxed: true,
+      frameWidth: 992,
+    })
+    const state = figure(page.frameLocator('iframe'), 'Sign in')
+
+    await expect(state.getByTestId('organization-heading')).toContainText('Contoso')
+    expect(recording.errors).toEqual([])
+  })
+
+  test(`the signIn preview draws the Axis heading above the sign-in card in ${mode} mode`, async ({ page }) => {
+    const recording = await openHarness(page, `?preview=signIn&mode=${mode}`, { sandboxed: true, frameWidth: 992 })
+    const frame = page.frameLocator('iframe')
+
+    for (const caption of ['Signed out', 'Sign-in refused']) {
+      const state = figure(frame, caption)
+      const heading = state.getByTestId('organization-heading')
+      await expect(heading).toContainText('Axis')
+      const headingBox = await heading.boundingBox()
+      const cardBox = await state.getByTestId('sign-in-card').boundingBox()
+      if (!headingBox || !cardBox) {
+        throw new Error('The heading or the sign-in card has no box')
+      }
+      expect(headingBox.y + headingBox.height).toBeLessThanOrEqual(cardBox.y)
+    }
+    expect(recording.errors).toEqual([])
+  })
+}
+
+for (const mode of modes) {
   test(`the shell preview's Form page breadcrumb links back to Requests in ${mode} mode`, async ({ page }) => {
     const recording = await openHarness(page, `?preview=shell&mode=${mode}`, { sandboxed: true, frameWidth: 992 })
     const breadcrumb = figure(page.frameLocator('iframe'), 'Form page').getByRole('navigation', {

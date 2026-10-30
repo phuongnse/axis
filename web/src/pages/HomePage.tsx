@@ -5,6 +5,7 @@ import { startSignIn } from '../platform/api'
 import { fetchCurrentUser, type CurrentUser } from '../platform/currentUser'
 import { colourTokens } from '../platform/designTokens'
 import { navigationIcon } from '../platform/navigationIcons'
+import { OrganizationHeading } from '../platform/OrganizationHeading'
 import { SiteMark } from '../platform/SiteMark'
 import { applicationTitle, fetchSites, siteTitle, type SiteListItem } from '../platform/site'
 import { useText } from '../platform/texts'
@@ -36,14 +37,14 @@ export function SignInCard() {
   const signInFailed = searchParams.get('signIn') === 'failed'
 
   return (
-    <Flex justify="center" align="center" style={{ paddingBlock: spacing.xl }}>
+    <Flex vertical align="center" gap={spacing.md} style={{ paddingBlock: spacing.xl }}>
+      <OrganizationHeading />
       <Card
         data-testid="sign-in-card"
         style={{ width: '100%', maxWidth: 420, border: `1px solid ${colour.borderSubtle}` }}
         styles={{ body: { padding: spacing.xl } }}
       >
         <Flex vertical gap={spacing.md}>
-          <SiteMark title="Axis" size={48} />
           <Typography.Title level={4} style={{ margin: 0 }}>
             {t('shell.home.signIn.title')}
           </Typography.Title>

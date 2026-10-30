@@ -35,9 +35,9 @@ _(planned for M17)_
   sign-ins, a password reset link of 30 minutes and no self-registration.
 - The realm's login theme is the Axis theme `axis`, see [theme](#theme).
 - _(planned for M17)_ The realm also has its people, its brokered identity providers and a client for each site.
-- _(planned for M17)_ The realm's display name is the organization's name, which every sign-in page shows above its
-  card, see [theme](#theme). Until `tenant create` takes that name, the realm has no display name and the pages name
-  Axis, never the tenant id
+- The realm's display name is the organization's name, which every sign-in page shows above its card, see
+  [theme](#theme). `tenant create` gives the realm no display name until it takes the organization's name, and a rerun
+  clears one that holds the tenant id. The pages then name Axis, never the tenant id
   ([D114](../decisions/d114-rules-from-the-sign-in-and-home-page-review.md)).
 - A preview tenant has no realm. It signs people in through its main tenant's realm, see
   [preview tenants](#preview-tenants).
@@ -390,9 +390,7 @@ _(planned for M17)_
   site's mark is, with the name beside it. The name is the realm's display name, and Axis while the realm has none.
   The card is at most 400 px wide, on `surface` with a `borderSubtle` border, `radius-base` corners and `spacing-xl`
   padding. Its title, such as "Sign in", names the step and does not repeat the organization's name. Axis's own
-  sign-in card draws the same heading, see [platform home page](shell.md#platform-home-page). _(The organization's
-  heading is planned for M17, [D114](../decisions/d114-rules-from-the-sign-in-and-home-page-review.md). Today the
-  pages show the Axis mark, and the organization's name under the card's title.)_
+  sign-in card draws the same heading, see [platform home page](shell.md#platform-home-page).
 - The sign-in page lists the site's brokered providers first, then "or" and the account form when the site allows
   accounts: email or username, password with "Forgot password?", "Keep me signed in" and a full-width Sign in button.
   The brokered providers' "Continue with" buttons are secondary buttons. A field's label follows the form widget's
@@ -418,8 +416,8 @@ _(planned for M17)_
   texts. When the sign-in goes through a site client, which carries `axis.accounts`, `site` holds that site's
   providers and accounts flag. The page then lists only those providers, and shows the account form only when the realm
   and the site both allow accounts. A client without `axis.accounts`, such as `axis`, has no `site`, so the page shows
-  every provider and the form as before. The account form is a real `<form method="post">` to the login address. The components draw the frame (the 32 px mark
-  with the word "Axis", the 400 px card and the organization's name under the title), the "Continue with" secondary
+  every provider and the form as before. The account form is a real `<form method="post">` to the login address. The templates leave `realmName` out when the realm's display name is empty or equals the realm id. The components
+  draw the frame (the organization's 32 px mark and name, or Axis, above the 400 px card), the "Continue with" secondary
   buttons, the form widget's field labels and "Forgot password?" on the password's row. The two-step page is drawn too,
   from its own context with `page` set to `twoStep`: six code boxes, one digit each, and a real
   `<form method="post">` to the login address that posts `otp` and `login`. "Try another way" posts `tryAnotherWay=on`

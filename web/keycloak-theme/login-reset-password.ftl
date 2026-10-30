@@ -16,7 +16,9 @@
   {
     "page": "resetPassword",
     "title": "${msg("axisResetTitle")?json_string?no_esc}",
-    "realmName": "${((realm.displayName)?has_content?then(realm.displayName, realm.name))?json_string?no_esc}",
+    <#if (realm.displayName)?has_content && realm.displayName != realm.name>
+    "realmName": "${realm.displayName?json_string?no_esc}",
+    </#if>
     <#if (auth.attemptedUsername)?has_content>
     "username": "${auth.attemptedUsername?json_string?no_esc}",
     </#if>

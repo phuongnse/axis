@@ -85,16 +85,46 @@ public sealed class AdminTenantRealmTests(KeycloakFixture keycloak, PostgreSqlFi
         var admin = await TokenAsync(http, "master", KeycloakFixture.AdminClientId, KeycloakFixture.AdminClientSecret);
         Assert.Equal(TenantRealm.LoginTheme, await LoginThemeAsync(http, admin, id));
 
-        // The platform client has no redirect address yet, so the page is opened through the realm's account console.
-        var redirect = Uri.EscapeDataString(new Uri(_baseAddress, $"realms/{id}/account/").ToString());
-        var signIn = new Uri(
-            _baseAddress,
-            $"realms/{id}/protocol/openid-connect/auth?client_id=account-console&response_type=code&scope=openid&redirect_uri={redirect}"
-            + $"&code_challenge={new string('a', 43)}&code_challenge_method=S256");
-        using var page = await http.GetAsync(signIn, CancellationToken);
-        var html = await page.Content.ReadAsStringAsync(CancellationToken);
-        Assert.True(page.StatusCode == HttpStatusCode.OK, html);
+        var html = await SignInPageAsync(http, id);
         Assert.NotNull(KeycloakSignIn.LoginAction(html));
+        // The realm has no display name, so the page names Axis, never the tenant id.
+        Assert.True(string.IsNullOrEmpty(await DisplayNameAsync(http, admin, id)));
+        Assert.Null(KeycloakSignIn.Property(html, "realmName"));
+    }
+
+    [Fact]
+    public async Task The_sign_in_page_names_the_realm_only_when_its_display_name_differs_from_its_id()
+    {
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        var id = NewTenantId(scenario);
+        Assert.Equal(0, (await CreateAsync(scenario, id)).Exit);
+        using var http = new HttpClient(_handler, disposeHandler: false);
+        var admin = await TokenAsync(http, "master", KeycloakFixture.AdminClientId, KeycloakFixture.AdminClientSecret);
+
+        using var asId = await SendAsync(http, admin, HttpMethod.Put, $"admin/realms/{id}", new Dictionary<string, object?> { ["displayName"] = id });
+        Assert.True(asId.IsSuccessStatusCode);
+        Assert.Null(KeycloakSignIn.Property(await SignInPageAsync(http, id), "realmName"));
+
+        using var named = await SendAsync(http, admin, HttpMethod.Put, $"admin/realms/{id}", new Dictionary<string, object?> { ["displayName"] = "Acme" });
+        Assert.True(named.IsSuccessStatusCode);
+        Assert.Equal("Acme", KeycloakSignIn.Property(await SignInPageAsync(http, id), "realmName"));
+    }
+
+    [Fact]
+    public async Task A_rerun_of_create_clears_a_display_name_that_holds_the_tenant_id()
+    {
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        var id = NewTenantId(scenario);
+        Assert.Equal(0, (await CreateAsync(scenario, id)).Exit);
+        using var http = new HttpClient(_handler, disposeHandler: false);
+        var admin = await TokenAsync(http, "master", KeycloakFixture.AdminClientId, KeycloakFixture.AdminClientSecret);
+        using var changed = await SendAsync(http, admin, HttpMethod.Put, $"admin/realms/{id}", new Dictionary<string, object?> { ["displayName"] = id });
+        Assert.True(changed.IsSuccessStatusCode);
+        await scenario.SetStatusAsync(id, "provisioning");
+
+        Assert.Equal(0, (await CreateAsync(scenario, id)).Exit);
+
+        Assert.True(string.IsNullOrEmpty(await DisplayNameAsync(http, admin, id)));
     }
 
     [Fact]
@@ -208,6 +238,28 @@ public sealed class AdminTenantRealmTests(KeycloakFixture keycloak, PostgreSqlFi
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
         return body.GetProperty("loginTheme").GetString();
+    }
+
+    private async Task<string?> DisplayNameAsync(HttpClient http, string token, string realm)
+    {
+        using var response = await SendAsync(http, token, HttpMethod.Get, $"admin/realms/{realm}");
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
+        return body.TryGetProperty("displayName", out var name) ? name.GetString() : null;
+    }
+
+    /// <summary>Opens the realm's sign-in page through its account console, as the platform client has no redirect address yet, and returns its HTML.</summary>
+    private async Task<string> SignInPageAsync(HttpClient http, string realm)
+    {
+        var redirect = Uri.EscapeDataString(new Uri(_baseAddress, $"realms/{realm}/account/").ToString());
+        var signIn = new Uri(
+            _baseAddress,
+            $"realms/{realm}/protocol/openid-connect/auth?client_id=account-console&response_type=code&scope=openid&redirect_uri={redirect}"
+            + $"&code_challenge={new string('a', 43)}&code_challenge_method=S256");
+        using var page = await http.GetAsync(signIn, CancellationToken);
+        var html = await page.Content.ReadAsStringAsync(CancellationToken);
+        Assert.True(page.StatusCode == HttpStatusCode.OK, html);
+        return html;
     }
 
     private async Task<HttpResponseMessage> SendAsync(HttpClient http, string token, HttpMethod method, string path, object? body = null)

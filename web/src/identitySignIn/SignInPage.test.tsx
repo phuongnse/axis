@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { designTokensFor } from '../platform/designTokens'
@@ -50,23 +50,29 @@ describe('SignInPage', () => {
     vi.restoreAllMocks()
   })
 
-  it('draws the word Axis beside a 32 px mark', () => {
+  it("draws the organization's name beside a 32 px mark above the card", () => {
     render(<SignInPage context={context} />)
 
-    const word = screen.getByText('Axis', { exact: true })
-    expect(word).toBeVisible()
-    // Ant Design wraps strong text in a span, so the mark is the sibling of that wrapper.
-    const mark = word.closest('.ant-typography')?.previousElementSibling
-    expect(mark).toHaveAttribute('aria-hidden', 'true')
+    const heading = screen.getByTestId('organization-heading')
+    expect(within(heading).getByText('Contoso', { exact: true })).toBeVisible()
+    const mark = heading.querySelector('[aria-hidden="true"]')
     expect(mark).toHaveStyle({ width: '32px', height: '32px' })
   })
 
-  it('shows the title "Sign in" with the organization\'s name under it in the muted colour', () => {
+  it('draws Axis in the heading when the realm has no display name', () => {
+    const { realmName: _realmName, ...unnamed } = context
+    render(<SignInPage context={unnamed} />)
+
+    expect(within(screen.getByTestId('organization-heading')).getByText('Axis', { exact: true })).toBeVisible()
+  })
+
+  it('shows the title "Sign in" without the organization\'s name under it', () => {
     render(<SignInPage context={context} />)
 
-    const organization = screen.getByText('Contoso', { exact: true })
-    expect(organization).toHaveStyle({ color: designTokensFor('light').colour.textMuted })
-    expect(organization.previousElementSibling).toHaveTextContent(/^Sign in$/)
+    expect(screen.getByRole('heading', { name: 'Sign in' })).toBeInTheDocument()
+    const names = screen.queryAllByText('Contoso', { exact: true })
+    expect(names).toHaveLength(1)
+    expect(screen.getByTestId('organization-heading')).toContainElement(names[0])
   })
 
   it('draws the field labels at weight 500 in the muted colour', () => {

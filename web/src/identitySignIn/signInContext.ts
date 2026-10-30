@@ -82,7 +82,8 @@ export interface SignInSite {
 export interface SignInContext {
   page: 'signIn'
   title: string
-  realmName: string
+  /** The realm's display name. Absent when the realm has none or it equals the realm id, so the heading names Axis. */
+  realmName?: string
   providers: SignInProvider[]
   /** Whether people may sign in with an account of the realm, next to or instead of the providers. */
   accounts: boolean
@@ -103,7 +104,8 @@ export interface SignInContext {
 export interface TwoStepContext {
   page: 'twoStep'
   title: string
-  realmName: string
+  /** The realm's display name. Absent when the realm has none or it equals the realm id, so the heading names Axis. */
+  realmName?: string
   /** The message to show above the form. No error means no alert. */
   error?: string
   /** Where the code form posts `otp` and `login`, and where "Try another way" posts `tryAnotherWay=on`. */
@@ -120,7 +122,8 @@ export interface TwoStepContext {
 export interface AddAuthenticatorContext {
   page: 'addAuthenticator'
   title: string
-  realmName: string
+  /** The realm's display name. Absent when the realm has none or it equals the realm id, so the heading names Axis. */
+  realmName?: string
   /** The message to show above the form. No error means no alert. */
   error?: string
   /** Where the form posts `totp`, `totpSecret`, `userLabel` and `mode`. */
@@ -143,7 +146,8 @@ export interface AddAuthenticatorContext {
 export interface ResetPasswordContext {
   page: 'resetPassword'
   title: string
-  realmName: string
+  /** The realm's display name. Absent when the realm has none or it equals the realm id, so the heading names Axis. */
+  realmName?: string
   /** The username that the person typed on the sign-in page, if any. */
   username?: string
   /** The message to show above the form. No error means no alert. */
@@ -160,7 +164,8 @@ export interface ResetPasswordContext {
 export interface UpdatePasswordContext {
   page: 'updatePassword'
   title: string
-  realmName: string
+  /** The realm's display name. Absent when the realm has none or it equals the realm id, so the heading names Axis. */
+  realmName?: string
   /** The message to show above the form. No error means no alert. */
   error?: string
   /** Where the form posts `password-new`, `password-confirm` and `logout-sessions`. */

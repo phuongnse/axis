@@ -22,8 +22,7 @@ SPA does today.
   The header's items are centred by its flex row, never by its line height. The header has
   `spacing-md` padding at its sides, and the items on its right are `spacing-sm` apart. The collapse button, the app
   switcher and the language and theme button are icon-only buttons, so each shows its name as a tooltip on hover and
-  on keyboard focus, see [buttons](frontend.md). _(Planned for M17.)_ The platform site's title and mark name the
-  organization once the tenant has a name, and Axis until then, as the
+  on keyboard focus, see [buttons](frontend.md). The platform site's title and mark name Axis, because the tenant has no name yet, as the
   [sign-in card](#platform-home-page) does.
 - **Sidebar.** The site's navigation entries, in configuration order, in a sidebar 224 px wide on `surface` with a
   `borderSubtle` rule on its right. Each entry shows its icon, see [navigation icons](#navigation-icons), and its
@@ -103,7 +102,7 @@ SPA does today.
 
 _(The page as [D114](../decisions/d114-rules-from-the-sign-in-and-home-page-review.md) agrees it is planned for M17.
 Today it shows D98's welcome band with the tools, then a card per application across the page with the number of
-applications and of its sites, and the sign-in screen with nobody signed in.)_
+applications and of its sites, and the sign-in screen with nobody signed in, whose card already has the Axis heading above it.)_
 
 - **Signed in.** The page has two parts, each under a `heading5` title with no count beside it: "Applications", then
   "Tools", as people use the applications most.
