@@ -346,7 +346,8 @@ user:
   computed field or expression that runs as SQL on the field is a compile error,
   and a field that declares an exact lookup may be filtered for equality. The
   record API still shows the field to users whose grants cover it. See
-  [D109](../decisions/d109-sensitive-fields-and-backups-are-encrypted-and-history-keeps-no-names.md).
+  [D109](../decisions/d109-sensitive-fields-and-backups-are-encrypted-and-history-keeps-no-names.md) and
+  [data encryption](data-encryption.md), which also describes `exactLookup`.
 - **Allowed fields.** `sensitive` is allowed on every type except
   `child-collection`, and on the fields of a child entity. On a
   `child-collection` field it is `AXC0013` at `/fields/{i}/sensitive`. A value
