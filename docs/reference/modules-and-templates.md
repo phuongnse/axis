@@ -74,9 +74,9 @@ calls `IsDepartmentCode`, so a department code must be in capital letters.
   lists the modules it depends on, with the `id` and `version` entries of an application's `modules`, see
   [dependencies](#processes-pages-policies-and-dependencies).
 - **Kinds a module may hold.** `entity`, `dataSource`, `rule`, `sequence`,
-  `form`, `page`, `event`, `text`, `seed` and `policy`. Processes and roles are
-  not allowed. _(planned for M20)_ `process` and `trigger`
-  are allowed too. _(planned for M24)_ So is `scenario`. Roles stay out.
+  `form`, `page`, `process`, `event`, `text`, `seed` and `policy`. Roles are
+  not allowed. _(planned for M20)_ `trigger`
+  is allowed too. _(planned for M24)_ So is `scenario`. Roles stay out.
 - **Installation.** Modules are installed per installation under
   `Modules:Path/<id>/<version>/`. The server, the worker and the scenario runner
   read them. The scenario runner gets a `--modules` option for the folder.
@@ -105,7 +105,9 @@ calls `IsDepartmentCode`, so a department code must be in capital letters.
   except that a `sequence` names only a sequence of its own module. A
   module event's `entity` follows the same rule, and an application process
   `entity`, raise event step `event` and event trigger `event` can name module
-  resources. A table widget's `dataSource` and a policy grant's `dataSource` can
+  resources, and so can an application task's `form` and sub-process step's
+  `process`, but only under a module that `application.json` declares. Any
+  other module keeps the unknown-form or unknown-process code. A table widget's `dataSource` and a policy grant's `dataSource` can
   name a module data source. A name under a module that `modules` does not
   declare is `AXC0207`, reported at `/entity` for a data source or a form, and at
   `/widgets/{i}/dataSource` or `/grants/{i}/dataSource` for a widget or a grant.
@@ -210,7 +212,7 @@ calls `IsDepartmentCode`, so a department code must be in capital letters.
 | `AXC0205` | No installed version meets the one range that asks for the module. The message lists the installed versions. Reported at `/modules/{i}/version`, in `application.json` or in `modules/<id>/module.json`. Several ranges that no version meets together are `AXC0295`. |
 | `AXC0206` | A module id appears twice in `modules`. Reported at `/modules/{i}/id` of each later entry, in `application.json` or in `modules/<id>/module.json`. |
 | `AXC0207` | A field's `target` or `sequence`, a data source's or form's `entity`, a widget's or policy grant's `dataSource`, a site navigation entry's `page`, or a qualified rule call `<module id>:<name>(…)` names a module that `modules` does not declare. Reported at `/fields/{i}/target`, `/fields/{i}/sequence`, `/entity`, `/widgets/{i}/dataSource`, `/grants/{i}/dataSource`, `/navigation/{i}/page` or the expression's pointer. A module that only another module depends on is not declared by the application, so a reference to it is reported too. A reference under a declared module that could not be pinned is not reported again. |
-| `AXC0208` | A field's `target` or `sequence` in a module entity, the `entity` of a module event, data source or form, the `target` of a module data source parameter, or a reference in a module page (a widget's `entity`, `form`, `dataSource` or `process`, the `page` or `process` of an action, or a page parameter's `target`), contains `/` and does not name a module that module declares. A `sequence` with `/` always gives it. Reported at that property in `modules/<id>/…`. |
+| `AXC0208` | A field's `target` or `sequence` in a module entity, the `entity` of a module event, data source, form or process, the `target` of a module data source parameter, a module process step's `form`, `event`, `process` or `entity`, or a reference in a module page (a widget's `entity`, `form`, `dataSource` or `process`, the `page` or `process` of an action, or a page parameter's `target`), contains `/` and does not name a module that module declares. A `sequence`, a step `form` and a step `process` with `/` always give it. Reported at that property in `modules/<id>/…`. |
 | `AXC0209` | A module text key lacks the `<id>.` prefix. Reported at `/texts/{key}` of the module text, and at `/roles/{i}/label/textKey` of `modules/<id>/module.json` for a role slot label, and at `/connectors/{i}/label/textKey` for a connector slot label. |
 | `AXC0210` | An application locale has no text from a pinned module. The message names the locale. Reported in `application.json` at `/modules/{i}` for a declared module, and at `/modules` for a module that only another module depends on. |
 | `AXC0211` | An application text key starts with the `<id>.` prefix of a module the application uses, declared or only depended on. Reported at `/texts/{key}`. |
@@ -265,7 +267,7 @@ agrees. An application that declares it maps the slot to one of its own roles:
 ]
 ```
 
-- **Kinds.** A module may also hold `process` and
+- **Kinds.** A module may also hold `process` _(built)_ and
   `trigger`, and _(planned for M24)_ `scenario`, as
   [D103](../decisions/d103-modules-hold-triggers-scenarios-and-connector-slots.md) agrees. It still holds no `role`, `site`, `identityProvider`,
   `connector`, `endpoint` or `webhook`.
@@ -310,8 +312,8 @@ agrees. An application that declares it maps the slot to one of its own roles:
   `form`, `dataSource` and `process` of a widget, the `page` of a `navigate` action in the widget's
   `actions`, `rowActions` and `toolbarActions` or in a kpi's `navigate`, and the `target` of a page
   parameter. The compiler rewrites each to the qualified name. A name with `/`, a module the
-  module declares included, is `AXC0208` at that property of the module file. A module holds no
-  process yet, so a process name is unknown. A name the module lacks, such as a data source of the
+  module declares included, is `AXC0208` at that property of the module file. A `process` names
+  a process of the same module. A name the module lacks, such as a data source of the
   application, gets the usual unknown-name diagnostic in the module file, and not in the
   application's files. Text keys in the page resolve against the merged texts, as in module forms.
   A module holds no site, so the application's site navigation lists a module page by that name,
@@ -325,12 +327,23 @@ agrees. An application that declares it maps the slot to one of its own roles:
   that is no record id names a module page. A module page named `New` cannot be opened, because
   `/{site}/{module id}/new` is the address of a new record on the application page named like the
   module. Who may read the records is up to the grants of the application's policies.
-- **Processes.** A module process works on an entity of its own module. Its
-  steps name resources of its own module, and call operations of the module's
-  `packages`. Its `callConnector` steps name a connector slot of the module,
-  see Connector slots below. The application starts it from a trigger, a
-  `startProcess` action, a sub-process step or an endpoint, by the name
-  `<module id>/<name>`. It is pinned with the rest of the release.
+- **Processes.** _(built for compilation)_ A module process is a `process` file in the module. In
+  an application it is named `<module id>/<name>`, and its id is derived from the application `id`
+  as for other module resources. It works on an entity of its own module, and its steps name
+  resources of its own module by plain name: the `entity` of the process and of a `createRecord`
+  step, the `form` of a task, the `event` of a step and the `process` of a sub-process step. The
+  compiler rewrites each to the qualified name. A name with `/` is `AXC0208` in the module file, but
+  an `entity` or an `event` may name a module that the module declares. A task `form` and a
+  sub-process `process` never name another module. The process sees no application form, process,
+  page, role, connector or rule, and naming one gives the usual unknown-name code in the module
+  file. Its expressions see the rules of its own module by plain name. A package operation step
+  gives `AXC0150` for now, whose message points to the module's `packages` in `module.json`,
+  because module packages are not read yet. _(planned for M20)_ Its steps call operations of the
+  module's `packages`. A task assignee naming a role slot, and the `callConnector` steps that name
+  a connector slot of the module, see Connector slots below. The application starts it from a
+  trigger, a `startProcess` action, a sub-process step or an endpoint, by the name
+  `<module id>/<name>`. It is pinned with the rest of the release. The engines are not changed
+  yet, so a process whose name contains `/` is not proven to start, run or show tasks.
 - **Triggers.** A module trigger starts a process of its own module. It
   reacts to an event or an entity of its own module, or of a module it
   declares. A schedule trigger runs in the time zone of each application that
@@ -425,7 +438,8 @@ agrees. An application that declares it maps the slot to one of its own roles:
   link. _(planned for M20)_ Studio shows a module's processes, pages and policies read-only,
   as it shows module entities. It never edits a module.
 - **Upgrades.** A module upgrade must still be additive for its entities
-  (`AXC0213`). Adding a process, page or policy is additive.
+  (`AXC0213`). Adding a process, page or policy is additive, and a version that adds a process
+  file is accepted.
 
 ## Application templates
 

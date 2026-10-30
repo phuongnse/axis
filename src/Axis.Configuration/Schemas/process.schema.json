@@ -136,7 +136,7 @@
         },
         "message": { "$ref": "#/$defs/notifyMessage" },
         "open": { "$ref": "#/$defs/notifyOpen" },
-        "process": { "$ref": "#/$defs/name" },
+        "process": { "$ref": "#/$defs/qualifiedName" },
         "subject": { "type": "string", "minLength": 1, "x-axis-expression": true },
         "parameters": {
           "type": "object",
@@ -146,7 +146,7 @@
         "next": { "$ref": "#/$defs/name", "x-axis-reference": { "part": "step", "of": "/name" } },
         "label": { "$ref": "#/$defs/textReference" },
         "assignee": { "$ref": "#/$defs/assignee" },
-        "form": { "$ref": "#/$defs/name", "x-axis-reference": "form" },
+        "form": { "$ref": "#/$defs/qualifiedName", "x-axis-reference": "form" },
         "dueIn": { "type": "string", "minLength": 1 },
         "wait": { "type": "string", "minLength": 1 },
         "until": { "type": "string", "minLength": 1, "x-axis-expression": true },

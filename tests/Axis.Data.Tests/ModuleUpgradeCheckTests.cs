@@ -34,6 +34,18 @@ public sealed class ModuleUpgradeCheckTests
     }
 
     [Fact]
+    public void A_new_process_file_gives_no_diagnostic()
+    {
+        var active = Module("1.0.0", Entity("Department.json", _departmentId, Code));
+        var next = Module("1.1.0", Entity("Department.json", _departmentId, Code));
+        next.Add(Resource(
+            "modules/departments/processes/Review.json",
+            $$"""{"id":"{{Guid.NewGuid()}}","kind":"process","name":"Review","entity":"Department","start":"done","steps":[{"name":"done","type":"end"}]}"""));
+
+        Assert.Empty(ModuleUpgradeCheck.Check(active, next));
+    }
+
+    [Fact]
     public void Nothing_to_compare_gives_no_diagnostic()
     {
         var next = Module("1.0.0", Entity("Department.json", _departmentId, Code));
