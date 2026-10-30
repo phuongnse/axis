@@ -301,5 +301,6 @@ public static class DiagnosticCodes
     public const string InvalidWebhookTimeout = "AXC0315";
     public const string SensitiveWebhookEventValue = "AXC0316";
     public const string ConnectorInputTooDeep = "AXC0317";
-    public const string StructuredInputExpression = "AXC0318";
+    public const string MismatchedInputMapping = "AXC0318";
+    public const string InvalidMappingSource = "AXC0319";
 }

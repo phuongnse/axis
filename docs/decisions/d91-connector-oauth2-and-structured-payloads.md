@@ -7,8 +7,8 @@ The owner agreed this on 2026-10-25. It adds to the `connector` resource of
 inputs outside the body, and nested input fields. It replaces D25's line that
 `auth` is none, a bearer token or a named header, and the line that inputs are
 sent as a JSON body. OAuth2 client credentials are built, and so is an output's `source`. Declaring and checking nested
-`object` and `list` inputs is built. Everything else here, including mapping them in a step, is
-_(planned for M19)_. See
+`object` and `list` inputs is built, and so are mapping them in a step and checking the mapping. Everything else
+here, including sending them, is _(planned for M19)_. See
 [connector resource](../reference/integration-resources.md#connector-resource).
 
 - **OAuth2 client credentials:**

@@ -28,7 +28,7 @@ public static class ApplicationLoader
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         PropertyNameCaseInsensitive = false,
-        Converters = { new IntegralNumberConverter(), new DataSourceGroupConverter() },
+        Converters = { new IntegralNumberConverter(), new DataSourceGroupConverter(), new InputMappingConverter() },
     };
 
     public static ApplicationLoadResult Load(string folderPath)

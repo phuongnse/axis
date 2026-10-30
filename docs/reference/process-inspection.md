@@ -319,7 +319,10 @@ evaluated input that the call sent, so it holds field values.
   - A named rule that a mapping expression uses counts the fields the rule
     reads, and so does every rule that rule uses.
   - A child field counts through the owner's grant, because child rows are
-    read through their owner's `fields` list.
+    read through their owner's `fields` list. A list mapping of a
+    `callConnector` step counts the owner's child collection field and the
+    fields reached through reference paths. It does not count the child
+    entity's own fields, as an aggregate does not.
   - The `output` mapping counts, even though no output value is stored or
     shown. A user who may not read a field that the call writes sees no
     input.

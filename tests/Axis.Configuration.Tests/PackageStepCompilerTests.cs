@@ -33,7 +33,7 @@ public sealed class PackageStepCompilerTests
         Assert.NotNull(result.Model);
         var step = Assert.IsType<PackageOperationStepModel>(Assert.Single(result.Model.Processes).Steps[0]);
         Assert.Equal(("add", "test-package", "1.0.0", "sum", "done"), (step.Name, step.Package, step.Version, step.Operation, step.Next));
-        Assert.Equal([("a", "1"), ("b", "amount")], step.Input.Select(input => (input.Input, input.Value.Expression)));
+        Assert.Equal([("a", "1"), ("b", "amount")], step.Input.Select(input => (input.Input, input.Value!.Expression)));
         Assert.Equal([new ConnectorOutputModel("total", "amount")], step.Output);
         Assert.Equal(new RetryPolicyModel(3, TimeSpan.FromSeconds(30)), step.Retry);
         Assert.False(step.Idempotent);

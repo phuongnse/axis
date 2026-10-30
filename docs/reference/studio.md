@@ -641,15 +641,15 @@ Run and the Test results list, the read-only view of a module entity, and the re
       key, so the compiler reports what is still missing. Every other key,
       including unknown keys, stays.
       - `updateRecord` shows `set` as rows of a field of the process's entity
-        and an expression. `callConnector` shows the connector and its
-        operation as pickers, `input` as rows of a typed input name and an
-        expression, `output` as rows of a typed connector output name and an
-        entity field, and `retry`. `raiseEvent` shows the event as a picker
-        and `fields` as rows of a payload field of that event and an
-        expression. `createRecord` shows the entity to create as a picker,
-        which lists every entity, child entities included, because the names
-        do not say which are child entities and the compiler reports one. It
-        shows `set` as rows of a field of that entity and an expression.
+        and an expression. `callConnector` shows the connector and its operation
+        as pickers, `input` as rows of a typed input name and an expression, or
+        "edit in JSON", `output` as rows of a typed connector output name and an
+        entity field, and `retry`. `raiseEvent` shows the event as a picker and
+        `fields` as rows of a payload field of that event and an expression.
+        `createRecord` shows the entity to create as a picker, which lists every
+        entity, child entities included, because the names do not say which are
+        child entities and the compiler reports one. It shows `set` as rows of a
+        field of that entity and an expression.
       - `notify` shows `to` as rows of a user expression, a role or an email
         expression, the `inApp` and `email` channels as checkboxes, the subject
         and body through the label editor, `values` as rows of a typed

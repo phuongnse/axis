@@ -51,6 +51,32 @@ public sealed class MappingFieldsTests
     }
 
     [Fact]
+    public void A_list_mapping_gives_the_owners_collection_field_and_the_fields_its_items_read_through_paths()
+    {
+        var fields = Collect(("lines", """{ "from": "lines", "fields": { "count": "quantity", "label": "product.name" } }"""));
+
+        Assert.Equal([(_requestId, "lines"), (_personId, "name")], Sorted(fields));
+    }
+
+    [Fact]
+    public void An_object_mapping_reads_over_the_subject()
+    {
+        var fields = Collect(("address", """{ "fields": { "city": "department.name" } }"""));
+
+        Assert.Equal([(_requestId, "department"), (_departmentId, "name")], Sorted(fields));
+    }
+
+    [Fact]
+    public void A_list_mapping_from_a_name_the_entity_does_not_have_gives_null()
+    {
+        var model = Model("amount");
+        var item = new ConnectorInputModel("lines", null) { From = "gone", Fields = [] };
+
+        Assert.Null(MappingFields.Collect(model, Request(model), [item], []));
+        Assert.Null(MappingFields.Collect(model, Request(model), [new ConnectorInputModel("lines", null) { From = "title", Fields = [] }], []));
+    }
+
+    [Fact]
     public void Functions_walk_all_their_arguments_and_literals_give_nothing()
     {
         var fields = Collect(("reference", "if(amount is null, concat(title, 'x'), lower(comment))"));
@@ -142,6 +168,8 @@ public sealed class MappingFieldsTests
 
     private static ApplicationModel Model(string input, string value = "amount", (string Output, string Field)? output = null)
     {
+        // A value that starts with a brace is a nested mapping, and any other is an expression.
+        var valueJson = value.StartsWith('{') ? value : $"\"{value}\"";
         var outputJson = output is { } o ? $$"""{ "{{o.Output}}": "{{o.Field}}" }""" : "{}";
         var compiled = ApplicationCompiler.Compile(
         [
@@ -172,7 +200,7 @@ public sealed class MappingFieldsTests
                 """),
             new ResourceContent("entities/line.json", $$"""
                 { "id": "{{_lineId}}", "kind": "entity", "name": "Line", "formatVersion": 1,
-                  "fields": [ { "name": "quantity", "type": "integer" } ] }
+                  "fields": [ { "name": "quantity", "type": "integer" }, { "name": "product", "type": "reference", "target": "Person" } ] }
                 """),
             new ResourceContent("rules/within.json", """
                 { "id": "55555555-5555-4555-8555-555555555555", "kind": "rule", "name": "Within", "formatVersion": 1,
@@ -190,7 +218,9 @@ public sealed class MappingFieldsTests
                         { "name": "reference", "type": "text" },
                         { "name": "amount", "type": "decimal" },
                         { "name": "flag", "type": "boolean" },
-                        { "name": "count", "type": "integer" }
+                        { "name": "count", "type": "integer" },
+                        { "name": "lines", "type": "list", "fields": [ { "name": "count", "type": "integer" }, { "name": "label", "type": "text" } ] },
+                        { "name": "address", "type": "object", "fields": [ { "name": "city", "type": "text" } ] }
                       ],
                       "output": [ { "name": "orderNumber", "type": "text" } ] }
                   ] }
@@ -201,7 +231,7 @@ public sealed class MappingFieldsTests
                   "steps": [
                     { "name": "call", "type": "operation", "operation": "callConnector",
                       "connector": { "name": "Purchasing", "operation": "createOrder" },
-                      "input": { "{{input}}": "{{value}}" }, "output": {{outputJson}}, "next": "done" },
+                      "input": { "{{input}}": {{valueJson}} }, "output": {{outputJson}}, "next": "done" },
                     { "name": "done", "type": "end" }
                   ] }
                 """),
