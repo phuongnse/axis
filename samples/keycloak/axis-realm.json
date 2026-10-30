@@ -706,6 +706,7 @@
       "serviceAccountClientId": "axis-users",
       "clientRoles": {
         "realm-management": [
+          "manage-users",
           "view-users",
           "query-users"
         ]
