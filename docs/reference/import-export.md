@@ -122,7 +122,8 @@ the SPA.
   as the value saved with it. A date cell is `yyyy-MM-dd`, and one that holds a
   time is `yyyy-MM-ddTHH:mm:ssZ`. A workbook stores no time zone, so the time is
   read as UTC. A date-only cell in a date-time field fails the check, as it has
-  no time. A workbook that is not readable, or that unpacks to more than 1,000
+  no time. A workbook that is not readable, which includes rows that are not in
+  ascending order, or that unpacks to more than 1,000
   entries or 100 MiB, is a header problem at `/columns`.
 - **Cells.** An empty cell leaves the field out, so its default applies or
   `Required.` is reported. A cell of an integer, decimal or money field that

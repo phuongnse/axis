@@ -17,10 +17,12 @@ coverage-guided fuzzer, so it needs no instrumentation and no extra package.
 | Expression type checker, `ExpressionTypeChecker` | Built | `ExpressionFuzzTests`, `Checker_returns_a_type_or_a_diagnostic_for_any_parsed_expression` |
 | SQL translator, `SqlTranslator` | Built | `ExpressionFuzzTests`, `Translator_keeps_every_input_value_in_a_parameter` |
 | Record API request bodies | Built | `RecordBodyFuzzTests` in `Axis.Server.Tests`, `Create_body_is_accepted_or_refused_with_a_400_problem` and `Update_body_is_parsed_or_refused_with_a_400_problem`, and `RecordBodyFuzzTests` in `Axis.Integration.Tests`, `Create_answers_an_allowed_status_and_an_accepted_body_leaves_a_valid_record` and `Update_answers_an_allowed_status_and_an_accepted_body_leaves_a_valid_record` |
-| CSV and spreadsheet import | _(planned for M18)_ | |
+| CSV reader, `RecordImportCsv` | Built | `RecordImportFuzzTests`, `Csv_reader_returns_rows_or_refusals_for_any_bytes` |
+| Spreadsheet reader, `RecordImportXlsx` | Built | `RecordImportFuzzTests`, `Xlsx_reader_returns_rows_or_refusals_for_any_workbook` |
+| Import dry run, `RecordImportCheckHandler` | Built | `RecordImportEndpointTests`, `The_dry_run_of_any_fuzzed_file_completes_checked_or_failed` |
 
 The expression tests leave out the interpreter, which evaluates a checked expression and takes no
-outside text.
+outside text. The import tests leave out the commit, which reads only rows that the dry run accepted.
 
 The unit suite of the record API tests fuzzes the body parsing, `RecordInputParser`, and the
 checks of a create that need no database, in `RecordCommand`. The integration suite sends the same
@@ -47,6 +49,50 @@ kind of bodies over HTTP. Neither fuzzes the query parameters of a list or the f
 - **Translator inputs.** Each parsed tree is translated twice: as parsed, which the translator's
   API allows, and with the type checker's result when the tree passes it. Most mutated inputs fail
   the checker, so the first translation keeps the translator busy.
+
+## How the import tests fuzz
+
+- **Suites.** `RecordImportFuzzTests` is in `Axis.Data.Tests`, so it runs in `scripts/test.sh`. Run it
+  with `dotnet test --project tests/Axis.Data.Tests -c Release --filter-class '*RecordImportFuzz*'`.
+  The dry run test is in `Axis.Integration.Tests`, because the check needs PostgreSQL and the work
+  item queue. Run it with `scripts/integration.sh --filter-class '*RecordImportEndpointTests*'`. The
+  inputs come from `tests/Axis.Data.Tests/ImportFuzzInputs.cs`, which both projects compile.
+- **Seed inputs.** A CSV input starts as the header of the test's entity and one to six rows of
+  values such as numbers, booleans, dates, empty cells and text that needs quotes. An xlsx input
+  starts as a generated workbook with the same header and rows.
+- **CSV mutations.** An input is a seed with one to four random edits on its bytes: an insert, a
+  deletion, a replacement, a duplicated span, a span of another seed, or a wrap. A token is a
+  quote, a line break, a byte order mark, bytes that are not UTF-8, a NUL byte, formula text such as
+  `=SUM(A1)`, a cell of 5,000 characters or 200 quotes. In one input of eight the file is random
+  bytes. In one of eight it is UTF-16 text with a byte order mark.
+- **Workbook mutations.** Each input is one of these:
+  - odd cells: shared and inline strings, shared string numbers that do not exist, numbers such as
+    `1E400` and `NaN`, dates with odd serials, booleans, error values, formulas with and without a
+    saved value, bad cell references, row numbers that are huge or go backwards, and repeated cells;
+  - odd encodings of a part: UTF-16 with and without a byte order mark and a declaration, a
+    declaration that does not match the bytes, `&#0;`, a DTD with nested entities and an external
+    entity;
+  - zip damage: a part left out or repeated, one to 3,000 extra entries, a changed CRC, size, method
+    or local header offset in the central directory, and random byte flips, inserts and cuts.
+- **Bombs.** In one input of eight the workbook is a real zip bomb, built once per run with 101 MiB
+  of letters: one cell of that size, an extra part of that size, or the first with the directory
+  edited to announce 1 KB. The edits to the directory also reach the limits of 1,000 entries and
+  100 MiB at almost no cost.
+- **Over-limit rule.** A workbook whose zip directory announces more than 1,000 entries or 100 MiB
+  must end with the header error `Unpacks to more than the import limit.` and no header. The test
+  measures the bytes the check's thread allocated with `GC.GetAllocatedBytesForCurrentThread`, and
+  they must stay under 16 MiB. A workbook whose directory announces a small size for a part that
+  unpacks to more must stay under 64 MiB. A control test shows that a workbook under the limits
+  with one cell of 20 MiB allocates more than 32 MiB, so the measure sees a read.
+- **What fails a run.** An exception, or an input past the time limit. A row with both or neither
+  of cells and an error. A row number that does not rise. A CSV row, or a workbook row, whose cells
+  differ in number from the header. The test also maps each readable header to a test entity and builds the body and the typed value
+  of each cell. A body that is not a JSON object fails the test.
+- **Dry run test.** It uploads up to 150 fuzzed CSV and xlsx files for `Item` through the
+  endpoint, runs the real check and requires each import to end `checked` or `failed`, with every
+  error key `/columns`, `/columns/{n}`, `/rows`, `/rows/{n}` or below a row, or the empty pointer.
+  It runs far fewer inputs than the reader tests, so it shows that the dry run copes with bad files
+  and does not search deeply.
 
 ## How the record API tests fuzz
 
@@ -140,7 +186,9 @@ Fuzz input 1342 of seed 2025 (rerun with AXIS_FUZZ_SEED=2025): "t == 'x'' and ((
   `ExpressionTypeCheckerTests` or `SqlTranslatorTests`, with a name that says what it shows. Fix
   the parser, and keep the test next to the similar cases. A record body goes into
   `RecordInputParserTests` in `Axis.Data.Tests`, or, when the failure is in a command step, into
-  `Axis.Server.Tests` or the integration tests of the record API.
+  `Axis.Server.Tests` or the integration tests of the record API. An import failure gives the kind of the
+  file and `Convert.FromBase64String("…")`: paste it into `RecordImportCsvTests` or
+  `RecordImportXlsxTests`. A file of 4 KB or more shows only its kind and length: replay it by seed.
 - **A `base64:` input.** The message of a record body shows its bytes as a C# literal when they are
   UTF-8 text. Otherwise it shows `base64:` and the bytes in base64. Decode them, for example with
   `Convert.FromBase64String`, and use the bytes as the test's body.
@@ -149,7 +197,7 @@ Fuzz input 1342 of seed 2025 (rerun with AXIS_FUZZ_SEED=2025): "t == 'x'' and ((
 
 ## Adding a fuzz test
 
-A later fuzz test, for import for example, uses the same helper,
+A later fuzz test uses the same helper,
 `tests/Axis.Expressions.Tests/Fuzz.cs`. The file depends on nothing else, so the test project links
 it:
 

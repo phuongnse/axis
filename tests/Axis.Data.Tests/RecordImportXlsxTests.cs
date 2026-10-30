@@ -134,4 +134,33 @@ public sealed class RecordImportXlsxTests
         Assert.Equal(["1"], rows.Take(1).Select(row => row.Cells![0]));
         Assert.Equal("Is not a readable xlsx workbook.", rows[^1].Error);
     }
+
+    [Fact]
+    public void A_row_number_too_large_for_a_row_is_a_broken_sheet_like_a_row_number_that_is_no_number()
+    {
+        var header = """<row r="1"><c r="A1" t="inlineStr"><is><t>a</t></is></c></row>""";
+        var inHeader = RecordImportXlsx.Open(XlsxFiles.Workbook([XlsxFiles.Sheet("""<row r="4294967296"><c r="A1" t="inlineStr"><is><t>a</t></is></c></row>""")]));
+        var afterHeader = RecordImportXlsx.Open(XlsxFiles.Workbook([XlsxFiles.Sheet(header + """<row r="-1"><c r="A2"><v>1</v></c></row>""")]));
+
+        var rows = afterHeader.Rows().ToList();
+
+        Assert.Equal("Is not a readable xlsx workbook.", inHeader.HeaderError);
+        Assert.Null(inHeader.Header);
+        Assert.Null(afterHeader.HeaderError);
+        Assert.Equal("Is not a readable xlsx workbook.", Assert.Single(rows).Error);
+    }
+
+    [Fact]
+    public void Rows_that_are_not_in_ascending_order_end_the_read_so_a_row_number_never_repeats_or_goes_back()
+    {
+        var header = """<row r="1"><c r="A1" t="inlineStr"><is><t>a</t></is></c></row>""";
+        var back = RecordImportXlsx.Open(XlsxFiles.Workbook([XlsxFiles.Sheet(header + """<row r="5"><c r="A5"><v>1</v></c></row><row r="3"><c r="A3"><v>2</v></c></row>""")]));
+        var repeated = RecordImportXlsx.Open(XlsxFiles.Workbook([XlsxFiles.Sheet(header + """<row r="2"><c r="A2"><v>1</v></c></row><row r="2"><c r="A2"><v>2</v></c></row>""")]));
+
+        var rows = back.Rows().ToList();
+
+        Assert.Equal(["1", null], rows.Select(row => row.Cells?[0]));
+        Assert.Equal(["Is not a readable xlsx workbook."], rows.Skip(1).Select(row => row.Error));
+        Assert.Equal(["Is not a readable xlsx workbook."], repeated.Rows().Skip(1).Select(row => row.Error));
+    }
 }

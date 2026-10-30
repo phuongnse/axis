@@ -1,9 +1,11 @@
 using System.Net;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Axis.Configuration.Packages;
 using Axis.Data.Naming;
 using Axis.Data.Records;
 using Axis.Data.Tests;
+using Axis.Expressions.Tests;
 using Axis.Processes.Instances;
 using Axis.Processes.Records;
 using Axis.Processes.Work;
@@ -103,6 +105,50 @@ public sealed class RecordImportEndpointTests(RecordApiFixture fixture) : IClass
 
         Assert.Equal(["/columns"], await ErrorKeysAsync(upload.Id));
         Assert.Equal("xlsx", await fixture.ScalarAsync(TenantA, $"SELECT format FROM axis.record_imports WHERE id = '{upload.Id:D}'"));
+    }
+
+    [Fact]
+    public async Task The_dry_run_of_any_fuzzed_file_completes_checked_or_failed()
+    {
+        await ResetAsync();
+        IReadOnlyList<string> header = ["name", "quantity", "price"];
+        var key = new Regex(@"^(|/columns(/\d+)?|/rows(/\d+(/.*)?)?)$", RegexOptions.CultureInvariant | RegexOptions.Singleline);
+        var inputs = 0;
+
+        Fuzz.Run(
+            random => random.Next(2) == 0 ? ImportFuzzInputs.Csv(random, header) : ImportFuzzInputs.Xlsx(random, header),
+            input =>
+            {
+                var upload = (input.Kind.StartsWith("csv", StringComparison.Ordinal)
+                    ? UploadCsvBytesAsync(fixture.Client, Items, input.File)
+                    : UploadXlsxAsync(fixture.Client, Items, input.File)).GetAwaiter().GetResult();
+                Assert.Equal(1, RunChecksAsync().GetAwaiter().GetResult());
+                using var import = GetAsync(fixture.Client, Items, upload.Id).GetAwaiter().GetResult();
+
+                var state = import.RootElement.GetProperty("state").GetString();
+                Assert.True(state is "checked" or "failed", $"The import is {state}.");
+                Assert.All(import.RootElement.GetProperty("errors").EnumerateObject(), error => Assert.Matches(key, error.Name));
+                Interlocked.Increment(ref inputs);
+            },
+            ImportFuzzInputs.Show,
+            maxInputs: 150);
+
+        Assert.True(inputs >= 20, $"Only {inputs} fuzzed files were checked.");
+    }
+
+    [Fact]
+    public async Task A_workbook_that_unpacks_past_the_import_limit_fails_its_dry_run_at_the_columns()
+    {
+        await ResetAsync();
+
+        var upload = await UploadXlsxAsync(fixture.Client, Items, ImportFuzzInputs.SheetBomb());
+        Assert.Equal(1, await RunChecksAsync());
+
+        using var failed = await GetAsync(fixture.Client, Items, upload.Id);
+        Assert.Equal("failed", failed.RootElement.GetProperty("state").GetString());
+        var errors = failed.RootElement.GetProperty("errors");
+        Assert.Equal(["/columns"], errors.EnumerateObject().Select(error => error.Name));
+        Assert.Equal(["Unpacks to more than the import limit."], errors.GetProperty("/columns").EnumerateArray().Select(message => message.GetString()));
     }
 
     [Fact]
@@ -619,6 +665,14 @@ public sealed class RecordImportEndpointTests(RecordApiFixture fixture) : IClass
     private static async Task<(HttpResponseMessage Response, JsonDocument Body, Guid Id)> UploadXlsxAsync(HttpClient client, string path, byte[] workbook)
     {
         var response = await SendBytesAsync(client, $"{path}/imports", workbook, XlsxFiles.ContentType);
+        Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
+        var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
+        return (response, body, body.RootElement.GetProperty("id").GetGuid());
+    }
+
+    private static async Task<(HttpResponseMessage Response, JsonDocument Body, Guid Id)> UploadCsvBytesAsync(HttpClient client, string path, byte[] file)
+    {
+        var response = await SendBytesAsync(client, $"{path}/imports", file, "text/csv");
         Assert.Equal(HttpStatusCode.Accepted, response.StatusCode);
         var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
         return (response, body, body.RootElement.GetProperty("id").GetGuid());

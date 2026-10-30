@@ -38,6 +38,7 @@
     <Compile Include="..\Axis.Configuration.Tests\TemporaryFolder.cs" Link="TemporaryFolder.cs" />
     <Compile Include="..\Axis.Configuration.Tests\SamplePackages.cs" Link="SamplePackages.cs" />
     <Compile Include="..\Axis.Configuration.Tests\TestPackages.cs" Link="TestPackages.cs" />
+    <Compile Include="..\Axis.Data.Tests\ImportFuzzInputs.cs" Link="ImportFuzzInputs.cs" />
     <Compile Include="..\Axis.Data.Tests\Models.cs" Link="Models.cs" />
     <Compile Include="..\Axis.Data.Tests\XlsxFiles.cs" Link="XlsxFiles.cs" />
     <Compile Include="..\Axis.Expressions.Tests\Fuzz.cs" Link="Fuzz.cs" />
