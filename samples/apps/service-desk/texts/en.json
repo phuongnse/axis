@@ -5,6 +5,8 @@
   "formatVersion": 1,
   "locale": "en",
   "texts": {
+    "application.title": "Service desk",
+    "application.description": "Raise tickets and follow them until they are solved.",
     "site.title": "Service desk",
     "nav.myTickets": "My tickets",
     "nav.myTasks": "My tasks",

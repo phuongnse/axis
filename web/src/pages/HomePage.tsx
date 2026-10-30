@@ -7,7 +7,7 @@ import { colourTokens } from '../platform/designTokens'
 import { navigationIcon } from '../platform/navigationIcons'
 import { OrganizationHeading } from '../platform/OrganizationHeading'
 import { SiteMark } from '../platform/SiteMark'
-import { applicationTitle, fetchSites, siteTitle, type SiteListItem } from '../platform/site'
+import { applicationDescription, applicationTitle, fetchSites, siteTitle, type SiteListItem } from '../platform/site'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { useNarrowWidth } from '../platform/useNarrowWidth'
@@ -84,44 +84,95 @@ export function SignInCard({ organization = 'Axis' }: { organization?: string })
   )
 }
 
-function ToolTile({ to, icon, title, description }: { to: string; icon: string; title: string; description: string }) {
+/**
+ * Proposed: one tile of the home page, for a tool or an application alike: its mark, its title and one line that says
+ * what it is for. With `to` the whole tile is the link; without it, `children` hold the links, such as an application's
+ * sites when it has more than one.
+ */
+function HomeTile({
+  to,
+  mark,
+  title,
+  description,
+  children,
+}: {
+  to?: string
+  mark: ReactNode
+  title: string
+  description?: string
+  children?: ReactNode
+}) {
   const { colour, spacing, radius } = useDesignTokens()
-  return (
-    <Link
-      to={to}
-      style={{
-        display: 'flex',
-        alignItems: 'flex-start',
-        gap: spacing.sm,
-        padding: spacing.md,
-        background: colour.surface,
-        border: `1px solid ${colour.borderSubtle}`,
-        borderRadius: radius.base,
-      }}
-    >
-      <span
-        data-testid="tool-icon"
-        style={{
-          display: 'grid',
-          placeItems: 'center',
-          flex: 'none',
-          width: 32,
-          height: 32,
-          background: colour.primary,
-          color: colourTokens.surface.light,
-          borderRadius: radius.base,
-        }}
-      >
-        {createElement(navigationIcon(icon), { 'aria-hidden': true, style: { fontSize: 20 } })}
-      </span>
-      <Flex vertical>
+  const style: CSSProperties = {
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+    minWidth: 0,
+    padding: spacing.md,
+    background: colour.surface,
+    border: `1px solid ${colour.borderSubtle}`,
+    borderRadius: radius.base,
+  }
+  const body = (
+    <>
+      {mark}
+      <Flex vertical style={{ minWidth: 0 }}>
         <Typography.Text strong>{title}</Typography.Text>
-        <Typography.Text style={{ color: colour.textMuted }}>{description}</Typography.Text>
+        {description && <Typography.Text style={{ color: colour.textMuted }}>{description}</Typography.Text>}
+        {children}
       </Flex>
+    </>
+  )
+  return to ? (
+    <Link to={to} style={style}>
+      {body}
     </Link>
+  ) : (
+    <div style={style}>{body}</div>
   )
 }
 
+function ToolMark({ icon }: { icon: string }) {
+  const { colour, radius } = useDesignTokens()
+  return (
+    <span
+      data-testid="tool-icon"
+      style={{
+        display: 'grid',
+        placeItems: 'center',
+        flex: 'none',
+        width: 32,
+        height: 32,
+        background: colour.primary,
+        color: colourTokens.surface.light,
+        borderRadius: radius.base,
+      }}
+    >
+      {createElement(navigationIcon(icon), { 'aria-hidden': true, style: { fontSize: 20 } })}
+    </span>
+  )
+}
+
+/** Proposed: a titled part of the home page, Tools or Applications, with its tiles in the three-column grid. */
+function HomeSection({ title, count, children }: { title: string; count?: number; children: ReactNode }) {
+  const { colour, spacing } = useDesignTokens()
+  const headingId = useId()
+  return (
+    <section aria-labelledby={headingId}>
+      <Flex vertical gap={spacing.md}>
+        <Flex align="center" gap={spacing.xs}>
+          <Typography.Title level={5} id={headingId} style={{ margin: 0 }}>
+            {title}
+          </Typography.Title>
+          {count !== undefined && <Typography.Text style={{ color: colour.textMuted }}>{count}</Typography.Text>}
+        </Flex>
+        {children}
+      </Flex>
+    </section>
+  )
+}
+
+/** Proposed: the tools of the person's roles, under the applications on the home page, as tiles like theirs. */
 function Tools({ user }: { user: CurrentUser }) {
   const t = useText()
   const grid = useHomeGrid()
@@ -129,125 +180,97 @@ function Tools({ user }: { user: CurrentUser }) {
     return null
   }
   return (
-    <div data-testid="home-grid" style={grid}>
-      {user.studio && (
-        <ToolTile
-          to="/studio"
-          icon="tool"
-          title={t('shell.appSwitcher.studio')}
-          description={t('shell.home.studio.description')}
-        />
-      )}
-      {user.console && (
-        <ToolTile
-          to="/console"
-          icon="dashboard"
-          title={t('shell.appSwitcher.console')}
-          description={t('shell.home.console.description')}
-        />
-      )}
-      {user.users && (
-        <ToolTile
-          to="/users"
-          icon="people"
-          title={t('shell.appSwitcher.users')}
-          description={t('shell.home.users.description')}
-        />
-      )}
-    </div>
+    <HomeSection title={t('shell.appSwitcher.tools')}>
+      <div data-testid="home-grid" style={grid}>
+        {user.studio && (
+          <HomeTile
+            to="/studio"
+            mark={<ToolMark icon="tool" />}
+            title={t('shell.appSwitcher.studio')}
+            description={t('shell.home.studio.description')}
+          />
+        )}
+        {user.console && (
+          <HomeTile
+            to="/console"
+            mark={<ToolMark icon="dashboard" />}
+            title={t('shell.appSwitcher.console')}
+            description={t('shell.home.console.description')}
+          />
+        )}
+        {user.users && (
+          <HomeTile
+            to="/users"
+            mark={<ToolMark icon="people" />}
+            title={t('shell.appSwitcher.users')}
+            description={t('shell.home.users.description')}
+          />
+        )}
+      </div>
+    </HomeSection>
   )
 }
 
-function WelcomeBand({ user }: { user: CurrentUser | 'failed' }) {
-  const t = useText()
-  const { colour, radius, spacing } = useDesignTokens()
-  return (
-    <div
-      style={{
-        background: colour.surface,
-        border: `1px solid ${colour.borderSubtle}`,
-        borderRadius: radius.base,
-        padding: spacing.lg,
-      }}
-    >
-      <Flex vertical gap={spacing.md}>
-        <Flex vertical gap={spacing.xs}>
-          <Typography.Title level={4} style={{ margin: 0 }}>
-            {t('shell.home.title')}
-          </Typography.Title>
-          <Typography.Text style={{ color: colour.textMuted }}>{t('shell.home.subtitle')}</Typography.Text>
-        </Flex>
-        {user !== 'failed' && <Tools user={user} />}
-      </Flex>
-    </div>
-  )
+interface ApplicationGroup {
+  name: string
+  title: string
+  description?: string
+  sites: SiteListItem[]
 }
 
-function ApplicationCard({ title, sites, locale }: { title: string; sites: SiteListItem[]; locale: string }) {
-  const t = useText()
+/**
+ * Proposed: an application is one tile with its mark, title and description. An application with one site opens it
+ * from the whole tile; one with more lists its sites as links in the tile.
+ */
+function ApplicationTile({ group, locale }: { group: ApplicationGroup; locale: string }) {
   const { colour, spacing } = useDesignTokens()
-  const grid = useHomeGrid()
-  const headingId = useId()
-  const count = sites.length
-  const sorted = [...sites].sort((a, b) => siteTitle(a, locale).localeCompare(siteTitle(b, locale), locale))
-
+  const mark = <SiteMark title={group.title} size={32} />
+  if (group.sites.length === 1) {
+    return (
+      <HomeTile
+        to={siteAddress(group.sites[0].path)}
+        mark={mark}
+        title={group.title}
+        description={group.description}
+      />
+    )
+  }
+  const sorted = [...group.sites].sort((a, b) => siteTitle(a, locale).localeCompare(siteTitle(b, locale), locale))
   return (
-    <Card styles={{ body: { padding: spacing.md } }}>
-      <section aria-labelledby={headingId}>
-        <Flex vertical gap={spacing.md}>
-          <Flex
-            data-testid="application-card-header"
-            align="center"
-            gap={spacing.sm}
-            style={{ paddingBottom: spacing.sm, borderBottom: `1px solid ${colour.divider}` }}
-          >
-            <SiteMark title={title} size={32} />
-            <Typography.Title level={5} id={headingId} style={{ margin: 0 }}>
-              {title}
-            </Typography.Title>
-            <Typography.Text style={{ color: colour.textMuted, marginInlineStart: 'auto' }}>
-              {`${count} ${t(count === 1 ? 'shell.home.applications.site' : 'shell.home.applications.sites')}`}
-            </Typography.Text>
-          </Flex>
-          <div data-testid="home-grid" style={grid}>
-            {sorted.map((site) => (
-              <Link
-                key={site.path}
-                to={siteAddress(site.path)}
-                style={{ display: 'flex', alignItems: 'center', gap: spacing.sm, minWidth: 0, padding: spacing.xs }}
-              >
-                <SiteMark title={siteTitle(site, locale)} size={24} />
-                <Typography.Text ellipsis style={{ color: colour.text }}>
-                  {siteTitle(site, locale)}
-                </Typography.Text>
-              </Link>
-            ))}
-          </div>
-        </Flex>
-      </section>
-    </Card>
+    <HomeTile mark={mark} title={group.title} description={group.description}>
+      <Flex vertical gap={4} style={{ marginTop: spacing.xs }}>
+        {sorted.map((site) => (
+          <Link key={site.path} to={siteAddress(site.path)} style={{ color: colour.primaryText }}>
+            {siteTitle(site, locale)}
+          </Link>
+        ))}
+      </Flex>
+    </HomeTile>
   )
 }
 
 function Applications({ sites, locale }: { sites: SiteListItem[] | 'failed'; locale: string }) {
   const t = useText()
-  const { colour, spacing } = useDesignTokens()
+  const grid = useHomeGrid()
   const groups = useMemo(() => {
     if (sites === 'failed') {
       return []
     }
-    const byName = new Map<string, { title: string; sites: SiteListItem[] }>()
+    const byName = new Map<string, ApplicationGroup>()
     for (const site of sites) {
       const group = byName.get(site.application.name)
       if (group) {
         group.sites.push(site)
       } else {
-        byName.set(site.application.name, { title: applicationTitle(site.application, locale), sites: [site] })
+        byName.set(site.application.name, {
+          name: site.application.name,
+          title: applicationTitle(site.application, locale),
+          description: applicationDescription(site.application, locale),
+          sites: [site],
+        })
       }
     }
-    return [...byName.entries()]
-      .map(([name, group]) => ({ name, ...group }))
-      .sort((a, b) => a.title.localeCompare(b.title, locale))
+    return [...byName.values()].sort((a, b) => a.title.localeCompare(b.title, locale))
   }, [sites, locale])
 
   let body: ReactNode
@@ -256,21 +279,19 @@ function Applications({ sites, locale }: { sites: SiteListItem[] | 'failed'; loc
   } else if (groups.length === 0) {
     body = <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('shell.home.applications.empty')} />
   } else {
-    body = groups.map((group) => (
-      <ApplicationCard key={group.name} title={group.title} sites={group.sites} locale={locale} />
-    ))
+    body = (
+      <div data-testid="home-grid" style={grid}>
+        {groups.map((group) => (
+          <ApplicationTile key={group.name} group={group} locale={locale} />
+        ))}
+      </div>
+    )
   }
 
   return (
-    <Flex vertical gap={spacing.md}>
-      <Flex align="center" gap={spacing.xs}>
-        <Typography.Title level={5} style={{ margin: 0 }}>
-          {t('shell.home.applications.title')}
-        </Typography.Title>
-        {sites !== 'failed' && <Typography.Text style={{ color: colour.textMuted }}>{groups.length}</Typography.Text>}
-      </Flex>
+    <HomeSection title={t('shell.home.applications.title')} count={sites === 'failed' ? undefined : groups.length}>
       {body}
-    </Flex>
+    </HomeSection>
   )
 }
 
@@ -319,8 +340,9 @@ export function HomePage() {
 
   return (
     <Flex vertical gap={spacing.lg}>
-      <WelcomeBand user={loaded.user} />
+      {/* Proposed: no welcome band; the applications come first, as people use them most, then the tools. */}
       <Applications sites={loaded.sites} locale={locale} />
+      {loaded.user !== 'failed' && <Tools user={loaded.user} />}
     </Flex>
   )
 }

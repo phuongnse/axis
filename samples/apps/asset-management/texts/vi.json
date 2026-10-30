@@ -5,6 +5,8 @@
   "formatVersion": 1,
   "locale": "vi",
   "texts": {
+    "application.title": "Quản lý tài sản",
+    "application.description": "Theo dõi tài sản của công ty, người đang giữ, việc bảo trì và phần mềm.",
     "site.title": "Quản lý tài sản",
     "nav.assets": "Tài sản",
     "nav.dashboard": "Tổng quan",

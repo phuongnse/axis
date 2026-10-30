@@ -5,6 +5,8 @@
   "formatVersion": 1,
   "locale": "vi",
   "texts": {
+    "application.title": "Đơn nghỉ phép",
+    "application.description": "Xin nghỉ phép và theo dõi quyết định của quản lý.",
     "site.title": "Nghỉ phép",
     "nav.myLeaveRequests": "Đơn nghỉ phép của tôi",
     "nav.myTasks": "Nhiệm vụ của tôi",

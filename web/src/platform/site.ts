@@ -31,6 +31,8 @@ export interface SiteMetadata {
 export interface SiteApplication {
   name: string
   titles: Record<string, string>
+  /** Proposed: what the application is for, per locale, or none when it declares no description. */
+  descriptions?: Record<string, string> | null
 }
 
 /** One application site in the list served by `GET /api/sites`, with its title per available locale. */
@@ -49,6 +51,12 @@ export function siteTitle(site: SiteListItem, locale: string): string {
 /** The application title in the given locale, or in the application's first locale when it lacks that one. */
 export function applicationTitle(app: SiteApplication, locale: string): string {
   return app.titles[locale] ?? Object.values(app.titles)[0] ?? app.name
+}
+
+/** Proposed: the application's description in `locale`, else in its first locale, or undefined when it has none. */
+export function applicationDescription(app: SiteApplication, locale: string): string | undefined {
+  const descriptions = app.descriptions ?? {}
+  return descriptions[locale] ?? Object.values(descriptions)[0]
 }
 
 /** An application site, as served by `GET /api/sites/{path}`. */

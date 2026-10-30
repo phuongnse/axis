@@ -1,6 +1,7 @@
 import { ConfigProvider } from 'antd'
-import { useCallback, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { antThemeFor } from './antTheme'
+import { colourTokens } from './designTokens'
 import { ThemeModeContext, type ThemeMode } from './themeMode'
 import { useReducedMotion } from './useReducedMotion'
 
@@ -42,6 +43,14 @@ export function ThemeModeProvider({ initialMode, children }: ThemeModeProviderPr
   const value = useMemo(() => ({ mode, toggleMode }), [mode, toggleMode])
   const reducedMotion = useReducedMotion()
   const config = useMemo(() => antThemeFor(mode, undefined, reducedMotion), [mode, reducedMotion])
+
+  // Proposed: the page behind the shell is `canvas` in both modes, so no white shows past its edges or when the page
+  // overscrolls. A design-system preview fixes its mode and leaves the document of its card alone.
+  useEffect(() => {
+    if (initialMode === undefined) {
+      document.body.style.background = colourTokens.canvas[mode]
+    }
+  }, [initialMode, mode])
 
   return (
     <ThemeModeContext.Provider value={value}>

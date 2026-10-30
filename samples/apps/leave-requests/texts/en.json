@@ -5,6 +5,8 @@
   "formatVersion": 1,
   "locale": "en",
   "texts": {
+    "application.title": "Leave requests",
+    "application.description": "Ask for leave and follow your manager's decision.",
     "site.title": "Leave",
     "nav.myLeaveRequests": "My leave requests",
     "nav.myTasks": "My tasks",

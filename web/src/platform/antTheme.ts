@@ -74,7 +74,8 @@ export function antThemeFor(mode: ThemeMode, page?: PageTokenValues, reducedMoti
     },
     components: {
       Form: { colorError: colour.dangerText },
-      Dropdown: { colorError: colour.dangerText },
+      // Proposed: a dropdown menu keeps spacing-xs round its items, so a marked last item does not sit on its edge.
+      Dropdown: { colorError: colour.dangerText, paddingXXS: spacing.xs },
       Tabs: {
         itemSelectedColor: colour.primaryText,
         itemHoverColor: colour.primaryText,

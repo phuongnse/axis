@@ -5,6 +5,8 @@
   "formatVersion": 1,
   "locale": "en",
   "texts": {
+    "application.title": "Purchase requests",
+    "application.description": "Request purchases and take them through approval.",
     "site.title": "Purchasing",
     "nav.purchaseRequests": "Purchase requests",
     "nav.myTasks": "My tasks",
