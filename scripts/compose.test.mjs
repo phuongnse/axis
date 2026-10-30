@@ -178,7 +178,7 @@ test('the stack runs from source', { timeout }, async () => {
 
   // Both images hold the sample module departments, and the server loads it.
   for (const service of ['server', 'worker']) {
-    const module = compose(['exec', '-T', service, 'test', '-f', '/modules/departments/1.0.0/module.json'])
+    const module = compose(['exec', '-T', service, 'test', '-f', '/modules/departments/1.1.0/module.json'])
     assert.equal(module.status, 0, `${service}: ${module.stderr}`)
   }
   assert.doesNotMatch(compose(['logs', 'server']).stdout, /The module version is not loaded/)

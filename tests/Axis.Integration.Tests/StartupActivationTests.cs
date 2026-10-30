@@ -454,7 +454,7 @@ public sealed class StartupActivationTests(PostgreSqlFixture database, KeycloakF
         using var folder = ApplicationFolder(TitleField)
             .With("application.json", $$"""
                 { "id": "{{_applicationId}}", "kind": "application", "name": "{{_name}}", "formatVersion": 1,
-                  "modules": [{ "id": "departments", "version": "^1.0.0" }] }
+                  "modules": [{ "id": "departments", "version": "^1.0.0", "roles": { "manager": "employee" } }] }
                 """)
             .With("texts/vi.json", """{ "id": "4b0f6a1e-2c7d-4e3a-9f51-8d2c6b7e0a16", "kind": "text", "name": "TextsVi", "formatVersion": 1, "locale": "vi", "texts": { "role.employee": "Nhân viên" } }""")
             .With(

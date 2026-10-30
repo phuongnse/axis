@@ -22,6 +22,6 @@ test -f "$theme/resources/assets/axis-sign-in.js"
 node scripts/check-fonts.mjs "$theme/resources"
 dotnet build Axis.slnx -c Release --no-restore
 bash scripts/lib/install-sample-modules.sh
-test -f artifacts/modules/departments/1.0.0/module.json
+test -f artifacts/modules/departments/1.1.0/module.json
 bash scripts/lib/install-sample-templates.sh
 test -d artifacts/templates

@@ -10,6 +10,7 @@
     "departments.department.name": "Name",
     "departments.department.manager": "Manager",
     "departments.department.codeUpperCase": "Use capital letters for the code.",
-    "departments.pages.departments.title": "Departments"
+    "departments.pages.departments.title": "Departments",
+    "departments.roles.manager": "Department manager"
   }
 }
