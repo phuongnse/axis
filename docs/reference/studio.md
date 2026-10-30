@@ -463,7 +463,7 @@ Run and the Test results list, the read-only views of a module entity, a module 
   | `policy`      | Generic form                                                    | Nothing                                                               |
   | `dataSource`  | Generic form                                                    | Nothing                                                               |
   | `connector`   | Typed editor                                                    | Nothing                                                               |
-  | `endpoint`    | Generic form, typed rows for `values` and, _(planned for M19)_, the `event`'s `fields` | Nothing                                                    |
+  | `endpoint`    | Generic form, typed rows for `values` and the `event`'s `fields`                       | Nothing                                                    |
   | `event`       | Generic form                                                    | Nothing                                                               |
   | `trigger`     | Generic form                                                    | Nothing                                                               |
   | `webhook`     | Generic form                                                    | Nothing                                                               |
