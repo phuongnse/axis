@@ -365,6 +365,12 @@ if affected playwright; then
     Tenants__default__Bindings__PurchasingSystemUrl__Value="$AXIS_E2E_PURCHASING_URL" \
     Tenants__default__Bindings__PurchasingSystemToken__Kind=secret \
     Tenants__default__Bindings__PurchasingSystemToken__Value=e2e-token \
+    Tenants__default__Bindings__CompanyIssuer__Kind=url \
+    Tenants__default__Bindings__CompanyIssuer__Value="http://127.0.0.1:$keycloak_port/realms/company" \
+    Tenants__default__Bindings__CompanyClientId__Kind=secret \
+    Tenants__default__Bindings__CompanyClientId__Value=axis-broker \
+    Tenants__default__Bindings__CompanyClientSecret__Kind=secret \
+    Tenants__default__Bindings__CompanyClientSecret__Value=axis-broker-development-secret \
     dotnet src/Axis.Admin/bin/Release/net10.0/Axis.Admin.dll publisher >>"$publisher_log" 2>&1 &
   publisher_pid=$!
 

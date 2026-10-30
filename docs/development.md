@@ -273,7 +273,9 @@ client `axis-broker` has the secret `axis-broker-development-secret`, a redirect
 `oidc-companyissuer` and a `groups` claim of plain group names, such as `employees` rather than `/employees`. The realm holds the
 group `employees` and one person in it, `pat` (Pat Example, `pat@company.example`), with the password `axis`. In E2E, Keycloak
 listens on `AXIS_E2E_KEYCLOAK_PORT` (default 8180) inside and outside its container, so the `axis` realm reaches the `company` realm
-at the address the browser uses. The `operator` role opens the purchase request sample's Approvals
+at the address the browser uses. Development, Compose, `scripts/dev.sh` and E2E give the `default` tenant the deployment
+bindings `CompanyIssuer` (the realm's issuer URL), `CompanyClientId` (`axis-broker`) and `CompanyClientSecret`. No sample names
+them yet, so nothing reads them. The `operator` role opens the purchase request sample's Approvals
 inspector page. The leave request sample, `samples/apps/leave-requests`, reuses the `employee` and
 `department-manager` users, in a site at `/leave`. The service desk sample, `samples/apps/service-desk`,
 adds the `agent` user and two `service-desk-lead` users and gives an employee the `requester` role, in a site
@@ -390,7 +392,8 @@ works on a fresh clone:
   at http://localhost:8025. When `AXIS_POSTGRES_PORT` is set, the script points the server's
   connection strings and the worker's `Tenants__default__ConnectionString` at
   that port. When `AXIS_KEYCLOAK_PORT` is set, it points the server's
-  `Tenants__default__Oidc__Authority` at Keycloak on that port. When
+  `Tenants__default__Oidc__Authority` at Keycloak on that port, and its
+  `Tenants__default__Bindings__CompanyIssuer__Value` at the `company` realm there. When
   `AXIS_PURCHASING_PORT` is set, it points the server's and the worker's
   `Tenants__default__Bindings__PurchasingSystemUrl__Value` at the purchasing
   system stub on that port.
