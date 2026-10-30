@@ -23,10 +23,49 @@ const summaryJson = ({ reads = 241, writes = 412, errors = 0.0002 } = {}) =>
     },
   })
 
+const bounds = [0.1, 0.25, 0.5, 1, 2, 3, 4, 5, 6, 7.5, 10, 15, 30, 60, 300, 900]
+
+// Counts of 100 in the bucket with the given index: (0.5, 1] is 3, (5, 6] is 8.
+const inBucket = (index) => Array.from({ length: bounds.length + 1 }, (_, i) => (i === index ? 100 : 0))
+
+const workerMetricsJson = (buckets = inBucket(3)) =>
+  JSON.stringify({
+    resourceMetrics: [
+      {
+        scopeMetrics: [
+          {
+            metrics: [
+              {
+                name: 'axis.work_items.claim_delay',
+                histogram: {
+                  aggregationTemporality: 2,
+                  dataPoints: [
+                    {
+                      attributes: [
+                        { key: 'axis.tenant', value: { stringValue: 'load' } },
+                        { key: 'axis.work_item.kind', value: { stringValue: 'process-step' } },
+                      ],
+                      startTimeUnixNano: '1',
+                      timeUnixNano: '2',
+                      count: '100',
+                      sum: 0,
+                      bucketCounts: buckets.map(String),
+                      explicitBounds: bounds,
+                    },
+                  ],
+                },
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  })
+
 const stubs = {
   // The k6 call exits with STUB_K6_STATUS (default 0). When STUB_SUMMARY is set, it writes that summary into the folder
-  // mounted at /results, as k6 does with --summary-export. The stop of the worker writes the metrics file, as the
-  // collector does with its last export.
+  // mounted at /results, as k6 does with --summary-export. The stop of the worker writes STUB_WORKER_METRICS into the
+  // metrics file, as the collector does with its last export.
   docker: `#!/usr/bin/env bash
 ${log('docker')}if [[ "$*" == *" k6 run "* ]]; then
   for arg in "$@"; do
@@ -35,7 +74,7 @@ ${log('docker')}if [[ "$*" == *" k6 run "* ]]; then
   exit "\${STUB_K6_STATUS:-0}"
 fi
 if [[ "$*" == *" up -d server worker"* && -e artifacts/load-results/worker-metrics.json ]]; then echo "metrics-file-before-worker" >> "$STUB_LOG"; fi
-if [[ "$*" == *" stop worker"* ]]; then printf '{}' > artifacts/load-results/worker-metrics.json; fi
+if [[ "$*" == *" stop worker"* ]]; then printf '%s' "$STUB_WORKER_METRICS" > artifacts/load-results/worker-metrics.json; fi
 exit 0
 `,
   // The tenant answers 401, as the wait for its host expects. The admin API of the identity provider answers by the URL,
@@ -101,6 +140,7 @@ function runLoad(args = [], extraEnv = {}, setup = () => {}) {
       ...process.env,
       PATH: `${bin}:${process.env.PATH}`,
       STUB_LOG: join(dir, 'log'),
+      STUB_WORKER_METRICS: workerMetricsJson(),
       AXIS_RETRY_DELAY_SECONDS: '0',
       ...extraEnv,
     }
@@ -235,6 +275,7 @@ describe('scripts/load.sh starts the reference stack and runs the objectives sce
     assert.match(run.stdout, /Reads p95 241 ms, objective under 300 ms: met/)
     assert.match(run.stdout, /Writes p95 412 ms, objective under 500 ms: met/)
     assert.match(run.stdout, /Server errors 0.02%, objective under 0.1%: met/)
+    assert.match(run.stdout, /Worker claim p95 \d\.\d{2} s, objective under 5 s: met/)
     assert.ok(indexOf(run, ' down -v ') > k6Index(run))
   })
 
@@ -244,6 +285,13 @@ describe('scripts/load.sh starts the reference stack and runs the objectives sce
     assert.equal(run.status, 1, run.stdout + run.stderr)
     assert.match(run.stdout, /Reads p95 400 ms, objective under 300 ms: missed/)
     assert.ok(indexOf(run, ' down -v ') > k6Index(run))
+  })
+
+  test('a worker metrics file over the objective gives exit code 1 and prints the missed worker line', () => {
+    const run = runLoad([], { STUB_SUMMARY: summaryJson(), STUB_WORKER_METRICS: workerMetricsJson(inBucket(8)) })
+
+    assert.equal(run.status, 1, run.stdout + run.stderr)
+    assert.match(run.stdout, /Worker claim p95 5\.95 s, objective under 5 s: missed/)
   })
 
   test('a missed objective gives exit code 1 even when k6 also fails', () => {

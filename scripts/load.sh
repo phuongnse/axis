@@ -8,8 +8,9 @@
 # of the connector to the stub, activates the
 # application in the tenant, which writes the seed records, and runs the k6 scenario tests/load/objectives.js through
 # the proxy: 50 users sign in through the realm and loop over the reads and writes of the objectives. k6 writes its summary
-# to artifacts/load-results, which scripts/lib/load-objectives.mjs checks against the objectives. The exit code is the
-# checker's when it fails, otherwise k6's, and k6's when k6 wrote no summary. An OpenTelemetry Collector receives the
+# to artifacts/load-results, and scripts/lib/load-objectives.mjs checks it and the worker's metrics against the
+# objectives. The exit code is the checker's when it fails, otherwise k6's, and k6's when k6 wrote no summary.
+# An OpenTelemetry Collector receives the
 # worker's metrics over https and writes them to artifacts/load-results/worker-metrics.json. After k6 the script stops the
 # worker and then the collector, so the last metrics reach the file. Removes the stack at the end, unless --keep
 # is given. Arguments after -- go to k6.
@@ -160,5 +161,5 @@ if [ ! -f "$results/summary.json" ]; then
   echo "k6 wrote no summary to $results/summary.json" >&2
   exit "$status"
 fi
-node scripts/lib/load-objectives.mjs "$results/summary.json" || exit $?
+node scripts/lib/load-objectives.mjs "$results/summary.json" "$results/worker-metrics.json" || exit $?
 exit "$status"
