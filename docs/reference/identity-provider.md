@@ -256,7 +256,7 @@ _(planned for M17)_
   gives, kept by application id. This is built. A provider matches when its alias equals the sign-in's `identity_provider`
   claim, and an application with several matching providers gets the union of their roles. A role mapped in one
   application grants nothing in another, and an account sign-in gets no mapped roles. The roles claim of the tenant
-  still gives roles to every application. Studio, the console and the users page check the roles claim and platform roles only. _(planned for M17)_ The roles the [users page](user-administration.md#roles)
+  still gives roles to every application. Studio, the console and the users page check the roles claim and platform roles only. The roles the [users page](user-administration.md#roles)
   gives join them. Platform roles come from the platform sign-in as before.
 
 ## Keeping the realm in step

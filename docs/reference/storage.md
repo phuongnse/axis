@@ -74,8 +74,8 @@ apply: sections marked _(planned for Mx)_ are not built yet, and Dn refers to
     [sign-in and the session](security.md#sign-in-and-the-session).
   - `Axis.Data` also owns `axis.given_roles`, with history in `axis.__data_migrations`. A row is a role that an
     administrator gave a person: `id` (`uuid`, the primary key), `user_id`, `application_id` (nullable, null for a
-    platform role) and `role`, with a unique index on those three that counts nulls as equal. A session reads its
-    person's rows at every request, see [roles](user-administration.md#roles).
+    platform role) and `role` (the kind, such as `operator`, for a platform role), with a unique index on
+    those three that counts nulls as equal. A session reads its person's rows at every request, see [roles](user-administration.md#roles).
   - `Axis.Data` also owns `axis.files` and `axis.file_contents`, with history
     in `axis.__data_migrations`. A row of `axis.files` is the details of one
     uploaded file of a [file field](file-fields.md#storage-and-clean-up): `id`
@@ -777,12 +777,12 @@ schema of the tenant database.
       nothing.
   - **User actions.** An administrator's command on a user of the tenant's realm
     writes one action, see [user administration](user-administration.md#audit):
-    `user.disabled`, `user.enabled` or `user.authenticatorReset`. The `actor` is
+    `user.disabled`, `user.enabled`, `user.authenticatorReset`, `user.roleGiven` or `user.roleRemoved`. The `actor` is
     the administrator's user id and `actor_name` their display name. `details`
-    is `{ "userId" }`, the id of the realm user the command acted on.
-    `application_id`, `entity_id`, `record_id` and `process_instance_id` are
-    null. The record commits with the end of the user's Axis sessions, after the
-    realm steps succeeded.
+    is `{ "userId" }`, the id of the realm user the command acted on, and a role action adds `role`.
+    `entity_id`, `record_id` and `process_instance_id` are null, and so is `application_id`, except that a role
+    action on an application role holds it. A platform role action adds `"platform": true` to `details` and its `role` is the kind.
+    A role action commits with the row it changes. The others commit with the end of the user's Axis sessions, after the realm steps succeeded.
 
   - **Dead letter actions.** A redeliver or a discard of a
     [dead letter](process-events.md#routes) writes `deadLetter.redelivered` or

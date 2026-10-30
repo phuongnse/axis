@@ -28,7 +28,8 @@ namespace Axis.Integration.Tests;
 /// through that realm's <c>axis-users</c> client. A test-only path signs the administrator in with the login time and roles that a test asks for.
 /// An administrator also gives and removes an application role through <c>POST /api/users/{id}/give-role</c> and <c>remove-role</c>,
 /// and the person's live session uses the change at its next request. That application, <c>Roles</c>, declares the role
-/// <c>buyer</c> and a policy that lets it read notes.
+/// <c>buyer</c> and a policy that lets it read notes. The same routes give and remove a platform role, which needs a login in the
+/// last 5 minutes, and an administrator cannot remove their own administrator role.
 /// The tenant is served at localhost.
 /// </summary>
 public sealed class UserCommandTests(KeycloakFixture keycloak, PostgreSqlFixture database) : IAsyncLifetime, IClassFixture<PostgreSqlFixture>
@@ -252,7 +253,7 @@ public sealed class UserCommandTests(KeycloakFixture keycloak, PostgreSqlFixture
     }
 
     [Fact]
-    public async Task Giving_a_role_the_release_does_not_declare_or_without_an_application_or_to_an_unknown_user_changes_and_audits_nothing()
+    public async Task Giving_a_role_the_release_does_not_declare_or_that_is_no_platform_role_or_to_an_unknown_user_changes_and_audits_nothing()
     {
         var admin = await AdministratorCookieAsync(authenticatedMinutesAgo: null);
 
@@ -296,6 +297,68 @@ public sealed class UserCommandTests(KeycloakFixture keycloak, PostgreSqlFixture
         Assert.Equal(HttpStatusCode.Forbidden, await RecordsStatusAsync(pat));
     }
 
+    [Fact]
+    public async Task A_platform_role_change_with_an_old_login_answers_403_and_changes_and_audits_nothing()
+    {
+        var stale = await AdministratorCookieAsync(authenticatedMinutesAgo: 6);
+
+        using var given = await PostJsonAsync($"/api/users/{_patId}/give-role", stale, PlatformBody("operator"));
+
+        Assert.Equal(HttpStatusCode.Forbidden, given.StatusCode);
+        Assert.Equal(0L, await GivenRolesCountAsync());
+
+        await PostgreSqlServer.AdminScalarAsync(
+            _connectionString!,
+            $"INSERT INTO axis.given_roles (id, user_id, application_id, role) VALUES (gen_random_uuid(), '{_patId}', NULL, 'operator')",
+            CancellationToken);
+
+        using var removed = await PostJsonAsync($"/api/users/{_patId}/remove-role", stale, PlatformBody("operator"));
+
+        Assert.Equal(HttpStatusCode.Forbidden, removed.StatusCode);
+        Assert.Equal(1L, await GivenRolesCountAsync());
+        Assert.Equal(0L, await UserAuditCountAsync());
+    }
+
+    [Fact]
+    public async Task An_administrator_removing_their_own_administrator_role_answers_409_and_changes_and_audits_nothing()
+    {
+        await PostgreSqlServer.AdminScalarAsync(
+            _connectionString!,
+            $"INSERT INTO axis.given_roles (id, user_id, application_id, role) VALUES (gen_random_uuid(), '{_patId}', NULL, 'administrator')",
+            CancellationToken);
+        var pat = await SessionCookieAsync(_patId, Administrator, authenticatedMinutesAgo: 0);
+
+        using var removed = await PostJsonAsync($"/api/users/{_patId}/remove-role", pat, PlatformBody("administrator"));
+
+        Assert.Equal(HttpStatusCode.Conflict, removed.StatusCode);
+        Assert.Equal(1L, await GivenRolesCountAsync());
+        Assert.Equal(0L, await UserAuditCountAsync());
+    }
+
+    [Fact]
+    public async Task A_given_platform_role_is_used_by_the_next_request_of_the_live_session_and_a_removed_one_is_not()
+    {
+        var pat = await SessionCookieAsync(_patId, Employee, authenticatedMinutesAgo: null);
+        var admin = await AdministratorCookieAsync(authenticatedMinutesAgo: 0);
+        Assert.False(await ConsoleAsync(pat));
+
+        using var given = await PostJsonAsync($"/api/users/{_patId}/give-role", admin, PlatformBody("operator"));
+        using var repeated = await PostJsonAsync($"/api/users/{_patId}/give-role", admin, PlatformBody("operator"));
+
+        Assert.Equal(HttpStatusCode.NoContent, given.StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, repeated.StatusCode);
+        Assert.True(await ConsoleAsync(pat));
+        Assert.Equal(1L, await PlatformRoleAuditCountAsync("user.roleGiven", "operator"));
+
+        using var removed = await PostJsonAsync($"/api/users/{_patId}/remove-role", admin, PlatformBody("operator"));
+
+        Assert.Equal(HttpStatusCode.NoContent, removed.StatusCode);
+        Assert.False(await ConsoleAsync(pat));
+        Assert.Equal(0L, await GivenRolesCountAsync());
+        Assert.Equal(1L, await PlatformRoleAuditCountAsync("user.roleRemoved", "operator"));
+        Assert.Equal(2L, await UserAuditCountAsync());
+    }
+
     public async ValueTask InitializeAsync()
     {
         _baseAddress = await keycloak.BaseAddressAsync();
@@ -321,6 +384,7 @@ public sealed class UserCommandTests(KeycloakFixture keycloak, PostgreSqlFixture
             builder.UseSetting("Tenants:a:Oidc:UsersClientSecret", UsersSecret);
             builder.UseSetting("Tenants:a:Oidc:RolesClaim", "roles");
             builder.UseSetting("Users:AdministratorRole", Administrator);
+            builder.UseSetting("Console:OperatorRole", "operator");
             builder.UseSetting("ActivateOnStartup:0", _rolesApplication.Path);
             builder.ConfigureTestServices(services => services.AddSingleton<IStartupFilter, SessionStartupFilter>());
         });
@@ -517,6 +581,8 @@ public sealed class UserCommandTests(KeycloakFixture keycloak, PostgreSqlFixture
         return await client.SendAsync(request, CancellationToken);
     }
 
+    private static string PlatformBody(string role) => $$"""{ "role": "{{role}}" }""";
+
     private static string Body(string role) => $$"""{ "applicationId": "{{_rolesId}}", "role": "{{role}}" }""";
 
     /// <summary>The application <c>Roles</c> with the role <c>buyer</c>, the entity <c>Note</c> and a policy that lets <c>buyer</c> read notes.</summary>
@@ -543,6 +609,17 @@ public sealed class UserCommandTests(KeycloakFixture keycloak, PostgreSqlFixture
         request.Headers.Add("Cookie", $"{Session.Scheme}={cookie}");
         using var response = await client.SendAsync(request, CancellationToken);
         return response.StatusCode;
+    }
+
+    private async Task<bool> ConsoleAsync(string cookie)
+    {
+        using var client = CreateClient(cookies: false);
+        using var request = new HttpRequestMessage(HttpMethod.Get, new Uri("/api/me", UriKind.Relative));
+        request.Headers.Add("Cookie", $"{Session.Scheme}={cookie}");
+        using var response = await client.SendAsync(request, CancellationToken);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
+        return body.GetProperty("console").GetBoolean();
     }
 
     private async Task<HttpResponseMessage> PostJsonAsync(string path, string? cookie, string body)
@@ -577,6 +654,19 @@ public sealed class UserCommandTests(KeycloakFixture keycloak, PostgreSqlFixture
             connection);
         command.Parameters.AddWithValue("action", action);
         command.Parameters.AddWithValue("application", _rolesId);
+        command.Parameters.AddWithValue("user", _patId);
+        command.Parameters.AddWithValue("role", role);
+        return (long)(await command.ExecuteScalarAsync(CancellationToken))!;
+    }
+
+    private async Task<long> PlatformRoleAuditCountAsync(string action, string role)
+    {
+        await using var connection = new NpgsqlConnection(_connectionString);
+        await connection.OpenAsync(CancellationToken);
+        await using var command = new NpgsqlCommand(
+            "SELECT count(*) FROM axis.audit_records WHERE action = @action AND application_id IS NULL AND details->>'platform' = 'true' AND details->>'userId' = @user AND details->>'role' = @role",
+            connection);
+        command.Parameters.AddWithValue("action", action);
         command.Parameters.AddWithValue("user", _patId);
         command.Parameters.AddWithValue("role", role);
         return (long)(await command.ExecuteScalarAsync(CancellationToken))!;
