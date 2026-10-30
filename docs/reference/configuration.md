@@ -506,7 +506,7 @@ flowchart LR
      unbalanced `{` or `}`, or a placeholder that is not `{idempotencyKey}` and names no `path`
      input, ignoring letter case, is `AXC0097` at `/operations/{i}/path`. A `path` input that is not
      in the path, is not `required` or is named `idempotencyKey`, and a `body` input on a `GET`, are
-     `AXC0310` at `/operations/{i}/input/{j}`. A `lookup` is `AXC0098` at `/operations/{i}/lookup`
+     `AXC0311` at `/operations/{i}/input/{j}`. A `lookup` is `AXC0098` at `/operations/{i}/lookup`
      when it names no operation of the connector, ignoring letter case, or names its own operation.
      It is also `AXC0098` when the operation it names is not a `GET`, has no `{idempotencyKey}` in
      its path, has inputs, or has other outputs than the operation it serves. Outputs are the same

@@ -10,7 +10,7 @@ namespace Axis.Configuration.Compilation;
 /// <c>clientId</c> and a <c>clientSecret</c> or a <c>clientKey</c>, and a <c>saml</c> provider has
 /// <c>metadata</c>. A binding name that the application also uses as another kind is a binding of
 /// the wrong kind. No resource declares binding kinds, so the kind of a name is read from where it
-/// is used: a connector's <c>baseUrl</c> is a <c>url</c>, its <c>auth</c> a <c>secret</c>, the
+/// is used: a connector's <c>baseUrl</c> and <c>oauth2</c> <c>tokenUrl</c> are <c>url</c>, its other <c>auth</c> bindings <c>secret</c>, the
 /// manifest's <c>fileStorage</c> a <c>storage</c>, and a provider's own bindings as the doc says.
 /// Names are compared ignoring letter case. A role in <c>roles.values</c> is a declared role. An
 /// application has at most one <c>accounts</c> provider. The schema already refuses the properties
@@ -24,9 +24,8 @@ internal static class IdentityProviderChecker
     private const string Oidc = "oidc";
     private const string Saml = "saml";
 
-    private const string UrlKind = "url";
-    private const string SecretKind = "secret";
-    private const string StorageKind = "storage";
+    private const string UrlKind = BindingUses.UrlKind;
+    private const string SecretKind = BindingUses.SecretKind;
 
     private const string DefaultRolesClaim = "roles";
 
@@ -44,7 +43,7 @@ internal static class IdentityProviderChecker
             return;
         }
 
-        var uses = CollectUses(providers, manifest, connectors);
+        var uses = BindingUses.Collect(providers, manifest, connectors);
         IdentityProviderResource? firstAccounts = null;
         foreach (var provider in providers)
         {
@@ -230,53 +229,7 @@ internal static class IdentityProviderChecker
         }
     }
 
-    /// <summary>Lists every use of a binding name with the kind it is used as, ignoring letter case.</summary>
-    private static Dictionary<string, List<BindingUse>> CollectUses(
-        IReadOnlyList<IdentityProviderResource> providers,
-        ApplicationManifest? manifest,
-        IReadOnlyList<ConnectorResource> connectors)
-    {
-        var uses = new Dictionary<string, List<BindingUse>>(StringComparer.OrdinalIgnoreCase);
-
-        void Add(BindingReference? binding, string kind, string file, string path)
-        {
-            if (binding is null)
-            {
-                return;
-            }
-
-            if (!uses.TryGetValue(binding.Binding, out var list))
-            {
-                uses[binding.Binding] = list = [];
-            }
-
-            list.Add(new BindingUse(kind, file, path));
-        }
-
-        if (manifest is not null)
-        {
-            Add(manifest.FileStorage, StorageKind, manifest.File, "/fileStorage/binding");
-        }
-
-        foreach (var connector in connectors)
-        {
-            Add(connector.BaseUrl, UrlKind, connector.File, "/baseUrl/binding");
-            Add(connector.Auth?.Token, SecretKind, connector.File, "/auth/token/binding");
-            Add(connector.Auth?.Value, SecretKind, connector.File, "/auth/value/binding");
-        }
-
-        foreach (var provider in providers)
-        {
-            foreach (var (property, kind, binding) in BindingsOf(provider))
-            {
-                Add(binding, kind, provider.File, $"/{property}/binding");
-            }
-        }
-
-        return uses;
-    }
-
-    private static IEnumerable<(string Property, string Kind, BindingReference Binding)> BindingsOf(IdentityProviderResource provider)
+    internal static IEnumerable<(string Property, string Kind, BindingReference Binding)> BindingsOf(IdentityProviderResource provider)
     {
         if (provider.Issuer is { } issuer)
         {
@@ -308,5 +261,4 @@ internal static class IdentityProviderChecker
     private static string EscapePointerSegment(string segment) =>
         segment.Replace("~", "~0", StringComparison.Ordinal).Replace("/", "~1", StringComparison.Ordinal);
 
-    private sealed record BindingUse(string Kind, string File, string Path);
 }
