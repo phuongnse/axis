@@ -4,7 +4,7 @@
   "name": "PurchasingSystem",
   "formatVersion": 1,
   "baseUrl": { "binding": "PurchasingSystemUrl" },
-  "auth": { "type": "bearer", "token": { "binding": "PurchasingSystemToken" } },
+  "auth": { "type": "bearer", "token": { "binding": "PurchasingSystemBearerToken" } },
   "timeout": "PT30S",
   "idempotency": "Idempotency-Key",
   "operations": [

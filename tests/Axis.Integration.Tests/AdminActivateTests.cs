@@ -13,7 +13,6 @@ namespace Axis.Integration.Tests;
 public sealed class AdminActivateTests(PostgreSqlFixture database) : IClassFixture<PostgreSqlFixture>
 {
     private const string UrlBinding = "PurchasingSystemUrl";
-    private const string SecretBinding = "PurchasingSystemToken";
     private const string Site = "/api/sites/purchasing";
     private const string Departments = "/api/apps/PurchaseRequests/entities/Department/records";
 
@@ -247,15 +246,8 @@ public sealed class AdminActivateTests(PostgreSqlFixture database) : IClassFixtu
         foreach (var id in ids)
         {
             Assert.Equal(0, (await scenario.CreateAsync(id, Host(id))).Exit);
-            context.TenantBindings.AddRange(
-                new TenantBindingRow { TenantId = id, Name = UrlBinding, Kind = "url", Url = "https://purchasing.example.test" },
-                new TenantBindingRow
-                {
-                    TenantId = id,
-                    Name = SecretBinding,
-                    Kind = "secret",
-                    SecretValue = AdminScenario.Cipher.Encrypt(id, TenantSecretFields.Binding(SecretBinding), "binding-secret-value"),
-                });
+            context.TenantBindings.Add(new TenantBindingRow { TenantId = id, Name = UrlBinding, Kind = "url", Url = "https://purchasing.example.test" });
+            context.TenantBindings.AddRange(PurchasingBindings.Rows(id));
             context.TenantBindings.AddRange(CompanyBindings.Rows(id));
         }
 

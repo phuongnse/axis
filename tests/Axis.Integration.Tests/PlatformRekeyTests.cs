@@ -23,7 +23,7 @@ namespace Axis.Integration.Tests;
 /// </summary>
 public sealed class PlatformRekeyTests(PostgreSqlFixture database) : IClassFixture<PostgreSqlFixture>
 {
-    private const string BindingName = "PurchasingSystemToken";
+    private const string BindingName = PurchasingBindings.ClientSecret;
     private const string BindingValue = "binding-secret-value";
 
     private static readonly string _newKey = Convert.ToBase64String(Enumerable.Repeat((byte)1, TenantSecretCipher.KeySize).ToArray());

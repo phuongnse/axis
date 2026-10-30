@@ -109,8 +109,8 @@ public sealed class ReleaseActivatorTests(DataDatabaseFixture database) : IClass
     [Theory]
     [InlineData(null, "secret", "/baseUrl/binding", "Tenant 'acme' has no binding 'PurchasingSystemUrl'. Add a 'url' binding with that name to the tenant.")]
     [InlineData("secret", "secret", "/baseUrl/binding", "Tenant 'acme' binding 'PurchasingSystemUrl' is a 'secret' binding. It is used here as a 'url' binding.")]
-    [InlineData("url", null, "/auth/token/binding", "Tenant 'acme' has no binding 'PurchasingSystemToken'. Add a 'secret' binding with that name to the tenant.")]
-    [InlineData("url", "url", "/auth/token/binding", "Tenant 'acme' binding 'PurchasingSystemToken' is a 'url' binding. It is used here as a 'secret' binding.")]
+    [InlineData("url", null, "/auth/token/binding", "Tenant 'acme' has no binding 'PurchasingSystemBearerToken'. Add a 'secret' binding with that name to the tenant.")]
+    [InlineData("url", "url", "/auth/token/binding", "Tenant 'acme' binding 'PurchasingSystemBearerToken' is a 'url' binding. It is used here as a 'secret' binding.")]
     public async Task A_connector_binding_the_tenant_lacks_or_holds_with_another_kind_is_a_diagnostic_and_changes_nothing(
         string? urlKind, string? tokenKind, string path, string message)
     {
@@ -129,7 +129,7 @@ public sealed class ReleaseActivatorTests(DataDatabaseFixture database) : IClass
 
         if (tokenKind is not null)
         {
-            bindings["PurchasingSystemToken"] = new ActivationBinding(tokenKind, tokenKind == "url" ? new Uri("https://token.example.test") : null);
+            bindings["PurchasingSystemBearerToken"] = new ActivationBinding(tokenKind, tokenKind == "url" ? new Uri("https://token.example.test") : null);
         }
 
         var result = await ActivateAsync(compiled, new ActivationBindings("acme", bindings, AllowHttp: false));
@@ -472,7 +472,7 @@ public sealed class ReleaseActivatorTests(DataDatabaseFixture database) : IClass
         var bindings = new Dictionary<string, ActivationBinding>(StringComparer.OrdinalIgnoreCase)
         {
             ["PurchasingSystemUrl"] = new(urlKind, urlKind == "url" ? new Uri("https://purchasing.example.test/api") : null),
-            ["PurchasingSystemToken"] = new(tokenKind, tokenKind == "url" ? new Uri("https://token.example.test") : null),
+            ["PurchasingSystemBearerToken"] = new(tokenKind, tokenKind == "url" ? new Uri("https://token.example.test") : null),
         };
 
         var result = await ActivateAsync(compiled, new ActivationBindings("acme", bindings, AllowHttp: false, IsPreview: true));
@@ -610,7 +610,7 @@ public sealed class ReleaseActivatorTests(DataDatabaseFixture database) : IClass
         var bindings = new Dictionary<string, ActivationBinding>(StringComparer.OrdinalIgnoreCase)
         {
             ["purchasingsystemurl"] = new(ActivationBinding.UrlKind, new Uri("http://purchasing.example.test/api")),
-            ["PurchasingSystemToken"] = new(ActivationBinding.SecretKind, null),
+            ["PurchasingSystemBearerToken"] = new(ActivationBinding.SecretKind, null),
         };
 
         var refused = await ActivateAsync(compiled, new ActivationBindings("acme", bindings, AllowHttp: false));
@@ -889,7 +889,7 @@ public sealed class ReleaseActivatorTests(DataDatabaseFixture database) : IClass
         $$"""
         { "id": "{{id}}", "kind": "connector", "name": "PurchasingSystem", "formatVersion": 1,
           "baseUrl": { "binding": "PurchasingSystemUrl" },
-          "auth": { "type": "bearer", "token": { "binding": "PurchasingSystemToken" } },
+          "auth": { "type": "bearer", "token": { "binding": "PurchasingSystemBearerToken" } },
           "operations": [ { "name": "createPurchaseOrder", "method": "POST", "path": "/purchase-orders" } ] }
         """;
 

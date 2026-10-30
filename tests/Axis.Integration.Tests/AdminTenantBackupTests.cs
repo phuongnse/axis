@@ -75,8 +75,13 @@ public sealed class AdminTenantBackupTests(AdminBackupFixture fixture) : IClassF
         var bindings = directory.GetProperty("bindings").EnumerateArray().ToDictionary(binding => binding.GetProperty("name").GetString()!);
         Assert.Equal("url", bindings["PurchasingSystemUrl"].GetProperty("kind").GetString());
         Assert.Equal("https://purchasing.example.test", bindings["PurchasingSystemUrl"].GetProperty("url").GetString());
-        Assert.Equal("secret", bindings["PurchasingSystemToken"].GetProperty("kind").GetString());
-        Assert.False(bindings["PurchasingSystemToken"].TryGetProperty("url", out _));
+        Assert.Equal("url", bindings[PurchasingBindings.TokenUrl].GetProperty("kind").GetString());
+        Assert.Equal(PurchasingBindings.PlaceholderTokenUrl, bindings[PurchasingBindings.TokenUrl].GetProperty("url").GetString());
+        foreach (var name in new[] { PurchasingBindings.ClientId, PurchasingBindings.ClientSecret })
+        {
+            Assert.Equal("secret", bindings[name].GetProperty("kind").GetString());
+            Assert.False(bindings[name].TryGetProperty("url", out _));
+        }
         Assert.Equal("url", bindings[CompanyBindings.Issuer].GetProperty("kind").GetString());
         Assert.Equal(CompanyBindings.IssuerUrl, bindings[CompanyBindings.Issuer].GetProperty("url").GetString());
         foreach (var name in new[] { CompanyBindings.ClientId, CompanyBindings.ClientSecret })
@@ -190,7 +195,7 @@ public sealed class AdminTenantBackupTests(AdminBackupFixture fixture) : IClassF
             AdminScenario.Cipher.Decrypt(row.Id, TenantSecretFields.SchemaPassword, row.SchemaPassword).Reveal(),
             AdminScenario.Cipher.Decrypt(row.Id, TenantSecretFields.RuntimePassword, row.RuntimePassword).Reveal(),
             fixture.Scenario.ClientSecret,
-            fixture.BindingSecret,
+            PurchasingBindings.ClientSecretValue,
             .. fixture.Scenario.AdminPasswords,
         ];
         var archive = ReadArchive(file, folder.Path);
@@ -342,16 +347,11 @@ public sealed class AdminBackupFixture : IAsyncLifetime
 
     private const string UrlBinding = "PurchasingSystemUrl";
 
-    private const string SecretBinding = "PurchasingSystemToken";
-
     private readonly PostgreSqlFixture _database = new();
     private WebApplicationFactory<Program>? _factory;
     private string _schemaConnection = "";
 
     public string TenantId { get; private set; } = "";
-
-    /// <summary>The random value of the tenant's <c>secret</c> binding.</summary>
-    public string BindingSecret { get; } = $"binding-{Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(16))}";
 
     internal AdminScenario Scenario { get; private set; } = null!;
 
@@ -370,15 +370,8 @@ public sealed class AdminBackupFixture : IAsyncLifetime
 
         await using (var context = new PlatformDbContext(new DbContextOptionsBuilder<PlatformDbContext>().UseNpgsql(Scenario.Platform).Options))
         {
-            context.TenantBindings.AddRange(
-                new TenantBindingRow { TenantId = TenantId, Name = UrlBinding, Kind = "url", Url = "https://purchasing.example.test" },
-                new TenantBindingRow
-                {
-                    TenantId = TenantId,
-                    Name = SecretBinding,
-                    Kind = "secret",
-                    SecretValue = AdminScenario.Cipher.Encrypt(TenantId, TenantSecretFields.Binding(SecretBinding), BindingSecret),
-                });
+            context.TenantBindings.Add(new TenantBindingRow { TenantId = TenantId, Name = UrlBinding, Kind = "url", Url = "https://purchasing.example.test" });
+            context.TenantBindings.AddRange(PurchasingBindings.Rows(TenantId));
             context.TenantBindings.AddRange(CompanyBindings.Rows(TenantId));
             await context.SaveChangesAsync(CancellationToken);
         }
@@ -398,8 +391,10 @@ public sealed class AdminBackupFixture : IAsyncLifetime
             builder.UseTestOidc(TenantId);
             builder.UseSetting($"Tenants:{TenantId}:Bindings:{UrlBinding}:Kind", "url");
             builder.UseSetting($"Tenants:{TenantId}:Bindings:{UrlBinding}:Value", "https://purchasing.example.test");
-            builder.UseSetting($"Tenants:{TenantId}:Bindings:{SecretBinding}:Kind", "secret");
-            builder.UseSetting($"Tenants:{TenantId}:Bindings:{SecretBinding}:Value", BindingSecret);
+            foreach (var (key, value) in PurchasingBindings.Settings(TenantId))
+            {
+                builder.UseSetting(key, value);
+            }
             foreach (var (key, value) in CompanyBindings.Settings(TenantId))
             {
                 builder.UseSetting(key, value);

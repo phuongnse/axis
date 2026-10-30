@@ -10,7 +10,7 @@ namespace Axis.Server.Tests;
 /// <summary>
 /// Each instrument of the <c>Axis</c> meter records only the attribute keys that the
 /// <see href="../../docs/reference/process-execution.md#worker-metrics">worker metrics</see> table lists for it, or the
-/// <see href="../../docs/architecture.md#health-checks">health checks</see> section for the server's gauge.
+/// <see href="../../docs/reference/health-checks.md">health checks</see> section for the server's gauge.
 /// </summary>
 public sealed class AxisMetricsTests
 {

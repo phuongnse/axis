@@ -20,8 +20,8 @@ public sealed class SecretBindingTests
 
         var exception = Assert.Throws<InvalidOperationException>(() => builder.Services.AddAxisWorker(builder.Configuration, builder.Environment));
 
-        Assert.Contains("Tenant 'a' binding 'PurchasingSystemToken' is a secret set in the file", exception.Message, StringComparison.Ordinal);
-        Assert.Contains("Tenants__a__Bindings__PurchasingSystemToken__Value", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("Tenant 'a' binding 'PurchasingSystemBearerToken' is a secret set in the file", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("Tenants__a__Bindings__PurchasingSystemBearerToken__Value", exception.Message, StringComparison.Ordinal);
         AssertHidesValue(exception.Message);
     }
 
@@ -30,7 +30,7 @@ public sealed class SecretBindingTests
     {
         using var folder = new TemporaryFolder().With("appsettings.json", SettingsFile("<from environment>"));
         var prefix = $"AXIS_TEST_{Guid.NewGuid():N}_";
-        var variable = $"{prefix}Tenants__a__Bindings__PurchasingSystemToken__Value";
+        var variable = $"{prefix}Tenants__a__Bindings__PurchasingSystemBearerToken__Value";
         Environment.SetEnvironmentVariable(variable, Value);
         try
         {
@@ -43,7 +43,7 @@ public sealed class SecretBindingTests
             accessor.Current = new TenantContext("a");
             try
             {
-                Assert.Equal(Value, host.Services.GetRequiredService<IDeploymentBindings>().ResolveSecret("PurchasingSystemToken").Reveal());
+                Assert.Equal(Value, host.Services.GetRequiredService<IDeploymentBindings>().ResolveSecret("PurchasingSystemBearerToken").Reveal());
             }
             finally
             {
@@ -101,7 +101,7 @@ public sealed class SecretBindingTests
 
     private static string SettingsFile(string value) =>
         $$"""
-        { "Tenants": { "a": { "Bindings": { "PurchasingSystemToken": { "Kind": "secret", "Value": "{{value}}" } } } } }
+        { "Tenants": { "a": { "Bindings": { "PurchasingSystemBearerToken": { "Kind": "secret", "Value": "{{value}}" } } } } }
         """;
 
     // Neither the value nor its first or last four characters may show.

@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Net;
 using System.Text.Json;
+using Axis.PurchasingStub;
 using Axis.Server.Tests;
 using static Axis.Integration.Tests.SampleAppFixture;
 
@@ -93,7 +94,7 @@ public sealed class TraceCorrelationTests(SampleAppFixture fixture) : IClassFixt
             foreach (var (key, value) in Values(span))
             {
                 Assert.DoesNotContain(marker, value, StringComparison.Ordinal);
-                Assert.DoesNotContain("sample-test-token", value, StringComparison.Ordinal);
+                Assert.DoesNotContain(PurchasingStubApp.DefaultClientSecret, value, StringComparison.Ordinal);
                 Assert.DoesNotContain(fixture.PurchasingUrl, value, StringComparison.Ordinal);
                 Assert.DoesNotContain("purchasing.example.test", value, StringComparison.Ordinal);
                 Assert.DoesNotContain(value, _users);

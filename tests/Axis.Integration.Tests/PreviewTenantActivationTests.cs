@@ -81,8 +81,10 @@ public sealed class PreviewTenantActivationTests(PostgreSqlFixture database) : I
             builder.UseSetting("Tenants:a:SchemaConnectionString", main);
             builder.UseSetting("Tenants:a:Bindings:PurchasingSystemUrl:Kind", "url");
             builder.UseSetting("Tenants:a:Bindings:PurchasingSystemUrl:Value", "https://purchasing.example.test");
-            builder.UseSetting("Tenants:a:Bindings:PurchasingSystemToken:Kind", "secret");
-            builder.UseSetting("Tenants:a:Bindings:PurchasingSystemToken:Value", "main-token");
+            foreach (var (key, value) in PurchasingBindings.Settings("a"))
+            {
+                builder.UseSetting(key, value);
+            }
             foreach (var (key, value) in CompanyBindings.Settings("a"))
             {
                 builder.UseSetting(key, value);

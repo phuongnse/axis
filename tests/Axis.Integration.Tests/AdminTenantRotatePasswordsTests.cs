@@ -16,7 +16,6 @@ namespace Axis.Integration.Tests;
 public sealed class AdminTenantRotatePasswordsTests(PostgreSqlFixture database) : IClassFixture<PostgreSqlFixture>
 {
     private const string UrlBinding = "PurchasingSystemUrl";
-    private const string SecretBinding = "PurchasingSystemToken";
     private const string Departments = "/api/apps/PurchaseRequests/entities/Department/records";
     private const string PurchaseRequests = "/api/apps/PurchaseRequests/entities/PurchaseRequest/records";
 
@@ -283,15 +282,8 @@ public sealed class AdminTenantRotatePasswordsTests(PostgreSqlFixture database) 
         Assert.Equal(0, (await scenario.CreateAsync(id, Host(id))).Exit);
         await using (var context = new PlatformDbContext(new DbContextOptionsBuilder<PlatformDbContext>().UseNpgsql(scenario.Platform).Options))
         {
-            context.TenantBindings.AddRange(
-                new TenantBindingRow { TenantId = id, Name = UrlBinding, Kind = "url", Url = "https://purchasing.example.test" },
-                new TenantBindingRow
-                {
-                    TenantId = id,
-                    Name = SecretBinding,
-                    Kind = "secret",
-                    SecretValue = AdminScenario.Cipher.Encrypt(id, TenantSecretFields.Binding(SecretBinding), "binding-secret-value"),
-                });
+            context.TenantBindings.Add(new TenantBindingRow { TenantId = id, Name = UrlBinding, Kind = "url", Url = "https://purchasing.example.test" });
+            context.TenantBindings.AddRange(PurchasingBindings.Rows(id));
             context.TenantBindings.AddRange(CompanyBindings.Rows(id));
             await context.SaveChangesAsync(CancellationToken);
         }

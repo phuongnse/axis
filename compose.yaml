@@ -94,8 +94,9 @@ services:
       Modules__Path: /modules
       # The sample templates, which the image holds.
       Templates__Path: /templates
-      # The purchasing system stub on the Compose network. The token is in appsettings.Development.json.
+      # The purchasing system stub on the Compose network. The client id and secret are in appsettings.Development.json.
       Tenants__default__Bindings__PurchasingSystemUrl__Value: http://purchasing:8080
+      Tenants__default__Bindings__PurchasingSystemTokenUrl__Value: http://purchasing:8080/oauth/token
       # The folder where Studio creates new applications. The volume below mounts it from the checkout.
       Studio__ApplicationsPath: /studio-apps
     volumes:
@@ -139,6 +140,7 @@ services:
       Tenants__default__ConnectionString: Host=postgres;Port=5432;Database=axis;Username=axis_runtime;Password=axis
       Tenants__default-preview__ConnectionString: Host=postgres;Port=5432;Database=axis_preview;Username=axis_preview_runtime;Password=axis
       Tenants__default__Bindings__PurchasingSystemUrl__Value: http://purchasing:8080
+      Tenants__default__Bindings__PurchasingSystemTokenUrl__Value: http://purchasing:8080/oauth/token
     # Healthy once the tenant database is migrated and the loop polls. The health address
     # http://127.0.0.1:5208 stays inside the container, so no port is published. The image has
     # bash but no curl. The worker is ready only after the server has activated.
@@ -171,8 +173,12 @@ services:
       Tenants__default__SchemaConnectionString: Host=postgres;Port=5432;Database=axis;Username=axis_schema;Password=axis
       Tenants__default__Bindings__PurchasingSystemUrl__Kind: url
       Tenants__default__Bindings__PurchasingSystemUrl__Value: http://purchasing:8080
-      Tenants__default__Bindings__PurchasingSystemToken__Kind: secret
-      Tenants__default__Bindings__PurchasingSystemToken__Value: axis-development-purchasing-token
+      Tenants__default__Bindings__PurchasingSystemTokenUrl__Kind: url
+      Tenants__default__Bindings__PurchasingSystemTokenUrl__Value: http://purchasing:8080/oauth/token
+      Tenants__default__Bindings__PurchasingSystemClientId__Kind: secret
+      Tenants__default__Bindings__PurchasingSystemClientId__Value: axis-purchasing
+      Tenants__default__Bindings__PurchasingSystemClientSecret__Kind: secret
+      Tenants__default__Bindings__PurchasingSystemClientSecret__Value: axis-development-purchasing-secret
       # The company realm's broker client, as in appsettings.Development.json of the server.
       Tenants__default__Bindings__CompanyIssuer__Kind: url
       Tenants__default__Bindings__CompanyIssuer__Value: http://localhost:8080/realms/company

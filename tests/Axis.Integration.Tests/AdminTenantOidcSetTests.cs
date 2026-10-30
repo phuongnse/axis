@@ -26,7 +26,6 @@ namespace Axis.Integration.Tests;
 public sealed class AdminTenantOidcSetTests(PostgreSqlFixture database, KeycloakFixture keycloak) : IClassFixture<PostgreSqlFixture>
 {
     private const string UrlBinding = "PurchasingSystemUrl";
-    private const string SecretBinding = "PurchasingSystemToken";
     private const string Departments = "/api/apps/PurchaseRequests/entities/Department/records";
 
     private static readonly string _sample = Path.Combine(AppContext.BaseDirectory, "Samples", "purchase-requests");
@@ -383,15 +382,8 @@ public sealed class AdminTenantOidcSetTests(PostgreSqlFixture database, Keycloak
         Assert.Equal(0, (await CreateAsync(scenario, id, $"{id}.example.test", authority)).Exit);
         await using (var context = new PlatformDbContext(new DbContextOptionsBuilder<PlatformDbContext>().UseNpgsql(scenario.Platform).Options))
         {
-            context.TenantBindings.AddRange(
-                new TenantBindingRow { TenantId = id, Name = UrlBinding, Kind = "url", Url = "https://purchasing.example.test" },
-                new TenantBindingRow
-                {
-                    TenantId = id,
-                    Name = SecretBinding,
-                    Kind = "secret",
-                    SecretValue = AdminScenario.Cipher.Encrypt(id, TenantSecretFields.Binding(SecretBinding), "binding-secret-value"),
-                });
+            context.TenantBindings.Add(new TenantBindingRow { TenantId = id, Name = UrlBinding, Kind = "url", Url = "https://purchasing.example.test" });
+            context.TenantBindings.AddRange(PurchasingBindings.Rows(id));
             context.TenantBindings.AddRange(CompanyBindings.Rows(id));
             await context.SaveChangesAsync(CancellationToken);
         }

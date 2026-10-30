@@ -332,8 +332,12 @@ if affected playwright; then
         Extensions__Path="$root/artifacts/extensions" Modules__Path="$root/artifacts/modules" \
         Tenants__default__Bindings__PurchasingSystemUrl__Kind=url \
         Tenants__default__Bindings__PurchasingSystemUrl__Value="$AXIS_E2E_PURCHASING_URL" \
-        Tenants__default__Bindings__PurchasingSystemToken__Kind=secret \
-        Tenants__default__Bindings__PurchasingSystemToken__Value=e2e-token \
+        Tenants__default__Bindings__PurchasingSystemTokenUrl__Kind=url \
+        Tenants__default__Bindings__PurchasingSystemTokenUrl__Value="$AXIS_E2E_PURCHASING_URL/oauth/token" \
+        Tenants__default__Bindings__PurchasingSystemClientId__Kind=secret \
+        Tenants__default__Bindings__PurchasingSystemClientId__Value=axis-purchasing \
+        Tenants__default__Bindings__PurchasingSystemClientSecret__Kind=secret \
+        Tenants__default__Bindings__PurchasingSystemClientSecret__Value=axis-development-purchasing-secret \
         dotnet src/Axis.Worker/bin/Release/net10.0/Axis.Worker.dll >>"$AXIS_E2E_WORKER_LOG" 2>&1 &
       child=$!
       echo "$child" >"$AXIS_E2E_WORKER_PID_FILE"
@@ -363,8 +367,12 @@ if affected playwright; then
     Extensions__Path="$root/artifacts/extensions" Modules__Path="$root/artifacts/modules" \
     Tenants__default__Bindings__PurchasingSystemUrl__Kind=url \
     Tenants__default__Bindings__PurchasingSystemUrl__Value="$AXIS_E2E_PURCHASING_URL" \
-    Tenants__default__Bindings__PurchasingSystemToken__Kind=secret \
-    Tenants__default__Bindings__PurchasingSystemToken__Value=e2e-token \
+    Tenants__default__Bindings__PurchasingSystemTokenUrl__Kind=url \
+    Tenants__default__Bindings__PurchasingSystemTokenUrl__Value="$AXIS_E2E_PURCHASING_URL/oauth/token" \
+    Tenants__default__Bindings__PurchasingSystemClientId__Kind=secret \
+    Tenants__default__Bindings__PurchasingSystemClientId__Value=axis-purchasing \
+    Tenants__default__Bindings__PurchasingSystemClientSecret__Kind=secret \
+    Tenants__default__Bindings__PurchasingSystemClientSecret__Value=axis-development-purchasing-secret \
     Tenants__default__Bindings__CompanyIssuer__Kind=url \
     Tenants__default__Bindings__CompanyIssuer__Value="http://127.0.0.1:$keycloak_port/realms/company" \
     Tenants__default__Bindings__CompanyClientId__Kind=secret \

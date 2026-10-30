@@ -49,7 +49,7 @@ reconciles is in [Connector calls](process-execution.md#connector-calls).
   and reading the directory fails when its value is not `database`.
 - **Secrets from the environment.** A secret's value is set with an
   environment variable, such as
-  `Tenants__default__Bindings__PurchasingSystemToken__Value`. A command-line
+  `Tenants__default__Bindings__PurchasingSystemClientSecret__Value`. A command-line
   argument or a mounted secret file works too. Only in Development may a
   committed `appsettings` file hold one.
 - **Secret source check.** Outside Development, startup fails when the
@@ -123,7 +123,9 @@ The purchasing system's bindings for tenant `default` look like this:
     "ConnectionString": "Host=...",
     "Bindings": {
       "PurchasingSystemUrl": { "Kind": "url", "Value": "https://purchasing.example.test/api" },
-      "PurchasingSystemToken": { "Kind": "secret", "Value": "<from environment>" },
+      "PurchasingSystemTokenUrl": { "Kind": "url", "Value": "https://auth.purchasing.example.test/oauth/token" },
+      "PurchasingSystemClientId": { "Kind": "secret", "Value": "<from environment>" },
+      "PurchasingSystemClientSecret": { "Kind": "secret", "Value": "<from environment>" },
       "Files": { "Kind": "storage", "Value": "database" }
     }
   }
@@ -142,7 +144,12 @@ The purchase request sample holds the purchasing system connector in
   "name": "PurchasingSystem",
   "formatVersion": 1,
   "baseUrl": { "binding": "PurchasingSystemUrl" },
-  "auth": { "type": "bearer", "token": { "binding": "PurchasingSystemToken" } },
+  "auth": {
+    "type": "oauth2",
+    "tokenUrl": { "binding": "PurchasingSystemTokenUrl" },
+    "clientId": { "binding": "PurchasingSystemClientId" },
+    "clientSecret": { "binding": "PurchasingSystemClientSecret" }
+  },
   "timeout": "PT30S",
   "idempotency": "Idempotency-Key",
   "operations": [
@@ -153,7 +160,18 @@ The purchase request sample holds the purchasing system connector in
       "input": [
         { "name": "requestNumber", "type": "text", "required": true },
         { "name": "supplierCode", "type": "text" },
-        { "name": "amount", "type": "decimal", "required": true }
+        { "name": "amount", "type": "decimal", "required": true },
+        {
+          "name": "lines",
+          "type": "list",
+          "required": true,
+          "fields": [
+            { "name": "description", "type": "text", "required": true },
+            { "name": "quantity", "type": "integer", "required": true },
+            { "name": "unitPrice", "type": "decimal", "required": true },
+            { "name": "amount", "type": "decimal", "required": true }
+          ]
+        }
       ],
       "output": [{ "name": "orderNumber", "type": "text", "required": true }],
       "lookup": "findPurchaseOrder"
@@ -210,7 +228,8 @@ The purchase request sample holds the purchasing system connector in
 The sample's `PurchaseRequest` entity has a `purchaseOrderNumber` `text`
 field, which the call writes. No policy lets a user update it, so the request
 form shows it read-only. The sample activates only for a tenant that holds the
-`PurchasingSystemUrl` and `PurchasingSystemToken` bindings. The entity also
+`PurchasingSystemUrl`, `PurchasingSystemTokenUrl`, `PurchasingSystemClientId`
+and `PurchasingSystemClientSecret` bindings. The entity also
 has a `paymentReference` `text` field, which the sample extension package
 writes after the purchase order is created, so the form shows it read-only too.
 Development,

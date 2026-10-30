@@ -348,8 +348,10 @@ public sealed class PublishingPerformanceTests(PostgreSqlFixture database) : ICl
             builder.UseTestOidc(HistoryTenant);
             builder.UseSetting($"Tenants:{HistoryTenant}:Bindings:PurchasingSystemUrl:Kind", "url");
             builder.UseSetting($"Tenants:{HistoryTenant}:Bindings:PurchasingSystemUrl:Value", "https://purchasing.example.test");
-            builder.UseSetting($"Tenants:{HistoryTenant}:Bindings:PurchasingSystemToken:Kind", "secret");
-            builder.UseSetting($"Tenants:{HistoryTenant}:Bindings:PurchasingSystemToken:Value", "studio-test-token");
+            foreach (var (key, value) in PurchasingBindings.Settings(HistoryTenant))
+            {
+                builder.UseSetting(key, value);
+            }
             foreach (var (key, value) in CompanyBindings.Settings(HistoryTenant))
             {
                 builder.UseSetting(key, value);

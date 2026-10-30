@@ -229,8 +229,10 @@ public sealed class StudioPublishTests : IAsyncLifetime
                 builder.UseSetting($"Tenants:{tenant}:SchemaConnectionString", connectionString);
                 builder.UseSetting($"Tenants:{tenant}:Bindings:PurchasingSystemUrl:Kind", "url");
                 builder.UseSetting($"Tenants:{tenant}:Bindings:PurchasingSystemUrl:Value", "https://purchasing.example.test");
-                builder.UseSetting($"Tenants:{tenant}:Bindings:PurchasingSystemToken:Kind", "secret");
-                builder.UseSetting($"Tenants:{tenant}:Bindings:PurchasingSystemToken:Value", "studio-test-token");
+                foreach (var (key, value) in PurchasingBindings.Settings(tenant))
+                {
+                    builder.UseSetting(key, value);
+                }
                 foreach (var (key, value) in CompanyBindings.Settings(tenant))
                 {
                     builder.UseSetting(key, value);
@@ -273,11 +275,13 @@ public sealed class StudioPublishTests : IAsyncLifetime
             [$"Tenants:{tenant}:SchemaConnectionString"] = connectionString,
             [$"Tenants:{tenant}:Bindings:PurchasingSystemUrl:Kind"] = "url",
             [$"Tenants:{tenant}:Bindings:PurchasingSystemUrl:Value"] = "https://purchasing.example.test",
-            [$"Tenants:{tenant}:Bindings:PurchasingSystemToken:Kind"] = "secret",
-            [$"Tenants:{tenant}:Bindings:PurchasingSystemToken:Value"] = "studio-test-token",
             ["Extensions:Path"] = SamplePackages.Path,
             ["Modules:Path"] = SampleModules.Path,
         };
+        foreach (var (key, value) in PurchasingBindings.Settings(tenant))
+        {
+            settings[key] = value;
+        }
         foreach (var (key, value) in CompanyBindings.Settings(tenant))
         {
             settings[key] = value;

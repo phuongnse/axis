@@ -46,8 +46,10 @@ public sealed class StudioDiagnosticsTests : IAsyncLifetime
             builder.UseTestOidc(Tenant);
             builder.UseSetting($"Tenants:{Tenant}:Bindings:PurchasingSystemUrl:Kind", "url");
             builder.UseSetting($"Tenants:{Tenant}:Bindings:PurchasingSystemUrl:Value", "https://purchasing.example.test");
-            builder.UseSetting($"Tenants:{Tenant}:Bindings:PurchasingSystemToken:Kind", "secret");
-            builder.UseSetting($"Tenants:{Tenant}:Bindings:PurchasingSystemToken:Value", "studio-test-token");
+            foreach (var (key, value) in PurchasingBindings.Settings(Tenant))
+            {
+                builder.UseSetting(key, value);
+            }
             foreach (var (key, value) in CompanyBindings.Settings(Tenant))
             {
                 builder.UseSetting(key, value);

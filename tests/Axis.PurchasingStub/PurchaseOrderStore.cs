@@ -1,11 +1,15 @@
 namespace Axis.PurchasingStub;
 
+internal sealed record PurchaseOrderLine(string Description, int Quantity, decimal UnitPrice, decimal Amount);
+
 internal sealed record PurchaseOrder(
     string OrderNumber,
     string IdempotencyKey,
     string RequestNumber,
     string? SupplierCode,
     decimal Amount,
+    string ClientId,
+    IReadOnlyList<PurchaseOrderLine> Lines,
     DateTimeOffset CreatedAt);
 
 /// <summary>
@@ -37,7 +41,8 @@ internal sealed class PurchaseOrderStore
     /// for before answering when the create is held, or <see langword="null"/>. A known key returns
     /// the stored order, even when the body differs.
     /// </summary>
-    public (PurchaseOrder Order, bool Created, bool Drop, bool Misfit, Task? Hold) Create(string key, string requestNumber, string? supplierCode, decimal amount)
+    public (PurchaseOrder Order, bool Created, bool Drop, bool Misfit, Task? Hold) Create(
+        string key, string requestNumber, string? supplierCode, decimal amount, string clientId, IReadOnlyList<PurchaseOrderLine> lines)
     {
         lock (_lock)
         {
@@ -55,7 +60,7 @@ internal sealed class PurchaseOrderStore
 
             var now = DateTimeOffset.UtcNow;
             _count++;
-            var order = new PurchaseOrder($"PO-{now.Year}-{_count:D4}", key, requestNumber, supplierCode, amount, now);
+            var order = new PurchaseOrder($"PO-{now.Year}-{_count:D4}", key, requestNumber, supplierCode, amount, clientId, lines, now);
             _byKey.Add(key, order);
             _orders.Add(order);
             return (order, true, drop, misfit, hold);

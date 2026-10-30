@@ -82,7 +82,6 @@ public sealed class AdminFleetFixture : IAsyncLifetime
 {
     private const int Tenants = 20;
     private const string UrlBinding = "PurchasingSystemUrl";
-    private const string SecretBinding = "PurchasingSystemToken";
 
     private readonly PostgreSqlFixture _database = new();
 
@@ -102,15 +101,8 @@ public sealed class AdminFleetFixture : IAsyncLifetime
         foreach (var id in Ids)
         {
             Assert.Equal(0, (await Scenario.CreateAsync(id, $"{id}.example.test")).Exit);
-            context.TenantBindings.AddRange(
-                new TenantBindingRow { TenantId = id, Name = UrlBinding, Kind = "url", Url = "https://purchasing.example.test" },
-                new TenantBindingRow
-                {
-                    TenantId = id,
-                    Name = SecretBinding,
-                    Kind = "secret",
-                    SecretValue = AdminScenario.Cipher.Encrypt(id, TenantSecretFields.Binding(SecretBinding), "binding-secret-value"),
-                });
+            context.TenantBindings.Add(new TenantBindingRow { TenantId = id, Name = UrlBinding, Kind = "url", Url = "https://purchasing.example.test" });
+            context.TenantBindings.AddRange(PurchasingBindings.Rows(id));
             context.TenantBindings.AddRange(CompanyBindings.Rows(id));
         }
 

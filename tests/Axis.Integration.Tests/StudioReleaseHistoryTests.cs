@@ -105,8 +105,8 @@ public sealed class StudioReleaseHistoryTests : IAsyncLifetime
         var deploymentBindings = new Dictionary<string, ActivationBinding>
         {
             ["PurchasingSystemUrl"] = new(ActivationBinding.UrlKind, new Uri("https://purchasing.example.test")),
-            ["PurchasingSystemToken"] = new(ActivationBinding.SecretKind, null),
         };
+        PurchasingBindings.AddTo(deploymentBindings);
         CompanyBindings.AddTo(deploymentBindings);
         var bindings = new ActivationBindings(Tenant, deploymentBindings, AllowHttp: false);
         var result = await ReleaseActivator.ActivateAsync(
@@ -126,8 +126,10 @@ public sealed class StudioReleaseHistoryTests : IAsyncLifetime
             builder.UseTestOidc(Tenant);
             builder.UseSetting($"Tenants:{Tenant}:Bindings:PurchasingSystemUrl:Kind", "url");
             builder.UseSetting($"Tenants:{Tenant}:Bindings:PurchasingSystemUrl:Value", "https://purchasing.example.test");
-            builder.UseSetting($"Tenants:{Tenant}:Bindings:PurchasingSystemToken:Kind", "secret");
-            builder.UseSetting($"Tenants:{Tenant}:Bindings:PurchasingSystemToken:Value", "studio-test-token");
+            foreach (var (key, value) in PurchasingBindings.Settings(Tenant))
+            {
+                builder.UseSetting(key, value);
+            }
             foreach (var (key, value) in CompanyBindings.Settings(Tenant))
             {
                 builder.UseSetting(key, value);

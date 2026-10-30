@@ -82,6 +82,7 @@ Detailed behaviour, one topic per file. Sections marked _(planned for Mx)_ are n
 | [Tenant setting commands](reference/tenant-setting-commands.md)        | The `Axis.Admin` commands that change bindings, sign-in settings, mail settings and hosts, rotate keys and passwords, end sessions, and the platform audit records |
 | [Tenant status commands](reference/tenant-status-commands.md)           | The `Axis.Admin` commands that suspend and resume a tenant and list the tenants       |
 | [Installation](reference/installation.md)                              | Production images and installs on premises and in the cloud                           |
+| [Health checks](reference/health-checks.md)                            | The server's and the worker's `/health/live` and `/health/ready` answers and when each status holds |
 
 ## Working on Axis
 
