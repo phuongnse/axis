@@ -113,8 +113,10 @@ request ends `approved`:
     fit leaves the call `unknown` or retried. A package output that does not fit
     fails the instance.
   - No real system or package code runs. The scenario tenant has placeholder
-    deployment bindings for every connector and package binding the application
-    names, never a real URL or secret.
+    deployment bindings for every connector, package and identity provider
+    binding the application names (the `issuer`, `clientId`, `clientSecret` or
+    `clientKey` of an `oidc` provider and the `metadata` of a `saml` provider),
+    never a real URL or secret.
 
 Every step has a `type`. These are the step kinds:
 

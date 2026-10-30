@@ -21,7 +21,9 @@ internal sealed class ScenarioBindings : IDeploymentBindings
     /// <summary>
     /// The bindings activation checks: a <c>url</c> binding for each connector base URL and package
     /// <c>url</c> capability, and a <c>secret</c> binding for each connector auth and package
-    /// <c>secret</c> capability the application names.
+    /// <c>secret</c> capability the application names. An <c>oidc</c> identity provider adds a <c>url</c> binding for
+    /// its <c>issuer</c> and <c>secret</c> bindings for its client id and its client secret or key. A <c>saml</c>
+    /// provider adds a <c>url</c> binding for its <c>metadata</c>.
     /// </summary>
     public static ActivationBindings ForActivation(ApplicationModel model)
     {
@@ -34,6 +36,22 @@ internal sealed class ScenarioBindings : IDeploymentBindings
             if (connector.Auth is { } auth)
             {
                 bindings[auth.Binding] = secret;
+            }
+        }
+
+        foreach (var provider in model.IdentityProviders)
+        {
+            switch (provider.Type)
+            {
+                case "oidc":
+                    Add(bindings, provider.IssuerBinding, url);
+                    Add(bindings, provider.ClientIdBinding, secret);
+                    Add(bindings, provider.ClientSecretBinding, secret);
+                    Add(bindings, provider.ClientKeyBinding, secret);
+                    break;
+                case "saml":
+                    Add(bindings, provider.MetadataBinding, url);
+                    break;
             }
         }
 
@@ -51,5 +69,13 @@ internal sealed class ScenarioBindings : IDeploymentBindings
         }
 
         return new ActivationBindings(ScenarioRunner.TenantId, bindings, AllowHttp: false);
+    }
+
+    private static void Add(Dictionary<string, ActivationBinding> bindings, string? name, ActivationBinding binding)
+    {
+        if (name is not null)
+        {
+            bindings[name] = binding;
+        }
     }
 }

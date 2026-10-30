@@ -1,9 +1,11 @@
 using System.Xml.Linq;
+using Axis.Configuration.Compilation;
 using Axis.Configuration.Modules;
 using Axis.Configuration.Packages;
 using Axis.Configuration.Releases;
 using Axis.Configuration.Storage;
 using Axis.Configuration.Tests;
+using Axis.Data;
 using Axis.Data.Storage;
 using Axis.Processes.Storage;
 using Axis.Processes.Work;
@@ -41,6 +43,81 @@ public sealed class ScenarioRunnerTests
         Assert.True(result.Passed, result.Failure);
         Assert.StartsWith("axis_scenario_", result.Database);
         Assert.False(await DatabaseExistsAsync(result.Database));
+    }
+
+    [Fact]
+    public async Task A_scenario_of_an_application_with_an_oidc_provider_activates_and_passes_without_a_missing_binding()
+    {
+        using var folder = OidcApplication(Scenario("OidcSignIn", Clerk, """
+            { "type": "createRecord", "entity": "Note", "as": "requester", "save": "note", "values": { "title": "Desk", "quantity": 3 } },
+            { "type": "expectRecord", "record": "note", "values": { "title": "Desk", "quantity": 3 } }
+            """));
+
+        var result = await RunAsync(folder, "OidcSignIn");
+
+        Assert.True(result.Passed, result.Failure);
+        Assert.True(result.Failure is null || !result.Failure.Contains("AXC0100", StringComparison.Ordinal));
+        Assert.False(await DatabaseExistsAsync(result.Database));
+    }
+
+    [Fact]
+    public void An_application_with_only_an_accounts_provider_gets_no_activation_bindings()
+    {
+        using var folder = Application();
+
+        var bindings = ScenarioBindings.ForActivation(ApplicationCompiler.Compile(folder.Path).Model!).Bindings;
+
+        Assert.Empty(bindings);
+    }
+
+    [Fact]
+    public void An_oidc_provider_gets_a_url_binding_for_its_issuer_and_secret_bindings_for_its_client_id_and_secret()
+    {
+        using var folder = OidcApplication(Scenario("Unused", Clerk, """
+            { "type": "createRecord", "entity": "Note", "as": "requester", "values": { "title": "Desk" } }
+            """));
+
+        var bindings = ScenarioBindings.ForActivation(ApplicationCompiler.Compile(folder.Path).Model!).Bindings;
+
+        Assert.Equal(3, bindings.Count);
+        Assert.Equal(ActivationBinding.UrlKind, bindings["CompanyIssuer"].Kind);
+        Assert.Equal(ActivationBinding.SecretKind, bindings["CompanyClientId"].Kind);
+        Assert.Equal(ActivationBinding.SecretKind, bindings["CompanyClientSecret"].Kind);
+    }
+
+    [Fact]
+    public void An_oidc_provider_with_a_client_key_gets_a_secret_binding_for_the_key()
+    {
+        using var folder = OidcApplication(Scenario("Unused", Clerk, """
+            { "type": "createRecord", "entity": "Note", "as": "requester", "values": { "title": "Desk" } }
+            """))
+            .With("identity-providers/company.json", $$"""
+                { "id": "{{Guid.NewGuid()}}", "kind": "identityProvider", "name": "company", "formatVersion": 1, "type": "oidc",
+                  "label": { "textKey": "provider.company" },
+                  "issuer": { "binding": "CompanyIssuer" }, "clientId": { "binding": "CompanyClientId" },
+                  "clientKey": { "binding": "CompanyClientKey" } }
+                """);
+
+        var bindings = ScenarioBindings.ForActivation(ApplicationCompiler.Compile(folder.Path).Model!).Bindings;
+
+        Assert.Equal(ActivationBinding.SecretKind, bindings["CompanyClientKey"].Kind);
+        Assert.False(bindings.ContainsKey("CompanyClientSecret"));
+    }
+
+    [Fact]
+    public void A_saml_provider_gets_a_url_binding_for_its_metadata()
+    {
+        using var folder = Application()
+            .With("texts/en.json", File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "Fixtures", "ScenarioOidcApp", "texts", "en.json"))
+                .Replace("provider.company", "provider.agency", StringComparison.Ordinal))
+            .With("identity-providers/agency.json", $$"""
+                { "id": "{{Guid.NewGuid()}}", "kind": "identityProvider", "name": "agency", "formatVersion": 1, "type": "saml",
+                  "label": { "textKey": "provider.agency" }, "metadata": { "binding": "AgencyMetadata" } }
+                """);
+
+        var bindings = ScenarioBindings.ForActivation(ApplicationCompiler.Compile(folder.Path).Model!).Bindings;
+
+        Assert.Equal(ActivationBinding.UrlKind, bindings["AgencyMetadata"].Kind);
     }
 
     [Fact]
@@ -1243,6 +1320,13 @@ public sealed class ScenarioRunnerTests
     /// </summary>
     private static TemporaryFolder NotifyApplication((string Name, string Json) scenario) =>
         Application("ScenarioPurchaseApp", [scenario], overlay: "ScenarioNotifyApp");
+
+    /// <summary>
+    /// A copy of the ScenarioApp fixture with the ScenarioOidcApp files over it: an <c>oidc</c> identity provider named
+    /// <c>company</c> with an issuer, a client id and a client secret, each a deployment binding.
+    /// </summary>
+    private static TemporaryFolder OidcApplication((string Name, string Json) scenario) =>
+        Application("ScenarioApp", [scenario], overlay: "ScenarioOidcApp");
 
     private static TemporaryFolder Application(string fixture, (string Name, string Json)[] scenarios, string? overlay = null)
     {
