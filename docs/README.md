@@ -59,6 +59,7 @@ Detailed behaviour, one topic per file. Sections marked _(planned for Mx)_ are n
 | [User administration](reference/user-administration.md)              | The administrator role, the users page, accounts and their MFA, and the roles an administrator gives |
 | [Security headers and rate limits](reference/headers-and-rate-limits.md) | The headers the server sets on every response, and the rate limits per partition      |
 | [Keys and data protection](reference/keys-and-data-protection.md) | The key policy, the cryptographic inventory and crypto agility, and the data protection levels |
+| [Data encryption](reference/data-encryption.md) | Encrypted `sensitive` field values, exact lookup, tenant data keys and their rotation, encrypted backups |
 | [ASVS](reference/asvs.md)                                              | The ASVS 5.0 Level 2 tracking: each requirement, its status and its evidence          |
 | [Fuzz tests](reference/fuzz-tests.md)                                  | The parsers that get fuzz tests, how they are fuzzed and how to replay a failure      |
 | [Threat model](reference/threat-model.md)                              | What can go wrong in Axis's own design: the frame, the scopes and each threat's status |
