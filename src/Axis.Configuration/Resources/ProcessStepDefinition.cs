@@ -66,9 +66,10 @@ public sealed record ProcessStepDefinition
 
     /// <summary>
     /// The inputs of the connector operation a <c>callConnector</c> step sends, each to an
-    /// expression, in file order, or null for any other step.
+    /// expression or, for an <c>object</c> or <c>list</c> input, a nested mapping, in file order, or
+    /// null for any other step.
     /// </summary>
-    public IReadOnlyDictionary<string, string>? Input { get; init; }
+    public IReadOnlyDictionary<string, InputMappingDefinition>? Input { get; init; }
 
     /// <summary>
     /// The outputs of the connector operation a <c>callConnector</c> step writes, each to a field

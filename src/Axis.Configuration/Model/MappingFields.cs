@@ -28,6 +28,7 @@ public static class MappingFields
     /// <item>every field on a reference path, such as <c>department</c> and the <c>name</c> of the department entity for <c>department.name</c>,</item>
     /// <item>every field passed as an argument to a rule, which is where a rule reads its fields from, because its body sees only its parameters,</item>
     /// <item>the owner's child-collection field for an aggregate such as <c>sum(lines, amount)</c>, because child rows are read through the owner, and the target fields of any path in its item expression,</item>
+    /// <item>the owner's child-collection field for a list mapping, and the same for the fields its items read,</item>
     /// <item>the subject field each output is written to.</item>
     /// </list>
     /// Returns null when the mapping uses a name, path, call or node type the walker does not
@@ -45,12 +46,9 @@ public static class MappingFields
         ArgumentNullException.ThrowIfNull(output);
 
         var fields = new HashSet<MappedField>();
-        foreach (var item in input)
+        if (!WalkInputs(pinned, input, subject, inItem: false, fields))
         {
-            if (!Walk(pinned, item.Value.Syntax, item.Value.Check, subject, inItem: false, fields))
-            {
-                return null;
-            }
+            return null;
         }
 
         foreach (var item in output)
@@ -64,7 +62,51 @@ public static class MappingFields
         return fields;
     }
 
-    // inItem is true inside the item expression of an aggregate, where a bare name is a field of the child row.
+    // An object mapping reads over the same entity. A list mapping reads each item over a row of its child collection.
+    private static bool WalkInputs(ApplicationModel pinned, IEnumerable<ConnectorInputModel> inputs, EntityModel entity, bool inItem, HashSet<MappedField> fields)
+    {
+        foreach (var item in inputs)
+        {
+            if (item.Value is { } value)
+            {
+                if (!Walk(pinned, value.Syntax, value.Check, entity, inItem, fields))
+                {
+                    return false;
+                }
+            }
+            else if (item.From is null)
+            {
+                if (!WalkInputs(pinned, item.Fields, entity, inItem, fields))
+                {
+                    return false;
+                }
+            }
+            else if (!WalkList(pinned, item, entity, inItem, fields))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    // The collection field counts through the owner, as it does for an aggregate. The child's own fields do not.
+    private static bool WalkList(ApplicationModel pinned, ConnectorInputModel item, EntityModel entity, bool inItem, HashSet<MappedField> fields)
+    {
+        if (inItem
+            || !entity.TryGetField(item.From!, out var collection)
+            || collection.Type != FieldType.ChildCollection
+            || collection.Target is null
+            || pinned.FindEntity(collection.Target.Id) is not { } child)
+        {
+            return false;
+        }
+
+        fields.Add(new MappedField(entity.Id, collection.Name));
+        return WalkInputs(pinned, item.Fields, child, inItem: true, fields);
+    }
+
+    // inItem is true inside the item expression of an aggregate or a list mapping, where a bare name is a field of the child row.
     private static bool Walk(ApplicationModel pinned, ExpressionNode node, ExpressionCheckResult check, EntityModel entity, bool inItem, HashSet<MappedField> fields)
     {
         switch (node)

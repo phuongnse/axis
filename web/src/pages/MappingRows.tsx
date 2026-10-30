@@ -18,7 +18,7 @@ export type MappingTarget = { kind: 'expression' } | { kind: 'field'; label: str
 /**
  * A map of the draft as rows of a key and its target, at `pointer`. A row's key is picked from `keyOptions`, or typed
  * while they are unknown. The rows edit the draft through `onChange`: a rename keeps the row's place in the file, and
- * a value that is not an object is left to the JSON view.
+ * a value that is not an object is left to the JSON view, and so is a row whose entry is an object.
  */
 export function MappingRows({
   pointer,
@@ -86,44 +86,50 @@ export function MappingRows({
                   />
                 )}
               </div>
-              <div style={{ flex: 1, minWidth: 240 }}>
-                {target.kind === 'field' ? (
-                  target.options === undefined ? (
+              {typeof entry === 'object' && entry !== null ? (
+                <Typography.Text type="secondary" data-testid="studio-json-only" style={{ flex: 1, minWidth: 240 }}>
+                  {t('shell.studio.editInJson')}
+                </Typography.Text>
+              ) : (
+                <div style={{ flex: 1, minWidth: 240 }}>
+                  {target.kind === 'field' ? (
+                    target.options === undefined ? (
+                      <Input
+                        aria-label={target.label}
+                        value={text}
+                        onChange={(event) => onChange(rowPointer, event.target.value)}
+                      />
+                    ) : (
+                      <ReferencePicker
+                        name={target.label}
+                        value={text}
+                        required
+                        options={target.options}
+                        onChange={(next) => onChange(rowPointer, next ?? '')}
+                      />
+                    )
+                  ) : check ? (
+                    <Suspense fallback={<Input aria-label={expressionName} value={text} readOnly />}>
+                      <LazyExpressionEditor
+                        application={check.application}
+                        resourceId={check.resourceId}
+                        path={rowPointer}
+                        name={expressionName}
+                        value={text}
+                        required
+                        options={expressionScope(check.kind, check.draft, rowPointer, check.names)}
+                        onChange={onChange}
+                      />
+                    </Suspense>
+                  ) : (
                     <Input
-                      aria-label={target.label}
+                      aria-label={expressionName}
                       value={text}
                       onChange={(event) => onChange(rowPointer, event.target.value)}
                     />
-                  ) : (
-                    <ReferencePicker
-                      name={target.label}
-                      value={text}
-                      required
-                      options={target.options}
-                      onChange={(next) => onChange(rowPointer, next ?? '')}
-                    />
-                  )
-                ) : check ? (
-                  <Suspense fallback={<Input aria-label={expressionName} value={text} readOnly />}>
-                    <LazyExpressionEditor
-                      application={check.application}
-                      resourceId={check.resourceId}
-                      path={rowPointer}
-                      name={expressionName}
-                      value={text}
-                      required
-                      options={expressionScope(check.kind, check.draft, rowPointer, check.names)}
-                      onChange={onChange}
-                    />
-                  </Suspense>
-                ) : (
-                  <Input
-                    aria-label={expressionName}
-                    value={text}
-                    onChange={(event) => onChange(rowPointer, event.target.value)}
-                  />
-                )}
-              </div>
+                  )}
+                </div>
+              )}
               <Button onClick={() => onChange(rowPointer, undefined)}>{t('shell.studio.process.removeMapping')}</Button>
             </Flex>
           )

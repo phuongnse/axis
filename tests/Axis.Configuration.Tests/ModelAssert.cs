@@ -137,6 +137,11 @@ internal static class ModelAssert
     /// package, version and operation, each input with its expression, each output with its field, its
     /// retry policy, <c>idempotent</c>, <c>timeout</c> and then its <c>next</c>.
     /// </summary>
+    private static string DescribeInput(ConnectorInputModel input) =>
+        input.Value is { } value
+            ? $"{input.Input} = {value.Expression}"
+            : $"{input.Input} {(input.From is null ? "" : $"from {input.From} ")}{{ {string.Join(", ", input.Fields.Select(DescribeInput))} }}";
+
     private static string Describe(ProcessStepModel step) =>
         step switch
         {
@@ -145,9 +150,9 @@ internal static class ModelAssert
             OperationStepModel operation =>
                 $"{operation.Name} {operation.Operation} [{string.Join(", ", operation.Set.Select(assignment => $"{assignment.Field} = {assignment.Value.Expression}"))}] next {operation.Next}",
             CallConnectorStepModel call =>
-                $"{call.Name} callConnector {call.Connector}.{call.Operation} [{string.Join(", ", call.Input.Select(input => $"{input.Input} = {input.Value.Expression}"))}] [{string.Join(", ", call.Output.Select(output => $"{output.Output} → {output.Field}"))}] retry {call.Retry.Attempts} {call.Retry.Backoff} next {call.Next}",
+                $"{call.Name} callConnector {call.Connector}.{call.Operation} [{string.Join(", ", call.Input.Select(DescribeInput))}] [{string.Join(", ", call.Output.Select(output => $"{output.Output} → {output.Field}"))}] retry {call.Retry.Attempts} {call.Retry.Backoff} next {call.Next}",
             PackageOperationStepModel package =>
-                $"{package.Name} package {package.Package} {package.Version} {package.Operation} [{string.Join(", ", package.Input.Select(input => $"{input.Input} = {input.Value.Expression}"))}] [{string.Join(", ", package.Output.Select(output => $"{output.Output} → {output.Field}"))}] retry {package.Retry.Attempts} {package.Retry.Backoff} idempotent {package.Idempotent} timeout {package.Timeout} next {package.Next}",
+                $"{package.Name} package {package.Package} {package.Version} {package.Operation} [{string.Join(", ", package.Input.Select(DescribeInput))}] [{string.Join(", ", package.Output.Select(output => $"{output.Output} → {output.Field}"))}] retry {package.Retry.Attempts} {package.Retry.Backoff} idempotent {package.Idempotent} timeout {package.Timeout} next {package.Next}",
             RaiseEventStepModel raise =>
                 $"{raise.Name} raiseEvent {raise.Event} [{string.Join(", ", raise.Fields.Select(field => $"{field.Field} = {field.Value.Expression}"))}] next {raise.Next}",
             CreateRecordStepModel create =>

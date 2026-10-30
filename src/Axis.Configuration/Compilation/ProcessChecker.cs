@@ -187,10 +187,14 @@ internal static class ProcessChecker
                 CheckConditions(process, scope, references, Report);
             }
 
+            ExpressionScope ChildScope(EntityResource child) =>
+                ExpressionScopes.ForProcess(child.Name, child.Fields, rules, findEntity, modules);
+
             CheckOperations(
                 process,
                 entity,
                 scope,
+                ChildScope,
                 findEntity,
                 ownerOf,
                 unloadedEntityNames,
@@ -297,6 +301,7 @@ internal static class ProcessChecker
             process,
             null,
             scope,
+            child => ExpressionScopes.ForProcess(child.Name, child.Fields, rules, findEntity, modules),
             findEntity,
             ownerOf,
             unloadedEntityNames,
@@ -821,25 +826,54 @@ internal static class ProcessChecker
                 [.. (step.Escalations ?? []).Select(BuildEscalation)]);
         }
 
+        // A checked mapping names each input once and fits its shape. Its inputs are in the operation's
+        // order, and the items of a list are compiled over a row of its child collection.
+        IReadOnlyList<ConnectorInputModel> BuildInputs(
+            IReadOnlyList<OperationField> fields,
+            IReadOnlyDictionary<string, InputMappingDefinition> mappings,
+            EntityResource? subject,
+            ExpressionScope inputScope)
+        {
+            var given = new Dictionary<string, InputMappingDefinition>(mappings, StringComparer.OrdinalIgnoreCase);
+            var models = new List<ConnectorInputModel>();
+            foreach (var input in fields.Where(candidate => given.ContainsKey(candidate.Name)))
+            {
+                var mapping = given[input.Name];
+                if (mapping.Expression is { } expression)
+                {
+                    models.Add(new ConnectorInputModel(input.Name, ExpressionModel.Compile(expression, inputScope, ExpressionScopes.TypeOf(input.Type))));
+                }
+                else if (mapping.From is { } from)
+                {
+                    var collection = FindField(subject!, from)!;
+                    var child = findEntity(collection.Target!)!;
+                    models.Add(new ConnectorInputModel(input.Name, null)
+                    {
+                        From = collection.Name,
+                        Fields = BuildInputs(input.Fields, mapping.Fields!, child, ExpressionScopes.ForProcess(child.Name, child.Fields, rules, findEntity, modules)),
+                    });
+                }
+                else
+                {
+                    models.Add(new ConnectorInputModel(input.Name, null) { Fields = BuildInputs(input.Fields, mapping.Fields!, subject, inputScope) });
+                }
+            }
+
+            return models;
+        }
+
         // A checked call names a loaded connector and operation, and each input, output and field once.
         CallConnectorStepModel BuildConnectorCall(ProcessStepDefinition step)
         {
             var connector = findConnector(step.Connector!.Name)!;
             var operation = FindOperation(connector, step.Connector.Operation)!;
-            var inputs = new Dictionary<string, string>(step.Input!, StringComparer.OrdinalIgnoreCase);
             var outputs = new Dictionary<string, string>(step.Output ?? new Dictionary<string, string>(), StringComparer.OrdinalIgnoreCase);
             TimeSpan? backoff = step.Retry?.Backoff is { } text && IsoDuration.TryParse(text, out var duration) ? duration : null;
             return new CallConnectorStepModel(
                 step.Name,
                 connector.Name,
                 operation.Name,
-                [
-                    .. operation.Input
-                        .Where(input => inputs.ContainsKey(input.Name))
-                        .Select(input => new ConnectorInputModel(
-                            input.Name,
-                            ExpressionModel.Compile(inputs[input.Name], scope, ExpressionScopes.TypeOf(input.Type)))),
-                ],
+                BuildInputs(ToFields(operation.Input), step.Input!, entity, scope),
                 [
                     .. operation.Output
                         .Where(output => outputs.ContainsKey(output.Name))
@@ -855,7 +889,6 @@ internal static class ProcessChecker
             var separator = step.Operation!.IndexOf('/', StringComparison.Ordinal);
             var package = findPackage(step.Operation[..separator])!;
             var operation = FindPackageOperation(package, step.Operation[(separator + 1)..])!;
-            var inputs = new Dictionary<string, string>(step.Input!, StringComparer.OrdinalIgnoreCase);
             var outputs = new Dictionary<string, string>(step.Output ?? new Dictionary<string, string>(), StringComparer.OrdinalIgnoreCase);
             TimeSpan? backoff = step.Retry?.Backoff is { } text && IsoDuration.TryParse(text, out var duration) ? duration : null;
             return new PackageOperationStepModel(
@@ -863,13 +896,7 @@ internal static class ProcessChecker
                 package.Id,
                 package.Version,
                 operation.Name,
-                [
-                    .. operation.Input
-                        .Where(input => inputs.ContainsKey(input.Name))
-                        .Select(input => new ConnectorInputModel(
-                            input.Name,
-                            ExpressionModel.Compile(inputs[input.Name], scope, ExpressionScopes.TypeOf(input.Type)))),
-                ],
+                BuildInputs(ToFields(operation.Input), step.Input!, entity, scope),
                 [
                     .. operation.Output
                         .Where(output => outputs.ContainsKey(output.Name))
@@ -1283,6 +1310,7 @@ internal static class ProcessChecker
         ProcessResource process,
         EntityResource? entity,
         ExpressionScope? scope,
+        Func<EntityResource, ExpressionScope> childScope,
         Func<string, EntityResource?> findEntity,
         Func<string, string?> ownerOf,
         IReadOnlySet<string> unloadedEntityNames,
@@ -1313,13 +1341,13 @@ internal static class ProcessChecker
 
             if (step.Operation!.Contains('/', StringComparison.Ordinal))
             {
-                CheckPackageCall(process, step, index, entity, scope, findPackage, declaredPackageIds, references, report);
+                CheckPackageCall(process, step, index, entity, scope, childScope, findEntity, findPackage, declaredPackageIds, references, report);
                 continue;
             }
 
             if (string.Equals(step.Operation, ProcessStepDefinition.CallConnector, StringComparison.Ordinal))
             {
-                CheckConnectorCall(process, step, index, entity, scope, findConnector, unloadedConnectorNames, findSlot, references, report);
+                CheckConnectorCall(process, step, index, entity, scope, childScope, findEntity, findConnector, unloadedConnectorNames, findSlot, references, report);
                 continue;
             }
 
@@ -1687,6 +1715,8 @@ internal static class ProcessChecker
         int index,
         EntityResource? entity,
         ExpressionScope? scope,
+        Func<EntityResource, ExpressionScope> childScope,
+        Func<string, EntityResource?> findEntity,
         Func<string, ConnectorResource?> findConnector,
         IReadOnlySet<string> unloadedConnectorNames,
         Func<string, ModuleConnectorSlot?>? findSlot,
@@ -1697,7 +1727,7 @@ internal static class ProcessChecker
         var reference = step.Connector!;
         if (findSlot is not null)
         {
-            CheckSlotCall(process, step, path, entity, scope, findSlot, references, report);
+            CheckSlotCall(process, step, path, entity, scope, childScope, findEntity, findSlot, references, report);
             CheckRetry(step, path, report);
             return;
         }
@@ -1726,7 +1756,7 @@ internal static class ProcessChecker
             }
             else
             {
-                CheckInputs(process, step, path, operation.Name, ToFields(operation.Input), scope, references, report);
+                CheckInputs(process, step, path, operation.Name, ToFields(operation.Input), entity, scope, childScope, findEntity, references, report);
                 // An output of a process without a subject is reported already, as it has no field to write.
                 if (process.Entity is not null)
                 {
@@ -1749,6 +1779,8 @@ internal static class ProcessChecker
         string path,
         EntityResource? entity,
         ExpressionScope? scope,
+        Func<EntityResource, ExpressionScope> childScope,
+        Func<string, EntityResource?> findEntity,
         Func<string, ModuleConnectorSlot?> findSlot,
         ReferenceIndexBuilder references,
         Action<string, string, string> report)
@@ -1773,7 +1805,7 @@ internal static class ProcessChecker
         }
 
         // A slot is not a resource, so the call adds no reference. The application's mapping records the edge to the connector.
-        CheckInputs(process, step, path, operation.Name, ToFields(operation.Input), scope, references, report);
+        CheckInputs(process, step, path, operation.Name, ToFields(operation.Input), entity, scope, childScope, findEntity, references, report);
         // An output of a process without a subject is reported already, as it has no field to write.
         if (process.Entity is not null)
         {
@@ -1795,6 +1827,8 @@ internal static class ProcessChecker
         int index,
         EntityResource? entity,
         ExpressionScope? scope,
+        Func<EntityResource, ExpressionScope> childScope,
+        Func<string, EntityResource?> findEntity,
         Func<string, PinnedOperations?> findPackage,
         IReadOnlySet<string>? declaredPackageIds,
         ReferenceIndexBuilder references,
@@ -1829,7 +1863,7 @@ internal static class ProcessChecker
             }
             else
             {
-                CheckInputs(process, step, path, operation.Name, ToFields(operation.Input), scope, references, report);
+                CheckInputs(process, step, path, operation.Name, ToFields(operation.Input), entity, scope, childScope, findEntity, references, report);
                 // An output of a process without a subject is reported already, as it has no field to write.
                 if (process.Entity is not null)
                 {
@@ -1853,10 +1887,10 @@ internal static class ProcessChecker
     }
 
     private static IReadOnlyList<OperationField> ToFields(IReadOnlyList<ConnectorFieldDefinition> fields) =>
-        [.. fields.Select(field => new OperationField(field.Name, FieldTypes.Parse(field.Type), field.Required))];
+        [.. fields.Select(field => new OperationField(field.Name, FieldTypes.Parse(field.Type), field.Required, ToFields(field.Fields ?? [])))];
 
     private static IReadOnlyList<OperationField> ToFields(IReadOnlyList<PackageField> fields) =>
-        [.. fields.Select(field => new OperationField(field.Name, field.Type, field.Required))];
+        [.. fields.Select(field => new OperationField(field.Name, field.Type, field.Required, []))];
 
     private static void CheckInputs(
         ProcessResource process,
@@ -1864,15 +1898,41 @@ internal static class ProcessChecker
         string path,
         string operationName,
         IReadOnlyList<OperationField> fields,
+        EntityResource? entity,
         ExpressionScope? scope,
+        Func<EntityResource, ExpressionScope> childScope,
+        Func<string, EntityResource?> findEntity,
+        ReferenceIndexBuilder references,
+        Action<string, string, string> report) =>
+        CheckMappings(process, step.Input!, $"{path}/input", operationName, fields, entity, scope, childScope, findEntity, references, report);
+
+    /// <summary>
+    /// Checks the mappings of one container, the <c>input</c> of a step or the <c>fields</c> of an
+    /// <c>object</c> or <c>list</c> mapping, against the declared <paramref name="fields"/>. An
+    /// unknown or repeated name is reported at the key, and a required field the container does not
+    /// give at the container. A scalar input needs an expression, an <c>object</c> needs <c>fields</c>
+    /// and a <c>list</c> needs <c>fields</c> and a <c>from</c>. The <c>from</c> of a list names a child
+    /// collection of <paramref name="entity"/>, and its items are checked over a row of the child.
+    /// The expressions are not checked when the subject entity is unknown.
+    /// </summary>
+    private static void CheckMappings(
+        ProcessResource process,
+        IReadOnlyDictionary<string, InputMappingDefinition> mappings,
+        string containerPath,
+        string operationName,
+        IReadOnlyList<OperationField> fields,
+        EntityResource? entity,
+        ExpressionScope? scope,
+        Func<EntityResource, ExpressionScope> childScope,
+        Func<string, EntityResource?> findEntity,
         ReferenceIndexBuilder references,
         Action<string, string, string> report)
     {
         // The key that first named each input, by the input's declared name.
         var namedBy = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var (key, expression) in step.Input!)
+        foreach (var (key, mapping) in mappings)
         {
-            var keyPath = $"{path}/input/{key}";
+            var keyPath = $"{containerPath}/{key}";
             var input = fields.FirstOrDefault(candidate => string.Equals(candidate.Name, key, StringComparison.OrdinalIgnoreCase));
             if (input is null)
             {
@@ -1892,26 +1952,67 @@ internal static class ProcessChecker
                 continue;
             }
 
-            if (input.Type is FieldType.Object or FieldType.List)
+            if (MismatchOf(input, mapping) is { } mismatch)
+            {
+                report(DiagnosticCodes.MismatchedInputMapping, mismatch, keyPath);
+                continue;
+            }
+
+            if (mapping.Expression is { } expression)
+            {
+                // The expression cannot be checked without the entity.
+                if (scope is null)
+                {
+                    continue;
+                }
+
+                var problem = CheckExpression(process, expression, scope, ExpressionScopes.TypeOf(input.Type), keyPath, references);
+                if (problem is not null)
+                {
+                    report(problem.Code, problem.Message, keyPath);
+                }
+
+                continue;
+            }
+
+            var nested = mapping.Fields!;
+            var nestedPath = $"{keyPath}/fields";
+            if (mapping.From is not { } from)
+            {
+                CheckMappings(process, nested, nestedPath, operationName, input.Fields, entity, scope, childScope, findEntity, references, report);
+                continue;
+            }
+
+            // The items cannot be checked without a child row, but their names still can.
+            EntityResource? child = null;
+            ExpressionScope? itemScope = null;
+            if (process.Entity is null)
             {
                 report(
-                    DiagnosticCodes.StructuredInputExpression,
-                    $"The input '{input.Name}' is {(input.Type == FieldType.Object ? "an object" : "a list")}, so a plain expression cannot give it. Mapping object and list inputs in a step is not built yet.",
-                    keyPath);
-                continue;
+                    DiagnosticCodes.InvalidMappingSource,
+                    $"The process has no subject record, so '{from}' is not a child collection of it. A list maps from a child collection of the subject.",
+                    $"{keyPath}/from");
+            }
+            else if (scope is not null)
+            {
+                var field = entity is null ? null : FindField(entity, from);
+                if (field is not null && FieldTypes.Parse(field.Type) == FieldType.ChildCollection)
+                {
+                    child = field.Target is { } target ? findEntity(target) : null;
+                    itemScope = child is null ? null : childScope(child);
+                }
+                else
+                {
+                    report(
+                        DiagnosticCodes.InvalidMappingSource,
+                        field is null
+                            ? $"The field '{from}' was not found. The entity '{entity?.Name}' has no field with that name. A list maps from a child collection of the subject."
+                            : $"The field '{field.Name}' is not a child collection. A list maps from a child collection of the subject.",
+                        $"{keyPath}/from");
+                }
             }
 
-            // The expression cannot be checked without the entity.
-            if (scope is null)
-            {
-                continue;
-            }
-
-            var problem = CheckExpression(process, expression, scope, ExpressionScopes.TypeOf(input.Type), keyPath, references);
-            if (problem is not null)
-            {
-                report(problem.Code, problem.Message, keyPath);
-            }
+            CheckMappings(process, nested, nestedPath, operationName, input.Fields, child, itemScope, childScope, findEntity, references, report);
         }
 
         foreach (var input in fields)
@@ -1921,10 +2022,24 @@ internal static class ProcessChecker
                 report(
                     DiagnosticCodes.MissingConnectorInput,
                     $"The input '{input.Name}' is required by the operation '{operationName}', but the step does not give it.",
-                    $"{path}/input");
+                    containerPath);
             }
         }
     }
+
+    // What is wrong with the shape of a mapping for its input, or null when the shape fits.
+    private static string? MismatchOf(OperationField input, InputMappingDefinition mapping) =>
+        input.Type switch
+        {
+            FieldType.Object when mapping.Fields is null || mapping.From is not null =>
+                $"The input '{input.Name}' is an object, so it is mapped as {{ \"fields\": {{ ... }} }}, without a 'from'.",
+            FieldType.List when mapping.Fields is null || mapping.From is null =>
+                $"The input '{input.Name}' is a list, so it is mapped as {{ \"from\": \"<child collection>\", \"fields\": {{ ... }} }}.",
+            FieldType.Object or FieldType.List => null,
+            _ when mapping.Fields is not null =>
+                $"The input '{input.Name}' is not an object or a list, so it is given by an expression, not by 'fields'.",
+            _ => null,
+        };
 
     private static void CheckOutputs(
         ProcessStepDefinition step,
@@ -2482,7 +2597,7 @@ internal static class ProcessChecker
     }
 
     /// <summary>An input or output field of a connector or package operation, with its type as a field type.</summary>
-    private sealed record OperationField(string Name, FieldType Type, bool Required);
+    private sealed record OperationField(string Name, FieldType Type, bool Required, IReadOnlyList<OperationField> Fields);
 
     /// <summary>A transition and its path in the process file. <see cref="Target"/> is the index of the step it names, or null when it names none.</summary>
     private readonly record struct Transition(int? Target, string Path);
