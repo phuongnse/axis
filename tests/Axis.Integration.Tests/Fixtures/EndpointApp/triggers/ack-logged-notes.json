@@ -1,0 +1,10 @@
+{
+  "id": "e5a2c7f0-1d94-4b38-a6c3-7f8b0d2e9154",
+  "kind": "trigger",
+  "name": "AckLoggedNotes",
+  "formatVersion": 1,
+  "type": "event",
+  "event": "NoteLogged",
+  "mode": "sync",
+  "process": "AckNote"
+}

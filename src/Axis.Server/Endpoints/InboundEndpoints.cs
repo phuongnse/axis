@@ -32,7 +32,10 @@ namespace Axis.Server.Endpoints;
 /// transaction then claims the key's receipt, unique per endpoint and caller, and creates the record
 /// from the mapped values through the record create command, with the caller's id in its creator
 /// fields, starts the processes of the data change triggers on the entity's create as <c>system</c>,
-/// and starts the endpoint's process on it as the process start does. A refused value, a
+/// and starts the endpoint's process on it as the process start does. An endpoint with an
+/// <c>event</c> then raises it for the new record in the same transaction, as a <c>raiseEvent</c>
+/// step does, and a <c>fields</c> expression that fails at run time is a 400 keyed
+/// <c>/event/fields/…</c>. A refused value, a
 /// failed validation and a missing reference are a 400 keyed <c>/values/…</c>, and a failed start
 /// condition a 400 keyed <c>/input</c>. Both audit records name the caller as the actor and the
 /// endpoint in their details. A call that fails writes nothing. The entity and process grants of
@@ -276,6 +279,34 @@ internal static class InboundEndpoints
             return new(started.Outcome == ProcessStartOutcome.ConditionFailed
                 ? Results.ValidationProblem(new Dictionary<string, string[]> { [InputPointer] = [started.TextKey!] })
                 : ProcessStartEndpoints.AlreadyRunning());
+        }
+
+        // The event is raised after the start, so a failed start condition and a running instance are
+        // answered before an event error. Its fields see the transaction's time as now().
+        if (endpoint.Event is { } raised)
+        {
+            var mappedEvent = EndpointInputMapper.MapEvent(application, endpoint, parsed.Input!, now);
+            if (mappedEvent.Errors is { } eventErrors)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                return new(Results.ValidationProblem(eventErrors));
+            }
+
+            var @event = application.Events.FirstOrDefault(candidate => string.Equals(candidate.Name, raised.Name, StringComparison.OrdinalIgnoreCase))
+                ?? throw new InvalidOperationException($"The event '{raised.Name}' of endpoint '{endpoint.Name}' is not in the model.");
+            await EventRaiser.RaiseAsync(
+                transaction,
+                tenantId,
+                application,
+                active.ReleaseId,
+                @event,
+                Guid.CreateVersion7(),
+                record.Id,
+                EventRaiser.Payload(mappedEvent.Fields),
+                instanceId,
+                (active.ReleaseId, application),
+                loggerFactory.CreateLogger(typeof(EventRaiser)),
+                cancellationToken);
         }
 
         await transaction.CommitAsync(cancellationToken);

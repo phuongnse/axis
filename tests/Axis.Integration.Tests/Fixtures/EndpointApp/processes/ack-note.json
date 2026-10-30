@@ -1,0 +1,9 @@
+{
+  "id": "0a7e4b19-3c5d-4e82-b6f1-92d8c4a7e350",
+  "kind": "process",
+  "name": "AckNote",
+  "formatVersion": 1,
+  "entity": "Note",
+  "start": "done",
+  "steps": [{ "name": "done", "type": "end" }]
+}

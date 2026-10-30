@@ -718,7 +718,7 @@ the caller's id.
 - **Event**. `event` is optional. It names an event about `entity` and maps each
   payload field to an expression over the input, as
   [D115](../decisions/d115-an-inbound-endpoint-call-raises-an-event.md) agrees.
-  The compiler checks it. _(planned for M19)_ The call raises it for the new
+  The compiler checks it. The call raises it for the new
   record in its transaction, see [the call](inbound-endpoints.md).
 
   ```json
