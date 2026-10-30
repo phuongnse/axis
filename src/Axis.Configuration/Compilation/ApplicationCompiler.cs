@@ -246,7 +246,7 @@ public static partial class ApplicationCompiler
         IReadOnlyList<ResourceContent> moduleFiles = [];
         IReadOnlySet<string>? declaredPackageIds = null;
         var timeZone = TimeZoneInfo.Utc;
-        var moduleResources = new ModuleResources([], [], [], [], [], [], [], [], new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new Dictionary<string, IReadOnlySet<string>>());
+        var moduleResources = new ModuleResources([], [], [], [], [], [], [], [], [], new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new Dictionary<string, IReadOnlySet<string>>(), new Dictionary<string, IReadOnlySet<string>>());
         if (loaded.Application is { } manifest)
         {
             packages = PackageChecker.Check(manifest, installedPackages, diagnostics, references);
@@ -263,7 +263,7 @@ public static partial class ApplicationCompiler
             }
         }
 
-        // A pinned module's entities, sequences, seeds, events, data sources and forms come before the application's own, so a
+        // A pinned module's entities, sequences, seeds, events, data sources, forms and policies come before the application's own, so a
         // step that depends on order sees each module target first. Application resources can name
         // them as '<module id>/<name>', but a module never names an application resource.
         var allEntities = new List<EntityResource>([.. moduleResources.Entities, .. loaded.Entities]);
@@ -279,6 +279,7 @@ public static partial class ApplicationCompiler
         {
             DataSources = [.. moduleResources.DataSources, .. loaded.DataSources],
             Forms = [.. moduleResources.Forms, .. loaded.Forms],
+            Policies = [.. moduleResources.Policies, .. loaded.Policies],
             UnloadedEntityNames = unloadedEntityNames,
             UnloadedSequenceNames = unloadedSequenceNames,
             UnloadedEventNames = unloadedEventNames,
@@ -433,9 +434,9 @@ public static partial class ApplicationCompiler
                 ]
                 : rules;
 
-        // A module data source filter sees only the rules of the modules its module declares, by qualified call.
-        IReadOnlyList<ExpressionRule> FilterRulesFor(DataSourceResource dataSource) =>
-            IsModuleResource(dataSource) ? [.. DeclaredRulesOf(dataSource)] : rules;
+        // A module data source or policy filter sees only the rules of the modules its module declares, by qualified call.
+        IReadOnlyList<ExpressionRule> FilterRulesFor(Resource resource) =>
+            IsModuleResource(resource) ? [.. DeclaredRulesOf(resource)] : rules;
 
         IEnumerable<ExpressionRule> DeclaredRulesOf(Resource resource)
         {
@@ -448,6 +449,20 @@ public static partial class ApplicationCompiler
             IsModuleResource(resource)
                 ? moduleResources.DeclaredModules.GetValueOrDefault(ModuleIdOf(resource.Name)) ?? new HashSet<string>()
                 : declaredModules;
+
+        // A module policy names role slots. In this application each slot is the role the module's entry maps
+        // it to, so the policy matrix and the model treat its grants as grants to that role. A slot that is not
+        // mapped, and a role that is not a slot, name nobody.
+        PolicyResource MapSlots(PolicyResource policy) =>
+            IsModuleResource(policy)
+                ? policy with
+                {
+                    Roles = [.. modules
+                        .Where(pin => pin.Id == ModuleIdOf(policy.Name))
+                        .SelectMany(pin => policy.Roles.Where(pin.Roles.ContainsKey).Select(slot => pin.Roles[slot]))
+                        .Distinct(StringComparer.Ordinal)],
+                }
+                : policy;
 
         foreach (var entity in allEntities)
         {
@@ -509,6 +524,7 @@ public static partial class ApplicationCompiler
             loaded.Policies,
             FindRole,
             loaded.UnloadedRoleNames,
+            moduleResources.RoleSlots,
             FindEntity,
             name => ownersByChildName.TryGetValue(name, out var owner) ? owner.ToString() : null,
             loaded.UnloadedEntityNames,
@@ -519,9 +535,9 @@ public static partial class ApplicationCompiler
             FindEndpoint,
             loaded.UnloadedEndpointNames,
             references,
-            rules,
+            FilterRulesFor,
             moduleReferences,
-            declaredModules,
+            DeclaredModulesOf,
             diagnostics);
         ConnectorChecker.Check(loaded.Connectors, diagnostics);
         IdentityProviderChecker.Check(
@@ -597,7 +613,7 @@ public static partial class ApplicationCompiler
             ModulePins = modules,
             PolicyMatrix = PolicyMatrixBuilder.Build(
                 loaded.Roles,
-                loaded.Policies,
+                [.. loaded.Policies.Select(MapSlots)],
                 allEntities,
                 ownersByChildName.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase),
                 loaded.DataSources,
@@ -653,7 +669,14 @@ public static partial class ApplicationCompiler
             Processes = loaded.Processes.Select(process => ProcessChecker.Build(process, FindEntity, FindForm, FindConnector, FindEvent, FindPackage, FindPage, FindProcess, rules, declaredModules)).ToList(),
             Forms = loaded.Forms.Select(form => BuildForm(formsByName[form.Name], entitiesByName, IsModuleResource(form) ? [] : rules, IsModuleResource(form) ? null : declaredModules)).ToList(),
             Roles = loaded.Roles,
-            Policies = loaded.Policies.Select(policy => PolicyChecker.Build(policy, entities, FindDataSource, FindProcess, FindEndpoint, rules, declaredModules)).ToList(),
+            Policies = loaded.Policies.Select(policy => PolicyChecker.Build(
+                MapSlots(policy) with { Id = IsModuleResource(policy) ? ModuleResourceIds.Derive(applicationId, policy.Id) : policy.Id },
+                entities,
+                FindDataSource,
+                FindProcess,
+                FindEndpoint,
+                FilterRulesFor(policy),
+                DeclaredModulesOf(policy))).ToList(),
             Connectors = loaded.Connectors.Select(ConnectorChecker.Build).ToList(),
             IdentityProviders = loaded.IdentityProviders.Select(IdentityProviderChecker.Build).ToList(),
             Events = allEvents.Select(@event => EventChecker.Build(eventsByName[@event.Name], FindEntity)).ToList(),

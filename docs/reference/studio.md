@@ -417,8 +417,8 @@ Run and the Test results list, the read-only view of a module entity, and the re
   - Selecting a cell opens its grants under the table. A cell lists the
     role's combined actions. A data source cell that lacks the `read` of its
     root entity warns and names that entity. A read-only row shows its reason.
-    A shared grant is tagged Shared, and its Open policy link opens that policy
-    in the Resources view.
+    A shared grant is tagged Shared, and its Open policy link opens that policy in the Resources view.
+    A module policy's grant, in the row of its slot's role, is tagged with the module and has no link.
   - In an editable row, the cell's own grants are editable. They are the
     grants of `<Role>Access` that name exactly this target. The panel reads
     that policy with the resource route, so every edit fits the file that a

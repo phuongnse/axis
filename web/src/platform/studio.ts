@@ -422,7 +422,10 @@ export interface StudioMatrixTarget {
   entity: string | null
 }
 
-/** One grant behind a matrix cell, as written in its policy. `fields` is null for every field. */
+/**
+ * One grant behind a matrix cell, as written in its policy. `fields` is null for every field. `module` is the
+ * module id when the grant comes from a module's policy, which Studio does not edit.
+ */
 export interface StudioMatrixGrant {
   policyId: string
   policy: string
@@ -431,6 +434,7 @@ export interface StudioMatrixGrant {
   filter: string | null
   fields: string[] | null
   shared: boolean
+  module: string | null
 }
 
 /** What one role may do on one target. `missingEntityRead` names the root entity a data source `read` lacks. */

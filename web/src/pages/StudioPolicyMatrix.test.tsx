@@ -23,6 +23,7 @@ const entityGrants: StudioMatrixCell['grants'] = [
     filter: null,
     fields: null,
     shared: false,
+    module: null,
   },
   {
     policyId: sharedPolicyId,
@@ -32,6 +33,7 @@ const entityGrants: StudioMatrixCell['grants'] = [
     filter: 'record.requester == user.id',
     fields: ['title', 'amount'],
     shared: true,
+    module: null,
   },
 ]
 
@@ -188,6 +190,45 @@ describe.each(['light', 'dark'])('StudioPolicyMatrixTable in %s mode', (mode) =>
     expect(within(grants[0]).queryByRole('checkbox')).not.toBeInTheDocument()
     await userEvent.click(within(grants[0]).getByRole('button', { name: 'Open policy' }))
     expect(onOpenPolicy).toHaveBeenCalledWith(sharedPolicyId)
+  })
+
+  it('tags a module grant with its module and offers no link to open its policy', async () => {
+    const onOpenPolicy = renderMatrix({
+      roles: [
+        {
+          ...matrix.roles[1],
+          cells: [
+            cell('entity', 'PurchaseRequest', {
+              actions: ['read'],
+              grants: [
+                {
+                  policyId: 'm1',
+                  policy: 'approvals/ApproverAccess',
+                  index: 0,
+                  actions: ['read'],
+                  filter: null,
+                  fields: null,
+                  shared: true,
+                  module: 'approvals',
+                },
+              ],
+            }),
+            cell('dataSource', 'OpenRequests'),
+            cell('process', 'PurchaseApproval'),
+            cell('endpoint', 'Intake'),
+          ],
+        },
+      ],
+    })
+
+    await userEvent.click(screen.getByTestId('studio-matrix-cell-manager-entity-PurchaseRequest'))
+
+    const grant = screen.getByTestId('studio-matrix-grant')
+    expect(within(grant).getByText('approvals/ApproverAccess')).toBeInTheDocument()
+    expect(within(grant).getByText('Shared')).toBeInTheDocument()
+    expect(within(grant).getByText('approvals')).toBeInTheDocument()
+    expect(within(grant).queryByRole('button', { name: 'Open policy' })).not.toBeInTheDocument()
+    expect(onOpenPolicy).not.toHaveBeenCalled()
   })
 
   it('shows the filter and the fields of a grant of a read-only row, and all fields when none are listed', async () => {

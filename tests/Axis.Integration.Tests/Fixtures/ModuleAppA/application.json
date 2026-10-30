@@ -5,6 +5,7 @@
   "formatVersion": 1,
   "modules": [
     { "id": "departments", "version": "^1.0.0" },
-    { "id": "budgets", "version": "^1.0.0" }
+    { "id": "budgets", "version": "^1.0.0" },
+    { "id": "approvals", "version": "^1.0.0", "roles": { "approver": "manager" } }
   ]
 }

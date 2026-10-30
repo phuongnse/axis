@@ -1,0 +1,7 @@
+{
+  "kind": "module",
+  "id": "approvals",
+  "version": "1.0.0",
+  "label": "Approvals",
+  "roles": [{ "name": "approver", "label": { "textKey": "approvals.roles.approver" } }]
+}

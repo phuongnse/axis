@@ -1,0 +1,8 @@
+{
+  "id": "6e1b8d43-7f5a-4c9d-a03b-1c4e8a2d5b01",
+  "kind": "entity",
+  "name": "Approval",
+  "formatVersion": 1,
+  "displayField": "title",
+  "fields": [{ "name": "title", "type": "text", "required": true, "maxLength": 100 }]
+}

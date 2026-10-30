@@ -260,7 +260,8 @@ function ReadOnlyGrant({
           </Tag>
         ))}
         {grant.shared && <Tag color="processing">{t('shell.studio.matrix.shared')}</Tag>}
-        {grant.shared && (
+        {grant.module !== null && <Tag>{grant.module}</Tag>}
+        {grant.shared && grant.module === null && (
           <Button type="link" size="small" onClick={() => onOpenPolicy(grant.policyId)}>
             {t('shell.studio.matrix.openPolicy')}
           </Button>

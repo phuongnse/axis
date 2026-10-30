@@ -1,0 +1,8 @@
+{
+  "id": "6e1b8d43-7f5a-4c9d-a03b-1c4e8a2d5b02",
+  "kind": "dataSource",
+  "name": "Approvals",
+  "formatVersion": 1,
+  "entity": "Approval",
+  "fields": [{ "name": "title", "path": "title" }]
+}

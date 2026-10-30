@@ -11,8 +11,10 @@ namespace Axis.Integration.Tests;
 /// <c>ActivateOnStartup</c>. Both use the <c>departments</c> test module installed under
 /// <c>Fixtures/Modules</c>, so the module's department table and seed rows exist once for each.
 /// ModuleAppA also declares the <c>budgets</c> module, which depends on <c>departments</c>, and has an
-/// <c>Employee</c> entity that references a department. The test
-/// authentication scheme signs in <c>requester</c>, an employee, and <c>manager</c>, who holds no role.
+/// <c>Employee</c> entity that references a department. Both also declare the <c>approvals</c> module, whose
+/// <c>approver</c> slot ModuleAppA maps to <c>manager</c> and ModuleAppB to <c>reviewer</c>. The test
+/// authentication scheme signs in <c>requester</c>, an employee, <c>manager</c>, who holds no role, and
+/// <c>approver-a</c>, who holds <c>manager</c> in ModuleAppA only.
 /// </summary>
 public sealed class ModuleAppFixture : IAsyncLifetime
 {
@@ -69,7 +71,11 @@ public sealed class ModuleAppFixture : IAsyncLifetime
             builder.UseSetting("ActivateOnStartup:1", Path.Combine(_fixtures, "ModuleAppB"));
             builder.UseTestAuthentication(
                 new TestIdentity("requester", "Requester User", "employee"),
-                new TestIdentity("manager", "Manager No Role"));
+                new TestIdentity("manager", "Manager No Role"),
+                new TestIdentity("approver-a", "Approver In A")
+                {
+                    ApplicationRoles = new Dictionary<Guid, IReadOnlyList<string>> { [AppAId] = ["manager"] },
+                });
         });
 
         // Creating a client starts the server, which migrates the database, activates both applications and seeds them.

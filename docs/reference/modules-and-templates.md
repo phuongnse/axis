@@ -11,10 +11,11 @@ This section follows
 [D40](../decisions/d40-reusable-modules.md). The manifest,
 installation, declaring, pinning, dependencies between modules, the diagnostics `AXC0200` to `AXC0214`,
 `AXC0295` and `AXC0296`, the
-role slots with their mapping, `AXC0292` to `AXC0294`, and the connector slots with their
-mapping, `AXC0297` to `AXC0303`, are built. A pinned module's files are stored in the release and
+role slots with their mapping, `AXC0292` to `AXC0294`, the connector slots with their
+mapping, `AXC0297` to `AXC0303`, and the module policies that name role slots, `AXC0304` and
+`AXC0305`, are built. A pinned module's files are stored in the release and
 checked as JSON, for an allowed kind and against the schema of their kind. A
-pinned module's entities, sequences, seeds, events, data sources and forms join the application
+pinned module's entities, sequences, seeds, events, data sources, forms and policies join the application
 model, each with an id derived from the application `id` and the name
 `<module id>/<name>`. A field's `target` and `sequence`, a data source's and a
 form's `entity` and a policy grant's `entity` can name them. A field's
@@ -27,6 +28,9 @@ with the rule checks, inside their module, and application expressions call them
 see [References](#modules). Activation provisions the module's entities as the
 application's own tables, startup seeding applies the module's seeds, the record
 API serves module entities, and the data source endpoint serves module data sources.
+A module policy grants the role its slot maps to, so a person who holds that role in
+the application reaches the module's entities and data sources, see
+[module policies](#processes-pages-policies-and-dependencies).
 A module is a
 versioned folder of resources that applications reuse. An application declares
 the modules it uses in `application.json`, with a version range for each:
@@ -70,8 +74,8 @@ calls `IsDepartmentCode`, so a department code must be in capital letters.
   lists the modules it depends on, with the `id` and `version` entries of an application's `modules`, see
   [dependencies](#processes-pages-policies-and-dependencies).
 - **Kinds a module may hold.** `entity`, `dataSource`, `rule`, `sequence`,
-  `form`, `event`, `text` and `seed`. Processes, pages, roles and policies are
-  not allowed. _(planned for M20)_ `process`, `page`, `policy` and `trigger`
+  `form`, `event`, `text`, `seed` and `policy`. Processes, pages and roles are
+  not allowed. _(planned for M20)_ `process`, `page` and `trigger`
   are allowed too. _(planned for M24)_ So is `scenario`. Roles stay out.
 - **Installation.** Modules are installed per installation under
   `Modules:Path/<id>/<version>/`. The server, the worker and the scenario runner
@@ -225,6 +229,8 @@ calls `IsDepartmentCode`, so a department code must be in capital letters.
 | `AXC0301` | An input of a slot operation is not an input of the connector's operation with the same type. The message names the slot, the operation and the field, and both types when the field exists. Reported at `/modules/{i}/connectors/{slot}`. |
 | `AXC0302` | An input of the connector's operation is required, and the slot operation has no input with that name. The message names the slot, the operation and the field. Reported at `/modules/{i}/connectors/{slot}`. |
 | `AXC0303` | An output of a slot operation is not an output of the connector's operation with the same type. The message names the slot, the operation and the field, and both types when the field exists. Reported at `/modules/{i}/connectors/{slot}`. |
+| `AXC0304` | A role in a module policy's `roles` is not a role slot of its module. The message lists the slots, or says there are none. Reported at `/roles/{i}` of the module file. |
+| `AXC0305` | A grant in a module policy is on something other than an entity or data source of its own module: a `process` or `endpoint` grant, a name with `/` such as `departments/Department`, or the plain name of an application entity or data source. Reported at `/grants/{i}/entity`, `/grants/{i}/dataSource`, `/grants/{i}/process` or `/grants/{i}/endpoint` of the module file. |
 
 ### Processes, pages, policies and dependencies
 
@@ -258,7 +264,7 @@ agrees. An application that declares it maps the slot to one of its own roles:
 ]
 ```
 
-- **Kinds.** A module may also hold `process`, `page`, `policy` and
+- **Kinds.** A module may also hold `process`, `page` and
   `trigger`, and _(planned for M24)_ `scenario`, as
   [D103](../decisions/d103-modules-hold-triggers-scenarios-and-connector-slots.md) agrees. It still holds no `role`, `site`, `identityProvider`,
   `connector`, `endpoint` or `webhook`.
@@ -267,18 +273,34 @@ agrees. An application that declares it maps the slot to one of its own roles:
   in the module, ignoring letter case, or the version fails at host start with
   `AXC0200` at `/roles/{i}/name`. A label's text key starts with `<module id>.`,
   or `AXC0209` is reported at `/roles/{i}/label/textKey` of `module.json`.
-  Declaring slots is built. _(planned for M20)_ Module policies and the
-  assignees of module tasks name a slot. Naming anything else is a new
-  diagnostic.
+  Declaring slots is built. A module policy names a slot, and anything else is
+  `AXC0304`. _(planned for M20)_ The assignees of module tasks name a slot too.
+  Naming anything else is a new diagnostic.
 - **Mapping slots.** Each `modules` entry of an application has `roles`, which
   maps every slot of that module to a role the application declares. A slot
   left unmapped is `AXC0292`, a slot mapped to an undeclared role is `AXC0293`
   and a key that is no slot of the pinned version is `AXC0294`. Slot and role
   names are matched exactly. The compiled model keeps the map of each pinned
-  module. _(planned for M20)_ After the mapping, a user who holds the role
-  holds the slot.
-- **Module policies.** A module policy grants only on resources of its own
-  module.
+  module. After the mapping, a user who holds the role in the application
+  holds the slot, for the module policies. _(planned for M20)_ The same holds for the assignees of module
+  tasks.
+- **Module policies.** _(built)_ A module policy is a `policy` file in the module.
+  In an application it is named `<module id>/<name>`, and its id is derived from
+  the application `id` as for other module resources. Its `roles` name role
+  slots of its own module, matched exactly, and anything else, a role included,
+  is `AXC0304`. Each slot becomes the role the application maps it to, so the
+  compiled policy names that role and a person who holds the role in the
+  application gets the grants there, and in no other application. A slot the
+  application does not map names nobody. A grant names an entity or data source of
+  its own module by its plain name. A name with `/`, including a module it
+  declares, a `process` or `endpoint` grant, and the plain name of an application
+  entity or data source are `AXC0305`. An unknown plain name keeps `AXC0092`. A grant's `filter` calls
+  only rules of the modules its module declares, by qualified call, as a module
+  data source filter does. Default deny still holds: without the mapped role a
+  person gets `403` on the module entity and data source. A module that the
+  application reaches only as a dependency has no slot map yet, so its policies
+  grant nobody. _(planned for M20)_ A module policy grants on the processes and
+  endpoints of its own module.
 - **Pages.** A module page is named `<module id>/<name>`. Its widgets name
   resources of its own module. A module holds no site, so the application's
   site navigation lists a module page by that name, such as
@@ -355,8 +377,10 @@ agrees. An application that declares it maps the slot to one of its own roles:
   `entity` still resolves to a dependency's resources. A name inside a
   dependency-only module's own resources that does not resolve keeps its
   unknown-name code.
-- **Studio.** Studio shows a module's processes, pages and policies read-only,
-  as it shows module entities, and never edits a module.
+- **Studio.** The policy matrix lists a module policy's grants in the row of the
+  role its slot maps to, read-only and tagged with the module, without an Open policy
+  link. _(planned for M20)_ Studio shows a module's processes, pages and policies read-only,
+  as it shows module entities. It never edits a module.
 - **Upgrades.** A module upgrade must still be additive for its entities
   (`AXC0213`). Adding a process, page or policy is additive.
 

@@ -289,4 +289,6 @@ public static class DiagnosticCodes
     public const string MismatchedSlotInput = "AXC0301";
     public const string MissingSlotRequiredInput = "AXC0302";
     public const string MismatchedSlotOutput = "AXC0303";
+    public const string ModulePolicyRoleNotSlot = "AXC0304";
+    public const string ModuleGrantOutsideModule = "AXC0305";
 }

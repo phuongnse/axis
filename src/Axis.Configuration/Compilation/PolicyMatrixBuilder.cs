@@ -114,7 +114,8 @@ internal static class PolicyMatrixBuilder
                     grant.Actions,
                     grant.Filter,
                     grant.Fields,
-                    Shared: !(ReferenceEquals(policy, access) && editable)));
+                    Shared: !(ReferenceEquals(policy, access) && editable),
+                    DefinedNamesBuilder.ModuleOf(policy)));
             }
         }
 
