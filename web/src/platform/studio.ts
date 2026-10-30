@@ -946,6 +946,52 @@ export function groupByKind(items: StudioResourceItem[]): ResourceGroup[] {
     }))
 }
 
+/** The kind of a module resource that Studio lists and opens read-only. */
+export type ModuleResourceKind = 'entity' | 'process' | 'policy'
+
+/** An entity, process or policy of a module the application uses, as the names give it. `name` is `<module>/<name>`. */
+export interface ModuleResourceItem {
+  id: string
+  kind: ModuleResourceKind
+  name: string
+  module: string
+}
+
+/** The module resources of one kind, in the order the names give them. */
+export interface ModuleResourceGroup {
+  kind: ModuleResourceKind
+  items: ModuleResourceItem[]
+}
+
+/**
+ * The module entities, processes and policies in the names, in that order, with the application's own left out.
+ * An item stays when its name or id contains `search`, ignoring letter case and surrounding spaces. A kind with no
+ * item has no group.
+ */
+export function moduleResources(names: StudioNames | null, search: string): ModuleResourceGroup[] {
+  if (names === null) {
+    return []
+  }
+  const needle = search.trim().toLowerCase()
+  const sources: [ModuleResourceKind, { id: string; name: string; module: string | null }[]][] = [
+    ['entity', names.entities],
+    ['process', names.processes],
+    ['policy', names.policies],
+  ]
+  return sources
+    .map(([kind, source]) => ({
+      kind,
+      items: source
+        .filter(
+          (item) =>
+            item.module !== null &&
+            (needle === '' || item.name.toLowerCase().includes(needle) || item.id.toLowerCase().includes(needle)),
+        )
+        .map((item): ModuleResourceItem => ({ id: item.id, kind, name: item.name, module: item.module! })),
+    }))
+    .filter((group) => group.items.length > 0)
+}
+
 function compareOrdinal(left: string, right: string): number {
   return left < right ? -1 : left > right ? 1 : 0
 }

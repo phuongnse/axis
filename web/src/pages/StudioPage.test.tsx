@@ -161,6 +161,7 @@ const applicationNames = {
   sequences: [],
   forms: [],
   pages: [],
+  policies: [],
   texts: [{ key: 'entity.purchaseRequest', texts: { en: 'Purchase request' }, usedBy: 1 }],
 }
 

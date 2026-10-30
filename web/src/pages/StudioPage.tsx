@@ -10,6 +10,8 @@ import {
   fetchStudioResources,
   filterResources,
   groupByKind,
+  type ModuleResourceItem,
+  moduleResources,
   resourceTitle,
   ServerUnreachableError,
   type StudioApplication,
@@ -23,11 +25,37 @@ import { StudioNamesContext } from '../platform/studioNames'
 import { useText } from '../platform/texts'
 import { StudioEditor } from './StudioEditor'
 import { StudioModuleEntity } from './StudioModuleEntity'
+import { StudioModulePolicy } from './StudioModulePolicy'
+import { StudioModuleProcess } from './StudioModuleProcess'
 import { StudioNewApplication } from './StudioNewApplication'
 import { StudioNewResource } from './StudioNewResource'
 import { StudioPolicyMatrix } from './StudioPolicyMatrix'
 import { StudioPublishing, type StudioPublishingHandle } from './StudioPublishing'
 import { StudioReferences } from './StudioReferences'
+
+/** The titles and test ids of the module resource groups in the list. */
+const moduleGroupTitles = {
+  entity: 'shell.studio.moduleEntities',
+  process: 'shell.studio.moduleProcesses',
+  policy: 'shell.studio.modulePolicies',
+} as const
+const moduleGroupTestIds = {
+  entity: 'studio-group-module-entities',
+  process: 'studio-group-module-processes',
+  policy: 'studio-group-module-policies',
+} as const
+
+/** The read-only view of a module resource, by its kind. */
+function ModuleResourceView({ application, item }: { application: string; item: ModuleResourceItem }) {
+  switch (item.kind) {
+    case 'entity':
+      return <StudioModuleEntity application={application} module={item.module} id={item.id} />
+    case 'process':
+      return <StudioModuleProcess application={application} module={item.module} id={item.id} />
+    case 'policy':
+      return <StudioModulePolicy application={application} module={item.module} id={item.id} />
+  }
+}
 
 /** The applications Studio may edit, or why they could not be listed. */
 type AppsState = StudioApplication[] | typeof forbidden | 'failed'
@@ -68,9 +96,11 @@ type NamesState = { application: string; names: StudioNames | null }
  * has a Run button in its details, which runs only that scenario. Both are off while a request runs and while the
  * reconnect message shows. A failed scenario in the test results opens at its failing step, as a diagnostic does.
  * A process step that a diagnostic of the open resource names is marked on its graph.
- * A Module entities group under the kinds lists the entities of the modules the application uses, from the names, by their
- * `<module>/<name>`. One opens read-only in the entity designer, with no editor, no Uses and no Used by lists. Its address is
- * the same `&resource=<id>`, so a reload, a shared link and a Uses entry open it too, when the id is not one of the folder's.
+ * Module entities, Module processes and Module policies groups under the kinds list those of the modules the application
+ * uses, from the names, by their `<module>/<name>`. One opens read-only, with no editor, no Uses and no Used by lists: an
+ * entity in the entity designer, a process as its graph alone and a policy as a table of its grants, each under a
+ * read-only notice with the alert role. Its address is the same `&resource=<id>`, so a reload, a shared link and a Uses
+ * entry open it too, when the id is not one of the folder's.
  */
 export function StudioPage() {
   const t = useText()
@@ -226,21 +256,14 @@ function StudioWorkspace() {
     [loaded, resourceId],
   )
   const groups = useMemo(() => groupByKind(filterResources(resources, search)), [resources, search])
-  const moduleEntities = useMemo(() => {
-    const needle = search.trim().toLowerCase()
-    return (names?.entities ?? []).filter(
-      (entity) =>
-        entity.module !== null &&
-        (needle === '' || entity.name.toLowerCase().includes(needle) || entity.id.toLowerCase().includes(needle)),
-    )
-  }, [names, search])
+  const moduleGroups = useMemo(() => moduleResources(names, search), [names, search])
   const selected = resourceId === null ? undefined : resources.find((item) => item.id === resourceId.toLowerCase())
-  const selectedModuleEntity =
+  const selectedModuleItem =
     resourceId === null || selected !== undefined
       ? undefined
-      : (names?.entities ?? []).find(
-          (entity) => entity.module !== null && entity.id.toLowerCase() === resourceId.toLowerCase(),
-        )
+      : moduleResources(names, '')
+          .flatMap((group) => group.items)
+          .find((item) => item.id.toLowerCase() === resourceId.toLowerCase())
 
   function pickApplication(name: string) {
     setSearch('')
@@ -381,7 +404,7 @@ function StudioWorkspace() {
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
                 />
-                {groups.length === 0 && moduleEntities.length === 0 && (
+                {groups.length === 0 && moduleGroups.length === 0 && (
                   <Typography.Text type="secondary">{t('shell.studio.noResources')}</Typography.Text>
                 )}
                 {groups.map((group) => (
@@ -402,24 +425,24 @@ function StudioWorkspace() {
                     </Flex>
                   </section>
                 ))}
-                {moduleEntities.length > 0 && (
-                  <section data-testid="studio-group-module-entities">
-                    <Typography.Title level={5}>{t('shell.studio.moduleEntities')}</Typography.Title>
+                {moduleGroups.map((group) => (
+                  <section key={group.kind} data-testid={moduleGroupTestIds[group.kind]}>
+                    <Typography.Title level={5}>{t(moduleGroupTitles[group.kind])}</Typography.Title>
                     <Flex vertical align="flex-start">
-                      {moduleEntities.map((entity) => (
+                      {group.items.map((item) => (
                         <Button
-                          key={entity.id}
-                          type={entity.id === selectedModuleEntity?.id ? 'primary' : 'text'}
-                          data-testid={`studio-module-resource-${entity.id}`}
-                          aria-current={entity.id === selectedModuleEntity?.id ? 'true' : undefined}
-                          onClick={() => selectResource(entity.id)}
+                          key={item.id}
+                          type={item.id === selectedModuleItem?.id ? 'primary' : 'text'}
+                          data-testid={`studio-module-resource-${item.id}`}
+                          aria-current={item.id === selectedModuleItem?.id ? 'true' : undefined}
+                          onClick={() => selectResource(item.id)}
                         >
-                          {entity.name}
+                          {item.name}
                         </Button>
                       ))}
                     </Flex>
                   </section>
-                )}
+                ))}
               </Flex>
               <div data-testid="studio-resource-details" style={{ flex: 1 }}>
                 {selected ? (
@@ -484,23 +507,22 @@ function StudioWorkspace() {
                       onOpen={openReference}
                     />
                   </Flex>
-                ) : selectedModuleEntity ? (
+                ) : selectedModuleItem ? (
                   <Flex vertical gap="middle">
                     <Descriptions
-                      title={selectedModuleEntity.name}
+                      title={selectedModuleItem.name}
                       column={1}
                       items={[
-                        { key: 'kind', label: t('shell.studio.kind'), children: 'entity' },
-                        { key: 'id', label: t('shell.studio.id'), children: selectedModuleEntity.id },
-                        { key: 'module', label: t('shell.studio.module'), children: selectedModuleEntity.module },
+                        { key: 'kind', label: t('shell.studio.kind'), children: selectedModuleItem.kind },
+                        { key: 'id', label: t('shell.studio.id'), children: selectedModuleItem.id },
+                        { key: 'module', label: t('shell.studio.module'), children: selectedModuleItem.module },
                       ]}
                     />
                     <StudioNamesContext.Provider value={names ?? undefined}>
-                      <StudioModuleEntity
-                        key={`module-entity-${selectedModuleEntity.id}`}
+                      <ModuleResourceView
+                        key={`module-${selectedModuleItem.kind}-${selectedModuleItem.id}`}
                         application={application!}
-                        module={selectedModuleEntity.module!}
-                        id={selectedModuleEntity.id}
+                        item={selectedModuleItem}
                       />
                     </StudioNamesContext.Provider>
                   </Flex>

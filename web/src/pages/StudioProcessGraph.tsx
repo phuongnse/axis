@@ -183,7 +183,8 @@ const edgeTestIdPrefix = 'rf__edge-'
  * an edge for the path of its transition. Every step but an `end` step has a handle at its bottom edge. Dragging from
  * it and releasing on a step, anywhere on the node, calls `onConnect` with the two step numbers and the release point,
  * relative to the canvas. The graph sets no transition itself. It has no keyboard way to connect, which the step
- * panel's pickers give.
+ * panel's pickers give. With `readOnly` no step has a handle, a connect does nothing and Delete or Backspace calls
+ * nothing, so the graph only shows the process.
  */
 export default function StudioProcessGraph({
   graph,
@@ -193,6 +194,7 @@ export default function StudioProcessGraph({
   onSelectEdge,
   onRemove,
   onConnect,
+  readOnly = false,
 }: {
   graph: ProcessGraph
   selected: number | null
@@ -201,6 +203,7 @@ export default function StudioProcessGraph({
   onSelectEdge: (transition: ProcessGraphTransition) => void
   onRemove: () => void
   onConnect: (source: number, target: number, point: { x: number; y: number }) => void
+  readOnly?: boolean
 }) {
   const t = useText()
   const { mode } = useThemeMode()
@@ -236,7 +239,7 @@ export default function StudioProcessGraph({
           start: graph.start === step.index,
           current: selected === step.index,
           marked: step.marked,
-          connectable: step.type !== 'end',
+          connectable: !readOnly && step.type !== 'end',
         },
       })),
       edges: graph.transitions.map((transition): Edge => {
@@ -258,7 +261,7 @@ export default function StudioProcessGraph({
         }
       }),
     }
-  }, [graph, selected, selectedEdge, colour, to])
+  }, [graph, selected, selectedEdge, colour, to, readOnly])
 
   // A drag ends on a node when React Flow snaps to its handle, and anywhere else on the node otherwise, so the node
   // under the pointer is the target. `onConnect` is not set, or React Flow would report a snapped drag twice.
@@ -284,7 +287,9 @@ export default function StudioProcessGraph({
   const onKeyDown = (event: KeyboardEvent<HTMLElement>) => {
     if (event.key === 'Delete' || event.key === 'Backspace') {
       event.preventDefault()
-      onRemove()
+      if (!readOnly) {
+        onRemove()
+      }
       return
     }
     if (event.key !== 'Enter' && event.key !== ' ') {
@@ -319,13 +324,13 @@ export default function StudioProcessGraph({
         colorMode={mode}
         fitView
         nodesDraggable={false}
-        nodesConnectable
+        nodesConnectable={!readOnly}
         nodesFocusable={false}
         elementsSelectable={false}
         edgesFocusable
         deleteKeyCode={null}
         zoomOnScroll={false}
-        onConnectEnd={onConnectEnd}
+        onConnectEnd={readOnly ? undefined : onConnectEnd}
         onNodeClick={(_, node) => onSelect(Number(node.id))}
         onEdgeClick={(_, edge) => {
           const transition = graph.transitions.find((candidate) => candidate.path === edge.id)

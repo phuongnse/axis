@@ -4,6 +4,9 @@
   "name": "ChecklistReview",
   "formatVersion": 1,
   "entity": "Checklist",
-  "start": "done",
-  "steps": [{ "name": "done", "type": "end" }]
+  "start": "check",
+  "steps": [
+    { "name": "check", "type": "decision", "branches": [{ "when": "true", "next": "done" }], "otherwise": "done" },
+    { "name": "done", "type": "end" }
+  ]
 }
