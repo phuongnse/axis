@@ -928,12 +928,18 @@ test.describe("Studio edits a process in the process editor", () => {
     const original = await readFile(target, "utf8");
 
     try {
-      const content = JSON.parse(original) as { steps: { name: string }[] };
+      const content = JSON.parse(original) as {
+        steps: { name: string; input: Record<string, unknown> }[];
+      };
       const index = content.steps.findIndex(
         (step) => step.name === "createPurchaseOrder",
       );
       expect(index).toBeGreaterThanOrEqual(0);
       const before = await diagnostics(page);
+      // The sample already maps the lines, so the author starts without that mapping.
+      const lines = content.steps[index].input.lines;
+      delete content.steps[index].input.lines;
+      await writeFile(target, JSON.stringify(content, null, 2));
 
       await page.goto(
         `${server.url}/studio?app=PurchaseRequests&resource=${id}`,
@@ -958,7 +964,7 @@ test.describe("Studio edits a process in the process editor", () => {
       const nested = page.getByTestId(
         `studio-field-/steps/${index}/input/lines/fields`,
       );
-      for (const name of ["description", "quantity"]) {
+      for (const name of ["description", "quantity", "unitPrice", "amount"]) {
         await nested
           .getByRole("button", { name: "Add mapping", exact: true })
           .click();
@@ -982,10 +988,7 @@ test.describe("Studio edits a process in the process editor", () => {
       const saved = JSON.parse(await readFile(target, "utf8")) as {
         steps: { input: Record<string, unknown> }[];
       };
-      expect(saved.steps[index].input.lines).toEqual({
-        from: "lineItems",
-        fields: { description: "description", quantity: "quantity" },
-      });
+      expect(saved.steps[index].input.lines).toEqual(lines);
     } finally {
       await writeFile(target, original);
     }
