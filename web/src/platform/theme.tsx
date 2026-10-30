@@ -47,6 +47,8 @@ export function ThemeModeProvider({ initialMode, children }: ThemeModeProviderPr
 
   useEffect(() => {
     document.body.style.backgroundColor = designTokensFor(mode).colour.canvas
+    // Proposed: the browser draws its own parts, every scrollbar among them, in the mode the shell draws in.
+    document.documentElement.style.colorScheme = mode
   }, [mode])
 
   return (
