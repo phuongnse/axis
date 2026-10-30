@@ -3,5 +3,8 @@
   "kind": "application",
   "name": "ModuleAppA",
   "formatVersion": 1,
-  "modules": [{ "id": "departments", "version": "^1.0.0" }]
+  "modules": [
+    { "id": "departments", "version": "^1.0.0" },
+    { "id": "budgets", "version": "^1.0.0" }
+  ]
 }

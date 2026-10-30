@@ -10,7 +10,8 @@ namespace Axis.Integration.Tests;
 /// server migrates it and activates the fixture applications ModuleAppA and ModuleAppB through
 /// <c>ActivateOnStartup</c>. Both use the <c>departments</c> test module installed under
 /// <c>Fixtures/Modules</c>, so the module's department table and seed rows exist once for each.
-/// ModuleAppA also has an <c>Employee</c> entity that references a department. The test
+/// ModuleAppA also declares the <c>budgets</c> module, which depends on <c>departments</c>, and has an
+/// <c>Employee</c> entity that references a department. The test
 /// authentication scheme signs in <c>requester</c>, an employee, and <c>manager</c>, who holds no role.
 /// </summary>
 public sealed class ModuleAppFixture : IAsyncLifetime

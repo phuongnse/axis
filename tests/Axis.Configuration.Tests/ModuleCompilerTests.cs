@@ -1089,7 +1089,7 @@ public sealed class ModuleCompilerTests
         };
         var diagnostics = new List<Diagnostic>();
 
-        var rules = RuleChecker.CheckModules([("departments", [rule])], diagnostics);
+        var rules = RuleChecker.CheckModules([("departments", [rule])], new Dictionary<string, IReadOnlySet<string>>(), diagnostics);
 
         Assert.Empty(diagnostics);
         Assert.Equal(["departments/IsActive"], rules.Keys);

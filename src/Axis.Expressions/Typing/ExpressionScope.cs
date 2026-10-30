@@ -21,7 +21,10 @@ public delegate ExpressionType? ReferenceFieldResolver(string targetEntity, stri
 /// collection name keeps its first one. A scope with a <see cref="ReferenceFieldResolver"/> also
 /// resolves paths through reference fields, such as <c>department.name</c>. A scope without one
 /// reports every path as an unknown name. A rule with a <see cref="ExpressionRule.Module"/> is
-/// called as <c>module:Name(…)</c>, and only when the scope names the application's modules.
+/// called as <c>module:Name(…)</c>, and only when the scope names the modules it may call. For an
+/// application those are its declared modules, and a call to another module is reported as an
+/// undeclared module. For a module with <see cref="UndeclaredModuleIsUnknown"/>, those are the modules
+/// its <c>module.json</c> declares, and a call to another module is an unknown rule.
 /// </summary>
 public sealed class ExpressionScope
 {
@@ -37,7 +40,8 @@ public sealed class ExpressionScope
         IEnumerable<ExpressionRule>? rules = null,
         IEnumerable<ExpressionCollection>? collections = null,
         ReferenceFieldResolver? referenceFields = null,
-        IEnumerable<string>? modules = null)
+        IEnumerable<string>? modules = null,
+        bool undeclaredModuleIsUnknown = false)
     {
         ArgumentNullException.ThrowIfNull(fields);
         _fields = new Dictionary<string, ExpressionType>(fields, StringComparer.OrdinalIgnoreCase);
@@ -66,7 +70,14 @@ public sealed class ExpressionScope
 
         _referenceFields = referenceFields;
         _modules = modules is null ? null : new HashSet<string>(modules, StringComparer.Ordinal);
+        UndeclaredModuleIsUnknown = undeclaredModuleIsUnknown;
     }
+
+    /// <summary>
+    /// Whether a qualified call to a module the scope does not name is an unknown rule, not an
+    /// undeclared module. True in a module file, where the fix is not in <c>application.json</c>.
+    /// </summary>
+    public bool UndeclaredModuleIsUnknown { get; }
 
     /// <summary>Whether paths through reference fields resolve in this scope.</summary>
     public bool ResolvesPaths => _referenceFields is not null;

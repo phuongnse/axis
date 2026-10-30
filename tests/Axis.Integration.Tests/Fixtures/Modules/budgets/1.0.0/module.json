@@ -1,0 +1,7 @@
+{
+  "kind": "module",
+  "id": "budgets",
+  "version": "1.0.0",
+  "label": "Budgets",
+  "modules": [{ "id": "departments", "version": "^1.0.0" }]
+}

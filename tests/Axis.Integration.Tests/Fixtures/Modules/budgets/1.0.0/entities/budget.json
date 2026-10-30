@@ -1,0 +1,14 @@
+{
+  "id": "4c8f6b21-5d3e-4a7b-8e29-8b2d1f6c3a01",
+  "kind": "entity",
+  "name": "Budget",
+  "formatVersion": 1,
+  "displayField": "code",
+  "fields": [
+    { "name": "code", "type": "text", "required": true, "maxLength": 20 },
+    { "name": "department", "type": "reference", "target": "departments/Department" }
+  ],
+  "validations": [
+    { "expression": "departments:IsCode(code)", "message": { "textKey": "budgets.budget.shortCode" }, "field": "code" }
+  ]
+}

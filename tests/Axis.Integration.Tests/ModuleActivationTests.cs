@@ -12,6 +12,7 @@ public sealed class ModuleActivationTests(ModuleAppFixture fixture) : IClassFixt
     private const string AppA = "/api/apps/ModuleAppA";
     private const string AppB = "/api/apps/ModuleAppB";
     private const string Departments = "entities/departments/Department/records";
+    private const string Budgets = "entities/budgets/Budget/records";
     private const string DepartmentsDataSource = "data-sources/departments/Departments/rows";
 
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
@@ -215,6 +216,43 @@ public sealed class ModuleActivationTests(ModuleAppFixture fixture) : IClassFixt
         var error = Assert.Single(problem.RootElement.GetProperty("errors").EnumerateObject());
         Assert.Equal("/values/code", error.Name);
         Assert.Equal("departments.department.shortCode", Assert.Single(error.Value.EnumerateArray()).GetString());
+    }
+
+    [Fact]
+    public async Task A_budget_of_a_module_that_depends_on_departments_points_at_a_department_and_reads_back()
+    {
+        using var client = fixture.CreateClient().SignedInAs("requester");
+
+        using var create = RecordApiFixture.Request(
+            HttpMethod.Post,
+            $"{AppA}/{Budgets}",
+            ModuleAppFixture.Host,
+            $$"""{ "values": { "code": "BUD-1", "department": "{{ModuleAppFixture.Finance:D}}" } }""");
+        using var created = await client.SendAsync(create, CancellationToken);
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+        using var createdBody = JsonDocument.Parse(await created.Content.ReadAsStringAsync(CancellationToken));
+        var id = createdBody.RootElement.GetProperty("id").GetGuid();
+
+        using var read = RecordApiFixture.Request(HttpMethod.Get, $"{AppA}/{Budgets}/{id:D}", ModuleAppFixture.Host);
+        using var response = await client.SendAsync(read, CancellationToken);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
+        Assert.Equal(ModuleAppFixture.Finance, body.RootElement.GetProperty("values").GetProperty("department").GetGuid());
+    }
+
+    [Fact]
+    public async Task A_budget_whose_code_breaks_the_rule_of_the_module_it_depends_on_is_refused()
+    {
+        using var client = fixture.CreateClient().SignedInAs("requester");
+
+        using var request = RecordApiFixture.Request(
+            HttpMethod.Post, $"{AppA}/{Budgets}", ModuleAppFixture.Host, """{ "values": { "code": "X" } }""");
+        using var response = await client.SendAsync(request, CancellationToken);
+
+        using var problem = await RecordApiFixture.ReadProblemAsync(response, HttpStatusCode.BadRequest);
+        var error = Assert.Single(problem.RootElement.GetProperty("errors").EnumerateObject());
+        Assert.Equal("/values/code", error.Name);
+        Assert.Equal("budgets.budget.shortCode", Assert.Single(error.Value.EnumerateArray()).GetString());
     }
 
     private static async Task CreateDepartmentAsync(HttpClient client, string app, string code, string name)

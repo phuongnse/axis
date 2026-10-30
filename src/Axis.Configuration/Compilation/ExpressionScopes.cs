@@ -23,9 +23,9 @@ namespace Axis.Configuration.Compilation;
 /// process scope resolves paths the same way, and a data change trigger's <c>when</c> uses the process
 /// scope. A navigate action's scope resolves paths when it is given <c>findEntity</c>. No other scope
 /// resolves paths. A rule call qualified with a module id is allowed only where the scope is given
-/// the application's <c>modules</c>. A navigate action's parameter sees <c>id</c>, as a reference
-/// parameter to the root entity, so a path cannot start at it, and the names of the row or record.
-/// It has no rules and no collections. A field default sees no fields, no collections and no
+/// <c>modules</c>, the application's or, with <c>undeclaredModuleIsUnknown</c>, those of a module. A
+/// navigate action's parameter sees <c>id</c>, as a reference parameter to the root entity, so a
+/// path cannot start at it, and the names of the row or record. It has no rules and no collections. A field default sees no fields, no collections and no
 /// paths, and has the rules it is given.
 /// </summary>
 public static class ExpressionScopes
@@ -35,7 +35,8 @@ public static class ExpressionScopes
         bool includeComputed = true,
         IEnumerable<ExpressionRule>? rules = null,
         Func<FieldModel, EntityModel?>? childOf = null,
-        IEnumerable<string>? modules = null)
+        IEnumerable<string>? modules = null,
+        bool undeclaredModuleIsUnknown = false)
     {
         ArgumentNullException.ThrowIfNull(fields);
         var all = fields.ToList();
@@ -54,7 +55,8 @@ public static class ExpressionScopes
                     .OfType<ExpressionCollection>()
                     .ToList(),
             referenceFields: null,
-            modules);
+            modules,
+            undeclaredModuleIsUnknown);
     }
 
     internal static ExpressionScope ForEntity(
@@ -63,7 +65,8 @@ public static class ExpressionScopes
         IEnumerable<ExpressionRule>? rules = null,
         Func<string, EntityResource?>? findEntity = null,
         IEnumerable<string>? modules = null,
-        bool references = true)
+        bool references = true,
+        bool undeclaredModuleIsUnknown = false)
     {
         var all = fields.ToList();
         return Build(
@@ -73,15 +76,17 @@ public static class ExpressionScopes
             rules,
             findEntity is null ? null : CollectionsOf(all, findEntity, references),
             referenceFields: null,
-            modules);
+            modules,
+            undeclaredModuleIsUnknown);
     }
 
     /// <summary>
     /// The scope of a field default: no fields, no collections and no paths, because no record
     /// exists yet. It has the named <paramref name="rules"/>.
     /// </summary>
-    internal static ExpressionScope ForDefault(IEnumerable<ExpressionRule> rules, IEnumerable<string>? modules) =>
-        Build([], rules, collections: null, referenceFields: null, modules);
+    internal static ExpressionScope ForDefault(
+        IEnumerable<ExpressionRule> rules, IEnumerable<string>? modules, bool undeclaredModuleIsUnknown = false) =>
+        Build([], rules, collections: null, referenceFields: null, modules, undeclaredModuleIsUnknown);
 
     /// <summary>
     /// The scope of a data source filter: the root entity's fields, then the parameters. A path
@@ -96,7 +101,8 @@ public static class ExpressionScopes
         IEnumerable<DataSourceParameterModel> parameters,
         Func<string, EntityModel?> findEntity,
         IEnumerable<ExpressionRule>? rules = null,
-        IEnumerable<string>? modules = null)
+        IEnumerable<string>? modules = null,
+        bool undeclaredModuleIsUnknown = false)
     {
         ArgumentNullException.ThrowIfNull(fields);
         ArgumentNullException.ThrowIfNull(parameters);
@@ -123,7 +129,8 @@ public static class ExpressionScopes
                     .OfType<ExpressionCollection>(),
             ],
             resolver,
-            modules);
+            modules,
+            undeclaredModuleIsUnknown);
     }
 
     /// <summary>
@@ -138,7 +145,8 @@ public static class ExpressionScopes
         IEnumerable<DataSourceParameterDefinition> parameters,
         Func<string, EntityResource?> findEntity,
         IEnumerable<ExpressionRule>? rules = null,
-        IEnumerable<string>? modules = null)
+        IEnumerable<string>? modules = null,
+        bool undeclaredModuleIsUnknown = false)
     {
         var all = fields.ToList();
         return Build(
@@ -150,7 +158,8 @@ public static class ExpressionScopes
             rules,
             CollectionsOf(all, findEntity, paths: true),
             ReferenceFieldsOf(findEntity),
-            modules);
+            modules,
+            undeclaredModuleIsUnknown);
     }
 
     /// <summary>
@@ -306,7 +315,8 @@ public static class ExpressionScopes
         IEnumerable<ExpressionRule>? rules,
         IEnumerable<ExpressionCollection>? collections,
         ReferenceFieldResolver? referenceFields,
-        IEnumerable<string>? modules = null)
+        IEnumerable<string>? modules = null,
+        bool undeclaredModuleIsUnknown = false)
     {
         var types = new Dictionary<string, ExpressionType>(StringComparer.OrdinalIgnoreCase);
         foreach (var (name, type) in fields)
@@ -317,7 +327,7 @@ public static class ExpressionScopes
             }
         }
 
-        return new ExpressionScope(types, rules, collections, referenceFields, modules);
+        return new ExpressionScope(types, rules, collections, referenceFields, modules, undeclaredModuleIsUnknown);
     }
 
     /// <summary>

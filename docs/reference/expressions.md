@@ -328,14 +328,17 @@ Paths in validations and computed fields are not built. There a path is
   wherever a rule call is: a rule body, a validation, a field default, a data
   source filter, a process condition and a policy filter. The module id must match exactly. The
   rule name ignores letter case. A bare name in an application expression never
-  reaches a module rule. A module's rule bodies and entity validations call that
-  module's rules by bare name. A qualified name never reaches an application rule
+  reaches a module rule. A module's rule bodies, entity validations and field
+  defaults call that module's rules by bare name, and the rules of the modules its
+  `module.json` declares as `beta:IsValid(x)`. A module data source filter calls
+  only those qualified rules. A qualified name never reaches an application rule
   or a built-in function. The
   interpreter runs the module rule's body, and a filter's SQL inlines it, with
   the module rules it calls in turn. A module that `modules` in
   `application.json` does not declare is `AXC0207`. A declared module without
   that rule is `AXC0050`, so is a qualified call where no rules are callable,
-  such as a computed field, a module's own rule or a module entity validation.
+  such as a computed field. In a module file a qualified call to a module it does
+  not declare, or with its own id, is `AXC0050` too, not `AXC0207`.
 - **Scope in a computed field.** The expression sees the entity's own fields
   that are not computed and its child collections through aggregates, and no
   reference path. Another computed field, itself included, is an unknown
