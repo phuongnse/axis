@@ -1,4 +1,3 @@
-using System.Net.Mail;
 using System.Security.Claims;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -244,7 +243,7 @@ internal static partial class UserCommandEndpoints
                     null,
                     null,
                     null,
-                    RoleDetails(id, body.ApplicationId, body.Role),
+                    UserInvitations.RoleDetails(id, body.ApplicationId, body.Role),
                     caller.DisplayName),
                 cancellationToken);
         }
@@ -273,8 +272,7 @@ internal static partial class UserCommandEndpoints
             body = null;
         }
 
-        if (body is null || body.Email?.Trim().ToLowerInvariant() is not { } email
-            || !MailAddress.TryCreate(email, out var address) || address.Address != email)
+        if (body is null || RealmUsers.NormalizeEmail(body.Email) is not { } email)
         {
             return Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: "The request needs an email address.");
         }
@@ -332,36 +330,13 @@ internal static partial class UserCommandEndpoints
         var connection = await database.GetConnectionAsync(cancellationToken);
         await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))
         {
-            foreach (var role in roles)
-            {
-                if (await GivenRoles.GiveAsync(transaction, id, role.ApplicationId, role.Role!, cancellationToken))
-                {
-                    await AuditRecords.AppendAsync(
-                        transaction,
-                        new AuditEntry(
-                            opening.Caller.Id,
-                            AuditActions.UserRoleGiven,
-                            role.ApplicationId,
-                            null,
-                            null,
-                            null,
-                            RoleDetails(id, role.ApplicationId, role.Role!),
-                            opening.Caller.DisplayName),
-                        cancellationToken);
-                }
-            }
-
-            await AuditRecords.AppendAsync(
+            await UserInvitations.RecordAsync(
                 transaction,
-                new AuditEntry(
-                    opening.Caller.Id,
-                    AuditActions.UserInvited,
-                    null,
-                    null,
-                    null,
-                    null,
-                    new JsonObject { ["userId"] = id, ["email"] = email },
-                    opening.Caller.DisplayName),
+                opening.Caller.Id,
+                opening.Caller.DisplayName,
+                id,
+                email,
+                [.. roles.Select(role => new GivenRole(role.ApplicationId, role.Role!))],
                 cancellationToken);
             await transaction.CommitAsync(cancellationToken);
         }
@@ -526,17 +501,6 @@ internal static partial class UserCommandEndpoints
         return PlatformRoles.IsKind(role)
             ? null
             : Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: "A platform role is author, publisher, operator or administrator.");
-    }
-
-    private static JsonObject RoleDetails(string userId, Guid? applicationId, string role)
-    {
-        var details = new JsonObject { ["userId"] = userId, ["role"] = role };
-        if (applicationId is null)
-        {
-            details["platform"] = true;
-        }
-
-        return details;
     }
 
     private sealed record Opening(ClaimsPrincipal Principal, CurrentUserResponse Caller, TenantContext Tenant, TenantRealmUsers Access);

@@ -6,7 +6,7 @@ administrator gives, and the users page where both are managed.
 what is not built yet is marked _(planned for M17)_. The account rules are built: every realm that `tenant create` makes
 holds them. The users page's list and the server commands that disable, enable and reset an authenticator are built, and so are
 the server routes that give and remove an application or a platform role. A user's roles panel with the Give and Remove
-buttons is built too. The server routes that invite an account and resend an invitation are built. The buttons of the invitations and of the other commands are not built yet. The conventions of [architecture.md](../architecture.md)
+buttons is built too. The server routes that invite an account and resend an invitation are built, and so is `tenant create --administrator`. The buttons of the invitations and of the other commands are not built yet. The conventions of [architecture.md](../architecture.md)
 apply.
 
 ## The administrator role
@@ -170,10 +170,21 @@ The server routes are built.
 
 ## The first administrator
 
-_(planned for M17)_
+The first administrator is built.
 
 - `tenant create --administrator <email>` invites the first account with the administrator role, see
-  [tenant create](administration.md#tenant-create).
+  [tenant create](administration.md#tenant-create). Its `administrator` step creates the invited account in the
+  tenant's realm and gives it the `administrator` platform role. It then has the realm email the invitation link, as the
+  invite route of the users page does, and sets the tenant `active`.
+- The tenant database gets one `user.invited` record and one `user.roleGiven` record for the platform role. Their
+  actor is the command, `tenant create`, and has no display name. The account has no display name either, so the users
+  list shows its email. No record holds the link.
+- The emailed link names no address to return to, because the realm's `axis` client has no return addresses yet. The
+  person can set a password and an authenticator, and cannot yet sign in to Axis until the realm learns the tenant's
+  addresses.
+- A rerun after a failed invitation finds the account by its email, so there is never a second account or a second
+  `user.invited` record. It gives the role and writes the records only when the first run did not. It sends the email
+  again only when the account has no password yet.
 - A tenant whose platform sign-in uses a brokered provider can instead give the role through that provider's claims,
   see [platform sign-in](identity-provider.md#platform-sign-in).
 
@@ -196,7 +207,7 @@ All the actions below are built.
   on: `user.invited`, `user.invitationResent`, `user.disabled`, `user.enabled`, `user.authenticatorReset`,
   `user.roleGiven` and `user.roleRemoved`. `details` holds `userId` and, for an invitation, `email`. A resend writes the new user
   id in `userId` and the old one in `previousUserId`, because the id changes. A role given at invite time writes a `user.roleGiven`
-  record too. A role record names the application in its application id, or for a platform role has no application and says
+  record too, and so does `tenant create --administrator`, whose actor is the command. A role record names the application in its application id, or for a platform role has no application and says
   `platform: true` in its details, and holds the role (the kind, for a platform role) in its details. Giving a role the person holds, or removing one they do
   not hold, is not a change and writes no record. No
   record holds a password, a code or an invitation link.
