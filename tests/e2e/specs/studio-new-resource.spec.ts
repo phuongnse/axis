@@ -333,6 +333,70 @@ test.describe('Studio creates a resource from a starter', () => {
     expect(site.signIn).toEqual(['accounts', 'company', 'Partner'])
   })
 
+  test('an author builds an oauth2 connector with path, query, nested and source controls in the Form tab', async ({
+    page,
+  }) => {
+    const fixture = JSON.parse(
+      await readFile(path.join(import.meta.dirname, '..', 'fixtures', 'studio-connector-oauth2.json'), 'utf8'),
+    ) as Record<string, unknown>
+    const { id: _fixtureId, ...expected } = fixture
+    const textbox = (name: string) => page.getByRole('textbox', { name, exact: true })
+    const row = (index: number) => page.getByTestId(`studio-field-/operations/0/input/${index}`)
+    const nested = (index: number) => page.getByTestId(`studio-field-/operations/0/input/2/fields/${index}`)
+
+    await useSession(page, 'author')
+    await page.goto(`${server.url}/studio?app=PurchaseRequests`)
+    await createResource(page, 'connector', 'WarehouseShipping')
+    await openFormTab(page)
+    await expect(page.getByTestId('studio-resource-details')).toContainText('connectors/warehouse-shipping.json')
+
+    await textbox('URL binding').fill('ShippingUrl')
+    await pick(page, 'studio-field-/auth/type', 'oauth2')
+    await textbox('Token URL (URL binding)').fill('ShippingTokenUrl')
+    await textbox('Client id (Secret binding)').fill('ShippingClientId')
+    await textbox('Client secret (Secret binding)').fill('ShippingClientSecret')
+    await textbox('Scope').fill('shipments.write')
+    await expect(textbox('Audience')).toHaveValue('')
+
+    await textbox('Operation name').fill('createShipment')
+    await pick(page, 'studio-field-/operations/0/method', 'POST')
+    await textbox('Path').fill('/warehouses/{warehouse}/shipments')
+
+    for (let index = 0; index < 3; index++) {
+      await page.getByRole('button', { name: 'Add input field', exact: true }).click()
+    }
+    await row(0).getByRole('textbox', { name: 'Input name', exact: true }).fill('warehouse')
+    await pick(page, 'studio-field-/operations/0/input/0/in', 'path')
+    await row(0).getByRole('checkbox', { name: 'Required', exact: true }).check()
+
+    await row(1).getByRole('textbox', { name: 'Input name', exact: true }).fill('dryRun')
+    await pick(page, 'studio-field-/operations/0/input/1/type', 'boolean')
+    await pick(page, 'studio-field-/operations/0/input/1/in', 'query')
+
+    await row(2).getByRole('textbox', { name: 'Input name', exact: true }).fill('lines')
+    await pick(page, 'studio-field-/operations/0/input/2/type', 'list')
+    await expect(page.getByTestId('studio-field-/operations/0/input/2/in')).toHaveCount(0)
+    await nested(0).getByRole('textbox', { name: 'Field name', exact: true }).fill('sku')
+    await nested(0).getByRole('checkbox', { name: 'Required', exact: true }).check()
+    await row(2).getByRole('button', { name: 'Add nested field', exact: true }).click()
+    await nested(1).getByRole('textbox', { name: 'Field name', exact: true }).fill('quantity')
+    await pick(page, 'studio-field-/operations/0/input/2/fields/1/type', 'integer')
+    await nested(1).getByRole('checkbox', { name: 'Required', exact: true }).check()
+
+    await page.getByRole('button', { name: 'Add output field', exact: true }).click()
+    await textbox('Output name').fill('trackingNumber')
+    await textbox('Output source').fill('/shipment/tracking/number')
+
+    const diagnostics = await save(page)
+    expect(diagnostics.filter((diagnostic) => diagnostic.file.includes('connectors/warehouse-shipping.json'))).toEqual([])
+    const saved = JSON.parse(await readFile(path.join(copy, 'connectors', 'warehouse-shipping.json'), 'utf8')) as Record<
+      string,
+      unknown
+    >
+    const { id: _savedId, ...savedWithoutId } = saved
+    expect(savedWithoutId).toEqual(expected)
+  })
+
   test('a click on the disabled Create button fails within the action timeout and names the button', async ({ page }) => {
     await useSession(page, 'author')
     await page.goto(`${server.url}/studio?app=PurchaseRequests`)
