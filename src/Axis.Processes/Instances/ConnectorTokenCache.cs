@@ -16,7 +16,7 @@ namespace Axis.Processes.Instances;
 /// them, and sends the client id and secret in HTTP Basic authentication, both form-encoded as RFC
 /// 6749 section 2.3.1 says. It goes through the connector client, so it follows no redirect, and it is
 /// cancelled after the connector's timeout. A token stays until a minute before its
-/// <c>expires_in</c>. A token without <c>expires_in</c>, or with 60 seconds or less, is used for the
+/// <c>expires_in</c>, or until the worker drops it after the system answers <c>401</c>. A token without <c>expires_in</c>, or with 60 seconds or less, is used for the
 /// one call and not kept. Each entry also holds a hash of the token URL, the client id, the client
 /// secret, the scope and the audience, so a changed binding or file gets a new token at once. Two calls
 /// that find the cache empty at the same moment may each request a token. A failed request gives only
@@ -65,6 +65,19 @@ internal sealed class ConnectorTokenCache(ConnectorClient client, TimeProvider c
         }
 
         return new ConnectorTokenResult(result.Token, result.Status, result.Error);
+    }
+
+    public void Drop(string tenantId, ConnectorModel connector, SecretValue token)
+    {
+        ArgumentNullException.ThrowIfNull(connector);
+        ArgumentNullException.ThrowIfNull(token);
+
+        // GetAsync gives the instance it caches, so the same reference means no call has cached a newer token.
+        var key = (tenantId, connector.Id);
+        if (_entries.TryGetValue(key, out var entry) && ReferenceEquals(entry.Token, token))
+        {
+            _entries.TryRemove(KeyValuePair.Create(key, entry));
+        }
     }
 
     private async Task<Issued> RequestAsync(

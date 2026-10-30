@@ -20,4 +20,9 @@ internal sealed class ScenarioTokens : IConnectorTokens
         SecretValue clientSecret,
         CancellationToken cancellationToken) =>
         Task.FromResult(new ConnectorTokenResult(_token, null, null));
+
+    public void Drop(string tenantId, ConnectorModel connector, SecretValue token)
+    {
+        // The placeholder token is never cached, so there is nothing to drop.
+    }
 }

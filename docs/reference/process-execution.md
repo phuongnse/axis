@@ -151,6 +151,7 @@ one transaction:
    the history row stores as `started_at`. A validation that the operation's
    write runs sees it too. See
    [D22](../decisions/d22-current-time-and-time-zones.md).
+
 4. It sets the new state and step, with the next revision, only if the
    instance is still `running` at the revision it loaded. Otherwise another
    transaction changed the instance first. The step then writes nothing else,
@@ -202,6 +203,7 @@ one transaction:
    and leaves no record, no sequence number taken and no audit record. The
    history output is `{ "next", "recordId" }`. See
    [Create record operation](process-flow.md#create-record-operation).
+
 6. It writes the step's history row and its audit records, all with the actor
    `system`:
    - An `updateRecord` operation first writes `record.updated` for the
@@ -416,8 +418,9 @@ same `operationId`. See [Retry](process-inspection.md#retry).
 1. **Mark.** A short transaction marks the call `sending` and counts the
    attempt. It extends the item's lease to the connector's `timeout` plus
    `Worker:LeaseDuration`, so no other worker claims the item while the call
-   runs. An `oauth2` connector gets twice the `timeout`, because its token
-   request has the same `timeout`.
+   runs. An `oauth2` connector gets four times the `timeout`: its token request
+   has the same `timeout`, and a `401` adds a second token request and a
+   second send.
 2. **Bindings.** The worker reads the connector's bindings from its host
    configuration. A missing binding, or an `http` URL outside Development,
    means the request is never sent. Only a worker that runs in Development
@@ -431,6 +434,10 @@ same `operationId`. See [Retry](process-inspection.md#retry).
      memory or the token endpoint, and sends that as the bearer token. A
      failed token request is a retryable attempt that sends nothing, see
      [OAuth2 auth](integration-resources.md#oauth2-auth).
+   - When an `oauth2` connector's system answers `401`, the worker drops the
+     token, gets a new one and sends the request once more in the same
+     attempt, with the same idempotency key. A second `401` fails the attempt
+     as any `4xx` does.
    - With `idempotency`, the request carries the header
      `<idempotency>: <operationId>`, such as `Idempotency-Key: 0192f5c3-…`.
    - The request is cancelled after the connector's `timeout`.
@@ -497,15 +504,15 @@ records or logs, and inspection shows it only under the
 The platform decides which outcomes are retried. A retry always sends the
 stored input again under the same operation identity.
 
-| Outcome of an attempt | Class | Retried | When attempts run out |
-| --- | --- | --- | --- |
-| `2xx` with a body that fits the output | Succeeded | Not needed | Not needed |
-| `2xx` with a body that does not fit the output | Unknown | Never resent. It goes straight to [reconciliation](#reconciliation), with or without `idempotency` | Does not apply |
-| `3xx` | Failed | No | The instance becomes `failed` at once |
-| `4xx` other than `408` and `429` | Failed | No | The instance becomes `failed` at once |
-| Never sent: DNS failure, connection refused, TLS failure, missing binding | Retryable | Yes | The instance becomes `failed` |
-| `408`, `429` and `503` | Retryable | Yes | The instance becomes `failed` |
-| Timeout, a reset after the request was sent, another `5xx`, or a call found still `sending` | Unknown | With the same key, only when the connector declares `idempotency`. Without it, the call goes to [reconciliation](#reconciliation) | The call goes to [reconciliation](#reconciliation) |
+| Outcome of an attempt                                                                       | Class     | Retried                                                                                                                           | When attempts run out                              |
+| ------------------------------------------------------------------------------------------- | --------- | --------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| `2xx` with a body that fits the output                                                      | Succeeded | Not needed                                                                                                                        | Not needed                                         |
+| `2xx` with a body that does not fit the output                                              | Unknown   | Never resent. It goes straight to [reconciliation](#reconciliation), with or without `idempotency`                                | Does not apply                                     |
+| `3xx`                                                                                       | Failed    | No                                                                                                                                | The instance becomes `failed` at once              |
+| `4xx` other than `408` and `429`                                                            | Failed    | No                                                                                                                                | The instance becomes `failed` at once              |
+| Never sent: DNS failure, connection refused, TLS failure, missing binding                   | Retryable | Yes                                                                                                                               | The instance becomes `failed`                      |
+| `408`, `429` and `503`                                                                      | Retryable | Yes                                                                                                                               | The instance becomes `failed`                      |
+| Timeout, a reset after the request was sent, another `5xx`, or a call found still `sending` | Unknown   | With the same key, only when the connector declares `idempotency`. Without it, the call goes to [reconciliation](#reconciliation) | The call goes to [reconciliation](#reconciliation) |
 
 A body fits the output when it is a JSON object with a value of the right type
 for each output, and a value for each required output.
@@ -711,16 +718,16 @@ attempt's outcome counts as unknown.
 The platform decides which outcomes are retried. A retry runs the operation
 again with the stored input under the same operation identity.
 
-| Outcome of an attempt | Class | Retried | When attempts run out |
-| --- | --- | --- | --- |
-| The output fits the manifest | Succeeded | Not needed | Not needed |
-| The output does not fit the manifest | Failed | No | The instance becomes `failed` at once |
-| A `RetryableException` | Retryable | Yes, while attempts are left | The instance becomes `failed` |
-| Any other exception, or a request to the context for an undeclared capability | Failed | No | The instance becomes `failed` at once |
-| The pinned version is missing on the worker | Retryable | Yes, while attempts are left | The instance becomes `failed` |
-| A declared binding the tenant lacks, or an `http` url outside Development | Retryable | Yes, while attempts are left | The instance becomes `failed` |
-| The release lacks the step, or the installed manifest lacks the operation | Failed | No | The instance becomes `failed` at once |
-| A timeout, or a call found still `sending` | Unknown | Only when the operation declares `idempotent: true` and attempts are left | The call stays `unknown` |
+| Outcome of an attempt                                                         | Class     | Retried                                                                   | When attempts run out                 |
+| ----------------------------------------------------------------------------- | --------- | ------------------------------------------------------------------------- | ------------------------------------- |
+| The output fits the manifest                                                  | Succeeded | Not needed                                                                | Not needed                            |
+| The output does not fit the manifest                                          | Failed    | No                                                                        | The instance becomes `failed` at once |
+| A `RetryableException`                                                        | Retryable | Yes, while attempts are left                                              | The instance becomes `failed`         |
+| Any other exception, or a request to the context for an undeclared capability | Failed    | No                                                                        | The instance becomes `failed` at once |
+| The pinned version is missing on the worker                                   | Retryable | Yes, while attempts are left                                              | The instance becomes `failed`         |
+| A declared binding the tenant lacks, or an `http` url outside Development     | Retryable | Yes, while attempts are left                                              | The instance becomes `failed`         |
+| The release lacks the step, or the installed manifest lacks the operation     | Failed    | No                                                                        | The instance becomes `failed` at once |
+| A timeout, or a call found still `sending`                                    | Unknown   | Only when the operation declares `idempotent: true` and attempts are left | The call stays `unknown`              |
 
 - **Fits.** An output fits when it has a value of the right
   [.NET type](extension-packages.md#contracts) for each output, and a value
@@ -812,14 +819,14 @@ with its own timer. A database without the notification tables yet is skipped.
 Any other failure is logged as a warning and does not hold back the tenant's
 work items.
 
-| Setting | Default | Meaning |
-| --- | --- | --- |
-| `Worker:LeaseDuration` | `00:00:30` | How long a claim lasts before another worker can claim the item. |
-| `Worker:PollInterval` | `00:00:01` | How long the worker waits before it polls again when it found no work. |
-| `Worker:MetricsInterval` | `00:00:30` | How often the worker reads each tenant database for the [due work item and pending computed field gauges](#worker-metrics). It must be positive. |
-| `Worker:DeliveryAttempts` | `5` | Failures of a delivery before it becomes a [dead letter](process-events.md#dead-letters). It must be at least 1. |
-| `Notifications:RetentionDays` | `90` | How many days the worker keeps [in-app notifications](notifications.md#in-app-notifications). It must be an integer of at least 1. |
-| `Health:Urls` | `http://127.0.0.1:5208` | The address of the worker's health endpoints, `/health/live` and `/health/ready`. It serves nothing else. |
+| Setting                       | Default                 | Meaning                                                                                                                                          |
+| ----------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `Worker:LeaseDuration`        | `00:00:30`              | How long a claim lasts before another worker can claim the item.                                                                                 |
+| `Worker:PollInterval`         | `00:00:01`              | How long the worker waits before it polls again when it found no work.                                                                           |
+| `Worker:MetricsInterval`      | `00:00:30`              | How often the worker reads each tenant database for the [due work item and pending computed field gauges](#worker-metrics). It must be positive. |
+| `Worker:DeliveryAttempts`     | `5`                     | Failures of a delivery before it becomes a [dead letter](process-events.md#dead-letters). It must be at least 1.                                 |
+| `Notifications:RetentionDays` | `90`                    | How many days the worker keeps [in-app notifications](notifications.md#in-app-notifications). It must be an integer of at least 1.               |
+| `Health:Urls`                 | `http://127.0.0.1:5208` | The address of the worker's health endpoints, `/health/live` and `/health/ready`. It serves nothing else.                                        |
 
 As environment variables they are `Worker__LeaseDuration`,
 `Worker__PollInterval`, `Worker__MetricsInterval`, `Worker__DeliveryAttempts`, `Notifications__RetentionDays` and `Health__Urls`. What the health endpoints answer is
@@ -851,17 +858,17 @@ the same end or attempt again when the item is retried. An ended instance whose
 release cannot be loaded is counted without `axis.application` and
 `axis.process`. A cancelled instance is not counted.
 
-| Metric | Instrument | Unit | Attributes |
-| --- | --- | --- | --- |
-| `axis.work_items.due` | gauge | items | `axis.tenant`, `axis.work_item.kind` |
-| `axis.work_items.oldest_due_age` | gauge | s | `axis.tenant`, `axis.work_item.kind`. Stuck work shows here |
-| `axis.work_items.claim_delay` | histogram | s | `axis.tenant`, `axis.work_item.kind`. The claim time minus the item's due time |
-| `axis.work_items.duration` | histogram | s | `axis.tenant`, `axis.work_item.kind`, `axis.outcome`: `completed`, `failed` or `fenced` |
-| `axis.process.instances.ended` | counter | `{instance}` | `axis.tenant`, `axis.application`, `axis.process`, `axis.outcome`: the end state, `completed` or `failed` |
-| `axis.calls.attempts` | counter | `{attempt}` | `axis.tenant`, `axis.application`, `axis.connector` or `axis.package`, `axis.operation`, `axis.outcome`: the [call outcome](#call-outcomes) class, `succeeded`, `retryable`, `failed` or `unknown` |
-| `axis.queries.timeouts` | counter | `{query}` | `axis.tenant`, `axis.application` when the route has one. An interactive read that ran past `Data:QueryTimeout`, see [Errors](record-api.md#errors) |
-| `axis.dead_letters.created` | counter | `{dead_letter}` | `axis.tenant`, `axis.work_item.kind`. See [Dead letters](process-events.md#dead-letters) |
-| `axis.computed.pending_fields` | gauge | fields | `axis.tenant`, `axis.application`. See [Recomputing computed fields](migrations.md#recomputing-computed-fields) |
+| Metric                           | Instrument | Unit            | Attributes                                                                                                                                                                                         |
+| -------------------------------- | ---------- | --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `axis.work_items.due`            | gauge      | items           | `axis.tenant`, `axis.work_item.kind`                                                                                                                                                               |
+| `axis.work_items.oldest_due_age` | gauge      | s               | `axis.tenant`, `axis.work_item.kind`. Stuck work shows here                                                                                                                                        |
+| `axis.work_items.claim_delay`    | histogram  | s               | `axis.tenant`, `axis.work_item.kind`. The claim time minus the item's due time                                                                                                                     |
+| `axis.work_items.duration`       | histogram  | s               | `axis.tenant`, `axis.work_item.kind`, `axis.outcome`: `completed`, `failed` or `fenced`                                                                                                            |
+| `axis.process.instances.ended`   | counter    | `{instance}`    | `axis.tenant`, `axis.application`, `axis.process`, `axis.outcome`: the end state, `completed` or `failed`                                                                                          |
+| `axis.calls.attempts`            | counter    | `{attempt}`     | `axis.tenant`, `axis.application`, `axis.connector` or `axis.package`, `axis.operation`, `axis.outcome`: the [call outcome](#call-outcomes) class, `succeeded`, `retryable`, `failed` or `unknown` |
+| `axis.queries.timeouts`          | counter    | `{query}`       | `axis.tenant`, `axis.application` when the route has one. An interactive read that ran past `Data:QueryTimeout`, see [Errors](record-api.md#errors)                                                |
+| `axis.dead_letters.created`      | counter    | `{dead_letter}` | `axis.tenant`, `axis.work_item.kind`. See [Dead letters](process-events.md#dead-letters)                                                                                                           |
+| `axis.computed.pending_fields`   | gauge      | fields          | `axis.tenant`, `axis.application`. See [Recomputing computed fields](migrations.md#recomputing-computed-fields)                                                                                    |
 
 The gauges are read every `Worker:MetricsInterval` by a loop that is separate
 from the work loop, so a hung item does not stop it and it does not slow the
