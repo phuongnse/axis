@@ -141,7 +141,7 @@ public sealed class ApplicationRolesTests
     [Fact]
     public void The_policies_of_an_application_see_the_tenant_wide_roles_and_the_roles_mapped_for_it()
     {
-        var first = Application("buyer", Provider("company", "CompanyIssuer", "groups"));
+        var first = Application(["buyer", "clerk"], Provider("company", "CompanyIssuer", "groups"));
         var second = Application("buyer", Provider("company", "CompanyIssuer", "groups"));
         var user = new CurrentUserResponse("u1", "User", ["tenant-role", "buyer"])
         {
@@ -154,6 +154,18 @@ public sealed class ApplicationRolesTests
         Assert.Equal(["tenant-role", "buyer", "clerk"], user.RolesIn(first));
         Assert.Equal(["tenant-role", "buyer"], user.RolesIn(second));
         Assert.Equal(["tenant-role", "buyer"], user.Roles);
+    }
+
+    [Fact]
+    public void An_application_role_that_the_application_does_not_declare_is_left_out()
+    {
+        var application = Application("buyer", Provider("company", "CompanyIssuer", "groups"));
+        var user = new CurrentUserResponse("u1", "User", ["tenant-role"])
+        {
+            ApplicationRoles = new Dictionary<Guid, IReadOnlyList<string>> { [application.Manifest.Id] = ["buyer", "dropped"] },
+        };
+
+        Assert.Equal(["tenant-role", "buyer"], user.RolesIn(application));
     }
 
     [Fact]

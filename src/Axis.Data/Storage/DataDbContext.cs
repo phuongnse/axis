@@ -37,6 +37,8 @@ public sealed class DataDbContext(DbContextOptions<DataDbContext> options) : DbC
 
     public DbSet<SessionRow> Sessions => Set<SessionRow>();
 
+    public DbSet<GivenRoleRow> GivenRoles => Set<GivenRoleRow>();
+
     public DbSet<FileRow> Files => Set<FileRow>();
 
     public DbSet<FileContentRow> FileContents => Set<FileContentRow>();
@@ -167,6 +169,23 @@ public sealed class DataDbContext(DbContextOptions<DataDbContext> options) : DbC
             session.Property(s => s.SitePath).HasColumnName("site_path");
             session.Property(s => s.IdentityProvider).HasColumnName("identity_provider");
             session.Property(s => s.ApplicationRoles).HasColumnName("application_roles").HasColumnType("jsonb").HasDefaultValueSql("'{}'::jsonb").IsRequired();
+        });
+
+        modelBuilder.Entity<GivenRoleRow>(given =>
+        {
+            given.ToTable("given_roles");
+            given.HasKey(g => g.Id).HasName("pk_given_roles");
+            given.Property(g => g.Id).HasColumnName("id").ValueGeneratedNever();
+            given.Property(g => g.UserId).HasColumnName("user_id");
+            given.Property(g => g.ApplicationId).HasColumnName("application_id");
+            given.Property(g => g.Role).HasColumnName("role");
+
+            // A person holds a role once. A platform role has a null application id, and NULLS NOT DISTINCT makes the nulls
+            // equal. The index starts with the user, so a session reads a person's roles by it.
+            given.HasIndex(g => new { g.UserId, g.ApplicationId, g.Role })
+                .IsUnique()
+                .AreNullsDistinct(false)
+                .HasDatabaseName("ux_given_roles_user_id_application_id_role");
         });
 
         modelBuilder.Entity<FileRow>(file =>

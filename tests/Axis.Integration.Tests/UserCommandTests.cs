@@ -4,6 +4,7 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Axis.Admin;
+using Axis.Configuration.Tests;
 using Axis.Core.Tenancy;
 using Axis.Server.Authentication;
 using Axis.Server.Tenancy;
@@ -25,6 +26,9 @@ namespace Axis.Integration.Tests;
 /// <c>POST /api/users/{id}/disable</c>, <c>enable</c> and <c>reset-authenticator</c>. The person signs in for real at a realm that
 /// <see cref="TenantRealm"/> makes in a real Keycloak, with a password and an authenticator, and the server changes the realm
 /// through that realm's <c>axis-users</c> client. A test-only path signs the administrator in with the login time and roles that a test asks for.
+/// An administrator also gives and removes an application role through <c>POST /api/users/{id}/give-role</c> and <c>remove-role</c>,
+/// and the person's live session uses the change at its next request. That application, <c>Roles</c>, declares the role
+/// <c>buyer</c> and a policy that lets it read notes.
 /// The tenant is served at localhost.
 /// </summary>
 public sealed class UserCommandTests(KeycloakFixture keycloak, PostgreSqlFixture database) : IAsyncLifetime, IClassFixture<PostgreSqlFixture>
@@ -35,6 +39,8 @@ public sealed class UserCommandTests(KeycloakFixture keycloak, PostgreSqlFixture
     private const string PlatformSecret = "platform-secret-1";
     private const string UsersSecret = "users-secret-1";
 
+    private static readonly Guid _rolesId = Guid.Parse("5b0d1f52-8d0e-4a47-9c1b-2f7e5a9d4c01");
+
     private readonly string _realm = $"t{Guid.NewGuid():N}"[..16];
     private readonly string _password = Guid.NewGuid().ToString("N");
     private readonly HttpClient _http = new(new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false });
@@ -44,6 +50,7 @@ public sealed class UserCommandTests(KeycloakFixture keycloak, PostgreSqlFixture
     private string? _connectionString;
     private long _lastCodePeriod;
     private WebApplicationFactory<Program>? _factory;
+    private TemporaryFolder? _rolesApplication;
 
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
 
@@ -182,6 +189,113 @@ public sealed class UserCommandTests(KeycloakFixture keycloak, PostgreSqlFixture
         Assert.Equal(0L, await UserAuditCountAsync());
     }
 
+    [Fact]
+    public async Task A_given_role_is_used_by_the_next_request_of_the_live_session_and_a_removed_role_is_not()
+    {
+        var pat = await SessionCookieAsync(_patId, Employee, authenticatedMinutesAgo: null);
+        var admin = await AdministratorCookieAsync(authenticatedMinutesAgo: null);
+        Assert.Equal(HttpStatusCode.Forbidden, await RecordsStatusAsync(pat));
+
+        using var given = await PostJsonAsync($"/api/users/{_patId}/give-role", admin, Body("buyer"));
+
+        Assert.Equal(HttpStatusCode.NoContent, given.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, await RecordsStatusAsync(pat));
+        Assert.Equal(1L, await GivenRolesCountAsync());
+        Assert.Equal(0L, await SessionRowRoleCountAsync());
+
+        using var removed = await PostJsonAsync($"/api/users/{_patId}/remove-role", admin, Body("buyer"));
+
+        Assert.Equal(HttpStatusCode.NoContent, removed.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, await RecordsStatusAsync(pat));
+        Assert.Equal(0L, await GivenRolesCountAsync());
+    }
+
+    [Fact]
+    public async Task Giving_and_removing_a_role_each_write_one_audit_record_and_a_repeat_writes_none()
+    {
+        var admin = await AdministratorCookieAsync(authenticatedMinutesAgo: null);
+
+        using var first = await PostJsonAsync($"/api/users/{_patId}/give-role", admin, Body("buyer"));
+        using var repeated = await PostJsonAsync($"/api/users/{_patId}/give-role", admin, Body("buyer"));
+
+        Assert.Equal(HttpStatusCode.NoContent, first.StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, repeated.StatusCode);
+        Assert.Equal(1L, await RoleAuditCountAsync("user.roleGiven", "buyer"));
+        Assert.Equal([Administrator], await AuditActorsAsync("user.roleGiven", _patId));
+
+        using var removed = await PostJsonAsync($"/api/users/{_patId}/remove-role", admin, Body("buyer"));
+        using var removedAgain = await PostJsonAsync($"/api/users/{_patId}/remove-role", admin, Body("buyer"));
+
+        Assert.Equal(HttpStatusCode.NoContent, removed.StatusCode);
+        Assert.Equal(HttpStatusCode.NoContent, removedAgain.StatusCode);
+        Assert.Equal(1L, await RoleAuditCountAsync("user.roleRemoved", "buyer"));
+        Assert.Equal(1L, await RoleAuditCountAsync("user.roleGiven", "buyer"));
+        Assert.Equal(2L, await UserAuditCountAsync());
+    }
+
+    [Fact]
+    public async Task A_person_who_is_not_an_administrator_gets_403_and_nobody_signed_in_gets_401_on_the_role_routes()
+    {
+        var employee = await SessionCookieAsync("someone", Employee, authenticatedMinutesAgo: 0);
+
+        foreach (var command in new[] { "give-role", "remove-role" })
+        {
+            using var forbidden = await PostJsonAsync($"/api/users/{_patId}/{command}", employee, Body("buyer"));
+            using var unauthorized = await PostJsonAsync($"/api/users/{_patId}/{command}", cookie: null, Body("buyer"));
+            Assert.Equal(HttpStatusCode.Forbidden, forbidden.StatusCode);
+            using var problem = await RecordApiFixture.ReadProblemAsync(unauthorized, HttpStatusCode.Unauthorized);
+            Assert.Equal("Sign in to read or write this data.", problem.RootElement.GetProperty("title").GetString());
+        }
+
+        Assert.Equal(0L, await GivenRolesCountAsync());
+        Assert.Equal(0L, await UserAuditCountAsync());
+    }
+
+    [Fact]
+    public async Task Giving_a_role_the_release_does_not_declare_or_without_an_application_or_to_an_unknown_user_changes_and_audits_nothing()
+    {
+        var admin = await AdministratorCookieAsync(authenticatedMinutesAgo: null);
+
+        using var undeclared = await PostJsonAsync($"/api/users/{_patId}/give-role", admin, Body("approver"));
+        using var platform = await PostJsonAsync($"/api/users/{_patId}/give-role", admin, """{ "role": "buyer" }""");
+        using var blank = await PostJsonAsync($"/api/users/{_patId}/give-role", admin, Body(" "));
+        using var malformed = await PostJsonAsync($"/api/users/{_patId}/give-role", admin, "{ not json");
+        using var otherApplication = await PostJsonAsync(
+            $"/api/users/{_patId}/give-role", admin, $$"""{ "applicationId": "{{Guid.NewGuid()}}", "role": "buyer" }""");
+        using var unknown = await PostJsonAsync($"/api/users/{Guid.NewGuid()}/give-role", admin, Body("buyer"));
+        using var unknownRemove = await PostJsonAsync($"/api/users/{Guid.NewGuid()}/remove-role", admin, Body("buyer"));
+        using var platformRemove = await PostJsonAsync($"/api/users/{_patId}/remove-role", admin, """{ "role": "buyer" }""");
+
+        Assert.Equal(HttpStatusCode.BadRequest, undeclared.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, platform.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, blank.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, malformed.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, otherApplication.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, unknown.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, unknownRemove.StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, platformRemove.StatusCode);
+        Assert.Equal(0L, await GivenRolesCountAsync());
+        Assert.Equal(0L, await UserAuditCountAsync());
+    }
+
+    [Fact]
+    public async Task A_given_row_for_a_role_the_release_does_not_declare_grants_nothing_and_can_still_be_removed()
+    {
+        var pat = await SessionCookieAsync(_patId, Employee, authenticatedMinutesAgo: null);
+        var admin = await AdministratorCookieAsync(authenticatedMinutesAgo: null);
+        await PostgreSqlServer.AdminScalarAsync(
+            _connectionString!,
+            $"INSERT INTO axis.given_roles (id, user_id, application_id, role) VALUES (gen_random_uuid(), '{_patId}', '{_rolesId}', 'dropped')",
+            CancellationToken);
+
+        using var removed = await PostJsonAsync($"/api/users/{_patId}/remove-role", admin, Body("dropped"));
+
+        Assert.Equal(HttpStatusCode.NoContent, removed.StatusCode);
+        Assert.Equal(0L, await GivenRolesCountAsync());
+        Assert.Equal(1L, await RoleAuditCountAsync("user.roleRemoved", "dropped"));
+        Assert.Equal(HttpStatusCode.Forbidden, await RecordsStatusAsync(pat));
+    }
+
     public async ValueTask InitializeAsync()
     {
         _baseAddress = await keycloak.BaseAddressAsync();
@@ -193,6 +307,7 @@ public sealed class UserCommandTests(KeycloakFixture keycloak, PostgreSqlFixture
 
         _connectionString = await database.CreateDatabaseAsync("user_commands", CancellationToken);
         await DataDatabaseFixture.MigrateTenantAsync(_connectionString, CancellationToken);
+        _rolesApplication = RolesApplication();
         _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
@@ -206,6 +321,7 @@ public sealed class UserCommandTests(KeycloakFixture keycloak, PostgreSqlFixture
             builder.UseSetting("Tenants:a:Oidc:UsersClientSecret", UsersSecret);
             builder.UseSetting("Tenants:a:Oidc:RolesClaim", "roles");
             builder.UseSetting("Users:AdministratorRole", Administrator);
+            builder.UseSetting("ActivateOnStartup:0", _rolesApplication.Path);
             builder.ConfigureTestServices(services => services.AddSingleton<IStartupFilter, SessionStartupFilter>());
         });
     }
@@ -217,6 +333,7 @@ public sealed class UserCommandTests(KeycloakFixture keycloak, PostgreSqlFixture
             await _factory.DisposeAsync();
         }
 
+        _rolesApplication?.Dispose();
         using var response = await SendAsync(HttpMethod.Delete, $"admin/realms/{_realm}");
         Assert.True(response.IsSuccessStatusCode || response.StatusCode == HttpStatusCode.NotFound);
         _http.Dispose();
@@ -398,6 +515,71 @@ public sealed class UserCommandTests(KeycloakFixture keycloak, PostgreSqlFixture
         }
 
         return await client.SendAsync(request, CancellationToken);
+    }
+
+    private static string Body(string role) => $$"""{ "applicationId": "{{_rolesId}}", "role": "{{role}}" }""";
+
+    /// <summary>The application <c>Roles</c> with the role <c>buyer</c>, the entity <c>Note</c> and a policy that lets <c>buyer</c> read notes.</summary>
+    private static TemporaryFolder RolesApplication() => new TemporaryFolder()
+        .With("application.json", $$"""{ "id": "{{_rolesId}}", "kind": "application", "name": "Roles", "formatVersion": 1 }""")
+        .With("texts/en.json", """
+            { "id": "5b0d1f52-8d0e-4a47-9c1b-2f7e5a9d4c10", "kind": "text", "name": "TextsEn", "formatVersion": 1, "locale": "en",
+              "texts": { "role.buyer": "Buyer" } }
+            """)
+        .With("roles/buyer.json", """{ "id": "5b0d1f52-8d0e-4a47-9c1b-2f7e5a9d4c13", "kind": "role", "name": "buyer", "formatVersion": 1, "label": { "textKey": "role.buyer" } }""")
+        .With("entities/note.json", """
+            { "id": "5b0d1f52-8d0e-4a47-9c1b-2f7e5a9d4c21", "kind": "entity", "name": "Note", "formatVersion": 1, "displayField": "title",
+              "fields": [ { "name": "title", "type": "text", "required": true } ] }
+            """)
+        .With("policies/buyer-access.json", """
+            { "id": "5b0d1f52-8d0e-4a47-9c1b-2f7e5a9d4c15", "kind": "policy", "name": "BuyerAccess", "formatVersion": 1,
+              "roles": ["buyer"], "grants": [ { "entity": "Note", "actions": ["read"], "fields": ["title"] } ] }
+            """);
+
+    private async Task<HttpStatusCode> RecordsStatusAsync(string cookie)
+    {
+        using var client = CreateClient(cookies: false);
+        using var request = new HttpRequestMessage(HttpMethod.Get, new Uri("/api/apps/Roles/entities/Note/records", UriKind.Relative));
+        request.Headers.Add("Cookie", $"{Session.Scheme}={cookie}");
+        using var response = await client.SendAsync(request, CancellationToken);
+        return response.StatusCode;
+    }
+
+    private async Task<HttpResponseMessage> PostJsonAsync(string path, string? cookie, string body)
+    {
+        using var client = CreateClient(cookies: false);
+        using var request = new HttpRequestMessage(HttpMethod.Post, new Uri(path, UriKind.Relative))
+        {
+            Content = new StringContent(body, System.Text.Encoding.UTF8, "application/json"),
+        };
+        request.Headers.Add("X-Axis-Csrf", "1");
+        if (cookie is not null)
+        {
+            request.Headers.Add("Cookie", $"{Session.Scheme}={cookie}");
+        }
+
+        return await client.SendAsync(request, CancellationToken);
+    }
+
+    private async Task<long> GivenRolesCountAsync() =>
+        (long)(await PostgreSqlServer.AdminScalarAsync(_connectionString!, "SELECT count(*) FROM axis.given_roles", CancellationToken))!;
+
+    // A given role is never written to the session row, so the stored roles stay empty.
+    private async Task<long> SessionRowRoleCountAsync() =>
+        (long)(await PostgreSqlServer.AdminScalarAsync(_connectionString!, "SELECT count(*) FROM axis.sessions WHERE application_roles <> '{}'::jsonb", CancellationToken))!;
+
+    private async Task<long> RoleAuditCountAsync(string action, string role)
+    {
+        await using var connection = new NpgsqlConnection(_connectionString);
+        await connection.OpenAsync(CancellationToken);
+        await using var command = new NpgsqlCommand(
+            "SELECT count(*) FROM axis.audit_records WHERE action = @action AND application_id = @application AND details->>'userId' = @user AND details->>'role' = @role",
+            connection);
+        command.Parameters.AddWithValue("action", action);
+        command.Parameters.AddWithValue("application", _rolesId);
+        command.Parameters.AddWithValue("user", _patId);
+        command.Parameters.AddWithValue("role", role);
+        return (long)(await command.ExecuteScalarAsync(CancellationToken))!;
     }
 
     private async Task<List<string>> AuditActorsAsync(string action, string userId)

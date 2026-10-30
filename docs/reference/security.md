@@ -185,9 +185,8 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place. _(planned f
     `auth_time`. It also holds the lower-case site path of the host that made the
     session, null for the tenant's own hosts, and the alias of the provider that
     signed the person in, from the ID token's `identity_provider` claim, none for
-    accounts, and the roles that each application's provider mapping gave, by application id. A session from before a column existed holds none of it and counts
-    as a sign-in through accounts on the tenant's own hosts. The table never holds the
-    session id or a token, and none reaches the browser.
+    accounts, and the roles that each application's provider mapping gave, by application id. Given roles are not in the row, the session reads them from `axis.given_roles` at every request. A session from before a column existed holds none of it and counts
+    as a sign-in through accounts on the tenant's own hosts. The table never holds the session id or a token, and none reaches the browser.
   - The cookie is one HttpOnly, SameSite=Lax cookie. It holds only the random
     session id, 256 bits, wrapped and protected by the key ring below. It
     holds no claim. The row's key is the SHA-256 hash of the id.
@@ -762,9 +761,9 @@ section is built. It follows
 The `role` and `policy` resource files are described in
 [configuration](roles-and-policies.md).
 
-- **Roles.** A user's roles are the roles claim values and the roles that the
-  application's provider mapping gave, kept in the [session](#sign-in-and-the-session). A value matches a declared `role` of
-  the application by its exact name. A value that names no declared role is
+- **Roles.** A user's roles are the roles claim values, the roles that the application's provider mapping gave, kept in the
+  [session](#sign-in-and-the-session), and the roles that an administrator gave, which the session reads at every request, see
+  [user administration](user-administration.md#roles). A value matches a declared `role` of the application by its exact name. A value that names no declared role is
   ignored. A user matches a policy when they hold any of its roles.
 - **Grants.** A policy holds grants. Each grant gives actions on one target:
   `read`, `create`, `update`, `delete`, `export` and `import` on an entity,
