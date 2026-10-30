@@ -642,9 +642,10 @@ Run and the Test results list, the read-only views of a module entity, a module 
       including unknown keys, stays.
       - `updateRecord` shows `set` as rows of a field of the process's entity
         and an expression. `callConnector` shows the connector and its operation
-        as pickers, `input` as rows of a typed input name and an expression, or
-        "edit in JSON", `output` as rows of a typed connector output name and an
-        entity field, and `retry`. `raiseEvent` shows the event as a picker and
+        as pickers, `input` as rows of a typed input name, a Value, Object or
+        List switch and an expression, with nested rows for an `object` or a
+        `list`, `output` as rows of a typed connector output name and an entity
+        field, and `retry`. `raiseEvent` shows the event as a picker and
         `fields` as rows of a payload field of that event and an expression.
         `createRecord` shows the entity to create as a picker, which lists every
         entity, child entities included, because the names do not say which are
@@ -659,8 +660,7 @@ Run and the Test results list, the read-only views of a module entity, a module 
       - A package operation is typed in a text box as
         `<package>/<operation>`, because no route lists the installed
         operations. It shows `input`, `output` and `retry` as `callConnector`
-        does. The names route lists no connector input or output names, so
-        those are typed too.
+        does, but `input` stays scalar rows. Their names are typed too.
       - `retry` is attempts and backoff. Clearing both removes `retry`.
       - While the application's names are not loaded, every picker is a name
         box. A key the step's operation forbids is not shown as rows. It says

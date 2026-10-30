@@ -12,6 +12,22 @@ const names = {
         { name: 'requester', type: 'text' },
       ],
     },
+    {
+      name: 'PurchaseOrder',
+      module: null,
+      fields: [
+        { name: 'status', type: 'text', target: null },
+        { name: 'lines', type: 'child-collection', target: 'Line' },
+      ],
+    },
+    {
+      name: 'Line',
+      module: null,
+      fields: [
+        { name: 'sku', type: 'text', target: null },
+        { name: 'quantity', type: 'integer', target: null },
+      ],
+    },
     { name: 'Department', module: null, fields: [{ name: 'code', type: 'text' }] },
   ],
   events: [
@@ -209,5 +225,57 @@ describe('expressionScope', () => {
 
     expect(labelsOf(options)).not.toContain('requester')
     expect(labelsOf(options)).toContain('length()')
+  })
+
+  describe('in the input of a callConnector step', () => {
+    const draft = {
+      entity: 'PurchaseOrder',
+      steps: [
+        {
+          name: 'call',
+          type: 'operation',
+          operation: 'callConnector',
+          input: {
+            lines: { from: 'Lines', fields: { sku: 'sku' } },
+            address: { fields: { city: 'status' } },
+            'a/b': { from: 'lines', fields: { sku: 'sku' } },
+            missing: { from: 'nothing', fields: { sku: 'sku' } },
+          },
+        },
+      ],
+    }
+
+    it('offers a list item expression the child entity fields and id, and none of the subject', () => {
+      const labels = labelsOf(expressionScope('process', draft, '/steps/0/input/lines/fields/sku', names))
+
+      expect(labels.slice(0, 3)).toEqual(['id', 'sku', 'quantity'])
+      expect(labels).not.toContain('status')
+      expect(labels).not.toContain('lines')
+    })
+
+    it('reads a key with a slash through its escaped segment', () => {
+      const labels = labelsOf(expressionScope('process', draft, '/steps/0/input/a~1b/fields/sku', names))
+
+      expect(labels).toContain('quantity')
+      expect(labels).not.toContain('status')
+    })
+
+    it('offers an object field expression and a plain input the subject fields', () => {
+      for (const pointer of ['/steps/0/input/address/fields/city', '/steps/0/input/lines']) {
+        const labels = labelsOf(expressionScope('process', draft, pointer, names))
+
+        expect(labels).toContain('status')
+        expect(labels).toContain('lines')
+        expect(labels).not.toContain('quantity')
+      }
+    })
+
+    it('offers a list over an unknown collection no field', () => {
+      const labels = labelsOf(expressionScope('process', draft, '/steps/0/input/missing/fields/sku', names))
+
+      expect(labels).not.toContain('status')
+      expect(labels).not.toContain('sku')
+      expect(labels).toContain('length()')
+    })
   })
 })

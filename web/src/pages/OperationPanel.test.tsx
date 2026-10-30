@@ -1,11 +1,13 @@
-import { render, screen, within } from '@testing-library/react'
+import { EditorView } from '@codemirror/view'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import raw from '../../../src/Axis.Configuration/Schemas/process.schema.json'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
 import type { StudioNames } from '../platform/studio'
 import { TextProvider } from '../platform/TextProvider'
+import { setAt } from '../platform/jsonPatch'
 import { loadKindSchema, type JsonSchema } from '../platform/studioSchemas'
 import { ThemeModeProvider } from '../platform/theme'
 import { useThemeMode } from '../platform/themeMode'
@@ -21,7 +23,21 @@ const names: StudioNames = {
       id: '1',
       name: 'PurchaseRequest',
       module: null,
-      fields: ['status', 'totalAmount', 'purchaseOrderNumber'].map((name) => ({
+      fields: [
+        ...['status', 'totalAmount', 'purchaseOrderNumber'].map((name) => ({
+          name,
+          type: 'text',
+          target: null,
+          values: null,
+        })),
+        { name: 'lines', type: 'child-collection', target: 'LineItem', values: null },
+      ],
+    },
+    {
+      id: '6',
+      name: 'LineItem',
+      module: null,
+      fields: ['sku', 'quantity'].map((name) => ({
         name,
         type: 'text',
         target: null,
@@ -156,6 +172,47 @@ function renderEditor(known = true, value: Record<string, unknown> = process, on
     </ThemeModeProvider>,
   )
   return onChange
+}
+
+/** Renders the editor over a draft that the edits change, and shows the draft as JSON in `draft`. */
+function renderStateful() {
+  function Harness() {
+    const [draft, setDraft] = useState<Record<string, unknown>>(process)
+    return (
+      <>
+        <ExpressionCheckContext.Provider
+          value={{ application: 'Shop', resourceId: '4b60c03e', kind: 'process', draft, names }}
+        >
+          <ProcessEditor
+            schema={schema}
+            value={draft}
+            onChange={(pointer, next) =>
+              setDraft((current) => setAt(current, pointer, next) as Record<string, unknown>)
+            }
+          />
+        </ExpressionCheckContext.Provider>
+        <pre data-testid="draft">{JSON.stringify(draft)}</pre>
+      </>
+    )
+  }
+  render(
+    <ThemeModeProvider>
+      <ThemeRoot>
+        <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+          <Harness />
+        </TextProvider>
+      </ThemeRoot>
+    </ThemeModeProvider>,
+  )
+}
+
+/** Replaces the text of the expression editor in the field with the test id. */
+async function editExpression(fieldTestId: string, text: string) {
+  const box = within(screen.getByTestId(fieldTestId)).getByRole('textbox', { name: 'Expression' })
+  const view = EditorView.findFromDOM(box)!
+  view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: text } })
+  // The editor reports an edit after a short pause.
+  await waitFor(() => expect(screen.getByTestId('draft')).toHaveTextContent(`"${text}"`))
 }
 
 function step(index: number) {
@@ -439,7 +496,7 @@ describe('An updateRecord step', () => {
 
     await userEvent.click(step(0).getByRole('combobox', { name: 'Add mapping Set' }))
     const options = optionTexts()
-    expect(options).toEqual(['purchaseOrderNumber'])
+    expect(options).toEqual(['purchaseOrderNumber', 'lines'])
     await chooseOption('purchaseOrderNumber')
 
     expect(onChange).toHaveBeenLastCalledWith('/steps/0/set/purchaseOrderNumber', '')
@@ -533,22 +590,126 @@ describe('A callConnector step', () => {
     expect(step(1).getByRole('textbox', { name: 'Backoff' })).toHaveValue('PT30S')
   })
 
-  it('shows the json-only text, and no expression box, for an input row whose value is an object', async () => {
+  it('shows a list input as its From picker and nested rows, and no json-only text', async () => {
     const steps = (process.steps as Record<string, unknown>[]).map((candidate) =>
       candidate.name === 'call'
-        ? { ...candidate, input: { amount: 'totalAmount', lines: { from: 'lines', fields: { sku: 'code' } } } }
+        ? { ...candidate, input: { amount: 'totalAmount', lines: { from: 'lines', fields: { sku: 'sku' } } } }
         : candidate,
     )
     renderEditor(true, { ...process, steps })
     await screen.findAllByTestId('studio-expression-type')
 
     const row = within(screen.getByTestId('studio-field-/steps/1/input/lines'))
-    expect(row.getByTestId('studio-json-only')).toBeVisible()
-    expect(row.getByTestId('studio-json-only')).toHaveTextContent('Edit this value in the JSON view.')
-    expect(row.queryByRole('textbox', { name: 'Expression' })).toBeNull()
-    expect(row.getByRole('button', { name: 'Remove' })).toBeVisible()
+    expect(row.queryByTestId('studio-json-only')).toBeNull()
+    expect(row.getByRole('combobox', { name: 'From' })).toBeVisible()
+    expect(row.getByText('lines')).toBeVisible()
+    expect(row.getAllByRole('radio', { name: 'List' })[0]).toBeChecked()
+    const nested = within(screen.getByTestId('studio-field-/steps/1/input/lines/fields/sku'))
+    expect(nested.getByRole('textbox', { name: 'Nested field' })).toHaveValue('sku')
+    expect(nested.getByRole('textbox', { name: 'Expression' })).toBeVisible()
     const amount = within(screen.getByTestId('studio-field-/steps/1/input/amount'))
+    expect(amount.getByRole('radio', { name: 'Value' })).toBeChecked()
     expect(amount.getByRole('textbox', { name: 'Expression' })).toBeVisible()
+  })
+
+  it('shows the json-only text for an input row that is neither text nor an object', async () => {
+    const steps = (process.steps as Record<string, unknown>[]).map((candidate) =>
+      candidate.name === 'call' ? { ...candidate, input: { amount: 'totalAmount', lines: [1] } } : candidate,
+    )
+    renderEditor(true, { ...process, steps })
+    await screen.findAllByTestId('studio-expression-type')
+
+    const row = within(screen.getByTestId('studio-field-/steps/1/input/lines'))
+    expect(row.getByTestId('studio-json-only')).toHaveTextContent('Edit this value in the JSON view.')
+  })
+
+  it('maps a list input from a child collection and an object input, and saves the matching step', async () => {
+    renderStateful()
+    await screen.findAllByTestId('studio-expression-type')
+    const input = () => within(screen.getByTestId('studio-field-/steps/1/input'))
+    // The radio input of a button group has no pointer events, so the click goes to its label.
+    const pick = (row: string, name: string) =>
+      userEvent.click(within(screen.getByTestId(row)).getAllByRole('radio', { name })[0].closest('label')!)
+
+    await userEvent.click(input().getByRole('button', { name: 'Add mapping' }))
+    await userEvent.type(screen.getByTestId('studio-field-/steps/1/input/').querySelector('input')!, 'lines')
+    await pick('studio-field-/steps/1/input/lines', 'List')
+    await chooseOption('lines', screen.getByTestId('studio-field-/steps/1/input/lines/from'))
+
+    const rows = () => within(screen.getByTestId('studio-field-/steps/1/input/lines/fields'))
+    for (const name of ['sku', 'quantity']) {
+      await userEvent.click(rows().getByRole('button', { name: 'Add mapping' }))
+      await userEvent.type(
+        screen.getByTestId('studio-field-/steps/1/input/lines/fields/').querySelector('input')!,
+        name,
+      )
+      await editExpression(`studio-field-/steps/1/input/lines/fields/${name}`, name)
+    }
+
+    await userEvent.click(input().getAllByRole('button', { name: 'Add mapping' }).at(-1)!)
+    await userEvent.type(screen.getByTestId('studio-field-/steps/1/input/').querySelector('input')!, 'address')
+    await pick('studio-field-/steps/1/input/address', 'Object')
+    const address = () => within(screen.getByTestId('studio-field-/steps/1/input/address/fields'))
+    await userEvent.click(address().getByRole('button', { name: 'Add mapping' }))
+    await userEvent.type(
+      screen.getByTestId('studio-field-/steps/1/input/address/fields/').querySelector('input')!,
+      'city',
+    )
+    await editExpression('studio-field-/steps/1/input/address/fields/city', 'status')
+
+    await waitFor(() =>
+      expect(JSON.parse(screen.getByTestId('draft').textContent!).steps[1].input).toEqual({
+        amount: 'totalAmount',
+        lines: { from: 'lines', fields: { sku: 'sku', quantity: 'quantity' } },
+        address: { fields: { city: 'status' } },
+      }),
+    )
+  })
+
+  it('switches an input row between a value, an object and a list', async () => {
+    const onChange = renderEditor(false)
+    const row = () => within(screen.getByTestId('studio-field-/steps/1/input/amount'))
+    const pick = (name: string) => userEvent.click(row().getByRole('radio', { name }).closest('label')!)
+
+    await pick('Value')
+    expect(onChange).not.toHaveBeenCalled()
+    await pick('Object')
+    expect(onChange).toHaveBeenLastCalledWith('/steps/1/input/amount', { fields: {} })
+    await pick('List')
+    expect(onChange).toHaveBeenLastCalledWith('/steps/1/input/amount', { from: '', fields: {} })
+  })
+
+  it('shows the type error of the check route under a list item expression', async () => {
+    const steps = (process.steps as Record<string, unknown>[]).map((candidate) =>
+      candidate.name === 'call'
+        ? { ...candidate, input: { lines: { from: 'lines', fields: { quantity: 'sku' } } } }
+        : candidate,
+    )
+    const fetchMock = vi.fn(
+      async (_input: RequestInfo | URL, _init?: RequestInit) =>
+        new Response(
+          JSON.stringify({
+            type: null,
+            diagnostics: [
+              { code: 'AXC0048', message: 'The value is text, but quantity is integer.', start: 0, end: 4 },
+            ],
+          }),
+          { status: 200 },
+        ),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    renderEditor(true, { ...process, steps })
+
+    const row = within(screen.getByTestId('studio-field-/steps/1/input/lines/fields/quantity'))
+    const box = await row.findByRole('textbox', { name: 'Expression' })
+    const view = EditorView.findFromDOM(box)!
+    view.dispatch({ changes: { from: view.state.doc.length, insert: 'x' } })
+
+    expect(await row.findByTestId('studio-expression-error')).toHaveTextContent(
+      'The value is text, but quantity is integer.',
+    )
+    const paths = fetchMock.mock.calls.map(([, init]) => (JSON.parse(init!.body as string) as { path: string }).path)
+    expect(paths).toContain('/steps/1/input/lines/fields/quantity')
   })
 
   it('picks the connector operation from the operations of the connector', async () => {
