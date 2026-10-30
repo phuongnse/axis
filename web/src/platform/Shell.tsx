@@ -81,11 +81,13 @@ export function Shell({ titleKey, navigation, locales, locale, onLocaleChange, n
   const hasSidebar = navigation.length > 1 || pageSidebar
   const sidebar = hasSidebar && !narrow
   const home = navigation[0]?.path ?? '/'
+  // Proposed: an entry is its label while the sidebar is open and its icon, centred, while it is collapsed, where a
+  // tooltip names it, as an action has text or an icon, never both.
   const items = navigation.map((item) => {
     const Icon = navigationIcon(item.icon)
     return {
       key: item.key,
-      icon: <Icon aria-hidden />,
+      icon: collapsed && !narrow ? <Icon aria-hidden /> : undefined,
       label: (
         <Link to={item.path} aria-current={item.key === activeKey ? 'page' : undefined}>
           {t(item.labelKey)}

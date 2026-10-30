@@ -1,5 +1,5 @@
 import { DownOutlined } from '@ant-design/icons'
-import { ConfigProvider, Dropdown, Flex, Menu, Typography, type MenuProps } from 'antd'
+import { ConfigProvider, Dropdown, Menu, Typography, type MenuProps } from 'antd'
 import { createElement, useContext } from 'react'
 import { createPortal } from 'react-dom'
 import { selectedItemTint } from '../platform/antTheme'
@@ -12,6 +12,12 @@ import { useDesignTokens, useThemeMode } from '../platform/themeMode'
 import { PlatformContext } from './context'
 import { StudioNewApplication } from './StudioNewApplication'
 import { groupedKinds, studioKindGroups, studioViewKey, type StudioView } from './studioViews'
+
+/** A thin rule between groups in the collapsed sidebar, in place of their titles. */
+function Divider() {
+  const { colour } = useDesignTokens()
+  return <span aria-hidden style={{ display: 'block', height: 1, background: colour.divider }} />
+}
 
 function Icon({ name }: { name: string }) {
   return createElement(navigationIcon(name), { 'aria-hidden': true })
@@ -54,37 +60,34 @@ export function StudioNavigation({
     counts.set(item.kind, (counts.get(item.kind) ?? 0) + 1)
   }
 
-  const entry = (key: string, icon: string, label: string, count?: number) => ({
+  // Proposed: an entry is its text while the sidebar is open and its icon, centred, while it is collapsed, where the
+  // shell names it in a tooltip. No entry shows a count.
+  const entry = (key: string, icon: string, label: string) => ({
     key,
-    icon: <Icon name={icon} />,
-    label: (
-      <Flex justify="space-between" gap={spacing.xs}>
-        <span>{label}</span>
-        {count !== undefined && <span style={{ color: colour.textMuted }}>{count}</span>}
-      </Flex>
-    ),
+    icon: collapsed ? <Icon name={icon} /> : undefined,
+    label,
   })
 
+  // Proposed: what concerns the whole application comes first: Overview, Releases and Settings.
   const items: NonNullable<MenuProps['items']> = [
     entry('overview', 'dashboard', t('shell.studio.nav.overview')),
+    entry('releases', 'clock', t('shell.studio.nav.releases')),
     entry('settings', 'settings', t('shell.studio.nav.settings')),
   ]
   for (const group of studioKindGroups) {
     const children = group.kinds
       .filter((entryKind) => counts.has(entryKind.kind))
-      .map((entryKind) =>
-        entry(
-          `kind:${entryKind.kind}`,
-          entryKind.icon,
-          t(`shell.studio.kind.${entryKind.kind}`),
-          counts.get(entryKind.kind),
-        ),
-      )
+      .map((entryKind) => entry(`kind:${entryKind.kind}`, entryKind.icon, t(`shell.studio.kind.${entryKind.kind}`)))
     if (group.key === 'access') {
       children.push(entry('policies', 'list', t('shell.studio.view.policies')))
     }
     if (children.length > 0) {
-      items.push({ type: 'group', key: `group:${group.key}`, label: t(`shell.studio.nav.${group.key}`), children })
+      // Proposed: collapsed, a group's title gives way to a divider, as a strip of icons has no room for words.
+      items.push(
+        collapsed
+          ? { type: 'group', key: `group:${group.key}`, label: <Divider />, children }
+          : { type: 'group', key: `group:${group.key}`, label: t(`shell.studio.nav.${group.key}`), children },
+      )
     }
   }
   const other = [...counts.keys()].filter((kind) => kind !== 'application' && !groupedKinds.has(kind)).sort()
@@ -92,11 +95,10 @@ export function StudioNavigation({
     items.push({
       type: 'group',
       key: 'group:other',
-      label: t('shell.studio.nav.other'),
-      children: other.map((kind) => entry(`kind:${kind}`, 'document', kind, counts.get(kind))),
+      label: collapsed ? <Divider /> : t('shell.studio.nav.other'),
+      children: other.map((kind) => entry(`kind:${kind}`, 'document', kind)),
     })
   }
-  items.push({ type: 'divider' }, entry('releases', 'clock', t('shell.studio.nav.releases')))
 
   function pick({ key }: { key: string }) {
     if (key.startsWith('kind:')) {
