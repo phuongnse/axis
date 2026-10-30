@@ -4,13 +4,13 @@ import { useMemo, type CSSProperties } from 'react'
 import { selectedItemTint } from './antTheme'
 import { AxisButton } from './AxisButton'
 import { useText } from './texts'
-import { useDesignTokens, useThemeMode, type ThemeMode } from './themeMode'
+import { useDesignTokens, useThemeMode, type ThemeChoice } from './themeMode'
 
-const modes: readonly ThemeMode[] = ['light', 'dark']
+const choices: readonly ThemeChoice[] = ['system', 'light', 'dark']
 
 /**
  * The "Language and theme" button in the shell header. Its menu holds the site's languages and
- * Light and Dark, with the current ones marked. Picking the current one changes nothing.
+ * System, Light and Dark, with the current ones marked. Picking the current one changes nothing.
  */
 export function PreferencesMenu({
   locales,
@@ -22,14 +22,14 @@ export function PreferencesMenu({
   onLocaleChange: (locale: string) => void
 }) {
   const t = useText()
-  const { mode, toggleMode } = useThemeMode()
+  const { mode, choice, choose } = useThemeMode()
   const { colour } = useDesignTokens()
   const selected = useMemo<CSSProperties>(
     () => ({ color: colour.primaryText, background: selectedItemTint(mode) }),
     [colour, mode],
   )
 
-  function choice(key: string, label: string, current: boolean) {
+  function option(key: string, label: string, current: boolean) {
     return { key, label, role: 'menuitemradio', 'aria-checked': current, style: current ? selected : undefined }
   }
 
@@ -38,15 +38,15 @@ export function PreferencesMenu({
       type: 'group',
       key: 'locale',
       label: t('shell.locale.label'),
-      children: locales.map((tag) => choice(`locale:${tag}`, t(`shell.locale.${tag}`), tag === locale)),
+      children: locales.map((tag) => option(`locale:${tag}`, t(`shell.locale.${tag}`), tag === locale)),
     },
     { type: 'divider' },
     {
       type: 'group',
       key: 'theme',
       label: t('shell.theme.label'),
-      children: modes.map((candidate) =>
-        choice(`theme:${candidate}`, t(`shell.theme.${candidate}`), candidate === mode),
+      children: choices.map((candidate) =>
+        option(`theme:${candidate}`, t(`shell.theme.${candidate}`), candidate === choice),
       ),
     },
   ] as MenuProps['items']
@@ -56,8 +56,8 @@ export function PreferencesMenu({
     const [kind, value] = key.split(':')
     if (kind === 'locale' && value !== locale) {
       onLocaleChange(value)
-    } else if (kind === 'theme' && value !== mode) {
-      toggleMode()
+    } else if (kind === 'theme' && value !== choice) {
+      choose(value as ThemeChoice)
     }
   }
 

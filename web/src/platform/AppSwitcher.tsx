@@ -1,22 +1,37 @@
 import { AppstoreOutlined } from '@ant-design/icons'
 import { Dropdown, type MenuProps } from 'antd'
-import { useEffect, useState } from 'react'
-import { Link } from 'react-router'
+import { useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { Link, useLocation } from 'react-router'
+import { selectedItemTint } from './antTheme'
 import { AxisButton } from './AxisButton'
 import { fetchCurrentUser, type CurrentUser } from './currentUser'
 import { fetchSites, siteTitle, type SiteListItem } from './site'
 import { useText } from './texts'
 import { siteAddress } from './siteLinks'
+import { useDesignTokens, useThemeMode } from './themeMode'
+
+/** Whether the page address is the address of a site or a tool, or lies inside it. */
+function isCurrent(address: string, pathname: string): boolean {
+  return pathname === address || address === '/' || pathname.startsWith(`${address}/`)
+}
 
 /**
  * The "Switch to" button in the shell header. Its menu lists the person's sites, then Studio for a
  * user who may use it, the operator console for a user who may use that and Users for an
- * administrator. It renders nothing
+ * administrator. The site or tool of the current page is drawn selected and marked as the current page.
+ * It renders nothing
  * while the user loads, when nobody is signed in, or when loading the user fails. When loading the
  * sites fails, the menu lists only the tools.
  */
 export function AppSwitcher({ locale }: { locale: string }) {
   const t = useText()
+  const { pathname } = useLocation()
+  const { colour } = useDesignTokens()
+  const { mode } = useThemeMode()
+  const selected = useMemo<CSSProperties>(
+    () => ({ color: colour.primaryText, background: selectedItemTint(mode) }),
+    [colour, mode],
+  )
   const [user, setUser] = useState<CurrentUser | null | undefined>(undefined)
   const [sites, setSites] = useState<SiteListItem[]>([])
 
@@ -43,15 +58,26 @@ export function AppSwitcher({ locale }: { locale: string }) {
     return null
   }
 
+  const entry = (address: string, text: string) => {
+    const current = isCurrent(address, pathname)
+    return {
+      label: (
+        <Link to={address} aria-current={current ? 'page' : undefined}>
+          {text}
+        </Link>
+      ),
+      style: current ? selected : undefined,
+    }
+  }
   const tools: NonNullable<MenuProps['items']> = []
   if (user.studio) {
-    tools.push({ key: 'studio', label: <Link to="/studio">{t('shell.appSwitcher.studio')}</Link> })
+    tools.push({ key: 'studio', ...entry('/studio', t('shell.appSwitcher.studio')) })
   }
   if (user.console) {
-    tools.push({ key: 'console', label: <Link to="/console">{t('shell.appSwitcher.console')}</Link> })
+    tools.push({ key: 'console', ...entry('/console', t('shell.appSwitcher.console')) })
   }
   if (user.users) {
-    tools.push({ key: 'users', label: <Link to="/users">{t('shell.appSwitcher.users')}</Link> })
+    tools.push({ key: 'users', ...entry('/users', t('shell.appSwitcher.users')) })
   }
   const items: NonNullable<MenuProps['items']> = []
   if (sites.length > 0) {
@@ -61,7 +87,7 @@ export function AppSwitcher({ locale }: { locale: string }) {
       label: t('shell.appSwitcher.sites'),
       children: sites.map((site) => ({
         key: `site:${site.path}`,
-        label: <Link to={siteAddress(site.path)}>{siteTitle(site, locale)}</Link>,
+        ...entry(siteAddress(site.path), siteTitle(site, locale)),
       })),
     })
   }

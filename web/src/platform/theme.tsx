@@ -1,21 +1,23 @@
 import { ConfigProvider } from 'antd'
-import { useCallback, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { antThemeFor } from './antTheme'
-import { ThemeModeContext, type ThemeMode } from './themeMode'
+import { designTokensFor } from './designTokens'
+import { ThemeModeContext, type ThemeChoice, type ThemeMode } from './themeMode'
 import { useReducedMotion } from './useReducedMotion'
+import { useSystemThemeMode } from './useSystemThemeMode'
 
 const storageKey = 'axis.themeMode'
 
-function storedMode(): ThemeMode {
+function storedChoice(): ThemeChoice {
   try {
     const stored = localStorage.getItem(storageKey)
-    if (stored === 'light' || stored === 'dark') {
+    if (stored === 'system' || stored === 'light' || stored === 'dark') {
       return stored
     }
   } catch {
-    // Storage can be unavailable (private mode); fall back to the system preference.
+    // Storage can be unavailable (private mode); the choice is then System.
   }
-  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+  return 'system'
 }
 
 interface ThemeModeProviderProps {
@@ -25,23 +27,26 @@ interface ThemeModeProviderProps {
 }
 
 export function ThemeModeProvider({ initialMode, children }: ThemeModeProviderProps) {
-  const [mode, setMode] = useState<ThemeMode>(() => initialMode ?? storedMode())
+  const [choice, setChoice] = useState<ThemeChoice>(() => initialMode ?? storedChoice())
+  const systemMode = useSystemThemeMode()
+  const mode = choice === 'system' ? systemMode : choice
 
-  const toggleMode = useCallback(() => {
-    setMode((current) => {
-      const next = current === 'dark' ? 'light' : 'dark'
-      try {
-        localStorage.setItem(storageKey, next)
-      } catch {
-        // The choice is still applied for this session.
-      }
-      return next
-    })
+  const choose = useCallback((next: ThemeChoice) => {
+    setChoice(next)
+    try {
+      localStorage.setItem(storageKey, next)
+    } catch {
+      // The choice is still applied for this session.
+    }
   }, [])
 
-  const value = useMemo(() => ({ mode, toggleMode }), [mode, toggleMode])
+  const value = useMemo(() => ({ mode, choice, choose }), [mode, choice, choose])
   const reducedMotion = useReducedMotion()
   const config = useMemo(() => antThemeFor(mode, undefined, reducedMotion), [mode, reducedMotion])
+
+  useEffect(() => {
+    document.body.style.backgroundColor = designTokensFor(mode).colour.canvas
+  }, [mode])
 
   return (
     <ThemeModeContext.Provider value={value}>

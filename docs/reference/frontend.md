@@ -906,7 +906,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
 - **Process inspector widget**. A page whose widget is a `processInspector` lists the instances of
   one process and opens one. See [process-inspector-widget.md](process-inspector-widget.md).
 - **Locale.** The shell header has a language and theme menu, in the Menu panel at narrow width. It lists the
-  site's locales and Light and Dark. The chosen locale is kept in `localStorage` under `axis.locale`, like the
+  site's locales and System, Light and Dark. The chosen locale is kept in `localStorage` under `axis.locale`, like the
   theme mode under `axis.themeMode`. These are the only keys the SPA keeps in browser storage. Sign-out clears
   both through `Clear-Site-Data`, so the next sign-in starts in the system theme and the site's default locale.
   One key serves every site: a site starts in the stored locale when it offers it, and in its default locale

@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { render, screen, waitFor, within, type BoundFunctions, type queries } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -8,6 +8,7 @@ import { AppSwitcher } from './AppSwitcher'
 import type { CurrentUser } from './currentUser'
 import type { SiteListItem } from './site'
 import { TextProvider } from './TextProvider'
+import { ThemeModeProvider } from './theme'
 
 const requester: CurrentUser = {
   id: 'requester',
@@ -70,19 +71,29 @@ function stubServer(current: CurrentUser | null, listed: SiteListItem[] = sites)
   return fetchMock
 }
 
-function renderSwitcher(locale = 'en', texts: Record<string, string> = platformEnglish) {
+function renderSwitcher(locale = 'en', texts: Record<string, string> = platformEnglish, initialEntries = ['/']) {
   render(
-    <TextProvider catalogs={[{ texts, fallbackTexts: texts }]} development={false}>
-      <MemoryRouter>
-        <AppSwitcher locale={locale} />
-      </MemoryRouter>
-    </TextProvider>,
+    <ThemeModeProvider>
+      <TextProvider catalogs={[{ texts, fallbackTexts: texts }]} development={false}>
+        <MemoryRouter initialEntries={initialEntries}>
+          <AppSwitcher locale={locale} />
+        </MemoryRouter>
+      </TextProvider>
+    </ThemeModeProvider>,
   )
 }
 
 async function openSwitcher(name = 'Switch to') {
   await userEvent.click(await screen.findByRole('button', { name }))
   return within(await screen.findByRole('menu', { name }))
+}
+
+/** The names of the entries that the menu marks as the current page. */
+function markedNames(menu: BoundFunctions<typeof queries>) {
+  return menu
+    .getAllByRole('link')
+    .filter((link) => link.getAttribute('aria-current') === 'page')
+    .map((link) => link.textContent)
 }
 
 beforeEach(() => {
@@ -160,6 +171,33 @@ describe('AppSwitcher', () => {
 
     expect(menu.getByRole('link', { name: 'Operator console' })).toBeInTheDocument()
     expect(menu.queryByRole('link', { name: 'Users' })).not.toBeInTheDocument()
+  })
+
+  it('marks the site of the current page as the current page, and no other entry', async () => {
+    stubServer(requester)
+    renderSwitcher('en', platformEnglish, ['/purchasing/requests'])
+
+    const menu = await openSwitcher()
+
+    expect(markedNames(menu)).toEqual(['Purchase requests'])
+  })
+
+  it('marks Studio on its own page, and no site', async () => {
+    stubServer(author)
+    renderSwitcher('en', platformEnglish, ['/studio'])
+
+    const menu = await openSwitcher()
+
+    expect(markedNames(menu)).toEqual(['Studio'])
+  })
+
+  it('marks no entry on the platform home page', async () => {
+    stubServer(author)
+    renderSwitcher()
+
+    const menu = await openSwitcher()
+
+    expect(markedNames(menu)).toEqual([])
   })
 
   it('shows the site titles of the locale, and the first title when a site lacks it', async () => {

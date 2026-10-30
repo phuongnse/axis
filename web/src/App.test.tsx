@@ -45,6 +45,7 @@ const texts: Record<string, Record<string, string>> = {
     'shell.appSwitcher.users': 'Users',
     'shell.preferences.label': 'Language and theme',
     'shell.theme.label': 'Theme',
+    'shell.theme.system': 'System',
     'shell.theme.light': 'Light',
     'shell.theme.dark': 'Dark',
     'shell.locale.label': 'Language',

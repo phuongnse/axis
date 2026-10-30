@@ -249,6 +249,7 @@ describe('PreferencesMenu', () => {
         'shell.locale.en': 'English',
         'shell.locale.vi': 'Tiếng Việt',
         'shell.theme.label': 'Theme',
+        'shell.theme.system': 'System',
         'shell.theme.light': 'Light',
         'shell.theme.dark': 'Dark',
       },
@@ -282,7 +283,31 @@ describe('PreferencesMenu', () => {
     expect(menu.getByText('Theme')).toBeInTheDocument()
     expect(menu.getByRole('menuitemradio', { name: 'English' })).toHaveAttribute('aria-checked', 'true')
     expect(menu.getByRole('menuitemradio', { name: 'Tiếng Việt' })).toHaveAttribute('aria-checked', 'false')
+    expect(menu.getByRole('menuitemradio', { name: 'System' })).toHaveAttribute('aria-checked', 'false')
     expect(menu.getByRole('menuitemradio', { name: 'Light' })).toHaveAttribute('aria-checked', 'true')
+    expect(menu.getByRole('menuitemradio', { name: 'Dark' })).toHaveAttribute('aria-checked', 'false')
+  })
+
+  it('marks System as the current theme when nothing is stored', async () => {
+    localStorage.clear()
+    renderPreferences()
+
+    const menu = within(await openMenu())
+
+    expect(menu.getByRole('menuitemradio', { name: 'System' })).toHaveAttribute('aria-checked', 'true')
+    expect(menu.getByRole('menuitemradio', { name: 'Light' })).toHaveAttribute('aria-checked', 'false')
+    expect(menu.getByRole('menuitemradio', { name: 'Dark' })).toHaveAttribute('aria-checked', 'false')
+  })
+
+  it('picks the system setting, stores it and marks it as current', async () => {
+    localStorage.setItem('axis.themeMode', 'dark')
+    renderPreferences()
+
+    await userEvent.click(within(await openMenu()).getByRole('menuitemradio', { name: 'System' }))
+
+    expect(localStorage.getItem('axis.themeMode')).toBe('system')
+    const menu = within(await openMenu())
+    expect(menu.getByRole('menuitemradio', { name: 'System' })).toHaveAttribute('aria-checked', 'true')
     expect(menu.getByRole('menuitemradio', { name: 'Dark' })).toHaveAttribute('aria-checked', 'false')
   })
 
