@@ -187,6 +187,16 @@ public sealed partial class TenantRealmAccountRulesTests(KeycloakFixture keycloa
     }
 
     [Fact]
+    public async Task A_second_run_leaves_the_verify_profile_action_off()
+    {
+        var realm = await NewRealmAsync();
+        await EnsureAsync(realm);
+
+        var action = await GetJsonAsync($"admin/realms/{realm}/authentication/required-actions/VERIFY_PROFILE");
+        Assert.False(action.GetProperty("enabled").GetBoolean());
+    }
+
+    [Fact]
     public async Task A_second_run_leaves_a_first_login_flow_that_only_creates_a_user_and_the_realm_allows_duplicate_emails()
     {
         var realm = await NewRealmAsync();

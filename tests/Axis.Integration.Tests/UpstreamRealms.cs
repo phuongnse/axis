@@ -8,7 +8,7 @@ namespace Axis.Integration.Tests;
 
 /// <summary>
 /// Realms in the test Keycloak that play the company's issuer for a tenant realm that brokers to it, and the browser that signs a
-/// person in through them. It deletes every realm it made, and every realm named by <see cref="NewRealmName"/>, when it is disposed.
+/// person in through them. The browser follows redirects and submits the self-submitting SAML forms. It deletes every realm it made, and every realm named by <see cref="NewRealmName"/>, when it is disposed.
 /// </summary>
 public sealed partial class UpstreamRealms : IDisposable
 {
@@ -84,6 +84,57 @@ public sealed partial class UpstreamRealms : IDisposable
         Assert.Equal(HttpStatusCode.Created, client.StatusCode);
         return realm;
     }
+
+    /// <summary>
+    /// Makes a realm that plays a company's SAML issuer, with the same frontend address as <see cref="NewUpstreamRealmAsync"/>. Its one
+    /// client is the tenant realm's service provider, <paramref name="entityId"/>, which accepts unsigned requests and posts its response
+    /// to <paramref name="assertionConsumerUrl"/>. It sends the user's first name as <c>name</c> and the user's email as <c>email</c>.
+    /// </summary>
+    public async Task<string> NewUpstreamSamlRealmAsync(string entityId, string assertionConsumerUrl)
+    {
+        var realm = NewRealmName();
+        using var created = await SendAsync(HttpMethod.Post, "admin/realms", new
+        {
+            realm,
+            enabled = true,
+            attributes = new Dictionary<string, string> { ["frontendUrl"] = _baseAddress.AbsoluteUri.TrimEnd('/') },
+        });
+        Assert.Equal(HttpStatusCode.Created, created.StatusCode);
+
+        using var client = await SendAsync(HttpMethod.Post, $"admin/realms/{realm}/clients", new
+        {
+            protocol = "saml",
+            clientId = entityId,
+            enabled = true,
+            redirectUris = _anyRedirect,
+            attributes = new Dictionary<string, string>
+            {
+                ["saml.client.signature"] = "false",
+                ["saml_assertion_consumer_url_post"] = assertionConsumerUrl,
+                ["saml.force.post.binding"] = "true",
+                ["saml_name_id_format"] = "persistent",
+            },
+            protocolMappers = new[] { SamlAttribute("name", "firstName"), SamlAttribute("email", "email") },
+        });
+        Assert.Equal(HttpStatusCode.Created, client.StatusCode);
+        return realm;
+    }
+
+    /// <summary>The address of the SAML metadata of the <paramref name="upstream"/> realm, which the tenant realm's provider imports.</summary>
+    public Uri SamlMetadata(string upstream) => new(_baseAddress, $"realms/{upstream}/protocol/saml/descriptor");
+
+    private static object SamlAttribute(string name, string property) => new
+    {
+        name,
+        protocol = "saml",
+        protocolMapper = "saml-user-property-mapper",
+        config = new Dictionary<string, string>
+        {
+            ["user.attribute"] = property,
+            ["attribute.name"] = name,
+            ["attribute.nameformat"] = "Basic",
+        },
+    };
 
     /// <summary>Adds the person <c>pat</c> with a complete profile, so Keycloak's profile check asks for nothing. Returns the user's id, which is the subject.</summary>
     public async Task<string> AddUpstreamUserAsync(string realm)
@@ -167,8 +218,9 @@ public sealed partial class UpstreamRealms : IDisposable
     }
 
     /// <summary>
-    /// Sends the request and follows each redirect by hand. Returns the address and HTML of the first page that is not a redirect, or
-    /// <see langword="null"/> and the address when the redirects end at the callback.
+    /// Sends the request and follows each redirect by hand. A page with a form that carries a hidden <c>SAMLRequest</c> or
+    /// <c>SAMLResponse</c> is submitted as a browser does, as a POST of the form's hidden inputs. Returns the address and HTML of the first
+    /// page that is neither, or <see langword="null"/> and the address when the redirects end at the callback.
     /// </summary>
     private async Task<(Uri? Page, string Html)> FollowAsync(
         List<(string Name, string Path, string Value)> jar,
@@ -196,7 +248,16 @@ public sealed partial class UpstreamRealms : IDisposable
             if (response.StatusCode is not (HttpStatusCode.Found or HttpStatusCode.SeeOther))
             {
                 var html = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
-                return (address, $"{(int)response.StatusCode} {address}\n{html}");
+                var samlForm = SamlForm(html);
+                if (samlForm is null)
+                {
+                    return (address, $"{(int)response.StatusCode} {address}\n{html}");
+                }
+
+                method = HttpMethod.Post;
+                address = new Uri(address, samlForm.Value.Action);
+                form = samlForm.Value.Fields;
+                continue;
             }
 
             var location = new Uri(address, response.Headers.Location!);
@@ -211,6 +272,31 @@ public sealed partial class UpstreamRealms : IDisposable
         }
 
         throw new InvalidOperationException("The sign-in redirected more than 20 times.");
+    }
+
+    /// <summary>The action and hidden inputs of the form that carries a <c>SAMLRequest</c> or a <c>SAMLResponse</c>, or <see langword="null"/> when the page has none.</summary>
+    private static (string Action, Dictionary<string, string> Fields)? SamlForm(string html)
+    {
+        var fields = new Dictionary<string, string>();
+        foreach (Match input in InputPattern().Matches(html))
+        {
+            var tag = input.Value;
+            if (!HiddenPattern().IsMatch(tag))
+            {
+                continue;
+            }
+
+            var name = NamePattern().Match(tag);
+            if (name.Success)
+            {
+                fields[WebUtility.HtmlDecode(name.Groups["v"].Value)] = WebUtility.HtmlDecode(ValuePattern().Match(tag).Groups["v"].Value);
+            }
+        }
+
+        var action = FormActionPattern().Match(html);
+        return action.Success && (fields.ContainsKey("SAMLRequest") || fields.ContainsKey("SAMLResponse"))
+            ? (WebUtility.HtmlDecode(action.Groups["action"].Value), fields)
+            : null;
     }
 
     /// <summary>
@@ -253,6 +339,18 @@ public sealed partial class UpstreamRealms : IDisposable
         var body = await response.Content.ReadFromJsonAsync<JsonElement>(TestContext.Current.CancellationToken);
         return body.GetProperty("access_token").GetString()!;
     }
+
+    [GeneratedRegex("""<input\b[^>]*>""", RegexOptions.IgnoreCase)]
+    private static partial Regex InputPattern();
+
+    [GeneratedRegex("""\btype\s*=\s*["']hidden["']""", RegexOptions.IgnoreCase)]
+    private static partial Regex HiddenPattern();
+
+    [GeneratedRegex("""\bname\s*=\s*["'](?<v>[^"']*)["']""", RegexOptions.IgnoreCase)]
+    private static partial Regex NamePattern();
+
+    [GeneratedRegex("""\bvalue\s*=\s*["'](?<v>[^"']*)["']""", RegexOptions.IgnoreCase)]
+    private static partial Regex ValuePattern();
 
     [GeneratedRegex("""<form\b[^>]*\baction="(?<action>[^"]+)""")]
     private static partial Regex FormActionPattern();
