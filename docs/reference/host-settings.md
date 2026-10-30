@@ -422,7 +422,7 @@ reads `Data:ImportMaxRows`. See
   at least 1, stops the start. A missing value takes the default.
 - **Writes.** Record writes, activation and the worker's own statements keep
   their current limits. The final values are set against the performance
-  objectives _(planned for M18)_.
+  objectives _(planned for M28)_.
 - **Environment.** As environment variables they are `Data__QueryTimeout`
   and so on.
 

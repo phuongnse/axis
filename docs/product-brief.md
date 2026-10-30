@@ -69,7 +69,7 @@ the agreed extension points (see [decisions](decisions.md)).
 
 - Formal security certification. The FAPI 2.0 profile and the ASVS work are in the
   Hardening milestone, M16. The conformance run and the ASVS sign-off are
-  _(planned for M18)_ (see the [roadmap](roadmap.md#milestones)).
+  _(planned for M28)_ (see the [roadmap](roadmap.md#milestones)).
 - Provisioning many tenants self-service, and Axis-hosted SaaS operations.
 - Custom UI widgets. They come after the visual designers (D8, D46).
 - Migrating live business data between installations.
@@ -329,7 +329,7 @@ its access rules and a maintenance entry, a warranty reminder process and its
 weekday trigger. It is active in development, Compose and E2E. The Studio
 journey builds the whole folder, compares it with the sample, runs its scenarios
 from Studio, publishes it and uses its site to register, import and export
-assets. Only the import and attachment scenarios are _(planned for M18)_.
+assets. Only the import and attachment scenarios are _(planned for M26)_.
 
 ### Data
 
@@ -383,10 +383,10 @@ SPA serves its bundle there. Texts are in `en` and `vi`.
 - Built: an asset is registered, an employee and an auditor cannot write, a
   negative cost is refused, an asset with a maintenance entry with a vendor, and
   software is recorded, and a user without a role is denied.
-- _(planned for M18)_ An import of valid assets, and an import whose dry run
+- _(planned for M26)_ An import of valid assets, and an import whose dry run
   reports a bad row and writes nothing.
-- _(planned for M18)_ An asset with an attachment.
-- _(planned for M18)_ Denied access for an employee to another holder's asset,
+- _(planned for M26)_ An asset with an attachment.
+- _(planned for M26)_ Denied access for an employee to another holder's asset,
   to its attachment's download and to an export, and for an auditor to an
   import.
 

@@ -323,7 +323,7 @@ The steps for a requested change, a design review and a sync are in the
   false fixes it in the same change. The rule is in the
   [AGENTS.md working rules](../AGENTS.md#working-rules), so the NexKit review
   applies it to every pull request.
-- **The threat model follows new trust boundaries** _(planned for M18)_. A
+- **The threat model follows new trust boundaries.** A
   change that adds a new kind of route, host, caller, stored secret or
   integration updates [the threat model](reference/threat-model.md) in the same change, and each docs
   sweep reviews it, see [D106](decisions/d106-a-threat-model-kept-current-like-the-asvs-tracking.md).

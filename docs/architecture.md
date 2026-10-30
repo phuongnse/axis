@@ -452,11 +452,11 @@ bindings work. Status rules and publishing are built too.
     repeat. See [security headers](reference/headers-and-rate-limits.md#security-headers) and
     [rate limits](reference/headers-and-rate-limits.md#rate-limits).
   - Axis is checked against ASVS 5.0 Level 2, tracked in [ASVS](reference/asvs.md).
-    The final sign-off is _(planned for M18)_.
-  - Authentication by default (D111) and `.github/CODEOWNERS` are built, see [authorization](reference/security.md#authorization).
-    _(Planned for M18.)_ A threat model (D106), see [ASVS](reference/asvs.md#other-evidence).
-  - _(Planned for M18.)_ Performance objectives and the weekly load test are in
-    [performance](reference/performance.md).
+    The final sign-off is _(planned for M28)_.
+  - Authentication by default (D111), `.github/CODEOWNERS` and a threat model (D106) are built, see
+    [authorization](reference/security.md#authorization) and [ASVS](reference/asvs.md#other-evidence).
+  - Performance objectives and the load test are built, except the weekly CI run _(planned for M28)_.
+    See [performance](reference/performance.md).
 - **Authorization (D12, D24).**
   - The record API, the data source endpoint and the process start endpoint
     call the policy module with the entity, data source or process and the

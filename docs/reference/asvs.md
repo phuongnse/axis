@@ -4,7 +4,7 @@ How Axis tracks its verification against OWASP ASVS 5.0, Level 2. The convention
 [architecture.md](../architecture.md) apply: sections marked _(planned for Mx)_ are not built yet,
 and Dn refers to [decisions.md](../decisions.md).
 
-The design follows [D84](../decisions/d84-asvs-level-2-and-a-server-side-session.md). The requirements are filled in. The final sign-off, when every row is met, delegated or not applicable, is _(planned for M18)_.
+The design follows [D84](../decisions/d84-asvs-level-2-and-a-server-side-session.md). The requirements are filled in. The final sign-off, when every row is met, delegated or not applicable, is _(planned for M28)_.
 
 ## How it is filled
 
@@ -35,7 +35,7 @@ The design follows [D84](../decisions/d84-asvs-level-2-and-a-server-side-session
     open or closes the requirement. A reviewer does.
 - **Kept current.** A change that adds a route, a setting or a stored secret checks the rows it
   touches, in the same change.
-- **Sign-off.** The final pass is _(planned for M18)_, after M14 and M15 have added their routes.
+- **Sign-off.** The final pass is _(planned for M28)_, after M14 and M15 have added their routes.
   Every row is then met, delegated or not applicable.
 
 ## Other evidence
@@ -47,11 +47,11 @@ The design follows [D84](../decisions/d84-asvs-level-2-and-a-server-side-session
   [development](../development.md#scripts).
 - **Threat model.** What can go wrong in Axis's own design, see [the threat model](threat-model.md)
   and [D106](../decisions/d106-a-threat-model-kept-current-like-the-asvs-tracking.md). Its threat
-  rows are _(planned for M18)_. Once a year the owner records here a rating of Axis against the
-  Threat Assessment practice of OWASP SAMM _(planned for M18)_.
+  rows are built. Once a year the owner records here a rating of Axis against the
+  Threat Assessment practice of OWASP SAMM _(planned for M28)_.
 - **Fuzz tests.** Random and mutated input for the parsers that read outside input: which are
   fuzzed, with what seed and limits, and how to replay a failure, see [fuzz tests](fuzz-tests.md).
-  Only the expression language is built, the record API and import are _(planned for M18)_.
+  The expression language, the record API and import are all built.
 - **Penetration test.** An independent tester's report, with its date, before the first
   customer's installation, see [D111](../decisions/d111-authentication-by-default-and-the-owner-guards-the-security-checks.md).
 
