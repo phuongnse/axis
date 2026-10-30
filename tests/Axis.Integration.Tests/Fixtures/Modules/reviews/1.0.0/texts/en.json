@@ -4,5 +4,10 @@
   "name": "TextsEn",
   "formatVersion": 1,
   "locale": "en",
-  "texts": { "reviews.review": "Review" }
+  "texts": {
+    "reviews.review": "Review",
+    "reviews.roles.approver": "Approver",
+    "reviews.approve.decide": "Decide on the review",
+    "reviews.approve.approve": "Approve"
+  }
 }

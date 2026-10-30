@@ -237,7 +237,7 @@ The token request and the cache are built. The resend after a `401` is not.
   `AXC0100` at `/auth/tokenUrl/binding`, `/auth/clientId/binding` or
   `/auth/clientSecret/binding`, and a missing one is a warning on a preview
   tenant. An `http` token URL outside Development is `AXC0101`. The compiler
-  reports `AXC0309` at the same paths when the application uses the name of
+  reports `AXC0310` at the same paths when the application uses the name of
   one of these bindings as another kind elsewhere. The kind of a name is read
   from where it is used, as for an [identity provider](identity-provider.md).
 - The worker requests a token with `grant_type=client_credentials`, adding

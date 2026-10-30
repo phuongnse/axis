@@ -3,5 +3,5 @@
   "kind": "application",
   "name": "ModuleProcessApp",
   "formatVersion": 1,
-  "modules": [{ "id": "reviews", "version": "^1.0.0" }]
+  "modules": [{ "id": "reviews", "version": "^1.0.0", "roles": { "approver": "manager" } }]
 }

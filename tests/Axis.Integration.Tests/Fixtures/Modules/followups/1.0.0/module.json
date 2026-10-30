@@ -3,5 +3,6 @@
   "id": "followups",
   "version": "1.0.0",
   "label": "Followups",
-  "modules": [{ "id": "reviews", "version": "^1.0.0" }]
+  "roles": [{ "name": "reviewer", "label": { "textKey": "followups.roles.reviewer" } }],
+  "modules": [{ "id": "reviews", "version": "^1.0.0", "roles": { "approver": "reviewer" } }]
 }
