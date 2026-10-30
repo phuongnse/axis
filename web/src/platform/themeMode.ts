@@ -3,8 +3,14 @@ import { designTokensFor, type DesignTokens } from './designTokens'
 
 export type ThemeMode = 'light' | 'dark'
 
+/** Proposed: what the person chose in the theme menu. `system` follows the operating system's light or dark setting. */
+export type ThemePreference = 'system' | ThemeMode
+
 export interface ThemeModeContextValue {
+  /** The mode the shell draws in: the chosen one, or the system's when the preference is `system`. */
   mode: ThemeMode
+  preference: ThemePreference
+  setPreference: (preference: ThemePreference) => void
   toggleMode: () => void
   /** Tokens that already include a page's values. Only the design-system bundle sets them. */
   tokens?: DesignTokens

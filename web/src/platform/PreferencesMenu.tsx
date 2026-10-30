@@ -4,13 +4,14 @@ import { useMemo, type CSSProperties } from 'react'
 import { selectedItemTint } from './antTheme'
 import { AxisButton } from './AxisButton'
 import { useText } from './texts'
-import { useDesignTokens, useThemeMode, type ThemeMode } from './themeMode'
+import { useDesignTokens, useThemeMode, type ThemePreference } from './themeMode'
 
-const modes: readonly ThemeMode[] = ['light', 'dark']
+/** Proposed: System first, as it is the choice a person starts with, then Light and Dark. */
+const preferences: readonly ThemePreference[] = ['system', 'light', 'dark']
 
 /**
  * The "Language and theme" button in the shell header. Its menu holds the site's languages and
- * Light and Dark, with the current ones marked. Picking the current one changes nothing.
+ * System, Light and Dark, with the current ones marked. Picking the current one changes nothing.
  */
 export function PreferencesMenu({
   locales,
@@ -22,7 +23,7 @@ export function PreferencesMenu({
   onLocaleChange: (locale: string) => void
 }) {
   const t = useText()
-  const { mode, toggleMode } = useThemeMode()
+  const { mode, preference, setPreference } = useThemeMode()
   const { colour } = useDesignTokens()
   const selected = useMemo<CSSProperties>(
     () => ({ color: colour.primaryText, background: selectedItemTint(mode) }),
@@ -45,8 +46,8 @@ export function PreferencesMenu({
       type: 'group',
       key: 'theme',
       label: t('shell.theme.label'),
-      children: modes.map((candidate) =>
-        choice(`theme:${candidate}`, t(`shell.theme.${candidate}`), candidate === mode),
+      children: preferences.map((candidate) =>
+        choice(`theme:${candidate}`, t(`shell.theme.${candidate}`), candidate === preference),
       ),
     },
   ] as MenuProps['items']
@@ -56,8 +57,8 @@ export function PreferencesMenu({
     const [kind, value] = key.split(':')
     if (kind === 'locale' && value !== locale) {
       onLocaleChange(value)
-    } else if (kind === 'theme' && value !== mode) {
-      toggleMode()
+    } else if (kind === 'theme' && value !== preference) {
+      setPreference(value as ThemePreference)
     }
   }
 
