@@ -335,7 +335,11 @@ describe. A trigger's data source, parameters and
 process are read when the occurrence runs, so a change only to them keeps the
 next occurrence. Triggers that the release removes lose their state and their
 work item. The server's startup activation writes this state right after
-the release is active.
+the release is active. A [module](modules-and-templates.md#processes-pages-policies-and-dependencies)
+schedule trigger has an id of its own in each application, so each application
+that uses the module has its own state and work item for it. Its `timeZone` is
+the application's time zone, so an application that changes its time zone
+gets a new next occurrence at its next activation.
 
 **Occurrences.** Each schedule trigger has one `trigger.schedule` work item,
 due at its next occurrence. Workers claim it with `FOR UPDATE SKIP LOCKED`,
@@ -351,7 +355,8 @@ does this:
 3. It computes the next occurrence after now, and sets the item's `due_at` to
    it.
 
-**Daylight saving.** Occurrences follow the trigger's `timeZone`. A local
+**Daylight saving.** Occurrences follow the trigger's `timeZone`, or the
+application's time zone for a module schedule trigger. A local
 time that does not exist runs at the next valid local time. A local time that
 happens twice runs once, at the first. For example, in `Europe/Berlin`,
 `30 2 * * *` runs at 03:00 on the day clocks go forward, and once at the

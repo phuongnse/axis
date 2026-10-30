@@ -1,0 +1,9 @@
+{
+  "id": "c7e3a1d5-2b84-4f96-8a0d-1e5b9c3f7a11",
+  "kind": "process",
+  "name": "Remind",
+  "formatVersion": 1,
+  "entity": "Followup",
+  "start": "done",
+  "steps": [{ "name": "done", "type": "end" }]
+}

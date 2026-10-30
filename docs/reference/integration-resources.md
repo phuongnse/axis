@@ -459,7 +459,9 @@ Minh City, for each note the `NoteRows` data source returns, in
   never matches a date is invalid: that is the case only when no allowed
   month has an allowed day of month. February counts as 29 days, so
   `0 0 29 2 *` is valid and runs in leap years.
-- `timeZone` is required. It is an IANA time zone id, such as
+- `timeZone` is required, except in a [module](modules-and-templates.md#processes-pages-policies-and-dependencies),
+  where it is not allowed because the schedule runs in the application's time
+  zone. It is an IANA time zone id, such as
   `Asia/Ho_Chi_Minh`. It does not settle the application time zone rule of
   [D22](../decisions/d22-current-time-and-time-zones.md).
 - `dataSource` names a [data source](data-sources.md) that is not grouped.

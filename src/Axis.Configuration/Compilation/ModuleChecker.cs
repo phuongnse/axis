@@ -38,9 +38,9 @@ namespace Axis.Configuration.Compilation;
 /// process's subject <c>entity</c>, and its steps' <c>form</c>, <c>event</c>, sub-process <c>process</c> and
 /// create-record <c>entity</c>, are rewritten the same way. Only an <c>entity</c> and an <c>event</c> may name a
 /// declared module, a <c>form</c> and a <c>process</c> never do. A trigger's <c>process</c> is rewritten like a
-/// sub-process, and its <c>event</c> and <c>entity</c> like a process's. A module may hold a trigger of type
-/// <c>event</c> or <c>dataChange</c>, and a <c>schedule</c> trigger is <see cref="DiagnosticCodes.ModuleKindNotAllowed"/>
-/// at <c>/type</c>. A
+/// sub-process, and its <c>event</c> and <c>entity</c> like a process's. A module may hold a trigger of any
+/// type. A <c>schedule</c> trigger has no <c>timeZone</c>, see <see cref="ResourceSchemas.ModuleTrigger"/>, and its
+/// <c>dataSource</c> is qualified with the module id like a policy grant's. A
 /// policy's grants name only the module's own resources, so each grant's <c>entity</c> and
 /// <c>dataSource</c> is qualified with the module id as written, and <see cref="PolicyChecker"/> reports
 /// one that is not a plain name. The <c>roles</c> of an entry must map each role slot of the pinned version to
@@ -616,7 +616,7 @@ internal static class ModuleChecker
             || !root.TryGetProperty("kind", out var kindElement)
             || kindElement.ValueKind != JsonValueKind.String
             || !_allowedKinds.Contains(kindElement.GetString()!)
-            || !ResourceSchemas.TryGet(kindElement.GetString()!, out var schema))
+            || !ResourceSchemas.TryGet(kindElement.GetString()!, out var kindSchema))
         {
             diagnostics.Add(new Diagnostic(
                 DiagnosticCodes.ModuleKindNotAllowed,
@@ -627,23 +627,9 @@ internal static class ModuleChecker
             return false;
         }
 
+        var schema = kindElement.GetString() == ResourceKinds.Trigger ? ResourceSchemas.ModuleTrigger : kindSchema;
         if (!SchemaDiagnostics.Validate(schema, root, DiagnosticCodes.SchemaViolation, path, resourceId, diagnostics))
         {
-            return false;
-        }
-
-        // A schedule runs in the application's time zone, D103, which a module schedule trigger cannot use yet.
-        if (kindElement.GetString() == ResourceKinds.Trigger
-            && root.TryGetProperty("type", out var type)
-            && type.ValueKind == JsonValueKind.String
-            && type.GetString() == "schedule")
-        {
-            diagnostics.Add(new Diagnostic(
-                DiagnosticCodes.ModuleKindNotAllowed,
-                "A module may hold a trigger of type 'event' or 'dataChange'. A module schedule trigger is not supported yet.",
-                path,
-                "/type",
-                resourceId));
             return false;
         }
 
@@ -807,9 +793,11 @@ internal static class ModuleChecker
                     var trigger = root.Deserialize<TriggerResource>(ApplicationLoader.SerializerOptions)! with { File = file };
 
                     // The process is always the module's own. The event or entity is the module's own or a declared module's.
+                    // A schedule's data source is always a plain name of the module's own, so it is qualified as written.
                     _triggers.Add(trigger with
                     {
                         Name = $"{moduleId}/{trigger.Name}",
+                        DataSource = trigger.DataSource is null ? null : $"{moduleId}/{trigger.DataSource}",
                         Process = Rewrite(moduleId, _noModules, trigger.Process, trigger.File, trigger.Id, "/process", _unloadedProcessNames, diagnostics)!,
                         Event = Rewrite(moduleId, declared, trigger.Event, trigger.File, trigger.Id, "/event", _unloadedEventNames, diagnostics),
                         Entity = Rewrite(moduleId, declared, trigger.Entity, trigger.File, trigger.Id, "/entity", _unloadedEntityNames, diagnostics),
