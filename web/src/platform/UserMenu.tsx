@@ -1,10 +1,13 @@
+import { DownOutlined } from '@ant-design/icons'
 import { Button, Dropdown, type MenuProps } from 'antd'
 import { useEffect, useState } from 'react'
 import { Link, useLocation } from 'react-router'
 import { startSignIn } from './api'
 import { fetchCurrentUser, signOutSession, type CurrentUser } from './currentUser'
 import { assignLocation } from './navigation'
+import { PersonAvatar } from './PersonAvatar'
 import { useText } from './texts'
+import { useDesignTokens } from './themeMode'
 
 /**
  * The account button in the shell header. With nobody signed in, it is a sign-in button that goes
@@ -15,6 +18,7 @@ import { useText } from './texts'
  */
 export function UserMenu() {
   const t = useText()
+  const { colour, spacing } = useDesignTokens()
   const { pathname } = useLocation()
   const [user, setUser] = useState<CurrentUser | null | undefined>(undefined)
 
@@ -54,8 +58,13 @@ export function UserMenu() {
 
   return (
     <Dropdown trigger={['click']} menu={{ items, 'aria-label': t('shell.account.label') }}>
-      <Button type="text" style={{ minWidth: 0, maxWidth: 160 }}>
-        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.displayName}</span>
+      {/* Proposed: the person's avatar, their name and a caret, as a trigger with text that opens a menu ends in a caret. */}
+      <Button type="text" style={{ minWidth: 0, maxWidth: 220, paddingInline: spacing.xs }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: spacing.xs, minWidth: 0 }}>
+          <PersonAvatar name={user.displayName} />
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user.displayName}</span>
+          <DownOutlined aria-hidden style={{ color: colour.textMuted, fontSize: 12 }} />
+        </span>
       </Button>
     </Dropdown>
   )
