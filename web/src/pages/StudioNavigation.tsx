@@ -1,4 +1,4 @@
-import { DownOutlined, PlusOutlined } from '@ant-design/icons'
+import { DownOutlined } from '@ant-design/icons'
 import { ConfigProvider, Dropdown, Flex, Menu, Typography, type MenuProps } from 'antd'
 import { createElement, useContext } from 'react'
 import { createPortal } from 'react-dom'
@@ -121,10 +121,7 @@ export function StudioNavigation({
             'aria-current': app.name === application ? ('true' as const) : undefined,
           })),
           ...(canCreate
-            ? [
-                { type: 'divider' as const },
-                { key: 'new', icon: <PlusOutlined aria-hidden />, label: t('shell.studio.newApplication.button') },
-              ]
+            ? [{ type: 'divider' as const }, { key: 'new', label: t('shell.studio.newApplication.button') }]
             : []),
         ],
         onClick: ({ key }) => (key === 'new' ? show() : onPickApplication(key)),
