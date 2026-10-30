@@ -245,7 +245,8 @@ the server stops at start, because it cannot reach `axis_preview`. See
 ## Development realm and users
 
 Docker Compose, `scripts/dev.sh` and `scripts/e2e.sh` start Keycloak with the development
-realm imported from `samples/keycloak/axis-realm.json`. The development password is `axis`
+realm imported from `samples/keycloak/axis-realm.json`. The folder `samples/keycloak` also holds
+`company-realm.json`, described below. The development password is `axis`
 for every user. After the password, the Keycloak login page asks for a 6-digit code, as D99 requires of every account.
 The password page is the Axis sign-in theme, built into `artifacts/keycloak-theme` and set as the realm's `loginTheme`.
 The code, forgot-password and set-password pages are the Axis theme too. The realm allows "Forgot password?" but sends no
@@ -254,8 +255,16 @@ Each user has a fixed secret in the realm file, the `secretData` value of the us
 the password. To get a code, add the secret to an authenticator app as a time-based account (SHA-1, 6 digits, 30 seconds), or run
 `oathtool --totp -b <secret>`. The realm accepts a code more than once, so tests can sign in the same user several times within 30 seconds.
 Service accounts need no code. A Keycloak container that already runs keeps the old realm, because the import skips a realm that exists,
-so recreate it to get the codes and the sign-in theme. The [development users table](reference/security.md#development-users) lists each
-user and the roles they hold. The `operator` role opens the purchase request sample's Approvals
+so recreate it to get the codes, the sign-in theme and the `company` realm below. The [development users table](reference/security.md#development-users) lists each
+user and the roles they hold.
+
+The same Keycloak also imports the realm `company` (Example Company) from `samples/keycloak/company-realm.json`. It plays an
+organization's own identity provider, which the `axis` realm can broker to. It asks for no code at sign-in. Its confidential
+client `axis-broker` has the secret `axis-broker-development-secret`, a redirect to the `axis` realm's broker endpoint for
+`oidc-companyissuer` and a `groups` claim of plain group names, such as `employees` rather than `/employees`. The realm holds the
+group `employees` and one person in it, `pat` (Pat Example, `pat@company.example`), with the password `axis`. In E2E, Keycloak
+listens on `AXIS_E2E_KEYCLOAK_PORT` (default 8180) inside and outside its container, so the `axis` realm reaches the `company` realm
+at the address the browser uses. The `operator` role opens the purchase request sample's Approvals
 inspector page. The leave request sample, `samples/apps/leave-requests`, reuses the `employee` and
 `department-manager` users, in a site at `/leave`. The service desk sample, `samples/apps/service-desk`,
 adds the `agent` user and two `service-desk-lead` users and gives an employee the `requester` role, in a site

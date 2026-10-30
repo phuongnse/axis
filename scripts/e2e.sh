@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # End-to-end tests: real server, real PostgreSQL and the built SPA in Chromium (requires Docker).
 # Keycloak runs with the development realm from samples/keycloak, and Playwright starts the
-# server only once the realm answers. The server signs people in through that realm at
+# server only once the realm answers. Keycloak imports the organization realm company too. It listens on
+# AXIS_E2E_KEYCLOAK_PORT (default 8180) inside and outside its container, so the axis realm reaches the company
+# realm at the address the browser uses. The server signs people in through that realm at
 # /api/auth/sign-in. The SPA does not offer it yet. The realm signs people in on the Axis theme, which this script
 # builds into artifacts/keycloak-theme and mounts read-only before Keycloak starts.
 # The server starts with seven applications active: the generic E2E test application in
@@ -149,12 +151,12 @@ if affected playwright; then
   # Keycloak starts now and imports the realm while PostgreSQL and the build get ready. It mounts the folder of the
   # theme, so the rebuild in scripts/build.sh later is fine.
   npm run build:keycloak-theme --prefix web
+  keycloak_port="${AXIS_E2E_KEYCLOAK_PORT:-8180}"
   docker run -d --name "$keycloak_container" \
     -e KC_BOOTSTRAP_ADMIN_USERNAME=admin -e KC_BOOTSTRAP_ADMIN_PASSWORD=admin \
     -v "$PWD/samples/keycloak:/opt/keycloak/data/import:ro" \
-    -v "$PWD/artifacts/keycloak-theme:/opt/keycloak/themes:ro" -p 127.0.0.1::8080 \
-    "$keycloak_image" start-dev --import-realm >/dev/null
-  keycloak_port="$(docker port "$keycloak_container" 8080/tcp | head -n1 | sed 's/.*://')"
+    -v "$PWD/artifacts/keycloak-theme:/opt/keycloak/themes:ro" -p "127.0.0.1:$keycloak_port:$keycloak_port" \
+    "$keycloak_image" start-dev --import-realm --http-port="$keycloak_port" >/dev/null
 
   # Check over TCP: the image's initialization server listens only on the Unix socket, so the check
   # succeeds only after the init scripts have run.
@@ -245,6 +247,16 @@ if affected playwright; then
   if [ "$ready" -ne 1 ]; then
     {
       echo "The axis realm of Keycloak in $keycloak_container $reason."
+      echo "Container logs:"
+      docker logs "$keycloak_container" 2>&1 || true
+    } >&2
+    exit 1
+  fi
+
+  # Keycloak imports every realm before it answers for one, so a single check is enough.
+  if ! curl -fs -o /dev/null "http://127.0.0.1:$keycloak_port/realms/company/.well-known/openid-configuration"; then
+    {
+      echo "The company realm of Keycloak in $keycloak_container did not answer."
       echo "Container logs:"
       docker logs "$keycloak_container" 2>&1 || true
     } >&2

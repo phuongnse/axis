@@ -196,6 +196,6 @@ public sealed class DevelopmentRealmTests(KeycloakFixture keycloak) : IAsyncLife
             : [audience.GetString()];
     }
 
-    private static JsonDocument DecodePayload(string token) =>
+    internal static JsonDocument DecodePayload(string token) =>
         JsonDocument.Parse(Base64Url.DecodeFromChars(token.Split('.')[1]));
 }

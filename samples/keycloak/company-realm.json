@@ -1,0 +1,66 @@
+{
+  "realm": "company",
+  "displayName": "Example Company",
+  "enabled": true,
+  "sslRequired": "external",
+  "groups": [
+    {
+      "name": "employees",
+      "path": "/employees"
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "axis-broker",
+      "name": "Axis broker",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "axis-broker-development-secret",
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "implicitFlowEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": [
+        "/realms/axis/broker/oidc-companyissuer/endpoint"
+      ],
+      "protocolMappers": [
+        {
+          "name": "groups",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-group-membership-mapper",
+          "config": {
+            "claim.name": "groups",
+            "full.path": "false",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "id": "pat",
+      "username": "pat",
+      "enabled": true,
+      "email": "pat@company.example",
+      "emailVerified": true,
+      "firstName": "Pat",
+      "lastName": "Example",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "axis",
+          "temporary": false
+        }
+      ],
+      "requiredActions": [],
+      "groups": [
+        "/employees"
+      ]
+    }
+  ]
+}

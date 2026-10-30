@@ -9,8 +9,9 @@ namespace Axis.Integration.Tests;
 /// first time a test needs it, so a run that needs no Keycloak never starts one. It loads the Axis theme, which the
 /// realm uses as its login theme, from the test output. Build the theme first with
 /// <c>npm run build:keycloak-theme --prefix web</c>. It also holds the breached-password list that the realms made by <c>TenantRealm</c> name in their password policy. The fixture removes
-/// the container when the run ends. A test may create and delete a realm of its own, but must not change the
-/// <c>axis</c> realm.
+/// the container when the run ends. It also holds the organization realm <c>company</c>, which plays an
+/// organization's own identity provider. A test may create and delete a realm of its own, but must not change the
+/// <c>axis</c> or <c>company</c> realm.
 /// </summary>
 public sealed class KeycloakFixture : IAsyncDisposable
 {
@@ -37,6 +38,11 @@ public sealed class KeycloakFixture : IAsyncDisposable
     public const string PurchasingClientSecret = "purchasing-system-development-secret";
     public const string ReportingClientId = "reporting-system";
     public const string ReportingClientSecret = "reporting-system-development-secret";
+
+    /// <summary>The confidential client of the <c>company</c> realm that the <c>axis</c> realm brokers sign-in through.</summary>
+    public const string CompanyBrokerClientId = "axis-broker";
+
+    public const string CompanyBrokerClientSecret = "axis-broker-development-secret";
 
     /// <summary>The client that the realm's FAPI 2.0 client policy covers. It has no secret, only the two keys below.</summary>
     public const string FapiClientId = "axis-fapi";
@@ -87,6 +93,7 @@ public sealed class KeycloakFixture : IAsyncDisposable
         // The builder already runs start-dev, and the command adds --import-realm to it.
         var container = new KeycloakBuilder(Image)
             .WithResourceMapping(new FileInfo(Path.Combine(AppContext.BaseDirectory, "Keycloak", "axis-realm.json")), "/opt/keycloak/data/import/")
+            .WithResourceMapping(new FileInfo(Path.Combine(AppContext.BaseDirectory, "Keycloak", "company-realm.json")), "/opt/keycloak/data/import/")
             .WithResourceMapping(new FileInfo(Path.Combine(AppContext.BaseDirectory, "Keycloak", "axis-breached-passwords.txt")), "/opt/keycloak/data/password-blacklists/")
             .WithResourceMapping(theme, "/opt/keycloak/themes/")
             .WithCommand("--import-realm")
