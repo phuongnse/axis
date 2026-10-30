@@ -45,8 +45,13 @@ public sealed class PublisherPreviewTests(PostgreSqlFixture database) : IClassFi
         Assert.Equal(0, result.Exit);
         Assert.Equal($"{main} claim ok", result.Output[0]);
         Assert.Equal(_steps.Select(step => $"{preview} {step} ok"), result.Output.Skip(1));
-        // The preview tenant has no purchasing system bindings, so activation only warns about them.
+        // The preview tenant has no purchasing system or company bindings, so activation only warns about them.
         Assert.All(result.Error, line => Assert.Contains($"{preview} warning AXC0100 ", line, StringComparison.Ordinal));
+        foreach (var name in new[] { CompanyBindings.Issuer, CompanyBindings.ClientId, CompanyBindings.ClientSecret })
+        {
+            Assert.Contains(result.Error, line => line.Contains($"{preview} warning AXC0100 ", StringComparison.Ordinal) && line.Contains(name, StringComparison.Ordinal));
+        }
+
         Assert.Equal("succeeded", await ScalarAsync(scenario, main, $"SELECT status FROM axis.publish_requests WHERE id = '{request}'"));
         var previewAfter = await ScalarAsync(scenario, preview!, "SELECT release_id FROM axis.active_releases");
         Assert.NotEqual(previewBefore, previewAfter);

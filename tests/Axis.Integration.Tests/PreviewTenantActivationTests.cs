@@ -38,6 +38,15 @@ public sealed class PreviewTenantActivationTests(PostgreSqlFixture database) : I
             && entry.Contains(DiagnosticCodes.MissingDeploymentBinding, StringComparison.Ordinal)
             && entry.Contains("tenant a-preview", StringComparison.Ordinal)
             && entry.Contains("PurchasingSystemUrl", StringComparison.Ordinal));
+        foreach (var name in new[] { CompanyBindings.Issuer, CompanyBindings.ClientId, CompanyBindings.ClientSecret })
+        {
+            Assert.Contains(logs.Entries, entry =>
+                entry.StartsWith("Warning:", StringComparison.Ordinal)
+                && entry.Contains(DiagnosticCodes.MissingDeploymentBinding, StringComparison.Ordinal)
+                && entry.Contains("tenant a-preview", StringComparison.Ordinal)
+                && entry.Contains(name, StringComparison.Ordinal));
+        }
+
         Assert.DoesNotContain(logs.Entries, entry =>
             entry.Contains(DiagnosticCodes.MissingDeploymentBinding, StringComparison.Ordinal)
             && entry.Contains("for tenant a ", StringComparison.Ordinal));

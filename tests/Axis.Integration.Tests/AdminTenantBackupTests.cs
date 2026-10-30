@@ -400,6 +400,11 @@ public sealed class AdminBackupFixture : IAsyncLifetime
             builder.UseSetting($"Tenants:{TenantId}:Bindings:{UrlBinding}:Value", "https://purchasing.example.test");
             builder.UseSetting($"Tenants:{TenantId}:Bindings:{SecretBinding}:Kind", "secret");
             builder.UseSetting($"Tenants:{TenantId}:Bindings:{SecretBinding}:Value", BindingSecret);
+            foreach (var (key, value) in CompanyBindings.Settings(TenantId))
+            {
+                builder.UseSetting(key, value);
+            }
+
             builder.UseSetting("Extensions:Path", SamplePackages.Path);
             builder.UseSetting("Modules:Path", SampleModules.Path);
             builder.UseSetting("ActivateOnStartup:0", Path.Combine(AppContext.BaseDirectory, "Samples", "purchase-requests"));

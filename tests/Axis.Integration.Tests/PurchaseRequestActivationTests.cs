@@ -9,8 +9,9 @@ using Npgsql;
 namespace Axis.Integration.Tests;
 
 /// <summary>
-/// The purchase request sample calls the purchasing system through a connector, so it activates
-/// only for a tenant that holds the connector's two deployment bindings.
+/// The purchase request sample calls the purchasing system through a connector and signs people in
+/// through the <c>company</c> identity provider, so it activates only for a tenant that holds the
+/// connector's two deployment bindings and the provider's three.
 /// </summary>
 public sealed class PurchaseRequestActivationTests(DataDatabaseFixture database) : IClassFixture<DataDatabaseFixture>
 {
@@ -19,7 +20,7 @@ public sealed class PurchaseRequestActivationTests(DataDatabaseFixture database)
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
 
     [Fact]
-    public async Task The_sample_activates_only_for_a_tenant_with_both_purchasing_bindings()
+    public async Task The_sample_activates_only_for_a_tenant_with_the_purchasing_and_company_bindings()
     {
         ReleaseCompilationResult compiled;
         await using (var context = database.CreateConfigurationContext())
@@ -31,10 +32,17 @@ public sealed class PurchaseRequestActivationTests(DataDatabaseFixture database)
 
         var refused = await ActivateAsync(compiled, ActivationBindings.None("acme"));
 
+        (string Code, string File, string Path, string Message)[] companyDiagnostics =
+        [
+            (DiagnosticCodes.MissingDeploymentBinding, "identity-providers/company.json", "/clientId/binding", "Tenant 'acme' has no binding 'CompanyClientId'. Add a 'secret' binding with that name to the tenant."),
+            (DiagnosticCodes.MissingDeploymentBinding, "identity-providers/company.json", "/clientSecret/binding", "Tenant 'acme' has no binding 'CompanyClientSecret'. Add a 'secret' binding with that name to the tenant."),
+            (DiagnosticCodes.MissingDeploymentBinding, "identity-providers/company.json", "/issuer/binding", "Tenant 'acme' has no binding 'CompanyIssuer'. Add a 'url' binding with that name to the tenant."),
+        ];
         Assert.Equal(
             [
                 (DiagnosticCodes.MissingDeploymentBinding, "connectors/purchasing-system.json", "/auth/token/binding", "Tenant 'acme' has no binding 'PurchasingSystemToken'. Add a 'secret' binding with that name to the tenant."),
                 (DiagnosticCodes.MissingDeploymentBinding, "connectors/purchasing-system.json", "/baseUrl/binding", "Tenant 'acme' has no binding 'PurchasingSystemUrl'. Add a 'url' binding with that name to the tenant."),
+                .. companyDiagnostics,
             ],
             refused.Diagnostics.Select(diagnostic => (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.Message)).Order());
         Assert.Null(await FindActiveAsync());
@@ -44,6 +52,14 @@ public sealed class PurchaseRequestActivationTests(DataDatabaseFixture database)
             ["PurchasingSystemUrl"] = new(ActivationBinding.UrlKind, new Uri("https://purchasing.example.test")),
             ["PurchasingSystemToken"] = new(ActivationBinding.SecretKind, null),
         };
+
+        var withoutCompany = await ActivateAsync(compiled, new ActivationBindings("acme", bindings, AllowHttp: false));
+
+        Assert.Equal(
+            companyDiagnostics,
+            withoutCompany.Diagnostics.Select(diagnostic => (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.Message)).Order());
+        Assert.Null(await FindActiveAsync());
+
         CompanyBindings.AddTo(bindings);
 
         var activated = await ActivateAsync(compiled, new ActivationBindings("acme", bindings, AllowHttp: false));

@@ -1,0 +1,12 @@
+{
+  "id": "eae52dc0-bf4d-4f5c-88e2-bac1ef94678e",
+  "kind": "identityProvider",
+  "name": "company",
+  "formatVersion": 1,
+  "type": "oidc",
+  "label": { "textKey": "signIn.company" },
+  "issuer": { "binding": "CompanyIssuer" },
+  "clientId": { "binding": "CompanyClientId" },
+  "clientSecret": { "binding": "CompanyClientSecret" },
+  "roles": { "claim": "groups", "values": { "employees": "employee" } }
+}
