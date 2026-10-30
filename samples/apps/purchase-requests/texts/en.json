@@ -6,7 +6,7 @@
   "locale": "en",
   "texts": {
     "site.title": "Purchasing",
-    "signIn.company": "Continue with Example Company",
+    "signIn.company": "Example Company",
     "nav.purchaseRequests": "Purchase requests",
     "nav.myTasks": "My tasks",
     "nav.requestsByDepartment": "By department",
