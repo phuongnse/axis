@@ -193,9 +193,19 @@ public sealed record CallConnectorStepModel(
 /// <summary>
 /// An input a <c>callConnector</c> or package operation step sends: the input's declared name, and
 /// the expression over the subject record that gives its value, checked against the input's type.
-/// The inputs of a step are in the operation's declaration order.
+/// An <c>object</c> or <c>list</c> input has no <see cref="Value"/> and holds its nested inputs in
+/// <see cref="Fields"/>, in the operation's declaration order. A list also names the child
+/// collection of the subject in <see cref="From"/>, and its nested expressions run over a row of
+/// that collection. The inputs of a step are in the operation's declaration order.
 /// </summary>
-public sealed record ConnectorInputModel(string Input, ExpressionModel Value);
+public sealed record ConnectorInputModel(string Input, ExpressionModel? Value)
+{
+    /// <summary>The declared name of the child collection a list input maps from, or null.</summary>
+    public string? From { get; init; }
+
+    /// <summary>The nested inputs of an object or list input, or empty for an input with a <see cref="Value"/>.</summary>
+    public IReadOnlyList<ConnectorInputModel> Fields { get; init; } = [];
+}
 
 /// <summary>
 /// An output a <c>callConnector</c> or package operation step writes: the output's declared name

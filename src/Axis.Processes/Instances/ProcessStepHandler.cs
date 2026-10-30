@@ -1151,7 +1151,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
     /// order, into the body the call stores. <paramref name="isRequired"/> says whether an input of
     /// the operation is required. Dates and date-times take the record API's text forms, and an optional input
     /// that gives null is stored as null. An input that fails at run time, or a required input that
-    /// gives null, fails the step.
+    /// gives null, fails the step. An object or list input fails the step too, as sending those is not built yet.
     /// </summary>
     private static async Task<JsonObject> StageAsync(
         Func<ExpressionModel, Task<ExpressionEvaluationResult>> evaluate,
@@ -1164,7 +1164,12 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
         var body = new JsonObject();
         foreach (var mapping in inputs)
         {
-            var result = await evaluate(mapping.Value);
+            if (mapping.Value is not { } value)
+            {
+                throw Failure($"The input '{mapping.Input}' of the step '{step.Name}' is an object or a list. Sending these inputs is not built yet.", instance, input);
+            }
+
+            var result = await evaluate(value);
             if (result.Error is { } error)
             {
                 throw ExpressionFailure($"input '{mapping.Input}'", step, error, instance, input);

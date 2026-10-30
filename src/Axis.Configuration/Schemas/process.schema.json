@@ -103,7 +103,7 @@
         "input": {
           "type": "object",
           "propertyNames": { "$ref": "#/$defs/name" },
-          "additionalProperties": { "type": "string", "minLength": 1, "x-axis-expression": true }
+          "additionalProperties": { "$ref": "#/$defs/inputMapping" }
         },
         "output": {
           "type": "object",
@@ -511,6 +511,26 @@
               "event": false,
               "entity": false,
               "fields": false
+            }
+          }
+        }
+      ]
+    },
+    "inputExpression": { "type": "string", "minLength": 1, "x-axis-expression": true },
+    "inputMapping": {
+      "oneOf": [
+        { "$ref": "#/$defs/inputExpression" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["fields"],
+          "properties": {
+            "from": { "$ref": "#/$defs/name" },
+            "fields": {
+              "type": "object",
+              "minProperties": 1,
+              "propertyNames": { "$ref": "#/$defs/name" },
+              "additionalProperties": { "$ref": "#/$defs/inputMapping" }
             }
           }
         }

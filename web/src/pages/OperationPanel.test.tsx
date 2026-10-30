@@ -533,6 +533,24 @@ describe('A callConnector step', () => {
     expect(step(1).getByRole('textbox', { name: 'Backoff' })).toHaveValue('PT30S')
   })
 
+  it('shows the json-only text, and no expression box, for an input row whose value is an object', async () => {
+    const steps = (process.steps as Record<string, unknown>[]).map((candidate) =>
+      candidate.name === 'call'
+        ? { ...candidate, input: { amount: 'totalAmount', lines: { from: 'lines', fields: { sku: 'code' } } } }
+        : candidate,
+    )
+    renderEditor(true, { ...process, steps })
+    await screen.findAllByTestId('studio-expression-type')
+
+    const row = within(screen.getByTestId('studio-field-/steps/1/input/lines'))
+    expect(row.getByTestId('studio-json-only')).toBeVisible()
+    expect(row.getByTestId('studio-json-only')).toHaveTextContent('Edit this value in the JSON view.')
+    expect(row.queryByRole('textbox', { name: 'Expression' })).toBeNull()
+    expect(row.getByRole('button', { name: 'Remove' })).toBeVisible()
+    const amount = within(screen.getByTestId('studio-field-/steps/1/input/amount'))
+    expect(amount.getByRole('textbox', { name: 'Expression' })).toBeVisible()
+  })
+
   it('picks the connector operation from the operations of the connector', async () => {
     const onChange = renderEditor()
 

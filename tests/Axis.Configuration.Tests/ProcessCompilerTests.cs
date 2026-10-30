@@ -991,8 +991,8 @@ public sealed class ProcessCompilerTests
         Assert.Equal(("call", "Purchasing", "createOrder", "done"), (call.Name, call.Connector, call.Operation, call.Next));
         Assert.Equal(
             [("reference", "status"), ("amount", "amount * 2"), ("note", "'urgent'")],
-            call.Input.Select(input => (input.Input, input.Value.Expression)));
-        Assert.Equal(20m, Evaluate(call.Input[1].Value, 10m));
+            call.Input.Select(input => (input.Input, input.Value!.Expression)));
+        Assert.Equal(20m, Evaluate(call.Input[1].Value!, 10m));
         Assert.Equal([new ConnectorOutputModel("orderNumber", "status"), new ConnectorOutputModel("count", "amount")], call.Output);
         Assert.Equal(new RetryPolicyModel(3, TimeSpan.FromSeconds(30)), call.Retry);
     }
@@ -1042,7 +1042,7 @@ public sealed class ProcessCompilerTests
         var result = ApplicationCompiler.Compile(folder.Path);
 
         var diagnostic = Assert.Single(result.Diagnostics);
-        Assert.Equal((DiagnosticCodes.StructuredInputExpression, "/steps/0/input/lines"), (diagnostic.Code, diagnostic.Path));
+        Assert.Equal((DiagnosticCodes.MismatchedInputMapping, "/steps/0/input/lines"), (diagnostic.Code, diagnostic.Path));
         Assert.Null(result.Model);
     }
 

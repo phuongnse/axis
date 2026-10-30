@@ -27,7 +27,7 @@ const expressionNodes: [kind: string, pointer: string][] = [
   ['process', '/$defs/branch/properties/when'],
   ['process', '/$defs/assignee/properties/user'],
   ['process', '/$defs/step/properties/set/additionalProperties'],
-  ['process', '/$defs/step/properties/input/additionalProperties'],
+  ['process', '/$defs/inputExpression'],
   ['process', '/$defs/step/properties/fields/additionalProperties'],
   ['endpoint', '/properties/values/additionalProperties'],
   ['page', '/$defs/navigateParameters/additionalProperties'],

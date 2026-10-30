@@ -313,11 +313,10 @@ After approval, the purchase request process creates a purchase order.
 - `input` maps operation inputs to expressions. Each key is an input of the
   operation. Each value is an expression over the subject record, with the
   same scope as a decision's `when`.
-  - _(planned for M19)_ An `object` input maps as `{ "fields": { … } }`, each
-    key a nested field. A `list` input maps from a child collection of the
-    subject as `{ "from": "<child collection>", "fields": { … } }`, and each
-    item expression is over the child row. Each nested field is checked as a
-    top-level input is. See
+  - An `object` input maps as `{ "fields": { … } }`, each key a nested field.
+    A `list` input maps from a child collection of the subject as
+    `{ "from": "<child collection>", "fields": { … } }`, and each item
+    expression is over the child row. Sending them is _(planned for M19)_. See
     [D91](../decisions/d91-connector-oauth2-and-structured-payloads.md) and
     [Connector resource](integration-resources.md#connector-resource).
 - `output` is optional. It maps operation outputs to subject fields. Each key
@@ -346,6 +345,14 @@ ignoring letter case, and the compiled step holds the declared names.
 - Each `input` expression gives the input's type. A problem is reported at
   `/steps/{i}/input/{key}` with its expression code, such as `AXC0048` for a
   value of the wrong type.
+- A nested mapping is checked as a top-level input is, at
+  `/steps/{i}/input/{key}/fields/{name}`, with `AXC0104`, `AXC0105` (at the
+  enclosing `…/fields`) and the expression codes. An item expression of a list
+  is over the child row, so it sees the child's fields, not the subject's.
+- A mapping of the wrong shape is `AXC0318` at `/steps/{i}/input/{key}`. A
+  `from` that is not a child collection of the subject, or in a process
+  without a subject, is `AXC0319` at `…/from`, and the item expressions are
+  then not checked.
 - Each `output` key names an output of the operation, at most once (`AXC0106`
   at `/steps/{i}/output/{key}`).
 - Each `output` value names a field of the subject entity that no other
@@ -362,7 +369,7 @@ ignoring letter case, and the compiled step holds the declared names.
 
 The compiled step holds the connector, the operation, the inputs in the
 operation's order, the outputs, the retry policy with its defaults filled in,
-and `next`.
+and `next`. An `object` or `list` input holds its nested inputs.
 
 - A module process's step names a
   [connector slot](modules-and-templates.md#processes-pages-policies-and-dependencies) of its
@@ -380,7 +387,8 @@ and `next`.
 1. It evaluates each `input` expression on the subject record. A required
    input that gives `null` fails the step. An optional input that gives
    `null` is stored as `null`. Dates and date-times are stored in the text
-   forms of the [record API](record-api.md).
+   forms of the [record API](record-api.md). An `object` or `list` input
+   fails the step, as sending them is _(planned for M19)_.
 2. It sets the instance to `waiting` on the step.
 3. It inserts the call into `axis.connector_calls` as `pending`, with
    0 attempts and the evaluated input. The row's id is the call's operation

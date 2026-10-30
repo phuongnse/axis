@@ -32,7 +32,9 @@ panel are _(built)_.
   edge, or pressing Enter on it, selects that edge and the step it leaves. The
   selected edge is drawn in the primary colour. The selected step and edge are
   not written to the URL. The palette and the transitions edit the canvas
-  _(built)_.
+  _(built)_. A module's process shows the same graph
+  read-only, with no palette, connect handle, step panel or delete, because the
+  module owns the file.
 - **Palette** _(built)_. It sits at the top of the panel beside the canvas and
   lists the step types and operations that `process.schema.json` defines today:
   `decision`, `task`, the operations `updateRecord`, `callConnector`,

@@ -341,9 +341,10 @@ _(planned for M19)_. Bodies stay JSON. An output's `source` is built.
     `list` goes only in the body, so one with another `in` is `AXC0312`.
   - A nested field name repeats an earlier name of the same `fields`, ignoring
     letter case, is `AXC0096`.
-  - _(planned for M19)_ The step maps them as in
-    [Step shape](process-execution.md#step-shape). Until then, a step that gives
-    one a plain expression is `AXC0318`.
+  - A `callConnector` step maps them as in
+    [Step shape](process-execution.md#step-shape), and a plain expression for
+    one is `AXC0318`. Sending them is _(planned for M19)_, and until then a step
+    that reaches one fails.
 - **`source`.** _(built)_ An output field may name a JSON Pointer
   ([RFC 6901](https://www.rfc-editor.org/rfc/rfc6901)) into the response body,
   such as `/shipment/tracking/number`. Without it, the output is read from the
