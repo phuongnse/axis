@@ -865,8 +865,8 @@ The Studio specs use these folders:
   `studio-tests`: a temporary copy of `samples/apps/purchase-requests`.
   `studio-tests` also copies it again for its server with `Studio:Tests` off.
 - `studio-module-entity`: a temporary copy of `samples/apps/leave-requests`.
-- `studio-new-application`, `studio-page-containers` and
-  `studio-page-parameters`: a temporary `Studio:ApplicationsPath`.
+- `studio-module-pickers`: a temporary copy of `tests/e2e/fixtures/module-app` and a temporary `Modules:Path` with the sample modules and the fixture module `checklists`.
+- `studio-new-application`, `studio-page-containers` and `studio-page-parameters`: a temporary `Studio:ApplicationsPath`.
 - `studio-entity-migrations` and `purchase-request-release`: folders under the
   test's output path.
 - `service-desk-journey`, `asset-management-journey`, `request-approval-journey` and `journey-tenant`: each its own application under

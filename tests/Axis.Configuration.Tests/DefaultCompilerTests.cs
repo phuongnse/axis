@@ -101,7 +101,9 @@ public sealed class DefaultCompilerTests
         Assert.NotNull(result.Model);
     }
 
-    public static TheoryData<FieldType> AllFieldTypes() => [.. Enum.GetValues<FieldType>()];
+    // Object and List are connector input types, refused by the entity schema.
+    public static TheoryData<FieldType> AllFieldTypes() =>
+        [.. Enum.GetValues<FieldType>().Where(type => type is not (FieldType.Object or FieldType.List))];
 
     [Theory]
     [MemberData(nameof(AllFieldTypes))]

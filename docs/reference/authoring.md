@@ -311,22 +311,22 @@ agrees it. The answer is:
 { locales: ["en", "vi"],
   entities: [{ id, name, module, fields: [{ name, type, target, values }] }],
   dataSources: [{ id, name, module, parameters: [{ name, type }], columns: [{ name, type }], groupBy }],
-  processes: [{ id, name, entity, parameters: [{ name, type }], steps: [{ name, type, outcomes: [...] }] }],
+  processes: [{ id, name, module, entity, parameters: [{ name, type }], steps: [{ name, type, outcomes: [...] }] }],
   rules: [{ id, name, module, parameters: [{ name, type }], resultType }],
   connectors: [{ id, name, operations: [{ name }] }],
   events: [{ id, name, entity, fields: [{ name, type }] }],
   roles, sequences, forms: [{ id, name }],
-  pages: [{ id, name, parameters: [{ name, type, required }] }],
+  pages: [{ id, name, module, parameters: [{ name, type, required }] }],
+  policies: [{ id, name, module }],
   texts: [{ key, texts: { <locale>: <text> }, usedBy }] }
 ```
 
-- **`name`.** It is written as a reference writes it. A module entity is
-  `<module id>/<name>`, and a module rule is `<module id>:<name>`. `module` is
-  the module id, or null for an entity or rule of the application.
-- **Module names.** A module's events, sequences and forms are listed
-  under their `<module id>/<name>` names too, but only entities, data sources
-  and rules carry `module`. A module resource's `id` is the id written in its
-  module file.
+- **`name`.** It is written as a reference writes it. A module entity, data
+  source, process, page or policy is `<module id>/<name>`, and a module rule
+  is `<module id>:<name>`. `module` is the module id, or null for the application's own.
+- **Module names.** Events, sequences and forms of a module are listed under
+  `<module id>/<name>` too. Only entities, data sources, rules, processes, pages
+  and policies carry `module`. A module resource's `id` is the id in its module file.
 - **Event `entity`.** It is the entity the event is about, written as a process
   writes its `entity`. A module event that names its own module's entity without
   a slash is listed with the entity qualified, as `<module id>/<name>`. Studio's
@@ -345,8 +345,8 @@ agrees it. The answer is:
   one total row, and null for a plain data source. A group field that names no
   field is still listed as a column, with a null type.
 - **Order.** Each list holds the module resources first, then the
-  application's own in file path order. A step that is not a task has
-  `outcomes: []`. Text keys are sorted ordinally.
+  application's own in file path order. Module policies come in pin order. A step
+  that is not a task has `outcomes: []`. Text keys are sorted ordinally.
 - **Process `entity`.** The subject entity of the process, or null for a process without a subject.
 - **Process `parameters`.** The parameters of a process without a subject, in file order. It is `[]` for a process with a subject.
 - **Page `parameters`.** The parameters the page declares, in file order. `required` is false when the file leaves it out.

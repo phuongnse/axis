@@ -1,0 +1,8 @@
+{
+  "id": "13864b9f-3010-4b4f-91c0-9546ffa7889c",
+  "kind": "entity",
+  "name": "Item",
+  "formatVersion": 1,
+  "displayField": "title",
+  "fields": [{ "name": "title", "type": "text", "required": true, "maxLength": 100 }]
+}

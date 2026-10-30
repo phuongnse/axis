@@ -1,0 +1,8 @@
+{
+  "id": "c4d017bf-004e-4489-be7c-ea3744ee05be",
+  "kind": "page",
+  "name": "Checklists",
+  "formatVersion": 1,
+  "title": { "textKey": "checklists.pages.checklists.title" },
+  "widgets": [{ "type": "table", "dataSource": "Checklists" }]
+}

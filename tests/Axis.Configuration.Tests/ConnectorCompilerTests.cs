@@ -689,6 +689,143 @@ public sealed class ConnectorCompilerTests
         Assert.All(result.Diagnostics, diagnostic => Assert.Equal(DiagnosticCodes.SchemaViolation, diagnostic.Code));
     }
 
+    [Fact]
+    public void An_object_input_holding_a_list_of_objects_compiles_with_its_nested_fields_in_order()
+    {
+        using var folder = Folder().With("connectors/purchasing-system.json", Connector("""
+            "operations": [
+              { "name": "createOrder", "method": "POST", "path": "/orders",
+                "input": [
+                  { "name": "order", "type": "object", "required": true, "fields": [
+                    { "name": "number", "type": "text", "required": true },
+                    { "name": "lines", "type": "list", "fields": [
+                      { "name": "sku", "type": "text" },
+                      { "name": "quantity", "type": "integer", "required": true }
+                    ] }
+                  ] }
+                ] }
+            ]
+            """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        var order = Assert.Single(Assert.Single(Assert.Single(result.Model!.Connectors).Operations).Input);
+        Assert.Equal(("order", FieldType.Object, true), (order.Name, order.Type, order.Required));
+        var fields = order.Fields!;
+        Assert.Equal(
+            [("number", FieldType.Text, true), ("lines", FieldType.List, false)],
+            fields.Select(field => (field.Name, field.Type, field.Required)));
+        Assert.Null(fields[0].Fields);
+        Assert.Equal(
+            [("sku", FieldType.Text, false), ("quantity", FieldType.Integer, true)],
+            fields[1].Fields!.Select(field => (field.Name, field.Type, field.Required)));
+    }
+
+    [Fact]
+    public void An_object_or_list_at_the_fifth_level_is_too_deep_and_the_fields_below_it_are_not_reported_again()
+    {
+        using var folder = Folder().With("connectors/purchasing-system.json", Connector("""
+            "operations": [
+              { "name": "createOrder", "method": "POST", "path": "/orders",
+                "input": [
+                  { "name": "a", "type": "object", "fields": [
+                    { "name": "b", "type": "object", "fields": [
+                      { "name": "c", "type": "list", "fields": [
+                        { "name": "d", "type": "object", "fields": [
+                          { "name": "e", "type": "object", "fields": [
+                            { "name": "f", "type": "object", "fields": [{ "name": "g", "type": "text" }] }
+                          ] },
+                          { "name": "h", "type": "text" }
+                        ] }
+                      ] }
+                    ] }
+                  ] }
+                ] }
+            ]
+            """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.ConnectorInputTooDeep, "/operations/0/input/0/fields/0/fields/0/fields/0/fields/0"),
+            (diagnostic.Code, diagnostic.Path));
+    }
+
+    [Fact]
+    public void An_object_input_in_the_query_is_a_misplaced_input_that_only_scalars_may_be()
+    {
+        using var folder = Folder().With("connectors/purchasing-system.json", Connector("""
+            "operations": [
+              { "name": "find", "method": "POST", "path": "/orders",
+                "input": [
+                  { "name": "first", "type": "text", "in": "query" },
+                  { "name": "filter", "type": "object", "in": "query", "fields": [{ "name": "state", "type": "text" }] }
+                ] }
+            ]
+            """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.MisplacedConnectorInput, "/operations/0/input/1"), (diagnostic.Code, diagnostic.Path));
+        Assert.Contains("Only scalar inputs go", diagnostic.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_repeated_nested_field_name_is_reported_at_its_name_ignoring_letter_case()
+    {
+        using var folder = Folder().With("connectors/purchasing-system.json", Connector("""
+            "operations": [
+              { "name": "createOrder", "method": "POST", "path": "/orders",
+                "input": [
+                  { "name": "order", "type": "object", "fields": [
+                    { "name": "number", "type": "text" },
+                    { "name": "NUMBER", "type": "integer" }
+                  ] }
+                ] }
+            ]
+            """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.DuplicateConnectorName, "/operations/0/input/0/fields/1/name"), (diagnostic.Code, diagnostic.Path));
+    }
+
+    [Theory]
+    [InlineData("""{ "name": "note", "type": "text", "fields": [{ "name": "a", "type": "text" }] }""")]
+    [InlineData("""{ "name": "order", "type": "object" }""")]
+    [InlineData("""{ "name": "order", "type": "list", "fields": [] }""")]
+    [InlineData("""{ "name": "order", "type": "object", "fields": [{ "name": "a", "type": "text", "in": "body" }] }""")]
+    [InlineData("""{ "name": "order", "type": "object", "fields": [{ "name": "a", "type": "text", "fields": [{ "name": "b", "type": "text" }] }] }""")]
+    public void An_input_with_fields_in_another_shape_is_a_schema_violation(string input)
+    {
+        using var folder = Folder().With("connectors/purchasing-system.json", Connector($$"""
+            "operations": [{ "name": "createOrder", "method": "POST", "path": "/orders", "input": [{{input}}] }]
+            """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.NotEmpty(result.Diagnostics);
+        Assert.All(result.Diagnostics, diagnostic => Assert.Equal((DiagnosticCodes.SchemaViolation, "connectors/purchasing-system.json"), (diagnostic.Code, diagnostic.File)));
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void An_output_cannot_be_an_object()
+    {
+        using var folder = Folder().With("connectors/purchasing-system.json", Connector("""
+            "operations": [{ "name": "find", "method": "GET", "path": "/orders", "output": [{ "name": "order", "type": "object" }] }]
+            """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.NotEmpty(result.Diagnostics);
+        Assert.All(result.Diagnostics, diagnostic => Assert.Equal(DiagnosticCodes.SchemaViolation, diagnostic.Code));
+    }
+
     private static string Connector(string body) => $$"""
         { "id": "{{ConnectorId}}", "kind": "connector", "name": "PurchasingSystem", "formatVersion": 1,
           "baseUrl": { "binding": "PurchasingSystemUrl" },

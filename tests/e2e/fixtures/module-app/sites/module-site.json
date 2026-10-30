@@ -1,0 +1,10 @@
+{
+  "id": "8f7847df-8a76-464f-ab4a-dc746cde0418",
+  "kind": "site",
+  "name": "ModuleSite",
+  "formatVersion": 1,
+  "path": "module-app",
+  "title": { "textKey": "site.title" },
+  "locales": { "default": "en", "fallback": "en", "available": ["en"] },
+  "navigation": [{ "page": "Items", "label": { "textKey": "nav.items" } }]
+}

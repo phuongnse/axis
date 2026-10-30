@@ -1892,6 +1892,15 @@ internal static class ProcessChecker
                 continue;
             }
 
+            if (input.Type is FieldType.Object or FieldType.List)
+            {
+                report(
+                    DiagnosticCodes.StructuredInputExpression,
+                    $"The input '{input.Name}' is {(input.Type == FieldType.Object ? "an object" : "a list")}, so a plain expression cannot give it. Mapping object and list inputs in a step is not built yet.",
+                    keyPath);
+                continue;
+            }
+
             // The expression cannot be checked without the entity.
             if (scope is null)
             {

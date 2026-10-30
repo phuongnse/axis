@@ -1,0 +1,9 @@
+{
+  "id": "06bf5c2d-df18-4d48-9dc6-66396e30f300",
+  "kind": "process",
+  "name": "ChecklistReview",
+  "formatVersion": 1,
+  "entity": "Checklist",
+  "start": "done",
+  "steps": [{ "name": "done", "type": "end" }]
+}

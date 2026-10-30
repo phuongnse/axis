@@ -38,6 +38,7 @@ internal static class DefinedNamesBuilder
             [.. loaded.Processes.Select(process => new DefinedProcess(
                 process.Id,
                 process.Name,
+                ModuleOf(process),
                 process.Entity,
                 [.. process.Parameters?.Select(parameter => new DefinedTyped(parameter.Name, parameter.Type)) ?? []],
                 [.. process.Steps.Select(step => new DefinedStep(
@@ -56,8 +57,10 @@ internal static class DefinedNamesBuilder
             [.. loaded.Pages.Select(page => new DefinedPage(
                 page.Id,
                 page.Name,
+                ModuleOf(page),
                 [.. page.Parameters.Select(parameter => new DefinedPageParameter(
                     parameter.Name, parameter.Type, parameter.Required ?? false))]))],
+            [.. loaded.Policies.Select(policy => new DefinedPolicy(policy.Id, policy.Name, ModuleOf(policy)))],
             Texts(texts, index));
     }
 

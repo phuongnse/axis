@@ -1,0 +1,8 @@
+{
+  "id": "48642851-8104-46b4-8bbf-7d4e300b6165",
+  "kind": "policy",
+  "name": "ItemAccess",
+  "formatVersion": 1,
+  "roles": ["employee"],
+  "grants": [{ "entity": "Item", "actions": ["read"] }]
+}
