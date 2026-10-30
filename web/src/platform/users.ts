@@ -116,3 +116,44 @@ export async function changeUserRole(
   }
   return 'ok'
 }
+
+/** A person to invite. The `roles` are given at once, each as in the give-role route. */
+export interface Invitation {
+  email: string
+  displayName: string
+  roles: RoleChange[]
+}
+
+/** Invites a person. `forbidden` is a platform role that needs a recent sign-in, and `conflict` is an account that already uses the email. */
+export async function inviteUser(invitation: Invitation): Promise<'ok' | 'forbidden' | 'conflict'> {
+  const response = await apiFetch('/api/users/invite', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(invitation),
+  })
+  if (response.status === 403) {
+    return 'forbidden'
+  }
+  if (response.status === 409) {
+    return 'conflict'
+  }
+  if (!response.ok) {
+    throw new Error(`Inviting the person failed with status ${response.status}.`)
+  }
+  return 'ok'
+}
+
+/** Sends an invitation again. `forbidden` is a caller that is not an administrator, and `conflict` is a person who cannot get a new invitation. */
+export async function resendInvitation(id: string): Promise<'ok' | 'forbidden' | 'conflict'> {
+  const response = await apiFetch(`/api/users/${encodeURIComponent(id)}/resend-invitation`, { method: 'POST' })
+  if (response.status === 403) {
+    return 'forbidden'
+  }
+  if (response.status === 409) {
+    return 'conflict'
+  }
+  if (!response.ok) {
+    throw new Error(`Resending the invitation failed with status ${response.status}.`)
+  }
+  return 'ok'
+}
