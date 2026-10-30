@@ -123,12 +123,16 @@ export function serverEnv(baseURL: string): Record<string, string> {
     Tenants__default__Realm__ActivationClientSecret: 'axis-activation-development-secret',
     // The users list reads the realm's users through the axis-users client, as in appsettings.Development.json.
     Tenants__default__Oidc__UsersClientSecret: 'axis-users-development-secret',
-    // The purchase request sample activates only with its purchasing system bindings. The stub
-    // ignores the token. The worker gets the same bindings from scripts/e2e.sh.
+    // The purchase request sample activates only with its purchasing system bindings. They hold the
+    // stub's default client credentials. The worker gets the same bindings from scripts/e2e.sh.
     Tenants__default__Bindings__PurchasingSystemUrl__Kind: 'url',
     Tenants__default__Bindings__PurchasingSystemUrl__Value: purchasingUrl,
-    Tenants__default__Bindings__PurchasingSystemToken__Kind: 'secret',
-    Tenants__default__Bindings__PurchasingSystemToken__Value: 'e2e-token',
+    Tenants__default__Bindings__PurchasingSystemTokenUrl__Kind: 'url',
+    Tenants__default__Bindings__PurchasingSystemTokenUrl__Value: `${purchasingUrl}/oauth/token`,
+    Tenants__default__Bindings__PurchasingSystemClientId__Kind: 'secret',
+    Tenants__default__Bindings__PurchasingSystemClientId__Value: 'axis-purchasing',
+    Tenants__default__Bindings__PurchasingSystemClientSecret__Kind: 'secret',
+    Tenants__default__Bindings__PurchasingSystemClientSecret__Value: 'axis-development-purchasing-secret',
     // The company realm's broker client, as in appsettings.Development.json. The purchase request sample's company provider reads them.
     Tenants__default__Bindings__CompanyIssuer__Kind: 'url',
     Tenants__default__Bindings__CompanyIssuer__Value: `${keycloakUrl}/realms/company`,

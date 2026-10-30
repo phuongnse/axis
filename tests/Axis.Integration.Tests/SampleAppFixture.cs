@@ -57,8 +57,6 @@ public sealed class SampleAppFixture : IAsyncLifetime
 
     private static readonly TimeSpan _lease = TimeSpan.FromSeconds(30);
 
-    private const string Token = "sample-test-token";
-
     private readonly PostgreSqlFixture _database = new();
     private WebApplication? _purchasing;
     private string? _purchasingUrl;
@@ -93,8 +91,10 @@ public sealed class SampleAppFixture : IAsyncLifetime
             builder.UseTestOidc(Tenant);
             builder.UseSetting($"Tenants:{Tenant}:Bindings:PurchasingSystemUrl:Kind", "url");
             builder.UseSetting($"Tenants:{Tenant}:Bindings:PurchasingSystemUrl:Value", "https://purchasing.example.test");
-            builder.UseSetting($"Tenants:{Tenant}:Bindings:PurchasingSystemToken:Kind", "secret");
-            builder.UseSetting($"Tenants:{Tenant}:Bindings:PurchasingSystemToken:Value", Token);
+            foreach (var (key, value) in PurchasingBindings.Settings(Tenant))
+            {
+                builder.UseSetting(key, value);
+            }
             foreach (var (key, value) in CompanyBindings.Settings(Tenant))
             {
                 builder.UseSetting(key, value);
@@ -218,16 +218,23 @@ public sealed class SampleAppFixture : IAsyncLifetime
     }
 
     /// <summary>The worker's settings for the tenant, with its purchasing bindings pointing at the stub.</summary>
-    private Dictionary<string, string?> WorkerTenantSettings() => new()
+    private Dictionary<string, string?> WorkerTenantSettings()
     {
-        ["Extensions:Path"] = SamplePackages.Path,
-        [$"Tenants:{Tenant}:Hosts:0"] = Host,
-        [$"Tenants:{Tenant}:ConnectionString"] = PostgreSqlServer.RuntimeConnectionString(ConnectionString),
-        [$"Tenants:{Tenant}:Bindings:PurchasingSystemUrl:Kind"] = "url",
-        [$"Tenants:{Tenant}:Bindings:PurchasingSystemUrl:Value"] = PurchasingUrl,
-        [$"Tenants:{Tenant}:Bindings:PurchasingSystemToken:Kind"] = "secret",
-        [$"Tenants:{Tenant}:Bindings:PurchasingSystemToken:Value"] = Token,
-    };
+        var settings = new Dictionary<string, string?>
+        {
+            ["Extensions:Path"] = SamplePackages.Path,
+            [$"Tenants:{Tenant}:Hosts:0"] = Host,
+            [$"Tenants:{Tenant}:ConnectionString"] = PostgreSqlServer.RuntimeConnectionString(ConnectionString),
+            [$"Tenants:{Tenant}:Bindings:PurchasingSystemUrl:Kind"] = "url",
+            [$"Tenants:{Tenant}:Bindings:PurchasingSystemUrl:Value"] = PurchasingUrl,
+        };
+        foreach (var (key, value) in PurchasingBindings.Settings(Tenant, $"{PurchasingUrl}/oauth/token"))
+        {
+            settings[key] = value;
+        }
+
+        return settings;
+    }
 
     /// <summary>Creates a draft Operations request with one line item of <paramref name="unitPrice"/>, and returns its id.</summary>
     public static Task<Guid> CreateRequestAsync(HttpClient client, decimal unitPrice) =>
@@ -237,8 +244,15 @@ public sealed class SampleAppFixture : IAsyncLifetime
     /// Creates a draft request in <paramref name="department"/> with one line item of <paramref name="unitPrice"/>,
     /// and returns its id.
     /// </summary>
-    public static async Task<Guid> CreateRequestAsync(HttpClient client, decimal unitPrice, Guid department)
+    public static Task<Guid> CreateRequestAsync(HttpClient client, decimal unitPrice, Guid department) =>
+        CreateRequestAsync(client, department, ("Desk", 1, unitPrice));
+
+    /// <summary>Creates a draft request in <paramref name="department"/> with the line items <paramref name="lines"/>, and returns its id.</summary>
+    public static async Task<Guid> CreateRequestAsync(HttpClient client, Guid department, params (string Description, int Quantity, decimal UnitPrice)[] lines)
     {
+        var lineItems = string.Join(
+            ", ",
+            lines.Select(line => $$"""{ "description": "{{line.Description}}", "quantity": {{line.Quantity}}, "unitPrice": {{line.UnitPrice.ToString(CultureInfo.InvariantCulture)}} }"""));
         using var response = await SendAsync(
             client,
             HttpMethod.Post,
@@ -249,7 +263,7 @@ public sealed class SampleAppFixture : IAsyncLifetime
                 "title": "Request {{Guid.NewGuid():N}}",
                 "status": "draft",
                 "department": "{{department:D}}",
-                "lineItems": [{ "description": "Desk", "quantity": 1, "unitPrice": {{unitPrice.ToString(CultureInfo.InvariantCulture)}} }]
+                "lineItems": [{{lineItems}}]
               }
             }
             """);
@@ -306,6 +320,16 @@ public sealed class SampleAppFixture : IAsyncLifetime
         return [.. body.RootElement.EnumerateArray()
             .Where(order => order.GetProperty("requestNumber").GetString() == requestNumber)
             .Select(order => order.GetProperty("orderNumber").GetString())];
+    }
+
+    /// <summary>The orders that the purchasing system stub holds for the request <paramref name="requestNumber"/>, as the stub lists them.</summary>
+    public async Task<IReadOnlyList<JsonElement>> PurchaseOrdersAsync(string requestNumber)
+    {
+        using var client = new HttpClient { BaseAddress = new Uri(PurchasingUrl) };
+        using var body = JsonDocument.Parse(await client.GetStringAsync("/purchase-orders", CancellationToken));
+        return [.. body.RootElement.EnumerateArray()
+            .Where(order => order.GetProperty("requestNumber").GetString() == requestNumber)
+            .Select(order => order.Clone())];
     }
 
     /// <summary>The connection string of the tenant database's owner, <see cref="PostgreSqlServer.SchemaRole"/>.</summary>

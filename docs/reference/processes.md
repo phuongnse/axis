@@ -173,7 +173,7 @@ a payment reference from the sample extension package, see
       "type": "operation",
       "operation": "callConnector",
       "connector": { "name": "PurchasingSystem", "operation": "createPurchaseOrder" },
-      "input": { "requestNumber": "number", "supplierCode": "supplier.code", "amount": "totalAmount" },
+      "input": { "requestNumber": "number", "supplierCode": "supplier.code", "amount": "totalAmount", "lines": { "from": "lineItems", "fields": { "description": "description", "quantity": "quantity", "unitPrice": "unitPrice", "amount": "amount" } } },
       "output": { "orderNumber": "purchaseOrderNumber" },
       "retry": { "attempts": 5, "backoff": "PT30S" },
       "next": "assignPaymentReference"

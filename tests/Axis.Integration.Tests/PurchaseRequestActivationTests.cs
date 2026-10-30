@@ -40,7 +40,9 @@ public sealed class PurchaseRequestActivationTests(DataDatabaseFixture database)
         ];
         Assert.Equal(
             [
-                (DiagnosticCodes.MissingDeploymentBinding, "connectors/purchasing-system.json", "/auth/token/binding", "Tenant 'acme' has no binding 'PurchasingSystemToken'. Add a 'secret' binding with that name to the tenant."),
+                (DiagnosticCodes.MissingDeploymentBinding, "connectors/purchasing-system.json", "/auth/clientId/binding", "Tenant 'acme' has no binding 'PurchasingSystemClientId'. Add a 'secret' binding with that name to the tenant."),
+                (DiagnosticCodes.MissingDeploymentBinding, "connectors/purchasing-system.json", "/auth/clientSecret/binding", "Tenant 'acme' has no binding 'PurchasingSystemClientSecret'. Add a 'secret' binding with that name to the tenant."),
+                (DiagnosticCodes.MissingDeploymentBinding, "connectors/purchasing-system.json", "/auth/tokenUrl/binding", "Tenant 'acme' has no binding 'PurchasingSystemTokenUrl'. Add a 'url' binding with that name to the tenant."),
                 (DiagnosticCodes.MissingDeploymentBinding, "connectors/purchasing-system.json", "/baseUrl/binding", "Tenant 'acme' has no binding 'PurchasingSystemUrl'. Add a 'url' binding with that name to the tenant."),
                 .. companyDiagnostics,
             ],
@@ -50,8 +52,8 @@ public sealed class PurchaseRequestActivationTests(DataDatabaseFixture database)
         var bindings = new Dictionary<string, ActivationBinding>(StringComparer.OrdinalIgnoreCase)
         {
             ["PurchasingSystemUrl"] = new(ActivationBinding.UrlKind, new Uri("https://purchasing.example.test")),
-            ["PurchasingSystemToken"] = new(ActivationBinding.SecretKind, null),
         };
+        PurchasingBindings.AddTo(bindings);
 
         var withoutCompany = await ActivateAsync(compiled, new ActivationBindings("acme", bindings, AllowHttp: false));
 

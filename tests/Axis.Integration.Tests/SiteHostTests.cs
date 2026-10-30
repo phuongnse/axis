@@ -125,15 +125,8 @@ public sealed class SiteHostTests(PostgreSqlFixture database) : IClassFixture<Po
         Assert.Equal(0, (await scenario.CreateAsync(id, OwnHost(id))).Exit);
         await using (var context = new PlatformDbContext(new DbContextOptionsBuilder<PlatformDbContext>().UseNpgsql(scenario.Platform).Options))
         {
-            context.TenantBindings.AddRange(
-                new TenantBindingRow { TenantId = id, Name = "PurchasingSystemUrl", Kind = "url", Url = "https://purchasing.example.test" },
-                new TenantBindingRow
-                {
-                    TenantId = id,
-                    Name = "PurchasingSystemToken",
-                    Kind = "secret",
-                    SecretValue = AdminScenario.Cipher.Encrypt(id, TenantSecretFields.Binding("PurchasingSystemToken"), "binding-secret-value"),
-                });
+            context.TenantBindings.Add(new TenantBindingRow { TenantId = id, Name = "PurchasingSystemUrl", Kind = "url", Url = "https://purchasing.example.test" });
+            context.TenantBindings.AddRange(PurchasingBindings.Rows(id));
             context.TenantBindings.AddRange(CompanyBindings.Rows(id));
             await context.SaveChangesAsync(CancellationToken);
         }

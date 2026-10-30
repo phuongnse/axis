@@ -400,7 +400,8 @@ works on a fresh clone:
   `Tenants__default__Oidc__Authority` at Keycloak on that port, and its
   `Tenants__default__Bindings__CompanyIssuer__Value` at the `company` realm there. When
   `AXIS_PURCHASING_PORT` is set, it points the server's and the worker's
-  `Tenants__default__Bindings__PurchasingSystemUrl__Value` at the purchasing
+  `Tenants__default__Bindings__PurchasingSystemUrl__Value` and
+  `Tenants__default__Bindings__PurchasingSystemTokenUrl__Value` at the purchasing
   system stub on that port.
 - The worker serves `/health/live` and `/health/ready` at `http://127.0.0.1:5208` and
   answers `404` elsewhere. `Health__Urls` moves that address. Two workers on one machine

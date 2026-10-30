@@ -127,7 +127,7 @@ public sealed class StartupActivationTests(PostgreSqlFixture database, KeycloakF
         folder.With("connectors/purchasing-system.json", $$"""
             { "id": "{{Guid.NewGuid()}}", "kind": "connector", "name": "PurchasingSystem", "formatVersion": 1,
               "baseUrl": { "binding": "PurchasingSystemUrl" },
-              "auth": { "type": "bearer", "token": { "binding": "PurchasingSystemToken" } },
+              "auth": { "type": "bearer", "token": { "binding": "PurchasingSystemBearerToken" } },
               "operations": [ { "name": "createPurchaseOrder", "method": "POST", "path": "/purchase-orders" } ] }
             """);
         var logs = new LogCollector();
@@ -135,8 +135,8 @@ public sealed class StartupActivationTests(PostgreSqlFixture database, KeycloakF
         {
             ["Tenants:a:Bindings:PurchasingSystemUrl:Kind"] = "url",
             ["Tenants:a:Bindings:PurchasingSystemUrl:Value"] = "http://purchasing.example.test/api",
-            ["Tenants:a:Bindings:PurchasingSystemToken:Kind"] = "secret",
-            ["Tenants:a:Bindings:PurchasingSystemToken:Value"] = "token-value-never-logged",
+            ["Tenants:a:Bindings:PurchasingSystemBearerToken:Kind"] = "secret",
+            ["Tenants:a:Bindings:PurchasingSystemBearerToken:Value"] = "token-value-never-logged",
         });
 
         var exception = Assert.ThrowsAny<Exception>(() => factory.CreateClient());

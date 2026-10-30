@@ -4,7 +4,12 @@
   "name": "PurchasingSystem",
   "formatVersion": 1,
   "baseUrl": { "binding": "PurchasingSystemUrl" },
-  "auth": { "type": "bearer", "token": { "binding": "PurchasingSystemToken" } },
+  "auth": {
+    "type": "oauth2",
+    "tokenUrl": { "binding": "PurchasingSystemTokenUrl" },
+    "clientId": { "binding": "PurchasingSystemClientId" },
+    "clientSecret": { "binding": "PurchasingSystemClientSecret" }
+  },
   "timeout": "PT30S",
   "idempotency": "Idempotency-Key",
   "operations": [
@@ -15,7 +20,18 @@
       "input": [
         { "name": "requestNumber", "type": "text", "required": true },
         { "name": "supplierCode", "type": "text" },
-        { "name": "amount", "type": "decimal", "required": true }
+        { "name": "amount", "type": "decimal", "required": true },
+        {
+          "name": "lines",
+          "type": "list",
+          "required": true,
+          "fields": [
+            { "name": "description", "type": "text", "required": true },
+            { "name": "quantity", "type": "integer", "required": true },
+            { "name": "unitPrice", "type": "decimal", "required": true },
+            { "name": "amount", "type": "decimal", "required": true }
+          ]
+        }
       ],
       "output": [{ "name": "orderNumber", "type": "text", "required": true }],
       "lookup": "findPurchaseOrder"

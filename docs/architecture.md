@@ -257,14 +257,16 @@ JSON. Without a tenant context, for a name the tenant lacks, or for a binding
 of the other kind, both throw an `InvalidOperationException` that names the
 binding and no value. So `Resolve` never hands out a plain secret. A secret's
 `Value` comes from the environment, such as
-`Tenants__default__Bindings__PurchasingSystemToken__Value`. See
+`Tenants__default__Bindings__PurchasingSystemClientSecret__Value`. See
 [connectors and deployment bindings](reference/integration-resources.md#connectors-and-deployment-bindings)
 and [D25](decisions/d25-connectors-deployment-bindings-and-secrets.md).
 
 ```json
 "Bindings": {
   "PurchasingSystemUrl": { "Kind": "url", "Value": "https://purchasing.example.test/api" },
-  "PurchasingSystemToken": { "Kind": "secret", "Value": "<from environment>" }
+  "PurchasingSystemTokenUrl": { "Kind": "url", "Value": "https://auth.purchasing.example.test/oauth/token" },
+  "PurchasingSystemClientId": { "Kind": "secret", "Value": "<from environment>" },
+  "PurchasingSystemClientSecret": { "Kind": "secret", "Value": "<from environment>" }
 }
 ```
 
@@ -655,92 +657,7 @@ holds table and column names.
 
 ## Health checks
 
-The server's `/health/live` and `/health/ready` work as described below, as
-[D37](decisions/d37-health-checks-for-the-server-and-the-worker.md)
-says.
-
-**The answer.** Each endpoint answers JSON of the form
-`{ "status": "Healthy" | "Degraded" | "Unhealthy" }` and nothing else.
-`/health` needs no session, so the answer names no tenant, database or error.
-Healthy and Degraded answer `200`, so a degraded host still passes a readiness
-probe. Unhealthy answers `503`.
-
-**Server `/health/live`.** It runs no checks. It is Healthy while the process
-answers requests, with status `200`. It is never Degraded or Unhealthy.
-
-**Server `/health/ready`.**
-
-| Status    | HTTP  | When                                                                                                                |
-| --------- | ----- | ------------------------------------------------------------------------------------------------------------------- |
-| Healthy   | `200` | The platform database answers, startup activation has finished for every tenant, and every tenant database answers. |
-| Degraded  | `200` | The platform database answers and activation has finished, but at least one tenant database does not answer.        |
-| Unhealthy | `503` | The platform database does not answer, or startup activation has not finished for every tenant.                     |
-
-Under `Tenancy:Source=directory`, the rows above hold
-until the first load of the [tenant directory](#tenant-directory) has worked.
-The server does not listen before that. After the first load, a platform
-database that does not answer is a failed refresh, and it makes the server
-Degraded (`200`), not Unhealthy. So does a refresh that fails while the platform
-database still answers. The server then keeps serving from the last good
-directory. Readiness returns to Healthy at the next refresh that works. Under
-`directory`, no startup activation runs, because `ActivateOnStartup` must be
-empty, so "startup activation has finished" holds from the start.
-
-- A tenant on another schema version than the server's is not served, so it
-  counts neither against readiness nor as a tenant database that does not
-  answer. One tenant whose migration failed cannot keep a deploy from being
-  ready.
-- One tenant database that is down makes the server Degraded and not
-  Unhealthy, so one tenant cannot take the others offline, see
-  [tenancy](#tenancy-d10). Requests for that tenant fail and the others work.
-- The tenant database checks run in parallel, and each gives up after 2
-  seconds. A database that has not answered by then counts as not answering,
-  so a hung database makes the server Degraded and does not stall the probe.
-- The tenant is named in a warning in the logs on every probe, and in the
-  gauge `axis.tenant.database.available`, never in the answer. The gauge is
-  labelled `axis.tenant` with the tenant id. It is 1 when the tenant database
-  answered the last probe and 0 when it did not. A scrape reads it from memory,
-  so it never queries a tenant database. Before the first probe a tenant has no
-  point.
-- Today the server does not listen until startup activation has finished, see
-  [startup activation](reference/host-settings.md#startup-activation). So a
-  probe gets no answer in that time. The activation rule matters once the
-  server listens earlier.
-
-**Worker.** The worker serves only `/health/live` and `/health/ready`, on the
-address `Health:Urls`. The default is `http://127.0.0.1:5208`, so nothing
-outside the host reaches it until someone changes the setting. See
-[worker settings](reference/process-execution.md#worker-settings). A tenant database
-that stops answering after the worker saw it migrated is only logged, and does
-not make the worker Degraded. Under `Tenancy:Source=directory`, the worker
-answers `503` on `/health/ready` until its first read of the
-[tenant directory](#tenant-directory) has worked, while `/health/live` stays
-`200`. A failed refresh of the directory makes the worker Degraded (`200`),
-and the worker keeps running the last good read. It is Healthy again after the
-next refresh that works.
-
-A tenant that waits for its schema version, see
-[tenant directory](#tenant-directory), counts as ready for `/health/ready`, and
-the worker stays Healthy while it waits. One tenant whose migration failed
-cannot keep the worker from being ready.
-
-The loop counts as stalled when it has not polled within twice
-`Worker:LeaseDuration`, one minute by default. A poll interval would be too
-short, because one work item can run for up to a lease.
-
-| Endpoint        | Status    | HTTP  | When                                                                                                                                                  |
-| --------------- | --------- | ----- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `/health/live`  | Healthy   | `200` | The loop has polled within twice `Worker:LeaseDuration`.                                                                                              |
-| `/health/live`  | Unhealthy | `503` | The loop has not polled within that time, so an orchestrator restarts the worker.                                                                     |
-| `/health/ready` | Healthy   | `200` | Every tenant database has its processes migrations, and the loop has polled within twice `Worker:LeaseDuration`.                                      |
-| `/health/ready` | Degraded  | `200` | A refresh of the tenant directory failed, and the last good read stays in use.                                                                        |
-| `/health/ready` | Unhealthy | `503` | A tenant database lacks its processes migrations, the first read of the tenant directory has not worked, or the loop has not polled within that time. |
-
-**Docker Compose.** The worker gets a health check on `/health/ready`. It runs
-inside the container, and Compose does not publish the worker's health port.
-The production Compose example has no container health checks, because the
-production images hold no `curl`. It publishes the worker's health port on
-`127.0.0.1` only, for probes from the host.
+Moved to [reference/health-checks.md](reference/health-checks.md).
 
 ## Installation
 
@@ -946,9 +863,11 @@ fails if it does not answer. Specs find it at `AXIS_E2E_PURCHASING_URL`. Its
 output goes to `artifacts/logs/e2e-purchasing.log`.
 
 The E2E server and worker run in the `Development` environment, because only
-Development lets a connector call an `http` URL. Their `PurchasingSystemUrl`
-and `PurchasingSystemToken` bindings point at the stub, so an approved
-purchase request creates its purchase order there.
+Development lets a connector call an `http` URL. Their `PurchasingSystemUrl`,
+`PurchasingSystemTokenUrl`, `PurchasingSystemClientId` and
+`PurchasingSystemClientSecret` bindings point at the stub and hold its default
+credentials, so an approved purchase request signs in and creates its purchase
+order there.
 
 ### Purchasing system stub
 
@@ -957,14 +876,35 @@ the purchase request sample's connector calls. It is a test fixture, not
 platform code, and references nothing under `src/`. The E2E run,
 `scripts/dev.sh` and Docker Compose start it. Its orders live in memory only.
 
+- `POST /oauth/token` is the token route of the OAuth2 client credentials
+  grant. It reads the form field `grant_type` and the client from the
+  `Authorization: Basic` header, as the worker sends them. Any other grant
+  type is a `400` with `unsupported_grant_type`. A missing or wrong client is a
+  `401` with `invalid_client`. Otherwise it answers `200` with `access_token`,
+  `token_type` `Bearer` and `expires_in`, and `Cache-Control: no-store`. The
+  stub knows one client, `axis-purchasing` with the secret
+  `axis-development-purchasing-secret`. The settings `Purchasing:ClientId` and
+  `Purchasing:ClientSecret` change them, but every development and test setting
+  uses these defaults. A token lives 120 seconds, and the setting
+  `Purchasing:TokenLifetime`, in seconds, changes that.
+- `POST /purchase-orders` and `GET /purchase-orders/by-key/{idempotencyKey}`
+  need an `Authorization: Bearer` header with a token the stub issued and that
+  has not expired. Without one the stub answers `401` with
+  `WWW-Authenticate: Bearer error="invalid_token"` and stores nothing. The
+  order list, `/health` and the `/test/*` switches need no token.
 - `POST /purchase-orders` with an `Idempotency-Key` header and a body with
-  `requestNumber`, `supplierCode` and `amount` creates an order. It answers
-  `201` with an `orderNumber` such as `PO-2026-0001`. A repeat with the same
-  key answers `200` with the same order and stores nothing new. A create
-  without the key, `requestNumber` or `amount` is a `400`.
+  `requestNumber`, `supplierCode`, `amount` and `lines` creates an order. Each
+  line has a `description`, a `quantity`, a `unitPrice` and an `amount`. It
+  answers `201` with an `orderNumber` such as `PO-2026-0001`. A repeat with the
+  same key answers `200` with the same order and stores nothing new. A create
+  without the key, `requestNumber`, `amount` or `lines`, with an empty `lines`,
+  or with a line that lacks a field is a `400`.
 - `GET /purchase-orders/by-key/{idempotencyKey}` answers `200` with the
   `orderNumber`, or `404` when the key is unknown.
-- `GET /purchase-orders` lists every stored order in creation order.
+- `GET /purchase-orders` lists every stored order in creation order. Each
+  order shows its `lines` in the order sent and the `clientId` of the token
+  that created it, so a test can tell that the order came after a token request
+  with the sample's credentials.
 - `POST /test/drop-next` drops the response of the next create.
   `POST /test/drop/{idempotencyKey}` drops the response of the first create
   with that key. A dropped create stores the order, then closes the connection
@@ -994,5 +934,3 @@ platform code, and references nothing under `src/`. The E2E run,
   endpoint, since each spec uses its own request number.
 - Each drop and each hold happens once. Each test endpoint answers `204`.
 - `GET /health` answers `200`.
-
-The stub ignores the `Authorization` header.

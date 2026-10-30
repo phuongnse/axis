@@ -502,7 +502,12 @@ test.describe('Studio on a copy of its own', () => {
       expect(after.operations.slice(0, added)).toEqual(before.operations)
       expect(after.operations[added]).toEqual({ name, method: 'POST', path: '/ping' })
       expect(after.baseUrl).toEqual({ binding: 'PurchasingSystemUrl' })
-      expect(after.auth).toEqual({ type: 'bearer', token: { binding: 'PurchasingSystemToken' } })
+      expect(after.auth).toEqual({
+        type: 'oauth2',
+        tokenUrl: { binding: 'PurchasingSystemTokenUrl' },
+        clientId: { binding: 'PurchasingSystemClientId' },
+        clientSecret: { binding: 'PurchasingSystemClientSecret' },
+      })
     } finally {
       await writeFile(file, original)
     }

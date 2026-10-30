@@ -10,7 +10,6 @@ namespace Axis.Integration.Tests;
 public sealed class AdminPlatformAuditTests(PostgreSqlFixture database) : IClassFixture<PostgreSqlFixture>
 {
     private const string UrlBinding = "PurchasingSystemUrl";
-    private const string SecretBinding = "PurchasingSystemToken";
 
     private static readonly string _sample = Path.Combine(AppContext.BaseDirectory, "Samples", "purchase-requests");
 
@@ -151,15 +150,8 @@ public sealed class AdminPlatformAuditTests(PostgreSqlFixture database) : IClass
     private static async Task AddBindingsAsync(AdminScenario scenario, string id)
     {
         await using var context = new PlatformDbContext(new DbContextOptionsBuilder<PlatformDbContext>().UseNpgsql(scenario.Platform).Options);
-        context.TenantBindings.AddRange(
-            new TenantBindingRow { TenantId = id, Name = UrlBinding, Kind = "url", Url = "https://purchasing.example.test" },
-            new TenantBindingRow
-            {
-                TenantId = id,
-                Name = SecretBinding,
-                Kind = "secret",
-                SecretValue = AdminScenario.Cipher.Encrypt(id, TenantSecretFields.Binding(SecretBinding), "binding-secret-value"),
-            });
+        context.TenantBindings.Add(new TenantBindingRow { TenantId = id, Name = UrlBinding, Kind = "url", Url = "https://purchasing.example.test" });
+        context.TenantBindings.AddRange(PurchasingBindings.Rows(id));
         context.TenantBindings.AddRange(CompanyBindings.Rows(id));
         await context.SaveChangesAsync(CancellationToken);
     }

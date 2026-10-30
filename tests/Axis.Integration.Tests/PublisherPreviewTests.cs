@@ -13,7 +13,6 @@ namespace Axis.Integration.Tests;
 public sealed class PublisherPreviewTests(PostgreSqlFixture database) : IClassFixture<PostgreSqlFixture>
 {
     private const string UrlBinding = "PurchasingSystemUrl";
-    private const string SecretBinding = "PurchasingSystemToken";
 
     private static readonly string _sample = Path.Combine(AppContext.BaseDirectory, "Samples", "purchase-requests");
 
@@ -162,15 +161,8 @@ public sealed class PublisherPreviewTests(PostgreSqlFixture database) : IClassFi
         Assert.Equal(0, (await scenario.CreateAsync(main, $"{main}.example.test")).Exit);
         await using (var context = new PlatformDbContext(new DbContextOptionsBuilder<PlatformDbContext>().UseNpgsql(scenario.Platform).Options))
         {
-            context.TenantBindings.AddRange(
-                new TenantBindingRow { TenantId = main, Name = UrlBinding, Kind = "url", Url = "https://purchasing.example.test" },
-                new TenantBindingRow
-                {
-                    TenantId = main,
-                    Name = SecretBinding,
-                    Kind = "secret",
-                    SecretValue = AdminScenario.Cipher.Encrypt(main, TenantSecretFields.Binding(SecretBinding), "binding-secret-value"),
-                });
+            context.TenantBindings.Add(new TenantBindingRow { TenantId = main, Name = UrlBinding, Kind = "url", Url = "https://purchasing.example.test" });
+            context.TenantBindings.AddRange(PurchasingBindings.Rows(main));
             context.TenantBindings.AddRange(CompanyBindings.Rows(main));
             await context.SaveChangesAsync(CancellationToken);
         }

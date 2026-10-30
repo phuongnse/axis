@@ -177,8 +177,8 @@ public sealed class WorkerHostTests(PostgreSqlFixture database) : IClassFixture<
         await EnqueueAsync(tenantA, "a", SecretCallKind);
         var bindings = new Dictionary<string, string?>
         {
-            ["Tenants:a:Bindings:PurchasingSystemToken:Kind"] = "secret",
-            ["Tenants:a:Bindings:PurchasingSystemToken:Value"] = TokenValue,
+            ["Tenants:a:Bindings:PurchasingSystemBearerToken:Kind"] = "secret",
+            ["Tenants:a:Bindings:PurchasingSystemBearerToken:Value"] = TokenValue,
         };
 
         var logs = new LogCollector();
@@ -424,14 +424,14 @@ public sealed class WorkerHostTests(PostgreSqlFixture database) : IClassFixture<
             Task.CompletedTask;
     }
 
-    /// <summary>Asks for the secret <c>PurchasingSystemToken</c> as a plain binding, which throws.</summary>
+    /// <summary>Asks for the secret <c>PurchasingSystemBearerToken</c> as a plain binding, which throws.</summary>
     private sealed class PlainSecretHandler(IDeploymentBindings bindings) : IWorkItemHandler
     {
         public string Kind => PlainSecretKind;
 
         public Task HandleAsync(WorkItemContext context, CancellationToken cancellationToken)
         {
-            bindings.Resolve("PurchasingSystemToken");
+            bindings.Resolve("PurchasingSystemBearerToken");
             return Task.CompletedTask;
         }
 
@@ -439,14 +439,14 @@ public sealed class WorkerHostTests(PostgreSqlFixture database) : IClassFixture<
             Task.CompletedTask;
     }
 
-    /// <summary>Resolves the secret <c>PurchasingSystemToken</c>, then fails as a refused call that names it.</summary>
+    /// <summary>Resolves the secret <c>PurchasingSystemBearerToken</c>, then fails as a refused call that names it.</summary>
     private sealed class SecretCallHandler(IDeploymentBindings bindings) : IWorkItemHandler
     {
         public string Kind => SecretCallKind;
 
         public Task HandleAsync(WorkItemContext context, CancellationToken cancellationToken)
         {
-            var secret = bindings.ResolveSecret("PurchasingSystemToken");
+            var secret = bindings.ResolveSecret("PurchasingSystemBearerToken");
             throw new InvalidOperationException($"Call refused with token {secret}");
         }
 

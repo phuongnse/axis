@@ -20,7 +20,6 @@ namespace Axis.Integration.Tests;
 public sealed class AdminPublisherTests(PostgreSqlFixture database) : IClassFixture<PostgreSqlFixture>
 {
     private const string UrlBinding = "PurchasingSystemUrl";
-    private const string SecretBinding = "PurchasingSystemToken";
 
     private static readonly string _sample = Path.Combine(AppContext.BaseDirectory, "Samples", "purchase-requests");
 
@@ -722,11 +721,13 @@ public sealed class AdminPublisherTests(PostgreSqlFixture database) : IClassFixt
             ["Tenants:default:SchemaConnectionString"] = schema,
             [$"Tenants:default:Bindings:{UrlBinding}:Kind"] = "url",
             [$"Tenants:default:Bindings:{UrlBinding}:Value"] = "https://purchasing.example.test",
-            [$"Tenants:default:Bindings:{SecretBinding}:Kind"] = "secret",
-            [$"Tenants:default:Bindings:{SecretBinding}:Value"] = "binding-secret-value",
             ["Extensions:Path"] = SamplePackages.Path,
             ["Modules:Path"] = SampleModules.Path,
         };
+        foreach (var (key, value) in PurchasingBindings.Settings("default"))
+        {
+            settings[key] = value;
+        }
         foreach (var (key, value) in CompanyBindings.Settings("default"))
         {
             settings[key] = value;
@@ -830,15 +831,8 @@ public sealed class AdminPublisherTests(PostgreSqlFixture database) : IClassFixt
         foreach (var id in ids)
         {
             Assert.Equal(0, (await scenario.CreateAsync(id, $"{id}.example.test")).Exit);
-            context.TenantBindings.AddRange(
-                new TenantBindingRow { TenantId = id, Name = UrlBinding, Kind = "url", Url = "https://purchasing.example.test" },
-                new TenantBindingRow
-                {
-                    TenantId = id,
-                    Name = SecretBinding,
-                    Kind = "secret",
-                    SecretValue = AdminScenario.Cipher.Encrypt(id, TenantSecretFields.Binding(SecretBinding), "binding-secret-value"),
-                });
+            context.TenantBindings.Add(new TenantBindingRow { TenantId = id, Name = UrlBinding, Kind = "url", Url = "https://purchasing.example.test" });
+            context.TenantBindings.AddRange(PurchasingBindings.Rows(id));
             context.TenantBindings.AddRange(CompanyBindings.Rows(id));
         }
 

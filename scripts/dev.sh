@@ -116,8 +116,9 @@ if [ -n "${AXIS_KEYCLOAK_PORT:-}" ]; then
   server_env+=("Tenants__default__Bindings__CompanyIssuer__Value=http://localhost:$AXIS_KEYCLOAK_PORT/realms/company")
 fi
 if [ -n "${AXIS_PURCHASING_PORT:-}" ]; then
-  # The server checks this binding when it activates the sample, and the worker calls it.
+  # The server checks these bindings when it activates the sample, and the worker calls them.
   export Tenants__default__Bindings__PurchasingSystemUrl__Value="http://localhost:$AXIS_PURCHASING_PORT"
+  export Tenants__default__Bindings__PurchasingSystemTokenUrl__Value="http://localhost:$AXIS_PURCHASING_PORT/oauth/token"
 fi
 
 # Job control leaves SIGINT enabled for the background processes. Without it, a
@@ -317,8 +318,12 @@ while :; do
       Tenants__default__SchemaConnectionString="Host=localhost;Port=$postgres_port;Database=axis;Username=axis_schema;Password=axis" \
       Tenants__default__Bindings__PurchasingSystemUrl__Kind=url \
       Tenants__default__Bindings__PurchasingSystemUrl__Value="http://localhost:$purchasing_port" \
-      Tenants__default__Bindings__PurchasingSystemToken__Kind=secret \
-      Tenants__default__Bindings__PurchasingSystemToken__Value=axis-development-purchasing-token \
+      Tenants__default__Bindings__PurchasingSystemTokenUrl__Kind=url \
+      Tenants__default__Bindings__PurchasingSystemTokenUrl__Value="http://localhost:$purchasing_port/oauth/token" \
+      Tenants__default__Bindings__PurchasingSystemClientId__Kind=secret \
+      Tenants__default__Bindings__PurchasingSystemClientId__Value=axis-purchasing \
+      Tenants__default__Bindings__PurchasingSystemClientSecret__Kind=secret \
+      Tenants__default__Bindings__PurchasingSystemClientSecret__Value=axis-development-purchasing-secret \
       Tenants__default__Bindings__CompanyIssuer__Kind=url \
       Tenants__default__Bindings__CompanyIssuer__Value="http://localhost:$keycloak_port/realms/company" \
       Tenants__default__Bindings__CompanyClientId__Kind=secret \

@@ -25,8 +25,6 @@ namespace Axis.Integration.Tests;
 
 public sealed class AdminTenantRestoreTests(AdminBackupFixture fixture) : IClassFixture<AdminBackupFixture>
 {
-    private const string SecretBinding = "PurchasingSystemToken";
-
     private static readonly string[] _steps =
     [
         "check", "entry", "roles", "database", "restore", "grants", "grants", "work", "sessions", "role-check", "version",
@@ -75,7 +73,7 @@ public sealed class AdminTenantRestoreTests(AdminBackupFixture fixture) : IClass
         Assert.NotEqual(original.DatabaseName, row.DatabaseName);
         Assert.Equal(0, await CountSecretBindingValuesAsync(newId));
         Assert.Equal(
-            [CompanyBindings.ClientId, CompanyBindings.ClientSecret, CompanyBindings.Issuer, SecretBinding, "PurchasingSystemUrl"],
+            [CompanyBindings.ClientId, CompanyBindings.ClientSecret, CompanyBindings.Issuer, PurchasingBindings.ClientId, PurchasingBindings.ClientSecret, PurchasingBindings.TokenUrl, "PurchasingSystemUrl"],
             await BindingNamesAsync(newId));
         Assert.Equal(0, await CountSessionsAsync(newId));
 
@@ -88,10 +86,10 @@ public sealed class AdminTenantRestoreTests(AdminBackupFixture fixture) : IClass
         }
 
         // The operator sets the secret bindings, which the archive never held, and resumes the tenant.
-        var setBinding = await scenario.RunAsync(["tenant", "binding", "set", newId, SecretBinding, "--secret"], input: "restored-token", extra: AdminScenario.Directory);
+        var setBinding = await scenario.RunAsync(["tenant", "binding", "set", newId, PurchasingBindings.ClientSecret, "--secret"], input: "restored-token", extra: AdminScenario.Directory);
         Assert.Equal(0, setBinding.Exit);
         Assert.Equal([$"{newId} binding ok"], setBinding.Output);
-        foreach (var name in new[] { CompanyBindings.ClientId, CompanyBindings.ClientSecret })
+        foreach (var name in new[] { CompanyBindings.ClientId, CompanyBindings.ClientSecret, PurchasingBindings.ClientId })
         {
             var setCompany = await scenario.RunAsync(["tenant", "binding", "set", newId, name, "--secret"], input: $"{name}-restored", extra: AdminScenario.Directory);
             Assert.Equal(0, setCompany.Exit);
@@ -106,7 +104,7 @@ public sealed class AdminTenantRestoreTests(AdminBackupFixture fixture) : IClass
         }
 
         var tenant = server.Services.GetRequiredService<ITenantCatalog>().Find(newId);
-        Assert.Equal("restored-token", tenant!.Bindings[SecretBinding].Secret!.Reveal());
+        Assert.Equal("restored-token", tenant!.Bindings[PurchasingBindings.ClientSecret].Secret!.Reveal());
 
         foreach (var id in ids)
         {
@@ -489,7 +487,7 @@ public sealed class AdminTenantRestoreTests(AdminBackupFixture fixture) : IClass
         Assert.Equal(2, refused.Exit);
         foreach (var line in result.Output.Concat(result.Error).Concat(refused.Output).Concat(refused.Error))
         {
-            Assert.DoesNotContain(fixture.BindingSecret, line, StringComparison.Ordinal);
+            Assert.DoesNotContain(PurchasingBindings.ClientSecretValue, line, StringComparison.Ordinal);
         }
 
         await fixture.Scenario.AssertNoSecretsAsync();

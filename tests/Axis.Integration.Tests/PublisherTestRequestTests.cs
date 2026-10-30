@@ -13,7 +13,6 @@ namespace Axis.Integration.Tests;
 public sealed class PublisherTestRequestTests(PostgreSqlFixture database) : IClassFixture<PostgreSqlFixture>, IAsyncLifetime
 {
     private const string UrlBinding = "PurchasingSystemUrl";
-    private const string SecretBinding = "PurchasingSystemToken";
 
     // The scenario that Failing is copied from, and the wrong status that makes the copy fail at its last step.
     private const string Passing = "ApprovalBelowThreshold";
@@ -304,15 +303,8 @@ public sealed class PublisherTestRequestTests(PostgreSqlFixture database) : ICla
         var tenant = scenario.NewTenantId();
         Assert.Equal(0, (await scenario.CreateAsync(tenant, $"{tenant}.example.test")).Exit);
         await using var context = new PlatformDbContext(new DbContextOptionsBuilder<PlatformDbContext>().UseNpgsql(scenario.Platform).Options);
-        context.TenantBindings.AddRange(
-            new TenantBindingRow { TenantId = tenant, Name = UrlBinding, Kind = "url", Url = "https://purchasing.example.test" },
-            new TenantBindingRow
-            {
-                TenantId = tenant,
-                Name = SecretBinding,
-                Kind = "secret",
-                SecretValue = AdminScenario.Cipher.Encrypt(tenant, TenantSecretFields.Binding(SecretBinding), "binding-secret-value"),
-            });
+        context.TenantBindings.Add(new TenantBindingRow { TenantId = tenant, Name = UrlBinding, Kind = "url", Url = "https://purchasing.example.test" });
+        context.TenantBindings.AddRange(PurchasingBindings.Rows(tenant));
         context.TenantBindings.AddRange(CompanyBindings.Rows(tenant));
         await context.SaveChangesAsync(CancellationToken);
         return tenant;

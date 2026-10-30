@@ -35,7 +35,7 @@ product brief.
   ([D88](d88-custom-widgets-in-the-designer-palette-and-a-published-sdk.md)).
   The author drags it from the palette onto a purchase request page in Studio.
   This is the only Studio step of the journey.
-- **OAuth2 and a structured payload** _(planned for M19)_: the purchasing
+- **OAuth2 and a structured payload**: the purchasing
   system connector signs in with client credentials and sends the approved
   order with its line items as a list
   ([D91](d91-connector-oauth2-and-structured-payloads.md)). The

@@ -33,8 +33,6 @@ public sealed class RestoredTenantWorkTests(AdminBackupFixture fixture) : IClass
 
     private const string UrlBinding = "PurchasingSystemUrl";
 
-    private const string SecretBinding = "PurchasingSystemToken";
-
     private const string Waiting = "waiting:managerApproval";
 
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
@@ -86,9 +84,13 @@ public sealed class RestoredTenantWorkTests(AdminBackupFixture fixture) : IClass
         await stub.StartAsync(CancellationToken);
         var stubAddress = stub.Services.GetRequiredService<IServer>().Features.GetRequiredFeature<IServerAddressesFeature>().Addresses.Single();
         Assert.Equal(0, (await scenario.RunAsync(["tenant", "binding", "set", newId, UrlBinding, "--url", stubAddress], extra: AdminScenario.Directory)).Exit);
-        Assert.Equal(
-            0,
-            (await scenario.RunAsync(["tenant", "binding", "set", newId, SecretBinding, "--secret"], input: "restored-token", extra: AdminScenario.Directory)).Exit);
+        Assert.Equal(0, (await scenario.RunAsync(["tenant", "binding", "set", newId, PurchasingBindings.TokenUrl, "--url", $"{stubAddress}/oauth/token"], extra: AdminScenario.Directory)).Exit);
+        foreach (var (name, value) in new[] { (PurchasingBindings.ClientId, PurchasingStubApp.DefaultClientId), (PurchasingBindings.ClientSecret, PurchasingStubApp.DefaultClientSecret) })
+        {
+            Assert.Equal(
+                0,
+                (await scenario.RunAsync(["tenant", "binding", "set", newId, name, "--secret"], input: value, extra: AdminScenario.Directory)).Exit);
+        }
         foreach (var name in new[] { CompanyBindings.ClientId, CompanyBindings.ClientSecret })
         {
             Assert.Equal(
