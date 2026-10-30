@@ -2,7 +2,7 @@
 
 The shell is the frame the SPA draws around every page of every site, the platform site and application sites
 alike: a header, the site's navigation, the page's header and a footer. The platform home page is the first page a
-person sees, and the sign-in screen when nobody is signed in. This page holds their rules. The routes, the site
+person sees. A person with no session goes to sign-in from it. This page holds their rules. The routes, the site
 endpoints and the widgets are in [frontend](frontend.md), and sign-in and the session in
 [security](security.md#sign-in-and-the-session).
 
@@ -102,7 +102,7 @@ SPA does today.
 
 _(The page as [D114](../decisions/d114-rules-from-the-sign-in-and-home-page-review.md) agrees it is planned for M17.
 Today it shows D98's welcome band with the tools, then a card per application across the page with the number of
-applications and of its sites, and the sign-in screen with nobody signed in, whose card already has the Axis heading above it.)_
+applications and of its sites.)_
 
 - **Signed in.** The page has two parts, each under a `heading5` title with no count beside it: "Applications", then
   "Tools", as people use the applications most.
@@ -201,8 +201,7 @@ manifest and each `site` may have a `description`, one line of text that the
 
 - The design system has a seventh group of cards, Shell, after Shared states, with three previews:
   - `shell`: Application site, Navigation collapsed, Form page and Platform site.
-  - `signIn`: Signed out, Sign-in refused and Session ended. _(Planned for M17: Sign-in refused, Signed out and Session
-    ended, with the organization's heading over the cards.)_
+  - `signIn`: Sign-in refused, Signed out and Session ended, with the organization's heading over the cards.
   - `identitySignIn`: the sign-in page of [Axis's identity provider](identity-provider.md#theme), in Sign in, Wrong
     password, Organization sign-in only, Two-step verification, Forgot password, Set password and Add an authenticator. It is built from fixtures through the shared sign-in components in `web/src/identitySignIn/`. Two-step
     verification, Forgot password, Set password and Add an authenticator are the same components that the theme draws.

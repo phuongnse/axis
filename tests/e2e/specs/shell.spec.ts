@@ -4,27 +4,33 @@ import { useSession } from '../sessions'
 import { chooseLanguage, chooseTheme, expectChosen } from '../shell'
 
 test('the home page loads and reports a ready server', async ({ page }) => {
-  await page.goto('/')
+  await page.goto('/?signedOut')
 
   await expect(page).toHaveTitle('Axis')
   await expect(page.getByTestId('footer-server-status')).toContainText('Ready')
-  // Nobody is signed in, so the home page is the sign-in card.
-  await expect(page.getByRole('main').getByText('Sign in to Axis', { exact: true })).toBeVisible()
-  await expect(page.getByRole('main').getByRole('button', { name: 'Sign in', exact: true })).toBeVisible()
+  // Nobody is signed in, so the page is the signed-out card.
+  await expect(page.getByRole('main').getByText('You have signed out', { exact: true })).toBeVisible()
+  await expect(page.getByRole('main').getByRole('button', { name: 'Sign in again', exact: true })).toBeVisible()
 })
 
-test('the sign-in screen has one Sign in button, in the page and not in the header', async ({ page }) => {
-  await page.goto('/')
+test('each sign-in card has one button, in the page and not in the header', async ({ page }) => {
+  await page.goto('/?signedOut')
+
+  await expect(page.getByRole('main').getByRole('button', { name: 'Sign in again', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Sign in again', exact: true })).toHaveCount(1)
+  const banner = page.getByRole('banner')
+  await expect(banner.getByRole('button', { name: /^Sign in/ })).toHaveCount(0)
+  await expect(banner.getByRole('button', { name: /Test user/i })).toHaveCount(0)
+
+  await page.goto('/?signIn=failed')
 
   await expect(page.getByRole('main').getByRole('button', { name: 'Sign in', exact: true })).toBeVisible()
   await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toHaveCount(1)
-  const banner = page.getByRole('banner')
-  await expect(banner.getByRole('button', { name: 'Sign in', exact: true })).toHaveCount(0)
-  await expect(banner.getByRole('button', { name: /Test user/i })).toHaveCount(0)
+  await expect(banner.getByRole('button', { name: /^Sign in/ })).toHaveCount(0)
 })
 
 test('dark mode can be switched on and survives a reload', async ({ page }) => {
-  await page.goto('/')
+  await page.goto('/?signedOut')
   await expectChosen(page, 'Light')
 
   await chooseTheme(page, 'Dark')
@@ -36,7 +42,7 @@ test('dark mode can be switched on and survives a reload', async ({ page }) => {
 })
 
 test('the shell renders in light and dark mode', async ({ page }) => {
-  await page.goto('/')
+  await page.goto('/?signedOut')
 
   for (const mode of ['light', 'dark']) {
     if (mode === 'dark') {
@@ -44,7 +50,7 @@ test('the shell renders in light and dark mode', async ({ page }) => {
     }
     const shell = page.locator(`[data-theme-mode="${mode}"]`)
     await expect(shell.getByRole('banner').getByRole('link', { name: 'Axis', exact: true })).toBeVisible()
-    await expect(shell.getByRole('main').getByText('Sign in to Axis', { exact: true })).toBeVisible()
+    await expect(shell.getByRole('main').getByText('You have signed out', { exact: true })).toBeVisible()
   }
 })
 
@@ -70,7 +76,7 @@ const style = (target: Locator, property: string) =>
   target.evaluate((element, name) => getComputedStyle(element).getPropertyValue(name), property)
 
 test('the shell keeps its colours in light and dark mode', async ({ page }) => {
-  await page.goto('/')
+  await page.goto('/?signedOut')
 
   for (const mode of ['light', 'dark'] as const) {
     if (mode === 'dark') {
@@ -108,15 +114,15 @@ test('the sidebar draws the current entry in the selected colour in light and da
 })
 
 test('switching the locale changes the texts and survives a reload', async ({ page }) => {
-  await page.goto('/')
-  await expect(page.getByRole('main').getByText('Sign in to Axis', { exact: true })).toBeVisible()
+  await page.goto('/?signedOut')
+  await expect(page.getByRole('main').getByText('You have signed out', { exact: true })).toBeVisible()
 
   await chooseLanguage(page, 'Tiếng Việt')
 
-  await expect(page.getByRole('main').getByText('Đăng nhập vào Axis', { exact: true })).toBeVisible()
+  await expect(page.getByRole('main').getByText('Bạn đã đăng xuất', { exact: true })).toBeVisible()
   await expect(page.getByRole('contentinfo').getByText('Trạng thái máy chủ:', { exact: true })).toBeVisible()
   await page.reload()
-  await expect(page.getByRole('main').getByText('Đăng nhập vào Axis', { exact: true })).toBeVisible()
+  await expect(page.getByRole('main').getByText('Bạn đã đăng xuất', { exact: true })).toBeVisible()
   await expect(page.getByRole('contentinfo').getByText('Trạng thái máy chủ:', { exact: true })).toBeVisible()
   await expectChosen(page, 'Tiếng Việt', 'Ngôn ngữ và giao diện')
 })
@@ -201,7 +207,7 @@ test('a site collapses its sidebar to icons and keeps it collapsed on the next p
 })
 
 test('the platform site has no sidebar and no collapse button', async ({ page }) => {
-  await page.goto('/')
+  await page.goto('/?signedOut')
 
   await expect(page.getByRole('main')).toBeVisible()
   await expect(page.locator('#shell-sidebar')).toHaveCount(0)
@@ -210,7 +216,7 @@ test('the platform site has no sidebar and no collapse button', async ({ page })
 
 test('the footer shows the version only to a signed-in person', async ({ page }) => {
   const year = new Date().getFullYear()
-  await page.goto('/')
+  await page.goto('/?signedOut')
   const footer = page.getByRole('contentinfo')
   await expect(footer).toContainText(`© ${year} Axis`)
   await expect(footer.getByTestId('footer-server-status')).toContainText('Ready')

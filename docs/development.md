@@ -294,9 +294,9 @@ Studio saves into those committed folders, so `git checkout -- samples/apps` rev
 The `publisher` role lets the authoring API publish, shows **Publish** on the Studio page and allows
 rollback from the release history. Under `scripts/dev.sh`,
 the server signs people in through Keycloak at `/api/auth/sign-in`, and the session then
-answers `GET /api/me`. The SPA offers sign-in on the home page and in the header, and sign-out in the header there. Sign-in through
+answers `GET /api/me`. Opening the home page without a session starts sign-in at once, and the header offers sign-in on other pages, and sign-out in the header there. Sign-in through
 Compose is not wired yet: the server in its container cannot reach Keycloak at the address the
-browser uses. The site endpoints, the record API and the data source endpoint need a session, so
+browser uses, so the sign-in that the home page starts there cannot complete. The site endpoints, the record API and the data source endpoint need a session, so
 under Compose they answer `401`, and an application page shows the sign-in prompt, whose button starts a sign-in that cannot complete yet.
 See [sign-in and the session](reference/security.md#sign-in-and-the-session).
 The realm also has the confidential client `axis-activation`, with the development secret `axis-activation-development-secret`.

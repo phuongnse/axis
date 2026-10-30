@@ -211,7 +211,7 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
         var signOutUrl = body.RootElement.GetProperty("signOutUrl").GetString();
         Assert.StartsWith($"{Authority}/protocol/openid-connect/logout?", signOutUrl, StringComparison.Ordinal);
         Assert.Contains("client_id=axis", signOutUrl, StringComparison.Ordinal);
-        Assert.Contains($"post_logout_redirect_uri={Uri.EscapeDataString("http://localhost:5206/")}", signOutUrl, StringComparison.Ordinal);
+        Assert.Contains($"post_logout_redirect_uri={Uri.EscapeDataString("http://localhost:5206/?signedOut")}", signOutUrl, StringComparison.Ordinal);
         Assert.Equal(HttpStatusCode.Unauthorized, me.StatusCode);
     }
 

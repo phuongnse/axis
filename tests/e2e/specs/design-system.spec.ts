@@ -52,7 +52,7 @@ const previews: Record<string, (page: Page | FrameLocator) => Locator> = {
   'field-child-collection': (page) =>
     figure(page, 'Reference and computed cells').getByRole('columnheader', { name: 'Description', exact: true }),
   shell: (page) => figure(page, 'Application site').getByRole('menu'),
-  signIn: (page) => figure(page, 'Signed out').getByRole('button', { name: 'Sign in', exact: true }),
+  signIn: (page) => figure(page, 'Sign-in refused').getByRole('button', { name: 'Sign in', exact: true }),
   identitySignIn: (page) => figure(page, 'Sign in').getByLabel('Email or username', { exact: true }),
 }
 
@@ -65,8 +65,8 @@ const stateKeys: Record<string, Record<string, (state: Locator) => Locator>> = {
     'Platform site': (state) => state.getByText('Purchase requests', { exact: true }).first(),
   },
   signIn: {
-    'Signed out': (state) => state.getByRole('button', { name: 'Sign in', exact: true }),
     'Sign-in refused': (state) => state.getByTestId('sign-in-failed'),
+    'Signed out': (state) => state.getByRole('button', { name: 'Sign in again', exact: true }),
     'Session ended': (state) => state.getByTestId('sign-in-prompt'),
   },
   identitySignIn: {
@@ -415,7 +415,7 @@ for (const mode of modes) {
     const recording = await openHarness(page, `?preview=signIn&mode=${mode}`, { sandboxed: true, frameWidth: 992 })
     const frame = page.frameLocator('iframe')
 
-    for (const caption of ['Signed out', 'Sign-in refused']) {
+    for (const caption of ['Sign-in refused', 'Signed out']) {
       const state = figure(frame, caption)
       const heading = state.getByTestId('organization-heading')
       await expect(heading).toContainText('Axis')

@@ -1,7 +1,7 @@
 import { Alert, Button, Card, Empty, Flex, Spin, Typography } from 'antd'
 import { createElement, useEffect, useId, useMemo, useState, type CSSProperties, type ReactNode } from 'react'
-import { Link, useSearchParams } from 'react-router'
-import { startSignIn } from '../platform/api'
+import { Link, useLocation } from 'react-router'
+import { isSignInCardAddress, startSignIn } from '../platform/api'
 import { fetchCurrentUser, type CurrentUser } from '../platform/currentUser'
 import { colourTokens } from '../platform/designTokens'
 import { navigationIcon } from '../platform/navigationIcons'
@@ -18,6 +18,18 @@ import { siteAddress } from '../platform/siteLinks'
 interface Loaded {
   user: CurrentUser | null | 'failed'
   sites: SiteListItem[] | null | 'failed'
+  /** Which card replaces the page when a call answered 401. */
+  card: SignInCardState | null
+}
+
+type SignInCardState = 'refused' | 'signedOut'
+
+/** The card the address asks for. A person who has no session and no card address goes to sign-in instead. */
+function cardOfAddress(pathname: string, search: string): SignInCardState | null {
+  if (!isSignInCardAddress(pathname, search)) {
+    return null
+  }
+  return new URLSearchParams(search).get('signIn') === 'failed' ? 'refused' : 'signedOut'
 }
 
 function useHomeGrid(): CSSProperties {
@@ -30,28 +42,30 @@ function useHomeGrid(): CSSProperties {
   }
 }
 
-export function SignInCard() {
+/** The card on `/` that replaces the page when nobody is signed in: after a refused sign-in or after sign-out. */
+export function SignInCard({ state }: { state: SignInCardState }) {
   const t = useText()
-  const [searchParams] = useSearchParams()
-  const { colour, spacing } = useDesignTokens()
-  const signInFailed = searchParams.get('signIn') === 'failed'
+  const { colour, radius, spacing } = useDesignTokens()
+  const refused = state === 'refused'
 
   return (
     <Flex vertical align="center" gap={spacing.md} style={{ paddingBlock: spacing.xl }}>
       <OrganizationHeading />
       <Card
         data-testid="sign-in-card"
-        style={{ width: '100%', maxWidth: 420, border: `1px solid ${colour.borderSubtle}` }}
+        style={{
+          width: '100%',
+          maxWidth: 400,
+          border: `1px solid ${colour.borderSubtle}`,
+          borderRadius: radius.base,
+        }}
         styles={{ body: { padding: spacing.xl } }}
       >
         <Flex vertical gap={spacing.md}>
           <Typography.Title level={4} style={{ margin: 0 }}>
-            {t('shell.home.signIn.title')}
+            {t(refused ? 'shell.home.signIn.title' : 'shell.home.signedOut.title')}
           </Typography.Title>
-          <Typography.Paragraph style={{ margin: 0, color: colour.textMuted }}>
-            {t('shell.home.signIn.message')}
-          </Typography.Paragraph>
-          {signInFailed && (
+          {refused ? (
             <Alert
               data-testid="sign-in-failed"
               role="alert"
@@ -59,9 +73,13 @@ export function SignInCard() {
               showIcon
               title={t('shell.home.signInFailed')}
             />
+          ) : (
+            <Typography.Paragraph style={{ margin: 0, color: colour.textMuted }}>
+              {t('shell.home.signedOut.message')}
+            </Typography.Paragraph>
           )}
           <Button type="primary" block onClick={startSignIn}>
-            {t('shell.account.signIn')}
+            {t(refused ? 'shell.account.signIn' : 'shell.home.signedOut.signIn')}
           </Button>
         </Flex>
       </Card>
@@ -263,6 +281,9 @@ export function HomePage() {
   const { locale } = usePlatform().current
   const { spacing } = useDesignTokens()
   const [loaded, setLoaded] = useState<Loaded>()
+  const { pathname, search } = useLocation()
+  // The card is the one the address asked for when the page opened.
+  const [card] = useState(() => cardOfAddress(pathname, search))
 
   useEffect(() => {
     const controller = new AbortController()
@@ -276,20 +297,25 @@ export function HomePage() {
       if (sites.status === 'rejected') {
         console.warn('Loading the sites failed', sites.reason)
       }
-      setLoaded({
-        user: user.status === 'fulfilled' ? user.value : 'failed',
-        sites: sites.status === 'fulfilled' ? sites.value : 'failed',
-      })
+      const loadedUser = user.status === 'fulfilled' ? user.value : 'failed'
+      const loadedSites = sites.status === 'fulfilled' ? sites.value : 'failed'
+      // Either call answering 401 means there is no session. Without a card address, sign-in starts at once
+      // and the spinner stays until the browser leaves.
+      if ((loadedUser === null || loadedSites === null) && card === null) {
+        startSignIn()
+        return
+      }
+      setLoaded({ user: loadedUser, sites: loadedSites, card })
     })
     return () => controller.abort()
-  }, [])
+  }, [card])
 
   if (loaded === undefined) {
     return <Spin />
   }
   // Either call answering 401 means the session is gone, even if the other call went through before it ended.
   if (loaded.user === null || loaded.sites === null) {
-    return <SignInCard />
+    return loaded.card === null ? <Spin /> : <SignInCard state={loaded.card} />
   }
 
   return (

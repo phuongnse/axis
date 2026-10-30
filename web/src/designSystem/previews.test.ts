@@ -61,7 +61,7 @@ describe('design-system previews', () => {
 
   test.each([
     ['shell', ['Application site', 'Navigation collapsed', 'Form page', 'Platform site']],
-    ['signIn', ['Signed out', 'Sign-in refused', 'Session ended']],
+    ['signIn', ['Sign-in refused', 'Signed out', 'Session ended']],
     [
       'identitySignIn',
       [
