@@ -6,7 +6,7 @@ The owner reviewed the sign-in screens, the shell's menus and the platform home 
 one change at a time, and agreed these rules on 2026-10-30. They change some rules of
 [D98](d98-rules-from-the-shell-review.md): the sign-in screen in front of every sign-in, the welcome band and the
 home page's cards. [Shell and home page](../reference/shell.md) and
-[Axis's identity provider](../reference/identity-provider.md#theme) hold the detail. None of it is built yet.
+[Axis's identity provider](../reference/identity-provider.md#theme) hold the detail. All of it is built.
 
 - **The organization heads the sign-in pages.** Every page of the identity provider, and Axis's own sign-in card,
   shows the organization's mark and name above one card, in place of the Axis mark. The card's title names the step

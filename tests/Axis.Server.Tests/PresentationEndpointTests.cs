@@ -45,7 +45,7 @@ public sealed class PresentationEndpointTests
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<TextsBody>(CancellationToken);
         Assert.Equal("en", body?.Locale);
-        Assert.Equal("Welcome to Axis", body?.Texts["shell.home.title"]);
+        Assert.Equal("Applications", body?.Texts["shell.home.applications.title"]);
     }
 
     [Fact]
@@ -59,7 +59,7 @@ public sealed class PresentationEndpointTests
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<TextsBody>(CancellationToken);
         Assert.Equal("vi", body?.Locale);
-        Assert.Equal("Chào mừng đến với Axis", body?.Texts["shell.home.title"]);
+        Assert.Equal("Ứng dụng", body?.Texts["shell.home.applications.title"]);
     }
 
     [Fact]

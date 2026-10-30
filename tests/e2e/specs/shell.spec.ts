@@ -167,7 +167,7 @@ test('the home page opens a site in its own shell, in light and dark mode', asyn
   }
 })
 
-test('Users is in the app switcher and the welcome band of an administrator only', async ({ page }) => {
+test('Users is in the app switcher and among the tools on the home page of an administrator only', async ({ page }) => {
   await useSession(page, 'administrator')
   await page.goto('/')
 
@@ -181,7 +181,7 @@ test('Users is in the app switcher and the welcome band of an administrator only
   await useSession(page, 'author')
   await page.goto('/')
 
-  await expect(main.getByText('Welcome to Axis', { exact: true })).toBeVisible()
+  await expect(main.getByRole('heading', { name: 'Applications', exact: true })).toBeVisible()
   await expect(main.getByRole('link', { name: /^Users/ })).toHaveCount(0)
   await page.getByRole('banner').getByRole('button', { name: 'Switch to', exact: true }).click()
   await expect(page.getByRole('menuitem', { name: 'Studio', exact: true })).toBeVisible()

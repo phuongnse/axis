@@ -50,6 +50,11 @@ export function siteTitle(site: SiteListItem, locale: string): string {
   return site.titles[locale] ?? Object.values(site.titles)[0] ?? site.path
 }
 
+/** The text in the given locale, or in the first locale it has one for. `null` when there is no text. */
+export function localized(texts: Record<string, string> | null, locale: string): string | null {
+  return texts === null ? null : (texts[locale] ?? Object.values(texts)[0] ?? null)
+}
+
 /** The application title in the given locale, or in the application's first locale when it lacks that one. */
 export function applicationTitle(app: SiteApplication, locale: string): string {
   return app.titles[locale] ?? Object.values(app.titles)[0] ?? app.name

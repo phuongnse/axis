@@ -7,11 +7,12 @@ import { colourTokens } from '../platform/designTokens'
 import { navigationIcon } from '../platform/navigationIcons'
 import { OrganizationHeading } from '../platform/OrganizationHeading'
 import { SiteMark } from '../platform/SiteMark'
-import { applicationTitle, fetchSites, siteTitle, type SiteListItem } from '../platform/site'
+import { applicationTitle, fetchSites, localized, siteTitle, type SiteListItem } from '../platform/site'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { useNarrowWidth } from '../platform/useNarrowWidth'
 import { usePlatform } from './context'
+import { homeGridColumns } from './homeGrid'
 import { siteAddress } from '../platform/siteLinks'
 
 /** What the page loaded. `null` means that the call answered 401, and `'failed'` that it failed otherwise. */
@@ -37,9 +38,17 @@ function useHomeGrid(): CSSProperties {
   const { spacing } = useDesignTokens()
   return {
     display: 'grid',
-    gridTemplateColumns: narrow ? '1fr' : 'repeat(3, minmax(0, 1fr))',
+    gridTemplateColumns: narrow ? '1fr' : homeGridColumns(spacing.md),
     gap: spacing.md,
   }
+}
+
+/** The keyboard focus ring of a link tile. Inline styles cannot target focus. */
+function HomeTileStyle() {
+  const { colour } = useDesignTokens()
+  return (
+    <style>{`[data-home-tile]:focus-visible { outline: 2px solid ${colour.focusRing}; outline-offset: 2px; }`}</style>
+  )
 }
 
 /** The card on `/` that replaces the page when nobody is signed in: after a refused sign-in or after sign-out. */
@@ -92,6 +101,7 @@ function ToolTile({ to, icon, title, description }: { to: string; icon: string; 
   return (
     <Link
       to={to}
+      data-home-tile
       style={{
         display: 'flex',
         alignItems: 'flex-start',
@@ -118,7 +128,9 @@ function ToolTile({ to, icon, title, description }: { to: string; icon: string; 
         {createElement(navigationIcon(icon), { 'aria-hidden': true, style: { fontSize: 20 } })}
       </span>
       <Flex vertical>
-        <Typography.Text strong>{title}</Typography.Text>
+        <Typography.Text strong style={{ color: colour.primaryText }}>
+          {title}
+        </Typography.Text>
         <Typography.Text style={{ color: colour.textMuted }}>{description}</Typography.Text>
       </Flex>
     </Link>
@@ -127,125 +139,136 @@ function ToolTile({ to, icon, title, description }: { to: string; icon: string; 
 
 function Tools({ user }: { user: CurrentUser }) {
   const t = useText()
+  const { spacing } = useDesignTokens()
   const grid = useHomeGrid()
   if (!user.studio && !user.console && !user.users) {
     return null
   }
   return (
-    <div data-testid="home-grid" style={grid}>
-      {user.studio && (
-        <ToolTile
-          to="/studio"
-          icon="tool"
-          title={t('shell.appSwitcher.studio')}
-          description={t('shell.home.studio.description')}
-        />
-      )}
-      {user.console && (
-        <ToolTile
-          to="/console"
-          icon="dashboard"
-          title={t('shell.appSwitcher.console')}
-          description={t('shell.home.console.description')}
-        />
-      )}
-      {user.users && (
-        <ToolTile
-          to="/users"
-          icon="people"
-          title={t('shell.appSwitcher.users')}
-          description={t('shell.home.users.description')}
-        />
-      )}
-    </div>
+    <Flex vertical gap={spacing.md}>
+      <Typography.Title level={5} style={{ margin: 0 }}>
+        {t('shell.home.tools.title')}
+      </Typography.Title>
+      <div data-testid="home-grid" style={grid}>
+        {user.studio && (
+          <ToolTile
+            to="/studio"
+            icon="tool"
+            title={t('shell.appSwitcher.studio')}
+            description={t('shell.home.studio.description')}
+          />
+        )}
+        {user.console && (
+          <ToolTile
+            to="/console"
+            icon="dashboard"
+            title={t('shell.appSwitcher.console')}
+            description={t('shell.home.console.description')}
+          />
+        )}
+        {user.users && (
+          <ToolTile
+            to="/users"
+            icon="people"
+            title={t('shell.appSwitcher.users')}
+            description={t('shell.home.users.description')}
+          />
+        )}
+      </div>
+    </Flex>
   )
 }
 
-function WelcomeBand({ user }: { user: CurrentUser | 'failed' }) {
-  const t = useText()
+function ApplicationCard({
+  title,
+  description,
+  sites,
+  locale,
+}: {
+  title: string
+  description: string | null
+  sites: SiteListItem[]
+  locale: string
+}) {
   const { colour, radius, spacing } = useDesignTokens()
+  const grid = useHomeGrid()
+  const headingId = useId()
+  const sorted = [...sites].sort((a, b) => siteTitle(a, locale).localeCompare(siteTitle(b, locale), locale))
+
   return (
-    <div
+    <section
+      aria-labelledby={headingId}
       style={{
         background: colour.surface,
         border: `1px solid ${colour.borderSubtle}`,
         borderRadius: radius.base,
-        padding: spacing.lg,
+        padding: spacing.md,
       }}
     >
-      <Flex vertical gap={spacing.md}>
-        <Flex vertical gap={spacing.xs}>
-          <Typography.Title level={4} style={{ margin: 0 }}>
-            {t('shell.home.title')}
+      <Flex
+        data-testid="application-card-header"
+        align={description === null ? 'center' : 'flex-start'}
+        gap={spacing.sm}
+      >
+        <SiteMark title={title} size={32} />
+        <Flex vertical>
+          <Typography.Title level={5} id={headingId} style={{ margin: 0 }}>
+            {title}
           </Typography.Title>
-          <Typography.Text style={{ color: colour.textMuted }}>{t('shell.home.subtitle')}</Typography.Text>
+          {description !== null && <Typography.Text style={{ color: colour.textMuted }}>{description}</Typography.Text>}
         </Flex>
-        {user !== 'failed' && <Tools user={user} />}
       </Flex>
-    </div>
-  )
-}
-
-function ApplicationCard({ title, sites, locale }: { title: string; sites: SiteListItem[]; locale: string }) {
-  const t = useText()
-  const { colour, spacing } = useDesignTokens()
-  const grid = useHomeGrid()
-  const headingId = useId()
-  const count = sites.length
-  const sorted = [...sites].sort((a, b) => siteTitle(a, locale).localeCompare(siteTitle(b, locale), locale))
-
-  return (
-    <Card styles={{ body: { padding: spacing.md } }}>
-      <section aria-labelledby={headingId}>
-        <Flex vertical gap={spacing.md}>
-          <Flex
-            data-testid="application-card-header"
-            align="center"
-            gap={spacing.sm}
-            style={{ paddingBottom: spacing.sm, borderBottom: `1px solid ${colour.divider}` }}
-          >
-            <SiteMark title={title} size={32} />
-            <Typography.Title level={5} id={headingId} style={{ margin: 0 }}>
-              {title}
-            </Typography.Title>
-            <Typography.Text style={{ color: colour.textMuted, marginInlineStart: 'auto' }}>
-              {`${count} ${t(count === 1 ? 'shell.home.applications.site' : 'shell.home.applications.sites')}`}
-            </Typography.Text>
-          </Flex>
-          <div data-testid="home-grid" style={grid}>
-            {sorted.map((site) => (
-              <Link
-                key={site.path}
-                to={siteAddress(site.path)}
-                style={{ display: 'flex', alignItems: 'center', gap: spacing.sm, minWidth: 0, padding: spacing.xs }}
-              >
-                <SiteMark title={siteTitle(site, locale)} size={24} />
-                <Typography.Text ellipsis style={{ color: colour.text }}>
+      <div style={{ borderTop: `1px solid ${colour.divider}`, marginBlock: spacing.md }} />
+      <div data-testid="home-grid" style={grid}>
+        {sorted.map((site) => {
+          const siteDescription = localized(site.descriptions, locale)
+          return (
+            <Link
+              key={site.path}
+              to={siteAddress(site.path)}
+              data-home-tile
+              style={{
+                display: 'flex',
+                alignItems: siteDescription === null ? 'center' : 'flex-start',
+                gap: spacing.sm,
+                minWidth: 0,
+              }}
+            >
+              <SiteMark title={siteTitle(site, locale)} size={20} />
+              <Flex vertical style={{ minWidth: 0 }}>
+                <Typography.Text strong style={{ color: colour.primaryText }}>
                   {siteTitle(site, locale)}
                 </Typography.Text>
-              </Link>
-            ))}
-          </div>
-        </Flex>
-      </section>
-    </Card>
+                {siteDescription !== null && (
+                  <Typography.Text style={{ color: colour.textMuted }}>{siteDescription}</Typography.Text>
+                )}
+              </Flex>
+            </Link>
+          )
+        })}
+      </div>
+    </section>
   )
 }
 
 function Applications({ sites, locale }: { sites: SiteListItem[] | 'failed'; locale: string }) {
   const t = useText()
-  const { colour, spacing } = useDesignTokens()
+  const { spacing } = useDesignTokens()
   const groups = useMemo(() => {
     if (sites === 'failed') {
       return []
     }
-    const byName = new Map<string, { title: string; sites: SiteListItem[] }>()
+    const byName = new Map<string, { title: string; description: string | null; sites: SiteListItem[] }>()
     for (const site of sites) {
       const group = byName.get(site.application.name)
       if (group) {
         group.sites.push(site)
       } else {
-        byName.set(site.application.name, { title: applicationTitle(site.application, locale), sites: [site] })
+        byName.set(site.application.name, {
+          title: applicationTitle(site.application, locale),
+          description: localized(site.application.descriptions, locale),
+          sites: [site],
+        })
       }
     }
     return [...byName.entries()]
@@ -260,18 +283,21 @@ function Applications({ sites, locale }: { sites: SiteListItem[] | 'failed'; loc
     body = <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('shell.home.applications.empty')} />
   } else {
     body = groups.map((group) => (
-      <ApplicationCard key={group.name} title={group.title} sites={group.sites} locale={locale} />
+      <ApplicationCard
+        key={group.name}
+        title={group.title}
+        description={group.description}
+        sites={group.sites}
+        locale={locale}
+      />
     ))
   }
 
   return (
     <Flex vertical gap={spacing.md}>
-      <Flex align="center" gap={spacing.xs}>
-        <Typography.Title level={5} style={{ margin: 0 }}>
-          {t('shell.home.applications.title')}
-        </Typography.Title>
-        {sites !== 'failed' && <Typography.Text style={{ color: colour.textMuted }}>{groups.length}</Typography.Text>}
-      </Flex>
+      <Typography.Title level={5} style={{ margin: 0 }}>
+        {t('shell.home.applications.title')}
+      </Typography.Title>
       {body}
     </Flex>
   )
@@ -320,8 +346,9 @@ export function HomePage() {
 
   return (
     <Flex vertical gap={spacing.lg}>
-      <WelcomeBand user={loaded.user} />
+      <HomeTileStyle />
       <Applications sites={loaded.sites} locale={locale} />
+      {loaded.user !== 'failed' && <Tools user={loaded.user} />}
     </Flex>
   )
 }

@@ -62,7 +62,8 @@ const stateKeys: Record<string, Record<string, (state: Locator) => Locator>> = {
     'Application site': (state) => state.getByRole('menu'),
     'Navigation collapsed': (state) => state.locator('button[aria-controls="shell-sidebar"][aria-expanded="false"]'),
     'Form page': (state) => state.getByRole('button', { name: 'Save', exact: true }).first(),
-    'Platform site': (state) => state.getByText('Purchase requests', { exact: true }).first(),
+    'Platform site': (state) =>
+      state.getByText("Runs the company's purchases, from the request to approval and ordering.", { exact: true }),
     'App switcher': (state) =>
       state
         .getByRole('menu', { name: 'Switch to', exact: true })
@@ -445,6 +446,46 @@ for (const mode of modes) {
     })
 
     await expect(breadcrumb.getByRole('link', { name: 'Requests', exact: true })).toHaveAttribute('href', '/sample/requests')
+    expect(recording.errors).toEqual([])
+  })
+}
+
+for (const mode of modes) {
+  test(`the shell preview's Platform site lays the home grid out in columns at 992px in ${mode} mode`, async ({
+    page,
+  }) => {
+    const recording = await openHarness(page, `?preview=shell&mode=${mode}`, { sandboxed: true, frameWidth: 992 })
+    const state = figure(page.frameLocator('iframe'), 'Platform site')
+    const boxOf = async (locator: Locator) => {
+      const box = await locator.boundingBox()
+      if (!box) {
+        throw new Error('A home page tile or grid has no box')
+      }
+      return box
+    }
+
+    const tools = ['Studio', 'Operator console', 'Users']
+    const boxes = []
+    for (const tool of tools) {
+      const link = state.getByRole('main').getByRole('link', { name: new RegExp(`^${tool}`) })
+      await expect(link).toBeVisible()
+      boxes.push(await boxOf(link))
+    }
+    expect(new Set(boxes.map((box) => box.y)).size).toBe(1)
+    expect(new Set(boxes.map((box) => box.x)).size).toBe(3)
+
+    const site = state.getByRole('link', { name: /^Service desk/ })
+    const siteBox = await boxOf(site)
+    const gridBox = await boxOf(site.locator('xpath=..'))
+    expect(siteBox.width).toBeGreaterThan(gridBox.width - 2)
+
+    const tile = state.getByRole('link', { name: /^Purchase requests/ })
+    await tile.focus()
+    const outline = await tile.evaluate((element) => {
+      const style = getComputedStyle(element)
+      return { width: style.outlineWidth, offset: style.outlineOffset, style: style.outlineStyle }
+    })
+    expect(outline).toEqual({ width: '2px', offset: '2px', style: 'solid' })
     expect(recording.errors).toEqual([])
   })
 }

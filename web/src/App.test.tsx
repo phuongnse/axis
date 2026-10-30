@@ -5,7 +5,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../src/Axis.Presentation/Texts/en.json'
 import platformVietnamese from '../../src/Axis.Presentation/Texts/vi.json'
 import { App } from './App'
+import { homeGridColumns } from './pages/homeGrid'
 import { apiFetch, signInUrl } from './platform/api'
+import { narrowWidthQuery } from './platform/useNarrowWidth'
 import { designTokensFor } from './platform/designTokens'
 import { assignLocation } from './platform/navigation'
 import type { CurrentUser } from './platform/currentUser'
@@ -33,7 +35,6 @@ const texts: Record<string, Record<string, string>> = {
   en: {
     'shell.title': 'Axis',
     'shell.nav.home': 'Home',
-    'shell.home.title': 'Welcome to Axis',
     'shell.serverStatus.title': 'Server status:',
     'shell.serverStatus.checking': 'Checking',
     'shell.serverStatus.ready': 'Ready',
@@ -52,13 +53,11 @@ const texts: Record<string, Record<string, string>> = {
     'shell.locale.en': 'English',
     'shell.locale.vi': 'Tiếng Việt',
     'shell.locale.loadFailed': 'The texts for this language could not be loaded.',
-    'shell.home.subtitle': 'Open an application below to start working.',
     'shell.home.studio.description': 'Build and publish applications.',
     'shell.home.console.description': 'See what failed and run the commands that fix it.',
     'shell.home.users.description': 'Invite people and give them roles.',
     'shell.home.applications.title': 'Applications',
-    'shell.home.applications.site': 'site',
-    'shell.home.applications.sites': 'sites',
+    'shell.home.tools.title': 'Tools',
     'shell.home.applications.empty': 'No application is active.',
     'shell.home.applications.loadFailed': 'The sites could not be loaded.',
     'shell.home.signIn.title': 'Sign in',
@@ -78,13 +77,19 @@ const texts: Record<string, Record<string, string>> = {
   },
   vi: {
     'shell.nav.home': 'Trang chủ',
-    'shell.home.title': 'Chào mừng đến với Axis',
+    'shell.home.applications.title': 'Ứng dụng',
     'shell.serverStatus.title': 'Trạng thái máy chủ:',
     'shell.preferences.label': 'Ngôn ngữ và giao diện',
     'shell.locale.label': 'Ngôn ngữ',
     'shell.locale.en': 'English',
     'shell.locale.vi': 'Tiếng Việt',
   },
+}
+
+const serviceDesk = {
+  name: 'ServiceDesk',
+  titles: { en: 'Service desk' },
+  descriptions: { en: 'Handles support requests.' },
 }
 
 const sites: SiteListItem[] = [
@@ -100,15 +105,15 @@ const sites: SiteListItem[] = [
     path: 'desk-staff',
     titleKey: 'site.title',
     titles: { en: 'Staff desk' },
-    descriptions: null,
-    application: { name: 'ServiceDesk', titles: { en: 'Service desk' }, descriptions: null },
+    descriptions: { en: 'Work the queue.' },
+    application: serviceDesk,
   },
   {
     path: 'desk-customers',
     titleKey: 'site.title',
     titles: { en: 'Customer portal' },
     descriptions: null,
-    application: { name: 'ServiceDesk', titles: { en: 'Service desk' }, descriptions: null },
+    application: serviceDesk,
   },
 ]
 
@@ -456,7 +461,7 @@ async function choosePreference(button: string, item: string) {
 }
 
 async function findShellRoot(mode: 'light' | 'dark') {
-  const heading = await screen.findByText('Welcome to Axis')
+  const heading = await screen.findByRole('heading', { name: 'Applications' })
   const root = heading.closest<HTMLElement>(`[data-theme-mode="${mode}"]`)
   expect(root).not.toBeNull()
   return root!
@@ -487,7 +492,7 @@ describe('App', () => {
   it('switches between light and dark mode and remembers the choice', async () => {
     stubServer()
     renderApp()
-    await screen.findByText('Welcome to Axis')
+    await screen.findByRole('heading', { name: 'Applications' })
 
     await choosePreference('Language and theme', 'Dark')
 
@@ -508,17 +513,17 @@ describe('App', () => {
 
     const dark = await findShellRoot('dark')
     expect(within(dark).getByRole('link', { name: 'Axis' })).toBeInTheDocument()
-    expect(within(dark).getByText('Welcome to Axis')).toBeInTheDocument()
+    expect(within(dark).getByRole('heading', { name: 'Applications' })).toBeInTheDocument()
   })
 
   it('switches the locale and remembers the choice', async () => {
     stubServer()
     renderApp()
-    await screen.findByText('Welcome to Axis')
+    await screen.findByRole('heading', { name: 'Applications' })
 
     await choosePreference('Language and theme', 'Tiếng Việt')
 
-    expect(await screen.findByText('Chào mừng đến với Axis')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Ứng dụng' })).toBeInTheDocument()
     expect(within(screen.getByRole('contentinfo')).getByText('Trạng thái máy chủ:')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Ngôn ngữ và giao diện' })).toBeInTheDocument()
     expect(localStorage.getItem('axis.locale')).toBe('vi')
@@ -528,14 +533,14 @@ describe('App', () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {})
     stubServer({ failingLocale: 'vi' })
     renderApp()
-    await screen.findByText('Welcome to Axis')
+    await screen.findByRole('heading', { name: 'Applications' })
 
     await choosePreference('Language and theme', 'Tiếng Việt')
 
     expect(await screen.findByTestId('locale-error')).toHaveTextContent(
       'The texts for this language could not be loaded.',
     )
-    expect(screen.getByText('Welcome to Axis')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Applications' })).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Language and theme' }))
     expect(await screen.findByRole('menuitemradio', { name: 'English' })).toHaveAttribute('aria-checked', 'true')
     expect(localStorage.getItem('axis.locale')).toBeNull()
@@ -547,7 +552,7 @@ describe('App', () => {
 
     renderApp()
 
-    expect(await screen.findByText('Chào mừng đến với Axis')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Ứng dụng' })).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: 'Ngôn ngữ và giao diện' }))
     expect(await screen.findByRole('menuitemradio', { name: 'Tiếng Việt' })).toHaveAttribute('aria-checked', 'true')
   })
@@ -558,7 +563,7 @@ describe('App', () => {
 
     renderApp()
 
-    expect(await screen.findByText('Welcome to Axis')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Applications' })).toBeInTheDocument()
     expect(fetch).not.toHaveBeenCalledWith('/api/texts/xx', expect.anything())
   })
 
@@ -571,7 +576,7 @@ describe('App', () => {
     expect(await screen.findByTestId('shell-error')).toHaveTextContent('Could not load the site.')
   })
 
-  it('groups the sites under application cards in title order, each with its site count', async () => {
+  it('groups the sites under application tiles in title order, each with all its sites in title order', async () => {
     stubServer()
 
     renderApp()
@@ -580,36 +585,143 @@ describe('App', () => {
     const notes = screen.getByRole('region', { name: 'E2E notes' })
     // Service desk sorts after E2E notes as a title, though its sites are listed first.
     expect(notes.compareDocumentPosition(desk) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    expect(within(desk).getByText('2 sites')).toBeInTheDocument()
-    expect(within(notes).getByText('1 site')).toBeInTheDocument()
     expect(
       within(desk)
         .getAllByRole('link')
         .map((link) => [link.textContent, link.getAttribute('href')]),
     ).toEqual([
       ['CCustomer portal', '/desk-customers'],
-      ['SStaff desk', '/desk-staff'],
+      ['SStaff deskWork the queue.', '/desk-staff'],
     ])
-    expect(screen.getByRole('heading', { name: 'Applications' })).toBeInTheDocument()
-    expect(screen.getByText('2')).toBeInTheDocument()
     expect(screen.queryByTestId('server-status')).not.toBeInTheDocument()
   })
 
-  it('draws each application card with a header row of its title, its site count and a rule under it', async () => {
+  it('draws each application as a tile with a 32 px mark, its title and a rule above its sites', async () => {
+    stubServer()
+
+    renderApp()
+
+    const desk = await screen.findByRole('region', { name: 'Service desk' })
+    const { colour, radius } = designTokensFor('light')
+    expect(desk).toHaveStyle({
+      backgroundColor: colour.surface,
+      border: `1px solid ${colour.borderSubtle}`,
+      borderRadius: `${radius.base}px`,
+    })
+    expect(within(desk).getByRole('heading', { level: 5, name: 'Service desk' })).toBeInTheDocument()
+    const header = within(desk).getByTestId('application-card-header')
+    expect(header.firstElementChild).toHaveStyle({ width: '32px', height: '32px' })
+    expect(header.nextElementSibling).toHaveStyle({ borderTop: `1px solid ${colour.divider}` })
+    for (const link of within(desk).getAllByRole('link')) {
+      expect(link.firstElementChild).toHaveStyle({ width: '20px', height: '20px' })
+    }
+  })
+
+  it('shows the home page with no welcome band and no count beside a heading, applications before tools', async () => {
+    stubServer({ me: { ...signedInUser, studio: true } })
+
+    renderApp()
+
+    const applications = await screen.findByRole('heading', { name: 'Applications' })
+    const tools = await screen.findByRole('heading', { name: 'Tools' })
+    const main = screen.getByRole('main')
+    expect(screen.queryByText('Open an application below to start working.')).not.toBeInTheDocument()
+    expect(within(main).queryByRole('heading', { level: 4 })).not.toBeInTheDocument()
+    // Nothing sits beside a heading: the next element is the first tile or the grid, not a count.
+    expect(applications.textContent).toBe('Applications')
+    expect(applications.nextElementSibling).toBe(screen.getAllByRole('region')[0])
+    expect(tools.textContent).toBe('Tools')
+    expect(tools.nextElementSibling).toBe(screen.getAllByTestId('home-grid').at(-1))
+    expect(applications.compareDocumentPosition(tools) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.queryByTestId('sign-in-card')).not.toBeInTheDocument()
+  })
+
+  it('hides the Tools heading when the person holds no tool', async () => {
+    stubServer()
+
+    renderApp()
+
+    await screen.findByRole('heading', { name: 'Applications' })
+    expect(screen.queryByRole('heading', { name: 'Tools' })).not.toBeInTheDocument()
+  })
+
+  it('shows the description of an application and of a site in muted text, and the title alone without one', async () => {
     stubServer()
 
     renderApp()
 
     const desk = await screen.findByRole('region', { name: 'Service desk' })
     const { colour } = designTokensFor('light')
-    expect(within(desk).getByRole('heading', { level: 5, name: 'Service desk' })).toBeInTheDocument()
-    expect(within(desk).getByText('2 sites')).toHaveStyle({ color: colour.textMuted })
-    expect(within(desk).getByTestId('application-card-header')).toHaveStyle({
-      borderBottom: `1px solid ${colour.divider}`,
-    })
+    expect(within(desk).getByText('Handles support requests.')).toHaveStyle({ color: colour.textMuted })
+    expect(within(desk).getByText('Work the queue.')).toHaveStyle({ color: colour.textMuted })
+    expect(within(desk).getByText('Staff desk')).toHaveStyle({ color: colour.primaryText })
+    const customers = within(desk).getByRole('link', { name: 'Customer portal' })
+    expect(customers.textContent).toBe('CCustomer portal')
+    expect(customers).toHaveStyle({ alignItems: 'center' })
+    const notes = screen.getByRole('region', { name: 'E2E notes' })
+    expect(within(notes).getByTestId('application-card-header')).toHaveTextContent(/^EE2E notes$/)
+    expect(within(notes).getByTestId('application-card-header')).toHaveStyle({ alignItems: 'center' })
+    expect(within(notes).getByRole('link')).toHaveTextContent(/^EE2E notes$/)
   })
 
-  it('opens a site from its application card', async () => {
+  it('gives every home grid up to three auto-fit columns, and one column at narrow width', async () => {
+    const original = window.matchMedia
+    try {
+      for (const tools of [0, 1, 2, 3]) {
+        stubServer({
+          me: { ...signedInUser, studio: tools > 0, console: tools > 1, users: tools > 2 },
+        })
+
+        const { unmount } = renderApp()
+
+        await screen.findByRole('region', { name: 'Service desk' })
+        const grids = screen.getAllByTestId('home-grid')
+        expect(grids).toHaveLength(tools === 0 ? 2 : 3)
+        for (const grid of grids) {
+          expect(grid).toHaveStyle({ gridTemplateColumns: homeGridColumns(16), gap: '16px' })
+        }
+        unmount()
+      }
+
+      vi.stubGlobal('matchMedia', (query: string) => ({
+        matches: query === narrowWidthQuery,
+        media: query,
+        onchange: null,
+        addListener() {},
+        removeListener() {},
+        addEventListener() {},
+        removeEventListener() {},
+        dispatchEvent: () => false,
+      }))
+      stubServer({ me: { ...signedInUser, studio: true, console: true, users: true } })
+
+      renderApp()
+
+      await screen.findByRole('region', { name: 'Service desk' })
+      for (const grid of screen.getAllByTestId('home-grid')) {
+        expect(grid).toHaveStyle({ gridTemplateColumns: '1fr', gap: '16px' })
+      }
+    } finally {
+      vi.stubGlobal('matchMedia', original)
+    }
+  })
+
+  it('draws the focus ring of a home tile with a 2 px outline offset by 2 px', async () => {
+    stubServer({ me: { ...signedInUser, studio: true } })
+
+    renderApp()
+
+    await screen.findByRole('heading', { name: 'Tools' })
+    const { colour } = designTokensFor('light')
+    const rule = Array.from(document.querySelectorAll('style'))
+      .map((element) => element.textContent ?? '')
+      .find((text) => text.includes('[data-home-tile]:focus-visible'))
+    expect(rule).toContain(`outline: 2px solid ${colour.focusRing}; outline-offset: 2px;`)
+    expect(screen.getByRole('link', { name: /^Studio/ })).toHaveAttribute('data-home-tile')
+    expect(screen.getByRole('link', { name: 'Customer portal' })).toHaveAttribute('data-home-tile')
+  })
+
+  it('opens a site from its application tile', async () => {
     stubServer()
 
     renderApp()
@@ -632,7 +744,7 @@ describe('App', () => {
 
       const { unmount } = renderApp()
 
-      await screen.findByText('Welcome to Axis')
+      await screen.findByRole('heading', { name: 'Applications' })
       const main = within(screen.getByRole('main'))
       const studioTile = main.queryByRole('link', { name: /Studio/ })
       const consoleTile = main.queryByRole('link', { name: /Operator console/ })
@@ -656,7 +768,7 @@ describe('App', () => {
 
       const { unmount } = renderApp()
 
-      await screen.findByText('Welcome to Axis')
+      await screen.findByRole('heading', { name: 'Applications' })
       const main = within(screen.getByRole('main'))
       const usersTile = main.queryByRole('link', { name: /^Users/ })
       expect(usersTile !== null).toBe(users)
@@ -670,22 +782,12 @@ describe('App', () => {
     }
   })
 
-  it('shows the welcome band with its guidance for a signed-in person', async () => {
-    stubServer()
-
-    renderApp()
-
-    expect(await screen.findByRole('heading', { name: 'Welcome to Axis' })).toBeInTheDocument()
-    expect(screen.getByText('Open an application below to start working.')).toBeInTheDocument()
-    expect(screen.queryByTestId('sign-in-card')).not.toBeInTheDocument()
-  })
-
   it('draws each tool tile with a 32 px primary square for its icon', async () => {
     stubServer({ me: { ...signedInUser, studio: true, console: true } })
 
     renderApp()
 
-    await screen.findByRole('heading', { name: 'Welcome to Axis' })
+    await screen.findByRole('heading', { name: 'Applications' })
     const { colour } = designTokensFor('light')
     const icons = screen.getAllByTestId('tool-icon')
     expect(icons).toHaveLength(2)
@@ -703,7 +805,7 @@ describe('App', () => {
     const error = await screen.findByTestId('applications-error')
     expect(error).toHaveTextContent('The sites could not be loaded.')
     expect(screen.getByRole('heading', { name: 'Applications' })).toBeInTheDocument()
-    expect(screen.getByText('Welcome to Axis')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Applications' })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: /E2E notes/ })).not.toBeInTheDocument()
   })
 
@@ -732,7 +834,6 @@ describe('App', () => {
 
     const notes = await screen.findByRole('region', { name: 'E2E notes' })
     expect(screen.getAllByTestId('application-card-header')).toHaveLength(1)
-    expect(within(notes).getByText('1 site')).toBeInTheDocument()
     expect(
       within(notes)
         .getAllByRole('link')
@@ -757,7 +858,7 @@ describe('App', () => {
 
     await waitFor(() => expect(assignLocation).toHaveBeenCalledExactlyOnceWith(signInUrl('/')))
     expect(screen.queryByTestId('sign-in-card')).not.toBeInTheDocument()
-    expect(screen.queryByText('Welcome to Axis')).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Applications' })).not.toBeInTheDocument()
   })
 
   it('shows the sign-in card, with a warning above one Sign in button, and starts sign-in only on the click', async () => {
@@ -775,7 +876,7 @@ describe('App', () => {
     expect(screen.getAllByRole('button', { name: 'Sign in' })).toHaveLength(1)
     expect(button.closest('button')).toHaveClass('ant-btn-block')
     expect(alert.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    expect(screen.queryByText('Welcome to Axis')).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Applications' })).not.toBeInTheDocument()
     expect(assignLocation).not.toHaveBeenCalled()
 
     await userEvent.click(button)
@@ -797,7 +898,7 @@ describe('App', () => {
     expect(button).toHaveClass('ant-btn-block')
     expect(message.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(screen.queryByTestId('sign-in-failed')).not.toBeInTheDocument()
-    expect(screen.queryByText('Welcome to Axis')).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Applications' })).not.toBeInTheDocument()
     expect(assignLocation).not.toHaveBeenCalled()
 
     await userEvent.click(button)
@@ -810,7 +911,7 @@ describe('App', () => {
 
     renderApp('/?signedOut')
 
-    expect(await screen.findByText('Welcome to Axis')).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Applications' })).toBeInTheDocument()
     expect(screen.queryByTestId('sign-in-card')).not.toBeInTheDocument()
   })
 
@@ -851,7 +952,7 @@ describe('App', () => {
     for (const texts of [platformEnglish, platformVietnamese]) {
       expect(texts).toHaveProperty(['shell.signInPrompt.title'])
       expect(texts).toHaveProperty(['shell.signInPrompt.message'])
-      expect(texts).toHaveProperty(['shell.home.subtitle'])
+      expect(texts).toHaveProperty(['shell.home.tools.title'])
       expect(texts).toHaveProperty(['shell.home.applications.title'])
     }
   })
@@ -1092,7 +1193,7 @@ describe('App', () => {
 
     renderApp()
 
-    await screen.findByText('Welcome to Axis')
+    await screen.findByRole('heading', { name: 'Applications' })
     expect(screen.queryByRole('navigation', { name: 'Breadcrumb' })).not.toBeInTheDocument()
   })
 
