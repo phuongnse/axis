@@ -30,7 +30,7 @@
     "timeZone": { "type": "string", "minLength": 1 },
     "dataSource": { "$ref": "#/$defs/name", "x-axis-reference": "dataSource" },
     "parameters": { "type": "object", "propertyNames": { "$ref": "#/$defs/name", "x-axis-reference": { "part": "parameter", "of": "/dataSource" } } },
-    "process": { "$ref": "#/$defs/name", "x-axis-reference": "process" }
+    "process": { "$ref": "#/$defs/qualifiedName", "x-axis-reference": "process" }
   },
   "allOf": [
     {

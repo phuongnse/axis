@@ -590,11 +590,12 @@ internal static class PresentationChecker
 
             // The page schema requires the process on an inspector.
             var processName = widget.Process!;
-            if (findProcess(processName) is { } process)
+            if (moduleReferences.Find(processName, findProcess) is { } process)
             {
                 references.Add(page, $"{path}/process", ReferenceRelations.WidgetProcess, ResourceNode.Of(process));
             }
-            else if (!loaded.UnloadedProcessNames.Contains(processName))
+            else if (!loaded.UnloadedProcessNames.Contains(processName)
+                && !moduleReferences.ReportUndeclared(processName, $"{path}/process", Report))
             {
                 Report(
                     DiagnosticCodes.UnknownWidgetProcess,
@@ -730,7 +731,7 @@ internal static class PresentationChecker
 
         if (isRecordLike)
         {
-            CheckActions(widget, page, path, recordEntity, navigateScope, loaded, findPage, findForm, findProcess, references, diagnostics);
+            CheckActions(widget, page, path, recordEntity, navigateScope, loaded, findPage, findForm, findProcess, moduleReferences, references, diagnostics);
             if (type == WidgetType.Detail)
             {
                 CheckDetailRecord(widget, path, page, recordEntity, Report);
@@ -761,7 +762,7 @@ internal static class PresentationChecker
                     }
                     else
                     {
-                        CheckStartProcess(rowActions[index], rowActionPath, recordEntity, page, loaded, findProcess, references, diagnostics);
+                        CheckStartProcess(rowActions[index], rowActionPath, recordEntity, page, loaded, findProcess, moduleReferences, references, diagnostics);
                     }
 
                     if (rowActions[index].VisibleWhen is { } visibleWhen)
@@ -1260,6 +1261,7 @@ internal static class PresentationChecker
         Func<string, PageResource?> findPage,
         Func<string, FormResource?> findForm,
         Func<string, ProcessResource?> findProcess,
+        ModuleReferences moduleReferences,
         ReferenceIndexBuilder references,
         List<Diagnostic> diagnostics)
     {
@@ -1274,7 +1276,7 @@ internal static class PresentationChecker
                 continue;
             }
 
-            CheckStartProcess(action, actionPath, recordEntity, page, loaded, findProcess, references, diagnostics);
+            CheckStartProcess(action, actionPath, recordEntity, page, loaded, findProcess, moduleReferences, references, diagnostics);
         }
     }
 
@@ -1289,6 +1291,7 @@ internal static class PresentationChecker
         PageResource page,
         ApplicationLoadResult loaded,
         Func<string, ProcessResource?> findProcess,
+        ModuleReferences moduleReferences,
         ReferenceIndexBuilder references,
         List<Diagnostic> diagnostics)
     {
@@ -1296,9 +1299,13 @@ internal static class PresentationChecker
 
         // The schema requires the process of a startProcess action.
         var processName = action.Process!;
-        if (findProcess(processName) is not { } process)
+        if (moduleReferences.Find(processName, findProcess) is not { } process)
         {
-            if (!loaded.UnloadedProcessNames.Contains(processName))
+            if (!loaded.UnloadedProcessNames.Contains(processName)
+                && !moduleReferences.ReportUndeclared(
+                    processName,
+                    $"{actionPath}/process",
+                    (code, message, pointer) => diagnostics.Add(new Diagnostic(code, message, page.File, pointer, page.Id))))
             {
                 diagnostics.Add(new Diagnostic(
                     DiagnosticCodes.UnknownActionProcess,

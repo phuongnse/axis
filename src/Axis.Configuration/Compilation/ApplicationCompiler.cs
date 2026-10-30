@@ -547,6 +547,7 @@ public static partial class ApplicationCompiler
             key => [.. texts.Where(text => text.Texts.ContainsKey(key)).Select(text => (text.Locale, text.Texts[key]))],
             name => NamesDeclaredModule(name) ? FindProcess(name) : null,
             loaded.UnloadedProcessNames,
+            moduleReferences,
             references,
             rules,
             declaredModules,
@@ -582,6 +583,7 @@ public static partial class ApplicationCompiler
                 key => [.. texts.Where(text => text.Texts.ContainsKey(key)).Select(text => (text.Locale, text.Texts[key]))],
                 name => Allowed(name) ? FindProcess(name) : null,
                 loaded.UnloadedProcessNames,
+                moduleReferences.For(moduleProcesses.First()),
                 references,
                 RulesFor(moduleProcesses.First()),
                 declared,
@@ -649,6 +651,7 @@ public static partial class ApplicationCompiler
             loaded.UnloadedDataSourceNames,
             rules,
             declaredModules,
+            moduleReferences,
             references,
             diagnostics);
         MigrationChecker.Check(loaded.Migrations, FindEntity, loaded.UnloadedEntityNames, references, diagnostics);

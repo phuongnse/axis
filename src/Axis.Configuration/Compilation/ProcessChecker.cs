@@ -93,6 +93,7 @@ internal static class ProcessChecker
         Func<string, IReadOnlyList<(string Locale, string Value)>> textValues,
         Func<string, ProcessResource?> findProcess,
         IReadOnlySet<string> unloadedProcessNames,
+        ModuleReferences moduleReferences,
         ReferenceIndexBuilder references,
         IEnumerable<ExpressionRule> rules,
         IReadOnlySet<string> modules,
@@ -125,6 +126,7 @@ internal static class ProcessChecker
                     textValues,
                     findProcess,
                     unloadedProcessNames,
+                    moduleReferences,
                     references,
                     Report,
                     diagnostics);
@@ -198,7 +200,7 @@ internal static class ProcessChecker
                 Report,
                 diagnostics);
 
-            CheckSubProcesses(process, entity, scope, findEntity, findProcess, unloadedProcessNames, references, Report);
+            CheckSubProcesses(process, entity, scope, findEntity, findProcess, unloadedProcessNames, moduleReferences, references, Report);
 
             CheckTasks(process, entity, scope, findEntity, findForm, unloadedFormNames, findRole, unloadedRoleNames, references, Report);
 
@@ -242,6 +244,7 @@ internal static class ProcessChecker
         Func<string, IReadOnlyList<(string Locale, string Value)>> textValues,
         Func<string, ProcessResource?> findProcess,
         IReadOnlySet<string> unloadedProcessNames,
+        ModuleReferences moduleReferences,
         ReferenceIndexBuilder references,
         Action<string, string, string> report,
         List<Diagnostic> diagnostics)
@@ -302,7 +305,7 @@ internal static class ProcessChecker
 
         CheckTimers(process, scope, references, report);
 
-        CheckSubProcesses(process, null, scope, findEntity, findProcess, unloadedProcessNames, references, report);
+        CheckSubProcesses(process, null, scope, findEntity, findProcess, unloadedProcessNames, moduleReferences, references, report);
 
         CheckTextKeys(process, references, diagnostics);
     }
@@ -361,8 +364,8 @@ internal static class ProcessChecker
 
     /// <summary>
     /// Checks each <c>subProcess</c> step against the process it names, found ignoring letter case.
-    /// A name that is not found is reported, unless its file was not loaded because of its own
-    /// errors, and then the step's <c>subject</c> and <c>parameters</c> are not checked. A child
+    /// A name under a module that the application does not declare is <c>AXC0207</c>. Any other name
+    /// that is not found is reported, unless its file was not loaded because of its own errors, and then the step's <c>subject</c> and <c>parameters</c> are not checked. A child
     /// without a subject takes no <c>subject</c> and every one of its parameters, each named once,
     /// ignoring letter case, with an expression that fits the parameter's type over
     /// <paramref name="scope"/>. A child with a subject takes no <c>parameters</c>. Its
@@ -378,6 +381,7 @@ internal static class ProcessChecker
         Func<string, EntityResource?> findEntity,
         Func<string, ProcessResource?> findProcess,
         IReadOnlySet<string> unloadedProcessNames,
+        ModuleReferences moduleReferences,
         ReferenceIndexBuilder references,
         Action<string, string, string> report)
     {
@@ -390,10 +394,11 @@ internal static class ProcessChecker
             }
 
             var path = $"/steps/{index}";
-            if (findProcess(step.Process!) is not { } child)
+            if (moduleReferences.Find(step.Process!, findProcess) is not { } child)
             {
                 // A process file that was not loaded because of its own errors is not reported again.
-                if (!unloadedProcessNames.Contains(step.Process!))
+                if (!unloadedProcessNames.Contains(step.Process!)
+                    && !moduleReferences.ReportUndeclared(step.Process!, $"{path}/process", report))
                 {
                     report(
                         DiagnosticCodes.UnknownSubProcess,

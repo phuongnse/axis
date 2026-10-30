@@ -105,12 +105,17 @@ calls `IsDepartmentCode`, so a department code must be in capital letters.
   except that a `sequence` names only a sequence of its own module. A
   module event's `entity` follows the same rule, and an application process
   `entity`, raise event step `event` and event trigger `event` can name module
-  resources, and so can an application task's `form` and sub-process step's
-  `process`, but only under a module that `application.json` declares. Any
-  other module keeps the unknown-form or unknown-process code. A table widget's `dataSource` and a policy grant's `dataSource` can
-  name a module data source. A name under a module that `modules` does not
-  declare is `AXC0207`, reported at `/entity` for a data source or a form, and at
-  `/widgets/{i}/dataSource` or `/grants/{i}/dataSource` for a widget or a grant.
+  resources, and so can an application task's `form`, but only under a module
+  that `application.json` declares. Any other module keeps the unknown-form
+  code. An application trigger's `process`, a `startProcess` action's
+  `process`, a process inspector's `process` and a sub-process step's `process`
+  can name a process of a declared module. A table widget's `dataSource` and a
+  policy grant's `dataSource` can name a module data source. A name under a
+  module that `modules` does not declare is `AXC0207`, reported at `/entity` for
+  a data source or a form, at `/widgets/{i}/dataSource` or
+  `/grants/{i}/dataSource` for a widget or a grant, and at `/process`,
+  `{actionPath}/process`, `/widgets/{i}/process` or `/steps/{i}/process` for a
+  trigger, a `startProcess` action, a process inspector or a sub-process step.
   A step or trigger that names an event under an undeclared module keeps its
   unknown-event code. A module field whose `target` or `sequence` contains `/`,
   a module event, data source or form whose `entity` does, or a module data
@@ -211,7 +216,7 @@ calls `IsDepartmentCode`, so a department code must be in capital letters.
 | `AXC0204` | A `modules` entry has a version range in no valid form. Reported at `/modules/{i}/version`, in `application.json` or in `modules/<id>/module.json`. |
 | `AXC0205` | No installed version meets the one range that asks for the module. The message lists the installed versions. Reported at `/modules/{i}/version`, in `application.json` or in `modules/<id>/module.json`. Several ranges that no version meets together are `AXC0295`. |
 | `AXC0206` | A module id appears twice in `modules`. Reported at `/modules/{i}/id` of each later entry, in `application.json` or in `modules/<id>/module.json`. |
-| `AXC0207` | A field's `target` or `sequence`, a data source's or form's `entity`, a widget's or policy grant's `dataSource`, a site navigation entry's `page`, or a qualified rule call `<module id>:<name>(…)` names a module that `modules` does not declare. Reported at `/fields/{i}/target`, `/fields/{i}/sequence`, `/entity`, `/widgets/{i}/dataSource`, `/grants/{i}/dataSource`, `/navigation/{i}/page` or the expression's pointer. A module that only another module depends on is not declared by the application, so a reference to it is reported too. A reference under a declared module that could not be pinned is not reported again. |
+| `AXC0207` | A field's `target` or `sequence`, a data source's or form's `entity`, a widget's or policy grant's `dataSource`, a site navigation entry's `page`, a trigger's, `startProcess` action's, process inspector's or sub-process step's `process`, or a qualified rule call `<module id>:<name>(…)` names a module that `modules` does not declare. Reported at `/fields/{i}/target`, `/fields/{i}/sequence`, `/entity`, `/widgets/{i}/dataSource`, `/grants/{i}/dataSource`, `/navigation/{i}/page`, `/process`, `{actionPath}/process`, `/widgets/{i}/process`, `/steps/{i}/process` or the expression's pointer. A module that only another module depends on is not declared by the application, so a reference to it is reported too. A reference under a declared module that could not be pinned is not reported again. |
 | `AXC0208` | A field's `target` or `sequence` in a module entity, the `entity` of a module event, data source, form or process, the `target` of a module data source parameter, a module process step's `form`, `event`, `process` or `entity`, or a reference in a module page (a widget's `entity`, `form`, `dataSource` or `process`, the `page` or `process` of an action, or a page parameter's `target`), contains `/` and does not name a module that module declares. A `sequence`, a step `form` and a step `process` with `/` always give it. Reported at that property in `modules/<id>/…`. |
 | `AXC0209` | A module text key lacks the `<id>.` prefix. Reported at `/texts/{key}` of the module text, and at `/roles/{i}/label/textKey` of `modules/<id>/module.json` for a role slot label, and at `/connectors/{i}/label/textKey` for a connector slot label. |
 | `AXC0210` | An application locale has no text from a pinned module. The message names the locale. Reported in `application.json` at `/modules/{i}` for a declared module, and at `/modules` for a module that only another module depends on. |
