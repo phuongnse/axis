@@ -300,11 +300,11 @@ events about a record for a `waitEvent` step.
 | `id` | `uuid` | A version 7 UUID, the event's id |
 | `application_id` | `uuid` | The application |
 | `event` | `text` | The event's name |
-| `release_id` | `uuid` | The release the raising instance is pinned to |
+| `release_id` | `uuid` | The release the raising instance is pinned to, or the active release for an event an inbound endpoint raises |
 | `entity_id` | `uuid` | The event's entity |
 | `subject_id` | `uuid` | The record the occurrence names |
 | `payload` | `jsonb` | The evaluated payload fields |
-| `process_instance_id` | `uuid` | The instance that raised the event |
+| `process_instance_id` | `uuid`, null _(planned for M19)_ | The instance that raised the event. _(planned for M19)_ For an event an [inbound endpoint](inbound-endpoints.md) raises, the instance the call started, or null when the endpoint has no `process` |
 | `raised_at` | `timestamptz` | The start of the step's transaction, `now()` |
 
 `axis.process_event_matches` holds one row for each use of an event occurrence by
@@ -335,7 +335,11 @@ describe. A trigger's data source, parameters and
 process are read when the occurrence runs, so a change only to them keeps the
 next occurrence. Triggers that the release removes lose their state and their
 work item. The server's startup activation writes this state right after
-the release is active.
+the release is active. A [module](modules-and-templates.md#processes-pages-policies-and-dependencies)
+schedule trigger has an id of its own in each application, so each application
+that uses the module has its own state and work item for it. Its `timeZone` is
+the application's time zone, so an application that changes its time zone
+gets a new next occurrence at its next activation.
 
 **Occurrences.** Each schedule trigger has one `trigger.schedule` work item,
 due at its next occurrence. Workers claim it with `FOR UPDATE SKIP LOCKED`,
@@ -351,7 +355,8 @@ does this:
 3. It computes the next occurrence after now, and sets the item's `due_at` to
    it.
 
-**Daylight saving.** Occurrences follow the trigger's `timeZone`. A local
+**Daylight saving.** Occurrences follow the trigger's `timeZone`, or the
+application's time zone for a module schedule trigger. A local
 time that does not exist runs at the next valid local time. A local time that
 happens twice runs once, at the first. For example, in `Europe/Berlin`,
 `30 2 * * *` runs at 03:00 on the day clocks go forward, and once at the
@@ -584,7 +589,7 @@ item's instance, since the outbox row does not record it.
 | `id` | `uuid` | A version 7 UUID |
 | `kind` | `text` | `event.deliver`, `trigger.fanOut` or `notification.email` |
 | `application_id` | `uuid` | The application |
-| `process_id` | `uuid` | The process whose grants govern it: the trigger's process, the waiting instance's process or the process that sent the email |
+| `process_id` | `uuid`, null _(planned for M19)_ | The process whose grants govern it: the trigger's process, the waiting instance's process or the process that sent the email. _(planned for M19)_ For a webhook delivery, the process of the instance that raised the event, or null when an endpoint without a `process` raised it. No process's routes list such a dead letter, and the [operator console](operator-console.md) shows it |
 | `event_id`, `trigger_id`, `process_instance_id`, `email_id` | `uuid`, null | What failed, as the kind needs |
 | `occurrence_at` | `timestamptz`, null | The schedule occurrence, for a fan-out |
 | `attempts` | `integer` | The failures counted |

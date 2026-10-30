@@ -19,7 +19,7 @@ M17 does not change. See the [roadmap](../roadmap.md#milestones).
   - M19 Connector OAuth2 and outbound webhooks:
     [D91](d91-connector-oauth2-and-structured-payloads.md) and
     [D92](d92-outbound-webhooks.md), and raising an event from an inbound
-    endpoint call.
+    endpoint call, which [D115](d115-an-inbound-endpoint-call-raises-an-event.md) designs.
   - M20 Modules with processes, pages and policies:
     [D89](d89-modules-that-hold-processes-pages-and-policies-and-depend-on-other-modules.md).
     [D103](d103-modules-hold-triggers-scenarios-and-connector-slots.md) renames it

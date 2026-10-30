@@ -673,7 +673,8 @@ public static partial class ApplicationCompiler
             diagnostics);
 
         // A module trigger starts a process of its own module and names an event or an entity of its own
-        // module or of a module it declares. It sees no application data source, and no application rule.
+        // module or of a module it declares. A schedule names a data source of its own module only. It sees no
+        // application data source, and no application rule.
         foreach (var moduleTriggers in loaded.Triggers.Where(IsModuleResource).GroupBy(trigger => ModuleIdOf(trigger.Name), StringComparer.Ordinal))
         {
             var moduleId = moduleTriggers.Key;
@@ -692,8 +693,8 @@ public static partial class ApplicationCompiler
                 name => Allowed(name) ? FindEvent(name) : null,
                 loaded.UnloadedEventNames,
                 loaded.UnloadedEntityNames,
-                _ => null,
-                new HashSet<string>(),
+                name => name.StartsWith(moduleId + "/", StringComparison.Ordinal) ? FindDataSource(name) : null,
+                loaded.UnloadedDataSourceNames,
                 RulesFor(moduleTriggers.First()),
                 declared,
                 moduleReferences.For(moduleTriggers.First()),
@@ -815,7 +816,8 @@ public static partial class ApplicationCompiler
                 FindProcess,
                 FindDataSource,
                 RulesFor(trigger),
-                DeclaredModulesOf(trigger))).ToList(),
+                DeclaredModulesOf(trigger),
+                timeZone)).ToList(),
             Migrations = loaded.Migrations.Select(migration => MigrationChecker.Build(migration, loaded.Resources.Single(resource => resource.Path == migration.File).Content)).ToList(),
             Packages = allPackages,
             Modules = modules,

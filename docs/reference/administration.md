@@ -280,7 +280,7 @@ archive of one tenant. See [D45](../decisions/d45-tenant-backup-and-restore.md).
 
 The archive is one tar file with two entries: `manifest.json` and `tenant.dump`.
 It holds no secret. No database password, OIDC client secret or `secret` binding
-value is ever in it, so it can be stored like any data file. _(planned for M27)_ The archive is encrypted with a backup key that the operator keeps outside the installation, and `tenant restore` needs the same key, see [D109](../decisions/d109-sensitive-fields-and-backups-are-encrypted-and-history-keeps-no-names.md).
+value is ever in it, so it can be stored like any data file. _(planned for M27)_ The archive is encrypted with a backup key that the operator keeps outside the installation and gives as `--backup-key-file <file>`, and `tenant restore` needs the same key. The archive then carries the tenant's data keys. See [encrypted backups](data-encryption.md#encrypted-backups).
 
 **Steps, in order.**
 
@@ -354,7 +354,7 @@ exists, a missing option, a missing tool or a missing setting.
 ## Tenant restore
 
 `tenant restore <file> --tenant <id> --host <host>...`
-restores an archive into a new tenant. See [D45](../decisions/d45-tenant-backup-and-restore.md).
+restores an archive into a new tenant. See [D45](../decisions/d45-tenant-backup-and-restore.md). _(planned for M27)_ It also takes `--backup-key-file <file>` and refuses an archive that is not encrypted, see [encrypted backups](data-encryption.md#encrypted-backups).
 
 | Option | Meaning |
 | --- | --- |
