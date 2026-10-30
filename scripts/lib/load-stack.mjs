@@ -3,8 +3,9 @@
 // roles, and override.json. Run it as `node scripts/lib/load-stack.mjs <folder>` with a folder that does not exist yet.
 // It mirrors the setup of scripts/onprem.test.mjs.
 //
-// The override file is JSON, which is valid YAML. It adds PostgreSQL over TLS, trusts the authority in every host
-// and adds the k6 service under the `load` profile. The authority key stays in ca-private and is never mounted.
+// The override file is JSON, which is valid YAML. It adds PostgreSQL over TLS, trusts the authority in every host,
+// including the worker, which calls the connector, and adds the https stub `load-stub`, which answers the connector's
+// calls, and the k6 service under the `load` profile. The authority key stays in ca-private and is never mounted.
 import { spawnSync } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
 import { chmodSync, copyFileSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs'
@@ -18,6 +19,11 @@ const root = fileURLToPath(new URL('../..', import.meta.url))
 export const k6Image = 'grafana/k6:1.3.0'
 export const tenantHost = 'load.axis.test'
 export const identityHost = 'id.axis.test'
+
+// The stub that answers the calls of the connector LoadService. It is the image of the proxy in deploy/compose/compose.yaml.
+export const stubImage = 'caddy:2.10.2-alpine'
+export const stubHost = 'load-stub'
+export const stubUrl = `https://${stubHost}:8443`
 
 const password = () => randomBytes(18).toString('hex')
 
@@ -74,6 +80,11 @@ export const writeLoadStack = (target, { proxyAddress = '172.31.250.10' } = {}) 
   issue(tls, 'proxy', [tenantHost, identityHost])
   copyFile(authority.certificate, join(tls, 'server-ca.crt'))
 
+  // The stub answers every call with a fixed JSON body, over TLS with a certificate for its service name.
+  const stub = folderOf('stub')
+  issue(stub, 'stub', [stubHost])
+  writeFile(join(stub, 'Caddyfile'), `{\n\tadmin off\n}\n\nhttps://:8443 {\n\ttls /stub/tls.crt /stub/tls.key\n\theader Content-Type application/json\n\trespond \`{"accepted":true}\` 200\n}\n`)
+
   const serverTls = folderOf('server-tls')
   issue(serverTls, 'server', ['servers'])
 
@@ -124,8 +135,18 @@ export const writeLoadStack = (target, { proxyAddress = '172.31.250.10' } = {}) 
         },
         server,
         'server-2': server,
-        worker: { environment: refresh, volumes: [trustVolume] },
+        // The worker calls the connector, so it trusts the authority that signed the stub's certificate.
+        worker: { environment: { ...refresh, ...authorityFile }, volumes: [trustVolume] },
         admin: { environment: authorityFile, volumes: [trustVolume] },
+        // The stub is only reached by the worker, over the compose network.
+        [stubHost]: {
+          profiles: ['load'],
+          image: stubImage,
+          read_only: true,
+          tmpfs: ['/data', '/config'],
+          command: ['caddy', 'run', '--config', '/stub/Caddyfile', '--adapter', 'caddyfile'],
+          volumes: [`${stub}:/stub:ro`],
+        },
         // k6 reaches the tenant host through the proxy only, at the proxy's fixed address.
         k6: {
           profiles: ['load'],

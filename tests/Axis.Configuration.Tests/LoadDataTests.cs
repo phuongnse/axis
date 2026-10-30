@@ -37,6 +37,41 @@ public sealed class LoadDataTests
     }
 
     [Fact]
+    public void Generated_application_calls_a_connector_and_delivers_an_event_from_Entity00_updates()
+    {
+        using var folder = new TemporaryFolder();
+        var path = Path.Combine(folder.Path, "app");
+
+        LoadDataGenerator.Write(path, seed: 1);
+        var result = ApplicationCompiler.Compile(path);
+
+        Assert.Empty(result.Diagnostics);
+        var model = result.Model;
+        Assert.NotNull(model);
+
+        var connector = Assert.Single(model.Connectors);
+        Assert.Equal("LoadService", connector.Name);
+        Assert.Equal(LoadDataGenerator.ConnectorUrlBinding, connector.BaseUrlBinding);
+        Assert.Equal("LoadServiceUrl", connector.BaseUrlBinding);
+        Assert.Single(connector.Operations);
+
+        var dataChange = Assert.Single(model.Triggers, trigger => trigger.Type == TriggerType.DataChange);
+        Assert.Equal("Entity00", dataChange.Entity?.Name);
+        Assert.Equal(DataChangeKinds.Update, dataChange.On);
+        Assert.Equal(["quantity"], dataChange.Fields);
+        var announce = Assert.Single(model.Processes, process => process.Name == dataChange.Process.Name);
+        var raise = Assert.Single(announce.Steps.OfType<RaiseEventStepModel>());
+        Assert.Equal("Entity00Changed", raise.Event);
+
+        var delivered = Assert.Single(model.Triggers, trigger => trigger.Type == TriggerType.Event);
+        Assert.Equal(TriggerMode.Async, delivered.Mode);
+        Assert.Equal("Entity00Changed", delivered.Event?.Name);
+        var notify = Assert.Single(model.Processes, process => process.Name == delivered.Process.Name);
+        var call = Assert.Single(notify.Steps.OfType<CallConnectorStepModel>());
+        Assert.Equal("LoadService", call.Connector);
+    }
+
+    [Fact]
     public void Same_seed_writes_identical_files_and_another_seed_keeps_the_shape()
     {
         using var folder = new TemporaryFolder();

@@ -9,6 +9,8 @@ namespace Axis.LoadData;
 /// entity. It is the data of the load test in docs/reference/performance.md. The counts are fixed.
 /// One seeded random generator draws every id and value, in a fixed order, so the same seed writes
 /// the same files and another seed changes ids and values but not the shape.
+/// The application also declares a connector, an event, two triggers and two processes. A change to the quantity of an
+/// Entity00 record raises the event and then calls the connector, so the run makes connector calls and event deliveries.
 /// </summary>
 #pragma warning disable CA5394 // Seeded data for a test application, not security.
 public static class LoadDataGenerator
@@ -21,6 +23,9 @@ public static class LoadDataGenerator
     public const int RecordsPerEntity = 100;
     public const int TextKeys = 1_600;
 
+    /// <summary>The name of the <c>url</c> binding that holds the base URL of the connector. The tenant sets it.</summary>
+    public const string ConnectorUrlBinding = "LoadServiceUrl";
+
     private const int ValidationsPerEntity = 2;
     private const int MaxQuantity = 1_000;
 
@@ -30,6 +35,8 @@ public static class LoadDataGenerator
     private static readonly string[] _readActions = ["read"];
     private static readonly string[] _startActions = ["start"];
     private static readonly string[] _invokeActions = ["invoke"];
+    private static readonly string[] _updateKinds = ["update"];
+    private static readonly string[] _quantityFields = ["quantity"];
 
     private static readonly string[] _words =
     [
@@ -77,6 +84,9 @@ public static class LoadDataGenerator
             WritePolicies();
             WriteProcesses();
             WriteEndpoints();
+            WriteConnectors();
+            WriteEvents();
+            WriteTriggers();
             WritePages();
             WriteSite();
             WriteSeeds();
@@ -306,6 +316,115 @@ public static class LoadDataGenerator
                 },
                 values = new { name = "name", quantity = "quantity" },
             });
+
+        /// <summary>The connector that the stub service of the load stack answers. It has no authentication and its operation has no outputs.</summary>
+        private void WriteConnectors() =>
+            WriteFile("connectors/load-service.json", new
+            {
+                id = NewId(),
+                kind = "connector",
+                name = "LoadService",
+                formatVersion = 1,
+                baseUrl = new { binding = ConnectorUrlBinding },
+                idempotency = "Idempotency-Key",
+                operations = new[]
+                {
+                    new
+                    {
+                        name = "notify",
+                        method = "POST",
+                        path = "/notifications",
+                        input = new object[]
+                        {
+                            new { name = "name", type = "text", required = true },
+                            new { name = "quantity", type = "integer" },
+                        },
+                    },
+                },
+            });
+
+        private void WriteEvents() =>
+            WriteFile("events/entity-00-changed.json", new
+            {
+                id = NewId(),
+                kind = "event",
+                name = "Entity00Changed",
+                formatVersion = 1,
+                entity = EntityName(0),
+                fields = new[] { new { name = "quantity", type = "integer" } },
+            });
+
+        /// <summary>
+        /// An update of the quantity of an Entity00 record starts the process that raises the event. The worker delivers the
+        /// event to the async trigger, which starts the process that calls the connector. The triggers start both processes
+        /// as the system, so no policy grants them.
+        /// </summary>
+        private void WriteTriggers()
+        {
+            WriteFile("processes/entity-00-announce.json", new
+            {
+                id = NewId(),
+                kind = "process",
+                name = "Entity00Announce",
+                formatVersion = 1,
+                entity = EntityName(0),
+                start = "announce",
+                steps = new object[]
+                {
+                    new { name = "announce", type = "operation", operation = "raiseEvent", @event = "Entity00Changed", fields = new { quantity = "quantity" }, next = "done" },
+                    new { name = "done", type = "end" },
+                },
+            });
+
+            WriteFile("processes/entity-00-notify.json", new
+            {
+                id = NewId(),
+                kind = "process",
+                name = "Entity00Notify",
+                formatVersion = 1,
+                entity = EntityName(0),
+                start = "notify",
+                steps = new object[]
+                {
+                    new
+                    {
+                        name = "notify",
+                        type = "operation",
+                        operation = "callConnector",
+                        connector = new { name = "LoadService", operation = "notify" },
+                        input = new { name = "name", quantity = "quantity" },
+                        retry = new { attempts = 3, backoff = "PT5S" },
+                        next = "done",
+                    },
+                    new { name = "done", type = "end" },
+                },
+            });
+
+            WriteFile("triggers/entity-00-quantity-changed.json", new
+            {
+                id = NewId(),
+                kind = "trigger",
+                name = "Entity00QuantityChanged",
+                formatVersion = 1,
+                type = "dataChange",
+                entity = EntityName(0),
+                on = _updateKinds,
+                fields = _quantityFields,
+                process = "Entity00Announce",
+            });
+
+            WriteFile("triggers/entity-00-changed-delivered.json", new
+            {
+                id = NewId(),
+                kind = "trigger",
+                name = "Entity00ChangedDelivered",
+                formatVersion = 1,
+                type = "event",
+                @event = "Entity00Changed",
+                mode = "async",
+                process = "Entity00Notify",
+            });
+        }
 
         private List<object> ReviewSteps(int index) =>
         [
