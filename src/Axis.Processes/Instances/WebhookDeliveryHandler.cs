@@ -2,6 +2,7 @@ using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json.Nodes;
 using Axis.Configuration.Model;
+using Axis.Core.Telemetry;
 using Axis.Data.Audit;
 using Axis.Processes.Work;
 using Axis.Tenancy;
@@ -21,8 +22,10 @@ namespace Axis.Processes.Instances;
 /// A <c>2xx</c> answer deletes the item, marks the row <c>delivered</c> and writes the audit record
 /// <c>webhook.delivered</c> with actor <c>system</c>, in one transaction. Any other answer, a timeout, a network error, a
 /// missing binding or an <c>http</c> URL outside Development is counted in <c>axis.delivery_failures</c> for the delivery,
-/// and the item is due again after the backoff of that count. It never stops: webhook dead letters are not built, so a
-/// delivery that keeps failing is tried every hour at most. A worker that crashes after a send sends the request again
+/// and the item is due again after the backoff of that count. At <see cref="DeliverySettings.Attempts"/> failures one
+/// transaction writes an <c>open</c> dead letter that names the application, the process of the raising instance, the
+/// instance, the occurrence and the webhook, and deletes the item. The row stays <c>pending</c>, and nothing more is
+/// sent until an operator redelivers the dead letter. A worker that crashes after a send sends the request again
 /// with the same <c>webhook-id</c>. Each transaction checks the claim token. No body, URL, secret value or exception
 /// message is stored or logged.
 /// </summary>
@@ -31,8 +34,9 @@ internal sealed partial class WebhookDeliveryHandler(
     IDeploymentBindings bindings,
     ConnectorClient client,
     ConnectorCallSettings settings,
+    DeliverySettings deliverySettings,
     TimeProvider time,
-    ILogger<WebhookDeliveryHandler> logger) : IExternalWorkItemHandler
+    ILogger<WebhookDeliveryHandler> logger) : IDeliveryWorkItemHandler
 {
     /// <summary>How much longer than the request itself a claim is leased, so the outcome transaction still holds it.</summary>
     private static readonly TimeSpan _leaseMargin = TimeSpan.FromSeconds(30);
@@ -199,8 +203,8 @@ internal sealed partial class WebhookDeliveryHandler(
     }
 
     /// <summary>
-    /// Counts the failed attempt in a transaction of its own and makes the item due after the backoff of the count. The
-    /// count has no limit, so the item is always kept.
+    /// Counts the failed attempt in a transaction of its own. Below the limit it makes the item due after the backoff of
+    /// the count. At the limit it writes an <c>open</c> dead letter and deletes the item.
     /// </summary>
     private async Task<WorkItemOutcome> CountFailureAsync(
         ClaimedWorkItem item,
@@ -214,6 +218,24 @@ internal sealed partial class WebhookDeliveryHandler(
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
         var attempts = await DeliveryFailures.CountAsync(transaction, DeliveryFailures.WebhookDeliverKind, delivery.Id.ToString("D"), error, cancellationToken);
         await WebhookDeliveries.CountAttemptAsync(connection, transaction, delivery.Id, answer.Status, cancellationToken);
+        if (attempts >= deliverySettings.Attempts)
+        {
+            var processId = await LoadProcessAsync(connection, transaction, delivery.ProcessInstanceId, cancellationToken);
+            var deadLetterId = await DeliveryFailures.InsertWebhookDeadLetterAsync(
+                transaction, delivery.ApplicationId, processId, delivery.ProcessInstanceId, delivery.Event.Id, delivery.WebhookId, attempts, error, cancellationToken);
+            if (!await WorkItemQueue.CompleteAsync(connection, transaction, item, cancellationToken))
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                LogLostClaim(item.Id, delivery.Id);
+                return WorkItemOutcome.LostClaim;
+            }
+
+            await transaction.CommitAsync(cancellationToken);
+            AxisMetrics.RecordDeadLetter(item.TenantId, DeliveryFailures.WebhookDeliverKind);
+            LogDeadLettered(webhook.Name, delivery.Id, attempts, deadLetterId, DeliveryFailures.WebhookDeliverKind);
+            return WorkItemOutcome.Completed;
+        }
+
         var delay = DeliveryFailures.Backoff(attempts);
         if (!await WorkItemQueue.RescheduleAsync(connection, transaction, item, delay, cancellationToken))
         {
@@ -223,8 +245,18 @@ internal sealed partial class WebhookDeliveryHandler(
         }
 
         await transaction.CommitAsync(cancellationToken);
-        LogSendFailed(webhook.Name, delivery.Id, error, attempts, delay);
+        LogSendFailed(webhook.Name, delivery.Id, error, attempts, deliverySettings.Attempts, delay);
         return WorkItemOutcome.Rescheduled;
+    }
+
+    /// <summary>Returns the process of the instance whose step raised the occurrence, which governs the dead letter.</summary>
+    private static async Task<Guid> LoadProcessAsync(NpgsqlConnection connection, NpgsqlTransaction transaction, Guid instanceId, CancellationToken cancellationToken)
+    {
+        await using var command = new NpgsqlCommand("SELECT process_id FROM axis.process_instances WHERE id = @instance", connection, transaction);
+        command.Parameters.AddWithValue("instance", instanceId);
+        return await command.ExecuteScalarAsync(cancellationToken) is Guid processId
+            ? processId
+            : throw new InvalidOperationException($"Process instance '{instanceId}' of the webhook delivery does not exist.");
     }
 
     /// <summary>Deletes the item in the open transaction when the claim is still current.</summary>
@@ -250,8 +282,11 @@ internal sealed partial class WebhookDeliveryHandler(
     [LoggerMessage(LogLevel.Warning, "Webhook work item {ItemId} for delivery {DeliveryId} names a webhook or event that release {ReleaseId} does not hold, so it was discarded.")]
     private partial void LogNoWebhook(Guid itemId, Guid deliveryId, Guid releaseId);
 
-    [LoggerMessage(LogLevel.Warning, "Sending webhook {Webhook} for delivery {DeliveryId} failed with {Error}, failure {Attempts}. It is due again in {Delay}.")]
-    private partial void LogSendFailed(string webhook, Guid deliveryId, string error, int attempts, TimeSpan delay);
+    [LoggerMessage(LogLevel.Warning, "Sending webhook {Webhook} for delivery {DeliveryId} failed with {Error}, failure {Attempts} of {Limit}. It is due again in {Delay}.")]
+    private partial void LogSendFailed(string webhook, Guid deliveryId, string error, int attempts, int limit, TimeSpan delay);
+
+    [LoggerMessage(LogLevel.Warning, "Sending webhook {Webhook} for delivery {DeliveryId} failed {Attempts} times and became dead letter {DeadLetterId} of kind {Kind}.")]
+    private partial void LogDeadLettered(string webhook, Guid deliveryId, int attempts, Guid deadLetterId, string kind);
 
     [LoggerMessage(LogLevel.Warning, "Webhook work item {ItemId} for delivery {DeliveryId} was claimed by another worker, so its writes were rolled back.")]
     private partial void LogLostClaim(Guid itemId, Guid? deliveryId);

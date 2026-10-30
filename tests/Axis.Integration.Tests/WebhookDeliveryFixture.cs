@@ -136,12 +136,13 @@ public sealed class WebhookDeliveryFixture : IAsyncLifetime
     public Task<WorkItemOutcome?> RunDeliveryOutsideDevelopmentAsync(CancellationToken cancellationToken) =>
         RunAsync(_production, ProcessStarts.WebhookDeliverWorkItemKind, cancellationToken);
 
-    /// <summary>Deletes every delivery and its work items, so a test starts with none from an earlier one.</summary>
+    /// <summary>Deletes every delivery, its work items and its dead letters, so a test starts with none from an earlier one.</summary>
     public async Task ClearDeliveriesAsync()
     {
         await _tenant.ScalarAsync("DELETE FROM axis.process_work_items WHERE kind = 'webhook.deliver'");
         await _tenant.ScalarAsync("DELETE FROM axis.webhook_deliveries");
         await _tenant.ScalarAsync("DELETE FROM axis.delivery_failures WHERE kind = 'webhook.deliver'");
+        await _tenant.ScalarAsync("DELETE FROM axis.dead_letters WHERE kind = 'webhook.deliver'");
     }
 
     /// <summary>Makes every webhook delivery item due now, so a test need not wait out a backoff.</summary>

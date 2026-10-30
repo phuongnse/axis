@@ -30,6 +30,9 @@ public sealed class DeadLetterRow
     /// <summary>The email that failed to send, when the kind has one.</summary>
     public Guid? EmailId { get; init; }
 
+    /// <summary>The webhook that failed to receive the event, when the kind has one.</summary>
+    public Guid? WebhookId { get; init; }
+
     /// <summary>The schedule occurrence, for a fan-out.</summary>
     public DateTimeOffset? OccurrenceAt { get; init; }
 

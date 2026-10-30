@@ -174,6 +174,10 @@ namespace Axis.Processes.Storage.Migrations
                         .HasColumnType("uuid")
                         .HasColumnName("trigger_id");
 
+                    b.Property<Guid?>("WebhookId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("webhook_id");
+
                     b.HasKey("Id")
                         .HasName("pk_dead_letters");
 

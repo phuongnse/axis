@@ -35,7 +35,7 @@ public sealed class DeadLetterEndpointTests(TaskApiFixture fixture) : IClassFixt
         using var maria = await ListOkAsync("maria", "?state=open");
         var item = FindItem(maria, letter.Id);
         Assert.Equal(
-            ["id", "kind", "eventId", "triggerId", "processInstanceId", "emailId", "occurrenceAt", "attempts", "lastError", "state", "reason", "settledBy", "createdAt", "settledAt", "commands"],
+            ["id", "kind", "eventId", "triggerId", "processInstanceId", "emailId", "webhookId", "occurrenceAt", "attempts", "lastError", "state", "reason", "settledBy", "createdAt", "settledAt", "commands"],
             item.EnumerateObject().Select(property => property.Name));
         Assert.Equal("event.deliver", item.GetProperty("kind").GetString());
         Assert.Equal(letter.EventId, item.GetProperty("eventId").GetGuid());
@@ -44,7 +44,7 @@ public sealed class DeadLetterEndpointTests(TaskApiFixture fixture) : IClassFixt
         Assert.Equal("Npgsql.PostgresException with SQLSTATE P0001", item.GetProperty("lastError").GetString());
         Assert.Equal("open", item.GetProperty("state").GetString());
         Assert.Equal(DateTimeKind.Utc, item.GetProperty("createdAt").GetDateTime().Kind);
-        Assert.All(["processInstanceId", "emailId", "occurrenceAt", "reason", "settledBy", "settledAt"], name => Assert.Equal(JsonValueKind.Null, item.GetProperty(name).ValueKind));
+        Assert.All(["processInstanceId", "emailId", "webhookId", "occurrenceAt", "reason", "settledBy", "settledAt"], name => Assert.Equal(JsonValueKind.Null, item.GetProperty(name).ValueKind));
         Assert.Equal(["redeliver", "discard"], Commands(item));
         Assert.Equal(1, maria.RootElement.GetProperty("page").GetInt32());
         Assert.Equal(20, maria.RootElement.GetProperty("pageSize").GetInt32());
@@ -275,6 +275,48 @@ public sealed class DeadLetterEndpointTests(TaskApiFixture fixture) : IClassFixt
         using var discard = await SendAsync("maria", HttpMethod.Post, $"dead-letters/{id:D}/discard", ReasonBody);
         Assert.Equal(HttpStatusCode.OK, discard.StatusCode);
         Assert.Equal("discarded", await StateAsync(id));
+    }
+
+    [Fact]
+    public async Task A_webhook_dead_letter_is_listed_with_its_webhook_for_a_user_with_inspect_and_a_user_without_inspect_gets_403_on_every_route()
+    {
+        Assert.True(fixture.Model.TryGetProcess("Decide", out var decide));
+        var id = Guid.CreateVersion7();
+        var eventId = Guid.NewGuid();
+        var webhookId = Guid.NewGuid();
+        await fixture.ExecuteAsync(
+            Tenant,
+            """
+            INSERT INTO axis.dead_letters (id, kind, application_id, process_id, process_instance_id, event_id, webhook_id, attempts, last_error, state, created_at)
+            VALUES (@id, 'webhook.deliver', @application, @process, @instance, @event, @webhook, 5, 'HTTP 500', 'open', now())
+            """,
+            ("id", id),
+            ("application", fixture.Model.Manifest.Id),
+            ("process", decide.Id),
+            ("instance", Guid.NewGuid()),
+            ("event", eventId),
+            ("webhook", webhookId));
+
+        using var maria = await ListOkAsync("maria", "?state=open");
+        var item = FindItem(maria, id);
+        Assert.Equal("webhook.deliver", item.GetProperty("kind").GetString());
+        Assert.Equal(eventId, item.GetProperty("eventId").GetGuid());
+        Assert.Equal(webhookId, item.GetProperty("webhookId").GetGuid());
+        Assert.Equal("HTTP 500", item.GetProperty("lastError").GetString());
+        Assert.Equal(["redeliver", "discard"], Commands(item));
+
+        using var denied = await SendAsync("otto", HttpMethod.Get, "dead-letters", body: null);
+        Assert.Equal(HttpStatusCode.Forbidden, denied.StatusCode);
+        foreach (var command in new[] { "redeliver", "discard" })
+        {
+            using var forbidden = await SendAsync("otto", HttpMethod.Post, $"dead-letters/{id:D}/{command}", ReasonBody);
+            Assert.Equal(HttpStatusCode.Forbidden, forbidden.StatusCode);
+        }
+
+        Assert.Equal("open", await StateAsync(id));
+        Assert.Equal(
+            0L,
+            await fixture.AdminCountAsync(Tenant, $"SELECT count(*) FROM axis.process_work_items WHERE kind = 'webhook.deliver' AND event_id = '{eventId:D}'"));
     }
 
     private static string ReasonBody => JsonSerializer.Serialize(new { reason = Reason });

@@ -663,6 +663,7 @@ const deadLetterPage: DeadLetterPage = {
       triggerId: 'f2afb3c4-d6e7-4cf9-b30a-2b4c5d6e7f80',
       processInstanceId: null,
       emailId: null,
+      webhookId: null,
       occurrenceAt: '2026-03-04T09:31:00.000000Z',
       attempts: 5,
       lastError: 'System.InvalidOperationException',
