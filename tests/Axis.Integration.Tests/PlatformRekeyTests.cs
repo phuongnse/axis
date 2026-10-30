@@ -68,7 +68,7 @@ public sealed class PlatformRekeyTests(PostgreSqlFixture database) : IClassFixtu
         }
 
         Assert.Equal(versionBefore + 1, await VersionAsync(scenario.Platform, id));
-        Assert.Equal(["platform rekey ok: 9 tenant secrets, 2 data protection keys"], result.Output);
+        Assert.Equal(["platform rekey ok: 11 tenant secrets, 2 data protection keys"], result.Output);
         await scenario.AssertNoSecretsAsync(CipherFor(_newKey, TestPlatform.SecretKey));
     }
 
@@ -99,9 +99,10 @@ public sealed class PlatformRekeyTests(PostgreSqlFixture database) : IClassFixtu
         await using (var connection = new NpgsqlConnection(scenario.Platform))
         {
             await connection.OpenAsync(CancellationToken);
-            await using var command = new NpgsqlCommand("UPDATE platform.tenant_bindings SET secret_value = @value WHERE tenant_id = @id", connection);
+            await using var command = new NpgsqlCommand("UPDATE platform.tenant_bindings SET secret_value = @value WHERE tenant_id = @id AND name = @name", connection);
             command.Parameters.AddWithValue("value", CipherFor(_thirdKey).Encrypt(id, TenantSecretFields.Binding(BindingName), BindingValue));
             command.Parameters.AddWithValue("id", id);
+            command.Parameters.AddWithValue("name", BindingName);
             await command.ExecuteNonQueryAsync(CancellationToken);
         }
 
@@ -189,7 +190,7 @@ public sealed class PlatformRekeyTests(PostgreSqlFixture database) : IClassFixtu
         Assert.True(reader.IsDBNull(1));
         Assert.Equal(Environment.UserName, reader.GetString(2));
         Assert.Equal(Environment.MachineName, reader.GetString(3));
-        Assert.Equal(["tenant secrets: 9", "data protection keys: 2"], (string[])reader[4]);
+        Assert.Equal(["tenant secrets: 11", "data protection keys: 2"], (string[])reader[4]);
         Assert.False(await reader.ReadAsync(CancellationToken));
     }
 
@@ -288,6 +289,7 @@ public sealed class PlatformRekeyTests(PostgreSqlFixture database) : IClassFixtu
             SecretValue = cipher.Encrypt(id, TenantSecretFields.Binding(BindingName), BindingValue),
         });
         context.TenantBindings.Add(new TenantBindingRow { TenantId = id, Name = "PurchasingSystemUrl", Kind = "url", Url = "https://purchasing.example.test" });
+        context.TenantBindings.AddRange(CompanyBindings.Rows(id));
         for (var i = 0; i < 2; i++)
         {
             var key = Guid.NewGuid();
