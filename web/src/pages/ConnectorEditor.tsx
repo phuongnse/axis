@@ -413,7 +413,7 @@ function NestedFields({
 }) {
   const t = useText()
   const list = Array.isArray(rows) ? rows : []
-  const types = level < nestingLimit ? inputTypes : fieldTypes
+  const types = level <= nestingLimit ? inputTypes : fieldTypes
 
   return (
     <Flex vertical gap="small" style={{ marginInlineStart: 24 }} data-testid={`studio-field-${pointer}`}>

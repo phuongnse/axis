@@ -65,10 +65,10 @@ Run and the Test results list, the read-only views of a module entity, a module 
 - **Resource list.** The list groups the resources by kind. The kind shows as
   written in the files, such as `entity`, without translation. A search box
   filters it by name and `id`, ignoring letter case. Selecting a resource shows
-  its name, kind, `id` and file, and opens it in the editor below. **Module entities**, **Module processes** and
-  **Module policies** groups below the kinds list those of the modules the application uses, by `<module>/<name>`, from
+  its name, kind, `id` and file, and opens it in the editor below. **Module entities**, **Module processes**,
+  **Module policies** and **Module pages** groups below the kinds list those of the modules the application uses, by `<module>/<name>`, from
   the application's names, and the search box filters them too. A module process opens as its graph alone, with no palette, connect handle, step panel or delete,
-  and a module policy as a read-only table of its grants. Each view shows its read-only notice with the alert role. Module pages have no view yet _(planned)_.
+  a module policy as a read-only table of its grants, and a module page on the page canvas, drawn from the module's page metadata route, with no palette, data panel, widget tree or moves. Each view shows its read-only notice with the alert role.
 - **Editor.** The editor shows one resource in two views of the same draft.
   - A form is built from the JSON Schema of the resource's kind. The SPA
     bundles the schemas in `src/Axis.Configuration/Schemas`, the files the
@@ -850,7 +850,7 @@ Run and the Test results list, the read-only views of a module entity, a module 
     components. Tables, charts and other data widgets show placeholder rows and
     values made from the field types, as the widget previews do with fixtures.
     Actions run nothing. The canvas asks
-    [the draft page metadata route](authoring.md#draft-page-metadata) 300 ms
+    [the draft page metadata route](draft-page-metadata.md) 300 ms
     after the last edit and redraws from its answer. From an edit until it
     draws the answer to that draft, the canvas has `aria-busy`, which the tests
     wait on before a drag. _Built:_ the canvas

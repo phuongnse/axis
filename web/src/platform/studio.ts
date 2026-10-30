@@ -185,6 +185,24 @@ export async function fetchStudioPageMetadata(
   return (await postDraftMetadata(application, id, draft, signal)) as StudioPageMetadataAnswer
 }
 
+/**
+ * Loads the metadata of a page of the module version that the application pins, so Studio can draw it read-only. `id` is
+ * the id written in the module's file. Any status other than 200 throws, as does a server that does not answer.
+ */
+export async function fetchStudioModulePageMetadata(
+  application: string,
+  module: string,
+  id: string,
+  signal?: AbortSignal,
+): Promise<StudioPageMetadataAnswer> {
+  const path = `/api/studio/apps/${encodeURIComponent(application)}/modules/${encodeURIComponent(module)}/resources/${encodeURIComponent(id)}/page-metadata`
+  const response = await studioFetch(path, { signal })
+  if (!response.ok) {
+    throw new Error(`Loading '${path}' failed with status ${response.status}.`)
+  }
+  return (await response.json()) as StudioPageMetadataAnswer
+}
+
 /** Asks for the form widget an unsaved form would have, in the same way as {@link fetchStudioPageMetadata}. */
 export async function fetchStudioFormMetadata(
   application: string,
@@ -947,9 +965,9 @@ export function groupByKind(items: StudioResourceItem[]): ResourceGroup[] {
 }
 
 /** The kind of a module resource that Studio lists and opens read-only. */
-export type ModuleResourceKind = 'entity' | 'process' | 'policy'
+export type ModuleResourceKind = 'entity' | 'process' | 'policy' | 'page'
 
-/** An entity, process or policy of a module the application uses, as the names give it. `name` is `<module>/<name>`. */
+/** An entity, process, policy or page of a module the application uses, as the names give it. `name` is `<module>/<name>`. */
 export interface ModuleResourceItem {
   id: string
   kind: ModuleResourceKind
@@ -964,7 +982,7 @@ export interface ModuleResourceGroup {
 }
 
 /**
- * The module entities, processes and policies in the names, in that order, with the application's own left out.
+ * The module entities, processes, policies and pages in the names, in that order, with the application's own left out.
  * An item stays when its name or id contains `search`, ignoring letter case and surrounding spaces. A kind with no
  * item has no group.
  */
@@ -977,6 +995,7 @@ export function moduleResources(names: StudioNames | null, search: string): Modu
     ['entity', names.entities],
     ['process', names.processes],
     ['policy', names.policies],
+    ['page', names.pages],
   ]
   return sources
     .map(([kind, source]) => ({

@@ -366,21 +366,21 @@ test.describe('Studio creates a resource from a starter', () => {
       await page.getByRole('button', { name: 'Add input field', exact: true }).click()
     }
     await row(0).getByRole('textbox', { name: 'Input name', exact: true }).fill('warehouse')
-    await pick(page, 'studio-field-/operations/0/input/0/in', 'path')
+    await pickOption(row(0).getByRole('combobox', { name: 'Input placement', exact: true }), 'path')
     await row(0).getByRole('checkbox', { name: 'Required', exact: true }).check()
 
     await row(1).getByRole('textbox', { name: 'Input name', exact: true }).fill('dryRun')
-    await pick(page, 'studio-field-/operations/0/input/1/type', 'boolean')
-    await pick(page, 'studio-field-/operations/0/input/1/in', 'query')
+    await pickOption(row(1).getByRole('combobox', { name: 'Input type', exact: true }), 'boolean')
+    await pickOption(row(1).getByRole('combobox', { name: 'Input placement', exact: true }), 'query')
 
     await row(2).getByRole('textbox', { name: 'Input name', exact: true }).fill('lines')
-    await pick(page, 'studio-field-/operations/0/input/2/type', 'list')
+    await pickOption(row(2).getByRole('combobox', { name: 'Input type', exact: true }), 'list')
     await expect(page.getByTestId('studio-field-/operations/0/input/2/in')).toHaveCount(0)
     await nested(0).getByRole('textbox', { name: 'Field name', exact: true }).fill('sku')
     await nested(0).getByRole('checkbox', { name: 'Required', exact: true }).check()
     await row(2).getByRole('button', { name: 'Add nested field', exact: true }).click()
     await nested(1).getByRole('textbox', { name: 'Field name', exact: true }).fill('quantity')
-    await pick(page, 'studio-field-/operations/0/input/2/fields/1/type', 'integer')
+    await pickOption(nested(1).getByRole('combobox', { name: 'Field type', exact: true }), 'integer')
     await nested(1).getByRole('checkbox', { name: 'Required', exact: true }).check()
 
     await page.getByRole('button', { name: 'Add output field', exact: true }).click()

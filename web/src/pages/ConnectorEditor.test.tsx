@@ -438,16 +438,22 @@ describe('ConnectorEditor', () => {
   })
 
   it('offers object and list in a nested row only down to the fourth level', async () => {
-    const level4 = { name: 'leaf', type: 'text' }
+    const level5 = { name: 'leaf', type: 'text' }
+    const level4 = { name: 'deep', type: 'object', fields: [level5] }
     const level3 = { name: 'inner', type: 'list', fields: [level4] }
     const level2 = { name: 'mid', type: 'object', fields: [level3] }
     const operations = [
       { name: 'find', method: 'POST', path: '/x', input: [{ name: 'top', type: 'list', fields: [level2] }] },
     ]
     renderEditor({ ...connector, operations })
-    const base = 'studio-field-/operations/0/input/0/fields/0'
+    const level4Row = 'studio-field-/operations/0/input/0/fields/0/fields/0/fields/0'
 
-    await userEvent.click(within(screen.getByTestId(`${base}/fields/0/fields/0/type`)).getByRole('combobox'))
+    await userEvent.click(within(screen.getByTestId(`${level4Row}/type`)).getByRole('combobox'))
+    expect(optionTexts(shownDropdown()!)).toContain('object')
+    expect(optionTexts(shownDropdown()!)).toContain('list')
+    await userEvent.keyboard('{Escape}')
+
+    await userEvent.click(within(screen.getByTestId(`${level4Row}/fields/0/type`)).getByRole('combobox'))
     expect(optionTexts(shownDropdown()!)).toEqual(['text', 'integer', 'decimal', 'boolean', 'date', 'date-time'])
   })
 
