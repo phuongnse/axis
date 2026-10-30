@@ -13,6 +13,7 @@
       "fields": ["department", "leaveType", "firstDay", "lastDay", "reason", "status"]
     },
     { "entity": "departments/Department", "actions": ["read"] },
+    { "dataSource": "departments/Departments", "actions": ["read"] },
     { "dataSource": "LeaveRequestList", "actions": ["read"] },
     { "process": "LeaveRequestApproval", "actions": ["start"] }
   ]

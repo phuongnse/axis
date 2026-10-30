@@ -18,6 +18,8 @@ namespace Axis.Server.Presentation;
 /// A tenant without site clients checks nothing. The list of sites holds only the sites that allow that provider. The texts endpoint
 /// answers the texts of the active release, or of any stored release of the site's application when
 /// it is given a <c>release</c> id, so a task page can show the texts of the release it started on.
+/// A page of a module is written <c>{module id}/{page name}</c>, as two path segments, for example
+/// <c>/api/sites/{path}/pages/departments/Departments</c>. It has the same checks as any other page.
 /// </summary>
 internal static class SiteEndpoints
 {
@@ -106,34 +108,49 @@ internal static class SiteEndpoints
                 : Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "No text resources exist for this locale.");
         });
 
-        sites.MapGet("/{path}/pages/{page}", async (HttpContext context, string path, string page, ActiveApplicationResolver resolver, SiteSignIn signIn, ITenantContextAccessor tenants, CancellationToken cancellationToken) =>
+        // A page of the application has one segment, and a page of a module has the module id and the
+        // page name as two, as the record API writes a module entity, so no page has two URLs.
+        foreach (var pattern in new[] { "/{path}/pages/{page}", "/{path}/pages/{module}/{page}" })
         {
-            if (await CurrentUsers.FindAsync(context) is not { } user)
-            {
-                return Grants.SignInRequired();
-            }
+            sites.MapGet(pattern, PageAsync).WithQueryTimeout(QueryTimeoutSettings.Interactive);
+        }
+    }
 
-            if (!await ServesSessionAsync(context, signIn, tenants, path, cancellationToken))
-            {
-                return Grants.SignInRequired();
-            }
+    private static async Task<IResult> PageAsync(
+        HttpContext context,
+        string path,
+        string page,
+        ActiveApplicationResolver resolver,
+        SiteSignIn signIn,
+        ITenantContextAccessor tenants,
+        CancellationToken cancellationToken)
+    {
+        var name = context.GetRouteValue("module") is string module ? $"{module}/{page}" : page;
+        if (await CurrentUsers.FindAsync(context) is not { } user)
+        {
+            return Grants.SignInRequired();
+        }
 
-            if (await resolver.ResolveBySitePathAsync(path, cancellationToken) is not { } active)
-            {
-                return SiteNotFound();
-            }
+        if (!await ServesSessionAsync(context, signIn, tenants, path, cancellationToken))
+        {
+            return Grants.SignInRequired();
+        }
 
-            if (ApplicationSites.FindPage(active.Application, page) is not { } metadata)
-            {
-                return Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "The site's application has no page with this name.");
-            }
+        if (await resolver.ResolveBySitePathAsync(path, cancellationToken) is not { } active)
+        {
+            return SiteNotFound();
+        }
 
-            // The metadata holds the page's declared name, so the lookup always succeeds.
-            var model = active.Application.Pages.First(candidate => candidate.Name == metadata.Name);
-            return PageAccess.CanRead(active.Application, user.RolesIn(active.Application), model)
-                ? Results.Ok(PageAccess.Shape(active.Application, user.RolesIn(active.Application), model, metadata))
-                : Grants.Forbidden();
-        }).WithQueryTimeout(QueryTimeoutSettings.Interactive);
+        if (ApplicationSites.FindPage(active.Application, name) is not { } metadata)
+        {
+            return Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "The site's application has no page with this name.");
+        }
+
+        // The metadata holds the page's declared name, so the lookup always succeeds.
+        var model = active.Application.Pages.First(candidate => candidate.Name == metadata.Name);
+        return PageAccess.CanRead(active.Application, user.RolesIn(active.Application), model)
+            ? Results.Ok(PageAccess.Shape(active.Application, user.RolesIn(active.Application), model, metadata))
+            : Grants.Forbidden();
     }
 
     // The user check has already passed, and the site routes are no service account routes, so the user came from the session.

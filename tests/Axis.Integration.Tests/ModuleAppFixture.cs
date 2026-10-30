@@ -15,6 +15,7 @@ namespace Axis.Integration.Tests;
 /// <c>approver</c> slot ModuleAppA maps to <c>manager</c> and ModuleAppB to <c>reviewer</c>. The test
 /// authentication scheme signs in <c>requester</c>, an employee, <c>manager</c>, who holds no role, and
 /// <c>approver-a</c>, who holds <c>manager</c> in ModuleAppA only.
+/// ModuleAppA also holds the site <c>modulesa</c>, which lists the <c>departments</c> module's Departments page.
 /// </summary>
 public sealed class ModuleAppFixture : IAsyncLifetime
 {

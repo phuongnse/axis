@@ -53,7 +53,7 @@ internal static class PresentationChecker
 
         foreach (var page in loaded.Pages)
         {
-            CheckPage(page, loaded, findEntity, findPage, findDataSource, findForm, findProcess, checkParameterField, moduleReferences, references, diagnostics);
+            CheckPage(page, loaded, findEntity, findPage, findDataSource, findForm, findProcess, checkParameterField, moduleReferences.For(page), references, diagnostics);
         }
 
         // Locales are compared ignoring letter case, as the text check does.
@@ -61,7 +61,7 @@ internal static class PresentationChecker
         var firstFileByPath = new Dictionary<string, string>(StringComparer.Ordinal);
         foreach (var site in loaded.Sites)
         {
-            CheckSite(site, loaded, findPage, references, textLocales, firstFileByPath, diagnostics);
+            CheckSite(site, loaded, findPage, moduleReferences, references, textLocales, firstFileByPath, diagnostics);
         }
     }
 
@@ -1375,6 +1375,7 @@ internal static class PresentationChecker
         SiteResource site,
         ApplicationLoadResult loaded,
         Func<string, PageResource?> findPage,
+        ModuleReferences moduleReferences,
         ReferenceIndexBuilder references,
         HashSet<string> textLocales,
         Dictionary<string, string> firstFileByPath,
@@ -1422,11 +1423,12 @@ internal static class PresentationChecker
             var path = $"/navigation/{index}";
             ApplicationCompiler.CheckTextKey(entry.Label, site, $"{path}/label", references, diagnostics);
 
-            if (findPage(entry.Page) is { } page)
+            if (moduleReferences.Find(entry.Page, findPage) is { } page)
             {
                 references.Add(site, $"{path}/page", ReferenceRelations.NavigationPage, ResourceNode.Of(page));
             }
-            else if (!loaded.UnloadedPageNames.Contains(entry.Page))
+            else if (!loaded.UnloadedPageNames.Contains(entry.Page)
+                && !moduleReferences.ReportUndeclared(entry.Page, $"{path}/page", Report))
             {
                 Report(
                     DiagnosticCodes.UnknownNavigationPage,

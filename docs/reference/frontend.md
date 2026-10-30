@@ -204,7 +204,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   | `GET /api/sites` | `{ "sites": [ { "path", "titleKey", "titles", "application": { "name", "titles" } } ] }`, every site of every active application, in path order. `application.titles` holds the application's title for each locale it has texts for: the text of the `label` in its `application.json`, or its name when it has no label. |
   | `GET /api/sites/{path}` | `{ "path", "titleKey", "locales": { "default", "fallback", "available" }, "navigation": [ { "page", "labelKey", "icon" } ], "notificationsPath" }`. `icon` is an Axis icon name, or `null` for an entry with none |
   | `GET /api/sites/{path}/texts/{locale}` | `{ "locale", "texts" }`, the active release's texts for one locale, in the shape of the platform texts. Optional `?release={releaseId}` serves any stored release of the site's application. An unknown id, a non-UUID or another application's release answers `404`. |
-  | `GET /api/sites/{path}/pages/{page}` | the page metadata shown below |
+  | `GET /api/sites/{path}/pages/{page}` | the page metadata shown below. The page of a module is `GET /api/sites/{path}/pages/{module id}/{name}`, two path segments as the record API writes a module entity. Its `name` is `{module id}/{name}` and its title and labels resolve from the module's texts |
 
   At typical size, a page with a three-level widget tree loads in under 2 s: its
   metadata, then the rows of its table, chart and KPIs read in parallel over 100,000
@@ -510,7 +510,7 @@ sections marked *(planned for Mx)* are not built yet, and Dn refers to
   | --- | --- |
   | `/` | the platform home page. Signed in, it is the launcher of [shell](shell.md#platform-home-page): the tools of the person's roles, then one card per application over its sites, each titled in the current locale, or in the site's first locale when it lacks the current one. With nobody signed in, it is the sign-in screen, one card with a Sign in button, and the page does not start sign-in. The shell's sign-in page is `/?signIn=failed`, where the server sends the browser after a refused sign-in. It shows the same card and, above its button, an alert that screen readers announce, with the platform text `shell.home.signInFailed` and no reason. |
   | `/{site}` | the site's first navigation entry, by redirect |
-  | `/{site}/{page}` | the page inside the site shell, with the page title. A table page also takes `?search=&page=&pageSize=&sort=`. A table bound to a data source also takes its parameter values. A page with `tabs` widgets also takes `?tab=`, `?tab2=` and so on |
+  | `/{site}/{page}` | the page inside the site shell, with the page title. A table page also takes `?search=&page=&pageSize=&sort=`. A table bound to a data source also takes its parameter values. A page with `tabs` widgets also takes `?tab=`, `?tab2=` and so on. A page of a module is `/{site}/{module id}/{name}`, listed in the navigation as `{module id}/{name}`, with `/new` and `/{id}` under it for a form page. A second segment that is no record id names a module page |
   | `/{site}/{page}?ticket=<id>` | a page with parameters: the values sit in the query under the parameter names |
   | `/{site}/{page}/new` | the form of a form page, to create a record |
   | `/{site}/{page}/{id}` | the form of a form page, to edit the record with that id |

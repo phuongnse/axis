@@ -246,7 +246,7 @@ public static partial class ApplicationCompiler
         IReadOnlyList<ResourceContent> moduleFiles = [];
         IReadOnlySet<string>? declaredPackageIds = null;
         var timeZone = TimeZoneInfo.Utc;
-        var moduleResources = new ModuleResources([], [], [], [], [], [], [], [], [], new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new Dictionary<string, IReadOnlySet<string>>(), new Dictionary<string, IReadOnlySet<string>>());
+        var moduleResources = new ModuleResources([], [], [], [], [], [], [], [], [], [], new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new Dictionary<string, IReadOnlySet<string>>(), new Dictionary<string, IReadOnlySet<string>>());
         if (loaded.Application is { } manifest)
         {
             packages = PackageChecker.Check(manifest, installedPackages, diagnostics, references);
@@ -263,7 +263,7 @@ public static partial class ApplicationCompiler
             }
         }
 
-        // A pinned module's entities, sequences, seeds, events, data sources, forms and policies come before the application's own, so a
+        // A pinned module's entities, sequences, seeds, events, data sources, forms, pages and policies come before the application's own, so a
         // step that depends on order sees each module target first. Application resources can name
         // them as '<module id>/<name>', but a module never names an application resource.
         var allEntities = new List<EntityResource>([.. moduleResources.Entities, .. loaded.Entities]);
@@ -275,16 +275,19 @@ public static partial class ApplicationCompiler
         var unloadedEventNames = new HashSet<string>(loaded.UnloadedEventNames.Concat(moduleResources.UnloadedEventNames), StringComparer.OrdinalIgnoreCase);
         var unloadedDataSourceNames = new HashSet<string>(loaded.UnloadedDataSourceNames.Concat(moduleResources.UnloadedDataSourceNames), StringComparer.OrdinalIgnoreCase);
         var unloadedFormNames = new HashSet<string>(loaded.UnloadedFormNames.Concat(moduleResources.UnloadedFormNames), StringComparer.OrdinalIgnoreCase);
+        var unloadedPageNames = new HashSet<string>(loaded.UnloadedPageNames.Concat(moduleResources.UnloadedPageNames), StringComparer.OrdinalIgnoreCase);
         loaded = loaded with
         {
             DataSources = [.. moduleResources.DataSources, .. loaded.DataSources],
             Forms = [.. moduleResources.Forms, .. loaded.Forms],
+            Pages = [.. moduleResources.Pages, .. loaded.Pages],
             Policies = [.. moduleResources.Policies, .. loaded.Policies],
             UnloadedEntityNames = unloadedEntityNames,
             UnloadedSequenceNames = unloadedSequenceNames,
             UnloadedEventNames = unloadedEventNames,
             UnloadedDataSourceNames = unloadedDataSourceNames,
             UnloadedFormNames = unloadedFormNames,
+            UnloadedPageNames = unloadedPageNames,
         };
         var declaredModules = new HashSet<string>(loaded.Application?.Modules.Select(module => module.Id) ?? [], StringComparer.Ordinal);
         var moduleReferences = new ModuleReferences(
@@ -652,6 +655,11 @@ public static partial class ApplicationCompiler
             formsByName[form.Name] = form with { Id = ModuleResourceIds.Derive(applicationId, form.Id) };
         }
 
+        foreach (var page in moduleResources.Pages)
+        {
+            pagesByName[page.Name] = page with { Id = ModuleResourceIds.Derive(applicationId, page.Id) };
+        }
+
         var entities = allEntities
             .Select(entity => BuildEntity(entitiesByName[entity.Name], entitiesByName, sequencesByName, RulesFor(entity), DeclaredModulesOf(entity)))
             .ToList();
@@ -661,7 +669,7 @@ public static partial class ApplicationCompiler
             TimeZone = timeZone,
             Entities = entities,
             Sites = loaded.Sites.Select(site => BuildSite(site, pagesByName, loaded.IdentityProviders)).ToList(),
-            Pages = loaded.Pages.Select(page => BuildPage(page, entitiesByName, pagesByName, dataSourcesByName, formsByName, processesByName)).ToList(),
+            Pages = loaded.Pages.Select(page => BuildPage(pagesByName[page.Name], entitiesByName, pagesByName, dataSourcesByName, formsByName, processesByName)).ToList(),
             Texts = texts,
             Seeds = allSeeds.Select(seed => BuildSeed(seed, entitiesByName, applicationId)).ToList(),
             DataSources = loaded.DataSources.Select(dataSource => BuildDataSource(

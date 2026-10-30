@@ -9,6 +9,7 @@
     "departments.department.code": "Mã",
     "departments.department.name": "Tên",
     "departments.department.manager": "Người quản lý",
-    "departments.department.codeUpperCase": "Mã phải viết hoa."
+    "departments.department.codeUpperCase": "Mã phải viết hoa.",
+    "departments.pages.departments.title": "Phòng ban"
   }
 }

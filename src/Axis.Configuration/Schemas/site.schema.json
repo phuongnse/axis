@@ -44,7 +44,7 @@
         "additionalProperties": false,
         "required": ["page", "label"],
         "properties": {
-          "page": { "$ref": "#/$defs/name", "x-axis-reference": "page" },
+          "page": { "$ref": "#/$defs/pageName", "x-axis-reference": "page" },
           "label": { "$ref": "#/$defs/textReference" },
           "icon": {
             "enum": [
@@ -66,6 +66,10 @@
       "type": "string",
       "pattern": "^[A-Za-z][A-Za-z0-9]*$",
       "maxLength": 60
+    },
+    "pageName": {
+      "type": "string",
+      "pattern": "^([A-Za-z][A-Za-z0-9]*|[a-z][a-z0-9-]*/[A-Za-z][A-Za-z0-9]*)$"
     },
     "textReference": {
       "type": "object",

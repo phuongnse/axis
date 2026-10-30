@@ -8,6 +8,7 @@
   "locales": { "default": "en", "fallback": "en", "available": ["en", "vi"] },
   "navigation": [
     { "page": "MyLeaveRequests", "label": { "textKey": "nav.myLeaveRequests" }, "icon": "calendar" },
-    { "page": "MyTasks", "label": { "textKey": "nav.myTasks" }, "icon": "tasks" }
+    { "page": "MyTasks", "label": { "textKey": "nav.myTasks" }, "icon": "tasks" },
+    { "page": "departments/Departments", "label": { "textKey": "nav.departments" }, "icon": "people" }
   ]
 }

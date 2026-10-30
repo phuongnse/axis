@@ -1,0 +1,8 @@
+{
+  "id": "3b7e5a10-4c2d-4f6a-9d18-7a1c0e5b2f07",
+  "kind": "page",
+  "name": "Departments",
+  "formatVersion": 1,
+  "title": { "textKey": "departments.pages.departments.title" },
+  "widgets": [{ "type": "table", "dataSource": "Departments" }]
+}

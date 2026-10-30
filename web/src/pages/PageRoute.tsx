@@ -20,11 +20,18 @@ type FormMode = 'new' | 'edit'
 // A record id in the hyphenated 8-4-4-4-12 hex form, as the record API accepts it.
 const recordIdPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-/** Shows the page named by the `:page` segment inside the site shell. */
+/**
+ * Shows the page named by the `:page` segment inside the site shell. A page of a module is named by two segments,
+ * `/{site}/{module id}/{name}`, which the route `:page/:id` also matches. A record id never looks like a page name, so
+ * a second segment that is no record id names a page of the module `:page`.
+ */
 export function PageRoute({ form }: { form?: FormMode }) {
   const site = useApplicationSite()
   const locale = useSiteLocale()
-  const { page = '', id = '' } = useParams()
+  const { module, page: segment = '', id = '' } = useParams()
+  const isModulePage = form === 'edit' && module === undefined && !recordIdPattern.test(id)
+  const page = module ? `${module}/${segment}` : isModulePage ? `${segment}/${id}` : segment
+  const mode = isModulePage ? undefined : form
   const location = useLocation()
   // The table that opened the form passes its address, with paging and sorting, in history state.
   // Without it, such as in a new tab, save and cancel go to the site, which opens its first page.
@@ -35,14 +42,14 @@ export function PageRoute({ form }: { form?: FormMode }) {
   // A new page or record starts from a clean state rather than showing the previous one meanwhile.
   return (
     <SitePage
-      key={`${site.path}/${page}/${form ?? ''}/${id}`}
+      key={`${site.path}/${page}/${mode ?? ''}/${isModulePage ? '' : id}`}
       sitePath={site.path}
       pages={pages}
       name={page}
       locale={locale}
       fallbackLocale={site.locales.fallback}
-      form={form}
-      recordId={form === 'edit' ? id : null}
+      form={mode}
+      recordId={mode === 'edit' ? id : null}
       returnTo={returnTo}
       trail={{ site, from: typeof from === 'string' ? from : null }}
     />

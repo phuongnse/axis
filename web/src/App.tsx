@@ -95,6 +95,8 @@ function PlatformRoutes() {
           <Route path=":page" element={<PageRoute />} />
           <Route path=":page/new" element={<PageRoute form="new" />} />
           <Route path=":page/:id" element={<PageRoute form="edit" />} />
+          <Route path=":module/:page/new" element={<PageRoute form="new" />} />
+          <Route path=":module/:page/:id" element={<PageRoute form="edit" />} />
         </Route>
         <Route
           path="*"
@@ -146,6 +148,8 @@ function PlatformRoutes() {
         <Route path=":page" element={<PageRoute />} />
         <Route path=":page/new" element={<PageRoute form="new" />} />
         <Route path=":page/:id" element={<PageRoute form="edit" />} />
+        <Route path=":module/:page/new" element={<PageRoute form="new" />} />
+        <Route path=":module/:page/:id" element={<PageRoute form="edit" />} />
       </Route>
       <Route
         path="*"

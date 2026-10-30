@@ -6,6 +6,7 @@
   "locale": "en",
   "texts": {
     "departments.department": "Department",
-    "departments.department.shortCode": "Use at least three characters for the code."
+    "departments.department.shortCode": "Use at least three characters for the code.",
+    "departments.pages.departments.title": "Departments"
   }
 }

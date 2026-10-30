@@ -711,7 +711,6 @@ public sealed class ModuleCompilerTests
 
     [Theory]
     [InlineData("""{ "kind": "process" }""")]
-    [InlineData("""{ "kind": "page" }""")]
     [InlineData("""{ "kind": "role" }""")]
     [InlineData("""{ "kind": "identityProvider" }""")]
     [InlineData("""{ "kind": "module", "id": "departments", "version": "1.0.0", "label": "Nested" }""")]
@@ -882,6 +881,87 @@ public sealed class ModuleCompilerTests
     }
 
     [Fact]
+    public void A_module_page_over_a_module_data_source_joins_the_model_and_a_site_lists_it()
+    {
+        using var modules = ModulesWithPage("Departments");
+        using var folder = Folder("""[{ "id": "departments", "version": "1.0.0" }]""")
+            .With("texts/en.json", SiteTexts)
+            .With("identity-providers/accounts.json", PresentationCompilerTests.AccountsProvider)
+            .With("sites/main.json", MainSite);
+
+        var result = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        Assert.Empty(result.Diagnostics);
+        var applicationId = Guid.Parse(ApplicationId);
+        var page = Assert.Single(result.Model!.Pages);
+        Assert.Equal(
+            (ModuleResourceIds.Derive(applicationId, Guid.Parse(ModulePageId)), "departments/Departments", "modules/departments/pages/Departments.json", ModulePageTitleKey),
+            (page.Id, page.Name, page.File, page.Title.TextKey));
+        Assert.Equal(
+            new DataSourceReference(ModuleResourceIds.Derive(applicationId, Guid.Parse(DataSourceId)), DepartmentsDataSourceName),
+            Assert.Single(page.Widgets).DataSource);
+        var entry = Assert.Single(Assert.Single(result.Model.Sites).Navigation);
+        Assert.Equal(new PageReference(page.Id, "departments/Departments"), entry.Page);
+    }
+
+    [Fact]
+    public void A_module_page_widget_that_names_an_application_data_source_is_reported_in_the_module_file()
+    {
+        using var modules = Modules("1.0.0")
+            .With("departments/1.0.0/pages/Departments.json", ModulePage("Departments"))
+            .With(
+                "departments/1.0.0/TextsEn.json",
+                Texts(ModuleTextsEnId, "en", $$"""{ "{{ModulePageTitleKey}}": "Departments" }"""));
+        using var folder = Folder("""[{ "id": "departments", "version": "1.0.0" }]""")
+            .With("texts/en.json", SiteTexts)
+            .With("data-sources/departments.json", DataSource(DepartmentName));
+
+        var result = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.UnknownWidgetDataSource, "modules/departments/pages/Departments.json", "/widgets/0/dataSource", Guid.Parse(ModulePageId)),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.ResourceId));
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void A_module_page_widget_that_names_another_module_with_a_slash_is_reported_once()
+    {
+        using var modules = Modules("1.0.0")
+            .With("departments/1.0.0/pages/Departments.json", ModulePage("other/Thing"))
+            .With(
+                "departments/1.0.0/TextsEn.json",
+                Texts(ModuleTextsEnId, "en", $$"""{ "{{ModulePageTitleKey}}": "Departments" }"""));
+        using var folder = Folder("""[{ "id": "departments", "version": "1.0.0" }]""").With("texts/en.json", SiteTexts);
+
+        var result = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.QualifiedModuleReference, "modules/departments/pages/Departments.json", "/widgets/0/dataSource", Guid.Parse(ModulePageId)),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.ResourceId));
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void A_navigation_entry_that_names_a_page_of_an_undeclared_module_is_reported_at_the_page()
+    {
+        using var folder = Folder("[]")
+            .With("texts/en.json", SiteTexts)
+            .With("identity-providers/accounts.json", PresentationCompilerTests.AccountsProvider)
+            .With("sites/main.json", MainSite);
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (ExpressionDiagnosticCodes.UndeclaredModuleReference, "sites/main.json", "/navigation/0/page"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
     public void A_policy_grant_can_name_a_module_data_source()
     {
         using var modules = ModulesWithTexts().With("departments/1.0.0/data-sources/Departments.json", ModuleDataSource);
@@ -1018,6 +1098,34 @@ public sealed class ModuleCompilerTests
         Assert.Contains("IsKept", diagnostic.Message, StringComparison.Ordinal);
         Assert.Null(result.Model);
     }
+
+    private const string ModulePageId = "66666666-6666-4666-8666-666666666602";
+    private const string ModulePageTitleKey = "departments.pages.departments.title";
+
+    private static string ModulePage(string dataSource) => $$"""
+        { "id": "{{ModulePageId}}", "kind": "page", "name": "Departments", "formatVersion": 1,
+          "title": { "textKey": "{{ModulePageTitleKey}}" },
+          "widgets": [ { "type": "table", "dataSource": "{{dataSource}}" } ] }
+        """;
+
+    private const string MainSite = """
+        { "id": "77777777-7777-4777-8777-777777777702", "kind": "site", "name": "Main", "formatVersion": 1, "path": "main",
+          "title": { "textKey": "site.title" }, "locales": { "default": "en", "fallback": "en", "available": ["en"] },
+          "navigation": [ { "page": "departments/Departments", "label": { "textKey": "nav.departments" } } ] }
+        """;
+
+    private const string SiteTexts = """
+        { "id": "55555555-5555-4555-8555-555555555556", "kind": "text", "name": "SiteTextsEn", "formatVersion": 1, "locale": "en",
+          "texts": { "site.title": "Main", "nav.departments": "Departments" } }
+        """;
+
+    private static TemporaryFolder ModulesWithPage(string dataSource) =>
+        Modules("1.0.0")
+            .With("departments/1.0.0/data-sources/Departments.json", ModuleDataSource)
+            .With("departments/1.0.0/pages/Departments.json", ModulePage(dataSource))
+            .With(
+                "departments/1.0.0/TextsEn.json",
+                Texts(ModuleTextsEnId, "en", $$"""{ "{{ModulePageTitleKey}}": "Departments" }"""));
 
     private static TemporaryFolder ModulesWithTexts() =>
         Modules("1.0.0").With(

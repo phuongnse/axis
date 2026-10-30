@@ -4,5 +4,10 @@
   "name": "TextsEn",
   "formatVersion": 1,
   "locale": "en",
-  "texts": { "role.employee": "Employee", "role.manager": "Manager" }
+  "texts": {
+    "role.employee": "Employee",
+    "role.manager": "Manager",
+    "site.title": "Module site",
+    "nav.departments": "Departments"
+  }
 }
