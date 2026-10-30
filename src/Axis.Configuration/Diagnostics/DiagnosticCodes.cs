@@ -294,8 +294,9 @@ public static class DiagnosticCodes
     public const string ModuleSlotMappingConflict = "AXC0306";
     public const string ModuleTaskRoleNotSlot = "AXC0307";
     public const string ConnectorBindingKind = "AXC0310";
-    public const string UnknownWebhookEvent = "AXC0311";
-    public const string MissingWebhookBinding = "AXC0312";
-    public const string InvalidWebhookTimeout = "AXC0313";
-    public const string SensitiveWebhookEventValue = "AXC0314";
+    public const string InvalidOutputSource = "AXC0311";
+    public const string UnknownWebhookEvent = "AXC0312";
+    public const string MissingWebhookBinding = "AXC0313";
+    public const string InvalidWebhookTimeout = "AXC0314";
+    public const string SensitiveWebhookEventValue = "AXC0315";
 }

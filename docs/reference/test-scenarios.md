@@ -103,7 +103,9 @@ request ends `approved`:
   ignoring letter case. One stub answers every call of its operation with the
   same output.
   - `output` is the answer of a successful call. The call writes it to the
-    subject fields and the process moves on, as a real call would.
+    subject fields and the process moves on, as a real call would. A connector
+    stub answers with a flat body keyed by output name, so an output with a
+    `source` is not found in it yet, and the call is left `unknown`.
   - `"outcome": "failed"` makes the call fail at once with no retry. The
     instance ends `failed`, which `expectInstance` can check.
   - A call that is reached and has no stub fails the scenario at that action.

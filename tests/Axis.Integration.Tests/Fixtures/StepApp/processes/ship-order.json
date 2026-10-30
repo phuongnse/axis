@@ -1,0 +1,20 @@
+{
+  "id": "cc0b19ba-cc09-4374-bea1-97fbfe791141",
+  "kind": "process",
+  "name": "ShipOrder",
+  "formatVersion": 1,
+  "entity": "Request",
+  "start": "createShipment",
+  "steps": [
+    {
+      "name": "createShipment",
+      "type": "operation",
+      "operation": "callConnector",
+      "connector": { "name": "Shipping", "operation": "createShipment" },
+      "input": { "reference": "title" },
+      "output": { "orderNumber": "title", "trackingNumber": "comment" },
+      "next": "done"
+    },
+    { "name": "done", "type": "end" }
+  ]
+}
