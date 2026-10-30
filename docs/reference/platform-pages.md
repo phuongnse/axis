@@ -33,3 +33,8 @@ so their paths are reserved site paths.
     search button and goes back to page 1. Each page is fetched from the server.
   - A `403` shows that the page is for administrators. A `404`, which a preview
     tenant answers, shows the not-found page. Any other failure shows an error message.
+  - Clicking a row opens a side panel with the person's roles from
+    `GET /api/users/{id}/roles`, with a Give or Remove button for each role. The button
+    asks for confirmation and calls the give-role or remove-role route, see
+    [the users page](user-administration.md#the-users-page). Its texts are
+    `shell.users.roles.*`.

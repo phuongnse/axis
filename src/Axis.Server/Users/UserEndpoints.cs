@@ -1,6 +1,9 @@
 using Axis.Configuration.Model;
 using Axis.Core.Tenancy;
 using Axis.Data.Profiles;
+using Axis.Data.Storage;
+using Axis.Server.Applications;
+using Axis.Server.Authentication;
 using Axis.Server.Http;
 using Axis.Server.Studio;
 using Axis.Server.Tenancy;
@@ -25,6 +28,15 @@ namespace Axis.Server.Users;
 /// client (404), the paging (400). A failure at the identity provider is a 502 with a fixed title, and the log names the step
 /// and the status code, never a body or a secret.
 /// </para>
+/// <para>
+/// <c>GET /api/users/{id}/roles</c> lists to an administrator the roles that were given to a person, and the roles that can be
+/// given. <c>given</c> holds the rows of <c>axis.given_roles</c>, each with its application id (null for a platform role), its
+/// role and <c>declared</c>: the active release of the application declares the role, or the platform role is one of the four
+/// kinds. A role of an application that has no active release is not declared. <c>applications</c> holds every active
+/// application with the roles that its active release declares, and <c>platformRoles</c> holds the four platform role kinds. A
+/// request is checked in order: signed-in user (401), administrator role (403), a tenant with a users client (404), the realm
+/// user (404, also for a service account). A failure at the identity provider is a 502 with a fixed title.
+/// </para>
 /// </summary>
 internal static partial class UserEndpoints
 {
@@ -32,6 +44,7 @@ internal static partial class UserEndpoints
     {
         endpoints.MapGet("/api/me", GetCurrentUserAsync);
         endpoints.MapGet("/api/users", ListUsersAsync);
+        endpoints.MapGet("/api/users/{id}/roles", GetUserRolesAsync);
     }
 
     private const int DefaultPageSize = 50;
@@ -96,6 +109,60 @@ internal static partial class UserEndpoints
             listed.TotalCount));
     }
 
+    private static async Task<IResult> GetUserRolesAsync(
+        string id,
+        HttpRequest request,
+        UsersSettings users,
+        ITenantCatalog catalog,
+        ITenantContextAccessor tenants,
+        TenantDatabase database,
+        ActiveApplicationResolver resolver,
+        IHttpClientFactory httpClients,
+        ILogger<UserLog> logger,
+        CancellationToken cancellationToken)
+    {
+        if (await CurrentUsers.FindAsync(request.HttpContext) is not { } user)
+        {
+            return Grants.SignInRequired();
+        }
+
+        if (!users.Allows(user.Roles))
+        {
+            return Grants.Forbidden();
+        }
+
+        if (IsPreview(catalog, tenants) || tenants.Current is not { } tenant || catalog.Find(tenant.TenantId)?.RealmUsers is not { } access)
+        {
+            return Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "This tenant has no users page.");
+        }
+
+        try
+        {
+            using var client = httpClients.CreateClient(nameof(UserEndpoints));
+            if (await new RealmUsers(client, access).FindAsync(id, cancellationToken) is null)
+            {
+                return Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "The tenant has no user with this id.");
+            }
+        }
+        catch (Exception exception) when (exception is InvalidOperationException or HttpRequestException)
+        {
+            LogRolesFailed(logger, tenant.TenantId, exception.Message);
+            return Results.Problem(statusCode: StatusCodes.Status502BadGateway, title: "The identity provider could not read the user.");
+        }
+
+        var models = await resolver.ListAsync(cancellationToken);
+        var given = await GivenRoles.ListAsync(await database.GetConnectionAsync(cancellationToken), id, cancellationToken);
+        return Results.Ok(new UserRolesResponse(
+            [.. given.Select(row => new GivenRoleItem(
+                row.ApplicationId,
+                row.Role,
+                row.ApplicationId is { } applicationId
+                    ? models.Any(model => model.Manifest.Id == applicationId && model.Roles.Any(role => string.Equals(role.Name, row.Role, StringComparison.Ordinal)))
+                    : PlatformRoles.IsKind(row.Role)))],
+            [.. models.Select(model => new GivableApplication(model.Manifest.Id, model.Manifest.Name, [.. model.Roles.Select(role => role.Name)]))],
+            PlatformRoles.Kinds));
+    }
+
     /// <summary><c>disabled</c> for a disabled realm user, otherwise <c>invited</c> without a profile and <c>active</c> with one.</summary>
     internal static string Status(bool enabled, bool hasProfile) =>
         !enabled ? "disabled" : hasProfile ? "active" : "invited";
@@ -106,6 +173,9 @@ internal static partial class UserEndpoints
 
     [LoggerMessage(LogLevel.Warning, "The users of tenant {TenantId} could not be listed. {Reason}")]
     private static partial void LogListFailed(ILogger logger, string tenantId, string reason);
+
+    [LoggerMessage(LogLevel.Warning, "The roles of a user of tenant {TenantId} could not be read. {Reason}")]
+    private static partial void LogRolesFailed(ILogger logger, string tenantId, string reason);
 
     // It takes the request rather than the context, so it binds as a route handler and its result is written.
     private static async Task<IResult> GetCurrentUserAsync(
@@ -136,6 +206,21 @@ internal sealed class UserLog;
 
 /// <summary>The answer of <c>GET /api/users</c>: one page of the realm's users and the number of all users that match the search.</summary>
 internal sealed record UserListResponse(IReadOnlyList<UserListItem> Items, int TotalCount);
+
+/// <summary>
+/// The answer of <c>GET /api/users/{id}/roles</c>: the roles given to the person, the active applications with the roles their
+/// active releases declare, and the four platform role kinds.
+/// </summary>
+internal sealed record UserRolesResponse(IReadOnlyList<GivenRoleItem> Given, IReadOnlyList<GivableApplication> Applications, IReadOnlyList<string> PlatformRoles);
+
+/// <summary>
+/// A role given to a person. <c>ApplicationId</c> is <c>null</c> for a platform role. <c>Declared</c> is false when the
+/// application's active release does not declare the role, or the application has no active release.
+/// </summary>
+internal sealed record GivenRoleItem(Guid? ApplicationId, string Role, bool Declared);
+
+/// <summary>An active application with the roles that its active release declares.</summary>
+internal sealed record GivableApplication(Guid Id, string Name, IReadOnlyList<string> Roles);
 
 /// <summary>
 /// A realm user of the list. <c>Provider</c> is <c>null</c> for an account, otherwise the alias of the user's federated

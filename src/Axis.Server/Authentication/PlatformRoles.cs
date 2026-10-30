@@ -19,6 +19,9 @@ internal static class PlatformRoles
     /// <summary>The kind of the administrator role, as the give-role and remove-role routes name it.</summary>
     public const string AdministratorKind = Administrator;
 
+    /// <summary>The kinds of the four platform roles.</summary>
+    public static IReadOnlyList<string> Kinds => [Author, Publisher, Operator, Administrator];
+
     /// <summary>Whether <paramref name="role"/> is the kind of one of the four platform roles.</summary>
     public static bool IsKind(string role) => role is Author or Publisher or Operator or Administrator;
 

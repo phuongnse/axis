@@ -425,7 +425,7 @@ file, and the realm accepts a code more than once. See [development realm and us
 | `approver`         | `approver`              | Request approval template journey; E2E journeys                                                                                               |
 | `lead-2`           | `service-desk-lead`     | Service desk sample; E2E claim and reassign journey                                                                                           |
 | `asset-manager`    | `asset-manager`         | Asset management sample; E2E asset management journey                                                                                         |
-| `auditor`          | `auditor`               | Asset management sample; E2E asset management journey                                                                                         |
+| `auditor`          | `auditor`               | Asset management sample; E2E asset management journey; the user whose roles the E2E users page journey gives and removes                       |
 | `administrator`    | `tenant-administrator`  | "Users" in the shell, E2E shell journey; E2E users page journey                                                                              |
 
 ## Machine callers

@@ -5,8 +5,8 @@ administrator gives, and the users page where both are managed.
 [D100](../decisions/d100-identity-providers-per-application-and-sign-in-per-site.md) agrees it. M17 builds it, so
 what is not built yet is marked _(planned for M17)_. The account rules are built: every realm that `tenant create` makes
 holds them. The users page's list and the server commands that disable, enable and reset an authenticator are built, and so are
-the server routes that give and remove an application or a platform role. The invitations, a user's details and the commands'
-buttons are not built yet. The conventions of [architecture.md](../architecture.md)
+the server routes that give and remove an application or a platform role. A user's roles panel with the Give and Remove
+buttons is built too. The invitations and the buttons of the other commands are not built yet. The conventions of [architecture.md](../architecture.md)
 apply.
 
 ## The administrator role
@@ -25,8 +25,8 @@ The setting, the shell entry and the users page's list are built.
 
 ## The users page
 
-The server's list route, the page's list and the server routes of five commands are built. A user's details and the buttons that call the
-commands are _(planned for M17)_.
+The server's list route, the page's list, a user's roles panel with its Give and Remove buttons, and the server routes of
+five commands are built. The invitations and the buttons of disable, enable and reset an authenticator are _(planned for M17)_.
 
 - **The list route:** `GET /api/users?search=&page=&pageSize=` answers `{ items, totalCount }` for the tenant's realm to an
   administrator. `page` starts at 1 and defaults to 1. `pageSize` is 1 to 50 and defaults to 50. A value outside these
@@ -42,12 +42,27 @@ commands are _(planned for M17)_.
   has the display name, the email, how the person signs in (the provider's alias as the route sends it, or "Account"), the status
   (`invited`, `active` or `disabled`) and the last sign-in. It searches by name or email, and pages. The page asks the
   route for 20 users at a time. A search starts on Enter or on the search button and goes back to page 1.
-- **A user:** opening a row shows the person's roles, for each application and for the platform, and the commands
-  below. A field marked `sensitive` and record data are never shown.
+- **The roles route:** `GET /api/users/{id}/roles` answers `{ given, applications, platformRoles }` to an administrator.
+  `given` holds the person's given roles, each as `{ applicationId, role, declared }`, with a `null` `applicationId` for a
+  platform role. `declared` is `false` for an application role that the application's active release no longer declares,
+  and for a role of an application that has no active release. A platform role is declared when it is one of the four
+  kinds. `applications` holds every active application as `{ id, name, roles }`, with the role names its active release
+  declares. `platformRoles` holds the four kinds, even when a host setting has no value. The route checks in the order of
+  the list route (`401`, `403`, `404` for a preview tenant or a tenant without a users client), then answers `404` for a user
+  that the realm does not have and for a service account. When the identity provider fails, it answers `502` with a fixed title.
+  It only reads, so it accepts any signed-in caller who holds `Users:AdministratorRole`, not only a browser session.
+- **A user:** clicking a row opens a side panel with the person's roles, one section for each active application and one
+  for the platform. Each role shows the "Given" tag when the person has it. A given role that is not declared any more
+  has a "Not declared" tag, and its section lists it even when its application is not active. A Give or Remove button
+  asks for confirmation, names the role, the place and the person, and then calls the give-role or remove-role route and
+  loads the roles again. The panel shows a `403` as "Sign in again to change a platform role." and a `409` as
+  "An administrator cannot remove their own administrator role." The panel shows names, not translated labels. It shows
+  what an administrator gave, not the platform roles that the provider's sign-in mapping gives. A field marked
+  `sensitive` and record data are never shown.
 - **Commands:** invite, resend an invitation, disable, enable, reset an account's authenticator, give a role and remove
   a role. Each command asks for confirmation, and each writes an [audit record](#audit). Disable, enable, reset an
-  authenticator, and give and remove an application or a platform role are built as server routes, which the user's details will call.
-  The others are _(planned for M17)_.
+  authenticator, and give and remove an application or a platform role are built as server routes. The roles panel calls
+  give and remove. The invitations and the buttons of disable, enable and reset an authenticator are _(planned for M17)_.
   - `POST /api/users/{id}/disable`, `POST /api/users/{id}/enable` and `POST /api/users/{id}/reset-authenticator` answer
     `204` and take no body. They take a browser session only, so a service account's bearer token gets `401`.
   - A request is checked in this order: signed-in user (`401`), `Users:AdministratorRole` (`403`), a tenant with a users

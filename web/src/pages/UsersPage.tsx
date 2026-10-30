@@ -6,6 +6,7 @@ import { useText } from '../platform/texts'
 import { fetchUsers, type UserList, type UserListItem, type UserListResult } from '../platform/users'
 import { usePlatform } from './context'
 import { NotFoundPage } from './NotFoundPage'
+import { UserRolesDrawer } from './UserRolesDrawer'
 
 const pageSize = 20
 
@@ -17,7 +18,8 @@ const statusColors: Record<UserListItem['status'], string> = {
 
 /**
  * The tenant's users for an administrator: a table that is searched by name or email and paged by the
- * server. A search starts on Enter or on the search button and goes back to page 1.
+ * server. A search starts on Enter or on the search button and goes back to page 1. Clicking a row opens a side panel
+ * with the person's roles.
  */
 export function UsersPage() {
   const t = useText()
@@ -28,6 +30,7 @@ export function UsersPage() {
   const [list, setList] = useState<UserList>()
   const [refusal, setRefusal] = useState<Exclude<UserListResult['kind'], 'ok'>>()
   const [loadFailed, setLoadFailed] = useState(false)
+  const [selected, setSelected] = useState<UserListItem | null>(null)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -83,6 +86,7 @@ export function UsersPage() {
             style={{ width: '100%' }}
             rowKey="id"
             dataSource={list.items}
+            onRow={(row) => ({ onClick: () => setSelected(row), style: { cursor: 'pointer' } })}
             pagination={{ current: page, pageSize, total: list.totalCount, showSizeChanger: false, onChange: setPage }}
             columns={[
               { title: t('shell.users.displayName'), dataIndex: 'displayName' },
@@ -112,6 +116,7 @@ export function UsersPage() {
           />
         </>
       )}
+      <UserRolesDrawer user={selected} onClose={() => setSelected(null)} />
     </PageLayout>
   )
 }
