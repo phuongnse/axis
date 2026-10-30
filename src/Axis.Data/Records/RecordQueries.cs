@@ -476,6 +476,28 @@ public static class RecordQueries
         return (rows, labels);
     }
 
+    /// <summary>The ids of the rows of a child collection of the record <paramref name="ownerId"/>, in position order.</summary>
+    internal static async Task<IReadOnlyList<Guid>> ReadRowIdsAsync(
+        NpgsqlConnection connection,
+        EntityModel child,
+        Guid ownerId,
+        CancellationToken cancellationToken)
+    {
+        await using var command = new NpgsqlCommand(
+            $"SELECT {EntityNaming.Quote(EntityNaming.IdColumn)} FROM {Table(child)} WHERE {EntityNaming.Quote(EntityNaming.OwnerColumn)} = @owner ORDER BY {EntityNaming.Quote(EntityNaming.PositionColumn)}",
+            connection);
+        command.Parameters.AddWithValue("owner", ownerId);
+
+        var ids = new List<Guid>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            ids.Add(reader.GetGuid(0));
+        }
+
+        return ids;
+    }
+
     internal static string Table(EntityModel entity) => EntityNaming.QualifiedTable(EntityNaming.Table(entity.Id));
 
     /// <summary>

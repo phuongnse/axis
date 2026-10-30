@@ -316,7 +316,7 @@ After approval, the purchase request process creates a purchase order.
   - An `object` input maps as `{ "fields": { … } }`, each key a nested field.
     A `list` input maps from a child collection of the subject as
     `{ "from": "<child collection>", "fields": { … } }`, and each item
-    expression is over the child row. Sending them is _(planned for M19)_. See
+    expression is over the child row. The step sends them as nested JSON. See
     [D91](../decisions/d91-connector-oauth2-and-structured-payloads.md) and
     [Connector resource](integration-resources.md#connector-resource).
 - `output` is optional. It maps operation outputs to subject fields. Each key
@@ -387,8 +387,8 @@ and `next`. An `object` or `list` input holds its nested inputs.
 1. It evaluates each `input` expression on the subject record. A required
    input that gives `null` fails the step. An optional input that gives
    `null` is stored as `null`. Dates and date-times are stored in the text
-   forms of the [record API](record-api.md). An `object` or `list` input
-   fails the step, as sending them is _(planned for M19)_.
+   forms of the [record API](record-api.md). An `object` or `list` input is
+   stored as nested JSON, see [Structured payloads](integration-resources.md#structured-payloads).
 2. It sets the instance to `waiting` on the step.
 3. It inserts the call into `axis.connector_calls` as `pending`, with
    0 attempts and the evaluated input. The row's id is the call's operation

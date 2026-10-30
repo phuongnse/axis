@@ -203,6 +203,41 @@ public sealed class ProcessStepFixture : IAsyncLifetime
         return id;
     }
 
+    /// <summary>
+    /// Inserts a shipment with a new title and one child row for each of <paramref name="lines"/>, and
+    /// returns its id. The rows go in reverse order with their <c>position</c> set to their index in
+    /// <paramref name="lines"/>, so a read that does not order by position gives the wrong order.
+    /// </summary>
+    public async Task<Guid> InsertShipmentAsync(params (string? Sku, long Quantity)[] lines)
+    {
+        Assert.True(Model.TryGetEntity("Shipment", out var shipment));
+        Assert.True(Model.TryGetEntity("ShipmentLine", out var line));
+        var id = Guid.NewGuid();
+        await using var owner = DataSource.CreateCommand(
+            $"INSERT INTO {EntityNaming.QualifiedTable(EntityNaming.Table(shipment.Id))} ({Column("id")}, {Column("title")}) VALUES (@id, @title)");
+        owner.Parameters.AddWithValue("id", id);
+        owner.Parameters.AddWithValue("title", $"Shipment {id:N}");
+        await owner.ExecuteNonQueryAsync();
+
+        for (var index = lines.Length - 1; index >= 0; index--)
+        {
+            await using var row = DataSource.CreateCommand(
+                $"""
+                INSERT INTO {EntityNaming.QualifiedTable(EntityNaming.Table(line.Id))}
+                    ({Column("id")}, {EntityNaming.Quote(EntityNaming.OwnerColumn)}, {EntityNaming.Quote(EntityNaming.PositionColumn)}, {Column("sku")}, {Column("quantity")})
+                VALUES (@id, @owner, @position, @sku, @quantity)
+                """);
+            row.Parameters.AddWithValue("id", Guid.NewGuid());
+            row.Parameters.AddWithValue("owner", id);
+            row.Parameters.AddWithValue("position", index);
+            row.Parameters.Add(new NpgsqlParameter("sku", NpgsqlDbType.Text) { Value = (object?)lines[index].Sku ?? DBNull.Value });
+            row.Parameters.AddWithValue("quantity", lines[index].Quantity);
+            await row.ExecuteNonQueryAsync();
+        }
+
+        return id;
+    }
+
     /// <summary>Sets the <c>divisor</c> of the request <paramref name="id"/>.</summary>
     public async Task SetDivisorAsync(Guid id, long divisor)
     {
