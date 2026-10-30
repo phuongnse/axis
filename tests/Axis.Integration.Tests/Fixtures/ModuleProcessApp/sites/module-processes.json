@@ -1,0 +1,10 @@
+{
+  "id": "9b4d6e83-2a5c-4f17-8d60-3e7a1c9b5f0b",
+  "kind": "site",
+  "name": "ModuleProcesses",
+  "formatVersion": 1,
+  "path": "module-processes",
+  "title": { "textKey": "site.title" },
+  "locales": { "default": "en", "fallback": "en", "available": ["en"] },
+  "navigation": [{ "page": "Orders", "label": { "textKey": "nav.orders" } }]
+}

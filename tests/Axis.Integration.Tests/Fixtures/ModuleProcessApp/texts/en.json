@@ -1,0 +1,14 @@
+{
+  "id": "9b4d6e83-2a5c-4f17-8d60-3e7a1c9b5f09",
+  "kind": "text",
+  "name": "TextsEn",
+  "formatVersion": 1,
+  "locale": "en",
+  "texts": {
+    "nav.orders": "Orders",
+    "order.closeReview": "Close review",
+    "pages.orders.title": "Orders",
+    "role.clerk": "Clerk",
+    "site.title": "Module processes"
+  }
+}

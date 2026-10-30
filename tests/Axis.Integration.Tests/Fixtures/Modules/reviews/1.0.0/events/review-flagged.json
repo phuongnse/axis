@@ -1,0 +1,8 @@
+{
+  "id": "5d9a7c32-6e4f-4b8c-9f3a-9c3e2a7d4b02",
+  "kind": "event",
+  "name": "ReviewFlagged",
+  "formatVersion": 1,
+  "entity": "Review",
+  "fields": [{ "name": "title", "type": "text" }]
+}

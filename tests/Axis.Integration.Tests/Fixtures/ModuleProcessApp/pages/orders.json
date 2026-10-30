@@ -1,0 +1,14 @@
+{
+  "id": "9b4d6e83-2a5c-4f17-8d60-3e7a1c9b5f06",
+  "kind": "page",
+  "name": "Orders",
+  "formatVersion": 1,
+  "title": { "textKey": "pages.orders.title" },
+  "widgets": [
+    {
+      "type": "form",
+      "entity": "Order",
+      "actions": [{ "type": "startProcess", "process": "CloseReview", "label": { "textKey": "order.closeReview" } }]
+    }
+  ]
+}

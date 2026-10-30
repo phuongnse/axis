@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json.Nodes;
 using Axis.Configuration.Model;
+using Axis.Configuration.Modules;
 using Axis.Configuration.Packages;
 using Axis.Configuration.Releases;
 using Axis.Configuration.Storage;
@@ -44,6 +45,7 @@ public sealed class ProcessStepFixture : IAsyncLifetime
     private readonly PostgreSqlFixture _database = new();
     private readonly string _tenantId;
     private readonly string _appFolder;
+    private readonly IReadOnlyCollection<InstalledModule> _modules;
     private string? _connectionString;
     private NpgsqlDataSource? _dataSource;
     private ServiceProvider? _services;
@@ -61,9 +63,19 @@ public sealed class ProcessStepFixture : IAsyncLifetime
 
     /// <summary>A fixture that activates the application in <paramref name="appFolder"/> first, in place of StepApp.</summary>
     internal ProcessStepFixture(string tenantId, string appFolder)
+        : this(tenantId, appFolder, null)
+    {
+    }
+
+    /// <summary>
+    /// A fixture that activates the application in <paramref name="appFolder"/> first, against the modules
+    /// installed under <paramref name="modulesPath"/>, when it is given. Later activations use the same modules.
+    /// </summary>
+    internal ProcessStepFixture(string tenantId, string appFolder, string? modulesPath)
     {
         _tenantId = tenantId;
         _appFolder = appFolder;
+        _modules = modulesPath is null ? [] : ModuleCatalog.Load(modulesPath).Modules;
     }
 
     /// <summary>The folder of the StepApp fixture application.</summary>
@@ -299,6 +311,44 @@ public sealed class ProcessStepFixture : IAsyncLifetime
                 ApplicationId = Model.Manifest.Id,
                 ProcessId = model.Id,
                 SubjectEntityId = request.Id,
+                SubjectId = subjectId,
+                ReleaseId = releaseId,
+                State = ProcessStarts.Running,
+                Revision = 1,
+                Step = model.Start,
+            }));
+        await WorkItemQueue.EnqueueAsync(
+            connection,
+            transaction,
+            _tenantId,
+            ProcessStarts.StepWorkItemKind,
+            DateTimeOffset.UtcNow.AddMinutes(-1),
+            CancellationToken.None,
+            processInstanceId: instanceId);
+        await transaction.CommitAsync();
+        return instanceId;
+    }
+
+    /// <summary>
+    /// Starts <paramref name="process"/> for the record <paramref name="subjectId"/> of the process's own
+    /// entity, pinned to <paramref name="releaseId"/>, as <see cref="StartAsync"/> does. The process may be
+    /// a module process, which works on the application's copy of a module entity.
+    /// </summary>
+    public async Task<Guid> StartOnSubjectAsync(string process, Guid subjectId, Guid releaseId)
+    {
+        Assert.True(Model.TryGetProcess(process, out var model));
+        var entity = Model.FindEntity(model.Entity!.Id)!;
+        var instanceId = Guid.CreateVersion7();
+        await using var connection = await DataSource.OpenConnectionAsync();
+        await using var transaction = await connection.BeginTransactionAsync();
+        Assert.True(await ProcessStarts.TryInsertInstanceAsync(
+            transaction,
+            new ProcessInstanceRow
+            {
+                Id = instanceId,
+                ApplicationId = Model.Manifest.Id,
+                ProcessId = model.Id,
+                SubjectEntityId = entity.Id,
                 SubjectId = subjectId,
                 ReleaseId = releaseId,
                 State = ProcessStarts.Running,
@@ -649,16 +699,18 @@ public sealed class ProcessStepFixture : IAsyncLifetime
     /// Compiles the application in <paramref name="folder"/> against <paramref name="packages"/> and activates it.
     /// Activation recomputes at most <paramref name="inlineRecomputeLimit"/> rows of an entity inline and leaves
     /// more to the backfill. The schedules are written as of <paramref name="activatedAt"/> when it is given.
-    /// Returns the release's id and model.
+    /// The release pins the highest version in range of <paramref name="modules"/>, or of the fixture's modules
+    /// when none are given. Returns the release's id and model.
     /// </summary>
     internal async Task<(Guid ReleaseId, ApplicationModel Model)> ActivateAsync(
         string folder,
         IReadOnlyCollection<PackageVersion> packages,
         ActivationBindings? bindings = null,
         int inlineRecomputeLimit = ReleaseActivator.DefaultInlineRecomputeLimit,
-        DateTimeOffset? activatedAt = null)
+        DateTimeOffset? activatedAt = null,
+        IReadOnlyCollection<InstalledModule>? modules = null)
     {
-        var (compiled, activated) = await TryActivateAsync(folder, packages, bindings ?? StepAppBindings(_tenantId), inlineRecomputeLimit);
+        var (compiled, activated) = await TryActivateAsync(folder, packages, bindings ?? StepAppBindings(_tenantId), inlineRecomputeLimit, modules);
         Assert.Empty(activated.Diagnostics);
         if (activatedAt is null)
         {
@@ -690,13 +742,14 @@ public sealed class ProcessStepFixture : IAsyncLifetime
         string folder,
         IReadOnlyCollection<PackageVersion> packages,
         ActivationBindings bindings,
-        int inlineRecomputeLimit = ReleaseActivator.DefaultInlineRecomputeLimit)
+        int inlineRecomputeLimit = ReleaseActivator.DefaultInlineRecomputeLimit,
+        IReadOnlyCollection<InstalledModule>? modules = null)
     {
         await using var connection = new NpgsqlConnection(_connectionString);
         await connection.OpenAsync();
         await using var configuration = DataDatabaseFixture.CreateConfigurationContext(connection);
         await using var data = DataDatabaseFixture.CreateContext(connection);
-        var compiled = await ReleaseCompiler.CompileAsync(folder, configuration, packages);
+        var compiled = await ReleaseCompiler.CompileAsync(folder, configuration, packages, modules ?? _modules);
         Assert.Empty(compiled.Diagnostics);
         var activated = await ReleaseActivator.ActivateAsync(compiled, new ActiveReleaseStore(configuration), data, bindings, OpenInstanceCounter.Instance, inlineRecomputeLimit);
         return (compiled, activated);

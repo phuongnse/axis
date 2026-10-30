@@ -332,7 +332,7 @@ agrees. An application that declares it maps the slot to one of its own roles:
   that is no record id names a module page. A module page named `New` cannot be opened, because
   `/{site}/{module id}/new` is the address of a new record on the application page named like the
   module. Who may read the records is up to the grants of the application's policies.
-- **Processes.** _(built for compilation)_ A module process is a `process` file in the module. In
+- **Processes.** _(built for compilation and running)_ A module process is a `process` file in the module. In
   an application it is named `<module id>/<name>`, and its id is derived from the application `id`
   as for other module resources. It works on an entity of its own module, and its steps name
   resources of its own module by plain name: the `entity` of the process and of a `createRecord`
@@ -349,8 +349,11 @@ agrees. An application that declares it maps the slot to one of its own roles:
   assignee naming a role slot, and the `callConnector` steps that name
   a connector slot of the module, see Connector slots below. The application starts it from a
   trigger, a `startProcess` action, a sub-process step or an endpoint, by the name
-  `<module id>/<name>`. It is pinned with the rest of the release. The engines are not changed
-  yet, so a process whose name contains `/` is not proven to start, run or show tasks.
+  `<module id>/<name>`. It is pinned with the rest of the release. The worker runs a module process
+  instance on the application's own copy of its module entity when a trigger or a sub-process step
+  starts it, and a waiting instance finishes on the release it was started on, even after a newer
+  module version is activated. Starting one through the start endpoint or an endpoint by
+  `<module id>/<name>`, and module tasks, are not proven yet.
 - **Triggers.** A module trigger starts a process of its own module. It
   reacts to an event or an entity of its own module, or of a module it
   declares. A schedule trigger runs in the time zone of each application that

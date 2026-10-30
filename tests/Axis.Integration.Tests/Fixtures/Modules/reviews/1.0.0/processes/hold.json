@@ -1,0 +1,19 @@
+{
+  "id": "5d9a7c32-6e4f-4b8c-9f3a-9c3e2a7d4b04",
+  "kind": "process",
+  "name": "Hold",
+  "formatVersion": 1,
+  "entity": "Review",
+  "start": "pause",
+  "steps": [
+    { "name": "pause", "type": "timer", "wait": "PT1H", "next": "mark" },
+    {
+      "name": "mark",
+      "type": "operation",
+      "operation": "updateRecord",
+      "set": { "state": "'held'" },
+      "next": "done"
+    },
+    { "name": "done", "type": "end" }
+  ]
+}

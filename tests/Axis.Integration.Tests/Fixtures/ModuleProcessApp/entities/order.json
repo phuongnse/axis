@@ -1,0 +1,11 @@
+{
+  "id": "9b4d6e83-2a5c-4f17-8d60-3e7a1c9b5f02",
+  "kind": "entity",
+  "name": "Order",
+  "formatVersion": 1,
+  "displayField": "title",
+  "fields": [
+    { "name": "title", "type": "text", "required": true },
+    { "name": "review", "type": "reference", "target": "reviews/Review" }
+  ]
+}

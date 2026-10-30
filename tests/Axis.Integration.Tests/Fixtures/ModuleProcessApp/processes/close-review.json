@@ -1,0 +1,12 @@
+{
+  "id": "9b4d6e83-2a5c-4f17-8d60-3e7a1c9b5f03",
+  "kind": "process",
+  "name": "CloseReview",
+  "formatVersion": 1,
+  "entity": "Order",
+  "start": "close",
+  "steps": [
+    { "name": "close", "type": "subProcess", "process": "reviews/Close", "subject": "review", "next": "done" },
+    { "name": "done", "type": "end" }
+  ]
+}
