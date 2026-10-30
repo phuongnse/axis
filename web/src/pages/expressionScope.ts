@@ -42,6 +42,7 @@ const fieldDefault = /^\/fields\/\d+\/default$/
 const grantFilter = /^\/grants\/\d+\/filter$/
 const grantIndex = /^\/grants\/(\d+)\//
 const waitEventWhen = /^\/steps\/(\d+)\/when$/
+const stepInput = /^\/steps\/(\d+)\/input\/(.+)$/
 
 /**
  * The names an expression can use at a JSON Pointer of a resource of the given kind. With no names loaded, only
@@ -122,7 +123,7 @@ function fieldOptions(
     }
     return namesOf(draft.fields).map((name) => option(name, 'field', false))
   }
-  const entity = entityOf(kind, draft, pointer)
+  const entity = (kind === 'process' ? itemEntity(draft, pointer, names) : undefined) ?? entityOf(kind, draft, pointer)
   const found = names.entities.find((item) => item.name.toLowerCase() === entity?.toLowerCase())
   if (!found) {
     return []
@@ -137,6 +138,40 @@ function fieldOptions(
       .filter((field) => listed === undefined || listed.has(field.name.toLowerCase()))
       .map((field) => option(field.name, 'field', false)),
   ]
+}
+
+/**
+ * The entity of the row an expression reads, when the pointer is inside a `list` input of a step's `input`. A `list`
+ * maps from a child collection of the entity around it, so its nested expressions read a row of that collection's
+ * entity. An object input keeps the entity around it. An unknown collection yields an empty name, which has no
+ * fields. Undefined when the pointer crosses no `from`.
+ */
+export function itemEntity(draft: Record<string, unknown>, pointer: string, names: StudioNames): string | undefined {
+  const match = stepInput.exec(pointer)
+  if (match === null || !Array.isArray(draft.steps)) {
+    return undefined
+  }
+  const segments = match[2].split('/').map((segment) => segment.replaceAll('~1', '/').replaceAll('~0', '~'))
+  let entity = stringProperty(draft, 'entity') ?? ''
+  let mapping: unknown = (draft.steps[Number(match[1])] as Record<string, unknown> | null | undefined)?.input
+  let crossed = false
+  for (let index = 0; index + 2 < segments.length && segments[index + 1] === 'fields'; index += 2) {
+    const entry: unknown = isRecord(mapping) ? mapping[segments[index]] : undefined
+    const from = stringProperty(entry, 'from')
+    if (from !== undefined) {
+      const collection = names.entities
+        .find((item) => item.name.toLowerCase() === entity.toLowerCase())
+        ?.fields.find((field) => field.type === 'child-collection' && field.name.toLowerCase() === from.toLowerCase())
+      entity = collection?.target ?? ''
+      crossed = true
+    }
+    mapping = isRecord(entry) ? entry.fields : undefined
+  }
+  return crossed ? entity : undefined
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 function listedFields(draft: Record<string, unknown>): Set<string> {

@@ -136,6 +136,19 @@ panel are _(built)_.
   required keys, empty. Keys the schema allows stay. The conditionals that also
   test the operation are left to the operation panel. A type with no panel yet
   shows its keys as "Edit in JSON" markers.
+- **Property panel (connector input)** _(built)_. The `input` of a
+  `callConnector` step is rows of a typed input name, a Value, Object or List
+  switch and an expression. The names route lists no input types, so the panel
+  reads a row's kind from the draft: text is a Value, an object with `from` a
+  List and any other object an Object. An `object` shows nested field rows,
+  each a typed field name and an expression over the subject. A `list` shows a
+  **From** picker of the subject's child collections, then nested field rows
+  with an expression over a row of that collection. The expression editor
+  offers that child entity's fields and `id`, not the subject's. Nested rows
+  nest further. The switch writes `{ fields }`, `{ from, fields }` or an empty
+  expression and keeps the nested `fields`, and the compiler reports what is
+  missing. A package operation's `input` stays scalar rows, because package
+  fields stay scalar.
 - **Property panel (timer)** _(built)_. A timer's card has a Wait or Until
   choice, a duration box for `wait`, an expression editor for `until`, and a
   Next step picker. Switching removes the other key and puts the chosen key,

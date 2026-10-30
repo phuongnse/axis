@@ -3,6 +3,7 @@ import { useContext, useState } from 'react'
 import type { StudioNames } from '../platform/studio'
 import { useText } from '../platform/texts'
 import { ExpressionCheckContext } from './expressionCheckContext'
+import { ConnectorInputRows } from './ConnectorInputRows'
 import { MappingRows } from './MappingRows'
 import { NotifyFields } from './NotifyFields'
 import { builtInOperations, forbiddenByOperation, packageChoice, withOperation, without } from './operationKeys'
@@ -95,7 +96,7 @@ export function OperationPanel({
       {operation === 'callConnector' && (
         <>
           <ConnectorChoice pointer={pointer} value={step.connector} names={names} onChange={onChange} />
-          <ConnectorMappings pointer={pointer} step={step} fields={fields} onChange={onChange} />
+          <ConnectorMappings pointer={pointer} step={step} fields={fields} entity={entity} nested onChange={onChange} />
         </>
       )}
       {operation === 'raiseEvent' && <EventChoice pointer={pointer} step={step} names={names} onChange={onChange} />}
@@ -103,7 +104,16 @@ export function OperationPanel({
         <CreateEntityChoice pointer={pointer} step={step} names={names} onChange={onChange} />
       )}
       {operation === 'notify' && <NotifyFields pointer={pointer} value={step} onChange={onChange} />}
-      {isPackage && <ConnectorMappings pointer={pointer} step={step} fields={fields} onChange={onChange} />}
+      {isPackage && (
+        <ConnectorMappings
+          pointer={pointer}
+          step={step}
+          fields={fields}
+          entity={entity}
+          nested={false}
+          onChange={onChange}
+        />
+      )}
     </>
   )
 }
@@ -289,29 +299,47 @@ function CreateEntityChoice({
   )
 }
 
-/** The `input`, `output` and `retry` that a connector call and a package operation share. */
+/**
+ * The `input`, `output` and `retry` that a connector call and a package operation share. A connector call's `input`
+ * can nest, as an `object` or a `list` of the subject's child collection, and a package operation's stays scalar.
+ */
 function ConnectorMappings({
   pointer,
   step,
   fields,
+  entity,
+  nested,
   onChange,
 }: {
   pointer: string
   step: Content
   fields: string[] | undefined
+  entity: string
+  nested: boolean
   onChange: ChangeHandler
 }) {
   const t = useText()
   return (
     <>
-      <MappingRows
-        pointer={`${pointer}/input`}
-        title={t('shell.studio.process.input')}
-        value={step.input}
-        keyLabel={t('shell.studio.process.inputName')}
-        target={{ kind: 'expression' }}
-        onChange={onChange}
-      />
+      {nested ? (
+        <ConnectorInputRows
+          pointer={`${pointer}/input`}
+          title={t('shell.studio.process.input')}
+          keyLabel={t('shell.studio.process.inputName')}
+          value={step.input}
+          entity={entity}
+          onChange={onChange}
+        />
+      ) : (
+        <MappingRows
+          pointer={`${pointer}/input`}
+          title={t('shell.studio.process.input')}
+          value={step.input}
+          keyLabel={t('shell.studio.process.inputName')}
+          target={{ kind: 'expression' }}
+          onChange={onChange}
+        />
+      )}
       <MappingRows
         pointer={`${pointer}/output`}
         title={t('shell.studio.process.output')}
