@@ -11,10 +11,10 @@ public static class ActivationRealmSync
 {
     /// <summary>
     /// Resolves <paramref name="plan"/> against <paramref name="bindings"/>: the sites, and for each provider its
-    /// issuer, client id, client secret and claims.
+    /// issuer, client id, client secret and claims, or for a <c>saml</c> provider its metadata address and claims.
     /// </summary>
     /// <exception cref="InvalidOperationException">
-    /// A provider has no <c>clientSecret</c> binding, or a binding it names is missing or of the wrong kind. The message
+    /// An <c>oidc</c> provider has no <c>clientSecret</c> binding, or a binding it names is missing or of the wrong kind. The message
     /// names the provider alias and, for a binding, its name.
     /// </exception>
     public static RealmState ToState(RealmPlan plan, IReadOnlyDictionary<string, TenantBinding> bindings)
@@ -50,6 +50,26 @@ public static class ActivationRealmSync
     private static RealmBrokeredProvider ToProvider(RealmProvider provider, IReadOnlyDictionary<string, TenantBinding> bindings)
     {
         var alias = provider.Alias;
+        if (provider.Type == "saml")
+        {
+            return new RealmBrokeredProvider(
+                alias,
+                null,
+                null,
+                null,
+                provider.Claims.DisplayName,
+                provider.Claims.Email,
+                provider.Claims.Locale,
+                provider.RolesClaims,
+                provider.Labels,
+                new Uri(Url(alias, provider.MetadataBinding ?? throw new InvalidOperationException($"The identity provider '{alias}' has no metadata binding, which the realm needs."), bindings)));
+        }
+
+        if (provider.IssuerBinding is not { } issuerBinding || provider.ClientIdBinding is not { } clientIdBinding)
+        {
+            throw new InvalidOperationException($"The identity provider '{alias}' has no issuer or clientId binding, which the realm needs.");
+        }
+
         if (provider.ClientSecretBinding is not { } clientSecretBinding)
         {
             throw new InvalidOperationException($"The identity provider '{alias}' has no clientSecret binding, which the realm needs.");
@@ -57,8 +77,8 @@ public static class ActivationRealmSync
 
         return new RealmBrokeredProvider(
             alias,
-            new Uri(Url(alias, provider.IssuerBinding, bindings)),
-            Secret(alias, provider.ClientIdBinding, bindings),
+            new Uri(Url(alias, issuerBinding, bindings)),
+            Secret(alias, clientIdBinding, bindings),
             Secret(alias, clientSecretBinding, bindings),
             provider.Claims.DisplayName,
             provider.Claims.Email,

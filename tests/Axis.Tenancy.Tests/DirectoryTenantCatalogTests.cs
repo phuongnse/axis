@@ -239,7 +239,7 @@ public sealed class DirectoryTenantCatalogTests
         Assert.Equal("oidc-companyissuer", company.Alias);
         Assert.Equal("groups", company.RolesClaim);
         Assert.Equal(new Dictionary<string, string> { ["axis-authors"] = "author", ["axis-ops"] = "operator" }, company.RoleValues);
-        Assert.Null(platform.Providers[1].Alias);
+        Assert.Equal("saml-federationmetadata", platform.Providers[1].Alias);
         Assert.Null(platform.Providers[1].RolesClaim);
         Assert.Equal("oidc-partnerissuer", platform.Providers[2].Alias);
         Assert.Empty(platform.Providers[2].RoleValues);

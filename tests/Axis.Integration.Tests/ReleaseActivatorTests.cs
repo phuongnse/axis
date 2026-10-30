@@ -266,6 +266,67 @@ public sealed class ReleaseActivatorTests(DataDatabaseFixture database) : IClass
         Assert.Null(await FindActiveAsync(_applicationId));
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task A_saml_provider_whose_metadata_binding_the_tenant_lacks_or_holds_as_a_secret_is_a_diagnostic_and_the_release_is_not_activated(
+        bool holdsSecret)
+    {
+        var suffix = $"{Guid.NewGuid():N}";
+        using var folder = SamlFolder(_applicationId, _name, Guid.NewGuid(), _orderId, $"Metadata{suffix}");
+        var compiled = await CompileAsync(folder);
+        var bindings = new Dictionary<string, ActivationBinding>(StringComparer.OrdinalIgnoreCase);
+        if (holdsSecret)
+        {
+            bindings[$"Metadata{suffix}"] = new(ActivationBinding.SecretKind, null);
+        }
+
+        var result = await ActivateAsync(compiled, new ActivationBindings("acme", bindings, AllowHttp: false));
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.MissingDeploymentBinding, "identity-providers/agency.json", "/metadata/binding", DiagnosticSeverity.Error),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.Severity));
+        Assert.Null(result.Realm);
+        Assert.Null(await FindActiveAsync(_applicationId));
+    }
+
+    [Fact]
+    public async Task A_saml_provider_whose_metadata_binding_is_a_url_binding_is_planned_with_the_saml_alias()
+    {
+        var suffix = $"{Guid.NewGuid():N}";
+        using var folder = SamlFolder(_applicationId, _name, Guid.NewGuid(), _orderId, $"Metadata{suffix}");
+        var compiled = await CompileAsync(folder);
+        var bindings = new Dictionary<string, ActivationBinding>(StringComparer.OrdinalIgnoreCase)
+        {
+            [$"Metadata{suffix}"] = new(ActivationBinding.UrlKind, new Uri("https://idp.example.test/metadata")),
+        };
+
+        var result = await ActivateAsync(compiled, new ActivationBindings("acme", bindings, AllowHttp: false));
+
+        Assert.Empty(result.Diagnostics);
+        var provider = Assert.Single(result.Realm!.Providers);
+        Assert.Equal(($"saml-metadata{suffix}", "saml"), (provider.Alias, provider.Type));
+        Assert.Equal(compiled.Release?.Id, (await FindActiveAsync(_applicationId))?.ReleaseId);
+    }
+
+    [Fact]
+    public async Task On_a_preview_tenant_a_saml_provider_without_a_metadata_binding_is_a_warning_and_the_plan_leaves_it_out()
+    {
+        var suffix = $"{Guid.NewGuid():N}";
+        using var folder = SamlFolder(_applicationId, _name, Guid.NewGuid(), _orderId, $"Metadata{suffix}");
+        var compiled = await CompileAsync(folder);
+
+        var result = await ActivateAsync(compiled, ActivationBindings.None("acme") with { IsPreview = true });
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.MissingDeploymentBinding, "/metadata/binding", DiagnosticSeverity.Warning),
+            (diagnostic.Code, diagnostic.Path, diagnostic.Severity));
+        Assert.Equal(compiled.Release?.Id, (await FindActiveAsync(_applicationId))?.ReleaseId);
+        Assert.Empty(result.Realm!.Providers);
+    }
+
     [Fact]
     public async Task On_a_preview_tenant_an_oidc_provider_without_bindings_is_a_warning_and_the_plan_leaves_it_out()
     {
@@ -660,6 +721,19 @@ public sealed class ReleaseActivatorTests(DataDatabaseFixture database) : IClass
                   "texts": { "provider.company": "Company" } }
                 """)
             .With("identity-providers/company.json", OidcProvider(providerId, "company", issuer, clientId, clientSecret));
+
+    /// <summary>An application with a <c>saml</c> provider named <c>agency</c>, which needs the text of its label.</summary>
+    private static TemporaryFolder SamlFolder(
+        Guid applicationId, string name, Guid providerId, Guid orderId, string metadata) =>
+        ApplicationFolder(applicationId, name, orderId, NumberField)
+            .With("texts/en.json", $$"""
+                { "id": "{{Guid.NewGuid()}}", "kind": "text", "name": "TextsEn", "formatVersion": 1, "locale": "en",
+                  "texts": { "provider.agency": "Agency" } }
+                """)
+            .With("identity-providers/agency.json", $$"""
+                { "id": "{{providerId}}", "kind": "identityProvider", "name": "agency", "formatVersion": 1, "type": "saml",
+                  "label": { "textKey": "provider.agency" }, "metadata": { "binding": "{{metadata}}" } }
+                """);
 
     private static string OidcProvider(Guid id, string name, string issuer, string clientId, string clientSecret) =>
         $$"""

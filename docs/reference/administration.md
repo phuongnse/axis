@@ -654,7 +654,7 @@ a missing binding is an `AXC0100` warning and not an error, as
    to the [release history](storage.md#release-history), unless the release is
    already the active one. After the activation has committed, the step brings the
    tenant's realm in step with the tenant's applications: it adds, changes and
-   removes the realm's `site-` clients and `oidc-` providers, see
+   removes the realm's `site-` clients and `oidc-` and `saml-` providers, see
    [keeping the realm in step](identity-provider.md#keeping-the-realm-in-step). It
    writes no line of its own. A tenant without an activation secret, such as a
    preview tenant, skips the update. A failure of the identity provider fails the

@@ -9,7 +9,7 @@ using Axis.Configuration.Resources;
 namespace Axis.Tenancy.Realms;
 
 /// <summary>
-/// Makes a tenant's realm hold the site clients and brokered <c>oidc</c> providers of a <see cref="RealmState"/>. It
+/// Makes a tenant's realm hold the site clients and brokered <c>oidc</c> and <c>saml</c> providers of a <see cref="RealmState"/>. It
 /// signs in to the realm as <c>axis-activation</c> with the client credentials grant, so it needs no rights in the
 /// master realm. Each site gets a confidential client <c>site-</c> and its path, which carries the attributes <c>axis.providers</c> (the aliases of the providers the site allows, separated by spaces) and <c>axis.accounts</c> (<c>true</c> or <c>false</c>), and which copies the redirect addresses, web origins and
 /// post-logout redirect addresses of <c>axis</c> and, when the state holds the platform secret, has the secret that
@@ -19,11 +19,14 @@ namespace Axis.Tenancy.Realms;
 /// <c>axis</c> by name, except the two named <c>identity provider</c> and <c>identity provider acr</c>, and never removes a mapper. Each
 /// provider gets claim mappers for the display name, the email, the locale and each roles claim, an <c>acr</c> mapper that copies the
 /// provider's <c>acr</c> claim into the person's realm session, and a <c>username</c> mapper that names a new user after the
-/// provider's alias and the person's subject. A provider with labels has the display name <c>${axisProvider.&lt;alias&gt;}</c>, and the
+/// provider's alias and the person's subject. A <c>saml</c> provider is imported from its metadata, which the sync reads
+/// before the realm changes and uploads to the import-config endpoint of the realm. It asks for a persistent NameID, signs its requests with
+/// the realm's own key (RSA-SHA256), and gets <c>saml-user-attribute-idp-mapper</c> mappers for the same claims as an <c>oidc</c> provider, no <c>acr</c> mapper,
+/// and a <c>username</c> mapper that names a new user after the provider's alias and the NameID. A provider with labels has the display name <c>${axisProvider.&lt;alias&gt;}</c>, and the
 /// sync writes the label of each platform locale as the realm text of that key through the realm localization API, which
 /// needs the <c>manage-realm</c> right, and removes the label texts (<see cref="LabelKeyPrefix"/>) of providers the realm no longer holds. Each provider also names the realm's own first-login flow
 /// (<see cref="FirstLoginFlowAlias"/>), which always creates a new user and never offers to link one. The sync adds, changes and removes only clients whose id
-/// starts with <see cref="SiteClientPrefix"/> and providers whose alias starts with <see cref="ProviderAliasPrefix"/>,
+/// starts with <see cref="SiteClientPrefix"/> and providers whose alias starts with <see cref="ProviderAliasPrefix"/> or <see cref="SamlProviderAliasPrefix"/>,
 /// so <c>axis</c>, <c>axis-activation</c>, <c>axis-users</c> and anything an operator added stay. A removed provider
 /// keeps its users in the realm. An error names the step and the status code, never a response body or a secret. A 409
 /// from the identity provider, which another sync of the same realm at the same time can cause, makes the sync read the
@@ -33,6 +36,9 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
 {
     public const string SiteClientPrefix = "site-";
     public const string ProviderAliasPrefix = "oidc-";
+
+    /// <summary>The start of the alias of a brokered <c>saml</c> provider.</summary>
+    public const string SamlProviderAliasPrefix = "saml-";
     public const string IdentityProviderClaim = "identity_provider";
 
     /// <summary>The claim of a site client's ID token that holds the <c>acr</c> the brokered provider signed the person in at.</summary>
@@ -62,6 +68,8 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
     private const string ActivationClientId = "axis-activation";
     private const string UserAttributeMapper = "oidc-user-attribute-idp-mapper";
     private const string UsernameMapper = "oidc-username-idp-mapper";
+    private const string SamlUserAttributeMapper = "saml-user-attribute-idp-mapper";
+    private const string SamlUsernameMapper = "saml-username-idp-mapper";
     private const string UsernameMapperName = "username";
     private const string SessionNoteMapper = "oidc-usersessionmodel-note-mapper";
     private const string SessionNoteMapperName = "identity provider";
@@ -79,11 +87,14 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
         var token = await ActivationTokenAsync(realm, activationSecret, cancellationToken);
         var realmPath = $"admin/realms/{Uri.EscapeDataString(realm)}";
 
-        // Every discovery document is read before the realm changes, so an unreachable issuer changes nothing.
-        var providers = new List<(RealmBrokeredProvider Provider, Dictionary<string, string> Endpoints)>();
+        // Every discovery document and every metadata document is read before the realm changes, so an unreachable issuer
+        // or metadata address changes nothing.
+        var providers = new List<ProviderSource>();
         foreach (var provider in state.Providers)
         {
-            providers.Add((provider, await ReadDiscoveryAsync(provider, cancellationToken)));
+            providers.Add(provider.Metadata is { } metadata
+                ? new ProviderSource(provider, [], await ReadMetadataAsync(provider.Alias, metadata, cancellationToken))
+                : new ProviderSource(provider, await ReadDiscoveryAsync(provider, cancellationToken), null));
         }
 
         for (var attempt = 1; ; attempt++)
@@ -126,9 +137,15 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
         var aliases = new HashSet<string>(StringComparer.Ordinal);
         foreach (var provider in state.Providers)
         {
-            if (!provider.Alias.StartsWith(ProviderAliasPrefix, StringComparison.Ordinal))
+            var prefix = provider.Metadata is null ? ProviderAliasPrefix : SamlProviderAliasPrefix;
+            if (!provider.Alias.StartsWith(prefix, StringComparison.Ordinal))
             {
-                throw new ArgumentException($"The provider alias '{provider.Alias}' does not start with '{ProviderAliasPrefix}'.", nameof(state));
+                throw new ArgumentException($"The provider alias '{provider.Alias}' does not start with '{prefix}'.", nameof(state));
+            }
+
+            if (provider.Metadata is null && (provider.Issuer is null || provider.ClientId is null || provider.ClientSecret is null))
+            {
+                throw new ArgumentException($"The provider '{provider.Alias}' has no issuer, client id or client secret.", nameof(state));
             }
 
             if (!aliases.Add(provider.Alias))
@@ -429,10 +446,17 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
         return count == desired.Count;
     }
 
+    private async Task<string> ReadMetadataAsync(string alias, Uri address, CancellationToken cancellationToken)
+    {
+        using var response = await http.GetAsync(address, cancellationToken);
+        EnsureSuccess(response, $"read the metadata of '{alias}'");
+        return await response.Content.ReadAsStringAsync(cancellationToken);
+    }
+
     private async Task<Dictionary<string, string>> ReadDiscoveryAsync(RealmBrokeredProvider provider, CancellationToken cancellationToken)
     {
         var step = $"read the discovery document of '{provider.Alias}'";
-        var address = new Uri(provider.Issuer.AbsoluteUri.TrimEnd('/') + "/.well-known/openid-configuration");
+        var address = new Uri(provider.Issuer!.AbsoluteUri.TrimEnd('/') + "/.well-known/openid-configuration");
         using var response = await http.GetAsync(address, cancellationToken);
         EnsureSuccess(response, step);
         var document = await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken);
@@ -462,7 +486,7 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
     private async Task SyncProvidersAsync(
         string token,
         string realmPath,
-        List<(RealmBrokeredProvider Provider, Dictionary<string, string> Endpoints)> providers,
+        List<ProviderSource> providers,
         CancellationToken cancellationToken)
     {
         using var listed = await SendAsync(token, HttpMethod.Get, $"{realmPath}/identity-provider/instances", null, cancellationToken);
@@ -471,16 +495,18 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
         foreach (var instance in (await listed.Content.ReadFromJsonAsync<JsonElement>(cancellationToken)).EnumerateArray())
         {
             var alias = instance.GetProperty("alias").GetString()!;
-            if (alias.StartsWith(ProviderAliasPrefix, StringComparison.Ordinal))
+            if (alias.StartsWith(ProviderAliasPrefix, StringComparison.Ordinal) || alias.StartsWith(SamlProviderAliasPrefix, StringComparison.Ordinal))
             {
                 existing.Add(alias);
             }
         }
 
-        foreach (var (provider, endpoints) in providers)
+        foreach (var (provider, endpoints, metadata) in providers)
         {
             var instancePath = $"{realmPath}/identity-provider/instances/{Uri.EscapeDataString(provider.Alias)}";
-            var representation = ProviderRepresentation(provider, endpoints);
+            var representation = metadata is null
+                ? ProviderRepresentation(provider, endpoints)
+                : SamlProviderRepresentation(provider, await ImportMetadataAsync(token, realmPath, provider.Alias, metadata, cancellationToken));
             if (existing.Contains(provider.Alias))
             {
                 using var updated = await SendAsync(token, HttpMethod.Put, instancePath, representation, cancellationToken);
@@ -555,18 +581,62 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
         }
     }
 
+    /// <summary>Has Keycloak read the SAML metadata and return the provider config that it makes of it.</summary>
+    private async Task<Dictionary<string, string>> ImportMetadataAsync(
+        string token, string realmPath, string alias, string metadata, CancellationToken cancellationToken)
+    {
+        using var content = new MultipartFormDataContent
+        {
+            { new StringContent("saml"), "providerId" },
+            { new StringContent(metadata, Encoding.UTF8, "application/xml"), "file", "metadata.xml" },
+        };
+        using var response = await SendAsync(token, HttpMethod.Post, $"{realmPath}/identity-provider/import-config", content, cancellationToken);
+        EnsureSuccess(response, $"import the metadata of '{alias}'");
+        return await response.Content.ReadFromJsonAsync<Dictionary<string, string>>(cancellationToken)
+            ?? throw new InvalidOperationException($"The identity provider step 'import the metadata of '{alias}'' found no config.");
+    }
+
+    private static Dictionary<string, object?> SamlProviderRepresentation(RealmBrokeredProvider provider, Dictionary<string, string> imported)
+    {
+        var config = new Dictionary<string, string>(imported, StringComparer.Ordinal)
+        {
+            ["wantAuthnRequestsSigned"] = "true",
+            ["signatureAlgorithm"] = "RSA_SHA256",
+            ["xmlSigKeyInfoKeyNameTransformer"] = "KEY_ID",
+            ["nameIDPolicyFormat"] = "urn:oasis:names:tc:SAML:2.0:nameid-format:persistent",
+            ["principalType"] = "SUBJECT",
+            ["syncMode"] = "FORCE",
+        };
+        var representation = new Dictionary<string, object?>
+        {
+            ["alias"] = provider.Alias,
+            ["providerId"] = "saml",
+            ["enabled"] = true,
+            ["trustEmail"] = false,
+            ["storeToken"] = false,
+            ["firstBrokerLoginFlowAlias"] = FirstLoginFlowAlias,
+            ["config"] = config,
+        };
+        if (provider.Labels is { Count: > 0 })
+        {
+            representation["displayName"] = "${" + LabelKey(provider.Alias) + "}";
+        }
+
+        return representation;
+    }
+
     private static Dictionary<string, object?> ProviderRepresentation(RealmBrokeredProvider provider, Dictionary<string, string> endpoints)
     {
         var config = new Dictionary<string, string>
         {
-            ["issuer"] = provider.Issuer.AbsoluteUri,
+            ["issuer"] = provider.Issuer!.AbsoluteUri,
             ["authorizationUrl"] = endpoints["authorization_endpoint"],
             ["tokenUrl"] = endpoints["token_endpoint"],
             ["jwksUrl"] = endpoints["jwks_uri"],
             ["useJwksUrl"] = "true",
             ["validateSignature"] = "true",
-            ["clientId"] = provider.ClientId,
-            ["clientSecret"] = provider.ClientSecret,
+            ["clientId"] = provider.ClientId!,
+            ["clientSecret"] = provider.ClientSecret!,
             ["clientAuthMethod"] = "client_secret_post",
             ["defaultScope"] = "openid profile email",
             ["syncMode"] = "FORCE",
@@ -604,29 +674,44 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
     /// <summary>Adds or updates the provider's mappers by name and removes every other mapper of the provider.</summary>
     private async Task SyncMappersAsync(string token, string instancePath, RealmBrokeredProvider provider, CancellationToken cancellationToken)
     {
+        var saml = provider.Metadata is not null;
+        (string Type, Dictionary<string, string> Config) Attribute(string claim, string attribute) =>
+            saml ? SamlAttributeMapper(claim, attribute) : AttributeMapper(claim, attribute);
+
         var desired = new Dictionary<string, (string Type, Dictionary<string, string> Config)>(StringComparer.Ordinal)
         {
-            ["display name"] = AttributeMapper(provider.DisplayNameClaim, "firstName"),
-            ["email"] = AttributeMapper(provider.EmailClaim, "email"),
-            ["locale"] = AttributeMapper(provider.LocaleClaim, "locale"),
+            ["display name"] = Attribute(provider.DisplayNameClaim, "firstName"),
+            ["email"] = Attribute(provider.EmailClaim, "email"),
+            ["locale"] = Attribute(provider.LocaleClaim, "locale"),
             // Set once, when the user is created. Keycloak lowercases the username.
-            [UsernameMapperName] = (UsernameMapper, new Dictionary<string, string>
-            {
-                ["syncMode"] = "IMPORT",
-                ["template"] = "${ALIAS}.${CLAIM.sub}",
-                ["target"] = "LOCAL",
-            }),
+            [UsernameMapperName] = saml
+                ? (SamlUsernameMapper, new Dictionary<string, string>
+                {
+                    ["syncMode"] = "IMPORT",
+                    ["template"] = "${ALIAS}.${NAMEID}",
+                    ["target"] = "LOCAL",
+                })
+                : (UsernameMapper, new Dictionary<string, string>
+                {
+                    ["syncMode"] = "IMPORT",
+                    ["template"] = "${ALIAS}.${CLAIM.sub}",
+                    ["target"] = "LOCAL",
+                }),
         };
-        // Copies the upstream acr into the session note "acr", whatever its value, for the site client's acr mapper to read.
-        desired[AcrMapperName] = (AcrNoteMapper, new Dictionary<string, string>
+        if (!saml)
         {
-            ["syncMode"] = "FORCE",
-            ["claims"] = """[{"key":"acr","value":".*"}]""",
-            ["are.claim.values.regex"] = "true",
-        });
+            // Copies the upstream acr into the session note "acr", whatever its value, for the site client's acr mapper to read.
+            desired[AcrMapperName] = (AcrNoteMapper, new Dictionary<string, string>
+            {
+                ["syncMode"] = "FORCE",
+                ["claims"] = """[{"key":"acr","value":".*"}]""",
+                ["are.claim.values.regex"] = "true",
+            });
+        }
+
         foreach (var claim in provider.RolesClaims)
         {
-            desired[$"roles {claim}"] = AttributeMapper(claim, RolesAttribute(claim));
+            desired[$"roles {claim}"] = Attribute(claim, RolesAttribute(claim));
         }
 
         using var listed = await SendAsync(token, HttpMethod.Get, $"{instancePath}/mappers", null, cancellationToken);
@@ -684,6 +769,14 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
             ["user.attribute"] = attribute,
         });
 
+    private static (string Type, Dictionary<string, string> Config) SamlAttributeMapper(string claim, string attribute) =>
+        (SamlUserAttributeMapper, new Dictionary<string, string>
+        {
+            ["syncMode"] = "FORCE",
+            ["attribute.name"] = claim,
+            ["user.attribute"] = attribute,
+        });
+
     internal async Task<HttpResponseMessage> SendAsync(string token, HttpMethod method, string path, object? body, CancellationToken cancellationToken)
     {
         using var request = new HttpRequestMessage(method, new Uri(baseAddress, path));
@@ -691,6 +784,10 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
         if (body is string text)
         {
             request.Content = new StringContent(text, Encoding.UTF8, "text/plain");
+        }
+        else if (body is HttpContent content)
+        {
+            request.Content = content;
         }
         else if (body is not null)
         {
@@ -710,6 +807,8 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
                 : new InvalidOperationException(message);
         }
     }
+
+    private sealed record ProviderSource(RealmBrokeredProvider Provider, Dictionary<string, string> Endpoints, string? Metadata);
 
     private sealed class ConflictException(string message) : InvalidOperationException(message);
 }

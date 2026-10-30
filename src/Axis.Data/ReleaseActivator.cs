@@ -313,7 +313,7 @@ public static class ReleaseActivator
     /// <summary>
     /// Reports every binding the tenant lacks or holds with another kind: the file storage binding of the
     /// application, those of the connectors, those of the <c>oidc</c> identity providers (<c>issuer</c> as <c>url</c>, the
-    /// client bindings as <c>secret</c>), and the <c>url</c> and <c>secret</c> bindings that a package operation step uses declares. Also
+    /// client bindings as <c>secret</c>), the <c>metadata</c> binding of the <c>saml</c> identity providers (as <c>url</c>), and the <c>url</c> and <c>secret</c> bindings that a package operation step uses declares. Also
     /// reports every base URL that is not <c>https</c> when <c>http</c> is not allowed. A missing binding is a warning
     /// on a preview tenant. A message names the tenant and the binding, never its value.
     /// </summary>
@@ -357,6 +357,14 @@ public static class ReleaseActivator
             CheckBinding(provider.ClientIdBinding, ActivationBinding.SecretKind, "/clientId/binding", bindings, Report);
             CheckBinding(provider.ClientSecretBinding, ActivationBinding.SecretKind, "/clientSecret/binding", bindings, Report);
             CheckBinding(provider.ClientKeyBinding, ActivationBinding.SecretKind, "/clientKey/binding", bindings, Report);
+        }
+
+        foreach (var provider in model.IdentityProviders.Where(provider => provider.Type == "saml"))
+        {
+            void Report(string code, string message, string path, DiagnosticSeverity severity = DiagnosticSeverity.Error) =>
+                diagnostics.Add(new Diagnostic(code, message, provider.File, path, provider.Id, severity));
+
+            CheckBinding(provider.MetadataBinding, ActivationBinding.UrlKind, "/metadata/binding", bindings, Report);
         }
 
         foreach (var process in model.Processes)

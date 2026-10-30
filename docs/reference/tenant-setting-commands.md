@@ -168,7 +168,7 @@ resource.
   [deployment binding](#deployment-bindings).
   Before it stores anything, the command checks each `oidc` provider against the tenant's bindings: the issuer must be
   a `url` binding, the client id, the client secret and the client key `secret` bindings, and each must exist and hold
-  a value. A `saml` provider's metadata binding is not checked. For a tenant that has a realm, an `oidc` provider
+  a value. A `saml` provider's metadata binding is not checked, and the realm leaves a `saml` provider out until the tenant has that binding as a `url` binding with a value. For a tenant that has a realm, an `oidc` provider
   needs `--client-secret`, because the realm sync refuses a provider without one.
 - **A whole replacement.** A run replaces the tenant's whole platform sign-in: accounts and every provider. A provider
   left out of the run is removed. It raises the tenant `version`.
@@ -193,7 +193,7 @@ resource.
   only when the tenant has a schema version. Without one, it checks against no releases.
 - **The realm.** After it commits, the command brings the tenant's realm in step with the active releases and the new
   platform sign-in, as [activation does](identity-provider.md#keeping-the-realm-in-step). A platform provider that names
-  the same bindings as an application's provider, ignoring letter case, uses the same `oidc-` provider. A tenant
+  the same bindings as an application's provider, ignoring letter case, uses the same `oidc-` or `saml-` provider. A tenant
   without realm details skips the sync, but not the checks. When the identity provider fails, the command prints
   `<id> realm failed:` and the identity provider step and its status, and exits with code 1. The stored sign-in stays,
   and the next activation brings the realm in step. An activation that runs between the command's checks and its commit

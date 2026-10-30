@@ -200,7 +200,7 @@ public static class TenantPlatformSignIn
             {
                 Providers = [.. application.Providers.Where(provider => RealmProviderBindings.Missing(provider, bindings) is null)],
             })],
-            platform);
+            [.. platform.Where(provider => RealmProviderBindings.Missing(provider, bindings) is null)]);
         var split = planned.Conflicts.FirstOrDefault(conflict => conflict.ApplicationId == RealmApplication.PlatformSignInId);
         if (split is not null)
         {
