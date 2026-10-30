@@ -24,7 +24,10 @@ namespace Axis.Configuration.Compilation;
 /// process's subject entity. Its parameters give a literal value of its type to every parameter of the
 /// data source and name no other. A schedule trigger without a data source is a scheduled job. It names
 /// a process without a subject, and its parameters give a literal value of its type to every parameter
-/// of the process and name no other.
+/// of the process and name no other. A module trigger is checked inside its module, see
+/// <see cref="ApplicationCompiler"/>: its process is a process of its own module, and its event or entity is
+/// one of its own module or of a module it declares, so it sees no application data source and no application
+/// rule, only the rules of its module. A module trigger is an event or data change trigger, as a module schedule trigger is not supported yet.
 /// </summary>
 internal static class TriggerChecker
 {

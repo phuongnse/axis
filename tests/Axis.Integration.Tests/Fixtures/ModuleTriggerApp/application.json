@@ -1,0 +1,10 @@
+{
+  "id": "a5d2f8b1-6c37-4e09-b4a2-7f1c3e9d5b01",
+  "kind": "application",
+  "name": "ModuleTriggerApp",
+  "formatVersion": 1,
+  "modules": [
+    { "id": "reviews", "version": "^1.0.0" },
+    { "id": "followups", "version": "^1.0.0" }
+  ]
+}

@@ -710,7 +710,6 @@ public sealed class ModuleCompilerTests
     }
 
     [Theory]
-    [InlineData("""{ "kind": "trigger" }""")]
     [InlineData("""{ "kind": "endpoint" }""")]
     [InlineData("""{ "kind": "role" }""")]
     [InlineData("""{ "kind": "identityProvider" }""")]

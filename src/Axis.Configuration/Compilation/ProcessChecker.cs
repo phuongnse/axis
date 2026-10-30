@@ -1,5 +1,6 @@
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Model;
+using Axis.Configuration.Modules;
 using Axis.Configuration.Packages;
 using Axis.Configuration.Resources;
 using Axis.Expressions.Diagnostics;
@@ -100,6 +101,7 @@ internal static class ProcessChecker
         IEnumerable<ExpressionRule> rules,
         IReadOnlySet<string> modules,
         List<Diagnostic> diagnostics,
+        Func<string, ModuleConnectorSlot?>? findSlot = null,
         (string ModuleId, IReadOnlySet<string> Slots)? roleSlots = null)
     {
         foreach (var process in processes)
@@ -132,7 +134,8 @@ internal static class ProcessChecker
                     moduleReferences,
                     references,
                     Report,
-                    diagnostics);
+                    diagnostics,
+                    findSlot);
                 continue;
             }
 
@@ -201,7 +204,8 @@ internal static class ProcessChecker
                 textValues,
                 references,
                 Report,
-                diagnostics);
+                diagnostics,
+                findSlot);
 
             CheckSubProcesses(process, entity, scope, findEntity, findProcess, unloadedProcessNames, moduleReferences, references, Report);
 
@@ -250,7 +254,8 @@ internal static class ProcessChecker
         ModuleReferences moduleReferences,
         ReferenceIndexBuilder references,
         Action<string, string, string> report,
-        List<Diagnostic> diagnostics)
+        List<Diagnostic> diagnostics,
+        Func<string, ModuleConnectorSlot?>? findSlot)
     {
         if (process.Parameters is not { } parameters)
         {
@@ -304,7 +309,8 @@ internal static class ProcessChecker
             textValues,
             references,
             report,
-            diagnostics);
+            diagnostics,
+            findSlot);
 
         CheckTimers(process, scope, references, report);
 
@@ -1288,7 +1294,8 @@ internal static class ProcessChecker
         Func<string, IReadOnlyList<(string Locale, string Value)>> textValues,
         ReferenceIndexBuilder references,
         Action<string, string, string> report,
-        List<Diagnostic> diagnostics)
+        List<Diagnostic> diagnostics,
+        Func<string, ModuleConnectorSlot?>? findSlot)
     {
         for (var index = 0; index < process.Steps.Count; index++)
         {
@@ -1306,7 +1313,7 @@ internal static class ProcessChecker
 
             if (string.Equals(step.Operation, ProcessStepDefinition.CallConnector, StringComparison.Ordinal))
             {
-                CheckConnectorCall(process, step, index, entity, scope, findConnector, unloadedConnectorNames, references, report);
+                CheckConnectorCall(process, step, index, entity, scope, findConnector, unloadedConnectorNames, findSlot, references, report);
                 continue;
             }
 
@@ -1663,7 +1670,10 @@ internal static class ProcessChecker
     /// ignoring letter case, that no earlier output writes, that an <c>updateRecord</c> could set
     /// and whose type fits the output's: the same type, or a decimal field for an integer output.
     /// The expressions and fields are not checked when the subject entity is unknown. The retry
-    /// <c>backoff</c>, when set, is a positive fixed duration.
+    /// <c>backoff</c>, when set, is a positive fixed duration. A module process has no application
+    /// connector to name: when <paramref name="findSlot"/> is set, the step names a connector slot of
+    /// its module, matched exactly, and one of the slot's operations, ignoring letter case. Its inputs
+    /// and outputs are then checked against the slot operation's fields, and the step adds no reference.
     /// </summary>
     private static void CheckConnectorCall(
         ProcessResource process,
@@ -1673,11 +1683,19 @@ internal static class ProcessChecker
         ExpressionScope? scope,
         Func<string, ConnectorResource?> findConnector,
         IReadOnlySet<string> unloadedConnectorNames,
+        Func<string, ModuleConnectorSlot?>? findSlot,
         ReferenceIndexBuilder references,
         Action<string, string, string> report)
     {
         var path = $"/steps/{index}";
         var reference = step.Connector!;
+        if (findSlot is not null)
+        {
+            CheckSlotCall(process, step, path, entity, scope, findSlot, references, report);
+            CheckRetry(step, path, report);
+            return;
+        }
+
         if (findConnector(reference.Name) is not { } connector)
         {
             // A connector file that was not loaded because of its own errors is not reported again.
@@ -1712,6 +1730,49 @@ internal static class ProcessChecker
         }
 
         CheckRetry(step, path, report);
+    }
+
+    /// <summary>
+    /// Checks a <c>callConnector</c> step of a module process against the connector slots of its
+    /// module. The slot is found by exact name and its operation ignoring letter case. The inputs and
+    /// outputs are then checked like those of an application connector, against the slot operation's fields.
+    /// </summary>
+    private static void CheckSlotCall(
+        ProcessResource process,
+        ProcessStepDefinition step,
+        string path,
+        EntityResource? entity,
+        ExpressionScope? scope,
+        Func<string, ModuleConnectorSlot?> findSlot,
+        ReferenceIndexBuilder references,
+        Action<string, string, string> report)
+    {
+        var reference = step.Connector!;
+        if (findSlot(reference.Name) is not { } slot)
+        {
+            report(
+                DiagnosticCodes.UnknownConnector,
+                $"The connector slot '{reference.Name}' was not found. Module '{ApplicationCompiler.ModuleIdOf(process.Name)}' has no connector slot with that name. A module process calls a connector slot of its module, not an application connector.",
+                $"{path}/connector/name");
+            return;
+        }
+
+        if (slot.Operations.FirstOrDefault(candidate => string.Equals(candidate.Name, reference.Operation, StringComparison.OrdinalIgnoreCase)) is not { } operation)
+        {
+            report(
+                DiagnosticCodes.UnknownConnectorOperation,
+                $"The operation '{reference.Operation}' was not found. The connector slot '{slot.Name}' has no operation with that name. A module process calls a connector slot of its module.",
+                $"{path}/connector/operation");
+            return;
+        }
+
+        // A slot is not a resource, so the call adds no reference. The application's mapping records the edge to the connector.
+        CheckInputs(process, step, path, operation.Name, ToFields(operation.Input), scope, references, report);
+        // An output of a process without a subject is reported already, as it has no field to write.
+        if (process.Entity is not null)
+        {
+            CheckOutputs(step, path, operation.Name, ToFields(operation.Output), entity, report);
+        }
     }
 
     /// <summary>

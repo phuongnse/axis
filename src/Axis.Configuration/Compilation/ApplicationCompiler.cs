@@ -219,7 +219,7 @@ public static partial class ApplicationCompiler
         resource.File.StartsWith(ApplicationLoader.ModulesFolderPrefix, StringComparison.Ordinal);
 
     /// <summary>The module id of a qualified resource name, the text before the first <c>/</c>.</summary>
-    private static string ModuleIdOf(string qualifiedName) => qualifiedName[..qualifiedName.IndexOf('/', StringComparison.Ordinal)];
+    internal static string ModuleIdOf(string qualifiedName) => qualifiedName[..qualifiedName.IndexOf('/', StringComparison.Ordinal)];
 
     private static CompilationResult Compile(
         ApplicationLoadResult loaded,
@@ -249,7 +249,7 @@ public static partial class ApplicationCompiler
         IReadOnlyList<ResourceContent> moduleFiles = [];
         IReadOnlySet<string>? declaredPackageIds = null;
         var timeZone = TimeZoneInfo.Utc;
-        var moduleResources = new ModuleResources([], [], [], [], [], [], [], [], [], [], [], new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new Dictionary<string, IReadOnlySet<string>>(), new Dictionary<string, IReadOnlySet<string>>());
+        var moduleResources = new ModuleResources([], [], [], [], [], [], [], [], [], [], [], [], new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new Dictionary<string, IReadOnlySet<string>>(), new Dictionary<string, IReadOnlySet<string>>());
         if (loaded.Application is { } manifest)
         {
             packages = PackageChecker.Check(manifest.Packages, installedPackages, manifest.File, manifest.Id, manifest, diagnostics, references);
@@ -298,6 +298,7 @@ public static partial class ApplicationCompiler
             Pages = [.. moduleResources.Pages, .. loaded.Pages],
             Processes = [.. moduleResources.Processes, .. loaded.Processes],
             Policies = [.. moduleResources.Policies, .. loaded.Policies],
+            Triggers = [.. moduleResources.Triggers, .. loaded.Triggers],
             UnloadedEntityNames = unloadedEntityNames,
             UnloadedSequenceNames = unloadedSequenceNames,
             UnloadedEventNames = unloadedEventNames,
@@ -459,6 +460,12 @@ public static partial class ApplicationCompiler
                 ]
                 : rules;
 
+        // A module process calls a connector slot, which this application maps to one of its connectors by name.
+        Func<string, ConnectorResource?> ConnectorsFor(Resource resource) =>
+            IsModuleResource(resource)
+                ? name => modules.First(pin => pin.Id == ModuleIdOf(resource.Name)).Connectors.TryGetValue(name, out var mapped) ? FindConnector(mapped) : null
+                : FindConnector;
+
         // A module data source or policy filter sees only the rules of the modules its module declares, by qualified call.
         IReadOnlyList<ExpressionRule> FilterRulesFor(Resource resource) =>
             IsModuleResource(resource) ? [.. DeclaredRulesOf(resource)] : rules;
@@ -595,6 +602,7 @@ public static partial class ApplicationCompiler
                 RulesFor(moduleProcesses.First()),
                 declared,
                 diagnostics,
+                name => moduleManifests[moduleId].Connectors.FirstOrDefault(slot => slot.Name == name),
                 (moduleId, moduleResources.RoleSlots.GetValueOrDefault(moduleId) ?? new HashSet<string>()));
         }
 
@@ -649,7 +657,7 @@ public static partial class ApplicationCompiler
             references,
             diagnostics);
         TriggerChecker.Check(
-            loaded.Triggers,
+            [.. loaded.Triggers.Where(trigger => !IsModuleResource(trigger))],
             FindEntity,
             FindProcess,
             loaded.UnloadedProcessNames,
@@ -663,6 +671,35 @@ public static partial class ApplicationCompiler
             moduleReferences,
             references,
             diagnostics);
+
+        // A module trigger starts a process of its own module and names an event or an entity of its own
+        // module or of a module it declares. It sees no application data source, and no application rule.
+        foreach (var moduleTriggers in loaded.Triggers.Where(IsModuleResource).GroupBy(trigger => ModuleIdOf(trigger.Name), StringComparer.Ordinal))
+        {
+            var moduleId = moduleTriggers.Key;
+            var declared = moduleResources.DeclaredModules.GetValueOrDefault(moduleId) ?? new HashSet<string>();
+            bool Allowed(string name)
+            {
+                var slash = name.IndexOf('/', StringComparison.Ordinal);
+                return slash >= 0 && (name[..slash] == moduleId || declared.Contains(name[..slash]));
+            }
+
+            TriggerChecker.Check(
+                [.. moduleTriggers],
+                FindEntity,
+                name => Allowed(name) && name.StartsWith(moduleId + "/", StringComparison.Ordinal) ? FindProcess(name) : null,
+                loaded.UnloadedProcessNames,
+                name => Allowed(name) ? FindEvent(name) : null,
+                loaded.UnloadedEventNames,
+                loaded.UnloadedEntityNames,
+                _ => null,
+                new HashSet<string>(),
+                RulesFor(moduleTriggers.First()),
+                declared,
+                moduleReferences.For(moduleTriggers.First()),
+                references,
+                diagnostics);
+        }
         MigrationChecker.Check(loaded.Migrations, FindEntity, loaded.UnloadedEntityNames, references, diagnostics);
         ScenarioChecker.Check(
             loaded.Scenarios,
@@ -756,7 +793,7 @@ public static partial class ApplicationCompiler
             Seeds = allSeeds.Select(seed => BuildSeed(seed, entitiesByName, applicationId)).ToList(),
             DataSources = loaded.DataSources.Select(dataSource => BuildDataSource(
                 dataSourcesByName[dataSource.Name], entities, FilterRulesFor(dataSource), DeclaredModulesOf(dataSource))).ToList(),
-            Processes = loaded.Processes.Select(process => ProcessChecker.Build(processesByName[process.Name], FindEntity, FindForm, FindConnector, FindEvent, FindAnyPackage, FindPage, FindProcess, RulesFor(process), DeclaredModulesOf(process), MapTaskRole(process))).ToList(),
+            Processes = loaded.Processes.Select(process => ProcessChecker.Build(processesByName[process.Name], FindEntity, FindForm, ConnectorsFor(process), FindEvent, FindAnyPackage, FindPage, FindProcess, RulesFor(process), DeclaredModulesOf(process), MapTaskRole(process))).ToList(),
             Forms = loaded.Forms.Select(form => BuildForm(formsByName[form.Name], entitiesByName, IsModuleResource(form) ? [] : rules, IsModuleResource(form) ? null : declaredModules)).ToList(),
             Roles = loaded.Roles,
             Policies = loaded.Policies.Select(policy => PolicyChecker.Build(
@@ -771,7 +808,14 @@ public static partial class ApplicationCompiler
             IdentityProviders = loaded.IdentityProviders.Select(IdentityProviderChecker.Build).ToList(),
             Events = allEvents.Select(@event => EventChecker.Build(eventsByName[@event.Name], FindEntity)).ToList(),
             Endpoints = loaded.Endpoints.Select(endpoint => EndpointChecker.Build(endpoint, FindEntity, FindProcess)).ToList(),
-            Triggers = loaded.Triggers.Select(trigger => TriggerChecker.Build(trigger, FindEntity, FindEvent, FindProcess, FindDataSource, rules, declaredModules)).ToList(),
+            Triggers = loaded.Triggers.Select(trigger => TriggerChecker.Build(
+                IsModuleResource(trigger) ? trigger with { Id = ModuleResourceIds.Derive(applicationId, trigger.Id) } : trigger,
+                FindEntity,
+                FindEvent,
+                FindProcess,
+                FindDataSource,
+                RulesFor(trigger),
+                DeclaredModulesOf(trigger))).ToList(),
             Migrations = loaded.Migrations.Select(migration => MigrationChecker.Build(migration, loaded.Resources.Single(resource => resource.Path == migration.File).Content)).ToList(),
             Packages = allPackages,
             Modules = modules,

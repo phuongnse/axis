@@ -144,6 +144,13 @@ user whose write fired a trigger needs no `start` grant.
    schedule adds `"occurrenceAt"`, the occurrence time in UTC, such as
    `"2026-01-01T05:00:00Z"`.
 
+A module's `event` and `dataChange` triggers start from the same steps. A module
+trigger is in each application's release as `<module id>/<name>`, with an id
+derived from the application, see
+[Modules and templates](modules-and-templates.md#processes-pages-policies-and-dependencies).
+Its starts, receipts and dead letters therefore belong to that application, and
+an event raised or a record changed in one application starts nothing in another.
+
 A trigger's `when` is evaluated before these steps. A `false`, a `null` or a
 run-time error there skips the start too. A skip never fails the write or
 the step that fired the trigger, which still commits. For a `sync` event

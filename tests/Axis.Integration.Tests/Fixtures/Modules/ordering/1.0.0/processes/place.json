@@ -1,0 +1,21 @@
+{
+  "id": "3e8a5b71-4c2d-4f96-8b0e-7a1d9c6e2f03",
+  "kind": "process",
+  "name": "Place",
+  "formatVersion": 1,
+  "entity": "PurchaseOrder",
+  "start": "createOrder",
+  "steps": [
+    {
+      "name": "createOrder",
+      "type": "operation",
+      "operation": "callConnector",
+      "connector": { "name": "purchasing", "operation": "createOrder" },
+      "input": { "title": "title" },
+      "output": { "orderNumber": "orderNumber" },
+      "retry": { "attempts": 3, "backoff": "PT1S" },
+      "next": "done"
+    },
+    { "name": "done", "type": "end" }
+  ]
+}
