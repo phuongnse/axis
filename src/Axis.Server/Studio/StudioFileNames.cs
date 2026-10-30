@@ -33,6 +33,7 @@ internal static partial class StudioFileNames
         [ResourceKinds.Event] = "events",
         [ResourceKinds.Endpoint] = "endpoints",
         [ResourceKinds.Trigger] = "triggers",
+        [ResourceKinds.Webhook] = "webhooks",
         [ResourceKinds.Migration] = "migrations",
         [ResourceKinds.Scenario] = "scenarios",
         [ResourceKinds.IdentityProvider] = "identity-providers",

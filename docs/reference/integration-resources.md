@@ -32,7 +32,7 @@ reconciles is in [Connector calls](process-execution.md#connector-calls).
   names one as `{ "binding": "<name>" }`. Where the name is used decides its
   kind: `baseUrl` needs a `url` binding, and `auth` needs a `secret` binding.
   An `oauth2` auth's `tokenUrl` needs a `url` binding, and its `clientId` and
-  `clientSecret` need `secret` bindings. _(planned for M19)_ A
+  `clientSecret` need `secret` bindings. A
   [webhook](#webhook-resource) names a `url` and a `secret` binding.
   A package operation names them in the `capabilities` of its manifest:
   `urls` need `url` bindings and `secrets` need `secret` bindings.
@@ -66,7 +66,8 @@ reconciles is in [Connector calls](process-execution.md#connector-calls).
   binding.
 - **Activation check.** Activating a release for a tenant fails when a
   binding the release uses is missing for that tenant, or is of the wrong
-  kind (`AXC0100`). The release uses the bindings of its connectors, the
+  kind (`AXC0100`). The release uses the bindings of its connectors and its
+  webhooks, the
   `capabilities` of each package operation that a process step uses, and the
   `fileStorage` binding of its application manifest, which must be a `storage`
   binding, reported at `/fileStorage/binding`. The
@@ -105,7 +106,8 @@ reconciles is in [Connector calls](process-execution.md#connector-calls).
   [file fields](file-fields.md#storage-and-clean-up) and
   [D76](../decisions/d76-file-money-and-enum-label-field-types.md).
 - **HTTPS.** A `url` binding may use `http` only in Development. Elsewhere it
-  must be `https`. Activation checks each connector's base URL binding and
+  must be `https`. Activation checks each connector's base URL binding, each
+  webhook's `url` binding and
   each `url` binding that a package operation step declares (`AXC0101`). The
   call checks it again: a worker outside Development never sends a call to an
   `http` URL, and fails the call instead. A package call is retried instead,
@@ -219,7 +221,7 @@ Docker Compose, `scripts/dev.sh` and the E2E run point them at the
 A connector can get its access token from an OAuth2 authorization server
 through the client credentials grant, as
 [D91](../decisions/d91-connector-oauth2-and-structured-payloads.md) agrees.
-The token request and the cache are built. The resend after a `401` is not.
+This auth is built.
 
 ```json
 "auth": {
@@ -260,12 +262,16 @@ The token request and the cache are built. The resend after a `401` is not.
   - Two calls that find the cache empty at the same moment may each request a
     token.
 - The token request has the connector's `timeout`, like the operation. The
-  call's lease is extended by twice the `timeout` for an `oauth2` connector.
+  call's lease is extended by four times the `timeout` for an `oauth2` connector,
+  for a token request and a send, and the same two again after a `401`.
 - A test scenario answers the operation from its stub and requests no token.
-- _(planned for M19)_ A `401` from the system drops the token. The worker gets
-  a new one and sends the request once more in the same attempt, with the same
-  idempotency key. A second `401` fails the attempt as any `4xx` does.
-- A failed token request, for any reason, is a retryable attempt, and the
+- A `401` from the system drops the token. The worker gets a new one and
+  sends the request once more in the same attempt, with the same idempotency
+  key. A second `401` fails the attempt as any `4xx` does. A lookup that gets a
+  `401` does the same, so a stale token does not keep a call `unknown`. The
+  worker drops the token only when its cache still holds the token that got
+  the `401`.
+- A failed token request, for any reason, including a redirect, is a retryable attempt, and the
   operation is not sent. A failed lookup stays `unknown`. The attempt row and
   the call record the token endpoint's status code and a fixed error text,
   never its body or an exception message.
@@ -302,7 +308,13 @@ _(planned for M19)_. Bodies stay JSON. An output's `source` is built.
       ]
     }
   ],
-  "output": [{ "name": "trackingNumber", "type": "text", "source": "/shipment/tracking/number" }]
+  "output": [
+    {
+      "name": "trackingNumber",
+      "type": "text",
+      "source": "/shipment/tracking/number"
+    }
+  ]
 }
 ```
 
@@ -324,13 +336,13 @@ _(planned for M19)_. Bodies stay JSON. An output's `source` is built.
   `object` or `list`: outputs, module connector slots and package fields stay
   scalar.
   - Nesting goes four levels deep at most, and the input is level 1. An `object`
-    or `list` among the `fields` of a level-4 one is `AXC0313`. An `object` or
+    or `list` among the `fields` of a level-4 one is `AXC0317`. An `object` or
     `list` goes only in the body, so one with another `in` is `AXC0312`.
   - A nested field name repeats an earlier name of the same `fields`, ignoring
     letter case, is `AXC0096`.
   - _(planned for M19)_ The step maps them as in
     [Step shape](process-execution.md#step-shape). Until then, a step that gives
-    one a plain expression is `AXC0315`.
+    one a plain expression is `AXC0318`.
 - **`source`.** _(built)_ An output field may name a JSON Pointer
   ([RFC 6901](https://www.rfc-editor.org/rfc/rfc6901)) into the response body,
   such as `/shipment/tracking/number`. Without it, the output is read from the
@@ -615,7 +627,12 @@ lets the purchasing system submit a purchase request, in
   "process": "PurchaseRequestApproval",
   "input": [
     { "name": "title", "type": "text", "required": true, "maxLength": 200 },
-    { "name": "department", "type": "reference", "target": "Department", "required": true },
+    {
+      "name": "department",
+      "type": "reference",
+      "target": "Department",
+      "required": true
+    },
     { "name": "supplier", "type": "reference", "target": "Supplier" },
     { "name": "currency", "type": "enum", "values": ["VND", "USD", "EUR"] },
     { "name": "lineItems", "type": "child-collection", "target": "LineItem" }
@@ -678,6 +695,7 @@ the caller's id.
   - An expression that reads an input that `values` maps to a field marked
     `sensitive` counts as reading that field, so an event that has a
     [webhook](#webhook-resource) may not carry it.
+
 - **Output.** `output` is optional. It lists field names of `entity` that a
   `201` returns when the instance completes within `wait`. _(planned for M19)_
   An endpoint without a `process` answers `201` as soon as it commits, and has
@@ -775,10 +793,12 @@ The compiler reports these as compile errors, all in one pass. The
 
 ## Outbound webhooks
 
-_(planned for M19)_ A webhook tells another system that an event happened, as
+A webhook tells another system that an event happened, as
 [D92](../decisions/d92-outbound-webhooks.md) agrees. The author configures it
 in the application, so it is part of the release. There is no API through
-which another system subscribes itself.
+which another system subscribes itself. The webhook resource, its compile
+checks and the activation check of its bindings are built. Webhook delivery is
+_(planned for M19)_.
 
 ### Webhook resource
 
@@ -802,20 +822,31 @@ A webhook that tells a chat system when a note is closed, in
   module the application declares. Only events raise webhooks. A record change
   raises one when a process raises an event for it.
 - `url` is a `url` binding and `secret` is a `secret` binding, checked at
-  activation as a connector's are. On a
+  activation as a connector's are: a missing binding or one of the wrong kind
+  is `AXC0100` at `/url/binding` or `/secret/binding`, and an `http` URL
+  outside Development is `AXC0101`. On a
   [preview tenant](host-settings.md#preview-tenants) a missing binding is a
   warning, and the delivery fails at run time.
 - `timeout` is an ISO 8601 duration. It defaults to `PT10S` and is at most
   `PT30S`.
-- An unknown event, a missing binding name and a timeout out of range are each
-  a new diagnostic.
+- An unknown event is `AXC0313` at `/event`. A missing `url` or `secret` is
+  `AXC0314` at `/url` or `/secret`. A `timeout` that is not a positive ISO 8601
+  duration of at most `PT30S` is `AXC0315` at `/timeout`. The schema leaves
+  `url` and `secret` optional, so a missing one has this code and not the
+  schema error `AXC0004`.
 - An event that has a webhook may not carry a value read from a field marked
-  `sensitive`. A [raise event step](process-events.md#raise-event-step), or an
-  [endpoint's event](#endpoint-resource), that maps one into its payload is a
+  `sensitive`. A [raise event step](process-events.md#raise-event-step) that
+  maps one into its payload, directly or through a reference path, is `AXC0316`
+  at `/steps/{i}/fields/{key}`. A step that maps it into an event that no
+  webhook names compiles. _(planned for M19)_ An
+  [endpoint's event](#endpoint-resource) that maps one into its payload is a
   new diagnostic.
-- A module holds no webhook.
+- A module holds no webhook. A file of kind `webhook` in a module is
+  `AXC0202` at `/kind`.
 
 ### Webhook delivery
+
+_(planned for M19)_ Nothing here is built yet.
 
 - **Staged with the event.** Raising the event stages one delivery for each
   webhook of the event, in the same transaction. The worker sends it later,
@@ -827,11 +858,16 @@ A webhook that tells a chat system when a note is closed, in
     "type": "NoteClosed",
     "id": "0d6f…",
     "timestamp": "2026-11-02T09:15:00Z",
-    "data": { "entity": "Note", "subjectId": "8c1e…", "fields": { "priority": 2, "amount": 120.5 } }
+    "data": {
+      "entity": "Note",
+      "subjectId": "8c1e…",
+      "fields": { "priority": 2, "amount": 120.5 }
+    }
   }
   ```
 
   `id` is the event occurrence id. `fields` holds the event's payload fields.
+
 - **Headers.** The Standard Webhooks headers:
   - `webhook-id`, built from the occurrence id and the webhook id, the same on
     every attempt, so a receiver can drop duplicates;

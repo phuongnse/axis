@@ -713,6 +713,7 @@ public sealed class ModuleCompilerTests
     [InlineData("""{ "kind": "endpoint" }""")]
     [InlineData("""{ "kind": "role" }""")]
     [InlineData("""{ "kind": "identityProvider" }""")]
+    [InlineData("""{ "kind": "webhook" }""")]
     [InlineData("""{ "kind": "module", "id": "departments", "version": "1.0.0", "label": "Nested" }""")]
     [InlineData("""{ "kind": "unknown" }""")]
     [InlineData("""{ "kind": 5 }""")]

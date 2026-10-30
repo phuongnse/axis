@@ -29,7 +29,7 @@ flowchart LR
 1. **Load.** Every `*.json` file in the folder and its subfolders is one
    resource. Each is validated against the JSON Schema for its `kind`
    (`application`, `entity`, `site`, `page`, `text`, `seed`, `dataSource`,
-   `rule`, `sequence`, `process`, `form`, `role`, `policy`, `connector`, `identityProvider`, `event`, `endpoint`, `trigger`, `migration` or `scenario`), see
+   `rule`, `sequence`, `process`, `form`, `role`, `policy`, `connector`, `identityProvider`, `event`, `endpoint`, `trigger`, `webhook`, `migration` or `scenario`), see
    [identity provider resource](identity-provider.md#identity-provider-resource). The manifest is the
    single `application` resource, stored as `application.json` at the
    folder root; an `application` resource in any other file is not used as
@@ -506,7 +506,7 @@ flowchart LR
      names no `path` input, ignoring letter case, is `AXC0097` at `/operations/{i}/path`. A `path`
      input that is not in the path, is not `required` or is named `idempotencyKey`, a `body` input
      on a `GET`, and an `object` or `list` input outside the body, are `AXC0312` at
-     `/operations/{i}/input/{j}`. An `object` or `list` in a level-4 one is `AXC0313`. A `lookup` is `AXC0098` at `/operations/{i}/lookup`
+     `/operations/{i}/input/{j}`. An `object` or `list` in a level-4 one is `AXC0317`. A `lookup` is `AXC0098` at `/operations/{i}/lookup`
      when it names no operation of the connector, ignoring letter case, or names its own operation.
      It is also `AXC0098` when the operation it names is not a `GET`, has no `{idempotencyKey}` in
      its path, has inputs, or has other outputs than the operation it serves. Outputs are the same
@@ -921,6 +921,7 @@ to show where a resource is used and what it uses.
 | `trigger event` | Trigger | `/event` | Event |
 | `trigger entity` | Trigger | `/entity` | Entity |
 | `trigger data source` | Trigger | `/dataSource` | Data source |
+| `webhook event` | Webhook | `/event` | Event |
 | `migration entity` | Migration | `/entity` | Entity |
 | `scenario entity` | Scenario | `/steps/{i}/entity` | Entity |
 | `scenario process` | Scenario | `/steps/{i}/process` | Process |
@@ -928,11 +929,10 @@ to show where a resource is used and what it uses.
 | `stub connector` | Scenario | `/stubs/{i}/connector/name` | Connector |
 | `stub package` | Scenario | `/stubs/{i}/operation` | Extension package |
 
-- **Label paths.** A `label text` edge sits at the `/textKey` of each label the
-  `AXC0028` check covers: the application label and description, entity and
-  field labels, enum value labels, the site title and description, navigation labels, page titles, action labels,
-  form section titles, role labels, identity provider labels, data source parameter labels, task and
-  outcome labels, the `startCondition` message and validation messages.
+- **Label paths.** A `label text` edge sits at the `/textKey` of each label the `AXC0028` check covers: the
+  application label and description, entity and field labels, enum value labels, the site title and description,
+  navigation labels, page titles, action labels, form section titles, role labels, identity provider labels,
+  data source parameter labels, task and outcome labels, the `startCondition` message and validation messages.
 - **Direct calls only.** A `rule call` edge goes from the expression that
   calls a rule to that rule. A rule that calls another rule gives its own
   `rule call` edge, at its `/expression`. So the caller does not get an edge

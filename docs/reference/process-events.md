@@ -85,6 +85,11 @@ The compiler reports these as compile errors.
 - Each expression fits its payload field's type, with the same scope as a
   decision's `when`. A problem is reported at `/steps/{i}/fields/{key}` with
   its expression code, such as `AXC0048` for a value of the wrong type.
+- When a [webhook](integration-resources.md#webhook-resource) names the
+  event, no expression reads a field marked `sensitive`, directly, through a
+  reference path, inside an aggregate or as an argument to a rule (`AXC0316` at
+  `/steps/{i}/fields/{key}`, naming the field). The same step compiles when no
+  webhook names the event.
 - A `raiseEvent` step has `event`, `fields` and `next`, and no `set`,
   `connector`, `input`, `output` or `retry` (`AXC0004`).
 

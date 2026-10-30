@@ -541,6 +541,16 @@ public static partial class ApplicationCompiler
         bool NamesDeclaredModule(string name) =>
             name.IndexOf('/', StringComparison.Ordinal) < 0 || declaredModules.Contains(ModuleIdOf(name));
 
+        // A raise event step never maps a sensitive field's value into an event that a webhook names.
+        var webhookEvents = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var webhook in loaded.Webhooks)
+        {
+            if (moduleReferences.Find(webhook.Event, FindEvent) is { } webhookEvent)
+            {
+                webhookEvents.Add(webhookEvent.Name);
+            }
+        }
+
         ProcessChecker.Check(
             [.. loaded.Processes.Where(process => !IsModuleResource(process))],
             FindEntity,
@@ -565,7 +575,8 @@ public static partial class ApplicationCompiler
             references,
             rules,
             declaredModules,
-            diagnostics);
+            diagnostics,
+            webhookEvents: webhookEvents);
         foreach (var moduleProcesses in loaded.Processes.Where(IsModuleResource).GroupBy(process => ModuleIdOf(process.Name), StringComparer.Ordinal))
         {
             var moduleId = moduleProcesses.Key;
@@ -603,7 +614,8 @@ public static partial class ApplicationCompiler
                 declared,
                 diagnostics,
                 name => moduleManifests[moduleId].Connectors.FirstOrDefault(slot => slot.Name == name),
-                (moduleId, moduleResources.RoleSlots.GetValueOrDefault(moduleId) ?? new HashSet<string>()));
+                (moduleId, moduleResources.RoleSlots.GetValueOrDefault(moduleId) ?? new HashSet<string>()),
+                webhookEvents);
         }
 
         PolicyChecker.Check(
@@ -702,6 +714,7 @@ public static partial class ApplicationCompiler
                 references,
                 diagnostics);
         }
+        WebhookChecker.Check(loaded.Webhooks, FindEvent, loaded.UnloadedEventNames, moduleReferences, references, diagnostics);
         MigrationChecker.Check(loaded.Migrations, FindEntity, loaded.UnloadedEntityNames, references, diagnostics);
         ScenarioChecker.Check(
             loaded.Scenarios,
@@ -819,6 +832,7 @@ public static partial class ApplicationCompiler
                 RulesFor(trigger),
                 DeclaredModulesOf(trigger),
                 timeZone)).ToList(),
+            Webhooks = loaded.Webhooks.Select(webhook => WebhookChecker.Build(webhook, FindEvent)).ToList(),
             Migrations = loaded.Migrations.Select(migration => MigrationChecker.Build(migration, loaded.Resources.Single(resource => resource.Path == migration.File).Content)).ToList(),
             Packages = allPackages,
             Modules = modules,

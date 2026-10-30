@@ -1295,6 +1295,26 @@ describe('StudioPage publishing', () => {
       expect(within(screen.getByTestId('studio-diagnostics')).getByText('AXC0777')).toBeInTheDocument()
     })
 
+    it('creates a webhook that names no event and no binding yet', async () => {
+      const fetchMock = stubCreate(201)
+      renderPage()
+
+      await fillDialog('webhook', 'NoteClosedChat', 'Name')
+
+      await waitFor(() => expect(fetchMock.mock.calls.some(([, call]) => call?.method === 'POST')).toBe(true))
+      const [, init] = fetchMock.mock.calls.find(([, call]) => call?.method === 'POST')!
+      const body = JSON.parse(init!.body as string) as Record<string, unknown>
+      expect(body).toMatchObject({
+        kind: 'webhook',
+        name: 'NoteClosedChat',
+        formatVersion: 1,
+        event: '',
+        url: { binding: '' },
+        secret: { binding: '' },
+      })
+      expect(body.id).toMatch(/^[0-9a-f-]{36}$/)
+    })
+
     it('copies the en texts when the application has no site', async () => {
       const fetchMock = stubCreate(201)
       const base = fetchMock.getMockImplementation()!

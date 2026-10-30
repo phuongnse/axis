@@ -24,6 +24,14 @@
         { "name": "amount", "type": "decimal", "required": true },
         { "name": "note", "type": "text" }
       ],
+      "output": [{ "name": "orderNumber", "type": "text" }],
+      "lookup": "findOrder"
+    },
+    {
+      "name": "findOrder",
+      "method": "GET",
+      "path": "/oauth-orders/{idempotencyKey}",
+      "input": [],
       "output": [{ "name": "orderNumber", "type": "text" }]
     }
   ]

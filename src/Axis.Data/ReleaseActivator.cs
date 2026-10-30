@@ -312,9 +312,9 @@ public static class ReleaseActivator
 
     /// <summary>
     /// Reports every binding the tenant lacks or holds with another kind: the file storage binding of the
-    /// application, those of the connectors (an <c>oauth2</c> auth adds its <c>tokenUrl</c> as <c>url</c> and its client id as <c>secret</c>), those of the <c>oidc</c> identity providers (<c>issuer</c> as <c>url</c>, the
+    /// application, those of the connectors (an <c>oauth2</c> auth adds its <c>tokenUrl</c> as <c>url</c> and its client id as <c>secret</c>), the <c>url</c> and <c>secret</c> bindings of the webhooks, those of the <c>oidc</c> identity providers (<c>issuer</c> as <c>url</c>, the
     /// client bindings as <c>secret</c>), the <c>metadata</c> binding of the <c>saml</c> identity providers (as <c>url</c>), and the <c>url</c> and <c>secret</c> bindings that a package operation step uses declares. Also
-    /// reports every base URL and token URL that is not <c>https</c> when <c>http</c> is not allowed. A missing binding is a warning
+    /// reports every base URL, token URL and webhook URL that is not <c>https</c> when <c>http</c> is not allowed. A missing binding is a warning
     /// on a preview tenant. A message names the tenant and the binding, never its value.
     /// </summary>
     private static List<Diagnostic> CheckBindings(ApplicationModel model, ActivationBindings bindings)
@@ -359,6 +359,23 @@ public static class ReleaseActivator
                     CheckBinding(oauth.ClientIdBinding, ActivationBinding.SecretKind, "/auth/clientId/binding", bindings, Report);
                 }
             }
+        }
+
+        foreach (var webhook in model.Webhooks)
+        {
+            void Report(string code, string message, string path, DiagnosticSeverity severity = DiagnosticSeverity.Error) =>
+                diagnostics.Add(new Diagnostic(code, message, webhook.File, path, webhook.Id, severity));
+
+            var url = CheckBinding(webhook.UrlBinding, ActivationBinding.UrlKind, "/url/binding", bindings, Report);
+            if (url is not null && !bindings.AllowHttp && url.Url?.Scheme != Uri.UriSchemeHttps)
+            {
+                Report(
+                    DiagnosticCodes.InsecureBaseUrl,
+                    $"Tenant '{bindings.TenantId}' binding '{webhook.UrlBinding}' is not an https URL. Only Development allows http.",
+                    "/url/binding");
+            }
+
+            CheckBinding(webhook.SecretBinding, ActivationBinding.SecretKind, "/secret/binding", bindings, Report);
         }
 
         foreach (var provider in model.IdentityProviders.Where(provider => provider.Type == "oidc"))

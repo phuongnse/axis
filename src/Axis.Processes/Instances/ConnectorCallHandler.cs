@@ -19,12 +19,14 @@ namespace Axis.Processes.Instances;
 /// <summary>
 /// Sends the connector call a <c>connector.call</c> work item names, with no transaction open while
 /// the request runs. A short transaction first marks the call <c>sending</c>, counts the attempt and
-/// extends the item's lease by the connector's timeout, or by twice the timeout for an <c>oauth2</c>
-/// connector, whose token request has the same timeout. The request then carries the stored input
-/// where each input's <c>in</c> says (the path, the query, a header or the JSON body), the auth from
-/// the tenant's secret binding and the operation identity as its idempotency key. An
+/// extends the item's lease by the connector's timeout, or by four times the timeout for an <c>oauth2</c>
+/// connector: a token request and a send, and the same two again after a <c>401</c>. The request then
+/// carries the stored input where each input's <c>in</c> says (the path, the query, a header or the
+/// JSON body), the auth from the tenant's secret binding and the operation identity as its idempotency key. An
 /// <c>oauth2</c> connector sends the token that <see cref="IConnectorTokens"/> gets as a bearer token,
-/// before each call or lookup. A failed token request is a retryable attempt that is never sent, with
+/// before each call or lookup. A <c>401</c> drops the cached token, gets a new one and sends the
+/// request once more in the same attempt, with the same idempotency key, and a lookup does the same.
+/// A second <c>401</c> is an answer like any other. A failed token request is a retryable attempt that is never sent, with
 /// the status of the token endpoint, or a failed lookup, and it holds no body. An
 /// outcome transaction records the result. A <c>2xx</c> whose body fits the output writes the
 /// output fields, starts the data change triggers of the update from the active release, settles
@@ -219,20 +221,14 @@ internal sealed partial class ConnectorCallHandler(
             return await SettleAttemptAsync(item, connection, attempt, target, ErrorClass.Retryable, null, bindingError, bindingError, cancellationToken);
         }
 
-        var credential = endpoint.Secret;
-        if (await GetTokenAsync(item, connector, endpoint, cancellationToken) is { } issued)
+        var (tokenFailure, answer) = await SendWithTokenAsync(item, target, attempt.Call, endpoint, cancellationToken);
+        if (tokenFailure is not null)
         {
-            if (issued.Error is { } tokenError)
-            {
-                // The operation is never sent, and no body of the token endpoint is kept.
-                return await SettleAttemptAsync(item, connection, attempt, target, ErrorClass.Retryable, issued.Status, tokenError, tokenError, cancellationToken);
-            }
-
-            credential = issued.Token;
+            // The operation is never sent, and no body of the token endpoint is kept.
+            return await SettleAttemptAsync(item, connection, attempt, target, ErrorClass.Retryable, tokenFailure.Status, tokenFailure.Error!, tokenFailure.Error!, cancellationToken);
         }
 
-        var answer = await SendAsync(target, attempt.Call, endpoint.BaseUrl, credential, cancellationToken);
-        if (answer.Error is { } sendError)
+        if (answer!.Error is { } sendError)
         {
             return await SettleAttemptAsync(item, connection, attempt, target, answer.Class, answer.Status, sendError, answer.Error!, cancellationToken);
         }
@@ -303,26 +299,21 @@ internal sealed partial class ConnectorCallHandler(
             return await KeepUnknownAsync(item, connection, attempt, target, null, bindingError, LookupRow(attempt, CallAttempts.Failed, null, bindingError), cancellationToken);
         }
 
-        var credential = endpoint.Secret;
-        if (await GetTokenAsync(item, connector, endpoint, cancellationToken) is { } issued)
+        var (tokenFailure, sent) = await SendWithTokenAsync(item, target with { Operation = lookup }, attempt.Call, endpoint, cancellationToken);
+        if (tokenFailure is not null)
         {
-            if (issued.Error is { } tokenError)
-            {
-                return await KeepUnknownAsync(
-                    item,
-                    connection,
-                    attempt,
-                    target,
-                    issued.Status,
-                    tokenError,
-                    LookupRow(attempt, CallAttempts.Failed, issued.Status, tokenError),
-                    cancellationToken);
-            }
-
-            credential = issued.Token;
+            return await KeepUnknownAsync(
+                item,
+                connection,
+                attempt,
+                target,
+                tokenFailure.Status,
+                tokenFailure.Error!,
+                LookupRow(attempt, CallAttempts.Failed, tokenFailure.Status, tokenFailure.Error),
+                cancellationToken);
         }
 
-        var answer = await SendAsync(target with { Operation = lookup }, attempt.Call, endpoint.BaseUrl, credential, cancellationToken);
+        var answer = sent!;
         if (answer is { Status: (int)HttpStatusCode.OK, Error: null } && Fit(answer.Body!, target) is { } values)
         {
             // The system acted on the call, so it is not sent again.
@@ -415,6 +406,43 @@ internal sealed partial class ConnectorCallHandler(
         $"Tenant '{item.TenantId}' binding '{binding}' is not an https URL. Only Development allows http.";
 
     /// <summary>
+    /// Sends the request of <paramref name="target"/> with the connector's credential. An <c>oauth2</c>
+    /// connector first gets its token. When the system answers <c>401</c>, the cached token is dropped, a
+    /// new one is requested and the request is sent once more, with the same idempotency key. The result
+    /// holds the failure of a token request, and then the request was not sent again, or the answer.
+    /// </summary>
+    private async Task<(ConnectorTokenResult? TokenFailure, Answer? Answer)> SendWithTokenAsync(
+        ClaimedWorkItem item, Target target, LoadedConnectorCall call, Endpoint endpoint, CancellationToken cancellationToken)
+    {
+        var credential = endpoint.Secret;
+        var issued = await GetTokenAsync(item, target.Connector, endpoint, cancellationToken);
+        if (issued is not null)
+        {
+            if (issued.Error is not null)
+            {
+                return (issued, null);
+            }
+
+            credential = issued.Token;
+        }
+
+        var answer = await SendAsync(target, call, endpoint.BaseUrl, credential, cancellationToken);
+        if (issued is null || answer.Status != (int)HttpStatusCode.Unauthorized)
+        {
+            return (null, answer);
+        }
+
+        tokens.Drop(item.TenantId, target.Connector, issued.Token!);
+        var renewed = await GetTokenAsync(item, target.Connector, endpoint, cancellationToken);
+        if (renewed!.Error is not null)
+        {
+            return (renewed, null);
+        }
+
+        return (null, await SendAsync(target, call, endpoint.BaseUrl, renewed.Token, cancellationToken));
+    }
+
+    /// <summary>
     /// Gets the access token of an <c>oauth2</c> connector, or gives <see langword="null"/> for a
     /// connector with another auth.
     /// </summary>
@@ -425,10 +453,11 @@ internal sealed partial class ConnectorCallHandler(
 
     /// <summary>
     /// How long the claim lasts while the call runs: the item's lease and the connector's timeout, and
-    /// a second timeout for the token request of an <c>oauth2</c> connector.
+    /// for an <c>oauth2</c> connector three more timeouts: the token request, and after a <c>401</c> a
+    /// second token request and a second send.
     /// </summary>
     private static TimeSpan Lease(ClaimedWorkItem item, ConnectorModel connector) =>
-        (connector.Auth?.OAuth2 is null ? connector.Timeout : connector.Timeout * 2) + item.Lease;
+        (connector.Auth?.OAuth2 is null ? connector.Timeout : connector.Timeout * 4) + item.Lease;
 
     /// <summary>The operation that looks up a call of the target's operation, or <see langword="null"/> when it declares none.</summary>
     private static ConnectorOperationModel? FindLookup(Target target) =>

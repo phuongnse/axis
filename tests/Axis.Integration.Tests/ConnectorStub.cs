@@ -21,7 +21,10 @@ namespace Axis.Integration.Tests;
 /// type <c>application/x-www-form-urlencoded</c> is a token request, as an authorization server gets
 /// it. The stub keeps it in <see cref="TokenRequests"/>, not in <see cref="Requests"/>, and answers
 /// <c>{"access_token":"issued-{n}-{guid}","token_type":"Bearer","expires_in":<see cref="TokenExpiresIn"/>}</c>
-/// with a new token each time, unless a test lines up a status with <see cref="RespondToken"/>.
+/// with a new token each time, unless a test lines up a status with <see cref="RespondToken"/>. A
+/// refused <c>3xx</c> answer carries a <c>Location</c> that points back at the token request's own path,
+/// so a client that followed it would send a second token request. A test can hold the next token
+/// response with <see cref="HoldToken"/>.
 /// </summary>
 public sealed class ConnectorStub : IAsyncDisposable
 {
@@ -36,6 +39,7 @@ public sealed class ConnectorStub : IAsyncDisposable
     private readonly Queue<(int Status, string Body)> _next = new();
     private readonly ConcurrentDictionary<Guid, bool> _keys = new();
     private HeldResponse? _held;
+    private HeldResponse? _heldToken;
     private bool _dropNext;
 
     private ConnectorStub(WebApplication app) => _app = app;
@@ -93,6 +97,18 @@ public sealed class ConnectorStub : IAsyncDisposable
         }
     }
 
+    /// <summary>Holds the response to the next token request until the returned handle is released.</summary>
+    public HeldResponse HoldToken()
+    {
+        var held = new HeldResponse();
+        lock (_lock)
+        {
+            _heldToken = held;
+        }
+
+        return held;
+    }
+
     /// <summary>Holds the response to the next request until the returned handle is released.</summary>
     public HeldResponse Hold()
     {
@@ -135,6 +151,7 @@ public sealed class ConnectorStub : IAsyncDisposable
         lock (_lock)
         {
             _held?.Release();
+            _heldToken?.Release();
         }
 
         await _app.DisposeAsync();
@@ -218,12 +235,15 @@ public sealed class ConnectorStub : IAsyncDisposable
     private async Task HandleTokenAsync(HttpContext context, string body)
     {
         int? refused = null;
+        HeldResponse? held;
         lock (_lock)
         {
             if (_nextToken.TryDequeue(out var status))
             {
                 refused = status;
             }
+
+            (held, _heldToken) = (_heldToken, null);
         }
 
         string? token = null;
@@ -238,7 +258,18 @@ public sealed class ConnectorStub : IAsyncDisposable
             context.Request.Headers.Authorization.ToString(),
             body,
             token));
+        if (held is not null)
+        {
+            held.Arrive();
+            await held.Released;
+        }
+
         context.Response.StatusCode = refused ?? StatusCodes.Status200OK;
+        if (refused is >= 300 and < 400)
+        {
+            context.Response.Headers.Location = context.Request.Path.Value ?? "/";
+        }
+
         context.Response.ContentType = "application/json";
         await context.Response.WriteAsync(
             token is null ? """{"error":"invalid_client"}""" : $$"""{"access_token":"{{token}}","token_type":"Bearer","expires_in":{{TokenExpiresIn}}}""",
