@@ -765,8 +765,8 @@ const currentUser: CurrentUser = {
   users: false,
 }
 
-const purchaseApplication = { name: application, titles: { [locale]: 'Purchase requests' } }
-const serviceApplication = { name: 'ServiceDesk', titles: { [locale]: 'Service desk' } }
+const purchaseApplication = { name: application, titles: { [locale]: 'Purchase requests' }, descriptions: null }
+const serviceApplication = { name: 'ServiceDesk', titles: { [locale]: 'Service desk' }, descriptions: null }
 
 /** Three sites in two applications, for the platform home page's cards. */
 const listedSites: SiteListItem[] = [
@@ -774,15 +774,23 @@ const listedSites: SiteListItem[] = [
     path: sitePath,
     titleKey: 'site.title',
     titles: { [locale]: 'Purchase requests' },
+    descriptions: null,
     application: purchaseApplication,
   },
   {
     path: 'archive',
     titleKey: 'site.title',
     titles: { [locale]: 'Archived requests' },
+    descriptions: null,
     application: purchaseApplication,
   },
-  { path: 'desk', titleKey: 'site.title', titles: { [locale]: 'Service desk' }, application: serviceApplication },
+  {
+    path: 'desk',
+    titleKey: 'site.title',
+    titles: { [locale]: 'Service desk' },
+    descriptions: null,
+    application: serviceApplication,
+  },
 ]
 
 const notificationPage: NotificationPage = { items: [], page: 1, pageSize: 10, totalCount: 0, unreadCount: 2 }

@@ -334,6 +334,18 @@ test.describe('the author builds the service desk with Studio only', () => {
     }
   })
 
+  test('the author gives the application its label and description', async ({ page }) => {
+    await useJourneySession(page, 'author')
+    await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
+
+    const en = await texts('en')
+    await page.getByTestId('studio-group-application').getByRole('button').click()
+    await expectForm(page)
+    await writeLabel(page, 'studio-field-/label', 'application.title', en['application.title'])
+    await writeLabel(page, 'studio-field-/description', 'application.description', en['application.description'])
+    await save(page)
+  })
+
   test('the author adds the three roles', async ({ page }) => {
     await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio?app=ServiceDesk`)
@@ -1016,6 +1028,7 @@ test.describe('the author builds the service desk with Studio only', () => {
 
     await page.getByTestId('studio-field-/locales/available').getByRole('button', { name: 'Add', exact: true }).click()
     await page.getByTestId('studio-field-/locales/available/1').getByRole('textbox').fill('vi')
+    await writeLabel(page, 'studio-field-/description', 'site.description', en['site.description'])
 
     // The starter site has the entry for Home, which the author turns into the first entry.
     const navigation: [page: string, key: string, icon: string][] = [

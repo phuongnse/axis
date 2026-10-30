@@ -5,7 +5,10 @@
   "formatVersion": 1,
   "locale": "en",
   "texts": {
+    "application.title": "Leave requests",
+    "application.description": "Tracks time off, from the request to the manager's approval.",
     "site.title": "Leave",
+    "site.description": "Ask for leave and follow your requests.",
     "nav.myLeaveRequests": "My leave requests",
     "nav.myTasks": "My tasks",
     "nav.departments": "Departments",

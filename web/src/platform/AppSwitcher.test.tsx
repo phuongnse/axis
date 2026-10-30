@@ -38,13 +38,15 @@ const sites: SiteListItem[] = [
     path: 'e2e',
     titleKey: 'site.title',
     titles: { en: 'E2E notes', vi: 'Ghi chú E2E' },
-    application: { name: 'e2e', titles: { en: 'E2E notes', vi: 'Ghi chú E2E' } },
+    descriptions: null,
+    application: { name: 'e2e', titles: { en: 'E2E notes', vi: 'Ghi chú E2E' }, descriptions: null },
   },
   {
     path: 'purchasing',
     titleKey: 'site.title',
     titles: { en: 'Purchase requests' },
-    application: { name: 'purchasing', titles: { en: 'Purchase requests' } },
+    descriptions: null,
+    application: { name: 'purchasing', titles: { en: 'Purchase requests' }, descriptions: null },
   },
 ]
 

@@ -27,17 +27,21 @@ export interface SiteMetadata {
   hostSite?: string | null
 }
 
-/** The application of a listed site, with its title per locale it has texts for. */
+/** The application of a listed site, with its title and description per locale it has texts for. */
 export interface SiteApplication {
   name: string
   titles: Record<string, string>
+  /** The description per locale, or `null` when the application has none. */
+  descriptions: Record<string, string> | null
 }
 
-/** One application site in the list served by `GET /api/sites`, with its title per available locale. */
+/** One application site in the list served by `GET /api/sites`, with its title and description per available locale. */
 export interface SiteListItem {
   path: string
   titleKey: string
   titles: Record<string, string>
+  /** The description per locale, or `null` when the site has none. */
+  descriptions: Record<string, string> | null
   application: SiteApplication
 }
 

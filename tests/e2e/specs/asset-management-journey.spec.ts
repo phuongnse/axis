@@ -604,13 +604,16 @@ test.describe('the author builds the asset management application with Studio on
     }
   })
 
-  test('the author sets the application time zone', async ({ page }) => {
+  test('the author sets the application time zone, label and description', async ({ page }) => {
     await useJourneySession(page, 'author')
     await page.goto(`${journeyURL}/studio?app=AssetManagement`)
 
+    const en = await texts('en')
     await page.getByTestId('studio-group-application').getByRole('button').click()
     await expectForm(page)
     await page.getByTestId('studio-field-/timeZone').getByRole('textbox').fill('Asia/Ho_Chi_Minh')
+    await writeLabel(page, 'studio-field-/label', 'application.title', en['application.title'])
+    await writeLabel(page, 'studio-field-/description', 'application.description', en['application.description'])
     await save(page)
   })
 
@@ -763,6 +766,7 @@ test.describe('the author builds the asset management application with Studio on
 
     await page.getByTestId('studio-field-/locales/available').getByRole('button', { name: 'Add', exact: true }).click()
     await page.getByTestId('studio-field-/locales/available/1').getByRole('textbox').fill('vi')
+    await writeLabel(page, 'studio-field-/description', 'site.description', en['site.description'])
 
     // The starter site has the entry for Home, which the author turns into the first entry.
     const navigation: [page: string, key: string, icon: string][] = [

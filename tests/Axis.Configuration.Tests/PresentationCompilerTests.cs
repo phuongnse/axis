@@ -528,16 +528,32 @@ public sealed class PresentationCompilerTests
         Assert.NotNull(result.Model);
     }
 
+    [Fact]
+    public void Site_description_with_a_text_key_that_exists_compiles()
+    {
+        using var folder = Folder()
+            .With("texts/en.json", TextsEn.Replace("\"site.title\"", "\"site.description\": \"Sell things.\", \"site.title\"", StringComparison.Ordinal))
+            .With("sites/sales.json", Site(descriptionKey: "site.description"));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+        Assert.Equal("site.description", result.Model.Sites[0].Description?.TextKey);
+    }
+
     [Theory]
     [InlineData("sites/sales.json", "/title/textKey")]
+    [InlineData("sites/sales.json", "/description/textKey")]
     [InlineData("sites/sales.json", "/navigation/0/label/textKey")]
     [InlineData("pages/orders.json", "/title/textKey")]
-    public void Site_title_navigation_label_or_page_title_with_a_missing_text_key_is_reported(string file, string path)
+    public void Site_title_description_navigation_label_or_page_title_with_a_missing_text_key_is_reported(string file, string path)
     {
         var content = (file, path) switch
         {
             ("pages/orders.json", _) => Page("Orders", OrdersWidget, titleKey: "missing.key"),
             (_, "/title/textKey") => Site(titleKey: "missing.key"),
+            (_, "/description/textKey") => Site(descriptionKey: "missing.key"),
             _ => Site(navigationKey: "missing.key"),
         };
         using var folder = Folder().With(file, content);
@@ -658,13 +674,14 @@ public sealed class PresentationCompilerTests
         string id = "66666666-6666-4666-8666-666666666661",
         string path = "sales",
         string titleKey = "site.title",
+        string? descriptionKey = null,
         string locales = """ "default": "en", "fallback": "en", "available": ["en"] """,
         string navigationPage = "Orders",
         string navigationKey = "nav.orders",
         string? navigationIcon = null) =>
         $$"""
         { "id": "{{id}}", "kind": "site", "name": "{{name}}", "formatVersion": 1, "path": "{{path}}",
-          "title": { "textKey": "{{titleKey}}" }, "locales": { {{locales}} },
+          "title": { "textKey": "{{titleKey}}" },{{(descriptionKey is null ? "" : $" \"description\": {{ \"textKey\": \"{descriptionKey}\" }},")}} "locales": { {{locales}} },
           "navigation": [ { "page": "{{navigationPage}}", "label": { "textKey": "{{navigationKey}}" }{{(navigationIcon is null ? "" : $", \"icon\": \"{navigationIcon}\"")}} } ] }
         """;
 

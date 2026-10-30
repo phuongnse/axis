@@ -393,6 +393,7 @@ public static partial class ApplicationCompiler
             texts = ModuleTextChecker.Check(application, modules, loaded.Texts, moduleResources.Texts, diagnostics);
             textKeys.UnionWith(texts.SelectMany(text => text.Texts.Keys));
             CheckTextKey(application.Label, application, "/label", references, diagnostics);
+            CheckTextKey(application.Description, application, "/description", references, diagnostics);
         }
 
         // Package ids are matched exactly. Each pin is an installed version, so it has its manifest's operations.
@@ -2449,6 +2450,7 @@ public static partial class ApplicationCompiler
             Name = site.Name,
             Path = site.Path,
             Title = site.Title,
+            Description = site.Description,
             Locales = site.Locales,
             File = site.File,
             Navigation = site.Navigation
