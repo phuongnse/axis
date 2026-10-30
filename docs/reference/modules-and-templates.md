@@ -337,9 +337,11 @@ agrees. An application that declares it maps the slot to one of its own roles:
   sub-process `process` never name another module. The process sees no application form, process,
   page, role, connector or rule, and naming one gives the usual unknown-name code in the module
   file. Its expressions see the rules of its own module by plain name. A package operation step
-  gives `AXC0150` for now, whose message points to the module's `packages` in `module.json`,
-  because module packages are not read yet. _(planned for M20)_ Its steps call operations of the
-  module's `packages`. A task assignee naming a role slot, and the `callConnector` steps that name
+  calls an operation of a package in the module's `packages`, which `module.json` lists like an
+  application's. The step is checked against the pinned version, and a package the module does not
+  list gives `AXC0150` in the module file. The pins follow the
+  [pinning rule](extension-packages.md#declaring-packages-in-an-application) of the release. A task
+  assignee naming a role slot, and the `callConnector` steps that name
   a connector slot of the module, see Connector slots below. The application starts it from a
   trigger, a `startProcess` action, a sub-process step or an endpoint, by the name
   `<module id>/<name>`. It is pinned with the rest of the release. The engines are not changed

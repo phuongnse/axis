@@ -423,7 +423,14 @@ installed, the sample does not compile: `AXC0139` at `/packages/0/id` names it.
   and pins that exact version in the release, as step 4, **Release**, of the
   pipeline describes. The server compiles against the packages installed
   under `Extensions:Path`. A process step is
-  checked against the pinned version's manifest.
+  checked against the pinned version's manifest. A module's `packages` share
+  the release's pins, which hold one version of each package id. A module
+  uses the application's pin when the application lists the package too, and
+  its entry is `AXC0141` in `module.json` when that pin is outside its range.
+  Otherwise the release pins the highest installed version that meets the
+  range of every module that lists the package, and a package with no such
+  version is `AXC0141` in each of those modules' `module.json`. An application
+  process sees only the application's own packages.
 - **Diagnostics.** A package id with no installed version is `AXC0139`. A
   range that no installed version meets is `AXC0141`, and its message lists
   the installed versions. Both are compile errors in `application.json`.

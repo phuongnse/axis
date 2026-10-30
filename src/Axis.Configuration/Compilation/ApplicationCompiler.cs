@@ -242,6 +242,9 @@ public static partial class ApplicationCompiler
         }
 
         IReadOnlyList<PinnedPackageModel> packages = [];
+        IReadOnlyList<PinnedPackageModel> allPackages = [];
+        IReadOnlyDictionary<string, IReadOnlyList<PinnedPackageModel>> modulePackages = new Dictionary<string, IReadOnlyList<PinnedPackageModel>>();
+        var moduleManifests = new Dictionary<string, ModuleManifest>(StringComparer.Ordinal);
         IReadOnlyList<PinnedModuleModel> modules = [];
         IReadOnlyList<ResourceContent> moduleFiles = [];
         IReadOnlySet<string>? declaredPackageIds = null;
@@ -249,8 +252,19 @@ public static partial class ApplicationCompiler
         var moduleResources = new ModuleResources([], [], [], [], [], [], [], [], [], [], [], new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new Dictionary<string, IReadOnlySet<string>>(), new Dictionary<string, IReadOnlySet<string>>());
         if (loaded.Application is { } manifest)
         {
-            packages = PackageChecker.Check(manifest, installedPackages, diagnostics, references);
+            packages = PackageChecker.Check(manifest.Packages, installedPackages, manifest.File, manifest.Id, manifest, diagnostics, references);
             (modules, moduleFiles, moduleResources) = ModuleChecker.Check(manifest, installedModules, diagnostics, references, loaded.Roles, loaded.UnloadedRoleNames, loaded.Connectors, loaded.UnloadedConnectorNames);
+            var pinnedManifests = modules
+                .Select(pin => (pin.Id, installedModules.First(candidate => candidate.Manifest.Id == pin.Id && candidate.Manifest.Version == pin.Version).Manifest))
+                .ToList();
+            foreach (var (id, pinnedManifest) in pinnedManifests)
+            {
+                moduleManifests[id] = pinnedManifest;
+            }
+
+            var (byModule, added) = PackageChecker.CheckModules(manifest, packages, pinnedManifests, installedPackages, diagnostics, references);
+            modulePackages = byModule;
+            allPackages = [.. packages, .. added];
             declaredPackageIds = new HashSet<string>(manifest.Packages.Select(package => package.Id), StringComparer.Ordinal);
             if (manifest.TimeZone is { } timeZoneId && !IanaTimeZones.TryFind(timeZoneId, out timeZone))
             {
@@ -400,15 +414,19 @@ public static partial class ApplicationCompiler
         }
 
         // Package ids are matched exactly. Each pin is an installed version, so it has its manifest's operations.
-        var pinnedPackages = packages.ToDictionary(
-            pin => pin.Id,
-            pin => new PinnedOperations(
-                pin.Id,
-                pin.Version,
-                installedPackages.First(candidate => candidate.Id == pin.Id && candidate.Version == pin.Version).Operations),
-            StringComparer.Ordinal);
+        PinnedOperations OperationsOf(PinnedPackageModel pin) => new(
+            pin.Id,
+            pin.Version,
+            installedPackages.First(candidate => candidate.Id == pin.Id && candidate.Version == pin.Version).Operations);
+
+        var pinnedPackages = packages.ToDictionary(pin => pin.Id, OperationsOf, StringComparer.Ordinal);
 
         PinnedOperations? FindPackage(string id) => pinnedPackages.GetValueOrDefault(id);
+
+        // A release pins one version of a package id, so the pins of the modules and the application agree.
+        var anyPinnedPackages = allPackages.ToDictionary(pin => pin.Id, OperationsOf, StringComparer.Ordinal);
+
+        PinnedOperations? FindAnyPackage(string id) => anyPinnedPackages.GetValueOrDefault(id);
 
         foreach (var role in loaded.Roles)
         {
@@ -505,7 +523,7 @@ public static partial class ApplicationCompiler
         CheckDataSources(loaded, FindEntity, ownersByChildName, moduleReferences, references, FilterRulesFor, DeclaredModulesOf, diagnostics);
         // An application process names a module form or process only under a module the application declares.
         // A module process names only its own module and the modules it declares, sees no application
-        // form, process, page, role or connector, and no package.
+        // form, process, page, role or connector, and only the packages its module lists.
         bool NamesDeclaredModule(string name) =>
             name.IndexOf('/', StringComparison.Ordinal) < 0 || declaredModules.Contains(ModuleIdOf(name));
 
@@ -537,6 +555,7 @@ public static partial class ApplicationCompiler
         {
             var moduleId = moduleProcesses.Key;
             var declared = moduleResources.DeclaredModules.GetValueOrDefault(moduleId) ?? new HashSet<string>();
+            var modulePins = modulePackages.GetValueOrDefault(moduleId)?.ToDictionary(pin => pin.Id, OperationsOf, StringComparer.Ordinal);
             bool Allowed(string name)
             {
                 var slash = name.IndexOf('/', StringComparison.Ordinal);
@@ -556,8 +575,8 @@ public static partial class ApplicationCompiler
                 new HashSet<string>(),
                 name => Allowed(name) ? FindEvent(name) : null,
                 loaded.UnloadedEventNames,
-                _ => null,
-                new HashSet<string>(),
+                id => modulePins?.GetValueOrDefault(id),
+                new HashSet<string>(moduleManifests[moduleId].Packages.Select(package => package.Id), StringComparer.Ordinal),
                 _ => null,
                 new HashSet<string>(),
                 key => [.. texts.Where(text => text.Texts.ContainsKey(key)).Select(text => (text.Locale, text.Texts[key]))],
@@ -725,7 +744,7 @@ public static partial class ApplicationCompiler
             Seeds = allSeeds.Select(seed => BuildSeed(seed, entitiesByName, applicationId)).ToList(),
             DataSources = loaded.DataSources.Select(dataSource => BuildDataSource(
                 dataSourcesByName[dataSource.Name], entities, FilterRulesFor(dataSource), DeclaredModulesOf(dataSource))).ToList(),
-            Processes = loaded.Processes.Select(process => ProcessChecker.Build(processesByName[process.Name], FindEntity, FindForm, FindConnector, FindEvent, FindPackage, FindPage, FindProcess, RulesFor(process), DeclaredModulesOf(process))).ToList(),
+            Processes = loaded.Processes.Select(process => ProcessChecker.Build(processesByName[process.Name], FindEntity, FindForm, FindConnector, FindEvent, FindAnyPackage, FindPage, FindProcess, RulesFor(process), DeclaredModulesOf(process))).ToList(),
             Forms = loaded.Forms.Select(form => BuildForm(formsByName[form.Name], entitiesByName, IsModuleResource(form) ? [] : rules, IsModuleResource(form) ? null : declaredModules)).ToList(),
             Roles = loaded.Roles,
             Policies = loaded.Policies.Select(policy => PolicyChecker.Build(
@@ -742,7 +761,7 @@ public static partial class ApplicationCompiler
             Endpoints = loaded.Endpoints.Select(endpoint => EndpointChecker.Build(endpoint, FindEntity, FindProcess)).ToList(),
             Triggers = loaded.Triggers.Select(trigger => TriggerChecker.Build(trigger, FindEntity, FindEvent, FindProcess, FindDataSource, rules, declaredModules)).ToList(),
             Migrations = loaded.Migrations.Select(migration => MigrationChecker.Build(migration, loaded.Resources.Single(resource => resource.Path == migration.File).Content)).ToList(),
-            Packages = packages,
+            Packages = allPackages,
             Modules = modules,
         };
 
@@ -753,7 +772,7 @@ public static partial class ApplicationCompiler
         return result with
         {
             Model = model,
-            ContentHash = ContentHash.Compute(resources, packages),
+            ContentHash = ContentHash.Compute(resources, allPackages),
             Resources = resources,
         };
     }

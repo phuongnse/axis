@@ -632,7 +632,8 @@ The compiler reports these as compile errors.
   matched exactly. Otherwise it is `AXC0150` at `/steps/{i}/operation`. A
   listed package that failed pinning (`AXC0139` to `AXC0142`) is not
   reported again, and neither is any package when `application.json` was not
-  loaded.
+  loaded. A module process is checked against the module's own `packages`
+  in `module.json` instead.
 - The operation is in the manifest of the version the release pins,
   matched ignoring letter case. Otherwise it is `AXC0151` at
   `/steps/{i}/operation`. The compiled step holds the manifest's declared
