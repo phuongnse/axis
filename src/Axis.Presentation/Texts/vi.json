@@ -70,6 +70,8 @@
   "shell.home.signIn.message": "Bạn đăng nhập tại trang đăng nhập của tổ chức, sau đó quay lại đây.",
   "shell.home.applications.empty": "Chưa có ứng dụng nào được kích hoạt.",
   "shell.home.applications.loadFailed": "Không thể tải danh sách trang ứng dụng.",
+  "shell.home.signedOut.title": "Bạn đã đăng xuất",
+  "shell.home.signedOut.message": "Bạn có thể đóng trang này hoặc đăng nhập lại.",
   "shell.home.signInFailed": "Đăng nhập chưa hoàn tất. Vui lòng thử lại.",
   "shell.signInPrompt.title": "Phiên làm việc của bạn đã kết thúc",
   "shell.signInPrompt.message": "Đăng nhập lại để tiếp tục.",

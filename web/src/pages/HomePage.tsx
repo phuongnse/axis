@@ -34,12 +34,15 @@ function useHomeGrid(): CSSProperties {
  * Proposed: the sign-in screen draws the identity provider's frame, the organization's mark and name above the card.
  * Nobody is signed in yet, so the organization's name needs an answer that does not need a session; until it has one,
  * the screen names Axis.
+ *
+ * Proposed: the home page sends a signed-out person straight to the identity provider, so this card shows only where
+ * that would loop or surprise: after a refused sign-in, `/?signIn=failed`, and after signing out, `/?signedOut`.
  */
 export function SignInCard({ organization = 'Axis' }: { organization?: string }) {
   const t = useText()
   const [searchParams] = useSearchParams()
   const { colour, spacing, radius } = useDesignTokens()
-  const signInFailed = searchParams.get('signIn') === 'failed'
+  const signedOut = searchParams.has('signedOut')
 
   return (
     <Flex vertical align="center" gap={spacing.md} style={{ paddingBlock: spacing.xl }}>
@@ -57,12 +60,13 @@ export function SignInCard({ organization = 'Axis' }: { organization?: string })
       >
         <Flex vertical gap={spacing.md}>
           <Typography.Title level={4} style={{ margin: 0 }}>
-            {t('shell.home.signIn.title')}
+            {t(signedOut ? 'shell.home.signedOut.title' : 'shell.home.signIn.title')}
           </Typography.Title>
-          <Typography.Paragraph style={{ margin: 0, color: colour.textMuted }}>
-            {t('shell.home.signIn.message')}
-          </Typography.Paragraph>
-          {signInFailed && (
+          {signedOut ? (
+            <Typography.Paragraph style={{ margin: 0, color: colour.textMuted }}>
+              {t('shell.home.signedOut.message')}
+            </Typography.Paragraph>
+          ) : (
             <Alert
               data-testid="sign-in-failed"
               role="alert"
@@ -72,7 +76,7 @@ export function SignInCard({ organization = 'Axis' }: { organization?: string })
             />
           )}
           <Button type="primary" block onClick={startSignIn}>
-            {t('shell.account.signIn')}
+            {t(signedOut ? 'shell.account.sessions.signInAgain' : 'shell.account.signIn')}
           </Button>
         </Flex>
       </Card>
@@ -274,6 +278,9 @@ export function HomePage() {
   const { locale } = usePlatform().current
   const { spacing } = useDesignTokens()
   const [loaded, setLoaded] = useState<Loaded>()
+  const [searchParams] = useSearchParams()
+  // Proposed: only a refused sign-in and a finished sign-out stop on the card; otherwise sign-in starts at once.
+  const stopOnCard = searchParams.get('signIn') === 'failed' || searchParams.has('signedOut')
 
   useEffect(() => {
     const controller = new AbortController()
@@ -295,10 +302,17 @@ export function HomePage() {
     return () => controller.abort()
   }, [])
 
-  if (loaded === undefined) {
+  // Either call answering 401 means the session is gone, even if the other call went through before it ended.
+  const signedOut = loaded !== undefined && (loaded.user === null || loaded.sites === null)
+  useEffect(() => {
+    if (signedOut && !stopOnCard) {
+      startSignIn()
+    }
+  }, [signedOut, stopOnCard])
+
+  if (loaded === undefined || (signedOut && !stopOnCard)) {
     return <Spin />
   }
-  // Either call answering 401 means the session is gone, even if the other call went through before it ended.
   if (loaded.user === null || loaded.sites === null) {
     return <SignInCard />
   }

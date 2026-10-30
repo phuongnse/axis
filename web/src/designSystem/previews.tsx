@@ -233,17 +233,18 @@ export const previews: Record<string, readonly PreviewState[]> = {
     { caption: 'Platform site', draw: () => <ShellPreview />, entry: '/', frameHeight: 600 },
   ],
   signIn: [
-    // Proposed: the same organization as the identity provider's pages.
-    {
-      caption: 'Signed out',
-      draw: () => <SignInCard organization={identitySignInContext.realmName} />,
-      entry: '/',
-      frameHeight: 480,
-    },
+    // Proposed: the same organization as the identity provider's pages. A signed-out person goes straight to the
+    // identity provider, so the card shows only after a refused sign-in and after signing out.
     {
       caption: 'Sign-in refused',
       draw: () => <SignInCard organization={identitySignInContext.realmName} />,
       entry: '/?signIn=failed',
+      frameHeight: 480,
+    },
+    {
+      caption: 'Signed out',
+      draw: () => <SignInCard organization={identitySignInContext.realmName} />,
+      entry: '/?signedOut',
       frameHeight: 480,
     },
     {

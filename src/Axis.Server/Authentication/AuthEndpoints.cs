@@ -102,10 +102,11 @@ internal static class AuthEndpoints
         var options = oidcOptions.Get(TenantSignIn.SchemeName(tenant.TenantId));
         var configuration = await options.ConfigurationManager!.GetConfigurationAsync(cancellationToken);
         var request = httpContext.Request;
-        var returnUrl = $"{request.Scheme}://{request.Host}/";
+        // Proposed: back to the signed-out card, since the home page otherwise starts a new sign-in at once.
+        var returnUrl = $"{request.Scheme}://{request.Host}/?signedOut";
         var signOutUrl = string.IsNullOrEmpty(configuration.EndSessionEndpoint)
             // An identity provider without a sign-out address leaves the browser on the site.
-            ? "/"
+            ? "/?signedOut"
             : $"{configuration.EndSessionEndpoint}?client_id={Uri.EscapeDataString(options.ClientId!)}&post_logout_redirect_uri={Uri.EscapeDataString(returnUrl)}";
         return Results.Ok(new SignOutResponse(signOutUrl));
     }

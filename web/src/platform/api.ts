@@ -37,13 +37,16 @@ export function reauthenticateUrl(returnUrl: string): string {
 /** The shell's sign-in page, where the server sends the browser after a refused sign-in. */
 export const signInFailedPath = '/?signIn=failed'
 
+/** Proposed: where the identity provider sends the browser back after signing out. */
+export const signedOutPath = '/?signedOut'
+
 /**
  * Sends the browser to sign in, and back to the current page with its query string after. On the
  * sign-in page after a refused sign-in the return address is `/`, so a retry does not land on the message.
  */
 export function startSignIn(): void {
   const current = window.location.pathname + window.location.search
-  assignLocation(signInUrl(current === signInFailedPath ? '/' : current))
+  assignLocation(signInUrl(current === signInFailedPath || current === signedOutPath ? '/' : current))
 }
 
 /**
