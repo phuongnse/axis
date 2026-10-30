@@ -350,6 +350,10 @@ public sealed class PublishingPerformanceTests(PostgreSqlFixture database) : ICl
             builder.UseSetting($"Tenants:{HistoryTenant}:Bindings:PurchasingSystemUrl:Value", "https://purchasing.example.test");
             builder.UseSetting($"Tenants:{HistoryTenant}:Bindings:PurchasingSystemToken:Kind", "secret");
             builder.UseSetting($"Tenants:{HistoryTenant}:Bindings:PurchasingSystemToken:Value", "studio-test-token");
+            foreach (var (key, value) in CompanyBindings.Settings(HistoryTenant))
+            {
+                builder.UseSetting(key, value);
+            }
             builder.UseSetting("Extensions:Path", SamplePackages.Path);
             builder.UseSetting("ActivateOnStartup:0", folder);
             builder.UseSetting("Studio:Folders:0", folder);

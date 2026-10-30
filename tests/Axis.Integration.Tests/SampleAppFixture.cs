@@ -95,6 +95,10 @@ public sealed class SampleAppFixture : IAsyncLifetime
             builder.UseSetting($"Tenants:{Tenant}:Bindings:PurchasingSystemUrl:Value", "https://purchasing.example.test");
             builder.UseSetting($"Tenants:{Tenant}:Bindings:PurchasingSystemToken:Kind", "secret");
             builder.UseSetting($"Tenants:{Tenant}:Bindings:PurchasingSystemToken:Value", Token);
+            foreach (var (key, value) in CompanyBindings.Settings(Tenant))
+            {
+                builder.UseSetting(key, value);
+            }
             builder.UseSetting("Extensions:Path", SamplePackages.Path);
             builder.UseSetting("ActivateOnStartup:0", _appFolder);
             builder.UseTestAuthentication(
