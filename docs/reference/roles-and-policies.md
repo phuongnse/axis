@@ -60,7 +60,7 @@ A `role` resource declares a role that users can hold:
   provider's `roles` mapping, which may map other claim values to roles. Mapped
   roles hold in the application whose provider maps them only, see
   [identity provider resource](identity-provider.md#identity-provider-resource).
-  _(planned for M17)_ The users page gives roles too.
+  The users page gives roles too, see [roles](user-administration.md#roles).
 - **Label.** The `label` is required. Its text key joins the `AXC0028`
   check.
 - **Schema.** A name in another form, or a missing `label`, is `AXC0004`.

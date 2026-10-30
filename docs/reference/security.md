@@ -10,7 +10,7 @@ _(planned for Mx)_ are not built yet, and Dn refers to [decisions.md](../decisio
 
 It follows
 [D23](../decisions/d23-sign-in-through-oidc-and-the-bff-session.md).
-Sign-in, the session, `GET /api/me` and sign-in needed are in place. _(planned for M17)_ Every tenant signs in through
+Sign-in, the session, `GET /api/me` and sign-in needed are in place. Every tenant that `tenant create` makes signs in through its realm in
 [Axis's identity provider](identity-provider.md).
 
 - **Flow.** Sign-in uses the OIDC authorization code flow with PKCE. The
@@ -252,8 +252,8 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place. _(planned f
 - **Roles.** The roles come from the roles claim at sign-in and are kept in
   the session row. A role change at the identity provider applies at the next
   sign-in. Each application's roles also come from its provider's `roles` mapping, kept by application
-  id, see [users](identity-provider.md#users). _(planned for M17)_ The roles the users page gives join them, and a
-  change on the users page applies to live sessions at once, see [roles](user-administration.md#roles).
+  id, see [users](identity-provider.md#users). The roles the users page gives join them, and a
+  change on the users page applies at the person's next request, see [roles](user-administration.md#roles).
 - **Current user.** `GET /api/me` keeps its shape,
   `{ "id", "displayName", "roles" }`, and reads the session. It adds a boolean `console`, true when the user holds
   the role that `Console:OperatorRole` names. With no value set it is false for everyone. See the

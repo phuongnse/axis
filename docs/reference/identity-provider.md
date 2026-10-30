@@ -3,16 +3,16 @@
 Axis ships an identity provider of its own, so people sign in on one standard Axis page, whatever identity provider
 their organization uses. [D99](../decisions/d99-axis-ships-its-own-identity-provider.md) agrees it, and
 [D100](../decisions/d100-identity-providers-per-application-and-sign-in-per-site.md) lets each application declare how
-its people sign in and each site pick from that. M17 builds it, and each section says whether it is built. The
-`identityProvider` resource, a site's `signIn` and their compile checks are built, and so is the tenant's realm that
-`tenant create` makes. Activation checks the bindings of `oidc` and `saml` providers and refuses providers that would split a person. Sign-in reads the
-`roles` mapping of each provider, activation updates the realm, and a new realm has no accounts, no redirect addresses and no role mappings, so until they do, a tenant signs in through an identity provider that runs outside
-Axis when its `Oidc` block points there, as [security](security.md#sign-in-and-the-session) describes. No command points the block at another provider. Accounts, roles given by an administrator and the
-users page are in [user administration](user-administration.md).
+its people sign in and each site pick from that. M17 built it, and each section says what is built. The `identityProvider` resource, a site's `signIn` and their
+compile checks are built, and so is the tenant's realm that `tenant create` makes. Activation checks the bindings of
+`oidc` and `saml` providers and refuses providers that would split a person. Sign-in reads the `roles` mapping of each
+provider, and activation keeps the realm in step, role mappers included. One gap is left: a new realm has no redirect
+addresses until `tenant host` commands keep them in step _(planned for M28)_, so an operator adds them by hand. The
+`Oidc` block can still point at an identity provider that runs outside Axis, as
+[security](security.md#sign-in-and-the-session) describes. No command does that. Accounts, roles given by an
+administrator and the users page are in [user administration](user-administration.md).
 
 ## What it is
-
-_(planned for M17)_
 
 - Axis's identity provider is Keycloak with the Axis theme. Every installation runs it beside the server and the
   worker.
@@ -34,7 +34,7 @@ _(planned for M17)_
   sign-in, passwords of 12 to 128 characters that are not on the breached-password list, a wait after 5 failed
   sign-ins, a password reset link of 30 minutes and no self-registration.
 - The realm's login theme is the Axis theme `axis`, see [theme](#theme).
-- _(planned for M17)_ The realm also has its people, its brokered identity providers and a client for each site.
+- The realm also has its people, its brokered identity providers and a client for each site.
 - The realm's display name is the organization's name, which every sign-in page shows above its card, see
   [theme](#theme). `tenant create` gives the realm no display name until it takes the organization's name, and a rerun
   clears one that holds the tenant id. The pages then name Axis, never the tenant id
@@ -189,8 +189,7 @@ so Studio edits it, with the identity provider editor of [Studio](studio.md), an
 `tenant sign-in set` stores the platform sign-in in the tenant directory, and `tenant create` and `tenant restore`
 set accounts on. Both are built. The server's callback for the platform pages reads the stored platform sign-in, see
 below. The realm sync is built: `tenant sign-in set` brings the tenant's realm in step, and every activation keeps the
-platform sign-in's providers in it, see [keeping the realm in step](#keeping-the-realm-in-step). The server's other
-checks of the stored platform sign-in are _(planned for M17)_.
+platform sign-in's providers in it, see [keeping the realm in step](#keeping-the-realm-in-step).
 
 - The home page, Studio, the operator console, the account page and the users page belong to no site. The tenant's
   platform sign-in says which providers they accept.
@@ -229,8 +228,6 @@ checks of the stored platform sign-in are _(planned for M17)_.
 
 ## Users
 
-_(planned for M17)_
-
 - **The user id is the realm's `sub`.** The issuer is always the tenant's realm, so a user is one realm user.
 - **One provider per binding:** the realm holds one brokered provider for each set of bindings. Two applications
   whose providers name the same bindings use the same provider in the realm, and the platform sign-in shares it too,
@@ -264,8 +261,6 @@ _(planned for M17)_
 
 ## Keeping the realm in step
 
-_(planned for M17)_
-
 - **Created by `Axis.Admin`:** `tenant create` creates the tenant's realm, its platform client `axis`, and two clients
   that Axis's hosts use to change the realm: `axis-activation`, with rights over the realm's providers and clients, and
   `manage-realm` for the providers' label texts, which Keycloak requires for realm texts and which also covers every
@@ -281,8 +276,8 @@ _(planned for M17)_
   identity provider that `tenant create` targets must hold in its `data/password-blacklists` folder. The repository
   keeps it in `deploy/keycloak/password-blacklists`, see `deploy/keycloak/README.md`. Without the file, `tenant create`
   fails at its realm step, also for a realm that exists.
-- _(planned for M17)_ **Kept in step later:** `tenant host add`, `remove` and `move` do not change the realm yet, so the
-  platform client has no redirect addresses until a later part of M17 adds them.
+- _(planned for M28)_ **Kept in step later:** `tenant host add`, `remove` and `move` do not change the realm yet, so the
+  platform client has no redirect addresses until M28 adds them.
 - **Realm sync:** the realm sync is built. It signs in to the realm as `axis-activation` and makes the realm's
   `site-<path>` clients and `oidc-` and `saml-` providers match a desired state. Each site client puts the alias of the provider that
   signed the person in into its ID token as the `identity_provider` claim, and each provider gets claim mappers for the
@@ -381,8 +376,6 @@ _(planned for M17)_
   tenant is not served, the session reads none of them and the request does not fail.
 
 ## Theme
-
-_(planned for M17)_
 
 - Every page of Axis's identity provider has one frame: the organization's mark and name above one card in the middle
   of the page on `canvas`, and below it the language links and "© <year> Axis". It follows light and dark mode and the

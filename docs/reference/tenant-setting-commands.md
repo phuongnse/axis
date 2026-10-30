@@ -136,7 +136,7 @@ and the public key as a PEM.
 - The command no longer takes `--authority`, `--client-id`, `--client-secret` or `--claim`, because the
   realm that `tenant create` sets up in [Axis's identity provider](identity-provider.md) gives the
   authority and the clients. The audiences, the profile and the client keys stay.
-- _(planned for M17)_ Every tenant signs in through its realm, and each `identityProvider` resource
+- Every tenant that `tenant create` makes signs in through its realm, and each `identityProvider` resource
   names its own claims. Axis registers a client key in the realm itself, as `tenant oidc set` does
   today for a tenant with a realm.
 
@@ -200,8 +200,8 @@ resource.
   can still leave a clashing pair, which the next activation of that application refuses.
 - **Used by activation.** `tenant create` and `tenant restore` set accounts on, and a migration set it on for the
   tenants that existed. Every activation, `Axis.Admin` `activate`, `publish` and `rollback` and the server's startup
-  activation, keeps the stored platform providers in the realm. The server's checks of the sign-in against the realm are
-  _(planned for M17)_. `tenant backup` does not carry the providers, so a restored tenant has accounts on and no provider
+  activation, keeps the stored platform providers in the realm. The server's sign-in callback checks the sign-in against the realm, see
+  [platform sign-in](identity-provider.md#platform-sign-in). `tenant backup` does not carry the providers, so a restored tenant has accounts on and no provider
   until the command runs again.
 
 ## Mail settings
