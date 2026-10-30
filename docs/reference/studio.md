@@ -243,7 +243,7 @@ Run and the Test results list, the read-only view of a module entity, and the re
 - **Reference pickers.** A property that the schema marks with
   [`x-axis-reference`](resource-files.md#schema-keywords) shows as a select over
   the names that the [names route](authoring.md#names) lists, in place of a text
-  box.
+  box. A module process, page or policy shows as `<module id>/<name>`, so a site's navigation can pick a module page and a `startProcess` action can pick a module process.
   - The select is searchable, and it matches a typed name without regard to
     letter case. A field or step part lists the fields of the entity, or the
     steps of the process, that the draft names. A parameter or column part

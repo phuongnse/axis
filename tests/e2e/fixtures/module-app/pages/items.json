@@ -1,0 +1,14 @@
+{
+  "id": "7efc308a-db20-4071-90f2-7a959098f233",
+  "kind": "page",
+  "name": "Items",
+  "formatVersion": 1,
+  "title": { "textKey": "pages.items.title" },
+  "widgets": [
+    {
+      "type": "form",
+      "entity": "Item",
+      "actions": [{ "type": "startProcess", "process": "ItemReview", "label": { "textKey": "item.review" } }]
+    }
+  ]
+}

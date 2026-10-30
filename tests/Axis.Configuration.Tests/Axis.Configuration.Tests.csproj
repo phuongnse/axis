@@ -28,10 +28,12 @@
     <None Include="..\..\samples\apps\service-desk\**\*" Link="Samples\service-desk\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\samples\apps\asset-management\**\*" Link="Samples\asset-management\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\samples\modules\departments\**\*" Link="SampleModules\departments\1.0.0\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\tests\e2e\fixtures\modules\checklists\**\*" Link="FixtureModules\checklists\1.0.0\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\samples\templates\request-approval\**\*" Link="SampleTemplates\request-approval\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\tests\e2e\fixtures\e2e-app\**\*" Link="Fixtures\e2e-app\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\tests\e2e\fixtures\subprocess-app\**\*" Link="Fixtures\subprocess-app\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\tests\e2e\fixtures\host-site-app\**\*" Link="Fixtures\host-site-app\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\tests\e2e\fixtures\module-app\**\*" Link="Fixtures\module-app\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\docs\**\*.md" Link="Docs\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 

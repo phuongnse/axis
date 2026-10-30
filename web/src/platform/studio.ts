@@ -275,11 +275,19 @@ export interface StudioNameResource {
   name: string
 }
 
-/** A page in `GET .../names`, with the parameters it declares. */
+/** A page in `GET .../names`, with the parameters it declares. `module` is the module id, or `null` for the application's own. */
 export interface StudioNamePage {
   id: string
   name: string
+  module: string | null
   parameters: { name: string; type: string; required: boolean }[]
+}
+
+/** A policy in `GET .../names`. `module` is the module id, or `null` for the application's own. */
+export interface StudioNamePolicy {
+  id: string
+  name: string
+  module: string | null
 }
 
 /** A text key in `GET .../names`, with its text in each locale that has it. */
@@ -297,6 +305,7 @@ export interface StudioNames {
   processes: {
     id: string
     name: string
+    module: string | null
     entity: string | null
     parameters: { name: string; type: string }[]
     steps: StudioNameStep[]
@@ -314,6 +323,7 @@ export interface StudioNames {
   sequences: StudioNameResource[]
   forms: StudioNameResource[]
   pages: StudioNamePage[]
+  policies: StudioNamePolicy[]
   texts: StudioNameText[]
 }
 

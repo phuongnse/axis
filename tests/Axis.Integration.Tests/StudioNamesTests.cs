@@ -173,6 +173,14 @@ public sealed class StudioNamesTests : IAsyncLifetime
             [("manager", "text"), ("user", "text")],
             rule.GetProperty("parameters").EnumerateArray().Select(parameter => (parameter.GetProperty("name").GetString()!, parameter.GetProperty("type").GetString()!)));
         Assert.Equal("boolean", rule.GetProperty("resultType").GetString());
+
+        var page = Named(names, "pages", "departments/Departments");
+        Assert.Equal("departments", page.GetProperty("module").GetString());
+        Assert.Equal(JsonValueKind.Null, Named(names, "pages", "MyTasks").GetProperty("module").ValueKind);
+
+        var policies = names.GetProperty("policies").EnumerateArray().ToList();
+        Assert.Equal(["DepartmentManagerAccess", "EmployeeAccess"], policies.Select(policy => policy.GetProperty("name").GetString()));
+        Assert.All(policies, policy => Assert.Equal(JsonValueKind.Null, policy.GetProperty("module").ValueKind));
     }
 
     [Fact]

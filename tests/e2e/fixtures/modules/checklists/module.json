@@ -1,0 +1,7 @@
+{
+  "kind": "module",
+  "id": "checklists",
+  "version": "1.0.0",
+  "label": "Checklists",
+  "roles": [{ "name": "reviewer", "label": { "textKey": "checklists.roles.reviewer" } }]
+}

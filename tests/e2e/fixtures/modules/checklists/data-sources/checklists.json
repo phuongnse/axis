@@ -1,0 +1,8 @@
+{
+  "id": "eb20b94a-35a7-41d9-a8d3-c2fd0b5898b6",
+  "kind": "dataSource",
+  "name": "Checklists",
+  "formatVersion": 1,
+  "entity": "Checklist",
+  "fields": [{ "name": "title", "path": "title" }]
+}
