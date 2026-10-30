@@ -9,7 +9,9 @@ internal static class ModelAssert
     {
         Assert.Equal(expected.Manifest with { Packages = [], Modules = [] }, actual.Manifest with { Packages = [], Modules = [] });
         Assert.Equal(expected.Manifest.Packages, actual.Manifest.Packages);
-        Assert.Equal(expected.Manifest.Modules, actual.Manifest.Modules);
+        Assert.Equal(
+            expected.Manifest.Modules.Select(module => (module.Id, module.Version, Roles: module.Roles?.OrderBy(pair => pair.Key, StringComparer.Ordinal).ToList(), Connectors: module.Connectors?.OrderBy(pair => pair.Key, StringComparer.Ordinal).ToList())),
+            actual.Manifest.Modules.Select(module => (module.Id, module.Version, Roles: module.Roles?.OrderBy(pair => pair.Key, StringComparer.Ordinal).ToList(), Connectors: module.Connectors?.OrderBy(pair => pair.Key, StringComparer.Ordinal).ToList())));
         Assert.Equal(expected.Packages, actual.Packages);
         Assert.Equal(expected.Modules, actual.Modules);
         Assert.Equal(expected.Entities.Count, actual.Entities.Count);

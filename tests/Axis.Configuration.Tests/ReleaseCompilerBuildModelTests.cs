@@ -323,6 +323,29 @@ public sealed class ReleaseCompilerBuildModelTests
     }
 
     [Fact]
+    public void Stored_release_keeps_the_package_pins_of_its_modules()
+    {
+        using var packages = new TemporaryFolder().Install("1.0.0", "1.1.0");
+        using var modules = ModulePackageTests.Modules(
+            ModulePackageTests.ModulePackages("^1.0.0"),
+            """{ "name": "add", "type": "operation", "operation": "test-package/sum", "input": { "a": "1", "b": "2" }, "next": "done" }""");
+        using var folder = ModulePackageTests.Application();
+        var installed = PackageCatalog.Load(packages.Path).Versions;
+        var compiled = ModulePackageTests.Compile(folder, modules, packages);
+        Assert.Empty(compiled.Diagnostics);
+        var release = StoredRelease(compiled);
+
+        // BuildModel throws unless the rebuilt content hash equals the stored one.
+        var model = ReleaseCompiler.BuildModel(release, installed);
+
+        Assert.Equal([("test-package", "1.1.0")], release.Packages.Select(package => (package.PackageId, package.Version)));
+        Assert.NotNull(compiled.Model);
+        ModelAssert.Equal(compiled.Model, model);
+        var step = Assert.IsType<PackageOperationStepModel>(Assert.Single(model.Processes).Steps[0]);
+        Assert.Equal("1.1.0", step.Version);
+    }
+
+    [Fact]
     public void Stored_release_whose_pin_is_missing_or_out_of_range_throws()
     {
         var compiled = ApplicationCompiler.Compile(

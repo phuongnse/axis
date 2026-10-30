@@ -135,6 +135,11 @@ public sealed class ModuleCatalog
                 manifest = manifest with { Modules = modules.Deserialize<List<ApplicationModuleDefinition>>(ApplicationLoader.SerializerOptions)! };
             }
 
+            if (root.TryGetProperty("packages", out var packages))
+            {
+                manifest = manifest with { Packages = packages.Deserialize<List<ApplicationPackageDefinition>>(ApplicationLoader.SerializerOptions)! };
+            }
+
             var slots = new List<ModuleRoleSlot>();
             if (root.TryGetProperty("roles", out var rolesElement))
             {
