@@ -1,0 +1,28 @@
+{
+  "id": "3b7c1d52-4e8a-4f60-9a1b-7d2e5c8f0a0d",
+  "kind": "entity",
+  "name": "Specimen",
+  "formatVersion": 1,
+  "displayField": "title",
+  "fields": [
+    { "name": "title", "type": "text", "required": true, "maxLength": 20 },
+    { "name": "code", "type": "text", "unique": true, "maxLength": 20 },
+    { "name": "quantity", "type": "integer", "min": 1, "max": 1000 },
+    { "name": "ratio", "type": "decimal", "precision": 6, "scale": 2 },
+    { "name": "cost", "type": "money", "currency": "VND" },
+    { "name": "active", "type": "boolean" },
+    { "name": "dueOn", "type": "date" },
+    { "name": "startedAt", "type": "date-time" },
+    { "name": "status", "type": "enum", "values": ["open", "closed"] },
+    { "name": "tag", "type": "reference", "target": "SpecimenTag" },
+    { "name": "tags", "type": "references", "target": "SpecimenTag" },
+    { "name": "attachment", "type": "file" },
+    { "name": "lines", "type": "child-collection", "target": "SpecimenLine" },
+    { "name": "lineCount", "type": "integer", "expression": "count(lines)" }
+  ],
+  "validations": [
+    { "expression": "count(lines) <= 5", "message": { "textKey": "specimen.lineLimit" }, "field": "lines" },
+    { "expression": "count(tags) <= 3", "message": { "textKey": "specimen.tagLimit" }, "field": "tags" },
+    { "expression": "status != 'closed' or active != true", "message": { "textKey": "specimen.closedInactive" }, "field": "status" }
+  ]
+}

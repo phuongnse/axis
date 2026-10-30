@@ -47,10 +47,7 @@ internal static class Fuzz
         ArgumentNullException.ThrowIfNull(next);
         ArgumentNullException.ThrowIfNull(check);
 
-        var actualSeed = seed ?? EnvironmentSeed() ?? DefaultSeed;
-        var actualBudget = budget ?? EnvironmentBudget() ?? DefaultBudget;
-        var limit = perInput ?? DefaultPerInput;
-        var actualMaxInputs = maxInputs ?? (EnvironmentBudget() is null ? DefaultMaxInputs : int.MaxValue);
+        var (actualSeed, actualBudget, limit, actualMaxInputs) = Settings(seed, budget, perInput, maxInputs);
         show ??= value => Literal(value?.ToString() ?? "");
 
         var random = new Random(actualSeed);
@@ -78,6 +75,55 @@ internal static class Fuzz
             }
         }
     }
+
+    /// <summary>
+    /// Runs <see cref="Run{T}"/> with a check that awaits, such as one that calls an HTTP endpoint. The seed, the
+    /// budget, the input count and the failure messages are the same. Inputs are checked one after the other.
+    /// A check that hangs leaves its task running until the test process ends.
+    /// </summary>
+    public static async Task RunAsync<T>(
+        Func<Random, T> next,
+        Func<T, Task> check,
+        Func<T, string>? show = null,
+        int? seed = null,
+        TimeSpan? budget = null,
+        TimeSpan? perInput = null,
+        int? maxInputs = null)
+    {
+        ArgumentNullException.ThrowIfNull(next);
+        ArgumentNullException.ThrowIfNull(check);
+
+        var (actualSeed, actualBudget, limit, actualMaxInputs) = Settings(seed, budget, perInput, maxInputs);
+        show ??= value => Literal(value?.ToString() ?? "");
+
+        var random = new Random(actualSeed);
+        var deadline = DateTime.UtcNow + actualBudget;
+        for (var index = 1; index <= actualMaxInputs && DateTime.UtcNow < deadline; index++)
+        {
+            var input = next(random);
+            var task = Task.Run(() => check(input));
+            if (await Task.WhenAny(task, Task.Delay(limit)) != task)
+            {
+                Assert.Fail($"{Describe(actualSeed, index, show(input))} ran past the time limit of {limit.TotalMilliseconds:0} ms.");
+                return;
+            }
+
+            if (task.Exception is { } failure)
+            {
+                var cause = failure.InnerExceptions.Count == 1 ? failure.InnerExceptions[0] : failure;
+                Assert.Fail($"{Describe(actualSeed, index, show(input))} threw:{Environment.NewLine}{cause}");
+                return;
+            }
+        }
+    }
+
+    private static (int Seed, TimeSpan Budget, TimeSpan PerInput, int MaxInputs) Settings(int? seed, TimeSpan? budget, TimeSpan? perInput, int? maxInputs) =>
+        (
+            seed ?? EnvironmentSeed() ?? DefaultSeed,
+            budget ?? EnvironmentBudget() ?? DefaultBudget,
+            perInput ?? DefaultPerInput,
+            maxInputs ?? (EnvironmentBudget() is null ? DefaultMaxInputs : int.MaxValue)
+        );
 
     /// <summary>Writes <paramref name="text"/> as a C# string literal: <c>\</c>, <c>"</c> and every char outside printable ASCII are escaped.</summary>
     public static string Literal(string text)

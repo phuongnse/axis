@@ -5,6 +5,8 @@
   "formatVersion": 1,
   "roles": ["employee"],
   "grants": [
-    { "entity": "Claim", "actions": ["read", "create", "update"] }
+    { "entity": "Claim", "actions": ["read", "create", "update"] },
+    { "entity": "Specimen", "actions": ["read", "create", "update"] },
+    { "entity": "SpecimenTag", "actions": ["read", "create"] }
   ]
 }

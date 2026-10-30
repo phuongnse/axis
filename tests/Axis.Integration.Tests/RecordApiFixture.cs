@@ -11,6 +11,7 @@ using Axis.Data.Schema;
 using Axis.Data.Storage;
 using Axis.Processes.Instances;
 using Axis.Processes.Storage;
+using Axis.Server.Http;
 using Axis.Server.Tests;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -171,6 +172,8 @@ public sealed class RecordApiFixture : IAsyncLifetime
             builder.UseSetting("Tenants:b:ConnectionString", PostgreSqlServer.RuntimeConnectionString(ConnectionString(TenantB)));
             builder.UseSetting("Tenants:b:SchemaConnectionString", ConnectionString(TenantB));
             builder.UseTestOidc("a", "b");
+            // The fuzz tests of the record API send thousands of requests in a few seconds as one user.
+            builder.UseSetting(RateLimitSettings.SessionSetting, "1000000");
             builder.UseTestAuthentication(
                 new TestIdentity("requester", "Requester User", "employee"),
                 new TestIdentity("manager", "Manager User"),
