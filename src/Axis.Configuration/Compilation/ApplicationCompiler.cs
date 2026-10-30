@@ -618,6 +618,7 @@ public static partial class ApplicationCompiler
             DeclaredModulesOf,
             diagnostics);
         ConnectorChecker.Check(loaded.Connectors, diagnostics);
+        ConnectorChecker.CheckBindingKinds(loaded.Connectors, loaded.Application, loaded.IdentityProviders, diagnostics);
         IdentityProviderChecker.Check(
             loaded.IdentityProviders,
             loaded.Application,

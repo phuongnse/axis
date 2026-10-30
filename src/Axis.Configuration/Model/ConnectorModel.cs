@@ -33,9 +33,22 @@ public sealed record ConnectorModel
 /// <summary>
 /// The auth of a compiled connector. <see cref="Binding"/> names the <c>secret</c> binding, which
 /// <see cref="BindingPath"/> points to in the connector file. A <c>header</c> auth sends it in the
-/// header <see cref="HeaderName"/>, and a <c>bearer</c> auth as <c>Authorization: Bearer</c>.
+/// header <see cref="HeaderName"/>, and a <c>bearer</c> auth as <c>Authorization: Bearer</c>. An
+/// <c>oauth2</c> auth gets a token with the client credentials grant and sends it as a bearer token.
+/// Its <see cref="Binding"/> is the client secret, and <see cref="OAuth2"/> holds the rest.
 /// </summary>
-public sealed record ConnectorAuthModel(string Type, string? HeaderName, string Binding, string BindingPath);
+public sealed record ConnectorAuthModel(string Type, string? HeaderName, string Binding, string BindingPath)
+{
+    /// <summary>The token request of an <c>oauth2</c> auth, or null for another type.</summary>
+    public ConnectorOAuth2Model? OAuth2 { get; init; }
+}
+
+/// <summary>
+/// The token request of an <c>oauth2</c> connector auth: the names of the <c>url</c> binding of the
+/// token endpoint and of the <c>secret</c> binding of the client id, and the <c>scope</c> and
+/// <c>audience</c> to ask for, when written.
+/// </summary>
+public sealed record ConnectorOAuth2Model(string TokenUrlBinding, string ClientIdBinding, string? Scope, string? Audience);
 
 /// <summary>
 /// A compiled connector operation. <see cref="Path"/> holds no placeholder but

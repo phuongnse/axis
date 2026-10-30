@@ -96,6 +96,111 @@ public sealed class ConnectorCompilerTests
     }
 
     [Fact]
+    public void An_oauth2_auth_names_its_token_url_client_id_and_client_secret_bindings_with_its_scope_and_audience()
+    {
+        using var folder = Folder().With("connectors/purchasing-system.json", Connector("""
+            "auth": {
+              "type": "oauth2",
+              "tokenUrl": { "binding": "PurchasingSystemTokenUrl" },
+              "clientId": { "binding": "PurchasingSystemClientId" },
+              "clientSecret": { "binding": "PurchasingSystemClientSecret" },
+              "scope": "orders.write",
+              "audience": "https://purchasing.example.test"
+            },
+            "operations": [{ "name": "ping", "method": "GET", "path": "/ping" }]
+            """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        var auth = Assert.IsType<ConnectorAuthModel>(Assert.Single(result.Model!.Connectors).Auth);
+        Assert.Equal(("oauth2", null, "PurchasingSystemClientSecret", "/auth/clientSecret/binding"), (auth.Type, auth.HeaderName, auth.Binding, auth.BindingPath));
+        Assert.Equal(
+            new ConnectorOAuth2Model("PurchasingSystemTokenUrl", "PurchasingSystemClientId", "orders.write", "https://purchasing.example.test"),
+            auth.OAuth2);
+    }
+
+    [Fact]
+    public void An_oauth2_auth_without_scope_and_audience_asks_for_neither()
+    {
+        using var folder = Folder().With("connectors/purchasing-system.json", Connector("""
+            "auth": {
+              "type": "oauth2",
+              "tokenUrl": { "binding": "PurchasingSystemTokenUrl" },
+              "clientId": { "binding": "PurchasingSystemClientId" },
+              "clientSecret": { "binding": "PurchasingSystemClientSecret" }
+            },
+            "operations": [{ "name": "ping", "method": "GET", "path": "/ping" }]
+            """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.Equal(
+            new ConnectorOAuth2Model("PurchasingSystemTokenUrl", "PurchasingSystemClientId", null, null),
+            Assert.Single(result.Model!.Connectors).Auth!.OAuth2);
+    }
+
+    [Theory]
+    [InlineData("tokenUrl", "PURCHASINGSYSTEMKEY", "/auth/tokenUrl/binding")]
+    [InlineData("clientId", "PurchasingSystemUrl", "/auth/clientId/binding")]
+    [InlineData("clientSecret", "PurchasingSystemUrl", "/auth/clientSecret/binding")]
+    public void An_oauth2_binding_used_elsewhere_in_the_application_as_another_kind_is_reported_at_its_path(string property, string name, string path)
+    {
+        // The connector's base URL is a url binding, and the bearer connector's token and the header connector's value are secret bindings.
+        var bindings = new Dictionary<string, string>
+        {
+            ["tokenUrl"] = "PurchasingSystemTokenUrl",
+            ["clientId"] = "PurchasingSystemClientId",
+            ["clientSecret"] = "PurchasingSystemClientSecret",
+            [property] = name,
+        };
+        using var folder = Folder()
+            .With("connectors/purchasing-system.json", Connector($$"""
+                "auth": {
+                  "type": "oauth2",
+                  "tokenUrl": { "binding": "{{bindings["tokenUrl"]}}" },
+                  "clientId": { "binding": "{{bindings["clientId"]}}" },
+                  "clientSecret": { "binding": "{{bindings["clientSecret"]}}" }
+                },
+                "operations": [{ "name": "ping", "method": "GET", "path": "/ping" }]
+                """))
+            .With("connectors/other-system.json", """
+                { "id": "9c5a2e4d-6b1f-4f0a-8d33-2f6b7c1e5a90", "kind": "connector", "name": "OtherSystem", "formatVersion": 1,
+                  "baseUrl": { "binding": "OtherSystemUrl" },
+                  "auth": { "type": "bearer", "token": { "binding": "PurchasingSystemKey" } },
+                  "operations": [{ "name": "ping", "method": "GET", "path": "/ping" }] }
+                """);
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.ConnectorBindingKind, "connectors/purchasing-system.json", path, Guid.Parse(ConnectorId)),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.ResourceId));
+        Assert.Contains($"The binding '{name}'", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void An_oauth2_binding_shared_with_another_use_of_the_same_kind_is_allowed()
+    {
+        using var folder = Folder().With("connectors/purchasing-system.json", Connector("""
+            "auth": {
+              "type": "oauth2",
+              "tokenUrl": { "binding": "PurchasingSystemUrl" },
+              "clientId": { "binding": "PurchasingSystemClient" },
+              "clientSecret": { "binding": "PurchasingSystemClient" }
+            },
+            "operations": [{ "name": "ping", "method": "GET", "path": "/ping" }]
+            """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+    }
+
+    [Fact]
     public void Connector_mistakes_are_each_a_diagnostic_at_their_path_in_one_pass()
     {
         using var folder = Folder().With("connectors/purchasing-system.json", Connector($$"""
@@ -282,6 +387,15 @@ public sealed class ConnectorCompilerTests
     [InlineData("""{ "type": "none", "token": { "binding": "Token" } }""")]
     [InlineData("""{ "type": "basic" }""")]
     [InlineData("""{ "type": "bearer", "token": "secret-value" }""")]
+    [InlineData("""{ "type": "bearer", "token": { "binding": "Token" }, "tokenUrl": { "binding": "Url" } }""")]
+    [InlineData("""{ "type": "header", "name": "X-Key", "value": { "binding": "Key" }, "scope": "orders.write" }""")]
+    [InlineData("""{ "type": "none", "audience": "https://purchasing.example.test" }""")]
+    [InlineData("""{ "type": "oauth2", "tokenUrl": { "binding": "Url" }, "clientId": { "binding": "Id" } }""")]
+    [InlineData("""{ "type": "oauth2", "tokenUrl": { "binding": "Url" }, "clientSecret": { "binding": "Secret" } }""")]
+    [InlineData("""{ "type": "oauth2", "clientId": { "binding": "Id" }, "clientSecret": { "binding": "Secret" } }""")]
+    [InlineData("""{ "type": "oauth2", "tokenUrl": { "binding": "Url" }, "clientId": { "binding": "Id" }, "clientSecret": { "binding": "Secret" }, "token": { "binding": "Token" } }""")]
+    [InlineData("""{ "type": "oauth2", "tokenUrl": { "binding": "Url" }, "clientId": { "binding": "Id" }, "clientSecret": { "binding": "Secret" }, "scope": "" }""")]
+    [InlineData("""{ "type": "oauth2", "tokenUrl": "https://auth.example.test", "clientId": { "binding": "Id" }, "clientSecret": { "binding": "Secret" } }""")]
     public void An_auth_in_another_shape_is_a_schema_violation(string auth)
     {
         using var folder = Folder().With("connectors/purchasing-system.json", Connector($$"""

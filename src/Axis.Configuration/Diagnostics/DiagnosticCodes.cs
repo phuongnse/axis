@@ -292,4 +292,5 @@ public static class DiagnosticCodes
     public const string ModulePolicyRoleNotSlot = "AXC0304";
     public const string ModuleGrantOutsideModule = "AXC0305";
     public const string ModuleSlotMappingConflict = "AXC0306";
+    public const string ConnectorBindingKind = "AXC0307";
 }

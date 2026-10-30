@@ -2,6 +2,7 @@ using Axis.Processes.Instances;
 using Axis.Processes.Records;
 using Axis.Processes.Work;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Axis.Processes;
 
@@ -11,7 +12,7 @@ public static class ProcessesServiceCollectionExtensions
     /// Registers the work item runner, the handler that runs process steps, the handler that resumes a
     /// parent when its sub-process child completes, the handler that expires
     /// tasks at their deadline, the handler that sends
-    /// connector calls, the handler that runs package operation calls, the handler that delivers
+    /// connector calls with the cache of their <c>oauth2</c> access tokens, the handler that runs package operation calls, the handler that delivers
     /// raised events to their triggers, the handler that runs the occurrences of schedule triggers,
     /// the handler that starts their processes for the records of their data sources, and the handler that
     /// backfills the computed values of an entity that activation left pending, and the handler that runs the
@@ -50,6 +51,8 @@ public static class ProcessesServiceCollectionExtensions
         services.AddSingleton(new ConnectorCallSettings(allowHttpConnectorUrls));
         services.AddSingleton(new DeliverySettings(deliveryAttempts));
         services.AddSingleton<ConnectorClient>();
+        services.TryAddSingleton(TimeProvider.System);
+        services.AddSingleton<IConnectorTokens, ConnectorTokenCache>();
         services.AddSingleton<PackageHttpTransport>();
         services.AddSingleton<IExternalWorkItemHandler, ConnectorCallHandler>();
         services.AddSingleton<IExternalWorkItemHandler, PackageCallHandler>();

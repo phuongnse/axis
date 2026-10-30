@@ -17,13 +17,20 @@ namespace Axis.Integration.Tests;
 /// the connection of the next request that is not a <c>GET</c>. The stub stores the key of each
 /// such request it acts on, from the <c>Idempotency-Key</c> header or a UUID last path segment. A
 /// <c>GET</c> with no answer lined up whose last path segment is a UUID is a lookup: it answers the
-/// default answer when that key is stored, and <c>404</c> otherwise.
+/// default answer when that key is stored, and <c>404</c> otherwise. A <c>POST</c> with the content
+/// type <c>application/x-www-form-urlencoded</c> is a token request, as an authorization server gets
+/// it. The stub keeps it in <see cref="TokenRequests"/>, not in <see cref="Requests"/>, and answers
+/// <c>{"access_token":"issued-{n}-{guid}","token_type":"Bearer","expires_in":<see cref="TokenExpiresIn"/>}</c>
+/// with a new token each time, unless a test lines up a status with <see cref="RespondToken"/>.
 /// </summary>
 public sealed class ConnectorStub : IAsyncDisposable
 {
     private const string DefaultBody = """{"orderNumber":"PO-1"}""";
 
     private readonly ConcurrentQueue<StubRequest> _requests = new();
+    private readonly ConcurrentQueue<TokenRequest> _tokenRequests = new();
+    private readonly Queue<int> _nextToken = new();
+    private int _issued;
     private readonly Lock _lock = new();
     private readonly WebApplication _app;
     private readonly Queue<(int Status, string Body)> _next = new();
@@ -38,6 +45,12 @@ public sealed class ConnectorStub : IAsyncDisposable
 
     /// <summary>The requests the stub got, in the order they arrived.</summary>
     public IReadOnlyCollection<StubRequest> Requests => _requests;
+
+    /// <summary>The token requests the stub got, in the order they arrived, with the token each one was given.</summary>
+    public IReadOnlyCollection<TokenRequest> TokenRequests => _tokenRequests;
+
+    /// <summary>The <c>expires_in</c> of the tokens the stub issues, in seconds.</summary>
+    public int TokenExpiresIn { get; set; } = 3600;
 
     public static async Task<ConnectorStub> StartAsync()
     {
@@ -68,6 +81,15 @@ public sealed class ConnectorStub : IAsyncDisposable
             {
                 _next.Enqueue(answer);
             }
+        }
+    }
+
+    /// <summary>Answers the next token request with <paramref name="status"/> and a body that holds no token. Later ones are answered with a token again.</summary>
+    public void RespondToken(int status)
+    {
+        lock (_lock)
+        {
+            _nextToken.Enqueue(status);
         }
     }
 
@@ -122,6 +144,13 @@ public sealed class ConnectorStub : IAsyncDisposable
     {
         using var reader = new StreamReader(context.Request.Body);
         var body = await reader.ReadToEndAsync(context.RequestAborted);
+        if (HttpMethods.IsPost(context.Request.Method)
+            && context.Request.ContentType?.StartsWith("application/x-www-form-urlencoded", StringComparison.OrdinalIgnoreCase) == true)
+        {
+            await HandleTokenAsync(context, body);
+            return;
+        }
+
         _requests.Enqueue(new StubRequest(
             context.Request.Method,
             context.Request.Path.Value ?? "",
@@ -184,12 +213,45 @@ public sealed class ConnectorStub : IAsyncDisposable
         await context.Response.WriteAsync(text, context.RequestAborted);
     }
 
+    private async Task HandleTokenAsync(HttpContext context, string body)
+    {
+        int? refused = null;
+        lock (_lock)
+        {
+            if (_nextToken.TryDequeue(out var status))
+            {
+                refused = status;
+            }
+        }
+
+        string? token = null;
+        if (refused is null)
+        {
+            token = $"issued-{Interlocked.Increment(ref _issued)}-{Guid.NewGuid():N}";
+        }
+
+        _tokenRequests.Enqueue(new TokenRequest(
+            context.Request.Method,
+            context.Request.Path.Value ?? "",
+            context.Request.Headers.Authorization.ToString(),
+            body,
+            token));
+        context.Response.StatusCode = refused ?? StatusCodes.Status200OK;
+        context.Response.ContentType = "application/json";
+        await context.Response.WriteAsync(
+            token is null ? """{"error":"invalid_client"}""" : $$"""{"access_token":"{{token}}","token_type":"Bearer","expires_in":{{TokenExpiresIn}}}""",
+            context.RequestAborted);
+    }
+
     private static Guid? PathKey(string? path) =>
         Guid.TryParse(path?[(path.LastIndexOf('/') + 1)..], out var key) ? key : null;
 }
 
 /// <summary>A request the stub got. <see cref="Authorization"/>, <see cref="IdempotencyKey"/> and <see cref="Traceparent"/> are empty when the header was missing.</summary>
 public sealed record StubRequest(string Method, string Path, string Authorization, string IdempotencyKey, string Body, string Traceparent = "");
+
+/// <summary>A token request the stub got. <see cref="Token"/> is the token it issued, or <see langword="null"/> when it refused the request.</summary>
+public sealed record TokenRequest(string Method, string Path, string Authorization, string Body, string? Token);
 
 /// <summary>A response the stub holds until <see cref="Release"/>.</summary>
 public sealed class HeldResponse
