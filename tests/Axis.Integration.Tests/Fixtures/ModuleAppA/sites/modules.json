@@ -1,0 +1,10 @@
+{
+  "id": "7a2f4c61-1b3d-4e58-8a9c-5d0e2f7b3a12",
+  "kind": "site",
+  "name": "Modules",
+  "formatVersion": 1,
+  "path": "modulesa",
+  "title": { "textKey": "site.title" },
+  "locales": { "default": "en", "fallback": "en", "available": ["en"] },
+  "navigation": [{ "page": "departments/Departments", "label": { "textKey": "nav.departments" } }]
+}

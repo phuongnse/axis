@@ -83,7 +83,12 @@ internal static partial class QueryTimeout
         var name = values["entity"] ?? values["dataSource"];
         if (name is null)
         {
-            return values["page"] is string page ? $"page {page}" : "page";
+            if (values["page"] is not string page)
+            {
+                return "page";
+            }
+
+            return values["module"] is string pageModule ? $"page {pageModule}/{page}" : $"page {page}";
         }
 
         return values["module"] is string module ? $"{module}/{name}" : $"{name}";

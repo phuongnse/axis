@@ -24,13 +24,17 @@ namespace Axis.Configuration.Compilation;
 /// pinned module's files are checked as JSON, for a kind a module may hold and against the schema
 /// of that kind. The files come back under <c>modules/&lt;id&gt;/</c>, ready to be stored in the
 /// release, once for each module. The entities,
-/// sequences, seeds, events, data sources, forms and policies of a pinned module come back as resources named
+/// sequences, seeds, events, data sources, forms, pages and policies of a pinned module come back as resources named
 /// <c>&lt;id&gt;/&lt;name&gt;</c>, keeping the ids written in the files. Its rules come back by module,
 /// under their plain names, for <see cref="RuleChecker.CheckModules"/>. Inside a module, a field's
 /// <c>target</c> or <c>sequence</c>, an event's, data source's or form's <c>entity</c> and a data source
 /// parameter's <c>target</c> name a resource of the same module without <c>/</c>, and are rewritten to
 /// the qualified name. All of them but a <c>sequence</c> may instead name a resource of a module the
 /// module declares in its <c>modules</c> as <c>&lt;id&gt;/&lt;name&gt;</c>, which is kept as written. A
+/// page's widgets, actions and parameters name only the module's own resources, never a module it
+/// declares, so each <c>entity</c>, <c>dataSource</c>, <c>form</c>, <c>process</c> and navigate
+/// <c>page</c> and each parameter <c>target</c> is rewritten to the qualified name, and any other
+/// value that contains <c>/</c> is <see cref="DiagnosticCodes.QualifiedModuleReference"/>. A
 /// policy's grants name only the module's own resources, so each grant's <c>entity</c> and
 /// <c>dataSource</c> is qualified with the module id as written, and <see cref="PolicyChecker"/> reports
 /// one that is not a plain name. The <c>roles</c> of an entry must map each role slot of the pinned version to
@@ -49,6 +53,7 @@ internal static class ModuleChecker
         ResourceKinds.Rule,
         ResourceKinds.Sequence,
         ResourceKinds.Form,
+        ResourceKinds.Page,
         ResourceKinds.Event,
         ResourceKinds.Text,
         ResourceKinds.Seed,
@@ -614,7 +619,7 @@ internal static class ModuleChecker
             ? value
             : null;
 
-    /// <summary>Collects the entities, sequences, seeds, rules, events, data sources, forms, policies and texts of the pinned modules, in the order of the pins and then by path.</summary>
+    /// <summary>Collects the entities, sequences, seeds, rules, events, data sources, forms, pages, policies and texts of the pinned modules, in the order of the pins and then by path.</summary>
     private sealed class ModuleResourceCollector
     {
         private readonly List<EntityResource> _entities = [];
@@ -624,6 +629,7 @@ internal static class ModuleChecker
         private readonly List<EventResource> _events = [];
         private readonly List<DataSourceResource> _dataSources = [];
         private readonly List<FormResource> _forms = [];
+        private readonly List<PageResource> _pages = [];
         private readonly List<PolicyResource> _policies = [];
         private readonly List<ModuleText> _texts = [];
         private readonly HashSet<string> _unloadedEntityNames = new(StringComparer.OrdinalIgnoreCase);
@@ -631,6 +637,7 @@ internal static class ModuleChecker
         private readonly HashSet<string> _unloadedEventNames = new(StringComparer.OrdinalIgnoreCase);
         private readonly HashSet<string> _unloadedDataSourceNames = new(StringComparer.OrdinalIgnoreCase);
         private readonly HashSet<string> _unloadedFormNames = new(StringComparer.OrdinalIgnoreCase);
+        private readonly HashSet<string> _unloadedPageNames = new(StringComparer.OrdinalIgnoreCase);
         private readonly HashSet<string> _noModules = [];
 
         public ModuleResources ToResources(
@@ -644,6 +651,7 @@ internal static class ModuleChecker
                 _events,
                 _dataSources,
                 _forms,
+                _pages,
                 _policies,
                 _texts,
                 _unloadedEntityNames,
@@ -651,10 +659,11 @@ internal static class ModuleChecker
                 _unloadedEventNames,
                 _unloadedDataSourceNames,
                 _unloadedFormNames,
+                _unloadedPageNames,
                 declaredModules,
                 roleSlots);
 
-        /// <summary>Notes the name of an entity, sequence, event, data source or form file that failed its schema, so a reference to it is not reported again.</summary>
+        /// <summary>Notes the name of an entity, sequence, event, data source, form or page file that failed its schema, so a reference to it is not reported again.</summary>
         public void AddUnloaded(string moduleId, JsonElement root)
         {
             if (root.ValueKind != JsonValueKind.Object
@@ -684,10 +693,13 @@ internal static class ModuleChecker
                 case ResourceKinds.Form:
                     _unloadedFormNames.Add(qualified);
                     break;
+                case ResourceKinds.Page:
+                    _unloadedPageNames.Add(qualified);
+                    break;
             }
         }
 
-        /// <summary>Reads a file that passed its schema, if it is an entity, a sequence, a seed, a rule, an event, a data source, a form, a policy or a text.</summary>
+        /// <summary>Reads a file that passed its schema, if it is an entity, a sequence, a seed, a rule, an event, a data source, a form, a page, a policy or a text.</summary>
         public void Add(string moduleId, IReadOnlySet<string> declared, string file, JsonElement root, List<Diagnostic> diagnostics)
         {
             switch (root.GetProperty("kind").GetString())
@@ -734,6 +746,10 @@ internal static class ModuleChecker
                         Name = $"{moduleId}/{form.Name}",
                         Entity = Rewrite(moduleId, declared, form.Entity, form.File, form.Id, "/entity", _unloadedEntityNames, diagnostics)!,
                     });
+                    break;
+                case ResourceKinds.Page:
+                    var page = root.Deserialize<PageResource>(ApplicationLoader.SerializerOptions)! with { File = file };
+                    _pages.Add(Qualify(moduleId, page, diagnostics));
                     break;
                 case ResourceKinds.Policy:
                     var policy = root.Deserialize<PolicyResource>(ApplicationLoader.SerializerOptions)! with { File = file };
@@ -798,6 +814,77 @@ internal static class ModuleChecker
         }
 
         /// <summary>
+        /// Gives the page its qualified name and rewrites the resources its parameters and widgets name
+        /// to the qualified names of resources of the same module. A page names no other module, so any
+        /// value that contains <c>/</c> is reported, and its rewritten name is left unresolved without a
+        /// second report. A module holds no processes, so a process is always left unresolved.
+        /// </summary>
+        private PageResource Qualify(string moduleId, PageResource page, List<Diagnostic> diagnostics)
+        {
+            var parameters = page.Parameters
+                .Select((parameter, index) => parameter with
+                {
+                    Target = Rewrite(moduleId, _noModules, parameter.Target, page.File, page.Id, $"/parameters/{index}/target", _unloadedEntityNames, diagnostics),
+                })
+                .ToList();
+            return page with
+            {
+                Name = $"{moduleId}/{page.Name}",
+                Parameters = parameters,
+                Widgets = QualifyWidgets(moduleId, page, page.Widgets, "/widgets", diagnostics),
+            };
+        }
+
+        private List<WidgetDefinition> QualifyWidgets(
+            string moduleId,
+            PageResource page,
+            IReadOnlyList<WidgetDefinition> widgets,
+            string listPath,
+            List<Diagnostic> diagnostics) =>
+            [.. widgets.Select((widget, index) => QualifyWidget(moduleId, page, widget, $"{listPath}/{index}", diagnostics))];
+
+        private WidgetDefinition QualifyWidget(string moduleId, PageResource page, WidgetDefinition widget, string path, List<Diagnostic> diagnostics)
+        {
+            string? Name(string? value, string property, HashSet<string> unloaded) =>
+                Rewrite(moduleId, _noModules, value, page.File, page.Id, $"{path}/{property}", unloaded, diagnostics);
+
+            IReadOnlyList<WidgetActionDefinition>? Actions(IReadOnlyList<WidgetActionDefinition>? actions, string property) =>
+                actions?.Select((action, index) => QualifyAction(moduleId, page, action, $"{path}/{property}/{index}", diagnostics)).ToList();
+
+            return widget with
+            {
+                Entity = Name(widget.Entity, "entity", _unloadedEntityNames),
+                DataSource = Name(widget.DataSource, "dataSource", _unloadedDataSourceNames),
+                Form = Name(widget.Form, "form", _unloadedFormNames),
+                Process = Name(widget.Process, "process", []),
+                Actions = Actions(widget.Actions, "actions"),
+                RowActions = Actions(widget.RowActions, "rowActions"),
+                ToolbarActions = Actions(widget.ToolbarActions, "toolbarActions"),
+                Navigate = widget.Navigate is null ? null : QualifyAction(moduleId, page, widget.Navigate, $"{path}/navigate", diagnostics),
+                Columns = widget.Columns?
+                    .Select((column, index) => column with
+                    {
+                        Widgets = QualifyWidgets(moduleId, page, column.Widgets, $"{path}/columns/{index}/widgets", diagnostics),
+                    })
+                    .ToList(),
+                Tabs = widget.Tabs?
+                    .Select((tab, index) => tab with
+                    {
+                        Widgets = QualifyWidgets(moduleId, page, tab.Widgets, $"{path}/tabs/{index}/widgets", diagnostics),
+                    })
+                    .ToList(),
+                Widgets = widget.Widgets is null ? null : QualifyWidgets(moduleId, page, widget.Widgets, $"{path}/widgets", diagnostics),
+            };
+        }
+
+        private WidgetActionDefinition QualifyAction(string moduleId, PageResource page, WidgetActionDefinition action, string path, List<Diagnostic> diagnostics) =>
+            action with
+            {
+                Process = Rewrite(moduleId, _noModules, action.Process, page.File, page.Id, $"{path}/process", [], diagnostics),
+                Page = Rewrite(moduleId, _noModules, action.Page, page.File, page.Id, $"{path}/page", _unloadedPageNames, diagnostics),
+            };
+
+        /// <summary>
         /// Rewrites a reference to a resource of the same module to its qualified name. A value whose
         /// module part, before the first <c>/</c>, is in <paramref name="declared"/> names a resource of
         /// that module and is returned as written. Any other value that contains <c>/</c> is reported,
@@ -843,7 +930,7 @@ internal static class ModuleChecker
 }
 
 /// <summary>
-/// The entities, sequences, seeds, events, data sources, forms, policies and texts of the pinned modules, named <c>&lt;id&gt;/&lt;name&gt;</c> and
+/// The entities, sequences, seeds, events, data sources, forms, pages, policies and texts of the pinned modules, named <c>&lt;id&gt;/&lt;name&gt;</c> and
 /// carrying the ids written in the module files. The rules come by module, in pin order, each in path
 /// order and under its plain name. <c>DeclaredModules</c> maps each pinned module to the ids in its
 /// manifest's <c>modules</c>, and <c>RoleSlots</c> to the names of the slots in its manifest's <c>roles</c>,
@@ -860,6 +947,7 @@ internal sealed record ModuleResources(
     IReadOnlyList<EventResource> Events,
     IReadOnlyList<DataSourceResource> DataSources,
     IReadOnlyList<FormResource> Forms,
+    IReadOnlyList<PageResource> Pages,
     IReadOnlyList<PolicyResource> Policies,
     IReadOnlyList<ModuleText> Texts,
     IReadOnlySet<string> UnloadedEntityNames,
@@ -867,6 +955,7 @@ internal sealed record ModuleResources(
     IReadOnlySet<string> UnloadedEventNames,
     IReadOnlySet<string> UnloadedDataSourceNames,
     IReadOnlySet<string> UnloadedFormNames,
+    IReadOnlySet<string> UnloadedPageNames,
     IReadOnlyDictionary<string, IReadOnlySet<string>> DeclaredModules,
     IReadOnlyDictionary<string, IReadOnlySet<string>> RoleSlots);
 

@@ -467,7 +467,10 @@ export async function fetchApplicationSite(path: string, signal?: AbortSignal): 
 
 /** Loads a page of an application site, or returns `null` when the site has no such page. */
 export async function fetchPage(path: string, page: string, signal?: AbortSignal): Promise<PageMetadata | null> {
-  return fetchOrNull<PageMetadata>(`/api/sites/${encodeURIComponent(path)}/pages/${encodeURIComponent(page)}`, signal)
+  return fetchOrNull<PageMetadata>(
+    `/api/sites/${encodeURIComponent(path)}/pages/${page.split('/').map(encodeURIComponent).join('/')}`,
+    signal,
+  )
 }
 
 async function fetchOrNull<T>(url: string, signal?: AbortSignal): Promise<T | null> {

@@ -139,6 +139,7 @@ const siteTexts: Record<string, Record<string, string>> = {
     'pages.noteForm.title': 'Note',
     'notes.new': 'New',
     'pages.nestedForm.section': 'Nested note',
+    'demo.pages.notes.title': 'Module notes',
     'shell.theme.dark': 'Night',
   },
   vi: {
@@ -348,6 +349,9 @@ pages.nestedform = {
   ],
 }
 
+// A page of a module is named by the module id and the page name.
+pages['demo/notes'] = { ...pages.notes, name: 'demo/Notes', titleKey: 'demo.pages.notes.title' }
+
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -407,8 +411,9 @@ function stubServer({
 /** Answers the application site endpoints for the site `e2e`, and 404 for anything else. */
 function siteRoute(path: string, failingLocale: string) {
   const notFound = json({ title: 'Not found', status: 404 }, 404)
-  const [sitePath, kind, name, ...rest] = path.split('/')
-  if (sitePath !== 'e2e' || rest.length > 0) {
+  const [sitePath, kind, ...segments] = path.split('/')
+  const name = segments.length > 0 ? segments.join('/') : undefined
+  if (sitePath !== 'e2e' || (kind !== 'pages' && segments.length > 1)) {
     return notFound
   }
   if (kind === undefined) {
@@ -1132,6 +1137,25 @@ describe('App', () => {
     expect(screen.getByRole('link', { name: 'Go to the home page' })).toHaveAttribute('href', '/')
   })
 
+  it('opens a page of a module at the address of its module id and name, with the module texts', async () => {
+    stubServer()
+
+    renderApp('/e2e/demo/Notes')
+
+    expect(await screen.findByRole('heading', { name: 'Module notes' })).toBeInTheDocument()
+    expect(fetch).toHaveBeenCalledWith('/api/sites/e2e/pages/demo/Notes', expect.anything())
+    expect(screen.queryByTestId('not-found')).not.toBeInTheDocument()
+  })
+
+  it('shows the not-found page for an unknown page of a module', async () => {
+    stubServer()
+
+    renderApp('/e2e/demo/Missing')
+
+    expect(await screen.findByTestId('not-found')).toBeInTheDocument()
+    expect(fetch).toHaveBeenCalledWith('/api/sites/e2e/pages/demo/Missing', expect.anything())
+  })
+
   it('shows the not-found page in the site shell for an unknown page, a bare form page and form routes of a table', async () => {
     stubServer()
 
@@ -1147,7 +1171,7 @@ describe('App', () => {
   it('shows the not-found page in the platform shell for a deeper unknown address', async () => {
     stubServer()
 
-    renderApp('/e2e/notes/42/edit')
+    renderApp('/e2e/notes/42/edit/more')
 
     expect(await screen.findByTestId('not-found')).toBeInTheDocument()
     expect(within(screen.getByRole('banner')).getByRole('link', { name: 'Axis' })).toBeInTheDocument()
