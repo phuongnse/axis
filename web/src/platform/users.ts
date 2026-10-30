@@ -45,3 +45,74 @@ export async function fetchUsers(
   }
   return { kind: 'ok', list: (await response.json()) as UserList }
 }
+
+/** A role given to a person. `applicationId` is `null` for a platform role. `declared` is false when the active release no longer declares the role. */
+export interface GivenRole {
+  applicationId: string | null
+  role: string
+  declared: boolean
+}
+
+/** An active application with the roles that its active release declares. */
+export interface GivableApplication {
+  id: string
+  name: string
+  roles: string[]
+}
+
+/** A person's given roles and the roles that can be given, as served by `GET /api/users/{id}/roles`. */
+export interface UserRoles {
+  given: GivenRole[]
+  applications: GivableApplication[]
+  platformRoles: string[]
+}
+
+/** The answer of the roles route: the roles, or the refusal that the panel shows. */
+export type UserRolesResult = { kind: 'ok'; roles: UserRoles } | { kind: 'forbidden' } | { kind: 'notFound' }
+
+/** Loads a person's given roles and the roles that can be given. */
+export async function fetchUserRoles(id: string, signal?: AbortSignal): Promise<UserRolesResult> {
+  const response = await apiFetch(`/api/users/${encodeURIComponent(id)}/roles`, { signal })
+  if (response.status === 403) {
+    return { kind: 'forbidden' }
+  }
+  if (response.status === 404) {
+    return { kind: 'notFound' }
+  }
+  if (!response.ok) {
+    throw new Error(`Loading the roles failed with status ${response.status}.`)
+  }
+  return { kind: 'ok', roles: (await response.json()) as UserRoles }
+}
+
+/** The role to give or remove: an application role has `applicationId`, a platform role names its kind. */
+export interface RoleChange {
+  applicationId?: string
+  role: string
+}
+
+/**
+ * Gives or removes a role. `forbidden` is a platform role that needs a recent sign-in, and `conflict` is an
+ * administrator removing their own administrator role.
+ */
+export async function changeUserRole(
+  id: string,
+  give: boolean,
+  change: RoleChange,
+): Promise<'ok' | 'forbidden' | 'conflict'> {
+  const response = await apiFetch(`/api/users/${encodeURIComponent(id)}/${give ? 'give-role' : 'remove-role'}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(change),
+  })
+  if (response.status === 403) {
+    return 'forbidden'
+  }
+  if (response.status === 409) {
+    return 'conflict'
+  }
+  if (!response.ok) {
+    throw new Error(`Changing the role failed with status ${response.status}.`)
+  }
+  return 'ok'
+}

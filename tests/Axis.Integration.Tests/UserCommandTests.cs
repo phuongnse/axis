@@ -30,6 +30,7 @@ namespace Axis.Integration.Tests;
 /// and the person's live session uses the change at its next request. That application, <c>Roles</c>, declares the role
 /// <c>buyer</c> and a policy that lets it read notes. The same routes give and remove a platform role, which needs a login in the
 /// last 5 minutes, and an administrator cannot remove their own administrator role.
+/// <c>GET /api/users/{id}/roles</c> lists the given roles and marks one that the active release does not declare.
 /// The tenant is served at localhost.
 /// </summary>
 public sealed class UserCommandTests(KeycloakFixture keycloak, PostgreSqlFixture database) : IAsyncLifetime, IClassFixture<PostgreSqlFixture>
@@ -295,6 +296,57 @@ public sealed class UserCommandTests(KeycloakFixture keycloak, PostgreSqlFixture
         Assert.Equal(0L, await GivenRolesCountAsync());
         Assert.Equal(1L, await RoleAuditCountAsync("user.roleRemoved", "dropped"));
         Assert.Equal(HttpStatusCode.Forbidden, await RecordsStatusAsync(pat));
+    }
+
+    [Fact]
+    public async Task The_roles_route_lists_given_roles_marks_an_undeclared_one_and_lists_what_can_be_given()
+    {
+        var admin = await AdministratorCookieAsync(authenticatedMinutesAgo: null);
+        var otherApplication = Guid.NewGuid();
+        foreach (var (application, role) in new[] { ($"'{_rolesId}'", "buyer"), ($"'{_rolesId}'", "dropped"), ("NULL", "operator"), ($"'{otherApplication}'", "buyer") })
+        {
+            await PostgreSqlServer.AdminScalarAsync(
+                _connectionString!,
+                $"INSERT INTO axis.given_roles (id, user_id, application_id, role) VALUES (gen_random_uuid(), '{_patId}', {application}, '{role}')",
+                CancellationToken);
+        }
+
+        using var response = await GetAsync($"/api/users/{_patId}/roles", admin);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
+        var given = body.GetProperty("given").EnumerateArray()
+            .Select(row => (
+                Application: row.GetProperty("applicationId").ValueKind == JsonValueKind.Null ? (Guid?)null : row.GetProperty("applicationId").GetGuid(),
+                Role: row.GetProperty("role").GetString(),
+                Declared: row.GetProperty("declared").GetBoolean()))
+            .ToHashSet();
+        Assert.Equal(
+            [((Guid?)null, "operator", true), (_rolesId, "buyer", true), (_rolesId, "dropped", false), (otherApplication, "buyer", false)],
+            given);
+        var roles = body.GetProperty("applications").EnumerateArray().Single(application => application.GetProperty("id").GetGuid() == _rolesId);
+        Assert.Equal("Roles", roles.GetProperty("name").GetString());
+        Assert.Equal(["buyer"], roles.GetProperty("roles").EnumerateArray().Select(role => role.GetString()));
+        Assert.Equal(
+            ["author", "publisher", "operator", "administrator"],
+            body.GetProperty("platformRoles").EnumerateArray().Select(role => role.GetString()));
+    }
+
+    [Fact]
+    public async Task The_roles_route_answers_401_with_nobody_signed_in_403_to_a_non_administrator_and_404_for_an_unknown_user()
+    {
+        var employee = await SessionCookieAsync("someone", Employee, authenticatedMinutesAgo: 0);
+        var admin = await AdministratorCookieAsync(authenticatedMinutesAgo: null);
+
+        using var unauthorized = await GetAsync($"/api/users/{_patId}/roles", cookie: null);
+        using var forbidden = await GetAsync($"/api/users/{_patId}/roles", employee);
+        using var unknown = await GetAsync($"/api/users/{Guid.NewGuid()}/roles", admin);
+        using var serviceAccount = await GetAsync($"/api/users/{await ServiceAccountIdAsync()}/roles", admin);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, unauthorized.StatusCode);
+        Assert.Equal(HttpStatusCode.Forbidden, forbidden.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, unknown.StatusCode);
+        Assert.Equal(HttpStatusCode.NotFound, serviceAccount.StatusCode);
     }
 
     [Fact]
@@ -573,6 +625,18 @@ public sealed class UserCommandTests(KeycloakFixture keycloak, PostgreSqlFixture
         using var client = CreateClient(cookies: false);
         using var request = new HttpRequestMessage(HttpMethod.Post, new Uri(path, UriKind.Relative));
         request.Headers.Add("X-Axis-Csrf", "1");
+        if (cookie is not null)
+        {
+            request.Headers.Add("Cookie", $"{Session.Scheme}={cookie}");
+        }
+
+        return await client.SendAsync(request, CancellationToken);
+    }
+
+    private async Task<HttpResponseMessage> GetAsync(string path, string? cookie)
+    {
+        using var client = CreateClient(cookies: false);
+        using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(path, UriKind.Relative));
         if (cookie is not null)
         {
             request.Headers.Add("Cookie", $"{Session.Scheme}={cookie}");
