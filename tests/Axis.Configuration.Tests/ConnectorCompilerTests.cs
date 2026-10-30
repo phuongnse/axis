@@ -236,7 +236,7 @@ public sealed class ConnectorCompilerTests
             "The lookup 'createPurchaseOrder' is a POST operation. A lookup is a GET.",
             result.Diagnostics[2].Message);
         Assert.Equal(
-            "The path '/orders/{orderId}' has the placeholder '{orderId}'. '{idempotencyKey}' is the only placeholder, and inputs are sent in the JSON body.",
+            "The path '/orders/{orderId}' has the placeholder '{orderId}', which names no path input. Add an input 'orderId' with 'in': 'path', or use '{idempotencyKey}'.",
             result.Diagnostics[4].Message);
         Assert.Null(result.Model);
     }
@@ -290,6 +290,143 @@ public sealed class ConnectorCompilerTests
 
         var diagnostic = Assert.Single(result.Diagnostics);
         Assert.Equal((DiagnosticCodes.InvalidOperationPath, "/operations/0/path"), (diagnostic.Code, diagnostic.Path));
+    }
+
+    [Fact]
+    public void An_operation_using_all_four_input_locations_compiles_with_each_location_in_the_model()
+    {
+        using var folder = Folder().With("connectors/purchasing-system.json", Connector("""
+            "operations": [
+              {
+                "name": "update", "method": "PUT", "path": "/orders/{Order}/lines/{line}",
+                "input": [
+                  { "name": "order", "type": "text", "required": true, "in": "path" },
+                  { "name": "line", "type": "integer", "required": true, "in": "path" },
+                  { "name": "dryRun", "type": "boolean", "in": "query" },
+                  { "name": "tenant", "type": "text", "in": "header" },
+                  { "name": "quantity", "type": "integer", "in": "body" },
+                  { "name": "note", "type": "text" }
+                ]
+              }
+            ]
+            """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        var operation = Assert.Single(Assert.Single(result.Model!.Connectors).Operations);
+        Assert.Equal(
+            [
+                new ConnectorFieldModel("order", FieldType.Text, true, "path"),
+                new ConnectorFieldModel("line", FieldType.Integer, true, "path"),
+                new ConnectorFieldModel("dryRun", FieldType.Boolean, false, "query"),
+                new ConnectorFieldModel("tenant", FieldType.Text, false, "header"),
+                new ConnectorFieldModel("quantity", FieldType.Integer, false, "body"),
+                new ConnectorFieldModel("note", FieldType.Text, false, "body"),
+            ],
+            operation.Input);
+    }
+
+    [Fact]
+    public void A_get_with_path_query_and_header_inputs_compiles()
+    {
+        using var folder = Folder().With("connectors/purchasing-system.json", Connector("""
+            "operations": [
+              {
+                "name": "find", "method": "GET", "path": "/orders/{order}",
+                "input": [
+                  { "name": "order", "type": "text", "required": true, "in": "path" },
+                  { "name": "state", "type": "text", "in": "query" },
+                  { "name": "channel", "type": "text", "in": "header" }
+                ]
+              }
+            ]
+            """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+    }
+
+    [Fact]
+    public void A_placeholder_that_names_no_path_input_is_an_invalid_path()
+    {
+        using var folder = Folder().With("connectors/purchasing-system.json", Connector("""
+            "operations": [
+              { "name": "find", "method": "GET", "path": "/orders/{orderId}",
+                "input": [{ "name": "orderId", "type": "text", "required": true, "in": "query" }] }
+            ]
+            """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.InvalidOperationPath, "/operations/0/path"), (diagnostic.Code, diagnostic.Path));
+        Assert.Contains("'{orderId}'", diagnostic.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("/orders", """{ "name": "order", "type": "text", "required": true, "in": "path" }""", "has no placeholder")]
+    [InlineData("/orders/{order}", """{ "name": "order", "type": "text", "in": "path" }""", "is not required")]
+    [InlineData("/orders/{order}", """{ "name": "order", "type": "text", "required": false, "in": "path" }""", "is not required")]
+    [InlineData("/orders/{idempotencyKey}", """{ "name": "idempotencyKey", "type": "text", "required": true, "in": "path" }""", "named like the placeholder")]
+    public void A_path_input_that_does_not_fit_the_path_is_a_misplaced_input(string path, string input, string reason)
+    {
+        using var folder = Folder().With("connectors/purchasing-system.json", Connector($$"""
+            "operations": [
+              { "name": "find", "method": "GET", "path": "{{path}}", "input": [{ "name": "first", "type": "text", "in": "query" }, {{input}}] }
+            ]
+            """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCodes.MisplacedConnectorInput);
+        Assert.Equal("/operations/0/input/1", diagnostic.Path);
+        Assert.Contains(reason, diagnostic.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("GET")]
+    [InlineData("DELETE")]
+    public void A_body_input_on_a_get_is_a_misplaced_input_and_on_another_method_it_is_not(string method)
+    {
+        using var folder = Folder().With("connectors/purchasing-system.json", Connector($$"""
+            "operations": [
+              { "name": "find", "method": "{{method}}", "path": "/orders",
+                "input": [{ "name": "state", "type": "text", "in": "query" }, { "name": "number", "type": "text" }, { "name": "note", "type": "text", "in": "body" }] }
+            ]
+            """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        if (method == "GET")
+        {
+            Assert.Equal(
+                [(DiagnosticCodes.MisplacedConnectorInput, "/operations/0/input/1"), (DiagnosticCodes.MisplacedConnectorInput, "/operations/0/input/2")],
+                result.Diagnostics.Select(diagnostic => (diagnostic.Code, diagnostic.Path)).ToArray());
+        }
+        else
+        {
+            Assert.Empty(result.Diagnostics);
+        }
+    }
+
+    [Fact]
+    public void A_lookup_that_has_inputs_is_invalid()
+    {
+        using var folder = Folder().With("connectors/purchasing-system.json", Connector($$"""
+            "operations": [
+              { "name": "create", "method": "POST", "path": "/orders", "output": {{Output}}, "lookup": "find" },
+              { "name": "find", "method": "GET", "path": "/orders/{idempotencyKey}", "output": {{Output}},
+                "input": [{ "name": "state", "type": "text", "in": "query" }] }
+            ]
+            """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.InvalidOperationLookup, "/operations/0/lookup"), (diagnostic.Code, diagnostic.Path));
+        Assert.Contains("has inputs", diagnostic.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -427,7 +564,7 @@ public sealed class ConnectorCompilerTests
         Assert.Equal(
             [
                 new ConnectorFieldModel("orderNumber", FieldType.Text, true),
-                new ConnectorFieldModel("trackingNumber", FieldType.Text, false, "/shipment/tracking/number"),
+                new ConnectorFieldModel("trackingNumber", FieldType.Text, false, Source: "/shipment/tracking/number"),
             ],
             Assert.Single(Assert.Single(result.Model!.Connectors).Operations).Output);
         Assert.Null(result.Model.Connectors[0].Operations[0].Output[0].Source);
@@ -486,7 +623,8 @@ public sealed class ConnectorCompilerTests
     }
 
     [Theory]
-    [InlineData("""{ "name": "find", "method": "GET", "path": "/orders", "input": [{ "name": "number", "type": "text" }] }""")]
+    [InlineData("""{ "name": "find", "method": "GET", "path": "/orders", "input": [{ "name": "number", "type": "text", "in": "cookie" }] }""")]
+    [InlineData("""{ "name": "find", "method": "GET", "path": "/orders", "output": [{ "name": "number", "type": "text", "in": "query" }] }""")]
     [InlineData("""{ "name": "find", "method": "HEAD", "path": "/orders" }""")]
     [InlineData("""{ "name": "ship", "method": "POST", "path": "/orders", "input": [{ "name": "number", "type": "text", "source": "/number" }] }""")]
     [InlineData("""{ "name": "find", "method": "GET", "path": "orders" }""")]

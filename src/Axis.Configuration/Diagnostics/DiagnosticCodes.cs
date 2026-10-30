@@ -295,4 +295,5 @@ public static class DiagnosticCodes
     public const string ModuleTaskRoleNotSlot = "AXC0307";
     public const string ConnectorBindingKind = "AXC0310";
     public const string InvalidOutputSource = "AXC0311";
+    public const string MisplacedConnectorInput = "AXC0312";
 }
