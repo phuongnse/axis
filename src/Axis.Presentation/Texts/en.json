@@ -66,7 +66,7 @@
   "shell.home.applications.title": "Applications",
   "shell.home.applications.site": "site",
   "shell.home.applications.sites": "sites",
-  "shell.home.signIn.title": "Sign in to Axis",
+  "shell.home.signIn.title": "Sign in",
   "shell.home.signIn.message": "You sign in at your organization's sign-in page, then come back here.",
   "shell.home.applications.empty": "No application is active.",
   "shell.home.applications.loadFailed": "The sites could not be loaded.",

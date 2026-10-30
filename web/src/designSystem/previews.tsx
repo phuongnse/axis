@@ -23,6 +23,7 @@ import {
   columnsRequestForm,
   columnsWidget,
   detailWidget,
+  identitySignInContext,
   emptyKpiWidget,
   emptyLinesRecord,
   emptyTableWidget,
@@ -232,8 +233,19 @@ export const previews: Record<string, readonly PreviewState[]> = {
     { caption: 'Platform site', draw: () => <ShellPreview />, entry: '/', frameHeight: 600 },
   ],
   signIn: [
-    { caption: 'Signed out', draw: () => <SignInCard />, entry: '/', frameHeight: 480 },
-    { caption: 'Sign-in refused', draw: () => <SignInCard />, entry: '/?signIn=failed', frameHeight: 480 },
+    // Proposed: the same organization as the identity provider's pages.
+    {
+      caption: 'Signed out',
+      draw: () => <SignInCard organization={identitySignInContext.realmName} />,
+      entry: '/',
+      frameHeight: 480,
+    },
+    {
+      caption: 'Sign-in refused',
+      draw: () => <SignInCard organization={identitySignInContext.realmName} />,
+      entry: '/?signIn=failed',
+      frameHeight: 480,
+    },
     {
       caption: 'Session ended',
       draw: () => (

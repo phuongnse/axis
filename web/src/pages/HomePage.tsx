@@ -5,6 +5,7 @@ import { startSignIn } from '../platform/api'
 import { fetchCurrentUser, type CurrentUser } from '../platform/currentUser'
 import { colourTokens } from '../platform/designTokens'
 import { navigationIcon } from '../platform/navigationIcons'
+import { OrganizationHeading } from '../platform/OrganizationHeading'
 import { SiteMark } from '../platform/SiteMark'
 import { applicationTitle, fetchSites, siteTitle, type SiteListItem } from '../platform/site'
 import { useText } from '../platform/texts'
@@ -29,21 +30,32 @@ function useHomeGrid(): CSSProperties {
   }
 }
 
-export function SignInCard() {
+/**
+ * Proposed: the sign-in screen draws the identity provider's frame, the organization's mark and name above the card.
+ * Nobody is signed in yet, so the organization's name needs an answer that does not need a session; until it has one,
+ * the screen names Axis.
+ */
+export function SignInCard({ organization = 'Axis' }: { organization?: string }) {
   const t = useText()
   const [searchParams] = useSearchParams()
-  const { colour, spacing } = useDesignTokens()
+  const { colour, spacing, radius } = useDesignTokens()
   const signInFailed = searchParams.get('signIn') === 'failed'
 
   return (
-    <Flex justify="center" align="center" style={{ paddingBlock: spacing.xl }}>
+    <Flex vertical align="center" gap={spacing.md} style={{ paddingBlock: spacing.xl }}>
+      <OrganizationHeading name={organization} />
       <Card
         data-testid="sign-in-card"
-        style={{ width: '100%', maxWidth: 420, border: `1px solid ${colour.borderSubtle}` }}
+        style={{
+          width: '100%',
+          maxWidth: 400,
+          background: colour.surface,
+          borderColor: colour.borderSubtle,
+          borderRadius: radius.base,
+        }}
         styles={{ body: { padding: spacing.xl } }}
       >
         <Flex vertical gap={spacing.md}>
-          <SiteMark title="Axis" size={48} />
           <Typography.Title level={4} style={{ margin: 0 }}>
             {t('shell.home.signIn.title')}
           </Typography.Title>
