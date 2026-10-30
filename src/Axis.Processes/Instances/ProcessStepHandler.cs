@@ -253,7 +253,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
         var restagesCall = false;
         var restagesPackageCall = false;
         NewEvent? occurrence = null;
-        Guid raisedEventId = Guid.Empty;
+        EventModel? raisedEvent = null;
         NewNotification? notification = null;
         EntityModel? created = null;
         List<KeyValuePair<FieldModel, object?>>? creation = null;
@@ -393,7 +393,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
                     instance.SubjectId!.Value,
                     await PayloadAsync(evaluate, raiseStep, instance, input),
                     instance.Id);
-                raisedEventId = raised.Id;
+                raisedEvent = raised;
                 state = ProcessStarts.Running;
                 nextStep = following.Name;
                 decision = null;
@@ -688,25 +688,22 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
             }
         }
 
-        if (occurrence is not null)
+        if (occurrence is not null && raisedEvent is not null)
         {
-            await ProcessEvents.InsertAsync(context.Transaction, occurrence, cancellationToken);
-            await StartSyncTriggersAsync(context, occurrence, cancellationToken);
-
-            // The occurrence is delivered even when no async trigger listens now, because the
-            // triggers come from the release that is active at delivery.
-            await WorkItemQueue.EnqueueAsync(
-                context.Connection,
+            var activeRelease = await models.FindActiveAsync(context, instance.ApplicationId, cancellationToken);
+            await EventRaiser.RaiseAsync(
                 context.Transaction,
                 context.Item.TenantId,
-                ProcessStarts.EventDeliverWorkItemKind,
-                DateTimeOffset.UtcNow,
-                cancellationToken,
-                eventId: occurrence.Id);
-
-            // The webhooks are those of the pinned release, which compiled the step and checked that no
-            // sensitive value reaches a payload. A step that rolls back stages none.
-            await WebhookDeliveries.StageAsync(context, model, raisedEventId, occurrence.Id, instance.ApplicationId, instance.ReleaseId, cancellationToken);
+                model,
+                instance.ReleaseId,
+                raisedEvent,
+                occurrence.Id,
+                occurrence.SubjectId,
+                occurrence.Payload,
+                instance.Id,
+                activeRelease,
+                logger,
+                cancellationToken);
         }
 
         // A notification with no recipient has no in-app row.
@@ -963,32 +960,6 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
         if (started.Outcome == ProcessStartOutcome.ConditionFailed)
         {
             throw Failure($"The step '{stepName}' cannot start the process '{child.Process.Name}': its start condition is not true.", instance, input);
-        }
-    }
-
-    /// <summary>
-    /// Starts the process of each <c>sync</c> trigger on the occurrence's event in the active release,
-    /// in model order, in the step's transaction. A skipped start is logged and lets the step commit.
-    /// Any other error throws, so the step rolls back with its event.
-    /// </summary>
-    private async Task StartSyncTriggersAsync(WorkItemContext context, NewEvent occurrence, CancellationToken cancellationToken)
-    {
-        var found = await EventTriggerStarts.FindAsync(
-            context, models, occurrence.ApplicationId, occurrence.Event, TriggerMode.Sync, cancellationToken);
-        if (found is not { Event: { } @event, Triggers: { Count: > 0 } triggers })
-        {
-            return;
-        }
-
-        var stored = new StoredEvent(occurrence.Id, occurrence.ApplicationId, occurrence.Event, occurrence.EntityId, occurrence.SubjectId, occurrence.Payload);
-        foreach (var trigger in triggers)
-        {
-            var (_, skipped) = await EventTriggerStarts.StartAsync(
-                context.Transaction, context.Item.TenantId, found.Model, found.ReleaseId, @event, stored, trigger, cancellationToken);
-            if (skipped is not null)
-            {
-                LogSyncSkipped(trigger.Name, trigger.Process.Name, occurrence.SubjectId, occurrence.Id, skipped);
-            }
         }
     }
 
@@ -1343,9 +1314,6 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
 
     /// <summary>The child a <c>subProcess</c> step starts: its new instance id, its process, and its record or parameter values.</summary>
     private sealed record PendingChild(Guid Id, ProcessModel Process, EntityModel? Entity, Guid? SubjectId, Record? Subject, JsonObject? Parameters);
-
-    [LoggerMessage(LogLevel.Information, "Trigger {Trigger} skipped the start of process {Process} for record {SubjectId} of event {EventId}: {Reason}.")]
-    private partial void LogSyncSkipped(string trigger, string process, Guid subjectId, Guid eventId, string reason);
 
     [LoggerMessage(LogLevel.Information, "Step {Step} of process instance {InstanceId} sends no email to user {UserId}, who has no profile or no email.")]
     private partial void LogNoEmailAddress(string step, Guid instanceId, string userId);

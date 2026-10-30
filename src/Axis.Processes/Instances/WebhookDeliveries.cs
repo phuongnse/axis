@@ -23,11 +23,12 @@ internal static class WebhookDeliveries
 
     /// <summary>
     /// Inserts a <c>pending</c> row for each webhook of the event in <paramref name="model"/>, in release order, and
-    /// queues a <c>webhook.deliver</c> work item for each, in the context's transaction. A transaction that rolls back
-    /// stages nothing.
+    /// queues a <c>webhook.deliver</c> work item for each, in <paramref name="transaction"/>. A transaction that rolls
+    /// back stages nothing.
     /// </summary>
     internal static async Task StageAsync(
-        WorkItemContext context,
+        NpgsqlTransaction transaction,
+        string tenantId,
         ApplicationModel model,
         Guid eventModelId,
         Guid occurrenceId,
@@ -35,6 +36,7 @@ internal static class WebhookDeliveries
         Guid releaseId,
         CancellationToken cancellationToken)
     {
+        var connection = transaction.Connection ?? throw new ArgumentException("The transaction is completed.", nameof(transaction));
         foreach (var webhook in model.Webhooks.Where(candidate => candidate.Event.Id == eventModelId))
         {
             var id = Guid.CreateVersion7();
@@ -43,8 +45,8 @@ internal static class WebhookDeliveries
                 INSERT INTO axis.webhook_deliveries (id, application_id, release_id, webhook_id, event_id, state, attempts, created_at)
                 VALUES (@id, @application, @release, @webhook, @event, 'pending', 0, now())
                 """,
-                context.Connection,
-                context.Transaction))
+                connection,
+                transaction))
             {
                 command.Parameters.AddWithValue("id", id);
                 command.Parameters.AddWithValue("application", applicationId);
@@ -55,9 +57,9 @@ internal static class WebhookDeliveries
             }
 
             await WorkItemQueue.EnqueueAsync(
-                context.Connection,
-                context.Transaction,
-                context.Item.TenantId,
+                connection,
+                transaction,
+                tenantId,
                 ProcessStarts.WebhookDeliverWorkItemKind,
                 DateTimeOffset.UtcNow,
                 cancellationToken,

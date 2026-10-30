@@ -130,6 +130,11 @@ event's declaration order.
    event writes no audit record of its own.
 8. It inserts the work item of the next step.
 
+An [inbound endpoint call](inbound-endpoints.md#order-of-checks) with an `event`
+raises it the same way, in the call's transaction. It writes steps 2 to 5 for
+the new record, with the instance the call started as the one that raised the
+event.
+
 ## Starts from triggers
 
 A start from a trigger follows the [start endpoint](processes.md#start-endpoint)'s

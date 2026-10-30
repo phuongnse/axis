@@ -15,6 +15,15 @@ public sealed record EndpointMapResult(
     SortedDictionary<string, string[]>? Errors);
 
 /// <summary>
+/// The payload fields of the event an endpoint call raises, in the event's declaration order, or the
+/// errors that refuse the call. <see cref="Errors"/> is keyed by JSON Pointer in ordinal key order,
+/// and is null when every field got a value.
+/// </summary>
+public sealed record EndpointEventMapResult(
+    IReadOnlyList<KeyValuePair<string, object?>> Fields,
+    SortedDictionary<string, string[]>? Errors);
+
+/// <summary>
 /// Maps a call's parsed input to the fields of the endpoint's entity. Each mapped field that is not
 /// a child collection gets the value of its expression over the input fields, where an input the
 /// body leaves out is <c>null</c>. A run-time error is an error at <c>/values/&lt;field&gt;</c>, as
@@ -35,22 +44,7 @@ public static class EndpointInputMapper
         ArgumentNullException.ThrowIfNull(input);
 
         var errors = new SortedDictionary<string, string[]>(StringComparer.Ordinal);
-        var parsed = input.Values.ToDictionary(value => value.Field.Name, StringComparer.Ordinal);
-        var inputs = new List<KeyValuePair<string, object?>>();
-        foreach (var field in endpoint.Input.Where(field => field.Type != FieldType.ChildCollection))
-        {
-            object? value = null;
-            if (parsed.TryGetValue(field.Name, out var given))
-            {
-                value = RecordClrValues.FromInput(given, out var exact);
-                if (!exact)
-                {
-                    errors.TryAdd($"/input/{field.Name}", [Messages.NotEvaluable]);
-                }
-            }
-
-            inputs.Add(KeyValuePair.Create(field.Name, value));
-        }
+        var inputs = InputValues(endpoint, input, errors);
 
         if (errors.Count > 0)
         {
@@ -112,5 +106,63 @@ public static class EndpointInputMapper
                 [.. RecordQueries.Columns(entity).Where(field => values.ContainsKey(field.Name)).Select(field => values[field.Name])],
                 [.. entity.Fields.Where(field => rows.ContainsKey(field.Name)).Select(field => rows[field.Name])],
                 null);
+    }
+
+    /// <summary>
+    /// Evaluates the <c>fields</c> of the event the endpoint raises over the call's input, with
+    /// <paramref name="now"/> as what <c>now()</c> gives. A field that fails at run time is an error at
+    /// <c>/event/fields/&lt;field&gt;</c>. An input that cannot be held exactly is an error at
+    /// <c>/input/&lt;name&gt;</c>, and then no expression is evaluated.
+    /// </summary>
+    public static EndpointEventMapResult MapEvent(ApplicationModel application, EndpointModel endpoint, RecordInput input, DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(application);
+        ArgumentNullException.ThrowIfNull(endpoint);
+        ArgumentNullException.ThrowIfNull(input);
+        var raised = endpoint.Event ?? throw new InvalidOperationException($"The endpoint '{endpoint.Name}' raises no event.");
+
+        var errors = new SortedDictionary<string, string[]>(StringComparer.Ordinal);
+        var values = new ExpressionValues(InputValues(endpoint, input, errors));
+        var fields = new List<KeyValuePair<string, object?>>();
+        if (errors.Count == 0)
+        {
+            foreach (var field in raised.Fields)
+            {
+                var result = ExpressionInterpreter.Evaluate(field.Value.Syntax, field.Value.Check, values, null, now, application.TimeZone);
+                if (result.Succeeded)
+                {
+                    fields.Add(KeyValuePair.Create(field.Field, result.Value));
+                }
+                else
+                {
+                    errors.TryAdd($"/event/fields/{field.Field}", [Messages.NotComputable]);
+                }
+            }
+        }
+
+        return errors.Count > 0 ? new EndpointEventMapResult([], errors) : new EndpointEventMapResult(fields, null);
+    }
+
+    // The input fields as the expressions read them: an input the body leaves out is null.
+    private static List<KeyValuePair<string, object?>> InputValues(EndpointModel endpoint, RecordInput input, SortedDictionary<string, string[]> errors)
+    {
+        var parsed = input.Values.ToDictionary(value => value.Field.Name, StringComparer.Ordinal);
+        var inputs = new List<KeyValuePair<string, object?>>();
+        foreach (var field in endpoint.Input.Where(field => field.Type != FieldType.ChildCollection))
+        {
+            object? value = null;
+            if (parsed.TryGetValue(field.Name, out var given))
+            {
+                value = RecordClrValues.FromInput(given, out var exact);
+                if (!exact)
+                {
+                    errors.TryAdd($"/input/{field.Name}", [Messages.NotEvaluable]);
+                }
+            }
+
+            inputs.Add(KeyValuePair.Create(field.Name, value));
+        }
+
+        return inputs;
     }
 }
