@@ -11,6 +11,9 @@ public sealed record SiteResource : Resource
 
     public required TextReference Title { get; init; }
 
+    /// <summary>Proposed: one line that says what the site is for and who uses it, which the platform home page shows under its title.</summary>
+    public TextReference? Description { get; init; }
+
     public required SiteLocales Locales { get; init; }
 
     public required IReadOnlyList<NavigationEntry> Navigation { get; init; }

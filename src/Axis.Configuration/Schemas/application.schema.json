@@ -10,7 +10,6 @@
     "name": { "$ref": "#/$defs/name" },
     "formatVersion": { "const": 1 },
     "label": { "$ref": "#/$defs/textReference" },
-    "description": { "$ref": "#/$defs/textReference" },
     "timeZone": { "type": "string", "minLength": 1 },
     "fileStorage": {
       "type": "object",

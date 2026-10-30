@@ -6,7 +6,7 @@
   "locale": "vi",
   "texts": {
     "application.title": "Yêu cầu mua hàng",
-    "application.description": "Tạo yêu cầu mua hàng và đưa chúng qua các bước duyệt.",
+    "site.description": "Tạo yêu cầu mua hàng và đưa chúng qua các bước duyệt.",
     "site.title": "Mua hàng",
     "nav.purchaseRequests": "Yêu cầu mua hàng",
     "nav.myTasks": "Nhiệm vụ của tôi",

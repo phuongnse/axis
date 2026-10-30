@@ -6,7 +6,7 @@
   "locale": "en",
   "texts": {
     "application.title": "Asset management",
-    "application.description": "Track company assets, who holds them, their maintenance and their software.",
+    "site.description": "Track the company's assets, who holds them, their maintenance and their software.",
     "site.title": "Asset management",
     "nav.assets": "Assets",
     "nav.dashboard": "Dashboard",

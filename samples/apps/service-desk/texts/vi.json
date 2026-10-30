@@ -6,7 +6,7 @@
   "locale": "vi",
   "texts": {
     "application.title": "Hỗ trợ dịch vụ",
-    "application.description": "Gửi yêu cầu hỗ trợ và theo dõi đến khi được giải quyết.",
+    "site.description": "Gửi yêu cầu hỗ trợ và theo dõi đến khi được giải quyết.",
     "site.title": "Hỗ trợ nội bộ",
     "nav.myTickets": "Yêu cầu của tôi",
     "nav.myTasks": "Nhiệm vụ của tôi",

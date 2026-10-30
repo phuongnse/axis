@@ -7,7 +7,7 @@ import { colourTokens } from '../platform/designTokens'
 import { navigationIcon } from '../platform/navigationIcons'
 import { OrganizationHeading } from '../platform/OrganizationHeading'
 import { SiteMark } from '../platform/SiteMark'
-import { applicationDescription, applicationTitle, fetchSites, siteTitle, type SiteListItem } from '../platform/site'
+import { applicationTitle, fetchSites, siteDescription, siteTitle, type SiteListItem } from '../platform/site'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
 import { useNarrowWidth } from '../platform/useNarrowWidth'
@@ -117,7 +117,10 @@ function HomeTile({
     <>
       {mark}
       <Flex vertical style={{ flex: 1, minWidth: 0 }}>
-        <Typography.Text strong>{title}</Typography.Text>
+        {/* A title without a line under it is centred on the 32 px mark. */}
+        <Typography.Text strong style={description ? undefined : { lineHeight: '32px' }}>
+          {title}
+        </Typography.Text>
         {description && <Typography.Text style={{ color: colour.textMuted }}>{description}</Typography.Text>}
         {children}
       </Flex>
@@ -214,36 +217,42 @@ function Tools({ user }: { user: CurrentUser }) {
 interface ApplicationGroup {
   name: string
   title: string
-  description?: string
   sites: SiteListItem[]
 }
 
 /**
- * Proposed: an application is one tile with its mark, title and description, over its sites. Each site is a link with
- * its own mark and title, so a person sees every site of every application, even an application with one.
+ * Proposed: an application is one tile with its mark and title, over its sites. Each site is a link with its own mark,
+ * its title and, when it declares one, the line that says what it is for, as an application often has several sites
+ * for different people.
  */
 function ApplicationTile({ group, locale }: { group: ApplicationGroup; locale: string }) {
   const { colour, spacing } = useDesignTokens()
   const sorted = [...group.sites].sort((a, b) => siteTitle(a, locale).localeCompare(siteTitle(b, locale), locale))
   return (
-    <HomeTile mark={<SiteMark title={group.title} size={32} />} title={group.title} description={group.description}>
+    <HomeTile mark={<SiteMark title={group.title} size={32} />} title={group.title}>
       <Flex
         vertical
-        gap={spacing.xs}
+        gap={spacing.sm}
         style={{ marginTop: spacing.sm, paddingTop: spacing.sm, borderTop: `1px solid ${colour.divider}` }}
       >
-        {sorted.map((site) => (
-          <Link
-            key={site.path}
-            to={siteAddress(site.path)}
-            style={{ display: 'flex', alignItems: 'center', gap: spacing.xs, minWidth: 0, color: colour.text }}
-          >
-            <SiteMark title={siteTitle(site, locale)} size={20} />
-            <Typography.Text ellipsis style={{ color: colour.primaryText }}>
-              {siteTitle(site, locale)}
-            </Typography.Text>
-          </Link>
-        ))}
+        {sorted.map((site) => {
+          const description = siteDescription(site, locale)
+          return (
+            <Link
+              key={site.path}
+              to={siteAddress(site.path)}
+              style={{ display: 'flex', alignItems: 'flex-start', gap: spacing.xs, minWidth: 0 }}
+            >
+              <SiteMark title={siteTitle(site, locale)} size={20} />
+              <Flex vertical style={{ minWidth: 0 }}>
+                <Typography.Text style={{ color: colour.primaryText, lineHeight: '20px' }}>
+                  {siteTitle(site, locale)}
+                </Typography.Text>
+                {description && <Typography.Text style={{ color: colour.textMuted }}>{description}</Typography.Text>}
+              </Flex>
+            </Link>
+          )
+        })}
       </Flex>
     </HomeTile>
   )
@@ -265,7 +274,6 @@ function Applications({ sites, locale }: { sites: SiteListItem[] | 'failed'; loc
         byName.set(site.application.name, {
           name: site.application.name,
           title: applicationTitle(site.application, locale),
-          description: applicationDescription(site.application, locale),
           sites: [site],
         })
       }

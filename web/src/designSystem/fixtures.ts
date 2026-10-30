@@ -765,16 +765,8 @@ const currentUser: CurrentUser = {
   users: false,
 }
 
-const purchaseApplication = {
-  name: application,
-  titles: { [locale]: 'Purchase requests' },
-  descriptions: { [locale]: 'Request purchases and take them through approval.' },
-}
-const serviceApplication = {
-  name: 'ServiceDesk',
-  titles: { [locale]: 'Service desk' },
-  descriptions: { [locale]: 'Raise tickets and follow them until they are solved.' },
-}
+const purchaseApplication = { name: application, titles: { [locale]: 'Purchase requests' } }
+const serviceApplication = { name: 'ServiceDesk', titles: { [locale]: 'Service desk' } }
 
 /** Three sites in two applications, for the platform home page's cards. */
 const listedSites: SiteListItem[] = [
@@ -783,14 +775,22 @@ const listedSites: SiteListItem[] = [
     titleKey: 'site.title',
     titles: { [locale]: 'Purchase requests' },
     application: purchaseApplication,
+    descriptions: { [locale]: 'Request purchases and take them through approval.' },
   },
   {
     path: 'archive',
     titleKey: 'site.title',
     titles: { [locale]: 'Archived requests' },
     application: purchaseApplication,
+    descriptions: { [locale]: 'Look up closed requests from earlier years.' },
   },
-  { path: 'desk', titleKey: 'site.title', titles: { [locale]: 'Service desk' }, application: serviceApplication },
+  {
+    path: 'desk',
+    titleKey: 'site.title',
+    titles: { [locale]: 'Service desk' },
+    application: serviceApplication,
+    descriptions: { [locale]: 'Raise tickets and follow them until they are solved.' },
+  },
 ]
 
 const notificationPage: NotificationPage = { items: [], page: 1, pageSize: 10, totalCount: 0, unreadCount: 2 }

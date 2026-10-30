@@ -27,15 +27,19 @@ public static class ApplicationSites
             text => text.Locale,
             text => application.Manifest.Label is { } label ? text.Texts[label.TextKey] : application.Manifest.Name,
             StringComparer.Ordinal);
-        // Proposed: the application's description in each locale, or none when it declares none.
-        var applicationDescriptions = application.Manifest.Description is { } description
-            ? application.Texts.ToDictionary(text => text.Locale, text => text.Texts[description.TextKey], StringComparer.Ordinal)
+        // Proposed: the site's description in each available locale, or none when it declares none.
+        var descriptions = site.Description is { } description
+            ? site.Locales.Available.ToDictionary(
+                locale => locale,
+                locale => FindText(application, locale)!.Texts[description.TextKey],
+                StringComparer.Ordinal)
             : null;
         return new SiteListItem(
             site.Path,
             site.Title.TextKey,
             titles,
-            new SiteApplication(application.Manifest.Name, applicationTitles, applicationDescriptions));
+            new SiteApplication(application.Manifest.Name, applicationTitles),
+            descriptions);
     }
 
     public static ApplicationSite Describe(ApplicationModel application, SiteModel site)

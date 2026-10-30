@@ -1384,6 +1384,7 @@ internal static class PresentationChecker
             diagnostics.Add(new Diagnostic(code, message, site.File, path, site.Id));
 
         ApplicationCompiler.CheckTextKey(site.Title, site, "/title", references, diagnostics);
+        ApplicationCompiler.CheckTextKey(site.Description, site, "/description", references, diagnostics);
 
         // A reserved path is reported once and left out of the duplicate check, so one mistake
         // gives one diagnostic.

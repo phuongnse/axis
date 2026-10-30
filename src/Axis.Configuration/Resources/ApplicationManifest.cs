@@ -3,9 +3,6 @@ namespace Axis.Configuration.Resources;
 /// <summary>The <c>application</c> resource at the root of an application folder.</summary>
 public sealed record ApplicationManifest : Resource
 {
-    /// <summary>Proposed: one line that says what the application is for, which the platform home page shows under its title.</summary>
-    public TextReference? Description { get; init; }
-
     /// <summary>
     /// The application's IANA time zone id, such as <c>Asia/Ho_Chi_Minh</c>, or null for UTC. It decides the date that
     /// <c>today()</c> and <c>toDate</c> give and the year of a sequence number.

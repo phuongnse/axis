@@ -13,6 +13,9 @@ public sealed record SiteModel
 
     public required TextReference Title { get; init; }
 
+    /// <summary>Proposed: what the site is for, or null when it declares no description.</summary>
+    public TextReference? Description { get; init; }
+
     public required SiteLocales Locales { get; init; }
 
     /// <summary>The site's file, relative to the application folder with <c>/</c> separators.</summary>

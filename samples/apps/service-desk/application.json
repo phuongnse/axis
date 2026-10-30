@@ -4,6 +4,5 @@
   "name": "ServiceDesk",
   "formatVersion": 1,
   "label": { "textKey": "application.title" },
-  "description": { "textKey": "application.description" },
   "timeZone": "Asia/Ho_Chi_Minh"
 }

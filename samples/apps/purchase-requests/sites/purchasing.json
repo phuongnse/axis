@@ -5,6 +5,7 @@
   "formatVersion": 1,
   "path": "purchasing",
   "title": { "textKey": "site.title" },
+  "description": { "textKey": "site.description" },
   "locales": { "default": "en", "fallback": "en", "available": ["en", "vi"] },
   "navigation": [
     { "page": "PurchaseRequests", "label": { "textKey": "nav.purchaseRequests" }, "icon": "cart" },

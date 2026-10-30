@@ -4,6 +4,5 @@
   "name": "LeaveRequests",
   "formatVersion": 1,
   "label": { "textKey": "application.title" },
-  "description": { "textKey": "application.description" },
   "modules": [{ "id": "departments", "version": "^1.0.0" }]
 }
