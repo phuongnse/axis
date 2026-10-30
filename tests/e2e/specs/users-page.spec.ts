@@ -1,3 +1,4 @@
+import type { Page } from '@playwright/test'
 import { expect, test } from '../test'
 import { csrfHeaders } from '../csrf'
 import { waitForDialog } from '../dialogs'
@@ -75,5 +76,62 @@ test.describe('roles of a user', () => {
     await removeDialog.getByRole('button', { name: 'Remove', exact: true }).click()
     await expect(role.getByText('Given', { exact: true })).toHaveCount(0)
     await expect(role.getByRole('button', { name: 'Give', exact: true })).toBeVisible()
+  })
+})
+
+test.describe('invitations', () => {
+  // Invited users stay in the realm, so each run invites an email of its own.
+  function inviteeEmail() {
+    return `invitee-${Date.now()}-${test.info().workerIndex}@axis.local`
+  }
+
+  async function findRow(page: Page, email: string) {
+    const main = page.getByRole('main')
+    await main.getByRole('searchbox', { name: 'Search by name or email', exact: true }).fill(email)
+    await page.keyboard.press('Enter')
+    const row = main.getByRole('row').filter({ hasText: email })
+    await expect(row).toHaveCount(1)
+    return row
+  }
+
+  test('an administrator invites a person through the form and finds them as invited', async ({ page }) => {
+    const email = inviteeEmail()
+    await useSession(page, 'administrator')
+    await page.goto('/users')
+    await page.getByRole('main').getByRole('button', { name: 'Invite', exact: true }).click()
+
+    const form = await waitForDialog(page, 'Invite a person')
+    await form.getByLabel('Email', { exact: true }).fill(email)
+    await form.getByLabel('Display name', { exact: true }).fill('Invited Person')
+    await form.getByRole('button', { name: 'Invite', exact: true }).click()
+    const confirmation = await waitForDialog(page, 'Invite this person?')
+    await expect(confirmation).toContainText(`Email: ${email}`)
+    await confirmation.getByRole('button', { name: 'Invite', exact: true }).click()
+
+    await expect(page.getByTestId('users-done')).toHaveText('The invitation was sent.')
+    const row = await findRow(page, email)
+    await expect(row).toContainText('Invited Person')
+    await expect(row).toContainText('Invited')
+  })
+
+  test('an administrator resends an invitation from an invited row after a confirmation', async ({ page }) => {
+    const email = inviteeEmail()
+    await useSession(page, 'administrator')
+    const invited = await page.request.post('/api/users/invite', {
+      headers: csrfHeaders,
+      data: { email, displayName: 'Invited Again' },
+    })
+    expect(invited.status()).toBe(201)
+    await page.goto('/users')
+
+    const row = await findRow(page, email)
+    await row.getByRole('button', { name: 'Resend invitation', exact: true }).click()
+    const confirmation = await waitForDialog(page, 'Resend the invitation?')
+    await expect(confirmation).toContainText(email)
+    await confirmation.getByRole('button', { name: 'Resend', exact: true }).click()
+
+    await expect(page.getByTestId('users-done')).toHaveText('The invitation was sent again.')
+    await expect(page.getByTestId('user-roles')).toHaveCount(0)
+    await expect(await findRow(page, email)).toContainText('Invited')
   })
 })

@@ -1,10 +1,11 @@
-import { Alert, Input, Result, Table, Tag } from 'antd'
+import { Alert, Button, Flex, Input, Modal, Result, Table, Tag, Typography } from 'antd'
 import { useEffect, useState } from 'react'
 import { EmptyDash } from '../platform/EmptyValue'
 import { PageLayout } from '../platform/PageLayout'
 import { useText } from '../platform/texts'
-import { fetchUsers, type UserList, type UserListItem, type UserListResult } from '../platform/users'
+import { fetchUsers, resendInvitation, type UserList, type UserListItem, type UserListResult } from '../platform/users'
 import { usePlatform } from './context'
+import { InviteUserModal } from './InviteUserModal'
 import { NotFoundPage } from './NotFoundPage'
 import { UserRolesDrawer } from './UserRolesDrawer'
 
@@ -16,10 +17,17 @@ const statusColors: Record<UserListItem['status'], string> = {
   disabled: 'default',
 }
 
+const resendProblemKeys = {
+  forbidden: 'shell.users.forbidden',
+  conflict: 'shell.users.resend.conflict',
+  failed: 'shell.users.invite.failed',
+}
+
 /**
  * The tenant's users for an administrator: a table that is searched by name or email and paged by the
  * server. A search starts on Enter or on the search button and goes back to page 1. Clicking a row opens a side panel
- * with the person's roles.
+ * with the person's roles. The Invite button opens the form that invites a person. An invited account has a Resend
+ * invitation button, which asks for a confirmation. Both reload the list, because a resend gives the person a new id.
  */
 export function UsersPage() {
   const t = useText()
@@ -31,6 +39,13 @@ export function UsersPage() {
   const [refusal, setRefusal] = useState<Exclude<UserListResult['kind'], 'ok'>>()
   const [loadFailed, setLoadFailed] = useState(false)
   const [selected, setSelected] = useState<UserListItem | null>(null)
+  const [inviting, setInviting] = useState(false)
+  const [resending, setResending] = useState<UserListItem | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [done, setDone] = useState<'invite' | 'resend'>()
+  const [problem, setProblem] = useState<'forbidden' | 'conflict' | 'failed'>()
+  // Counts the commands, so each one loads the list again.
+  const [reloads, setReloads] = useState(0)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -52,7 +67,31 @@ export function UsersPage() {
       },
     )
     return () => controller.abort()
-  }, [search, page])
+  }, [search, page, reloads])
+
+  async function resend() {
+    if (!resending) {
+      return
+    }
+    setBusy(true)
+    setDone(undefined)
+    setProblem(undefined)
+    try {
+      const result = await resendInvitation(resending.id)
+      if (result === 'ok') {
+        setDone('resend')
+      } else {
+        setProblem(result)
+      }
+    } catch (error: unknown) {
+      console.warn('Resending the invitation failed', error)
+      setProblem('failed')
+    } finally {
+      setBusy(false)
+      setResending(null)
+    }
+    setReloads((count) => count + 1)
+  }
 
   if (refusal === 'notFound') {
     return <NotFoundPage />
@@ -71,17 +110,31 @@ export function UsersPage() {
       {loadFailed && <Alert data-testid="users-error" type="error" title={t('shell.users.loadFailed')} />}
       {list && !refusal && (
         <>
-          <Input.Search
-            allowClear
-            maxLength={200}
-            aria-label={t('shell.users.search')}
-            placeholder={t('shell.users.search')}
-            style={{ maxWidth: 400 }}
-            onSearch={(value) => {
-              setSearch(value.trim())
-              setPage(1)
-            }}
-          />
+          <Flex gap="small">
+            <Input.Search
+              allowClear
+              maxLength={200}
+              aria-label={t('shell.users.search')}
+              placeholder={t('shell.users.search')}
+              style={{ maxWidth: 400 }}
+              onSearch={(value) => {
+                setSearch(value.trim())
+                setPage(1)
+              }}
+            />
+            <Button
+              type="primary"
+              onClick={() => {
+                setDone(undefined)
+                setProblem(undefined)
+                setInviting(true)
+              }}
+            >
+              {t('shell.users.invite')}
+            </Button>
+          </Flex>
+          {done && <Alert data-testid="users-done" type="success" title={t(`shell.users.${done}.done`)} />}
+          {problem && <Alert data-testid="users-command-problem" type="error" title={t(resendProblemKeys[problem])} />}
           <Table<UserListItem>
             style={{ width: '100%' }}
             rowKey="id"
@@ -112,11 +165,58 @@ export function UsersPage() {
                 dataIndex: 'lastSignedInAt',
                 render: (value: string | null) => (value ? new Date(value).toLocaleString(locale) : <EmptyDash />),
               },
+              {
+                // Brokered users get no button: the resend route answers 409 for them.
+                render: (_: unknown, row: UserListItem) =>
+                  row.status === 'invited' &&
+                  row.provider === null && (
+                    <Button
+                      size="small"
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        setResending(row)
+                      }}
+                    >
+                      {t('shell.users.resend')}
+                    </Button>
+                  ),
+              },
             ]}
           />
         </>
       )}
       <UserRolesDrawer user={selected} onClose={() => setSelected(null)} />
+      {inviting && (
+        <InviteUserModal
+          onClose={() => setInviting(false)}
+          onInvited={() => {
+            setInviting(false)
+            setDone('invite')
+            setReloads((count) => count + 1)
+          }}
+          onReload={() => setReloads((count) => count + 1)}
+        />
+      )}
+      <Modal
+        open={resending !== null}
+        title={t('shell.users.resend.confirm')}
+        okText={t('shell.users.resend.ok')}
+        cancelText={t('shell.users.roles.cancel')}
+        confirmLoading={busy}
+        onOk={() => void resend()}
+        onCancel={() => setResending(null)}
+      >
+        {resending && (
+          <Flex vertical>
+            <Typography.Text data-testid="users-resend-confirm">
+              {t('shell.users.roles.person')}: {resending.displayName}
+            </Typography.Text>
+            <Typography.Text>
+              {t('shell.users.email')}: {resending.email}
+            </Typography.Text>
+          </Flex>
+        )}
+      </Modal>
     </PageLayout>
   )
 }

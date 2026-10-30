@@ -74,6 +74,46 @@ function stubRoles(change: () => Response = () => new Response(null, { status: 2
   })
 }
 
+const administrator = {
+  id: 'me',
+  displayName: 'Admin',
+  roles: [],
+  studio: false,
+  studioPublisher: false,
+  studioCreate: false,
+  studioPreviewHost: null,
+  studioTest: false,
+  console: false,
+  users: true,
+}
+
+/** Answers the current user, the list and the roles by their address, and a POST with `status`. */
+function stubInvitations(status = 201) {
+  return stubServer((input, init) => {
+    if (init?.method === 'POST') {
+      return status === 201 ? json({ id: 'u9' }, 201) : new Response(null, { status })
+    }
+    if (input === '/api/me') {
+      return json(administrator)
+    }
+    return input.startsWith('/api/users?') ? json(users) : json(roles)
+  })
+}
+
+function posts(fetchMock: ReturnType<typeof stubServer>) {
+  return fetchMock.mock.calls.filter(([, init]) => init?.method === 'POST')
+}
+
+/** Opens the invite form, fills it and asks to invite, which opens the confirmation. */
+async function fillInvitation() {
+  renderPage()
+  await userEvent.click(await screen.findByRole('button', { name: 'Invite' }))
+  const form = await confirmation('Invite a person')
+  await userEvent.type(within(form).getByLabelText('Email'), 'new@axis.local')
+  await userEvent.type(within(form).getByLabelText('Display name'), 'New Person')
+  return form
+}
+
 async function openAnn() {
   renderPage()
   await userEvent.click(await screen.findByText('Ann Invited'))
@@ -230,5 +270,143 @@ describe('UsersPage', () => {
     expect(await screen.findByTestId('user-roles-problem')).toHaveTextContent(
       'Sign in again to change a platform role.',
     )
+  })
+
+  it('invites a person with the chosen roles after a confirmation and loads the list again', async () => {
+    const fetchMock = stubInvitations()
+    const form = await fillInvitation()
+    expect(requested(fetchMock)).toContain('/api/users/me/roles')
+    await userEvent.click(
+      within(await within(form).findByRole('region', { name: 'Purchasing' })).getByRole('checkbox', {
+        name: 'approver',
+      }),
+    )
+    await userEvent.click(
+      within(within(form).getByRole('region', { name: 'Platform' })).getByRole('checkbox', { name: 'operator' }),
+    )
+    await userEvent.click(within(form).getByRole('button', { name: 'Invite' }))
+
+    const dialog = await confirmation('Invite this person?')
+    expect(within(dialog).getByTestId('users-invite-confirm')).toHaveTextContent('Email: new@axis.local')
+    expect(dialog).toHaveTextContent('Name: New Person')
+    expect(dialog).toHaveTextContent('Roles: approver (Purchasing), operator (Platform)')
+    expect(posts(fetchMock)).toHaveLength(0)
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Invite' }))
+
+    expect(await screen.findByTestId('users-done')).toHaveTextContent('The invitation was sent.')
+    const [post] = posts(fetchMock)
+    expect(post[0]).toBe('/api/users/invite')
+    expect(JSON.parse(post[1]!.body as string)).toEqual({
+      email: 'new@axis.local',
+      displayName: 'New Person',
+      roles: [{ applicationId, role: 'approver' }, { role: 'operator' }],
+    })
+    await vi.waitFor(() =>
+      expect(requested(fetchMock).filter((input) => input.startsWith('/api/users?'))).toHaveLength(2),
+    )
+  })
+
+  it('invites without roles when the roles cannot be loaded', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const fetchMock = stubServer((input, init) => {
+      if (init?.method === 'POST') {
+        return json({ id: 'u9' }, 201)
+      }
+      return input.startsWith('/api/users?') ? json(users) : new Response(null, { status: 500 })
+    })
+    const form = await fillInvitation()
+    expect(await within(form).findByTestId('users-invite-roles-failed')).toHaveTextContent(
+      'The roles could not be loaded. You can invite without roles.',
+    )
+    await userEvent.click(within(form).getByRole('button', { name: 'Invite' }))
+    const dialog = await confirmation('Invite this person?')
+    expect(dialog).toHaveTextContent('Roles: —')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Invite' }))
+
+    await screen.findByTestId('users-done')
+    expect(JSON.parse(posts(fetchMock)[0][1]!.body as string).roles).toEqual([])
+  })
+
+  it('asks for the fields of the form before it asks to invite', async () => {
+    const fetchMock = stubInvitations()
+    renderPage()
+    await userEvent.click(await screen.findByRole('button', { name: 'Invite' }))
+    const form = await confirmation('Invite a person')
+    await userEvent.type(within(form).getByLabelText('Email'), 'not-an-email')
+    await userEvent.click(within(form).getByRole('button', { name: 'Invite' }))
+
+    await vi.waitFor(() => expect(form.querySelectorAll('.ant-form-item-explain-error').length).toBe(2))
+    expect(screen.queryByText('Invite this person?')).toBeNull()
+    expect(posts(fetchMock)).toHaveLength(0)
+  })
+
+  it.each([
+    [403, 'Sign in again to give a platform role.'],
+    [409, 'An account already uses this email.'],
+  ])('shows a fixed text when the invite answers %i', async (status, text) => {
+    stubInvitations(status)
+    const form = await fillInvitation()
+    await userEvent.click(within(form).getByRole('button', { name: 'Invite' }))
+    const dialog = await confirmation('Invite this person?')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Invite' }))
+
+    expect(await screen.findByTestId('users-invite-problem')).toHaveTextContent(text)
+    expect(screen.queryByTestId('users-done')).toBeNull()
+    expect(within(form).getByLabelText('Email')).toHaveValue('new@axis.local')
+  })
+
+  it('shows a generic text and loads the list again when the invite fails', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const fetchMock = stubInvitations(502)
+    const form = await fillInvitation()
+    await userEvent.click(within(form).getByRole('button', { name: 'Invite' }))
+    const dialog = await confirmation('Invite this person?')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Invite' }))
+
+    expect(await screen.findByTestId('users-invite-problem')).toHaveTextContent('The invitation could not be sent.')
+    await vi.waitFor(() =>
+      expect(requested(fetchMock).filter((input) => input.startsWith('/api/users?'))).toHaveLength(2),
+    )
+  })
+
+  it('offers Resend invitation on an invited account only and sends it after a confirmation', async () => {
+    const fetchMock = stubInvitations()
+    renderPage()
+    const row = (await screen.findByText('Ann Invited')).closest('tr')!
+    expect(screen.getAllByRole('button', { name: 'Resend invitation' })).toHaveLength(1)
+    expect(within(screen.getByText('Bob Active').closest('tr')!).queryByRole('button')).toBeNull()
+
+    await userEvent.click(within(row).getByRole('button', { name: 'Resend invitation' }))
+    const dialog = await confirmation('Resend the invitation?')
+    expect(dialog).toHaveTextContent('Person: Ann Invited')
+    expect(dialog).toHaveTextContent('Email: ann@axis.local')
+    expect(posts(fetchMock)).toHaveLength(0)
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Resend' }))
+
+    expect(await screen.findByTestId('users-done')).toHaveTextContent('The invitation was sent again.')
+    const [post] = posts(fetchMock)
+    expect(post[0]).toBe('/api/users/u1/resend-invitation')
+    expect(post[1]!.body).toBeUndefined()
+    await vi.waitFor(() =>
+      expect(requested(fetchMock).filter((input) => input.startsWith('/api/users?'))).toHaveLength(2),
+    )
+    expect(requested(fetchMock)).not.toContain('/api/users/u1/roles')
+    expect(screen.queryByTestId('user-roles')).toBeNull()
+  })
+
+  it.each([
+    [403, 'This page is for administrators.'],
+    [409, 'This person has a password or signs in through a provider, so they cannot get a new invitation.'],
+    [502, 'The invitation could not be sent.'],
+  ])('shows a fixed text when the resend answers %i', async (status, text) => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    stubInvitations(status)
+    renderPage()
+    await userEvent.click(await screen.findByRole('button', { name: 'Resend invitation' }))
+    const dialog = await confirmation('Resend the invitation?')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Resend' }))
+
+    expect(await screen.findByTestId('users-command-problem')).toHaveTextContent(text)
+    expect(screen.queryByTestId('users-done')).toBeNull()
   })
 })

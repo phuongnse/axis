@@ -6,7 +6,8 @@ administrator gives, and the users page where both are managed.
 what is not built yet is marked _(planned for M17)_. The account rules are built: every realm that `tenant create` makes
 holds them. The users page's list and the server commands that disable, enable and reset an authenticator are built, and so are
 the server routes that give and remove an application or a platform role. A user's roles panel with the Give and Remove
-buttons is built too. The server routes that invite an account and resend an invitation are built, and so is `tenant create --administrator`. The buttons of the invitations and of the other commands are not built yet. The conventions of [architecture.md](../architecture.md)
+buttons is built too, and so are the Invite button and the Resend invitation button. The server routes that invite an account and resend an invitation are built, and so is `tenant create --administrator`.
+The buttons of disable, enable and reset an authenticator are not built yet. The conventions of [architecture.md](../architecture.md)
 apply.
 
 ## The administrator role
@@ -26,7 +27,7 @@ The setting, the shell entry and the users page's list are built.
 ## The users page
 
 The server's list route, the page's list, a user's roles panel with its Give and Remove buttons, and the server routes of
-seven commands are built. The buttons of invite, resend an invitation, disable, enable and reset an authenticator are _(planned for M17)_.
+seven commands are built. The invite and resend an invitation buttons are built. The buttons of disable, enable and reset an authenticator are _(planned for M17)_.
 
 - **The list route:** `GET /api/users?search=&page=&pageSize=` answers `{ items, totalCount }` for the tenant's realm to an
   administrator. `page` starts at 1 and defaults to 1. `pageSize` is 1 to 50 and defaults to 50. A value outside these
@@ -42,6 +43,19 @@ seven commands are built. The buttons of invite, resend an invitation, disable, 
   has the display name, the email, how the person signs in (the provider's alias as the route sends it, or "Account"), the status
   (`invited`, `active` or `disabled`) and the last sign-in. It searches by name or email, and pages. The page asks the
   route for 20 users at a time. A search starts on Enter or on the search button and goes back to page 1.
+- **Invite:** the "Invite" button next to the search box opens a form with the email, the display name and optional roles.
+  The roles are in one section for each active application and one for the platform, as in the roles panel. The form gets
+  them from the roles route, called with the signed-in administrator's own id, and uses only `applications` and
+  `platformRoles`. When they cannot be loaded, the form says so and still invites without roles. Submitting the form asks
+  "Invite this person?" and names the email, the name and the roles. After the confirmation, the page calls the invite route
+  and loads the list again, so the new row shows as `invited`. It shows a `403` as "Sign in again to give a platform
+  role." and a `409` as "An account already uses this email." Any other failure shows "The invitation could not be sent."
+  and loads the list again, because an invitation whose email failed leaves the account as `invited`.
+- **Resend invitation:** a row that is `invited` and an account, not a brokered user, has a "Resend invitation" button. It
+  asks for confirmation, names the person and the email, calls the resend route, shows "The invitation was sent again." and
+  loads the list again, because the resend gives the person a new id. It shows a `403` as "This page is for
+  administrators." and a `409` as "This person has a password or signs in through a provider, so they cannot get a new
+  invitation."
 - **The roles route:** `GET /api/users/{id}/roles` answers `{ given, applications, platformRoles }` to an administrator.
   `given` holds the person's given roles, each as `{ applicationId, role, declared }`, with a `null` `applicationId` for a
   platform role. `declared` is `false` for an application role that the application's active release no longer declares,
@@ -62,7 +76,7 @@ seven commands are built. The buttons of invite, resend an invitation, disable, 
 - **Commands:** invite, resend an invitation, disable, enable, reset an account's authenticator, give a role and remove
   a role. Each command asks for confirmation, and each writes an [audit record](#audit). Disable, enable, reset an
   authenticator, give and remove an application or a platform role, invite and resend an invitation are built as server routes.
-  The roles panel calls give and remove. The buttons of invite, resend an invitation, disable, enable and reset an authenticator are _(planned for M17)_.
+  The roles panel calls give and remove, and the users page calls invite and resend an invitation. The buttons of disable, enable and reset an authenticator are _(planned for M17)_.
   - `POST /api/users/{id}/disable`, `POST /api/users/{id}/enable` and `POST /api/users/{id}/reset-authenticator` answer
     `204` and take no body. They take a browser session only, so a service account's bearer token gets `401`.
   - A request is checked in this order: signed-in user (`401`), `Users:AdministratorRole` (`403`), a tenant with a users
@@ -116,7 +130,7 @@ asks its development users for a code, because each one has an authenticator, an
   invitation. The identity provider cannot revoke a link it issued, so the resend deletes the realm user and creates it
   again with a new id, which ends the old link. The given roles move to the new id. If the resend stops between the delete and
   the create, the person has no account and the administrator invites them again. The routes are built, see
-  [the users page](#the-users-page). Their buttons are _(planned for M17)_.
+  [the users page](#the-users-page), and so are their buttons.
 - **Username:** an account's username is its email, and it signs in with its email. The realm allows two users to
   share an email, because a person who signs in through two brokered providers becomes two users, and Keycloak then
   looks accounts up by username only. The sign-in form asks for a "Username". A brokered user's username is the
