@@ -90,6 +90,7 @@ public sealed class DevelopmentStudioFoldersTests
             builder.UseSetting("Tenants:default:ConnectionString", UnreachableDatabase);
             builder.UseSetting("Tenants:default:SchemaConnectionString", UnreachableDatabase);
             builder.UseSetting("Extensions:Path", SamplePackages.Path);
+            builder.UseSetting("Modules:Path", SampleModules.Path);
             for (var i = 0; i < folders.Count; i++)
             {
                 builder.UseSetting($"Studio:Folders:{i}", folders[i]);

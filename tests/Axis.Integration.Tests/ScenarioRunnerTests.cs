@@ -1285,7 +1285,7 @@ public sealed class ScenarioRunnerTests
         using var results = new TemporaryFolder();
 
         var exitCode = await ScenarioCommand.RunAsync(
-            [folder.Path, "--server", await PostgreSqlServer.AdminConnectionStringAsync(), "--extensions", SamplePackages.Path, "--results", results.Path],
+            [folder.Path, "--server", await PostgreSqlServer.AdminConnectionStringAsync(), "--extensions", SamplePackages.Path, "--modules", SampleModules.Path, "--results", results.Path],
             new StringWriter(),
             CancellationToken);
 
@@ -1306,6 +1306,7 @@ public sealed class ScenarioRunnerTests
                 Path.Combine(RepositoryRoot(), "samples", "apps", "purchase-requests"),
                 "--server", await PostgreSqlServer.AdminConnectionStringAsync(),
                 "--extensions", Path.Combine(results.Path, "missing"),
+                "--modules", SampleModules.Path,
                 "--results", results.Path,
             ],
             output,

@@ -411,7 +411,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
             .ToList();
         Assert.Contains(actual, item => item.Item1 == DiagnosticCodes.UnknownReferenceTarget && item.Item4 == EntityFile);
         Assert.Contains(actual, item => item.Item1 == DiagnosticCodes.SchemaViolation && item.Item4 == scenarioFile);
-        var expected = ApplicationCompiler.Compile(Folder, SamplePackages.Versions).Diagnostics
+        var expected = ApplicationCompiler.Compile(Folder, SamplePackages.Versions, SampleModules.Modules).Diagnostics
             .Select(diagnostic => (
                 diagnostic.Code,
                 diagnostic.Severity == DiagnosticSeverity.Warning ? "warning" : "error",
@@ -427,6 +427,13 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     public async Task Diagnostics_compile_against_the_installed_modules()
     {
         var modules = Path.Combine(_root, "modules");
+        foreach (var file in Directory.EnumerateFiles(SampleModules.Path, "*", SearchOption.AllDirectories))
+        {
+            var target = Path.Combine(modules, Path.GetRelativePath(SampleModules.Path, file));
+            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+            File.Copy(file, target);
+        }
+
         Directory.CreateDirectory(Path.Combine(modules, "cost-centers", "1.0.0"));
         File.WriteAllText(
             Path.Combine(modules, "cost-centers", "1.0.0", "module.json"),
@@ -1525,11 +1532,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
             builder.UseSetting("Tenants:default:ConnectionString", UnreachableDatabase);
             builder.UseSetting("Tenants:default:SchemaConnectionString", UnreachableDatabase);
             builder.UseSetting("Extensions:Path", SamplePackages.Path);
-            if (modulesPath is not null)
-            {
-                builder.UseSetting("Modules:Path", modulesPath);
-            }
-
+            builder.UseSetting("Modules:Path", modulesPath ?? SampleModules.Path);
             builder.UseSetting("Studio:Folders:0", folder ?? Folder);
             builder.UseSetting("Studio:AuthorRole", authorRole);
             if (tests)

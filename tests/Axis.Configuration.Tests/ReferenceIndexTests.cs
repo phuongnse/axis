@@ -551,7 +551,7 @@ public sealed class ReferenceIndexTests
     public void Compiling_the_purchase_request_sample_gives_the_edges_into_its_department_entity()
     {
         var result = ApplicationCompiler.Compile(
-            Path.Combine(AppContext.BaseDirectory, "Samples", "purchase-requests"), SamplePackages.Versions);
+            Path.Combine(AppContext.BaseDirectory, "Samples", "purchase-requests"), SamplePackages.Versions, SampleModules.Modules);
 
         Assert.Empty(result.Diagnostics);
         var edges = result.References.Edges

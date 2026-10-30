@@ -8,7 +8,7 @@ public sealed class SampleApplicationTests
     [Fact]
     public void Purchase_request_sample_compiles_without_diagnostics()
     {
-        var result = ApplicationCompiler.Compile(Path.Combine(AppContext.BaseDirectory, "Samples", "purchase-requests"), SamplePackages.Versions);
+        var result = ApplicationCompiler.Compile(Path.Combine(AppContext.BaseDirectory, "Samples", "purchase-requests"), SamplePackages.Versions, SampleModules.Modules);
 
         Assert.Empty(result.Diagnostics);
         Assert.NotNull(result.Model);
@@ -36,8 +36,8 @@ public sealed class SampleApplicationTests
             .Select(file => new ResourceContent(Path.GetRelativePath(folder, file).Replace('\\', '/'), File.ReadAllText(file)))
             .ToList();
 
-        var fromFolder = ApplicationCompiler.Compile(folder, SamplePackages.Versions);
-        var fromFiles = ApplicationCompiler.CompileFiles(files, SamplePackages.Versions, null);
+        var fromFolder = ApplicationCompiler.Compile(folder, SamplePackages.Versions, SampleModules.Modules);
+        var fromFiles = ApplicationCompiler.CompileFiles(files, SamplePackages.Versions, SampleModules.Modules);
 
         Assert.Empty(fromFiles.Diagnostics);
         Assert.NotNull(fromFolder.ContentHash);
@@ -77,7 +77,7 @@ public sealed class SampleApplicationTests
     [Fact]
     public void Purchase_request_start_condition_message_has_an_English_and_a_Vietnamese_text()
     {
-        var result = ApplicationCompiler.Compile(Path.Combine(AppContext.BaseDirectory, "Samples", "purchase-requests"), SamplePackages.Versions);
+        var result = ApplicationCompiler.Compile(Path.Combine(AppContext.BaseDirectory, "Samples", "purchase-requests"), SamplePackages.Versions, SampleModules.Modules);
 
         Assert.NotNull(result.Model);
         var process = Assert.Single(result.Model.Processes);

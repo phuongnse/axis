@@ -100,7 +100,7 @@ public sealed class StudioReleaseHistoryTests : IAsyncLifetime
         await connection.OpenAsync(CancellationToken);
         await using var configuration = DataDatabaseFixture.CreateConfigurationContext(connection);
         await using var data = DataDatabaseFixture.CreateContext(connection);
-        var compiled = await ReleaseCompiler.CompileAsync(folder, configuration, SamplePackages.Versions, CancellationToken);
+        var compiled = await ReleaseCompiler.CompileAsync(folder, configuration, SamplePackages.Versions, SampleModules.Modules, CancellationToken);
         Assert.DoesNotContain(compiled.Diagnostics, diagnostic => diagnostic.Severity == Axis.Configuration.Diagnostics.DiagnosticSeverity.Error);
         var deploymentBindings = new Dictionary<string, ActivationBinding>
         {
@@ -135,6 +135,7 @@ public sealed class StudioReleaseHistoryTests : IAsyncLifetime
                 builder.UseSetting(key, value);
             }
             builder.UseSetting("Extensions:Path", SamplePackages.Path);
+            builder.UseSetting("Modules:Path", SampleModules.Path);
             builder.UseSetting("ActivateOnStartup:0", folder);
             builder.UseSetting("Studio:Folders:0", folder);
             builder.UseSetting("Studio:AuthorRole", "author");

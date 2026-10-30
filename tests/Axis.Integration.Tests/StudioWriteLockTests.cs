@@ -311,6 +311,7 @@ public sealed class StudioWriteLockTests(PostgreSqlFixture database) : IClassFix
                 builder.UseSetting("Tenants:default:SchemaConnectionString", database.ConnectionString);
                 builder.UseSetting("Studio:Folders:0", folderA);
                 builder.UseSetting("Studio:Folders:1", folderB);
+                builder.UseSetting("Modules:Path", SampleModules.Path);
                 builder.UseSetting("Studio:AuthorRole", "author");
                 builder.UseTestOidc("default");
                 builder.UseTestAuthentication(new TestIdentity("author", "Author User", "author"));

@@ -101,6 +101,7 @@ public sealed class PreviewTenantActivationTests(PostgreSqlFixture database) : I
 
             builder.UseTestOidc("a");
             builder.UseSetting("Extensions:Path", SamplePackages.Path);
+            builder.UseSetting("Modules:Path", SampleModules.Path);
             builder.UseSetting("ActivateOnStartup:0", _appFolder);
             builder.ConfigureLogging(logging => logging.AddProvider(logs));
         });
