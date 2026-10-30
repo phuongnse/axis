@@ -12,8 +12,9 @@ This section follows
 installation, declaring, pinning, dependencies between modules, the diagnostics `AXC0200` to `AXC0214`,
 `AXC0295` and `AXC0296`, the
 role slots with their mapping, `AXC0292` to `AXC0294`, the connector slots with their
-mapping, `AXC0297` to `AXC0303`, the maps of a depending module, with `AXC0306`, and the module
-policies that name role slots, `AXC0304` and `AXC0305`, are built. A pinned module's files are stored in the release and
+mapping, `AXC0297` to `AXC0303`, the maps of a depending module, with `AXC0306`, the module
+policies that name role slots, `AXC0304` and `AXC0305`, and the task assignees that name role slots,
+`AXC0307`, are built. A pinned module's files are stored in the release and
 checked as JSON, for an allowed kind and against the schema of their kind. A
 pinned module's entities, sequences, seeds, events, data sources, forms and policies join the application
 model, each with an id derived from the application `id` and the name
@@ -239,6 +240,7 @@ calls `IsDepartmentCode`, so a department code must be in capital letters.
 | `AXC0304` | A role in a module policy's `roles` is not a role slot of its module. The message lists the slots, or says there are none. Reported at `/roles/{i}` of the module file. |
 | `AXC0305` | A grant in a module policy is on something other than an entity or data source of its own module: a `process` or `endpoint` grant, a name with `/` such as `departments/Department`, or the plain name of an application entity or data source. Reported at `/grants/{i}/entity`, `/grants/{i}/dataSource`, `/grants/{i}/process` or `/grants/{i}/endpoint` of the module file. |
 | `AXC0306` | Two mappings of the same slot of a module give it different roles or different connectors: the application's own entry and the chain through a depending module, or the chains through two depending modules. The message names the slot, the module and both mappings. The application's entry stays, and otherwise the first depending module in pin order. Reported at `/modules/{i}/roles/{slot}` or `/modules/{i}/connectors/{slot}` of the later entry, in `modules/<id>/module.json`. See [mapping slots](#processes-pages-policies-and-dependencies). |
+| `AXC0307` | A module task's `assignee.role`, or an escalation's `reassign.role`, is not a role slot of its module. A role of an application gives this too. The message lists the slots, or says there are none. Reported at `/steps/{i}/assignee/role` or `/steps/{i}/escalations/{j}/reassign/role` of the module file. |
 
 ### Processes, pages, policies and dependencies
 
@@ -282,8 +284,9 @@ agrees. An application that declares it maps the slot to one of its own roles:
   `AXC0200` at `/roles/{i}/name`. A label's text key starts with `<module id>.`,
   or `AXC0209` is reported at `/roles/{i}/label/textKey` of `module.json`.
   Declaring slots is built. A module policy names a slot, and anything else is
-  `AXC0304`. _(planned for M20)_ The assignees of module tasks name a slot too.
-  Naming anything else is a new diagnostic.
+  `AXC0304`. The assignees of module tasks name a slot too, in a task step's
+  `assignee.role` and an escalation's `reassign.role`. Naming anything else, an
+  application role included, is `AXC0307`. A module task can still name a user with `assignee.user`.
 - **Mapping slots.** Each `modules` entry of an application has `roles`, which
   maps every slot of that module to a role the application declares. A slot
   left unmapped is `AXC0292`, a slot mapped to an undeclared role is `AXC0293`
@@ -292,8 +295,8 @@ agrees. An application that declares it maps the slot to one of its own roles:
   module. After the mapping, a user who holds the role in the application
   holds the slot, for the module policies. A module that the application
   reaches only as a dependency gets its map through the chain, see
-  [dependencies](#processes-pages-policies-and-dependencies). _(planned for M20)_ The same holds for
-  the assignees of module tasks.
+  [dependencies](#processes-pages-policies-and-dependencies). A module task
+  that names a slot goes to the people who hold the mapped role in that application.
 - **Module policies.** _(built)_ A module policy is a `policy` file in the module.
   In an application it is named `<module id>/<name>`, and its id is derived from
   the application `id` as for other module resources. Its `roles` name role
@@ -346,14 +349,16 @@ agrees. An application that declares it maps the slot to one of its own roles:
   application's. The step is checked against the pinned version, and a package the module does not
   list gives `AXC0150` in the module file. The pins follow the
   [pinning rule](extension-packages.md#declaring-packages-in-an-application) of the release. A task
-  assignee naming a role slot, and the `callConnector` steps that name
+  assignee names a role slot of the module, which the compiled task replaces with the role the
+  application maps it to, see Role slots above. The `callConnector` steps that name
   a connector slot of the module, see Connector slots below. The application starts it from a
   trigger, a `startProcess` action, a sub-process step or an endpoint, by the name
   `<module id>/<name>`. It is pinned with the rest of the release. The worker runs a module process
   instance on the application's own copy of its module entity when a trigger or a sub-process step
   starts it, and a waiting instance finishes on the release it was started on, even after a newer
   module version is activated. Starting one through the start endpoint or an endpoint by
-  `<module id>/<name>`, and module tasks, are not proven yet.
+  `<module id>/<name>` is not proven yet. A module task assigned to a slot is listed in the task inbox of
+  the people who hold the mapped role, and only they can decide it.
 - **Triggers.** A module trigger starts a process of its own module. It
   reacts to an event or an entity of its own module, or of a module it
   declares. A schedule trigger runs in the time zone of each application that

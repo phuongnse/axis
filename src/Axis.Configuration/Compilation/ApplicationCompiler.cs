@@ -489,6 +489,13 @@ public static partial class ApplicationCompiler
                 }
                 : policy;
 
+        // A module task names a role slot. In this application it goes to the role the module's entry maps the slot to.
+        // A compile that checked the process maps every slot, as it does for a module policy.
+        Func<string, string>? MapTaskRole(ProcessResource process) =>
+            IsModuleResource(process)
+                ? slot => modules.First(pin => pin.Id == ModuleIdOf(process.Name)).Roles[slot]
+                : null;
+
         foreach (var entity in allEntities)
         {
             CheckEntity(
@@ -587,7 +594,8 @@ public static partial class ApplicationCompiler
                 references,
                 RulesFor(moduleProcesses.First()),
                 declared,
-                diagnostics);
+                diagnostics,
+                (moduleId, moduleResources.RoleSlots.GetValueOrDefault(moduleId) ?? new HashSet<string>()));
         }
 
         PolicyChecker.Check(
@@ -747,7 +755,7 @@ public static partial class ApplicationCompiler
             Seeds = allSeeds.Select(seed => BuildSeed(seed, entitiesByName, applicationId)).ToList(),
             DataSources = loaded.DataSources.Select(dataSource => BuildDataSource(
                 dataSourcesByName[dataSource.Name], entities, FilterRulesFor(dataSource), DeclaredModulesOf(dataSource))).ToList(),
-            Processes = loaded.Processes.Select(process => ProcessChecker.Build(processesByName[process.Name], FindEntity, FindForm, FindConnector, FindEvent, FindAnyPackage, FindPage, FindProcess, RulesFor(process), DeclaredModulesOf(process))).ToList(),
+            Processes = loaded.Processes.Select(process => ProcessChecker.Build(processesByName[process.Name], FindEntity, FindForm, FindConnector, FindEvent, FindAnyPackage, FindPage, FindProcess, RulesFor(process), DeclaredModulesOf(process), MapTaskRole(process))).ToList(),
             Forms = loaded.Forms.Select(form => BuildForm(formsByName[form.Name], entitiesByName, IsModuleResource(form) ? [] : rules, IsModuleResource(form) ? null : declaredModules)).ToList(),
             Roles = loaded.Roles,
             Policies = loaded.Policies.Select(policy => PolicyChecker.Build(

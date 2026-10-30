@@ -72,6 +72,8 @@ internal static class ProcessChecker
     /// loaded. <paramref name="findPage"/> finds a loaded page by name and <paramref name="unloadedPageNames"/>
     /// holds the pages that failed to load. <paramref name="textValues"/> gives the value of a text key
     /// in each locale that has it. <paramref name="findProcess"/> finds a process by name, ignoring letter case.
+    /// <paramref name="roleSlots"/> is set for the processes of a module: a task's assignee and an escalation's
+    /// <c>reassign</c> then name one of the module's role slots, not a role.
     /// </summary>
     public static void Check(
         IReadOnlyList<ProcessResource> processes,
@@ -97,7 +99,8 @@ internal static class ProcessChecker
         ReferenceIndexBuilder references,
         IEnumerable<ExpressionRule> rules,
         IReadOnlySet<string> modules,
-        List<Diagnostic> diagnostics)
+        List<Diagnostic> diagnostics,
+        (string ModuleId, IReadOnlySet<string> Slots)? roleSlots = null)
     {
         foreach (var process in processes)
         {
@@ -202,9 +205,9 @@ internal static class ProcessChecker
 
             CheckSubProcesses(process, entity, scope, findEntity, findProcess, unloadedProcessNames, moduleReferences, references, Report);
 
-            CheckTasks(process, entity, scope, findEntity, findForm, unloadedFormNames, findRole, unloadedRoleNames, references, Report);
+            CheckTasks(process, entity, scope, findEntity, findForm, unloadedFormNames, findRole, unloadedRoleNames, references, Report, roleSlots);
 
-            CheckEscalations(process, entity, scope, findEntity, findRole, unloadedRoleNames, findPage, unloadedPageNames, textValues, references, Report, diagnostics);
+            CheckEscalations(process, entity, scope, findEntity, findRole, unloadedRoleNames, findPage, unloadedPageNames, textValues, references, Report, diagnostics, roleSlots);
 
             CheckTimers(process, scope, references, Report);
 
@@ -669,7 +672,8 @@ internal static class ProcessChecker
         Func<string, PageResource?> findPage,
         Func<string, ProcessResource?> findProcess,
         IEnumerable<ExpressionRule> rules,
-        IReadOnlySet<string> modules)
+        IReadOnlySet<string> modules,
+        Func<string, string>? mapRole = null)
     {
         // A checked process without a subject has no task, update, raised event or output, so the
         // builders of those use the entity only when there is one.
@@ -723,9 +727,12 @@ internal static class ProcessChecker
                 Resolve(step.Next!));
         }
 
-        // A checked assignee has exactly one of user and role.
+        // A checked assignee has exactly one of user and role. A module process names a role slot, and
+        // mapRole gives the application role the slot maps to.
         TaskAssigneeModel BuildAssignee(TaskAssigneeDefinition assignee) =>
-            new(assignee.User is { } user ? ExpressionModel.Compile(user, scope, ExpressionType.Text) : null, assignee.Role);
+            new(
+                assignee.User is { } user ? ExpressionModel.Compile(user, scope, ExpressionType.Text) : null,
+                assignee.Role is { } role && mapRole is not null ? mapRole(role) : assignee.Role);
 
         // A checked notification has recipients that each have one kind, a loaded page when it opens one, and
         // parameters that each name a parameter of that page once.
@@ -2153,6 +2160,8 @@ internal static class ProcessChecker
     /// one of <c>user</c> and <c>role</c>, a <c>user</c> expression that gives <c>text</c> over
     /// <paramref name="scope"/>, and a <c>role</c> that <paramref name="findRole"/> finds, compared
     /// exactly, unless its file was not loaded. The expression is not checked when the subject entity is unknown.
+    /// In a module process, <paramref name="roleSlots"/> is set and a <c>role</c> must be one of its slots,
+    /// compared exactly. Any other name is <see cref="DiagnosticCodes.ModuleTaskRoleNotSlot"/>, and no role is looked up.
     /// </summary>
     private static void CheckAssignee(
         ProcessResource process,
@@ -2162,7 +2171,8 @@ internal static class ProcessChecker
         Func<string, RoleResource?> findRole,
         IReadOnlySet<string> unloadedRoleNames,
         ReferenceIndexBuilder references,
-        Action<string, string, string> report)
+        Action<string, string, string> report,
+        (string ModuleId, IReadOnlySet<string> Slots)? roleSlots = null)
     {
         if ((assignee.User is null) == (assignee.Role is null))
         {
@@ -2170,15 +2180,28 @@ internal static class ProcessChecker
         }
 
         // A role file that was not loaded because of its own errors is not reported again.
-        if (assignee.Role is { } role)
+        if (assignee.Role is { } role && roleSlots is { } module)
         {
-            if (findRole(role) is { } roleResource)
+            // A module task names a slot, and each application maps the slot to its own role.
+            if (!module.Slots.Contains(role))
+            {
+                report(
+                    DiagnosticCodes.ModuleTaskRoleNotSlot,
+                    module.Slots.Count == 0
+                        ? $"The module '{module.ModuleId}' has no role slots, so '{role}' names nothing. A module task's assignee names role slots of its module."
+                        : $"'{role}' is not a role slot of the module '{module.ModuleId}'. A module task's assignee names role slots, not roles. The slots are {string.Join(", ", module.Slots.Order(StringComparer.Ordinal).Select(slot => $"'{slot}'"))}.",
+                    $"{path}/role");
+            }
+        }
+        else if (assignee.Role is { } applicationRole)
+        {
+            if (findRole(applicationRole) is { } roleResource)
             {
                 references.Add(process, $"{path}/role", ReferenceRelations.TaskRole, ResourceNode.Of(roleResource));
             }
-            else if (!unloadedRoleNames.Contains(role))
+            else if (!unloadedRoleNames.Contains(applicationRole))
             {
-                report(DiagnosticCodes.UnknownTaskRole, $"The role '{role}' was not found. No declared role has that name.", $"{path}/role");
+                report(DiagnosticCodes.UnknownTaskRole, $"The role '{applicationRole}' was not found. No declared role has that name.", $"{path}/role");
             }
         }
 
@@ -2196,7 +2219,7 @@ internal static class ProcessChecker
     /// Checks the <c>escalations</c> of each task step. Each <c>after</c> is a positive fixed duration,
     /// and shorter than the step's <c>deadline.after</c> when the step has a deadline and both are valid.
     /// An escalation has at least one of <c>reassign</c> and <c>notify</c>. A <c>reassign</c> is checked like
-    /// a task's assignee by <see cref="CheckAssignee"/>, and a <c>notify</c> like a <c>notify</c> step by
+    /// a task's assignee by <see cref="CheckAssignee"/>, which names a role slot in a module process, and a <c>notify</c> like a <c>notify</c> step by
     /// <see cref="CheckNotify"/>. The escalations are not checked when the process has no subject, which
     /// is reported already. They may be in any order of <c>after</c>.
     /// </summary>
@@ -2212,7 +2235,8 @@ internal static class ProcessChecker
         Func<string, IReadOnlyList<(string Locale, string Value)>> textValues,
         ReferenceIndexBuilder references,
         Action<string, string, string> report,
-        List<Diagnostic> diagnostics)
+        List<Diagnostic> diagnostics,
+        (string ModuleId, IReadOnlySet<string> Slots)? roleSlots = null)
     {
         if (process.Entity is null)
         {
@@ -2256,7 +2280,7 @@ internal static class ProcessChecker
 
                 if (definition.Reassign is { } reassign)
                 {
-                    CheckAssignee(process, reassign, $"{path}/reassign", scope, findRole, unloadedRoleNames, references, report);
+                    CheckAssignee(process, reassign, $"{path}/reassign", scope, findRole, unloadedRoleNames, references, report, roleSlots);
                 }
 
                 if (definition.Notify is { } notify)
@@ -2287,7 +2311,8 @@ internal static class ProcessChecker
     /// <summary>
     /// Checks each task step: its assignee has exactly one of <c>user</c> and <c>role</c>, a
     /// <c>user</c> expression gives <c>text</c> over <paramref name="scope"/>, and a <c>role</c> is
-    /// a role <paramref name="findRole"/> finds, compared exactly, unless its file was not loaded. Its
+    /// a role <paramref name="findRole"/> finds, compared exactly, unless its file was not loaded. In a module
+    /// process (<paramref name="roleSlots"/> set) a <c>role</c> is one of the module's role slots instead. Its
     /// form is a loaded form whose entity is <paramref name="entity"/>. Its <c>dueIn</c>, when set, is a positive
     /// fixed duration, and its outcome names are unique ignoring letter case. The expression and the
     /// form's entity are not checked when the subject entity is unknown, and the form's entity is not
@@ -2303,7 +2328,8 @@ internal static class ProcessChecker
         Func<string, RoleResource?> findRole,
         IReadOnlySet<string> unloadedRoleNames,
         ReferenceIndexBuilder references,
-        Action<string, string, string> report)
+        Action<string, string, string> report,
+        (string ModuleId, IReadOnlySet<string> Slots)? roleSlots = null)
     {
         for (var index = 0; index < process.Steps.Count; index++)
         {
@@ -2316,7 +2342,7 @@ internal static class ProcessChecker
             }
 
             var path = $"/steps/{index}";
-            CheckAssignee(process, step.Assignee!, $"{path}/assignee", scope, findRole, unloadedRoleNames, references, report);
+            CheckAssignee(process, step.Assignee!, $"{path}/assignee", scope, findRole, unloadedRoleNames, references, report, roleSlots);
 
             var formName = step.Form!;
             if (findForm(formName) is { } form)

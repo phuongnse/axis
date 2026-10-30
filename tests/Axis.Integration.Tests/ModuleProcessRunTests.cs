@@ -127,6 +127,82 @@ public sealed class ModuleProcessRunTests(ModuleProcessFixture fixture) : IClass
             await fixture.Steps.CountAsync("SELECT count(*) FROM axis.process_instances WHERE subject_id = @id", ("id", order)));
     }
 
+    [Fact]
+    public async Task A_module_task_assigned_to_a_slot_goes_to_the_people_who_hold_the_mapped_role_who_decide_it()
+    {
+        var review = await fixture.InsertReviewAsync();
+        var instance = await fixture.Steps.StartOnSubjectAsync("reviews/Approve", review, fixture.Steps.FirstReleaseId);
+        await fixture.Steps.RunUntilIdleAsync(CancellationToken);
+        var task = await TaskIdAsync(instance);
+        Assert.Equal("waiting", (await fixture.Steps.InstanceAsync(instance)).State);
+        Assert.Equal(
+            "role/manager",
+            await fixture.Steps.ScalarAsync("SELECT assignee_kind || '/' || assignee FROM axis.process_tasks WHERE id = @id", ("id", task)));
+        using var manager = fixture.CreateClient().SignedInAs("manager");
+
+        Assert.Contains(task, await InboxAsync(manager));
+        using (var read = Request(HttpMethod.Get, $"{Tasks}/{task:D}", ModuleProcessFixture.Host))
+        using (var response = await manager.SendAsync(read, CancellationToken))
+        {
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        }
+
+        using (var complete = Request(HttpMethod.Post, $"{Tasks}/{task:D}/complete", ModuleProcessFixture.Host, """{ "outcome": "approve" }"""))
+        using (var response = await manager.SendAsync(complete, CancellationToken))
+        {
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        }
+
+        await fixture.Steps.RunUntilIdleAsync(CancellationToken);
+        Assert.Equal("completed", (await fixture.Steps.InstanceAsync(instance)).State);
+        Assert.Equal("approved", await fixture.ReviewStateAsync(review));
+    }
+
+    [Theory]
+    [InlineData("clerk")]
+    [InlineData("elsewhere")]
+    [InlineData("outsider")]
+    public async Task A_person_without_the_mapped_role_in_the_application_neither_sees_nor_decides_a_module_task(string user)
+    {
+        var review = await fixture.InsertReviewAsync();
+        var instance = await fixture.Steps.StartOnSubjectAsync("reviews/Approve", review, fixture.Steps.FirstReleaseId);
+        await fixture.Steps.RunUntilIdleAsync(CancellationToken);
+        var task = await TaskIdAsync(instance);
+        using var client = fixture.CreateClient().SignedInAs(user);
+
+        Assert.DoesNotContain(task, await InboxAsync(client));
+        using (var read = Request(HttpMethod.Get, $"{Tasks}/{task:D}", ModuleProcessFixture.Host))
+        using (var response = await client.SendAsync(read, CancellationToken))
+        {
+            Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        }
+
+        using (var complete = Request(HttpMethod.Post, $"{Tasks}/{task:D}/complete", ModuleProcessFixture.Host, """{ "outcome": "approve" }"""))
+        using (var response = await client.SendAsync(complete, CancellationToken))
+        {
+            Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        }
+
+        await fixture.Steps.RunUntilIdleAsync(CancellationToken);
+        Assert.Equal("waiting", (await fixture.Steps.InstanceAsync(instance)).State);
+        Assert.Null(await fixture.ReviewStateAsync(review));
+    }
+
+    private const string Tasks = "/api/apps/ModuleProcessApp/tasks";
+
+    private async Task<Guid> TaskIdAsync(Guid instance) =>
+        (Guid)(await fixture.Steps.ScalarAsync("SELECT id FROM axis.process_tasks WHERE process_instance_id = @id", ("id", instance))
+            ?? throw new InvalidOperationException("The instance has no task."));
+
+    private static async Task<IReadOnlyList<Guid>> InboxAsync(HttpClient client)
+    {
+        using var request = Request(HttpMethod.Get, $"{Tasks}?pageSize=100", ModuleProcessFixture.Host);
+        using var response = await client.SendAsync(request, CancellationToken);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
+        return [.. body.RootElement.GetProperty("items").EnumerateArray().Select(item => item.GetProperty("id").GetGuid())];
+    }
+
     private static async Task<Guid> StartAsync(HttpClient client, string process, Guid subject)
     {
         using var request = Request(
