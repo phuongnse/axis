@@ -246,7 +246,7 @@ public static partial class ApplicationCompiler
         IReadOnlyList<ResourceContent> moduleFiles = [];
         IReadOnlySet<string>? declaredPackageIds = null;
         var timeZone = TimeZoneInfo.Utc;
-        var moduleResources = new ModuleResources([], [], [], [], [], [], [], [], [], [], new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new Dictionary<string, IReadOnlySet<string>>(), new Dictionary<string, IReadOnlySet<string>>());
+        var moduleResources = new ModuleResources([], [], [], [], [], [], [], [], [], [], [], new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new Dictionary<string, IReadOnlySet<string>>(), new Dictionary<string, IReadOnlySet<string>>());
         if (loaded.Application is { } manifest)
         {
             packages = PackageChecker.Check(manifest, installedPackages, diagnostics, references);
@@ -263,7 +263,7 @@ public static partial class ApplicationCompiler
             }
         }
 
-        // A pinned module's entities, sequences, seeds, events, data sources, forms, pages and policies come before the application's own, so a
+        // A pinned module's entities, sequences, seeds, events, data sources, forms, pages, processes and policies come before the application's own, so a
         // step that depends on order sees each module target first. Application resources can name
         // them as '<module id>/<name>', but a module never names an application resource.
         var allEntities = new List<EntityResource>([.. moduleResources.Entities, .. loaded.Entities]);
@@ -276,11 +276,13 @@ public static partial class ApplicationCompiler
         var unloadedDataSourceNames = new HashSet<string>(loaded.UnloadedDataSourceNames.Concat(moduleResources.UnloadedDataSourceNames), StringComparer.OrdinalIgnoreCase);
         var unloadedFormNames = new HashSet<string>(loaded.UnloadedFormNames.Concat(moduleResources.UnloadedFormNames), StringComparer.OrdinalIgnoreCase);
         var unloadedPageNames = new HashSet<string>(loaded.UnloadedPageNames.Concat(moduleResources.UnloadedPageNames), StringComparer.OrdinalIgnoreCase);
+        var unloadedProcessNames = new HashSet<string>(loaded.UnloadedProcessNames.Concat(moduleResources.UnloadedProcessNames), StringComparer.OrdinalIgnoreCase);
         loaded = loaded with
         {
             DataSources = [.. moduleResources.DataSources, .. loaded.DataSources],
             Forms = [.. moduleResources.Forms, .. loaded.Forms],
             Pages = [.. moduleResources.Pages, .. loaded.Pages],
+            Processes = [.. moduleResources.Processes, .. loaded.Processes],
             Policies = [.. moduleResources.Policies, .. loaded.Policies],
             UnloadedEntityNames = unloadedEntityNames,
             UnloadedSequenceNames = unloadedSequenceNames,
@@ -288,6 +290,7 @@ public static partial class ApplicationCompiler
             UnloadedDataSourceNames = unloadedDataSourceNames,
             UnloadedFormNames = unloadedFormNames,
             UnloadedPageNames = unloadedPageNames,
+            UnloadedProcessNames = unloadedProcessNames,
         };
         var declaredModules = new HashSet<string>(loaded.Application?.Modules.Select(module => module.Id) ?? [], StringComparer.Ordinal);
         var moduleReferences = new ModuleReferences(
@@ -428,13 +431,13 @@ public static partial class ApplicationCompiler
         var appRules = RuleChecker.Check(loaded.Rules, references, diagnostics, moduleRules, declaredModules);
         var rules = (IReadOnlyList<ExpressionRule>)[.. appRules.Values, .. moduleRules];
 
-        // A module entity sees the rules of its own module by plain name, and the rules of the
+        // A module entity or process sees the rules of its own module by plain name, and the rules of the
         // modules it declares by qualified call. It sees no application rule.
-        IReadOnlyList<ExpressionRule> RulesFor(EntityResource entity) =>
-            IsModuleResource(entity)
+        IReadOnlyList<ExpressionRule> RulesFor(Resource resource) =>
+            IsModuleResource(resource)
                 ? [
-                    .. moduleRules.Where(rule => rule.Module == ModuleIdOf(entity.Name)).Select(rule => rule with { Module = null }),
-                    .. DeclaredRulesOf(entity),
+                    .. moduleRules.Where(rule => rule.Module == ModuleIdOf(resource.Name)).Select(rule => rule with { Module = null }),
+                    .. DeclaredRulesOf(resource),
                 ]
                 : rules;
 
@@ -500,12 +503,18 @@ public static partial class ApplicationCompiler
             diagnostics);
         CheckSeeds(allSeeds, loaded.UnloadedEntityNames, FindEntity, references, diagnostics);
         CheckDataSources(loaded, FindEntity, ownersByChildName, moduleReferences, references, FilterRulesFor, DeclaredModulesOf, diagnostics);
+        // An application process names a module form or process only under a module the application declares.
+        // A module process names only its own module and the modules it declares, sees no application
+        // form, process, page, role or connector, and no package.
+        bool NamesDeclaredModule(string name) =>
+            name.IndexOf('/', StringComparison.Ordinal) < 0 || declaredModules.Contains(ModuleIdOf(name));
+
         ProcessChecker.Check(
-            loaded.Processes,
+            [.. loaded.Processes.Where(process => !IsModuleResource(process))],
             FindEntity,
             name => ownersByChildName.TryGetValue(name, out var owner) ? owner.ToString() : null,
             loaded.UnloadedEntityNames,
-            FindForm,
+            name => NamesDeclaredModule(name) ? FindForm(name) : null,
             loaded.UnloadedFormNames,
             FindRole,
             loaded.UnloadedRoleNames,
@@ -518,12 +527,48 @@ public static partial class ApplicationCompiler
             FindPage,
             loaded.UnloadedPageNames,
             key => [.. texts.Where(text => text.Texts.ContainsKey(key)).Select(text => (text.Locale, text.Texts[key]))],
-            FindProcess,
+            name => NamesDeclaredModule(name) ? FindProcess(name) : null,
             loaded.UnloadedProcessNames,
             references,
             rules,
             declaredModules,
             diagnostics);
+        foreach (var moduleProcesses in loaded.Processes.Where(IsModuleResource).GroupBy(process => ModuleIdOf(process.Name), StringComparer.Ordinal))
+        {
+            var moduleId = moduleProcesses.Key;
+            var declared = moduleResources.DeclaredModules.GetValueOrDefault(moduleId) ?? new HashSet<string>();
+            bool Allowed(string name)
+            {
+                var slash = name.IndexOf('/', StringComparison.Ordinal);
+                return slash >= 0 && (name[..slash] == moduleId || declared.Contains(name[..slash]));
+            }
+
+            ProcessChecker.Check(
+                [.. moduleProcesses],
+                FindEntity,
+                name => ownersByChildName.TryGetValue(name, out var owner) ? owner.ToString() : null,
+                loaded.UnloadedEntityNames,
+                name => Allowed(name) ? FindForm(name) : null,
+                loaded.UnloadedFormNames,
+                _ => null,
+                new HashSet<string>(),
+                _ => null,
+                new HashSet<string>(),
+                name => Allowed(name) ? FindEvent(name) : null,
+                loaded.UnloadedEventNames,
+                _ => null,
+                new HashSet<string>(),
+                _ => null,
+                new HashSet<string>(),
+                key => [.. texts.Where(text => text.Texts.ContainsKey(key)).Select(text => (text.Locale, text.Texts[key]))],
+                name => Allowed(name) ? FindProcess(name) : null,
+                loaded.UnloadedProcessNames,
+                references,
+                RulesFor(moduleProcesses.First()),
+                declared,
+                diagnostics);
+        }
+
         PolicyChecker.Check(
             loaded.Policies,
             FindRole,
@@ -661,6 +706,11 @@ public static partial class ApplicationCompiler
             pagesByName[page.Name] = page with { Id = ModuleResourceIds.Derive(applicationId, page.Id) };
         }
 
+        foreach (var process in moduleResources.Processes)
+        {
+            processesByName[process.Name] = process with { Id = ModuleResourceIds.Derive(applicationId, process.Id) };
+        }
+
         var entities = allEntities
             .Select(entity => BuildEntity(entitiesByName[entity.Name], entitiesByName, sequencesByName, RulesFor(entity), DeclaredModulesOf(entity)))
             .ToList();
@@ -675,7 +725,7 @@ public static partial class ApplicationCompiler
             Seeds = allSeeds.Select(seed => BuildSeed(seed, entitiesByName, applicationId)).ToList(),
             DataSources = loaded.DataSources.Select(dataSource => BuildDataSource(
                 dataSourcesByName[dataSource.Name], entities, FilterRulesFor(dataSource), DeclaredModulesOf(dataSource))).ToList(),
-            Processes = loaded.Processes.Select(process => ProcessChecker.Build(process, FindEntity, FindForm, FindConnector, FindEvent, FindPackage, FindPage, FindProcess, rules, declaredModules)).ToList(),
+            Processes = loaded.Processes.Select(process => ProcessChecker.Build(processesByName[process.Name], FindEntity, FindForm, FindConnector, FindEvent, FindPackage, FindPage, FindProcess, RulesFor(process), DeclaredModulesOf(process))).ToList(),
             Forms = loaded.Forms.Select(form => BuildForm(formsByName[form.Name], entitiesByName, IsModuleResource(form) ? [] : rules, IsModuleResource(form) ? null : declaredModules)).ToList(),
             Roles = loaded.Roles,
             Policies = loaded.Policies.Select(policy => PolicyChecker.Build(

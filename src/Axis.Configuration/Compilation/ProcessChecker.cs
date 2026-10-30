@@ -1731,7 +1731,9 @@ internal static class ProcessChecker
             {
                 report(
                     DiagnosticCodes.UnknownStepPackage,
-                    $"The package '{packageId}' is not one of the application's packages. Add it to 'packages' in application.json.",
+                    ApplicationCompiler.IsModuleResource(process)
+                        ? $"The package '{packageId}' is not one of the module's packages. Add it to 'packages' in module.json."
+                        : $"The package '{packageId}' is not one of the application's packages. Add it to 'packages' in application.json.",
                     $"{path}/operation");
             }
         }
