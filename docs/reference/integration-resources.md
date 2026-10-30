@@ -715,11 +715,11 @@ the caller's id.
   - A `child-collection` field takes a `child-collection` input with the same
     target, by its name. The input's rows become the record's rows.
   - Fields that `values` leaves out are `null`, as in a record API create.
-- **Event** _(planned for M19)_. `event` is optional. It names an event about
-  `entity` and maps each payload field to an expression over the input, as
+- **Event**. `event` is optional. It names an event about `entity` and maps each
+  payload field to an expression over the input, as
   [D115](../decisions/d115-an-inbound-endpoint-call-raises-an-event.md) agrees.
-  The call raises it for the new record in its transaction, see
-  [the call](inbound-endpoints.md).
+  The compiler checks it. _(planned for M19)_ The call raises it for the new
+  record in its transaction, see [the call](inbound-endpoints.md).
 
   ```json
   "event": { "name": "PurchaseRequestReceived", "fields": { "title": "title" } }
@@ -817,11 +817,14 @@ The compiler reports these as compile errors, all in one pass. The
   breaking it is `AXC0004`.
 - `wait` is a valid ISO 8601 duration, more than zero and at most `PT30S`:
   `AXC0124`. So `PT0S` is `AXC0124`.
-- _(planned for M19)_ An `event` follows the checks of a
+- An `event` follows the checks of a
   [raise event step](process-events.md#raise-event-step), with its codes
   reported under `/event`: the event exists (`AXC0125` at `/event/name`), is
   about `entity` (`AXC0126`), and `fields` names each payload field once
   (`AXC0127` at `/event/fields/{key}` and `AXC0128` at `/event/fields`). Each
   expression is checked as a `values` expression, against its payload field's
-  type. The schema needs `process`, `event` or both, and refuses `output` and
-  `wait` without `process`, so breaking either is `AXC0004`.
+  type. When a [webhook](outbound-webhooks.md#webhook-resource) names the
+  event, an expression that reads an input that `values` maps to a `sensitive`
+  field is `AXC0316` at `/event/fields/{key}`.
+- _(planned for M19)_ The schema needs `process`, `event` or both, and refuses
+  `output` and `wait` without `process`, so breaking either is `AXC0004`.

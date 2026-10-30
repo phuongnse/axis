@@ -2,6 +2,7 @@ using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Model;
 using Axis.Configuration.Resources;
 using Axis.Expressions.Parsing;
+using Axis.Expressions.Syntax;
 using Axis.Expressions.Typing;
 
 namespace Axis.Configuration.Compilation;
@@ -19,7 +20,11 @@ namespace Axis.Configuration.Compilation;
 /// and gives the field's type. Each <c>output</c> entry names a field of the entity. A
 /// <c>wait</c> is an ISO 8601 duration, more than zero and at most 30 seconds. Every problem of an
 /// endpoint is reported in one pass. The mapping and the output are not checked without the
-/// entity, and the mapping is not matched against inputs that have a diagnostic of their own.
+/// entity, and the mapping is not matched against inputs that have a diagnostic of their own. An
+/// optional <c>event</c> is checked with <see cref="RaiseEventChecks"/> like a raise event step,
+/// with expressions that see only the input fields. When a webhook names the event, no expression
+/// reads an input that <c>values</c> maps to a sensitive field. The event is checked without the
+/// entity, and its expressions are skipped while an input has a diagnostic of its own.
 /// </summary>
 internal static class EndpointChecker
 {
@@ -38,6 +43,9 @@ internal static class EndpointChecker
         IReadOnlySet<string> unloadedEntityNames,
         Func<string, ProcessResource?> findProcess,
         IReadOnlySet<string> unloadedProcessNames,
+        Func<string, EventResource?> findEvent,
+        IReadOnlySet<string> unloadedEventNames,
+        IReadOnlySet<string> webhookEvents,
         Action<FieldDefinition, string, Action<string, string, string>> checkInputField,
         ModuleReferences moduleReferences,
         ReferenceIndexBuilder references,
@@ -121,6 +129,29 @@ internal static class EndpointChecker
                     "/wait");
             }
 
+            if (endpoint.Event is { } raised)
+            {
+                // The event is checked without the entity, and its expressions only while the input is valid.
+                RaiseEventChecks.Check(
+                    endpoint,
+                    raised.Name,
+                    raised.Fields,
+                    "/event/name",
+                    "/event/fields",
+                    ReferenceRelations.EndpointEvent,
+                    "endpoint",
+                    "An endpoint can raise only an event about its entity '{0}'.",
+                    entity,
+                    inputValid ? ExpressionScopes.ForEndpointInput(endpoint.Input) : null,
+                    findEntity,
+                    name => moduleReferences.Find(name, findEvent),
+                    name => unloadedEventNames.Contains(name) || moduleReferences.ReportUndeclared(name, "/event/name", Report),
+                    webhookEvents,
+                    (node, _) => SensitiveInputRead(endpoint, entity, node),
+                    references,
+                    Report);
+            }
+
             if (entity is null)
             {
                 // The mapping and the output cannot be checked without the entity.
@@ -149,7 +180,10 @@ internal static class EndpointChecker
     /// as the entity declares them.
     /// </summary>
     public static EndpointModel Build(
-        EndpointResource endpoint, Func<string, EntityResource?> findEntity, Func<string, ProcessResource?> findProcess)
+        EndpointResource endpoint,
+        Func<string, EntityResource?> findEntity,
+        Func<string, ProcessResource?> findProcess,
+        Func<string, EventResource?> findEvent)
     {
         var entity = findEntity(endpoint.Entity)
             ?? throw new ArgumentException("Only a checked endpoint can be built.", nameof(endpoint));
@@ -176,6 +210,21 @@ internal static class EndpointChecker
             wait = duration;
         }
 
+        EndpointEventModel? raisedEvent = null;
+        if (endpoint.Event is { } raised)
+        {
+            // A checked event is loaded and gets each of its payload fields once.
+            var @event = findEvent(raised.Name)!;
+            var fields = new Dictionary<string, string>(raised.Fields, StringComparer.OrdinalIgnoreCase);
+            raisedEvent = new EndpointEventModel(
+                @event.Name,
+                [
+                    .. @event.Fields.Select(field => new EventPayloadModel(
+                        field.Name,
+                        ExpressionModel.Compile(fields[field.Name], scope, ExpressionScopes.TypeOf(field.Type)))),
+                ]);
+        }
+
         return new EndpointModel
         {
             Id = endpoint.Id,
@@ -183,6 +232,7 @@ internal static class EndpointChecker
             File = endpoint.File,
             Entity = new EntityReference(entity.Id, entity.Name),
             Process = new ProcessReference(process.Id, process.Name),
+            Event = raisedEvent,
             Input = endpoint.Input
                 .Select(input => new EndpointInputModel(
                     input.Name,
@@ -198,6 +248,105 @@ internal static class EndpointChecker
             Output = endpoint.Output?.Select(name => ApplicationCompiler.FindField(entity, name)!.Name).ToList(),
             Wait = wait,
         };
+    }
+
+    /// <summary>
+    /// Describes the first input that <paramref name="node"/> reads and that a <c>values</c>
+    /// expression of a sensitive field reads too, or gives null. It counts every input name such an
+    /// expression mentions, not only an expression that is the name alone, so that
+    /// <c>upper(token)</c> still counts as copying <c>token</c>.
+    /// </summary>
+    private static string? SensitiveInputRead(EndpointResource endpoint, EntityResource? entity, ExpressionNode node)
+    {
+        if (entity is null)
+        {
+            return null;
+        }
+
+        // The sensitive field that reads each input, by the input's name.
+        var sensitiveByInput = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (key, value) in endpoint.Values)
+        {
+            if (ApplicationCompiler.FindField(entity, key) is not { Sensitive: true } field
+                || FieldTypes.Parse(field.Type) == FieldType.ChildCollection)
+            {
+                continue;
+            }
+
+            var parsed = ExpressionParser.Parse(value);
+            if (!parsed.Succeeded)
+            {
+                continue;
+            }
+
+            foreach (var name in Names(parsed.Expression!))
+            {
+                sensitiveByInput.TryAdd(name, field.Name);
+            }
+        }
+
+        foreach (var name in Names(node))
+        {
+            if (sensitiveByInput.TryGetValue(name, out var fieldName))
+            {
+                return $"the input '{name}', which 'values' maps to the sensitive field '{entity.Name}.{fieldName}'";
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>The names that <paramref name="node"/> reads, in order of appearance.</summary>
+    private static IEnumerable<string> Names(ExpressionNode node)
+    {
+        switch (node)
+        {
+            case NameNode name:
+                yield return name.Name;
+                break;
+            case MemberNode member:
+                foreach (var inner in Names(member.Target))
+                {
+                    yield return inner;
+                }
+
+                break;
+            case UnaryNode unary:
+                foreach (var inner in Names(unary.Operand))
+                {
+                    yield return inner;
+                }
+
+                break;
+            case BinaryNode binary:
+                foreach (var inner in Names(binary.Left).Concat(Names(binary.Right)))
+                {
+                    yield return inner;
+                }
+
+                break;
+            case IsNullNode isNull:
+                foreach (var inner in Names(isNull.Operand))
+                {
+                    yield return inner;
+                }
+
+                break;
+            case InNode inList:
+                foreach (var inner in Names(inList.Operand).Concat(inList.Items.SelectMany(Names)))
+                {
+                    yield return inner;
+                }
+
+                break;
+            case CallNode call:
+                foreach (var inner in call.Arguments.SelectMany(Names))
+                {
+                    yield return inner;
+                }
+
+                break;
+        }
     }
 
     /// <summary>

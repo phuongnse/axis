@@ -11,6 +11,19 @@
     "formatVersion": { "const": 1 },
     "entity": { "$ref": "#/$defs/qualifiedName", "x-axis-reference": "entity" },
     "process": { "$ref": "#/$defs/qualifiedName", "x-axis-reference": "process" },
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "fields"],
+      "properties": {
+        "name": { "$ref": "#/$defs/qualifiedName", "x-axis-reference": "event" },
+        "fields": {
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/name" },
+          "additionalProperties": { "type": "string", "minLength": 1, "x-axis-expression": true }
+        }
+      }
+    },
     "input": {
       "type": "array",
       "items": { "$ref": "#/$defs/input" }

@@ -19,6 +19,9 @@ public sealed record EndpointModel
     /// <summary>The process the call starts on the new record. Its subject entity is <see cref="Entity"/>.</summary>
     public required ProcessReference Process { get; init; }
 
+    /// <summary>The event the call is to raise about the new record, or null when the endpoint names none.</summary>
+    public EndpointEventModel? Event { get; init; }
+
     /// <summary>The input fields of the call's body, in declaration order.</summary>
     public required IReadOnlyList<EndpointInputModel> Input { get; init; }
 
@@ -31,6 +34,12 @@ public sealed record EndpointModel
     /// <summary>How long the call waits for the instance to complete, or null when it does not wait.</summary>
     public TimeSpan? Wait { get; init; }
 }
+
+/// <summary>
+/// The event a compiled endpoint names: its declared name, and the payload the call gives, one
+/// expression over the input fields for each payload field, in the event's declaration order.
+/// </summary>
+public sealed record EndpointEventModel(string Name, IReadOnlyList<EventPayloadModel> Fields);
 
 /// <summary>
 /// An input field of a compiled endpoint, with its field type and the constraints of that type. A
