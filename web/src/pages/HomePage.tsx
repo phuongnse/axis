@@ -116,7 +116,7 @@ function HomeTile({
   const body = (
     <>
       {mark}
-      <Flex vertical style={{ minWidth: 0 }}>
+      <Flex vertical style={{ flex: 1, minWidth: 0 }}>
         <Typography.Text strong>{title}</Typography.Text>
         {description && <Typography.Text style={{ color: colour.textMuted }}>{description}</Typography.Text>}
         {children}
@@ -219,29 +219,29 @@ interface ApplicationGroup {
 }
 
 /**
- * Proposed: an application is one tile with its mark, title and description. An application with one site opens it
- * from the whole tile; one with more lists its sites as links in the tile.
+ * Proposed: an application is one tile with its mark, title and description, over its sites. Each site is a link with
+ * its own mark and title, so a person sees every site of every application, even an application with one.
  */
 function ApplicationTile({ group, locale }: { group: ApplicationGroup; locale: string }) {
   const { colour, spacing } = useDesignTokens()
-  const mark = <SiteMark title={group.title} size={32} />
-  if (group.sites.length === 1) {
-    return (
-      <HomeTile
-        to={siteAddress(group.sites[0].path)}
-        mark={mark}
-        title={group.title}
-        description={group.description}
-      />
-    )
-  }
   const sorted = [...group.sites].sort((a, b) => siteTitle(a, locale).localeCompare(siteTitle(b, locale), locale))
   return (
-    <HomeTile mark={mark} title={group.title} description={group.description}>
-      <Flex vertical gap={4} style={{ marginTop: spacing.xs }}>
+    <HomeTile mark={<SiteMark title={group.title} size={32} />} title={group.title} description={group.description}>
+      <Flex
+        vertical
+        gap={spacing.xs}
+        style={{ marginTop: spacing.sm, paddingTop: spacing.sm, borderTop: `1px solid ${colour.divider}` }}
+      >
         {sorted.map((site) => (
-          <Link key={site.path} to={siteAddress(site.path)} style={{ color: colour.primaryText }}>
-            {siteTitle(site, locale)}
+          <Link
+            key={site.path}
+            to={siteAddress(site.path)}
+            style={{ display: 'flex', alignItems: 'center', gap: spacing.xs, minWidth: 0, color: colour.text }}
+          >
+            <SiteMark title={siteTitle(site, locale)} size={20} />
+            <Typography.Text ellipsis style={{ color: colour.primaryText }}>
+              {siteTitle(site, locale)}
+            </Typography.Text>
           </Link>
         ))}
       </Flex>
