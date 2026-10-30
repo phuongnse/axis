@@ -12,7 +12,8 @@ namespace Axis.Integration.Tests;
 /// <c>Review</c> entity, and maps the module's role slot <c>approver</c> to the role <c>manager</c>. The real server
 /// serves it on host <c>a.example.test</c> and signs in <c>clerk</c>, who holds the role <c>clerk</c> in the application,
 /// <c>manager</c>, who holds <c>manager</c>, <c>elsewhere</c>, who holds <c>manager</c> in another application only,
-/// and <c>outsider</c>, who holds no role. The worker is the one of <see cref="Steps"/>, which
+/// and <c>outsider</c>, who holds no role. The endpoint callers are <c>review-importer</c>, who holds the role
+/// <c>clerk</c>, and <c>outsider-system</c>, who holds no role. The worker is the one of <see cref="Steps"/>, which
 /// runs only when a test calls it, so a started instance stays <c>running</c> until then.
 /// </summary>
 public sealed class ModuleProcessFixture : IAsyncLifetime
@@ -61,6 +62,9 @@ public sealed class ModuleProcessFixture : IAsyncLifetime
                     ApplicationRoles = new Dictionary<Guid, IReadOnlyList<string>> { [Guid.Parse("9b4d6e83-2a5c-4f17-8d60-3e7a1c9b5fff")] = ["manager"] },
                 },
                 new TestIdentity("outsider", "Outsider No Role"));
+            builder.UseTestEndpointCallers(
+                new TestIdentity("review-importer", "Review Importer", "clerk"),
+                new TestIdentity("outsider-system", "Outsider System"));
         });
     }
 
@@ -104,6 +108,12 @@ public sealed class ModuleProcessFixture : IAsyncLifetime
         await command.ExecuteNonQueryAsync();
         return id;
     }
+
+    /// <summary>The number of reviews in the application's copy of the module's table that have the title <paramref name="title"/>.</summary>
+    public Task<long> CountReviewsAsync(string title) =>
+        Steps.CountAsync(
+            $"SELECT count(*) FROM {Table("reviews/Review")} WHERE {Column("title")} = @title",
+            ("title", title));
 
     /// <summary>The <c>state</c> of the review <paramref name="id"/>, or <see langword="null"/> when it has none.</summary>
     public async Task<string?> ReviewStateAsync(Guid id) =>

@@ -711,6 +711,7 @@ public sealed class ModuleCompilerTests
 
     [Theory]
     [InlineData("""{ "kind": "trigger" }""")]
+    [InlineData("""{ "kind": "endpoint" }""")]
     [InlineData("""{ "kind": "role" }""")]
     [InlineData("""{ "kind": "identityProvider" }""")]
     [InlineData("""{ "kind": "module", "id": "departments", "version": "1.0.0", "label": "Nested" }""")]
