@@ -8,6 +8,9 @@
     "role.employee": "Employee",
     "role.reader": "Reader",
     "role.fielded": "Fielded",
-    "role.filtered": "Filtered"
+    "role.filtered": "Filtered",
+    "specimen.lineLimit": "A specimen has at most five lines.",
+    "specimen.tagLimit": "A specimen has at most three tags.",
+    "specimen.closedInactive": "A closed specimen is not active."
   }
 }

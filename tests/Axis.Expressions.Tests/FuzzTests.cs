@@ -39,6 +39,52 @@ public sealed class FuzzTests
     }
 
     [Fact]
+    public async Task An_async_check_that_throws_fails_the_run_naming_the_seed_and_the_input()
+    {
+        var failure = await Assert.ThrowsAnyAsync<XunitException>(() => Fuzz.RunAsync(
+            random => random.Next(1000),
+            async _ =>
+            {
+                await Task.Yield();
+                throw new InvalidOperationException("boom");
+            },
+            input => $"number {input}",
+            seed: 77,
+            budget: _budget));
+
+        Assert.Contains("seed 77", failure.Message, StringComparison.Ordinal);
+        Assert.Contains("AXIS_FUZZ_SEED=77", failure.Message, StringComparison.Ordinal);
+        Assert.Contains($"number {new Random(77).Next(1000)}", failure.Message, StringComparison.Ordinal);
+        Assert.Contains("InvalidOperationException", failure.Message, StringComparison.Ordinal);
+        Assert.Contains("boom", failure.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task An_async_check_that_runs_past_the_per_input_limit_fails_the_run_naming_the_seed_and_the_input()
+    {
+        var failure = await Assert.ThrowsAnyAsync<XunitException>(() => Fuzz.RunAsync(
+            _ => "slow",
+            _ => Task.Delay(TimeSpan.FromSeconds(5)),
+            seed: 5,
+            budget: _budget,
+            perInput: TimeSpan.FromMilliseconds(50)));
+
+        Assert.Contains("seed 5", failure.Message, StringComparison.Ordinal);
+        Assert.Contains("\"slow\"", failure.Message, StringComparison.Ordinal);
+        Assert.Contains("time limit of 50 ms", failure.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task An_async_run_stops_after_the_maximum_number_of_inputs()
+    {
+        var count = 0;
+
+        await Fuzz.RunAsync(random => random.Next(), _ => Task.FromResult(Interlocked.Increment(ref count)), seed: 1, budget: _budget, maxInputs: 25);
+
+        Assert.Equal(25, count);
+    }
+
+    [Fact]
     public void A_failure_message_shows_the_input_with_the_given_writer()
     {
         var failure = Assert.ThrowsAny<XunitException>(() => Fuzz.Run(
