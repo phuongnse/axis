@@ -580,9 +580,11 @@ the caller's id.
 - **Entity and process.** `entity` names the entity of the record the call
   creates. It is not a child entity. `process` names the process the call
   starts on that record, and its subject entity is `entity`.
-  _(planned for M20)_ They may name a module entity and process of a module
-  the application declares, as `<module id>/<name>`, see
-  [D103](../decisions/d103-modules-hold-triggers-scenarios-and-connector-slots.md).
+  They may name a module entity and process of a module the application
+  declares, as `<module id>/<name>`. The call then writes the record into the
+  application's copy of the module's table and starts the module process on it,
+  see [D103](../decisions/d103-modules-hold-triggers-scenarios-and-connector-slots.md).
+  A module still holds no `endpoint` file.
 - **Input.** `input` lists the typed input fields of the call's body.
   - Their types are the
     [entity field types](resource-files.md#entity-field-types-and-constraints), including
@@ -657,6 +659,9 @@ The compiler reports these as compile errors, all in one pass. The
 - The `process` exists, and its subject entity is `entity`: `AXC0116` and
   `AXC0117`. A process without a subject is `AXC0117` too, because the call
   starts the process on the record it creates.
+- A name under a module that `modules` does not declare, as `entity` or
+  `process`, is `AXC0207` at `/entity` or `/process`, whether the application
+  pulls the module in only as another module's dependency or not at all.
 - An input field's type is an entity field type, with only that type's
   properties. A property on the wrong type is `AXC0013`, and a missing
   `target` or `values` is `AXC0014`. The schema refuses `label`, `unique`,

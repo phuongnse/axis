@@ -8,6 +8,7 @@
     { "entity": "Order", "actions": ["read"] },
     { "entity": "reviews/Review", "actions": ["read"] },
     { "process": "CloseReview", "actions": ["start"] },
-    { "process": "FlagReview", "actions": ["start"] }
+    { "process": "FlagReview", "actions": ["start"] },
+    { "endpoint": "ImportReview", "actions": ["invoke"] }
   ]
 }
