@@ -3,7 +3,10 @@ name: CodeQL
 # Scans the C# and TypeScript code. Alerts go to GitHub code scanning, and the owner sets the
 # high-or-critical threshold that fails the check in a repository code scanning rule. NexKit's
 # merges start no push workflow, so NexKit starts the scan on main once every 32 of its merges
-# (D112). It also scans a person's push to main, pull requests and on demand.
+# (D112). It also scans a person's push to main, hand-made pull requests and on demand. A pull
+# request that NexKit opens with the Actions token gets a run that waits for approval and runs no
+# job. Nobody approves it, so it scans nothing, and GitHub ends it as failed when the pull request
+# merges.
 on:
   push:
     branches: [main]
