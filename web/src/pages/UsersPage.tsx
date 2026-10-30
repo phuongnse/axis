@@ -159,7 +159,8 @@ export function UsersPage() {
                 setInviting(true)
               }}
             >
-              {t('shell.users.invite')}
+              {/* Proposed: an action that opens a dialog asking for more ends in an ellipsis. */}
+              {t('shell.users.invite.button')}
             </Button>
           </Flex>
           {done && <Alert data-testid="users-done" type="success" title={t(`shell.users.${done}.done`)} />}
