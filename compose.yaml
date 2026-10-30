@@ -173,6 +173,13 @@ services:
       Tenants__default__Bindings__PurchasingSystemUrl__Value: http://purchasing:8080
       Tenants__default__Bindings__PurchasingSystemToken__Kind: secret
       Tenants__default__Bindings__PurchasingSystemToken__Value: axis-development-purchasing-token
+      # The company realm's broker client, as in appsettings.Development.json of the server.
+      Tenants__default__Bindings__CompanyIssuer__Kind: url
+      Tenants__default__Bindings__CompanyIssuer__Value: http://localhost:8080/realms/company
+      Tenants__default__Bindings__CompanyClientId__Kind: secret
+      Tenants__default__Bindings__CompanyClientId__Value: axis-broker
+      Tenants__default__Bindings__CompanyClientSecret__Kind: secret
+      Tenants__default__Bindings__CompanyClientSecret__Value: axis-broker-development-secret
       # The preview tenant default-preview, where preview requests run.
       Tenants__default-preview__PreviewOf: default
       Tenants__default-preview__Hosts__0: preview.localhost

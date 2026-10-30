@@ -107,6 +107,9 @@ fi
 if [ -n "${AXIS_KEYCLOAK_PORT:-}" ]; then
   # The server signs people in at the moved Keycloak.
   export Tenants__default__Oidc__Authority="http://localhost:$AXIS_KEYCLOAK_PORT/realms/axis"
+  # Activation reads the company issuer's discovery document, so it follows the moved port too. Only the
+  # server gets it: the worker has no company binding kind, so an exported value would stop the worker.
+  server_env+=("Tenants__default__Bindings__CompanyIssuer__Value=http://localhost:$AXIS_KEYCLOAK_PORT/realms/company")
 fi
 if [ -n "${AXIS_PURCHASING_PORT:-}" ]; then
   # The server checks this binding when it activates the sample, and the worker calls it.
@@ -310,6 +313,12 @@ while :; do
       Tenants__default__Bindings__PurchasingSystemUrl__Value="http://localhost:$purchasing_port" \
       Tenants__default__Bindings__PurchasingSystemToken__Kind=secret \
       Tenants__default__Bindings__PurchasingSystemToken__Value=axis-development-purchasing-token \
+      Tenants__default__Bindings__CompanyIssuer__Kind=url \
+      Tenants__default__Bindings__CompanyIssuer__Value="http://localhost:$keycloak_port/realms/company" \
+      Tenants__default__Bindings__CompanyClientId__Kind=secret \
+      Tenants__default__Bindings__CompanyClientId__Value=axis-broker \
+      Tenants__default__Bindings__CompanyClientSecret__Kind=secret \
+      Tenants__default__Bindings__CompanyClientSecret__Value=axis-broker-development-secret \
       'Tenants__default-preview__PreviewOf=default' \
       'Tenants__default-preview__Hosts__0=preview.localhost' \
       "Tenants__default-preview__ConnectionString=Host=localhost;Port=$postgres_port;Database=axis_preview;Username=axis_preview_runtime;Password=axis" \
