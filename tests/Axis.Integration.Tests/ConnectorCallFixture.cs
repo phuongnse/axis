@@ -14,7 +14,7 @@ namespace Axis.Integration.Tests;
 /// Development for both tenants. Each tenant's <c>PurchasingUrl</c> binding points at its own path
 /// on the stub, <c>/tenant-a</c> or <c>/tenant-b</c>, and its <c>PurchasingToken</c> secret holds
 /// its own token. A second worker with the same bindings runs as Production, so it refuses the
-/// stub's <c>http</c> URL. The hosts are never started, so a test runs the work items itself, and
+/// stub's <c>http</c> URL. Both workers share <see cref="Clock"/>. The hosts are never started, so a test runs the work items itself, and
 /// a test can build the Development worker again to stand for a restart.
 /// </summary>
 public sealed class ConnectorCallFixture : IAsyncLifetime
@@ -32,6 +32,12 @@ public sealed class ConnectorCallFixture : IAsyncLifetime
     private IConfiguration? _settings;
     private ServiceProvider? _development;
     private ServiceProvider? _production;
+
+    /// <summary>
+    /// The clock of the workers, which starts at the real time and moves only when a test advances it.
+    /// It decides when a cached access token expires.
+    /// </summary>
+    internal ManualClock Clock { get; } = new();
 
     public ConnectorStub Stub => _stub ?? throw new InvalidOperationException("The fixture is not initialized.");
 
@@ -144,6 +150,7 @@ public sealed class ConnectorCallFixture : IAsyncLifetime
     private ServiceProvider Worker(IConfiguration settings, string environment) =>
         new ServiceCollection()
             .AddLogging(logging => logging.AddProvider(Logs).SetMinimumLevel(LogLevel.Trace))
+            .AddSingleton<TimeProvider>(Clock)
             .AddAxisWorker(settings, new HostingEnvironment { EnvironmentName = environment })
             .BuildServiceProvider();
 
@@ -153,4 +160,15 @@ public sealed class ConnectorCallFixture : IAsyncLifetime
         var item = await Tenant(tenantId).ClaimAsync(kind, _lease, cancellationToken);
         return item is null ? null : await runner.ExecuteAsync(item, cancellationToken);
     }
+}
+
+/// <summary>A clock that starts at the real time and moves only when a test advances it.</summary>
+internal sealed class ManualClock : TimeProvider
+{
+    private DateTimeOffset _now = DateTimeOffset.UtcNow;
+
+    public override DateTimeOffset GetUtcNow() => _now;
+
+    /// <summary>Moves the clock forward by <paramref name="by"/>.</summary>
+    public void Advance(TimeSpan by) => _now += by;
 }

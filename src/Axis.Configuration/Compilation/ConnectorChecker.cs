@@ -9,11 +9,15 @@ namespace Axis.Configuration.Compilation;
 /// Checks the connectors of an application and builds the checked ones. A connector's
 /// <c>timeout</c> is a positive duration of at most 2 minutes. Its operation names are unique,
 /// and so are the field names of each operation's input and of its output, all ignoring letter
-/// case. A path holds no placeholder but <c>{idempotencyKey}</c>. A <c>lookup</c> names another
-/// operation of the connector, ignoring letter case, which is a <c>GET</c> whose path holds
-/// <c>{idempotencyKey}</c> and whose outputs are those of the operation it serves. The schema
-/// already refuses inputs on a <c>GET</c>. Every problem of a connector is reported in one pass.
-/// Its bindings are checked at activation, against the tenant's.
+/// case. An output's <c>source</c> is a JSON Pointer: it starts with <c>/</c> and every <c>~</c> in it
+/// is followed by <c>0</c> or <c>1</c>. Each placeholder of a path is <c>{idempotencyKey}</c> or names a
+/// <c>path</c> input, ignoring letter case. Each <c>path</c> input is <c>required</c>, appears in the path
+/// and is not named <c>idempotencyKey</c>, and a <c>GET</c> has no <c>body</c> input. A <c>lookup</c> names
+/// another operation of the connector, ignoring letter case, which is a <c>GET</c> with no inputs whose path
+/// holds <c>{idempotencyKey}</c> and whose outputs, with their <c>source</c>, are those of the operation it
+/// serves. Every problem of a connector is reported in one pass.
+/// Its bindings are checked at activation, against the tenant's. At compile time,
+/// <see cref="CheckBindingKinds"/> reports an <c>oauth2</c> binding whose name the application uses as another kind.
 /// <see cref="CheckSlot"/> checks a connector against a module's connector slot, and
 /// <see cref="CheckSlotAgainstSlot"/> checks a slot against the slot of a depending module.
 /// </summary>
@@ -55,10 +59,23 @@ internal static class ConnectorChecker
 
                 CheckFieldNames(operation.Input, $"{path}/input", "input", Report);
                 CheckFieldNames(operation.Output, $"{path}/output", "output", Report);
-                if (FindPathProblem(operation.Path) is { } problem)
+                for (var outputIndex = 0; outputIndex < operation.Output.Count; outputIndex++)
+                {
+                    if (operation.Output[outputIndex].Source is { } source && FindSourceProblem(source) is { } sourceProblem)
+                    {
+                        Report(
+                            DiagnosticCodes.InvalidOutputSource,
+                            $"The source '{source}' of the output '{operation.Output[outputIndex].Name}' {sourceProblem}",
+                            $"{path}/output/{outputIndex}/source");
+                    }
+                }
+
+                if (FindPathProblem(operation.Path, operation.Input) is { } problem)
                 {
                     Report(DiagnosticCodes.InvalidOperationPath, $"The path '{operation.Path}' {problem}", $"{path}/path");
                 }
+
+                CheckInputPlacement(operation, path, Report);
             }
 
             for (var index = 0; index < connector.Operations.Count; index++)
@@ -67,6 +84,41 @@ internal static class ConnectorChecker
                 if (operation.Lookup is { } lookup && FindLookupProblem(connector, operation, lookup) is { } problem)
                 {
                     Report(DiagnosticCodes.InvalidOperationLookup, problem, $"/operations/{index}/lookup");
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Reports each <c>oauth2</c> binding of <paramref name="connectors"/> whose name the application
+    /// also uses as another kind, ignoring letter case, at <c>/auth/&lt;property&gt;/binding</c>. The
+    /// kind of a name is read from where it is used, as for an identity provider's bindings.
+    /// </summary>
+    public static void CheckBindingKinds(
+        IReadOnlyList<ConnectorResource> connectors,
+        ApplicationManifest? manifest,
+        IReadOnlyList<IdentityProviderResource> providers,
+        List<Diagnostic> diagnostics)
+    {
+        if (!connectors.Any(connector => connector.Auth is { Type: "oauth2" }))
+        {
+            return;
+        }
+
+        var uses = BindingUses.Collect(providers, manifest, connectors);
+        foreach (var connector in connectors.Where(connector => connector.Auth is { Type: "oauth2" }))
+        {
+            foreach (var (property, kind, binding) in BindingUses.BindingsOf(connector).Where(use => use.Property.StartsWith("auth/", StringComparison.Ordinal)))
+            {
+                if (uses.TryGetValue(binding.Binding, out var candidates)
+                    && candidates.FirstOrDefault(candidate => candidate.Kind != kind) is { } other)
+                {
+                    diagnostics.Add(new Diagnostic(
+                        DiagnosticCodes.ConnectorBindingKind,
+                        $"The binding '{binding.Binding}' is a {kind} binding here, but '{other.File}' uses it as a {other.Kind} binding at '{other.Path}'.",
+                        connector.File,
+                        $"/{property}/binding",
+                        connector.Id));
                 }
             }
         }
@@ -203,6 +255,11 @@ internal static class ConnectorChecker
             {
                 { Type: "bearer", Token: { } token } => new ConnectorAuthModel("bearer", null, token.Binding, "/auth/token/binding"),
                 { Type: "header", Name: { } name, Value: { } value } => new ConnectorAuthModel("header", name, value.Binding, "/auth/value/binding"),
+                { Type: "oauth2", TokenUrl: { } tokenUrl, ClientId: { } clientId, ClientSecret: { } clientSecret } =>
+                    new ConnectorAuthModel("oauth2", null, clientSecret.Binding, "/auth/clientSecret/binding")
+                    {
+                        OAuth2 = new ConnectorOAuth2Model(tokenUrl.Binding, clientId.Binding, connector.Auth.Scope, connector.Auth.Audience),
+                    },
                 _ => null,
             },
             Timeout = timeout,
@@ -220,7 +277,7 @@ internal static class ConnectorChecker
     }
 
     private static ConnectorFieldModel BuildField(ConnectorFieldDefinition field) =>
-        new(field.Name, FieldTypes.Parse(field.Type), field.Required);
+        new(field.Name, FieldTypes.Parse(field.Type), field.Required, field.In, field.Source);
 
     /// <summary>Parses a timeout, which is 30 seconds when not written.</summary>
     private static bool TryParseTimeout(string? text, out TimeSpan timeout)
@@ -250,8 +307,85 @@ internal static class ConnectorChecker
         }
     }
 
+    /// <summary>
+    /// Reports, at each input of <paramref name="operation"/>, a <c>path</c> input that is not in the
+    /// path, is not <c>required</c> or is named <c>idempotencyKey</c>, and a <c>body</c> input on a <c>GET</c>.
+    /// </summary>
+    private static void CheckInputPlacement(
+        ConnectorOperationDefinition operation, string operationPath, Action<string, string, string> report)
+    {
+        var placeholders = Placeholders(operation.Path);
+        for (var index = 0; index < operation.Input.Count; index++)
+        {
+            var field = operation.Input[index];
+            var path = $"{operationPath}/input/{index}";
+            if (field.In == "path")
+            {
+                if (string.Equals(field.Name, IdempotencyKeyPlaceholder, StringComparison.OrdinalIgnoreCase))
+                {
+                    report(
+                        DiagnosticCodes.MisplacedConnectorInput,
+                        $"The path input '{field.Name}' is named like the placeholder '{{{IdempotencyKeyPlaceholder}}}', which holds the operation identity. Give the input another name.",
+                        path);
+                }
+                else if (!placeholders.Contains(field.Name))
+                {
+                    report(
+                        DiagnosticCodes.MisplacedConnectorInput,
+                        $"The path input '{field.Name}' has no placeholder '{{{field.Name}}}' in the path '{operation.Path}'. Add the placeholder or move the input to the query, a header or the body.",
+                        path);
+                }
+
+                if (!field.Required)
+                {
+                    report(
+                        DiagnosticCodes.MisplacedConnectorInput,
+                        $"The path input '{field.Name}' is not required. A path input is always 'required': true, because the path needs its value.",
+                        path);
+                }
+            }
+            else if (field.In == "body" && operation.Method == "GET")
+            {
+                report(
+                    DiagnosticCodes.MisplacedConnectorInput,
+                    $"The input '{field.Name}' goes in the body, but a GET sends no body. Use 'in': 'path', 'query' or 'header'.",
+                    path);
+            }
+        }
+    }
+
+    /// <summary>Lists the placeholder names of a path template, ignoring letter case. An unbalanced path gives what its balanced part holds.</summary>
+    private static HashSet<string> Placeholders(string path)
+    {
+        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var position = 0;
+        while (position < path.Length)
+        {
+            var open = path.IndexOf('{', position);
+            if (open < 0)
+            {
+                break;
+            }
+
+            var close = path.IndexOfAny(['{', '}'], open + 1);
+            if (close < 0)
+            {
+                break;
+            }
+
+            if (path[close] == '}')
+            {
+                names.Add(path[(open + 1)..close]);
+            }
+
+            position = close;
+        }
+
+        return names;
+    }
+
     /// <summary>Describes the first problem of a path template, or gives null when it has none.</summary>
-    private static string? FindPathProblem(string path)
+    private static string? FindPathProblem(string path, IReadOnlyList<ConnectorFieldDefinition> input)
     {
         var position = 0;
         while (position < path.Length)
@@ -269,12 +403,33 @@ internal static class ConnectorChecker
             }
 
             var placeholder = path[(open + 1)..close];
-            if (placeholder != IdempotencyKeyPlaceholder)
+            if (placeholder != IdempotencyKeyPlaceholder
+                && !input.Any(field => field.In == "path" && string.Equals(field.Name, placeholder, StringComparison.OrdinalIgnoreCase)))
             {
-                return $"has the placeholder '{{{placeholder}}}'. '{{{IdempotencyKeyPlaceholder}}}' is the only placeholder, and inputs are sent in the JSON body.";
+                return $"has the placeholder '{{{placeholder}}}', which names no path input. Add an input '{placeholder}' with 'in': 'path', or use '{{{IdempotencyKeyPlaceholder}}}'.";
             }
 
             position = close + 1;
+        }
+
+        return null;
+    }
+
+    /// <summary>Describes the first problem of a JSON Pointer (RFC 6901), or gives null when it has none.</summary>
+    private static string? FindSourceProblem(string source)
+    {
+        if (!source.StartsWith('/'))
+        {
+            return "does not start with '/'. Write a JSON Pointer such as '/shipment/tracking/number'.";
+        }
+
+        for (var position = source.IndexOf('~'); position >= 0; position = source.IndexOf('~', position + 1))
+        {
+            if (position + 1 >= source.Length || source[position + 1] is not ('0' or '1'))
+            {
+                var escape = position + 1 < source.Length ? source.Substring(position, 2) : "~";
+                return $"has the escape '{escape}'. Write '~0' for '~' and '~1' for '/'.";
+            }
         }
 
         return null;
@@ -303,9 +458,14 @@ internal static class ConnectorChecker
             return $"The lookup '{lookup}' has no '{{{IdempotencyKeyPlaceholder}}}' in its path, so it cannot find an earlier call.";
         }
 
+        if (target.Input.Count > 0)
+        {
+            return $"The lookup '{lookup}' has inputs. A lookup has no inputs, because it finds a call by its idempotency key alone.";
+        }
+
         if (!SameFields(operation.Output, target.Output))
         {
-            return $"The lookup '{lookup}' has other outputs than operation '{operation.Name}'. Give it the same output names, types and 'required'.";
+            return $"The lookup '{lookup}' has other outputs than operation '{operation.Name}'. Give it the same output names, types, 'required' and 'source'.";
         }
 
         return null;
@@ -319,7 +479,7 @@ internal static class ConnectorChecker
     private static ConnectorFieldDefinition? FindField(IReadOnlyList<ConnectorFieldDefinition> fields, string name) =>
         fields.FirstOrDefault(candidate => string.Equals(candidate.Name, name, StringComparison.OrdinalIgnoreCase));
 
-    /// <summary>Whether two field lists have the same names, ignoring letter case and order, with the same type and <c>required</c>.</summary>
+    /// <summary>Whether two field lists have the same names, ignoring letter case and order, with the same type, <c>required</c> and <c>source</c>.</summary>
     private static bool SameFields(IReadOnlyList<ConnectorFieldDefinition> left, IReadOnlyList<ConnectorFieldDefinition> right)
     {
         if (left.Count != right.Count)
@@ -336,6 +496,7 @@ internal static class ConnectorChecker
 
         return rightByName.Count == right.Count
             && left.Select(field => field.Name).Distinct(StringComparer.OrdinalIgnoreCase).Count() == left.Count
-            && left.All(field => rightByName.TryGetValue(field.Name, out var match) && match.Type == field.Type && match.Required == field.Required);
+            && left.All(field => rightByName.TryGetValue(field.Name, out var match) && match.Type == field.Type && match.Required == field.Required
+                && string.Equals(match.Source, field.Source, StringComparison.Ordinal));
     }
 }

@@ -31,8 +31,9 @@ reconciles is in [Connector calls](process-execution.md#connector-calls).
 - **No binding resource.** No resource kind declares bindings. A connector
   names one as `{ "binding": "<name>" }`. Where the name is used decides its
   kind: `baseUrl` needs a `url` binding, and `auth` needs a `secret` binding.
-  _(planned for M19)_ An `oauth2` auth's `tokenUrl` needs a `url` binding, and
-  a [webhook](#webhook-resource) names a `url` and a `secret` binding.
+  An `oauth2` auth's `tokenUrl` needs a `url` binding, and its `clientId` and
+  `clientSecret` need `secret` bindings. _(planned for M19)_ A
+  [webhook](#webhook-resource) names a `url` and a `secret` binding.
   A package operation names them in the `capabilities` of its manifest:
   `urls` need `url` bindings and `secrets` need `secret` bindings.
 - **Where values live.** Under `Tenancy:Source=configuration`, each tenant holds its values in
@@ -171,21 +172,24 @@ The purchase request sample holds the purchasing system connector in
   - `bearer`, with `token`, a `secret` binding sent as
     `Authorization: Bearer <value>`;
   - `header`, with `name`, the header name, and `value`, a `secret` binding;
-  - `oauth2` _(planned for M19)_, see [OAuth2 auth](#oauth2-auth).
+  - `oauth2`, with a token URL and client credentials, see [OAuth2 auth](#oauth2-auth).
 - `timeout` is an ISO 8601 duration. It defaults to `PT30S` and is at most
   `PT2M`.
 - `idempotency` names the request header that carries the idempotency key.
   It is absent when the system does not support one.
 - `operations` lists the named operations.
   - `method` is `GET`, `POST`, `PUT`, `PATCH` or `DELETE`.
-  - `path` is a path template. `{idempotencyKey}` is the only placeholder.
-    Other placeholders come later. _(planned for M19)_ A `{name}` placeholder
-    names a `path` input, see [Structured payloads](#structured-payloads).
-  - `input` fields are sent as a JSON body. A `GET` sends no body, so a `GET`
-    with `input` fields is a schema error. _(planned for M19)_ An input's `in`
-    may send it in the path, the query or a header instead, and a `GET` may
-    have those.
-  - `output` fields are read from the JSON response.
+  - `path` is a path template. `{idempotencyKey}` holds the operation
+    identity. Any other `{name}` placeholder names a `path` input, see
+    [Structured payloads](#structured-payloads).
+  - `input` fields are sent as a JSON body, unless an input's `in` sends it in
+    the path, the query or a header. A `GET` sends no body, so it may have
+    `path`, `query` and `header` inputs but no `body` input.
+  - `output` fields are read from the JSON response. An output is read from
+    the top-level property of its name, unless it has a `source`, a JSON
+    Pointer ([RFC 6901](https://www.rfc-editor.org/rfc/rfc6901)) into the
+    response body, see [Structured payloads](#structured-payloads). `source` is
+    allowed on outputs only.
   - Input and output field types are the
     [rule parameter types](resource-files.md#resource-file-shape): `text`, `integer`,
     `decimal`, `boolean`, `date` and `date-time`. _(planned for M19)_ Inputs
@@ -193,7 +197,8 @@ The purchase request sample holds the purchasing system connector in
 - `lookup` is optional and set per operation. It names another operation of
   the same connector that finds an earlier call by its idempotency key.
   - The lookup is a `GET` whose `path` holds `{idempotencyKey}`.
-  - It has no inputs, and the same outputs as the operation it serves.
+  - It has no inputs, and the same outputs as the operation it serves, each
+    with the same `source`.
   - A `200` means found, and its body gives the output. A `404` means not
     found. Anything else is a failed lookup.
 - The worker never follows a redirect. A `3xx` response fails the call, so
@@ -211,9 +216,10 @@ Docker Compose, `scripts/dev.sh` and the E2E run point them at the
 
 ### OAuth2 auth
 
-_(planned for M19)_ A connector can get its access token from an OAuth2
-authorization server through the client credentials grant, as
+A connector can get its access token from an OAuth2 authorization server
+through the client credentials grant, as
 [D91](../decisions/d91-connector-oauth2-and-structured-payloads.md) agrees.
+The token request and the cache are built. The resend after a `401` is not.
 
 ```json
 "auth": {
@@ -226,19 +232,43 @@ authorization server through the client credentials grant, as
 ```
 
 - `tokenUrl` is a `url` binding. `clientId` and `clientSecret` are `secret`
-  bindings. `scope` and `audience` are optional strings.
-- The worker requests a token with `grant_type=client_credentials`, sending
-  the client id and secret with HTTP Basic authentication, and sends the token
-  as `Authorization: Bearer <token>`.
+  bindings. `scope` and `audience` are optional strings of 1 to 2000
+  characters. The schema refuses `token`, `name` and `value` on an `oauth2`
+  auth, and refuses `tokenUrl`, `clientId`, `clientSecret`, `scope` and
+  `audience` on the other types.
+- **Checks.** Activation checks the three bindings as it checks a
+  connector's others. A missing binding, or one of the wrong kind, is
+  `AXC0100` at `/auth/tokenUrl/binding`, `/auth/clientId/binding` or
+  `/auth/clientSecret/binding`, and a missing one is a warning on a preview
+  tenant. An `http` token URL outside Development is `AXC0101`. The compiler
+  reports `AXC0310` at the same paths when the application uses the name of
+  one of these bindings as another kind elsewhere. The kind of a name is read
+  from where it is used, as for an [identity provider](identity-provider.md).
+- The worker requests a token with `grant_type=client_credentials`, adding
+  `scope` and `audience` when they are set. It sends the client id and secret
+  with HTTP Basic authentication, each form-encoded as RFC 6749 section 2.3.1
+  says, and sends the token as `Authorization: Bearer <token>`. It does this
+  before each call and each lookup.
 - The token stays in the worker's memory, for each tenant and connector, until
-  a minute before its `expires_in`. It is never stored, logged or shown, and
-  each worker replica gets its own.
-- A `401` from the system drops the token. The worker gets a new one and sends
-  the request once more in the same attempt, with the same idempotency key. A
-  second `401` fails the attempt as any `4xx` does.
+  a minute before its `expires_in`. It is never stored, logged, traced or
+  shown, and each worker replica gets its own.
+  - A response without `expires_in`, or with 60 seconds or less, gives a token
+    for that one call only.
+  - The cache also holds a hash of the token URL, the client id, the client
+    secret, the scope and the audience. When one of them changes, the worker
+    asks for a new token, so changing a binding needs no restart.
+  - Two calls that find the cache empty at the same moment may each request a
+    token.
+- The token request has the connector's `timeout`, like the operation. The
+  call's lease is extended by twice the `timeout` for an `oauth2` connector.
+- A test scenario answers the operation from its stub and requests no token.
+- _(planned for M19)_ A `401` from the system drops the token. The worker gets
+  a new one and sends the request once more in the same attempt, with the same
+  idempotency key. A second `401` fails the attempt as any `4xx` does.
 - A failed token request, for any reason, is a retryable attempt, and the
-  operation is not sent. History records the token endpoint's status code,
-  never its body.
+  operation is not sent. A failed lookup stays `unknown`. The attempt row and
+  the call record the token endpoint's status code and a fixed error text,
+  never its body or an exception message.
 - The token URL follows the connector rules: `https` outside Development, and
   no redirects.
 - `clientAuth: "privateKeyJwt"`, with the private key in a `secret` binding,
@@ -249,10 +279,10 @@ authorization server through the client credentials grant, as
 
 ### Structured payloads
 
-_(planned for M19)_ Inputs can go outside the body and nest, and outputs can
-come from deep in the response, as
+Inputs go outside the body, as
 [D91](../decisions/d91-connector-oauth2-and-structured-payloads.md) agrees.
-Bodies stay JSON.
+_(planned for M19)_ Inputs can also nest. The `lines` input in the example is
+still planned. Bodies stay JSON. An output's `source` is built.
 
 ```json
 {
@@ -276,19 +306,36 @@ Bodies stay JSON.
 ```
 
 - **`in`.** `body`, the default, `path`, `query` or `header`. A `header`
-  input's name is the header name. Only scalar inputs may go outside the body.
+  input's name is the header name, so it cannot hold a hyphen yet. Only scalar
+  inputs may go outside the body. An optional input with no value is left out.
 - **Path placeholders.** Each `{name}` in `path` names a `path` input, and each
-  `path` input appears in `path`. A `path` input is `required`. Its value is
-  escaped as one path segment.
+  `path` input appears in `path`. Names match ignoring letter case. A `path`
+  input is `required`, and none is named `idempotencyKey`, which stays the
+  operation identity. Its value is escaped as one path segment, so `a/b c`
+  becomes `a%2Fb%20c`. A `query` input becomes a `name=value` pair of the
+  query string, escaped the same way.
 - **`GET`.** A `GET` may have `path`, `query` and `header` inputs, but no
-  `body` input.
-- **`object` and `list`.** An `object` input has nested `fields`. A `list`
+  `body` input. The JSON body of any other method holds only the `body`
+  inputs.
+- **`object` and `list`.** _(planned for M19)_ An `object` input has nested `fields`. A `list`
   input's items are objects with `fields`. Nesting goes four levels deep at
   most. The step maps them as in
   [Step shape](process-execution.md#step-shape).
-- **`source`.** An output field may name a JSON Pointer into the response
-  body. Without it, the output is read from the top-level property of its
-  name. Outputs stay scalar, because they write subject fields.
+- **`source`.** _(built)_ An output field may name a JSON Pointer
+  ([RFC 6901](https://www.rfc-editor.org/rfc/rfc6901)) into the response body,
+  such as `/shipment/tracking/number`. Without it, the output is read from the
+  top-level property of its name. Outputs stay scalar, because they write
+  subject fields.
+  - A token reads an object property by its exact name, and an array element by
+    its index, such as `/items/0/sku`. Write `~0` for `~` and `~1` for `/` in a
+    token.
+  - A `source` must start with `/`, and every `~` must be followed by `0` or
+    `1`, otherwise it is `AXC0311`. The empty pointer is refused, because it
+    names the whole body, which is never a scalar.
+  - When the `source` names nothing in a `2xx` body, a required output leaves
+    the call `unknown`, as a missing top-level output does. An optional output
+    writes nothing.
+  - A lookup's outputs need the same `source` as the operation it serves.
 - **Later.** Writing a list from the response into a child collection, and
   bodies that are not JSON.
 

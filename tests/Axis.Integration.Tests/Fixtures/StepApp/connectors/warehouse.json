@@ -1,0 +1,33 @@
+{
+  "id": "a9d71dc9-72ee-4a78-95f4-57f351f19234",
+  "kind": "connector",
+  "name": "Warehouse",
+  "formatVersion": 1,
+  "baseUrl": { "binding": "PurchasingUrl" },
+  "auth": { "type": "bearer", "token": { "binding": "PurchasingToken" } },
+  "idempotency": "Idempotency-Key",
+  "operations": [
+    {
+      "name": "findShipment",
+      "method": "GET",
+      "path": "/shipments/{shipment}",
+      "input": [
+        { "name": "shipment", "type": "text", "required": true, "in": "path" },
+        { "name": "state", "type": "text", "in": "query" },
+        { "name": "Channel", "type": "text", "in": "header" }
+      ],
+      "output": [{ "name": "orderNumber", "type": "text" }]
+    },
+    {
+      "name": "shipOrder",
+      "method": "POST",
+      "path": "/warehouses/{warehouse}/orders",
+      "input": [
+        { "name": "warehouse", "type": "text", "required": true, "in": "path" },
+        { "name": "reference", "type": "text", "required": true },
+        { "name": "amount", "type": "decimal", "required": true }
+      ],
+      "output": [{ "name": "orderNumber", "type": "text" }]
+    }
+  ]
+}

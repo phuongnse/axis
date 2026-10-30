@@ -135,6 +135,7 @@ names its address. The TLS rule of each is under [TLS](#tls).
 | server | Each tenant's identity provider: discovery, signing keys and the token endpoint, with DPoP and pushed authorization requests under `fapi2` | The tenant's OIDC `Authority` in the tenant directory | [Identity provider](#tls) |
 | server, worker | The telemetry collector | `OTEL_EXPORTER_OTLP_*`, see [telemetry export](host-settings.md#telemetry-export) | [Telemetry export](#tls) |
 | worker | A connector's service | The `url` binding that the connector names as its `baseUrl`, see [deployment bindings](integration-resources.md#deployment-bindings) | [URL bindings](#tls) |
+| worker | A connector's OAuth2 token endpoint | The `url` binding that an `oauth2` auth names as its `tokenUrl`, see [OAuth2 auth](integration-resources.md#oauth2-auth) | [URL bindings](#tls) |
 | worker | A package operation's service | A `url` binding that the operation declares in its `capabilities` | [URL bindings](#tls) |
 | worker | The mail server | `Email:Smtp:Host`, or the tenant's email settings, see [notifications](notifications.md) | [Mail](#tls) |
 
@@ -159,8 +160,8 @@ HTTP address: the identity provider's admin API, at `IdentityProvider:Url`, over
 - **Extension packages are trusted code.** A package runs in the worker's
   process, so installing one means trusting its code. The `url` binding limits
   the client that Axis hands to it, not the package's own code.
-- **Planned.** An OAuth2 `tokenUrl` and an outbound webhook _(planned for M19)_
-  will name a `url` binding too, and join this table.
+- **Planned.** An outbound webhook _(planned for M19)_ will name a `url`
+  binding too, and join this table.
 
 ## On premises
 

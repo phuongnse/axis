@@ -20,7 +20,7 @@ public sealed class DocumentationTests
     [Fact]
     public void Diagnostic_code_table_matches_DiagnosticCodes()
     {
-        var tables = new List<List<string>>();
+        var tables = new List<(List<string> Built, List<string> Planned)>();
         foreach (var lines in DocsFiles().Select(File.ReadAllLines))
         {
             for (var i = 0; i < lines.Length; i++)
@@ -30,29 +30,34 @@ public sealed class DocumentationTests
                     continue;
                 }
 
-                var codes = new List<string>();
+                var built = new List<string>();
+                var planned = new List<string>();
                 for (var j = i + 1; j < lines.Length && lines[j].StartsWith('|'); j++)
                 {
                     var match = Regex.Match(lines[j], @"^\|\s*`(AXC\d{4})`\s*\|");
                     if (match.Success)
                     {
-                        codes.Add(match.Groups[1].Value);
+                        // A row marked _(planned for Mx)_ is not built yet, so it is listed apart from the built codes.
+                        var isPlanned = Regex.IsMatch(lines[j], @"^\|[^|]*\|\s*_\(planned for M\d+\)_");
+                        (isPlanned ? planned : built).Add(match.Groups[1].Value);
                     }
                 }
 
-                tables.Add(codes);
+                tables.Add((built, planned));
             }
         }
 
         Assert.True(tables.Count == 1, $"Expected exactly one table with header '| Code |' under docs/, found {tables.Count}.");
-        var documented = tables[0];
+        var (builtCodes, plannedCodes) = tables[0];
+        var documented = builtCodes.Concat(plannedCodes).ToList();
         // Configuration and expression codes share one number range and one table.
         var declared = Constants(typeof(DiagnosticCodes)).Concat(Constants(typeof(ExpressionDiagnosticCodes))).ToList();
         var duplicates = declared.GroupBy(code => code).Where(group => group.Count() > 1).Select(group => group.Key).ToList();
 
         Assert.True(duplicates.Count == 0, $"Declared more than once: {string.Join(", ", duplicates)}.");
         Assert.True(!declared.Except(documented).Any(), $"Missing from the docs table: {string.Join(", ", declared.Except(documented))}.");
-        Assert.True(!documented.Except(declared).Any(), $"Not in DiagnosticCodes or ExpressionDiagnosticCodes: {string.Join(", ", documented.Except(declared))}.");
+        Assert.True(!plannedCodes.Intersect(declared).Any(), $"Marked planned in the docs but already declared: {string.Join(", ", plannedCodes.Intersect(declared))}.");
+        Assert.True(!builtCodes.Except(declared).Any(), $"Not in DiagnosticCodes or ExpressionDiagnosticCodes: {string.Join(", ", builtCodes.Except(declared))}. Mark the row _(planned for Mx)_ or declare the code.");
         Assert.Equal(documented.Count, documented.Distinct().Count());
     }
 

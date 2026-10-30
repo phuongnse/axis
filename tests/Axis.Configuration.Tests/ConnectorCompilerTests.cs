@@ -96,6 +96,111 @@ public sealed class ConnectorCompilerTests
     }
 
     [Fact]
+    public void An_oauth2_auth_names_its_token_url_client_id_and_client_secret_bindings_with_its_scope_and_audience()
+    {
+        using var folder = Folder().With("connectors/purchasing-system.json", Connector("""
+            "auth": {
+              "type": "oauth2",
+              "tokenUrl": { "binding": "PurchasingSystemTokenUrl" },
+              "clientId": { "binding": "PurchasingSystemClientId" },
+              "clientSecret": { "binding": "PurchasingSystemClientSecret" },
+              "scope": "orders.write",
+              "audience": "https://purchasing.example.test"
+            },
+            "operations": [{ "name": "ping", "method": "GET", "path": "/ping" }]
+            """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        var auth = Assert.IsType<ConnectorAuthModel>(Assert.Single(result.Model!.Connectors).Auth);
+        Assert.Equal(("oauth2", null, "PurchasingSystemClientSecret", "/auth/clientSecret/binding"), (auth.Type, auth.HeaderName, auth.Binding, auth.BindingPath));
+        Assert.Equal(
+            new ConnectorOAuth2Model("PurchasingSystemTokenUrl", "PurchasingSystemClientId", "orders.write", "https://purchasing.example.test"),
+            auth.OAuth2);
+    }
+
+    [Fact]
+    public void An_oauth2_auth_without_scope_and_audience_asks_for_neither()
+    {
+        using var folder = Folder().With("connectors/purchasing-system.json", Connector("""
+            "auth": {
+              "type": "oauth2",
+              "tokenUrl": { "binding": "PurchasingSystemTokenUrl" },
+              "clientId": { "binding": "PurchasingSystemClientId" },
+              "clientSecret": { "binding": "PurchasingSystemClientSecret" }
+            },
+            "operations": [{ "name": "ping", "method": "GET", "path": "/ping" }]
+            """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.Equal(
+            new ConnectorOAuth2Model("PurchasingSystemTokenUrl", "PurchasingSystemClientId", null, null),
+            Assert.Single(result.Model!.Connectors).Auth!.OAuth2);
+    }
+
+    [Theory]
+    [InlineData("tokenUrl", "PURCHASINGSYSTEMKEY", "/auth/tokenUrl/binding")]
+    [InlineData("clientId", "PurchasingSystemUrl", "/auth/clientId/binding")]
+    [InlineData("clientSecret", "PurchasingSystemUrl", "/auth/clientSecret/binding")]
+    public void An_oauth2_binding_used_elsewhere_in_the_application_as_another_kind_is_reported_at_its_path(string property, string name, string path)
+    {
+        // The connector's base URL is a url binding, and the bearer connector's token and the header connector's value are secret bindings.
+        var bindings = new Dictionary<string, string>
+        {
+            ["tokenUrl"] = "PurchasingSystemTokenUrl",
+            ["clientId"] = "PurchasingSystemClientId",
+            ["clientSecret"] = "PurchasingSystemClientSecret",
+            [property] = name,
+        };
+        using var folder = Folder()
+            .With("connectors/purchasing-system.json", Connector($$"""
+                "auth": {
+                  "type": "oauth2",
+                  "tokenUrl": { "binding": "{{bindings["tokenUrl"]}}" },
+                  "clientId": { "binding": "{{bindings["clientId"]}}" },
+                  "clientSecret": { "binding": "{{bindings["clientSecret"]}}" }
+                },
+                "operations": [{ "name": "ping", "method": "GET", "path": "/ping" }]
+                """))
+            .With("connectors/other-system.json", """
+                { "id": "9c5a2e4d-6b1f-4f0a-8d33-2f6b7c1e5a90", "kind": "connector", "name": "OtherSystem", "formatVersion": 1,
+                  "baseUrl": { "binding": "OtherSystemUrl" },
+                  "auth": { "type": "bearer", "token": { "binding": "PurchasingSystemKey" } },
+                  "operations": [{ "name": "ping", "method": "GET", "path": "/ping" }] }
+                """);
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.ConnectorBindingKind, "connectors/purchasing-system.json", path, Guid.Parse(ConnectorId)),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.ResourceId));
+        Assert.Contains($"The binding '{name}'", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void An_oauth2_binding_shared_with_another_use_of_the_same_kind_is_allowed()
+    {
+        using var folder = Folder().With("connectors/purchasing-system.json", Connector("""
+            "auth": {
+              "type": "oauth2",
+              "tokenUrl": { "binding": "PurchasingSystemUrl" },
+              "clientId": { "binding": "PurchasingSystemClient" },
+              "clientSecret": { "binding": "PurchasingSystemClient" }
+            },
+            "operations": [{ "name": "ping", "method": "GET", "path": "/ping" }]
+            """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+    }
+
+    [Fact]
     public void Connector_mistakes_are_each_a_diagnostic_at_their_path_in_one_pass()
     {
         using var folder = Folder().With("connectors/purchasing-system.json", Connector($$"""
@@ -131,7 +236,7 @@ public sealed class ConnectorCompilerTests
             "The lookup 'createPurchaseOrder' is a POST operation. A lookup is a GET.",
             result.Diagnostics[2].Message);
         Assert.Equal(
-            "The path '/orders/{orderId}' has the placeholder '{orderId}'. '{idempotencyKey}' is the only placeholder, and inputs are sent in the JSON body.",
+            "The path '/orders/{orderId}' has the placeholder '{orderId}', which names no path input. Add an input 'orderId' with 'in': 'path', or use '{idempotencyKey}'.",
             result.Diagnostics[4].Message);
         Assert.Null(result.Model);
     }
@@ -185,6 +290,143 @@ public sealed class ConnectorCompilerTests
 
         var diagnostic = Assert.Single(result.Diagnostics);
         Assert.Equal((DiagnosticCodes.InvalidOperationPath, "/operations/0/path"), (diagnostic.Code, diagnostic.Path));
+    }
+
+    [Fact]
+    public void An_operation_using_all_four_input_locations_compiles_with_each_location_in_the_model()
+    {
+        using var folder = Folder().With("connectors/purchasing-system.json", Connector("""
+            "operations": [
+              {
+                "name": "update", "method": "PUT", "path": "/orders/{Order}/lines/{line}",
+                "input": [
+                  { "name": "order", "type": "text", "required": true, "in": "path" },
+                  { "name": "line", "type": "integer", "required": true, "in": "path" },
+                  { "name": "dryRun", "type": "boolean", "in": "query" },
+                  { "name": "tenant", "type": "text", "in": "header" },
+                  { "name": "quantity", "type": "integer", "in": "body" },
+                  { "name": "note", "type": "text" }
+                ]
+              }
+            ]
+            """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        var operation = Assert.Single(Assert.Single(result.Model!.Connectors).Operations);
+        Assert.Equal(
+            [
+                new ConnectorFieldModel("order", FieldType.Text, true, "path"),
+                new ConnectorFieldModel("line", FieldType.Integer, true, "path"),
+                new ConnectorFieldModel("dryRun", FieldType.Boolean, false, "query"),
+                new ConnectorFieldModel("tenant", FieldType.Text, false, "header"),
+                new ConnectorFieldModel("quantity", FieldType.Integer, false, "body"),
+                new ConnectorFieldModel("note", FieldType.Text, false, "body"),
+            ],
+            operation.Input);
+    }
+
+    [Fact]
+    public void A_get_with_path_query_and_header_inputs_compiles()
+    {
+        using var folder = Folder().With("connectors/purchasing-system.json", Connector("""
+            "operations": [
+              {
+                "name": "find", "method": "GET", "path": "/orders/{order}",
+                "input": [
+                  { "name": "order", "type": "text", "required": true, "in": "path" },
+                  { "name": "state", "type": "text", "in": "query" },
+                  { "name": "channel", "type": "text", "in": "header" }
+                ]
+              }
+            ]
+            """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+    }
+
+    [Fact]
+    public void A_placeholder_that_names_no_path_input_is_an_invalid_path()
+    {
+        using var folder = Folder().With("connectors/purchasing-system.json", Connector("""
+            "operations": [
+              { "name": "find", "method": "GET", "path": "/orders/{orderId}",
+                "input": [{ "name": "orderId", "type": "text", "required": true, "in": "query" }] }
+            ]
+            """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.InvalidOperationPath, "/operations/0/path"), (diagnostic.Code, diagnostic.Path));
+        Assert.Contains("'{orderId}'", diagnostic.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("/orders", """{ "name": "order", "type": "text", "required": true, "in": "path" }""", "has no placeholder")]
+    [InlineData("/orders/{order}", """{ "name": "order", "type": "text", "in": "path" }""", "is not required")]
+    [InlineData("/orders/{order}", """{ "name": "order", "type": "text", "required": false, "in": "path" }""", "is not required")]
+    [InlineData("/orders/{idempotencyKey}", """{ "name": "idempotencyKey", "type": "text", "required": true, "in": "path" }""", "named like the placeholder")]
+    public void A_path_input_that_does_not_fit_the_path_is_a_misplaced_input(string path, string input, string reason)
+    {
+        using var folder = Folder().With("connectors/purchasing-system.json", Connector($$"""
+            "operations": [
+              { "name": "find", "method": "GET", "path": "{{path}}", "input": [{ "name": "first", "type": "text", "in": "query" }, {{input}}] }
+            ]
+            """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics, diagnostic => diagnostic.Code == DiagnosticCodes.MisplacedConnectorInput);
+        Assert.Equal("/operations/0/input/1", diagnostic.Path);
+        Assert.Contains(reason, diagnostic.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("GET")]
+    [InlineData("DELETE")]
+    public void A_body_input_on_a_get_is_a_misplaced_input_and_on_another_method_it_is_not(string method)
+    {
+        using var folder = Folder().With("connectors/purchasing-system.json", Connector($$"""
+            "operations": [
+              { "name": "find", "method": "{{method}}", "path": "/orders",
+                "input": [{ "name": "state", "type": "text", "in": "query" }, { "name": "number", "type": "text" }, { "name": "note", "type": "text", "in": "body" }] }
+            ]
+            """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        if (method == "GET")
+        {
+            Assert.Equal(
+                [(DiagnosticCodes.MisplacedConnectorInput, "/operations/0/input/1"), (DiagnosticCodes.MisplacedConnectorInput, "/operations/0/input/2")],
+                result.Diagnostics.Select(diagnostic => (diagnostic.Code, diagnostic.Path)).ToArray());
+        }
+        else
+        {
+            Assert.Empty(result.Diagnostics);
+        }
+    }
+
+    [Fact]
+    public void A_lookup_that_has_inputs_is_invalid()
+    {
+        using var folder = Folder().With("connectors/purchasing-system.json", Connector($$"""
+            "operations": [
+              { "name": "create", "method": "POST", "path": "/orders", "output": {{Output}}, "lookup": "find" },
+              { "name": "find", "method": "GET", "path": "/orders/{idempotencyKey}", "output": {{Output}},
+                "input": [{ "name": "state", "type": "text", "in": "query" }] }
+            ]
+            """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.InvalidOperationLookup, "/operations/0/lookup"), (diagnostic.Code, diagnostic.Path));
+        Assert.Contains("has inputs", diagnostic.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -255,9 +497,136 @@ public sealed class ConnectorCompilerTests
         Assert.Empty(result.Diagnostics);
     }
 
+    [Fact]
+    public void An_output_source_that_is_not_a_json_pointer_is_reported_at_its_path()
+    {
+        using var folder = Folder().With("connectors/purchasing-system.json", Connector("""
+            "operations": [
+              { "name": "ship", "method": "POST", "path": "/shipments",
+                "output": [
+                  { "name": "plain", "type": "text" },
+                  { "name": "number", "type": "text", "source": "shipment/number" },
+                  { "name": "bad", "type": "text", "source": "/a~2b" },
+                  { "name": "empty", "type": "text", "source": "" },
+                  { "name": "trailing", "type": "text", "source": "/a~" }
+                ] }
+            ]
+            """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Equal(
+            [
+                (DiagnosticCodes.InvalidOutputSource, "/operations/0/output/1/source"),
+                (DiagnosticCodes.InvalidOutputSource, "/operations/0/output/2/source"),
+                (DiagnosticCodes.InvalidOutputSource, "/operations/0/output/3/source"),
+                (DiagnosticCodes.InvalidOutputSource, "/operations/0/output/4/source"),
+            ],
+            result.Diagnostics.Select(diagnostic => (diagnostic.Code, diagnostic.Path)));
+        Assert.Contains("does not start with '/'", result.Diagnostics[0].Message, StringComparison.Ordinal);
+        Assert.Contains("'~2'", result.Diagnostics[1].Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void An_output_source_with_valid_escapes_or_an_array_index_is_valid()
+    {
+        using var folder = Folder().With("connectors/purchasing-system.json", Connector("""
+            "operations": [
+              { "name": "ship", "method": "POST", "path": "/shipments",
+                "output": [
+                  { "name": "escaped", "type": "text", "source": "/a~0b~1c" },
+                  { "name": "item", "type": "text", "source": "/items/0/sku" }
+                ] }
+            ]
+            """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+    }
+
+    [Fact]
+    public void A_compiled_output_keeps_its_source_and_a_plain_one_has_none()
+    {
+        using var folder = Folder().With("connectors/purchasing-system.json", Connector("""
+            "operations": [
+              { "name": "ship", "method": "POST", "path": "/shipments",
+                "output": [
+                  { "name": "orderNumber", "type": "text", "required": true },
+                  { "name": "trackingNumber", "type": "text", "source": "/shipment/tracking/number" }
+                ] }
+            ]
+            """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.Equal(
+            [
+                new ConnectorFieldModel("orderNumber", FieldType.Text, true),
+                new ConnectorFieldModel("trackingNumber", FieldType.Text, false, Source: "/shipment/tracking/number"),
+            ],
+            Assert.Single(Assert.Single(result.Model!.Connectors).Operations).Output);
+        Assert.Null(result.Model.Connectors[0].Operations[0].Output[0].Source);
+    }
+
+    [Fact]
+    public void A_lookup_whose_output_source_differs_from_its_operations_is_invalid()
+    {
+        using var folder = Folder().With("connectors/purchasing-system.json", Connector("""
+            "operations": [
+              { "name": "create", "method": "POST", "path": "/orders", "lookup": "find",
+                "output": [{ "name": "tracking", "type": "text", "source": "/shipment/tracking/number" }] },
+              { "name": "find", "method": "GET", "path": "/orders/{idempotencyKey}",
+                "output": [{ "name": "tracking", "type": "text", "source": "/tracking" }] }
+            ]
+            """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.InvalidOperationLookup, "/operations/0/lookup"), (diagnostic.Code, diagnostic.Path));
+        Assert.Contains("has other outputs", diagnostic.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_lookup_whose_output_lacks_the_source_of_its_operation_is_invalid()
+    {
+        using var folder = Folder().With("connectors/purchasing-system.json", Connector("""
+            "operations": [
+              { "name": "create", "method": "POST", "path": "/orders", "lookup": "find",
+                "output": [{ "name": "tracking", "type": "text", "source": "/tracking" }] },
+              { "name": "find", "method": "GET", "path": "/orders/{idempotencyKey}", "output": [{ "name": "tracking", "type": "text" }] }
+            ]
+            """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Equal(DiagnosticCodes.InvalidOperationLookup, Assert.Single(result.Diagnostics).Code);
+    }
+
+    [Fact]
+    public void A_lookup_whose_output_source_matches_its_operations_is_valid()
+    {
+        using var folder = Folder().With("connectors/purchasing-system.json", Connector("""
+            "operations": [
+              { "name": "create", "method": "POST", "path": "/orders", "lookup": "find",
+                "output": [{ "name": "tracking", "type": "text", "source": "/shipment/tracking/number" }] },
+              { "name": "find", "method": "GET", "path": "/orders/{idempotencyKey}",
+                "output": [{ "name": "tracking", "type": "text", "source": "/shipment/tracking/number" }] }
+            ]
+            """));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+    }
+
     [Theory]
-    [InlineData("""{ "name": "find", "method": "GET", "path": "/orders", "input": [{ "name": "number", "type": "text" }] }""")]
+    [InlineData("""{ "name": "find", "method": "GET", "path": "/orders", "input": [{ "name": "number", "type": "text", "in": "cookie" }] }""")]
+    [InlineData("""{ "name": "find", "method": "GET", "path": "/orders", "output": [{ "name": "number", "type": "text", "in": "query" }] }""")]
     [InlineData("""{ "name": "find", "method": "HEAD", "path": "/orders" }""")]
+    [InlineData("""{ "name": "ship", "method": "POST", "path": "/orders", "input": [{ "name": "number", "type": "text", "source": "/number" }] }""")]
     [InlineData("""{ "name": "find", "method": "GET", "path": "orders" }""")]
     [InlineData("""{ "name": "find", "method": "GET", "path": "/orders", "output": [{ "name": "number", "type": "enum" }] }""")]
     [InlineData("""{ "name": "find", "method": "GET", "path": "/orders", "retries": 3 }""")]
@@ -282,6 +651,15 @@ public sealed class ConnectorCompilerTests
     [InlineData("""{ "type": "none", "token": { "binding": "Token" } }""")]
     [InlineData("""{ "type": "basic" }""")]
     [InlineData("""{ "type": "bearer", "token": "secret-value" }""")]
+    [InlineData("""{ "type": "bearer", "token": { "binding": "Token" }, "tokenUrl": { "binding": "Url" } }""")]
+    [InlineData("""{ "type": "header", "name": "X-Key", "value": { "binding": "Key" }, "scope": "orders.write" }""")]
+    [InlineData("""{ "type": "none", "audience": "https://purchasing.example.test" }""")]
+    [InlineData("""{ "type": "oauth2", "tokenUrl": { "binding": "Url" }, "clientId": { "binding": "Id" } }""")]
+    [InlineData("""{ "type": "oauth2", "tokenUrl": { "binding": "Url" }, "clientSecret": { "binding": "Secret" } }""")]
+    [InlineData("""{ "type": "oauth2", "clientId": { "binding": "Id" }, "clientSecret": { "binding": "Secret" } }""")]
+    [InlineData("""{ "type": "oauth2", "tokenUrl": { "binding": "Url" }, "clientId": { "binding": "Id" }, "clientSecret": { "binding": "Secret" }, "token": { "binding": "Token" } }""")]
+    [InlineData("""{ "type": "oauth2", "tokenUrl": { "binding": "Url" }, "clientId": { "binding": "Id" }, "clientSecret": { "binding": "Secret" }, "scope": "" }""")]
+    [InlineData("""{ "type": "oauth2", "tokenUrl": "https://auth.example.test", "clientId": { "binding": "Id" }, "clientSecret": { "binding": "Secret" } }""")]
     public void An_auth_in_another_shape_is_a_schema_violation(string auth)
     {
         using var folder = Folder().With("connectors/purchasing-system.json", Connector($$"""

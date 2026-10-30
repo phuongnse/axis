@@ -51,23 +51,67 @@
       "additionalProperties": false,
       "required": ["type"],
       "properties": {
-        "type": { "enum": ["none", "bearer", "header"] },
+        "type": { "enum": ["none", "bearer", "header", "oauth2"] },
         "token": { "$ref": "#/$defs/binding" },
         "name": { "$ref": "#/$defs/header" },
-        "value": { "$ref": "#/$defs/binding" }
+        "value": { "$ref": "#/$defs/binding" },
+        "tokenUrl": { "$ref": "#/$defs/binding" },
+        "clientId": { "$ref": "#/$defs/binding" },
+        "clientSecret": { "$ref": "#/$defs/binding" },
+        "scope": { "type": "string", "minLength": 1, "maxLength": 2000 },
+        "audience": { "type": "string", "minLength": 1, "maxLength": 2000 }
       },
       "allOf": [
         {
           "if": { "required": ["type"], "properties": { "type": { "const": "none" } } },
-          "then": { "properties": { "token": false, "name": false, "value": false } }
+          "then": {
+            "properties": {
+              "token": false,
+              "name": false,
+              "value": false,
+              "tokenUrl": false,
+              "clientId": false,
+              "clientSecret": false,
+              "scope": false,
+              "audience": false
+            }
+          }
         },
         {
           "if": { "required": ["type"], "properties": { "type": { "const": "bearer" } } },
-          "then": { "required": ["token"], "properties": { "name": false, "value": false } }
+          "then": {
+            "required": ["token"],
+            "properties": {
+              "name": false,
+              "value": false,
+              "tokenUrl": false,
+              "clientId": false,
+              "clientSecret": false,
+              "scope": false,
+              "audience": false
+            }
+          }
         },
         {
           "if": { "required": ["type"], "properties": { "type": { "const": "header" } } },
-          "then": { "required": ["name", "value"], "properties": { "token": false } }
+          "then": {
+            "required": ["name", "value"],
+            "properties": {
+              "token": false,
+              "tokenUrl": false,
+              "clientId": false,
+              "clientSecret": false,
+              "scope": false,
+              "audience": false
+            }
+          }
+        },
+        {
+          "if": { "required": ["type"], "properties": { "type": { "const": "oauth2" } } },
+          "then": {
+            "required": ["tokenUrl", "clientId", "clientSecret"],
+            "properties": { "token": false, "name": false, "value": false }
+          }
         }
       ]
     },
@@ -81,6 +125,28 @@
         "required": { "type": "boolean" }
       }
     },
+    "inputField": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "type"],
+      "properties": {
+        "name": { "$ref": "#/$defs/name" },
+        "type": { "$ref": "#/$defs/type" },
+        "required": { "type": "boolean" },
+        "in": { "enum": ["body", "path", "query", "header"] }
+      }
+    },
+    "outputField": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "type"],
+      "properties": {
+        "name": { "$ref": "#/$defs/name" },
+        "type": { "$ref": "#/$defs/type" },
+        "required": { "type": "boolean" },
+        "source": { "type": "string", "maxLength": 2000 }
+      }
+    },
     "operation": {
       "type": "object",
       "additionalProperties": false,
@@ -89,12 +155,10 @@
         "name": { "$ref": "#/$defs/name" },
         "method": { "enum": ["GET", "POST", "PUT", "PATCH", "DELETE"] },
         "path": { "type": "string", "pattern": "^/", "maxLength": 2000 },
-        "input": { "type": "array", "items": { "$ref": "#/$defs/field" } },
-        "output": { "type": "array", "items": { "$ref": "#/$defs/field" } },
+        "input": { "type": "array", "items": { "$ref": "#/$defs/inputField" } },
+        "output": { "type": "array", "items": { "$ref": "#/$defs/outputField" } },
         "lookup": { "$ref": "#/$defs/name", "x-axis-reference": { "part": "operation", "of": "/name" } }
-      },
-      "if": { "required": ["method"], "properties": { "method": { "const": "GET" } } },
-      "then": { "properties": { "input": { "maxItems": 0 } } }
+      }
     }
   }
 }

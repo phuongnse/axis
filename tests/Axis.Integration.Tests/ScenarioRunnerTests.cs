@@ -121,6 +121,20 @@ public sealed class ScenarioRunnerTests
     }
 
     [Fact]
+    public void An_oauth2_connector_gets_a_url_binding_for_its_token_url_and_secret_bindings_for_its_client_id_and_secret()
+    {
+        using var folder = Application().With("connectors/purchasing-system.json", OAuthConnector);
+
+        var bindings = ScenarioBindings.ForActivation(ApplicationCompiler.Compile(folder.Path).Model!).Bindings;
+
+        Assert.Equal(4, bindings.Count);
+        Assert.Equal(ActivationBinding.UrlKind, bindings["PurchasingSystemUrl"].Kind);
+        Assert.Equal(ActivationBinding.UrlKind, bindings["PurchasingSystemTokenUrl"].Kind);
+        Assert.Equal(ActivationBinding.SecretKind, bindings["PurchasingSystemClientId"].Kind);
+        Assert.Equal(ActivationBinding.SecretKind, bindings["PurchasingSystemClientSecret"].Kind);
+    }
+
+    [Fact]
     public async Task An_expectation_that_differs_fails_with_the_step_the_field_and_both_values_and_drops_the_database()
     {
         using var folder = Application(Scenario("Mismatch", Clerk, """
@@ -868,6 +882,39 @@ public sealed class ScenarioRunnerTests
         { "type": "completeTask", "record": "request", "step": "managerApproval", "outcome": "approve", "as": "manager" },
         """;
 
+    /// <summary>The purchasing system connector of the call application with <c>oauth2</c> auth, whose token URL and client are deployment bindings.</summary>
+    private const string OAuthConnector = """
+        {
+          "id": "409bc638-0aec-4084-ada2-e3baed50057d", "kind": "connector", "name": "PurchasingSystem", "formatVersion": 1,
+          "baseUrl": { "binding": "PurchasingSystemUrl" },
+          "auth": {
+            "type": "oauth2",
+            "tokenUrl": { "binding": "PurchasingSystemTokenUrl" },
+            "clientId": { "binding": "PurchasingSystemClientId" },
+            "clientSecret": { "binding": "PurchasingSystemClientSecret" },
+            "scope": "orders.write"
+          },
+          "timeout": "PT30S",
+          "idempotency": "Idempotency-Key",
+          "operations": [
+            {
+              "name": "createPurchaseOrder", "method": "POST", "path": "/purchase-orders",
+              "input": [
+                { "name": "requestNumber", "type": "text", "required": true },
+                { "name": "supplierCode", "type": "text" },
+                { "name": "amount", "type": "decimal", "required": true }
+              ],
+              "output": [{ "name": "orderNumber", "type": "text", "required": true }],
+              "lookup": "findPurchaseOrder"
+            },
+            {
+              "name": "findPurchaseOrder", "method": "GET", "path": "/purchase-orders/by-key/{idempotencyKey}",
+              "input": [], "output": [{ "name": "orderNumber", "type": "text", "required": true }]
+            }
+          ]
+        }
+        """;
+
     private const string OrderStub = """{ "connector": { "name": "PurchasingSystem", "operation": "createPurchaseOrder" }, "output": { "orderNumber": "PO-1001" } }""";
 
     private const string ReferenceStub = """{ "operation": "payment-references/creditorReference", "output": { "creditorReference": "RF00STUB" } }""";
@@ -1063,6 +1110,20 @@ public sealed class ScenarioRunnerTests
             """, stubs: $"{OrderStub}, {ReferenceStub}"));
 
         var result = await RunAsync(folder, "ConnectorStub", packages: _packages.Value);
+
+        Assert.True(result.Passed, result.Failure);
+    }
+
+    [Fact]
+    public async Task A_connector_stub_answers_the_call_of_an_oauth2_connector_without_a_token_request()
+    {
+        using var folder = CallApplication(Scenario("OAuthStub", Purchasing, ApproveBelowThreshold + """
+            { "type": "expectInstance", "process": "PurchaseRequestApproval", "record": "request", "state": "completed" },
+            { "type": "expectRecord", "record": "request", "values": { "status": "approved", "purchaseOrderNumber": "PO-1001" } }
+            """, stubs: $"{OrderStub}, {ReferenceStub}"))
+            .With("connectors/purchasing-system.json", OAuthConnector);
+
+        var result = await RunAsync(folder, "OAuthStub", packages: _packages.Value);
 
         Assert.True(result.Passed, result.Failure);
     }

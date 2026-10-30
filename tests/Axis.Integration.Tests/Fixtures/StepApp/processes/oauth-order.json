@@ -1,0 +1,20 @@
+{
+  "id": "fe7fdf0c-1fad-40ea-8126-e12aa3c16226",
+  "kind": "process",
+  "name": "OAuthOrder",
+  "formatVersion": 1,
+  "entity": "Request",
+  "start": "createOrder",
+  "steps": [
+    {
+      "name": "createOrder",
+      "type": "operation",
+      "operation": "callConnector",
+      "connector": { "name": "OAuthPurchasing", "operation": "createOrder" },
+      "input": { "reference": "title", "amount": "amount", "note": "comment" },
+      "output": { "orderNumber": "comment" },
+      "next": "done"
+    },
+    { "name": "done", "type": "end" }
+  ]
+}

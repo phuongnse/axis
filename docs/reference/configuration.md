@@ -497,26 +497,24 @@ flowchart LR
      `lower`, is `AXC0053`.
      A name whose role, entity, data source, process or endpoint file was not
      loaded because of its own errors is not reported again.
-   - **Connectors.** A [connector](integration-resources.md#connector-resource)'s `timeout` that is not
-     a positive ISO 8601 duration of at most `PT2M`, in the form a task's
-     `dueIn` takes, is `AXC0099` at `/timeout`. A later operation whose name
-     an earlier operation of the connector already uses, ignoring letter case,
-     is `AXC0096` at `/operations/{i}/name`. So is a later input or output
-     field whose name an earlier field of the same list already uses, ignoring
-     letter case, at `/operations/{i}/input/{j}/name` or
-     `/operations/{i}/output/{j}/name`. A `path` with an unbalanced `{` or
-     `}`, or a placeholder other than `{idempotencyKey}`, matched exactly, is
-     `AXC0097` at `/operations/{i}/path`. A placeholder is refused even when it
-     matches an input name, because inputs go in the JSON body. A `lookup` is
-     `AXC0098` at `/operations/{i}/lookup` when it names no operation of the
-     connector, ignoring letter case, or names its own operation. It is also
-     `AXC0098` when the operation it names is not a `GET`, has no
-     `{idempotencyKey}` in its path, or has other outputs than the operation
-     it serves. Outputs are the same when they have the same names, ignoring
-     letter case and order, with the same type and `required`. The message
-     says which. A `GET` with `input` fields, and an `auth` without the
-     properties its `type` needs or with others, are `AXC0004`. Bindings are
-     checked at activation, not here.
+   - **Connectors.** A [connector](integration-resources.md#connector-resource)'s `timeout` that is
+     not a positive ISO 8601 duration of at most `PT2M`, in the form a task's `dueIn` takes, is
+     `AXC0099` at `/timeout`. A later operation whose name an earlier operation of the connector
+     already uses, ignoring letter case, is `AXC0096` at `/operations/{i}/name`. So is a later input
+     or output field whose name an earlier field of the same list already uses, ignoring letter case,
+     at `/operations/{i}/input/{j}/name` or `/operations/{i}/output/{j}/name`. A `path` with an
+     unbalanced `{` or `}`, or a placeholder that is not `{idempotencyKey}` and names no `path`
+     input, ignoring letter case, is `AXC0097` at `/operations/{i}/path`. A `path` input that is not
+     in the path, is not `required` or is named `idempotencyKey`, and a `body` input on a `GET`, are
+     `AXC0312` at `/operations/{i}/input/{j}`. A `lookup` is `AXC0098` at `/operations/{i}/lookup`
+     when it names no operation of the connector, ignoring letter case, or names its own operation.
+     It is also `AXC0098` when the operation it names is not a `GET`, has no `{idempotencyKey}` in
+     its path, has inputs, or has other outputs than the operation it serves. Outputs are the same
+     when they have the same names, ignoring letter case and order, with the same type, `required`
+     and `source`. A `source` that is no JSON Pointer is `AXC0311` at
+     `/operations/{i}/output/{j}/source`. A `source` on an input, an input whose `in` is not `body`,
+     `path`, `query` or `header`, and an `auth` without the properties its `type` needs or with
+     others, are `AXC0004`. Bindings are checked at activation, not here.
    - **Events.** An [event](integration-resources.md#event-resource)'s `entity` must name a loaded
      entity, ignoring letter case, otherwise it is `AXC0110` at `/entity`. It
      is not reported when the name is an entity file that was not loaded

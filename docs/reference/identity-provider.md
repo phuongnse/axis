@@ -96,7 +96,7 @@ so Studio edits it, with the identity provider editor of [Studio](studio.md), an
     `clientSecret` or `clientKey`, and a `saml` provider needs `metadata`.
   - A binding of the wrong kind is `AXC0285`. No resource declares the kind of a binding, so the compiler compares
     uses: a provider's binding name that the application also uses as another kind, ignoring letter case, fails. The
-    other uses are a connector's `baseUrl` (`url`) and `auth` (`secret`), the manifest's `fileStorage` (`storage`) and
+    other uses are a connector's `baseUrl` (`url`) and `auth` (`secret`, except the `tokenUrl` of an `oauth2` auth, which is `url`), the manifest's `fileStorage` (`storage`) and
     the bindings of other providers. A clash with a package operation's binding shows up at activation.
   - A role in `values` that the application does not declare is `AXC0287`, and a second `accounts` provider is
     `AXC0288`.
