@@ -78,7 +78,8 @@ so Studio edits it, with the identity provider editor of [Studio](studio.md), an
   - `saml`: a provider that the realm brokers to over SAML 2.0. `metadata` is a `url` binding, the address of the
     provider's metadata. The realm signs its requests with a key of its own and publishes its own metadata for the
     organization to register.
-- **`label`:** the text of the "Continue with" button, as a text key of the application. Activation writes it to the
+- **`label`:** the name of the provider on the "Continue with" button, such as "Example Company", as a text key of the
+  application. The sign-in page adds "Continue with" in the person's language. Activation writes it to the
   realm in every platform locale, see [keeping the realm in step](#keeping-the-realm-in-step).
 - **`claims`:** the claims that give the display name, the email and the locale, by default `name`, `email` and
   `locale`. The realm links a person to the provider by the provider's own subject, and the user id that Axis keeps is

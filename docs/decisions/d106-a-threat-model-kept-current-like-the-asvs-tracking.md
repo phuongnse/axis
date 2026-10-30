@@ -7,7 +7,7 @@ checks Axis against controls that every web application needs, and
 [D84](d84-asvs-level-2-and-a-server-side-session.md) set it. It does not ask what can go wrong
 in Axis itself: a tenant that reads another tenant's records, an author who can change every
 policy, an extension package that holds every tenant's secrets. Axis gets a threat model for
-that. It is built _(planned for M18)_, before the final ASVS sign-off.
+that. It is built.
 
 - **Scope:** three parts.
   - The product: the server, the worker, the SPA, tenants, Studio and authoring, extension

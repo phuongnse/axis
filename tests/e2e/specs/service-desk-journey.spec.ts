@@ -1045,6 +1045,9 @@ test.describe('the author builds the service desk with Studio only', () => {
       await writeLabel(page, `studio-field-/navigation/${index}/label`, key, en[key])
       await pick(page, `studio-field-/navigation/${index}/icon`, icon)
     }
+    // The Service desk allows only accounts, so the site names that provider.
+    await page.getByRole('button', { name: 'Add provider', exact: true }).click()
+    await pickOption(page.getByTestId('studio-field-/signIn/0').getByRole('combobox'), 'accounts')
     await save(page)
     await expectForm(page)
 

@@ -69,7 +69,7 @@ the agreed extension points (see [decisions](decisions.md)).
 
 - Formal security certification. The FAPI 2.0 profile and the ASVS work are in the
   Hardening milestone, M16. The conformance run and the ASVS sign-off are
-  _(planned for M18)_ (see the [roadmap](roadmap.md#milestones)).
+  _(planned for M28)_ (see the [roadmap](roadmap.md#milestones)).
 - Provisioning many tenants self-service, and Axis-hosted SaaS operations.
 - Custom UI widgets. They come after the visual designers (D8, D46).
 - Migrating live business data between installations.
@@ -107,11 +107,22 @@ configuration in `samples/apps/purchase-requests/`. It is not platform code.
 7. Users see their requests, their tasks, status and history. Authorized users
    can inspect each process run.
 
+### Sign-in
+
+The Purchasing site allows two sign-ins: accounts, and the organization's own
+identity provider. In development, the provider is the `company` realm, a second
+Keycloak realm that plays the organization's provider. A person in its
+`employees` group signs in through "Continue with Example Company" and gets the
+`employee` role.
+
 ### Scenarios the application must pass
 
 - The happy path with and without finance review, plus return and reject.
 - Denied access: users cannot see another department's requests or act on
   another user's task.
+- Sign-in per site: a Playwright journey signs Pat of the `company` realm in to
+  Purchasing, signs an account in to the Service desk with a password and a
+  code, and shows that the Service desk refuses the organization's provider.
 - A worker restarts while a request waits for approval.
 - Duplicate or concurrent submissions and decisions.
 - The purchasing system accepts the order but the response is lost.
@@ -248,6 +259,9 @@ the parts built in M12,
 - The requester cannot edit the resolution.
 - A requester may delete their own ticket while its status is `draft`. An
   agent and the lead may not delete.
+- The Service desk site allows only accounts. Its sign-in page has no
+  "Continue with" button, and the callback refuses a person who arrives through
+  the organization's provider.
 - Everything else is denied by default.
 
 ### Pages
@@ -329,7 +343,7 @@ its access rules and a maintenance entry, a warranty reminder process and its
 weekday trigger. It is active in development, Compose and E2E. The Studio
 journey builds the whole folder, compares it with the sample, runs its scenarios
 from Studio, publishes it and uses its site to register, import and export
-assets. Only the import and attachment scenarios are _(planned for M18)_.
+assets. Only the import and attachment scenarios are _(planned for M26)_.
 
 ### Data
 
@@ -383,10 +397,10 @@ SPA serves its bundle there. Texts are in `en` and `vi`.
 - Built: an asset is registered, an employee and an auditor cannot write, a
   negative cost is refused, an asset with a maintenance entry with a vendor, and
   software is recorded, and a user without a role is denied.
-- _(planned for M18)_ An import of valid assets, and an import whose dry run
+- _(planned for M26)_ An import of valid assets, and an import whose dry run
   reports a bad row and writes nothing.
-- _(planned for M18)_ An asset with an attachment.
-- _(planned for M18)_ Denied access for an employee to another holder's asset,
+- _(planned for M26)_ An asset with an attachment.
+- _(planned for M26)_ Denied access for an employee to another holder's asset,
   to its attachment's download and to an export, and for an auditor to an
   import.
 

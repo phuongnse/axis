@@ -8,7 +8,7 @@ test that measures them. It builds on the per-request budgets of the
 [typical application size](../domain/knowledge.md#typical-application-size)
 and the two server replicas of
 [D49](d49-several-server-replicas-behind-a-tls-proxy.md). The objectives and the
-load test are _(planned for M18)_. See [performance](../reference/performance.md) for the
+load test are built, except the weekly CI run _(planned for M28)_. See [performance](../reference/performance.md) for the
 detail. The owner agreed these points on 2026-10-25.
 
 - **Objectives:**

@@ -9,7 +9,7 @@
     "application.description": "Quản lý việc mua hàng của công ty, từ yêu cầu đến phê duyệt và đặt hàng.",
     "site.title": "Mua hàng",
     "site.description": "Gửi yêu cầu mua hàng và theo dõi đến khi được phê duyệt.",
-    "signIn.company": "Tiếp tục với Example Company",
+    "signIn.company": "Example Company",
     "nav.purchaseRequests": "Yêu cầu mua hàng",
     "nav.myTasks": "Nhiệm vụ của tôi",
     "nav.requestsByDepartment": "Theo phòng ban",
