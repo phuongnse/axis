@@ -21,6 +21,7 @@ import { PageLeaf } from '../platform/PageLeaf'
 import { placeholderApi, placeholderPageValues } from '../platform/placeholderApi'
 import type { PageWidgetMetadata, PlaceholderWidgetMetadata } from '../platform/site'
 import {
+  fetchStudioModulePageMetadata,
   fetchStudioPageMetadata,
   ServerUnreachableError,
   type StudioDiagnostic,
@@ -72,9 +73,13 @@ const CanvasLeaf = memo(PageLeaf)
  * On the frame of the selected widget, Alt+ArrowDown or Alt+ArrowUp asks `onMove` to move the widget to the next or
  * previous place. When `onMove` answers that it moved the widget, focus goes to the frame of the widget at its new
  * pointer once the canvas redraws from the answer to the moved draft. When that frame is not drawn, focus stays.
+ *
+ * With `module` set, the page is one of that module's, and the canvas reads its metadata with a GET from the module page
+ * route instead of posting the draft.
  */
 export function StudioPageCanvas({
   application,
+  module,
   resourceId,
   draft,
   selected,
@@ -82,6 +87,8 @@ export function StudioPageCanvas({
   onMove,
 }: {
   application: string
+  /** The id of the module that owns the page, when it is a module page. */
+  module?: string
   resourceId: string
   draft: Record<string, unknown>
   /** The pointer of the selected widget, or of the selected action of a widget. */
@@ -122,7 +129,11 @@ export function StudioPageCanvas({
   useEffect(() => {
     const controller = new AbortController()
     const timer = setTimeout(() => {
-      fetchStudioPageMetadata(application, resourceId, draft, controller.signal).then(
+      const request =
+        module === undefined
+          ? fetchStudioPageMetadata(application, resourceId, draft, controller.signal)
+          : fetchStudioModulePageMetadata(application, module, resourceId, controller.signal)
+      request.then(
         (result) => {
           if (!controller.signal.aborted) {
             setAnswered({ draft, answer: result })
@@ -145,7 +156,7 @@ export function StudioPageCanvas({
       clearTimeout(timer)
       controller.abort()
     }
-  }, [application, resourceId, draft, generation, lost])
+  }, [application, module, resourceId, draft, generation, lost])
 
   // A layout effect, because the widgets fetch in passive effects. A child's effect runs before its parent's, so a
   // passive effect here would let the widgets' first requests reach the server. Layout effects run before any of them.

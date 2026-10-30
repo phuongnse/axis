@@ -27,14 +27,67 @@ namespace Axis.Server.Studio;
 /// a <c>form</c> widget that names the form and each section, field and step carries <c>path</c>. The widget is null when the
 /// compile has any error. Its diagnostics are those whose resource is the form. A resource that is neither a page nor a form
 /// is 404.
+/// <c>GET /api/studio/apps/{application}/modules/{module}/resources/{id}/page-metadata</c> answers <c>{ page, diagnostics }</c>
+/// for a page of the module version the application pins, so Studio can draw it read-only. The <c>id</c> is the one written in
+/// the module's file, found as <see cref="StudioEndpoints"/> finds a module resource. The page has the shape above and each
+/// widget carries <c>path</c>. The page is null when the application's compile has any error. <c>diagnostics</c> are those of
+/// the page's file. The checks run as above: session (401), author role (403), then 404 for an unknown application, a module
+/// the application does not pin, an unknown resource and a resource that is not a page.
 /// </summary>
 internal static partial class StudioPageMetadataEndpoints
 {
     // The compile of the draft as sent, then at most this many compiles of it with the widgets that failed taken out.
     private const int MaxRounds = 3;
 
-    public static void MapStudioPageMetadataEndpoints(this IEndpointRouteBuilder endpoints) =>
+    public static void MapStudioPageMetadataEndpoints(this IEndpointRouteBuilder endpoints)
+    {
         endpoints.MapPost("/api/studio/apps/{application}/resources/{id}/page-metadata", PageMetadataAsync);
+        endpoints.MapGet("/api/studio/apps/{application}/modules/{module}/resources/{id}/page-metadata", ModulePageMetadataAsync);
+    }
+
+    private static async Task<IResult> ModulePageMetadataAsync(
+        string application,
+        string module,
+        string id,
+        HttpContext httpContext,
+        StudioOptions options,
+        PackageCatalog packages,
+        ModuleCatalog modules)
+    {
+        var (folder, refusal) = await StudioEndpoints.FindFolderAsync(application, httpContext, options);
+        if (folder is null)
+        {
+            return refusal!;
+        }
+
+        var compiled = ApplicationCompiler.Compile(folder, packages.Versions, modules.Modules);
+        var (found, notFound) = StudioEndpoints.FindModuleFile(compiled, modules, module, id);
+        if (found is null)
+        {
+            return notFound!;
+        }
+
+        if (found.Kind != "page")
+        {
+            return StudioEndpoints.NotFound("The resource is not a page.");
+        }
+
+        var file = $"modules/{module}/{found.Path}";
+        var diagnostics = compiled.Diagnostics
+            .Where(diagnostic => string.Equals(diagnostic.File, file, StringComparison.Ordinal))
+            .Select(StudioDiagnostics.Map)
+            .ToList();
+        if (HasErrors(compiled) || compiled.Model is not { } model
+            || ApplicationSites.FindPage(model, $"{module}/{found.Name}") is not { } metadata)
+        {
+            return Results.Ok(new StudioPageMetadataResponse(null, diagnostics));
+        }
+
+        var content = JsonNode.Parse(found.Text) as JsonObject;
+        return Results.Ok(new StudioPageMetadataResponse(
+            metadata with { Widgets = Merge(content?["widgets"] as JsonArray, "/widgets", metadata.Widgets, []) },
+            diagnostics));
+    }
 
     private static async Task<IResult> PageMetadataAsync(
         string application,

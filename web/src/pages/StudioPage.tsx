@@ -25,6 +25,7 @@ import { StudioNamesContext } from '../platform/studioNames'
 import { useText } from '../platform/texts'
 import { StudioEditor } from './StudioEditor'
 import { StudioModuleEntity } from './StudioModuleEntity'
+import { StudioModulePage } from './StudioModulePage'
 import { StudioModulePolicy } from './StudioModulePolicy'
 import { StudioModuleProcess } from './StudioModuleProcess'
 import { StudioNewApplication } from './StudioNewApplication'
@@ -38,11 +39,13 @@ const moduleGroupTitles = {
   entity: 'shell.studio.moduleEntities',
   process: 'shell.studio.moduleProcesses',
   policy: 'shell.studio.modulePolicies',
+  page: 'shell.studio.modulePages',
 } as const
 const moduleGroupTestIds = {
   entity: 'studio-group-module-entities',
   process: 'studio-group-module-processes',
   policy: 'studio-group-module-policies',
+  page: 'studio-group-module-pages',
 } as const
 
 /** The read-only view of a module resource, by its kind. */
@@ -54,6 +57,8 @@ function ModuleResourceView({ application, item }: { application: string; item: 
       return <StudioModuleProcess application={application} module={item.module} id={item.id} />
     case 'policy':
       return <StudioModulePolicy application={application} module={item.module} id={item.id} />
+    case 'page':
+      return <StudioModulePage application={application} module={item.module} id={item.id} />
   }
 }
 
@@ -96,10 +101,10 @@ type NamesState = { application: string; names: StudioNames | null }
  * has a Run button in its details, which runs only that scenario. Both are off while a request runs and while the
  * reconnect message shows. A failed scenario in the test results opens at its failing step, as a diagnostic does.
  * A process step that a diagnostic of the open resource names is marked on its graph.
- * Module entities, Module processes and Module policies groups under the kinds list those of the modules the application
+ * Module entities, Module processes, Module policies and Module pages groups under the kinds list those of the modules the application
  * uses, from the names, by their `<module>/<name>`. One opens read-only, with no editor, no Uses and no Used by lists: an
- * entity in the entity designer, a process as its graph alone and a policy as a table of its grants, each under a
- * read-only notice with the alert role. Its address is the same `&resource=<id>`, so a reload, a shared link and a Uses
+ * entity in the entity designer, a process as its graph alone, a policy as a table of its grants and a page on the page
+ * canvas with no palette, data panel, widget tree or moves, each under a read-only notice with the alert role. Its address is the same `&resource=<id>`, so a reload, a shared link and a Uses
  * entry open it too, when the id is not one of the folder's.
  */
 export function StudioPage() {

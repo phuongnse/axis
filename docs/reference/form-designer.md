@@ -15,7 +15,7 @@ Dn refers to [decisions.md](../decisions.md).
   - **Canvas.** It draws the unsaved draft with the site's form widget, in its
     sections and steps. Fields get placeholder values made from the field
     types, and a child collection gets placeholder rows. The canvas asks
-    [the draft page metadata route](authoring.md#draft-page-metadata) 300 ms
+    [the draft page metadata route](draft-page-metadata.md) 300 ms
     after the last edit. For a form it answers the metadata of a form widget,
     with a `path` on each section, field and step.
     _Built:_ the Design tab is there, and a form opens on it. The canvas opens

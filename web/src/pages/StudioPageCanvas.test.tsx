@@ -16,6 +16,7 @@ import { ThemeModeProvider } from '../platform/theme'
 import { TextProvider } from '../platform/TextProvider'
 import { chooseOption } from '../test/antd'
 import { StudioEditor } from './StudioEditor'
+import { StudioPageCanvas } from './StudioPageCanvas'
 
 // The drag library draws as it is, and the test calls the drop handler that the page designer gives it, because jsdom
 // has no layout to hit-test.
@@ -228,6 +229,42 @@ beforeAll(() => loadKindSchema('page'))
 afterEach(() => {
   vi.unstubAllGlobals()
   vi.restoreAllMocks()
+})
+
+describe('a module page', () => {
+  it('reads the metadata with a GET from the module route, posts nothing and draws the answer', async () => {
+    const draft = content([{ type: 'kpi' }])
+    const moduleRoute = `${folder}/modules/checklists/resources/${pageId}/page-metadata`
+    const fetchMock = vi.fn(async (input: string, init?: RequestInit) =>
+      input === moduleRoute && init?.method === undefined
+        ? respond(metadataOf(draft), [])
+        : new Response(null, { status: 404 }),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    render(
+      <MemoryRouter>
+        <ThemeModeProvider>
+          <TextProvider catalogs={[{ texts: platformEnglish, fallbackTexts: platformEnglish }]} development={false}>
+            <StudioNamesContext.Provider value={names}>
+              <StudioPageCanvas
+                application="Shop"
+                module="checklists"
+                resourceId={pageId}
+                draft={draft}
+                selected=""
+                onSelect={vi.fn()}
+              />
+            </StudioNamesContext.Provider>
+          </TextProvider>
+        </ThemeModeProvider>
+      </MemoryRouter>,
+    )
+
+    expect(await screen.findByTestId('kpi-tile', {}, slow)).toBeInTheDocument()
+    expect(fetchMock.mock.calls.map(([input]) => String(input))).toEqual([moduleRoute])
+    expect(fetchMock.mock.calls.some(([, init]) => init?.method === 'POST')).toBe(false)
+  })
 })
 
 describe('the Design tab of a page', () => {
