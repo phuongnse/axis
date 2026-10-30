@@ -176,19 +176,16 @@ function ToolMark({ icon }: { icon: string }) {
   )
 }
 
-/** Proposed: a titled part of the home page, Tools or Applications, with its tiles in the three-column grid. */
-function HomeSection({ title, count, children }: { title: string; count?: number; children: ReactNode }) {
-  const { colour, spacing } = useDesignTokens()
+/** Proposed: a titled part of the home page, Applications or Tools, with no count beside its title. */
+function HomeSection({ title, children }: { title: string; children: ReactNode }) {
+  const { spacing } = useDesignTokens()
   const headingId = useId()
   return (
     <section aria-labelledby={headingId}>
       <Flex vertical gap={spacing.md}>
-        <Flex align="center" gap={spacing.xs}>
-          <Typography.Title level={5} id={headingId} style={{ margin: 0 }}>
-            {title}
-          </Typography.Title>
-          {count !== undefined && <Typography.Text style={{ color: colour.textMuted }}>{count}</Typography.Text>}
-        </Flex>
+        <Typography.Title level={5} id={headingId} style={{ margin: 0 }}>
+          {title}
+        </Typography.Title>
         {children}
       </Flex>
     </section>
@@ -326,7 +323,7 @@ function Applications({ sites, locale }: { sites: SiteListItem[] | 'failed'; loc
   }
 
   return (
-    <HomeSection title={t('shell.home.applications.title')} count={sites === 'failed' ? undefined : groups.length}>
+    <HomeSection title={t('shell.home.applications.title')}>
       {body}
     </HomeSection>
   )
