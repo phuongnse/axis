@@ -18,7 +18,8 @@ namespace Axis.Integration.Tests;
 /// Sign-in that starts on a site page, against Keycloak. Tenant <c>a</c> has realm details, and its startup activation syncs the
 /// site clients of its application into the realm. In the development realm the application has two sites that allow accounts,
 /// <c>sitesaccounts</c> and <c>sitesother</c>, as that realm has no flow for a brokered provider. In a realm of its own the application
-/// has <c>sitespartner</c> and <c>sitespartner2</c> as well, which allow only the brokered provider <c>partner</c>. The tests show
+/// has <c>sitespartner</c> and <c>sitespartner2</c> as well, which allow only the brokered provider <c>partner</c>. With a SAML issuer
+/// it has the <c>saml</c> provider <c>agency</c> and the site <c>sitesagency</c>, which allows only it. The tests show
 /// the client of each sign-in, the provider hint, the check of the ID token's audience, the provider that the session row keeps
 /// and the sites that serve a session through that provider.
 /// </summary>
@@ -27,6 +28,7 @@ public sealed class SiteSignInTests(KeycloakFixture keycloak, PostgreSqlFixture 
     private const string SiteIssuer = "SiteIssuer";
     private const string SiteClient = "SiteClient";
     private const string SiteSecret = "SiteSecret";
+    private const string SamlMetadata = "AgencyMetadata";
 
     // The realm's client accepts redirects to http://localhost:5206/*, the development server, and so do the site clients.
     private static readonly Uri _serverAddress = new("http://localhost:5206");
@@ -142,6 +144,71 @@ public sealed class SiteSignInTests(KeycloakFixture keycloak, PostgreSqlFixture 
 
             // The site allows accounts only, but the browser forces the brokered provider on the realm's authorize address.
             var forced = new Uri($"{authorize.AbsoluteUri}&kc_idp_hint=oidc-siteissuer");
+            var callback = await realms.LogInAsync(forced, upstream, _callbackAddress);
+            using var refused = await host.Client.GetAsync(callback.PathAndQuery, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.Found, refused.StatusCode);
+            Assert.Equal("/?signIn=failed", refused.Headers.Location?.OriginalString);
+            Assert.Equal(0L, await CountAsync("axis.sessions"));
+            Assert.Equal(0L, await CountAsync("axis.audit_records WHERE action = 'session.signedIn'"));
+            Assert.Equal("providerNotAllowed", await RefusalReasonAsync());
+            using var me = await host.Client.GetAsync(new Uri("/api/me", UriKind.Relative), CancellationToken);
+            Assert.Equal(HttpStatusCode.Unauthorized, me.StatusCode);
+        }
+        finally
+        {
+            await realms.DeleteRealmsAsync();
+        }
+    }
+
+    [Fact]
+    public async Task A_site_sign_in_through_a_saml_provider_creates_a_session_with_the_mapped_name_and_email()
+    {
+        var baseAddress = await keycloak.BaseAddressAsync();
+        using var realms = await UpstreamRealms.CreateAsync(baseAddress);
+        try
+        {
+            var (host, upstream) = await StartSamlAsync(realms, baseAddress);
+            await using var hosted = host;
+
+            var authorize = await host.AuthorizeAsync("/sitesagency");
+            Assert.Equal("saml-agencymetadata", HttpUtility.ParseQueryString(authorize.Query)["kc_idp_hint"]);
+            var callback = await realms.LogInAsync(authorize, upstream, _callbackAddress);
+            using var signedIn = await host.Client.GetAsync(callback.PathAndQuery, CancellationToken);
+
+            Assert.Equal(HttpStatusCode.Found, signedIn.StatusCode);
+            Assert.Equal("/sitesagency", signedIn.Headers.Location!.OriginalString);
+            Assert.Equal(1L, await CountAsync("axis.sessions"));
+            Assert.Equal(1L, await CountAsync("axis.audit_records WHERE action = 'session.signedIn'"));
+            Assert.Equal("saml-agencymetadata", await SessionIdentityProviderAsync());
+            using var me = await host.Client.GetAsync(new Uri("/api/me", UriKind.Relative), CancellationToken);
+            Assert.Equal(HttpStatusCode.OK, me.StatusCode);
+            var body = await me.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
+            Assert.Equal("Pat", body.GetProperty("displayName").GetString());
+            Assert.Equal(
+                UpstreamRealms.Email,
+                await PostgreSqlServer.AdminScalarAsync(_schemaConnection!, "SELECT email FROM axis.user_profiles", CancellationToken));
+        }
+        finally
+        {
+            await realms.DeleteRealmsAsync();
+        }
+    }
+
+    [Fact]
+    public async Task A_site_callback_through_a_saml_provider_the_site_does_not_allow_is_refused()
+    {
+        var baseAddress = await keycloak.BaseAddressAsync();
+        using var realms = await UpstreamRealms.CreateAsync(baseAddress);
+        try
+        {
+            var (host, upstream) = await StartSamlAsync(realms, baseAddress);
+            await using var hosted = host;
+            var authorize = await host.AuthorizeAsync("/sitesaccounts");
+            Assert.Null(HttpUtility.ParseQueryString(authorize.Query)["kc_idp_hint"]);
+
+            // The site allows accounts only, but the browser forces the SAML provider on the realm's authorize address.
+            var forced = new Uri($"{authorize.AbsoluteUri}&kc_idp_hint=saml-agencymetadata");
             var callback = await realms.LogInAsync(forced, upstream, _callbackAddress);
             using var refused = await host.Client.GetAsync(callback.PathAndQuery, CancellationToken);
 
@@ -300,16 +367,7 @@ public sealed class SiteSignInTests(KeycloakFixture keycloak, PostgreSqlFixture 
     /// </summary>
     private async Task<(SiteHost Host, string Upstream)> StartBrokeredAsync(UpstreamRealms realms, Uri baseAddress, string[]? partnerAcr = null)
     {
-        var tenant = realms.NewRealmName();
-        using var http = new HttpClient();
-        await new TenantRealm(http, new IdentityProviderAdmin(baseAddress, KeycloakFixture.AdminClientId, KeycloakFixture.AdminClientSecret))
-            .EnsureAsync(tenant, "Acme", _realmSecrets, CancellationToken);
-        var clients = await realms.GetJsonAsync($"admin/realms/{tenant}/clients?clientId={TenantRealm.PlatformClientId}");
-        var platform = clients[0].Deserialize<Dictionary<string, JsonElement>>()!;
-        platform["redirectUris"] = JsonSerializer.SerializeToElement(new[] { $"{_serverAddress.AbsoluteUri}*" });
-        using var updated = await realms.SendAsync(HttpMethod.Put, $"admin/realms/{tenant}/clients/{platform["id"].GetString()}", platform);
-        Assert.Equal(HttpStatusCode.NoContent, updated.StatusCode);
-
+        var tenant = await NewTenantRealmAsync(realms, baseAddress);
         var upstream = await realms.NewUpstreamRealmAsync();
         await realms.AddUpstreamUserAsync(upstream);
         var host = await StartAsync(
@@ -324,6 +382,41 @@ public sealed class SiteSignInTests(KeycloakFixture keycloak, PostgreSqlFixture 
             partnerAcr: partnerAcr);
         await realms.PointBackChannelAtTheContainerAsync(tenant, "oidc-siteissuer", upstream);
         return (host, upstream);
+    }
+
+    /// <summary>
+    /// Starts the server in front of a tenant realm of its own, with the sites of <see cref="Applications"/> and the <c>saml</c> provider
+    /// <c>agency</c> bound to the metadata of an upstream SAML realm that holds the user <c>pat</c>. Returns the host and the upstream realm.
+    /// </summary>
+    private async Task<(SiteHost Host, string Upstream)> StartSamlAsync(UpstreamRealms realms, Uri baseAddress)
+    {
+        var tenant = await NewTenantRealmAsync(realms, baseAddress);
+        var entityId = $"{baseAddress.AbsoluteUri}realms/{tenant}";
+        var upstream = await realms.NewUpstreamSamlRealmAsync(entityId, $"{entityId}/broker/saml-agencymetadata/endpoint");
+        await realms.AddUpstreamUserAsync(upstream);
+        var host = await StartAsync(
+            partner: false,
+            new Uri(baseAddress, $"realms/{tenant}"),
+            tenant,
+            _realmSecrets.Platform,
+            _realmSecrets.Activation,
+            samlMetadata: realms.SamlMetadata(upstream));
+        return (host, upstream);
+    }
+
+    /// <summary>Makes a tenant realm whose platform client accepts redirects to the server, before the server starts and makes the site clients.</summary>
+    private static async Task<string> NewTenantRealmAsync(UpstreamRealms realms, Uri baseAddress)
+    {
+        var tenant = realms.NewRealmName();
+        using var http = new HttpClient();
+        await new TenantRealm(http, new IdentityProviderAdmin(baseAddress, KeycloakFixture.AdminClientId, KeycloakFixture.AdminClientSecret))
+            .EnsureAsync(tenant, "Acme", _realmSecrets, CancellationToken);
+        var clients = await realms.GetJsonAsync($"admin/realms/{tenant}/clients?clientId={TenantRealm.PlatformClientId}");
+        var platform = clients[0].Deserialize<Dictionary<string, JsonElement>>()!;
+        platform["redirectUris"] = JsonSerializer.SerializeToElement(new[] { $"{_serverAddress.AbsoluteUri}*" });
+        using var updated = await realms.SendAsync(HttpMethod.Put, $"admin/realms/{tenant}/clients/{platform["id"].GetString()}", platform);
+        Assert.Equal(HttpStatusCode.NoContent, updated.StatusCode);
+        return tenant;
     }
 
     private async Task<string> RefusalReasonAsync()
@@ -344,15 +437,16 @@ public sealed class SiteSignInTests(KeycloakFixture keycloak, PostgreSqlFixture 
     /// <summary>
     /// An application with the sites <c>sitesaccounts</c> and, as that realm has no flow for a brokered provider, <c>sitesother</c>, which allow
     /// accounts. With <paramref name="partner"/> it has the sites <c>sitespartner</c> and <c>sitespartner2</c> too, which allow only the provider <c>partner</c>,
-    /// and a <paramref name="partnerAcr"/> list is the provider's <c>acr</c>.
+    /// and a <paramref name="partnerAcr"/> list is the provider's <c>acr</c>. With <paramref name="saml"/> it has the <c>saml</c> provider
+    /// <c>agency</c> and the site <c>sitesagency</c>, which allows only it.
     /// </summary>
-    private static TemporaryFolder Applications(bool partner, string[]? partnerAcr = null)
+    private static TemporaryFolder Applications(bool partner, string[]? partnerAcr = null, bool saml = false)
     {
         var folder = new TemporaryFolder()
             .With("application.json", """{ "id": "3c6b1f52-8d0e-4a47-9c1b-2f7e5a9d4b10", "kind": "application", "name": "SiteSignIn", "formatVersion": 1 }""")
             .With("texts/en.json", """
                 { "id": "3c6b1f52-8d0e-4a47-9c1b-2f7e5a9d4b11", "kind": "text", "name": "TextsEn", "formatVersion": 1, "locale": "en",
-                  "texts": { "site.title": "Home", "nav.home": "Home", "pages.home.title": "Home", "signIn.partner": "Continue with Partner" } }
+                  "texts": { "site.title": "Home", "nav.home": "Home", "pages.home.title": "Home", "signIn.partner": "Continue with Partner", "signIn.agency": "Continue with Agency" } }
                 """)
             .With("pages/home.json", """
                 { "id": "3c6b1f52-8d0e-4a47-9c1b-2f7e5a9d4b12", "kind": "page", "name": "Home", "formatVersion": 1,
@@ -360,6 +454,16 @@ public sealed class SiteSignInTests(KeycloakFixture keycloak, PostgreSqlFixture 
                 """)
             .With("identity-providers/accounts.json", """{ "id": "3c6b1f52-8d0e-4a47-9c1b-2f7e5a9d4b13", "kind": "identityProvider", "name": "accounts", "formatVersion": 1, "type": "accounts" }""")
             .With("sites/sitesaccounts.json", Site("3c6b1f52-8d0e-4a47-9c1b-2f7e5a9d4b15", "sitesaccounts", "accounts"));
+        if (saml)
+        {
+            folder
+                .With("identity-providers/agency.json", $$"""
+                    { "id": "3c6b1f52-8d0e-4a47-9c1b-2f7e5a9d4b19", "kind": "identityProvider", "name": "agency", "formatVersion": 1, "type": "saml",
+                      "label": { "textKey": "signIn.agency" }, "metadata": { "binding": "{{SamlMetadata}}" } }
+                    """)
+                .With("sites/sitesagency.json", Site("3c6b1f52-8d0e-4a47-9c1b-2f7e5a9d4b1a", "sitesagency", "agency"));
+        }
+
         var acr = partnerAcr is null ? "" : $$""", "acr": [{{string.Join(", ", partnerAcr.Select(level => $"\"{level}\""))}}]""";
         return partner
             ? folder
@@ -393,10 +497,11 @@ public sealed class SiteSignInTests(KeycloakFixture keycloak, PostgreSqlFixture 
         Uri? siteIssuer = null,
         string siteClient = "site-client-value",
         string siteSecret = "site-secret-value",
-        string[]? partnerAcr = null)
+        string[]? partnerAcr = null,
+        Uri? samlMetadata = null)
     {
         var baseAddress = await keycloak.BaseAddressAsync();
-        var applications = Applications(partner, partnerAcr);
+        var applications = Applications(partner, partnerAcr, saml: samlMetadata is not null);
         var factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
         {
             builder.UseEnvironment("Testing");
@@ -415,6 +520,12 @@ public sealed class SiteSignInTests(KeycloakFixture keycloak, PostgreSqlFixture 
             builder.UseSetting($"Tenants:a:Bindings:{SiteClient}:Value", siteClient);
             builder.UseSetting($"Tenants:a:Bindings:{SiteSecret}:Kind", "secret");
             builder.UseSetting($"Tenants:a:Bindings:{SiteSecret}:Value", siteSecret);
+            if (samlMetadata is not null)
+            {
+                builder.UseSetting($"Tenants:a:Bindings:{SamlMetadata}:Kind", "url");
+                builder.UseSetting($"Tenants:a:Bindings:{SamlMetadata}:Value", samlMetadata.AbsoluteUri);
+            }
+
             builder.UseSetting("ActivateOnStartup:0", applications.Path);
             if (provider is not null)
             {

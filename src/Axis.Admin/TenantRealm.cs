@@ -24,7 +24,7 @@ internal sealed record TenantRealmSecrets(string Platform, string Activation, st
 /// a password reset link that lasts 30 minutes and no self-registration. It offers the platform locales
 /// (<see cref="PlatformLocales"/>) on its sign-in pages. It allows two users to share an email, which
 /// turns sign-in by email off, so an account's username is its email. It gets a first-login flow of its own for brokered
-/// users, <see cref="RealmSync.FirstLoginFlowAlias"/>, whose only step creates a new user. It also gets three clients: the platform client
+/// users, <see cref="RealmSync.FirstLoginFlowAlias"/>, whose only step creates a new user, and it turns off the Verify Profile step. It also gets three clients: the platform client
 /// <c>axis</c>, <c>axis-activation</c> with rights over the realm's providers and clients and over the realm's texts (<c>manage-realm</c>, which
 /// Keycloak requires for them and which also covers every realm setting), and <c>axis-users</c> with
 /// rights over its users only. The realm uses the Axis theme <see cref="LoginTheme"/> as its login theme. The identity provider
@@ -131,6 +131,7 @@ internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
         await EnsureRealmAsync(token, realm, realmPath, displayName, cancellationToken);
         await EnsureSecondStepAsync(token, realmPath, cancellationToken);
         await EnsureFirstLoginFlowAsync(token, realmPath, cancellationToken);
+        await EnsureNoProfileReviewAsync(token, realmPath, cancellationToken);
         await EnsureClientAsync(token, realmPath, PlatformClient(secrets.Platform), cancellationToken);
         var activation = await EnsureClientAsync(token, realmPath, ServiceClient(ActivationClientId, secrets.Activation), cancellationToken);
         var users = await EnsureClientAsync(token, realmPath, ServiceClient(UsersClientId, secrets.Users), cancellationToken);
@@ -255,6 +256,31 @@ internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
             using var updated = await SendAsync(token, HttpMethod.Put, path, body, cancellationToken);
             EnsureSuccess(updated, "require the second step");
         }
+    }
+
+    /// <summary>
+    /// Turns off Keycloak's Verify Profile required action, so no sign-in stops on a page that asks for a missing profile field,
+    /// such as the last name that a <c>saml</c> provider may not send. An identity provider without the action has nothing to turn off.
+    /// </summary>
+    private async Task EnsureNoProfileReviewAsync(string token, string realmPath, CancellationToken cancellationToken)
+    {
+        var path = $"{realmPath}/authentication/required-actions/VERIFY_PROFILE";
+        using var response = await SendAsync(token, HttpMethod.Get, path, null, cancellationToken);
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return;
+        }
+
+        EnsureSuccess(response, "read the verify-profile action");
+        var action = (await response.Content.ReadFromJsonAsync<JsonElement>(cancellationToken)).Deserialize<Dictionary<string, JsonElement>>()!;
+        if (!action.TryGetValue("enabled", out var enabled) || enabled.ValueKind != JsonValueKind.True)
+        {
+            return;
+        }
+
+        action["enabled"] = JsonSerializer.SerializeToElement(false);
+        using var updated = await SendAsync(token, HttpMethod.Put, path, action, cancellationToken);
+        EnsureSuccess(updated, "turn off the verify-profile action");
     }
 
     /// <summary>

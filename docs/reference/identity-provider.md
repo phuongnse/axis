@@ -270,7 +270,8 @@ _(planned for M17)_
   platform client's secret encrypted in the tenant directory and points the tenant's `Oidc` block at the realm. A
   second run updates the realm, brings it up to the account rules and sets its login theme to `axis` again. It turns on language support in the realm, with `en` and `vi` and `en` as the default, so
   `kc_locale` and the theme's language links work. It also creates the first-login flow
-  `axis first login` for brokered users and allows two users to share an email, which turns sign-in by email off: an
+  `axis first login` for brokered users. It turns off Keycloak's Verify Profile required action, so no sign-in stops on a
+  page that asks for a missing profile field, such as the last name that a `saml` provider may not send. It allows two users to share an email, which turns sign-in by email off: an
   account's username is its email, see [accounts](user-administration.md#accounts). Only `Axis.Admin` holds the identity provider's admin rights over every realm, from the
   `IdentityProvider` settings of its own, see [administration](administration.md#settings).
 - **The breached-password list:** the realm's password policy names the file `axis-breached-passwords.txt`, which every
