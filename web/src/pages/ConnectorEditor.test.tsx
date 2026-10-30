@@ -194,6 +194,24 @@ describe('ConnectorEditor', () => {
     expect(screen.getByTestId('studio-connector-get-no-input')).toBeVisible()
   })
 
+  it('does not say that a GET sends no body when its rows all go in the path, the query or a header', () => {
+    const operations = [
+      {
+        name: 'find',
+        method: 'GET',
+        path: '/x/{a}',
+        input: [
+          { name: 'a', type: 'text', required: true, in: 'path' },
+          { name: 'b', type: 'text', in: 'query' },
+        ],
+      },
+    ]
+    renderEditor({ ...connector, operations })
+
+    expect(screen.getAllByRole('textbox', { name: 'Input name' })).toHaveLength(2)
+    expect(screen.queryByTestId('studio-connector-get-no-input')).toBeNull()
+  })
+
   it('shows the secret binding and the header name of a header auth', () => {
     renderEditor({ ...connector, auth: { type: 'header', name: 'X-Api-Key', value: { binding: 'ApiKey' } } })
 

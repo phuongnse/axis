@@ -1,0 +1,20 @@
+{
+  "id": "421e6191-b8af-4480-af55-531a93ecd861",
+  "kind": "process",
+  "name": "FindShipment",
+  "formatVersion": 1,
+  "entity": "Request",
+  "start": "findShipment",
+  "steps": [
+    {
+      "name": "findShipment",
+      "type": "operation",
+      "operation": "callConnector",
+      "connector": { "name": "Warehouse", "operation": "findShipment" },
+      "input": { "shipment": "'a/b c'", "state": "'open now'", "Channel": "'web'" },
+      "output": { "orderNumber": "comment" },
+      "next": "done"
+    },
+    { "name": "done", "type": "end" }
+  ]
+}

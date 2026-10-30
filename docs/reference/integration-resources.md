@@ -181,13 +181,12 @@ The purchase request sample holds the purchasing system connector in
   It is absent when the system does not support one.
 - `operations` lists the named operations.
   - `method` is `GET`, `POST`, `PUT`, `PATCH` or `DELETE`.
-  - `path` is a path template. `{idempotencyKey}` is the only placeholder.
-    Other placeholders come later. _(planned for M19)_ A `{name}` placeholder
-    names a `path` input, see [Structured payloads](#structured-payloads).
-  - `input` fields are sent as a JSON body. A `GET` sends no body, so a `GET`
-    with `input` fields is a schema error. _(planned for M19)_ An input's `in`
-    may send it in the path, the query or a header instead, and a `GET` may
-    have those.
+  - `path` is a path template. `{idempotencyKey}` holds the operation
+    identity. Any other `{name}` placeholder names a `path` input, see
+    [Structured payloads](#structured-payloads).
+  - `input` fields are sent as a JSON body, unless an input's `in` sends it in
+    the path, the query or a header. A `GET` sends no body, so it may have
+    `path`, `query` and `header` inputs but no `body` input.
   - `output` fields are read from the JSON response. An output is read from
     the top-level property of its name, unless it has a `source`, a JSON
     Pointer ([RFC 6901](https://www.rfc-editor.org/rfc/rfc6901)) into the
@@ -282,10 +281,10 @@ The token request and the cache are built. The resend after a `401` is not.
 
 ### Structured payloads
 
-_(planned for M19)_ Inputs can go outside the body and nest, as
+Inputs go outside the body, as
 [D91](../decisions/d91-connector-oauth2-and-structured-payloads.md) agrees.
-Bodies stay JSON. An output's `source` is built, and the rest of this section
-is planned.
+_(planned for M19)_ Inputs can also nest. The `lines` input in the example is
+still planned. Bodies stay JSON. An output's `source` is built.
 
 ```json
 {
@@ -309,13 +308,18 @@ is planned.
 ```
 
 - **`in`.** `body`, the default, `path`, `query` or `header`. A `header`
-  input's name is the header name. Only scalar inputs may go outside the body.
+  input's name is the header name, so it cannot hold a hyphen yet. Only scalar
+  inputs may go outside the body. An optional input with no value is left out.
 - **Path placeholders.** Each `{name}` in `path` names a `path` input, and each
-  `path` input appears in `path`. A `path` input is `required`. Its value is
-  escaped as one path segment.
+  `path` input appears in `path`. Names match ignoring letter case. A `path`
+  input is `required`, and none is named `idempotencyKey`, which stays the
+  operation identity. Its value is escaped as one path segment, so `a/b c`
+  becomes `a%2Fb%20c`. A `query` input becomes a `name=value` pair of the
+  query string, escaped the same way.
 - **`GET`.** A `GET` may have `path`, `query` and `header` inputs, but no
-  `body` input.
-- **`object` and `list`.** An `object` input has nested `fields`. A `list`
+  `body` input. The JSON body of any other method holds only the `body`
+  inputs.
+- **`object` and `list`.** _(planned for M19)_ An `object` input has nested `fields`. A `list`
   input's items are objects with `fields`. Nesting goes four levels deep at
   most. The step maps them as in
   [Step shape](process-execution.md#step-shape).
@@ -799,14 +803,14 @@ A webhook that tells a chat system when a note is closed, in
   warning, and the delivery fails at run time.
 - `timeout` is an ISO 8601 duration. It defaults to `PT10S` and is at most
   `PT30S`.
-- An unknown event is `AXC0312` at `/event`. A missing `url` or `secret` is
-  `AXC0313` at `/url` or `/secret`. A `timeout` that is not a positive ISO 8601
-  duration of at most `PT30S` is `AXC0314` at `/timeout`. The schema leaves
+- An unknown event is `AXC0313` at `/event`. A missing `url` or `secret` is
+  `AXC0314` at `/url` or `/secret`. A `timeout` that is not a positive ISO 8601
+  duration of at most `PT30S` is `AXC0315` at `/timeout`. The schema leaves
   `url` and `secret` optional, so a missing one has this code and not the
   schema error `AXC0004`.
 - An event that has a webhook may not carry a value read from a field marked
   `sensitive`. A [raise event step](process-events.md#raise-event-step) that
-  maps one into its payload, directly or through a reference path, is `AXC0315`
+  maps one into its payload, directly or through a reference path, is `AXC0316`
   at `/steps/{i}/fields/{key}`. A step that maps it into an event that no
   webhook names compiles. _(planned for M19)_ An
   [endpoint's event](#endpoint-resource) that maps one into its payload is a

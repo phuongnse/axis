@@ -51,8 +51,8 @@ public sealed record ConnectorAuthModel(string Type, string? HeaderName, string 
 public sealed record ConnectorOAuth2Model(string TokenUrlBinding, string ClientIdBinding, string? Scope, string? Audience);
 
 /// <summary>
-/// A compiled connector operation. <see cref="Path"/> holds no placeholder but
-/// <c>{idempotencyKey}</c>. <see cref="Lookup"/> is the declared name of another operation of the
+/// A compiled connector operation. Each placeholder of <see cref="Path"/> is
+/// <c>{idempotencyKey}</c> or names a <c>path</c> input. <see cref="Lookup"/> is the declared name of another operation of the
 /// connector: a <c>GET</c> whose path holds <c>{idempotencyKey}</c>, with no inputs and the same
 /// outputs.
 /// </summary>
@@ -66,7 +66,9 @@ public sealed record ConnectorOperationModel(
 
 /// <summary>
 /// An input or output field of a compiled connector operation, with a scalar field type. For an
-/// output, <paramref name="Source"/> is a JSON Pointer into the response body, and null means the
-/// top-level property of <paramref name="Name"/>.
+/// input, <paramref name="In"/> is where a call sends it: <c>body</c>, <c>path</c>, <c>query</c> or
+/// <c>header</c>. For an output, <paramref name="Source"/> is a JSON Pointer into the response body,
+/// and null means the top-level property of <paramref name="Name"/>.
 /// </summary>
-public sealed record ConnectorFieldModel(string Name, FieldType Type, bool Required, string? Source = null);
+public sealed record ConnectorFieldModel(
+    string Name, FieldType Type, bool Required, string In = "body", string? Source = null);
