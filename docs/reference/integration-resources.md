@@ -289,8 +289,8 @@ This auth is built.
 Inputs go outside the body, as
 [D91](../decisions/d91-connector-oauth2-and-structured-payloads.md) agrees.
 Inputs can also nest: declaring an `object` or `list` input is built, and the
-`lines` input in the example compiles. A step cannot map one yet, which is
-_(planned for M19)_. Bodies stay JSON. An output's `source` is built.
+`lines` input in the example compiles. A step maps one and sends it as nested
+JSON. Bodies stay JSON. An output's `source` is built.
 
 ```json
 {
@@ -343,8 +343,22 @@ _(planned for M19)_. Bodies stay JSON. An output's `source` is built.
     letter case, is `AXC0096`.
   - A `callConnector` step maps them as in
     [Step shape](process-execution.md#step-shape), and a plain expression for
-    one is `AXC0318`. Sending them is _(planned for M19)_, and until then a step
-    that reaches one fails.
+    one is `AXC0318`. The step stores the nested body when it stages the call,
+    as [Staging and the call](process-execution.md#staging-and-the-call) says,
+    and the worker sends it as it is.
+  - When a step stages its call, an `object` input is stored as a JSON object
+    of its nested fields. A `list` input is stored as an array with one object
+    for each stored row of the child collection it maps from, in the
+    collection's position order, and each item expression is evaluated over
+    that row. An empty collection gives `[]`. The worker sends the stored body
+    as it is, so a retry sends the same body.
+  - A required nested field that gives `null` fails the step with
+    `The required input 'lines/1/sku' of the step 'shipLines' gave no value.`
+    An expression error in a nested field fails it with
+    `The input 'lines/1/quantity' of the step 'shipLines' failed: <kind>.` The
+    nested path joins the input names with `/` and uses the item's zero-based
+    index for a list, as record error pointers do. No text shows a value, and
+    a failed step stages no call.
 - **`source`.** _(built)_ An output field may name a JSON Pointer
   ([RFC 6901](https://www.rfc-editor.org/rfc/rfc6901)) into the response body,
   such as `/shipment/tracking/number`. Without it, the output is read from the

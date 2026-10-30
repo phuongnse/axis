@@ -1,0 +1,12 @@
+{
+  "id": "5c2e9a41-7d03-4b8f-a6e1-3f94d0b7c1a2",
+  "kind": "entity",
+  "name": "Shipment",
+  "formatVersion": 1,
+  "displayField": "title",
+  "fields": [
+    { "name": "title", "type": "text", "required": true },
+    { "name": "orderNumber", "type": "text" },
+    { "name": "lines", "type": "child-collection", "target": "ShipmentLine" }
+  ]
+}

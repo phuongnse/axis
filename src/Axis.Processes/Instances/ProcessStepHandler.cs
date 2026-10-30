@@ -163,6 +163,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
         Record? record = null;
         (Guid ReleaseId, ApplicationModel Model)? active = null;
         Func<ExpressionModel, Task<ExpressionEvaluationResult>> evaluate;
+        RowSource? rowSource = null;
         if (instance.SubjectId is { } subjectId && instance.SubjectEntityId is { } entityId)
         {
             var subjectEntity = model.FindEntity(entityId)
@@ -205,6 +206,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
                 : stored;
             var subject = record;
             evaluate = expression => RecordExpressions.EvaluateAsync(context.Connection, model, subjectEntity, subject, expression, instance.Now, cancellationToken);
+            rowSource = collection => ReadRowsAsync(context, model, subjectEntity, subject, collection, instance, step, input, cancellationToken);
         }
         else
         {
@@ -357,7 +359,8 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
                         evaluate,
                         callStep,
                         callStep.Input,
-                        name => operation.Input.Any(field => field.Required && string.Equals(field.Name, name, StringComparison.OrdinalIgnoreCase)),
+                        names => IsRequired(operation.Input, names),
+                        rowSource,
                         instance,
                         input));
                 state = ProcessStarts.Waiting;
@@ -448,7 +451,8 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
                         evaluate,
                         packageStep,
                         packageStep.Input,
-                        name => packageOperation.Input.Any(field => field.Required && string.Equals(field.Name, name, StringComparison.OrdinalIgnoreCase)),
+                        names => names.Count == 1 && packageOperation.Input.Any(field => field.Required && string.Equals(field.Name, names[0], StringComparison.OrdinalIgnoreCase)),
+                        null,
                         instance,
                         input));
                 state = ProcessStarts.Waiting;
@@ -1149,41 +1153,139 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
     /// <summary>
     /// Evaluates each input of a <c>callConnector</c> or package operation step, in the step's
     /// order, into the body the call stores. <paramref name="isRequired"/> says whether an input of
-    /// the operation is required. Dates and date-times take the record API's text forms, and an optional input
-    /// that gives null is stored as null. An input that fails at run time, or a required input that
-    /// gives null, fails the step. An object or list input fails the step too, as sending those is not built yet.
+    /// the operation is required, given the declared names from the top-level input down. Dates and date-times take the record API's text forms, and an optional input
+    /// that gives null is stored as null. An <c>object</c> input becomes a JSON object of its nested inputs.
+    /// A <c>list</c> input becomes an array with one object for each stored row of its child collection, in position order,
+    /// each evaluated over that row, which <paramref name="rows"/> reads. An input that fails at run time, or a required input that
+    /// gives null, fails the step with the nested path of the input, such as <c>lines/1/sku</c>, and never its value.
     /// </summary>
+    private static Task<JsonObject> StageAsync(
+        Func<ExpressionModel, Task<ExpressionEvaluationResult>> evaluate,
+        ProcessStepModel step,
+        IReadOnlyList<ConnectorInputModel> inputs,
+        Func<IReadOnlyList<string>, bool> isRequired,
+        RowSource? rows,
+        LoadedInstance instance,
+        JsonObject input) =>
+        StageAsync(evaluate, step, inputs, isRequired, rows, instance, input, [], null);
+
     private static async Task<JsonObject> StageAsync(
         Func<ExpressionModel, Task<ExpressionEvaluationResult>> evaluate,
         ProcessStepModel step,
         IReadOnlyList<ConnectorInputModel> inputs,
-        Func<string, bool> isRequired,
+        Func<IReadOnlyList<string>, bool> isRequired,
+        RowSource? rows,
         LoadedInstance instance,
-        JsonObject input)
+        JsonObject input,
+        IReadOnlyList<string> names,
+        string? pointer)
     {
         var body = new JsonObject();
         foreach (var mapping in inputs)
         {
-            if (mapping.Value is not { } value)
+            var declared = new List<string>(names) { mapping.Input };
+            var path = pointer is null ? mapping.Input : $"{pointer}/{mapping.Input}";
+            if (mapping.Value is { } value)
             {
-                throw Failure($"The input '{mapping.Input}' of the step '{step.Name}' is an object or a list. Sending these inputs is not built yet.", instance, input);
-            }
+                var result = await evaluate(value);
+                if (result.Error is { } error)
+                {
+                    throw ExpressionFailure($"input '{path}'", step, error, instance, input);
+                }
 
-            var result = await evaluate(value);
-            if (result.Error is { } error)
+                if (result.Value is null && isRequired(declared))
+                {
+                    throw Failure($"The required input '{path}' of the step '{step.Name}' gave no value.", instance, input);
+                }
+
+                body[mapping.Input] = ToJson(result.Value, $"input '{path}'", step, instance, input);
+            }
+            else if (mapping.From is { } collection)
             {
-                throw ExpressionFailure($"input '{mapping.Input}'", step, error, instance, input);
-            }
+                if (rows is null)
+                {
+                    throw Failure($"The input '{path}' of the step '{step.Name}' needs a subject.", instance, input);
+                }
 
-            if (result.Value is null && isRequired(mapping.Input))
+                var items = new JsonArray();
+                var evaluators = await rows(collection);
+                for (var index = 0; index < evaluators.Count; index++)
+                {
+                    items.Add(await StageAsync(evaluators[index], step, mapping.Fields, isRequired, rows, instance, input, declared, $"{path}/{index}"));
+                }
+
+                body[mapping.Input] = items;
+            }
+            else
             {
-                throw Failure($"The required input '{mapping.Input}' of the step '{step.Name}' gave no value.", instance, input);
+                body[mapping.Input] = await StageAsync(evaluate, step, mapping.Fields, isRequired, rows, instance, input, declared, path);
             }
-
-            body[mapping.Input] = ToJson(result.Value, $"input '{mapping.Input}'", step, instance, input);
         }
 
         return body;
+    }
+
+    /// <summary>Whether the operation input at the declared <paramref name="names"/>, from the top-level input down, is required. Names ignore letter case.</summary>
+    private static bool IsRequired(IReadOnlyList<ConnectorFieldModel> fields, IReadOnlyList<string> names)
+    {
+        ConnectorFieldModel? field = null;
+        foreach (var name in names)
+        {
+            field = fields.FirstOrDefault(candidate => string.Equals(candidate.Name, name, StringComparison.OrdinalIgnoreCase));
+            if (field is null)
+            {
+                return false;
+            }
+
+            fields = field.Fields ?? [];
+        }
+
+        return field?.Required ?? false;
+    }
+
+    /// <summary>
+    /// The evaluators of the stored rows of a child collection of the subject, in position order. Each evaluates an
+    /// expression over one row, whose values the step already read with the subject and which carry the pending
+    /// computed values of the active release. The ids come from one more query, matched to the rows by position,
+    /// as an expression may use <c>id</c>.
+    /// </summary>
+    private static async Task<IReadOnlyList<Func<ExpressionModel, Task<ExpressionEvaluationResult>>>> ReadRowsAsync(
+        WorkItemContext context,
+        ApplicationModel model,
+        EntityModel subjectEntity,
+        Record subject,
+        string collection,
+        LoadedInstance instance,
+        ProcessStepModel step,
+        JsonObject input,
+        CancellationToken cancellationToken)
+    {
+        var field = subjectEntity.Fields.FirstOrDefault(candidate =>
+            candidate.Type == FieldType.ChildCollection && string.Equals(candidate.Name, collection, StringComparison.OrdinalIgnoreCase))
+            ?? throw Failure($"The entity '{subjectEntity.Name}' has no child collection '{collection}'.", instance, input);
+        var child = model.FindEntity(field.Target!.Id)
+            ?? throw Failure($"The release has no entity '{field.Target.Id}'.", instance, input);
+        var rows = subject.Values.GetValueOrDefault(field.Name) as JsonArray ?? [];
+        var ids = await RecordQueries.ReadRowIdsAsync(context.Connection, child, subject.Id, cancellationToken);
+        if (ids.Count != rows.Count)
+        {
+            throw Failure($"The child collection '{collection}' changed while the step '{step.Name}' read it.", instance, input);
+        }
+
+        var evaluators = new List<Func<ExpressionModel, Task<ExpressionEvaluationResult>>>(rows.Count);
+        for (var index = 0; index < rows.Count; index++)
+        {
+            var values = new Dictionary<string, JsonNode?>(StringComparer.Ordinal);
+            foreach (var (name, value) in rows[index]!.AsObject())
+            {
+                values[name] = value?.DeepClone();
+            }
+
+            var row = new Record(ids[index], subject.Version, values, new Dictionary<string, JsonNode>());
+            evaluators.Add(expression => RecordExpressions.EvaluateAsync(context.Connection, model, child, row, expression, instance.Now, cancellationToken));
+        }
+
+        return evaluators;
     }
 
     /// <summary>
@@ -1235,6 +1337,9 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
 
     private static ProcessStepException Failure(string message, LoadedInstance instance, JsonObject input, Exception? innerException = null) =>
         new(message, instance.Step, instance.Revision, instance.Now, input, innerException);
+
+    /// <summary>Reads the stored rows of a child collection of the subject, by its declared name, as one evaluator for each row.</summary>
+    private delegate Task<IReadOnlyList<Func<ExpressionModel, Task<ExpressionEvaluationResult>>>> RowSource(string collection);
 
     /// <summary>The child a <c>subProcess</c> step starts: its new instance id, its process, and its record or parameter values.</summary>
     private sealed record PendingChild(Guid Id, ProcessModel Process, EntityModel? Entity, Guid? SubjectId, Record? Subject, JsonObject? Parameters);

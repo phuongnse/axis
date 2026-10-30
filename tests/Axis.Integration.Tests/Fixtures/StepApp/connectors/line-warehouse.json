@@ -1,0 +1,33 @@
+{
+  "id": "5c2e9a41-7d03-4b8f-a6e1-3f94d0b7c1a4",
+  "kind": "connector",
+  "name": "LineWarehouse",
+  "formatVersion": 1,
+  "baseUrl": { "binding": "PurchasingUrl" },
+  "timeout": "PT1S",
+  "auth": { "type": "bearer", "token": { "binding": "PurchasingToken" } },
+  "idempotency": "Idempotency-Key",
+  "operations": [
+    {
+      "name": "shipLines",
+      "method": "POST",
+      "path": "/line-shipments",
+      "input": [
+        {
+          "name": "customer",
+          "type": "object",
+          "fields": [{ "name": "name", "type": "text", "required": true }]
+        },
+        {
+          "name": "lines",
+          "type": "list",
+          "fields": [
+            { "name": "sku", "type": "text", "required": true },
+            { "name": "quantity", "type": "integer", "required": true }
+          ]
+        }
+      ],
+      "output": [{ "name": "orderNumber", "type": "text" }]
+    }
+  ]
+}
