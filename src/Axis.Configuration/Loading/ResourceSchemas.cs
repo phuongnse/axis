@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Text.Json.Nodes;
 using Axis.Configuration.Resources;
 using Json.Schema;
 
@@ -31,15 +32,34 @@ internal static class ResourceSchemas
         [ResourceKinds.Scenario] = Load("scenario.schema.json"),
     };
 
+    /// <summary>
+    /// The trigger schema for a module file. A module schedule runs in the time zone of each application that
+    /// uses the module, D103, so it leaves out <c>timeZone</c> and the schema forbids it.
+    /// </summary>
+    public static JsonSchema ModuleTrigger { get; } = LoadModuleTrigger();
+
     public static bool TryGet(string kind, out JsonSchema schema) =>
         _schemasByKind.TryGetValue(kind, out schema!);
 
-    private static JsonSchema Load(string fileName)
+    private static JsonSchema Load(string fileName) => JsonSchema.FromText(ReadText(fileName));
+
+    private static JsonSchema LoadModuleTrigger()
+    {
+        var schema = JsonNode.Parse(ReadText("trigger.schema.json"))!;
+        var then = schema["allOf"]!.AsArray()
+            .FirstOrDefault(entry => entry?["if"]?["properties"]?["type"]?["const"]?.GetValue<string>() == "schedule")?["then"]
+            ?? throw new InvalidOperationException("The trigger schema has no branch for a schedule trigger.");
+        then["required"] = new JsonArray("schedule");
+        then["properties"]!["timeZone"] = false;
+        return JsonSchema.FromText(schema.ToJsonString());
+    }
+
+    private static string ReadText(string fileName)
     {
         var resourceName = $"Axis.Configuration.Schemas.{fileName}";
         using var stream = Assembly.GetExecutingAssembly().GetManifestResourceStream(resourceName)
             ?? throw new InvalidOperationException($"Embedded schema '{resourceName}' was not found.");
         using var reader = new StreamReader(stream);
-        return JsonSchema.FromText(reader.ReadToEnd());
+        return reader.ReadToEnd();
     }
 }

@@ -1,0 +1,8 @@
+{
+  "id": "c7e3a1d5-2b84-4f96-8a0d-1e5b9c3f7a10",
+  "kind": "dataSource",
+  "name": "AllFollowups",
+  "formatVersion": 1,
+  "entity": "Followup",
+  "fields": [{ "name": "title", "path": "title" }]
+}

@@ -9,7 +9,9 @@ namespace Axis.Integration.Tests;
 /// <summary>
 /// One tenant database, <c>a</c>, with the applications ModuleTriggerApp and ModuleTriggerOtherApp
 /// activated against the <c>reviews</c> and <c>followups</c> test modules under <c>Fixtures/Modules</c>.
-/// Each application holds its own copy of the modules' tables and of the <c>followups</c> triggers. The real
+/// Each application holds its own copy of the modules' tables and of the <c>followups</c> triggers, and
+/// its own state of the schedule trigger <c>RemindFollowups</c>, which runs in the time zone of the
+/// application: <c>Asia/Ho_Chi_Minh</c> for ModuleTriggerApp and <c>Europe/Berlin</c> for ModuleTriggerOtherApp. The real
 /// server serves them on host <c>a.example.test</c> and signs in <c>clerk</c>, who holds the role
 /// <c>clerk</c> in both, and <c>outsider</c>, who holds no role. The worker is the one of
 /// <see cref="Steps"/>, which runs only when a test calls it, so a started instance stays

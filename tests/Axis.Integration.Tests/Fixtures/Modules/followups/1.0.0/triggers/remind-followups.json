@@ -1,0 +1,10 @@
+{
+  "id": "c7e3a1d5-2b84-4f96-8a0d-1e5b9c3f7a12",
+  "kind": "trigger",
+  "name": "RemindFollowups",
+  "formatVersion": 1,
+  "type": "schedule",
+  "schedule": "0 6 * * *",
+  "dataSource": "AllFollowups",
+  "process": "Remind"
+}

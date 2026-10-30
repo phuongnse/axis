@@ -75,9 +75,8 @@ calls `IsDepartmentCode`, so a department code must be in capital letters.
   [dependencies](#processes-pages-policies-and-dependencies).
 - **Kinds a module may hold.** `entity`, `dataSource`, `rule`, `sequence`,
   `form`, `page`, `process`, `event`, `text`, `seed`, `policy` and `trigger`
-  of type `event` or `dataChange`. Roles are not allowed. _(planned for M20)_ A
-  `trigger` of type `schedule` is allowed too. _(planned for M24)_ So is
-  `scenario`. Roles stay out.
+  of type `event`, `dataChange` or `schedule`. Roles are not allowed.
+  _(planned for M24)_ `scenario` is allowed too. Roles stay out.
 - **Installation.** Modules are installed per installation under
   `Modules:Path/<id>/<version>/`. The server, the worker and the scenario runner
   read them. The scenario runner gets a `--modules` option for the folder.
@@ -212,7 +211,7 @@ calls `IsDepartmentCode`, so a department code must be in capital letters.
 | --- | --- |
 | `AXC0200` | `module.json` is missing, unreadable, not JSON or fails its schema, or another file of the module version cannot be read. Reported at host start, at the failing pointer. A connector slot name, a slot operation name or a slot field name that repeats an earlier one in its list, ignoring letter case, is reported at its `name`. A copy of a module in a stored release without a valid `modules/<id>/module.json` is reported the same way, when the release is rebuilt. |
 | `AXC0201` | The folder names differ from the manifest `id` or `version`. Reported at host start, at `/id` or `/version`. In a stored release, the folder `modules/<id>/` differing from the manifest `id` is reported the same way. |
-| `AXC0202` | A module file has a kind that a module may not hold, or no kind. Reported at compile, at `/kind` of `modules/<id>/<relative path>`. A module `trigger` of type `schedule` is reported the same way at `/type`, until module schedules are built. |
+| `AXC0202` | A module file has a kind that a module may not hold, or no kind. Reported at compile, at `/kind` of `modules/<id>/<relative path>`. |
 | `AXC0203` | A `modules` entry names a module with no installed version. Reported in `application.json` at `/modules/{i}/id`, or in `modules/<id>/module.json` for an entry of a module's own `modules`. |
 | `AXC0204` | A `modules` entry has a version range in no valid form. Reported at `/modules/{i}/version`, in `application.json` or in `modules/<id>/module.json`. |
 | `AXC0205` | No installed version meets the one range that asks for the module. The message lists the installed versions. Reported at `/modules/{i}/version`, in `application.json` or in `modules/<id>/module.json`. Several ranges that no version meets together are `AXC0295`. |
@@ -273,9 +272,8 @@ agrees. An application that declares it maps the slot to one of its own roles:
 ]
 ```
 
-- **Kinds.** A module may also hold `process` _(built)_, `trigger` of type `event`
-  or `dataChange` _(built)_, `trigger` of type `schedule` _(planned for M20)_ and
-  _(planned for M24)_ `scenario`, as
+- **Kinds.** A module may also hold `process` _(built)_, `trigger` of type `event`,
+  `dataChange` or `schedule` _(built)_ and _(planned for M24)_ `scenario`, as
   [D103](../decisions/d103-modules-hold-triggers-scenarios-and-connector-slots.md) agrees. It still holds no `role`, `site`, `identityProvider`,
   `connector`, `endpoint` or `webhook`.
 - **Role slots.** `roles` in `module.json` lists the module's role slots, each
@@ -369,10 +367,19 @@ agrees. An application that declares it maps the slot to one of its own roles:
   module's other resources. A create, update or delete of the application's
   copy of the module's entity, or an event raised in that application, starts
   the module's process in that application only, and its receipts and dead
-  letters belong to that application. A trigger of type `schedule` is
-  _(planned for M20)_: until it is built, a module file with one is `AXC0202`
-  at `/type`. It will run in the time zone of each application that uses the
-  module, and each application's copy will have its own occurrences.
+  letters belong to that application. A trigger of type `schedule` is built
+  too. It has no `timeZone`, and writing one is `AXC0004` at `/timeZone`. It
+  runs in the time zone of each application that uses the module, so two
+  applications fire the same schedule at their own local times. Its
+  `dataSource` names a data source of its own module by plain name, or is left
+  out for a scheduled job. An application data source is unknown, `AXC0162`
+  in the module file. Each application has its own schedule state and its own
+  `trigger.schedule` work item, keyed by the trigger's id for that application.
+  Occurrences, catch-up after downtime and the fan-out to records stay inside
+  that application, so one application's occurrence never fires or catches up
+  another's. When an application changes its time zone, its next activation
+  recomputes the next occurrence of its module schedules, as it does for a
+  changed `timeZone` of an application schedule.
 - **Connector slots.** `connectors` in `module.json` lists the module's
   connector slots. Each has a `name`, a `label` and `operations`, each with a
   `name` and typed `input` and `output` fields in the shape of a
