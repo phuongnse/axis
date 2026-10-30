@@ -10,8 +10,9 @@ _(planned for Mx)_ are not built yet, and Dn refers to [decisions.md](../decisio
 This section follows
 [D40](../decisions/d40-reusable-modules.md). The manifest,
 installation, declaring, pinning, dependencies between modules, the diagnostics `AXC0200` to `AXC0214`,
-`AXC0295` and `AXC0296`, and the
-role slots with their mapping, `AXC0292` to `AXC0294`, are built. A pinned module's files are stored in the release and
+`AXC0295` and `AXC0296`, the
+role slots with their mapping, `AXC0292` to `AXC0294`, and the connector slots with their
+mapping, `AXC0297` to `AXC0303`, are built. A pinned module's files are stored in the release and
 checked as JSON, for an allowed kind and against the schema of their kind. A
 pinned module's entities, sequences, seeds, events, data sources and forms join the application
 model, each with an id derived from the application `id` and the name
@@ -62,12 +63,12 @@ calls `IsDepartmentCode`, so a department code must be in capital letters.
 
 - **Manifest.** `module.json` has `kind: module`, an `id` (lower-case letters,
   digits and `-`, starting with a letter), a SemVer `version`, a `label` and an
-  optional `packages`, `roles` and `modules`. `packages` has the same shape as in `application.json`,
+  optional `packages`, `roles`, `connectors` and `modules`. `packages` has the same shape as in `application.json`,
   see [Extension packages](extension-packages.md#declaring-packages-in-an-application).
-  `roles` lists the role slots, see Role slots below. `modules`
+  `roles` lists the role slots, see Role slots below. `connectors` lists the
+  connector slots, see Connector slots below. `modules`
   lists the modules it depends on, with the `id` and `version` entries of an application's `modules`, see
-  [dependencies](#processes-pages-policies-and-dependencies). _(planned for M20)_ It gets `connectors`, see
-  [Processes, pages, policies and dependencies](#processes-pages-policies-and-dependencies).
+  [dependencies](#processes-pages-policies-and-dependencies).
 - **Kinds a module may hold.** `entity`, `dataSource`, `rule`, `sequence`,
   `form`, `event`, `text` and `seed`. Processes, pages, roles and policies are
   not allowed. _(planned for M20)_ `process`, `page`, `policy` and `trigger`
@@ -182,7 +183,7 @@ calls `IsDepartmentCode`, so a department code must be in capital letters.
 
 | Built code | Meaning |
 | --- | --- |
-| `AXC0200` | `module.json` is missing, unreadable, not JSON or fails its schema, or another file of the module version cannot be read. Reported at host start, at the failing pointer. A copy of a module in a stored release without a valid `modules/<id>/module.json` is reported the same way, when the release is rebuilt. |
+| `AXC0200` | `module.json` is missing, unreadable, not JSON or fails its schema, or another file of the module version cannot be read. Reported at host start, at the failing pointer. A connector slot name, a slot operation name or a slot field name that repeats an earlier one in its list, ignoring letter case, is reported at its `name`. A copy of a module in a stored release without a valid `modules/<id>/module.json` is reported the same way, when the release is rebuilt. |
 | `AXC0201` | The folder names differ from the manifest `id` or `version`. Reported at host start, at `/id` or `/version`. In a stored release, the folder `modules/<id>/` differing from the manifest `id` is reported the same way. |
 | `AXC0202` | A module file has a kind that a module may not hold, or no kind. Reported at compile, at `/kind` of `modules/<id>/<relative path>`. |
 | `AXC0203` | A `modules` entry names a module with no installed version. Reported in `application.json` at `/modules/{i}/id`, or in `modules/<id>/module.json` for an entry of a module's own `modules`. |
@@ -191,7 +192,7 @@ calls `IsDepartmentCode`, so a department code must be in capital letters.
 | `AXC0206` | A module id appears twice in `modules`. Reported at `/modules/{i}/id` of each later entry, in `application.json` or in `modules/<id>/module.json`. |
 | `AXC0207` | A field's `target` or `sequence`, a data source's or form's `entity`, a widget's or policy grant's `dataSource`, or a qualified rule call `<module id>:<name>(…)` names a module that `modules` does not declare. Reported at `/fields/{i}/target`, `/fields/{i}/sequence`, `/entity`, `/widgets/{i}/dataSource`, `/grants/{i}/dataSource` or the expression's pointer. A module that only another module depends on is not declared by the application, so a reference to it is reported too. A reference under a declared module that could not be pinned is not reported again. |
 | `AXC0208` | A field's `target` or `sequence` in a module entity, the `entity` of a module event, data source or form, or the `target` of a module data source parameter, contains `/`. Reported at that property in `modules/<id>/…`. |
-| `AXC0209` | A module text key lacks the `<id>.` prefix. Reported at `/texts/{key}` of the module text, and at `/roles/{i}/label/textKey` of `modules/<id>/module.json` for a role slot label. |
+| `AXC0209` | A module text key lacks the `<id>.` prefix. Reported at `/texts/{key}` of the module text, and at `/roles/{i}/label/textKey` of `modules/<id>/module.json` for a role slot label, and at `/connectors/{i}/label/textKey` for a connector slot label. |
 | `AXC0210` | An application locale has no text from a pinned module. The message names the locale. Reported in `application.json` at `/modules/{i}` for a declared module, and at `/modules` for a module that only another module depends on. |
 | `AXC0211` | An application text key starts with the `<id>.` prefix of a module the application uses, declared or only depended on. Reported at `/texts/{key}`. |
 | `AXC0212` | An application file sits under `modules/`, which releases reserve. Reported at that file, with an empty path. |
@@ -202,6 +203,13 @@ calls `IsDepartmentCode`, so a department code must be in capital letters.
 | `AXC0294` | A key in the entry's `roles` is not a role slot of the pinned module version. The message lists the slots, or says there are none. Reported at `/modules/{i}/roles/{key}`, escaped the same way. |
 | `AXC0295` | No installed version of a module meets every range that asks for it, and two or more ranges ask. The message names the application or each module that asks, with its range, and lists the installed versions. Reported at `/modules/{i}/version` of the application's own entry when the application asks, and otherwise of the first asking module's `modules/<id>/module.json`. See [resolving the graph](#processes-pages-policies-and-dependencies). |
 | `AXC0296` | Modules depend on each other in a cycle, and a module that depends on itself is a cycle. The message names the cycle. Reported once for each cycle, at `/modules/{i}/id` of the entry that closes it, in `modules/<id>/module.json`. |
+| `AXC0297` | A connector slot of the pinned module version has no key in the entry's `connectors`. The message names the slot, the module and the version. Reported in `application.json` at `/modules/{i}/connectors`, or at `/modules/{i}` when the entry has no `connectors`. |
+| `AXC0298` | A connector slot is mapped to a name that is not a connector the application declares, ignoring letter case. Reported at `/modules/{i}/connectors/{slot}`, with `~` written `~0` and `/` written `~1`. A connector whose file failed its own schema is not reported again. |
+| `AXC0299` | A key in the entry's `connectors` is not a connector slot of the pinned module version. The message lists the slots, or says there are none. Reported at `/modules/{i}/connectors/{key}`, escaped the same way. |
+| `AXC0300` | The connector a slot is mapped to has no operation with the name of an operation of the slot, ignoring letter case. The message names the slot, the connector and the operation. Reported at `/modules/{i}/connectors/{slot}`. |
+| `AXC0301` | An input of a slot operation is not an input of the connector's operation with the same type. The message names the slot, the operation and the field, and both types when the field exists. Reported at `/modules/{i}/connectors/{slot}`. |
+| `AXC0302` | An input of the connector's operation is required, and the slot operation has no input with that name. The message names the slot, the operation and the field. Reported at `/modules/{i}/connectors/{slot}`. |
+| `AXC0303` | An output of a slot operation is not an output of the connector's operation with the same type. The message names the slot, the operation and the field, and both types when the field exists. Reported at `/modules/{i}/connectors/{slot}`. |
 
 ### Processes, pages, policies and dependencies
 
@@ -279,10 +287,27 @@ agrees. An application that declares it maps the slot to one of its own roles:
   `"connectors": { "orders": "PurchasingSystem" }`. The connector must have
   each operation of the slot by name, every input of the slot with the same
   type, no required input the slot lacks, and every output of the slot with
-  the same type. An unmapped slot, an unknown connector and each mismatch are
-  new diagnostics. The application's connector keeps its base URL, auth,
-  bindings, timeout, idempotency header and lookup. A depending module maps
-  the connector slots of a module it depends on to its own slots.
+  the same type. Declaring and mapping connector slots, with these checks, is built.
+  Slot names are unique in the module, and so are the operation names of a
+  slot and the field names of an input or output, all ignoring letter case, or
+  the version fails at host start with `AXC0200`. A label is a `textKey` that
+  starts with `<module id>.`, or `AXC0209` is reported at
+  `/connectors/{i}/label/textKey`. An unmapped slot is `AXC0297`, at
+  `/modules/{i}/connectors` of `application.json`, or at `/modules/{i}` when the
+  entry has no `connectors`. A slot mapped to an undeclared connector is
+  `AXC0298` and a key that is no slot is `AXC0299`, both at
+  `/modules/{i}/connectors/{slot}`. A missing operation is `AXC0300`, an input
+  of another type or one the operation lacks is `AXC0301`, a required operation
+  input the slot lacks is `AXC0302` and an output of another type or one the
+  operation lacks is `AXC0303`, each at the same pointer and with a message
+  that names the slot, the operation and the field. Slot keys are matched
+  exactly. Connector, operation and field names are matched ignoring letter
+  case, and a field's `required` is not compared for the slot's own fields. The
+  compiled model keeps the map from slot to the connector's declared name.
+  The application's connector keeps its base URL, auth, bindings, timeout,
+  idempotency header and lookup. _(planned for M20)_ A `callConnector` step on
+  a slot, and a depending module that maps the connector slots of a module it
+  depends on to its own slots.
 - **Scenarios** _(planned for M24)_. A module scenario gives its users role
   slots instead of roles. When it runs for an application, each slot becomes
   the role it maps to, and the scenario runs against the application as

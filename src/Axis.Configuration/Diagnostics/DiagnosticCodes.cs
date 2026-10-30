@@ -282,4 +282,11 @@ public static class DiagnosticCodes
     public const string UnknownModuleRoleSlot = "AXC0294";
     public const string ModuleRangeConflict = "AXC0295";
     public const string ModuleDependencyCycle = "AXC0296";
+    public const string UnmappedModuleConnectorSlot = "AXC0297";
+    public const string UnknownModuleSlotConnector = "AXC0298";
+    public const string UnknownModuleConnectorSlot = "AXC0299";
+    public const string MissingSlotOperation = "AXC0300";
+    public const string MismatchedSlotInput = "AXC0301";
+    public const string MissingSlotRequiredInput = "AXC0302";
+    public const string MismatchedSlotOutput = "AXC0303";
 }

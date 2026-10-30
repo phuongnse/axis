@@ -16,4 +16,11 @@ public sealed record ApplicationModuleDefinition
     /// key is a slot name and the value a role name. The compiler checks it against the pinned version.
     /// </summary>
     public IReadOnlyDictionary<string, string> Roles { get; init; } = new Dictionary<string, string>();
+
+    /// <summary>
+    /// The mapping from each connector slot of the module to a connector of the application, as
+    /// written: the key is a slot name and the value a connector name. The compiler checks it against
+    /// the pinned version.
+    /// </summary>
+    public IReadOnlyDictionary<string, string> Connectors { get; init; } = new Dictionary<string, string>();
 }

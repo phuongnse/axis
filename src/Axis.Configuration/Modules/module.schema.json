@@ -20,6 +20,10 @@
       "type": "array",
       "items": { "$ref": "#/$defs/roleSlot" }
     },
+    "connectors": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/connectorSlot" }
+    },
     "modules": {
       "type": "array",
       "items": { "$ref": "#/$defs/module" }
@@ -48,6 +52,55 @@
           "properties": {
             "textKey": { "type": "string", "minLength": 1 }
           }
+        }
+      }
+    },
+    "connectorName": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9]*$",
+      "maxLength": 60
+    },
+    "connectorType": {
+      "enum": ["text", "integer", "decimal", "boolean", "date", "date-time"]
+    },
+    "connectorField": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "type"],
+      "properties": {
+        "name": { "$ref": "#/$defs/connectorName" },
+        "type": { "$ref": "#/$defs/connectorType" },
+        "required": { "type": "boolean" }
+      }
+    },
+    "slotOperation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": { "$ref": "#/$defs/connectorName" },
+        "input": { "type": "array", "items": { "$ref": "#/$defs/connectorField" } },
+        "output": { "type": "array", "items": { "$ref": "#/$defs/connectorField" } }
+      }
+    },
+    "connectorSlot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "label", "operations"],
+      "properties": {
+        "name": { "$ref": "#/$defs/connectorName" },
+        "label": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["textKey"],
+          "properties": {
+            "textKey": { "type": "string", "minLength": 1 }
+          }
+        },
+        "operations": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/slotOperation" }
         }
       }
     },

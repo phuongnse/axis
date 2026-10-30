@@ -1,5 +1,6 @@
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Model;
+using Axis.Configuration.Modules;
 using Axis.Configuration.Resources;
 
 namespace Axis.Configuration.Compilation;
@@ -13,6 +14,7 @@ namespace Axis.Configuration.Compilation;
 /// <c>{idempotencyKey}</c> and whose outputs are those of the operation it serves. The schema
 /// already refuses inputs on a <c>GET</c>. Every problem of a connector is reported in one pass.
 /// Its bindings are checked at activation, against the tenant's.
+/// <see cref="CheckSlot"/> checks a connector against a module's connector slot.
 /// </summary>
 internal static class ConnectorChecker
 {
@@ -64,6 +66,64 @@ internal static class ConnectorChecker
                 if (operation.Lookup is { } lookup && FindLookupProblem(connector, operation, lookup) is { } problem)
                 {
                     Report(DiagnosticCodes.InvalidOperationLookup, problem, $"/operations/{index}/lookup");
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Checks that <paramref name="connector"/> fits <paramref name="slot"/>, and reports every
+    /// problem in one pass through <paramref name="report"/>, with a code and a message. Each slot
+    /// operation must be an operation of the connector, ignoring letter case. Each slot input must be
+    /// an input of that operation with the same type, every required input of the operation must be a
+    /// slot input, and each slot output must be an output of the operation with the same type. Field
+    /// names are matched ignoring letter case, and a field's <c>required</c> is not compared.
+    /// </summary>
+    public static void CheckSlot(ModuleConnectorSlot slot, ConnectorResource connector, Action<string, string> report)
+    {
+        foreach (var slotOperation in slot.Operations)
+        {
+            if (Find(connector, slotOperation.Name) is not { } operation)
+            {
+                report(
+                    DiagnosticCodes.MissingSlotOperation,
+                    $"The connector '{connector.Name}' has no operation '{slotOperation.Name}', which slot '{slot.Name}' needs.");
+                continue;
+            }
+
+            foreach (var field in slotOperation.Input)
+            {
+                var match = FindField(operation.Input, field.Name);
+                if (match is null || match.Type != field.Type)
+                {
+                    report(
+                        DiagnosticCodes.MismatchedSlotInput,
+                        match is null
+                            ? $"Slot '{slot.Name}' sends the input '{field.Name}' of type '{field.Type}' to operation '{operation.Name}', but operation '{operation.Name}' of connector '{connector.Name}' has no input '{field.Name}'."
+                            : $"Slot '{slot.Name}' sends the input '{field.Name}' of type '{field.Type}' to operation '{operation.Name}', but operation '{operation.Name}' of connector '{connector.Name}' has the input '{match.Name}' of type '{match.Type}'.");
+                }
+            }
+
+            foreach (var field in operation.Input.Where(input => input.Required))
+            {
+                if (FindField(slotOperation.Input, field.Name) is null)
+                {
+                    report(
+                        DiagnosticCodes.MissingSlotRequiredInput,
+                        $"Operation '{operation.Name}' of connector '{connector.Name}' requires the input '{field.Name}', but slot '{slot.Name}' has no input '{field.Name}' for operation '{slotOperation.Name}'.");
+                }
+            }
+
+            foreach (var field in slotOperation.Output)
+            {
+                var match = FindField(operation.Output, field.Name);
+                if (match is null || match.Type != field.Type)
+                {
+                    report(
+                        DiagnosticCodes.MismatchedSlotOutput,
+                        match is null
+                            ? $"Slot '{slot.Name}' reads the output '{field.Name}' of type '{field.Type}' from operation '{operation.Name}', but operation '{operation.Name}' of connector '{connector.Name}' has no output '{field.Name}'."
+                            : $"Slot '{slot.Name}' reads the output '{field.Name}' of type '{field.Type}' from operation '{operation.Name}', but operation '{operation.Name}' of connector '{connector.Name}' has the output '{match.Name}' of type '{match.Type}'.");
                 }
             }
         }
@@ -198,6 +258,10 @@ internal static class ConnectorChecker
     /// <summary>Finds the first operation with <paramref name="name"/>, ignoring letter case.</summary>
     private static ConnectorOperationDefinition? Find(ConnectorResource connector, string name) =>
         connector.Operations.FirstOrDefault(candidate => string.Equals(candidate.Name, name, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>Finds the first field with <paramref name="name"/>, ignoring letter case.</summary>
+    private static ConnectorFieldDefinition? FindField(IReadOnlyList<ConnectorFieldDefinition> fields, string name) =>
+        fields.FirstOrDefault(candidate => string.Equals(candidate.Name, name, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>Whether two field lists have the same names, ignoring letter case and order, with the same type and <c>required</c>.</summary>
     private static bool SameFields(IReadOnlyList<ConnectorFieldDefinition> left, IReadOnlyList<ConnectorFieldDefinition> right)
