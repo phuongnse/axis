@@ -17,6 +17,8 @@ public static class FieldTypes
         ["child-collection"] = FieldType.ChildCollection,
         ["file"] = FieldType.File,
         ["money"] = FieldType.Money,
+        ["object"] = FieldType.Object,
+        ["list"] = FieldType.List,
     };
 
     private static readonly Dictionary<FieldType, string> _namesByType = _typesByName.ToDictionary(pair => pair.Value, pair => pair.Key);

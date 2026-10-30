@@ -44,7 +44,9 @@ public sealed class FieldRangeCompilerTests
         [FieldType.File] = "\"type\": \"file\"",
     };
 
-    public static TheoryData<FieldType> Types => new(Enum.GetValues<FieldType>());
+    // Object and List are connector input types, refused by the entity schema.
+    public static TheoryData<FieldType> Types =>
+        new(Enum.GetValues<FieldType>().Where(type => type is not (FieldType.Object or FieldType.List)));
 
     [Theory]
     [MemberData(nameof(Types))]

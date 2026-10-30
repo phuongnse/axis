@@ -30,7 +30,8 @@ public sealed class ExportWriterTests
             [FieldType.Money] = (JsonNode.Parse("12345678901234567890.10")!, null, "12345678901234567890.10"),
         };
 
-    private static readonly FieldType[] _types = [.. Enum.GetValues<FieldType>()];
+    // Object and List are connector input types, refused by the entity schema.
+    private static readonly FieldType[] _types = [.. Enum.GetValues<FieldType>().Where(type => type is not (FieldType.Object or FieldType.List))];
 
     public static TheoryData<FieldType> ColumnTypes() =>
         [.. _types.Where(type => type != FieldType.ChildCollection)];

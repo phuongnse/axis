@@ -15,7 +15,9 @@ namespace Axis.Configuration.Compilation;
 /// and is not named <c>idempotencyKey</c>, and a <c>GET</c> has no <c>body</c> input. A <c>lookup</c> names
 /// another operation of the connector, ignoring letter case, which is a <c>GET</c> with no inputs whose path
 /// holds <c>{idempotencyKey}</c> and whose outputs, with their <c>source</c>, are those of the operation it
-/// serves. Every problem of a connector is reported in one pass.
+/// serves. An <c>object</c> or <c>list</c> input holds nested fields, whose names are unique within their list,
+/// ignoring letter case, and which go four levels deep at most, counting the input as the first. Such an input goes
+/// only in the body. Every problem of a connector is reported in one pass.
 /// Its bindings are checked at activation, against the tenant's. At compile time,
 /// <see cref="CheckBindingKinds"/> reports an <c>oauth2</c> binding whose name the application uses as another kind.
 /// <see cref="CheckSlot"/> checks a connector against a module's connector slot, and
@@ -24,6 +26,7 @@ namespace Axis.Configuration.Compilation;
 internal static class ConnectorChecker
 {
     private const string IdempotencyKeyPlaceholder = "idempotencyKey";
+    private const int MaxInputLevels = 4;
 
     private static readonly TimeSpan _defaultTimeout = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan _maxTimeout = TimeSpan.FromMinutes(2);
@@ -59,6 +62,15 @@ internal static class ConnectorChecker
 
                 CheckFieldNames(operation.Input, $"{path}/input", "input", Report);
                 CheckFieldNames(operation.Output, $"{path}/output", "output", Report);
+                for (var inputIndex = 0; inputIndex < operation.Input.Count; inputIndex++)
+                {
+                    var input = operation.Input[inputIndex];
+                    if (IsStructured(input.Type) && input.Fields is { } nested)
+                    {
+                        CheckNestedFields(nested, $"{path}/input/{inputIndex}/fields", input.Name, 2, Report);
+                    }
+                }
+
                 for (var outputIndex = 0; outputIndex < operation.Output.Count; outputIndex++)
                 {
                     if (operation.Output[outputIndex].Source is { } source && FindSourceProblem(source) is { } sourceProblem)
@@ -277,7 +289,10 @@ internal static class ConnectorChecker
     }
 
     private static ConnectorFieldModel BuildField(ConnectorFieldDefinition field) =>
-        new(field.Name, FieldTypes.Parse(field.Type), field.Required, field.In, field.Source);
+        new(field.Name, FieldTypes.Parse(field.Type), field.Required, field.In, field.Source)
+        {
+            Fields = field.Fields?.Select(BuildField).ToList(),
+        };
 
     /// <summary>Parses a timeout, which is 30 seconds when not written.</summary>
     private static bool TryParseTimeout(string? text, out TimeSpan timeout)
@@ -307,9 +322,55 @@ internal static class ConnectorChecker
         }
     }
 
+    private static bool IsStructured(string type) => type is "object" or "list";
+
+    /// <summary>
+    /// Reports a repeated name among <paramref name="fields"/>, ignoring letter case, and an <c>object</c> or
+    /// <c>list</c> field deeper than four levels. <paramref name="level"/> is the level of these fields. A field
+    /// that is too deep is reported once, and the fields below it are not checked.
+    /// </summary>
+    private static void CheckNestedFields(
+        IReadOnlyList<ConnectorFieldDefinition> fields,
+        string path,
+        string parentName,
+        int level,
+        Action<string, string, string> report)
+    {
+        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        for (var index = 0; index < fields.Count; index++)
+        {
+            var field = fields[index];
+            if (!names.Add(field.Name))
+            {
+                report(
+                    DiagnosticCodes.DuplicateConnectorName,
+                    $"The field name '{field.Name}' is already used by an earlier field of '{parentName}'.",
+                    $"{path}/{index}/name");
+            }
+
+            if (!IsStructured(field.Type))
+            {
+                continue;
+            }
+
+            if (level > MaxInputLevels)
+            {
+                report(
+                    DiagnosticCodes.ConnectorInputTooDeep,
+                    $"The field '{field.Name}' is {(field.Type == "object" ? "an object" : "a list")} at level {level}. Inputs nest objects and lists {MaxInputLevels} levels deep at most, counting the input as level 1. Make the field a scalar or move it up.",
+                    $"{path}/{index}");
+            }
+            else if (field.Fields is { } nested)
+            {
+                CheckNestedFields(nested, $"{path}/{index}/fields", field.Name, level + 1, report);
+            }
+        }
+    }
+
     /// <summary>
     /// Reports, at each input of <paramref name="operation"/>, a <c>path</c> input that is not in the
-    /// path, is not <c>required</c> or is named <c>idempotencyKey</c>, and a <c>body</c> input on a <c>GET</c>.
+    /// path, is not <c>required</c> or is named <c>idempotencyKey</c>, a <c>body</c> input on a <c>GET</c>, and an
+    /// <c>object</c> or <c>list</c> input outside the body.
     /// </summary>
     private static void CheckInputPlacement(
         ConnectorOperationDefinition operation, string operationPath, Action<string, string, string> report)
@@ -319,6 +380,15 @@ internal static class ConnectorChecker
         {
             var field = operation.Input[index];
             var path = $"{operationPath}/input/{index}";
+            if (IsStructured(field.Type) && field.In != "body")
+            {
+                report(
+                    DiagnosticCodes.MisplacedConnectorInput,
+                    $"The input '{field.Name}' is {(field.Type == "object" ? "an object" : "a list")}, so it can only go in the body. Only scalar inputs go in the path, the query or a header. Remove 'in' or set it to 'body'.",
+                    path);
+                continue;
+            }
+
             if (field.In == "path")
             {
                 if (string.Equals(field.Name, IdempotencyKeyPlaceholder, StringComparison.OrdinalIgnoreCase))
