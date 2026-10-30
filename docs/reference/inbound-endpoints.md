@@ -305,3 +305,12 @@ state of an instance that an endpoint call started.
   `state`. `output` is there only when the instance is `completed`.
 - **Output as contract.** The output values are read as the endpoint's
   contract, outside field grants, as the call's own `201` does.
+
+## Editing in Studio
+
+- **Endpoint `event`** _(built)_. The [Studio](studio.md) endpoint form shows the
+  `event` as a picker of the application's events. The event's `fields` show as
+  rows of a payload field and an expression, and **Add mapping** lists the
+  payload fields that have no row. Clearing the picker removes the whole
+  `event`. Picking another event keeps the rows. A value that is not an object
+  is left to the JSON view.
