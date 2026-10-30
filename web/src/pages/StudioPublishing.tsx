@@ -241,16 +241,27 @@ export function StudioPublishing({
 
   const actions = (
     <Flex gap="small" align="center">
-      <Button disabled={busy} onClick={() => send(() => validateStudioApp(application))}>
+      {/* Proposed: in the band, the actions that check are text buttons, so Publish is its one solid button. */}
+      <Button type="text" disabled={busy} onClick={() => send(() => validateStudioApp(application))}>
         {t('shell.studio.validate')}
       </Button>
       {previewHost !== null && (
-        <Button data-testid="studio-preview" disabled={busy} onClick={() => send(() => previewStudioApp(application))}>
+        <Button
+          type="text"
+          data-testid="studio-preview"
+          disabled={busy}
+          onClick={() => send(() => previewStudioApp(application))}
+        >
           {t('shell.studio.preview')}
         </Button>
       )}
       {canTest && (
-        <Button data-testid="studio-run-tests" disabled={busy} onClick={() => send(() => testStudioApp(application))}>
+        <Button
+          type="text"
+          data-testid="studio-run-tests"
+          disabled={busy}
+          onClick={() => send(() => testStudioApp(application))}
+        >
           {t('shell.studio.runTests')}
         </Button>
       )}
