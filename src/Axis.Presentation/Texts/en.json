@@ -310,6 +310,7 @@
   "shell.studio.kind": "Kind",
   "shell.studio.moduleEntities": "Module entities",
   "shell.studio.moduleProcesses": "Module processes",
+  "shell.studio.modulePages": "Module pages",
   "shell.studio.modulePolicies": "Module policies",
   "shell.studio.moduleRoles": "Roles",
   "shell.studio.moduleGrants.target": "Target",

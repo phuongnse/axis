@@ -238,27 +238,31 @@ describe('moduleResources', () => {
       { id: 'own-policy', name: 'Access', module: null },
       { id: 'checklists-policy', name: 'checklists/ChecklistAccess', module: 'checklists' },
     ],
-    pages: [{ id: 'checklists-page', name: 'checklists/Checklists', module: 'checklists', parameters: [] }],
+    pages: [
+      { id: 'own-page', name: 'Home', module: null, parameters: [] },
+      { id: 'checklists-page', name: 'checklists/Checklists', module: 'checklists', parameters: [] },
+    ],
   } as unknown as StudioNames
 
-  it('returns the entities, processes and policies of modules with their module id', () => {
+  it('returns the entities, processes, policies and pages of modules with their module id', () => {
     const groups = moduleResources(names, '')
 
-    expect(groups.map((group) => group.kind)).toEqual(['entity', 'process', 'policy'])
+    expect(groups.map((group) => group.kind)).toEqual(['entity', 'process', 'policy', 'page'])
     expect(groups.flatMap((group) => group.items)).toEqual([
       { id: 'checklists-entity', kind: 'entity', name: 'checklists/Checklist', module: 'checklists' },
       { id: 'checklists-process', kind: 'process', name: 'checklists/ChecklistReview', module: 'checklists' },
       { id: 'checklists-policy', kind: 'policy', name: 'checklists/ChecklistAccess', module: 'checklists' },
+      { id: 'checklists-page', kind: 'page', name: 'checklists/Checklists', module: 'checklists' },
     ])
   })
 
-  it('leaves out the application own resources and the pages', () => {
+  it('leaves out the application own resources', () => {
     const ids = moduleResources(names, '').flatMap((group) => group.items.map((item) => item.id))
 
     expect(ids).not.toContain('own-entity')
     expect(ids).not.toContain('own-process')
     expect(ids).not.toContain('own-policy')
-    expect(ids).not.toContain('checklists-page')
+    expect(ids).not.toContain('own-page')
   })
 
   it('applies the search to the name and the id, ignoring letter case and spaces, and drops empty groups', () => {

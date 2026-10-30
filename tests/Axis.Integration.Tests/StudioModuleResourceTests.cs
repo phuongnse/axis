@@ -9,7 +9,8 @@ namespace Axis.Integration.Tests;
 
 /// <summary>
 /// The Studio module resource route answers one file of the module version an application pins. It checks the
-/// session and the author role, and answers 404 for an unknown application, module or resource.
+/// session and the author role, and answers 404 for an unknown application, module or resource. Its page metadata route
+/// answers a module page the same way.
 /// </summary>
 public sealed class StudioModuleResourceTests : IAsyncLifetime
 {
@@ -18,6 +19,8 @@ public sealed class StudioModuleResourceTests : IAsyncLifetime
     private const string Host = "a.example.test";
 
     private const string DepartmentId = "3a5633d1-fc29-4997-b93d-36a1a865c8e3";
+
+    private const string ModulePageId = "5fc44a93-1087-417f-b29d-85ea3ce86be1";
 
     private readonly PostgreSqlFixture _database = new();
 
@@ -101,6 +104,52 @@ public sealed class StudioModuleResourceTests : IAsyncLifetime
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
+
+    [Fact]
+    public async Task An_author_reads_the_metadata_of_a_module_page()
+    {
+        using var client = _factory.CreateClient().SignedInAs("author");
+        using var response = await client.SendAsync(PageRequest("LeaveRequests", "departments", ModulePageId), CancellationToken);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken)).RootElement;
+        var page = body.GetProperty("page");
+        Assert.Equal("departments/Departments", page.GetProperty("name").GetString());
+        var widget = page.GetProperty("widgets")[0];
+        Assert.Equal("table", widget.GetProperty("type").GetString());
+        Assert.Equal("/widgets/0", widget.GetProperty("path").GetString());
+        Assert.Equal(0, body.GetProperty("diagnostics").GetArrayLength());
+    }
+
+    [Fact]
+    public async Task The_module_page_route_needs_a_session_and_the_author_role()
+    {
+        using var anonymous = _factory.CreateClient();
+        using var anonymousResponse = await anonymous.SendAsync(PageRequest("LeaveRequests", "departments", ModulePageId), CancellationToken);
+        Assert.Equal(HttpStatusCode.Unauthorized, anonymousResponse.StatusCode);
+
+        using var employee = _factory.CreateClient().SignedInAs("requester");
+        using var employeeResponse = await employee.SendAsync(PageRequest("LeaveRequests", "departments", ModulePageId), CancellationToken);
+        Assert.Equal(HttpStatusCode.Forbidden, employeeResponse.StatusCode);
+    }
+
+    [Theory]
+    [InlineData("Unknown", "departments", ModulePageId)]
+    [InlineData("LeaveRequests", "nope", ModulePageId)]
+    [InlineData("LeaveRequests", "departments", DepartmentId)]
+    [InlineData("LeaveRequests", "departments", "5b0f6e3c-2d8a-4c1e-9a77-0e4f1d2c3b4a")]
+    [InlineData("LeaveRequests", "departments", "not-a-guid")]
+    public async Task The_module_page_route_answers_404_for_an_unknown_application_module_or_resource_or_one_that_is_not_a_page(
+        string application, string module, string id)
+    {
+        using var client = _factory.CreateClient().SignedInAs("author");
+        using var response = await client.SendAsync(PageRequest(application, module, id), CancellationToken);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    private static HttpRequestMessage PageRequest(string application, string module, string id) =>
+        RecordApiFixture.Request($"/api/studio/apps/{application}/modules/{module}/resources/{id}/page-metadata", Host);
 
     private static HttpRequestMessage Request(string application, string module, string id) =>
         RecordApiFixture.Request($"/api/studio/apps/{application}/modules/{module}/resources/{id}", Host);

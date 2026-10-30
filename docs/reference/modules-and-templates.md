@@ -487,9 +487,9 @@ agrees. An application that declares it maps the slot to one of its own roles:
   unknown-name code.
 - **Studio.** The policy matrix lists a module policy's grants in the row of the
   role its slot maps to, read-only and tagged with the module, without an Open policy
-  link. Studio shows a module's processes and policies read-only _(built)_, as it shows
-  module entities: a process as its graph and a policy as a table of its grants. A
-  module's pages stay _(planned for M20)_. Studio never edits a module.
+  link. Studio shows a module's processes, policies and pages read-only _(built)_, as it shows
+  module entities: a process as its graph, a policy as a table of its grants and a page
+  drawn on the page canvas. Studio never edits a module.
 - **Upgrades.** A module upgrade must still be additive for its entities
   (`AXC0213`). Adding a process, page or policy is additive, and a version that adds a process
   file is accepted.

@@ -35,7 +35,8 @@ namespace Axis.Server.Studio;
 /// <c>GET /api/studio/apps/{application}/modules/{module}/resources/{id}</c> answers one file of the module version the
 /// application pins, the highest installed version in its range, in the shape of a resource read, with <c>file</c> as
 /// <c>modules/&lt;module&gt;/&lt;path&gt;</c> and no <c>ETag</c>. It answers 404 for an unknown application, a module the
-/// application does not pin and an unknown resource, and never answers <c>module.json</c>.
+/// application does not pin and an unknown resource, and never answers <c>module.json</c>. The page metadata route of
+/// <see cref="StudioPageMetadataEndpoints"/> finds a module page with the same lookup.
 /// <c>GET /api/studio/apps/{application}/resources/{id}/references</c> answers <c>{ uses, usedBy }</c> from the same
 /// compile's reference index, and <c>GET /api/studio/apps/{application}/texts/{key}/references</c> answers
 /// <c>{ usedBy }</c>. A text key that nothing defines or uses answers 404.
@@ -209,20 +210,43 @@ internal static class StudioEndpoints
             return refusal!;
         }
 
-        var pin = ApplicationCompiler.Compile(folder, packages.Versions, modules.Modules).ModulePins
-            .FirstOrDefault(pin => string.Equals(pin.Id, module, StringComparison.Ordinal));
+        var (found, notFound) = FindModuleFile(
+            ApplicationCompiler.Compile(folder, packages.Versions, modules.Modules), modules, module, id);
+        if (found is null)
+        {
+            return notFound!;
+        }
+
+        return Results.Ok(new StudioResourceResponse(
+            found.Id.ToString("D"),
+            found.Kind,
+            found.Name,
+            $"modules/{module}/{found.Path}",
+            Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(found.Text))),
+            found.Root));
+    }
+
+    /// <summary>One file of an installed module version: its file id, kind, name, path, text and parsed root.</summary>
+    internal sealed record ModuleFile(Guid Id, string Kind, string? Name, string Path, string Text, JsonElement Root);
+
+    // The file with this id, written in the file, in the module version the compile pins, or the 404 problem. The id is not
+    // the one derived for the application. The module's manifest is never a resource.
+    internal static (ModuleFile? File, IResult? NotFound) FindModuleFile(
+        CompilationResult compiled, ModuleCatalog modules, string module, string id)
+    {
+        var pin = compiled.ModulePins.FirstOrDefault(pin => string.Equals(pin.Id, module, StringComparison.Ordinal));
         var installed = pin is null
             ? null
             : modules.Modules.FirstOrDefault(item =>
                 item.Manifest.Id == pin.Id && item.Manifest.Version == pin.Version);
         if (installed is null)
         {
-            return NotFound("The application uses no module with this id.");
+            return (null, NotFound("The application uses no module with this id."));
         }
 
         if (id is not { Length: 36 } || !Guid.TryParseExact(id, "D", out var guid))
         {
-            return NotFound(NoModuleResource);
+            return (null, NotFound(NoModuleResource));
         }
 
         foreach (var file in installed.Files.Where(file => file.Path != ModuleCatalog.ManifestFileName))
@@ -242,20 +266,14 @@ internal static class StudioEndpoints
                 var name = root.TryGetProperty("name", out var nameProperty) && nameProperty.ValueKind == JsonValueKind.String
                     ? nameProperty.GetString()
                     : null;
-                return Results.Ok(new StudioResourceResponse(
-                    guid.ToString("D"),
-                    kind.GetString()!,
-                    name,
-                    $"modules/{module}/{file.Path}",
-                    Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(file.Content))),
-                    root.Clone()));
+                return (new ModuleFile(guid, kind.GetString()!, name, file.Path, file.Content, root.Clone()), null);
             }
             catch (JsonException)
             {
             }
         }
 
-        return NotFound(NoModuleResource);
+        return (null, NotFound(NoModuleResource));
     }
 
     private static async Task<IResult> DiagnosticsAsync(
