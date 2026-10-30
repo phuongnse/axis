@@ -27,12 +27,19 @@ interface Loaded {
   sites: SiteListItem[] | null | 'failed'
 }
 
+/**
+ * Proposed: the home page's grid takes as many columns as it has tiles, up to three: one tile fills the row, two share
+ * it, and three or more take a third each. `auto-fit` drops the empty columns, and a column is never narrower than a
+ * third of the row, so no rule counts the tiles. Below 992 px it is one column.
+ */
 function useHomeGrid(): CSSProperties {
   const narrow = useNarrowWidth()
   const { spacing } = useDesignTokens()
   return {
     display: 'grid',
-    gridTemplateColumns: narrow ? '1fr' : 'repeat(3, minmax(0, 1fr))',
+    gridTemplateColumns: narrow
+      ? '1fr'
+      : `repeat(auto-fit, minmax(max(0px, calc((100% - ${2 * spacing.md}px) / 3)), 1fr))`,
     gap: spacing.md,
   }
 }
