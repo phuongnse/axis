@@ -646,7 +646,7 @@ internal sealed class TenantRestore : IAsyncDisposable
     {
         var row = _row!;
         var cipher = _settings.Cipher;
-        await _realm!.EnsureForTenantAsync(_platform, row, cipher, _cancellationToken);
+        await _realm!.EnsureForTenantAsync(_platform, row, cipher, _settings.Mail ?? RealmMail.None, _cancellationToken);
 
         var applications = new List<RealmApplication>();
         var connection = await Steps.SchemaConnectionAsync();

@@ -198,7 +198,7 @@ internal sealed class TenantCreate : IAsyncDisposable
         _steps ??= new TenantDatabaseSteps(_settings.Cipher, _row!, _admin.Host!, _admin.Port, TenantDatabaseTls.From(_admin.ConnectionString), _cancellationToken);
 
     // Saves the secrets and the Oidc block before the realm exists, so a stop between the two never loses a secret.
-    private Task RealmAsync() => _realm!.EnsureForTenantAsync(_platform, _row!, _settings.Cipher, _cancellationToken);
+    private Task RealmAsync() => _realm!.EnsureForTenantAsync(_platform, _row!, _settings.Cipher, _settings.Mail ?? RealmMail.None, _cancellationToken);
 
     private async Task ActivateAsync()
     {

@@ -121,7 +121,7 @@ public sealed class PreviewTenantPlatformSignInTests(KeycloakFixture keycloak, P
         _baseAddress = await keycloak.BaseAddressAsync();
         _adminToken = await MasterTokenAsync();
         await new TenantRealm(_http, new IdentityProviderAdmin(_baseAddress, KeycloakFixture.AdminClientId, KeycloakFixture.AdminClientSecret))
-            .EnsureAsync(_realm, "Acme", new TenantRealmSecrets(PlatformSecret, "activation-secret-1", UsersSecret), CancellationToken);
+            .EnsureAsync(_realm, "Acme", new TenantRealmSecrets(PlatformSecret, "activation-secret-1", UsersSecret), new Dictionary<string, string>(), CancellationToken);
         await ConfigureClientAsync();
         _patId = await CreatePatAsync();
 

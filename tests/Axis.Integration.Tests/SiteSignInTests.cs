@@ -78,7 +78,7 @@ public sealed class SiteSignInTests(KeycloakFixture keycloak, PostgreSqlFixture 
         try
         {
             await new TenantRealm(http, new IdentityProviderAdmin(baseAddress, KeycloakFixture.AdminClientId, KeycloakFixture.AdminClientSecret))
-                .EnsureAsync(realm, "Acme", _realmSecrets, CancellationToken);
+                .EnsureAsync(realm, "Acme", _realmSecrets, new Dictionary<string, string>(), CancellationToken);
             await using var host = await StartAsync(
                 partner: true, new Uri(baseAddress, $"realms/{realm}"), realm, _realmSecrets.Platform, _realmSecrets.Activation);
 
@@ -484,7 +484,7 @@ public sealed class SiteSignInTests(KeycloakFixture keycloak, PostgreSqlFixture 
         var tenant = realms.NewRealmName();
         using var http = new HttpClient();
         await new TenantRealm(http, new IdentityProviderAdmin(baseAddress, KeycloakFixture.AdminClientId, KeycloakFixture.AdminClientSecret))
-            .EnsureAsync(tenant, "Acme", _realmSecrets, CancellationToken);
+            .EnsureAsync(tenant, "Acme", _realmSecrets, new Dictionary<string, string>(), CancellationToken);
         var clients = await realms.GetJsonAsync($"admin/realms/{tenant}/clients?clientId={TenantRealm.PlatformClientId}");
         var platform = clients[0].Deserialize<Dictionary<string, JsonElement>>()!;
         platform["redirectUris"] = JsonSerializer.SerializeToElement(new[] { $"{_serverAddress.AbsoluteUri}*" });

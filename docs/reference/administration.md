@@ -41,6 +41,7 @@ which host holds which connection. There is no HTTP API for provisioning.
 | `IdentityProvider:Url` | `IdentityProvider__Url` | The base address of [Axis's identity provider](identity-provider.md), such as `https://idp.example.com/`. `tenant create` of a main tenant reads it, and `tenant restore` reads it when it is set. `tenant restore` needs it when the archive's tenant signed in through its own realm, see [Tenant restore](#tenant-restore). It must be an absolute URL, and `https` outside `Development` and `Testing`. A path in it is kept. |
 | `IdentityProvider:AdminClientId` | `IdentityProvider__AdminClientId` | The client of the identity provider's `master` realm that `tenant create` signs in as, with the client credentials grant, to create a tenant's realm. `tenant create` of a main tenant reads it, and so does `tenant restore` when it is set. |
 | `IdentityProvider:AdminClientSecret` | `IdentityProvider__AdminClientSecret` | The secret of that client. `tenant create` of a main tenant reads it, and so does `tenant restore` when `IdentityProvider:Url` is set. It is never stored and never printed. |
+| `Email:*` | `Email__...` | The host's mail settings, with the same keys as the worker's, see [mail settings](notifications.md#mail-settings). A tenant without mail settings of its own gets them in its realm's mail server, see [keeping the realm in step](identity-provider.md#keeping-the-realm-in-step). `tenant create`, `tenant restore`, `activate`, `publisher` and `tenant email set` and `clear` read them. A value that is not valid exits with code 2, naming the setting. Without them, a tenant that has no mail settings of its own gets no mail server in its realm. |
 | `Tenants` | `Tenants__<id>__...` | The tenants of `Tenancy:Source=configuration`, with each `SchemaConnectionString` and `ConnectionString` and its bindings. Only `publisher` reads them, and only under that source. See [publisher](#publisher). |
 | `DOTNET_ENVIRONMENT` | `DOTNET_ENVIRONMENT` | `Development` lets a `url` binding use `http` and a `secret` binding take its value from a configuration file, as on the server and the worker. Only `publisher` under the configuration source reads that. Every command reads it for the TLS check: outside `Development` and `Testing`, a command exits with code 2, naming the setting, when `Admin:ConnectionString`, `ConnectionStrings:PlatformSchema` or `Scenarios:ServerConnectionString` is set with an `SSL Mode` below `VerifyFull` or none. An unset value is `Production`. |
 | `Scenarios:ServerConnectionString` | `Scenarios__ServerConnectionString` | A database role with `CREATEDB`, not a superuser, that owns no tenant database. Only `publisher` reads it, to run `test` requests. It creates and drops the `axis_scenario_<uuid>` databases of the scenarios. Empty means a `test` request fails with `AXC0217`, which names this setting. A value that is not a connection string exits with code 2. See [database roles](storage.md#database-roles). |
@@ -64,11 +65,10 @@ the `IdentityProvider` settings or `AXIS_OIDC_CLIENT_SECRET`.
 `Platform:PreviousSecretKey`. It needs no admin role, no client secret and no `Tenancy:Source`.
 
 The `tenant binding`, `tenant host` and `tenant email` commands read `ConnectionStrings:PlatformSchema` and
-need `Tenancy:Source=directory`. Only `tenant binding set --secret` and `tenant email set --password`
-also read `Platform:SecretKey`, because they encrypt. See
+need `Tenancy:Source=directory`. Only `tenant binding set --secret` and the two `tenant email` commands
+also read `Platform:SecretKey`, because they encrypt, or, for `tenant email`, decrypt the password to copy it into the realm. See
 [tenant setting commands](tenant-setting-commands.md).
-`tenant session end` reads `ConnectionStrings:PlatformSchema` and `Platform:SecretKey`, because it connects
-to the tenant database as the schema role, and needs `Tenancy:Source=directory`. It needs no admin role.
+`tenant session end` reads `ConnectionStrings:PlatformSchema` and `Platform:SecretKey`, because it connects to the tenant database as the schema role, and needs `Tenancy:Source=directory`. It needs no admin role.
 
 `tenant backup` reads only `ConnectionStrings:PlatformSchema`,
 `Platform:SecretKey` and `PATH`. It creates no role or database, so it needs
@@ -213,7 +213,7 @@ with code 2.
   time. A stop between the save and the call never loses a secret. The realm's name is the tenant id, and its display
   name is the tenant id too. The step signs in to the `master` realm with the admin client, creates the realm
   with sessions of at most 8 hours, `en` and `vi` and the three clients, and gives the activation client `manage-realm`
-  among its rights, see [keeping the realm in step](identity-provider.md#keeping-the-realm-in-step). A failure names
+  among its rights, and its mail server, see [keeping the realm in step](identity-provider.md#keeping-the-realm-in-step). A failure names
   the step of the identity provider and its status code, never a response body or a secret.
 - `roles` saves each generated password, encrypted, before it creates the role.
   It never alters a role that exists. A role that exists with no password
@@ -661,7 +661,7 @@ a missing binding is an `AXC0100` warning and not an error, as
    step with a line that names the identity provider step and its status code, and
    never a secret. The command reads the identity provider's address and the
    activation secret from the tenant's own entry, so it needs no `IdentityProvider`
-   settings. It reaches the identity provider as `tenant create` does, so the admin
+   settings. The update also writes the realm's mail server from the tenant's mail settings or the host's `Email` settings. It reaches the identity provider as `tenant create` does, so the admin
    host must trust its certificate.
 4. `seed`: insert the seed records and write the schedule trigger state.
 5. `indexes`: build the non-unique indexes that activation left out of a table

@@ -10,13 +10,24 @@ namespace Axis.Integration.Tests;
 /// <summary>
 /// One real Mailpit container, a mail server that keeps every email it receives, shared by the whole run. It starts the
 /// first time a test needs it, so a run that needs no mail server never starts one. The fixture removes the container
-/// when the run ends. Every test uses addresses of its own and reads only the emails sent to them.
+/// when the run ends. Both servers join the <see cref="IntegrationNetwork"/>, so Keycloak sends to them by <see cref="NetworkAlias"/> and
+/// <see cref="AuthNetworkAlias"/> on <see cref="NetworkSmtpPort"/>. Every test uses addresses of its own and reads only the emails sent to them.
 /// </summary>
 public sealed class MailpitFixture : IAsyncDisposable
 {
     public const string Image = "axllent/mailpit:v1.32.0";
 
     private const int SmtpContainerPort = 1025;
+
+    /// <summary>The name that the plain server has on the integration network.</summary>
+    public const string NetworkAlias = "mailpit";
+
+    /// <summary>The name that the server that requires a password has on the integration network.</summary>
+    public const string AuthNetworkAlias = "mailpit-auth";
+
+    /// <summary>The SMTP port of both servers on the integration network.</summary>
+    public const int NetworkSmtpPort = SmtpContainerPort;
+
     private const int ApiContainerPort = 8025;
 
     /// <summary>The user name that the second server, the one that requires a password, accepts.</summary>
@@ -28,8 +39,8 @@ public sealed class MailpitFixture : IAsyncDisposable
     private const string AuthSmtp = $"{AuthUserName}:{AuthPassword}";
 
     // The start takes no test's cancellation token, so cancelling one test does not fail the other.
-    private readonly Lazy<Task<IContainer>> _container = new(() => StartContainerAsync(null));
-    private readonly Lazy<Task<IContainer>> _authContainer = new(() => StartContainerAsync(AuthSmtp));
+    private readonly Lazy<Task<IContainer>> _container = new(() => StartContainerAsync(null, NetworkAlias));
+    private readonly Lazy<Task<IContainer>> _authContainer = new(() => StartContainerAsync(AuthSmtp, AuthNetworkAlias));
     private readonly HttpClient _client = new();
 
     /// <summary>Starts the container if no test has yet, and returns the host that the SMTP port is published on.</summary>
@@ -95,9 +106,12 @@ public sealed class MailpitFixture : IAsyncDisposable
     }
 
     // With smtpAuth, the server rejects a client that does not sign in, and accepts the sign-in without TLS.
-    private static async Task<IContainer> StartContainerAsync(string? smtpAuth)
+    private static async Task<IContainer> StartContainerAsync(string? smtpAuth, string networkAlias)
     {
+        var network = await IntegrationNetwork.GetAsync();
         var builder = new ContainerBuilder(Image)
+            .WithNetwork(network)
+            .WithNetworkAliases(networkAlias)
             .WithPortBinding(SmtpContainerPort, assignRandomHostPort: true)
             .WithPortBinding(ApiContainerPort, assignRandomHostPort: true)
             .WithWaitStrategy(Wait.ForUnixContainer().UntilHttpRequestIsSucceeded(request => request.ForPort(ApiContainerPort).ForPath("/api/v1/messages")));

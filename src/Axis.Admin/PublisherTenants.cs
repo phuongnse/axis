@@ -39,7 +39,7 @@ internal interface IPublisherTenants
 }
 
 /// <summary>The active tenants of the directory that are on this build's schema version.</summary>
-internal sealed class DirectoryPublisherTenants(PlatformSettings settings, TimeSpan readInterval, HttpClient http) : IPublisherTenants
+internal sealed class DirectoryPublisherTenants(PlatformSettings settings, RealmMail mail, TimeSpan readInterval, HttpClient http) : IPublisherTenants
 {
     public TimeSpan ReadInterval => readInterval;
 
@@ -65,7 +65,12 @@ internal sealed class DirectoryPublisherTenants(PlatformSettings settings, TimeS
                 row.SchemaVersion,
                 bindings[row.Id],
                 () => new TenantDatabaseSteps(settings.Cipher, row, row.DatabaseHost, row.DatabasePort, TenantDatabaseTls.From(settings.PlatformConnectionString), CancellationToken.None),
-                SyncRealm: TenantReleaseActivation.RealmSync(http, DirectoryTenantCatalog.Realm(row, settings.Cipher), realmBindings[row.Id], CancellationToken.None)),
+                SyncRealm: TenantReleaseActivation.RealmSync(
+                    http,
+                    DirectoryTenantCatalog.Realm(row, settings.Cipher),
+                    realmBindings[row.Id],
+                    mail.For(DirectoryTenantCatalog.Email(row, settings.Cipher)),
+                    CancellationToken.None)),
             StringComparer.Ordinal);
         var previewIds = rows
             .Where(row => row.PreviewOf is not null)
@@ -90,6 +95,7 @@ internal sealed class DirectoryPublisherTenants(PlatformSettings settings, TimeS
 /// </summary>
 internal sealed class ConfigurationPublisherTenants(
     IReadOnlyList<TenantEntry> entries,
+    RealmMail mail,
     bool allowHttp,
     TextWriter output,
     HttpClient http) : IPublisherTenants
@@ -123,7 +129,7 @@ internal sealed class ConfigurationPublisherTenants(
                 TenantSchemaVersion.Current,
                 Bindings(entry),
                 () => new ConfiguredTenantConnections(entry),
-                SyncRealm: TenantReleaseActivation.RealmSync(http, entry.Realm, entry.Bindings, CancellationToken.None)));
+                SyncRealm: TenantReleaseActivation.RealmSync(http, entry.Realm, entry.Bindings, mail.For(entry.Email), CancellationToken.None)));
         }
 
         var previewIds = entries

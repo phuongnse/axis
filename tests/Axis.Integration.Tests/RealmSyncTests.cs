@@ -381,7 +381,7 @@ public sealed partial class RealmSyncTests(KeycloakFixture keycloak) : IAsyncLif
         var realm = $"t{Guid.NewGuid():N}"[..16];
         _realms.Add(realm);
         await new TenantRealm(_http, new IdentityProviderAdmin(_baseAddress, KeycloakFixture.AdminClientId, KeycloakFixture.AdminClientSecret))
-            .EnsureAsync(realm, "Acme", _secrets, TestContext.Current.CancellationToken);
+            .EnsureAsync(realm, "Acme", _secrets, new Dictionary<string, string>(), TestContext.Current.CancellationToken);
         return realm;
     }
 

@@ -467,9 +467,15 @@ public sealed class DirectoryTenantCatalog : ITenantCatalog
         return bindings;
     }
 
-    // A tenant has its own mail settings exactly when its SMTP host is set. A preview tenant's are its own, bound to its own id.
-    private static EmailSettings? Email(TenantRow row, TenantSecretCipher cipher)
+    /// <summary>
+    /// The mail settings of a tenant row, or <c>null</c> when the row has none. A tenant has its own mail settings exactly
+    /// when its SMTP host is set. A preview tenant's are its own, bound to its own id. The password stays encrypted until it is revealed.
+    /// </summary>
+    public static EmailSettings? Email(TenantRow row, TenantSecretCipher cipher)
     {
+        ArgumentNullException.ThrowIfNull(row);
+        ArgumentNullException.ThrowIfNull(cipher);
+
         if (Blank(row.SmtpHost) is not { } host)
         {
             return null;

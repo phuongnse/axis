@@ -289,7 +289,7 @@ public sealed partial class TenantRealmAccountRulesTests(KeycloakFixture keycloa
 
     private Task EnsureAsync(string realm) =>
         new TenantRealm(_http, new IdentityProviderAdmin(_baseAddress, KeycloakFixture.AdminClientId, KeycloakFixture.AdminClientSecret))
-            .EnsureAsync(realm, "Acme Corporation", _secrets, TestContext.Current.CancellationToken);
+            .EnsureAsync(realm, "Acme Corporation", _secrets, new Dictionary<string, string>(), TestContext.Current.CancellationToken);
 
     private async Task AddClientAsync(string realm)
     {

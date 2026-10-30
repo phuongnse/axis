@@ -28,7 +28,8 @@ internal sealed record TenantRealmSecrets(string Platform, string Activation, st
 /// <c>axis</c>, <c>axis-activation</c> with rights over the realm's providers and clients and over the realm's texts (<c>manage-realm</c>, which
 /// Keycloak requires for them and which also covers every realm setting), and <c>axis-users</c> with
 /// rights over its users only. The realm uses the Axis theme <see cref="LoginTheme"/> as its login theme. The identity provider
-/// must hold the theme and the breached-password list file. A second run updates what the first made, and sets the theme again. An error names the step and the status code,
+/// must hold the theme and the breached-password list file. The realm's mail server (<c>smtpServer</c>) is the one that
+/// <see cref="RealmMailServer"/> maps from the tenant's mail settings or the host's, so a password reset link is sent. A second run updates what the first made, and sets the theme again. An error names the step and the status code,
 /// never a response body or a secret.
 /// </summary>
 internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
@@ -66,7 +67,7 @@ internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
     /// client secrets are generated, or kept when the row holds them already. They and the <c>Oidc</c> block are saved,
     /// encrypted, before the identity provider is called, so a stop between the two never loses a secret.
     /// </summary>
-    public async Task EnsureForTenantAsync(PlatformDbContext platform, TenantRow row, TenantSecretCipher cipher, CancellationToken cancellationToken)
+    public async Task EnsureForTenantAsync(PlatformDbContext platform, TenantRow row, TenantSecretCipher cipher, RealmMail mail, CancellationToken cancellationToken)
     {
         var id = row.Id;
         var changed = false;
@@ -94,7 +95,7 @@ internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
             cipher.Decrypt(id, TenantSecretFields.RealmUsersClientSecret, row.RealmUsersClientSecret!).Reveal());
 
         // The display name is the tenant id until the command takes the organization's name.
-        await EnsureAsync(id, id, secrets, cancellationToken);
+        await EnsureAsync(id, id, secrets, mail.For(DirectoryTenantCatalog.Email(row, cipher)), cancellationToken);
 
         // A secret that is stored is kept, so a rerun never changes it.
         bool Ensure(byte[]? stored, string field, Action<byte[]> write)
@@ -123,12 +124,13 @@ internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
         return true;
     }
 
-    public async Task EnsureAsync(string realm, string displayName, TenantRealmSecrets secrets, CancellationToken cancellationToken)
+    public async Task EnsureAsync(
+        string realm, string displayName, TenantRealmSecrets secrets, IReadOnlyDictionary<string, string> smtpServer, CancellationToken cancellationToken)
     {
         var token = await AdminTokenAsync(cancellationToken);
         var realmPath = $"admin/realms/{Uri.EscapeDataString(realm)}";
 
-        await EnsureRealmAsync(token, realm, realmPath, displayName, cancellationToken);
+        await EnsureRealmAsync(token, realm, realmPath, displayName, smtpServer, cancellationToken);
         await EnsureSecondStepAsync(token, realmPath, cancellationToken);
         await EnsureFirstLoginFlowAsync(token, realmPath, cancellationToken);
         await EnsureNoProfileReviewAsync(token, realmPath, cancellationToken);
@@ -156,12 +158,13 @@ internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
         return body.GetProperty("access_token").GetString()!;
     }
 
-    private async Task EnsureRealmAsync(string token, string realm, string realmPath, string displayName, CancellationToken cancellationToken)
+    private async Task EnsureRealmAsync(
+        string token, string realm, string realmPath, string displayName, IReadOnlyDictionary<string, string> smtpServer, CancellationToken cancellationToken)
     {
         using var existing = await SendAsync(token, HttpMethod.Get, realmPath, null, cancellationToken);
         if (existing.StatusCode == HttpStatusCode.NotFound)
         {
-            using var created = await SendAsync(token, HttpMethod.Post, "admin/realms", RealmRepresentation(displayName, realm), cancellationToken);
+            using var created = await SendAsync(token, HttpMethod.Post, "admin/realms", RealmRepresentation(displayName, realm, smtpServer), cancellationToken);
             // A concurrent create made the realm first, so the update below brings it in step.
             if (created.StatusCode != HttpStatusCode.Conflict)
             {
@@ -174,11 +177,11 @@ internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
             EnsureSuccess(existing, "read the realm");
         }
 
-        using var updated = await SendAsync(token, HttpMethod.Put, realmPath, RealmRepresentation(displayName, null), cancellationToken);
+        using var updated = await SendAsync(token, HttpMethod.Put, realmPath, RealmRepresentation(displayName, null, smtpServer), cancellationToken);
         EnsureSuccess(updated, "update the realm");
     }
 
-    private static Dictionary<string, object?> RealmRepresentation(string displayName, string? realm)
+    private static Dictionary<string, object?> RealmRepresentation(string displayName, string? realm, IReadOnlyDictionary<string, string> smtpServer)
     {
         var representation = new Dictionary<string, object?>
         {
@@ -213,6 +216,8 @@ internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
             ["internationalizationEnabled"] = true,
             ["supportedLocales"] = PlatformLocales.All,
             ["defaultLocale"] = PlatformLocales.Fallback,
+            // An empty map clears the mail server. The map can hold the SMTP password, so nothing logs the representation.
+            ["smtpServer"] = smtpServer,
         };
         if (realm is not null)
         {

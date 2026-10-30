@@ -126,7 +126,7 @@ public sealed class TenantRealmTests(KeycloakFixture keycloak) : IAsyncLifetime
 
     private Task EnsureAsync(string realm, string displayName, TenantRealmSecrets secrets) =>
         new TenantRealm(_http, new IdentityProviderAdmin(_baseAddress, KeycloakFixture.AdminClientId, KeycloakFixture.AdminClientSecret))
-            .EnsureAsync(realm, displayName, secrets, TestContext.Current.CancellationToken);
+            .EnsureAsync(realm, displayName, secrets, new Dictionary<string, string>(), TestContext.Current.CancellationToken);
 
     private async Task<int> CountClientsAsync(string token, string realm, string clientId)
     {
