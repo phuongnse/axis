@@ -286,7 +286,9 @@ _(planned for M17)_
   display name, the email, the locale and each roles claim, and a `username` mapper that names a new user
   `<provider alias>.<subject>`. Each provider also gets an `acr` mapper (`oidc-user-session-note-idp-mapper`) that copies the
   upstream `acr` claim into the person's realm session, and each site client an `identity provider acr` mapper that puts
-  that session value into its ID token as the `identity_provider_acr` claim. Each provider names the realm's first-login flow. It touches no other client or
+  that session value into its ID token as the `identity_provider_acr` claim. Each site client also gets one mapper for each roles claim of
+  the providers its site allows, named `axis_roles_<claim>`, which puts that user attribute into the ID token. The sync removes such a
+  mapper that the site no longer needs. Each provider names the realm's first-login flow. It touches no other client or
   provider, so `axis`, `axis-activation`, `axis-users` and anything an operator added stay. A `saml-` provider is
   imported from its metadata: the sync reads the metadata from the `metadata` binding's address before it changes the
   realm, and uploads it to Keycloak's import-config endpoint, so an unreachable address changes nothing. The provider
