@@ -22,15 +22,24 @@ let env
 let ports
 const running = []
 
-function freePort() {
-  return new Promise((resolve, reject) => {
-    const server = net.createServer()
-    server.once('error', reject)
-    server.listen(0, '127.0.0.1', () => {
-      const { port } = server.address()
-      server.close(() => resolve(port))
+const handedOut = new Set()
+
+/** A free port that no earlier call returned, because a closed port can be handed out again at once. */
+async function freePort() {
+  for (;;) {
+    const port = await new Promise((resolve, reject) => {
+      const server = net.createServer()
+      server.once('error', reject)
+      server.listen(0, '127.0.0.1', () => {
+        const { port } = server.address()
+        server.close(() => resolve(port))
+      })
     })
-  })
+    if (!handedOut.has(port)) {
+      handedOut.add(port)
+      return port
+    }
+  }
 }
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))

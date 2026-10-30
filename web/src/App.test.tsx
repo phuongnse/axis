@@ -709,6 +709,31 @@ describe('App', () => {
     expect(await screen.findByText('No application is active.')).toBeInTheDocument()
   })
 
+  it('lists only the sites that /api/sites returns for the provider of the session, and no tool tiles', async () => {
+    stubServer({ me: { ...signedInUser, studio: false, console: false, users: false } })
+    const fetchMock = vi.mocked(fetch)
+    const answer = fetchMock.getMockImplementation()!
+    fetchMock.mockImplementation(async (input, init) =>
+      input === '/api/sites' ? json({ sites: [sites[0]] }) : answer(input, init),
+    )
+
+    renderApp()
+
+    const notes = await screen.findByRole('region', { name: 'E2E notes' })
+    expect(screen.getAllByTestId('application-card-header')).toHaveLength(1)
+    expect(within(notes).getByText('1 site')).toBeInTheDocument()
+    expect(
+      within(notes)
+        .getAllByRole('link')
+        .map((link) => link.getAttribute('href')),
+    ).toEqual(['/e2e'])
+    expect(screen.queryByRole('region', { name: 'Service desk' })).not.toBeInTheDocument()
+    const main = within(screen.getByRole('main'))
+    expect(main.queryByRole('link', { name: /Studio/ })).not.toBeInTheDocument()
+    expect(main.queryByRole('link', { name: /Operator console/ })).not.toBeInTheDocument()
+    expect(main.queryByRole('link', { name: /^Users/ })).not.toBeInTheDocument()
+  })
+
   it('shows the sign-in card, with one Sign in button and without starting sign-in, when nobody is signed in', async () => {
     vi.mocked(assignLocation).mockReset()
     stubServer({ me: null })

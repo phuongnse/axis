@@ -256,6 +256,17 @@ internal sealed partial class TenantSignInOptions(TenantSignInSettings settings,
                     services.GetRequiredService<StudioOptions>(),
                     services.GetRequiredService<ConsoleSettings>(),
                     services.GetRequiredService<UsersSettings>());
+                // On the tenant's host, a provider that an active site there allows may sign in too. It gets no mapped roles.
+                if (mapped is null
+                    && services.GetRequiredService<ITenantContextAccessor>().Current?.SitePath is null
+                    && await services.GetRequiredService<SiteSignIn>().AllowedOnTenantHostAsync(
+                        tenantId,
+                        principal.FindFirst(RealmSync.IdentityProviderClaim)?.Value,
+                        context.HttpContext.RequestAborted))
+                {
+                    mapped = [];
+                }
+
                 if (mapped is null)
                 {
                     context.HttpContext.Items[TenantSignIn.ProviderRefusedItem] = true;

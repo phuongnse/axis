@@ -757,7 +757,7 @@ schema of the tenant database.
       `Authority`, in any profile, or a `fapi2` callback whose `iss` is missing
       or is not the tenant's `Authority`.
       `providerError` covers a person who cancels at the identity provider, and
-      a provider error. `providerNotAccepted` is a valid token whose provider the tenant's platform sign-in does not accept. `providerNotAllowed` is a valid token whose provider the site that started the sign-in does not allow, or a site that is no longer active. `acrNotAccepted` is a valid token whose provider the site allows, but whose upstream `acr` the provider's `acr` list does not accept or the token lacks.
+      a provider error. `providerNotAccepted` is a valid token whose provider the tenant's platform sign-in does not accept and no active site that shares the tenant's host allows. `providerNotAllowed` is a valid token whose provider the site that started the sign-in does not allow, or a site that is no longer active. `acrNotAccepted` is a valid token whose provider the site allows, but whose upstream `acr` the provider's `acr` list does not accept or the token lacks.
     - `application_id`, `entity_id`, `record_id` and `process_instance_id` are
       null.
     - `clientAddress` is always present. It is the address as text, with an
