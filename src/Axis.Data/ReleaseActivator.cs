@@ -312,9 +312,9 @@ public static class ReleaseActivator
 
     /// <summary>
     /// Reports every binding the tenant lacks or holds with another kind: the file storage binding of the
-    /// application, those of the connectors, those of the <c>oidc</c> identity providers (<c>issuer</c> as <c>url</c>, the
+    /// application, those of the connectors (an <c>oauth2</c> auth adds its <c>tokenUrl</c> as <c>url</c> and its client id as <c>secret</c>), those of the <c>oidc</c> identity providers (<c>issuer</c> as <c>url</c>, the
     /// client bindings as <c>secret</c>), the <c>metadata</c> binding of the <c>saml</c> identity providers (as <c>url</c>), and the <c>url</c> and <c>secret</c> bindings that a package operation step uses declares. Also
-    /// reports every base URL that is not <c>https</c> when <c>http</c> is not allowed. A missing binding is a warning
+    /// reports every base URL and token URL that is not <c>https</c> when <c>http</c> is not allowed. A missing binding is a warning
     /// on a preview tenant. A message names the tenant and the binding, never its value.
     /// </summary>
     private static List<Diagnostic> CheckBindings(ApplicationModel model, ActivationBindings bindings)
@@ -345,6 +345,19 @@ public static class ReleaseActivator
             if (connector.Auth is { } auth)
             {
                 CheckBinding(auth.Binding, ActivationBinding.SecretKind, auth.BindingPath, bindings, Report);
+                if (auth.OAuth2 is { } oauth)
+                {
+                    var tokenUrl = CheckBinding(oauth.TokenUrlBinding, ActivationBinding.UrlKind, "/auth/tokenUrl/binding", bindings, Report);
+                    if (tokenUrl is not null && !bindings.AllowHttp && tokenUrl.Url?.Scheme != Uri.UriSchemeHttps)
+                    {
+                        Report(
+                            DiagnosticCodes.InsecureBaseUrl,
+                            $"Tenant '{bindings.TenantId}' binding '{oauth.TokenUrlBinding}' is not an https URL. Only Development allows http.",
+                            "/auth/tokenUrl/binding");
+                    }
+
+                    CheckBinding(oauth.ClientIdBinding, ActivationBinding.SecretKind, "/auth/clientId/binding", bindings, Report);
+                }
             }
         }
 

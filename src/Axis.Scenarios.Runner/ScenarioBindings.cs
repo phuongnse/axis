@@ -19,8 +19,8 @@ internal sealed class ScenarioBindings : IDeploymentBindings
     public SecretValue ResolveSecret(string name) => new(Secret);
 
     /// <summary>
-    /// The bindings activation checks: a <c>url</c> binding for each connector base URL and package
-    /// <c>url</c> capability, and a <c>secret</c> binding for each connector auth and package
+    /// The bindings activation checks: a <c>url</c> binding for each connector base URL, <c>oauth2</c> token URL and package
+    /// <c>url</c> capability, and a <c>secret</c> binding for each connector auth (an <c>oauth2</c> auth adds its client id) and package
     /// <c>secret</c> capability the application names. An <c>oidc</c> identity provider adds a <c>url</c> binding for
     /// its <c>issuer</c> and <c>secret</c> bindings for its client id and its client secret or key. A <c>saml</c>
     /// provider adds a <c>url</c> binding for its <c>metadata</c>.
@@ -36,6 +36,11 @@ internal sealed class ScenarioBindings : IDeploymentBindings
             if (connector.Auth is { } auth)
             {
                 bindings[auth.Binding] = secret;
+                if (auth.OAuth2 is { } oauth)
+                {
+                    bindings[oauth.TokenUrlBinding] = url;
+                    bindings[oauth.ClientIdBinding] = secret;
+                }
             }
         }
 

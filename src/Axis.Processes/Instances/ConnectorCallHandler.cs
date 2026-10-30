@@ -19,8 +19,12 @@ namespace Axis.Processes.Instances;
 /// <summary>
 /// Sends the connector call a <c>connector.call</c> work item names, with no transaction open while
 /// the request runs. A short transaction first marks the call <c>sending</c>, counts the attempt and
-/// extends the item's lease by the connector's timeout. The request then carries the stored input,
+/// extends the item's lease by the connector's timeout, or by twice the timeout for an <c>oauth2</c>
+/// connector, whose token request has the same timeout. The request then carries the stored input,
 /// the auth from the tenant's secret binding and the operation identity as its idempotency key. An
+/// <c>oauth2</c> connector sends the token that <see cref="IConnectorTokens"/> gets as a bearer token,
+/// before each call or lookup. A failed token request is a retryable attempt that is never sent, with
+/// the status of the token endpoint, or a failed lookup, and it holds no body. An
 /// outcome transaction records the result. A <c>2xx</c> whose body fits the output writes the
 /// output fields, starts the data change triggers of the update from the active release, settles
 /// the call <c>succeeded</c> and resumes the instance on <c>next</c>. A
@@ -39,12 +43,13 @@ namespace Axis.Processes.Instances;
 /// transaction also writes one row to <c>axis.process_call_attempts</c>: the attempt, or the lookup,
 /// with its times, its outcome class, its status and a fixed error text. A call found <c>sending</c>
 /// gets an attempt row with the outcome <c>unknown</c>. No request or response body and no secret
-/// value is stored or logged.
+/// value or token is stored or logged.
 /// </summary>
 internal sealed partial class ConnectorCallHandler(
     ReleaseModelCache models,
     IDeploymentBindings bindings,
     ConnectorClient client,
+    IConnectorTokens tokens,
     ConnectorCallSettings settings,
     ILogger<ConnectorCallHandler> logger) : IExternalWorkItemHandler
 {
@@ -121,7 +126,7 @@ internal sealed partial class ConnectorCallHandler(
                 }
 
                 // A lookup is no attempt, so nothing is counted. No other worker claims the item while it runs.
-                if (!await WorkItemQueue.ExtendLeaseAsync(connection, transaction, item, target.Connector.Timeout + item.Lease, cancellationToken))
+                if (!await WorkItemQueue.ExtendLeaseAsync(connection, transaction, item, Lease(item, target.Connector), cancellationToken))
                 {
                     await transaction.RollbackAsync(cancellationToken);
                     LogLostClaim(item.Id, item.ConnectorCallId);
@@ -137,7 +142,7 @@ internal sealed partial class ConnectorCallHandler(
                 attempt = attempt with { Attempts = attempts };
 
                 // No other worker claims the item while the request runs.
-                if (!await WorkItemQueue.ExtendLeaseAsync(connection, transaction, item, target.Connector.Timeout + item.Lease, cancellationToken))
+                if (!await WorkItemQueue.ExtendLeaseAsync(connection, transaction, item, Lease(item, target.Connector), cancellationToken))
                 {
                     await transaction.RollbackAsync(cancellationToken);
                     LogLostClaim(item.Id, item.ConnectorCallId);
@@ -206,13 +211,26 @@ internal sealed partial class ConnectorCallHandler(
         CancellationToken cancellationToken)
     {
         var connector = target.Connector;
-        if (ResolveEndpoint(item, connector, out var baseUrl, out var secret) is { } bindingError)
+        var endpoint = ResolveEndpoint(item, connector);
+        if (endpoint.Error is { } bindingError)
         {
             // The request is never sent.
             return await SettleAttemptAsync(item, connection, attempt, target, ErrorClass.Retryable, null, bindingError, bindingError, cancellationToken);
         }
 
-        var answer = await SendAsync(target, attempt.Call, baseUrl, secret, cancellationToken);
+        var credential = endpoint.Secret;
+        if (await GetTokenAsync(item, connector, endpoint, cancellationToken) is { } issued)
+        {
+            if (issued.Error is { } tokenError)
+            {
+                // The operation is never sent, and no body of the token endpoint is kept.
+                return await SettleAttemptAsync(item, connection, attempt, target, ErrorClass.Retryable, issued.Status, tokenError, tokenError, cancellationToken);
+            }
+
+            credential = issued.Token;
+        }
+
+        var answer = await SendAsync(target, attempt.Call, endpoint.BaseUrl, credential, cancellationToken);
         if (answer.Error is { } sendError)
         {
             return await SettleAttemptAsync(item, connection, attempt, target, answer.Class, answer.Status, sendError, answer.Error!, cancellationToken);
@@ -278,12 +296,32 @@ internal sealed partial class ConnectorCallHandler(
         CancellationToken cancellationToken)
     {
         var connector = target.Connector;
-        if (ResolveEndpoint(item, connector, out var baseUrl, out var secret) is { } bindingError)
+        var endpoint = ResolveEndpoint(item, connector);
+        if (endpoint.Error is { } bindingError)
         {
             return await KeepUnknownAsync(item, connection, attempt, target, null, bindingError, LookupRow(attempt, CallAttempts.Failed, null, bindingError), cancellationToken);
         }
 
-        var answer = await SendAsync(target with { Operation = lookup }, attempt.Call, baseUrl, secret, cancellationToken);
+        var credential = endpoint.Secret;
+        if (await GetTokenAsync(item, connector, endpoint, cancellationToken) is { } issued)
+        {
+            if (issued.Error is { } tokenError)
+            {
+                return await KeepUnknownAsync(
+                    item,
+                    connection,
+                    attempt,
+                    target,
+                    issued.Status,
+                    tokenError,
+                    LookupRow(attempt, CallAttempts.Failed, issued.Status, tokenError),
+                    cancellationToken);
+            }
+
+            credential = issued.Token;
+        }
+
+        var answer = await SendAsync(target with { Operation = lookup }, attempt.Call, endpoint.BaseUrl, credential, cancellationToken);
         if (answer is { Status: (int)HttpStatusCode.OK, Error: null } && Fit(answer.Body!, target) is { } values)
         {
             // The system acted on the call, so it is not sent again.
@@ -325,31 +363,71 @@ internal sealed partial class ConnectorCallHandler(
     }
 
     /// <summary>
-    /// Resolves the connector's base URL and auth secret from the tenant's bindings. Returns the
-    /// error when a binding is missing or of the wrong kind, or when the URL is not <c>https</c> and
-    /// the host does not allow <c>http</c>, or <see langword="null"/>.
+    /// Resolves the connector's base URL and auth secret from the tenant's bindings. For an
+    /// <c>oauth2</c> auth it also resolves the token URL and the client id. The error is set when a
+    /// binding is missing or of the wrong kind, or when the base URL or the token URL is not
+    /// <c>https</c> and the host does not allow <c>http</c>.
     /// </summary>
-    private string? ResolveEndpoint(ClaimedWorkItem item, ConnectorModel connector, out string baseUrl, out SecretValue? secret)
+    private Endpoint ResolveEndpoint(ClaimedWorkItem item, ConnectorModel connector)
     {
-        secret = null;
+        string baseUrl;
+        SecretValue? secret = null;
+        string? tokenUrl = null;
+        SecretValue? clientId = null;
         try
         {
             baseUrl = bindings.Resolve(connector.BaseUrlBinding).Value;
             if (connector.Auth is { } auth)
             {
                 secret = bindings.ResolveSecret(auth.Binding);
+                if (auth.OAuth2 is { } oauth)
+                {
+                    tokenUrl = bindings.Resolve(oauth.TokenUrlBinding).Value;
+                    clientId = bindings.ResolveSecret(oauth.ClientIdBinding);
+                }
             }
         }
         catch (InvalidOperationException exception)
         {
-            baseUrl = "";
-            return exception.Message;
+            return new Endpoint("", null, null, null, exception.Message);
         }
 
-        return Uri.TryCreate(baseUrl, UriKind.Absolute, out var uri) && (uri.Scheme == Uri.UriSchemeHttps || settings.AllowHttp)
-            ? null
-            : $"Tenant '{item.TenantId}' binding '{connector.BaseUrlBinding}' is not an https URL. Only Development allows http.";
+        if (!IsAllowed(baseUrl, out _))
+        {
+            return new Endpoint(baseUrl, secret, null, clientId, NotHttps(item, connector.BaseUrlBinding));
+        }
+
+        if (tokenUrl is null)
+        {
+            return new Endpoint(baseUrl, secret, null, clientId, null);
+        }
+
+        return IsAllowed(tokenUrl, out var uri)
+            ? new Endpoint(baseUrl, secret, uri, clientId, null)
+            : new Endpoint(baseUrl, secret, null, clientId, NotHttps(item, connector.Auth!.OAuth2!.TokenUrlBinding));
     }
+
+    private bool IsAllowed(string url, out Uri? uri) =>
+        Uri.TryCreate(url, UriKind.Absolute, out uri) && (uri.Scheme == Uri.UriSchemeHttps || settings.AllowHttp);
+
+    private static string NotHttps(ClaimedWorkItem item, string binding) =>
+        $"Tenant '{item.TenantId}' binding '{binding}' is not an https URL. Only Development allows http.";
+
+    /// <summary>
+    /// Gets the access token of an <c>oauth2</c> connector, or gives <see langword="null"/> for a
+    /// connector with another auth.
+    /// </summary>
+    private async Task<ConnectorTokenResult?> GetTokenAsync(ClaimedWorkItem item, ConnectorModel connector, Endpoint endpoint, CancellationToken cancellationToken) =>
+        endpoint.TokenUrl is { } tokenUrl
+            ? await tokens.GetAsync(item.TenantId, connector, tokenUrl, endpoint.ClientId!, endpoint.Secret!, cancellationToken)
+            : null;
+
+    /// <summary>
+    /// How long the claim lasts while the call runs: the item's lease and the connector's timeout, and
+    /// a second timeout for the token request of an <c>oauth2</c> connector.
+    /// </summary>
+    private static TimeSpan Lease(ClaimedWorkItem item, ConnectorModel connector) =>
+        (connector.Auth?.OAuth2 is null ? connector.Timeout : connector.Timeout * 2) + item.Lease;
 
     /// <summary>The operation that looks up a call of the target's operation, or <see langword="null"/> when it declares none.</summary>
     private static ConnectorOperationModel? FindLookup(Target target) =>
@@ -419,7 +497,7 @@ internal sealed partial class ConnectorCallHandler(
 
             if (connector.Auth is { } auth && secret is not null)
             {
-                if (auth.Type == "bearer")
+                if (auth.Type is "bearer" or "oauth2")
                 {
                     request.Headers.TryAddWithoutValidation("Authorization", $"Bearer {secret.Reveal()}");
                 }
@@ -1145,6 +1223,12 @@ internal sealed partial class ConnectorCallHandler(
     /// with this one, and the time of the mark transaction, which starts the step's history row.
     /// </summary>
     private sealed record Attempt(LoadedConnectorCall Call, long Revision, int Attempts, DateTimeOffset StartedAt, string? Application = null);
+
+    /// <summary>
+    /// The connector's resolved base URL and auth secret, and for an <c>oauth2</c> auth its token URL
+    /// and client id. <see cref="Error"/> is set when a binding fails the checks.
+    /// </summary>
+    private sealed record Endpoint(string BaseUrl, SecretValue? Secret, Uri? TokenUrl, SecretValue? ClientId, string? Error);
 
     /// <summary>What the call's release declares for it.</summary>
     private sealed record Target(

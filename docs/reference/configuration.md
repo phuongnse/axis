@@ -514,7 +514,7 @@ flowchart LR
      `{idempotencyKey}` in its path, or has other outputs than the operation
      it serves. Outputs are the same when they have the same names, ignoring
      letter case and order, with the same type, `required` and `source`. A
-     `source` that is no JSON Pointer is `AXC0310` at
+     `source` that is no JSON Pointer is `AXC0311` at
      `/operations/{i}/output/{j}/source`. A `source` on an input, a `GET` with
      `input` fields, and a bad `auth` are `AXC0004`. Bindings are checked at activation.
    - **Events.** An [event](integration-resources.md#event-resource)'s `entity` must name a loaded

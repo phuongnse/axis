@@ -14,7 +14,8 @@ namespace Axis.Configuration.Compilation;
 /// operation of the connector, ignoring letter case, which is a <c>GET</c> whose path holds
 /// <c>{idempotencyKey}</c> and whose outputs, with their <c>source</c>, are those of the operation it serves. The schema
 /// already refuses inputs on a <c>GET</c>. Every problem of a connector is reported in one pass.
-/// Its bindings are checked at activation, against the tenant's.
+/// Its bindings are checked at activation, against the tenant's. At compile time,
+/// <see cref="CheckBindingKinds"/> reports an <c>oauth2</c> binding whose name the application uses as another kind.
 /// <see cref="CheckSlot"/> checks a connector against a module's connector slot, and
 /// <see cref="CheckSlotAgainstSlot"/> checks a slot against the slot of a depending module.
 /// </summary>
@@ -79,6 +80,41 @@ internal static class ConnectorChecker
                 if (operation.Lookup is { } lookup && FindLookupProblem(connector, operation, lookup) is { } problem)
                 {
                     Report(DiagnosticCodes.InvalidOperationLookup, problem, $"/operations/{index}/lookup");
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// Reports each <c>oauth2</c> binding of <paramref name="connectors"/> whose name the application
+    /// also uses as another kind, ignoring letter case, at <c>/auth/&lt;property&gt;/binding</c>. The
+    /// kind of a name is read from where it is used, as for an identity provider's bindings.
+    /// </summary>
+    public static void CheckBindingKinds(
+        IReadOnlyList<ConnectorResource> connectors,
+        ApplicationManifest? manifest,
+        IReadOnlyList<IdentityProviderResource> providers,
+        List<Diagnostic> diagnostics)
+    {
+        if (!connectors.Any(connector => connector.Auth is { Type: "oauth2" }))
+        {
+            return;
+        }
+
+        var uses = BindingUses.Collect(providers, manifest, connectors);
+        foreach (var connector in connectors.Where(connector => connector.Auth is { Type: "oauth2" }))
+        {
+            foreach (var (property, kind, binding) in BindingUses.BindingsOf(connector).Where(use => use.Property.StartsWith("auth/", StringComparison.Ordinal)))
+            {
+                if (uses.TryGetValue(binding.Binding, out var candidates)
+                    && candidates.FirstOrDefault(candidate => candidate.Kind != kind) is { } other)
+                {
+                    diagnostics.Add(new Diagnostic(
+                        DiagnosticCodes.ConnectorBindingKind,
+                        $"The binding '{binding.Binding}' is a {kind} binding here, but '{other.File}' uses it as a {other.Kind} binding at '{other.Path}'.",
+                        connector.File,
+                        $"/{property}/binding",
+                        connector.Id));
                 }
             }
         }
@@ -215,6 +251,11 @@ internal static class ConnectorChecker
             {
                 { Type: "bearer", Token: { } token } => new ConnectorAuthModel("bearer", null, token.Binding, "/auth/token/binding"),
                 { Type: "header", Name: { } name, Value: { } value } => new ConnectorAuthModel("header", name, value.Binding, "/auth/value/binding"),
+                { Type: "oauth2", TokenUrl: { } tokenUrl, ClientId: { } clientId, ClientSecret: { } clientSecret } =>
+                    new ConnectorAuthModel("oauth2", null, clientSecret.Binding, "/auth/clientSecret/binding")
+                    {
+                        OAuth2 = new ConnectorOAuth2Model(tokenUrl.Binding, clientId.Binding, connector.Auth.Scope, connector.Auth.Audience),
+                    },
                 _ => null,
             },
             Timeout = timeout,
