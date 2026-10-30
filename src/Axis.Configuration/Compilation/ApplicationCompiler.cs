@@ -218,6 +218,9 @@ public static partial class ApplicationCompiler
     internal static bool IsModuleResource(Resource resource) =>
         resource.File.StartsWith(ApplicationLoader.ModulesFolderPrefix, StringComparison.Ordinal);
 
+    /// <summary>The module id of a qualified resource name, the text before the first <c>/</c>.</summary>
+    private static string ModuleIdOf(string qualifiedName) => qualifiedName[..qualifiedName.IndexOf('/', StringComparison.Ordinal)];
+
     private static CompilationResult Compile(
         ApplicationLoadResult loaded,
         IReadOnlyCollection<PackageVersion> installedPackages,
@@ -243,7 +246,7 @@ public static partial class ApplicationCompiler
         IReadOnlyList<ResourceContent> moduleFiles = [];
         IReadOnlySet<string>? declaredPackageIds = null;
         var timeZone = TimeZoneInfo.Utc;
-        var moduleResources = new ModuleResources([], [], [], [], [], [], [], [], new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>());
+        var moduleResources = new ModuleResources([], [], [], [], [], [], [], [], new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new Dictionary<string, IReadOnlySet<string>>());
         if (loaded.Application is { } manifest)
         {
             packages = PackageChecker.Check(manifest, installedPackages, diagnostics, references);
@@ -409,9 +412,10 @@ public static partial class ApplicationCompiler
             CheckTextKey(provider.Label, provider, "/label", references, diagnostics);
         }
 
-        // A module rule sees only the rules of its own module. Application expressions call it
-        // as '<module id>:<name>(…)', so the module rules are checked first.
-        var moduleRules = RuleChecker.CheckModules(moduleResources.Rules, diagnostics).Values.ToList();
+        // A module rule sees the rules of its own module by plain name and those of the modules it
+        // declares as '<module id>:<name>(…)'. Application expressions call it the same way, so the
+        // module rules are checked first.
+        var moduleRules = RuleChecker.CheckModules(moduleResources.Rules, moduleResources.DeclaredModules, diagnostics).Values.ToList();
 
         // Validations, at their top level, data source filters, process conditions and policy
         // filters call rules, and module rules by their qualified name. Computed fields and
@@ -419,12 +423,31 @@ public static partial class ApplicationCompiler
         var appRules = RuleChecker.Check(loaded.Rules, references, diagnostics, moduleRules, declaredModules);
         var rules = (IReadOnlyList<ExpressionRule>)[.. appRules.Values, .. moduleRules];
 
-        // A module entity sees only the rules of its own module, by plain name. It sees no
-        // application rule and no qualified call.
+        // A module entity sees the rules of its own module by plain name, and the rules of the
+        // modules it declares by qualified call. It sees no application rule.
         IReadOnlyList<ExpressionRule> RulesFor(EntityResource entity) =>
             IsModuleResource(entity)
-                ? [.. moduleRules.Where(rule => rule.Module == entity.Name[..entity.Name.IndexOf('/')]).Select(rule => rule with { Module = null })]
+                ? [
+                    .. moduleRules.Where(rule => rule.Module == ModuleIdOf(entity.Name)).Select(rule => rule with { Module = null }),
+                    .. DeclaredRulesOf(entity),
+                ]
                 : rules;
+
+        // A module data source filter sees only the rules of the modules its module declares, by qualified call.
+        IReadOnlyList<ExpressionRule> FilterRulesFor(DataSourceResource dataSource) =>
+            IsModuleResource(dataSource) ? [.. DeclaredRulesOf(dataSource)] : rules;
+
+        IEnumerable<ExpressionRule> DeclaredRulesOf(Resource resource)
+        {
+            var declared = DeclaredModulesOf(resource);
+            return moduleRules.Where(rule => rule.Module is not null && declared.Contains(rule.Module));
+        }
+
+        // The module ids a resource may name: the application's, or those its module declares.
+        IReadOnlySet<string> DeclaredModulesOf(Resource resource) =>
+            IsModuleResource(resource)
+                ? moduleResources.DeclaredModules.GetValueOrDefault(ModuleIdOf(resource.Name)) ?? new HashSet<string>()
+                : declaredModules;
 
         foreach (var entity in allEntities)
         {
@@ -438,7 +461,7 @@ public static partial class ApplicationCompiler
                 moduleReferences.For(entity),
                 references,
                 RulesFor(entity),
-                IsModuleResource(entity) ? null : declaredModules,
+                DeclaredModulesOf(entity),
                 maxFileSize,
                 diagnostics);
         }
@@ -457,7 +480,7 @@ public static partial class ApplicationCompiler
             declaredModules,
             diagnostics);
         CheckSeeds(allSeeds, loaded.UnloadedEntityNames, FindEntity, references, diagnostics);
-        CheckDataSources(loaded, FindEntity, ownersByChildName, moduleReferences, references, rules, declaredModules, diagnostics);
+        CheckDataSources(loaded, FindEntity, ownersByChildName, moduleReferences, references, FilterRulesFor, DeclaredModulesOf, diagnostics);
         ProcessChecker.Check(
             loaded.Processes,
             FindEntity,
@@ -614,7 +637,7 @@ public static partial class ApplicationCompiler
         }
 
         var entities = allEntities
-            .Select(entity => BuildEntity(entitiesByName[entity.Name], entitiesByName, sequencesByName, RulesFor(entity), IsModuleResource(entity) ? null : declaredModules))
+            .Select(entity => BuildEntity(entitiesByName[entity.Name], entitiesByName, sequencesByName, RulesFor(entity), DeclaredModulesOf(entity)))
             .ToList();
         var model = new ApplicationModel
         {
@@ -626,7 +649,7 @@ public static partial class ApplicationCompiler
             Texts = texts,
             Seeds = allSeeds.Select(seed => BuildSeed(seed, entitiesByName, applicationId)).ToList(),
             DataSources = loaded.DataSources.Select(dataSource => BuildDataSource(
-                dataSourcesByName[dataSource.Name], entities, IsModuleResource(dataSource) ? [] : rules, IsModuleResource(dataSource) ? null : declaredModules)).ToList(),
+                dataSourcesByName[dataSource.Name], entities, FilterRulesFor(dataSource), DeclaredModulesOf(dataSource))).ToList(),
             Processes = loaded.Processes.Select(process => ProcessChecker.Build(process, FindEntity, FindForm, FindConnector, FindEvent, FindPackage, FindPage, FindProcess, rules, declaredModules)).ToList(),
             Forms = loaded.Forms.Select(form => BuildForm(formsByName[form.Name], entitiesByName, IsModuleResource(form) ? [] : rules, IsModuleResource(form) ? null : declaredModules)).ToList(),
             Roles = loaded.Roles,
@@ -845,7 +868,7 @@ public static partial class ApplicationCompiler
         CheckTextKey(entity.Label, entity, "/label", references, diagnostics);
 
         var childOwner = ownersByChildName.GetValueOrDefault(entity.Name);
-        var defaultScope = ExpressionScopes.ForDefault(rules, modules);
+        var defaultScope = ExpressionScopes.ForDefault(rules, modules, IsModuleResource(entity));
         var firstIndexByName = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         for (var index = 0; index < entity.Fields.Count; index++)
         {
@@ -1025,7 +1048,8 @@ public static partial class ApplicationCompiler
             return;
         }
 
-        var scope = ExpressionScopes.ForEntity(entity.Fields, rules: rules, findEntity: findEntity, modules: modules);
+        var scope = ExpressionScopes.ForEntity(
+            entity.Fields, rules: rules, findEntity: findEntity, modules: modules, undeclaredModuleIsUnknown: IsModuleResource(entity));
         for (var index = 0; index < entity.Validations.Count; index++)
         {
             var validation = entity.Validations[index];
@@ -1773,8 +1797,8 @@ public static partial class ApplicationCompiler
         IReadOnlyDictionary<string, ChildOwner> ownersByChildName,
         ModuleReferences moduleReferences,
         ReferenceIndexBuilder references,
-        IEnumerable<ExpressionRule> rules,
-        IReadOnlySet<string>? modules,
+        Func<DataSourceResource, IReadOnlyList<ExpressionRule>> rulesFor,
+        Func<DataSourceResource, IReadOnlySet<string>> modulesFor,
         List<Diagnostic> diagnostics)
     {
         foreach (var dataSource in loaded.DataSources)
@@ -2015,13 +2039,14 @@ public static partial class ApplicationCompiler
             // A parameter without a usable type would only add noise to the filters' diagnostics.
             if (diagnostics.Count == countBeforeParameters)
             {
-                // Module rules are a separate step, so a module data source sees none and cannot call an application rule.
+                // A module data source sees only the rules of the modules its module declares and cannot call an application rule.
                 var filterScope = ExpressionScopes.ForDataSource(
                     entity.Fields,
                     dataSource.Parameters,
                     findEntity,
-                    IsModuleResource(dataSource) ? [] : rules,
-                    IsModuleResource(dataSource) ? null : modules);
+                    rulesFor(dataSource),
+                    modulesFor(dataSource),
+                    undeclaredModuleIsUnknown: IsModuleResource(dataSource));
 
                 void CheckDataSourceFilter(string filter, string path)
                 {
@@ -2309,9 +2334,10 @@ public static partial class ApplicationCompiler
         // The child models are not built yet, so both scopes come from the definitions.
         EntityResource? FindEntity(string name) => entitiesByName.GetValueOrDefault(name);
         var inputScope = ExpressionScopes.ForEntity(entity.Fields, includeComputed: false, findEntity: FindEntity, references: false);
-        var defaultScope = ExpressionScopes.ForDefault(rules, modules);
+        var defaultScope = ExpressionScopes.ForDefault(rules, modules, IsModuleResource(entity));
         var fields = entity.Fields.Select(field => BuildField(entity, field, inputScope, defaultScope, entitiesByName, sequencesByName)).ToList();
-        var scope = ExpressionScopes.ForEntity(entity.Fields, rules: rules, findEntity: FindEntity, modules: modules);
+        var scope = ExpressionScopes.ForEntity(
+            entity.Fields, rules: rules, findEntity: FindEntity, modules: modules, undeclaredModuleIsUnknown: IsModuleResource(entity));
         return new EntityModel
         {
             Id = entity.Id,
@@ -2693,7 +2719,8 @@ public static partial class ApplicationCompiler
         DataSourceFieldModel Projected(string name) =>
             fields.First(field => string.Equals(field.Name, name, StringComparison.Ordinal));
 
-        var filterScope = ExpressionScopes.ForDataSource(entity.Fields, parameters, Find, rules, modules);
+        var filterScope = ExpressionScopes.ForDataSource(
+            entity.Fields, parameters, Find, rules, modules, undeclaredModuleIsUnknown: IsModuleResource(dataSource));
 
         // The compile check has accepted this data source's search, so a field matches by the same rule.
         var searchFields = dataSource.Search == true

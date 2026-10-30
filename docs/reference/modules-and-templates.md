@@ -94,9 +94,11 @@ calls `IsDepartmentCode`, so a department code must be in capital letters.
   release at the next activation, as for packages.
 - **References.** An application resource names a module resource as
   `<module id>/<name>`, for example `departments/Department`. A module resource
-  names only resources of its own module, written without a `/`. The compiler
+  names resources of its own module without a `/`, and resources of a module its
+  `module.json` declares in `modules` as `<module id>/<name>`. The compiler
   builds both rules for a field's `target` and `sequence` and for a data
-  source's and a form's `entity`, and for a data source parameter's `target`. A
+  source's and a form's `entity`, and for a data source parameter's `target`,
+  except that a `sequence` names only a sequence of its own module. A
   module event's `entity` follows the same rule, and an application process
   `entity`, raise event step `event` and event trigger `event` can name module
   resources. A table widget's `dataSource` and a policy grant's `dataSource` can
@@ -106,16 +108,24 @@ calls `IsDepartmentCode`, so a department code must be in capital letters.
   A step or trigger that names an event under an undeclared module keeps its
   unknown-event code. A module field whose `target` or `sequence` contains `/`,
   a module event, data source or form whose `entity` does, or a module data
-  source parameter whose `target` does, is `AXC0208`.
+  source parameter whose `target` does, is `AXC0208` unless the part before the
+  first `/` is a module that module declares. A `sequence` with `/`, the
+  module's own id and an undeclared module are all `AXC0208`. A reference under
+  a declared module that could not be pinned is not reported again, and a
+  module resource never gets `AXC0207`.
   An unknown name inside a declared module keeps its existing code, such as
   `AXC0012`, `AXC0042`, `AXC0066` or `AXC0074`. A policy grant `entity` can
   name a module entity. One that names an undeclared module keeps the policy's
-  unknown-entity code, `AXC0092`. A module rule calls only rules of its own
-  module, by plain name, such as `isActive(x)`. The rule checks, `AXC0055`,
+  unknown-entity code, `AXC0092`. A module rule calls rules of its own
+  module by plain name, such as `isActive(x)`, and rules of a module it declares
+  as `<module id>:<rule>(…)`, such as `departments:IsCode(x)`. The rule checks, `AXC0055`,
   `AXC0056`, `AXC0057` and `AXC0065`, and the type check of its expression
   apply to it and are reported in the module file. A call to an application
-  rule, or to a rule of another module, is `AXC0050` at `/expression` of the
-  module file. The compiler keeps each module rule as `<module id>/<name>`.
+  rule, or a qualified call to a module it does not declare or to its own id, is
+  `AXC0050` at `/expression` of the module file, not `AXC0207`, because that code
+  tells the user to fix `application.json`. The compiler checks module rules in
+  dependency order, so a module in a dependency cycle, which is `AXC0296`, may
+  also get `AXC0050` for a call back into the cycle. The compiler keeps each module rule as `<module id>/<name>`.
   An application expression calls it as `<module id>:<name>(…)`, such as
   `departments:IsManager(x)`, with no spaces around the `:`. A rule, a
   validation, a data source filter, a process condition and a policy filter can
@@ -126,13 +136,18 @@ calls `IsDepartmentCode`, so a department code must be in capital letters.
   call chain that passes from an application rule into module rules counts
   toward the 8-deep limit, `AXC0065`. See
   [qualified rule calls](expressions.md#names-and-references). A module
-  entity's validations call rules of their own module by plain name, as a
-  module rule does. A call to an application rule, or a qualified call, even
-  with the module's own id, is `AXC0050` at `/validations/{i}/expression` of the
-  module file. The record API runs the module rule's body in each application
-  that declares the module. These calls add no rule-call edge to the reference
-  index, and the 8-deep limit counts the rule chain only. A module data source
-  filter sees no rules. Module entities come before the application's own entities
+  entity's validations and field defaults call rules of their own module by
+  plain name and rules of a declared module by qualified name, as a module rule
+  does. A call to an application rule, or a qualified call to an undeclared
+  module or with the module's own id, is `AXC0050` at
+  `/validations/{i}/expression` of the module file. The record API runs the
+  module rule's body in each application that uses the module. These calls add
+  no rule-call edge to the reference index, and the 8-deep limit counts the
+  rule chain only. A name a module gives to a resource of a declared module does
+  add an edge, so "where is this used" on a module entity lists the fields of
+  the modules that depend on it. A module data source filter sees no rule of its
+  own module. It calls rules of the modules its module declares by qualified
+  name. Module entities come before the application's own entities
   in the model, in the order of the pins and then by path. The pins list the
   application's `modules` entries as written, and then each module they depend on in the
   order it is first reached. The record API
@@ -191,7 +206,7 @@ calls `IsDepartmentCode`, so a department code must be in capital letters.
 | `AXC0205` | No installed version meets the one range that asks for the module. The message lists the installed versions. Reported at `/modules/{i}/version`, in `application.json` or in `modules/<id>/module.json`. Several ranges that no version meets together are `AXC0295`. |
 | `AXC0206` | A module id appears twice in `modules`. Reported at `/modules/{i}/id` of each later entry, in `application.json` or in `modules/<id>/module.json`. |
 | `AXC0207` | A field's `target` or `sequence`, a data source's or form's `entity`, a widget's or policy grant's `dataSource`, or a qualified rule call `<module id>:<name>(…)` names a module that `modules` does not declare. Reported at `/fields/{i}/target`, `/fields/{i}/sequence`, `/entity`, `/widgets/{i}/dataSource`, `/grants/{i}/dataSource` or the expression's pointer. A module that only another module depends on is not declared by the application, so a reference to it is reported too. A reference under a declared module that could not be pinned is not reported again. |
-| `AXC0208` | A field's `target` or `sequence` in a module entity, the `entity` of a module event, data source or form, or the `target` of a module data source parameter, contains `/`. Reported at that property in `modules/<id>/…`. |
+| `AXC0208` | A field's `target` or `sequence` in a module entity, the `entity` of a module event, data source or form, or the `target` of a module data source parameter, contains `/` and does not name a module that module declares. A `sequence` with `/` always gives it. Reported at that property in `modules/<id>/…`. |
 | `AXC0209` | A module text key lacks the `<id>.` prefix. Reported at `/texts/{key}` of the module text, and at `/roles/{i}/label/textKey` of `modules/<id>/module.json` for a role slot label, and at `/connectors/{i}/label/textKey` for a connector slot label. |
 | `AXC0210` | An application locale has no text from a pinned module. The message names the locale. Reported in `application.json` at `/modules/{i}` for a declared module, and at `/modules` for a module that only another module depends on. |
 | `AXC0211` | An application text key starts with the `<id>.` prefix of a module the application uses, declared or only depended on. Reported at `/texts/{key}`. |
@@ -218,7 +233,7 @@ permissions, triggers and outside calls, and build on other modules, as
 [D89](../decisions/d89-modules-that-hold-processes-pages-and-policies-and-depend-on-other-modules.md)
 and [D103](../decisions/d103-modules-hold-triggers-scenarios-and-connector-slots.md) agree. It replaces the two limits above: the kinds a module may hold, and no
 dependencies. Dependencies (the `modules` list without the slot maps), resolving the graph, one
-copy each and what the application names are built. The rest of this section is planned.
+copy each, what the application names, and what a module names and calls of the modules it declares are built. The rest of this section is planned.
 
 ```json
 {
@@ -315,10 +330,10 @@ agrees. An application that declares it maps the slot to one of its own roles:
 - **Dependencies.** _(built)_ `module.json` has an optional `modules`, with the `id` and
   `version` entries of an application's `modules`. A bad entry is `AXC0203`,
   `AXC0204` or `AXC0206`, reported in the `module.json` of the module that
-  holds it. _(planned for M20)_ A module names resources and calls rules
-  only of the modules it declares, as `<module id>/<name>` and
-  `<module id>:<rule>(…)`. Its entry for a module it depends on maps that
-  module's slots to its own slots, with `roles` and `connectors`.
+  holds it. A module names resources and calls rules only of the modules it
+  declares, as `<module id>/<name>` and `<module id>:<rule>(…)`, see
+  [references](#modules). _(planned for M20)_ Its entry for a module it depends
+  on maps that module's slots to its own slots, with `roles` and `connectors`.
 - **Resolving the graph.** _(built)_ The application resolves every module it declares
   and every module they declare, flat. Each module id gets one version: the
   highest installed version that meets every range that asks for it.

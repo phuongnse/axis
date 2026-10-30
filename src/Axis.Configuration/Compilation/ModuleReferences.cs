@@ -10,18 +10,20 @@ namespace Axis.Configuration.Compilation;
 /// could not be pinned already has its own diagnostic on its <c>modules</c> entry, so a reference
 /// under it is not reported again. The application declares only the modules it lists itself. A
 /// resource of a module may name every pinned module, because its own module is pinned even when
-/// only another module depends on it, see <see cref="For"/>.
+/// only another module depends on it, see <see cref="For"/>. The module checker has already
+/// refused a name of a module that the module does not declare.
 /// </summary>
-internal sealed class ModuleReferences(IReadOnlySet<string> declared, IReadOnlySet<string> pinned)
+internal sealed class ModuleReferences(IReadOnlySet<string> declared, IReadOnlySet<string> pinned, bool reportsUndeclared = true)
 {
     private ModuleReferences? _forModules;
 
     /// <summary>
     /// The references to check <paramref name="resource"/> with: this one for an application resource,
-    /// and one that treats every pinned module as declared for a module resource.
+    /// and one that treats every pinned module as declared and never reports <c>AXC0207</c> for a
+    /// module resource, because that code tells the user to fix <c>application.json</c>.
     /// </summary>
     public ModuleReferences For(Resource resource) =>
-        ApplicationCompiler.IsModuleResource(resource) ? _forModules ??= new ModuleReferences(pinned, pinned) : this;
+        ApplicationCompiler.IsModuleResource(resource) ? _forModules ??= new ModuleReferences(pinned, pinned, reportsUndeclared: false) : this;
 
     /// <summary>
     /// Looks <paramref name="name"/> up with <paramref name="find"/>, except a name under a module that
@@ -51,6 +53,11 @@ internal sealed class ModuleReferences(IReadOnlySet<string> declared, IReadOnlyS
         var moduleId = name[..slash];
         if (!declared.Contains(moduleId))
         {
+            if (!reportsUndeclared)
+            {
+                return true;
+            }
+
             report(
                 ExpressionDiagnosticCodes.UndeclaredModuleReference,
                 $"The name '{name}' refers to the module '{moduleId}', which the application does not declare. Add '{moduleId}' to 'modules' in application.json.",

@@ -168,6 +168,14 @@ public static class ExpressionTypeChecker
                 return InferRuleCall(call, moduleRule, context);
             }
 
+            if (declared == false && context.Scope.UndeclaredModuleIsUnknown)
+            {
+                throw Fail(
+                    ExpressionDiagnosticCodes.UnknownFunction,
+                    $"Unknown rule '{call.Name}' in module '{module}'. A module calls only rules of the modules its module.json declares",
+                    call.Offset);
+            }
+
             throw declared == false
                 ? Fail(
                     ExpressionDiagnosticCodes.UndeclaredModuleReference,

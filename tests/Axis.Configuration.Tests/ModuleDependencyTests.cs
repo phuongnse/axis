@@ -3,6 +3,7 @@ using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Model;
 using Axis.Configuration.Modules;
 using Axis.Configuration.Releases;
+using Axis.Configuration.Resources;
 
 namespace Axis.Configuration.Tests;
 
@@ -12,6 +13,9 @@ public sealed class ModuleDependencyTests
     private const string AlphaEntityId = "5c1d2f0e-7a3b-4c8d-9e21-3b6a8f4d1c01";
     private const string BetaEntityId = "5c1d2f0e-7a3b-4c8d-9e21-3b6a8f4d1c02";
     private const string GammaEntityId = "5c1d2f0e-7a3b-4c8d-9e21-3b6a8f4d1c03";
+    private const string BetaRuleId = "5c1d2f0e-7a3b-4c8d-9e21-3b6a8f4d1c11";
+    private const string AlphaRuleId = "5c1d2f0e-7a3b-4c8d-9e21-3b6a8f4d1c12";
+    private const string AlphaWrapperRuleId = "5c1d2f0e-7a3b-4c8d-9e21-3b6a8f4d1c13";
 
     [Fact]
     public void A_module_that_depends_on_another_pins_both_and_copies_both_into_the_release()
@@ -298,6 +302,113 @@ public sealed class ModuleDependencyTests
         Assert.Equal(compiled.ContentHash, rebuilt.ContentHash);
     }
 
+    [Fact]
+    public void A_module_names_an_entity_and_calls_a_rule_of_a_module_it_declares()
+    {
+        using var modules = new TemporaryFolder();
+        InstallBetaRule(modules);
+        InstallDependent(modules, "alpha", AlphaEntityId, Depends(("beta", "^1.0.0")), "beta/Item", "beta:IsValid(name)");
+        modules.With("alpha/1.0.0/Wrapper.json", Rule(AlphaWrapperRuleId, "Wrapper", "beta:IsValid(value)"));
+        using var folder = ApplicationWithTexts(("alpha", "^1.0.0"));
+
+        var result = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+        var validation = Assert.Single(result.Model.Entities.Single(entity => entity.Name == "alpha/Item").Validations);
+        Assert.Equal("beta:IsValid(name)", validation.Expression);
+    }
+
+    [Fact]
+    public void A_module_that_does_not_declare_a_module_cannot_name_its_entity_or_call_its_rule()
+    {
+        using var modules = new TemporaryFolder();
+        InstallBetaRule(modules);
+        InstallDependent(modules, "gamma", GammaEntityId, "", "beta/Item", "beta:IsValid(name)");
+        using var folder = ApplicationWithTexts(("gamma", "^1.0.0"), ("beta", "^1.0.0"));
+
+        var result = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        Assert.Equal(
+            [
+                ("AXC0050", "modules/gamma/Item.json", "/validations/0/expression"),
+                (DiagnosticCodes.QualifiedModuleReference, "modules/gamma/Item.json", "/fields/0/target"),
+            ],
+            result.Diagnostics.Select(diagnostic => (diagnostic.Code, diagnostic.File, diagnostic.Path)).Order());
+    }
+
+    [Fact]
+    public void A_module_that_names_its_own_id_in_a_name_or_a_rule_call_gets_the_module_codes()
+    {
+        using var modules = new TemporaryFolder();
+        InstallDependent(modules, "alpha", AlphaEntityId, "", "alpha/Item", "alpha:IsValid(name)");
+        modules.With("alpha/1.0.0/IsValid.json", Rule(AlphaRuleId, "IsValid", "length(value) > 0"));
+        modules.With("alpha/1.0.0/Wrapper.json", Rule(AlphaWrapperRuleId, "Wrapper", "alpha:IsValid(value)"));
+        using var folder = ApplicationWithTexts(("alpha", "^1.0.0"));
+
+        var result = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        Assert.Equal(
+            [
+                ("AXC0050", "modules/alpha/Item.json", "/validations/0/expression"),
+                ("AXC0050", "modules/alpha/Wrapper.json", "/expression"),
+                (DiagnosticCodes.QualifiedModuleReference, "modules/alpha/Item.json", "/fields/0/target"),
+            ],
+            result.Diagnostics.Select(diagnostic => (diagnostic.Code, diagnostic.File, diagnostic.Path)).Order());
+    }
+
+    [Fact]
+    public void A_module_field_that_targets_an_entity_of_a_declared_module_is_listed_as_its_use()
+    {
+        using var modules = new TemporaryFolder();
+        InstallBetaRule(modules);
+        InstallDependent(modules, "alpha", AlphaEntityId, Depends(("beta", "^1.0.0")), "beta/Item", "beta:IsValid(name)");
+        using var folder = ApplicationWithTexts(("alpha", "^1.0.0"));
+
+        var result = ApplicationCompiler.Compile(folder.Path, null, ModuleCatalog.Load(modules.Path).Modules);
+
+        Assert.Empty(result.Diagnostics);
+        var uses = result.References.UsedBy(
+            new ResourceNode(Guid.Parse(BetaEntityId), ResourceKinds.Entity, "beta/Item", "modules/beta/Item.json"));
+        Assert.Equal(
+            [("alpha/Item", "/fields/0/target", ReferenceRelations.FieldTarget)],
+            uses.Select(edge => (edge.From.Name, edge.Path, edge.Relation)));
+    }
+
+    private static void InstallBetaRule(TemporaryFolder modules)
+    {
+        Install(modules, "beta", "1.0.0", BetaEntityId);
+        modules.With("beta/1.0.0/Item.json", $$"""
+            { "id": "{{BetaEntityId}}", "kind": "entity", "name": "Item", "formatVersion": 1, "displayField": "name",
+              "fields": [ { "name": "name", "type": "text", "required": true } ] }
+            """);
+        modules.With("beta/1.0.0/IsValid.json", Rule(BetaRuleId, "IsValid", "length(value) > 2"));
+        modules.With("beta/1.0.0/TextsEn.json", Texts("c8e2f4a6-3b5d-4f70-9c0b-1d2e3f4a5c90", """{ "beta.title": "Beta" }"""));
+    }
+
+    /// <summary>
+    /// Installs a module whose <c>Item</c> entity has a reference field at <c>/fields/0</c> to
+    /// <paramref name="target"/> and one validation that evaluates <paramref name="validation"/>.
+    /// </summary>
+    private static void InstallDependent(
+        TemporaryFolder modules, string id, string entityId, string dependencies, string target, string validation)
+    {
+        Install(modules, id, "1.0.0", entityId, dependencies);
+        modules.With($"{id}/1.0.0/Item.json", $$"""
+            { "id": "{{entityId}}", "kind": "entity", "name": "Item", "formatVersion": 1,
+              "fields": [
+                { "name": "beta", "type": "reference", "target": "{{target}}" },
+                { "name": "name", "type": "text", "required": true } ],
+              "validations": [ { "expression": "{{validation}}", "message": { "textKey": "{{id}}.item.invalid" }, "field": "name" } ] }
+            """);
+        modules.With($"{id}/1.0.0/TextsEn.json", Texts($"c8e2f4a6-3b5d-4f70-9c0b-1d2e3f4a5c{id.Length:00}", $$"""{ "{{id}}.item.invalid": "Not valid." }"""));
+    }
+
+    private static string Rule(string id, string name, string expression) => $$"""
+        { "id": "{{id}}", "kind": "rule", "name": "{{name}}", "formatVersion": 1,
+          "parameters": [{ "name": "value", "type": "text" }], "resultType": "boolean", "expression": "{{expression}}" }
+        """;
+
     private static void Install(TemporaryFolder root, string id, string version, string entityId, string modules = "")
     {
         root.With($"{id}/{version}/module.json", $$"""
@@ -317,6 +428,9 @@ public sealed class ModuleDependencyTests
             { "id": "{{ApplicationId}}", "kind": "application", "name": "Sample", "formatVersion": 1,
               "modules": [{{string.Join(", ", entries.Select(entry => $$"""{ "id": "{{entry.Id}}", "version": "{{entry.Version}}" }"""))}}] }
             """);
+
+    private static TemporaryFolder ApplicationWithTexts(params (string Id, string Version)[] entries) =>
+        Application(entries).With("TextsEn.json", Texts("c8e2f4a6-3b5d-4f70-9c0b-1d2e3f4a5c91", """{ "sample.title": "Sample" }"""));
 
     private static string Texts(string id, string texts) => $$"""
         { "id": "{{id}}", "kind": "text", "name": "TextsEn", "formatVersion": 1, "locale": "en", "texts": {{texts}} }

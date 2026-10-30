@@ -556,6 +556,27 @@ public sealed class ExpressionTypeCheckerTests
         Assert.Equal((code, message), (diagnostic.Code, diagnostic.Message));
     }
 
+    [Theory]
+    [InlineData("payroll:IsPositive(i)")]
+    [InlineData("payroll:Nope(i)")]
+    public void A_module_scope_reports_a_qualified_call_to_a_module_it_does_not_name_as_an_unknown_rule(string text)
+    {
+        var diagnostic = CheckFails(text, ExpressionType.Boolean, ModuleScope(undeclaredModuleIsUnknown: true));
+
+        Assert.Equal(ExpressionDiagnosticCodes.UnknownFunction, diagnostic.Code);
+        Assert.Contains("module.json", diagnostic.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("application.json", diagnostic.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void A_module_scope_still_resolves_a_qualified_call_to_a_module_it_names()
+    {
+        var ok = Check("departments:IsPositive(i)", ExpressionType.Boolean, ModuleScope(undeclaredModuleIsUnknown: true));
+
+        Assert.True(ok.Succeeded, ok.Diagnostic?.Message);
+        Assert.Equal("departments", Assert.Single(ok.RuleCalls.Values).Module);
+    }
+
     [Fact]
     public void A_scope_built_without_modules_allows_no_qualified_call()
     {
@@ -728,14 +749,15 @@ public sealed class ExpressionTypeCheckerTests
         });
 
     /// <summary>The fields of <see cref="_scope"/>, with two rules known by their signatures.</summary>
-    private static ExpressionScope ModuleScope() => new(
+    private static ExpressionScope ModuleScope(bool undeclaredModuleIsUnknown = false) => new(
         new Dictionary<string, ExpressionType> { ["i"] = ExpressionType.Integer },
         [
             new ExpressionRule("IsPositive", [new ExpressionRuleParameter("value", ExpressionType.Integer)], ExpressionType.Boolean) { Module = "departments" },
             new ExpressionRule("Twice", [new ExpressionRuleParameter("value", ExpressionType.Decimal)], ExpressionType.Decimal) { Module = "departments" },
             new ExpressionRule("Own", [new ExpressionRuleParameter("value", ExpressionType.Integer)], ExpressionType.Boolean),
         ],
-        modules: ["departments", "people"]);
+        modules: ["departments", "people"],
+        undeclaredModuleIsUnknown: undeclaredModuleIsUnknown);
 
     private static ExpressionScope RuleScope() => new(
         new Dictionary<string, ExpressionType>

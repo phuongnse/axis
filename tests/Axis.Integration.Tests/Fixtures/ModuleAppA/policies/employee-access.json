@@ -7,6 +7,7 @@
   "grants": [
     { "entity": "departments/Department", "actions": ["read", "create", "update", "delete"] },
     { "dataSource": "departments/Departments", "actions": ["read"] },
+    { "entity": "budgets/Budget", "actions": ["read", "create"] },
     { "entity": "Employee", "actions": ["read", "create", "update", "delete"] }
   ]
 }

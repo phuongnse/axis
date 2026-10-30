@@ -1,0 +1,11 @@
+{
+  "id": "4c8f6b21-5d3e-4a7b-8e29-8b2d1f6c3a05",
+  "kind": "text",
+  "name": "TextsEn",
+  "formatVersion": 1,
+  "locale": "en",
+  "texts": {
+    "budgets.budget": "Budget",
+    "budgets.budget.shortCode": "Use at least three characters for the code."
+  }
+}

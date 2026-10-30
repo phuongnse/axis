@@ -29,7 +29,8 @@ namespace Axis.Configuration.Compilation;
 /// under their plain names, for <see cref="RuleChecker.CheckModules"/>. Inside a module, a field's
 /// <c>target</c> or <c>sequence</c>, an event's, data source's or form's <c>entity</c> and a data source
 /// parameter's <c>target</c> name a resource of the same module without <c>/</c>, and are rewritten to
-/// the qualified name. The <c>roles</c> of an entry must map each role slot of the pinned version to
+/// the qualified name. All of them but a <c>sequence</c> may instead name a resource of a module the
+/// module declares in its <c>modules</c> as <c>&lt;id&gt;/&lt;name&gt;</c>, which is kept as written. The <c>roles</c> of an entry must map each role slot of the pinned version to
 /// a role of the application, and the pin keeps that map. The <c>connectors</c> of an entry must map
 /// each connector slot of the pinned version to a connector of the application that fits it, see
 /// <see cref="ConnectorChecker.CheckSlot"/>, and the pin keeps that map too.
@@ -186,6 +187,7 @@ internal static class ModuleChecker
         var pins = new List<PinnedModuleModel>();
         var files = new List<ResourceContent>();
         var resources = new ModuleResourceCollector();
+        var declaredByModule = new Dictionary<string, IReadOnlySet<string>>(StringComparer.Ordinal);
         foreach (var id in order)
         {
             if (!picks.TryGetValue(id, out var picked))
@@ -209,10 +211,12 @@ internal static class ModuleChecker
                 pins.Add(new PinnedModuleModel(id, first.RangeText, picked));
             }
 
-            CheckFiles(pinnedModule, files, resources, diagnostics);
+            var declared = new HashSet<string>(pinnedModule.Manifest.Modules.Select(module => module.Id), StringComparer.Ordinal);
+            declaredByModule[id] = declared;
+            CheckFiles(pinnedModule, declared, files, resources, diagnostics);
         }
 
-        return (pins, files, resources.ToResources());
+        return (pins, files, resources.ToResources(declaredByModule));
     }
 
     /// <summary>
@@ -529,7 +533,11 @@ internal static class ModuleChecker
 
     /// <summary>Checks each file of a pinned module and adds the valid ones, in canonical form, under <c>modules/&lt;id&gt;/</c>.</summary>
     private static void CheckFiles(
-        InstalledModule module, List<ResourceContent> files, ModuleResourceCollector resources, List<Diagnostic> diagnostics)
+        InstalledModule module,
+        IReadOnlySet<string> declared,
+        List<ResourceContent> files,
+        ModuleResourceCollector resources,
+        List<Diagnostic> diagnostics)
     {
         foreach (var file in module.Files)
         {
@@ -563,7 +571,7 @@ internal static class ModuleChecker
                         continue;
                     }
 
-                    resources.Add(module.Manifest.Id, path, root, diagnostics);
+                    resources.Add(module.Manifest.Id, declared, path, root, diagnostics);
                 }
 
                 files.Add(new ResourceContent(path, JsonCanonicalizer.Canonicalize(root)));
@@ -616,8 +624,9 @@ internal static class ModuleChecker
         private readonly HashSet<string> _unloadedEventNames = new(StringComparer.OrdinalIgnoreCase);
         private readonly HashSet<string> _unloadedDataSourceNames = new(StringComparer.OrdinalIgnoreCase);
         private readonly HashSet<string> _unloadedFormNames = new(StringComparer.OrdinalIgnoreCase);
+        private readonly HashSet<string> _noModules = [];
 
-        public ModuleResources ToResources() =>
+        public ModuleResources ToResources(IReadOnlyDictionary<string, IReadOnlySet<string>> declaredModules) =>
             new(
                 _entities,
                 _sequences,
@@ -631,7 +640,8 @@ internal static class ModuleChecker
                 _unloadedSequenceNames,
                 _unloadedEventNames,
                 _unloadedDataSourceNames,
-                _unloadedFormNames);
+                _unloadedFormNames,
+                declaredModules);
 
         /// <summary>Notes the name of an entity, sequence, event, data source or form file that failed its schema, so a reference to it is not reported again.</summary>
         public void AddUnloaded(string moduleId, JsonElement root)
@@ -667,13 +677,13 @@ internal static class ModuleChecker
         }
 
         /// <summary>Reads a file that passed its schema, if it is an entity, a sequence, a seed, a rule, an event, a data source, a form or a text.</summary>
-        public void Add(string moduleId, string file, JsonElement root, List<Diagnostic> diagnostics)
+        public void Add(string moduleId, IReadOnlySet<string> declared, string file, JsonElement root, List<Diagnostic> diagnostics)
         {
             switch (root.GetProperty("kind").GetString())
             {
                 case ResourceKinds.Entity:
                     var entity = root.Deserialize<EntityResource>(ApplicationLoader.SerializerOptions)! with { File = file };
-                    _entities.Add(Qualify(moduleId, entity, diagnostics));
+                    _entities.Add(Qualify(moduleId, declared, entity, diagnostics));
                     break;
                 case ResourceKinds.Sequence:
                     var sequence = root.Deserialize<SequenceResource>(ApplicationLoader.SerializerOptions)! with { File = file };
@@ -699,19 +709,19 @@ internal static class ModuleChecker
                     _events.Add(@event with
                     {
                         Name = $"{moduleId}/{@event.Name}",
-                        Entity = Rewrite(moduleId, @event.Entity, @event.File, @event.Id, "/entity", _unloadedEntityNames, diagnostics)!,
+                        Entity = Rewrite(moduleId, declared, @event.Entity, @event.File, @event.Id, "/entity", _unloadedEntityNames, diagnostics)!,
                     });
                     break;
                 case ResourceKinds.DataSource:
                     var dataSource = root.Deserialize<DataSourceResource>(ApplicationLoader.SerializerOptions)! with { File = file };
-                    _dataSources.Add(Qualify(moduleId, dataSource, diagnostics));
+                    _dataSources.Add(Qualify(moduleId, declared, dataSource, diagnostics));
                     break;
                 case ResourceKinds.Form:
                     var form = root.Deserialize<FormResource>(ApplicationLoader.SerializerOptions)! with { File = file };
                     _forms.Add(form with
                     {
                         Name = $"{moduleId}/{form.Name}",
-                        Entity = Rewrite(moduleId, form.Entity, form.File, form.Id, "/entity", _unloadedEntityNames, diagnostics)!,
+                        Entity = Rewrite(moduleId, declared, form.Entity, form.File, form.Id, "/entity", _unloadedEntityNames, diagnostics)!,
                     });
                     break;
                 case ResourceKinds.Text:
@@ -723,16 +733,17 @@ internal static class ModuleChecker
 
         /// <summary>
         /// Gives the entity its qualified name and rewrites each field's <c>target</c> and <c>sequence</c>
-        /// to the qualified name of a resource of the same module. A value that already contains
-        /// <c>/</c> is reported, and its rewritten name is left unresolved without a second report.
+        /// to the qualified name of a resource of the same module. A <c>target</c> that names a module
+        /// in <paramref name="declared"/> keeps its name. A sequence names only its own module's. Any other
+        /// value that contains <c>/</c> is reported, and its rewritten name is left unresolved without a second report.
         /// </summary>
-        private EntityResource Qualify(string moduleId, EntityResource entity, List<Diagnostic> diagnostics)
+        private EntityResource Qualify(string moduleId, IReadOnlySet<string> declared, EntityResource entity, List<Diagnostic> diagnostics)
         {
             var fields = entity.Fields
                 .Select((field, index) => field with
                 {
-                    Target = Rewrite(moduleId, field.Target, entity.File, entity.Id, $"/fields/{index}/target", _unloadedEntityNames, diagnostics),
-                    Sequence = Rewrite(moduleId, field.Sequence, entity.File, entity.Id, $"/fields/{index}/sequence", _unloadedSequenceNames, diagnostics),
+                    Target = Rewrite(moduleId, declared, field.Target, entity.File, entity.Id, $"/fields/{index}/target", _unloadedEntityNames, diagnostics),
+                    Sequence = Rewrite(moduleId, _noModules, field.Sequence, entity.File, entity.Id, $"/fields/{index}/sequence", _unloadedSequenceNames, diagnostics),
                 })
                 .ToList();
             return entity with { Name = $"{moduleId}/{entity.Name}", Fields = fields };
@@ -740,32 +751,36 @@ internal static class ModuleChecker
 
         /// <summary>
         /// Gives the data source its qualified name and rewrites its <c>entity</c> and each parameter's
-        /// <c>target</c> to the qualified name of an entity of the same module. A value that already
-        /// contains <c>/</c> is reported, and its rewritten name is left unresolved without a second report.
+        /// <c>target</c> to the qualified name of an entity of the same module. A value that names a
+        /// module in <paramref name="declared"/> keeps its name. Any other value that contains <c>/</c> is
+        /// reported, and its rewritten name is left unresolved without a second report.
         /// </summary>
-        private DataSourceResource Qualify(string moduleId, DataSourceResource dataSource, List<Diagnostic> diagnostics)
+        private DataSourceResource Qualify(string moduleId, IReadOnlySet<string> declared, DataSourceResource dataSource, List<Diagnostic> diagnostics)
         {
             var parameters = dataSource.Parameters
                 .Select((parameter, index) => parameter with
                 {
-                    Target = Rewrite(moduleId, parameter.Target, dataSource.File, dataSource.Id, $"/parameters/{index}/target", _unloadedEntityNames, diagnostics),
+                    Target = Rewrite(moduleId, declared, parameter.Target, dataSource.File, dataSource.Id, $"/parameters/{index}/target", _unloadedEntityNames, diagnostics),
                 })
                 .ToList();
             return dataSource with
             {
                 Name = $"{moduleId}/{dataSource.Name}",
-                Entity = Rewrite(moduleId, dataSource.Entity, dataSource.File, dataSource.Id, "/entity", _unloadedEntityNames, diagnostics)!,
+                Entity = Rewrite(moduleId, declared, dataSource.Entity, dataSource.File, dataSource.Id, "/entity", _unloadedEntityNames, diagnostics)!,
                 Parameters = parameters,
             };
         }
 
         /// <summary>
-        /// Rewrites a reference to a resource of the same module to its qualified name. A value that
-        /// already contains <c>/</c> is reported, and its rewritten name is added to
-        /// <paramref name="unloaded"/> so it is left unresolved without a second report.
+        /// Rewrites a reference to a resource of the same module to its qualified name. A value whose
+        /// module part, before the first <c>/</c>, is in <paramref name="declared"/> names a resource of
+        /// that module and is returned as written. Any other value that contains <c>/</c> is reported,
+        /// and its rewritten name is added to <paramref name="unloaded"/> so it is left unresolved
+        /// without a second report.
         /// </summary>
         private static string? Rewrite(
             string moduleId,
+            IReadOnlySet<string> declared,
             string? value,
             string file,
             Guid id,
@@ -778,12 +793,18 @@ internal static class ModuleChecker
                 return null;
             }
 
+            var slash = value.IndexOf('/', StringComparison.Ordinal);
+            if (slash >= 0 && declared.Contains(value[..slash]))
+            {
+                return value;
+            }
+
             var qualified = $"{moduleId}/{value}";
-            if (value.Contains('/', StringComparison.Ordinal))
+            if (slash >= 0)
             {
                 diagnostics.Add(new Diagnostic(
                     DiagnosticCodes.QualifiedModuleReference,
-                    $"A module resource names only resources of its own module, without '/'. Write '{value[(value.LastIndexOf('/') + 1)..]}', not '{value}'.",
+                    $"A module resource names its own resources without '/' and, except for a sequence, the resources of a module it declares as '<module id>/<name>'. '{value}' is neither. Write '{value[(value.LastIndexOf('/') + 1)..]}' for a resource of this module.",
                     file,
                     path,
                     id));
@@ -798,7 +819,8 @@ internal static class ModuleChecker
 /// <summary>
 /// The entities, sequences, seeds, events, data sources, forms and texts of the pinned modules, named <c>&lt;id&gt;/&lt;name&gt;</c> and
 /// carrying the ids written in the module files. The rules come by module, in pin order, each in path
-/// order and under its plain name. The unloaded names are those of module files that
+/// order and under its plain name. <c>DeclaredModules</c> maps each pinned module to the ids in its
+/// manifest's <c>modules</c>. The unloaded names are those of module files that
 /// failed their schema or whose reference was reported, so no second diagnostic names them. Both name
 /// sets ignore letter case.
 /// </summary>
@@ -815,7 +837,8 @@ internal sealed record ModuleResources(
     IReadOnlySet<string> UnloadedSequenceNames,
     IReadOnlySet<string> UnloadedEventNames,
     IReadOnlySet<string> UnloadedDataSourceNames,
-    IReadOnlySet<string> UnloadedFormNames);
+    IReadOnlySet<string> UnloadedFormNames,
+    IReadOnlyDictionary<string, IReadOnlySet<string>> DeclaredModules);
 
 /// <summary>A text resource of a pinned module, with the id of that module.</summary>
 internal sealed record ModuleText(string ModuleId, TextResource Text);

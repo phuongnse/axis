@@ -16,23 +16,25 @@ namespace Axis.Configuration.Compilation;
 /// chain deeper than the limit is reported once, at the lowest rule past the limit. A rule with a
 /// problem in its own expression, or in a cycle, is kept by its signature only, so that calls to it
 /// are still checked without further diagnostics. A body may call a module rule as
-/// <c>module:Name(…)</c> when it is given the module rules and the declared module ids. A chain that
-/// passes into module rules counts every rule in it toward the depth limit.
+/// <c>module:Name(…)</c> when it is given the module rules and the declared module ids. A module rule
+/// calls only rules of the modules its <c>module.json</c> declares. A chain that passes into module
+/// rules counts every rule in it toward the depth limit.
 /// </summary>
 internal static class RuleChecker
 {
     /// <summary>
     /// Checks <paramref name="rules"/>, which come in path order, and returns the rules by name, ignoring letter case.
     /// <paramref name="moduleRules"/> are the checked rules of the declared modules and
-    /// <paramref name="modules"/> the declared module ids. Both are null for a module's own rules,
-    /// which call no module rule.
+    /// <paramref name="modules"/> the declared module ids. With <paramref name="undeclaredModuleIsUnknown"/>,
+    /// the rules are a module's, and a call to a module outside <paramref name="modules"/> is an unknown rule.
     /// </summary>
     public static IReadOnlyDictionary<string, ExpressionRule> Check(
         IReadOnlyList<RuleResource> rules,
         ReferenceIndexBuilder? references,
         List<Diagnostic> diagnostics,
         IReadOnlyCollection<ExpressionRule>? moduleRules = null,
-        IReadOnlySet<string>? modules = null)
+        IReadOnlySet<string>? modules = null,
+        bool undeclaredModuleIsUnknown = false)
     {
         // Rule names are unique ignoring letter case; a second rule with the same name is already
         // reported by the loader, so calls resolve to the first one.
@@ -91,24 +93,62 @@ internal static class RuleChecker
             }
         }
 
-        new Walk(resources, built, bodies, references, diagnostics, moduleRules ?? [], modules).Run();
+        new Walk(resources, built, bodies, references, diagnostics, moduleRules ?? [], modules, undeclaredModuleIsUnknown).Run();
         return built;
     }
 
     /// <summary>
-    /// Checks each module's rules on their own, so a module rule calls only rules of its module, and
-    /// returns them by <c>&lt;module id&gt;/&lt;name&gt;</c>, ignoring letter case.
+    /// Checks each module's rules and returns them by <c>&lt;module id&gt;/&lt;name&gt;</c>, ignoring
+    /// letter case. A module rule calls its own rules by plain name and the rules of the modules in
+    /// <paramref name="declaredByModule"/> as <c>module:Name(…)</c>. The modules are checked
+    /// depth-first over their declared modules, so a rule is checked after the rules it calls. In a
+    /// dependency cycle a call back into a module still being checked finds no rule.
     /// </summary>
     public static IReadOnlyDictionary<string, ExpressionRule> CheckModules(
-        IReadOnlyList<(string ModuleId, IReadOnlyList<RuleResource> Rules)> modules, List<Diagnostic> diagnostics)
+        IReadOnlyList<(string ModuleId, IReadOnlyList<RuleResource> Rules)> modules,
+        IReadOnlyDictionary<string, IReadOnlySet<string>> declaredByModule,
+        List<Diagnostic> diagnostics)
     {
-        var rules = new Dictionary<string, ExpressionRule>(StringComparer.OrdinalIgnoreCase);
-        foreach (var (moduleId, moduleRules) in modules)
+        var rulesByModule = modules.ToDictionary(module => module.ModuleId, module => module.Rules, StringComparer.Ordinal);
+        var checkedByModule = new Dictionary<string, List<ExpressionRule>>(StringComparer.Ordinal);
+        var started = new HashSet<string>(StringComparer.Ordinal);
+
+        void Visit(string moduleId)
         {
-            // Module rules add no rule-call edges until the modules issue indexes module resources.
-            foreach (var (name, rule) in Check(moduleRules, null, diagnostics))
+            if (!started.Add(moduleId))
             {
-                rules[$"{moduleId}/{name}"] = rule with { Module = moduleId };
+                return;
+            }
+
+            var declared = declaredByModule.TryGetValue(moduleId, out var ids) ? ids : new HashSet<string>();
+            foreach (var id in declared.Order(StringComparer.Ordinal))
+            {
+                if (rulesByModule.ContainsKey(id))
+                {
+                    Visit(id);
+                }
+            }
+
+            // Module rules add no rule-call edges, only the resources a module names are indexed.
+            var callable = declared.Where(checkedByModule.ContainsKey).SelectMany(id => checkedByModule[id]).ToList();
+            checkedByModule[moduleId] =
+            [
+                .. Check(rulesByModule[moduleId], null, diagnostics, callable, declared, undeclaredModuleIsUnknown: true)
+                    .Values.Select(rule => rule with { Module = moduleId }),
+            ];
+        }
+
+        foreach (var (moduleId, _) in modules)
+        {
+            Visit(moduleId);
+        }
+
+        var rules = new Dictionary<string, ExpressionRule>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (moduleId, _) in modules)
+        {
+            foreach (var rule in checkedByModule[moduleId])
+            {
+                rules[$"{moduleId}/{rule.Name}"] = rule;
             }
         }
 
@@ -126,9 +166,10 @@ internal static class RuleChecker
         ReferenceIndexBuilder? references,
         List<Diagnostic> diagnostics,
         IReadOnlyCollection<ExpressionRule> moduleRules,
-        IReadOnlySet<string>? modules)
+        IReadOnlySet<string>? modules,
+        bool undeclaredModuleIsUnknown)
     {
-        private readonly ExpressionScope _moduleScope = new([], moduleRules, modules: modules);
+        private readonly ExpressionScope _moduleScope = new([], moduleRules, modules: modules, undeclaredModuleIsUnknown: undeclaredModuleIsUnknown);
         private readonly Dictionary<string, bool> _doneByName = new(StringComparer.OrdinalIgnoreCase);
         private readonly List<string> _stack = [];
         private readonly HashSet<string> _inCycle = new(StringComparer.OrdinalIgnoreCase);
@@ -327,7 +368,7 @@ internal static class RuleChecker
                 parameters.TryAdd(parameter.Name, parameter.Type);
             }
 
-            var check = ExpressionTypeChecker.Check(body, new ExpressionScope(parameters, built.Values.Concat(moduleRules), modules: modules), rule.ResultType);
+            var check = ExpressionTypeChecker.Check(body, new ExpressionScope(parameters, built.Values.Concat(moduleRules), modules: modules, undeclaredModuleIsUnknown: undeclaredModuleIsUnknown), rule.ResultType);
             references?.RecordExpression(resource, "/expression", check.Type, check.Diagnostic);
             if (!check.Succeeded)
             {
