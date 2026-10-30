@@ -6,6 +6,7 @@ import { dirname, join } from 'node:path'
 import { describe, test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { loadUsers } from './lib/load-realm.mjs'
+import { writeLoadStack } from './lib/load-stack.mjs'
 
 // Runs scripts/load.sh in a temporary copy of the files it needs, with docker, npm and curl replaced by stubs that log
 // their calls. The real node and openssl write the certificates, the secret files and the override file.
@@ -24,7 +25,8 @@ const summaryJson = ({ reads = 241, writes = 412, errors = 0.0002 } = {}) =>
 
 const stubs = {
   // The k6 call exits with STUB_K6_STATUS (default 0). When STUB_SUMMARY is set, it writes that summary into the folder
-  // mounted at /results, as k6 does with --summary-export.
+  // mounted at /results, as k6 does with --summary-export. The stop of the worker writes the metrics file, as the
+  // collector does with its last export.
   docker: `#!/usr/bin/env bash
 ${log('docker')}if [[ "$*" == *" k6 run "* ]]; then
   for arg in "$@"; do
@@ -32,6 +34,8 @@ ${log('docker')}if [[ "$*" == *" k6 run "* ]]; then
   done
   exit "\${STUB_K6_STATUS:-0}"
 fi
+if [[ "$*" == *" up -d server worker"* && -e artifacts/load-results/worker-metrics.json ]]; then echo "metrics-file-before-worker" >> "$STUB_LOG"; fi
+if [[ "$*" == *" stop worker"* ]]; then printf '{}' > artifacts/load-results/worker-metrics.json; fi
 exit 0
 `,
   // The tenant answers 401, as the wait for its host expects. The admin API of the identity provider answers by the URL,
@@ -122,6 +126,7 @@ function runLoad(args = [], extraEnv = {}, setup = () => {}) {
       left: existsSync(join(dir, 'artifacts/load/override.json')),
       results,
       resultsMode,
+      metricsKept: existsSync(join(resultsFolder, 'worker-metrics.json')),
     }
   } finally {
     rmSync(dir, { recursive: true, force: true })
@@ -259,6 +264,97 @@ describe('scripts/load.sh starts the reference stack and runs the objectives sce
     assert.equal(run.status, 0, run.stdout + run.stderr)
     assert.equal(run.results, true)
     assert.equal(run.resultsMode, 0o777)
+  })
+})
+
+describe('scripts/load.sh collects the metrics of the worker', () => {
+  test('the worker stops after the k6 run and before the stack is removed, and the metrics file is kept', () => {
+    const run = runLoad()
+
+    assert.equal(run.status, 0, run.stdout + run.stderr)
+    const stop = indexOf(run, ' stop worker collector')
+    assert.ok(stop > k6Index(run))
+    assert.ok(stop < indexOf(run, ' down -v '))
+    assert.equal(run.metricsKept, true)
+  })
+
+  test('the worker stops even when k6 fails, and the exit code is k6\'s', () => {
+    const run = runLoad([], { STUB_K6_STATUS: '3' })
+
+    assert.equal(run.status, 3, run.stdout + run.stderr)
+    assert.ok(indexOf(run, ' stop worker collector') > k6Index(run))
+  })
+
+  test('a metrics file left by an earlier run is removed before the worker starts', () => {
+    const run = runLoad([], {}, (dir) => {
+      mkdirSync(join(dir, 'artifacts/load-results'), { recursive: true })
+      writeFileSync(join(dir, 'artifacts/load-results/worker-metrics.json'), 'stale')
+    })
+
+    assert.equal(run.status, 0, run.stdout + run.stderr)
+    assert.ok(indexOf(run, ' up -d server worker') >= 0)
+    assert.equal(run.calls.includes('metrics-file-before-worker'), false, run.calls.join('\n'))
+  })
+
+  describe('the load stack', () => {
+    const withStack = (check) => {
+      const dir = mkdtempSync(join(tmpdir(), 'axis-load-stack-'))
+      try {
+        const folder = join(dir, 'run')
+        writeLoadStack(folder, { results: join(dir, 'artifacts/load-results') })
+        check({
+          folder,
+          dir,
+          override: JSON.parse(readFileSync(join(folder, 'override.json'), 'utf8')),
+          collector: JSON.parse(readFileSync(join(folder, 'collector.json'), 'utf8')),
+        })
+      } finally {
+        rmSync(dir, { recursive: true, force: true })
+      }
+    }
+
+    test('the worker exports its metrics over https to the collector and trusts the run\'s authority', () => {
+      withStack(({ folder, override }) => {
+        const { worker } = override.services
+        assert.match(worker.environment.OTEL_EXPORTER_OTLP_METRICS_ENDPOINT, /^https:\/\/collector:4318\//)
+        assert.equal(worker.environment.OTEL_EXPORTER_OTLP_PROTOCOL, 'http/protobuf')
+        assert.equal(worker.environment.OTEL_METRIC_EXPORT_INTERVAL, '5000')
+        assert.equal(worker.environment.OTEL_EXPORTER_OTLP_ENDPOINT, undefined)
+        assert.equal(worker.environment.SSL_CERT_FILE, '/run/test-ca/ca.crt')
+        assert.ok(worker.volumes.includes(`${join(folder, 'ca')}:/run/test-ca:ro`), worker.volumes.join('\n'))
+        assert.ok(worker.depends_on.includes('collector'))
+      })
+    })
+
+    test('the collector certificate is signed by the authority and names the collector', () => {
+      withStack(({ folder, collector, override }) => {
+        const certificate = join(folder, 'collector-tls/tls.crt')
+        const verify = spawnSync('openssl', ['verify', '-CAfile', join(folder, 'ca/ca.crt'), certificate], { encoding: 'utf8' })
+        assert.equal(verify.status, 0, verify.stdout + verify.stderr)
+        const names = spawnSync('openssl', ['x509', '-noout', '-ext', 'subjectAltName', '-in', certificate], { encoding: 'utf8' })
+        assert.equal(names.status, 0, names.stdout + names.stderr)
+        assert.match(names.stdout, /DNS:collector\b/)
+
+        const { http } = collector.receivers.otlp.protocols
+        assert.equal(http.endpoint, '0.0.0.0:4318')
+        const mount = override.services.collector.volumes.find((volume) => volume.endsWith(':/collector-tls:ro'))
+        assert.equal(mount, `${join(folder, 'collector-tls')}:/collector-tls:ro`)
+        assert.equal(http.tls.cert_file, '/collector-tls/tls.crt')
+        assert.equal(http.tls.key_file, '/collector-tls/tls.key')
+        assert.deepEqual(collector.service.pipelines.metrics, { receivers: ['otlp'], exporters: ['file'] })
+      })
+    })
+
+    test('the collector writes the metrics into the results folder', () => {
+      withStack(({ dir, folder, collector, override }) => {
+        const { volumes } = override.services.collector
+        assert.equal(collector.exporters.file.path, '/results/worker-metrics.json')
+        assert.ok(volumes.includes(`${join(dir, 'artifacts/load-results')}:/results`), volumes.join('\n'))
+        assert.ok(volumes.includes(`${join(folder, 'collector.json')}:/etc/otelcol-contrib/config.yaml:ro`), volumes.join('\n'))
+        assert.match(override.services.collector.image, /^otel\/opentelemetry-collector-contrib:\d+\.\d+\.\d+$/)
+        assert.equal(override.services.collector.profiles, undefined)
+      })
+    })
   })
 })
 
