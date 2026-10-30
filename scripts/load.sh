@@ -9,7 +9,9 @@
 # application in the tenant, which writes the seed records, and runs the k6 scenario tests/load/objectives.js through
 # the proxy: 50 users sign in through the realm and loop over the reads and writes of the objectives. k6 writes its summary
 # to artifacts/load-results, which scripts/lib/load-objectives.mjs checks against the objectives. The exit code is the
-# checker's when it fails, otherwise k6's, and k6's when k6 wrote no summary. Removes the stack at the end, unless --keep
+# checker's when it fails, otherwise k6's, and k6's when k6 wrote no summary. An OpenTelemetry Collector receives the
+# worker's metrics over https and writes them to artifacts/load-results/worker-metrics.json. After k6 the script stops the
+# worker and then the collector, so the last metrics reach the file. Removes the stack at the end, unless --keep
 # is given. Arguments after -- go to k6.
 # The files of the run, with the certificates and secret files, are in artifacts/load. See docs/reference/performance.md.
 set -euo pipefail
@@ -121,6 +123,12 @@ wait_for 60 PostgreSQL compose exec -T postgres pg_isready -h 127.0.0.1 -U postg
 compose up -d identity proxy
 wait_for 240 'The identity provider' identity_answers
 
+# The collector writes the worker's metrics into the results folder, as the host user. The grafana/k6 image does not run as
+# the host user either, so the folder must be writable by all. Files of an earlier run are removed.
+mkdir -p "$results"
+chmod a+rwx "$results"
+rm -f "$results/summary.json" "$results/worker-metrics.json"
+
 compose up -d server worker
 wait_for 120 'The server' server_ready "$AXIS_SERVER_PORT"
 wait_for 120 'The worker' worker_ready
@@ -142,14 +150,11 @@ compose --profile admin run --rm --no-TTY admin tenant oidc set load --endpoint-
 compose --profile admin run --rm --no-TTY admin tenant binding set load LoadServiceUrl --url https://load-stub:8443
 compose --profile admin run --rm --no-TTY admin activate /apps/load --tenant load
 
-# The grafana/k6 image does not run as the host user, so the folder must be writable by all.
-mkdir -p "$results"
-chmod a+rwx "$results"
-rm -f "$results/summary.json"
-
 set +e
 compose --profile load run --rm --no-TTY -v "$results:/results" k6 run --summary-export=/results/summary.json ${k6_args[@]+"${k6_args[@]}"} /scripts/objectives.js
 status=$?
+# The worker flushes its last metrics when it stops, and the collector, which it depends on, stops after it.
+compose stop worker collector
 set -e
 if [ ! -f "$results/summary.json" ]; then
   echo "k6 wrote no summary to $results/summary.json" >&2

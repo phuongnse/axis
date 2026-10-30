@@ -1,11 +1,14 @@
 // Writes the files that scripts/load.sh needs to start the reference stack from deploy/compose/compose.yaml:
 // a certificate authority made for the run, the certificates, the secret files, the SQL that creates the database
-// roles, and override.json. Run it as `node scripts/lib/load-stack.mjs <folder>` with a folder that does not exist yet.
-// It mirrors the setup of scripts/onprem.test.mjs.
+// roles, collector.json and override.json. Run it as `node scripts/lib/load-stack.mjs <folder>` with a folder that does
+// not exist yet. It mirrors the setup of scripts/onprem.test.mjs.
 //
 // The override file is JSON, which is valid YAML. It adds PostgreSQL over TLS, trusts the authority in every host,
-// including the worker, which calls the connector, and adds the https stub `load-stub`, which answers the connector's
-// calls, and the k6 service under the `load` profile. The authority key stays in ca-private and is never mounted.
+// adds the OpenTelemetry Collector with its own certificate from the authority, points the worker's metrics at the
+// collector over https, adds the https stub `load-stub`, which answers the connector's calls, and adds the k6 service
+// under the `load` profile. The worker trusts the authority, which signed the certificates of the collector and the
+// stub. The authority key stays in ca-private and is never mounted. collector.json is the collector's configuration:
+// it receives OTLP over https and writes the metrics to worker-metrics.json in the results folder.
 import { spawnSync } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
 import { chmodSync, copyFileSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs'
@@ -17,6 +20,8 @@ const root = fileURLToPath(new URL('../..', import.meta.url))
 
 // The tag of the k6 image, and the hosts of the run.
 export const k6Image = 'grafana/k6:1.3.0'
+// The contrib build, which includes the `file` exporter.
+export const collectorImage = 'otel/opentelemetry-collector-contrib:0.135.0'
 export const tenantHost = 'load.axis.test'
 export const identityHost = 'id.axis.test'
 
@@ -27,7 +32,7 @@ export const stubUrl = `https://${stubHost}:8443`
 
 const password = () => randomBytes(18).toString('hex')
 
-export const writeLoadStack = (target, { proxyAddress = '172.31.250.10' } = {}) => {
+export const writeLoadStack = (target, { proxyAddress = '172.31.250.10', results = join(root, 'artifacts/load-results') } = {}) => {
   const folder = resolve(target)
   mkdirSync(folder, { recursive: true })
   chmodSync(folder, 0o755)
@@ -88,6 +93,18 @@ export const writeLoadStack = (target, { proxyAddress = '172.31.250.10' } = {}) 
   const serverTls = folderOf('server-tls')
   issue(serverTls, 'server', ['servers'])
 
+  // The collector receives OTLP over https only, with a certificate for its service name.
+  const collectorTls = folderOf('collector-tls')
+  issue(collectorTls, 'collector', ['collector'])
+  writeFile(
+    join(folder, 'collector.json'),
+    JSON.stringify({
+      receivers: { otlp: { protocols: { http: { endpoint: '0.0.0.0:4318', tls: { cert_file: '/collector-tls/tls.crt', key_file: '/collector-tls/tls.key' } } } } },
+      exporters: { file: { path: '/results/worker-metrics.json' } },
+      service: { pipelines: { metrics: { receivers: ['otlp'], exporters: ['file'] } } },
+    }),
+  )
+
   const secrets = folderOf('secrets')
   const passwords = { schema: password(), platform: password(), admin: password(), postgres: password(), identity: password() }
   const trusted = verifyFull('/run/test-ca/ca.crt')
@@ -135,8 +152,25 @@ export const writeLoadStack = (target, { proxyAddress = '172.31.250.10' } = {}) 
         },
         server,
         'server-2': server,
-        // The worker calls the connector, so it trusts the authority that signed the stub's certificate.
-        worker: { environment: { ...refresh, ...authorityFile }, volumes: [trustVolume] },
+        // The worker exports its metrics every 5 s over OTLP http/protobuf. Only the metrics endpoint is set, so
+        // traces and logs stay off.
+        worker: {
+          environment: {
+            ...refresh,
+            ...authorityFile,
+            OTEL_EXPORTER_OTLP_METRICS_ENDPOINT: 'https://collector:4318/v1/metrics',
+            OTEL_EXPORTER_OTLP_PROTOCOL: 'http/protobuf',
+            OTEL_METRIC_EXPORT_INTERVAL: '5000',
+          },
+          volumes: [trustVolume],
+          depends_on: ['collector'],
+        },
+        // Runs as the host user, so that the host user can read and delete the file it writes.
+        collector: {
+          image: collectorImage,
+          user: `${process.getuid()}:${process.getgid()}`,
+          volumes: [`${join(folder, 'collector.json')}:/etc/otelcol-contrib/config.yaml:ro`, `${collectorTls}:/collector-tls:ro`, `${results}:/results`],
+        },
         admin: { environment: authorityFile, volumes: [trustVolume] },
         // The stub is only reached by the worker, over the compose network.
         [stubHost]: {
