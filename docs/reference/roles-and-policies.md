@@ -248,10 +248,13 @@ Compile checks, each a compile error:
   exactly, is `AXC0089`.
 - A policy `roles` entry that names no declared role, compared exactly, is
   `AXC0090`.
+  A [module policy](modules-and-templates.md#processes-pages-policies-and-dependencies)
+  names role slots of its module instead, and anything else is `AXC0304`.
 - A grant without exactly one of `entity`, `dataSource`, `process` and
   `endpoint` is `AXC0091`.
 - A target that names no loaded entity, data source, process or endpoint,
-  ignoring letter case, is `AXC0092`.
+  ignoring letter case, is `AXC0092`. In a module policy, a target outside the
+  module is `AXC0305`.
 - An action that the target's kind does not take, such as `start` on an
   entity or `read` on an endpoint, is `AXC0091`. So is `inspect` on anything
   but a process.

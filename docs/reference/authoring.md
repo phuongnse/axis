@@ -372,7 +372,7 @@ agrees it. The answer is:
 { targets: [{ kind, id, name, module, actions: [...], entity }],
   roles: [{ id, name, accessPolicy: { name, id }, editable, readOnlyReason,
             cells: [{ kind, target, actions: [...], missingEntityRead,
-                      grants: [{ policyId, policy, index, actions, filter, fields, shared }] }] }] }
+                      grants: [{ policyId, policy, index, actions, filter, fields, shared, module }] }] }] }
 ```
 
 - **Columns.** `targets` lists root entities first, with module entities
@@ -401,10 +401,10 @@ agrees it. The answer is:
   also read the data source's root entity. When it has a `read` grant but not
   that entity read, `read` is left out and `missingEntityRead` names the root
   entity. It is null otherwise.
-- **`grants`.** Each grant of a policy that names the role, with its `policyId`
-  and `policy` name, its `index` in the policy, and its `actions`, `filter` and
-  `fields` as written. `fields` is null for every field. Filters and field lists
-  are not evaluated here.
+- **`grants`.** Each grant of a policy that names the role: its `policyId`,
+  `policy` name, `index`, and `actions`, `filter` and `fields` as written, not
+  evaluated. `fields` is null for every field. `module` is the module id of a grant from a
+  [module policy](modules-and-templates.md#processes-pages-policies-and-dependencies), else null.
 - **`shared`.** A grant is shared unless it comes from the role's own
   `<Role>Access` policy and that policy names only that role.
 - **`<Role>Access`.** `accessPolicy` is the PascalCase role name plus `Access`.

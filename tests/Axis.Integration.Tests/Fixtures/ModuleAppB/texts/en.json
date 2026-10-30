@@ -4,5 +4,5 @@
   "name": "TextsEn",
   "formatVersion": 1,
   "locale": "en",
-  "texts": { "role.employee": "Employee" }
+  "texts": { "role.employee": "Employee", "role.reviewer": "Reviewer" }
 }

@@ -1,0 +1,8 @@
+{
+  "id": "6e1b8d43-7f5a-4c9d-a03b-1c4e8a2d5b04",
+  "kind": "text",
+  "name": "TextsEn",
+  "formatVersion": 1,
+  "locale": "en",
+  "texts": { "approvals.roles.approver": "Approver" }
+}

@@ -54,7 +54,9 @@ public sealed record PolicyMatrixCell(
 
 /// <summary>
 /// One grant behind a cell, as written. <paramref name="Shared"/> is false only for a grant of the role's own
-/// <c>&lt;Role&gt;Access</c> policy, which names no other role.
+/// <c>&lt;Role&gt;Access</c> policy, which names no other role. <paramref name="Module"/> is the module id when the
+/// grant comes from a module's policy, which Studio does not edit, and null for the application's own. A module
+/// policy is named <c>&lt;module id&gt;/&lt;name&gt;</c> and its role slots are already the roles the application maps them to.
 /// </summary>
 public sealed record PolicyMatrixGrant(
     Guid PolicyId,
@@ -63,4 +65,5 @@ public sealed record PolicyMatrixGrant(
     IReadOnlyList<string> Actions,
     string? Filter,
     IReadOnlyList<string>? Fields,
-    bool Shared);
+    bool Shared,
+    string? Module);

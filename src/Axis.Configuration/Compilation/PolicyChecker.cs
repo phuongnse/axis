@@ -24,6 +24,13 @@ namespace Axis.Configuration.Compilation;
 /// because of its own errors is not reported again. A data source grant that names a module the
 /// application does not declare is <c>AXC0207</c>, in place of the unknown-target diagnostic.
 /// </summary>
+/// <remarks>
+/// A module policy is named <c>&lt;module id&gt;/&lt;name&gt;</c>. Each role it names is a role slot of
+/// its module, matched exactly, or <c>AXC0304</c>. Each grant's <c>entity</c> or <c>dataSource</c> is
+/// qualified with the module id by the module checker, and the plain name behind it names a resource of
+/// the module. A <c>process</c> or <c>endpoint</c> grant, a name with <c>/</c> and the plain name of an
+/// application resource are <c>AXC0305</c>. Its filter sees the rules of the modules its module declares.
+/// </remarks>
 internal static class PolicyChecker
 {
     private static readonly PolicyAction[] _entityActions = [.. PolicyActions.Of("entity").Select(ParseAction)];
@@ -33,13 +40,15 @@ internal static class PolicyChecker
 
     /// <summary>
     /// Checks <paramref name="policies"/>, which come in path order. <paramref name="findRole"/>
-    /// finds a declared role by name, compared exactly. <paramref name="ownerOf"/> names the owner of
-    /// a child entity, or gives null for a root entity.
+    /// finds a declared role by name, compared exactly. <paramref name="moduleSlots"/> holds the role
+    /// slot names of each pinned module, which the roles of a module policy name instead.
+    /// <paramref name="ownerOf"/> names the owner of a child entity, or gives null for a root entity.
     /// </summary>
     public static void Check(
         IReadOnlyList<PolicyResource> policies,
         Func<string, RoleResource?> findRole,
         IReadOnlySet<string> unloadedRoleNames,
+        IReadOnlyDictionary<string, IReadOnlySet<string>> moduleSlots,
         Func<string, EntityResource?> findEntity,
         Func<string, string?> ownerOf,
         IReadOnlySet<string> unloadedEntityNames,
@@ -50,9 +59,9 @@ internal static class PolicyChecker
         Func<string, EndpointResource?> findEndpoint,
         IReadOnlySet<string> unloadedEndpointNames,
         ReferenceIndexBuilder references,
-        IEnumerable<ExpressionRule> rules,
+        Func<PolicyResource, IEnumerable<ExpressionRule>> rulesFor,
         ModuleReferences moduleReferences,
-        IReadOnlySet<string> modules,
+        Func<PolicyResource, IReadOnlySet<string>> modulesFor,
         List<Diagnostic> diagnostics)
     {
         foreach (var policy in policies)
@@ -60,10 +69,25 @@ internal static class PolicyChecker
             void Report(string code, string message, string path) =>
                 diagnostics.Add(new Diagnostic(code, message, policy.File, path, policy.Id));
 
+            var moduleId = ModuleIdOf(policy);
             for (var index = 0; index < policy.Roles.Count; index++)
             {
                 var role = policy.Roles[index];
-                if (findRole(role) is { } roleResource)
+                if (moduleId is not null)
+                {
+                    // A module policy names slots of its module, and each application maps them to its own roles.
+                    var slots = moduleSlots.GetValueOrDefault(moduleId) ?? new HashSet<string>();
+                    if (!slots.Contains(role))
+                    {
+                        Report(
+                            DiagnosticCodes.ModulePolicyRoleNotSlot,
+                            slots.Count == 0
+                                ? $"The module '{moduleId}' has no role slots, so '{role}' names nothing. A module policy names the role slots of its module."
+                                : $"'{role}' is not a role slot of the module '{moduleId}'. A module policy names role slots, not roles. The slots are {string.Join(", ", slots.Order(StringComparer.Ordinal).Select(slot => $"'{slot}'"))}.",
+                            $"/roles/{index}");
+                    }
+                }
+                else if (findRole(role) is { } roleResource)
                 {
                     references.Add(policy, $"/roles/{index}", ReferenceRelations.PolicyRole, ResourceNode.Of(roleResource));
                 }
@@ -89,9 +113,9 @@ internal static class PolicyChecker
                     findEndpoint,
                     unloadedEndpointNames,
                     references,
-                    rules,
+                    rulesFor(policy),
                     moduleReferences,
-                    modules,
+                    modulesFor(policy),
                     Report);
             }
 
@@ -113,6 +137,7 @@ internal static class PolicyChecker
         IEnumerable<ExpressionRule> rules,
         IReadOnlySet<string> modules)
     {
+        var undeclaredModuleIsUnknown = ModuleIdOf(policy) is not null;
         EntityModel? Find(string name) =>
             entities.FirstOrDefault(candidate => string.Equals(candidate.Name, name, StringComparison.OrdinalIgnoreCase));
 
@@ -146,7 +171,7 @@ internal static class PolicyChecker
                 actions,
                 grant.Filter is { } filter
                     ? ExpressionModel.Compile(
-                        filter, ExpressionScopes.ForDataSource(entity.Fields, [], Find, rules, modules), ExpressionType.Boolean, policyFilter: true)
+                        filter, ExpressionScopes.ForDataSource(entity.Fields, [], Find, rules, modules, undeclaredModuleIsUnknown), ExpressionType.Boolean, policyFilter: true)
                     : null,
                 // A checked grant names only fields of the entity.
                 grant.Fields?.Select(name => entity.Fields.First(field => string.Equals(field.Name, name, StringComparison.OrdinalIgnoreCase)).Name).ToList());
@@ -259,6 +284,7 @@ internal static class PolicyChecker
             return;
         }
 
+        var moduleId = ModuleIdOf(policy);
         var (kind, described, name, allowed) = grant switch
         {
             { Entity: { } entity } => ("entity", "An entity grant", entity, _entityActions),
@@ -294,18 +320,55 @@ internal static class PolicyChecker
             }
         }
 
+        var written = name;
+        if (moduleId is not null)
+        {
+            if (kind is "process" or "endpoint")
+            {
+                report(
+                    DiagnosticCodes.ModuleGrantOutsideModule,
+                    $"{described} cannot be in a module policy. A module policy grants only on the entities and data sources of its own module, and a module holds no {kind}.",
+                    $"{path}/{kind}");
+                return;
+            }
+
+            // The module checker qualified the name with the module id, so what the file wrote is the rest.
+            written = name[(moduleId.Length + 1)..];
+            if (written.Contains('/', StringComparison.Ordinal))
+            {
+                report(
+                    DiagnosticCodes.ModuleGrantOutsideModule,
+                    $"The {(kind == "entity" ? "entity" : "data source")} '{written}' is not a resource of the module '{moduleId}'. A module policy grants only on the resources of its own module, and names them without '/'.",
+                    $"{path}/{kind}");
+                return;
+            }
+        }
+
+        // A module policy sees the modules as its own module does, so the application's declared modules do not apply.
+        var reachable = moduleReferences.For(policy);
+
         // A target file that was not loaded because of its own errors is not reported again.
         switch (kind)
         {
             case "dataSource":
-                if (moduleReferences.Find(name, findDataSource) is { } dataSource)
+                if (reachable.Find(name, findDataSource) is { } dataSource)
                 {
                     references.Add(policy, $"{path}/dataSource", ReferenceRelations.Grant, ResourceNode.Of(dataSource));
                 }
                 else if (!unloadedDataSourceNames.Contains(name)
-                    && !moduleReferences.ReportUndeclared(name, $"{path}/dataSource", report))
+                    && !reachable.ReportUndeclared(name, $"{path}/dataSource", report))
                 {
-                    report(DiagnosticCodes.UnknownGrantTarget, $"The data source '{name}' was not found. No loaded data source has that name.", $"{path}/dataSource");
+                    if (moduleId is not null && findDataSource(written) is { } outside && !ApplicationCompiler.IsModuleResource(outside))
+                    {
+                        report(
+                            DiagnosticCodes.ModuleGrantOutsideModule,
+                            $"The data source '{written}' is a data source of the application, not of the module '{moduleId}'. A module policy grants only on the resources of its own module.",
+                            $"{path}/dataSource");
+                    }
+                    else
+                    {
+                        report(DiagnosticCodes.UnknownGrantTarget, $"The data source '{written}' was not found. No loaded data source has that name.", $"{path}/dataSource");
+                    }
                 }
 
                 return;
@@ -338,9 +401,20 @@ internal static class PolicyChecker
         var entityResource = findEntity(name);
         if (entityResource is null)
         {
-            if (!unloadedEntityNames.Contains(name))
+            if (unloadedEntityNames.Contains(name))
             {
-                report(DiagnosticCodes.UnknownGrantTarget, $"The entity '{name}' was not found. No loaded entity has that name.", $"{path}/entity");
+                // Its own errors are reported.
+            }
+            else if (moduleId is not null && findEntity(written) is { } outside && !ApplicationCompiler.IsModuleResource(outside))
+            {
+                report(
+                    DiagnosticCodes.ModuleGrantOutsideModule,
+                    $"The entity '{written}' is an entity of the application, not of the module '{moduleId}'. A module policy grants only on the resources of its own module.",
+                    $"{path}/entity");
+            }
+            else
+            {
+                report(DiagnosticCodes.UnknownGrantTarget, $"The entity '{written}' was not found. No loaded entity has that name.", $"{path}/entity");
             }
 
             return;
@@ -373,7 +447,9 @@ internal static class PolicyChecker
         if (grant.Filter is { } filter)
         {
             var problem = ApplicationCompiler.CheckFilter(
-                filter, ExpressionScopes.ForDataSource(entityResource.Fields, [], findEntity, rules, modules), policyFilter: true, out var check);
+                filter, ExpressionScopes.ForDataSource(entityResource.Fields, [], findEntity, rules, modules, undeclaredModuleIsUnknown: moduleId is not null),
+                policyFilter: true,
+                out var check);
             if (check is not null)
             {
                 references.AddRuleCalls(policy, $"{path}/filter", check);
@@ -386,6 +462,10 @@ internal static class PolicyChecker
             }
         }
     }
+
+    /// <summary>The module id of a module policy, the text before the first <c>/</c> of its name, or null for an application policy.</summary>
+    private static string? ModuleIdOf(PolicyResource policy) =>
+        ApplicationCompiler.IsModuleResource(policy) ? policy.Name[..policy.Name.IndexOf('/', StringComparison.Ordinal)] : null;
 
     private static PolicyAction ParseAction(string action) =>
         action switch

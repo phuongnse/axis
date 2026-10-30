@@ -24,13 +24,16 @@ namespace Axis.Configuration.Compilation;
 /// pinned module's files are checked as JSON, for a kind a module may hold and against the schema
 /// of that kind. The files come back under <c>modules/&lt;id&gt;/</c>, ready to be stored in the
 /// release, once for each module. The entities,
-/// sequences, seeds, events, data sources and forms of a pinned module come back as resources named
+/// sequences, seeds, events, data sources, forms and policies of a pinned module come back as resources named
 /// <c>&lt;id&gt;/&lt;name&gt;</c>, keeping the ids written in the files. Its rules come back by module,
 /// under their plain names, for <see cref="RuleChecker.CheckModules"/>. Inside a module, a field's
 /// <c>target</c> or <c>sequence</c>, an event's, data source's or form's <c>entity</c> and a data source
 /// parameter's <c>target</c> name a resource of the same module without <c>/</c>, and are rewritten to
 /// the qualified name. All of them but a <c>sequence</c> may instead name a resource of a module the
-/// module declares in its <c>modules</c> as <c>&lt;id&gt;/&lt;name&gt;</c>, which is kept as written. The <c>roles</c> of an entry must map each role slot of the pinned version to
+/// module declares in its <c>modules</c> as <c>&lt;id&gt;/&lt;name&gt;</c>, which is kept as written. A
+/// policy's grants name only the module's own resources, so each grant's <c>entity</c> and
+/// <c>dataSource</c> is qualified with the module id as written, and <see cref="PolicyChecker"/> reports
+/// one that is not a plain name. The <c>roles</c> of an entry must map each role slot of the pinned version to
 /// a role of the application, and the pin keeps that map. The <c>connectors</c> of an entry must map
 /// each connector slot of the pinned version to a connector of the application that fits it, see
 /// <see cref="ConnectorChecker.CheckSlot"/>, and the pin keeps that map too.
@@ -49,6 +52,7 @@ internal static class ModuleChecker
         ResourceKinds.Event,
         ResourceKinds.Text,
         ResourceKinds.Seed,
+        ResourceKinds.Policy,
     };
 
     /// <summary>
@@ -188,6 +192,7 @@ internal static class ModuleChecker
         var files = new List<ResourceContent>();
         var resources = new ModuleResourceCollector();
         var declaredByModule = new Dictionary<string, IReadOnlySet<string>>(StringComparer.Ordinal);
+        var slotsByModule = new Dictionary<string, IReadOnlySet<string>>(StringComparer.Ordinal);
         foreach (var id in order)
         {
             if (!picks.TryGetValue(id, out var picked))
@@ -213,10 +218,11 @@ internal static class ModuleChecker
 
             var declared = new HashSet<string>(pinnedModule.Manifest.Modules.Select(module => module.Id), StringComparer.Ordinal);
             declaredByModule[id] = declared;
+            slotsByModule[id] = pinnedModule.Manifest.Roles.Select(slot => slot.Name).ToHashSet(StringComparer.Ordinal);
             CheckFiles(pinnedModule, declared, files, resources, diagnostics);
         }
 
-        return (pins, files, resources.ToResources(declaredByModule));
+        return (pins, files, resources.ToResources(declaredByModule, slotsByModule));
     }
 
     /// <summary>
@@ -608,7 +614,7 @@ internal static class ModuleChecker
             ? value
             : null;
 
-    /// <summary>Collects the entities, sequences, seeds, rules, events, data sources, forms and texts of the pinned modules, in the order of the pins and then by path.</summary>
+    /// <summary>Collects the entities, sequences, seeds, rules, events, data sources, forms, policies and texts of the pinned modules, in the order of the pins and then by path.</summary>
     private sealed class ModuleResourceCollector
     {
         private readonly List<EntityResource> _entities = [];
@@ -618,6 +624,7 @@ internal static class ModuleChecker
         private readonly List<EventResource> _events = [];
         private readonly List<DataSourceResource> _dataSources = [];
         private readonly List<FormResource> _forms = [];
+        private readonly List<PolicyResource> _policies = [];
         private readonly List<ModuleText> _texts = [];
         private readonly HashSet<string> _unloadedEntityNames = new(StringComparer.OrdinalIgnoreCase);
         private readonly HashSet<string> _unloadedSequenceNames = new(StringComparer.OrdinalIgnoreCase);
@@ -626,7 +633,9 @@ internal static class ModuleChecker
         private readonly HashSet<string> _unloadedFormNames = new(StringComparer.OrdinalIgnoreCase);
         private readonly HashSet<string> _noModules = [];
 
-        public ModuleResources ToResources(IReadOnlyDictionary<string, IReadOnlySet<string>> declaredModules) =>
+        public ModuleResources ToResources(
+            IReadOnlyDictionary<string, IReadOnlySet<string>> declaredModules,
+            IReadOnlyDictionary<string, IReadOnlySet<string>> roleSlots) =>
             new(
                 _entities,
                 _sequences,
@@ -635,13 +644,15 @@ internal static class ModuleChecker
                 _events,
                 _dataSources,
                 _forms,
+                _policies,
                 _texts,
                 _unloadedEntityNames,
                 _unloadedSequenceNames,
                 _unloadedEventNames,
                 _unloadedDataSourceNames,
                 _unloadedFormNames,
-                declaredModules);
+                declaredModules,
+                roleSlots);
 
         /// <summary>Notes the name of an entity, sequence, event, data source or form file that failed its schema, so a reference to it is not reported again.</summary>
         public void AddUnloaded(string moduleId, JsonElement root)
@@ -676,7 +687,7 @@ internal static class ModuleChecker
             }
         }
 
-        /// <summary>Reads a file that passed its schema, if it is an entity, a sequence, a seed, a rule, an event, a data source, a form or a text.</summary>
+        /// <summary>Reads a file that passed its schema, if it is an entity, a sequence, a seed, a rule, an event, a data source, a form, a policy or a text.</summary>
         public void Add(string moduleId, IReadOnlySet<string> declared, string file, JsonElement root, List<Diagnostic> diagnostics)
         {
             switch (root.GetProperty("kind").GetString())
@@ -722,6 +733,21 @@ internal static class ModuleChecker
                     {
                         Name = $"{moduleId}/{form.Name}",
                         Entity = Rewrite(moduleId, declared, form.Entity, form.File, form.Id, "/entity", _unloadedEntityNames, diagnostics)!,
+                    });
+                    break;
+                case ResourceKinds.Policy:
+                    var policy = root.Deserialize<PolicyResource>(ApplicationLoader.SerializerOptions)! with { File = file };
+
+                    // A grant names only a resource of the module, so every name is qualified with the
+                    // module id, and PolicyChecker reports one that was not a plain name.
+                    _policies.Add(policy with
+                    {
+                        Name = $"{moduleId}/{policy.Name}",
+                        Grants = [.. policy.Grants.Select(grant => grant with
+                        {
+                            Entity = grant.Entity is null ? null : $"{moduleId}/{grant.Entity}",
+                            DataSource = grant.DataSource is null ? null : $"{moduleId}/{grant.DataSource}",
+                        })],
                     });
                     break;
                 case ResourceKinds.Text:
@@ -817,10 +843,12 @@ internal static class ModuleChecker
 }
 
 /// <summary>
-/// The entities, sequences, seeds, events, data sources, forms and texts of the pinned modules, named <c>&lt;id&gt;/&lt;name&gt;</c> and
+/// The entities, sequences, seeds, events, data sources, forms, policies and texts of the pinned modules, named <c>&lt;id&gt;/&lt;name&gt;</c> and
 /// carrying the ids written in the module files. The rules come by module, in pin order, each in path
 /// order and under its plain name. <c>DeclaredModules</c> maps each pinned module to the ids in its
-/// manifest's <c>modules</c>. The unloaded names are those of module files that
+/// manifest's <c>modules</c>, and <c>RoleSlots</c> to the names of the slots in its manifest's <c>roles</c>,
+/// matched exactly. A policy's <c>Roles</c> still name slots here, and a grant's <c>Entity</c> and
+/// <c>DataSource</c> are the written name behind the module id. The unloaded names are those of module files that
 /// failed their schema or whose reference was reported, so no second diagnostic names them. Both name
 /// sets ignore letter case.
 /// </summary>
@@ -832,13 +860,15 @@ internal sealed record ModuleResources(
     IReadOnlyList<EventResource> Events,
     IReadOnlyList<DataSourceResource> DataSources,
     IReadOnlyList<FormResource> Forms,
+    IReadOnlyList<PolicyResource> Policies,
     IReadOnlyList<ModuleText> Texts,
     IReadOnlySet<string> UnloadedEntityNames,
     IReadOnlySet<string> UnloadedSequenceNames,
     IReadOnlySet<string> UnloadedEventNames,
     IReadOnlySet<string> UnloadedDataSourceNames,
     IReadOnlySet<string> UnloadedFormNames,
-    IReadOnlyDictionary<string, IReadOnlySet<string>> DeclaredModules);
+    IReadOnlyDictionary<string, IReadOnlySet<string>> DeclaredModules,
+    IReadOnlyDictionary<string, IReadOnlySet<string>> RoleSlots);
 
 /// <summary>A text resource of a pinned module, with the id of that module.</summary>
 internal sealed record ModuleText(string ModuleId, TextResource Text);

@@ -12,8 +12,14 @@ using Microsoft.Extensions.Options;
 
 namespace Axis.Server.Tests;
 
-/// <summary>A person a test host can sign in through the test authentication scheme.</summary>
-internal sealed record TestIdentity(string Id, string DisplayName, params string[] Roles);
+/// <summary>
+/// A person a test host can sign in through the test authentication scheme. <c>Roles</c> hold in every
+/// application. <c>ApplicationRoles</c> are the roles held in one application only, by application id.
+/// </summary>
+internal sealed record TestIdentity(string Id, string DisplayName, params string[] Roles)
+{
+    public IReadOnlyDictionary<Guid, IReadOnlyList<string>>? ApplicationRoles { get; init; }
+}
 
 /// <summary>
 /// Signs people in to test hosts without an identity provider. Only test hosts register it. A
@@ -85,7 +91,8 @@ internal sealed class TestAuthenticationHandler(
             return Task.FromResult(AuthenticateResult.NoResult());
         }
 
-        var principal = Session.CreatePrincipal(tenant.TenantId, identity.Id, identity.DisplayName, identity.Roles);
+        var principal = Session.CreatePrincipal(
+            tenant.TenantId, identity.Id, identity.DisplayName, identity.Roles, applicationRoles: identity.ApplicationRoles);
         return Task.FromResult(AuthenticateResult.Success(new AuthenticationTicket(principal, Scheme.Name)));
     }
 }

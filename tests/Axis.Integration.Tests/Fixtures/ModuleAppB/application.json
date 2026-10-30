@@ -3,5 +3,8 @@
   "kind": "application",
   "name": "ModuleAppB",
   "formatVersion": 1,
-  "modules": [{ "id": "departments", "version": "^1.0.0" }]
+  "modules": [
+    { "id": "departments", "version": "^1.0.0" },
+    { "id": "approvals", "version": "^1.0.0", "roles": { "approver": "reviewer" } }
+  ]
 }
