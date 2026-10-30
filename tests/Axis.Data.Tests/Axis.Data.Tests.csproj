@@ -15,6 +15,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="..\Axis.Expressions.Tests\Fuzz.cs" Link="Fuzz.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\src\Axis.Data\Axis.Data.csproj" />
   </ItemGroup>
 

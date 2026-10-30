@@ -19,7 +19,7 @@ namespace Axis.Data.Records;
 /// or <c>yyyy-MM-ddTHH:mm:ssZ</c> when it holds a time, which is read as UTC because a workbook has no time zone.
 /// A formula cell is read from the value saved with it. A data row has an error when a cell holds an error value
 /// or a date that does not exist, or when a cell lies to the right of the header. A workbook that cannot be read,
-/// or that unpacks to more than 1,000 entries or 100 MiB, has a <see cref="HeaderError"/>. A workbook is parsed
+/// which includes rows that are not in ascending order, or that unpacks to more than 1,000 entries or 100 MiB, has a <see cref="HeaderError"/>. A workbook is parsed
 /// as a stream of elements, so only one row is held at a time.
 /// </summary>
 public sealed class RecordImportXlsx : IRecordImportFile
@@ -172,7 +172,7 @@ public sealed class RecordImportXlsx : IRecordImportFile
     // What a workbook that is damaged, or not a workbook, throws as it is read.
     private static bool IsReadError(Exception exception) =>
         exception is InvalidDataException or OpenXmlPackageException or FileFormatException or XmlException
-            or ArgumentException or FormatException or InvalidOperationException or NotSupportedException or IOException;
+            or ArgumentException or FormatException or OverflowException or InvalidOperationException or NotSupportedException or IOException;
 
     // A zip bomb is refused by the entry count and the size the entries announce, before anything is unpacked.
     // Each part that is read is cut off at MaxCharactersInPart too.
@@ -254,6 +254,11 @@ public sealed class RecordImportXlsx : IRecordImportFile
                     if (reader.ElementType == typeof(Row) && reader.LoadCurrentElement() is Row element)
                     {
                         var row = ReadRow(element, previous + 1, context);
+                        if (row.Index <= previous)
+                        {
+                            throw new InvalidDataException("The rows are not in ascending order.");
+                        }
+
                         previous = row.Index;
                         yield return row;
                     }
