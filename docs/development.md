@@ -286,7 +286,10 @@ adds the `approver` user. The `administrator` user holds the `tenant-administrat
 `samples/apps/` under `scripts/dev.sh`, and opens the Studio page at http://localhost:5173/studio.
 Each sample declares one `accounts` identity provider in `identity-providers/accounts.json`, because a site needs one.
 The purchase request sample also declares the `oidc` provider `company` in `identity-providers/company.json`, which brokers to the
-`company` realm, and its Purchasing site allows both `accounts` and `company`.
+`company` realm, and its Purchasing site allows both `accounts` and `company`. The service desk sample's site allows only
+`accounts`. The E2E journey `tests/e2e/specs/site-sign-in-journey.spec.ts` covers three sign-ins: `pat` signs in to Purchasing
+through "Continue with Example Company", `agent` signs in to the Service desk with a password and a code, and a forced
+`kc_idp_hint=oidc-companyissuer` on a Service desk sign-in is refused with `/?signIn=failed`.
 Studio saves into those committed folders, so `git checkout -- samples/apps` reverts an edit.
 The `publisher` role lets the authoring API publish, shows **Publish** on the Studio page and allows
 rollback from the release history. Under `scripts/dev.sh`,

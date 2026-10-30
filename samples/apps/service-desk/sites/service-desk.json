@@ -12,6 +12,7 @@
     "fallback": "en",
     "available": ["en", "vi"]
   },
+  "signIn": ["accounts"],
   "navigation": [
     {
       "page": "MyTickets",

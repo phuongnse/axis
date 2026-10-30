@@ -107,11 +107,22 @@ configuration in `samples/apps/purchase-requests/`. It is not platform code.
 7. Users see their requests, their tasks, status and history. Authorized users
    can inspect each process run.
 
+### Sign-in
+
+The Purchasing site allows two sign-ins: accounts, and the organization's own
+identity provider. In development, the provider is the `company` realm, a second
+Keycloak realm that plays the organization's provider. A person in its
+`employees` group signs in through "Continue with Example Company" and gets the
+`employee` role.
+
 ### Scenarios the application must pass
 
 - The happy path with and without finance review, plus return and reject.
 - Denied access: users cannot see another department's requests or act on
   another user's task.
+- Sign-in per site: a Playwright journey signs Pat of the `company` realm in to
+  Purchasing, signs an account in to the Service desk with a password and a
+  code, and shows that the Service desk refuses the organization's provider.
 - A worker restarts while a request waits for approval.
 - Duplicate or concurrent submissions and decisions.
 - The purchasing system accepts the order but the response is lost.
@@ -248,6 +259,9 @@ the parts built in M12,
 - The requester cannot edit the resolution.
 - A requester may delete their own ticket while its status is `draft`. An
   agent and the lead may not delete.
+- The Service desk site allows only accounts. Its sign-in page has no
+  "Continue with" button, and the callback refuses a person who arrives through
+  the organization's provider.
 - Everything else is denied by default.
 
 ### Pages
