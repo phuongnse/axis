@@ -2,12 +2,13 @@ import { DownOutlined, PlusOutlined } from '@ant-design/icons'
 import { ConfigProvider, Dropdown, Flex, Menu, Typography, type MenuProps } from 'antd'
 import { createElement, useContext } from 'react'
 import { createPortal } from 'react-dom'
+import { selectedItemTint } from '../platform/antTheme'
 import { navigationIcon } from '../platform/navigationIcons'
 import { useShellSidebar } from '../platform/shellSidebar'
 import { SiteMark } from '../platform/SiteMark'
 import { studioApplicationTitle, type StudioApplication, type StudioResourceItem } from '../platform/studio'
 import { useText } from '../platform/texts'
-import { useDesignTokens } from '../platform/themeMode'
+import { useDesignTokens, useThemeMode } from '../platform/themeMode'
 import { PlatformContext } from './context'
 import { StudioNewApplication } from './StudioNewApplication'
 import { groupedKinds, studioKindGroups, studioViewKey, type StudioView } from './studioViews'
@@ -43,6 +44,7 @@ export function StudioNavigation({
   const t = useText()
   const { slot, collapsed } = useShellSidebar()
   const { colour, spacing } = useDesignTokens()
+  const { mode } = useThemeMode()
   const locale = useContext(PlatformContext)?.current.locale ?? 'en'
   const current = applications.find((app) => app.name === application)
   const currentTitle = current ? studioApplicationTitle(current, locale) : application
@@ -108,9 +110,16 @@ export function StudioNavigation({
     <Dropdown
       trigger={['click']}
       menu={{
-        selectedKeys: [application],
         items: [
-          ...applications.map((app) => ({ key: app.name, label: studioApplicationTitle(app, locale) })),
+          // Proposed: the open application is marked as the language and theme menu marks its choices: primaryText on
+          // the selected tint, which stays readable in dark mode.
+          ...applications.map((app) => ({
+            key: app.name,
+            label: studioApplicationTitle(app, locale),
+            style:
+              app.name === application ? { color: colour.primaryText, background: selectedItemTint(mode) } : undefined,
+            'aria-current': app.name === application ? ('true' as const) : undefined,
+          })),
           ...(canCreate
             ? [
                 { type: 'divider' as const },
@@ -129,7 +138,8 @@ export function StudioNavigation({
           alignItems: 'center',
           gap: spacing.xs,
           width: '100%',
-          padding: collapsed ? `${spacing.xs}px 0` : spacing.xs,
+          height: '100%',
+          padding: collapsed ? 0 : `0 ${spacing.xs}px`,
           justifyContent: collapsed ? 'center' : 'flex-start',
           border: 'none',
           background: 'transparent',
@@ -152,7 +162,15 @@ export function StudioNavigation({
 
   const navigation = (
     <nav aria-label={t('shell.studio.nav.label')}>
-      <div style={{ padding: spacing.xs, borderBottom: `1px solid ${colour.borderSubtle}` }}>
+      {/* Proposed: the application's row is 48 px, as the header band beside it, so their rules line up. */}
+      <div
+        style={{
+          height: 48,
+          boxSizing: 'border-box',
+          padding: `0 ${spacing.xs}px`,
+          borderBottom: `1px solid ${colour.borderSubtle}`,
+        }}
+      >
         <StudioNewApplication onCreated={onApplicationCreated} trigger={switcher} />
       </div>
       {/* Proposed: a workspace's navigation is compact, with 32 px entries. */}

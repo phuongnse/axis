@@ -74,8 +74,8 @@ function useBandMargin() {
 }
 
 /**
- * Proposed: the compact band, one row: the breadcrumb, whose last step is the page's title as its heading, and the
- * actions on the right, with spacing-xs above and below.
+ * Proposed: the compact band, one row 48 px high: the breadcrumb, whose last step is the page's title as its heading,
+ * and the actions on the right.
  */
 function CompactBand({
   steps,
@@ -94,7 +94,8 @@ function CompactBand({
     <div
       style={{
         margin: `-${pad}px -${pad}px 0`,
-        padding: `${spacing.xs}px ${pad}px`,
+        // 48 px with its rule, as the shell's header and Studio's application row, so their rules line up.
+        padding: `0 ${pad}px`,
         minHeight: 48,
         boxSizing: 'border-box',
         display: 'flex',
