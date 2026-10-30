@@ -1,0 +1,10 @@
+{
+  "id": "a5d2f8b1-6c37-4e09-b4a2-7f1c3e9d5c08",
+  "kind": "text",
+  "name": "TextsEn",
+  "formatVersion": 1,
+  "locale": "en",
+  "texts": {
+    "role.clerk": "Clerk"
+  }
+}

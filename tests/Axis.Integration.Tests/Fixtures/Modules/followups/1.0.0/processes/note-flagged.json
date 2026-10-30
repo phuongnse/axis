@@ -1,0 +1,18 @@
+{
+  "id": "c7e3a1d5-2b84-4f96-8a0d-1e5b9c3f7a04",
+  "kind": "process",
+  "name": "NoteFlagged",
+  "formatVersion": 1,
+  "entity": "reviews/Review",
+  "start": "note",
+  "steps": [
+    {
+      "name": "note",
+      "type": "operation",
+      "operation": "updateRecord",
+      "set": { "state": "'noted'" },
+      "next": "done"
+    },
+    { "name": "done", "type": "end" }
+  ]
+}

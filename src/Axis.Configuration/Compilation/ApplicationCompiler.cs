@@ -249,7 +249,7 @@ public static partial class ApplicationCompiler
         IReadOnlyList<ResourceContent> moduleFiles = [];
         IReadOnlySet<string>? declaredPackageIds = null;
         var timeZone = TimeZoneInfo.Utc;
-        var moduleResources = new ModuleResources([], [], [], [], [], [], [], [], [], [], [], new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new Dictionary<string, IReadOnlySet<string>>(), new Dictionary<string, IReadOnlySet<string>>());
+        var moduleResources = new ModuleResources([], [], [], [], [], [], [], [], [], [], [], [], new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new HashSet<string>(), new Dictionary<string, IReadOnlySet<string>>(), new Dictionary<string, IReadOnlySet<string>>());
         if (loaded.Application is { } manifest)
         {
             packages = PackageChecker.Check(manifest.Packages, installedPackages, manifest.File, manifest.Id, manifest, diagnostics, references);
@@ -298,6 +298,7 @@ public static partial class ApplicationCompiler
             Pages = [.. moduleResources.Pages, .. loaded.Pages],
             Processes = [.. moduleResources.Processes, .. loaded.Processes],
             Policies = [.. moduleResources.Policies, .. loaded.Policies],
+            Triggers = [.. moduleResources.Triggers, .. loaded.Triggers],
             UnloadedEntityNames = unloadedEntityNames,
             UnloadedSequenceNames = unloadedSequenceNames,
             UnloadedEventNames = unloadedEventNames,
@@ -641,7 +642,7 @@ public static partial class ApplicationCompiler
             references,
             diagnostics);
         TriggerChecker.Check(
-            loaded.Triggers,
+            [.. loaded.Triggers.Where(trigger => !IsModuleResource(trigger))],
             FindEntity,
             FindProcess,
             loaded.UnloadedProcessNames,
@@ -655,6 +656,35 @@ public static partial class ApplicationCompiler
             moduleReferences,
             references,
             diagnostics);
+
+        // A module trigger starts a process of its own module and names an event or an entity of its own
+        // module or of a module it declares. It sees no application data source, and no application rule.
+        foreach (var moduleTriggers in loaded.Triggers.Where(IsModuleResource).GroupBy(trigger => ModuleIdOf(trigger.Name), StringComparer.Ordinal))
+        {
+            var moduleId = moduleTriggers.Key;
+            var declared = moduleResources.DeclaredModules.GetValueOrDefault(moduleId) ?? new HashSet<string>();
+            bool Allowed(string name)
+            {
+                var slash = name.IndexOf('/', StringComparison.Ordinal);
+                return slash >= 0 && (name[..slash] == moduleId || declared.Contains(name[..slash]));
+            }
+
+            TriggerChecker.Check(
+                [.. moduleTriggers],
+                FindEntity,
+                name => Allowed(name) && name.StartsWith(moduleId + "/", StringComparison.Ordinal) ? FindProcess(name) : null,
+                loaded.UnloadedProcessNames,
+                name => Allowed(name) ? FindEvent(name) : null,
+                loaded.UnloadedEventNames,
+                loaded.UnloadedEntityNames,
+                _ => null,
+                new HashSet<string>(),
+                RulesFor(moduleTriggers.First()),
+                declared,
+                moduleReferences.For(moduleTriggers.First()),
+                references,
+                diagnostics);
+        }
         MigrationChecker.Check(loaded.Migrations, FindEntity, loaded.UnloadedEntityNames, references, diagnostics);
         ScenarioChecker.Check(
             loaded.Scenarios,
@@ -763,7 +793,14 @@ public static partial class ApplicationCompiler
             IdentityProviders = loaded.IdentityProviders.Select(IdentityProviderChecker.Build).ToList(),
             Events = allEvents.Select(@event => EventChecker.Build(eventsByName[@event.Name], FindEntity)).ToList(),
             Endpoints = loaded.Endpoints.Select(endpoint => EndpointChecker.Build(endpoint, FindEntity, FindProcess)).ToList(),
-            Triggers = loaded.Triggers.Select(trigger => TriggerChecker.Build(trigger, FindEntity, FindEvent, FindProcess, FindDataSource, rules, declaredModules)).ToList(),
+            Triggers = loaded.Triggers.Select(trigger => TriggerChecker.Build(
+                IsModuleResource(trigger) ? trigger with { Id = ModuleResourceIds.Derive(applicationId, trigger.Id) } : trigger,
+                FindEntity,
+                FindEvent,
+                FindProcess,
+                FindDataSource,
+                RulesFor(trigger),
+                DeclaredModulesOf(trigger))).ToList(),
             Migrations = loaded.Migrations.Select(migration => MigrationChecker.Build(migration, loaded.Resources.Single(resource => resource.Path == migration.File).Content)).ToList(),
             Packages = allPackages,
             Modules = modules,

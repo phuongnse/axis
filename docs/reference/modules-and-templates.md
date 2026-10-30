@@ -74,9 +74,10 @@ calls `IsDepartmentCode`, so a department code must be in capital letters.
   lists the modules it depends on, with the `id` and `version` entries of an application's `modules`, see
   [dependencies](#processes-pages-policies-and-dependencies).
 - **Kinds a module may hold.** `entity`, `dataSource`, `rule`, `sequence`,
-  `form`, `page`, `process`, `event`, `text`, `seed` and `policy`. Roles are
-  not allowed. _(planned for M20)_ `trigger`
-  is allowed too. _(planned for M24)_ So is `scenario`. Roles stay out.
+  `form`, `page`, `process`, `event`, `text`, `seed`, `policy` and `trigger`
+  of type `event` or `dataChange`. Roles are not allowed. _(planned for M20)_ A
+  `trigger` of type `schedule` is allowed too. _(planned for M24)_ So is
+  `scenario`. Roles stay out.
 - **Installation.** Modules are installed per installation under
   `Modules:Path/<id>/<version>/`. The server, the worker and the scenario runner
   read them. The scenario runner gets a `--modules` option for the folder.
@@ -211,13 +212,13 @@ calls `IsDepartmentCode`, so a department code must be in capital letters.
 | --- | --- |
 | `AXC0200` | `module.json` is missing, unreadable, not JSON or fails its schema, or another file of the module version cannot be read. Reported at host start, at the failing pointer. A connector slot name, a slot operation name or a slot field name that repeats an earlier one in its list, ignoring letter case, is reported at its `name`. A copy of a module in a stored release without a valid `modules/<id>/module.json` is reported the same way, when the release is rebuilt. |
 | `AXC0201` | The folder names differ from the manifest `id` or `version`. Reported at host start, at `/id` or `/version`. In a stored release, the folder `modules/<id>/` differing from the manifest `id` is reported the same way. |
-| `AXC0202` | A module file has a kind that a module may not hold, or no kind. Reported at compile, at `/kind` of `modules/<id>/<relative path>`. |
+| `AXC0202` | A module file has a kind that a module may not hold, or no kind. Reported at compile, at `/kind` of `modules/<id>/<relative path>`. A module `trigger` of type `schedule` is reported the same way at `/type`, until module schedules are built. |
 | `AXC0203` | A `modules` entry names a module with no installed version. Reported in `application.json` at `/modules/{i}/id`, or in `modules/<id>/module.json` for an entry of a module's own `modules`. |
 | `AXC0204` | A `modules` entry has a version range in no valid form. Reported at `/modules/{i}/version`, in `application.json` or in `modules/<id>/module.json`. |
 | `AXC0205` | No installed version meets the one range that asks for the module. The message lists the installed versions. Reported at `/modules/{i}/version`, in `application.json` or in `modules/<id>/module.json`. Several ranges that no version meets together are `AXC0295`. |
 | `AXC0206` | A module id appears twice in `modules`. Reported at `/modules/{i}/id` of each later entry, in `application.json` or in `modules/<id>/module.json`. |
 | `AXC0207` | A field's `target` or `sequence`, a data source's or form's `entity`, a widget's or policy grant's `dataSource`, a site navigation entry's `page`, a trigger's, `startProcess` action's, process inspector's or sub-process step's `process`, an endpoint's `entity` or `process`, or a qualified rule call `<module id>:<name>(…)` names a module that `modules` does not declare. Reported at `/fields/{i}/target`, `/fields/{i}/sequence`, `/entity`, `/widgets/{i}/dataSource`, `/grants/{i}/dataSource`, `/navigation/{i}/page`, `/process`, `{actionPath}/process`, `/widgets/{i}/process`, `/steps/{i}/process` or the expression's pointer. A module that only another module depends on is not declared by the application, so a reference to it is reported too. A reference under a declared module that could not be pinned is not reported again. |
-| `AXC0208` | A field's `target` or `sequence` in a module entity, the `entity` of a module event, data source, form or process, the `target` of a module data source parameter, a module process step's `form`, `event`, `process` or `entity`, or a reference in a module page (a widget's `entity`, `form`, `dataSource` or `process`, the `page` or `process` of an action, or a page parameter's `target`), contains `/` and does not name a module that module declares. A `sequence`, a step `form` and a step `process` with `/` always give it. Reported at that property in `modules/<id>/…`. |
+| `AXC0208` | A field's `target` or `sequence` in a module entity, the `entity` of a module event, data source, form or process, the `target` of a module data source parameter, a module process step's `form`, `event`, `process` or `entity`, a module trigger's `process`, `event` or `entity`, or a reference in a module page (a widget's `entity`, `form`, `dataSource` or `process`, the `page` or `process` of an action, or a page parameter's `target`), contains `/` and does not name a module that module declares. A `sequence`, a step `form`, a step `process` and a trigger `process` with `/` always give it. Reported at that property in `modules/<id>/…`. |
 | `AXC0209` | A module text key lacks the `<id>.` prefix. Reported at `/texts/{key}` of the module text, and at `/roles/{i}/label/textKey` of `modules/<id>/module.json` for a role slot label, and at `/connectors/{i}/label/textKey` for a connector slot label. |
 | `AXC0210` | An application locale has no text from a pinned module. The message names the locale. Reported in `application.json` at `/modules/{i}` for a declared module, and at `/modules` for a module that only another module depends on. |
 | `AXC0211` | An application text key starts with the `<id>.` prefix of a module the application uses, declared or only depended on. Reported at `/texts/{key}`. |
@@ -272,8 +273,9 @@ agrees. An application that declares it maps the slot to one of its own roles:
 ]
 ```
 
-- **Kinds.** A module may also hold `process` _(built)_ and
-  `trigger`, and _(planned for M24)_ `scenario`, as
+- **Kinds.** A module may also hold `process` _(built)_, `trigger` of type `event`
+  or `dataChange` _(built)_, `trigger` of type `schedule` _(planned for M20)_ and
+  _(planned for M24)_ `scenario`, as
   [D103](../decisions/d103-modules-hold-triggers-scenarios-and-connector-slots.md) agrees. It still holds no `role`, `site`, `identityProvider`,
   `connector`, `endpoint` or `webhook`.
 - **Role slots.** `roles` in `module.json` lists the module's role slots, each
@@ -356,8 +358,21 @@ agrees. An application that declares it maps the slot to one of its own roles:
   through the start endpoint, and module tasks, are not proven yet.
 - **Triggers.** A module trigger starts a process of its own module. It
   reacts to an event or an entity of its own module, or of a module it
-  declares. A schedule trigger runs in the time zone of each application that
-  uses the module, and each application's copy has its own occurrences.
+  declares. A trigger of type `event` or `dataChange`, delete triggers included,
+  is built. Its `process` names a process of its own module by plain name, and a
+  name with `/` is `AXC0208`. An unknown name, such as an application process,
+  is `AXC0129`. Its `event` or `entity` names its own module's resource by plain
+  name, or a declared module's resource as `<module id>/<name>`, and anything
+  else is `AXC0208`. An unknown name keeps `AXC0130` or `AXC0143`. Each is
+  reported in the module file. In each application the trigger is named
+  `<module id>/<name>` and has an id derived from the application, like the
+  module's other resources. A create, update or delete of the application's
+  copy of the module's entity, or an event raised in that application, starts
+  the module's process in that application only, and its receipts and dead
+  letters belong to that application. A trigger of type `schedule` is
+  _(planned for M20)_: until it is built, a module file with one is `AXC0202`
+  at `/type`. It will run in the time zone of each application that uses the
+  module, and each application's copy will have its own occurrences.
 - **Connector slots.** `connectors` in `module.json` lists the module's
   connector slots. Each has a `name`, a `label` and `operations`, each with a
   `name` and typed `input` and `output` fields in the shape of a
