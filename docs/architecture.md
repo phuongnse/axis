@@ -380,11 +380,10 @@ bindings work. Status rules and publishing are built too.
   [`tenant create --preview-of`](reference/administration.md#tenant-create). The
   entry stores no sign-in settings. The catalog copies the main tenant's at each
   refresh.
-- **Sign-in.** A preview tenant uses its main tenant's authority, client id,
-  client secret and claim names. It uses neither `Oidc:EndpointAudience` nor
-  `Oidc:ServiceAudience`, so it accepts no machine-caller or service account
-  token. The operator registers the preview host's
-  redirect address at the identity provider.
+- **Sign-in.** A preview tenant uses its main tenant's authority, client id, client secret and claim names. It uses
+  neither `Oidc:EndpointAudience` nor `Oidc:ServiceAudience`, so it accepts no machine-caller or service account token.
+  The operator registers the preview host's redirect address at the identity provider. A session there reads its main
+  tenant's given roles, see [preview tenants](reference/identity-provider.md#preview-tenants).
 - **Bindings.** A preview tenant's bindings are its own and empty by default.
   A missing binding is a warning at activation there, not an error, see
   [deployment bindings](reference/integration-resources.md#deployment-bindings).
@@ -392,7 +391,8 @@ bindings work. Status rules and publishing are built too.
   not suspend its preview tenant.
 - **Publishing.** Studio on the main tenant's host stores a preview request in
   the main tenant's database. The publisher runs it against the preview tenant.
-  The server never opens a connection to another tenant's database. See
+  The server opens no connection to another tenant's database, except that a
+  preview session reads its main tenant's given roles. See
   [preview](reference/authoring.md#preview).
 
 ### Request resolution

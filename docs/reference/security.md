@@ -185,7 +185,7 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place. _(planned f
     `auth_time`. It also holds the lower-case site path of the host that made the
     session, null for the tenant's own hosts, and the alias of the provider that
     signed the person in, from the ID token's `identity_provider` claim, none for
-    accounts, and the roles that each application's provider mapping gave, by application id. Given roles are not in the row, the session reads them from `axis.given_roles` at every request. A session from before a column existed holds none of it and counts
+    accounts, and the roles that each application's provider mapping gave, by application id. Given roles are not in the row, the session reads them from `axis.given_roles` at every request. On a preview tenant it reads those of its main tenant, from the main tenant's database. A session from before a column existed holds none of it and counts
     as a sign-in through accounts on the tenant's own hosts. The table never holds the session id or a token, and none reaches the browser.
   - The cookie is one HttpOnly, SameSite=Lax cookie. It holds only the random
     session id, 256 bits, wrapped and protected by the key ring below. It

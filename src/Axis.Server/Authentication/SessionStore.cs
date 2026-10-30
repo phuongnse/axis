@@ -2,9 +2,11 @@ using System.Buffers.Text;
 using System.Security.Cryptography;
 using System.Text.Json;
 using Axis.Core.Tenancy;
+using Axis.Data.Storage;
 using Axis.Server.Studio;
 using Axis.Server.Tenancy;
 using Axis.Server.Users;
+using Axis.Tenancy;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Npgsql;
@@ -17,7 +19,7 @@ namespace Axis.Server.Authentication;
 /// cookie holds only the key of a session. The key is 32 random bytes in base64url, and the row's key
 /// is the SHA-256 hash of those bytes. The row never holds the key or a token. A request reads the row,
 /// moves its last request time and refuses it once it is past <see cref="Session.IdleTimeout"/> or
-/// <see cref="Session.MaxLifetime"/>. The row holds the alias of the provider that signed the person in, null for accounts, and the roles that each application's provider mapping gave the person, by application id. It never holds the roles that an administrator gave: the same statement that moves the last request time reads them from <c>axis.given_roles</c>, and they live in the request's principal only, so a change applies at the next request on every replica. A given platform role is stored by its kind, and the request maps it to the role name that the host setting configures, which joins the roles of the sign-in. It holds the site path of the host that made it, null for the tenant's own
+/// <see cref="Session.MaxLifetime"/>. The row holds the alias of the provider that signed the person in, null for accounts, and the roles that each application's provider mapping gave the person, by application id. It never holds the roles that an administrator gave: the same statement that moves the last request time reads them from <c>axis.given_roles</c>, and they live in the request's principal only, so a change applies at the next request on every replica. A given platform role is stored by its kind, and the request maps it to the role name that the host setting configures, which joins the roles of the sign-in. A preview tenant has no users page, so a request on it reads the given roles of its main tenant from the main tenant's database in the same way. It holds the site path of the host that made it, null for the tenant's own
 /// hosts, and a request on another host of the tenant neither uses nor deletes it. The overloads without an <see cref="HttpContext"/> cannot know the
 /// tenant, so they are not supported.
 /// </summary>
@@ -85,6 +87,12 @@ internal sealed class SessionStore : ITicketStore
         }
 
         var now = httpContext.RequestServices.GetRequiredService<TimeProvider>().GetUtcNow();
+        // The reader ends before the query on the main tenant, so every value it holds is read first.
+        string? userId = null, displayName = null;
+        string[] storedRoles = [], givenPlatformKinds = [];
+        DateTimeOffset? authenticatedAt = null;
+        string? identityProvider = null;
+        Dictionary<Guid, IReadOnlyList<string>> applicationRoles = [];
         await using (var update = new NpgsqlCommand(
             """
             WITH touched AS (
@@ -108,34 +116,71 @@ internal sealed class SessionStore : ITicketStore
             await using var reader = await update.ExecuteReaderAsync(cancellationToken);
             if (await reader.ReadAsync(cancellationToken))
             {
-                var applicationRoles = JsonSerializer.Deserialize<Dictionary<Guid, string[]>>(reader.GetString(5))!
+                userId = reader.GetString(0);
+                displayName = reader.GetString(1);
+                storedRoles = reader.GetFieldValue<string[]>(2);
+                authenticatedAt = await reader.IsDBNullAsync(3, cancellationToken) ? null : reader.GetFieldValue<DateTimeOffset>(3);
+                identityProvider = await reader.IsDBNullAsync(4, cancellationToken) ? null : reader.GetString(4);
+                applicationRoles = JsonSerializer.Deserialize<Dictionary<Guid, string[]>>(reader.GetString(5))!
                     .ToDictionary(pair => pair.Key, pair => (IReadOnlyList<string>)pair.Value);
                 MergeGivenRoles(applicationRoles, reader.GetFieldValue<Guid[]>(6), reader.GetFieldValue<string[]>(7));
-                var services = httpContext.RequestServices;
-                var studio = services.GetRequiredService<StudioOptions>();
-                var console = services.GetRequiredService<ConsoleSettings>();
-                var users = services.GetRequiredService<UsersSettings>();
-                var givenPlatformRoles = reader.GetFieldValue<string[]>(8)
-                    .Select(kind => PlatformRoles.NameOf(kind, studio, console, users))
-                    .OfType<string>();
-                var principal = Session.CreatePrincipal(
-                    tenant.TenantId,
-                    reader.GetString(0),
-                    reader.GetString(1),
-                    reader.GetFieldValue<string[]>(2).Concat(givenPlatformRoles).Distinct(StringComparer.Ordinal),
-                    await reader.IsDBNullAsync(3, cancellationToken) ? null : reader.GetFieldValue<DateTimeOffset>(3),
-                    Base64Url.EncodeToString(hash),
-                    await reader.IsDBNullAsync(4, cancellationToken) ? null : reader.GetString(4),
-                    applicationRoles);
-                // The handler renews a cookie only for a ticket that carries both times.
-                var properties = new AuthenticationProperties { IssuedUtc = now, ExpiresUtc = now + Session.IdleTimeout };
-                return new AuthenticationTicket(principal, properties, Session.Scheme);
+                givenPlatformKinds = reader.GetFieldValue<string[]>(8);
             }
         }
 
         // No row, or one past a limit. Deleting is harmless when there is no row, and it leaves a row of another host alone.
-        await DeleteAsync(connection, hash, tenant, cancellationToken);
-        return null;
+        if (userId is null)
+        {
+            await DeleteAsync(connection, hash, tenant, cancellationToken);
+            return null;
+        }
+
+        var services = httpContext.RequestServices;
+        var givenPlatformRoles = givenPlatformKinds.ToList();
+        if (await MainTenantGivenRolesAsync(services, tenant, userId, cancellationToken) is { } fromMain)
+        {
+            MergeGivenRoles(
+                applicationRoles,
+                [.. fromMain.Where(role => role.ApplicationId is not null).Select(role => role.ApplicationId!.Value)],
+                [.. fromMain.Where(role => role.ApplicationId is not null).Select(role => role.Role)]);
+            givenPlatformRoles.AddRange(fromMain.Where(role => role.ApplicationId is null).Select(role => role.Role));
+        }
+
+        var studio = services.GetRequiredService<StudioOptions>();
+        var console = services.GetRequiredService<ConsoleSettings>();
+        var users = services.GetRequiredService<UsersSettings>();
+        var principal = Session.CreatePrincipal(
+            tenant.TenantId,
+            userId,
+            displayName!,
+            storedRoles.Concat(givenPlatformRoles
+                .Select(kind => PlatformRoles.NameOf(kind, studio, console, users))
+                .OfType<string>()).Distinct(StringComparer.Ordinal),
+            authenticatedAt,
+            Base64Url.EncodeToString(hash),
+            identityProvider,
+            applicationRoles);
+        // The handler renews a cookie only for a ticket that carries both times.
+        var properties = new AuthenticationProperties { IssuedUtc = now, ExpiresUtc = now + Session.IdleTimeout };
+        return new AuthenticationTicket(principal, properties, Session.Scheme);
+    }
+
+    /// <summary>
+    /// The roles that the users page of the main tenant gave the person, when the request is on a preview tenant. A preview
+    /// tenant has no users page, so its own table is empty. Null on any other tenant, and null when the main tenant is not
+    /// served, so a preview then gives the person no role from the users page.
+    /// </summary>
+    private static async Task<IReadOnlyList<GivenRole>?> MainTenantGivenRolesAsync(
+        IServiceProvider services, TenantContext tenant, string userId, CancellationToken cancellationToken)
+    {
+        var catalog = services.GetRequiredService<ITenantCatalog>();
+        if (catalog.Find(tenant.TenantId)?.PreviewOf is not { } main || catalog.Find(main) is null)
+        {
+            return null;
+        }
+
+        await using var connection = await services.GetRequiredService<TenantConnectionFactory>().OpenConnectionAsync(main, cancellationToken);
+        return await GivenRoles.ListAsync(connection, userId, cancellationToken);
     }
 
     public async Task RemoveAsync(string key, HttpContext httpContext, CancellationToken cancellationToken)
