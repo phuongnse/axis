@@ -9,9 +9,9 @@ namespace Axis.Configuration.Compilation;
 
 /// <summary>
 /// Checks the endpoints of an application and builds the checked ones. An endpoint names a loaded
-/// root entity and a loaded process whose subject entity is that entity. Either name may be
-/// <c>&lt;module id&gt;/&lt;name&gt;</c> of a module the application declares, and a name under a
-/// module it does not declare is <c>AXC0207</c>. Its input fields have
+/// root entity and, when it names one, a loaded process whose subject entity is that entity. Either
+/// name may be <c>&lt;module id&gt;/&lt;name&gt;</c> of a module the application declares, and a
+/// name under a module it does not declare is <c>AXC0207</c>. Its input fields have
 /// unique names, ignoring letter case, and the type properties of an entity field. A
 /// child-collection input targets a child entity. Each <c>values</c> key names a field of the
 /// entity, ignoring letter case and at most once, that is not computed and has no
@@ -82,38 +82,41 @@ internal static class EndpointChecker
                     "/entity");
             }
 
-            var process = moduleReferences.Find(endpoint.Process, findProcess);
-            if (process is null)
+            if (endpoint.Process is { } processName)
             {
-                if (!unloadedProcessNames.Contains(endpoint.Process)
-                    && !moduleReferences.ReportUndeclared(endpoint.Process, "/process", Report))
+                var process = moduleReferences.Find(processName, findProcess);
+                if (process is null)
                 {
+                    if (!unloadedProcessNames.Contains(processName)
+                        && !moduleReferences.ReportUndeclared(processName, "/process", Report))
+                    {
+                        Report(
+                            DiagnosticCodes.UnknownEndpointProcess,
+                            $"The process '{processName}' was not found. No loaded process has that name.",
+                            "/process");
+                    }
+                }
+                else
+                {
+                    references.Add(endpoint, "/process", ReferenceRelations.EndpointProcess, ResourceNode.Of(process));
+                }
+
+                if (process is { Entity: null })
+                {
+                    // The call starts the process on the record it creates, so the process needs a subject.
                     Report(
-                        DiagnosticCodes.UnknownEndpointProcess,
-                        $"The process '{endpoint.Process}' was not found. No loaded process has that name.",
+                        DiagnosticCodes.EndpointProcessOverOtherEntity,
+                        $"The process '{process.Name}' has no subject, but the endpoint starts it on the record it creates.",
                         "/process");
                 }
-            }
-            else
-            {
-                references.Add(endpoint, "/process", ReferenceRelations.EndpointProcess, ResourceNode.Of(process));
-            }
-
-            if (process is { Entity: null })
-            {
-                // The call starts the process on the record it creates, so the process needs a subject.
-                Report(
-                    DiagnosticCodes.EndpointProcessOverOtherEntity,
-                    $"The process '{process.Name}' has no subject, but the endpoint starts it on the record it creates.",
-                    "/process");
-            }
-            else if (process is not null && entity is not null && process.Entity is { } subjectName && findEntity(subjectName) is { } subject && !ReferenceEquals(subject, entity))
-            {
-                // The call starts the process on the record it creates, so that record is its subject.
-                Report(
-                    DiagnosticCodes.EndpointProcessOverOtherEntity,
-                    $"The process '{process.Name}' is over the entity '{subject.Name}', but the endpoint creates records of '{entity.Name}'.",
-                    "/process");
+                else if (process is not null && entity is not null && process.Entity is { } subjectName && findEntity(subjectName) is { } subject && !ReferenceEquals(subject, entity))
+                {
+                    // The call starts the process on the record it creates, so that record is its subject.
+                    Report(
+                        DiagnosticCodes.EndpointProcessOverOtherEntity,
+                        $"The process '{process.Name}' is over the entity '{subject.Name}', but the endpoint creates records of '{entity.Name}'.",
+                        "/process");
+                }
             }
 
             var countBeforeInput = diagnostics.Count;
@@ -187,7 +190,7 @@ internal static class EndpointChecker
     {
         var entity = findEntity(endpoint.Entity)
             ?? throw new ArgumentException("Only a checked endpoint can be built.", nameof(endpoint));
-        var process = findProcess(endpoint.Process)!;
+        var process = endpoint.Process is { } processName ? findProcess(processName)! : null;
         var scope = ExpressionScopes.ForEndpointInput(endpoint.Input);
 
         var values = new List<EndpointValueModel>();
@@ -231,7 +234,7 @@ internal static class EndpointChecker
             Name = endpoint.Name,
             File = endpoint.File,
             Entity = new EntityReference(entity.Id, entity.Name),
-            Process = new ProcessReference(process.Id, process.Name),
+            Process = process is null ? null : new ProcessReference(process.Id, process.Name),
             Event = raisedEvent,
             Input = endpoint.Input
                 .Select(input => new EndpointInputModel(

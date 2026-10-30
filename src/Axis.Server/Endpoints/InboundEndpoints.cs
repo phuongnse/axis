@@ -34,7 +34,9 @@ namespace Axis.Server.Endpoints;
 /// fields, starts the processes of the data change triggers on the entity's create as <c>system</c>,
 /// and starts the endpoint's process on it as the process start does. An endpoint with an
 /// <c>event</c> then raises it for the new record in the same transaction, as a <c>raiseEvent</c>
-/// step does, and a <c>fields</c> expression that fails at run time is a 400 keyed
+/// step does, with no instance when the endpoint has no process. Such an endpoint answers a <c>201</c>
+/// with the record's id only, as soon as the transaction commits, and its status location is always a
+/// <c>404</c>. A <c>fields</c> expression that fails at run time is a 400 keyed
 /// <c>/event/fields/…</c>. A refused value, a
 /// failed validation and a missing reference are a 400 keyed <c>/values/…</c>, and a failed start
 /// condition a 400 keyed <c>/input</c>. Both audit records name the caller as the actor and the
@@ -157,9 +159,10 @@ internal static class InboundEndpoints
 
         var entity = application.FindEntity(endpoint.Entity.Id)
             ?? throw new InvalidOperationException($"The entity '{endpoint.Entity.Name}' of endpoint '{endpoint.Name}' is not in the model.");
-        if (!application.TryGetProcess(endpoint.Process.Name, out var process))
+        ProcessModel? process = null;
+        if (endpoint.Process is { } processReference && !application.TryGetProcess(processReference.Name, out process))
         {
-            throw new InvalidOperationException($"The process '{endpoint.Process.Name}' of endpoint '{endpoint.Name}' is not in the model.");
+            throw new InvalidOperationException($"The process '{processReference.Name}' of endpoint '{endpoint.Name}' is not in the model.");
         }
 
         var mapped = EndpointInputMapper.Map(application, entity, endpoint, parsed.Input!);
@@ -171,7 +174,7 @@ internal static class InboundEndpoints
         var tenantId = (tenants.Current ?? throw new InvalidOperationException("No tenant context is set.")).TenantId;
         var details = new JsonObject { ["endpoint"] = endpoint.Name };
         var recordId = Guid.CreateVersion7();
-        var instanceId = Guid.CreateVersion7();
+        Guid? instanceId = process is null ? null : Guid.CreateVersion7();
         var connection = await database.GetConnectionAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
 
@@ -258,27 +261,30 @@ internal static class InboundEndpoints
             loggerFactory.CreateLogger(typeof(DataChangeTriggerStarts)),
             cancellationToken);
 
-        var started = await ProcessStarter.StartAsync(
-            connection,
-            transaction,
-            tenantId,
-            application,
-            active.ReleaseId,
-            process,
-            entity,
-            record.Id,
-            subject: null,
-            instanceId,
-            caller.Id,
-            caller.DisplayName,
-            details,
-            cancellationToken);
-        if (started.Outcome != ProcessStartOutcome.Started)
+        if (process is not null)
         {
-            await transaction.RollbackAsync(cancellationToken);
-            return new(started.Outcome == ProcessStartOutcome.ConditionFailed
-                ? Results.ValidationProblem(new Dictionary<string, string[]> { [InputPointer] = [started.TextKey!] })
-                : ProcessStartEndpoints.AlreadyRunning());
+            var started = await ProcessStarter.StartAsync(
+                connection,
+                transaction,
+                tenantId,
+                application,
+                active.ReleaseId,
+                process,
+                entity,
+                record.Id,
+                subject: null,
+                instanceId!.Value,
+                caller.Id,
+                caller.DisplayName,
+                details,
+                cancellationToken);
+            if (started.Outcome != ProcessStartOutcome.Started)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                return new(started.Outcome == ProcessStartOutcome.ConditionFailed
+                    ? Results.ValidationProblem(new Dictionary<string, string[]> { [InputPointer] = [started.TextKey!] })
+                    : ProcessStartEndpoints.AlreadyRunning());
+            }
         }
 
         // The event is raised after the start, so a failed start condition and a running instance are
@@ -310,9 +316,16 @@ internal static class InboundEndpoints
         }
 
         await transaction.CommitAsync(cancellationToken);
+
+        // An endpoint without a process has no instance to wait for, and its schema refuses a wait.
+        if (instanceId is not { } startedInstanceId)
+        {
+            return new(Results.Json(new EndpointCallResponse(record.Id), statusCode: StatusCodes.Status201Created));
+        }
+
         return endpoint.Wait is null
-            ? new(Results.Json(new EndpointCallResponse(record.Id, instanceId, ProcessStarts.Running), statusCode: StatusCodes.Status201Created))
-            : new(Committed: new CommittedCall(application, entity, endpoint, record.Id, instanceId));
+            ? new(Results.Json(new EndpointCallResponse(record.Id, startedInstanceId, ProcessStarts.Running), statusCode: StatusCodes.Status201Created))
+            : new(Committed: new CommittedCall(application, entity, endpoint, record.Id, startedInstanceId));
     }
 
     // Holds no connection between checks. The transaction of the attempt is already disposed.
@@ -366,22 +379,27 @@ internal static class InboundEndpoints
                 title: "This idempotency key was used with a different input.");
         }
 
-        var state = (await ProcessStarts.FindInstanceAsync(connection, receipt.InstanceId, cancellationToken)
+        if (receipt.InstanceId is not { } instanceId)
+        {
+            return Results.Json(new EndpointCallResponse(receipt.RecordId), statusCode: StatusCodes.Status201Created);
+        }
+
+        var state = (await ProcessStarts.FindInstanceAsync(connection, instanceId, cancellationToken)
             ?? throw new InvalidOperationException("The instance of an endpoint receipt could not be found.")).State;
         if (endpoint.Output is null)
         {
-            return Results.Json(new EndpointCallResponse(receipt.RecordId, receipt.InstanceId, state), statusCode: StatusCodes.Status201Created);
+            return Results.Json(new EndpointCallResponse(receipt.RecordId, instanceId, state), statusCode: StatusCodes.Status201Created);
         }
 
         if (state == ProcessStarts.Completed)
         {
             var output = await ReadOutputAsync(connection, application, entity, endpoint, receipt.RecordId, cancellationToken);
-            return Results.Json(new EndpointCallResponse(receipt.RecordId, receipt.InstanceId, state, output), statusCode: StatusCodes.Status201Created);
+            return Results.Json(new EndpointCallResponse(receipt.RecordId, instanceId, state, output), statusCode: StatusCodes.Status201Created);
         }
 
         return Results.Accepted(
-            StatusLocation(application, endpoint, receipt.InstanceId),
-            new EndpointCallResponse(receipt.RecordId, receipt.InstanceId, state));
+            StatusLocation(application, endpoint, instanceId),
+            new EndpointCallResponse(receipt.RecordId, instanceId, state));
     }
 
     // It takes the request rather than the context, so it binds as a route handler and its result is written.
@@ -411,7 +429,8 @@ internal static class InboundEndpoints
             return Grants.Forbidden();
         }
 
-        if (instanceId.Length != 36 || !Guid.TryParseExact(instanceId, "D", out var id))
+        // An endpoint without a process starts no instance, so every id is unknown to it.
+        if (endpoint.Process is not { } process || instanceId.Length != 36 || !Guid.TryParseExact(instanceId, "D", out var id))
         {
             return InstanceNotFound();
         }
@@ -421,7 +440,7 @@ internal static class InboundEndpoints
         var connection = await database.GetConnectionAsync(cancellationToken);
         if (await ProcessStarts.FindInstanceAsync(connection, id, cancellationToken) is not { SubjectEntityId: { } subjectEntityId, SubjectId: { } subjectId } instance
             || instance.ApplicationId != application.Manifest.Id
-            || instance.ProcessId != endpoint.Process.Id
+            || instance.ProcessId != process.Id
             || subjectEntityId != endpoint.Entity.Id
             || !await AuditRecords.IsProcessStartedByAsync(
                 connection, subjectEntityId, subjectId, id, caller.Id, endpoint.Name, cancellationToken))
@@ -483,10 +502,11 @@ internal static class InboundEndpoints
 
 /// <summary>
 /// The record and the instance an endpoint call created, the instance's state, and the endpoint's
-/// output fields once the instance completed.
+/// output fields once the instance completed. An endpoint without a process starts no instance, so
+/// its answer has the record only.
 /// </summary>
 internal sealed record EndpointCallResponse(
     Guid RecordId,
-    Guid InstanceId,
-    string State,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] Guid? InstanceId = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? State = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] JsonObject? Output = null);

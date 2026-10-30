@@ -377,7 +377,7 @@ events about a record for a `waitEvent` step.
 | `entity_id` | `uuid` | The event's entity |
 | `subject_id` | `uuid` | The record the occurrence names |
 | `payload` | `jsonb` | The evaluated payload fields |
-| `process_instance_id` | `uuid`, null _(planned for M19)_ | The instance that raised the event. _(planned for M19)_ For an event an [inbound endpoint](inbound-endpoints.md) raises, the instance the call started, or null when the endpoint has no `process` |
+| `process_instance_id` | `uuid`, null | The instance that raised the event. For an event an [inbound endpoint](inbound-endpoints.md) raises, the instance the call started, or null when the endpoint has no `process` |
 | `raised_at` | `timestamptz` | The start of the step's transaction, `now()` |
 
 `axis.process_event_matches` holds one row for each use of an event occurrence by
@@ -653,8 +653,10 @@ the row stays `pending`, so nothing more is sent until an operator redelivers.
 The dead letter names the application, the process of the instance that raised
 the event, that instance in `process_instance_id`, the occurrence in `event_id`
 and the webhook in `webhook_id`. The process is read through the row's
-instance. Other webhooks of the occurrence have their own rows and items, so
-they still deliver.
+instance. For an occurrence that an inbound endpoint without a `process` raised,
+no instance raised it, so `process_id` and `process_instance_id` are null and no
+process's dead letter routes list the letter. Other webhooks of the occurrence
+have their own rows and items, so they still deliver.
 
 **The counter.** `axis.delivery_failures` holds one row per target:
 
@@ -673,7 +675,7 @@ they still deliver.
 | `id` | `uuid` | A version 7 UUID |
 | `kind` | `text` | `event.deliver`, `trigger.fanOut`, `notification.email` or `webhook.deliver` |
 | `application_id` | `uuid` | The application |
-| `process_id` | `uuid`, null _(planned for M19)_ | The process whose grants govern it: the trigger's process, the waiting instance's process, the process that sent the email or the process of the instance that raised the webhook's event. _(planned for M19)_ A webhook delivery of an event that an endpoint without a `process` raised has a null process. No process's routes list such a dead letter, and the [operator console](operator-console.md) shows it |
+| `process_id` | `uuid`, null | The process whose grants govern it: the trigger's process, the waiting instance's process, the process that sent the email or the process of the instance that raised the webhook's event. A webhook delivery of an event that an endpoint without a `process` raised has a null process. No process's routes list such a dead letter, and the [operator console](operator-console.md) shows it |
 | `event_id`, `trigger_id`, `process_instance_id`, `email_id`, `webhook_id` | `uuid`, null | What failed, as the kind needs |
 | `occurrence_at` | `timestamptz`, null | The schedule occurrence, for a fan-out |
 | `attempts` | `integer` | The failures counted |

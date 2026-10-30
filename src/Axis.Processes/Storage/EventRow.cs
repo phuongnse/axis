@@ -26,8 +26,8 @@ public sealed class EventRow
     /// <summary>The evaluated payload as JSON text, keyed by the payload fields' declared names.</summary>
     public required string Payload { get; init; }
 
-    /// <summary>The instance that raised the event.</summary>
-    public required Guid ProcessInstanceId { get; init; }
+    /// <summary>The instance that raised the event, or null when an endpoint without a process raised it.</summary>
+    public Guid? ProcessInstanceId { get; init; }
 
     /// <summary>The start of the raising step's transaction.</summary>
     public DateTimeOffset RaisedAt { get; init; }

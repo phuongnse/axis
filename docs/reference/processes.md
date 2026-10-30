@@ -776,8 +776,8 @@ database, with history in `axis.__processes_migrations` (see
 - `axis.process_start_receipts`: the stored `201` response of each
   `Idempotency-Key`, unique per application, process and key. The subject is
   null for a process without a subject.
-- `axis.endpoint_receipts`: the record and instance of each endpoint call's
-  `Idempotency-Key`, unique per application, endpoint, caller and key, with a
+- `axis.endpoint_receipts`: the record and instance (null for an endpoint without a `process`) of
+  each endpoint call's `Idempotency-Key`, unique per application, endpoint, caller and key, with a
   hash of the input. See [Idempotency](inbound-endpoints.md#idempotency).
 - `axis.process_tasks`: one row per task. Times use the database clock. An
   index on application, state, assignee kind and assignee finds the open tasks

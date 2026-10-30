@@ -29,7 +29,7 @@ internal static class ProcessEvents
         command.Parameters.AddWithValue("entity", occurrence.EntityId);
         command.Parameters.AddWithValue("subject", occurrence.SubjectId);
         command.Parameters.Add(new NpgsqlParameter("payload", NpgsqlDbType.Jsonb) { Value = occurrence.Payload.ToJsonString() });
-        command.Parameters.AddWithValue("instance", occurrence.ProcessInstanceId);
+        command.Parameters.AddWithValue("instance", (object?)occurrence.ProcessInstanceId ?? DBNull.Value);
         await command.ExecuteNonQueryAsync(cancellationToken);
     }
 
@@ -150,6 +150,7 @@ internal static class ProcessEvents
 /// <param name="EntityId">The event's entity.</param>
 /// <param name="SubjectId">The record the occurrence names.</param>
 /// <param name="Payload">The evaluated payload, keyed by the payload fields' declared names.</param>
+/// <param name="ProcessInstanceId">The instance that raised the occurrence, or null when an endpoint without a process raised it.</param>
 internal sealed record NewEvent(
     Guid Id,
     Guid ApplicationId,
@@ -158,7 +159,7 @@ internal sealed record NewEvent(
     Guid EntityId,
     Guid SubjectId,
     JsonObject Payload,
-    Guid ProcessInstanceId);
+    Guid? ProcessInstanceId);
 
 /// <summary>A stored event occurrence, as its delivery reads it.</summary>
 /// <param name="Event">The event's declared name, as the release that raised it declares it.</param>

@@ -145,7 +145,7 @@ namespace Axis.Processes.Storage.Migrations
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("occurrence_at");
 
-                    b.Property<Guid>("ProcessId")
+                    b.Property<Guid?>("ProcessId")
                         .HasColumnType("uuid")
                         .HasColumnName("process_id");
 
@@ -328,7 +328,7 @@ namespace Axis.Processes.Storage.Migrations
                         .HasColumnType("bytea")
                         .HasColumnName("input_hash");
 
-                    b.Property<Guid>("InstanceId")
+                    b.Property<Guid?>("InstanceId")
                         .HasColumnType("uuid")
                         .HasColumnName("instance_id");
 
@@ -366,7 +366,7 @@ namespace Axis.Processes.Storage.Migrations
                         .HasColumnType("jsonb")
                         .HasColumnName("payload");
 
-                    b.Property<Guid>("ProcessInstanceId")
+                    b.Property<Guid?>("ProcessInstanceId")
                         .HasColumnType("uuid")
                         .HasColumnName("process_instance_id");
 
@@ -1233,7 +1233,6 @@ namespace Axis.Processes.Storage.Migrations
                         .WithMany()
                         .HasForeignKey("ProcessInstanceId")
                         .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
                         .HasConstraintName("fk_events_process_instances_process_instance_id");
                 });
 

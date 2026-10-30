@@ -5,7 +5,7 @@ namespace Axis.Processes.Instances;
 
 /// <summary>
 /// Writes and reads the receipt of an endpoint call that carried an <c>Idempotency-Key</c>, over a
-/// connection to a tenant database. The receipt holds the record and the instance the call created,
+/// connection to a tenant database. The receipt holds the record and the instance, if any, the call created,
 /// and a hash of its input. The input is hashed in its <c>jsonb</c> text form, so two inputs with the
 /// same JSON value have the same hash whatever their whitespace and property order.
 /// </summary>
@@ -23,7 +23,7 @@ public static class EndpointReceipts
         string caller,
         string key,
         Guid recordId,
-        Guid instanceId,
+        Guid? instanceId,
         string inputJson,
         CancellationToken cancellationToken = default)
     {
@@ -41,7 +41,7 @@ public static class EndpointReceipts
         command.Parameters.AddWithValue("caller", caller);
         command.Parameters.AddWithValue("key", key);
         command.Parameters.AddWithValue("record", recordId);
-        command.Parameters.AddWithValue("instance", instanceId);
+        command.Parameters.AddWithValue("instance", (object?)instanceId ?? DBNull.Value);
         command.Parameters.Add(new NpgsqlParameter("input", NpgsqlDbType.Jsonb) { Value = inputJson });
         return await command.ExecuteNonQueryAsync(cancellationToken) == 1;
     }
@@ -76,10 +76,13 @@ public static class EndpointReceipts
         command.Parameters.Add(new NpgsqlParameter("input", NpgsqlDbType.Jsonb) { Value = inputJson });
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         return await reader.ReadAsync(cancellationToken)
-            ? new EndpointReceipt(reader.GetGuid(0), reader.GetGuid(1), reader.GetBoolean(2))
+            ? new EndpointReceipt(reader.GetGuid(0), reader.IsDBNull(1) ? null : reader.GetGuid(1), reader.GetBoolean(2))
             : null;
     }
 }
 
-/// <summary>A stored endpoint call: the record and the instance it created, and whether a repeat has the same input.</summary>
-public sealed record EndpointReceipt(Guid RecordId, Guid InstanceId, bool SameInput);
+/// <summary>
+/// A stored endpoint call: the record and the instance it created, which is null for an endpoint
+/// without a process, and whether a repeat has the same input.
+/// </summary>
+public sealed record EndpointReceipt(Guid RecordId, Guid? InstanceId, bool SameInput);

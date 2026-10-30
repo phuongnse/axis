@@ -16,8 +16,11 @@ public sealed record EndpointModel
     /// <summary>The root entity of the record the call creates.</summary>
     public required EntityReference Entity { get; init; }
 
-    /// <summary>The process the call starts on the new record. Its subject entity is <see cref="Entity"/>.</summary>
-    public required ProcessReference Process { get; init; }
+    /// <summary>
+    /// The process the call starts on the new record, or null when the endpoint starts none. Its
+    /// subject entity is <see cref="Entity"/>.
+    /// </summary>
+    public ProcessReference? Process { get; init; }
 
     /// <summary>The event the call is to raise about the new record, or null when the endpoint names none.</summary>
     public EndpointEventModel? Event { get; init; }

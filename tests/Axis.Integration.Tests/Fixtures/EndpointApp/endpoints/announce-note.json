@@ -1,0 +1,20 @@
+{
+  "id": "9e4a7c31-5d82-4b6f-a1c3-7f0d2e8b4a95",
+  "kind": "endpoint",
+  "name": "AnnounceNote",
+  "formatVersion": 1,
+  "entity": "Note",
+  "input": [
+    { "name": "title", "type": "text", "required": true, "maxLength": 50 }
+  ],
+  "values": {
+    "title": "title",
+    "status": "'open'"
+  },
+  "event": {
+    "name": "NoteAnnounced",
+    "fields": {
+      "title": "title"
+    }
+  }
+}

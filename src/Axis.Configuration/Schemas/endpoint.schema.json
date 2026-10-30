@@ -3,7 +3,7 @@
   "title": "Axis endpoint",
   "type": "object",
   "additionalProperties": false,
-  "required": ["id", "kind", "name", "formatVersion", "entity", "process", "input", "values"],
+  "required": ["id", "kind", "name", "formatVersion", "entity", "input", "values"],
   "properties": {
     "id": { "$ref": "#/$defs/id" },
     "kind": { "const": "endpoint" },
@@ -42,9 +42,15 @@
     "wait": { "type": "string" }
   },
   "dependentRequired": {
-    "output": ["wait"],
-    "wait": ["output"]
+    "output": ["wait", "process"],
+    "wait": ["output", "process"]
   },
+  "allOf": [
+    {
+      "if": { "not": { "required": ["process"] } },
+      "then": { "required": ["event"] }
+    }
+  ],
   "$defs": {
     "id": {
       "type": "string",
