@@ -1,8 +1,8 @@
 # D116. How sensitive fields and backups are encrypted
 
-Status: **Proposed**
+Status: **Agreed**
 
-This sets the shapes that [D109](d109-sensitive-fields-and-backups-are-encrypted-and-history-keeps-no-names.md) left
+The owner agreed this on 2026-10-30. It sets the shapes that [D109](d109-sensitive-fields-and-backups-are-encrypted-and-history-keeps-no-names.md) left
 open, so that M27 can be broken into issues. It adds to D109 and changes none of its points. Everything here is
 _(planned for M27)_. [Data encryption](../reference/data-encryption.md) holds the detail.
 
@@ -18,12 +18,15 @@ _(planned for M27)_. [Data encryption](../reference/data-encryption.md) holds th
     key, and `platform rekey` moves them too.
   - Under the configuration source they are tenant settings.
 - **Two commands:**
-  - `tenant data-key rotate <id>` adds a key and re-encrypts every value under older keys.
-  - `tenant data-key retire <id>` deletes the older keys that no value uses any more, and refuses while one does.
-  - The lookup key is not rotated in M27. Rotating it would also mean recomputing every lookup hash.
+  - `tenant data-key rotate <id>` adds a data key and a lookup key, re-encrypts every value under older data keys
+    and recomputes every lookup hash under older lookup keys.
+  - `tenant data-key retire <id>` deletes the older keys that no value or hash uses any more, and refuses while
+    one does.
 - **Exact lookup:**
   - A field declares `"exactLookup": true` next to `"sensitive": true`. Axis then stores an HMAC-SHA256 of the
     value in a second column, with an index, and a filter may only test the field for equality.
+  - Lookup keys are numbered as data keys are, and each hash names its key. A search hashes the value under every
+    lookup key the tenant holds, so it stays right while a rotation runs.
   - `exactLookup` without `sensitive` is an error.
 - **Refusals:** one new code covers every use that D109 forbids on a sensitive field: filter, sort, aggregate,
   index, `unique`, `searchable`, a stored computed field, a data source column that sorts or groups, and an
@@ -41,11 +44,11 @@ _(planned for M27)_. [Data encryption](../reference/data-encryption.md) holds th
     32 random bytes, base64-encoded, in the form of `Platform:SecretKey`. The key never goes on the command line.
   - The whole archive is encrypted, in chunks of 1 MiB with AES-256-GCM, so a cut or reordered archive fails to
     decrypt.
-  - The archive carries the tenant's data keys and lookup key, so its sensitive values can be read after a restore.
+  - The archive carries the tenant's data keys and lookup keys, so its sensitive values can be read after a restore.
     Restore stores them again under the target installation's key.
   - Restore refuses an archive that is not encrypted, or a key that does not open it, before anything changes.
 
-_Why:_ numbered keys make rotation safe without stopping the hosts, the same way client keys rotate under `fapi2`.
+_Why:_ numbered keys make rotation safe without stopping the hosts, for the lookup hashes as much as for the values, the same way client keys rotate under `fapi2`.
 A key file keeps the backup key out of the process list and the shell history. The archive has to carry the data
 keys, or a restored tenant could not read its own sensitive values. The backup key protects them, so a stolen
 archive is still useless without it. Refusing archives without encryption is cheap now, because no customer has

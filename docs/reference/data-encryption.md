@@ -1,8 +1,8 @@
 # Data encryption
 
 _(planned for M27)_ Axis encrypts the values of fields marked `sensitive` and tenant backup archives, as
-[D109](../decisions/d109-sensitive-fields-and-backups-are-encrypted-and-history-keeps-no-names.md) agrees and
-[D116](../decisions/d116-how-sensitive-fields-and-backups-are-encrypted.md) proposes. The keys are in the
+[D109](../decisions/d109-sensitive-fields-and-backups-are-encrypted-and-history-keeps-no-names.md) and
+[D116](../decisions/d116-how-sensitive-fields-and-backups-are-encrypted.md) agree. The keys are in the
 [cryptographic inventory](keys-and-data-protection.md#cryptographic-inventory). Secrets in the platform tables are
 encrypted as [storage](storage.md#platform-database) describes, and nothing here changes that.
 
@@ -38,10 +38,14 @@ A sensitive field may declare an exact lookup, so a filter can find a record by 
 { "name": "nationalId", "type": "text", "maxLength": 20, "sensitive": true, "exactLookup": true }
 ```
 
-- Axis stores an HMAC-SHA256 of the value's plain text in a second `bytea` column, named after the field's column
-  with the suffix `_lookup`, with an index. The key is the tenant's lookup key.
-- A data source filter, a policy's record filter or a caller's filter may test the field with `==` or `!=` against a
-  value, and nothing else. Axis compares the hashes.
+- Axis stores a lookup hash in a second `bytea` column, named after the field's column with the suffix `_lookup`,
+  with an index. The hash is the lookup key's number, a 4-byte big-endian integer, then the 32-byte HMAC-SHA256 of
+  the value's plain text under that key. The HMAC's message starts with the same associated data as the value,
+  without the record id, so equal values in two fields hash differently.
+- A write uses the newest lookup key.
+- A data source filter, a policy grant's `filter` or a caller's filter may test the field with `==` or `!=` against
+  a value, and nothing else. Axis hashes the value under every lookup key the tenant holds and matches any of the
+  hashes, so a search stays right while a rotation runs.
 - Two records with the same value have the same hash, so whoever reads the table can see that they match. That is
   the cost of the lookup.
 
@@ -79,29 +83,31 @@ Adding or removing `sensitive` or `exactLookup` is a schema change that activati
 
 - **Data keys.** Each tenant has one or more data keys of 32 random bytes, numbered from 1. A write uses the newest
   one. A read uses the one that the value names, so a host that still holds an older list keeps working.
-- **Lookup key.** Each tenant has one lookup key of 32 random bytes. It is not rotated in M27.
+- **Lookup keys.** Each tenant has one or more lookup keys of 32 random bytes, numbered from 1, used the same way:
+  a write uses the newest, and a hash names the key that made it.
 - **Under the directory source.**
-  - `platform.tenant_data_keys` holds the keys, one row per key: the tenant id, the key's `number` (`0` for the
-    lookup key) and the key, encrypted by the installation key as other secrets are.
-  - The field name in the associated data is `data_key:` followed by the number.
+  - `platform.tenant_data_keys` holds the keys, one row per key: the tenant id, the `kind` (`data` or `lookup`), the
+    key's `number` and the key, encrypted by the installation key as other secrets are.
+  - The field name in the associated data is `data_key:` or `lookup_key:`, followed by the number.
   - `platform rekey` re-encrypts them with the other secrets.
-- **Under the configuration source.** `Tenants:{id}:DataKeys:{number}` and `Tenants:{id}:LookupKey` hold the keys,
+- **Under the configuration source.** `Tenants:{id}:DataKeys:{number}` and `Tenants:{id}:LookupKeys:{number}` hold the keys,
   base64-encoded. Development and the tests set them.
-- **When they are made.** `tenant create` makes data key 1 and the lookup key. `tenant restore` takes them from the
+- **When they are made.** `tenant create` makes data key 1 and lookup key 1. `tenant restore` takes them from the
   archive. `migrate` makes them for a tenant that has none.
 - **No key, no write.** A host that finds no key for a tenant refuses to write a sensitive value, with a `500`
   problem and an error log line that names the tenant. It never writes a sensitive value in clear.
 - **Refresh.** Each host reads a tenant's keys when it first needs them, and again when a value names a number it
   does not hold.
 
-### Rotating a data key
+### Rotating the keys
 
-`tenant data-key rotate <id>` adds the next data key, then re-encrypts every sensitive value under an older key, one
-table at a time, each in a transaction of its own. It prints
-`<id> data-key rotate ok: key <n>, <m> values re-encrypted`. A host that wrote with an older key during the rotation
-leaves values that a second run re-encrypts.
+`tenant data-key rotate <id>` adds the next data key and the next lookup key. Then, one table at a time and each in a
+transaction of its own, it re-encrypts every sensitive value under an older data key and recomputes every lookup hash
+under an older lookup key. It prints `<id> data-key rotate ok: data key <n>, lookup key <k>, <m> values updated`. A
+host that wrote with an older key during the rotation leaves values that a second run updates.
 
-`tenant data-key retire <id>` deletes every data key older than the newest that no stored value names. It refuses,
+`tenant data-key retire <id>` deletes every data key and lookup key older than the newest that no stored value or
+hash names. It refuses,
 with exit code `1`, while a value still names one, and says how many. Run `rotate` again, then `retire`.
 
 Both write a [platform audit record](tenant-setting-commands.md#platform-audit-records) with the key numbers and
@@ -119,7 +125,7 @@ never a key. The exit codes are those of [output and exit codes](administration.
   - Chunks of 1 MiB of the tar follow, each encrypted with AES-256-GCM. A chunk's nonce is the prefix and the
     chunk's 4-byte counter. Its associated data marks whether it is the last chunk.
   - A cut, reordered or changed archive fails to decrypt.
-- **The tenant's keys go with it.** The manifest holds the tenant's data keys and lookup key, base64-encoded, under
+- **The tenant's keys go with it.** The manifest holds the tenant's data keys and lookup keys, base64-encoded, under
   `keys`. Only the backup key protects them, so a restored tenant can read its sensitive values. `tenant restore`
   stores them again under the installation key.
 - **Restore refusals.** `tenant restore` refuses, before anything changes and with exit code `2`:
