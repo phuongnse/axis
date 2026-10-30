@@ -6,8 +6,8 @@ namespace Axis.Server.Authentication;
 
 /// <summary>
 /// Writes the audit records of sign-in and sign-out in the database of the tenant that the host
-/// resolves to. A record holds the client address after the forwarded headers rules and never a
-/// token, a cookie or the user agent.
+/// resolves to. A record holds the shortened client address after the forwarded headers rules and
+/// never a token, a cookie or the user agent.
 /// </summary>
 internal static class SessionAudit
 {
@@ -24,19 +24,13 @@ internal static class SessionAudit
         var database = httpContext.RequestServices.GetRequiredService<TenantDatabase>();
         var connection = await database.GetConnectionAsync(cancellationToken);
 
-        var address = httpContext.Connection.RemoteIpAddress;
-        if (address is { IsIPv4MappedToIPv6: true })
-        {
-            address = address.MapToIPv4();
-        }
-
         var details = new JsonObject();
         if (reason is not null)
         {
             details["reason"] = reason;
         }
 
-        details["clientAddress"] = address?.ToString();
+        details["clientAddress"] = ClientAddress.Shorten(httpContext.Connection.RemoteIpAddress);
 
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
         await AuditRecords.AppendAsync(

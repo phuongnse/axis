@@ -734,11 +734,11 @@ schema of the tenant database.
       a provider error. `providerNotAccepted` is a valid token whose provider the tenant's platform sign-in does not accept and no active site that shares the tenant's host allows. `providerNotAllowed` is a valid token whose provider the site that started the sign-in does not allow, or a site that is no longer active. `acrNotAccepted` is a valid token whose provider the site allows, but whose upstream `acr` the provider's `acr` list does not accept or the token lacks.
     - `application_id`, `entity_id`, `record_id` and `process_instance_id` are
       null.
-    - `clientAddress` is always present. It is the address as text, with an
-      IPv4-mapped IPv6 address written as IPv4, or `null` when the server sees
-      no address.
-      _(planned for M27)_ New records drop the last octet of IPv4 and the last
-      80 bits of IPv6, see [D109](../decisions/d109-sensitive-fields-and-backups-are-encrypted-and-history-keeps-no-names.md).
+    - `clientAddress` is always present. It is the address as text, with the
+      last octet of IPv4 and the last 80 bits of IPv6 set to zero, such as
+      `203.0.113.0` and `2001:db8:1::`. An IPv4-mapped IPv6 address is written
+      as IPv4 first. It is `null` when the server sees no address, see
+      [D109](../decisions/d109-sensitive-fields-and-backups-are-encrypted-and-history-keeps-no-names.md).
     - A `session.signedIn` or `session.signedOut` record commits before its
       action takes effect. If it cannot be written, the callback fails and
       creates no session, or sign-out fails with a `500` and the session stays.

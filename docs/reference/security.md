@@ -174,8 +174,8 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place. Every tenan
     existed.
   - An expired session writes nothing. A host that resolves to no tenant writes
     nothing, because there is no tenant database.
-  - Each record holds the client address, and never a token, a cookie or the
-    user agent. The address follows the
+  - Each record holds the [shortened client address](storage.md#audit-records-and-sequence-counters),
+    never a token, a cookie or the user agent. The address follows the
     [forwarded headers](host-settings.md#forwarded-headers) rules of
     [D49](../decisions/d49-several-server-replicas-behind-a-tls-proxy.md).
 - **Session.** The session state is a row of `axis.sessions` in the tenant
