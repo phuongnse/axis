@@ -402,8 +402,23 @@ agrees. An application that declares it maps the slot to one of its own roles:
   The application's connector keeps its base URL, auth, bindings, timeout,
   idempotency header and lookup. A depending module maps the connector slots
   of a module it depends on to its own slots, see
-  [dependencies](#processes-pages-policies-and-dependencies). _(planned for M20)_ A
-  `callConnector` step on a slot.
+  [dependencies](#processes-pages-policies-and-dependencies). A module process's
+  `callConnector` step is built: its `connector` names a slot of the module,
+  matched exactly, and one of the slot's operations, ignoring letter case, as in
+  `"connector": { "name": "orders", "operation": "createOrder" }`. Its `input`
+  and `output` are checked against the slot operation's fields, not against
+  any one application's connector, with the codes `AXC0104` to `AXC0108` of
+  an application step, reported in the module's process file. A name that is
+  no slot of the module, which includes an application connector's name, is
+  `AXC0102` at `/steps/{i}/connector/name` of the module file. An operation
+  the slot lacks is `AXC0103` at `/steps/{i}/connector/operation`. The inputs a
+  step must give are those the slot marks `required`. The step adds no
+  reference, since a slot is no resource. In each application the compiled
+  step names the connector the slot maps to and its operation, so the call
+  keeps that connector's base URL, auth, bindings, timeout, idempotency
+  header and lookup, and the worker runs it like an application step. Two
+  applications that map one slot to different connectors call different
+  systems. A module never names a binding.
 - **Scenarios** _(planned for M24)_. A module scenario gives its users role
   slots instead of roles. When it runs for an application, each slot becomes
   the role it maps to, and the scenario runs against the application as

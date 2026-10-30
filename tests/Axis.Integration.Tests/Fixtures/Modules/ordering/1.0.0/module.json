@@ -1,0 +1,19 @@
+{
+  "kind": "module",
+  "id": "ordering",
+  "version": "1.0.0",
+  "label": "Ordering",
+  "connectors": [
+    {
+      "name": "purchasing",
+      "label": { "textKey": "ordering.purchasing" },
+      "operations": [
+        {
+          "name": "createOrder",
+          "input": [{ "name": "title", "type": "text", "required": true }],
+          "output": [{ "name": "orderNumber", "type": "text" }]
+        }
+      ]
+    }
+  ]
+}
