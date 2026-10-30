@@ -25,7 +25,7 @@ public sealed class PurchaseRequestActivationTests(DataDatabaseFixture database)
         ReleaseCompilationResult compiled;
         await using (var context = database.CreateConfigurationContext())
         {
-            compiled = await ReleaseCompiler.CompileAsync(_appFolder, context, SamplePackages.Versions, CancellationToken);
+            compiled = await ReleaseCompiler.CompileAsync(_appFolder, context, SamplePackages.Versions, SampleModules.Modules, CancellationToken);
         }
 
         Assert.Empty(compiled.Diagnostics);
@@ -80,7 +80,7 @@ public sealed class PurchaseRequestActivationTests(DataDatabaseFixture database)
         ReleaseCompilationResult compiled;
         await using (var context = database.CreateConfigurationContext())
         {
-            compiled = await ReleaseCompiler.CompileAsync(_appFolder, context, [], CancellationToken);
+            compiled = await ReleaseCompiler.CompileAsync(_appFolder, context, [], SampleModules.Modules, CancellationToken);
         }
 
         Assert.Null(compiled.Release);

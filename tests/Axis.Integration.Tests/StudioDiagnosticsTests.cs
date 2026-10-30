@@ -55,6 +55,7 @@ public sealed class StudioDiagnosticsTests : IAsyncLifetime
                 builder.UseSetting(key, value);
             }
             builder.UseSetting("Extensions:Path", SamplePackages.Path);
+            builder.UseSetting("Modules:Path", SampleModules.Path);
             builder.UseSetting("ActivateOnStartup:0", folder.Path);
             builder.UseSetting("Studio:Folders:0", folder.Path);
             builder.UseSetting("Studio:AuthorRole", "author");

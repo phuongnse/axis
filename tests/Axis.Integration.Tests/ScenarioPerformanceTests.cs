@@ -29,6 +29,7 @@ public sealed class ScenarioPerformanceTests
                 Path.Combine(AppContext.BaseDirectory, "Samples", "purchase-requests"),
                 "--server", await PostgreSqlServer.AdminConnectionStringAsync(),
                 "--extensions", SamplePackages.Path,
+                "--modules", SampleModules.Path,
                 "--results", results.Path,
             ],
             output,
