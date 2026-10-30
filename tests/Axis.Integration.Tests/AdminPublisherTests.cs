@@ -830,6 +830,7 @@ public sealed class AdminPublisherTests(PostgreSqlFixture database) : IClassFixt
                     Kind = "secret",
                     SecretValue = AdminScenario.Cipher.Encrypt(id, TenantSecretFields.Binding(SecretBinding), "binding-secret-value"),
                 });
+            context.TenantBindings.AddRange(CompanyBindings.Rows(id));
         }
 
         await context.SaveChangesAsync(CancellationToken);

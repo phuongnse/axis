@@ -166,6 +166,7 @@ public sealed class PublisherPreviewTests(PostgreSqlFixture database) : IClassFi
                     Kind = "secret",
                     SecretValue = AdminScenario.Cipher.Encrypt(main, TenantSecretFields.Binding(SecretBinding), "binding-secret-value"),
                 });
+            context.TenantBindings.AddRange(CompanyBindings.Rows(main));
             await context.SaveChangesAsync(CancellationToken);
         }
 

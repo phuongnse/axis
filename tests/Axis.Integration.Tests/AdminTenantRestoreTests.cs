@@ -75,7 +75,7 @@ public sealed class AdminTenantRestoreTests(AdminBackupFixture fixture) : IClass
         Assert.NotEqual(original.DatabaseName, row.DatabaseName);
         Assert.Equal(0, await CountSecretBindingValuesAsync(newId));
         Assert.Equal(
-            ["PurchasingSystemToken", "PurchasingSystemUrl"],
+            [CompanyBindings.ClientId, CompanyBindings.ClientSecret, CompanyBindings.Issuer, SecretBinding, "PurchasingSystemUrl"],
             await BindingNamesAsync(newId));
         Assert.Equal(0, await CountSessionsAsync(newId));
 
@@ -87,10 +87,16 @@ public sealed class AdminTenantRestoreTests(AdminBackupFixture fixture) : IClass
             Assert.Equal(HttpStatusCode.ServiceUnavailable, held.StatusCode);
         }
 
-        // The operator sets the secret binding, which the archive never held, and resumes the tenant.
+        // The operator sets the secret bindings, which the archive never held, and resumes the tenant.
         var setBinding = await scenario.RunAsync(["tenant", "binding", "set", newId, SecretBinding, "--secret"], input: "restored-token", extra: AdminScenario.Directory);
         Assert.Equal(0, setBinding.Exit);
         Assert.Equal([$"{newId} binding ok"], setBinding.Output);
+        foreach (var name in new[] { CompanyBindings.ClientId, CompanyBindings.ClientSecret })
+        {
+            var setCompany = await scenario.RunAsync(["tenant", "binding", "set", newId, name, "--secret"], input: $"{name}-restored", extra: AdminScenario.Directory);
+            Assert.Equal(0, setCompany.Exit);
+        }
+
         Assert.Equal(0, (await scenario.RunAsync(["tenant", "resume", newId])).Exit);
         await RefreshAsync(server);
 

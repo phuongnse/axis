@@ -13,7 +13,7 @@ internal static class CompanyBindings
 
     public const string ClientSecret = "CompanyClientSecret";
 
-    private const string IssuerUrl = "https://company.example.test/realms/company";
+    public const string IssuerUrl = "https://company.example.test/realms/company";
 
     private const string ClientIdValue = "axis-broker";
 

@@ -292,6 +292,7 @@ public sealed class AdminTenantRotatePasswordsTests(PostgreSqlFixture database) 
                     Kind = "secret",
                     SecretValue = AdminScenario.Cipher.Encrypt(id, TenantSecretFields.Binding(SecretBinding), "binding-secret-value"),
                 });
+            context.TenantBindings.AddRange(CompanyBindings.Rows(id));
             await context.SaveChangesAsync(CancellationToken);
         }
 

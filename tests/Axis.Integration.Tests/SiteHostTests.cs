@@ -134,6 +134,7 @@ public sealed class SiteHostTests(PostgreSqlFixture database) : IClassFixture<Po
                     Kind = "secret",
                     SecretValue = AdminScenario.Cipher.Encrypt(id, TenantSecretFields.Binding("PurchasingSystemToken"), "binding-secret-value"),
                 });
+            context.TenantBindings.AddRange(CompanyBindings.Rows(id));
             await context.SaveChangesAsync(CancellationToken);
         }
 

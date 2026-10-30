@@ -77,6 +77,14 @@ public sealed class AdminTenantBackupTests(AdminBackupFixture fixture) : IClassF
         Assert.Equal("https://purchasing.example.test", bindings["PurchasingSystemUrl"].GetProperty("url").GetString());
         Assert.Equal("secret", bindings["PurchasingSystemToken"].GetProperty("kind").GetString());
         Assert.False(bindings["PurchasingSystemToken"].TryGetProperty("url", out _));
+        Assert.Equal("url", bindings[CompanyBindings.Issuer].GetProperty("kind").GetString());
+        Assert.Equal(CompanyBindings.IssuerUrl, bindings[CompanyBindings.Issuer].GetProperty("url").GetString());
+        foreach (var name in new[] { CompanyBindings.ClientId, CompanyBindings.ClientSecret })
+        {
+            Assert.Equal("secret", bindings[name].GetProperty("kind").GetString());
+            Assert.False(bindings[name].TryGetProperty("url", out _));
+        }
+
         Assert.DoesNotContain("database", archive.Manifest, StringComparison.OrdinalIgnoreCase);
 
         await fixture.Scenario.AssertNoSecretsAsync();
@@ -324,8 +332,9 @@ public sealed class AdminTenantBackupTests(AdminBackupFixture fixture) : IClassF
 
 /// <summary>
 /// One platform database with one active tenant, <c>t-…</c>, made by <c>tenant create</c> and served by the real server on
-/// <see cref="Host"/>. The tenant has a <c>url</c> binding and a <c>secret</c> binding, and the server activates the purchase
-/// request and leave request samples in it, so releases pin the payment references package and the departments module.
+/// <see cref="Host"/>. The tenant has a <c>url</c> binding and a <c>secret</c> binding for the purchasing system, and the
+/// Company sign-in bindings. The server activates the purchase request and leave request samples in it, so releases pin the
+/// payment references package and the departments module.
 /// </summary>
 public sealed class AdminBackupFixture : IAsyncLifetime
 {
@@ -370,6 +379,7 @@ public sealed class AdminBackupFixture : IAsyncLifetime
                     Kind = "secret",
                     SecretValue = AdminScenario.Cipher.Encrypt(TenantId, TenantSecretFields.Binding(SecretBinding), BindingSecret),
                 });
+            context.TenantBindings.AddRange(CompanyBindings.Rows(TenantId));
             await context.SaveChangesAsync(CancellationToken);
         }
 

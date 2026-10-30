@@ -89,6 +89,13 @@ public sealed class RestoredTenantWorkTests(AdminBackupFixture fixture) : IClass
         Assert.Equal(
             0,
             (await scenario.RunAsync(["tenant", "binding", "set", newId, SecretBinding, "--secret"], input: "restored-token", extra: AdminScenario.Directory)).Exit);
+        foreach (var name in new[] { CompanyBindings.ClientId, CompanyBindings.ClientSecret })
+        {
+            Assert.Equal(
+                0,
+                (await scenario.RunAsync(["tenant", "binding", "set", newId, name, "--secret"], input: $"{name}-restored", extra: AdminScenario.Directory)).Exit);
+        }
+
         Assert.Equal(0, (await scenario.RunAsync(["tenant", "resume", newId])).Exit);
 
         await using var server = CreateDirectoryServer(scenario.Platform);

@@ -313,6 +313,7 @@ public sealed class PublisherTestRequestTests(PostgreSqlFixture database) : ICla
                 Kind = "secret",
                 SecretValue = AdminScenario.Cipher.Encrypt(tenant, TenantSecretFields.Binding(SecretBinding), "binding-secret-value"),
             });
+        context.TenantBindings.AddRange(CompanyBindings.Rows(tenant));
         await context.SaveChangesAsync(CancellationToken);
         return tenant;
     }
