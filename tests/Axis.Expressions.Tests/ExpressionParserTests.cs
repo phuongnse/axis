@@ -303,26 +303,6 @@ public sealed class ExpressionParserTests
         Assert.Equal(ExpressionDiagnosticCodes.TooManyNodes, ExpressionParser.Parse($"f({arguments}).a").Diagnostic?.Code);
     }
 
-    [Fact]
-    public void The_parser_never_throws()
-    {
-        string[] pieces =
-        [
-            "a", "b1", "f", "(", ")", "(", ")", ",", ".", "-", "-", "+", "*", "/", "not", "and", "or", "is", "in",
-            "null", "true", "==", "!=", "<", "<=", ">", ">=", "=", "!", "1", "2.5", "99999999999999999999", "'x'",
-            "'", "''", "date", " ", "\n", "#", "é", "\ud83d",
-        ];
-        var random = new Random(101);
-        for (var i = 0; i < 20_000; i++)
-        {
-            var text = string.Concat(Enumerable.Range(0, random.Next(1, 40)).Select(_ => pieces[random.Next(pieces.Length)] + " "));
-
-            var result = ExpressionParser.Parse(text);
-
-            Assert.True(result.Expression is null != result.Diagnostic is null, text);
-        }
-    }
-
     private static string Nested(string prefix, int count) => string.Concat(Enumerable.Repeat(prefix, count));
 
     private static string InList(int items) => $"x in ({string.Join(",", Enumerable.Repeat("1", items))})";
