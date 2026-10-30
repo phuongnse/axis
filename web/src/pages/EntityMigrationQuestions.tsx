@@ -57,8 +57,13 @@ export function EntityMigrationQuestions({
       onCancel={onCancel}
       footer={
         <Flex gap="small" justify="end">
-          {rename && <Button onClick={onCancel}>{t('shell.studio.cancel')}</Button>}
-          <Button danger onClick={() => answer('drop')}>
+          {/* Proposed: beside the solid button, the other actions are text buttons. */}
+          {rename && (
+            <Button type="text" onClick={onCancel}>
+              {t('shell.studio.cancel')}
+            </Button>
+          )}
+          <Button type="text" danger onClick={() => answer('drop')}>
             {t('shell.studio.entity.migration.dropData')}
           </Button>
           <Button type="primary" onClick={() => answer('keep')}>
@@ -110,8 +115,10 @@ function ExpressionQuestion({
       onCancel={onCancel}
       footer={
         <Flex gap="small" justify="end">
-          <Button onClick={onCancel}>{t('shell.studio.cancel')}</Button>
-          <Button onClick={() => onAnswer('skip')}>
+          <Button type="text" onClick={onCancel}>
+            {t('shell.studio.cancel')}
+          </Button>
+          <Button type="text" onClick={() => onAnswer('skip')}>
             {t(convert ? 'shell.studio.entity.migration.skip' : 'shell.studio.entity.migration.leaveNulls')}
           </Button>
           <Button type="primary" disabled={value.trim() === ''} onClick={() => onAnswer({ value: value.trim() })}>

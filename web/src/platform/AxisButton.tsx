@@ -1,7 +1,18 @@
 import { Button, Tooltip, type ButtonProps } from 'antd'
-import type { CSSProperties, ReactNode, Ref } from 'react'
+import { createContext, useContext, type CSSProperties, type ReactNode, type Ref } from 'react'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
+
+/**
+ * Proposed: a row of actions that holds a `finish` button. Beside it, every other action is a text button in its own
+ * level's colour, so the solid button is the row's one filled shape. A form's footer and a page's compact band are
+ * such rows; a dialog's Cancel follows the same rule through the theme.
+ */
+const BesideFinish = createContext(false)
+
+export function ActionRow({ finish, children }: { finish: boolean; children: ReactNode }) {
+  return <BesideFinish.Provider value={finish}>{children}</BesideFinish.Provider>
+}
 
 /** The level of an action. Each level has one style, so the same kind of action always looks the same. */
 export type ButtonRole = 'finish' | 'main' | 'secondary' | 'icon' | 'destructive'
@@ -35,6 +46,7 @@ export type AxisButtonProps =
 export function AxisButton(props: AxisButtonProps) {
   const t = useText()
   const { colour } = useDesignTokens()
+  const besideFinish = useContext(BesideFinish)
 
   if (props.role === 'icon') {
     const { role: _role, nameKey, destructive, nameSuffix, joined, icon, style, disabled, ...rest } = props
@@ -56,6 +68,17 @@ export function AxisButton(props: AxisButtonProps) {
 
   const { role, style, disabled, ...rest } = props
   const outline = (text: string): CSSProperties => (disabled ? {} : { color: text, borderColor: text })
+  if (besideFinish && role !== 'finish') {
+    const text = role === 'main' ? colour.primaryText : role === 'destructive' ? colour.dangerText : undefined
+    return (
+      <Button
+        {...rest}
+        type="text"
+        disabled={disabled}
+        style={{ ...(text && !disabled ? { color: text } : {}), ...style }}
+      />
+    )
+  }
   switch (role) {
     case 'finish':
       return <Button {...rest} type="primary" disabled={disabled} style={style} />

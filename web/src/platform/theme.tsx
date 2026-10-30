@@ -2,6 +2,7 @@ import { ConfigProvider } from 'antd'
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { antThemeFor } from './antTheme'
 import { designTokensFor } from './designTokens'
+import { dialogButtons } from './dialogButtons'
 import { ThemeModeContext, type ThemeChoice, type ThemeMode } from './themeMode'
 import { useReducedMotion } from './useReducedMotion'
 import { useSystemThemeMode } from './useSystemThemeMode'
@@ -50,7 +51,10 @@ export function ThemeModeProvider({ initialMode, children }: ThemeModeProviderPr
 
   return (
     <ThemeModeContext.Provider value={value}>
-      <ConfigProvider theme={config}>{children}</ConfigProvider>
+      {/* Proposed: beside a dialog's solid button, Cancel is a text button, as every action beside a solid one. */}
+      <ConfigProvider theme={config} modal={dialogButtons}>
+        {children}
+      </ConfigProvider>
     </ThemeModeContext.Provider>
   )
 }
