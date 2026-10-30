@@ -81,6 +81,17 @@
         "required": { "type": "boolean" }
       }
     },
+    "outputField": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "type"],
+      "properties": {
+        "name": { "$ref": "#/$defs/name" },
+        "type": { "$ref": "#/$defs/type" },
+        "required": { "type": "boolean" },
+        "source": { "type": "string", "maxLength": 2000 }
+      }
+    },
     "operation": {
       "type": "object",
       "additionalProperties": false,
@@ -90,7 +101,7 @@
         "method": { "enum": ["GET", "POST", "PUT", "PATCH", "DELETE"] },
         "path": { "type": "string", "pattern": "^/", "maxLength": 2000 },
         "input": { "type": "array", "items": { "$ref": "#/$defs/field" } },
-        "output": { "type": "array", "items": { "$ref": "#/$defs/field" } },
+        "output": { "type": "array", "items": { "$ref": "#/$defs/outputField" } },
         "lookup": { "$ref": "#/$defs/name", "x-axis-reference": { "part": "operation", "of": "/name" } }
       },
       "if": { "required": ["method"], "properties": { "method": { "const": "GET" } } },
