@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 # The load test, first three parts: builds the three production images, writes the generated application of typical size
 # (tests/Axis.LoadData, seed 1) into its run folder, starts the reference stack of deploy/compose/compose.yaml (two
-# server replicas behind the TLS proxy, one worker, PostgreSQL over TLS), migrates and creates the tenant `load`. It then
+# server replicas behind the TLS proxy, one worker, PostgreSQL over TLS) and the https stub that answers the application's
+# connector, migrates and creates the tenant `load`. It then
 # prepares the realm `load` with 50 users and a machine caller (scripts/lib/load-realm.mjs, which writes
-# artifacts/load/k6/users.json and caller.json for k6), sets the tenant to accept the caller's tokens, activates the
+# artifacts/load/k6/users.json and caller.json for k6), sets the tenant to accept the caller's tokens and the url binding
+# of the connector to the stub, activates the
 # application in the tenant, which writes the seed records, and runs the k6 scenario tests/load/objectives.js through
 # the proxy: 50 users sign in through the realm and loop over the reads and writes of the objectives. k6 writes its summary
 # to artifacts/load-results, which scripts/lib/load-objectives.mjs checks against the objectives. The exit code is the
@@ -131,6 +133,8 @@ compose up -d server worker
 wait_for 120 'The server' server_ready "$AXIS_SERVER_PORT"
 wait_for 120 'The worker' worker_ready
 
+compose --profile load up -d load-stub
+
 compose --profile replicas up -d server-2
 wait_for 120 'The second server' server_ready "$AXIS_SERVER_2_PORT"
 
@@ -142,6 +146,8 @@ wait_for 60 "The host $tenant_host" tenant_routed
 node scripts/lib/load-realm.mjs "$folder" "$AXIS_HTTPS_PORT" "$seed"
 # The tenant accepts the tokens of the machine caller, whose audience is axis-load-endpoints.
 compose --profile admin run --rm --no-TTY admin tenant oidc set load --endpoint-audience axis-load-endpoints
+# Activation checks that the binding of the connector exists and is https.
+compose --profile admin run --rm --no-TTY admin tenant binding set load LoadServiceUrl --url https://load-stub:8443
 compose --profile admin run --rm --no-TTY admin activate /apps/load --tenant load
 
 set +e

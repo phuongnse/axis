@@ -89,8 +89,10 @@ to find its own numbers.
   [objectives](#objectives), with a pause of about 1 s an iteration. Every request goes through one helper that tags it with
   its objective (`reads`, `writes` or `signIn`) and its route. The run fails, with a non-zero exit code, when reads miss p95
   under 300 ms, writes miss p95 under 500 ms, the rate of `5xx` answers, the `server_errors` metric, is 0.1% or more, or
-  fewer than 99% of its checks pass. The sign-in pages and the token request are tagged `signIn`, so they count toward no objective. It removes the stack at the end, unless `--keep` is
-  given. It needs Docker. See [development](../development.md#scripts).
+  fewer than 99% of its checks pass. The sign-in pages and the token request are tagged `signIn`, so they count toward no objective.
+  The stack also runs the https stub `load-stub`, a Caddy service under the `load` profile whose certificate comes from the
+  run's own authority and which answers every call with a fixed JSON body. The worker trusts that authority. It removes the
+  stack at the end, unless `--keep` is given. It needs Docker. See [development](../development.md#scripts).
 - **Data.** _(Built.)_ It creates a tenant with a generated application of
   [typical size](../domain/knowledge.md#typical-application-size), and records in every entity.
   `tests/Axis.LoadData` writes that application from a seed, so the same seed gives the same files:
@@ -100,7 +102,13 @@ to find its own numbers.
   which stores the release and writes the seed records. The application also declares the inbound
   endpoint `CreateEntity00`, which creates an `Entity00` record from the inputs `name` and
   `quantity` and starts `Entity00Process01` on it without `wait`, and the role `load-caller`, whose
-  policy grants `invoke` on that endpoint.
+  policy grants `invoke` on that endpoint. It declares the connector `LoadService`, with one `POST`
+  operation `notify` and the `url` binding `LoadServiceUrl`, and the event `Entity00Changed`. The data
+  change trigger `Entity00QuantityChanged` starts the process `Entity00Announce` when an update changes the `quantity` of
+  an `Entity00` record. That process raises the event. The worker delivers the event to the async event trigger
+  `Entity00ChangedDelivered`, which starts the process `Entity00Notify`, and its step calls the connector. So the run
+  makes `process.step`, `connector.call` and `event.deliver` work items. `scripts/load.sh` sets the binding
+  to `https://load-stub:8443` for the tenant `load` before it activates the application.
 - **Users.** _(Built.)_ `scripts/load.sh` adds the users `load-user-01` to `load-user-50` to the
   realm of the tenant `load`, each with a password, an authenticator whose secret comes from the
   seed and the application's roles, except `load-caller`. It writes their names, passwords and

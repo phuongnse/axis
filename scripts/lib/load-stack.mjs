@@ -5,9 +5,10 @@
 //
 // The override file is JSON, which is valid YAML. It adds PostgreSQL over TLS, trusts the authority in every host,
 // adds the OpenTelemetry Collector with its own certificate from the authority, points the worker's metrics at the
-// collector over https and adds the k6 service under the `load` profile. The authority key stays in ca-private and is
-// never mounted. collector.json is the collector's configuration: it receives OTLP over https and writes the metrics
-// to worker-metrics.json in the results folder.
+// collector over https, adds the https stub `load-stub`, which answers the connector's calls, and adds the k6 service
+// under the `load` profile. The worker trusts the authority, which signed the certificates of the collector and the
+// stub. The authority key stays in ca-private and is never mounted. collector.json is the collector's configuration:
+// it receives OTLP over https and writes the metrics to worker-metrics.json in the results folder.
 import { spawnSync } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
 import { chmodSync, copyFileSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs'
@@ -23,6 +24,11 @@ export const k6Image = 'grafana/k6:1.3.0'
 export const collectorImage = 'otel/opentelemetry-collector-contrib:0.135.0'
 export const tenantHost = 'load.axis.test'
 export const identityHost = 'id.axis.test'
+
+// The stub that answers the calls of the connector LoadService. It is the image of the proxy in deploy/compose/compose.yaml.
+export const stubImage = 'caddy:2.10.2-alpine'
+export const stubHost = 'load-stub'
+export const stubUrl = `https://${stubHost}:8443`
 
 const password = () => randomBytes(18).toString('hex')
 
@@ -78,6 +84,11 @@ export const writeLoadStack = (target, { proxyAddress = '172.31.250.10', results
   const tls = folderOf('tls')
   issue(tls, 'proxy', [tenantHost, identityHost])
   copyFile(authority.certificate, join(tls, 'server-ca.crt'))
+
+  // The stub answers every call with a fixed JSON body, over TLS with a certificate for its service name.
+  const stub = folderOf('stub')
+  issue(stub, 'stub', [stubHost])
+  writeFile(join(stub, 'Caddyfile'), `{\n\tadmin off\n}\n\nhttps://:8443 {\n\ttls /stub/tls.crt /stub/tls.key\n\theader Content-Type application/json\n\trespond \`{"accepted":true}\` 200\n}\n`)
 
   const serverTls = folderOf('server-tls')
   issue(serverTls, 'server', ['servers'])
@@ -161,6 +172,15 @@ export const writeLoadStack = (target, { proxyAddress = '172.31.250.10', results
           volumes: [`${join(folder, 'collector.json')}:/etc/otelcol-contrib/config.yaml:ro`, `${collectorTls}:/collector-tls:ro`, `${results}:/results`],
         },
         admin: { environment: authorityFile, volumes: [trustVolume] },
+        // The stub is only reached by the worker, over the compose network.
+        [stubHost]: {
+          profiles: ['load'],
+          image: stubImage,
+          read_only: true,
+          tmpfs: ['/data', '/config'],
+          command: ['caddy', 'run', '--config', '/stub/Caddyfile', '--adapter', 'caddyfile'],
+          volumes: [`${stub}:/stub:ro`],
+        },
         // k6 reaches the tenant host through the proxy only, at the proxy's fixed address.
         k6: {
           profiles: ['load'],

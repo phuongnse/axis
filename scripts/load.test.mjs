@@ -113,6 +113,13 @@ function runLoad(args = [], extraEnv = {}, setup = () => {}) {
     const caller = existsSync(callerFile) ? JSON.parse(readFileSync(callerFile, 'utf8')) : undefined
     const bodies = existsSync(`${env.STUB_LOG}.body`) ? readFileSync(`${env.STUB_LOG}.body`, 'utf8') : ''
     const calls = existsSync(env.STUB_LOG) ? readFileSync(env.STUB_LOG, 'utf8').trimEnd().split('\n') : []
+    const overrideFile = join(dir, 'artifacts/load/override.json')
+    const override = existsSync(overrideFile) ? JSON.parse(readFileSync(overrideFile, 'utf8')) : undefined
+    const openssl = (...args) => spawnSync('openssl', args, { encoding: 'utf8' }).stdout
+    const stubFile = join(dir, 'artifacts/load/stub/tls.crt')
+    const stubCertificate = existsSync(stubFile) ? openssl('x509', '-in', stubFile, '-noout', '-ext', 'subjectAltName', '-issuer') : undefined
+    const authorityFile = join(dir, 'artifacts/load/ca/ca.crt')
+    const authoritySubject = existsSync(authorityFile) ? openssl('x509', '-in', authorityFile, '-noout', '-subject') : undefined
     const resultsFolder = join(dir, 'artifacts/load-results')
     const results = existsSync(resultsFolder)
     const resultsMode = results ? statSync(resultsFolder).mode & 0o777 : undefined
@@ -123,6 +130,9 @@ function runLoad(args = [], extraEnv = {}, setup = () => {}) {
       dir,
       users,
       caller,
+      override,
+      stubCertificate,
+      authoritySubject,
       left: existsSync(join(dir, 'artifacts/load/override.json')),
       results,
       resultsMode,
@@ -376,6 +386,31 @@ describe('scripts/load.sh writes the application and activates it in the load te
     assert.equal(run.status, 0, run.stdout + run.stderr)
     assert.ok(indexOf(run, 'admin tenant create load') < indexOf(run, activate))
     assert.ok(indexOf(run, activate) < k6Index(run))
+  })
+
+  test('the stack has an https stub for the connector, signed by the run authority, and the worker trusts that authority', () => {
+    const run = runLoad(['--keep'])
+
+    assert.equal(run.status, 0, run.stdout + run.stderr)
+    const stub = run.override.services['load-stub']
+    assert.deepEqual(stub.profiles, ['load'])
+    assert.ok(stub.volumes.some((volume) => volume.endsWith(':/stub:ro')), stub.volumes.join('\n'))
+    assert.match(run.stubCertificate, /DNS:load-stub\b/)
+    const subject = run.authoritySubject.replace(/^subject=\s*/, '').trim()
+    assert.ok(subject.length > 0)
+    assert.equal(run.stubCertificate.match(/^issuer=\s*(.*)$/m)[1].trim(), subject)
+    assert.equal(run.override.services.worker.environment.SSL_CERT_FILE, '/run/test-ca/ca.crt')
+  })
+
+  test('the stub starts and the connector binding is set before the activation and the k6 run', () => {
+    const run = runLoad()
+
+    assert.equal(run.status, 0, run.stdout + run.stderr)
+    const binding = indexOf(run, 'admin tenant binding set load LoadServiceUrl --url https://load-stub:8443')
+    assert.ok(indexOf(run, 'up -d load-stub') < k6Index(run))
+    assert.ok(indexOf(run, 'admin tenant create load') < binding)
+    assert.ok(binding < indexOf(run, activate))
+    assert.ok(binding < k6Index(run))
   })
 
   test('the realm is prepared and 50 users are created before the activation', () => {
