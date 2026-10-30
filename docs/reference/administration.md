@@ -138,13 +138,12 @@ The command creates the tenant's realm in
 tenant's `Oidc` block to the realm itself: the authority `<IdentityProvider:Url>/realms/<id>` and the client `axis`.
 The command takes no `--oidc-*` option, and either one is a usage error. It does not read `AXIS_OIDC_CLIENT_SECRET`.
 The admin host's `IdentityProvider` settings give it the identity provider's admin client. The realm has no
-redirect addresses and no accounts yet, so nobody can finish a sign-in there until a later part of the
-identity provider adds them. With `--administrator <email>`, the realm gets one invited account. Its emailed link
+redirect addresses yet, so nobody can finish a sign-in there until M28 keeps them in step. With `--administrator <email>`, the realm gets one invited account. Its emailed link
 names no address to return to, so the person can set a password and an authenticator and cannot yet sign in to Axis.
 
-_(planned for M17)_ The command also turns accounts on in the tenant's
+The command also turns accounts on in the tenant's
 [platform sign-in](identity-provider.md#platform-sign-in).
-`tenant host add`, `remove` and `move` do not yet change the realm, see
+_(planned for M28)_ `tenant host add`, `remove` and `move` do not yet change the realm, see
 [keeping the realm in step](identity-provider.md#keeping-the-realm-in-step). A preview tenant gets no realm.
 
 **Preview tenant.** With `--preview-of`, the command creates
