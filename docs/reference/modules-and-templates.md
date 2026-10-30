@@ -42,7 +42,7 @@ the modules it uses in `application.json`, with a version range for each:
   "kind": "application",
   "name": "PurchaseRequests",
   "formatVersion": 1,
-  "modules": [{ "id": "departments", "version": "^1.0.0" }]
+  "modules": [{ "id": "departments", "version": "^1.0.0", "roles": { "manager": "department-manager" } }]
 }
 ```
 
@@ -52,8 +52,9 @@ The module's manifest is `module.json` at the root of its folder:
 {
   "kind": "module",
   "id": "departments",
-  "version": "1.0.0",
-  "label": "Departments"
+  "version": "1.1.0",
+  "label": "Departments",
+  "roles": [{ "name": "manager", "label": { "textKey": "departments.roles.manager" } }]
 }
 ```
 
@@ -62,8 +63,12 @@ The module's manifest is `module.json` at the root of its folder:
 an `IsManager(manager, user)` rule and an `IsDepartmentCode(code)` rule, three seed
 departments and `en` and `vi` texts. The `Department` entity has a validation that
 calls `IsDepartmentCode`, so a department code must be in capital letters.
+It has a `manager` role slot, labelled in `en` and `vi`, and a `ManagerAccess` module
+policy for the slot. The policy lets the role read the departments whose `manager` is the
+current user, and read the `Departments` data source. The leave request sample maps the
+slot to its `department-manager` role.
 `scripts/build.sh`, `scripts/dev.sh` and the E2E run install it under
-`artifacts/modules/departments/1.0.0/`, and the Compose images hold it in
+`artifacts/modules/departments/1.1.0/`, and the Compose images hold it in
 `/modules`. The server and the worker read it through `Modules:Path`.
 
 - **Manifest.** `module.json` has `kind: module`, an `id` (lower-case letters,

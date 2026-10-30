@@ -1,0 +1,11 @@
+{
+  "id": "ae8cf9c2-8632-4a4f-8150-120f6c2c0298",
+  "kind": "policy",
+  "name": "ManagerAccess",
+  "formatVersion": 1,
+  "roles": ["manager"],
+  "grants": [
+    { "entity": "Department", "actions": ["read"], "filter": "manager == currentUser()" },
+    { "dataSource": "Departments", "actions": ["read"] }
+  ]
+}

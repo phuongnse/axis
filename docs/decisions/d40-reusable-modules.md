@@ -83,7 +83,7 @@ confirmed these points on issue #571 on 2026-10-18.
 - **Packages:** `module.json` keeps an optional `packages`, with the same
   shape as in `application.json`. No kind a module may hold can call a
   package operation yet, because only process steps can.
-- **Sample:** `samples/modules/departments`, version `1.0.0`. It has the
+- **Sample:** `samples/modules/departments`, first released as version `1.0.0`. It has the
   `Department` entity with code, name and manager, a data source over it, a rule
   that tells whether a user manages a department, seed departments, and `en`
   and `vi` texts. The build, dev, Compose and E2E scripts install it under

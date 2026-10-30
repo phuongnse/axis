@@ -26,7 +26,7 @@ function runSmoke({ changed, failing = [] } = {}) {
       copyFileSync(join(root, file), join(dir, file))
     }
     mkdirSync(join(dir, 'samples/modules/departments'), { recursive: true })
-    writeFileSync(join(dir, 'samples/modules/departments/module.json'), '{"id":"departments","version":"1.0.0"}')
+    writeFileSync(join(dir, 'samples/modules/departments/module.json'), '{"id":"departments","version":"1.1.0"}')
     for (const [suite, file] of Object.entries(suites)) {
       const body = failing.includes(suite) ? 'assert.fail()' : ''
       writeFileSync(
@@ -57,7 +57,7 @@ function runSmoke({ changed, failing = [] } = {}) {
 
     const result = spawnSync('bash', ['scripts/smoke.sh'], { cwd: dir, encoding: 'utf8', timeout: 60_000, env })
     const written = Object.keys(suites).filter((suite) => existsSync(join(dir, 'artifacts/test-results', `${suite}.xml`)))
-    const modules = existsSync(join(dir, 'artifacts/modules/departments/1.0.0/module.json'))
+    const modules = existsSync(join(dir, 'artifacts/modules/departments/1.1.0/module.json'))
     return { ...result, written, modules }
   } finally {
     rmSync(dir, { recursive: true, force: true })

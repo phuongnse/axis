@@ -90,4 +90,23 @@ public sealed class SampleApplicationTests
             Assert.False(string.IsNullOrWhiteSpace(text));
         }
     }
+
+    [Fact]
+    public void Leave_request_sample_maps_the_manager_slot_of_the_departments_module_to_department_manager()
+    {
+        var result = ApplicationCompiler.Compile(Path.Combine(AppContext.BaseDirectory, "Samples", "leave-requests"), SamplePackages.Versions, SampleModules.Modules);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+        var module = Assert.Single(result.Model.Modules);
+        Assert.Equal("departments", module.Id);
+        Assert.Equal("1.1.0", module.Version);
+        var policy = Assert.Single(result.Model.Policies, policy => policy.Name == "departments/ManagerAccess");
+        Assert.Equal(["department-manager"], policy.Roles);
+        var entityGrant = Assert.Single(policy.Grants, grant => grant.Entity is not null);
+        Assert.Equal("departments/Department", entityGrant.Entity!.Name);
+        Assert.NotNull(entityGrant.Filter);
+        var dataSourceGrant = Assert.Single(policy.Grants, grant => grant.DataSource is not null);
+        Assert.Equal("departments/Departments", dataSourceGrant.DataSource!.Name);
+    }
 }
