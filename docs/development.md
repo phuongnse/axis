@@ -265,7 +265,7 @@ server starts. It is the flow that the realm sync names on every brokered provid
 existing one. The flow is not in `axis-realm.json`, because a partial `authenticationFlows` import drops Keycloak's built-in flows.
 A Keycloak container that `scripts/dev.sh` reuses gets the flow on the next run, with no recreate, and a realm that has it is not
 changed. If an admin call fails, the script stops and names the step and the HTTP status. Docker Compose's own start does not add
-the flow. No sample declares a brokered provider yet, so sign-in is unchanged.
+the flow. The purchase request sample's `company` provider, below, uses it.
 
 The same Keycloak also imports the realm `company` (Example Company) from `samples/keycloak/company-realm.json`. It plays an
 organization's own identity provider, which the `axis` realm can broker to. It asks for no code at sign-in. Its confidential
@@ -274,8 +274,8 @@ client `axis-broker` has the secret `axis-broker-development-secret`, a redirect
 group `employees` and one person in it, `pat` (Pat Example, `pat@company.example`), with the password `axis`. In E2E, Keycloak
 listens on `AXIS_E2E_KEYCLOAK_PORT` (default 8180) inside and outside its container, so the `axis` realm reaches the `company` realm
 at the address the browser uses. Development, Compose, `scripts/dev.sh` and E2E give the `default` tenant the deployment
-bindings `CompanyIssuer` (the realm's issuer URL), `CompanyClientId` (`axis-broker`) and `CompanyClientSecret`. No sample names
-them yet, so nothing reads them. The `operator` role opens the purchase request sample's Approvals
+bindings `CompanyIssuer` (the realm's issuer URL), `CompanyClientId` (`axis-broker`) and `CompanyClientSecret`. The purchase request
+sample's `company` provider reads them. The `operator` role opens the purchase request sample's Approvals
 inspector page. The leave request sample, `samples/apps/leave-requests`, reuses the `employee` and
 `department-manager` users, in a site at `/leave`. The service desk sample, `samples/apps/service-desk`,
 adds the `agent` user and two `service-desk-lead` users and gives an employee the `requester` role, in a site
@@ -284,7 +284,9 @@ and uses the `employee` user as the holder of assets, in a site at `/asset-manag
 The request-approval template journey, `tests/e2e/specs/request-approval-journey.spec.ts`,
 adds the `approver` user. The `administrator` user holds the `tenant-administrator` role, so it sees "Users" in the shell, and the E2E shell journey uses it. The [users page](reference/user-administration.md) it links to lists the development users, and the E2E users page journey uses it. The `author` role lets the authoring API list and read the resources of every sample under
 `samples/apps/` under `scripts/dev.sh`, and opens the Studio page at http://localhost:5173/studio.
-Each sample declares one `accounts` identity provider in `identity-providers/accounts.json`, because a site needs one. Sign-in does not read it yet.
+Each sample declares one `accounts` identity provider in `identity-providers/accounts.json`, because a site needs one.
+The purchase request sample also declares the `oidc` provider `company` in `identity-providers/company.json`, which brokers to the
+`company` realm, and its Purchasing site allows both `accounts` and `company`.
 Studio saves into those committed folders, so `git checkout -- samples/apps` reverts an edit.
 The `publisher` role lets the authoring API publish, shows **Publish** on the Studio page and allows
 rollback from the release history. Under `scripts/dev.sh`,
@@ -297,9 +299,11 @@ See [sign-in and the session](reference/security.md#sign-in-and-the-session).
 The realm also has the confidential client `axis-activation`, with the development secret `axis-activation-development-secret`.
 Its service account holds the `realm-management` roles that a tenant's realm grants the same client. The `default` tenant's realm details
 under `scripts/dev.sh` and the E2E run name the realm `axis` and that secret, so the server's startup activation signs in as the client and adds
-the `site-` client of each sample site to the realm. Docker Compose sets the secret blank, so its server skips the update. A Keycloak
-container that already runs keeps the old realm without the client, and the server then fails to start with a `401` at the activation token,
-so run `docker compose rm -sf keycloak` once to recreate it.
+the `site-` client of each sample site to the realm. It also creates the brokered provider `oidc-companyissuer` from the purchase request
+sample's `company` provider, and lists it in the `site-purchasing` client's `axis.providers`. Docker Compose sets the secret blank, so its server
+skips the update. A Keycloak container that already runs keeps the old realm without the client, and the server then fails to start with a `401`
+at the activation token. A container imported before the `company` realm existed also stops startup activation, with a `404` at the company
+issuer's discovery document. In both cases run `docker compose rm -sf keycloak` once to recreate it.
 The realm also has the confidential client `axis-users`, with the development secret `axis-users-development-secret`. Its service account holds
 `manage-users`, `view-users` and `query-users`, as the client of a realm that `tenant create` makes does. The `default` tenant's `Oidc:UsersClientSecret` in the Development and E2E settings names that secret, so the
 server's `GET /api/users` lists the realm's users through it, and the commands that invite, disable, enable and reset the authenticator of a user change them. Until the Keycloak container is recreated, as above, the list route answers `502`, and so do the commands, because the client of an older realm cannot change users.

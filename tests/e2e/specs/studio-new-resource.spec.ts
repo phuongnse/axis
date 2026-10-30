@@ -277,19 +277,19 @@ test.describe('Studio creates a resource from a starter', () => {
     expect(backlog.indexes).toEqual([{ fields: ['stage', 'count'], unique: true }])
   })
 
-  test('an author creates an oidc identity provider and lets the Purchasing site allow it', async ({ page }) => {
+  test('an author creates a second oidc identity provider and lets the Purchasing site allow it', async ({ page }) => {
     await useSession(page, 'author')
     await page.goto(`${server.url}/studio?app=PurchaseRequests`)
 
-    await createResource(page, 'identityProvider', 'Company')
+    await createResource(page, 'identityProvider', 'Partner')
     await openFormTab(page)
-    await expect(page.getByTestId('studio-resource-details')).toContainText('identity-providers/company.json')
+    await expect(page.getByTestId('studio-resource-details')).toContainText('identity-providers/partner.json')
     await pick(page, 'studio-field-/type', 'oidc')
-    await page.getByRole('textbox', { name: 'Issuer (URL binding)', exact: true }).fill('CompanyIssuer')
-    await page.getByRole('textbox', { name: 'Client id (Secret binding)', exact: true }).fill('CompanyClientId')
-    await page.getByRole('textbox', { name: 'Client secret (Secret binding)', exact: true }).fill('CompanyClientSecret')
+    await page.getByRole('textbox', { name: 'Issuer (URL binding)', exact: true }).fill('PartnerIssuer')
+    await page.getByRole('textbox', { name: 'Client id (Secret binding)', exact: true }).fill('PartnerClientId')
+    await page.getByRole('textbox', { name: 'Client secret (Secret binding)', exact: true }).fill('PartnerClientSecret')
     const label = page.getByTestId('studio-field-/label')
-    await label.getByRole('textbox', { name: 'en', exact: true }).fill('Continue with Company')
+    await label.getByRole('textbox', { name: 'en', exact: true }).fill('Continue with Partner')
     await label.getByRole('button', { name: 'Write texts', exact: true }).click()
     await expect(label.getByTestId('studio-label-written')).toBeVisible()
     await page.getByRole('button', { name: 'Add role', exact: true }).click()
@@ -301,36 +301,36 @@ test.describe('Studio creates a resource from a starter', () => {
     await page.getByTestId('studio-group-site').getByRole('button', { name: 'Purchasing', exact: true }).click()
     await openFormTab(page)
     await page.getByRole('button', { name: 'Add provider', exact: true }).click()
-    await pickOption(page.getByTestId('studio-field-/signIn/0').getByRole('combobox'), 'Company')
+    await pickOption(page.getByTestId('studio-field-/signIn/2').getByRole('combobox'), 'Partner')
     const siteDiagnostics = await save(page)
 
     const own = [...providerDiagnostics, ...siteDiagnostics].filter(
       (diagnostic) =>
-        diagnostic.file.includes('identity-providers/company.json') || diagnostic.file.includes('sites/purchasing.json'),
+        diagnostic.file.includes('identity-providers/partner.json') || diagnostic.file.includes('sites/purchasing.json'),
     )
     expect(own).toEqual([])
     // The starter of the page that an earlier journey created has an empty label, so the panel is checked for the two
     // files of this journey and for the codes that only a provider or a sign-in list raises.
     const panel = page.getByTestId('studio-diagnostics')
-    for (const file of ['identity-providers/company.json', 'sites/purchasing.json']) {
+    for (const file of ['identity-providers/partner.json', 'sites/purchasing.json']) {
       await expect(panel.getByRole('button').filter({ hasText: file })).toHaveCount(0)
     }
     for (const code of ['AXC0285', 'AXC0288', 'AXC0289']) {
       await expect(panel).not.toContainText(code)
     }
-    const saved = JSON.parse(await readFile(path.join(copy, 'identity-providers', 'company.json'), 'utf8')) as Record<
+    const saved = JSON.parse(await readFile(path.join(copy, 'identity-providers', 'partner.json'), 'utf8')) as Record<
       string,
       unknown
     >
     expect(saved).toMatchObject({
       type: 'oidc',
-      issuer: { binding: 'CompanyIssuer' },
-      clientId: { binding: 'CompanyClientId' },
-      clientSecret: { binding: 'CompanyClientSecret' },
+      issuer: { binding: 'PartnerIssuer' },
+      clientId: { binding: 'PartnerClientId' },
+      clientSecret: { binding: 'PartnerClientSecret' },
       roles: { values: { managers: 'department-manager' } },
     })
     const site = JSON.parse(await readFile(path.join(copy, 'sites', 'purchasing.json'), 'utf8')) as { signIn: string[] }
-    expect(site.signIn).toEqual(['Company'])
+    expect(site.signIn).toEqual(['accounts', 'company', 'Partner'])
   })
 
   test('a click on the disabled Create button fails within the action timeout and names the button', async ({ page }) => {

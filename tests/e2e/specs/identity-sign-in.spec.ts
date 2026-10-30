@@ -57,6 +57,37 @@ test('a wrong password shows the sign-in error and keeps the username', async ({
   await expect(signInUsername(page)).toHaveValue('requester')
 })
 
+// Startup activation made the brokered provider of the purchase request sample's company provider and listed it on the
+// Purchasing site's client.
+test('startup activation creates the company provider in the axis realm and allows it on the Purchasing site', async ({
+  request,
+}) => {
+  const keycloak = process.env.AXIS_E2E_KEYCLOAK_URL!
+  const tokenResponse = await request.post(`${keycloak}/realms/axis/protocol/openid-connect/token`, {
+    form: {
+      grant_type: 'client_credentials',
+      client_id: 'axis-activation',
+      client_secret: 'axis-activation-development-secret',
+    },
+  })
+  expect(tokenResponse.status()).toBe(200)
+  const { access_token: token } = (await tokenResponse.json()) as { access_token: string }
+  const headers = { Authorization: `Bearer ${token}` }
+
+  const provider = await request.get(`${keycloak}/admin/realms/axis/identity-provider/instances/oidc-companyissuer`, {
+    headers,
+  })
+  expect(provider.status()).toBe(200)
+  expect(((await provider.json()) as { config: { clientId: string } }).config.clientId).toBe('axis-broker')
+
+  const clients = await request.get(`${keycloak}/admin/realms/axis/clients?clientId=site-purchasing`, { headers })
+  expect(clients.status()).toBe(200)
+  const [client, ...others] = (await clients.json()) as { attributes: Record<string, string> }[]
+  expect(others).toEqual([])
+  expect(client.attributes['axis.providers'].split(' ')).toContain('oidc-companyissuer')
+  expect(client.attributes['axis.accounts']).toBe('true')
+})
+
 for (const { mode, canvas } of [
   { mode: 'light', canvas: 'rgb(245, 245, 245)' },
   { mode: 'dark', canvas: 'rgb(0, 0, 0)' },

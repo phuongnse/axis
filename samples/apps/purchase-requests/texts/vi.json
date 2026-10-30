@@ -6,6 +6,7 @@
   "locale": "vi",
   "texts": {
     "site.title": "Mua hàng",
+    "signIn.company": "Tiếp tục với Example Company",
     "nav.purchaseRequests": "Yêu cầu mua hàng",
     "nav.myTasks": "Nhiệm vụ của tôi",
     "nav.requestsByDepartment": "Theo phòng ban",

@@ -125,7 +125,7 @@ export function serverEnv(baseURL: string): Record<string, string> {
     Tenants__default__Bindings__PurchasingSystemUrl__Value: purchasingUrl,
     Tenants__default__Bindings__PurchasingSystemToken__Kind: 'secret',
     Tenants__default__Bindings__PurchasingSystemToken__Value: 'e2e-token',
-    // The company realm's broker client, as in appsettings.Development.json. No sample names these bindings yet.
+    // The company realm's broker client, as in appsettings.Development.json. The purchase request sample's company provider reads them.
     Tenants__default__Bindings__CompanyIssuer__Kind: 'url',
     Tenants__default__Bindings__CompanyIssuer__Value: `${keycloakUrl}/realms/company`,
     Tenants__default__Bindings__CompanyClientId__Kind: 'secret',

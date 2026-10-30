@@ -6,6 +6,7 @@
   "path": "purchasing",
   "title": { "textKey": "site.title" },
   "locales": { "default": "en", "fallback": "en", "available": ["en", "vi"] },
+  "signIn": ["accounts", "company"],
   "navigation": [
     { "page": "PurchaseRequests", "label": { "textKey": "nav.purchaseRequests" }, "icon": "cart" },
     { "page": "MyTasks", "label": { "textKey": "nav.myTasks" }, "icon": "tasks" },

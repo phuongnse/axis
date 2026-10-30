@@ -202,6 +202,11 @@ public sealed class AdminPreviewTenantTests(PostgreSqlFixture database, Keycloak
         Assert.Equal(0, result.Exit);
         Assert.Equal(_activateSteps.Select(step => $"{preview} {step} ok"), result.Output);
         Assert.Contains(result.Error, line => line.StartsWith($"{preview} warning AXC0100 ", StringComparison.Ordinal));
+        foreach (var name in new[] { CompanyBindings.Issuer, CompanyBindings.ClientId, CompanyBindings.ClientSecret })
+        {
+            Assert.Contains(result.Error, line => line.StartsWith($"{preview} warning AXC0100 ", StringComparison.Ordinal) && line.Contains(name, StringComparison.Ordinal));
+        }
+
         Assert.DoesNotContain(result.Error, line => !line.StartsWith($"{preview} warning ", StringComparison.Ordinal));
 
         // The main tenant has no such mercy: a missing binding fails its activation.

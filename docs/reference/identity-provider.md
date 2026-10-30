@@ -451,7 +451,8 @@ _(planned for M17)_
   from volumes that the operator names. See [in the cloud](installation.md#in-the-cloud).
 - The development realm `axis` stays for `scripts/dev.sh` and the tests, as the `default` tenant's realm, see
   [security](security.md#development-users). Under `scripts/dev.sh` and in the E2E run, the server's startup activation
-  keeps it in step through its `axis-activation` client, so the realm holds a `site-` client for each sample site, see
+  keeps it in step through its `axis-activation` client, so the realm holds a `site-` client for each sample site and the brokered provider `oidc-companyissuer`, which the
+  purchase request sample's `company` provider names and which brokers to the `company` realm, see
   [development realm and users](../development.md#development-realm-and-users). Under Docker Compose it does not,
   because the server's container cannot reach Keycloak at `localhost:8080`.
 - **Backup and restore:** the identity provider's database holds the accounts and their credentials. The operator

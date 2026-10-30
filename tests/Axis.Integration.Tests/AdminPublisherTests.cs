@@ -712,19 +712,28 @@ public sealed class AdminPublisherTests(PostgreSqlFixture database) : IClassFixt
     }
 
     // The settings of one tenant, 'default', under the configuration source.
-    private static Dictionary<string, string?> ConfiguredSettings(string schema) => new()
+    private static Dictionary<string, string?> ConfiguredSettings(string schema)
     {
-        ["Tenancy:Source"] = "configuration",
-        ["Tenants:default:Hosts:0"] = "default.example.test",
-        ["Tenants:default:ConnectionString"] = PostgreSqlServer.RuntimeConnectionString(schema),
-        ["Tenants:default:SchemaConnectionString"] = schema,
-        [$"Tenants:default:Bindings:{UrlBinding}:Kind"] = "url",
-        [$"Tenants:default:Bindings:{UrlBinding}:Value"] = "https://purchasing.example.test",
-        [$"Tenants:default:Bindings:{SecretBinding}:Kind"] = "secret",
-        [$"Tenants:default:Bindings:{SecretBinding}:Value"] = "binding-secret-value",
-        ["Extensions:Path"] = SamplePackages.Path,
-        ["Modules:Path"] = SampleModules.Path,
-    };
+        var settings = new Dictionary<string, string?>
+        {
+            ["Tenancy:Source"] = "configuration",
+            ["Tenants:default:Hosts:0"] = "default.example.test",
+            ["Tenants:default:ConnectionString"] = PostgreSqlServer.RuntimeConnectionString(schema),
+            ["Tenants:default:SchemaConnectionString"] = schema,
+            [$"Tenants:default:Bindings:{UrlBinding}:Kind"] = "url",
+            [$"Tenants:default:Bindings:{UrlBinding}:Value"] = "https://purchasing.example.test",
+            [$"Tenants:default:Bindings:{SecretBinding}:Kind"] = "secret",
+            [$"Tenants:default:Bindings:{SecretBinding}:Value"] = "binding-secret-value",
+            ["Extensions:Path"] = SamplePackages.Path,
+            ["Modules:Path"] = SampleModules.Path,
+        };
+        foreach (var (key, value) in CompanyBindings.Settings("default"))
+        {
+            settings[key] = value;
+        }
+
+        return settings;
+    }
 
     private static async Task<AdminResult> RunConfiguredAsync(
         Dictionary<string, string?> settings, SynchronizedWriter output, CancellationToken stop, HttpMessageHandler? identityProvider = null)
