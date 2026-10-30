@@ -27,7 +27,8 @@ namespace Axis.Configuration.Compilation;
 /// of the process and name no other. A module trigger is checked inside its module, see
 /// <see cref="ApplicationCompiler"/>: its process is a process of its own module, and its event or entity is
 /// one of its own module or of a module it declares, so it sees no application data source and no application
-/// rule, only the rules of its module. A module trigger is an event or data change trigger, as a module schedule trigger is not supported yet.
+/// rule, only the rules of its module. A module schedule trigger has no time zone and runs in the time zone
+/// of the application. It names a data source of its own module, or none.
 /// </summary>
 internal static class TriggerChecker
 {
@@ -386,8 +387,8 @@ internal static class TriggerChecker
             report(DiagnosticCodes.InvalidTriggerSchedule, $"The schedule '{trigger.Schedule}' is not valid. {cronError}", "/schedule");
         }
 
-        var timeZoneId = trigger.TimeZone!;
-        if (!IanaTimeZones.TryFind(timeZoneId, out _))
+        // An application trigger always has a time zone, the schema requires it. A module trigger has none.
+        if (trigger.TimeZone is { } timeZoneId && !IanaTimeZones.TryFind(timeZoneId, out _))
         {
             report(
                 DiagnosticCodes.UnknownTriggerTimeZone,
@@ -590,7 +591,8 @@ internal static class TriggerChecker
     /// <summary>
     /// Builds a checked trigger. Its event or entity and process are resolved and named as they
     /// declare themselves. Its <c>when</c> is compiled over the event's payload fields, or for a
-    /// data change trigger over the watched record with the scope of a process condition.
+    /// data change trigger over the watched record with the scope of a process condition. A schedule
+    /// trigger without a time zone, a module's, takes <paramref name="applicationTimeZone"/>.
     /// </summary>
     public static TriggerModel Build(
         TriggerResource trigger,
@@ -599,7 +601,8 @@ internal static class TriggerChecker
         Func<string, ProcessResource?> findProcess,
         Func<string, DataSourceResource?> findDataSource,
         IEnumerable<ExpressionRule> rules,
-        IReadOnlySet<string> modules)
+        IReadOnlySet<string> modules,
+        TimeZoneInfo applicationTimeZone)
     {
         if (trigger.Type == "dataChange")
         {
@@ -608,7 +611,7 @@ internal static class TriggerChecker
 
         if (trigger.Type == "schedule")
         {
-            return BuildSchedule(trigger, findProcess, findDataSource);
+            return BuildSchedule(trigger, findProcess, findDataSource, applicationTimeZone);
         }
 
         var @event = findEvent(trigger.Event!)
@@ -635,14 +638,17 @@ internal static class TriggerChecker
     private static TriggerModel BuildSchedule(
         TriggerResource trigger,
         Func<string, ProcessResource?> findProcess,
-        Func<string, DataSourceResource?> findDataSource)
+        Func<string, DataSourceResource?> findDataSource,
+        TimeZoneInfo applicationTimeZone)
     {
         var process = findProcess(trigger.Process)
             ?? throw new ArgumentException("Only a checked trigger can be built.", nameof(trigger));
         var dataSource = trigger.DataSource is { } dataSourceName
             ? findDataSource(dataSourceName) ?? throw new ArgumentException("Only a checked trigger can be built.", nameof(trigger))
             : null;
-        if (!CronSchedule.TryParse(trigger.Schedule!, out var schedule, out _) || !IanaTimeZones.TryFind(trigger.TimeZone!, out var timeZone))
+        var timeZone = applicationTimeZone;
+        if (!CronSchedule.TryParse(trigger.Schedule!, out var schedule, out _)
+            || (trigger.TimeZone is { } timeZoneId && !IanaTimeZones.TryFind(timeZoneId, out timeZone)))
         {
             throw new ArgumentException("Only a checked trigger can be built.", nameof(trigger));
         }

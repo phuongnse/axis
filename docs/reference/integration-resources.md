@@ -237,7 +237,7 @@ The token request and the cache are built. The resend after a `401` is not.
   `AXC0100` at `/auth/tokenUrl/binding`, `/auth/clientId/binding` or
   `/auth/clientSecret/binding`, and a missing one is a warning on a preview
   tenant. An `http` token URL outside Development is `AXC0101`. The compiler
-  reports `AXC0307` at the same paths when the application uses the name of
+  reports `AXC0309` at the same paths when the application uses the name of
   one of these bindings as another kind elsewhere. The kind of a name is read
   from where it is used, as for an [identity provider](identity-provider.md).
 - The worker requests a token with `grant_type=client_credentials`, adding
@@ -485,7 +485,9 @@ Minh City, for each note the `NoteRows` data source returns, in
   never matches a date is invalid: that is the case only when no allowed
   month has an allowed day of month. February counts as 29 days, so
   `0 0 29 2 *` is valid and runs in leap years.
-- `timeZone` is required. It is an IANA time zone id, such as
+- `timeZone` is required, except in a [module](modules-and-templates.md#processes-pages-policies-and-dependencies),
+  where it is not allowed because the schedule runs in the application's time
+  zone. It is an IANA time zone id, such as
   `Asia/Ho_Chi_Minh`. It does not settle the application time zone rule of
   [D22](../decisions/d22-current-time-and-time-zones.md).
 - `dataSource` names a [data source](data-sources.md) that is not grouped.
@@ -605,7 +607,10 @@ the caller's id.
 
 - **Entity and process.** `entity` names the entity of the record the call
   creates. It is not a child entity. `process` names the process the call
-  starts on that record, and its subject entity is `entity`.
+  starts on that record, and its subject entity is `entity`. _(planned for
+  M19)_ `process` is optional when the endpoint has an `event`. Without it,
+  the call creates the record and raises the event, and the event's triggers
+  start the work. An endpoint has a `process`, an `event` or both.
   They may name a module entity and process of a module the application
   declares, as `<module id>/<name>`. The call then writes the record into the
   application's copy of the module's table and starts the module process on it,
@@ -627,8 +632,25 @@ the caller's id.
   - A `child-collection` field takes a `child-collection` input with the same
     target, by its name. The input's rows become the record's rows.
   - Fields that `values` leaves out are `null`, as in a record API create.
+- **Event** _(planned for M19)_. `event` is optional. It names an event about
+  `entity` and maps each payload field to an expression over the input, as
+  [D115](../decisions/d115-an-inbound-endpoint-call-raises-an-event.md) agrees.
+  The call raises it for the new record in its transaction, see
+  [the call](inbound-endpoints.md).
+
+  ```json
+  "event": { "name": "PurchaseRequestReceived", "fields": { "title": "title" } }
+  ```
+
+  - The expressions follow the rules of `values`: they see only the input
+    fields, and call no rule or aggregate and follow no path.
+  - An expression that reads an input that `values` maps to a field marked
+    `sensitive` counts as reading that field, so an event that has a
+    [webhook](#webhook-resource) may not carry it.
 - **Output.** `output` is optional. It lists field names of `entity` that a
-  `201` returns when the instance completes within `wait`.
+  `201` returns when the instance completes within `wait`. _(planned for M19)_
+  An endpoint without a `process` answers `201` as soon as it commits, and has
+  no `output` or `wait`.
 - **Wait.** `wait` is an ISO 8601 duration, more than zero and at most
   `PT30S`. It is how long the call waits for the instance to complete.
 - **Together.** `output` and `wait` are declared together, or neither is.
@@ -711,6 +733,14 @@ The compiler reports these as compile errors, all in one pass. The
   breaking it is `AXC0004`.
 - `wait` is a valid ISO 8601 duration, more than zero and at most `PT30S`:
   `AXC0124`. So `PT0S` is `AXC0124`.
+- _(planned for M19)_ An `event` follows the checks of a
+  [raise event step](process-events.md#raise-event-step), with its codes
+  reported under `/event`: the event exists (`AXC0125` at `/event/name`), is
+  about `entity` (`AXC0126`), and `fields` names each payload field once
+  (`AXC0127` at `/event/fields/{key}` and `AXC0128` at `/event/fields`). Each
+  expression is checked as a `values` expression, against its payload field's
+  type. The schema needs `process`, `event` or both, and refuses `output` and
+  `wait` without `process`, so breaking either is `AXC0004`.
 
 ## Outbound webhooks
 
@@ -749,8 +779,9 @@ A webhook that tells a chat system when a note is closed, in
 - An unknown event, a missing binding name and a timeout out of range are each
   a new diagnostic.
 - An event that has a webhook may not carry a value read from a field marked
-  `sensitive`. A [raise event step](process-events.md#raise-event-step) that
-  maps one into its payload is a new diagnostic.
+  `sensitive`. A [raise event step](process-events.md#raise-event-step), or an
+  [endpoint's event](#endpoint-resource), that maps one into its payload is a
+  new diagnostic.
 - A module holds no webhook.
 
 ### Webhook delivery
