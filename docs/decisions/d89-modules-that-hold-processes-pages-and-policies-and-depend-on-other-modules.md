@@ -8,9 +8,9 @@ out of a module, and that a module does not depend on other modules. Roles stay
 out. Everything else in D40 holds. Everything here is _(planned for M20)_. See
 [modules](../reference/modules-and-templates.md#processes-pages-policies-and-dependencies).
 
-Role slots in `module.json` and their mapping in an application's `modules` entry are built, with `AXC0292` to `AXC0294`. Policies that name a slot are built too, with `AXC0304` and `AXC0305`. Task assignees that name a slot are not.
+Role slots in `module.json` and their mapping in an application's `modules` entry are built, with `AXC0292` to `AXC0294`. Policies that name a slot are built too, with `AXC0304` and `AXC0305`. Task assignees that name a slot are built too, with `AXC0307`.
 
-Module processes compile inside their module, named `<module id>/<name>` with a derived id, and see only the resources of their module and the modules it declares. Role slots in task assignees, connector slots and the engines are not built yet. A module's `packages` are built: its process steps call their operations, and the release pins them with the application's.
+Module processes compile inside their module, named `<module id>/<name>` with a derived id, and see only the resources of their module and the modules it declares. Connector slots and the engines are not built yet. A module's `packages` are built: its process steps call their operations, and the release pins them with the application's.
 
 The `modules` list in `module.json`, flat resolution of the graph, one copy of each module, and the rule that the application names only modules it declares are built, with `AXC0295` and `AXC0296`. The slot maps of a dependency entry are built too, with `AXC0306` for mappings that differ. A module naming resources of its dependencies is not.
 

@@ -2,5 +2,6 @@
   "kind": "module",
   "id": "reviews",
   "version": "1.0.0",
-  "label": "Reviews"
+  "label": "Reviews",
+  "roles": [{ "name": "approver", "label": { "textKey": "reviews.roles.approver" } }]
 }

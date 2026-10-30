@@ -5,7 +5,7 @@
   "formatVersion": 1,
   "timeZone": "Europe/Berlin",
   "modules": [
-    { "id": "reviews", "version": "^1.0.0" },
-    { "id": "followups", "version": "^1.0.0" }
+    { "id": "reviews", "version": "^1.0.0", "roles": { "approver": "clerk" } },
+    { "id": "followups", "version": "^1.0.0", "roles": { "reviewer": "clerk" } }
   ]
 }

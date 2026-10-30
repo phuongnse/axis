@@ -1,0 +1,8 @@
+{
+  "id": "5d9a7c32-6e4f-4b8c-9f3a-9c3e2a7d4b06",
+  "kind": "form",
+  "name": "ReviewForm",
+  "formatVersion": 1,
+  "entity": "Review",
+  "sections": [{ "title": { "textKey": "reviews.review" }, "fields": [{ "field": "title" }] }]
+}

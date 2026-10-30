@@ -1,0 +1,26 @@
+{
+  "id": "5d9a7c32-6e4f-4b8c-9f3a-9c3e2a7d4b07",
+  "kind": "process",
+  "name": "Approve",
+  "formatVersion": 1,
+  "entity": "Review",
+  "start": "decide",
+  "steps": [
+    {
+      "name": "decide",
+      "type": "task",
+      "label": { "textKey": "reviews.approve.decide" },
+      "assignee": { "role": "approver" },
+      "form": "ReviewForm",
+      "outcomes": [{ "name": "approve", "label": { "textKey": "reviews.approve.approve" }, "next": "mark" }]
+    },
+    {
+      "name": "mark",
+      "type": "operation",
+      "operation": "updateRecord",
+      "set": { "state": "'approved'" },
+      "next": "done"
+    },
+    { "name": "done", "type": "end" }
+  ]
+}

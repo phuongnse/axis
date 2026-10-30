@@ -388,10 +388,10 @@ reported in one pass. See
   (`AXC0004`). Its checks are in [Wait for event step](process-flow.md#wait-for-event-step).
 - A task's `assignee` has exactly one of `user` and `role` (`AXC0081` at
   `/steps/{i}/assignee`). A `role` is a non-empty name (`AXC0004`). It must
-  name a declared [role](roles-and-policies.md), compared
-  exactly, otherwise it is `AXC0089` at `/steps/{i}/assignee/role`. A name
-  whose role file was not loaded because of its own errors is not reported
-  again.
+  name a declared [role](roles-and-policies.md), compared exactly, otherwise it
+  is `AXC0089` at `/steps/{i}/assignee/role`. A name whose role file was not
+  loaded is not reported again. In a [module](modules-and-templates.md#processes-pages-policies-and-dependencies)
+  process `role` names a role slot instead, otherwise it is `AXC0307`.
 - A `user` expression gives `text`, with the same scope as a `when`. A
   problem is reported at `/steps/{i}/assignee/user` with its expression code,
   such as `AXC0048` for a number.

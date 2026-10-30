@@ -9,10 +9,11 @@ namespace Axis.Integration.Tests;
 /// <summary>
 /// One tenant database, <c>a</c>, with the ModuleProcessApp fixture activated against the <c>reviews</c>
 /// test module under <c>Fixtures/Modules</c>. The application holds the module's copy of its
-/// <c>Review</c> entity. The real server serves it on host <c>a.example.test</c> and signs in <c>clerk</c>,
-/// who holds the role <c>clerk</c> in the application, and <c>outsider</c>, who holds no role. The endpoint
-/// callers are <c>review-importer</c>, who holds the role <c>clerk</c>, and <c>outsider-system</c>, who holds no
-/// role. The worker is the one of <see cref="Steps"/>, which
+/// <c>Review</c> entity, and maps the module's role slot <c>approver</c> to the role <c>manager</c>. The real server
+/// serves it on host <c>a.example.test</c> and signs in <c>clerk</c>, who holds the role <c>clerk</c> in the application,
+/// <c>manager</c>, who holds <c>manager</c>, <c>elsewhere</c>, who holds <c>manager</c> in another application only,
+/// and <c>outsider</c>, who holds no role. The endpoint callers are <c>review-importer</c>, who holds the role
+/// <c>clerk</c>, and <c>outsider-system</c>, who holds no role. The worker is the one of <see cref="Steps"/>, which
 /// runs only when a test calls it, so a started instance stays <c>running</c> until then.
 /// </summary>
 public sealed class ModuleProcessFixture : IAsyncLifetime
@@ -51,6 +52,14 @@ public sealed class ModuleProcessFixture : IAsyncLifetime
                 new TestIdentity("clerk", "Clerk User")
                 {
                     ApplicationRoles = new Dictionary<Guid, IReadOnlyList<string>> { [AppId] = ["clerk"] },
+                },
+                new TestIdentity("manager", "Manager User")
+                {
+                    ApplicationRoles = new Dictionary<Guid, IReadOnlyList<string>> { [AppId] = ["manager"] },
+                },
+                new TestIdentity("elsewhere", "Manager Elsewhere")
+                {
+                    ApplicationRoles = new Dictionary<Guid, IReadOnlyList<string>> { [Guid.Parse("9b4d6e83-2a5c-4f17-8d60-3e7a1c9b5fff")] = ["manager"] },
                 },
                 new TestIdentity("outsider", "Outsider No Role"));
             builder.UseTestEndpointCallers(
