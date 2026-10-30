@@ -63,6 +63,12 @@ const stateKeys: Record<string, Record<string, (state: Locator) => Locator>> = {
     'Navigation collapsed': (state) => state.locator('button[aria-controls="shell-sidebar"][aria-expanded="false"]'),
     'Form page': (state) => state.getByRole('button', { name: 'Save', exact: true }).first(),
     'Platform site': (state) => state.getByText('Purchase requests', { exact: true }).first(),
+    'App switcher': (state) =>
+      state
+        .getByRole('menu', { name: 'Switch to', exact: true })
+        .getByRole('link', { name: 'Purchase requests', exact: true })
+        .and(state.locator('[aria-current="page"]')),
+    'Language and theme': (state) => state.getByRole('menuitemradio', { name: 'System', exact: true }),
   },
   signIn: {
     'Signed out': (state) => state.getByRole('button', { name: 'Sign in', exact: true }),

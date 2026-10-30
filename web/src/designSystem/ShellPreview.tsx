@@ -40,36 +40,34 @@ export function ShellPreview() {
   )
 }
 
-/** Collapses the navigation sidebar once the shell draws its collapse button, so the shell starts collapsed. */
-export function CollapsedOnMount({ children }: { children: ReactNode }) {
+/** Clicks the first button matching `selector` once the shell draws it, so a state opens or collapses it once. */
+export function ClickOnMount({ selector, children }: { selector: string; children: ReactNode }) {
   const wrapper = useRef<HTMLDivElement>(null)
-  const collapsed = useRef(false)
+  const clicked = useRef(false)
   useEffect(() => {
     const element = wrapper.current
     if (!element) {
       return
     }
-    const collapse = () => {
-      const button = element.querySelector<HTMLButtonElement>(
-        'button[aria-controls="shell-sidebar"][aria-expanded="true"]',
-      )
-      if (collapsed.current || !button) {
+    const click = () => {
+      const button = element.querySelector<HTMLButtonElement>(selector)
+      if (clicked.current || !button) {
         return false
       }
-      collapsed.current = true
+      clicked.current = true
       button.click()
       return true
     }
-    if (collapse()) {
+    if (click()) {
       return
     }
     const observer = new MutationObserver(() => {
-      if (collapse()) {
+      if (click()) {
         observer.disconnect()
       }
     })
     observer.observe(element, { childList: true, subtree: true })
     return () => observer.disconnect()
-  }, [])
+  }, [selector])
   return <div ref={wrapper}>{children}</div>
 }

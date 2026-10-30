@@ -15,7 +15,7 @@ import { WidgetTree } from '../platform/WidgetTree'
 import { FieldPreview } from './FieldPreview'
 import { IdentitySignIn } from './IdentitySignIn'
 import { SubmittedOnMount } from './SubmittedOnMount'
-import { CollapsedOnMount, ShellPreview } from './ShellPreview'
+import { ClickOnMount, ShellPreview } from './ShellPreview'
 import {
   blankDetailWidget,
   chartWidget,
@@ -216,9 +216,9 @@ export const previews: Record<string, readonly PreviewState[]> = {
     {
       caption: 'Navigation collapsed',
       draw: () => (
-        <CollapsedOnMount>
+        <ClickOnMount selector='button[aria-controls="shell-sidebar"][aria-expanded="true"]'>
           <ShellPreview />
-        </CollapsedOnMount>
+        </ClickOnMount>
       ),
       entry: '/sample/requests',
       frameHeight: 600,
@@ -230,6 +230,26 @@ export const previews: Record<string, readonly PreviewState[]> = {
       frameHeight: 600,
     },
     { caption: 'Platform site', draw: () => <ShellPreview />, entry: '/', frameHeight: 600 },
+    {
+      caption: 'App switcher',
+      draw: () => (
+        <ClickOnMount selector='button[aria-label="Switch to"]'>
+          <ShellPreview />
+        </ClickOnMount>
+      ),
+      entry: '/sample/requests',
+      frameHeight: 600,
+    },
+    {
+      caption: 'Language and theme',
+      draw: () => (
+        <ClickOnMount selector='button[aria-label="Language and theme"]'>
+          <ShellPreview />
+        </ClickOnMount>
+      ),
+      entry: '/sample/requests',
+      frameHeight: 600,
+    },
   ],
   signIn: [
     { caption: 'Signed out', draw: () => <SignInCard />, entry: '/', frameHeight: 480 },

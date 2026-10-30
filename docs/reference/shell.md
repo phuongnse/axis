@@ -34,9 +34,9 @@ SPA does today.
   collapse it. The page takes the whole width.
 - **Narrow width.** Below 992 px the sidebar gives way to a panel under the header, which a Menu button opens and
   closes, as it does today.
-- **Window.** _(Planned for M17.)_ The shell fills the browser window: the page has no margin round it, and the
+- **Window.** The shell fills the browser window: the page has no margin round it, and the
   document behind it is `canvas` in both modes, so no white shows at its edges or when the page scrolls past its
-  end. Today the browser's default 8 px margin shows round the shell.
+  end.
 - **Page area.** Pages draw on `canvas` with `spacing-lg` padding. A wide table scrolls inside its widget, so the
   page never scrolls sideways.
 - **Footer.** A slim footer runs the full width under the sidebar and the page, as the header does above them, on
@@ -80,20 +80,18 @@ SPA does today.
 - **App switcher.** An icon button named "Switch to" opens a menu of the person's sites, by title, then the tools of
   their roles: Studio for an author, the operator console for an operator and Users for an administrator. It replaces the Studio link beside the
   account button. With nobody signed in it is not shown. The menu shows the sites under the
-  heading "Sites" and the tools under the heading "Tools". _(Planned for M17.)_ The entry of the current page, a site
-  or a tool, is drawn selected, as the language and theme menu draws its current choices, and marked
-  `aria-current="page"`. Today no entry is marked.
-- **Menus.** _(Planned for M17.)_ Every dropdown menu keeps `spacing-xs` round its items, so a selected last item does
-  not sit on the menu's edge. Today the menus keep 4 px.
+  heading "Sites" and the tools under the heading "Tools". The entry of the current page, a site or a tool, is drawn
+  selected, as the language and theme menu draws its current choices, and marked `aria-current="page"`.
+- **Menus.** Every dropdown menu keeps `spacing-xs` round its items, so a selected last item does not sit on the
+  menu's edge.
 - **Language and theme.** An icon button named "Language and theme" opens one menu with the site's languages and the
-  themes, the current ones selected. _(Planned for M17.)_ The themes are System, Light and Dark. System is the default,
-  when the browser holds no choice, and follows the operating system's light or dark setting, changing at once when
-  it changes. Light and Dark keep their mode. The choice is kept in the browser under `axis.themeMode`, as `system`,
-  `light` or `dark`. Today the menu offers Light and Dark, and the system's setting applies only until one is picked. Its icon is a settings gear. The current
-  language and theme are drawn selected, in `primaryText` on a `primary` tint, not only marked for assistive
-  technology, and a divider separates the languages from the themes. It replaces the locale switch and the theme toggle in the header,
-  for signed-in people and for nobody signed in alike. At narrow width it sits in the Menu panel, while the app
-  switcher stays in the header.
+  themes, the current ones selected. The themes are System, Light and Dark. System is the default, when the browser
+  holds no choice, and follows the operating system's light or dark setting, changing at once when it changes. Light
+  and Dark keep their mode. The choice is kept in the browser under `axis.themeMode`, as `system`, `light` or `dark`.
+  Its icon is a settings gear. The current language and theme are drawn selected, in `primaryText` on a `primary`
+  tint, not only marked for assistive technology, and a divider separates the languages from the themes. It replaces
+  the locale switch and the theme toggle in the header, for signed-in people and for nobody signed in alike. At narrow
+  width it sits in the Menu panel, while the app switcher stays in the header.
 - **Users.** The app switcher and the home page's tools also offer "Users" to an administrator, after the
   operator console, see [the administrator role](user-administration.md#the-administrator-role). The users page it
   links to is `/users`. On a site's own host the app switcher lists only that site and no tools.
@@ -200,7 +198,7 @@ manifest and each `site` may have a `description`, one line of text that the
 ## Design system previews
 
 - The design system has a seventh group of cards, Shell, after Shared states, with three previews:
-  - `shell`: Application site, Navigation collapsed, Form page and Platform site.
+  - `shell`: Application site, Navigation collapsed, Form page, Platform site, App switcher and Language and theme.
   - `signIn`: Signed out, Sign-in refused and Session ended. _(Planned for M17: Sign-in refused, Signed out and Session
     ended, with the organization's heading over the cards.)_
   - `identitySignIn`: the sign-in page of [Axis's identity provider](identity-provider.md#theme), in Sign in, Wrong

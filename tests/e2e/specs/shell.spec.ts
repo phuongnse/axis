@@ -25,7 +25,7 @@ test('the sign-in screen has one Sign in button, in the page and not in the head
 
 test('dark mode can be switched on and survives a reload', async ({ page }) => {
   await page.goto('/')
-  await expectChosen(page, 'Light')
+  await expectChosen(page, 'System')
 
   await chooseTheme(page, 'Dark')
   await expectChosen(page, 'Dark')
@@ -86,6 +86,27 @@ test('the shell keeps its colours in light and dark mode', async ({ page }) => {
       expected.page,
     )
     expect(await style(banner.getByText('Axis', { exact: true }), 'color')).toBe(expected.title)
+  }
+})
+
+test('the shell fills the window on canvas in light and dark mode', async ({ page }) => {
+  for (const mode of ['light', 'dark'] as const) {
+    await page.goto('/')
+    await chooseTheme(page, mode === 'dark' ? 'Dark' : 'Light')
+    await page.goto('/')
+    await expect(page.locator(`[data-theme-mode="${mode}"]`).getByRole('banner')).toBeVisible()
+
+    const body = page.locator('body')
+    expect(await style(body, 'margin')).toBe('0px')
+    expect(await style(body, 'background-color')).toBe(shellColours[mode].page)
+    expect(await page.evaluate(() => document.documentElement.scrollHeight <= window.innerHeight)).toBe(true)
+
+    await page.getByRole('banner').getByRole('button', { name: 'Language and theme', exact: true }).click()
+    const menu = page.getByRole('menu', { name: 'Language and theme', exact: true })
+    await expect(menu).toBeVisible()
+    expect(await style(menu, 'padding')).toBe('8px')
+    await page.keyboard.press('Escape')
+    await expect(menu).toBeHidden()
   }
 })
 

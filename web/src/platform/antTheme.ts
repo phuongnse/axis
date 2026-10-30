@@ -74,7 +74,8 @@ export function antThemeFor(mode: ThemeMode, page?: PageTokenValues, reducedMoti
     },
     components: {
       Form: { colorError: colour.dangerText },
-      Dropdown: { colorError: colour.dangerText },
+      // D114: every dropdown menu keeps spacing-xs round its items.
+      Dropdown: { colorError: colour.dangerText, paddingXXS: spacing.xs },
       Tabs: {
         itemSelectedColor: colour.primaryText,
         itemHoverColor: colour.primaryText,

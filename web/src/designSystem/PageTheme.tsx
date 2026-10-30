@@ -43,8 +43,11 @@ export function PageTheme({ children }: { children: ReactNode }) {
     () => JSON.parse(snapshot) as { mode: ThemeMode; values: PageTokenValues },
     [snapshot],
   )
-  // The page owns the mode, so a widget's request to toggle it changes nothing.
-  const value = useMemo(() => ({ mode, toggleMode: () => {}, tokens: designTokensFor(mode, values) }), [mode, values])
+  // The page owns the mode, so a widget's request to choose another one changes nothing.
+  const value = useMemo(
+    () => ({ mode, choice: mode, choose: () => {}, tokens: designTokensFor(mode, values) }),
+    [mode, values],
+  )
   const reducedMotion = useReducedMotion()
   const config = useMemo(() => antThemeFor(mode, values, reducedMotion), [mode, values, reducedMotion])
 
