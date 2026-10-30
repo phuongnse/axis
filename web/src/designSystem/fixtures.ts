@@ -989,6 +989,109 @@ export const fixtureScopes = [
  * The answers of the fixture application's APIs, by path or by path and query. The page's own
  * queries (paging, sorting) are answered by the path alone.
  */
+
+const studioBlankApp = { name: 'Inventory', titles: { en: 'Inventory', vi: 'Kho hàng' }, descriptions: null }
+
+/** A resource of a Studio fixture folder. */
+const studioItem = (id: string, kind: string, name: string, file: string) => ({
+  id,
+  kind,
+  name,
+  file,
+  version: id,
+  usedBy: 0,
+})
+
+const leaveEntity = '5f0c6a1e-2b7d-4c1a-9e3f-0a8b7c6d5e41'
+const leavePage = '5f0c6a1e-2b7d-4c1a-9e3f-0a8b7c6d5e42'
+const leaveResources = [
+  studioItem('5f0c6a1e-2b7d-4c1a-9e3f-0a8b7c6d5e40', 'application', 'LeaveRequests', 'application.json'),
+  studioItem(leaveEntity, 'entity', 'LeaveRequest', 'entities/leave-request.json'),
+  studioItem(leavePage, 'page', 'Requests', 'pages/requests.json'),
+  studioItem('5f0c6a1e-2b7d-4c1a-9e3f-0a8b7c6d5e43', 'form', 'LeaveRequestForm', 'forms/leave-request-form.json'),
+  studioItem('5f0c6a1e-2b7d-4c1a-9e3f-0a8b7c6d5e44', 'site', 'LeaveRequests', 'sites/leave-requests.json'),
+  studioItem('5f0c6a1e-2b7d-4c1a-9e3f-0a8b7c6d5e45', 'role', 'Employee', 'roles/employee.json'),
+  studioItem(
+    '5f0c6a1e-2b7d-4c1a-9e3f-0a8b7c6d5e46',
+    'identityProvider',
+    'accounts',
+    'identity-providers/accounts.json',
+  ),
+]
+const leaveDiagnostics = [
+  {
+    code: 'AXC0027',
+    severity: 'warning',
+    message: "The text key 'pages.requests.empty' is missing from locale 'vi'; locale 'en' has it.",
+    file: 'texts/vi.json',
+    path: '/texts',
+    resourceId: null,
+  },
+  {
+    code: 'AXC0021',
+    severity: 'error',
+    message: "The widget's entity 'LeaveRequests' names no loaded entity.",
+    file: 'pages/requests.json',
+    path: '/widgets/0/entity',
+    resourceId: leavePage,
+  },
+]
+const leaveReleases = {
+  active: { releaseId: '01a18bb7-ef25-7408-8a42-9716776650a2', number: 2, contentHash: 'a2' },
+  folderContentHash: 'a3',
+  items: [
+    {
+      releaseId: '01a18bb7-ef25-7408-8a42-9716776650a2',
+      number: 2,
+      contentHash: 'a2',
+      activatedAt: '2026-10-27T16:05:00+00:00',
+      actor: 'author',
+      actorName: 'Alex Morgan',
+      label: 'Half days',
+      note: null,
+      requestId: null,
+    },
+  ],
+}
+
+const blankResources = [
+  studioItem('7d2e4f60-1a3b-4c5d-8e9f-0b1c2d3e4f50', 'application', 'Inventory', 'application.json'),
+  studioItem('7d2e4f60-1a3b-4c5d-8e9f-0b1c2d3e4f51', 'site', 'Inventory', 'sites/inventory.json'),
+  studioItem('7d2e4f60-1a3b-4c5d-8e9f-0b1c2d3e4f52', 'page', 'Home', 'pages/home.json'),
+  studioItem(
+    '7d2e4f60-1a3b-4c5d-8e9f-0b1c2d3e4f53',
+    'identityProvider',
+    'accounts',
+    'identity-providers/accounts.json',
+  ),
+  studioItem('7d2e4f60-1a3b-4c5d-8e9f-0b1c2d3e4f54', 'text', 'en', 'texts/en.json'),
+]
+
+/** The answers Studio loads for one application's folder. */
+function studioFolder(name: string, items: unknown[], diagnostics: unknown[], releases: unknown) {
+  const base = `/api/studio/apps/${name}`
+  const names = {
+    locales: ['en'],
+    entities: [],
+    dataSources: [],
+    processes: [],
+    rules: [],
+    connectors: [],
+    events: [],
+    roles: [],
+    sequences: [],
+    forms: [],
+    pages: [],
+    texts: [],
+  }
+  return {
+    [`${base}/resources`]: () => ({ items }),
+    [`${base}/diagnostics`]: () => ({ diagnostics }),
+    [`${base}/names`]: () => names,
+    [`${base}/releases`]: () => releases,
+  }
+}
+
 export const routes: Record<string, () => unknown> = {
   [requestsPath]: () => recordPage,
   [`${requestsPath}/${requestId}`]: () => savedRecord,
@@ -1015,4 +1118,9 @@ export const routes: Record<string, () => unknown> = {
   '/health/ready': () => new Response(null, { status: 200 }),
   // Proposed: Studio's answers for the purchase request sample, as the local stack gave them, with a short release history.
   ...Object.fromEntries(Object.entries(studioFixtures).map(([path, body]) => [path, () => body])),
+  // Proposed: two more applications for Studio's overview: one with errors and changes that are not live yet, and one
+  // just created, with nothing but what a blank application holds.
+  '/api/studio/apps': () => ({ items: [...studioFixtures['/api/studio/apps'].items, studioBlankApp] }),
+  ...studioFolder('LeaveRequests', leaveResources, leaveDiagnostics, leaveReleases),
+  ...studioFolder('Inventory', blankResources, [], { active: null, folderContentHash: 'b1', items: [] }),
 }

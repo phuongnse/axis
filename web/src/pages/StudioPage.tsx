@@ -1,4 +1,4 @@
-import { Alert, Button, Descriptions, Flex, Input, Result, Tag, Typography } from 'antd'
+import { Alert, Button, Descriptions, Flex, Input, Result, Typography } from 'antd'
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { fetchCurrentUser } from '../platform/currentUser'
@@ -18,6 +18,7 @@ import {
   type StudioApplication,
   type StudioDiagnostic,
   type StudioNames,
+  type StudioReleases,
   type StudioResourceItem,
   waitForServer,
 } from '../platform/studio'
@@ -31,6 +32,7 @@ import { StudioModulePolicy } from './StudioModulePolicy'
 import { StudioModuleProcess } from './StudioModuleProcess'
 import { StudioNewApplication } from './StudioNewApplication'
 import { StudioNewResource } from './StudioNewResource'
+import { StudioOverview } from './StudioOverview'
 import { StudioPolicyMatrix } from './StudioPolicyMatrix'
 import { StudioPublishing, type StudioPublishingHandle } from './StudioPublishing'
 import { StudioNavigation } from './StudioNavigation'
@@ -151,6 +153,7 @@ function StudioWorkspace() {
   const [previewHost, setPreviewHost] = useState<string | null>(null)
   const [folderRevision, setFolderRevision] = useState(0)
   const [namesState, setNamesState] = useState<NamesState>()
+  const [releases, setReleases] = useState<{ application: string; history: StudioReleases | 'failed' }>()
   const publishing = useRef<StudioPublishingHandle>(null)
   const [requestBusy, setRequestBusy] = useState(false)
 
@@ -446,6 +449,7 @@ function StudioWorkspace() {
             onBusyChange={setRequestBusy}
             actionsSlot={actionsSlot}
             showHistory={view.name === 'releases' && !selected}
+            onHistory={(history) => setReleases({ application, history })}
             ref={publishing}
           />
         )}
@@ -564,22 +568,18 @@ function StudioWorkspace() {
                 />
               </Flex>
             ) : view.name === 'overview' ? (
-              <section data-testid="studio-diagnostics">
-                <Typography.Title level={5} style={{ marginTop: 0 }}>
-                  {t('shell.studio.diagnostics')}
-                </Typography.Title>
-                {loaded.diagnostics.length === 0 ? (
-                  <Typography.Text type="secondary">{t('shell.studio.noDiagnostics')}</Typography.Text>
-                ) : (
-                  <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-                    {loaded.diagnostics.map((diagnostic, index) => (
-                      <li key={index}>
-                        <DiagnosticRow diagnostic={diagnostic} onSelect={selectDiagnostic} />
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </section>
+              <StudioOverview
+                locale={locale}
+                description={openApp ? studioApplicationDescription(openApp, locale) : undefined}
+                resources={loaded.resources}
+                diagnostics={loaded.diagnostics}
+                releases={releases?.application === application ? releases.history : undefined}
+                addressOf={(target) =>
+                  'resource' in target
+                    ? `/studio?${new URLSearchParams({ app: application, resource: target.resource, ...(target.path ? { path: target.path } : {}) })}`
+                    : studioAddress(application, target)
+                }
+              />
             ) : null}
           </div>
         )}
@@ -693,40 +693,5 @@ function StudioResourceRows({
         </button>
       ))}
     </div>
-  )
-}
-
-/** One diagnostic: severity, code, message, file and path. It is a button when it names a resource. */
-function DiagnosticRow({
-  diagnostic,
-  onSelect,
-}: {
-  diagnostic: StudioDiagnostic
-  onSelect: (resourceId: string, path: string) => void
-}) {
-  const t = useText()
-  const content = (
-    <Flex vertical align="flex-start">
-      <span>
-        <Tag color={diagnostic.severity === 'error' ? 'error' : 'warning'}>{diagnostic.severity}</Tag>
-        <strong>{diagnostic.code}</strong> {diagnostic.message}
-      </span>
-      <Typography.Text type="secondary">
-        {diagnostic.file}
-        {diagnostic.path !== '' && ` · ${t('shell.studio.path')}: ${diagnostic.path}`}
-      </Typography.Text>
-    </Flex>
-  )
-  const resourceId = diagnostic.resourceId
-  return resourceId === null ? (
-    <div style={{ padding: '4px 15px' }}>{content}</div>
-  ) : (
-    <Button
-      type="text"
-      style={{ height: 'auto', textAlign: 'left' }}
-      onClick={() => onSelect(resourceId, diagnostic.path)}
-    >
-      {content}
-    </Button>
   )
 }

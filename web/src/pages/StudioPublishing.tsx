@@ -66,6 +66,7 @@ export function StudioPublishing({
   onBusyChange,
   actionsSlot,
   showHistory = true,
+  onHistory,
   ref,
 }: {
   application: string
@@ -81,6 +82,8 @@ export function StudioPublishing({
   actionsSlot?: HTMLElement | null
   /** Proposed: whether the release history draws here. The workspace shows it on its Releases view only. */
   showHistory?: boolean
+  /** Proposed: called with the release history each time it loads, for the workspace's overview. */
+  onHistory?: (history: StudioReleases | 'failed') => void
   ref?: Ref<StudioPublishingHandle>
 }) {
   const t = useText()
@@ -111,6 +114,16 @@ export function StudioPublishing({
     })
     return () => controller.abort()
   }, [application, generation, historyRevision, folderRevision, lost])
+
+  const historyHandler = useRef(onHistory)
+  useEffect(() => {
+    historyHandler.current = onHistory
+  }, [onHistory])
+  useEffect(() => {
+    if (history !== undefined) {
+      historyHandler.current?.(history)
+    }
+  }, [history])
 
   const diagnosticsHandler = useRef(onDiagnostics)
   useEffect(() => {

@@ -282,7 +282,20 @@ export const previews: Record<string, readonly PreviewState[]> = {
   // Proposed: a Studio group of cards, drawn from Studio's own pages over the purchase request sample.
   studio: [
     { caption: 'Applications', draw: () => <ShellPreview />, entry: '/studio', frameHeight: 600 },
-    { caption: 'Application', draw: () => <ShellPreview />, entry: `/studio?app=${studioApp}`, frameHeight: 600 },
+    // Proposed: an application opens on its overview, which says what to do next.
+    { caption: 'Overview', draw: () => <ShellPreview />, entry: `/studio?app=${studioApp}`, frameHeight: 600 },
+    {
+      caption: 'Overview with errors and changes not live',
+      draw: () => <ShellPreview />,
+      entry: '/studio?app=LeaveRequests',
+      frameHeight: 600,
+    },
+    {
+      caption: 'Overview of a new application',
+      draw: () => <ShellPreview />,
+      entry: '/studio?app=Inventory',
+      frameHeight: 600,
+    },
     {
       caption: 'Entities',
       draw: () => <ShellPreview />,
