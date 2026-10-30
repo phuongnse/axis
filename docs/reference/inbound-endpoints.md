@@ -94,8 +94,7 @@ One transaction then does the rest:
 3. It starts the processes of the [data change triggers](process-events.md#starts-from-triggers)
    on `create` for the entity, as `system`, in the order of the release. A
    skipped trigger start does not fail the call.
-4. _(planned for M19)_ Steps 4 and 5 run only when the endpoint has a
-   `process`. It evaluates the process's `startCondition` on the new record. A failure
+4. Steps 4 and 5 run only when the endpoint has a `process`. It evaluates the process's `startCondition` on the new record. A failure
    is a `400` keyed `/input`, with the condition's message text key.
 5. It inserts the instance, pinned to the active release, with its first
    work item, as the [process start](processes.md#start-endpoint) does. An
@@ -103,8 +102,7 @@ One transaction then does the rest:
 6. With an `event`, it raises the event for the new record,
    as a [raise event step](process-events.md#raise-event-step) does: it stores
    the occurrence, with the instance of step 5 as the one that raised it, or
-   _(planned for M19)_ no instance when the endpoint has no `process`, and the
-   active release, runs the `sync` event triggers, queues the `event.deliver`
+   no instance when the endpoint has no `process`, and the active release, runs the `sync` event triggers, queues the `event.deliver`
    work item and stages the event's
    [webhook deliveries](outbound-webhooks.md#webhook-delivery). A run-time
    error in an expression is a `400` keyed `/event/fields/<key>`. See
@@ -142,6 +140,16 @@ endpoint without `output` answers at once, and the instance is still
   "recordId": "0192f5b1-7a2c-7d3e-8f4a-5b6c7d8e9f01",
   "instanceId": "0192f5b1-7a40-7b1c-9d2e-3f4a5b6c7d8e",
   "state": "running"
+}
+```
+
+**`201` without process.** An endpoint with no `process` starts no instance.
+It answers at once, when the record is stored and the event is raised, with
+the record only:
+
+```json
+{
+  "recordId": "0192f5b1-7a2c-7d3e-8f4a-5b6c7d8e9f01"
 }
 ```
 
@@ -251,6 +259,9 @@ without meeting.
 
 - **Repeat.** A repeat with the same key and the same input returns the same
   record and instance. It creates no record and starts no instance.
+- **No instance.** A repeat of an endpoint without a `process` answers the
+  same body as the first call, `{ "recordId" }`. It writes nothing and raises
+  nothing.
 - **Never waits.** A repeat follows the instance's state at that moment. For
   an endpoint with `output`, it is a `201` with output when the instance has
   completed, otherwise a `202` with the status location. For an endpoint
@@ -295,6 +306,8 @@ state of an instance that an endpoint call started.
 - **Checks.** It needs a bearer token and the `invoke` grant on the
   endpoint, checked in the same order as the call: `401`, then `404` for the
   path, then `403`.
+- **No process.** An endpoint without a `process` starts no instance, so its
+  status location is always a `404` with the same title.
 - **Own calls only.** Only the caller who made the call can read it. Another
   caller's instance, an instance of another endpoint, an unknown one and an
   `{instanceId}` that is not a UUID are all `404`, titled "No instance of

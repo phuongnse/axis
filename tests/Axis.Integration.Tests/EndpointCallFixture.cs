@@ -73,7 +73,15 @@ public sealed class EndpointCallFixture : IAsyncLifetime
             await using var data = DataDatabaseFixture.CreateContext(connection);
             var compiled = await ReleaseCompiler.CompileAsync(_appFolder, configuration);
             Assert.Empty(compiled.Diagnostics);
-            var activated = await ReleaseActivator.ActivateAsync(compiled, new ActiveReleaseStore(configuration), data, ActivationBindings.None("a"), OpenInstanceCounter.Instance);
+            var activated = await ReleaseActivator.ActivateAsync(compiled, new ActiveReleaseStore(configuration), data, new ActivationBindings(
+                "a",
+                new Dictionary<string, ActivationBinding>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["AnnounceHookUrl"] = new(ActivationBinding.UrlKind, new Uri("https://hooks.example.test/announce")),
+                    ["AnnounceHookSecret"] = new(ActivationBinding.SecretKind, null),
+                },
+                AllowHttp: false),
+                OpenInstanceCounter.Instance);
             Assert.Empty(activated.Diagnostics);
             ReleaseId = compiled.Release!.Id;
             _model = compiled.Model!;

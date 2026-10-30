@@ -140,6 +140,36 @@ public sealed class EndpointEventCompilerTests
         Assert.Null(Assert.Single(result.Model!.Endpoints).Event);
     }
 
+    [Theory]
+    [InlineData(null, "")]
+    [InlineData("event", """ "output": ["title"], "wait": "PT5S", """)]
+    [InlineData("event", """ "wait": "PT5S", """)]
+    public void An_endpoint_needs_a_process_or_an_event_and_output_and_wait_need_a_process(string? withEvent, string rest)
+    {
+        using var folder = Folder().With(
+            "endpoints/log.json",
+            Endpoint("Log", withEvent is null ? null : Event("title"), process: null, rest: rest));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.NotEmpty(result.Diagnostics);
+        Assert.All(result.Diagnostics, diagnostic => Assert.Equal((DiagnosticCodes.SchemaViolation, "endpoints/log.json"), (diagnostic.Code, diagnostic.File)));
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void An_endpoint_with_only_an_event_compiles_with_no_process()
+    {
+        using var folder = Folder().With("endpoints/log.json", Endpoint("Log", Event("title"), process: null));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        var endpoint = Assert.Single(result.Model!.Endpoints);
+        Assert.Null(endpoint.Process);
+        Assert.Equal("TicketLogged", endpoint.Event!.Name);
+    }
+
     [Fact]
     public void The_event_is_checked_when_the_entity_is_unknown_and_its_expressions_wait_for_a_valid_input()
     {
@@ -179,9 +209,10 @@ public sealed class EndpointEventCompilerTests
           "url": { "binding": "chatUrl" }, "secret": { "binding": "chatSecret" } }
         """;
 
-    private static string Endpoint(string name, string? @event, string id = "13", string entity = "Ticket", string input = Input) => $$"""
+    private static string Endpoint(
+        string name, string? @event, string id = "13", string entity = "Ticket", string input = Input, string? process = "TicketClose", string rest = "") => $$"""
         { "id": "83244ba2-b26f-4348-aa7a-0e39eb9920{{id}}", "kind": "endpoint", "name": "{{name}}", "formatVersion": 1, "entity": "{{entity}}",
-          "process": "TicketClose", {{(@event is null ? "" : $"\"event\": {@event},")}} "input": {{input}}, "values": {{Values}} }
+          {{(process is null ? "" : $"\"process\": \"{process}\",")}} {{(@event is null ? "" : $"\"event\": {@event},")}} {{rest}} "input": {{input}}, "values": {{Values}} }
         """;
 
     /// <summary>

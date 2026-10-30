@@ -1,0 +1,10 @@
+{
+  "id": "c3d81f6a-2e47-49b0-9a5d-6b1e0f7c8d24",
+  "kind": "webhook",
+  "name": "AnnounceHook",
+  "formatVersion": 1,
+  "event": "NoteAnnounced",
+  "url": { "binding": "AnnounceHookUrl" },
+  "secret": { "binding": "AnnounceHookSecret" },
+  "timeout": "PT5S"
+}

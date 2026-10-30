@@ -220,7 +220,9 @@ internal sealed partial class WebhookDeliveryHandler(
         await WebhookDeliveries.CountAttemptAsync(connection, transaction, delivery.Id, answer.Status, cancellationToken);
         if (attempts >= deliverySettings.Attempts)
         {
-            var processId = await LoadProcessAsync(connection, transaction, delivery.ProcessInstanceId, cancellationToken);
+            Guid? processId = delivery.ProcessInstanceId is { } instanceId
+                ? await LoadProcessAsync(connection, transaction, instanceId, cancellationToken)
+                : null;
             var deadLetterId = await DeliveryFailures.InsertWebhookDeadLetterAsync(
                 transaction, delivery.ApplicationId, processId, delivery.ProcessInstanceId, delivery.Event.Id, delivery.WebhookId, attempts, error, cancellationToken);
             if (!await WorkItemQueue.CompleteAsync(connection, transaction, item, cancellationToken))

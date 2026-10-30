@@ -690,8 +690,8 @@ the caller's id.
 
 - **Entity and process.** `entity` names the entity of the record the call
   creates. It is not a child entity. `process` names the process the call
-  starts on that record, and its subject entity is `entity`. _(planned for
-  M19)_ `process` is optional when the endpoint has an `event`. Without it,
+  starts on that record, and its subject entity is `entity`. `process` is
+  optional when the endpoint has an `event`. Without it,
   the call creates the record and raises the event, and the event's triggers
   start the work. An endpoint has a `process`, an `event` or both.
   They may name a module entity and process of a module the application
@@ -732,12 +732,16 @@ the caller's id.
     [webhook](outbound-webhooks.md#webhook-resource) may not carry it.
 
 - **Output.** `output` is optional. It lists field names of `entity` that a
-  `201` returns when the instance completes within `wait`. _(planned for M19)_
+  `201` returns when the instance completes within `wait`.
   An endpoint without a `process` answers `201` as soon as it commits, and has
   no `output` or `wait`.
 - **Wait.** `wait` is an ISO 8601 duration, more than zero and at most
   `PT30S`. It is how long the call waits for the instance to complete.
-- **Together.** `output` and `wait` are declared together, or neither is.
+- **Together.** `output` and `wait` are declared together, or neither is. Both
+  also need a `process`, because they read the instance the call started. An
+  endpoint without a `process` answers `201` with `{ "recordId" }` once the
+  record is stored and the event is raised, see
+  [Responses](inbound-endpoints.md#responses).
 
 An endpoint without `output` answers `201` as soon as the record and the
 instance are stored. The approval process always waits for a manager, so
@@ -826,5 +830,5 @@ The compiler reports these as compile errors, all in one pass. The
   type. When a [webhook](outbound-webhooks.md#webhook-resource) names the
   event, an expression that reads an input that `values` maps to a `sensitive`
   field is `AXC0316` at `/event/fields/{key}`.
-- _(planned for M19)_ The schema needs `process`, `event` or both, and refuses
+- The schema needs `process`, `event` or both, and refuses
   `output` and `wait` without `process`, so breaking either is `AXC0004`.

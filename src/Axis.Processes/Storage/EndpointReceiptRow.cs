@@ -18,7 +18,8 @@ public sealed class EndpointReceiptRow
 
     public required Guid RecordId { get; init; }
 
-    public required Guid InstanceId { get; init; }
+    /// <summary>The instance the call started, or null for an endpoint without a process.</summary>
+    public Guid? InstanceId { get; init; }
 
     /// <summary>The SHA-256 hash of the call's input as canonical JSON, so the key cannot be reused with another input.</summary>
     public required byte[] InputHash { get; init; }

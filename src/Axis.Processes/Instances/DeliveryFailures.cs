@@ -207,12 +207,15 @@ internal static class DeliveryFailures
         return id;
     }
 
-    /// <summary>Writes an <c>open</c> dead letter for one occurrence sent to one webhook and returns its id.</summary>
+    /// <summary>
+    /// Writes an <c>open</c> dead letter for one occurrence sent to one webhook and returns its id. An occurrence
+    /// that no instance raised has no process and no instance, and no process's dead letters list it.
+    /// </summary>
     internal static async Task<Guid> InsertWebhookDeadLetterAsync(
         NpgsqlTransaction transaction,
         Guid applicationId,
-        Guid processId,
-        Guid processInstanceId,
+        Guid? processId,
+        Guid? processInstanceId,
         Guid eventId,
         Guid webhookId,
         int attempts,
@@ -230,8 +233,8 @@ internal static class DeliveryFailures
         command.Parameters.AddWithValue("id", id);
         command.Parameters.AddWithValue("kind", WebhookDeliverKind);
         command.Parameters.AddWithValue("application", applicationId);
-        command.Parameters.AddWithValue("process", processId);
-        command.Parameters.AddWithValue("instance", processInstanceId);
+        command.Parameters.AddWithValue("process", (object?)processId ?? DBNull.Value);
+        command.Parameters.AddWithValue("instance", (object?)processInstanceId ?? DBNull.Value);
         command.Parameters.AddWithValue("event", eventId);
         command.Parameters.AddWithValue("webhook", webhookId);
         command.Parameters.AddWithValue("attempts", attempts);

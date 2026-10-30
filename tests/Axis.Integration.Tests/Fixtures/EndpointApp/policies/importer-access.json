@@ -10,6 +10,7 @@
     { "endpoint": "ImportReviewedNote", "actions": ["invoke"] },
     { "endpoint": "ImportRepeatedNote", "actions": ["invoke"] },
     { "endpoint": "ImportFailingNote", "actions": ["invoke"] },
-    { "endpoint": "ImportLoggedNote", "actions": ["invoke"] }
+    { "endpoint": "ImportLoggedNote", "actions": ["invoke"] },
+    { "endpoint": "AnnounceNote", "actions": ["invoke"] }
   ]
 }

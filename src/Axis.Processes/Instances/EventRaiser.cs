@@ -20,7 +20,8 @@ public static partial class EventRaiser
     /// <paramref name="active"/>, in model order, as <c>system</c>. It then queues <c>event.deliver</c>, which
     /// starts the <c>async</c> triggers later, and stages a delivery for each webhook of <paramref name="model"/>.
     /// A skipped trigger start is logged and lets the transaction commit. Any other error throws, so the
-    /// caller rolls back with the event. <paramref name="active"/> is the active release of the application,
+    /// caller rolls back with the event. <paramref name="processInstanceId"/> is the instance that raises the
+    /// event, or <see langword="null"/> for an inbound endpoint that starts no process. <paramref name="active"/> is the active release of the application,
     /// or <see langword="null"/> when it has none, in which case no <c>sync</c> trigger starts.
     /// </summary>
     public static async Task RaiseAsync(
@@ -32,7 +33,7 @@ public static partial class EventRaiser
         Guid occurrenceId,
         Guid subjectId,
         JsonObject payload,
-        Guid processInstanceId,
+        Guid? processInstanceId,
         (Guid ReleaseId, ApplicationModel Model)? active,
         ILogger logger,
         CancellationToken cancellationToken)

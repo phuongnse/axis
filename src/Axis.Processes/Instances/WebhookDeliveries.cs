@@ -96,7 +96,7 @@ internal static class WebhookDeliveries
             reader.GetInt32(4),
             new StoredEvent(reader.GetGuid(11), reader.GetGuid(0), reader.GetString(5), reader.GetGuid(6), reader.GetGuid(7), JsonNode.Parse(reader.GetString(8)) as JsonObject ?? []),
             reader.GetFieldValue<DateTimeOffset>(9),
-            reader.GetGuid(10));
+            reader.IsDBNull(10) ? null : reader.GetGuid(10));
     }
 
     /// <summary>
@@ -147,7 +147,7 @@ internal static class WebhookDeliveries
 /// <param name="WebhookId">The webhook of that release.</param>
 /// <param name="Event">The stored occurrence. Its payload is the body's <c>fields</c>.</param>
 /// <param name="RaisedAt">When the occurrence was raised.</param>
-/// <param name="ProcessInstanceId">The instance whose step raised the occurrence.</param>
+/// <param name="ProcessInstanceId">The instance whose step raised the occurrence, or null when an endpoint without a process raised it.</param>
 internal sealed record StagedDelivery(
     Guid Id,
     Guid ApplicationId,
@@ -157,4 +157,4 @@ internal sealed record StagedDelivery(
     int Attempts,
     StoredEvent Event,
     DateTimeOffset RaisedAt,
-    Guid ProcessInstanceId);
+    Guid? ProcessInstanceId);

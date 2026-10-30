@@ -63,8 +63,8 @@ apply: sections marked _(planned for Mx)_ are not built yet, and Dn refers to
     `raiseEvent` step staged),
     `axis.process_start_receipts` (the stored response of each
     `Idempotency-Key` of a start), `axis.endpoint_receipts` (the record and
-    instance of each endpoint call's `Idempotency-Key`, unique per
-    application, endpoint, caller and key, with a hash of the input) and
+    instance, null for an endpoint without a `process`, of each endpoint call's
+    `Idempotency-Key`, unique per application, endpoint, caller and key, with a hash of the input) and
     `axis.process_work_items` (the work that
     workers claim and run), with history in `axis.__processes_migrations`.
     See [processes](processes.md#tables).

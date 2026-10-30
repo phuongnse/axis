@@ -15,8 +15,11 @@ public sealed class DeadLetterRow
     /// <summary>The application.</summary>
     public required Guid ApplicationId { get; init; }
 
-    /// <summary>The process whose grants govern the dead letter.</summary>
-    public required Guid ProcessId { get; init; }
+    /// <summary>
+    /// The process whose grants govern the dead letter, or null for a webhook delivery of an
+    /// occurrence that no instance raised.
+    /// </summary>
+    public Guid? ProcessId { get; init; }
 
     /// <summary>The event that failed to deliver, when the kind has one.</summary>
     public Guid? EventId { get; init; }

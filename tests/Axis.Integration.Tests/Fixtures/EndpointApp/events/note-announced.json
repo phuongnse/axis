@@ -1,0 +1,10 @@
+{
+  "id": "2b7e9c14-6a3d-4f58-b0e1-8d5c7a9f3e62",
+  "kind": "event",
+  "name": "NoteAnnounced",
+  "formatVersion": 1,
+  "entity": "Note",
+  "fields": [
+    { "name": "title", "type": "text" }
+  ]
+}

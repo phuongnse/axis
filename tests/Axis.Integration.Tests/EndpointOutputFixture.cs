@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using Axis.Configuration.Model;
 using Axis.Configuration.Releases;
 using Axis.Configuration.Storage;
@@ -27,7 +28,9 @@ namespace Axis.Integration.Tests;
 /// <c>other-importer</c>, which hold <c>importer</c>, and <c>reader-system</c>, which holds
 /// <c>reader</c>. The test authentication scheme signs in <c>ivy</c>, who holds <c>importer</c> and
 /// completes tasks. The fixture also holds the worker's services, with the host never started, so a
-/// test runs the instances' steps itself. The worker's connections are not limited.
+/// test runs the instances' steps itself. The worker's connections are not limited. The worker runs in
+/// Development, so it sends the <c>AnnounceHook</c> webhook of <c>NoteAnnounced</c> to the http URL of
+/// <see cref="Receiver"/>.
 /// </summary>
 public sealed class EndpointOutputFixture : IAsyncLifetime
 {
@@ -45,9 +48,13 @@ public sealed class EndpointOutputFixture : IAsyncLifetime
     private WebApplicationFactory<Program>? _factory;
     private ServiceProvider? _services;
     private ApplicationModel? _model;
+    private WebhookReceiver? _receiver;
 
     /// <summary>The compiled model of the EndpointApp fixture.</summary>
     public ApplicationModel Model => _model ?? throw new InvalidOperationException("The fixture is not initialized.");
+
+    /// <summary>The receiver that stands in for the outside system of the <c>AnnounceHook</c> webhook, at <c>/announce</c>.</summary>
+    public WebhookReceiver Receiver => _receiver ?? throw new InvalidOperationException("The fixture is not initialized.");
 
     private NpgsqlDataSource DataSource => _dataSource ?? throw new InvalidOperationException("The fixture is not initialized.");
 
@@ -58,6 +65,7 @@ public sealed class EndpointOutputFixture : IAsyncLifetime
     public async ValueTask InitializeAsync()
     {
         await _database.InitializeAsync();
+        _receiver = await WebhookReceiver.StartAsync();
         _connectionString = await _database.CreateDatabaseAsync("endpoint_output_a");
         _dataSource = NpgsqlDataSource.Create(_connectionString);
         await using (var configuration = CreateConfigurationContext())
@@ -77,7 +85,15 @@ public sealed class EndpointOutputFixture : IAsyncLifetime
             await using var data = DataDatabaseFixture.CreateContext(connection);
             var compiled = await ReleaseCompiler.CompileAsync(_appFolder, configuration);
             Assert.Empty(compiled.Diagnostics);
-            var activated = await ReleaseActivator.ActivateAsync(compiled, new ActiveReleaseStore(configuration), data, ActivationBindings.None(Tenant), OpenInstanceCounter.Instance);
+            var activated = await ReleaseActivator.ActivateAsync(compiled, new ActiveReleaseStore(configuration), data, new ActivationBindings(
+                Tenant,
+                new Dictionary<string, ActivationBinding>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["AnnounceHookUrl"] = new(ActivationBinding.UrlKind, new Uri(_receiver.BaseUrl + "/announce")),
+                    ["AnnounceHookSecret"] = new(ActivationBinding.SecretKind, null),
+                },
+                AllowHttp: true),
+                OpenInstanceCounter.Instance);
             Assert.Empty(activated.Diagnostics);
             _model = compiled.Model!;
         }
@@ -102,9 +118,15 @@ public sealed class EndpointOutputFixture : IAsyncLifetime
             {
                 ["Tenants:a:Hosts:0"] = Host,
                 ["Tenants:a:ConnectionString"] = PostgreSqlServer.RuntimeConnectionString(_connectionString),
+                ["Tenants:a:Bindings:AnnounceHookUrl:Kind"] = "url",
+                ["Tenants:a:Bindings:AnnounceHookUrl:Value"] = _receiver.BaseUrl + "/announce",
+                ["Tenants:a:Bindings:AnnounceHookSecret:Kind"] = "secret",
+                ["Tenants:a:Bindings:AnnounceHookSecret:Value"] = "whsec_" + Convert.ToBase64String(RandomNumberGenerator.GetBytes(24)),
             })
             .Build();
-        _services = new ServiceCollection().AddLogging().AddAxisWorker(settings, new HostingEnvironment { EnvironmentName = "Testing" }).BuildServiceProvider();
+
+        // Development lets the worker send to the receiver's http URL.
+        _services = new ServiceCollection().AddLogging().AddAxisWorker(settings, new HostingEnvironment { EnvironmentName = "Development" }).BuildServiceProvider();
     }
 
     public async ValueTask DisposeAsync()
@@ -122,6 +144,11 @@ public sealed class EndpointOutputFixture : IAsyncLifetime
         if (_dataSource is not null)
         {
             await _dataSource.DisposeAsync();
+        }
+
+        if (_receiver is not null)
+        {
+            await _receiver.DisposeAsync();
         }
 
         await _database.DisposeAsync();
@@ -162,12 +189,31 @@ public sealed class EndpointOutputFixture : IAsyncLifetime
         return (long)(await command.ExecuteScalarAsync())!;
     }
 
+    /// <summary>Runs <paramref name="sql"/>, a <c>SELECT</c> of one value, with the named parameters.</summary>
+    public async Task<T> ScalarAsync<T>(string sql, params (string Name, object Value)[] parameters)
+    {
+        await using var command = DataSource.CreateCommand(sql);
+        foreach (var (name, value) in parameters)
+        {
+            command.Parameters.AddWithValue(name, value);
+        }
+
+        return (T)(await command.ExecuteScalarAsync())!;
+    }
+
+    /// <summary>Opens a connection to the tenant database. The caller disposes it.</summary>
+    public ValueTask<NpgsqlConnection> OpenConnectionAsync() => DataSource.OpenConnectionAsync();
+
     /// <summary>Runs <paramref name="sql"/>, which returns nothing.</summary>
     public async Task ExecuteAsync(string sql)
     {
         await using var command = DataSource.CreateCommand(sql);
         await command.ExecuteNonQueryAsync();
     }
+
+    /// <summary>Makes every webhook delivery item due now, so a test need not wait out a backoff.</summary>
+    public Task MakeWebhookDeliveriesDueAsync() =>
+        ExecuteAsync("UPDATE axis.process_work_items SET due_at = now() WHERE kind = 'webhook.deliver'");
 
     /// <summary>The id of the one task of the instance <paramref name="instanceId"/>.</summary>
     public async Task<Guid> TaskIdAsync(Guid instanceId)
