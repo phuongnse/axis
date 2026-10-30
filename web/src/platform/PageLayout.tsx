@@ -21,18 +21,25 @@ export function PageLayout({
   title,
   breadcrumb,
   actions,
+  compact: compactProp,
   children,
 }: {
   title: string
   breadcrumb?: readonly BreadcrumbStep[]
   /** Proposed: the page's own actions, on the right of its title, such as Studio's Validate and Publish. */
   actions?: ReactNode
+  /**
+   * Proposed: a compact page, such as every page of Studio, draws its band as one row: the breadcrumb, whose last step
+   * is the page's title, then the actions. Without it, a workspace that claimed the shell's sidebar is compact.
+   */
+  compact?: boolean
   children: ReactNode
 }) {
   const { spacing } = useDesignTokens()
-  const compact = (useContext(ShellSidebarContext)?.contentPadding ?? spacing.lg) < spacing.lg
+  const contentPadding = useContext(ShellSidebarContext)?.contentPadding ?? spacing.lg
+  const compact = compactProp ?? contentPadding < spacing.lg
   const title4 = (
-    <Typography.Title level={compact ? 5 : 4} style={{ margin: 0 }}>
+    <Typography.Title level={4} style={{ margin: 0 }}>
       {title}
     </Typography.Title>
   )
@@ -46,31 +53,93 @@ export function PageLayout({
   )
 
   return (
-    <Flex vertical gap={compact ? 'small' : 'middle'}>
-      {breadcrumb ? <HeaderBand steps={breadcrumb}>{heading}</HeaderBand> : heading}
+    // Proposed: under a compact band the content starts as far from it as from the page area's sides.
+    <Flex vertical gap={compact ? contentPadding : 'middle'}>
+      {breadcrumb && compact ? (
+        <CompactBand steps={breadcrumb} title={title} actions={actions} />
+      ) : breadcrumb ? (
+        <HeaderBand steps={breadcrumb}>{heading}</HeaderBand>
+      ) : (
+        heading
+      )}
       {children}
     </Flex>
+  )
+}
+
+/** Negative margins reach the edges of the page area, whose padding the shell gives. */
+function useBandMargin() {
+  const { spacing } = useDesignTokens()
+  return useContext(ShellSidebarContext)?.contentPadding ?? spacing.lg
+}
+
+/**
+ * Proposed: the compact band, one row: the breadcrumb, whose last step is the page's title as its heading, and the
+ * actions on the right, with spacing-xs above and below.
+ */
+function CompactBand({
+  steps,
+  title,
+  actions,
+}: {
+  steps: readonly BreadcrumbStep[]
+  title: string
+  actions?: ReactNode
+}) {
+  const t = useText()
+  const { colour, spacing } = useDesignTokens()
+  const pad = useBandMargin()
+  const earlier = steps.slice(0, -1)
+  return (
+    <div
+      style={{
+        margin: `-${pad}px -${pad}px 0`,
+        padding: `${spacing.xs}px ${pad}px`,
+        minHeight: 48,
+        boxSizing: 'border-box',
+        display: 'flex',
+        alignItems: 'center',
+        gap: spacing.md,
+        background: colour.surface,
+        borderBottom: `1px solid ${colour.borderSubtle}`,
+      }}
+    >
+      <Breadcrumb
+        aria-label={t('shell.breadcrumb.label')}
+        style={{ flex: 1, minWidth: 0 }}
+        items={[
+          ...earlier.map((step) => ({
+            title: step.to ? <Link to={step.to}>{step.label}</Link> : <span>{step.label}</span>,
+          })),
+          {
+            title: (
+              <Typography.Title level={5} aria-current="page" style={{ display: 'inline', margin: 0 }}>
+                {title}
+              </Typography.Title>
+            ),
+          },
+        ]}
+      />
+      {actions}
+    </div>
   )
 }
 
 function HeaderBand({ steps, children }: { steps: readonly BreadcrumbStep[]; children: ReactNode }) {
   const t = useText()
   const { colour, spacing } = useDesignTokens()
-  // Proposed: in a workspace, whose page area has spacing-md round it, the band is compact too.
-  const pad = useContext(ShellSidebarContext)?.contentPadding ?? spacing.lg
-  const compact = pad < spacing.lg
+  const pad = useBandMargin()
 
   return (
     <div
       style={{
-        // Negative margins reach the edges of the content area, whose padding is `pad`.
         margin: `-${pad}px -${pad}px 0`,
-        padding: compact ? `${spacing.sm}px ${pad}px` : `${spacing.lg}px ${spacing.lg}px ${spacing.md}px`,
+        padding: `${spacing.lg}px ${pad}px ${spacing.md}px`,
         background: colour.surface,
         borderBottom: `1px solid ${colour.borderSubtle}`,
       }}
     >
-      <Flex vertical gap={compact ? 0 : spacing.xs}>
+      <Flex vertical gap={spacing.xs}>
         <Breadcrumb
           aria-label={t('shell.breadcrumb.label')}
           items={steps.map((step) => ({

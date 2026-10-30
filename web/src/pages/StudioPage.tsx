@@ -336,6 +336,7 @@ function StudioWorkspace() {
   if (application === null) {
     return (
       <PageLayout
+        compact
         title={t('shell.studio.title')}
         breadcrumb={[{ label: 'Axis', to: '/' }, { label: t('shell.studio.title') }]}
         actions={canCreate ? <StudioNewApplication primary onCreated={onApplicationCreated} /> : undefined}
@@ -419,7 +420,12 @@ function StudioWorkspace() {
           }}
         />
       )}
-      <PageLayout title={title} breadcrumb={steps} actions={<div ref={setActionsSlot} style={{ display: 'flex' }} />}>
+      <PageLayout
+        compact
+        title={title}
+        breadcrumb={steps}
+        actions={<div ref={setActionsSlot} style={{ display: 'flex' }} />}
+      >
         {loaded && 'resources' in loaded && (
           <StudioPublishing
             key={application}
@@ -607,8 +613,8 @@ function parseView(view: string | null, kind: string | null): StudioView {
 }
 
 /**
- * Proposed: Studio's applications as the home page shows them: one tile across the page each, its mark, its title and
- * its description, and the whole tile opens it.
+ * Proposed: Studio's applications as tiles of the home page, its mark, its title and its description, in the home
+ * page's grid of up to three columns, as an application in Studio has no sites under it. The whole tile opens it.
  */
 function StudioApplicationTiles({ applications }: { applications: readonly StudioApplication[] }) {
   const { spacing } = useDesignTokens()
@@ -617,7 +623,13 @@ function StudioApplicationTiles({ applications }: { applications: readonly Studi
     studioApplicationTitle(a, locale).localeCompare(studioApplicationTitle(b, locale), locale),
   )
   return (
-    <Flex vertical gap={spacing.md}>
+    <div
+      style={{
+        display: 'grid',
+        gridTemplateColumns: `repeat(auto-fit, minmax(max(0px, calc((100% - ${2 * spacing.md}px) / 3)), 1fr))`,
+        gap: spacing.md,
+      }}
+    >
       {sorted.map((app) => {
         const title = studioApplicationTitle(app, locale)
         return (
@@ -630,7 +642,7 @@ function StudioApplicationTiles({ applications }: { applications: readonly Studi
           />
         )
       })}
-    </Flex>
+    </div>
   )
 }
 
