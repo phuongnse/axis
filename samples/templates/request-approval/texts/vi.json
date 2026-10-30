@@ -5,7 +5,10 @@
   "formatVersion": 1,
   "locale": "vi",
   "texts": {
+    "application.title": "Phê duyệt yêu cầu",
+    "application.description": "Một biểu mẫu yêu cầu, một danh sách và phê duyệt hai bước.",
     "site.title": "Phê duyệt yêu cầu",
+    "site.description": "Gửi yêu cầu và phê duyệt qua hai bước.",
     "nav.myRequests": "Yêu cầu của tôi",
     "nav.myTasks": "Công việc của tôi",
     "pages.myRequests.title": "Yêu cầu của tôi",

@@ -90,20 +90,23 @@ const sites: SiteListItem[] = [
     path: 'e2e',
     titleKey: 'site.title',
     titles: { en: 'E2E notes', vi: 'Ghi chú E2E' },
-    application: { name: 'E2eNotes', titles: { en: 'E2E notes', vi: 'Ghi chú E2E' } },
+    descriptions: null,
+    application: { name: 'E2eNotes', titles: { en: 'E2E notes', vi: 'Ghi chú E2E' }, descriptions: null },
   },
   // Listed out of title order, so the tests see the sort.
   {
     path: 'desk-staff',
     titleKey: 'site.title',
     titles: { en: 'Staff desk' },
-    application: { name: 'ServiceDesk', titles: { en: 'Service desk' } },
+    descriptions: null,
+    application: { name: 'ServiceDesk', titles: { en: 'Service desk' }, descriptions: null },
   },
   {
     path: 'desk-customers',
     titleKey: 'site.title',
     titles: { en: 'Customer portal' },
-    application: { name: 'ServiceDesk', titles: { en: 'Service desk' } },
+    descriptions: null,
+    application: { name: 'ServiceDesk', titles: { en: 'Service desk' }, descriptions: null },
   },
 ]
 

@@ -665,6 +665,19 @@ public sealed class ApplicationCompilerTests
         Assert.Null(result.Model);
     }
 
+    [Fact]
+    public void Application_description_without_any_text_resource_is_a_missing_key()
+    {
+        using var folder = new TemporaryFolder()
+            .With("application.json", Manifest.Replace("\"formatVersion\": 1", "\"formatVersion\": 1, \"description\": { \"textKey\": \"sample.description\" }", StringComparison.Ordinal));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.MissingTextKey, "application.json", "/description/textKey"), (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Null(result.Model);
+    }
+
     [Theory]
     [InlineData("unknown", "'unknown'")]
     [InlineData("note", "an optional text")]

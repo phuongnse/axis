@@ -58,7 +58,7 @@ flowchart LR
      [Modules](modules-and-templates.md#modules).
      Each release carries its own texts, so a newer release can remove a key
      that older running work still shows.
-   - **Labels.** The text key of the application label, an entity label, a
+   - **Labels.** The text key of the application label or description, an entity label, a
      field label, an enum value label (`valueLabels`) or the `label` of an
      [identity provider](identity-provider.md#identity-provider-resource) must be in some locale, otherwise it is `AXC0028` at that
      label's `/textKey`. This applies also when the application has no text
@@ -155,7 +155,7 @@ flowchart LR
      must name a loaded page (`AXC0023`). Its optional `icon` must be a name from
      Axis's list, see [navigation icons](shell.md#navigation-icons), otherwise it is `AXC0004` at `/navigation/{i}/icon`. Entity, page, data source, form and process names
      resolve ignoring letter case, and a name whose file was not loaded
-     because of its own errors is not reported again. Site titles, navigation labels, page titles and action labels join the
+     because of its own errors is not reported again. Site titles and descriptions, navigation labels, page titles and action labels join the
      `AXC0028` check.
      A page's `widgets` form a tree, see
      [D61](../decisions/d61-widget-trees-in-columns-tabs-and-sections-and-pages-at-phone-width.md).
@@ -931,8 +931,8 @@ to show where a resource is used and what it uses.
 | `stub package` | Scenario | `/stubs/{i}/operation` | Extension package |
 
 - **Label paths.** A `label text` edge sits at the `/textKey` of each label the
-  `AXC0028` check covers: the application label, entity and
-  field labels, enum value labels, the site title, navigation labels, page titles, action labels,
+  `AXC0028` check covers: the application label and description, entity and
+  field labels, enum value labels, the site title and description, navigation labels, page titles, action labels,
   form section titles, role labels, identity provider labels, data source parameter labels, task and
   outcome labels, the `startCondition` message and validation messages.
 - **Direct calls only.** A `rule call` edge goes from the expression that

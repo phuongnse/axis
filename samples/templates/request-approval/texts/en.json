@@ -5,7 +5,10 @@
   "formatVersion": 1,
   "locale": "en",
   "texts": {
+    "application.title": "Request approval",
+    "application.description": "A request form, a list and a two-step approval.",
     "site.title": "Request approval",
+    "site.description": "Send requests and approve them in two steps.",
     "nav.myRequests": "My requests",
     "nav.myTasks": "My tasks",
     "pages.myRequests.title": "My requests",

@@ -1335,6 +1335,7 @@ public sealed class StudioEndpointTests : IAsyncLifetime
     {
         await using var factory = CreateFactory();
         using var client = factory.CreateClient().SignedInAs("author");
+        var keysBefore = ((JsonObject)JsonNode.Parse(File.ReadAllBytes(Path.Combine(Folder, "texts", "en.json")))!["texts"]!).Select(pair => pair.Key).ToList();
 
         var added = await PutText(client, """{"texts":{"EN":"Hello","VI":"Xin chào"}}""", "greeting.new");
         var changed = await PutText(client, """{"texts":{"en":"Purchasing system","vi":"Mua hàng"}}""", "site.title");
@@ -1342,9 +1343,8 @@ public sealed class StudioEndpointTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.OK, added.StatusCode);
         Assert.Equal(HttpStatusCode.OK, changed.StatusCode);
         var en = (JsonObject)JsonNode.Parse(File.ReadAllBytes(Path.Combine(Folder, "texts", "en.json")))!["texts"]!;
-        Assert.Equal("site.title", en.First().Key);
+        Assert.Equal([.. keysBefore, "greeting.new"], en.Select(pair => pair.Key));
         Assert.Equal("Purchasing system", (string?)en["site.title"]);
-        Assert.Equal("greeting.new", en.Last().Key);
         Assert.Equal("Hello", (string?)en["greeting.new"]);
         var vi = (JsonObject)JsonNode.Parse(File.ReadAllBytes(Path.Combine(Folder, "texts", "vi.json")))!["texts"]!;
         Assert.Equal("Xin chào", (string?)vi["greeting.new"]);

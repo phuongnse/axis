@@ -3,5 +3,7 @@
   "kind": "application",
   "name": "PurchaseRequests",
   "formatVersion": 1,
+  "label": { "textKey": "application.title" },
+  "description": { "textKey": "application.description" },
   "packages": [{ "id": "payment-references", "version": "^1.0.0" }]
 }

@@ -5,7 +5,10 @@
   "formatVersion": 1,
   "locale": "en",
   "texts": {
+    "application.title": "Purchase requests",
+    "application.description": "Runs the company's purchases, from the request to approval and ordering.",
     "site.title": "Purchasing",
+    "site.description": "Request purchases and take them through approval.",
     "signIn.company": "Example Company",
     "nav.purchaseRequests": "Purchase requests",
     "nav.myTasks": "My tasks",

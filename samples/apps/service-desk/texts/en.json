@@ -5,7 +5,10 @@
   "formatVersion": 1,
   "locale": "en",
   "texts": {
+    "application.title": "Service desk",
+    "application.description": "Handles the company's internal support requests.",
     "site.title": "Service desk",
+    "site.description": "Raise a ticket and follow it until it is solved.",
     "nav.myTickets": "My tickets",
     "nav.myTasks": "My tasks",
     "nav.allTickets": "All tickets",

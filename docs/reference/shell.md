@@ -155,9 +155,9 @@ applications and of its sites, and the sign-in screen with nobody signed in, who
 
 ## Application and site descriptions
 
-_(Planned for M17, [D114](../decisions/d114-rules-from-the-sign-in-and-home-page-review.md).)_ The `application`
-manifest and each `site` may have a `description`, one line of text that the
-[platform home page](#platform-home-page) shows under the title:
+The `application` manifest and each `site` may have a `description`, one line of text that the
+[platform home page](#platform-home-page) shows under the title, as
+[D114](../decisions/d114-rules-from-the-sign-in-and-home-page-review.md) agrees:
 
 ```json
 {
@@ -184,7 +184,7 @@ manifest and each `site` may have a `description`, one line of text that the
   as "Request purchases and take them through approval.", as an application often has several sites for different
   people. The two should not repeat each other.
 - Both are optional `{ "textKey" }` texts, checked like the application's `label` and the site's `title`: a key that
-  no text resource holds is `AXC0028`, at `/description`. Without one, the home page shows the title alone.
+  no text resource holds is `AXC0028`, at `/description/textKey`. Without one, the home page shows the title alone.
 - The application's `label` is its title on the home page and in the app switcher, and its name when it has none, so
   a sample or template gives its application a `label` in every locale it has texts for.
 - `GET /api/sites` gives both descriptions per locale, see [platform home page](#platform-home-page).
