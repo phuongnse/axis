@@ -423,7 +423,13 @@ same `operationId`. See [Retry](process-inspection.md#retry).
    allows `http`. The error of an `http` URL names the tenant and the
    binding, never the URL.
 3. **Send.** The worker sends the request outside any transaction.
-   - The body is the stored input, as JSON. A `GET` sends no body.
+   - Each input goes where its `in` says, see
+     [Structured payloads](integration-resources.md#structured-payloads). A
+     `path` input fills its placeholder, escaped as one segment. `query`
+     inputs make the query string, and `header` inputs are request headers
+     named after the input. An optional input with no value is left out.
+   - The body is JSON that holds only the `body` inputs. A `GET` sends no
+     body.
    - The auth sends the secret as `Authorization: Bearer <secret>`, or in
      the named header.
    - With `idempotency`, the request carries the header

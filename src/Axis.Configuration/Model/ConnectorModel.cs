@@ -38,8 +38,8 @@ public sealed record ConnectorModel
 public sealed record ConnectorAuthModel(string Type, string? HeaderName, string Binding, string BindingPath);
 
 /// <summary>
-/// A compiled connector operation. <see cref="Path"/> holds no placeholder but
-/// <c>{idempotencyKey}</c>. <see cref="Lookup"/> is the declared name of another operation of the
+/// A compiled connector operation. Each placeholder of <see cref="Path"/> is
+/// <c>{idempotencyKey}</c> or names a <c>path</c> input. <see cref="Lookup"/> is the declared name of another operation of the
 /// connector: a <c>GET</c> whose path holds <c>{idempotencyKey}</c>, with no inputs and the same
 /// outputs.
 /// </summary>
@@ -51,5 +51,9 @@ public sealed record ConnectorOperationModel(
     IReadOnlyList<ConnectorFieldModel> Output,
     string? Lookup);
 
-/// <summary>An input or output field of a compiled connector operation, with a scalar field type.</summary>
-public sealed record ConnectorFieldModel(string Name, FieldType Type, bool Required);
+/// <summary>
+/// An input or output field of a compiled connector operation, with a scalar field type. For an
+/// input, <paramref name="In"/> is where a call sends it: <c>body</c>, <c>path</c>, <c>query</c> or
+/// <c>header</c>.
+/// </summary>
+public sealed record ConnectorFieldModel(string Name, FieldType Type, bool Required, string In = "body");

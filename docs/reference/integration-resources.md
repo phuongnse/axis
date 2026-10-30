@@ -178,13 +178,12 @@ The purchase request sample holds the purchasing system connector in
   It is absent when the system does not support one.
 - `operations` lists the named operations.
   - `method` is `GET`, `POST`, `PUT`, `PATCH` or `DELETE`.
-  - `path` is a path template. `{idempotencyKey}` is the only placeholder.
-    Other placeholders come later. _(planned for M19)_ A `{name}` placeholder
-    names a `path` input, see [Structured payloads](#structured-payloads).
-  - `input` fields are sent as a JSON body. A `GET` sends no body, so a `GET`
-    with `input` fields is a schema error. _(planned for M19)_ An input's `in`
-    may send it in the path, the query or a header instead, and a `GET` may
-    have those.
+  - `path` is a path template. `{idempotencyKey}` holds the operation
+    identity. Any other `{name}` placeholder names a `path` input, see
+    [Structured payloads](#structured-payloads).
+  - `input` fields are sent as a JSON body, unless an input's `in` sends it in
+    the path, the query or a header. A `GET` sends no body, so it may have
+    `path`, `query` and `header` inputs but no `body` input.
   - `output` fields are read from the JSON response.
   - Input and output field types are the
     [rule parameter types](resource-files.md#resource-file-shape): `text`, `integer`,
@@ -249,10 +248,11 @@ authorization server through the client credentials grant, as
 
 ### Structured payloads
 
-_(planned for M19)_ Inputs can go outside the body and nest, and outputs can
-come from deep in the response, as
+Inputs go outside the body, as
 [D91](../decisions/d91-connector-oauth2-and-structured-payloads.md) agrees.
-Bodies stay JSON.
+_(planned for M19)_ Inputs can also nest, and outputs can come from deep in
+the response. The `lines` input and the `source` output in the example are
+still planned. Bodies stay JSON.
 
 ```json
 {
@@ -276,17 +276,22 @@ Bodies stay JSON.
 ```
 
 - **`in`.** `body`, the default, `path`, `query` or `header`. A `header`
-  input's name is the header name. Only scalar inputs may go outside the body.
+  input's name is the header name, so it cannot hold a hyphen yet. Only scalar
+  inputs may go outside the body. An optional input with no value is left out.
 - **Path placeholders.** Each `{name}` in `path` names a `path` input, and each
-  `path` input appears in `path`. A `path` input is `required`. Its value is
-  escaped as one path segment.
+  `path` input appears in `path`. Names match ignoring letter case. A `path`
+  input is `required`, and none is named `idempotencyKey`, which stays the
+  operation identity. Its value is escaped as one path segment, so `a/b c`
+  becomes `a%2Fb%20c`. A `query` input becomes a `name=value` pair of the
+  query string, escaped the same way.
 - **`GET`.** A `GET` may have `path`, `query` and `header` inputs, but no
-  `body` input.
-- **`object` and `list`.** An `object` input has nested `fields`. A `list`
+  `body` input. The JSON body of any other method holds only the `body`
+  inputs.
+- **`object` and `list`.** _(planned for M19)_ An `object` input has nested `fields`. A `list`
   input's items are objects with `fields`. Nesting goes four levels deep at
   most. The step maps them as in
   [Step shape](process-execution.md#step-shape).
-- **`source`.** An output field may name a JSON Pointer into the response
+- **`source`.** _(planned for M19)_ An output field may name a JSON Pointer into the response
   body. Without it, the output is read from the top-level property of its
   name. Outputs stay scalar, because they write subject fields.
 - **Later.** Writing a list from the response into a child collection, and

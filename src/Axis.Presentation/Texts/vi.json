@@ -544,7 +544,7 @@
   "shell.studio.connector.fieldName": "tên",
   "shell.studio.connector.fieldType": "kiểu",
   "shell.studio.connector.required": "Bắt buộc",
-  "shell.studio.connector.getNoInput": "Thao tác GET không gửi nội dung, nên không có trường đầu vào.",
+  "shell.studio.connector.getNoInput": "Thao tác GET không gửi nội dung, nên đầu vào phải nằm trong đường dẫn, chuỗi truy vấn hoặc tiêu đề.",
   "shell.studio.identityProvider.name": "Tên",
   "shell.studio.identityProvider.type": "Loại",
   "shell.studio.identityProvider.urlBinding": "Binding URL",

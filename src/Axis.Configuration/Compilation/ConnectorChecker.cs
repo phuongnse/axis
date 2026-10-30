@@ -9,10 +9,12 @@ namespace Axis.Configuration.Compilation;
 /// Checks the connectors of an application and builds the checked ones. A connector's
 /// <c>timeout</c> is a positive duration of at most 2 minutes. Its operation names are unique,
 /// and so are the field names of each operation's input and of its output, all ignoring letter
-/// case. A path holds no placeholder but <c>{idempotencyKey}</c>. A <c>lookup</c> names another
-/// operation of the connector, ignoring letter case, which is a <c>GET</c> whose path holds
-/// <c>{idempotencyKey}</c> and whose outputs are those of the operation it serves. The schema
-/// already refuses inputs on a <c>GET</c>. Every problem of a connector is reported in one pass.
+/// case. Each placeholder of a path is <c>{idempotencyKey}</c> or names a <c>path</c> input,
+/// ignoring letter case. Each <c>path</c> input is <c>required</c>, appears in the path and is not
+/// named <c>idempotencyKey</c>, and a <c>GET</c> has no <c>body</c> input. A <c>lookup</c> names
+/// another operation of the connector, ignoring letter case, which is a <c>GET</c> with no inputs
+/// whose path holds <c>{idempotencyKey}</c> and whose outputs are those of the operation it serves.
+/// Every problem of a connector is reported in one pass.
 /// Its bindings are checked at activation, against the tenant's.
 /// <see cref="CheckSlot"/> checks a connector against a module's connector slot, and
 /// <see cref="CheckSlotAgainstSlot"/> checks a slot against the slot of a depending module.
@@ -55,10 +57,12 @@ internal static class ConnectorChecker
 
                 CheckFieldNames(operation.Input, $"{path}/input", "input", Report);
                 CheckFieldNames(operation.Output, $"{path}/output", "output", Report);
-                if (FindPathProblem(operation.Path) is { } problem)
+                if (FindPathProblem(operation.Path, operation.Input) is { } problem)
                 {
                     Report(DiagnosticCodes.InvalidOperationPath, $"The path '{operation.Path}' {problem}", $"{path}/path");
                 }
+
+                CheckInputPlacement(operation, path, Report);
             }
 
             for (var index = 0; index < connector.Operations.Count; index++)
@@ -220,7 +224,7 @@ internal static class ConnectorChecker
     }
 
     private static ConnectorFieldModel BuildField(ConnectorFieldDefinition field) =>
-        new(field.Name, FieldTypes.Parse(field.Type), field.Required);
+        new(field.Name, FieldTypes.Parse(field.Type), field.Required, field.In);
 
     /// <summary>Parses a timeout, which is 30 seconds when not written.</summary>
     private static bool TryParseTimeout(string? text, out TimeSpan timeout)
@@ -250,8 +254,85 @@ internal static class ConnectorChecker
         }
     }
 
+    /// <summary>
+    /// Reports, at each input of <paramref name="operation"/>, a <c>path</c> input that is not in the
+    /// path, is not <c>required</c> or is named <c>idempotencyKey</c>, and a <c>body</c> input on a <c>GET</c>.
+    /// </summary>
+    private static void CheckInputPlacement(
+        ConnectorOperationDefinition operation, string operationPath, Action<string, string, string> report)
+    {
+        var placeholders = Placeholders(operation.Path);
+        for (var index = 0; index < operation.Input.Count; index++)
+        {
+            var field = operation.Input[index];
+            var path = $"{operationPath}/input/{index}";
+            if (field.In == "path")
+            {
+                if (string.Equals(field.Name, IdempotencyKeyPlaceholder, StringComparison.OrdinalIgnoreCase))
+                {
+                    report(
+                        DiagnosticCodes.MisplacedConnectorInput,
+                        $"The path input '{field.Name}' is named like the placeholder '{{{IdempotencyKeyPlaceholder}}}', which holds the operation identity. Give the input another name.",
+                        path);
+                }
+                else if (!placeholders.Contains(field.Name))
+                {
+                    report(
+                        DiagnosticCodes.MisplacedConnectorInput,
+                        $"The path input '{field.Name}' has no placeholder '{{{field.Name}}}' in the path '{operation.Path}'. Add the placeholder or move the input to the query, a header or the body.",
+                        path);
+                }
+
+                if (!field.Required)
+                {
+                    report(
+                        DiagnosticCodes.MisplacedConnectorInput,
+                        $"The path input '{field.Name}' is not required. A path input is always 'required': true, because the path needs its value.",
+                        path);
+                }
+            }
+            else if (field.In == "body" && operation.Method == "GET")
+            {
+                report(
+                    DiagnosticCodes.MisplacedConnectorInput,
+                    $"The input '{field.Name}' goes in the body, but a GET sends no body. Use 'in': 'path', 'query' or 'header'.",
+                    path);
+            }
+        }
+    }
+
+    /// <summary>Lists the placeholder names of a path template, ignoring letter case. An unbalanced path gives what its balanced part holds.</summary>
+    private static HashSet<string> Placeholders(string path)
+    {
+        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var position = 0;
+        while (position < path.Length)
+        {
+            var open = path.IndexOf('{', position);
+            if (open < 0)
+            {
+                break;
+            }
+
+            var close = path.IndexOfAny(['{', '}'], open + 1);
+            if (close < 0)
+            {
+                break;
+            }
+
+            if (path[close] == '}')
+            {
+                names.Add(path[(open + 1)..close]);
+            }
+
+            position = close;
+        }
+
+        return names;
+    }
+
     /// <summary>Describes the first problem of a path template, or gives null when it has none.</summary>
-    private static string? FindPathProblem(string path)
+    private static string? FindPathProblem(string path, IReadOnlyList<ConnectorFieldDefinition> input)
     {
         var position = 0;
         while (position < path.Length)
@@ -269,9 +350,10 @@ internal static class ConnectorChecker
             }
 
             var placeholder = path[(open + 1)..close];
-            if (placeholder != IdempotencyKeyPlaceholder)
+            if (placeholder != IdempotencyKeyPlaceholder
+                && !input.Any(field => field.In == "path" && string.Equals(field.Name, placeholder, StringComparison.OrdinalIgnoreCase)))
             {
-                return $"has the placeholder '{{{placeholder}}}'. '{{{IdempotencyKeyPlaceholder}}}' is the only placeholder, and inputs are sent in the JSON body.";
+                return $"has the placeholder '{{{placeholder}}}', which names no path input. Add an input '{placeholder}' with 'in': 'path', or use '{{{IdempotencyKeyPlaceholder}}}'.";
             }
 
             position = close + 1;
@@ -301,6 +383,11 @@ internal static class ConnectorChecker
         if (!target.Path.Contains($"{{{IdempotencyKeyPlaceholder}}}", StringComparison.Ordinal))
         {
             return $"The lookup '{lookup}' has no '{{{IdempotencyKeyPlaceholder}}}' in its path, so it cannot find an earlier call.";
+        }
+
+        if (target.Input.Count > 0)
+        {
+            return $"The lookup '{lookup}' has inputs. A lookup has no inputs, because it finds a call by its idempotency key alone.";
         }
 
         if (!SameFields(operation.Output, target.Output))
