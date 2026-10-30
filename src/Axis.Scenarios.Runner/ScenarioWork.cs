@@ -50,7 +50,7 @@ internal sealed class ScenarioWork : IDisposable
         var timerHandler = new ProcessTimerHandler(models, loggerFactory.CreateLogger<ProcessTimerHandler>());
         IExternalWorkItemHandler[] externalHandlers =
         [
-            new ConnectorCallHandler(models, bindings, _client, settings, loggerFactory.CreateLogger<ConnectorCallHandler>()),
+            new ConnectorCallHandler(models, bindings, _client, new ScenarioTokens(), settings, loggerFactory.CreateLogger<ConnectorCallHandler>()),
             new PackageCallHandler(models, packages, bindings, settings, _transport, loggerFactory.CreateLogger<PackageCallHandler>(), stubs.CreateOperation),
             new EventDeliveryHandler(models, new DeliverySettings(5), loggerFactory.CreateLogger<EventDeliveryHandler>()),
         ];

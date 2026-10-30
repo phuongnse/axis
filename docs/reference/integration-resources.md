@@ -31,8 +31,9 @@ reconciles is in [Connector calls](process-execution.md#connector-calls).
 - **No binding resource.** No resource kind declares bindings. A connector
   names one as `{ "binding": "<name>" }`. Where the name is used decides its
   kind: `baseUrl` needs a `url` binding, and `auth` needs a `secret` binding.
-  _(planned for M19)_ An `oauth2` auth's `tokenUrl` needs a `url` binding, and
-  a [webhook](#webhook-resource) names a `url` and a `secret` binding.
+  An `oauth2` auth's `tokenUrl` needs a `url` binding, and its `clientId` and
+  `clientSecret` need `secret` bindings. _(planned for M19)_ A
+  [webhook](#webhook-resource) names a `url` and a `secret` binding.
   A package operation names them in the `capabilities` of its manifest:
   `urls` need `url` bindings and `secrets` need `secret` bindings.
 - **Where values live.** Under `Tenancy:Source=configuration`, each tenant holds its values in
@@ -171,7 +172,7 @@ The purchase request sample holds the purchasing system connector in
   - `bearer`, with `token`, a `secret` binding sent as
     `Authorization: Bearer <value>`;
   - `header`, with `name`, the header name, and `value`, a `secret` binding;
-  - `oauth2` _(planned for M19)_, see [OAuth2 auth](#oauth2-auth).
+  - `oauth2`, with a token URL and client credentials, see [OAuth2 auth](#oauth2-auth).
 - `timeout` is an ISO 8601 duration. It defaults to `PT30S` and is at most
   `PT2M`.
 - `idempotency` names the request header that carries the idempotency key.
@@ -211,9 +212,10 @@ Docker Compose, `scripts/dev.sh` and the E2E run point them at the
 
 ### OAuth2 auth
 
-_(planned for M19)_ A connector can get its access token from an OAuth2
-authorization server through the client credentials grant, as
+A connector can get its access token from an OAuth2 authorization server
+through the client credentials grant, as
 [D91](../decisions/d91-connector-oauth2-and-structured-payloads.md) agrees.
+The token request and the cache are built. The resend after a `401` is not.
 
 ```json
 "auth": {
@@ -226,19 +228,43 @@ authorization server through the client credentials grant, as
 ```
 
 - `tokenUrl` is a `url` binding. `clientId` and `clientSecret` are `secret`
-  bindings. `scope` and `audience` are optional strings.
-- The worker requests a token with `grant_type=client_credentials`, sending
-  the client id and secret with HTTP Basic authentication, and sends the token
-  as `Authorization: Bearer <token>`.
+  bindings. `scope` and `audience` are optional strings of 1 to 2000
+  characters. The schema refuses `token`, `name` and `value` on an `oauth2`
+  auth, and refuses `tokenUrl`, `clientId`, `clientSecret`, `scope` and
+  `audience` on the other types.
+- **Checks.** Activation checks the three bindings as it checks a
+  connector's others. A missing binding, or one of the wrong kind, is
+  `AXC0100` at `/auth/tokenUrl/binding`, `/auth/clientId/binding` or
+  `/auth/clientSecret/binding`, and a missing one is a warning on a preview
+  tenant. An `http` token URL outside Development is `AXC0101`. The compiler
+  reports `AXC0310` at the same paths when the application uses the name of
+  one of these bindings as another kind elsewhere. The kind of a name is read
+  from where it is used, as for an [identity provider](identity-provider.md).
+- The worker requests a token with `grant_type=client_credentials`, adding
+  `scope` and `audience` when they are set. It sends the client id and secret
+  with HTTP Basic authentication, each form-encoded as RFC 6749 section 2.3.1
+  says, and sends the token as `Authorization: Bearer <token>`. It does this
+  before each call and each lookup.
 - The token stays in the worker's memory, for each tenant and connector, until
-  a minute before its `expires_in`. It is never stored, logged or shown, and
-  each worker replica gets its own.
-- A `401` from the system drops the token. The worker gets a new one and sends
-  the request once more in the same attempt, with the same idempotency key. A
-  second `401` fails the attempt as any `4xx` does.
+  a minute before its `expires_in`. It is never stored, logged, traced or
+  shown, and each worker replica gets its own.
+  - A response without `expires_in`, or with 60 seconds or less, gives a token
+    for that one call only.
+  - The cache also holds a hash of the token URL, the client id, the client
+    secret, the scope and the audience. When one of them changes, the worker
+    asks for a new token, so changing a binding needs no restart.
+  - Two calls that find the cache empty at the same moment may each request a
+    token.
+- The token request has the connector's `timeout`, like the operation. The
+  call's lease is extended by twice the `timeout` for an `oauth2` connector.
+- A test scenario answers the operation from its stub and requests no token.
+- _(planned for M19)_ A `401` from the system drops the token. The worker gets
+  a new one and sends the request once more in the same attempt, with the same
+  idempotency key. A second `401` fails the attempt as any `4xx` does.
 - A failed token request, for any reason, is a retryable attempt, and the
-  operation is not sent. History records the token endpoint's status code,
-  never its body.
+  operation is not sent. A failed lookup stays `unknown`. The attempt row and
+  the call record the token endpoint's status code and a fixed error text,
+  never its body or an exception message.
 - The token URL follows the connector rules: `https` outside Development, and
   no redirects.
 - `clientAuth: "privateKeyJwt"`, with the private key in a `secret` binding,

@@ -127,6 +127,29 @@ public sealed class IdentityProviderCompilerTests
     }
 
     [Fact]
+    public void A_binding_used_as_the_token_url_of_an_oauth2_connector_is_a_url_binding_for_the_provider_check()
+    {
+        using var folder = Folder()
+            .With("connectors/purchasing-system.json", $$"""
+                { "id": "{{ConnectorId}}", "kind": "connector", "name": "PurchasingSystem", "formatVersion": 1,
+                  "baseUrl": { "binding": "PurchasingSystemUrl" },
+                  "auth": { "type": "oauth2", "tokenUrl": { "binding": "companyclientid" },
+                            "clientId": { "binding": "PurchasingClientId" }, "clientSecret": { "binding": "PurchasingClientSecret" } },
+                  "operations": [{ "name": "ping", "method": "GET", "path": "/ping" }] }
+                """)
+            .With("identity-providers/company.json", Provider(OidcId, "company", OidcBody));
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Equal(
+            [
+                (DiagnosticCodes.IdentityProviderBindingKind, "identity-providers/company.json", "/clientId/binding"),
+                (DiagnosticCodes.ConnectorBindingKind, "connectors/purchasing-system.json", "/auth/tokenUrl/binding"),
+            ],
+            result.Diagnostics.Select(diagnostic => (diagnostic.Code, diagnostic.File, diagnostic.Path)).Order().ToArray());
+    }
+
+    [Fact]
     public void A_binding_shared_with_another_provider_as_another_kind_is_reported_at_each_use()
     {
         using var folder = Folder()

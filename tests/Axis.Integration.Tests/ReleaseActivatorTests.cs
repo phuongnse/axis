@@ -419,6 +419,103 @@ public sealed class ReleaseActivatorTests(DataDatabaseFixture database) : IClass
         Assert.Null(await FindActiveAsync(_applicationId));
     }
 
+    [Theory]
+    [InlineData("/auth/tokenUrl/binding", false)]
+    [InlineData("/auth/tokenUrl/binding", true)]
+    [InlineData("/auth/clientId/binding", false)]
+    [InlineData("/auth/clientId/binding", true)]
+    [InlineData("/auth/clientSecret/binding", false)]
+    [InlineData("/auth/clientSecret/binding", true)]
+    public async Task An_oauth2_binding_the_tenant_lacks_or_holds_with_another_kind_is_a_diagnostic_and_the_release_is_not_activated(
+        string path, bool wrongKind)
+    {
+        using var folder = ApplicationFolder(_applicationId, _name, _orderId, NumberField)
+            .With("connectors/purchasing-system.json", OAuthConnector(_connectorId));
+        var compiled = await CompileAsync(folder);
+        var url = new ActivationBinding(ActivationBinding.UrlKind, new Uri("https://auth.example.test/token"));
+        var secret = new ActivationBinding(ActivationBinding.SecretKind, null);
+        var bindings = new Dictionary<string, ActivationBinding>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["PurchasingSystemUrl"] = url,
+            ["PurchasingSystemTokenUrl"] = url,
+            ["PurchasingSystemClientId"] = secret,
+            ["PurchasingSystemClientSecret"] = secret,
+        };
+        var name = path switch
+        {
+            "/auth/tokenUrl/binding" => "PurchasingSystemTokenUrl",
+            "/auth/clientId/binding" => "PurchasingSystemClientId",
+            _ => "PurchasingSystemClientSecret",
+        };
+        if (wrongKind)
+        {
+            bindings[name] = path == "/auth/tokenUrl/binding" ? secret : url;
+        }
+        else
+        {
+            bindings.Remove(name);
+        }
+
+        var result = await ActivateAsync(compiled, new ActivationBindings("acme", bindings, AllowHttp: false));
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.MissingDeploymentBinding, "connectors/purchasing-system.json", path, DiagnosticSeverity.Error),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.Severity));
+        Assert.Contains($"'{name}'", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Null(await FindActiveAsync(_applicationId));
+    }
+
+    [Fact]
+    public async Task On_a_preview_tenant_a_missing_oauth2_binding_is_a_warning_and_the_release_is_activated()
+    {
+        using var folder = ApplicationFolder(_applicationId, _name, _orderId, NumberField)
+            .With("connectors/purchasing-system.json", OAuthConnector(_connectorId));
+        var compiled = await CompileAsync(folder);
+
+        var result = await ActivateAsync(compiled, ActivationBindings.None("acme") with { IsPreview = true });
+
+        Assert.Equal(
+            [
+                (DiagnosticCodes.MissingDeploymentBinding, "/auth/clientId/binding", DiagnosticSeverity.Warning),
+                (DiagnosticCodes.MissingDeploymentBinding, "/auth/clientSecret/binding", DiagnosticSeverity.Warning),
+                (DiagnosticCodes.MissingDeploymentBinding, "/auth/tokenUrl/binding", DiagnosticSeverity.Warning),
+                (DiagnosticCodes.MissingDeploymentBinding, "/baseUrl/binding", DiagnosticSeverity.Warning),
+            ],
+            result.Diagnostics.Select(diagnostic => (diagnostic.Code, diagnostic.Path, diagnostic.Severity)).Order());
+        Assert.Equal(compiled.Release?.Id, (await FindActiveAsync(_applicationId))?.ReleaseId);
+    }
+
+    [Fact]
+    public async Task An_http_oauth2_token_url_is_refused_unless_http_is_allowed()
+    {
+        using var folder = ApplicationFolder(_applicationId, _name, _orderId, NumberField)
+            .With("connectors/purchasing-system.json", OAuthConnector(_connectorId));
+        var compiled = await CompileAsync(folder);
+        var secret = new ActivationBinding(ActivationBinding.SecretKind, null);
+        var bindings = new Dictionary<string, ActivationBinding>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["PurchasingSystemUrl"] = new(ActivationBinding.UrlKind, new Uri("https://purchasing.example.test/api")),
+            ["PurchasingSystemTokenUrl"] = new(ActivationBinding.UrlKind, new Uri("http://auth.example.test/token")),
+            ["PurchasingSystemClientId"] = secret,
+            ["PurchasingSystemClientSecret"] = secret,
+        };
+
+        var refused = await ActivateAsync(compiled, new ActivationBindings("acme", bindings, AllowHttp: false));
+
+        var diagnostic = Assert.Single(refused.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.InsecureBaseUrl, "connectors/purchasing-system.json", "/auth/tokenUrl/binding",
+                "Tenant 'acme' binding 'PurchasingSystemTokenUrl' is not an https URL. Only Development allows http."),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.Message));
+        Assert.Null(await FindActiveAsync(_applicationId));
+
+        var allowed = await ActivateAsync(compiled, new ActivationBindings("acme", bindings, AllowHttp: true));
+
+        Assert.Empty(allowed.Diagnostics);
+        Assert.Equal(compiled.Release?.Id, (await FindActiveAsync(_applicationId))?.ReleaseId);
+    }
+
     [Fact]
     public async Task An_http_base_url_is_refused_unless_http_is_allowed()
     {
@@ -696,6 +793,15 @@ public sealed class ReleaseActivatorTests(DataDatabaseFixture database) : IClass
         { "id": "{{id}}", "kind": "connector", "name": "PurchasingSystem", "formatVersion": 1,
           "baseUrl": { "binding": "PurchasingSystemUrl" },
           "auth": { "type": "bearer", "token": { "binding": "PurchasingSystemToken" } },
+          "operations": [ { "name": "createPurchaseOrder", "method": "POST", "path": "/purchase-orders" } ] }
+        """;
+
+    private static string OAuthConnector(Guid id) =>
+        $$"""
+        { "id": "{{id}}", "kind": "connector", "name": "PurchasingSystem", "formatVersion": 1,
+          "baseUrl": { "binding": "PurchasingSystemUrl" },
+          "auth": { "type": "oauth2", "tokenUrl": { "binding": "PurchasingSystemTokenUrl" },
+                    "clientId": { "binding": "PurchasingSystemClientId" }, "clientSecret": { "binding": "PurchasingSystemClientSecret" } },
           "operations": [ { "name": "createPurchaseOrder", "method": "POST", "path": "/purchase-orders" } ] }
         """;
 

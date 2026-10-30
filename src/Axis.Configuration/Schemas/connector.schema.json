@@ -51,23 +51,67 @@
       "additionalProperties": false,
       "required": ["type"],
       "properties": {
-        "type": { "enum": ["none", "bearer", "header"] },
+        "type": { "enum": ["none", "bearer", "header", "oauth2"] },
         "token": { "$ref": "#/$defs/binding" },
         "name": { "$ref": "#/$defs/header" },
-        "value": { "$ref": "#/$defs/binding" }
+        "value": { "$ref": "#/$defs/binding" },
+        "tokenUrl": { "$ref": "#/$defs/binding" },
+        "clientId": { "$ref": "#/$defs/binding" },
+        "clientSecret": { "$ref": "#/$defs/binding" },
+        "scope": { "type": "string", "minLength": 1, "maxLength": 2000 },
+        "audience": { "type": "string", "minLength": 1, "maxLength": 2000 }
       },
       "allOf": [
         {
           "if": { "required": ["type"], "properties": { "type": { "const": "none" } } },
-          "then": { "properties": { "token": false, "name": false, "value": false } }
+          "then": {
+            "properties": {
+              "token": false,
+              "name": false,
+              "value": false,
+              "tokenUrl": false,
+              "clientId": false,
+              "clientSecret": false,
+              "scope": false,
+              "audience": false
+            }
+          }
         },
         {
           "if": { "required": ["type"], "properties": { "type": { "const": "bearer" } } },
-          "then": { "required": ["token"], "properties": { "name": false, "value": false } }
+          "then": {
+            "required": ["token"],
+            "properties": {
+              "name": false,
+              "value": false,
+              "tokenUrl": false,
+              "clientId": false,
+              "clientSecret": false,
+              "scope": false,
+              "audience": false
+            }
+          }
         },
         {
           "if": { "required": ["type"], "properties": { "type": { "const": "header" } } },
-          "then": { "required": ["name", "value"], "properties": { "token": false } }
+          "then": {
+            "required": ["name", "value"],
+            "properties": {
+              "token": false,
+              "tokenUrl": false,
+              "clientId": false,
+              "clientSecret": false,
+              "scope": false,
+              "audience": false
+            }
+          }
+        },
+        {
+          "if": { "required": ["type"], "properties": { "type": { "const": "oauth2" } } },
+          "then": {
+            "required": ["tokenUrl", "clientId", "clientSecret"],
+            "properties": { "token": false, "name": false, "value": false }
+          }
         }
       ]
     },

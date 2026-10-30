@@ -1,0 +1,30 @@
+{
+  "id": "7fa3522d-bb70-4deb-bbd4-f1afd94f1b61",
+  "kind": "connector",
+  "name": "OAuthPurchasing",
+  "formatVersion": 1,
+  "baseUrl": { "binding": "PurchasingUrl" },
+  "timeout": "PT1S",
+  "auth": {
+    "type": "oauth2",
+    "tokenUrl": { "binding": "PurchasingUrl" },
+    "clientId": { "binding": "PurchasingToken" },
+    "clientSecret": { "binding": "PurchasingToken" },
+    "scope": "orders.write",
+    "audience": "https://purchasing.example.test"
+  },
+  "idempotency": "Idempotency-Key",
+  "operations": [
+    {
+      "name": "createOrder",
+      "method": "POST",
+      "path": "/oauth-orders",
+      "input": [
+        { "name": "reference", "type": "text", "required": true },
+        { "name": "amount", "type": "decimal", "required": true },
+        { "name": "note", "type": "text" }
+      ],
+      "output": [{ "name": "orderNumber", "type": "text" }]
+    }
+  ]
+}
