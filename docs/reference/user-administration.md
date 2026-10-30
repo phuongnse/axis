@@ -46,7 +46,7 @@ commands are _(planned for M17)_.
   below. A field marked `sensitive` and record data are never shown.
 - **Commands:** invite, resend an invitation, disable, enable, reset an account's authenticator, give a role and remove
   a role. Each command asks for confirmation, and each writes an [audit record](#audit). Disable, enable, reset an
-  authenticator, and give and remove an application role are built as server routes, which the user's details will call.
+  authenticator, and give and remove an application or a platform role are built as server routes, which the user's details will call.
   The others are _(planned for M17)_.
   - `POST /api/users/{id}/disable`, `POST /api/users/{id}/enable` and `POST /api/users/{id}/reset-authenticator` answer
     `204` and take no body. They take a browser session only, so a service account's bearer token gets `401`.
@@ -153,8 +153,7 @@ The list route, the disable, enable and reset authenticator routes and the give 
 
 ## Audit
 
-`user.disabled`, `user.enabled`, `user.authenticatorReset`, and `user.roleGiven` and `user.roleRemoved` for application roles
-are built. The others are _(planned for M17)_.
+`user.disabled`, `user.enabled`, `user.authenticatorReset`, and `user.roleGiven` and `user.roleRemoved` are built. The others are _(planned for M17)_.
 
 - Each command writes one audit record in the tenant database, with the administrator as actor and the user it acts
   on: `user.invited`, `user.invitationResent`, `user.disabled`, `user.enabled`, `user.authenticatorReset`,
