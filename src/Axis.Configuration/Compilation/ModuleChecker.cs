@@ -30,7 +30,9 @@ namespace Axis.Configuration.Compilation;
 /// <c>target</c> or <c>sequence</c>, an event's, data source's or form's <c>entity</c> and a data source
 /// parameter's <c>target</c> name a resource of the same module without <c>/</c>, and are rewritten to
 /// the qualified name. The <c>roles</c> of an entry must map each role slot of the pinned version to
-/// a role of the application, and the pin keeps that map.
+/// a role of the application, and the pin keeps that map. The <c>connectors</c> of an entry must map
+/// each connector slot of the pinned version to a connector of the application that fits it, see
+/// <see cref="ConnectorChecker.CheckSlot"/>, and the pin keeps that map too.
 /// </summary>
 internal static class ModuleChecker
 {
@@ -60,7 +62,9 @@ internal static class ModuleChecker
         List<Diagnostic> diagnostics,
         ReferenceIndexBuilder references,
         IReadOnlyList<RoleResource> roles,
-        IReadOnlySet<string> unloadedRoleNames)
+        IReadOnlySet<string> unloadedRoleNames,
+        IReadOnlyList<ConnectorResource> connectors,
+        IReadOnlySet<string> unloadedConnectorNames)
     {
         var versionsById = installed
             .GroupBy(candidate => candidate.Manifest.Id, StringComparer.Ordinal)
@@ -197,7 +201,8 @@ internal static class ModuleChecker
             {
                 references.Add(application, $"/modules/{first.Index}", ReferenceRelations.Module, new ModuleNode(id));
                 var slotRoles = CheckRoleSlots(application, first.Index, application.Modules[first.Index], pinnedModule.Manifest, roles, unloadedRoleNames, diagnostics);
-                pins.Add(new PinnedModuleModel(id, first.RangeText, picked) { Roles = slotRoles });
+                var slotConnectors = CheckConnectorSlots(application, first.Index, application.Modules[first.Index], pinnedModule.Manifest, connectors, unloadedConnectorNames, diagnostics);
+                pins.Add(new PinnedModuleModel(id, first.RangeText, picked) { Roles = slotRoles, Connectors = slotConnectors });
             }
             else
             {
@@ -436,6 +441,81 @@ internal static class ModuleChecker
                 Report(
                     DiagnosticCodes.UnknownModuleSlotRole,
                     $"The role slot '{key}' is mapped to '{roleName}', but the application declares no role with that name.",
+                    keyPath);
+            }
+        }
+
+        return mapped.Count == 0 ? ReadOnlyDictionary<string, string>.Empty : mapped;
+    }
+
+    /// <summary>
+    /// Checks the <c>connectors</c> mapping of a module entry against the connector slots of its
+    /// pinned version, and the prefix of each slot label. Returns the slots mapped to a connector, by
+    /// slot name, to the connector's declared name. Slot names are matched exactly and connector names
+    /// ignoring letter case. A mapped connector that failed its own schema is not reported again.
+    /// </summary>
+    private static IReadOnlyDictionary<string, string> CheckConnectorSlots(
+        ApplicationManifest application,
+        int index,
+        ApplicationModuleDefinition entry,
+        ModuleManifest manifest,
+        IReadOnlyList<ConnectorResource> connectors,
+        IReadOnlySet<string> unloadedConnectorNames,
+        List<Diagnostic> diagnostics)
+    {
+        var path = $"/modules/{index}";
+        void Report(string code, string message, string at) =>
+            diagnostics.Add(new Diagnostic(code, message, application.File, at, application.Id));
+
+        for (var slotIndex = 0; slotIndex < manifest.Connectors.Count; slotIndex++)
+        {
+            var textKey = manifest.Connectors[slotIndex].Label.TextKey;
+            if (!textKey.StartsWith($"{manifest.Id}.", StringComparison.Ordinal))
+            {
+                diagnostics.Add(new Diagnostic(
+                    DiagnosticCodes.ModuleTextKeyWithoutPrefix,
+                    $"The text key '{textKey}' lacks the prefix '{manifest.Id}.'. Start each text key of the module with it.",
+                    $"modules/{manifest.Id}/{ModuleCatalog.ManifestFileName}",
+                    $"/connectors/{slotIndex}/label/textKey"));
+            }
+        }
+
+        var slotsByName = manifest.Connectors.ToDictionary(slot => slot.Name, StringComparer.Ordinal);
+        var mapped = new Dictionary<string, string>(StringComparer.Ordinal);
+        var connectorsPath = entry.Connectors.Count > 0 ? $"{path}/connectors" : path;
+        foreach (var slot in manifest.Connectors)
+        {
+            if (!entry.Connectors.ContainsKey(slot.Name))
+            {
+                Report(
+                    DiagnosticCodes.UnmappedModuleConnectorSlot,
+                    $"The connector slot '{slot.Name}' of module '{manifest.Id}' {manifest.Version} is not mapped. Map it to a connector of the application under 'connectors'.",
+                    connectorsPath);
+            }
+        }
+
+        foreach (var (key, connectorName) in entry.Connectors)
+        {
+            var keyPath = $"{path}/connectors/{Escape(key)}";
+            if (!slotsByName.TryGetValue(key, out var slot))
+            {
+                Report(
+                    DiagnosticCodes.UnknownModuleConnectorSlot,
+                    slotsByName.Count == 0
+                        ? $"The module '{manifest.Id}' {manifest.Version} has no connector slots, so '{key}' maps nothing."
+                        : $"The module '{manifest.Id}' {manifest.Version} has no connector slot '{key}'. Its slots are {string.Join(", ", manifest.Connectors.Select(candidate => $"'{candidate.Name}'"))}.",
+                    keyPath);
+            }
+            else if (connectors.FirstOrDefault(candidate => string.Equals(candidate.Name, connectorName, StringComparison.OrdinalIgnoreCase)) is { } connector)
+            {
+                ConnectorChecker.CheckSlot(slot, connector, (code, message) => Report(code, message, keyPath));
+                mapped[key] = connector.Name;
+            }
+            else if (!unloadedConnectorNames.Contains(connectorName))
+            {
+                Report(
+                    DiagnosticCodes.UnknownModuleSlotConnector,
+                    $"The connector slot '{key}' is mapped to '{connectorName}', but the application declares no connector with that name.",
                     keyPath);
             }
         }

@@ -135,31 +135,96 @@ public sealed class ModuleCatalog
                 manifest = manifest with { Modules = modules.Deserialize<List<ApplicationModuleDefinition>>(ApplicationLoader.SerializerOptions)! };
             }
 
-            if (!root.TryGetProperty("roles", out var rolesElement))
+            var slots = new List<ModuleRoleSlot>();
+            if (root.TryGetProperty("roles", out var rolesElement))
             {
-                return manifest;
+                var firstIndexByName = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+                foreach (var slotElement in rolesElement.EnumerateArray())
+                {
+                    var name = slotElement.GetProperty("name").GetString()!;
+                    if (!firstIndexByName.TryAdd(name, slots.Count))
+                    {
+                        problems.Add(new Diagnostic(
+                            DiagnosticCodes.ModuleManifestInvalid,
+                            $"The role slot '{name}' repeats the name of the slot at '/roles/{firstIndexByName[name]}', ignoring letter case. Name each slot once.",
+                            file,
+                            $"/roles/{slots.Count}/name"));
+                    }
+
+                    slots.Add(new ModuleRoleSlot(
+                        name,
+                        new TextReference(slotElement.GetProperty("label").GetProperty("textKey").GetString()!)));
+                }
             }
 
-            var slots = new List<ModuleRoleSlot>();
-            var firstIndexByName = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-            foreach (var slotElement in rolesElement.EnumerateArray())
+            var connectorSlots = new List<ModuleConnectorSlot>();
+            if (root.TryGetProperty("connectors", out var connectorsElement))
             {
-                var name = slotElement.GetProperty("name").GetString()!;
-                if (!firstIndexByName.TryAdd(name, slots.Count))
+                connectorSlots = connectorsElement.Deserialize<List<ModuleConnectorSlot>>(ApplicationLoader.SerializerOptions)!;
+                CheckConnectorSlotNames(connectorSlots, file, problems);
+            }
+
+            if (problems.Count > 0)
+            {
+                return null;
+            }
+
+            // A list that is not written keeps the shared empty default, which manifests compare equal.
+            return manifest with
+            {
+                Roles = slots.Count > 0 ? slots : manifest.Roles,
+                Connectors = connectorSlots.Count > 0 ? connectorSlots : manifest.Connectors,
+            };
+        }
+    }
+
+    /// <summary>Reports a connector slot, slot operation or field name that repeats an earlier one in its list, ignoring letter case.</summary>
+    private static void CheckConnectorSlotNames(List<ModuleConnectorSlot> slots, string file, List<Diagnostic> problems)
+    {
+        void Report(string message, string path) =>
+            problems.Add(new Diagnostic(DiagnosticCodes.ModuleManifestInvalid, message, file, path));
+
+        void CheckFields(IReadOnlyList<ConnectorFieldDefinition> fields, string path, string list)
+        {
+            var firstIndexByName = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            for (var index = 0; index < fields.Count; index++)
+            {
+                if (!firstIndexByName.TryAdd(fields[index].Name, index))
                 {
-                    problems.Add(new Diagnostic(
-                        DiagnosticCodes.ModuleManifestInvalid,
-                        $"The role slot '{name}' repeats the name of the slot at '/roles/{firstIndexByName[name]}', ignoring letter case. Name each slot once.",
-                        file,
-                        $"/roles/{slots.Count}/name"));
+                    Report(
+                        $"The {list} field '{fields[index].Name}' repeats the field at '{path}/{firstIndexByName[fields[index].Name]}', ignoring letter case. Name each field once.",
+                        $"{path}/{index}/name");
+                }
+            }
+        }
+
+        var firstSlotByName = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        for (var slotIndex = 0; slotIndex < slots.Count; slotIndex++)
+        {
+            var slot = slots[slotIndex];
+            var slotPath = $"/connectors/{slotIndex}";
+            if (!firstSlotByName.TryAdd(slot.Name, slotIndex))
+            {
+                Report(
+                    $"The connector slot '{slot.Name}' repeats the name of the slot at '/connectors/{firstSlotByName[slot.Name]}', ignoring letter case. Name each slot once.",
+                    $"{slotPath}/name");
+            }
+
+            var firstOperationByName = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            for (var operationIndex = 0; operationIndex < slot.Operations.Count; operationIndex++)
+            {
+                var operation = slot.Operations[operationIndex];
+                var operationPath = $"{slotPath}/operations/{operationIndex}";
+                if (!firstOperationByName.TryAdd(operation.Name, operationIndex))
+                {
+                    Report(
+                        $"The operation '{operation.Name}' of connector slot '{slot.Name}' repeats the operation at '{slotPath}/operations/{firstOperationByName[operation.Name]}', ignoring letter case. Name each operation once.",
+                        $"{operationPath}/name");
                 }
 
-                slots.Add(new ModuleRoleSlot(
-                    name,
-                    new TextReference(slotElement.GetProperty("label").GetProperty("textKey").GetString()!)));
+                CheckFields(operation.Input, $"{operationPath}/input", "input");
+                CheckFields(operation.Output, $"{operationPath}/output", "output");
             }
-
-            return problems.Count > 0 ? null : manifest with { Roles = slots };
         }
     }
 
