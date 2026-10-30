@@ -145,6 +145,10 @@ The server routes are built.
 - **At the next request:** a session reads the person's given roles at every request, in the statement that moves its
   last request time, and keeps them for that request only. A change applies at the person's next request, on every
   replica, and the person does not sign in again.
+- **On a preview tenant:** the preview has no users page and its own table stays empty. A session on it reads the given
+  roles, application and platform, of its main tenant at every request, from the main tenant's database. Removing a role
+  on the main tenant takes it away on the preview at the person's next request. When the main tenant is not served, the
+  session reads none.
 
 ## The first administrator
 

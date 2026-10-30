@@ -15,11 +15,16 @@ public sealed class TenantConnectionFactory(ITenantCatalog catalog, ITenantConte
 
     public async ValueTask<NpgsqlConnection> OpenConnectionAsync(CancellationToken cancellationToken = default)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
         var tenant = accessor.Current
             ?? throw new InvalidOperationException("No tenant context is set. Tenant database connections are only available while a tenant is resolved.");
+        return await OpenConnectionAsync(tenant.TenantId, cancellationToken).ConfigureAwait(false);
+    }
 
-        var dataSource = _dataSources.GetOrAdd(tenant.TenantId, CreateDataSource).Value;
+    /// <summary>Opens a connection to the named tenant's database from its pool, whatever tenant the request resolved.</summary>
+    public async ValueTask<NpgsqlConnection> OpenConnectionAsync(string tenantId, CancellationToken cancellationToken = default)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        var dataSource = _dataSources.GetOrAdd(tenantId, CreateDataSource).Value;
         return await dataSource.OpenConnectionAsync(cancellationToken).ConfigureAwait(false);
     }
 
