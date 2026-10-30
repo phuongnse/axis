@@ -99,7 +99,15 @@ One transaction then does the rest:
 5. It inserts the instance, pinned to the active release, with its first
    work item, as the [process start](processes.md#start-endpoint) does. An
    instance already running for the record is a `409`.
-6. It writes the audit records `record.created` and `process.started`.
+6. _(planned for M19)_ With an `event`, it raises the event for the new record,
+   as a [raise event step](process-events.md#raise-event-step) does: it stores
+   the occurrence, with the instance of step 5 as the one that raised it and the
+   active release, runs the `sync` event triggers, queues the `event.deliver`
+   work item and stages the event's
+   [webhook deliveries](integration-resources.md#webhook-delivery). A run-time
+   error in an expression is a `400` keyed `/event/fields/<key>`. See
+   [D115](../decisions/d115-an-inbound-endpoint-call-raises-an-event.md).
+7. It writes the audit records `record.created` and `process.started`.
 
 When any part fails, nothing is written. After the commit, an endpoint with
 `wait` checks the instance's state until it completes or `wait` runs out.

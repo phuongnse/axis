@@ -297,7 +297,7 @@ events about a record for a `waitEvent` step.
 | `entity_id` | `uuid` | The event's entity |
 | `subject_id` | `uuid` | The record the occurrence names |
 | `payload` | `jsonb` | The evaluated payload fields |
-| `process_instance_id` | `uuid` | The instance that raised the event |
+| `process_instance_id` | `uuid` | The instance that raised the event. _(planned for M19)_ For an event an [inbound endpoint](inbound-endpoints.md) raises, the instance the call started |
 | `raised_at` | `timestamptz` | The start of the step's transaction, `now()` |
 
 `axis.process_event_matches` holds one row for each use of an event occurrence by

@@ -601,6 +601,21 @@ the caller's id.
   - A `child-collection` field takes a `child-collection` input with the same
     target, by its name. The input's rows become the record's rows.
   - Fields that `values` leaves out are `null`, as in a record API create.
+- **Event** _(planned for M19)_. `event` is optional. It names an event about
+  `entity` and maps each payload field to an expression over the input, as
+  [D115](../decisions/d115-an-inbound-endpoint-call-raises-an-event.md) agrees.
+  The call raises it for the new record in its transaction, see
+  [the call](inbound-endpoints.md).
+
+  ```json
+  "event": { "name": "PurchaseRequestReceived", "fields": { "title": "title" } }
+  ```
+
+  - The expressions follow the rules of `values`: they see only the input
+    fields, and call no rule or aggregate and follow no path.
+  - An expression that reads an input that `values` maps to a field marked
+    `sensitive` counts as reading that field, so an event that has a
+    [webhook](#webhook-resource) may not carry it.
 - **Output.** `output` is optional. It lists field names of `entity` that a
   `201` returns when the instance completes within `wait`.
 - **Wait.** `wait` is an ISO 8601 duration, more than zero and at most
@@ -685,6 +700,13 @@ The compiler reports these as compile errors, all in one pass. The
   breaking it is `AXC0004`.
 - `wait` is a valid ISO 8601 duration, more than zero and at most `PT30S`:
   `AXC0124`. So `PT0S` is `AXC0124`.
+- _(planned for M19)_ An `event` follows the checks of a
+  [raise event step](process-events.md#raise-event-step), with its codes
+  reported under `/event`: the event exists (`AXC0125` at `/event/name`), is
+  about `entity` (`AXC0126`), and `fields` names each payload field once
+  (`AXC0127` at `/event/fields/{key}` and `AXC0128` at `/event/fields`). Each
+  expression is checked as a `values` expression, against its payload field's
+  type.
 
 ## Outbound webhooks
 
@@ -723,8 +745,9 @@ A webhook that tells a chat system when a note is closed, in
 - An unknown event, a missing binding name and a timeout out of range are each
   a new diagnostic.
 - An event that has a webhook may not carry a value read from a field marked
-  `sensitive`. A [raise event step](process-events.md#raise-event-step) that
-  maps one into its payload is a new diagnostic.
+  `sensitive`. A [raise event step](process-events.md#raise-event-step), or an
+  [endpoint's event](#endpoint-resource), that maps one into its payload is a
+  new diagnostic.
 - A module holds no webhook.
 
 ### Webhook delivery
