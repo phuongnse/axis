@@ -161,7 +161,9 @@ function Operation({
   const t = useText()
   const pointer = `/operations/${index}`
   const lookup = typeof operation.lookup === 'string' ? operation.lookup : undefined
-  const hasInput = Array.isArray(operation.input) && operation.input.length > 0
+  const hasBodyInput =
+    Array.isArray(operation.input) &&
+    operation.input.some((row) => !isContent(row) || row.in === undefined || row.in === 'body')
 
   return (
     <Card size="small" data-testid={`studio-operation-${index}`}>
@@ -209,7 +211,7 @@ function Operation({
           rows={operation.input}
           onChange={onChange}
         />
-        {operation.method === 'GET' && hasInput && (
+        {operation.method === 'GET' && hasBodyInput && (
           <Typography.Text type="warning" data-testid="studio-connector-get-no-input">
             {t('shell.studio.connector.getNoInput')}
           </Typography.Text>

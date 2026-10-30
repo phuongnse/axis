@@ -681,8 +681,8 @@ Run and the Test results list, the read-only view of a module entity, and the re
     - **Operations.** A card per operation shows its name, method, path and
       `lookup`, which is picked from the connector's other operations. Its
       input and output fields are rows of name, type and required. Operations
-      and rows can be added and removed. A `GET` with input rows keeps them and
-      shows a hint, and the compiler reports the error.
+      and rows can be added and removed. A `GET` with a body row keeps it and
+      shows a hint, and the compiler reports the error. There is no `in` picker.
     - **Unknown keys.** A key the editor does not show, in the file, in an
       operation or in `auth`, is saved unchanged.
   - **Identity provider editor** _(built)_. The Form tab shows the

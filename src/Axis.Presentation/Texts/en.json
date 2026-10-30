@@ -544,7 +544,7 @@
   "shell.studio.connector.fieldName": "name",
   "shell.studio.connector.fieldType": "type",
   "shell.studio.connector.required": "Required",
-  "shell.studio.connector.getNoInput": "A GET operation sends no body, so it cannot have input fields.",
+  "shell.studio.connector.getNoInput": "A GET operation sends no body, so its inputs must go in the path, the query or a header.",
   "shell.studio.identityProvider.name": "Name",
   "shell.studio.identityProvider.type": "Type",
   "shell.studio.identityProvider.urlBinding": "URL binding",

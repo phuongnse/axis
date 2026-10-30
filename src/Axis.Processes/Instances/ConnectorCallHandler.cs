@@ -20,8 +20,9 @@ namespace Axis.Processes.Instances;
 /// Sends the connector call a <c>connector.call</c> work item names, with no transaction open while
 /// the request runs. A short transaction first marks the call <c>sending</c>, counts the attempt and
 /// extends the item's lease by the connector's timeout, or by four times the timeout for an <c>oauth2</c>
-/// connector: a token request and a send, and the same two again after a <c>401</c>. The request then carries the stored input,
-/// the auth from the tenant's secret binding and the operation identity as its idempotency key. An
+/// connector: a token request and a send, and the same two again after a <c>401</c>. The request then
+/// carries the stored input where each input's <c>in</c> says (the path, the query, a header or the
+/// JSON body), the auth from the tenant's secret binding and the operation identity as its idempotency key. An
 /// <c>oauth2</c> connector sends the token that <see cref="IConnectorTokens"/> gets as a bearer token,
 /// before each call or lookup. A <c>401</c> drops the cached token, gets a new one and sends the
 /// request once more in the same attempt, with the same idempotency key, and a lookup does the same.
@@ -502,8 +503,11 @@ internal sealed partial class ConnectorCallHandler(
     }
 
     /// <summary>
-    /// Sends the call's request and reads a <c>2xx</c> body. Any other status, a timeout or an
-    /// exception is an error, with its class. An error names no header value and no body.
+    /// Sends the call's request and reads a <c>2xx</c> body. Each <c>path</c> input fills its
+    /// placeholder, escaped as one segment. The <c>query</c> inputs make the query string and the
+    /// <c>header</c> inputs the request headers, and an input with no value is left out. A non-<c>GET</c>
+    /// sends a JSON body of the <c>body</c> inputs. Any other status, a timeout or an exception is an
+    /// error, with its class. An error names no header value and no body.
     /// </summary>
     private async Task<Answer> SendAsync(Target target, LoadedConnectorCall call, string baseUrl, SecretValue? secret, CancellationToken cancellationToken)
     {
@@ -513,7 +517,67 @@ internal sealed partial class ConnectorCallHandler(
         timeout.CancelAfter(connector.Timeout);
         try
         {
-            var url = baseUrl.TrimEnd('/') + operation.Path.Replace("{idempotencyKey}", call.Id.ToString("D"), StringComparison.Ordinal);
+            var values = JsonNode.Parse(call.Input ?? "{}") as JsonObject ?? new JsonObject();
+            var path = operation.Path.Replace("{idempotencyKey}", call.Id.ToString("D"), StringComparison.Ordinal);
+            var query = new List<string>();
+            var headers = new List<KeyValuePair<string, string>>();
+            var body = new JsonObject();
+            foreach (var property in values)
+            {
+                var field = operation.Input.FirstOrDefault(candidate => string.Equals(candidate.Name, property.Key, StringComparison.OrdinalIgnoreCase));
+                if (field is null)
+                {
+                    continue;
+                }
+
+                if (field.In == "body")
+                {
+                    body[property.Key] = property.Value?.DeepClone();
+                }
+                else if (property.Value is not null)
+                {
+                    var text = property.Value is JsonValue value && value.TryGetValue<string>(out var textValue) ? textValue : property.Value.ToJsonString();
+                    switch (field.In)
+                    {
+                        case "query":
+                            query.Add($"{Uri.EscapeDataString(field.Name)}={Uri.EscapeDataString(text)}");
+                            break;
+                        case "header":
+                            headers.Add(new KeyValuePair<string, string>(field.Name, text));
+                            break;
+                    }
+                }
+            }
+
+            foreach (var field in operation.Input.Where(input => input.In == "path"))
+            {
+                var placeholder = $"{{{field.Name}}}";
+                if (!path.Contains(placeholder, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                var pathValue = values.FirstOrDefault(property => string.Equals(property.Key, field.Name, StringComparison.OrdinalIgnoreCase)).Value;
+                if (pathValue is null)
+                {
+                    // Compiling and staging prevent this. The error names the input, never a value.
+                    return new Answer(
+                        null,
+                        null,
+                        $"The operation '{operation.Name}' of the connector '{connector.Name}' has no value for the path input '{field.Name}'.",
+                        ErrorClass.Failed);
+                }
+
+                var segment = pathValue is JsonValue pathScalar && pathScalar.TryGetValue<string>(out var pathText) ? pathText : pathValue.ToJsonString();
+                path = path.Replace(placeholder, Uri.EscapeDataString(segment), StringComparison.OrdinalIgnoreCase);
+            }
+
+            if (query.Count > 0)
+            {
+                path += (path.Contains('?', StringComparison.Ordinal) ? "&" : "?") + string.Join('&', query);
+            }
+
+            var url = baseUrl.TrimEnd('/') + path;
             using var request = new HttpRequestMessage(new HttpMethod(operation.Method), url);
 
             // The request says which operation it is for. Only scenario stubs read these options.
@@ -521,7 +585,12 @@ internal sealed partial class ConnectorCallHandler(
             request.Options.Set(ConnectorClient.OperationOption, operation.Name);
             if (request.Method != HttpMethod.Get)
             {
-                request.Content = new StringContent(call.Input ?? "{}", Encoding.UTF8, "application/json");
+                request.Content = new StringContent(body.ToJsonString(), Encoding.UTF8, "application/json");
+            }
+
+            foreach (var header in headers)
+            {
+                request.Headers.TryAddWithoutValidation(header.Key, header.Value);
             }
 
             if (connector.Auth is { } auth && secret is not null)

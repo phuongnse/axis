@@ -428,7 +428,13 @@ same `operationId`. See [Retry](process-inspection.md#retry).
    binding, never the URL. For an `oauth2` connector this covers the token
    URL too.
 3. **Send.** The worker sends the request outside any transaction.
-   - The body is the stored input, as JSON. A `GET` sends no body.
+   - Each input goes where its `in` says, see
+     [Structured payloads](integration-resources.md#structured-payloads). A
+     `path` input fills its placeholder, escaped as one segment. `query`
+     inputs make the query string, and `header` inputs are request headers
+     named after the input. An optional input with no value is left out.
+   - The body is JSON that holds only the `body` inputs. A `GET` sends no
+     body.
    - The auth sends the secret as `Authorization: Bearer <secret>`, or in
      the named header. An `oauth2` auth first gets a token, from the worker's
      memory or the token endpoint, and sends that as the bearer token. A
