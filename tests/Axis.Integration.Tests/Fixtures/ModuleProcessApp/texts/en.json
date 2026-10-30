@@ -9,6 +9,7 @@
     "order.closeReview": "Close review",
     "pages.orders.title": "Orders",
     "role.clerk": "Clerk",
+    "role.manager": "Manager",
     "site.title": "Module processes"
   }
 }

@@ -4,5 +4,5 @@
   "name": "TextsEn",
   "formatVersion": 1,
   "locale": "en",
-  "texts": { "followups.followup": "Followup" }
+  "texts": { "followups.followup": "Followup", "followups.roles.reviewer": "Reviewer" }
 }

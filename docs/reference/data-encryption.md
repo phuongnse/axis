@@ -51,7 +51,7 @@ A sensitive field may declare an exact lookup, so a filter can find a record by 
 
 ## What a sensitive field cannot do
 
-Compilation refuses each of these on a sensitive field with [`AXC0307`](diagnostic-codes.md), at the path of the use.
+Compilation refuses each of these on a sensitive field with [`AXC0308`](diagnostic-codes.md), at the path of the use.
 The message names the field and the use.
 
 - A filter, other than the equality of an exact lookup.
@@ -62,7 +62,7 @@ The message names the field and the use.
 - An expression that runs as SQL, such as a data source `filter` or a policy grant's `filter`, other than the
   equality of an exact lookup.
 
-`exactLookup` on a field that is not `sensitive` is [`AXC0308`](diagnostic-codes.md) at `/fields/{i}/exactLookup`. A
+`exactLookup` on a field that is not `sensitive` is [`AXC0309`](diagnostic-codes.md) at `/fields/{i}/exactLookup`. A
 filter on a sensitive field that a caller sends at run time, through the record API or a data source's parameters,
 is a `400` problem keyed at the filter. Import and export read and write the plain values, under the same grants as
 the record API.
