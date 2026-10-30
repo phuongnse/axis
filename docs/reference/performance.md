@@ -118,12 +118,14 @@ to find its own numbers.
 - **Output.** _(Built.)_ k6 writes its summary to `artifacts/load-results/summary.json`, and the
   cleanup keeps that folder. `scripts/lib/load-objectives.mjs` prints each objective with its
   measured value and exits non-zero when one is missed or a metric is missing from the summary. The
-  k6 summary is kept as a CI artifact _(planned with the weekly run)_.
+  evaluator also reads `worker-metrics.json` and checks the claim delay p95 of the tenant `load` against
+  5 s. It interpolates the percentile inside the histogram buckets, and it fails when the metric is
+  missing. The k6 summary is kept as a CI artifact _(planned with the weekly run)_.
 - **Worker metrics.** _(Built.)_ `scripts/load.sh` adds an OpenTelemetry Collector to the stack. The worker
   exports its metrics to it every 5 s over OTLP with https, because the worker refuses plain http
   outside Development. The collector's certificate comes from the run's own authority, which the worker
   trusts. The collector writes the metrics, as OTLP JSON with one document per line, to
   `artifacts/load-results/worker-metrics.json`. After k6 the script stops the worker and then the
-  collector, so the last values reach the file, and the cleanup keeps it. Nothing checks the file yet.
+  collector, so the last values reach the file, and the cleanup keeps it.
 - **When it runs.** CI runs it once a week and on demand. It never gates a merge, and it is not a
   NexKit check, because a run on a shared CI machine varies too much to block a pull request.
