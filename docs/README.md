@@ -65,7 +65,7 @@ Detailed behaviour, one topic per file. Sections marked _(planned for Mx)_ are n
 | [Log inventory](reference/log-inventory.md)                            | Every log Axis writes: events, format, destination, readers, retention and the security events |
 | [Performance](reference/performance.md)                                | The service level objectives, the reference environment and the load test             |
 | [Frontend](reference/frontend.md)                                      | The SPA, sites, pages and widgets                                                     |
-| [Shell and home page](reference/shell.md)                             | The shell around every page, navigation icons, the page header, the platform home page and the sign-in screen |
+| [Shell and home page](reference/shell.md)                             | The shell around every page, navigation icons, the page header, the platform home page and the sign-in cards      |
 | [Platform pages](reference/platform-pages.md)                        | The sessions screen at `/account` and the users page at `/users`                      |
 | [Studio](reference/studio.md)                                          | The Studio page: editors, designers, publishing, tests                                |
 | [Entity designer](reference/entity-designer.md)                        | The Form tab of the entity editor: fields, settings, indexes, validations                 |

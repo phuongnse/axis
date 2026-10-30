@@ -34,16 +34,28 @@ export function reauthenticateUrl(returnUrl: string): string {
   return `${signInUrl(returnUrl)}&reauthenticate=true`
 }
 
-/** The shell's sign-in page, where the server sends the browser after a refused sign-in. */
+/** The shell's sign-in card, where the server sends the browser after a refused sign-in. */
 export const signInFailedPath = '/?signIn=failed'
 
+/** The shell's signed-out card, where the identity provider sends the browser after sign-out. */
+export const signedOutPath = '/?signedOut'
+
+/** Whether the address is one of the two cards on `/`: a refused sign-in or a signed-out person. */
+export function isSignInCardAddress(pathname: string, search: string): boolean {
+  if (pathname !== '/') {
+    return false
+  }
+  const params = new URLSearchParams(search)
+  return params.get('signIn') === 'failed' || params.has('signedOut')
+}
+
 /**
- * Sends the browser to sign in, and back to the current page with its query string after. On the
- * sign-in page after a refused sign-in the return address is `/`, so a retry does not land on the message.
+ * Sends the browser to sign in, and back to the current page with its query string after. On either
+ * card of `/` the return address is `/`, so a retry does not land on the card again.
  */
 export function startSignIn(): void {
-  const current = window.location.pathname + window.location.search
-  assignLocation(signInUrl(current === signInFailedPath ? '/' : current))
+  const { pathname, search } = window.location
+  assignLocation(signInUrl(isSignInCardAddress(pathname, search) ? '/' : pathname + search))
 }
 
 /**

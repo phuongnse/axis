@@ -252,8 +252,13 @@ export const previews: Record<string, readonly PreviewState[]> = {
     },
   ],
   signIn: [
-    { caption: 'Signed out', draw: () => <SignInCard />, entry: '/', frameHeight: 480 },
-    { caption: 'Sign-in refused', draw: () => <SignInCard />, entry: '/?signIn=failed', frameHeight: 480 },
+    {
+      caption: 'Sign-in refused',
+      draw: () => <SignInCard state="refused" />,
+      entry: '/?signIn=failed',
+      frameHeight: 480,
+    },
+    { caption: 'Signed out', draw: () => <SignInCard state="signedOut" />, entry: '/?signedOut', frameHeight: 480 },
     {
       caption: 'Session ended',
       draw: () => (

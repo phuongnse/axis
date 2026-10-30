@@ -64,7 +64,7 @@ describe('design-system previews', () => {
       'shell',
       ['Application site', 'Navigation collapsed', 'Form page', 'Platform site', 'App switcher', 'Language and theme'],
     ],
-    ['signIn', ['Signed out', 'Sign-in refused', 'Session ended']],
+    ['signIn', ['Sign-in refused', 'Signed out', 'Session ended']],
     [
       'identitySignIn',
       [

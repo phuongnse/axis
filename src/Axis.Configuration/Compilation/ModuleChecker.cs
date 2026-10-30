@@ -202,6 +202,7 @@ internal static class ModuleChecker
         var resources = new ModuleResourceCollector();
         var declaredByModule = new Dictionary<string, IReadOnlySet<string>>(StringComparer.Ordinal);
         var slotsByModule = new Dictionary<string, IReadOnlySet<string>>(StringComparer.Ordinal);
+        var manifests = new Dictionary<string, ModuleManifest>(StringComparer.Ordinal);
         foreach (var id in order)
         {
             if (!picks.TryGetValue(id, out var picked))
@@ -225,13 +226,23 @@ internal static class ModuleChecker
                 pins.Add(new PinnedModuleModel(id, first.RangeText, picked));
             }
 
+            manifests[id] = pinnedModule.Manifest;
             var declared = new HashSet<string>(pinnedModule.Manifest.Modules.Select(module => module.Id), StringComparer.Ordinal);
             declaredByModule[id] = declared;
             slotsByModule[id] = pinnedModule.Manifest.Roles.Select(slot => slot.Name).ToHashSet(StringComparer.Ordinal);
             CheckFiles(pinnedModule, declared, files, resources, diagnostics);
         }
 
-        return (pins, files, resources.ToResources(declaredByModule, slotsByModule));
+        // The entries of a pinned module for a pinned module send the slots of the dependency to its own.
+        var dependencies = order
+            .Where(manifests.ContainsKey)
+            .SelectMany(asker => EntriesOf(asker, picks[asker]).Requests
+                .Where(request => manifests.ContainsKey(request.Id))
+                .Select(request => new ModuleSlotChains.ModuleDependency(asker, request.Id, request.Index)))
+            .ToList();
+        var chained = new ModuleSlotChains(manifests, dependencies, connectors, diagnostics).Apply(pins);
+
+        return (chained, files, resources.ToResources(declaredByModule, slotsByModule));
     }
 
     /// <summary>
@@ -543,7 +554,7 @@ internal static class ModuleChecker
     }
 
     /// <summary>Escapes a key as an RFC 6901 JSON Pointer segment.</summary>
-    private static string Escape(string segment) =>
+    internal static string Escape(string segment) =>
         segment.Replace("~", "~0", StringComparison.Ordinal).Replace("/", "~1", StringComparison.Ordinal);
 
     /// <summary>Checks each file of a pinned module and adds the valid ones, in canonical form, under <c>modules/&lt;id&gt;/</c>.</summary>

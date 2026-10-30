@@ -6,10 +6,9 @@ import { logInAtKeycloak } from '../keycloak'
 // signs in as the employee in two fresh browser contexts, because the saved sessions of the other specs must stay alive.
 // The sign-in at Keycloak is at most 5 minutes old, so the screen allows ending sessions.
 
-/** Signs in as the employee on the Keycloak login page from the sign-in card on the home page. */
+/** Signs in as the employee on the Keycloak login page at once from the home page. */
 async function signInAsEmployee(page: Page) {
   await page.goto('/')
-  await page.getByRole('main').getByRole('button', { name: 'Sign in', exact: true }).click()
   await logInAtKeycloak(page, 'employee')
   await expect(page.getByRole('banner').getByRole('button', { name: 'Employee User', exact: true })).toBeVisible()
 }

@@ -291,4 +291,5 @@ public static class DiagnosticCodes
     public const string MismatchedSlotOutput = "AXC0303";
     public const string ModulePolicyRoleNotSlot = "AXC0304";
     public const string ModuleGrantOutsideModule = "AXC0305";
+    public const string ModuleSlotMappingConflict = "AXC0306";
 }

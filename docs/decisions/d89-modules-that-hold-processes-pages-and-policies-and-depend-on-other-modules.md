@@ -12,7 +12,7 @@ Role slots in `module.json` and their mapping in an application's `modules` entr
 
 Module processes compile inside their module, named `<module id>/<name>` with a derived id, and see only the resources of their module and the modules it declares. Role slots in task assignees, connector slots, module packages and the engines are not built yet.
 
-The `modules` list in `module.json`, flat resolution of the graph, one copy of each module, and the rule that the application names only modules it declares are built, with `AXC0295` and `AXC0296`. The slot maps of a dependency entry and a module naming resources of its dependencies are not.
+The `modules` list in `module.json`, flat resolution of the graph, one copy of each module, and the rule that the application names only modules it declares are built, with `AXC0295` and `AXC0296`. The slot maps of a dependency entry are built too, with `AXC0306` for mappings that differ. A module naming resources of its dependencies is not.
 
 - **New kinds in a module:** a module may also hold `process`, `page` and
   `policy` resources. It still holds no `role`, `site`, `connector`,
