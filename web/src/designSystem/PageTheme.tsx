@@ -1,5 +1,6 @@
 import { ConfigProvider } from 'antd'
 import { dialogButtons } from '../platform/dialogButtons'
+import { fieldErrors } from '../platform/fieldErrors'
 import { useMemo, useSyncExternalStore, type ReactNode } from 'react'
 import { antThemeFor } from '../platform/antTheme'
 import { designTokensFor, pageTokenPropertyNames, type PageTokenValues } from '../platform/designTokens'
@@ -54,7 +55,7 @@ export function PageTheme({ children }: { children: ReactNode }) {
 
   return (
     <ThemeModeContext.Provider value={value}>
-      <ConfigProvider theme={config} modal={dialogButtons}>
+      <ConfigProvider theme={config} modal={dialogButtons} form={fieldErrors}>
         {children}
       </ConfigProvider>
     </ThemeModeContext.Provider>

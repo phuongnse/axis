@@ -44,7 +44,7 @@ const numberStyle: CSSProperties = { textAlign: 'right', fontVariantNumeric: 'ta
 const plainCellStyle: CSSProperties = { minHeight: 32, display: 'flex', alignItems: 'center' }
 const plainNumberStyle: CSSProperties = { ...plainCellStyle, justifyContent: 'flex-end', ...numberStyle }
 // A cell's message sits under its input and stays left-aligned, even in a number column.
-const cellMessageStyle: CSSProperties = { display: 'block', marginTop: 4, textAlign: 'left' }
+const cellMessageStyle: CSSProperties = { display: 'block', textAlign: 'left' }
 
 /** The reference cell whose lookup is open. */
 interface OpenLookup {

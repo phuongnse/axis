@@ -579,14 +579,9 @@ export function useRecordForm(
                       }
                       required={required}
                       validateStatus={errors ? 'error' : undefined}
-                      // Ant Design cancels the item's bottom margin under a message, so this one sets the gap below.
                       help={
                         errors && (
-                          <div
-                            role="alert"
-                            data-testid={`field-error-${field.name}`}
-                            style={{ marginTop: 4, marginBottom: spacing.lg, fontSize: 14, lineHeight: '20px' }}
-                          >
+                          <div role="alert" data-testid={`field-error-${field.name}`}>
                             {errors.join(' ')}
                           </div>
                         )

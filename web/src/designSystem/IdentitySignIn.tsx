@@ -13,13 +13,22 @@ import {
 } from './fixtures'
 
 export type IdentitySignInPage =
-  'signIn' | 'wrongPassword' | 'organizationOnly' | 'twoStep' | 'resetPassword' | 'updatePassword' | 'addAuthenticator'
+  | 'signIn'
+  | 'emptyFields'
+  | 'wrongPassword'
+  | 'organizationOnly'
+  | 'twoStep'
+  | 'resetPassword'
+  | 'updatePassword'
+  | 'addAuthenticator'
 
 /** The identity provider's sign-in page in one of its states, built from fixtures through the shared sign-in components. */
 export function IdentitySignIn({ page }: { page: IdentitySignInPage }) {
   switch (page) {
     case 'signIn':
       return <SignInPage context={identitySignInContext} />
+    case 'emptyFields':
+      return <SignInPage context={{ ...identitySignInContext, username: '' }} />
     case 'wrongPassword':
       return <SignInPage context={{ ...identitySignInContext, error: identityInvalid }} />
     case 'organizationOnly':

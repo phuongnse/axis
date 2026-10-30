@@ -315,6 +315,16 @@ export const previews: Record<string, readonly PreviewState[]> = {
   identitySignIn: [
     { caption: 'Sign in', draw: () => <IdentitySignIn page="signIn" />, frameHeight: 600 },
     { caption: 'Wrong password', draw: () => <IdentitySignIn page="wrongPassword" />, frameHeight: 600 },
+    {
+      // Proposed: each error keeps the whole gap before the next field.
+      caption: 'Fields left empty',
+      draw: () => (
+        <SubmittedOnMount>
+          <IdentitySignIn page="emptyFields" />
+        </SubmittedOnMount>
+      ),
+      frameHeight: 600,
+    },
     { caption: 'Organization sign-in only', draw: () => <IdentitySignIn page="organizationOnly" />, frameHeight: 600 },
     { caption: 'Two-step verification', draw: () => <IdentitySignIn page="twoStep" />, frameHeight: 600 },
     { caption: 'Forgot password', draw: () => <IdentitySignIn page="resetPassword" />, frameHeight: 600 },
