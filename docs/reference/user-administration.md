@@ -114,7 +114,9 @@ asks its development users for a code, because each one has an authenticator, an
   of breached passwords, a file that the identity provider holds, see
   [keeping the realm in step](identity-provider.md#keeping-the-realm-in-step). "Forgot password?" sends a link by email
   that lasts 30 minutes. The 30 minutes apply to every link that a person requests, and password reset is the only one
-  today. Until the tenant's mail settings work, a reset request sends nothing.
+  today. The realm sends the link through the tenant's [mail settings](tenant-setting-commands.md#mail-settings), or through
+  the host's `Email` settings when the tenant has none, see
+  [keeping the realm in step](identity-provider.md#keeping-the-realm-in-step). With no mail settings at all, a reset request sends nothing.
 - **Failed sign-ins:** after 5 failed sign-ins in a row the account waits before the next try, starting at 1 minute
   and growing by 1 minute with each further 5 failures, up to 15 minutes. This is Keycloak's own temporary lockout, which
   cannot double the wait. The sign-in page shows the same message whether the account is locked, the password is wrong

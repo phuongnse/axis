@@ -3,6 +3,14 @@
   "enabled": true,
   "loginTheme": "axis",
   "resetPasswordAllowed": true,
+  "smtpServer": {
+    "host": "mailpit",
+    "port": "1025",
+    "from": "axis@localhost",
+    "ssl": "false",
+    "starttls": "false",
+    "auth": "false"
+  },
   "internationalizationEnabled": true,
   "supportedLocales": ["en", "vi"],
   "defaultLocale": "en",

@@ -222,6 +222,9 @@ through it, and the settings replace the host's `Email` settings as a whole, see
 `tenant email clear <id>` removes the tenant's own settings, so the tenant uses the host's again. A
 successful run of either command prints `<id> email ok`.
 
+Both commands also update the tenant's realm, so its "Forgot password?" link is sent through the same server, see
+[keeping the realm in step](identity-provider.md#keeping-the-realm-in-step).
+
 - **The whole block.** Each `set` replaces the tenant's whole mail block. An option left out is
   reset to its default or to empty, so a changed host never inherits an old user name or password.
   This is why `--host` and `--from` are required.
@@ -236,8 +239,14 @@ successful run of either command prints `<id> email ok`.
 - **Which tenants.** The commands work on an `active`, `suspended` or preview tenant. A preview
   tenant has its own mail settings, as it has its own bindings. A tenant that is still
   `provisioning` exits with code 2, as the binding commands do.
-- **Settings.** Only `--password` needs `Platform:SecretKey`. Both commands need
-  `ConnectionStrings:PlatformSchema` and `Tenancy:Source=directory`.
+- **The realm.** The commands store the change first and then write the realm's mail server: the tenant's own
+  settings, or the host's `Email` settings of `Axis.Admin` when the tenant has none. A tenant without a realm of its own,
+  such as a preview tenant, has nothing to write. When the identity provider fails, the settings stay stored, the
+  command prints `<id> realm failed: …` and exits with code 1, and the next activation or email command brings the realm in step.
+- **Settings.** Both commands need `Platform:SecretKey`, `ConnectionStrings:PlatformSchema` and
+  `Tenancy:Source=directory`. They read the host's `Email` settings, and an `Email` setting that is not valid exits
+  with code 2, naming the setting. When a tenant has a realm, `IdentityProvider:Url` is not needed, because the
+  command reads the address from the tenant's entry.
 - **Audit.** One [platform audit record](#platform-audit-records) is written with the change, in one
   transaction. For `set` it names the settings that were given, in this order: `smtpHost`,
   `smtpPort`, `smtpUseTls`, `smtpUserName`, `smtpPassword` and `from`. For `clear` it names `email`.

@@ -6,6 +6,8 @@
 # realm at the address the browser uses. The server signs people in through that realm at
 # /api/auth/sign-in. The SPA does not offer it yet. The realm signs people in on the Axis theme, which this script
 # builds into artifacts/keycloak-theme and mounts read-only before Keycloak starts.
+# The axis realm sends its emails, such as a password reset link, to Mailpit. This script starts Mailpit on a Docker
+# network of its own with the alias mailpit, joins Keycloak to that network, and removes both at the end.
 # The server starts with seven applications active: the generic E2E test application in
 # tests/e2e/fixtures/e2e-app, the purchase request sample in samples/apps/purchase-requests, the
 # leave request sample in samples/apps/leave-requests, the service desk sample in
@@ -101,6 +103,9 @@ container="axis-e2e-postgres-$$"
 password="e2e-$RANDOM$RANDOM"
 keycloak_image="quay.io/keycloak/keycloak:26.4"
 keycloak_container="axis-e2e-keycloak-$$"
+mailpit_image="axllent/mailpit:v1.32.0"
+mailpit_container="axis-e2e-mailpit-$$"
+network="axis-e2e-$$"
 
 purchasing_pid=""
 publisher_pid=""
@@ -139,6 +144,8 @@ cleanup() {
   fi
   docker rm -f "$container" >/dev/null 2>&1 || true
   docker rm -f "$keycloak_container" >/dev/null 2>&1 || true
+  docker rm -f "$mailpit_container" >/dev/null 2>&1 || true
+  docker network rm "$network" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
 
@@ -152,7 +159,10 @@ if affected playwright; then
   # theme, so the rebuild in scripts/build.sh later is fine.
   npm run build:keycloak-theme --prefix web
   keycloak_port="${AXIS_E2E_KEYCLOAK_PORT:-8180}"
-  docker run -d --name "$keycloak_container" \
+  # The realm names Mailpit by its alias, so both containers join a network of their own.
+  docker network create "$network" >/dev/null
+  docker run -d --name "$mailpit_container" --network "$network" --network-alias mailpit "$mailpit_image" >/dev/null
+  docker run -d --name "$keycloak_container" --network "$network" \
     -e KC_BOOTSTRAP_ADMIN_USERNAME=admin -e KC_BOOTSTRAP_ADMIN_PASSWORD=admin \
     -v "$PWD/samples/keycloak:/opt/keycloak/data/import:ro" \
     -v "$PWD/artifacts/keycloak-theme:/opt/keycloak/themes:ro" -p "127.0.0.1:$keycloak_port:$keycloak_port" \

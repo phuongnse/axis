@@ -341,6 +341,11 @@ works on a fresh clone:
   only. An exported `Email__*` setting replaces each one, so a developer can try a real mail server.
   The script runs Development, the only environment that sends email with `Email__Smtp__UseTls`
   off. See [mail settings](reference/notifications.md#mail-settings).
+- The development realm `axis` sends its emails, such as a password reset link, to Mailpit too, under `scripts/dev.sh`,
+  Compose and `scripts/e2e.sh`, because `samples/keycloak/axis-realm.json` names `mailpit:1025`. Keycloak reaches Mailpit
+  by the name `mailpit` on the Docker network: Compose has it already, and `scripts/e2e.sh` starts Mailpit and Keycloak on a
+  network of their own. `scripts/dev.sh` gives the publisher `Email__*` settings for `mailpit:1025`, which is the address
+  that Keycloak sees, because the publisher writes the realm's mail server when it publishes.
 - It also runs one publisher, `axis-admin publisher`, with
   its lines starting with `[publisher]`. It starts once the server has
   migrated the tenant databases. It runs from the built `Axis.Admin.dll`, not under

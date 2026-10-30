@@ -172,6 +172,25 @@ describe('scripts/e2e.sh runs Playwright, or one shard of it with AXIS_E2E_SHARD
     assert.ok(keycloak > build, run.calls.join('\n'))
   })
 
+  test('Mailpit runs with the alias mailpit on the network of Keycloak, and both are removed at the end', () => {
+    const run = runE2e()
+
+    assert.equal(run.status, 0, run.stdout + run.stderr)
+    const mailpit = run.calls.findIndex((call) => call.startsWith('docker run ') && call.includes('axllent/mailpit'))
+    const keycloak = run.calls.findIndex((call) => call.startsWith('docker run ') && call.includes('/opt/keycloak/themes:ro'))
+    assert.ok(mailpit >= 0, run.calls.join('\n'))
+    assert.ok(keycloak >= 0, run.calls.join('\n'))
+    assert.match(run.calls[mailpit], /--network-alias mailpit /)
+    const network = /--network (\S+)/.exec(run.calls[mailpit])?.[1]
+    assert.ok(network, run.calls[mailpit])
+    assert.match(run.calls[keycloak], new RegExp(`--network ${network} `))
+    const created = run.calls.indexOf(`docker network create ${network}`)
+    assert.ok(created >= 0 && created < mailpit && created < keycloak, run.calls.join('\n'))
+    const mailpitName = /--name (\S+)/.exec(run.calls[mailpit])?.[1]
+    assert.ok(run.calls.includes(`docker rm -f ${mailpitName}`), run.calls.join('\n'))
+    assert.ok(run.calls.includes(`docker network rm ${network}`), run.calls.join('\n'))
+  })
+
   for (const shard of ['4/3', '0/3', 'abc']) {
     test(`a shard of ${shard} stops the script before any container starts`, () => {
       const run = runE2e(shard)

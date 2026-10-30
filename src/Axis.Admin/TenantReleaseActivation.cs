@@ -122,14 +122,22 @@ internal sealed class TenantReleaseActivation(
 
     /// <summary>
     /// The realm sync for <see cref="RunAsync"/>: it applies a realm plan to the realm of <paramref name="realm"/> with the tenant's
-    /// <paramref name="bindings"/>. It is <c>null</c> when the tenant has no realm details, such as a preview tenant, so the step skips the sync.
+    /// <paramref name="bindings"/>, then writes <paramref name="smtpServer"/> as the realm's mail server. It is <c>null</c> when the tenant has no realm details,
+    /// such as a preview tenant, so the step skips the sync.
     /// </summary>
     public static Func<RealmPlan, Task>? RealmSync(
         HttpClient http,
         TenantRealmAccess? realm,
         IReadOnlyDictionary<string, TenantBinding> bindings,
+        IReadOnlyDictionary<string, string> smtpServer,
         CancellationToken cancellationToken) =>
-        realm is null ? null : plan => ActivationRealmSync.SyncAsync(http, realm, bindings, plan, cancellationToken);
+        realm is null
+            ? null
+            : async plan =>
+            {
+                await ActivationRealmSync.SyncAsync(http, realm, bindings, plan, cancellationToken);
+                await new RealmSync(http, realm.BaseAddress).SyncMailServerAsync(realm.Name, realm.ActivationClientSecret.Reveal(), smtpServer, cancellationToken);
+            };
 
     /// <summary>
     /// Runs the <c>version</c> step and then the <c>validate</c> step for the tenant <paramref name="id"/>. The validate step compiles

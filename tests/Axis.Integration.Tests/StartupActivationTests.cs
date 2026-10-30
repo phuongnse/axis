@@ -515,7 +515,7 @@ public sealed class StartupActivationTests(PostgreSqlFixture database, KeycloakF
         try
         {
             await new TenantRealm(http, new IdentityProviderAdmin(baseAddress, KeycloakFixture.AdminClientId, KeycloakFixture.AdminClientSecret))
-                .EnsureAsync(realm, "Acme", secrets, CancellationToken);
+                .EnsureAsync(realm, "Acme", secrets, new Dictionary<string, string>(), CancellationToken);
 
             await using (var factory = CreateFactory(a, b, folder.Path, new LogCollector(), RealmSettings(baseAddress, realm, secrets.Activation)))
             {
@@ -548,7 +548,7 @@ public sealed class StartupActivationTests(PostgreSqlFixture database, KeycloakF
         try
         {
             await new TenantRealm(http, new IdentityProviderAdmin(baseAddress, KeycloakFixture.AdminClientId, KeycloakFixture.AdminClientSecret))
-                .EnsureAsync(realm, "Acme", new TenantRealmSecrets("platform-1", "activation-1", "users-1"), CancellationToken);
+                .EnsureAsync(realm, "Acme", new TenantRealmSecrets("platform-1", "activation-1", "users-1"), new Dictionary<string, string>(), CancellationToken);
 
             await using var factory = CreateFactory(a, b, folder.Path, logs, RealmSettings(baseAddress, realm, WrongSecret));
 

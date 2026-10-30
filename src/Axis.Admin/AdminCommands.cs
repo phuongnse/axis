@@ -229,7 +229,13 @@ internal static partial class AdminCommands
                 return 2;
             }
 
-            settings = settings with { IdentityProvider = identityProvider };
+            if (ReadRealmMail(configuration, out problem) is not { } mail)
+            {
+                error.WriteLine(problem);
+                return 2;
+            }
+
+            settings = settings with { IdentityProvider = identityProvider, Mail = mail };
         }
 
         try
@@ -1009,6 +1015,7 @@ internal static partial class AdminCommands
             tenants,
             bindings,
             realmBindings,
+            settings.Mail,
             http,
             folder,
             settings.Packages,
@@ -1089,7 +1096,7 @@ internal static partial class AdminCommands
         return await new Publisher(
             new ReleaseSettings(settings.Packages, settings.Modules, settings.InlineRecomputeLimit),
             scenarioServer,
-            new DirectoryPublisherTenants(settings.Platform, refreshInterval, http),
+            new DirectoryPublisherTenants(settings.Platform, settings.Mail, refreshInterval, http),
             lease,
             testLimit,
             output,
@@ -1136,12 +1143,18 @@ internal static partial class AdminCommands
             return 2;
         }
 
+        if (ReadRealmMail(configuration, out problem) is not { } mail)
+        {
+            error.WriteLine(problem);
+            return 2;
+        }
+
         var allowHttp = (configuration[DotnetEnvironmentSetting] ?? Environments.Production) == Environments.Development;
         using var http = IdentityProviderClient(identityProviderHandler);
         return await new Publisher(
             settings,
             scenarioServer,
-            new ConfigurationPublisherTenants(catalog.Tenants, allowHttp, output, http),
+            new ConfigurationPublisherTenants(catalog.Tenants, mail, allowHttp, output, http),
             lease,
             testLimit,
             output,
@@ -1267,7 +1280,26 @@ internal static partial class AdminCommands
         }
 
         var release = ReadReleaseSettings(configuration, error, out problem);
-        return release is null ? null : new ActivateSettings(platform, release.Packages, release.Modules, release.InlineRecomputeLimit);
+        if (release is null)
+        {
+            return null;
+        }
+
+        return ReadRealmMail(configuration, out problem) is { } mail
+            ? new ActivateSettings(platform, release.Packages, release.Modules, release.InlineRecomputeLimit, mail)
+            : null;
+    }
+
+    /// <summary>
+    /// Reads the <c>Email</c> block that a realm's mail server falls back to, for the commands that write a realm. A problem names
+    /// the setting and never its value, and one line holds each problem.
+    /// </summary>
+    internal static RealmMail? ReadRealmMail(IConfiguration configuration, out string problem)
+    {
+        var problems = new List<string>();
+        var mail = RealmMail.Read(configuration, problems);
+        problem = string.Join(Environment.NewLine, problems);
+        return problems.Count == 0 ? mail : null;
     }
 
     // The part of the activate settings that needs no platform database: the catalogs and the inline recompute limit.
@@ -1391,7 +1423,12 @@ internal static partial class AdminCommands
                 return null;
             }
 
-            create = create with { IdentityProvider = identityProvider };
+            if (ReadRealmMail(configuration, out problem) is not { } mail)
+            {
+                return null;
+            }
+
+            create = create with { IdentityProvider = identityProvider, Mail = mail };
         }
 
         var path = configuration[PathSetting];
@@ -1793,8 +1830,8 @@ internal sealed record TenantRestoreRequest(string File, string Id, IReadOnlyLis
 /// <summary>The settings every command reads: the platform database and the key of the tenant secrets.</summary>
 internal sealed record PlatformSettings(string PlatformConnectionString, TenantSecretCipher Cipher);
 
-/// <summary>The settings of <c>activate</c>: the common ones, the loaded packages and modules and the inline recompute limit.</summary>
-internal sealed record ActivateSettings(PlatformSettings Platform, PackageCatalog Packages, ModuleCatalog Modules, int InlineRecomputeLimit);
+/// <summary>The settings of <c>activate</c>: the common ones, the loaded packages and modules, the inline recompute limit and the realm's mail fallback.</summary>
+internal sealed record ActivateSettings(PlatformSettings Platform, PackageCatalog Packages, ModuleCatalog Modules, int InlineRecomputeLimit, RealmMail Mail);
 
 /// <summary>The settings of the release steps that need no platform database: the loaded packages and modules and the inline recompute limit.</summary>
 internal sealed record ReleaseSettings(PackageCatalog Packages, ModuleCatalog Modules, int InlineRecomputeLimit);
@@ -1815,14 +1852,15 @@ internal sealed record BackupSettings(string PlatformConnectionString, TenantSec
 
 /// <summary>
 /// The settings of <c>tenant create</c>, which also needs the admin role. <paramref name="OidcClientSecret"/> is for <c>tenant restore</c>.
-/// <paramref name="IdentityProvider"/> is set only by <c>tenant create</c> of a main tenant.
+/// <paramref name="IdentityProvider"/> and <paramref name="Mail"/> are set only by <c>tenant create</c> of a main tenant, and by <c>tenant restore</c> when it has the identity provider settings.
 /// </summary>
 internal sealed record CreateSettings(
     NpgsqlConnectionStringBuilder Admin,
     string PlatformConnectionString,
     TenantSecretCipher Cipher,
     string? OidcClientSecret,
-    IdentityProviderAdmin? IdentityProvider = null);
+    IdentityProviderAdmin? IdentityProvider = null,
+    RealmMail? Mail = null);
 
 /// <summary>The settings of <c>tenant restore</c>: those of <c>tenant create</c>, the <c>PATH</c> and the installed extension packages, which may be unset.</summary>
 internal sealed record RestoreSettings(CreateSettings Create, string SearchPath, string? ExtensionsPath);

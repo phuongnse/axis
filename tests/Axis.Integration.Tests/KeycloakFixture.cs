@@ -9,7 +9,7 @@ namespace Axis.Integration.Tests;
 /// first time a test needs it, so a run that needs no Keycloak never starts one. It loads the Axis theme, which the
 /// realm uses as its login theme, from the test output. Build the theme first with
 /// <c>npm run build:keycloak-theme --prefix web</c>. It also holds the breached-password list that the realms made by <c>TenantRealm</c> name in their password policy. The fixture removes
-/// the container when the run ends. It also holds the organization realm <c>company</c>, which plays an
+/// the container when the run ends. It joins the <see cref="IntegrationNetwork"/>, so it reaches the Mailpit servers of <see cref="MailpitFixture"/> by their network aliases. It also holds the organization realm <c>company</c>, which plays an
 /// organization's own identity provider. A test may create and delete a realm of its own, but must not change the
 /// <c>axis</c> or <c>company</c> realm.
 /// </summary>
@@ -90,8 +90,11 @@ public sealed class KeycloakFixture : IAsyncDisposable
                 "The Axis Keycloak theme is missing from the test output. Run 'npm run build:keycloak-theme --prefix web' and build the tests again.");
         }
 
+        var network = await IntegrationNetwork.GetAsync();
+
         // The builder already runs start-dev, and the command adds --import-realm to it.
         var container = new KeycloakBuilder(Image)
+            .WithNetwork(network)
             .WithResourceMapping(new FileInfo(Path.Combine(AppContext.BaseDirectory, "Keycloak", "axis-realm.json")), "/opt/keycloak/data/import/")
             .WithResourceMapping(new FileInfo(Path.Combine(AppContext.BaseDirectory, "Keycloak", "company-realm.json")), "/opt/keycloak/data/import/")
             .WithResourceMapping(new FileInfo(Path.Combine(AppContext.BaseDirectory, "Keycloak", "axis-breached-passwords.txt")), "/opt/keycloak/data/password-blacklists/")

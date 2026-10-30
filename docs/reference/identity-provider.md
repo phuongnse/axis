@@ -327,12 +327,26 @@ _(planned for M17)_
   stored platform providers are always part of the plan, so a provider that only the platform sign-in names stays in
   the realm. A provider that nothing names any more is removed. Its users stay, but cannot sign in through it.
   Built for `Axis.Admin`: `activate`, and the publisher's `publish`, `publish` with target `preview` and `rollback`
-  update the realm inside their `activate` step, after the activation has committed. A tenant without an activation
+  update the realm, with its mail server, inside their `activate` step, after the activation has committed. A tenant without an activation
   secret, such as a preview tenant or one that signs in through an outside identity provider, skips the update. A
   failure of the identity provider fails the step with a line that names the identity provider step and its status
   code, and the new release stays active, see [activate](administration.md#activate). A `validate` and a `test`
   never update the realm. The server's startup activation updates it too, see above. `tenant sign-in set` brings the
   realm in step after it stores the platform sign-in, see [platform sign-in](tenant-setting-commands.md#platform-sign-in).
+- **Mail server:** the realm's `smtpServer` mirrors the tenant's own [mail settings](tenant-setting-commands.md#mail-settings),
+  or the host's `Email` settings when the tenant has none, so "Forgot password?" sends its reset link, see
+  [accounts](user-administration.md#accounts). It copies the host, port, user, password and from address. TLS on port 465
+  is `ssl`, TLS on another port is `starttls`, and TLS off is neither. The realm's mail server is empty when neither the
+  tenant nor the host has mail settings. It is empty too outside Development when the settings have TLS off, because the
+  worker sends nothing in that case either, see [mail settings](notifications.md#mail-settings). `tenant create`, and
+  `tenant restore` when it makes a new realm, write it in their `realm` step. `tenant email set` and `tenant email clear` write it right
+  after they store the change, and `Axis.Admin` `activate`, `publish` and `rollback` write it again inside their `activate` step.
+  These commands read the host's settings from the `Email` settings of `Axis.Admin`, the same keys that the worker reads, so
+  the operator gives both hosts the same block. The server's startup activation leaves the mail server as it is, because
+  the server has no `Email` settings. The SMTP password is copied into the identity provider and never printed, and the
+  identity provider's admin API shows it masked. The development realm `axis` has a mail server in
+  `samples/keycloak/axis-realm.json` that points at Mailpit as `mailpit:1025`, see
+  [development realm and users](../development.md#development-realm-and-users).
 - **Brought in step by restore:** `tenant restore` of a tenant that gets a new realm creates the realm as `tenant create`
   does and brings it in step with the active releases of the restored database. The archive holds no secret value, so a
   provider whose bindings have no value yet is left out with a warning. The next activation adds it once the operator has

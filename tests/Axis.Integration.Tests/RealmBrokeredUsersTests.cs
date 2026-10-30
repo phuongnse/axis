@@ -38,7 +38,7 @@ public sealed class RealmBrokeredUsersTests(KeycloakFixture keycloak) : IAsyncLi
     {
         var tenant = _realms.NewRealmName();
         await new TenantRealm(_http, new IdentityProviderAdmin(_baseAddress, KeycloakFixture.AdminClientId, KeycloakFixture.AdminClientSecret))
-            .EnsureAsync(tenant, "Acme", _secrets, TestContext.Current.CancellationToken);
+            .EnsureAsync(tenant, "Acme", _secrets, new Dictionary<string, string>(), TestContext.Current.CancellationToken);
         var upstreamA = await _realms.NewUpstreamRealmAsync();
         var upstreamB = await _realms.NewUpstreamRealmAsync();
         var subjectA = await _realms.AddUpstreamUserAsync(upstreamA);

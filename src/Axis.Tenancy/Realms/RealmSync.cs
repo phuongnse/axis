@@ -119,6 +119,22 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
         }
     }
 
+    /// <summary>
+    /// Replaces the realm's mail server (<c>smtpServer</c>) with <paramref name="smtpServer"/>, which
+    /// <see cref="RealmMailServer.Of"/> builds. An empty map clears the mail server. It signs in as <c>axis-activation</c>,
+    /// whose <c>manage-realm</c> right covers the realm settings. An error names the step and the status code, never a response body or the password.
+    /// </summary>
+    public async Task SyncMailServerAsync(
+        string realm, string activationSecret, IReadOnlyDictionary<string, string> smtpServer, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(smtpServer);
+
+        var token = await ActivationTokenAsync(realm, activationSecret, cancellationToken);
+        using var response = await SendAsync(
+            token, HttpMethod.Put, $"admin/realms/{Uri.EscapeDataString(realm)}", new Dictionary<string, object> { ["smtpServer"] = smtpServer }, cancellationToken);
+        EnsureSuccess(response, "update the mail server");
+    }
+
     private static void Validate(RealmState state)
     {
         var paths = new HashSet<string>(StringComparer.Ordinal);

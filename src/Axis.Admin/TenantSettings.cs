@@ -140,10 +140,17 @@ internal static class TenantSettings
             return Usage(run);
         }
 
-        var (setup, exit) = await PrepareAsync(run, needsCipher: request.WithPassword);
+        // The key decrypts the stored password, which the realm's mail server copies.
+        var (setup, exit) = await PrepareAsync(run, needsCipher: true);
         if (setup is null)
         {
             return exit;
+        }
+
+        if (AdminCommands.ReadRealmMail(run.Configuration, out var problem) is not { } mail)
+        {
+            run.Error.WriteLine(problem);
+            return 2;
         }
 
         var id = run.Args[3];
@@ -185,7 +192,7 @@ internal static class TenantSettings
             return 1;
         }
 
-        return Print(run, id, "email", result);
+        return await EmailRealmAsync(run, setup, mail, id, result);
     }
 
     public static async Task<int> SignInSetAsync(AdminRun run)
@@ -301,11 +308,68 @@ internal static class TenantSettings
             return Usage(run);
         }
 
-        return await ChangeAsync(
-            run,
-            run.Args[3],
-            "email",
-            (platform, command) => TenantEmailSettings.ClearAsync(platform, command, run.Args[3], run.CancellationToken));
+        var (setup, exit) = await PrepareAsync(run, needsCipher: true);
+        if (setup is null)
+        {
+            return exit;
+        }
+
+        if (AdminCommands.ReadRealmMail(run.Configuration, out var problem) is not { } mail)
+        {
+            run.Error.WriteLine(problem);
+            return 2;
+        }
+
+        var id = run.Args[3];
+        TenantSettingResult result;
+        try
+        {
+            await using var platform = NewContext(setup.Connection);
+            result = await TenantEmailSettings.ClearAsync(platform, run.Command.Name, id, run.CancellationToken);
+        }
+        catch (OperationCanceledException)
+        {
+            run.Error.WriteLine("The command was canceled before any tenant work.");
+            return 1;
+        }
+
+        return await EmailRealmAsync(run, setup, mail, id, result);
+    }
+
+    /// <summary>
+    /// After a stored change of the mail settings, writes the tenant's realm mail server: its own settings, or the host's when it has none.
+    /// A tenant without a realm of its own, such as a preview tenant, has nothing to write. The stored change stays when the identity provider fails:
+    /// the next activation or email command brings the realm in step.
+    /// </summary>
+    private static async Task<int> EmailRealmAsync(AdminRun run, Setup setup, RealmMail mail, string id, TenantSettingResult result)
+    {
+        if (result.Outcome != TenantSettingOutcome.Changed)
+        {
+            return Print(run, id, "email", result);
+        }
+
+        try
+        {
+            TenantRow? row;
+            await using (var platform = NewContext(setup.Connection))
+            {
+                row = await platform.Tenants.AsNoTracking().SingleOrDefaultAsync(tenant => tenant.Id == id, run.CancellationToken);
+            }
+
+            if (row is not null && DirectoryTenantCatalog.Realm(row, setup.Cipher!) is { } realm)
+            {
+                using var http = AdminCommands.IdentityProviderClient(run.IdentityProviderHandler);
+                await new RealmSync(http, realm.BaseAddress).SyncMailServerAsync(
+                    realm.Name, realm.ActivationClientSecret.Reveal(), mail.For(DirectoryTenantCatalog.Email(row, setup.Cipher!)), run.CancellationToken);
+            }
+        }
+        catch (Exception exception) when (exception is HttpRequestException or InvalidOperationException or OperationCanceledException or NpgsqlException)
+        {
+            run.Output.WriteLine($"{id} realm failed: {TenantDatabaseSteps.Safe(exception)}");
+            return 1;
+        }
+
+        return Print(run, id, "email", result);
     }
 
     public static async Task<int> SessionEndAsync(AdminRun run)

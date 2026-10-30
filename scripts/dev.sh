@@ -13,6 +13,10 @@
 # Mailpit is a local mail server that keeps every email. The worker sends its emails to it, and they can be read on
 # its web page. This script sets Email__Smtp__Host, Email__Smtp__Port, Email__Smtp__UseTls and Email__From for the
 # worker's process only, and an exported Email__* setting replaces each one, to try a real mail server.
+# The development realm axis sends its emails, such as a password reset link, to Mailpit too, because
+# samples/keycloak/axis-realm.json names it. Keycloak runs in Docker and reaches Mailpit as mailpit:1025, while the
+# worker reaches it on localhost. The publisher writes the realm's mail server when it publishes, so it gets the address
+# that Keycloak sees, or it would clear the realm's setting.
 # The server runs startup activation as the database role axis_schema and serves requests as
 # axis_runtime. The worker runs only as axis_runtime. The publisher runs its steps as axis_schema
 # and seeds as axis_runtime. Docker Compose creates both roles. The publisher also gets the role
@@ -290,8 +294,10 @@ while :; do
   if [ -z "$publisher" ] && [ -e "$state/server-listening" ]; then
     log "The server has migrated the tenant databases. Starting the publisher."
     # Bash cannot export a name with a hyphen, so the settings go through env. The realm settings only let the
-    # tenant catalog pass validation: the server alone brings the realm in step.
+    # tenant catalog pass validation: the server alone brings the realm in step. The Email__ settings are the address that
+    # Keycloak sees, mailpit:1025, and not localhost, because the publisher writes them into the realm's mail server.
     (exec env DOTNET_ENVIRONMENT=Development \
+      Email__Smtp__Host=mailpit Email__Smtp__Port=1025 Email__Smtp__UseTls=false Email__From=axis@localhost \
       Extensions__Path="$PWD/artifacts/extensions" \
       Modules__Path="$PWD/artifacts/modules" \
       Tenants__default__Hosts__0=localhost \
