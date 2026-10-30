@@ -16,6 +16,25 @@ internal static class PlatformRoles
     private const string Operator = "operator";
     private const string Administrator = "administrator";
 
+    /// <summary>The kind of the administrator role, as the give-role and remove-role routes name it.</summary>
+    public const string AdministratorKind = Administrator;
+
+    /// <summary>Whether <paramref name="role"/> is the kind of one of the four platform roles.</summary>
+    public static bool IsKind(string role) => role is Author or Publisher or Operator or Administrator;
+
+    /// <summary>
+    /// The role name that the host settings configure for a platform role kind, or <c>null</c> when the kind is unknown or its
+    /// setting has no value.
+    /// </summary>
+    public static string? NameOf(string kind, StudioOptions studio, ConsoleSettings console, UsersSettings users) => kind switch
+    {
+        Author => studio.AuthorRole,
+        Publisher => studio.PublisherRole,
+        Operator => console.OperatorRole,
+        Administrator => users.AdministratorRole,
+        _ => null,
+    };
+
     /// <summary>
     /// Decides a sign-in. A sign-in without an <c>identity_provider</c> claim is an account sign-in, which the platform
     /// sign-in accepts only with accounts on. A sign-in through a provider is accepted only when a provider of the
@@ -58,14 +77,7 @@ internal static class PlatformRoles
                 continue;
             }
 
-            var name = platformRole switch
-            {
-                Author => studio.AuthorRole,
-                Publisher => studio.PublisherRole,
-                Operator => console.OperatorRole,
-                Administrator => users.AdministratorRole,
-                _ => null,
-            };
+            var name = NameOf(platformRole, studio, console, users);
             if (name is not null && !roles.Contains(name, StringComparer.Ordinal))
             {
                 roles.Add(name);

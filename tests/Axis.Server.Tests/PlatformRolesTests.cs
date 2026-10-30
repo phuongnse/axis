@@ -111,6 +111,37 @@ public sealed class PlatformRolesTests
         Assert.Equal(["console-operator"], roles);
     }
 
+    [Theory]
+    [InlineData("author", "studio-author")]
+    [InlineData("publisher", "studio-publisher")]
+    [InlineData("operator", "console-operator")]
+    [InlineData("administrator", "users-administrator")]
+    public void Each_kind_of_platform_role_maps_to_its_host_setting(string kind, string expected)
+    {
+        Assert.True(PlatformRoles.IsKind(kind));
+        Assert.Equal(expected, PlatformRoles.NameOf(kind, _studio, _console, _users));
+    }
+
+    [Theory]
+    [InlineData("owner")]
+    [InlineData("Operator")]
+    [InlineData("")]
+    public void An_unknown_kind_maps_to_nothing(string kind)
+    {
+        Assert.False(PlatformRoles.IsKind(kind));
+        Assert.Null(PlatformRoles.NameOf(kind, _studio, _console, _users));
+    }
+
+    [Theory]
+    [InlineData("author")]
+    [InlineData("publisher")]
+    [InlineData("operator")]
+    [InlineData("administrator")]
+    public void A_kind_whose_setting_has_no_value_maps_to_nothing(string kind)
+    {
+        Assert.Null(PlatformRoles.NameOf(kind, new StudioOptions([], null, null), new ConsoleSettings(null), new UsersSettings(null)));
+    }
+
     [Fact]
     public void Only_the_values_of_the_providers_own_roles_claim_count()
     {

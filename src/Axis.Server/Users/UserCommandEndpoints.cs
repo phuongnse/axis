@@ -27,14 +27,18 @@ namespace Axis.Server.Users;
 /// or a secret. The realm steps run first and the Axis sessions and the audit record follow in one transaction, so a
 /// command that stopped partway can run again.
 /// <para>
-/// <c>POST /api/users/{id}/give-role</c> and <c>remove-role</c> give a person an application role, or take it away. They take
-/// <c>{ "applicationId": "...", "role": "..." }</c> and answer 204. They check in the order above, up to the realm user (404),
-/// and only then read the body, so a refused caller learns nothing about the body. A body that is missing, malformed or
-/// without an application id (a platform role, which is not built yet), a role that is blank, an application without an active
-/// release, and for give a role that the active release does not declare, answer 400 with a fixed title. A change writes one
-/// audit record, <c>user.roleGiven</c> or <c>user.roleRemoved</c>, with the administrator as actor, the application id, and the
-/// user and role in <c>details</c>. Giving a role the person holds, or removing one they do not hold, answers 204 and writes
-/// nothing. A session reads the given roles at every request, so a change applies at the person's next request.
+/// <c>POST /api/users/{id}/give-role</c> and <c>remove-role</c> give a person a role, or take it away. They take
+/// <c>{ "applicationId": "...", "role": "..." }</c> for an application role, or <c>{ "role": "..." }</c> for a platform role
+/// (<c>author</c>, <c>publisher</c>, <c>operator</c> or <c>administrator</c>), and answer 204. They check in the order above, up
+/// to the realm user (404), and only then read the body, so a refused caller learns nothing about the body. A body that is
+/// missing or malformed, a role that is blank, a role without an application id that is not a platform role, an application
+/// without an active release, and for give a role that the active release does not declare, answer 400 with a fixed title. A
+/// platform role then needs a login at the identity provider in the last <see cref="Session.ReauthenticationWindow"/> (403), and
+/// removing one's own administrator role answers 409. A change writes one audit record, <c>user.roleGiven</c> or
+/// <c>user.roleRemoved</c>, with the administrator as actor, the application id (null for a platform role), and the user and
+/// role in <c>details</c>, with <c>platform: true</c> for a platform role. Giving a role the person holds, or removing one they
+/// do not hold, answers 204 and writes nothing. A session reads the given roles at every request, so a change applies at the
+/// person's next request.
 /// </para>
 /// </summary>
 internal static partial class UserCommandEndpoints
@@ -154,7 +158,7 @@ internal static partial class UserCommandEndpoints
     }
 
     /// <summary>
-    /// Gives or removes an application role. The body is read by hand and last, because binding it would answer 400 before the
+    /// Gives or removes an application or platform role. The body is read by hand and last, because binding it would answer 400 before the
     /// 401 and 403 checks.
     /// </summary>
     private static async Task<IResult> RunRoleAsync(bool give, string id, HttpContext httpContext, CancellationToken cancellationToken)
@@ -204,47 +208,68 @@ internal static partial class UserCommandEndpoints
 
         if (body is null || string.IsNullOrWhiteSpace(body.Role))
         {
-            return Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: "The request needs an application id and a role.");
-        }
-
-        if (body.ApplicationId is not { } applicationId)
-        {
-            return Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: "Platform roles cannot be given yet.");
+            return Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: "The request needs a role, and an application id for an application role.");
         }
 
         var database = services.GetRequiredService<TenantDatabase>();
-        var active = await new ActiveReleaseStore(await database.GetConfigurationAsync(cancellationToken)).FindByApplicationIdAsync(applicationId, cancellationToken);
-        var model = active is null
-            ? null
-            : await services.GetRequiredService<ActiveApplicationResolver>().FindReleaseModelAsync(applicationId, active.ReleaseId, cancellationToken);
-        if (model is null)
+        if (body.ApplicationId is { } applicationId)
         {
-            return Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: "The application has no active release.");
-        }
+            var active = await new ActiveReleaseStore(await database.GetConfigurationAsync(cancellationToken)).FindByApplicationIdAsync(applicationId, cancellationToken);
+            var model = active is null
+                ? null
+                : await services.GetRequiredService<ActiveApplicationResolver>().FindReleaseModelAsync(applicationId, active.ReleaseId, cancellationToken);
+            if (model is null)
+            {
+                return Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: "The application has no active release.");
+            }
 
-        // Removing needs no declaration, so an administrator can clear a row for a role that a later release dropped.
-        if (give && !model.Roles.Any(role => string.Equals(role.Name, body.Role, StringComparison.Ordinal)))
+            // Removing needs no declaration, so an administrator can clear a row for a role that a later release dropped.
+            if (give && !model.Roles.Any(role => string.Equals(role.Name, body.Role, StringComparison.Ordinal)))
+            {
+                return Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: "The active release of the application does not declare this role.");
+            }
+        }
+        else
         {
-            return Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: "The active release of the application does not declare this role.");
+            if (!PlatformRoles.IsKind(body.Role))
+            {
+                return Results.Problem(statusCode: StatusCodes.Status400BadRequest, title: "A platform role is author, publisher, operator or administrator.");
+            }
+
+            if (!Session.MayEndSessions(authenticated.Principal, services.GetRequiredService<TimeProvider>().GetUtcNow()))
+            {
+                return Results.Problem(statusCode: StatusCodes.Status403Forbidden, title: "Log in again at the identity provider to change a platform role.");
+            }
+
+            if (!give && id == caller.Id && body.Role == PlatformRoles.AdministratorKind)
+            {
+                return Results.Problem(statusCode: StatusCodes.Status409Conflict, title: "An administrator cannot remove their own administrator role.");
+            }
         }
 
         var connection = await database.GetConnectionAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
         var changed = give
-            ? await GivenRoles.GiveAsync(transaction, id, applicationId, body.Role, cancellationToken)
-            : await GivenRoles.RemoveAsync(transaction, id, applicationId, body.Role, cancellationToken);
+            ? await GivenRoles.GiveAsync(transaction, id, body.ApplicationId, body.Role, cancellationToken)
+            : await GivenRoles.RemoveAsync(transaction, id, body.ApplicationId, body.Role, cancellationToken);
         if (changed)
         {
+            var details = new JsonObject { ["userId"] = id, ["role"] = body.Role };
+            if (body.ApplicationId is null)
+            {
+                details["platform"] = true;
+            }
+
             await AuditRecords.AppendAsync(
                 transaction,
                 new AuditEntry(
                     caller.Id,
                     give ? AuditActions.UserRoleGiven : AuditActions.UserRoleRemoved,
-                    applicationId,
+                    body.ApplicationId,
                     null,
                     null,
                     null,
-                    new JsonObject { ["userId"] = id, ["role"] = body.Role },
+                    details,
                     caller.DisplayName),
                 cancellationToken);
         }
@@ -264,5 +289,5 @@ internal static partial class UserCommandEndpoints
     private static partial void LogCommandFailed(ILogger logger, string tenantId, string command, string step, string reason);
 }
 
-/// <summary>The body of the give and remove role routes. A null <c>ApplicationId</c> would mean a platform role.</summary>
+/// <summary>The body of the give and remove role routes. A null <c>ApplicationId</c> means a platform role.</summary>
 internal sealed record UserRoleRequest(Guid? ApplicationId, string? Role);
