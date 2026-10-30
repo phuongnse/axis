@@ -1,4 +1,4 @@
-import { Alert, Button, Descriptions, Flex, Input, Result, Segmented, Select, Tag, Typography } from 'antd'
+import { Alert, Button, Descriptions, Flex, Input, Result, Tag, Typography } from 'antd'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { fetchCurrentUser } from '../platform/currentUser'
@@ -9,7 +9,6 @@ import {
   fetchStudioNames,
   fetchStudioResources,
   filterResources,
-  groupByKind,
   type ModuleResourceItem,
   moduleResources,
   resourceTitle,
@@ -32,21 +31,12 @@ import { StudioNewApplication } from './StudioNewApplication'
 import { StudioNewResource } from './StudioNewResource'
 import { StudioPolicyMatrix } from './StudioPolicyMatrix'
 import { StudioPublishing, type StudioPublishingHandle } from './StudioPublishing'
+import { StudioNavigation } from './StudioNavigation'
+import type { StudioView } from './studioViews'
 import { StudioReferences } from './StudioReferences'
-
-/** The titles and test ids of the module resource groups in the list. */
-const moduleGroupTitles = {
-  entity: 'shell.studio.moduleEntities',
-  process: 'shell.studio.moduleProcesses',
-  policy: 'shell.studio.modulePolicies',
-  page: 'shell.studio.modulePages',
-} as const
-const moduleGroupTestIds = {
-  entity: 'studio-group-module-entities',
-  process: 'studio-group-module-processes',
-  policy: 'studio-group-module-policies',
-  page: 'studio-group-module-pages',
-} as const
+import { PageLayout, type BreadcrumbStep } from '../platform/PageLayout'
+import { SiteMark } from '../platform/SiteMark'
+import { useDesignTokens } from '../platform/themeMode'
 
 /** The read-only view of a module resource, by its kind. */
 function ModuleResourceView({ application, item }: { application: string; item: ModuleResourceItem }) {
@@ -101,8 +91,8 @@ type NamesState = { application: string; names: StudioNames | null }
  * has a Run button in its details, which runs only that scenario. Both are off while a request runs and while the
  * reconnect message shows. A failed scenario in the test results opens at its failing step, as a diagnostic does.
  * A process step that a diagnostic of the open resource names is marked on its graph.
- * Module entities, Module processes, Module policies and Module pages groups under the kinds list those of the modules the application
- * uses, from the names, by their `<module>/<name>`. One opens read-only, with no editor, no Uses and no Used by lists: an
+ * A kind's list also holds the entities, processes, policies or pages of the modules the application uses, from the
+ * names, by their `<module>/<name>`, with the module beside each. One opens read-only, with no editor, no Uses and no Used by lists: an
  * entity in the entity designer, a process as its graph alone, a policy as a table of its grants and a page on the page
  * canvas with no palette, data panel, widget tree or moves, each under a read-only notice with the alert role. Its address is the same `&resource=<id>`, so a reload, a shared link and a Uses
  * entry open it too, when the id is not one of the folder's.
@@ -144,7 +134,9 @@ function StudioWorkspace() {
   const application = params.get('app')
   const resourceId = params.get('resource')
   const path = params.get('path')
-  const policiesView = params.get('view') === 'policies'
+  // Proposed: `view` and `kind` pick the part of the workspace the sidebar opened; an open resource wins.
+  const view: StudioView = parseView(params.get('view'), params.get('kind'))
+  const [actionsSlot, setActionsSlot] = useState<HTMLDivElement | null>(null)
   const [apps, setApps] = useState<AppsState>()
   const [folder, setFolder] = useState<FolderState>()
   const [search, setSearch] = useState('')
@@ -260,7 +252,6 @@ function StudioWorkspace() {
         : [],
     [loaded, resourceId],
   )
-  const groups = useMemo(() => groupByKind(filterResources(resources, search)), [resources, search])
   const moduleGroups = useMemo(() => moduleResources(names, search), [names, search])
   const selected = resourceId === null ? undefined : resources.find((item) => item.id === resourceId.toLowerCase())
   const selectedModuleItem =
@@ -335,225 +326,368 @@ function StudioWorkspace() {
     )
   }
 
+  // Proposed: with several applications and none open, Studio lists them as tiles, with New application as its main
+  // action. An application opens in a workspace with Studio's navigation in the shell's sidebar.
+  if (application === null) {
+    return (
+      <PageLayout
+        title={t('shell.studio.title')}
+        breadcrumb={[{ label: 'Axis', to: '/' }, { label: t('shell.studio.title') }]}
+        actions={canCreate ? <StudioNewApplication primary onCreated={onApplicationCreated} /> : undefined}
+      >
+        <StudioApplicationTiles applications={apps} onPick={pickApplication} />
+      </PageLayout>
+    )
+  }
+
+  const kindView = view.name === 'kind' ? view.kind : (selected?.kind ?? selectedModuleItem?.kind)
+  const steps: BreadcrumbStep[] = [
+    { label: t('shell.studio.title'), to: '/studio' },
+    { label: application, to: `/studio?app=${encodeURIComponent(application)}` },
+  ]
+  let title = application
+  if (selected) {
+    if (selected.kind !== 'application') {
+      steps.push({
+        label: kindLabel(selected.kind),
+        to: studioAddress(application, { name: 'kind', kind: selected.kind }),
+      })
+    }
+    title = resourceTitle(selected)
+  } else if (selectedModuleItem) {
+    steps.push({
+      label: kindLabel(selectedModuleItem.kind),
+      to: studioAddress(application, { name: 'kind', kind: selectedModuleItem.kind }),
+    })
+    title = selectedModuleItem.name
+  } else if (view.name === 'kind') {
+    title = kindLabel(view.kind)
+  } else if (view.name === 'policies') {
+    title = t('shell.studio.view.policies')
+  } else if (view.name === 'releases') {
+    title = t('shell.studio.nav.releases')
+  }
+  if (steps.length > 2 || title !== application) {
+    steps.push({ label: title })
+  } else {
+    steps.pop()
+    steps.push({ label: application })
+  }
+
+  function kindLabel(kind: string) {
+    const key = `shell.studio.kind.${kind}`
+    const label = t(key)
+    return label === key ? kind : label
+  }
+
+  const ofKind = kindView ? resources.filter((item) => item.kind === kindView) : []
+  const listed = filterResources(ofKind, search)
+  const navigationView: StudioView =
+    selected?.kind === 'application'
+      ? { name: 'settings' }
+      : kindView && (selected || selectedModuleItem || view.name === 'kind')
+        ? { name: 'kind', kind: kindView }
+        : view
+
   return (
-    <Flex vertical gap="middle">
-      <Typography.Title level={2}>{t('shell.studio.title')}</Typography.Title>
-      <Flex gap="small">
-        <Select
-          aria-label={t('shell.studio.application')}
-          placeholder={t('shell.studio.application')}
-          showSearch
-          optionFilterProp="label"
-          style={{ maxWidth: 360 }}
-          value={application}
-          options={apps.map((app) => ({ value: app.name, label: app.name }))}
-          onChange={pickApplication}
-        />
-        {canCreate && <StudioNewApplication onCreated={onApplicationCreated} />}
-      </Flex>
-      {application !== null && loaded && 'resources' in loaded && (
-        <StudioPublishing
-          key={application}
-          application={application}
-          canPublish={canPublish}
-          canTest={canTest}
-          previewHost={previewHost}
-          sites={resources.filter((item) => item.kind === 'site')}
-          folderRevision={folderRevision}
-          onDiagnostics={(diagnostics) =>
-            setFolder((current) =>
-              current && current.application === application && 'resources' in current
-                ? { ...current, diagnostics }
-                : current,
-            )
-          }
-          onOpenScenario={selectDiagnostic}
-          onBusyChange={setRequestBusy}
-          ref={publishing}
-        />
-      )}
-      {application !== null && loaded && 'resources' in loaded && (
-        <Segmented
-          aria-label={t('shell.studio.view')}
-          value={policiesView ? 'policies' : 'resources'}
-          options={[
-            { value: 'resources', label: t('shell.studio.view.resources') },
-            { value: 'policies', label: t('shell.studio.view.policies') },
-          ]}
-          onChange={(value) =>
-            setParams(value === 'policies' ? { app: application, view: 'policies' } : { app: application })
-          }
-        />
-      )}
-      {application !== null && loaded && 'failed' in loaded && (
-        <Alert data-testid="studio-load-error" type="error" title={t('shell.studio.loadFailed')} />
-      )}
+    <>
       {loaded && 'resources' in loaded && (
-        <>
-          {policiesView ? (
-            <StudioPolicyMatrix
-              application={application!}
-              folderRevision={folderRevision}
-              names={names}
-              onOpenPolicy={(id) => setParams({ app: application!, resource: id })}
-              onWritten={onWritten}
-            />
-          ) : (
-            <Flex gap="large" align="flex-start">
-              <Flex vertical gap="small" style={{ width: 320, flex: 'none' }}>
-                <StudioNewResource application={application!} resources={resources} onCreated={onCreated} />
-                <Input.Search
-                  aria-label={t('shell.studio.search')}
-                  placeholder={t('shell.studio.search')}
-                  allowClear
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                />
-                {groups.length === 0 && moduleGroups.length === 0 && (
-                  <Typography.Text type="secondary">{t('shell.studio.noResources')}</Typography.Text>
-                )}
-                {groups.map((group) => (
-                  <section key={group.kind} data-testid={`studio-group-${group.kind}`}>
-                    <Typography.Title level={5}>{group.kind}</Typography.Title>
-                    <Flex vertical align="flex-start">
-                      {group.items.map((item) => (
-                        <Button
-                          key={item.id}
-                          type={item.id === selected?.id ? 'primary' : 'text'}
-                          data-testid={`studio-resource-${item.id}`}
-                          aria-current={item.id === selected?.id ? 'true' : undefined}
-                          onClick={() => selectResource(item.id)}
-                        >
-                          {resourceTitle(item)}
-                        </Button>
-                      ))}
-                    </Flex>
-                  </section>
-                ))}
-                {moduleGroups.map((group) => (
-                  <section key={group.kind} data-testid={moduleGroupTestIds[group.kind]}>
-                    <Typography.Title level={5}>{t(moduleGroupTitles[group.kind])}</Typography.Title>
-                    <Flex vertical align="flex-start">
-                      {group.items.map((item) => (
-                        <Button
-                          key={item.id}
-                          type={item.id === selectedModuleItem?.id ? 'primary' : 'text'}
-                          data-testid={`studio-module-resource-${item.id}`}
-                          aria-current={item.id === selectedModuleItem?.id ? 'true' : undefined}
-                          onClick={() => selectResource(item.id)}
-                        >
-                          {item.name}
-                        </Button>
-                      ))}
-                    </Flex>
-                  </section>
-                ))}
-              </Flex>
-              <div data-testid="studio-resource-details" style={{ flex: 1 }}>
-                {selected ? (
-                  <Flex vertical gap="middle">
-                    <Descriptions
-                      title={resourceTitle(selected)}
-                      column={1}
-                      extra={
-                        canTest && selected.kind === 'scenario' && selected.name ? (
-                          <Button
-                            data-testid="studio-run-scenario"
-                            disabled={requestBusy || reconnecting}
-                            onClick={() => publishing.current?.runTests([selected.name!])}
-                          >
-                            {t('shell.studio.runScenario')}
-                          </Button>
-                        ) : undefined
-                      }
-                      items={[
-                        { key: 'kind', label: t('shell.studio.kind'), children: selected.kind },
-                        { key: 'id', label: t('shell.studio.id'), children: selected.id },
-                        { key: 'file', label: t('shell.studio.file'), children: selected.file },
-                        ...(path ? [{ key: 'path', label: t('shell.studio.path'), children: path }] : []),
-                      ]}
-                    />
-                    <StudioNamesContext.Provider value={names ?? undefined}>
-                      <StudioEditor
-                        key={`editor-${selected.id}`}
-                        application={application!}
-                        item={selected}
-                        resources={loaded.resources}
-                        path={path}
-                        diagnosticPaths={diagnosticPaths}
-                        onOpen={openReference}
-                        onSaved={(diagnostics, created) => {
-                          setFolder({
-                            ...loaded,
-                            resources: created ? [...loaded.resources, ...created] : loaded.resources,
-                            diagnostics,
-                          })
-                          setFolderRevision((value) => value + 1)
-                        }}
-                        onTextsWritten={(diagnostics) => {
-                          setFolder({ ...loaded, diagnostics })
-                          setFolderRevision((value) => value + 1)
-                        }}
-                        onDeleted={(diagnostics) => {
-                          setFolder({
-                            ...loaded,
-                            resources: loaded.resources.filter((item) => item.id !== selected.id),
-                            diagnostics,
-                          })
-                          setFolderRevision((value) => value + 1)
-                          setParams({ app: application! })
-                        }}
-                      />
-                    </StudioNamesContext.Provider>
-                    <StudioReferences
-                      key={`references-${selected.id}`}
-                      application={application!}
-                      resourceId={selected.id}
-                      onOpen={openReference}
-                    />
-                  </Flex>
-                ) : selectedModuleItem ? (
-                  <Flex vertical gap="middle">
-                    <Descriptions
-                      title={selectedModuleItem.name}
-                      column={1}
-                      items={[
-                        { key: 'kind', label: t('shell.studio.kind'), children: selectedModuleItem.kind },
-                        { key: 'id', label: t('shell.studio.id'), children: selectedModuleItem.id },
-                        { key: 'module', label: t('shell.studio.module'), children: selectedModuleItem.module },
-                      ]}
-                    />
-                    <StudioNamesContext.Provider value={names ?? undefined}>
-                      <ModuleResourceView
-                        key={`module-${selectedModuleItem.kind}-${selectedModuleItem.id}`}
-                        application={application!}
-                        item={selectedModuleItem}
-                      />
-                    </StudioNamesContext.Provider>
-                  </Flex>
-                ) : (
-                  <Typography.Text type="secondary">{t('shell.studio.selectResource')}</Typography.Text>
-                )}
-              </div>
-            </Flex>
-          )}
-          <section data-testid="studio-diagnostics">
-            <Typography.Title level={4}>{t('shell.studio.diagnostics')}</Typography.Title>
-            {loaded.diagnostics.length === 0 ? (
-              <Typography.Text type="secondary">{t('shell.studio.noDiagnostics')}</Typography.Text>
-            ) : (
-              <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-                {loaded.diagnostics.map((diagnostic, index) => (
-                  <li key={index}>
-                    <DiagnosticRow diagnostic={diagnostic} onSelect={selectDiagnostic} />
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-        </>
+        <StudioNavigation
+          application={application}
+          applications={apps}
+          resources={resources}
+          view={navigationView}
+          canCreate={canCreate}
+          onPickApplication={pickApplication}
+          onApplicationCreated={onApplicationCreated}
+          onView={(next) => {
+            setSearch('')
+            if (next.name === 'settings') {
+              const settings = resources.find((item) => item.kind === 'application')
+              setParams(settings ? { app: application, resource: settings.id } : { app: application })
+            } else {
+              setParams(new URLSearchParams(studioAddress(application, next).split('?')[1]))
+            }
+          }}
+        />
       )}
-    </Flex>
+      <PageLayout title={title} breadcrumb={steps} actions={<div ref={setActionsSlot} style={{ display: 'flex' }} />}>
+        {loaded && 'resources' in loaded && (
+          <StudioPublishing
+            key={application}
+            application={application}
+            canPublish={canPublish}
+            canTest={canTest}
+            previewHost={previewHost}
+            sites={resources.filter((item) => item.kind === 'site')}
+            folderRevision={folderRevision}
+            onDiagnostics={(diagnostics) =>
+              setFolder((current) =>
+                current && current.application === application && 'resources' in current
+                  ? { ...current, diagnostics }
+                  : current,
+              )
+            }
+            onOpenScenario={selectDiagnostic}
+            onBusyChange={setRequestBusy}
+            actionsSlot={actionsSlot}
+            showHistory={view.name === 'releases' && !selected}
+            ref={publishing}
+          />
+        )}
+        {loaded && 'failed' in loaded && (
+          <Alert data-testid="studio-load-error" type="error" title={t('shell.studio.loadFailed')} />
+        )}
+        {loaded && 'resources' in loaded && (
+          <div data-testid="studio-resource-details">
+            {selected ? (
+              <Flex vertical gap="middle">
+                <Descriptions
+                  title={resourceTitle(selected)}
+                  column={1}
+                  extra={
+                    canTest && selected.kind === 'scenario' && selected.name ? (
+                      <Button
+                        data-testid="studio-run-scenario"
+                        disabled={requestBusy || reconnecting}
+                        onClick={() => publishing.current?.runTests([selected.name!])}
+                      >
+                        {t('shell.studio.runScenario')}
+                      </Button>
+                    ) : undefined
+                  }
+                  items={[
+                    { key: 'kind', label: t('shell.studio.kind'), children: selected.kind },
+                    { key: 'id', label: t('shell.studio.id'), children: selected.id },
+                    { key: 'file', label: t('shell.studio.file'), children: selected.file },
+                    ...(path ? [{ key: 'path', label: t('shell.studio.path'), children: path }] : []),
+                  ]}
+                />
+                <StudioNamesContext.Provider value={names ?? undefined}>
+                  <StudioEditor
+                    key={`editor-${selected.id}`}
+                    application={application!}
+                    item={selected}
+                    resources={loaded.resources}
+                    path={path}
+                    diagnosticPaths={diagnosticPaths}
+                    onOpen={openReference}
+                    onSaved={(diagnostics, created) => {
+                      setFolder({
+                        ...loaded,
+                        resources: created ? [...loaded.resources, ...created] : loaded.resources,
+                        diagnostics,
+                      })
+                      setFolderRevision((value) => value + 1)
+                    }}
+                    onTextsWritten={(diagnostics) => {
+                      setFolder({ ...loaded, diagnostics })
+                      setFolderRevision((value) => value + 1)
+                    }}
+                    onDeleted={(diagnostics) => {
+                      setFolder({
+                        ...loaded,
+                        resources: loaded.resources.filter((item) => item.id !== selected.id),
+                        diagnostics,
+                      })
+                      setFolderRevision((value) => value + 1)
+                      setParams({ app: application! })
+                    }}
+                  />
+                </StudioNamesContext.Provider>
+                <StudioReferences
+                  key={`references-${selected.id}`}
+                  application={application!}
+                  resourceId={selected.id}
+                  onOpen={openReference}
+                />
+              </Flex>
+            ) : selectedModuleItem ? (
+              <Flex vertical gap="middle">
+                <Descriptions
+                  title={selectedModuleItem.name}
+                  column={1}
+                  items={[
+                    { key: 'kind', label: t('shell.studio.kind'), children: selectedModuleItem.kind },
+                    { key: 'id', label: t('shell.studio.id'), children: selectedModuleItem.id },
+                    { key: 'module', label: t('shell.studio.module'), children: selectedModuleItem.module },
+                  ]}
+                />
+                <StudioNamesContext.Provider value={names ?? undefined}>
+                  <ModuleResourceView
+                    key={`module-${selectedModuleItem.kind}-${selectedModuleItem.id}`}
+                    application={application}
+                    item={selectedModuleItem}
+                  />
+                </StudioNamesContext.Provider>
+              </Flex>
+            ) : view.name === 'policies' ? (
+              <StudioPolicyMatrix
+                application={application}
+                folderRevision={folderRevision}
+                names={names}
+                onOpenPolicy={(id) => setParams({ app: application, resource: id })}
+                onWritten={onWritten}
+              />
+            ) : view.name === 'kind' ? (
+              <Flex vertical gap="middle">
+                <Flex gap="small" align="center">
+                  <Input.Search
+                    aria-label={t('shell.studio.search')}
+                    placeholder={t('shell.studio.search')}
+                    allowClear
+                    style={{ maxWidth: 360 }}
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                  />
+                  <div style={{ flex: 1 }} />
+                  <StudioNewResource application={application} resources={resources} onCreated={onCreated} />
+                </Flex>
+                <StudioResourceRows
+                  items={listed}
+                  extra={moduleGroups.find((group) => group.kind === view.kind)?.items ?? []}
+                  onOpen={selectResource}
+                />
+              </Flex>
+            ) : view.name === 'overview' ? (
+              <section data-testid="studio-diagnostics">
+                <Typography.Title level={4}>{t('shell.studio.diagnostics')}</Typography.Title>
+                {loaded.diagnostics.length === 0 ? (
+                  <Typography.Text type="secondary">{t('shell.studio.noDiagnostics')}</Typography.Text>
+                ) : (
+                  <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+                    {loaded.diagnostics.map((diagnostic, index) => (
+                      <li key={index}>
+                        <DiagnosticRow diagnostic={diagnostic} onSelect={selectDiagnostic} />
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+            ) : null}
+          </div>
+        )}
+      </PageLayout>
+    </>
+  )
+}
+
+/** Proposed: the workspace address of a view of `application`. */
+function studioAddress(application: string, view: StudioView): string {
+  const app = `app=${encodeURIComponent(application)}`
+  switch (view.name) {
+    case 'kind':
+      return `/studio?${app}&view=kind&kind=${encodeURIComponent(view.kind)}`
+    case 'policies':
+    case 'releases':
+      return `/studio?${app}&view=${view.name}`
+    default:
+      return `/studio?${app}`
+  }
+}
+
+function parseView(view: string | null, kind: string | null): StudioView {
+  if (view === 'kind' && kind) {
+    return { name: 'kind', kind }
+  }
+  if (view === 'policies' || view === 'releases') {
+    return { name: view }
+  }
+  return { name: 'overview' }
+}
+
+/** Proposed: Studio's applications as tiles in a three-column grid, each its mark and name, which opens it. */
+function StudioApplicationTiles({
+  applications,
+  onPick,
+}: {
+  applications: readonly StudioApplication[]
+  onPick: (name: string) => void
+}) {
+  const { colour, spacing, radius } = useDesignTokens()
+  return (
+    <div
+      style={{
+        display: 'grid',
+        gridTemplateColumns: `repeat(auto-fit, minmax(max(0px, calc((100% - ${2 * spacing.md}px) / 3)), 1fr))`,
+        gap: spacing.md,
+      }}
+    >
+      {applications.map((app) => (
+        <button
+          key={app.name}
+          type="button"
+          data-testid={`studio-application-${app.name}`}
+          onClick={() => onPick(app.name)}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: spacing.sm,
+            padding: spacing.md,
+            background: colour.surface,
+            border: `1px solid ${colour.borderSubtle}`,
+            borderRadius: radius.base,
+            cursor: 'pointer',
+            font: 'inherit',
+            textAlign: 'start',
+          }}
+        >
+          <SiteMark title={app.name} size={32} />
+          <Typography.Text strong style={{ color: colour.primaryText }}>
+            {app.name}
+          </Typography.Text>
+        </button>
+      ))}
+    </div>
+  )
+}
+
+/** Proposed: the resources of one kind as rows, each its name and file, which opens it in the editor. */
+function StudioResourceRows({
+  items,
+  extra,
+  onOpen,
+}: {
+  items: readonly StudioResourceItem[]
+  extra: readonly { id: string; name: string; module: string | null }[]
+  onOpen: (id: string) => void
+}) {
+  const t = useText()
+  const { colour, spacing, radius } = useDesignTokens()
+  const rows = [
+    ...items.map((item) => ({ id: item.id, name: resourceTitle(item), detail: item.file })),
+    ...extra.map((entity) => ({ id: entity.id, name: entity.name, detail: entity.module ?? '' })),
+  ]
+  if (rows.length === 0) {
+    return <Typography.Text type="secondary">{t('shell.studio.noResources')}</Typography.Text>
+  }
+  return (
+    <div style={{ background: colour.surface, border: `1px solid ${colour.borderSubtle}`, borderRadius: radius.base }}>
+      {rows.map((row, index) => (
+        <button
+          key={row.id}
+          type="button"
+          data-testid={`studio-resource-${row.id}`}
+          onClick={() => onOpen(row.id)}
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            gap: spacing.md,
+            width: '100%',
+            padding: `${spacing.sm}px ${spacing.md}px`,
+            background: 'transparent',
+            border: 'none',
+            borderTop: index === 0 ? 'none' : `1px solid ${colour.divider}`,
+            cursor: 'pointer',
+            font: 'inherit',
+            textAlign: 'start',
+          }}
+        >
+          <Typography.Text style={{ color: colour.primaryText }}>{row.name}</Typography.Text>
+          <Typography.Text style={{ color: colour.textMuted }}>{row.detail}</Typography.Text>
+        </button>
+      ))}
+    </div>
   )
 }
 

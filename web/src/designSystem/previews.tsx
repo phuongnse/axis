@@ -283,7 +283,19 @@ export const previews: Record<string, readonly PreviewState[]> = {
   studio: [
     { caption: 'Applications', draw: () => <ShellPreview />, entry: '/studio', frameHeight: 600 },
     { caption: 'Application', draw: () => <ShellPreview />, entry: `/studio?app=${studioApp}`, frameHeight: 600 },
+    {
+      caption: 'Entities',
+      draw: () => <ShellPreview />,
+      entry: `/studio?app=${studioApp}&view=kind&kind=entity`,
+      frameHeight: 600,
+    },
     { caption: 'Entity', draw: () => <ShellPreview />, entry: studioResource(studioEntity), frameHeight: 600 },
+    {
+      caption: 'Releases',
+      draw: () => <ShellPreview />,
+      entry: `/studio?app=${studioApp}&view=releases`,
+      frameHeight: 600,
+    },
     {
       caption: 'Policy matrix',
       draw: () => <ShellPreview />,

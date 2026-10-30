@@ -19,16 +19,27 @@ export interface BreadcrumbStep {
 export function PageLayout({
   title,
   breadcrumb,
+  actions,
   children,
 }: {
   title: string
   breadcrumb?: readonly BreadcrumbStep[]
+  /** Proposed: the page's own actions, on the right of its title, such as Studio's Validate and Publish. */
+  actions?: ReactNode
   children: ReactNode
 }) {
-  const heading = (
+  const title4 = (
     <Typography.Title level={4} style={{ margin: 0 }}>
       {title}
     </Typography.Title>
+  )
+  const heading = actions ? (
+    <Flex align="center" justify="space-between" gap="middle" wrap>
+      {title4}
+      {actions}
+    </Flex>
+  ) : (
+    title4
   )
 
   return (

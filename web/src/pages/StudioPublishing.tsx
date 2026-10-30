@@ -1,5 +1,6 @@
 import { Alert, Button, Flex, Input, Modal } from 'antd'
 import { type Ref, useEffect, useImperativeHandle, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import {
   fetchStudioReleases,
   fetchStudioRequest,
@@ -63,6 +64,8 @@ export function StudioPublishing({
   onDiagnostics,
   onOpenScenario,
   onBusyChange,
+  actionsSlot,
+  showHistory = true,
   ref,
 }: {
   application: string
@@ -74,6 +77,10 @@ export function StudioPublishing({
   onDiagnostics: (diagnostics: StudioDiagnostic[]) => void
   onOpenScenario: (resourceId: string, path: string) => void
   onBusyChange?: (busy: boolean) => void
+  /** Proposed: where the buttons draw, such as the workspace's header band. Without it they draw here. */
+  actionsSlot?: HTMLElement | null
+  /** Proposed: whether the release history draws here. The workspace shows it on its Releases view only. */
+  showHistory?: boolean
   ref?: Ref<StudioPublishingHandle>
 }) {
   const t = useText()
@@ -232,32 +239,32 @@ export function StudioPublishing({
     runTests: (scenarios) => send(() => testStudioApp(application, scenarios)),
   }))
 
+  const actions = (
+    <Flex gap="small" align="center">
+      <Button disabled={busy} onClick={() => send(() => validateStudioApp(application))}>
+        {t('shell.studio.validate')}
+      </Button>
+      {previewHost !== null && (
+        <Button data-testid="studio-preview" disabled={busy} onClick={() => send(() => previewStudioApp(application))}>
+          {t('shell.studio.preview')}
+        </Button>
+      )}
+      {canTest && (
+        <Button data-testid="studio-run-tests" disabled={busy} onClick={() => send(() => testStudioApp(application))}>
+          {t('shell.studio.runTests')}
+        </Button>
+      )}
+      {canPublish && (
+        <Button type="primary" data-testid="studio-publish" disabled={busy} onClick={() => setDialogOpen(true)}>
+          {t('shell.studio.publish')}
+        </Button>
+      )}
+    </Flex>
+  )
+
   return (
     <Flex vertical gap="small">
-      <Flex gap="small" align="center">
-        <Button disabled={busy} onClick={() => send(() => validateStudioApp(application))}>
-          {t('shell.studio.validate')}
-        </Button>
-        {previewHost !== null && (
-          <Button
-            data-testid="studio-preview"
-            disabled={busy}
-            onClick={() => send(() => previewStudioApp(application))}
-          >
-            {t('shell.studio.preview')}
-          </Button>
-        )}
-        {canTest && (
-          <Button data-testid="studio-run-tests" disabled={busy} onClick={() => send(() => testStudioApp(application))}>
-            {t('shell.studio.runTests')}
-          </Button>
-        )}
-        {canPublish && (
-          <Button type="primary" data-testid="studio-publish" disabled={busy} onClick={() => setDialogOpen(true)}>
-            {t('shell.studio.publish')}
-          </Button>
-        )}
-      </Flex>
+      {actionsSlot ? createPortal(actions, actionsSlot) : actions}
       {sendFailed && (
         <Alert data-testid="studio-request-error" type="error" title={t('shell.studio.request.sendFailed')} />
       )}
@@ -272,10 +279,10 @@ export function StudioPublishing({
           ))}
         </Flex>
       )}
-      {history === 'failed' && (
+      {showHistory && history === 'failed' && (
         <Alert data-testid="studio-releases-error" type="error" title={t('shell.studio.releases.loadFailed')} />
       )}
-      {history && history !== 'failed' && (
+      {showHistory && history && history !== 'failed' && (
         <>
           {folderDiffers(history) && (
             <Alert

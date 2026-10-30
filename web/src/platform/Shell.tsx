@@ -1,7 +1,7 @@
 import { MenuFoldOutlined, MenuUnfoldOutlined } from '@ant-design/icons'
 import { Button, ConfigProvider, Flex, Layout, Menu, Typography } from 'antd'
 import dayjs from 'dayjs'
-import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react'
 import { Link, useLocation } from 'react-router'
 import { AppSwitcher } from './AppSwitcher'
 import { AxisButton } from './AxisButton'
@@ -10,6 +10,7 @@ import { navigationIcon } from './navigationIcons'
 import { NotificationBell } from './NotificationBell'
 import { PreferencesMenu } from './PreferencesMenu'
 import { ShellFooter } from './ShellFooter'
+import { ShellSidebarContext } from './shellSidebar'
 import { SiteMark } from './SiteMark'
 import type { NavigationItem } from './site'
 import { useText } from './texts'
@@ -68,7 +69,14 @@ export function Shell({ titleKey, navigation, locales, locale, onLocaleChange, n
   const toggle = useRef<HTMLButtonElement>(null)
   // The sidebar stays collapsed or open while the person moves between pages, as the shell stays mounted.
   const [collapsed, setCollapsed] = useState(false)
-  const hasSidebar = navigation.length > 1
+  // Proposed: a page with its own navigation claims the sidebar and draws in `pageSidebarSlot`.
+  const [pageSidebar, setPageSidebar] = useState(false)
+  const [pageSidebarSlot, setPageSidebarSlot] = useState<HTMLElement | null>(null)
+  const sidebarContext = useMemo(
+    () => ({ slot: pageSidebarSlot, collapsed: collapsed && !narrow, claim: setPageSidebar }),
+    [pageSidebarSlot, collapsed, narrow],
+  )
+  const hasSidebar = navigation.length > 1 || pageSidebar
   const sidebar = hasSidebar && !narrow
   const home = navigation[0]?.path ?? '/'
   const items = navigation.map((item) => {
@@ -174,12 +182,16 @@ export function Shell({ titleKey, navigation, locales, locale, onLocaleChange, n
                 borderBottom: `1px solid ${colour.borderSubtle}`,
               }}
             >
-              <Menu
-                mode="inline"
-                style={{ borderInlineEnd: 'none' }}
-                selectedKeys={activeKey ? [activeKey] : []}
-                items={items}
-              />
+              {pageSidebar ? (
+                <div ref={setPageSidebarSlot} />
+              ) : (
+                <Menu
+                  mode="inline"
+                  style={{ borderInlineEnd: 'none' }}
+                  selectedKeys={activeKey ? [activeKey] : []}
+                  items={items}
+                />
+              )}
               {preferences}
             </nav>
           )}
@@ -194,17 +206,23 @@ export function Shell({ titleKey, navigation, locales, locale, onLocaleChange, n
                 trigger={null}
                 style={{ background: colour.surface, borderInlineEnd: `1px solid ${colour.borderSubtle}` }}
               >
-                <nav aria-label={t('shell.navigation.menu')}>
-                  <Menu
-                    mode="inline"
-                    style={{ borderInlineEnd: 'none' }}
-                    selectedKeys={activeKey ? [activeKey] : []}
-                    items={items}
-                  />
-                </nav>
+                {pageSidebar ? (
+                  <div ref={setPageSidebarSlot} />
+                ) : (
+                  <nav aria-label={t('shell.navigation.menu')}>
+                    <Menu
+                      mode="inline"
+                      style={{ borderInlineEnd: 'none' }}
+                      selectedKeys={activeKey ? [activeKey] : []}
+                      items={items}
+                    />
+                  </nav>
+                )}
               </Layout.Sider>
             )}
-            <Layout.Content style={{ padding: spacing.lg }}>{children}</Layout.Content>
+            <Layout.Content style={{ padding: spacing.lg }}>
+              <ShellSidebarContext.Provider value={sidebarContext}>{children}</ShellSidebarContext.Provider>
+            </Layout.Content>
           </Layout>
           <ShellFooter />
         </Layout>

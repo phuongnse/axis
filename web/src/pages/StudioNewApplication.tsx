@@ -1,5 +1,5 @@
 import { Alert, Button, Flex, Form, Input, Modal, Radio, Typography } from 'antd'
-import { useContext, useEffect, useState } from 'react'
+import { useContext, useEffect, useState, type ReactNode } from 'react'
 import { createStudioApp, fetchStudioTemplates, ServerUnreachableError, type StudioTemplate } from '../platform/studio'
 import { useStudioConnection } from '../platform/studioConnection'
 import { isApplicationName } from '../platform/studioStarters'
@@ -16,7 +16,17 @@ type Problem = 'exists' | 'invalid' | 'failed'
  * open in both cases. When the template list does not load, the dialog offers only Blank. `onCreated` gets the new
  * application's name once the create succeeds.
  */
-export function StudioNewApplication({ onCreated }: { onCreated: (name: string) => void }) {
+export function StudioNewApplication({
+  onCreated,
+  trigger,
+  primary = false,
+}: {
+  onCreated: (name: string) => void
+  /** Proposed: what opens the dialog, given the function that opens it, such as the sidebar's application menu. */
+  trigger?: (show: () => void) => ReactNode
+  /** Proposed: the button is the page's main action, as on Studio's list of applications. */
+  primary?: boolean
+}) {
   const t = useText()
   const { lost } = useStudioConnection()
   const locale = useContext(PlatformContext)?.current.locale ?? 'en'
@@ -90,7 +100,13 @@ export function StudioNewApplication({ onCreated }: { onCreated: (name: string) 
 
   return (
     <>
-      <Button onClick={show}>{t('shell.studio.newApplication.button')}</Button>
+      {trigger ? (
+        trigger(show)
+      ) : (
+        <Button type={primary ? 'primary' : 'default'} onClick={show}>
+          {t('shell.studio.newApplication.button')}
+        </Button>
+      )}
       <Modal
         open={open}
         title={t('shell.studio.newApplication.title')}
