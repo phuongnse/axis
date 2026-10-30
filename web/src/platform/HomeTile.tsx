@@ -48,7 +48,15 @@ export function HomeTile({
         >
           {title}
         </Typography.Text>
-        {description && <Typography.Text style={{ color: colour.textMuted }}>{description}</Typography.Text>}
+        {/* Proposed: a description takes at most two lines; a longer one ends in an ellipsis and shows whole in a tooltip. */}
+        {description && (
+          <Typography.Paragraph
+            ellipsis={{ rows: 2, tooltip: description }}
+            style={{ margin: 0, color: colour.textMuted }}
+          >
+            {description}
+          </Typography.Paragraph>
+        )}
         {children}
       </Flex>
     </>

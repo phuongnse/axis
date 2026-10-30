@@ -627,6 +627,7 @@ function StudioApplicationTiles({ applications }: { applications: readonly Studi
       style={{
         display: 'grid',
         gridTemplateColumns: `repeat(auto-fit, minmax(max(0px, calc((100% - ${2 * spacing.md}px) / 3)), 1fr))`,
+        gridAutoRows: '1fr',
         gap: spacing.md,
       }}
     >

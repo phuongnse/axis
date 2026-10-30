@@ -39,6 +39,8 @@ function useHomeGrid(): CSSProperties {
   return {
     display: 'grid',
     gridTemplateColumns: narrow ? '1fr' : homeGridColumns(spacing.md),
+    // Proposed: every row is as tall as the tallest, so a tile in one row matches the tiles in the others.
+    gridAutoRows: '1fr',
     gap: spacing.md,
   }
 }
@@ -131,7 +133,13 @@ function ToolTile({ to, icon, title, description }: { to: string; icon: string; 
         <Typography.Text strong style={{ color: colour.primaryText }}>
           {title}
         </Typography.Text>
-        <Typography.Text style={{ color: colour.textMuted }}>{description}</Typography.Text>
+        {/* Proposed: a description takes at most two lines; a longer one ends in an ellipsis and shows whole in a tooltip. */}
+        <Typography.Paragraph
+          ellipsis={{ rows: 2, tooltip: description }}
+          style={{ margin: 0, color: colour.textMuted }}
+        >
+          {description}
+        </Typography.Paragraph>
       </Flex>
     </Link>
   )
@@ -240,7 +248,12 @@ function ApplicationCard({
                   {siteTitle(site, locale)}
                 </Typography.Text>
                 {siteDescription !== null && (
-                  <Typography.Text style={{ color: colour.textMuted }}>{siteDescription}</Typography.Text>
+                  <Typography.Paragraph
+                    ellipsis={{ rows: 2, tooltip: siteDescription }}
+                    style={{ margin: 0, color: colour.textMuted }}
+                  >
+                    {siteDescription}
+                  </Typography.Paragraph>
                 )}
               </Flex>
             </Link>
