@@ -242,19 +242,25 @@ interface ApplicationGroup {
 }
 
 /**
- * Proposed: an application is one tile with its mark, its title and what it is for as a whole, over its sites. Each
- * site is a link with its own mark, its title and what that site does, as an application often has several sites for
- * different people. Both descriptions are optional.
+ * Proposed: an application is one tile across the page with its mark, its title and what it is for as a whole, over its
+ * sites in the three-column grid. Each site is a link with its own mark, its title and what that site does, as an
+ * application often has several sites for different people. Both descriptions are optional.
  */
 function ApplicationTile({ group, locale }: { group: ApplicationGroup; locale: string }) {
   const { colour, spacing } = useDesignTokens()
+  const grid = useHomeGrid()
   const sorted = [...group.sites].sort((a, b) => siteTitle(a, locale).localeCompare(siteTitle(b, locale), locale))
   return (
     <HomeTile mark={<SiteMark title={group.title} size={32} />} title={group.title} description={group.description}>
-      <Flex
-        vertical
-        gap={spacing.sm}
-        style={{ marginTop: spacing.sm, paddingTop: spacing.sm, borderTop: `1px solid ${colour.divider}` }}
+      <div
+        data-testid="application-sites"
+        style={{
+          ...grid,
+          rowGap: spacing.sm,
+          marginTop: spacing.sm,
+          paddingTop: spacing.sm,
+          borderTop: `1px solid ${colour.divider}`,
+        }}
       >
         {sorted.map((site) => {
           const description = siteDescription(site, locale)
@@ -274,14 +280,14 @@ function ApplicationTile({ group, locale }: { group: ApplicationGroup; locale: s
             </Link>
           )
         })}
-      </Flex>
+      </div>
     </HomeTile>
   )
 }
 
 function Applications({ sites, locale }: { sites: SiteListItem[] | 'failed'; locale: string }) {
   const t = useText()
-  const grid = useHomeGrid()
+  const { spacing } = useDesignTokens()
   const groups = useMemo(() => {
     if (sites === 'failed') {
       return []
@@ -309,12 +315,13 @@ function Applications({ sites, locale }: { sites: SiteListItem[] | 'failed'; loc
   } else if (groups.length === 0) {
     body = <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('shell.home.applications.empty')} />
   } else {
+    // Proposed: each application takes the whole row, and its sites share the three-column grid inside it.
     body = (
-      <div data-testid="home-grid" style={grid}>
+      <Flex vertical gap={spacing.md}>
         {groups.map((group) => (
           <ApplicationTile key={group.name} group={group} locale={locale} />
         ))}
-      </div>
+      </Flex>
     )
   }
 
