@@ -251,9 +251,10 @@ public sealed record PackageOperationStepModel(
 public sealed record RaiseEventStepModel(string Name, string Event, IReadOnlyList<EventPayloadModel> Fields, string Next) : ProcessStepModel(Name);
 
 /// <summary>
-/// A payload field a <c>raiseEvent</c> step gives: the field's declared name, and the expression
-/// over the subject record that gives its value, checked against the field's type. The fields of a
-/// step are in the event's declaration order.
+/// A payload field a <c>raiseEvent</c> step or an endpoint gives: the field's declared name, and
+/// the expression that gives its value, checked against the field's type. It is over the subject
+/// record for a step, and over the input fields for an endpoint. The fields of a step or an
+/// endpoint are in the event's declaration order.
 /// </summary>
 public sealed record EventPayloadModel(string Field, ExpressionModel Value);
 

@@ -253,7 +253,7 @@ describe('scripts/dev.sh', { concurrency: false }, () => {
     assert.match(run.stdout, /\[dev\] Installing SPA packages/)
 
     // The sample module departments is installed where Modules:Path points, and the server loads it.
-    assert.ok(fs.existsSync(path.join(copy, 'artifacts/modules/departments/1.0.0/module.json')))
+    assert.ok(fs.existsSync(path.join(copy, 'artifacts/modules/departments/1.1.0/module.json')))
     assert.doesNotMatch(run.stdout, /The module version is not loaded/)
 
     // The templates folder exists where Templates:Path points, even with no sample template, or the server would stop.

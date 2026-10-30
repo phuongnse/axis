@@ -317,6 +317,7 @@ public sealed class EndpointCompilerTests
     [InlineData(""" "input": [], "values": { "title": "" } """)]
     [InlineData(""" "input": [], "values": {}, "output": ["title"] """)]
     [InlineData(""" "input": [], "values": {}, "wait": "PT10S" """)]
+    [InlineData(""" "input": [], "values": {}, "event": { "name": "NoteClosed" } """)]
     [InlineData(""" "input": [] """)]
     public void An_endpoint_in_another_shape_is_a_schema_violation(string body)
     {

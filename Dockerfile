@@ -47,7 +47,7 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS worker
 WORKDIR /app
 COPY --from=build /worker .
 COPY --from=build /src/artifacts/extensions /extensions
-COPY samples/modules/departments/ /modules/departments/1.0.0/
+COPY samples/modules/departments/ /modules/departments/1.1.0/
 USER $APP_UID
 ENTRYPOINT ["dotnet", "Axis.Worker.dll"]
 
@@ -57,7 +57,7 @@ FROM mcr.microsoft.com/dotnet/runtime:10.0 AS publisher
 WORKDIR /app
 COPY --from=build /admin .
 COPY --from=build /src/artifacts/extensions /extensions
-COPY samples/modules/departments/ /modules/departments/1.0.0/
+COPY samples/modules/departments/ /modules/departments/1.1.0/
 USER $APP_UID
 ENTRYPOINT ["dotnet", "Axis.Admin.dll"]
 
@@ -138,7 +138,7 @@ RUN apt-get update \
 WORKDIR /app
 COPY --from=build /app .
 COPY --from=build /src/artifacts/extensions /extensions
-COPY samples/modules/departments/ /modules/departments/1.0.0/
+COPY samples/modules/departments/ /modules/departments/1.1.0/
 COPY samples/ /samples/
 COPY samples/templates/request-approval/ /templates/request-approval/1.0.0/
 USER $APP_UID

@@ -54,9 +54,10 @@ A webhook that tells a chat system when a note is closed, in
   `sensitive`. A [raise event step](process-events.md#raise-event-step) that
   maps one into its payload, directly or through a reference path, is `AXC0316`
   at `/steps/{i}/fields/{key}`. A step that maps it into an event that no
-  webhook names compiles. _(planned for M19)_ An
-  [endpoint's event](integration-resources.md#endpoint-resource) that maps one into its payload is a
-  new diagnostic.
+  webhook names compiles. An
+  [endpoint's event](integration-resources.md#endpoint-resource) that reads an
+  input that `values` maps to a sensitive field is `AXC0316` at
+  `/event/fields/{key}`.
 - A module holds no webhook. A file of kind `webhook` in a module is
   `AXC0202` at `/kind`.
 
