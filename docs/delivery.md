@@ -226,7 +226,10 @@ follows NexKit's rules too. Axis adds these rules for writing it.
 1. **Check it is ready.** When the owner asks whether a milestone can be
    broken down, the local agent runs the readiness check of
    [D68](decisions/d68-issues-of-several-milestones-run-at-once.md) and answers
-   with its verdict for that milestone and the other planned ones. A milestone
+   with its verdict for that milestone and the other planned ones of the
+   current phase of the [roadmap](roadmap.md#milestones), as
+   [D117](decisions/d117-small-businesses-first-and-the-milestones-in-three-phases.md)
+   agrees. A milestone of a later phase is checked only when the owner asks. A milestone
    that is not ready first gets the decisions and doc sections it lacks. That
    work needs no NexKit, so it can go on while other milestones run.
 2. **Break it down.** On a *ready* verdict, the local agent breaks the

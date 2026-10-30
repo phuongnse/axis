@@ -41,7 +41,7 @@ built. Each row comes from the issue that models one trust boundary, and the
     **Delegated** row names the right party. A reviewer does.
 - **Kept current.** A change that adds a trust boundary updates this page in the same change, see
   [the threat model rule](../delivery.md#keeping-the-docs-current). Each docs sweep reviews the page.
-  Once a year the owner rates Axis against OWASP SAMM _(planned for M28)_, see
+  Once a year the owner rates Axis against OWASP SAMM _(planned for M32)_, see
   [ASVS other evidence](asvs.md#other-evidence).
 
 ## The product
@@ -685,7 +685,7 @@ flowchart LR
 
 | Id | Threat | Boundary | Category | Rating | Status | Evidence |
 | --- | --- | --- | --- | --- | --- | --- |
-| I5 | An image is swapped or changed between the registry and the host. | Images and registry | Tampering | High | **Delegated** | The operator builds the images or pulls them from a registry the operator controls, see [Images](installation.md#images). Signed images are planned for M28, see [D107](../decisions/d107-the-dependency-scan-runs-now-and-images-are-scanned-and-signed.md). |
+| I5 | An image is swapped or changed between the registry and the host. | Images and registry | Tampering | High | **Delegated** | The operator builds the images or pulls them from a registry the operator controls, see [Images](installation.md#images). Signed images are planned for M32, see [D107](../decisions/d107-the-dependency-scan-runs-now-and-images-are-scanned-and-signed.md). |
 | I6 | An image ships samples, development settings or source control metadata. | Images and registry | Information disclosure | High | **Mitigated** | `scripts/images.test.mjs` (no image holds a sample, a Development settings file or `.git`). |
 | I7 | A process in a container writes to its image or runs as root. | Images and registry | Elevation of privilege | High | **Mitigated** | `scripts/images.test.mjs` (each image runs as a user other than root, and the server and worker start read-only with their settings in `/run/secrets`). |
 | I8 | An install keeps running a version with a known vulnerability. | Images and registry | Elevation of privilege | Medium | **Delegated** | The operator upgrades to the latest version, the only one that gets security fixes, see [Upgrade](installation.md#upgrade). |

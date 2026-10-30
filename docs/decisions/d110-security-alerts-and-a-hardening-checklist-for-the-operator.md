@@ -6,7 +6,7 @@ The owner agreed these points on 2026-10-29. Axis already records its
 [security events](../reference/log-inventory.md#security-events), but nothing tells anyone when
 they spike. Many ASVS rows are delegated to the operator, such as disk encryption, malware
 scanning of uploads and access to logs, and no single page lists them. Everything here is
-_(planned for M28)_, see the [roadmap](../roadmap.md#milestones).
+_(planned for M32)_, as [D117](d117-small-businesses-first-and-the-milestones-in-three-phases.md) moves it, see the [roadmap](../roadmap.md#milestones).
 
 - **Alert rules ship with Axis:**
   - The Helm chart ships Prometheus alert rules, off by default and on with one value. The same

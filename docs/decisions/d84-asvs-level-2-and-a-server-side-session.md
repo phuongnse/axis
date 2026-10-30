@@ -5,7 +5,7 @@ Status: **Agreed**
 M16 verifies Axis against OWASP ASVS 5.0 Level 2, the level that
 [D50](d50-sign-in-audit-records-and-security-scanning-in-ci.md) left to M16.
 It also closes the gaps in the session that the level shows. The server-side
-session and its cookie are built. The requirements are filled in. The final ASVS sign-off is _(planned for M28)_. See
+session and its cookie are built. The requirements are filled in. The final ASVS sign-off is _(planned for M32)_. See
 [ASVS](../reference/asvs.md) and
 [sign-in and the session](../reference/security.md#sign-in-and-the-session)
 for the detail. The owner agreed these points on 2026-10-25.

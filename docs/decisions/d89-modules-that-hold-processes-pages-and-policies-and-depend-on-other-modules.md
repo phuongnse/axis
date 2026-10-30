@@ -69,7 +69,7 @@ The `modules` list in `module.json`, flat resolution of the graph, one copy of e
 - **Upgrades:** a module upgrade must still be additive for its entities.
   Adding a process, page or policy is additive.
   - [D102](d102-built-in-modules-open-to-change-and-bound-by-a-contract.md)
-    replaces this point in M25: a module ships migrations.
+    replaces this point in M29, as [D117](d117-small-businesses-first-and-the-milestones-in-three-phases.md) moves it: a module ships migrations.
 
 _Why:_ a module that holds only data and rules cannot ship a working feature,
 such as an approval with its screens and permissions. Role slots let a module

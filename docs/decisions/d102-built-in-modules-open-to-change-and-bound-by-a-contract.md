@@ -9,7 +9,10 @@ foresee. A business must be able to add them anywhere, without writing its
 process from scratch, while the values at the core of the module and of the
 platform still hold. M24 builds the contracts, M25 the customization layers,
 and M26 the first built-in modules, see the [roadmap](../roadmap.md#milestones).
-Everything here is _(planned for M24 to M26)_.
+Everything here is _(planned for M24 to M26)_, except module migrations,
+the upgrade merge and eject, _(planned for M29)_, and the `service-desk` and
+`assets` modules, _(planned for M30)_, as
+[D117](d117-small-businesses-first-and-the-milestones-in-three-phases.md) moves them.
 
 - **Four layers:**
   - The platform: the engines. They hold no domain and never name a built-in
@@ -148,6 +151,10 @@ Everything here is _(planned for M24 to M26)_.
   M21 and M22, as
   [D101](d101-the-extensibility-milestone-is-split-into-six.md)'s order now
   reads.
+  - [D117](d117-small-businesses-first-and-the-milestones-in-three-phases.md) keeps the layer in M25 and moves module migrations, the
+    upgrade merge and eject to M29 Module upgrades. M26 builds `organization`
+    and `approvals`, and M30 More built-in modules builds `service-desk` and
+    `assets`.
   - [D109](d109-sensitive-fields-and-backups-are-encrypted-and-history-keeps-no-names.md)
     makes M26 wait for M27, which encrypts sensitive fields, because the
     built-in applications of M26 are the first that a customer runs.
