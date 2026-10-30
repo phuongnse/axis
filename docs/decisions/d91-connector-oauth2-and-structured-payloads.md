@@ -6,8 +6,7 @@ The owner agreed this on 2026-10-25. It adds to the `connector` resource of
 [D25](d25-connectors-deployment-bindings-and-secrets.md): a new `auth` type,
 inputs outside the body, and nested input fields. It replaces D25's line that
 `auth` is none, a bearer token or a named header, and the line that inputs are
-sent as a JSON body. OAuth2 client credentials are built, except the resend
-after a `401`, and so is an output's `source`. Everything else here is
+sent as a JSON body. OAuth2 client credentials are built, and so is an output's `source`. Everything else here is
 _(planned for M19)_. See
 [connector resource](../reference/integration-resources.md#connector-resource).
 
@@ -21,7 +20,7 @@ _(planned for M19)_. See
     until a minute before it expires. It is never stored, logged or shown.
   - A `401` from the system drops the token. The worker gets a new one and
     sends the request once more, in the same attempt, with the same
-    idempotency key. _(planned for M19)_
+    idempotency key.
   - A failed token request is a retryable attempt. History records the token
     endpoint's status code, never its body.
   - The token URL follows the connector rules: `https` outside Development,

@@ -2,6 +2,7 @@ using System.Text;
 using System.Web;
 using Axis.Processes.Instances;
 using Axis.Processes.Work;
+using Microsoft.AspNetCore.Http;
 
 namespace Axis.Integration.Tests;
 
@@ -114,37 +115,23 @@ public sealed class ConnectorOAuth2Tests(ConnectorCallFixture fixture) : IClassF
         Assert.Equal(2, fixture.Stub.TokenRequests.Count - tokensBefore);
     }
 
-    [Fact]
-    public async Task A_refused_token_request_retries_the_call_with_the_status_and_sends_no_operation()
+    [Theory]
+    [InlineData(500)]
+    [InlineData(307)]
+    public async Task A_refused_or_redirected_token_request_retries_the_call_with_the_status_and_sends_no_operation(int status)
     {
         await fixture.RestartWorkerAsync();
+        var tokensBefore = fixture.Stub.TokenRequests.Count;
         var (_, instanceId) = await fixture.StageAsync("a", CancellationToken, Process);
         var callId = await CallIdAsync(instanceId);
-        fixture.Stub.RespondToken(500);
+        fixture.Stub.RespondToken(status);
 
         Assert.Equal(WorkItemOutcome.Rescheduled, await fixture.RunCallAsync("a", CancellationToken));
 
+        // The redirect points back at the token endpoint, so a followed redirect would show as a second token request.
         Assert.Empty(fixture.Stub.RequestsWithKey(callId));
-        var tenant = fixture.Tenant("a");
-        var error = "The token request of the connector 'OAuthPurchasing' answered with the status 500.";
-        await using (var command = tenant.DataSource.CreateCommand(
-            "SELECT state, attempts, last_status, last_error FROM axis.connector_calls WHERE id = @id"))
-        {
-            command.Parameters.AddWithValue("id", callId);
-            await using var reader = await command.ExecuteReaderAsync(CancellationToken);
-            Assert.True(await reader.ReadAsync(CancellationToken));
-            Assert.Equal(("pending", 1, 500, error), (reader.GetString(0), reader.GetInt32(1), reader.GetInt32(2), reader.GetString(3)));
-        }
-
-        await using (var command = tenant.DataSource.CreateCommand(
-            "SELECT outcome, http_status, error FROM axis.process_call_attempts WHERE call_id = @id AND kind = 'attempt'"))
-        {
-            command.Parameters.AddWithValue("id", callId);
-            await using var reader = await command.ExecuteReaderAsync(CancellationToken);
-            Assert.True(await reader.ReadAsync(CancellationToken));
-            Assert.Equal(("retryable", 500, error), (reader.GetString(0), reader.GetInt32(1), reader.GetString(2)));
-            Assert.False(await reader.ReadAsync(CancellationToken));
-        }
+        Assert.Equal(1, fixture.Stub.TokenRequests.Count - tokensBefore);
+        await AssertRetryableAsync(callId, status, $"The token request of the connector 'OAuthPurchasing' answered with the status {status}.");
 
         // The failure is not cached, so the retry asks again and sends the operation.
         await fixture.MakeDueAsync("a", callId);
@@ -152,6 +139,107 @@ public sealed class ConnectorOAuth2Tests(ConnectorCallFixture fixture) : IClassF
         var request = Assert.Single(fixture.Stub.RequestsWithKey(callId));
         Assert.Equal($"Bearer {fixture.Stub.TokenRequests.Last().Token}", request.Authorization);
         Assert.Equal(WorkItemOutcome.Completed, await fixture.RunStepAsync("a", CancellationToken));
+    }
+
+    [Fact]
+    public async Task A_token_request_that_times_out_retries_the_call_with_no_status_and_sends_no_operation()
+    {
+        await fixture.RestartWorkerAsync();
+        var tokensBefore = fixture.Stub.TokenRequests.Count;
+        var (_, instanceId) = await fixture.StageAsync("a", CancellationToken, Process);
+        var callId = await CallIdAsync(instanceId);
+        var held = fixture.Stub.HoldToken();
+        try
+        {
+            Assert.Equal(WorkItemOutcome.Rescheduled, await fixture.RunCallAsync("a", CancellationToken));
+        }
+        finally
+        {
+            held.Release();
+        }
+
+        Assert.Empty(fixture.Stub.RequestsWithKey(callId));
+        Assert.Equal(1, fixture.Stub.TokenRequests.Count - tokensBefore);
+        await AssertRetryableAsync(callId, null, "The token request of the connector 'OAuthPurchasing' timed out after 1 seconds.");
+    }
+
+    [Fact]
+    public async Task A_401_drops_the_token_and_resends_once_with_a_new_token_and_the_same_key_in_the_same_attempt()
+    {
+        await fixture.RestartWorkerAsync();
+        var tokensBefore = fixture.Stub.TokenRequests.Count;
+        var (_, instanceId) = await fixture.StageAsync("a", CancellationToken, Process);
+        var callId = await CallIdAsync(instanceId);
+        fixture.Stub.Respond(401, "{}");
+
+        Assert.Equal(WorkItemOutcome.Completed, await fixture.RunCallAsync("a", CancellationToken));
+
+        var tokens = fixture.Stub.TokenRequests.Skip(tokensBefore).Select(request => request.Token).ToList();
+        Assert.Equal(2, tokens.Count);
+        var requests = fixture.Stub.RequestsWithKey(callId);
+        Assert.Equal(2, requests.Count);
+        Assert.Equal(tokens.Select(token => $"Bearer {token}"), requests.Select(request => request.Authorization));
+        Assert.Equal(("succeeded", 1), await CallStateAsync(callId));
+        await AssertAttemptRowAsync(callId, "succeeded", 200);
+        Assert.Equal(WorkItemOutcome.Completed, await fixture.RunStepAsync("a", CancellationToken));
+
+        // The new token is cached, so the next call sends it and requests none.
+        Assert.Equal(tokens[1], await CallAsync("a"));
+        Assert.Equal(2, fixture.Stub.TokenRequests.Count - tokensBefore);
+    }
+
+    [Fact]
+    public async Task Two_401s_in_a_row_fail_the_attempt_with_one_token_request_between_them()
+    {
+        await fixture.RestartWorkerAsync();
+        var tokensBefore = fixture.Stub.TokenRequests.Count;
+        var (_, instanceId) = await fixture.StageAsync("a", CancellationToken, Process);
+        var callId = await CallIdAsync(instanceId);
+        fixture.Stub.RespondMany((401, "{}"), (401, "{}"));
+
+        Assert.Equal(WorkItemOutcome.Failed, await fixture.RunCallAsync("a", CancellationToken));
+
+        Assert.Equal(2, fixture.Stub.TokenRequests.Count - tokensBefore);
+        Assert.Equal(2, fixture.Stub.RequestsWithKey(callId).Count);
+        await using (var command = fixture.Tenant("a").DataSource.CreateCommand(
+            "SELECT state, attempts, last_status FROM axis.connector_calls WHERE id = @id"))
+        {
+            command.Parameters.AddWithValue("id", callId);
+            await using var reader = await command.ExecuteReaderAsync(CancellationToken);
+            Assert.True(await reader.ReadAsync(CancellationToken));
+            Assert.Equal(("failed", 1, 401), (reader.GetString(0), reader.GetInt32(1), reader.GetInt32(2)));
+        }
+
+        await AssertAttemptRowAsync(callId, "failed", 401);
+    }
+
+    [Fact]
+    public async Task A_lookup_that_gets_a_401_requests_a_new_token_and_resends_the_lookup_once()
+    {
+        await fixture.RestartWorkerAsync();
+        var tokensBefore = fixture.Stub.TokenRequests.Count;
+        var (_, instanceId) = await fixture.StageAsync("a", CancellationToken, Process);
+        var callId = await CallIdAsync(instanceId);
+        await fixture.Tenant("a").ScalarAsync("UPDATE axis.connector_calls SET state = 'unknown', attempts = 1 WHERE id = @id", ("id", callId));
+        await fixture.MakeDueAsync("a", callId);
+        fixture.Stub.Respond(401, "{}");
+
+        Assert.NotNull(await fixture.RunCallAsync("a", CancellationToken));
+
+        var tokens = fixture.Stub.TokenRequests.Skip(tokensBefore).Select(request => request.Token).ToList();
+        Assert.Equal(2, tokens.Count);
+        var lookups = fixture.Stub.RequestsFor(callId).Where(request => HttpMethods.IsGet(request.Method)).ToList();
+        Assert.Equal(2, lookups.Count);
+        Assert.Equal(tokens.Select(token => $"Bearer {token}"), lookups.Select(request => request.Authorization));
+
+        // The stub answers the resent lookup 404, so the system never acted and the lookup row says so.
+        await using var command = fixture.Tenant("a").DataSource.CreateCommand(
+            "SELECT outcome, http_status FROM axis.process_call_attempts WHERE call_id = @id AND kind = 'lookup'");
+        command.Parameters.AddWithValue("id", callId);
+        await using var reader = await command.ExecuteReaderAsync(CancellationToken);
+        Assert.True(await reader.ReadAsync(CancellationToken));
+        Assert.Equal(("notFound", 404), (reader.GetString(0), reader.GetInt32(1)));
+        Assert.False(await reader.ReadAsync(CancellationToken));
     }
 
     [Fact]
@@ -195,6 +283,42 @@ public sealed class ConnectorOAuth2Tests(ConnectorCallFixture fixture) : IClassF
             Assert.DoesNotContain(value, spans, StringComparison.Ordinal);
             Assert.DoesNotContain(fixture.Logs.Entries, entry => entry.Contains(value, StringComparison.Ordinal));
         }
+    }
+
+    /// <summary>Checks the call is pending after one retryable attempt that holds the status, or none, and the fixed error, and no body of the token endpoint.</summary>
+    private async Task AssertRetryableAsync(Guid callId, int? status, string error)
+    {
+        var tenant = fixture.Tenant("a");
+        await using (var command = tenant.DataSource.CreateCommand(
+            "SELECT state, attempts, last_status, last_error FROM axis.connector_calls WHERE id = @id"))
+        {
+            command.Parameters.AddWithValue("id", callId);
+            await using var reader = await command.ExecuteReaderAsync(CancellationToken);
+            Assert.True(await reader.ReadAsync(CancellationToken));
+            Assert.Equal(("pending", 1, status, error), (reader.GetString(0), reader.GetInt32(1), reader.IsDBNull(2) ? null : reader.GetInt32(2), reader.GetString(3)));
+        }
+
+        await using (var command = tenant.DataSource.CreateCommand(
+            "SELECT outcome, http_status, error FROM axis.process_call_attempts WHERE call_id = @id AND kind = 'attempt'"))
+        {
+            command.Parameters.AddWithValue("id", callId);
+            await using var reader = await command.ExecuteReaderAsync(CancellationToken);
+            Assert.True(await reader.ReadAsync(CancellationToken));
+            Assert.Equal(("retryable", status, error), (reader.GetString(0), reader.IsDBNull(1) ? null : reader.GetInt32(1), reader.GetString(2)));
+            Assert.False(await reader.ReadAsync(CancellationToken));
+        }
+    }
+
+    /// <summary>Checks the call has one attempt row, of the outcome and status, and no lookup row.</summary>
+    private async Task AssertAttemptRowAsync(Guid callId, string outcome, int status)
+    {
+        await using var command = fixture.Tenant("a").DataSource.CreateCommand(
+            "SELECT kind, outcome, http_status FROM axis.process_call_attempts WHERE call_id = @id");
+        command.Parameters.AddWithValue("id", callId);
+        await using var reader = await command.ExecuteReaderAsync(CancellationToken);
+        Assert.True(await reader.ReadAsync(CancellationToken));
+        Assert.Equal(("attempt", outcome, status), (reader.GetString(0), reader.GetString(1), reader.GetInt32(2)));
+        Assert.False(await reader.ReadAsync(CancellationToken));
     }
 
     /// <summary>Stages and runs one call of <paramref name="tenantId"/> and gives the bearer token its operation carried.</summary>

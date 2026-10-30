@@ -219,7 +219,7 @@ Docker Compose, `scripts/dev.sh` and the E2E run point them at the
 A connector can get its access token from an OAuth2 authorization server
 through the client credentials grant, as
 [D91](../decisions/d91-connector-oauth2-and-structured-payloads.md) agrees.
-The token request and the cache are built. The resend after a `401` is not.
+This auth is built.
 
 ```json
 "auth": {
@@ -260,12 +260,16 @@ The token request and the cache are built. The resend after a `401` is not.
   - Two calls that find the cache empty at the same moment may each request a
     token.
 - The token request has the connector's `timeout`, like the operation. The
-  call's lease is extended by twice the `timeout` for an `oauth2` connector.
+  call's lease is extended by four times the `timeout` for an `oauth2` connector,
+  for a token request and a send, and the same two again after a `401`.
 - A test scenario answers the operation from its stub and requests no token.
-- _(planned for M19)_ A `401` from the system drops the token. The worker gets
-  a new one and sends the request once more in the same attempt, with the same
-  idempotency key. A second `401` fails the attempt as any `4xx` does.
-- A failed token request, for any reason, is a retryable attempt, and the
+- A `401` from the system drops the token. The worker gets a new one and
+  sends the request once more in the same attempt, with the same idempotency
+  key. A second `401` fails the attempt as any `4xx` does. A lookup that gets a
+  `401` does the same, so a stale token does not keep a call `unknown`. The
+  worker drops the token only when its cache still holds the token that got
+  the `401`.
+- A failed token request, for any reason, including a redirect, is a retryable attempt, and the
   operation is not sent. A failed lookup stays `unknown`. The attempt row and
   the call record the token endpoint's status code and a fixed error text,
   never its body or an exception message.
@@ -301,7 +305,13 @@ still planned. Bodies stay JSON. An output's `source` is built.
       ]
     }
   ],
-  "output": [{ "name": "trackingNumber", "type": "text", "source": "/shipment/tracking/number" }]
+  "output": [
+    {
+      "name": "trackingNumber",
+      "type": "text",
+      "source": "/shipment/tracking/number"
+    }
+  ]
 }
 ```
 
@@ -605,7 +615,12 @@ lets the purchasing system submit a purchase request, in
   "process": "PurchaseRequestApproval",
   "input": [
     { "name": "title", "type": "text", "required": true, "maxLength": 200 },
-    { "name": "department", "type": "reference", "target": "Department", "required": true },
+    {
+      "name": "department",
+      "type": "reference",
+      "target": "Department",
+      "required": true
+    },
     { "name": "supplier", "type": "reference", "target": "Supplier" },
     { "name": "currency", "type": "enum", "values": ["VND", "USD", "EUR"] },
     { "name": "lineItems", "type": "child-collection", "target": "LineItem" }
@@ -668,6 +683,7 @@ the caller's id.
   - An expression that reads an input that `values` maps to a field marked
     `sensitive` counts as reading that field, so an event that has a
     [webhook](#webhook-resource) may not carry it.
+
 - **Output.** `output` is optional. It lists field names of `entity` that a
   `201` returns when the instance completes within `wait`. _(planned for M19)_
   An endpoint without a `process` answers `201` as soon as it commits, and has
@@ -817,11 +833,16 @@ A webhook that tells a chat system when a note is closed, in
     "type": "NoteClosed",
     "id": "0d6f…",
     "timestamp": "2026-11-02T09:15:00Z",
-    "data": { "entity": "Note", "subjectId": "8c1e…", "fields": { "priority": 2, "amount": 120.5 } }
+    "data": {
+      "entity": "Note",
+      "subjectId": "8c1e…",
+      "fields": { "priority": 2, "amount": 120.5 }
+    }
   }
   ```
 
   `id` is the event occurrence id. `fields` holds the event's payload fields.
+
 - **Headers.** The Standard Webhooks headers:
   - `webhook-id`, built from the occurrence id and the webhook id, the same on
     every attempt, so a receiver can drop duplicates;
