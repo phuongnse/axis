@@ -416,6 +416,42 @@ public sealed class ConnectorCallTests(ConnectorCallFixture fixture) : IClassFix
     }
 
     [Fact]
+    public async Task Output_with_a_source_reads_the_nested_value_and_one_without_reads_the_top_level_property()
+    {
+        var tenant = fixture.Tenant("a");
+        var (subjectId, instanceId) = await fixture.StageAsync("a", CancellationToken, "ShipOrder");
+        var callId = await CallIdAsync(tenant, instanceId);
+        fixture.Stub.Respond(200, "{\"orderNumber\":\"PO-7\",\"shipment\":{\"tracking\":{\"number\":\"TR-1\"}}}");
+
+        Assert.Equal(WorkItemOutcome.Completed, await fixture.RunCallAsync("a", CancellationToken));
+
+        Assert.Equal((ConnectorCalls.Succeeded, 1), await StateAsync(tenant, callId));
+        var record = await tenant.RequestAsync(subjectId);
+        Assert.Equal("PO-7", record.Values["title"]!.GetValue<string>());
+        Assert.Equal("TR-1", record.Values["comment"]!.GetValue<string>());
+        Assert.Equal(WorkItemOutcome.Completed, await fixture.RunStepAsync("a", CancellationToken));
+    }
+
+    [Fact]
+    public async Task Output_whose_source_points_at_nothing_leaves_the_call_unknown()
+    {
+        var tenant = fixture.Tenant("a");
+        var (subjectId, instanceId) = await fixture.StageAsync("a", CancellationToken, "ShipOrder");
+        var callId = await CallIdAsync(tenant, instanceId);
+        var before = await tenant.RequestAsync(subjectId);
+        fixture.Stub.Respond(200, "{\"orderNumber\":\"PO-7\",\"shipment\":{}}");
+
+        Assert.Equal(WorkItemOutcome.Completed, await fixture.RunCallAsync("a", CancellationToken));
+
+        var call = await CallAsync(tenant, callId);
+        Assert.Equal((ConnectorCalls.Unknown, 1, (int?)200), (call.State, call.Attempts, call.LastStatus));
+        Assert.Equal("The response did not fit the output of the operation 'createShipment' of the connector 'Shipping'.", call.LastError);
+        var after = await tenant.RequestAsync(subjectId);
+        Assert.Equal(before.Version, after.Version);
+        Assert.Equal(before.Values["title"]!.GetValue<string>(), after.Values["title"]!.GetValue<string>());
+    }
+
+    [Fact]
     public async Task Worker_restart_between_attempts_keeps_the_attempt_count_and_the_due_time()
     {
         var tenant = fixture.Tenant("a");

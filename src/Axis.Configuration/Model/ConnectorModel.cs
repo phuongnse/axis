@@ -64,5 +64,9 @@ public sealed record ConnectorOperationModel(
     IReadOnlyList<ConnectorFieldModel> Output,
     string? Lookup);
 
-/// <summary>An input or output field of a compiled connector operation, with a scalar field type.</summary>
-public sealed record ConnectorFieldModel(string Name, FieldType Type, bool Required);
+/// <summary>
+/// An input or output field of a compiled connector operation, with a scalar field type. For an
+/// output, <paramref name="Source"/> is a JSON Pointer into the response body, and null means the
+/// top-level property of <paramref name="Name"/>.
+/// </summary>
+public sealed record ConnectorFieldModel(string Name, FieldType Type, bool Required, string? Source = null);

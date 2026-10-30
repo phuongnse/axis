@@ -568,8 +568,9 @@ internal sealed partial class ConnectorCallHandler(
         };
 
     /// <summary>
-    /// Reads the outputs from a <c>2xx</c> body. The body fits when it is a JSON object with a value
-    /// of the right type for each output it holds, and a value for each required output. Returns the
+    /// Reads the outputs from a <c>2xx</c> body. An output is read from the place its <c>source</c>
+    /// JSON Pointer names, or from the top-level property of its name when it has none. The body fits
+    /// when it is a JSON object with a value of the right type for each output it holds, and a value for each required output. Returns the
     /// subject fields to write with their values, or <see langword="null"/> when the body does not
     /// fit. An optional output the body leaves out writes nothing, and an explicit <c>null</c>
     /// writes <c>null</c>.
@@ -597,7 +598,9 @@ internal sealed partial class ConnectorCallHandler(
             var values = new List<KeyValuePair<FieldModel, object?>>();
             foreach (var output in target.Operation.Output)
             {
-                var present = root.TryGetProperty(output.Name, out var element);
+                var present = output.Source is { } source
+                    ? TryResolve(root, source, out var element)
+                    : root.TryGetProperty(output.Name, out element);
                 object? value = null;
                 if (!present || element.ValueKind == JsonValueKind.Null)
                 {
@@ -626,6 +629,47 @@ internal sealed partial class ConnectorCallHandler(
             return values;
         }
     }
+
+    /// <summary>
+    /// Finds the value a JSON Pointer (RFC 6901) names in <paramref name="root"/>. A token reads an
+    /// object property by its exact name, or an array element by a decimal index without leading
+    /// zeros. Returns false when the pointer names nothing.
+    /// </summary>
+    internal static bool TryResolve(JsonElement root, string pointer, out JsonElement element)
+    {
+        element = root;
+        if (pointer.Length == 0)
+        {
+            return true;
+        }
+
+        if (pointer[0] != '/')
+        {
+            return false;
+        }
+
+        foreach (var encoded in pointer[1..].Split('/'))
+        {
+            var token = encoded.Replace("~1", "/", StringComparison.Ordinal).Replace("~0", "~", StringComparison.Ordinal);
+            switch (element.ValueKind)
+            {
+                case JsonValueKind.Object when element.TryGetProperty(token, out var property):
+                    element = property;
+                    break;
+                case JsonValueKind.Array when IsIndex(token) && int.TryParse(token, NumberStyles.None, CultureInfo.InvariantCulture, out var index) && index < element.GetArrayLength():
+                    element = element[index];
+                    break;
+                default:
+                    element = default;
+                    return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static bool IsIndex(string token) =>
+        token.Length > 0 && token.All(char.IsAsciiDigit) && (token.Length == 1 || token[0] != '0');
 
     /// <summary>
     /// Reads an output value in the form the expression interpreter gives, the reverse of how a
