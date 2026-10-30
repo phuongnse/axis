@@ -169,8 +169,8 @@ Every step has a `type`. These are the step kinds:
 - `completeTask` and `expectTask` use the newest task of that step for the
   record. A returned request can create the same task again.
 - `assignee` is `{ "user": … }` or `{ "role": … }`. `state` uses the instance
-  and task states in [processes](processes.md#instance-states) and
-  [task states](processes.md#task-states).
+  and task states in [processes](process-states.md#instance-states) and
+  [task states](process-states.md#task-states).
 - Every reference to an entity, field, process, step, outcome, role, user or
   alias is checked at compile. See the **Scenarios** bullet of the
   [Resolve step](configuration.md#configuration-pipeline) for the checks and their codes.
@@ -207,6 +207,11 @@ Every step has a `type`. These are the step kinds:
   `now` is before the time the application clock queued it. It logs the
   no-mail-host warning, and the email stays `pending`. `expectNotification`
   still finds it.
+- Webhooks are never sent. A [raise event step](process-events.md#raise-event-step)
+  in a scenario still stages one delivery for each webhook of its event, but
+  `advanceTime` does not run `webhook.deliver` items. They stay queued, and the
+  rows in `axis.webhook_deliveries` stay `pending`, so no scenario calls an
+  outside system. See [webhook delivery](process-events.md#webhook-delivery).
 
 `advanceTime`:
 

@@ -37,7 +37,7 @@ Each view lists the newest items first, pages through them and filters by applic
   [instance detail](process-inspection.md#instance-detail), with the graph, the history, the
   tasks and the calls.
 - **Dead letters.** Event deliveries that reached the event delivery limit that M14 adds,
-  including [webhook deliveries](integration-resources.md#outbound-webhooks). Each shows the
+  including [webhook deliveries](outbound-webhooks.md#outbound-webhooks). Each shows the
   event, the trigger or webhook, the attempts and the last error.
 - **Webhook deliveries.** Recent deliveries of each webhook, with their status code and attempts.
 - **Schedules.** Each schedule trigger of each active release, with its last and next

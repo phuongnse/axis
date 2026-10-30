@@ -7,9 +7,10 @@ system that an event happened, without a process step that calls a connector.
 It builds on the events of [D26](d26-events-and-triggers.md), the bindings of
 [D25](d25-connectors-deployment-bindings-and-secrets.md), and the event
 delivery limit and dead letters that M14 adds. The resource, its compile
-checks and the activation check of its bindings are built. Delivery, rotation
-of the secret and the console view are _(planned for M19)_. See
-[outbound webhooks](../reference/integration-resources.md#outbound-webhooks).
+checks, the activation check of its bindings and the delivery are built.
+Rotation tooling, dead letters of a failing delivery and the console view are
+_(planned for M19)_. See
+[outbound webhooks](../reference/outbound-webhooks.md#outbound-webhooks).
 
 - **A `webhook` resource:**
   - It names an `event` of the application, or of a module the application

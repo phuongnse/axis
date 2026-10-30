@@ -40,6 +40,8 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
 
     public DbSet<EmailOutboxRow> EmailOutbox => Set<EmailOutboxRow>();
 
+    public DbSet<WebhookDeliveryRow> WebhookDeliveries => Set<WebhookDeliveryRow>();
+
     public DbSet<ProcessStartReceiptRow> StartReceipts => Set<ProcessStartReceiptRow>();
 
     public DbSet<EndpointReceiptRow> EndpointReceipts => Set<EndpointReceiptRow>();
@@ -345,6 +347,23 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
             email.HasIndex(e => e.MessageId).IsUnique().HasDatabaseName("ux_email_outbox_message_id");
         });
 
+        modelBuilder.Entity<WebhookDeliveryRow>(delivery =>
+        {
+            delivery.ToTable("webhook_deliveries");
+            delivery.HasKey(d => d.Id).HasName("pk_webhook_deliveries");
+            delivery.Property(d => d.Id).HasColumnName("id").ValueGeneratedNever();
+            delivery.Property(d => d.ApplicationId).HasColumnName("application_id");
+            delivery.Property(d => d.ReleaseId).HasColumnName("release_id");
+            delivery.Property(d => d.WebhookId).HasColumnName("webhook_id");
+            delivery.Property(d => d.EventId).HasColumnName("event_id");
+            delivery.Property(d => d.State).HasColumnName("state").HasDefaultValue("pending");
+            delivery.Property(d => d.Attempts).HasColumnName("attempts").HasDefaultValue(0);
+            delivery.Property(d => d.StatusCode).HasColumnName("status_code");
+            delivery.Property(d => d.CreatedAt).HasColumnName("created_at").HasDefaultValueSql("now()");
+            delivery.Property(d => d.DeliveredAt).HasColumnName("delivered_at");
+            delivery.HasIndex(d => new { d.EventId, d.WebhookId }).IsUnique().HasDatabaseName("ux_webhook_deliveries_event_id_webhook_id");
+        });
+
         modelBuilder.Entity<ProcessStartReceiptRow>(receipt =>
         {
             receipt.ToTable("process_start_receipts");
@@ -456,6 +475,7 @@ public sealed class ProcessesDbContext(DbContextOptions<ProcessesDbContext> opti
             item.Property(i => i.PackageCallId).HasColumnName("package_call_id");
             item.Property(i => i.EventId).HasColumnName("event_id");
             item.Property(i => i.EmailId).HasColumnName("email_id");
+            item.Property(i => i.WebhookDeliveryId).HasColumnName("webhook_delivery_id");
             item.Property(i => i.TriggerId).HasColumnName("trigger_id");
             item.Property(i => i.ReleaseId).HasColumnName("release_id");
             item.Property(i => i.OccurrenceAt).HasColumnName("occurrence_at");

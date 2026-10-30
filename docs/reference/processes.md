@@ -28,7 +28,7 @@ the `axis.process_instances`, `axis.process_step_history`,
 `axis.process_tasks`, `axis.process_start_receipts`,
 `axis.endpoint_receipts`, `axis.process_work_items`, `axis.connector_calls`,
 `axis.package_calls`, `axis.events`, `axis.process_event_matches`, `axis.notifications`,
-`axis.notification_reads` and `axis.email_outbox` tables are built too. So is the engine that runs
+`axis.notification_reads`, `axis.email_outbox` and `axis.webhook_deliveries` tables are built too. So is the engine that runs
 `decision`, `task`, `operation`, `end` and `timer` steps, see
 [Running a step](process-execution.md#running-a-step). The [task API](task-api.md) routes that
 list the user's tasks, read one task and complete one are built. Completing
@@ -567,34 +567,6 @@ these:
   stored on the receipt's instance. Decimals count as equal when they are the
   same number.
 
-## Instance states
-
-| State | Meaning |
-| --- | --- |
-| `running` | The instance has work that is ready or claimed by a worker. |
-| `waiting` | The instance waits for a human task to be completed or for a connector call to settle, see [Connector calls](process-execution.md#connector-calls). It also waits for a package operation call, see [Package operations](process-execution.md#package-operations), for the child of a sub-process step, see [Sub-process step](process-flow.md#sub-process-step), and for a timer, see [Timer step](process-flow.md#timer-step). It also waits for an event, see [process flow](process-flow.md). |
-| `completed` | The instance reached an `end` step. |
-| `failed` | A step failed. The error is in the history. |
-| `cancelled` | An operator cancelled the instance while it was `running` or `waiting`. It is an end state. See [Cancel](process-inspection.md#cancel). |
-
-Only `running` and `waiting` block a new start for the same process and
-record. A `failed` or `cancelled` instance does not, so it never locks its
-record. An operator can cancel a `running` or `waiting` instance, see
-[Cancel](process-inspection.md#cancel). An operator can retry a `failed` instance, see [Retry](process-inspection.md#retry).
-
-## Task states
-
-| State | Meaning |
-| --- | --- |
-| `open` | The task waits for a decision. |
-| `completed` | The decision is recorded, and the instance moves on. |
-| `cancelled` | An operator cancelled the task's instance. The task has no decision and leaves every inbox. See [Cancel](process-inspection.md#cancel). |
-| `expired` | The task's `deadline` passed while it was `open`, and the instance moved to the deadline's `next` step. The task has no decision and leaves every inbox. It cannot be completed. See [Escalations and deadline](task-deadlines.md#escalations-and-deadline). |
-
-A task has no other state. Its due date is only shown, so there is no overdue
-state. The task API reports an open task past its due date as overdue, see
-[Task states](task-deadlines.md#task-states).
-
 ## Releases and running work
 
 New work starts on the active release. Running work stays on its pinned
@@ -786,6 +758,10 @@ database, with history in `axis.__processes_migrations` (see
     [Escalations and deadline](task-deadlines.md#escalations-and-deadline).
   - `notification.email` sends one email of `axis.email_outbox`. Its item also
     has the `email_id` of the row.
+  - `webhook.deliver` sends one event occurrence to one webhook, from a row of
+    `axis.webhook_deliveries`. Its item also has the `webhook_delivery_id` of the
+    row, without a foreign key. See
+    [Webhook delivery](process-events.md#webhook-delivery).
   - `computed.backfill` recomputes the out-of-date rows of
     one entity. Its item also has the `entity_id`, and each claim runs one
     batch of up to 500 rows. See
@@ -945,6 +921,17 @@ database, with history in `axis.__processes_migrations` (see
   | `address`, `locale` | `text`, `text` null | The address the email goes to, not validated when staged, and the locale of the texts. The locale is null when the release has none |
   | `subject`, `body`, `message_id`, `values` | `text`, `text`, `text`, `jsonb` | The rendered subject, the plain text body with the page link if any, the `Message-ID` header, which a unique index keeps once, and the raw placeholder values of the step run as in `axis.notifications`, `{}` before the column existed |
   | `state`, `created_at`, `sent_at` | `text`, `timestamptz`, `timestamptz` null | `pending` or `sent`, `pending` at first. The start of the step's transaction, `now()`. When the email was sent, null while it is pending |
+- `axis.webhook_deliveries`: one row per event occurrence and webhook, which a
+  `raiseEvent` step staged for each webhook of the event, see
+  [Webhook delivery](process-events.md#webhook-delivery). It holds no body. Times
+  use the database clock.
+
+  | Column | Type | Meaning |
+  | --- | --- | --- |
+  | `id` | `uuid` | A version 7 UUID. The row's `webhook.deliver` item names it in `webhook_delivery_id`, without a foreign key |
+  | `application_id`, `release_id`, `webhook_id`, `event_id` | `uuid` | The application, the release the raising instance is pinned to, the webhook of that release and the occurrence in `axis.events`. A unique index keeps (`event_id`, `webhook_id`) once |
+  | `state`, `attempts`, `status_code` | `text`, `integer`, `integer` null | `pending` or `delivered`, `pending` at first. The attempts made, 0 at first. The status of the last attempt, null when none was made or the last got no answer |
+  | `created_at`, `delivered_at` | `timestamptz`, `timestamptz` null | The start of the step's transaction, `now()`. When a receiver answered `2xx`, null while the row is pending |
 - `axis.trigger_schedules`: the schedule state, one row per
   schedule trigger of the tenant, see [Schedules](process-events.md#schedules). Activation
   writes it.

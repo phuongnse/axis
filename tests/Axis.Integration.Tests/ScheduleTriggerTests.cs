@@ -32,6 +32,9 @@ public sealed class ScheduleTriggerTests(ScheduleTriggerFixture fixture) : IClas
         ComputedBackfill.WorkItemKind,
         RecordImports.CommitWorkItemKind,
         RecordImports.CheckWorkItemKind,
+
+        // Until webhook dead letters land, a failing delivery retries without end and writes no dead letter.
+        ProcessStarts.WebhookDeliverWorkItemKind,
     ];
 
     private static readonly DateTimeOffset _occurrence = DateTimeOffset.Parse("2026-01-01T05:00:00Z");

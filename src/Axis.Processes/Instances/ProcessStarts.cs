@@ -44,6 +44,9 @@ public static class ProcessStarts
     /// <summary>The kind of the work item that sends one email of the outbox.</summary>
     public const string NotificationEmailWorkItemKind = "notification.email";
 
+    /// <summary>The kind of the work item that sends one event occurrence to one webhook.</summary>
+    public const string WebhookDeliverWorkItemKind = "webhook.deliver";
+
     /// <summary>The state of an instance that has work ready or claimed.</summary>
     public const string Running = "running";
 

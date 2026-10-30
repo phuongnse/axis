@@ -1026,6 +1026,65 @@ namespace Axis.Processes.Storage.Migrations
                     b.ToTable("trigger_starts", "axis");
                 });
 
+            modelBuilder.Entity("Axis.Processes.Storage.WebhookDeliveryRow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid>("ApplicationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("application_id");
+
+                    b.Property<int>("Attempts")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasDefaultValue(0)
+                        .HasColumnName("attempts");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<DateTimeOffset?>("DeliveredAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("delivered_at");
+
+                    b.Property<Guid>("EventId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("event_id");
+
+                    b.Property<Guid>("ReleaseId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("release_id");
+
+                    b.Property<string>("State")
+                        .IsRequired()
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("text")
+                        .HasDefaultValue("pending")
+                        .HasColumnName("state");
+
+                    b.Property<int?>("StatusCode")
+                        .HasColumnType("integer")
+                        .HasColumnName("status_code");
+
+                    b.Property<Guid>("WebhookId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("webhook_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_webhook_deliveries");
+
+                    b.HasIndex("EventId", "WebhookId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_webhook_deliveries_event_id_webhook_id");
+
+                    b.ToTable("webhook_deliveries", "axis");
+                });
+
             modelBuilder.Entity("Axis.Processes.Storage.WorkItemRow", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1120,6 +1179,10 @@ namespace Axis.Processes.Storage.Migrations
                     b.Property<Guid?>("TriggerId")
                         .HasColumnType("uuid")
                         .HasColumnName("trigger_id");
+
+                    b.Property<Guid?>("WebhookDeliveryId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("webhook_delivery_id");
 
                     b.HasKey("Id")
                         .HasName("pk_process_work_items");

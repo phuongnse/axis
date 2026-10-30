@@ -85,7 +85,7 @@ The compiler reports these as compile errors.
 - Each expression fits its payload field's type, with the same scope as a
   decision's `when`. A problem is reported at `/steps/{i}/fields/{key}` with
   its expression code, such as `AXC0048` for a value of the wrong type.
-- When a [webhook](integration-resources.md#webhook-resource) names the
+- When a [webhook](outbound-webhooks.md#webhook-resource) names the
   event, no expression reads a field marked `sensitive`, directly, through a
   reference path, inside an aggregate or as an argument to a rule (`AXC0316` at
   `/steps/{i}/fields/{key}`, naming the field). The same step compiles when no
@@ -120,10 +120,15 @@ event's declaration order.
    step's revision check already raises the event once.
 4. It queues one `event.deliver` work item for the occurrence, even when no
    `async` trigger listens yet. See [Event delivery](#event-delivery).
-5. It writes the step's history row, with output `{ "next", "eventId" }`.
-6. It writes `process.stepCompleted`, as other operations do. Raising an
+5. It stages one webhook delivery for each webhook of the event, as a row in
+   `axis.webhook_deliveries` and a `webhook.deliver` work item. The webhooks
+   come from the release the instance is pinned to, which compiled the step. See
+   [Webhook delivery](#webhook-delivery). A step that fails or rolls back stages
+   none.
+6. It writes the step's history row, with output `{ "next", "eventId" }`.
+7. It writes `process.stepCompleted`, as other operations do. Raising an
    event writes no audit record of its own.
-7. It inserts the work item of the next step.
+8. It inserts the work item of the next step.
 
 ## Starts from triggers
 
@@ -291,6 +296,64 @@ that each wake one waiting instance, and running the steps they wake, finishes
 within 30 s, and `EventWakePerformanceTests` fails past that. The lookup for
 waiting instances reaches the instances of a record by an index and never reads
 the whole instance table.
+
+## Webhook delivery
+
+A `webhook.deliver` work item sends one occurrence to one
+[webhook](outbound-webhooks.md#webhook-delivery). The step that raised the
+event staged a row in `axis.webhook_deliveries` and the item, in the step's
+transaction. The row holds no body. Each attempt builds the body again from the
+stored occurrence in `axis.events`, so every attempt sends the same bytes.
+
+1. A transaction loads the row. An item with no row, or with a row that is
+   already `delivered`, is deleted and sends nothing. It reads the release the
+   row names, finds the webhook and its event there, and extends the item's
+   lease by the webhook's `timeout` and 30 seconds.
+2. With no transaction open, the worker resolves the `url` binding and the
+   `secret` binding. A missing binding, or an `http` URL outside Development,
+   fails the attempt. The worker sends a `POST` with the body, the three
+   Standard Webhooks headers and the content type `application/json`. It follows
+   no redirect and cancels the request after the webhook's `timeout`.
+3. A `2xx` answer runs one transaction. It deletes the item, sets the row
+   `delivered` with the status code and the time, and writes the audit record
+   `webhook.delivered`, see [storage](storage.md#audit-records-and-sequence-counters).
+   A worker that crashes after the send sends the request again, with the same
+   `webhook-id`.
+4. Any other answer, a `3xx`, a timeout or a network error runs one transaction
+   that counts the failure, adds one to the row's `attempts`, stores the status
+   code of the answer, or null when there was none, and makes the item due after
+   the backoff of the count.
+
+**Backoff.** A failure is counted in `axis.delivery_failures` under the kind
+`webhook.deliver` and the target `{deliveryId}`, the id of the row. The wait is
+the event delivery backoff of [Dead letters](#dead-letters): 30 seconds doubled
+for each earlier failure, at most one hour. The count has no limit yet, so a
+delivery that keeps failing retries every hour and writes no dead letter. The
+last error is a fixed text such as `HTTP 500`, `HTTP 302 (redirects are not
+followed)` or the exception type, and never holds a body, a URL or a secret.
+_(planned for M19)_ At `Worker:DeliveryAttempts` failures the delivery becomes a
+dead letter.
+
+**Test scenarios.** A [test scenario](test-scenarios.md) never sends a webhook.
+`advanceTime` does not run `webhook.deliver` items, so the deliveries a scenario
+stages stay queued.
+
+**The table.** `axis.webhook_deliveries` holds one row per occurrence and webhook.
+A unique index on (`event_id`, `webhook_id`) keeps a repeat from staging a second
+delivery:
+
+| Column | Type | Meaning |
+| --- | --- | --- |
+| `id` | `uuid` | A version 7 UUID. The work item names it in `webhook_delivery_id` |
+| `application_id` | `uuid` | The application |
+| `release_id` | `uuid` | The release the raising instance is pinned to, which holds the webhook |
+| `webhook_id` | `uuid` | The webhook of that release |
+| `event_id` | `uuid` | The occurrence, a row of `axis.events` |
+| `state` | `text` | `pending` or `delivered` |
+| `attempts` | `integer` | The attempts made, 0 when staged |
+| `status_code` | `integer`, null | The status of the last attempt, or null when none was made or the last got no answer |
+| `created_at` | `timestamptz` | The start of the step's transaction, `now()` |
+| `delivered_at` | `timestamptz`, null | When a receiver answered `2xx` |
 
 ## Event tables
 
@@ -576,6 +639,10 @@ an operator redelivers. The dead letter names the application, the process of
 the instance whose `notify` step staged the email, that instance in
 `process_instance_id` and the row in `email_id`. The process is read through the
 item's instance, since the outbox row does not record it.
+
+For a webhook delivery, the failure is counted under the kind `webhook.deliver`
+and the target `{deliveryId}`, and no limit applies yet, see
+[Webhook delivery](#webhook-delivery).
 
 **The counter.** `axis.delivery_failures` holds one row per target:
 
