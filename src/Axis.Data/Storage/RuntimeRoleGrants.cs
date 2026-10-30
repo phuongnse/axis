@@ -48,6 +48,7 @@ public static class RuntimeRoleGrants
         "computed_field_errors",
         "pending_computed_fields",
         "sessions",
+        "given_roles",
         "files",
         "file_contents",
         "record_imports",

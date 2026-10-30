@@ -145,17 +145,27 @@ internal sealed record UserListItem(string Id, string DisplayName, string? Email
 
 /// <summary>
 /// The signed-in user's id, display name and role names. <c>Roles</c> are the tenant-wide and platform roles.
-/// <c>ApplicationRoles</c> are the roles that each application's identity provider mapping gave at sign-in, by application id.
+/// <c>ApplicationRoles</c> are the roles that each application's identity provider mapping gave at sign-in and the roles that an
+/// administrator gave, by application id.
 /// </summary>
 internal sealed record CurrentUserResponse(string Id, string DisplayName, IReadOnlyList<string> Roles)
 {
     public IReadOnlyDictionary<Guid, IReadOnlyList<string>> ApplicationRoles { get; init; } = new Dictionary<Guid, IReadOnlyList<string>>();
 
-    /// <summary>The roles that the policies of <paramref name="application"/> see: the tenant-wide roles and the roles mapped for that application only.</summary>
-    public IReadOnlyList<string> RolesIn(ApplicationModel application) =>
-        ApplicationRoles.TryGetValue(application.Manifest.Id, out var mapped)
-            ? [.. Roles.Concat(mapped).Distinct(StringComparer.Ordinal)]
-            : Roles;
+    /// <summary>
+    /// The roles that the policies of <paramref name="application"/> see: the tenant-wide roles and the roles mapped or given
+    /// for that application only. An application role counts only while the application declares it.
+    /// </summary>
+    public IReadOnlyList<string> RolesIn(ApplicationModel application)
+    {
+        if (!ApplicationRoles.TryGetValue(application.Manifest.Id, out var applicationRoles))
+        {
+            return Roles;
+        }
+
+        var declared = application.Roles.Select(role => role.Name).ToHashSet(StringComparer.Ordinal);
+        return [.. Roles.Concat(applicationRoles.Where(declared.Contains)).Distinct(StringComparer.Ordinal)];
+    }
 }
 
 /// <summary>

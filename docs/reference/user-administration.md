@@ -4,8 +4,9 @@ Detailed reference for the accounts of [Axis's identity provider](identity-provi
 administrator gives, and the users page where both are managed.
 [D100](../decisions/d100-identity-providers-per-application-and-sign-in-per-site.md) agrees it. M17 builds it, so
 what is not built yet is marked _(planned for M17)_. The account rules are built: every realm that `tenant create` makes
-holds them. The users page's list and the server commands that disable, enable and reset an authenticator are built. The invitations,
-a user's details, the commands' buttons and the roles are not built yet. The conventions of [architecture.md](../architecture.md)
+holds them. The users page's list and the server commands that disable, enable and reset an authenticator are built, and so are
+the server routes that give and remove an application role. The invitations, a user's details, the commands' buttons and the
+platform roles are not built yet. The conventions of [architecture.md](../architecture.md)
 apply.
 
 ## The administrator role
@@ -24,7 +25,7 @@ The setting, the shell entry and the users page's list are built.
 
 ## The users page
 
-The server's list route, the page's list and the server routes of three commands are built. A user's details and the buttons that call the
+The server's list route, the page's list and the server routes of five commands are built. A user's details and the buttons that call the
 commands are _(planned for M17)_.
 
 - **The list route:** `GET /api/users?search=&page=&pageSize=` answers `{ items, totalCount }` for the tenant's realm to an
@@ -44,14 +45,23 @@ commands are _(planned for M17)_.
 - **A user:** opening a row shows the person's roles, for each application and for the platform, and the commands
   below. A field marked `sensitive` and record data are never shown.
 - **Commands:** invite, resend an invitation, disable, enable, reset an account's authenticator, give a role and remove
-  a role. Each command asks for confirmation, and each writes an [audit record](#audit). Disable, enable and reset an
-  authenticator are built as server routes, which the user's details will call. The others are _(planned for M17)_.
+  a role. Each command asks for confirmation, and each writes an [audit record](#audit). Disable, enable, reset an
+  authenticator, and give and remove an application role are built as server routes, which the user's details will call.
+  The others are _(planned for M17)_.
   - `POST /api/users/{id}/disable`, `POST /api/users/{id}/enable` and `POST /api/users/{id}/reset-authenticator` answer
     `204` and take no body. They take a browser session only, so a service account's bearer token gets `401`.
   - A request is checked in this order: signed-in user (`401`), `Users:AdministratorRole` (`403`), a tenant with a users
     client (`404`, as for the list), for disable a login at the identity provider in the last 5 minutes (`403`), for disable
     not oneself (`409`), then the realm user. A user that the realm does not have answers `404`, and so does a service account.
     The checks come before the lookup, so a refused caller learns nothing about which ids exist.
+  - `POST /api/users/{id}/give-role` and `POST /api/users/{id}/remove-role` take the JSON body
+    `{ "applicationId": "<uuid>", "role": "<name>" }` and answer `204`. They take a browser session only. They check in the
+    order above up to the realm user (`401`, `403`, `404`), and only then read the body, so a refused caller learns nothing
+    about the body. They answer `400` with a fixed title for a body that is missing or malformed, a blank role, a body
+    without `applicationId` (a platform role, which is not built yet), an application with no active release, and, for
+    give, a role that the active release does not declare. Remove needs no declaration, so an administrator can clear a
+    row for a role that a later release dropped. Giving a role the person holds, or removing one they do not hold,
+    answers `204`, changes nothing and writes no audit record. Neither route needs a recent login.
   - Enable and reset an authenticator need no recent login. For a user of a brokered provider, reset an authenticator
     answers `409` and changes nothing.
   - The realm steps run first. When the identity provider fails, the route answers `502` with a fixed title, and the
@@ -104,18 +114,19 @@ The server routes are built.
 
 ## Roles
 
-_(planned for M17)_
+Application roles are built. Platform roles are _(planned for M17)_.
 
 - **Application roles:** an administrator gives a person a role that an application's active release declares. Given
   roles add to the roles that the provider's `roles` mapping gives, see
   [users](identity-provider.md#users).
-- **Platform roles:** an administrator gives the author, publisher, operator and administrator roles, as the values of
+- **Platform roles** _(planned for M17)_**:** an administrator gives the author, publisher, operator and administrator roles, as the values of
   `Studio:AuthorRole`, `Studio:PublisherRole`, `Console:OperatorRole` and `Users:AdministratorRole`.
 - **Stored by Axis:** given roles are rows of the tenant database, each with the user, the application or the
   platform, and the role, so the realm holds no Axis role. A row for a role that the active release no longer
   declares stays and gives nothing, and the page marks it.
-- **At once:** a change also rewrites the roles of the person's live sessions, so a removed role stops working at the
-  next request.
+- **At the next request:** a session reads the person's given roles at every request, in the statement that moves its
+  last request time, and keeps them for that request only. A change applies at the person's next request, on every
+  replica, and the person does not sign in again.
 
 ## The first administrator
 
@@ -128,7 +139,7 @@ _(planned for M17)_
 
 ## Rights of the server
 
-The list route and the disable, enable and reset authenticator routes are built. Inviting accounts is _(planned for M17)_.
+The list route, the disable, enable and reset authenticator routes and the give and remove role routes are built. Inviting accounts is _(planned for M17)_.
 
 - The server reads the realm's users through the realm's users client `axis-users`, with the rights `view-users` and
   `query-users`, see [tenant realm](host-settings.md#tenant-realm). The client also holds `manage-users`, which disable, enable
@@ -139,9 +150,11 @@ The list route and the disable, enable and reset authenticator routes are built.
 
 ## Audit
 
-`user.disabled`, `user.enabled` and `user.authenticatorReset` are built. The others are _(planned for M17)_.
+`user.disabled`, `user.enabled`, `user.authenticatorReset`, and `user.roleGiven` and `user.roleRemoved` for application roles
+are built. The others are _(planned for M17)_.
 
 - Each command writes one audit record in the tenant database, with the administrator as actor and the user it acts
   on: `user.invited`, `user.invitationResent`, `user.disabled`, `user.enabled`, `user.authenticatorReset`,
-  `user.roleGiven` and `user.roleRemoved`. A role record names the application or the platform, and the role. No
+  `user.roleGiven` and `user.roleRemoved`. A role record names the application or the platform, and the role. Giving a role the person holds, or removing one they do
+  not hold, is not a change and writes no record. No
   record holds a password, a code or an invitation link.

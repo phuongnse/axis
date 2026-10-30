@@ -15,7 +15,7 @@ namespace Axis.Server.Authentication;
 /// cookie holds only the key of a session. The key is 32 random bytes in base64url, and the row's key
 /// is the SHA-256 hash of those bytes. The row never holds the key or a token. A request reads the row,
 /// moves its last request time and refuses it once it is past <see cref="Session.IdleTimeout"/> or
-/// <see cref="Session.MaxLifetime"/>. The row holds the alias of the provider that signed the person in, null for accounts, and the roles that each application's provider mapping gave the person, by application id. It holds the site path of the host that made it, null for the tenant's own
+/// <see cref="Session.MaxLifetime"/>. The row holds the alias of the provider that signed the person in, null for accounts, and the roles that each application's provider mapping gave the person, by application id. It never holds the roles that an administrator gave: the same statement that moves the last request time reads them from <c>axis.given_roles</c>, and they live in the request's principal only, so a change applies at the next request on every replica. It holds the site path of the host that made it, null for the tenant's own
 /// hosts, and a request on another host of the tenant neither uses nor deletes it. The overloads without an <see cref="HttpContext"/> cannot know the
 /// tenant, so they are not supported.
 /// </summary>
@@ -85,9 +85,15 @@ internal sealed class SessionStore : ITicketStore
         var now = httpContext.RequestServices.GetRequiredService<TimeProvider>().GetUtcNow();
         await using (var update = new NpgsqlCommand(
             """
-            UPDATE axis.sessions SET last_request_at = @now
-            WHERE id_hash = @hash AND site_path IS NOT DISTINCT FROM @site AND signed_in_at > @signedInAfter AND last_request_at > @activeAfter
-            RETURNING user_id, display_name, roles, authenticated_at, identity_provider, application_roles::text
+            WITH touched AS (
+                UPDATE axis.sessions SET last_request_at = @now
+                WHERE id_hash = @hash AND site_path IS NOT DISTINCT FROM @site AND signed_in_at > @signedInAfter AND last_request_at > @activeAfter
+                RETURNING user_id, display_name, roles, authenticated_at, identity_provider, application_roles::text AS application_roles
+            )
+            SELECT t.user_id, t.display_name, t.roles, t.authenticated_at, t.identity_provider, t.application_roles,
+                ARRAY(SELECT g.application_id FROM axis.given_roles g WHERE g.user_id = t.user_id AND g.application_id IS NOT NULL ORDER BY g.application_id, g.role),
+                ARRAY(SELECT g.role FROM axis.given_roles g WHERE g.user_id = t.user_id AND g.application_id IS NOT NULL ORDER BY g.application_id, g.role)
+            FROM touched t
             """,
             connection))
         {
@@ -99,6 +105,9 @@ internal sealed class SessionStore : ITicketStore
             await using var reader = await update.ExecuteReaderAsync(cancellationToken);
             if (await reader.ReadAsync(cancellationToken))
             {
+                var applicationRoles = JsonSerializer.Deserialize<Dictionary<Guid, string[]>>(reader.GetString(5))!
+                    .ToDictionary(pair => pair.Key, pair => (IReadOnlyList<string>)pair.Value);
+                MergeGivenRoles(applicationRoles, reader.GetFieldValue<Guid[]>(6), reader.GetFieldValue<string[]>(7));
                 var principal = Session.CreatePrincipal(
                     tenant.TenantId,
                     reader.GetString(0),
@@ -107,8 +116,7 @@ internal sealed class SessionStore : ITicketStore
                     await reader.IsDBNullAsync(3, cancellationToken) ? null : reader.GetFieldValue<DateTimeOffset>(3),
                     Base64Url.EncodeToString(hash),
                     await reader.IsDBNullAsync(4, cancellationToken) ? null : reader.GetString(4),
-                    JsonSerializer.Deserialize<Dictionary<Guid, string[]>>(reader.GetString(5))!
-                        .ToDictionary(pair => pair.Key, pair => (IReadOnlyList<string>)pair.Value));
+                    applicationRoles);
                 // The handler renews a cookie only for a ticket that carries both times.
                 var properties = new AuthenticationProperties { IssuedUtc = now, ExpiresUtc = now + Session.IdleTimeout };
                 return new AuthenticationTicket(principal, properties, Session.Scheme);
@@ -139,6 +147,22 @@ internal sealed class SessionStore : ITicketStore
     public Task<AuthenticationTicket?> RetrieveAsync(string key) => throw new NotSupportedException();
 
     public Task RemoveAsync(string key) => throw new NotSupportedException();
+
+    /// <summary>
+    /// Adds the roles that an administrator gave to the roles that the row holds, without repeats. They live in the principal of
+    /// this request only, never in the row.
+    /// </summary>
+    private static void MergeGivenRoles(Dictionary<Guid, IReadOnlyList<string>> applicationRoles, Guid[] applicationIds, string[] roles)
+    {
+        for (var index = 0; index < applicationIds.Length; index++)
+        {
+            var held = applicationRoles.TryGetValue(applicationIds[index], out var existing) ? existing : [];
+            if (!held.Contains(roles[index], StringComparer.Ordinal))
+            {
+                applicationRoles[applicationIds[index]] = [.. held, roles[index]];
+            }
+        }
+    }
 
     /// <summary>The hash that keys the row, or null when <paramref name="key"/> is not a session key.</summary>
     private static byte[]? Hash(string key)

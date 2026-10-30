@@ -66,15 +66,16 @@ apply: sections marked _(planned for Mx)_ are not built yet, and Dn refers to
     `axis.process_work_items` (the work that
     workers claim and run), with history in `axis.__processes_migrations`.
     See [processes](processes.md#tables).
-  - `Axis.Data` also owns `axis.sessions`, with history in
-    `axis.__data_migrations`. A row is one signed-in session: `id_hash`
-    (`bytea`, the primary key, the SHA-256 hash of the session id), `user_id`,
-    `display_name`, `roles` (`text[]`), `signed_in_at`, `last_request_at`,
-    `authenticated_at` (nullable, the ID token's `auth_time`), `site_path`
-    (nullable, a site's own host) and `identity_provider` (nullable, the
-    provider's alias). The server reads, writes and deletes rows, the worker
-    deletes expired ones, and `tenant restore` empties the table, see
+  - `Axis.Data` also owns `axis.sessions`, with history in `axis.__data_migrations`. A row is one signed-in session:
+    `id_hash` (`bytea`, the primary key, the SHA-256 hash of the session id), `user_id`, `display_name`, `roles`
+    (`text[]`), `signed_in_at`, `last_request_at`, `authenticated_at` (nullable, the ID token's `auth_time`),
+    `site_path` (nullable, a site's own host) and `identity_provider` (nullable, the provider's alias). The server
+    reads, writes and deletes rows, the worker deletes expired ones, and `tenant restore` empties the table, see
     [sign-in and the session](security.md#sign-in-and-the-session).
+  - `Axis.Data` also owns `axis.given_roles`, with history in `axis.__data_migrations`. A row is a role that an
+    administrator gave a person: `id` (`uuid`, the primary key), `user_id`, `application_id` (nullable, null for a
+    platform role) and `role`, with a unique index on those three that counts nulls as equal. A session reads its
+    person's rows at every request, see [roles](user-administration.md#roles).
   - `Axis.Data` also owns `axis.files` and `axis.file_contents`, with history
     in `axis.__data_migrations`. A row of `axis.files` is the details of one
     uploaded file of a [file field](file-fields.md#storage-and-clean-up): `id`
@@ -87,9 +88,8 @@ apply: sections marked _(planned for Mx)_ are not built yet, and Dn refers to
     with the same `file_id`, and is deleted with it. The server reads, inserts,
     updates and deletes their rows. A file field's column in the `entities`
     schema is a `uuid` with a foreign key to `axis.files (id)`.
-  - `Axis.Data` also owns `axis.user_profiles`, one row for each user who
-    signed in, with the display name, email, locale and the first and last
-    sign-in. Each sign-in upserts it through `UserProfiles.UpsertAsync`, see
+  - `Axis.Data` also owns `axis.user_profiles`, one row for each user who signed in, with the display name, email, locale
+    and the first and last sign-in. Each sign-in upserts it through `UserProfiles.UpsertAsync`, see
     [User profiles](notifications.md#user-profiles).
   - `Axis.Data` also owns `axis.audit_records`, with history in
     `axis.__data_migrations`. Other modules append and read audit records
@@ -353,7 +353,7 @@ What each database role may do:
 | Objects                                                                                                                                                                                                                                                                                                                                                                                                          | Schema database role                                             | Runtime database role                                             |
 | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------------- |
 | `entities` tables                                                                                                                                                                                                                                                                                                                                                                                                | Owns them                                                        | Read and write rows                                               |
-| `axis` tables that runtime writes: `process_*`, `connector_calls`, `package_calls`, `events`, `notifications`, `notification_reads`, `email_outbox`, the receipts, `trigger_schedules`, `trigger_starts`, `delivery_failures`, `dead_letters`, `audit_records`, `user_profiles`, `sequence_counters`, `computed_field_errors`, `pending_computed_fields`, `sessions`, `record_imports`, `files`, `file_contents` | Owns them                                                        | Read and write rows                                               |
+| `axis` tables that runtime writes: `process_*`, `connector_calls`, `package_calls`, `events`, `notifications`, `notification_reads`, `email_outbox`, the receipts, `trigger_schedules`, `trigger_starts`, `delivery_failures`, `dead_letters`, `audit_records`, `user_profiles`, `sequence_counters`, `computed_field_errors`, `pending_computed_fields`, `sessions`, `given_roles`, `record_imports`, `files`, `file_contents` | Owns them                                                        | Read and write rows                                               |
 | Tables that activation writes: `active_releases`, `active_sites`, `provisioned_entities`, `provisioned_enum_values`, `applied_migrations`, `release_computed_fingerprints`, the `__*_migrations` tables                                                                                                                                                                                                          | Owns them                                                        | Read only                                                         |
 | Release tables: `releases`, `release_resources`, `release_packages`                                                                                                                                                                                                                                                                                                                                              | Insert and read. The trigger refuses update, delete and truncate | Read only                                                         |
 | `publish_requests`                                                                                                                                                                                                                                                                                                                                                                                               | Owns it. The publisher changes the status and the lease          | `SELECT` and `INSERT` only. It never updates or deletes a request |

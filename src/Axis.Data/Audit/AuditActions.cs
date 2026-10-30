@@ -64,4 +64,8 @@ public static class AuditActions
     public const string UserEnabled = "user.enabled";
 
     public const string UserAuthenticatorReset = "user.authenticatorReset";
+
+    public const string UserRoleGiven = "user.roleGiven";
+
+    public const string UserRoleRemoved = "user.roleRemoved";
 }

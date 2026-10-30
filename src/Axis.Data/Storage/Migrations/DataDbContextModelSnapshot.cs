@@ -237,6 +237,38 @@ namespace Axis.Data.Storage.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Axis.Data.Storage.GivenRoleRow", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<Guid?>("ApplicationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("application_id");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("role");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("user_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_given_roles");
+
+                    b.HasIndex("UserId", "ApplicationId", "Role")
+                        .IsUnique()
+                        .HasDatabaseName("ux_given_roles_user_id_application_id_role");
+
+                    NpgsqlIndexBuilderExtensions.AreNullsDistinct(b.HasIndex("UserId", "ApplicationId", "Role"), false);
+
+                    b.ToTable("given_roles", "axis");
+                });
+
             modelBuilder.Entity("Axis.Data.Storage.PendingComputedFieldRow", b =>
                 {
                     b.Property<Guid>("EntityId")
