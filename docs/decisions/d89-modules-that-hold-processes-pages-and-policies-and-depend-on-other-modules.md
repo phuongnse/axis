@@ -10,7 +10,7 @@ out. Everything else in D40 holds. Everything here is _(planned for M20)_. See
 
 Role slots in `module.json` and their mapping in an application's `modules` entry are built, with `AXC0292` to `AXC0294`. Policies that name a slot are built too, with `AXC0304` and `AXC0305`. Task assignees that name a slot are not.
 
-The `modules` list in `module.json`, flat resolution of the graph, one copy of each module, and the rule that the application names only modules it declares are built, with `AXC0295` and `AXC0296`. The slot maps of a dependency entry and a module naming resources of its dependencies are not.
+The `modules` list in `module.json`, flat resolution of the graph, one copy of each module, and the rule that the application names only modules it declares are built, with `AXC0295` and `AXC0296`. The slot maps of a dependency entry are built too, with `AXC0306` for mappings that differ. A module naming resources of its dependencies is not.
 
 - **New kinds in a module:** a module may also hold `process`, `page` and
   `policy` resources. It still holds no `role`, `site`, `connector`,

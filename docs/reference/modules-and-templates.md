@@ -12,8 +12,8 @@ This section follows
 installation, declaring, pinning, dependencies between modules, the diagnostics `AXC0200` to `AXC0214`,
 `AXC0295` and `AXC0296`, the
 role slots with their mapping, `AXC0292` to `AXC0294`, the connector slots with their
-mapping, `AXC0297` to `AXC0303`, and the module policies that name role slots, `AXC0304` and
-`AXC0305`, are built. A pinned module's files are stored in the release and
+mapping, `AXC0297` to `AXC0303`, the maps of a depending module, with `AXC0306`, and the module
+policies that name role slots, `AXC0304` and `AXC0305`, are built. A pinned module's files are stored in the release and
 checked as JSON, for an allowed kind and against the schema of their kind. A
 pinned module's entities, sequences, seeds, events, data sources, forms and policies join the application
 model, each with an id derived from the application `id` and the name
@@ -217,20 +217,21 @@ calls `IsDepartmentCode`, so a department code must be in capital letters.
 | `AXC0212` | An application file sits under `modules/`, which releases reserve. Reported at that file, with an empty path. |
 | `AXC0213` | The pinned version drops a module entity, drops one of its fields or changes a field's `type`, compared with the active release. The message names the module and both versions, and `none` when the module is removed. Reported at activation, at `/fields/{i}/type` of the module entity file in the release for a type change and at `/fields` for a dropped field. A dropped entity, or a removed module, is reported at the entity file of the active release, with an empty path. |
 | `AXC0214` | A `migration`'s `entity` names a module entity, that is, it contains `/`. Reported at compile, at `/entity`. |
-| `AXC0292` | A role slot of the pinned module version has no key in the entry's `roles`. The message names the slot, the module and the version. Reported in `application.json` at `/modules/{i}/roles`, or at `/modules/{i}` when the entry has no `roles`. |
-| `AXC0293` | A role slot is mapped to a name that is not a role the application declares. Reported at `/modules/{i}/roles/{slot}`, with `~` written `~0` and `/` written `~1`. A role whose file failed its own schema is not reported again. |
-| `AXC0294` | A key in the entry's `roles` is not a role slot of the pinned module version. The message lists the slots, or says there are none. Reported at `/modules/{i}/roles/{key}`, escaped the same way. |
+| `AXC0292` | A role slot of the pinned module version has no key in the entry's `roles`. The message names the slot, the module and the version. Reported in `application.json` at `/modules/{i}/roles`, or at `/modules/{i}` when the entry has no `roles`. An entry of a `module.json` is checked the same way for the role slots of the module it names, and reported in `modules/<id>/module.json` of the module that holds it. |
+| `AXC0293` | A role slot is mapped to a name that is not a role the application declares. Reported at `/modules/{i}/roles/{slot}`, with `~` written `~0` and `/` written `~1`. A role whose file failed its own schema is not reported again. In an entry of a `module.json` the name must be a role slot of the module that holds the entry, matched exactly, and the report is in that `module.json`. |
+| `AXC0294` | A key in the entry's `roles` is not a role slot of the pinned module version. The message lists the slots, or says there are none. Reported at `/modules/{i}/roles/{key}`, escaped the same way. It is reported the same way in `modules/<id>/module.json` for an entry of a module. |
 | `AXC0295` | No installed version of a module meets every range that asks for it, and two or more ranges ask. The message names the application or each module that asks, with its range, and lists the installed versions. Reported at `/modules/{i}/version` of the application's own entry when the application asks, and otherwise of the first asking module's `modules/<id>/module.json`. See [resolving the graph](#processes-pages-policies-and-dependencies). |
 | `AXC0296` | Modules depend on each other in a cycle, and a module that depends on itself is a cycle. The message names the cycle. Reported once for each cycle, at `/modules/{i}/id` of the entry that closes it, in `modules/<id>/module.json`. |
-| `AXC0297` | A connector slot of the pinned module version has no key in the entry's `connectors`. The message names the slot, the module and the version. Reported in `application.json` at `/modules/{i}/connectors`, or at `/modules/{i}` when the entry has no `connectors`. |
-| `AXC0298` | A connector slot is mapped to a name that is not a connector the application declares, ignoring letter case. Reported at `/modules/{i}/connectors/{slot}`, with `~` written `~0` and `/` written `~1`. A connector whose file failed its own schema is not reported again. |
-| `AXC0299` | A key in the entry's `connectors` is not a connector slot of the pinned module version. The message lists the slots, or says there are none. Reported at `/modules/{i}/connectors/{key}`, escaped the same way. |
-| `AXC0300` | The connector a slot is mapped to has no operation with the name of an operation of the slot, ignoring letter case. The message names the slot, the connector and the operation. Reported at `/modules/{i}/connectors/{slot}`. |
-| `AXC0301` | An input of a slot operation is not an input of the connector's operation with the same type. The message names the slot, the operation and the field, and both types when the field exists. Reported at `/modules/{i}/connectors/{slot}`. |
-| `AXC0302` | An input of the connector's operation is required, and the slot operation has no input with that name. The message names the slot, the operation and the field. Reported at `/modules/{i}/connectors/{slot}`. |
-| `AXC0303` | An output of a slot operation is not an output of the connector's operation with the same type. The message names the slot, the operation and the field, and both types when the field exists. Reported at `/modules/{i}/connectors/{slot}`. |
+| `AXC0297` | A connector slot of the pinned module version has no key in the entry's `connectors`. The message names the slot, the module and the version. Reported in `application.json` at `/modules/{i}/connectors`, or at `/modules/{i}` when the entry has no `connectors`. An entry of a `module.json` is checked the same way for the connector slots of the module it names, and reported in `modules/<id>/module.json` of the module that holds it. |
+| `AXC0298` | A connector slot is mapped to a name that is not a connector the application declares, ignoring letter case. Reported at `/modules/{i}/connectors/{slot}`, with `~` written `~0` and `/` written `~1`. A connector whose file failed its own schema is not reported again. In an entry of a `module.json` the name must be a connector slot of the module that holds the entry, matched exactly, and the report is in that `module.json`. |
+| `AXC0299` | A key in the entry's `connectors` is not a connector slot of the pinned module version. The message lists the slots, or says there are none. Reported at `/modules/{i}/connectors/{key}`, escaped the same way. It is reported the same way in `modules/<id>/module.json` for an entry of a module. |
+| `AXC0300` | The connector a slot is mapped to has no operation with the name of an operation of the slot, ignoring letter case. The message names the slot, the connector and the operation. Reported at `/modules/{i}/connectors/{slot}`. In an entry of a `module.json` the slot of the depending module takes the place of the connector, and the report is in that `module.json`. |
+| `AXC0301` | An input of a slot operation is not an input of the connector's operation with the same type. The message names the slot, the operation and the field, and both types when the field exists. Reported at `/modules/{i}/connectors/{slot}`. In an entry of a `module.json` the slot of the depending module takes the place of the connector, and the report is in that `module.json`. |
+| `AXC0302` | An input of the connector's operation is required, and the slot operation has no input with that name. The message names the slot, the operation and the field. Reported at `/modules/{i}/connectors/{slot}`. In an entry of a `module.json` it is checked against the connector that the chain of slots reaches, and the report is in that `module.json`. |
+| `AXC0303` | An output of a slot operation is not an output of the connector's operation with the same type. The message names the slot, the operation and the field, and both types when the field exists. Reported at `/modules/{i}/connectors/{slot}`. In an entry of a `module.json` the slot of the depending module takes the place of the connector, and the report is in that `module.json`. |
 | `AXC0304` | A role in a module policy's `roles` is not a role slot of its module. The message lists the slots, or says there are none. Reported at `/roles/{i}` of the module file. |
 | `AXC0305` | A grant in a module policy is on something other than an entity or data source of its own module: a `process` or `endpoint` grant, a name with `/` such as `departments/Department`, or the plain name of an application entity or data source. Reported at `/grants/{i}/entity`, `/grants/{i}/dataSource`, `/grants/{i}/process` or `/grants/{i}/endpoint` of the module file. |
+| `AXC0306` | Two mappings of the same slot of a module give it different roles or different connectors: the application's own entry and the chain through a depending module, or the chains through two depending modules. The message names the slot, the module and both mappings. The application's entry stays, and otherwise the first depending module in pin order. Reported at `/modules/{i}/roles/{slot}` or `/modules/{i}/connectors/{slot}` of the later entry, in `modules/<id>/module.json`. See [mapping slots](#processes-pages-policies-and-dependencies). |
 
 ### Processes, pages, policies and dependencies
 
@@ -238,7 +239,7 @@ _(planned for M20)_ A module can ship a working feature with its screens,
 permissions, triggers and outside calls, and build on other modules, as
 [D89](../decisions/d89-modules-that-hold-processes-pages-and-policies-and-depend-on-other-modules.md)
 and [D103](../decisions/d103-modules-hold-triggers-scenarios-and-connector-slots.md) agree. It replaces the two limits above: the kinds a module may hold, and no
-dependencies. Dependencies (the `modules` list without the slot maps), resolving the graph, one
+dependencies. Dependencies (the `modules` list with the slot maps), resolving the graph, one
 copy each, what the application names, and what a module names and calls of the modules it declares are built, and so are module pages. The rest of this section is planned.
 
 ```json
@@ -282,8 +283,10 @@ agrees. An application that declares it maps the slot to one of its own roles:
   and a key that is no slot of the pinned version is `AXC0294`. Slot and role
   names are matched exactly. The compiled model keeps the map of each pinned
   module. After the mapping, a user who holds the role in the application
-  holds the slot, for the module policies. _(planned for M20)_ The same holds for the assignees of module
-  tasks.
+  holds the slot, for the module policies. A module that the application
+  reaches only as a dependency gets its map through the chain, see
+  [dependencies](#processes-pages-policies-and-dependencies). _(planned for M20)_ The same holds for
+  the assignees of module tasks.
 - **Module policies.** _(built)_ A module policy is a `policy` file in the module.
   In an application it is named `<module id>/<name>`, and its id is derived from
   the application `id` as for other module resources. Its `roles` name role
@@ -298,8 +301,8 @@ agrees. An application that declares it maps the slot to one of its own roles:
   only rules of the modules its module declares, by qualified call, as a module
   data source filter does. Default deny still holds: without the mapped role a
   person gets `403` on the module entity and data source. A module that the
-  application reaches only as a dependency has no slot map yet, so its policies
-  grant nobody. _(planned for M20)_ A module policy grants on the processes and
+  application reaches only as a dependency gets its slot map through the chain, so its policies
+  grant the role the chain reaches. _(planned for M20)_ A module policy grants on the processes and
   endpoints of its own module.
 - **Pages.** _(built)_ A module page is a `page` file in the module. In an application it is
   named `<module id>/<name>`, and its id is derived from the application `id` as for other module
@@ -359,9 +362,10 @@ agrees. An application that declares it maps the slot to one of its own roles:
   case, and a field's `required` is not compared for the slot's own fields. The
   compiled model keeps the map from slot to the connector's declared name.
   The application's connector keeps its base URL, auth, bindings, timeout,
-  idempotency header and lookup. _(planned for M20)_ A `callConnector` step on
-  a slot, and a depending module that maps the connector slots of a module it
-  depends on to its own slots.
+  idempotency header and lookup. A depending module maps the connector slots
+  of a module it depends on to its own slots, see
+  [dependencies](#processes-pages-policies-and-dependencies). _(planned for M20)_ A
+  `callConnector` step on a slot.
 - **Scenarios** _(planned for M24)_. A module scenario gives its users role
   slots instead of roles. When it runs for an application, each slot becomes
   the role it maps to, and the scenario runs against the application as
@@ -371,8 +375,30 @@ agrees. An application that declares it maps the slot to one of its own roles:
   `AXC0204` or `AXC0206`, reported in the `module.json` of the module that
   holds it. A module names resources and calls rules only of the modules it
   declares, as `<module id>/<name>` and `<module id>:<rule>(…)`, see
-  [references](#modules). _(planned for M20)_ Its entry for a module it depends
-  on maps that module's slots to its own slots, with `roles` and `connectors`.
+  [references](#modules). Its entry for a module it depends on maps that module's
+  slots to its own slots, with `roles` and `connectors` as an application's entry
+  has. Each key is a slot of the module it depends on and each value is a slot of
+  the module that holds the entry, all matched exactly. Following the chain gives
+  each slot of the dependency the application role or connector that the slot of
+  the depending module reaches, and the compiled model keeps that map for the
+  pin. A slot the entry leaves unmapped is `AXC0292` or `AXC0297`, a value that
+  is no slot of the depending module is `AXC0293` or `AXC0298`, and a key that is
+  no slot of the dependency is `AXC0294` or `AXC0299`, each reported in the
+  `module.json` that holds the entry, at `/modules/{i}/roles` or
+  `/modules/{i}/connectors`, and at the key for the last two. A connector slot is
+  checked against the slot it maps to as it is against a connector: a missing
+  operation is `AXC0300`, and an input or output of another type, or one the
+  slot lacks, is `AXC0301` or `AXC0303`, with a message that names the slot, the
+  operation and the field. A required input is `AXC0302`, checked against the
+  connector that the chain reaches, because a slot's own `required` is not
+  compared. A slot that the chain leaves without a role or connector, because
+  the application leaves a slot of the depending module unmapped, gets nothing
+  and no report beyond that of the break. When the application declares a
+  module and also reaches it through a depending module, or two depending
+  modules map the same slot, the mappings must give the same role or connector.
+  A difference is `AXC0306`, which names both mappings and is reported at the
+  later entry. The application's entry stays in the model, and otherwise the
+  first depending module in pin order.
 - **Resolving the graph.** _(built)_ The application resolves every module it declares
   and every module they declare, flat. Each module id gets one version: the
   highest installed version that meets every range that asks for it.
