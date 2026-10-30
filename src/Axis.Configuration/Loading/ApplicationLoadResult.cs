@@ -13,10 +13,10 @@ namespace Axis.Configuration.Loading;
 /// <remarks>
 /// When <see cref="HasErrors"/> is true, <see cref="Application"/>, <see cref="Entities"/>,
 /// <see cref="Sites"/>, <see cref="Pages"/>, <see cref="Texts"/>, <see cref="Seeds"/>,
-/// <see cref="DataSources"/>, <see cref="Rules"/>, <see cref="Sequences"/>, <see cref="Processes"/>, <see cref="Forms"/>, <see cref="Roles"/>, <see cref="Policies"/>, <see cref="Connectors"/>, <see cref="IdentityProviders"/>, <see cref="Events"/>, <see cref="Endpoints"/>, <see cref="Triggers"/>, <see cref="Migrations"/> and <see cref="Scenarios"/> hold only
+/// <see cref="DataSources"/>, <see cref="Rules"/>, <see cref="Sequences"/>, <see cref="Processes"/>, <see cref="Forms"/>, <see cref="Roles"/>, <see cref="Policies"/>, <see cref="Connectors"/>, <see cref="IdentityProviders"/>, <see cref="Events"/>, <see cref="Endpoints"/>, <see cref="Triggers"/>, <see cref="Webhooks"/>, <see cref="Migrations"/> and <see cref="Scenarios"/> hold only
 /// the files that passed schema validation. They may be used to find further diagnostics, but never
 /// to build a model or a release. When the folder could not be listed, the result has no
-/// application, entities, sites, pages, texts, seeds, data sources, rules, sequences, processes, forms, roles, policies, connectors, events, endpoints, triggers, migrations, scenarios or resources and a single <see cref="DiagnosticCodes.UnlistableFolder"/>
+/// application, entities, sites, pages, texts, seeds, data sources, rules, sequences, processes, forms, roles, policies, connectors, events, endpoints, triggers, webhooks, migrations, scenarios or resources and a single <see cref="DiagnosticCodes.UnlistableFolder"/>
 /// diagnostic.
 /// </remarks>
 /// <param name="UnloadedEntityNames">
@@ -110,6 +110,9 @@ public sealed record ApplicationLoadResult(
 
     /// <summary>The <c>trigger</c> resources, in path order.</summary>
     public IReadOnlyList<TriggerResource> Triggers { get; init; } = [];
+
+    /// <summary>The <c>webhook</c> resources, in path order.</summary>
+    public IReadOnlyList<WebhookResource> Webhooks { get; init; } = [];
 
     /// <summary>The <c>migration</c> resources, in path order.</summary>
     public IReadOnlyList<MigrationResource> Migrations { get; init; } = [];

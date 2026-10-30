@@ -20,6 +20,7 @@ public static class ResourceKinds
     public const string Event = "event";
     public const string Endpoint = "endpoint";
     public const string Trigger = "trigger";
+    public const string Webhook = "webhook";
     public const string Migration = "migration";
     public const string Scenario = "scenario";
 }

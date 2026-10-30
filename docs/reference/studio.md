@@ -36,10 +36,9 @@ Run and the Test results list, the read-only view of a module entity, and the re
   [D51](../decisions/d51-creating-applications-and-resources-from-studio.md).
 - **New resource.** A **New resource** button above the search box opens a
   dialog that asks for the kind and the name, or the locale for a `text`
-  resource. The kind picker lists the 19 kinds that the create route accepts,
-  which is every kind except the manifest. The author can type to narrow it. A
-  new `identityProvider` starts with type `accounts`, in
-  `identity-providers/<name>.json`.
+  resource. The kind picker lists the 20 kinds the create route accepts: every
+  kind except the manifest. The author can type to narrow it. A new
+  `identityProvider` starts with type `accounts`, in `identity-providers/<name>.json`.
   - It sends the kind's starter with an id from `crypto.randomUUID()`. A starter
     is the smallest content that passes the kind's schema. A reference the
     author must still choose is an empty string, so it shows up as a diagnostic.
@@ -467,6 +466,7 @@ Run and the Test results list, the read-only view of a module entity, and the re
   | `endpoint`    | Generic form, typed rows for `values` and, _(planned for M19)_, the `event`'s `fields` | Nothing                                                    |
   | `event`       | Generic form                                                    | Nothing                                                               |
   | `trigger`     | Generic form                                                    | Nothing                                                               |
+  | `webhook`     | Generic form                                                    | Nothing                                                               |
   | `migration`   | Generic form                                                    | The `changes` list, because each change's fields depend on its `type` |
   | `seed`        | Typed editor                                                    | Nothing                                                               |
   | `scenario`    | Typed editor                                                    | Nothing                                                               |
