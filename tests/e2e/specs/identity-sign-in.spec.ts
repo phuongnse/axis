@@ -26,7 +26,6 @@ for (const { mode, canvas } of [
     })
 
     await page.goto('/')
-    await page.getByRole('main').getByRole('button', { name: 'Sign in', exact: true }).click()
 
     await expect(page.getByRole('heading', { name: 'Sign in', exact: true })).toBeVisible()
     await expect(page.getByText(/^© \d{4} Axis$/)).toBeVisible()
@@ -49,7 +48,6 @@ for (const { mode, canvas } of [
 
 test('a wrong password shows the sign-in error and keeps the username', async ({ page }) => {
   await page.goto('/')
-  await page.getByRole('main').getByRole('button', { name: 'Sign in', exact: true }).click()
 
   await submitPassword(page, 'requester', 'not-the-password')
 
@@ -97,7 +95,6 @@ for (const { mode, canvas } of [
     await page.emulateMedia({ colorScheme: mode })
 
     await page.goto('/')
-    await page.getByRole('main').getByRole('button', { name: 'Sign in', exact: true }).click()
     await page.getByRole('link', { name: 'Forgot password?', exact: true }).click()
 
     await expect(page.getByRole('heading', { name: 'Reset your password', exact: true })).toBeVisible()

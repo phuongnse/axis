@@ -26,6 +26,14 @@ describe('startSignIn', () => {
     expect(assignLocation).toHaveBeenCalledWith('/api/auth/sign-in?returnUrl=%2F')
   })
 
+  it.each(['/?signedOut', '/?signedOut=1', '/?signIn=failed&other=1'])('returns to / from %s', (address) => {
+    history.pushState(null, '', address)
+
+    startSignIn()
+
+    expect(assignLocation).toHaveBeenCalledWith('/api/auth/sign-in?returnUrl=%2F')
+  })
+
   it('keeps another path that has a signIn query parameter', () => {
     history.pushState(null, '', '/e2e/notes?signIn=failed')
 

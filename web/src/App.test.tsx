@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -61,8 +61,10 @@ const texts: Record<string, Record<string, string>> = {
     'shell.home.applications.sites': 'sites',
     'shell.home.applications.empty': 'No application is active.',
     'shell.home.applications.loadFailed': 'The sites could not be loaded.',
-    'shell.home.signIn.title': 'Sign in to Axis',
-    'shell.home.signIn.message': "You sign in at your organization's sign-in page, then come back here.",
+    'shell.home.signIn.title': 'Sign in',
+    'shell.home.signedOut.title': 'You have signed out',
+    'shell.home.signedOut.message': 'You can close this page, or sign in again.',
+    'shell.home.signedOut.signIn': 'Sign in again',
     'shell.home.signInFailed': 'Sign-in did not complete. Try again.',
     'shell.account.signIn': 'Sign in',
     'shell.signInPrompt.title': 'Your session has ended',
@@ -675,7 +677,7 @@ describe('App', () => {
 
     expect(await screen.findByRole('heading', { name: 'Welcome to Axis' })).toBeInTheDocument()
     expect(screen.getByText('Open an application below to start working.')).toBeInTheDocument()
-    expect(screen.queryByText('Sign in to Axis')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('sign-in-card')).not.toBeInTheDocument()
   })
 
   it('draws each tool tile with a 32 px primary square for its icon', async () => {
@@ -743,34 +745,87 @@ describe('App', () => {
     expect(main.queryByRole('link', { name: /^Users/ })).not.toBeInTheDocument()
   })
 
-  it('shows the sign-in card, with one Sign in button and without starting sign-in, when nobody is signed in', async () => {
+  it.each([
+    ['the user answers 401', { me: null }],
+    ['the sites answer 401 though the user loaded', { sitesStatus: 401 }],
+  ])('starts sign-in at once, and draws no card, when %s on /', async (_name, server) => {
     vi.mocked(assignLocation).mockReset()
-    stubServer({ me: null })
+    history.pushState(null, '', '/')
+    stubServer(server)
 
     renderApp()
 
-    expect(await screen.findByText('Sign in to Axis')).toBeInTheDocument()
-    expect(
-      screen.getByText("You sign in at your organization's sign-in page, then come back here."),
-    ).toBeInTheDocument()
+    await waitFor(() => expect(assignLocation).toHaveBeenCalledExactlyOnceWith(signInUrl('/')))
+    expect(screen.queryByTestId('sign-in-card')).not.toBeInTheDocument()
+    expect(screen.queryByText('Welcome to Axis')).not.toBeInTheDocument()
+  })
+
+  it('shows the sign-in card, with a warning above one Sign in button, and starts sign-in only on the click', async () => {
+    vi.mocked(assignLocation).mockReset()
+    history.pushState(null, '', '/?signIn=failed')
+    stubServer({ me: null })
+
+    renderApp('/?signIn=failed')
+
+    expect(await screen.findByRole('heading', { name: 'Sign in' })).toBeInTheDocument()
+    const alert = screen.getByTestId('sign-in-failed')
+    expect(alert).toHaveTextContent('Sign-in did not complete. Try again.')
+    expect(alert).toHaveAttribute('role', 'alert')
+    const button = screen.getByRole('button', { name: 'Sign in' })
     expect(screen.getAllByRole('button', { name: 'Sign in' })).toHaveLength(1)
+    expect(button.closest('button')).toHaveClass('ant-btn-block')
+    expect(alert.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.queryByText('Welcome to Axis')).not.toBeInTheDocument()
+    expect(assignLocation).not.toHaveBeenCalled()
+
+    await userEvent.click(button)
+
+    expect(assignLocation).toHaveBeenCalledExactlyOnceWith(signInUrl('/'))
+  })
+
+  it('shows the signed-out card, with its message above one Sign in again button, and starts sign-in only on the click', async () => {
+    vi.mocked(assignLocation).mockReset()
+    history.pushState(null, '', '/?signedOut')
+    stubServer({ me: null })
+
+    renderApp('/?signedOut')
+
+    expect(await screen.findByRole('heading', { name: 'You have signed out' })).toBeInTheDocument()
+    const message = screen.getByText('You can close this page, or sign in again.')
+    const button = screen.getByRole('button', { name: 'Sign in again' })
+    expect(screen.getAllByRole('button', { name: 'Sign in again' })).toHaveLength(1)
+    expect(button).toHaveClass('ant-btn-block')
+    expect(message.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(screen.queryByTestId('sign-in-failed')).not.toBeInTheDocument()
     expect(screen.queryByText('Welcome to Axis')).not.toBeInTheDocument()
     expect(assignLocation).not.toHaveBeenCalled()
+
+    await userEvent.click(button)
+
+    expect(assignLocation).toHaveBeenCalledExactlyOnceWith(signInUrl('/'))
   })
 
-  it('keeps the sign-in card at most 420 px wide', async () => {
+  it('shows the home page, not a card, to a signed-in person who opens a card address', async () => {
+    stubServer()
+
+    renderApp('/?signedOut')
+
+    expect(await screen.findByText('Welcome to Axis')).toBeInTheDocument()
+    expect(screen.queryByTestId('sign-in-card')).not.toBeInTheDocument()
+  })
+
+  it('keeps the sign-in card at most 400 px wide', async () => {
     stubServer({ me: null })
 
-    renderApp()
+    renderApp('/?signedOut')
 
-    expect(await screen.findByTestId('sign-in-card')).toHaveStyle({ maxWidth: '420px' })
+    expect(await screen.findByTestId('sign-in-card')).toHaveStyle({ maxWidth: '400px' })
   })
 
   it('draws the 32 px Axis heading above the sign-in card and no mark inside it', async () => {
     stubServer({ me: null })
 
-    renderApp()
+    renderApp('/?signedOut')
 
     const card = await screen.findByTestId('sign-in-card')
     const heading = screen.getByTestId('organization-heading')
@@ -781,43 +836,14 @@ describe('App', () => {
     expect(card.querySelector('[aria-hidden="true"]')).toBeNull()
   })
 
-  it('shows the sign-in card when the sites answer 401 though the user loaded', async () => {
-    stubServer({ sitesStatus: 401 })
-
-    renderApp()
-
-    expect(await screen.findByText('Sign in to Axis')).toBeInTheDocument()
-    expect(screen.getAllByRole('button', { name: 'Sign in' })).toHaveLength(1)
-  })
-
-  it('starts sign-in with the home page when the sign-in card button is clicked', async () => {
-    vi.mocked(assignLocation).mockReset()
-    history.pushState(null, '', '/')
-    stubServer({ me: null })
-
-    renderApp()
-
-    await userEvent.click(await screen.findByRole('button', { name: 'Sign in' }))
-
-    expect(assignLocation).toHaveBeenCalledExactlyOnceWith(signInUrl('/'))
-  })
-
-  it('shows a sign-in-did-not-complete warning above the Sign in button when the address has the marker', async () => {
-    stubServer({ me: null })
-
-    renderApp('/?signIn=failed')
-
-    const alert = await screen.findByTestId('sign-in-failed')
-    expect(alert).toHaveTextContent('Sign-in did not complete. Try again.')
-    expect(alert).toHaveAttribute('role', 'alert')
-    const button = screen.getByRole('button', { name: 'Sign in' })
-    expect(alert.compareDocumentPosition(button) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    expect(screen.getAllByRole('button', { name: 'Sign in' })).toHaveLength(1)
-  })
-
-  it('has the sign-in-did-not-complete text in every platform locale', () => {
+  it('has the sign-in card texts in every platform locale and no sign-in explanation', () => {
     for (const texts of [platformEnglish, platformVietnamese]) {
       expect(texts).toHaveProperty(['shell.home.signInFailed'])
+      expect(texts).toHaveProperty(['shell.home.signIn.title'])
+      expect(texts).toHaveProperty(['shell.home.signedOut.title'])
+      expect(texts).toHaveProperty(['shell.home.signedOut.message'])
+      expect(texts).toHaveProperty(['shell.home.signedOut.signIn'])
+      expect(texts).not.toHaveProperty(['shell.home.signIn.message'])
     }
   })
 
@@ -825,8 +851,6 @@ describe('App', () => {
     for (const texts of [platformEnglish, platformVietnamese]) {
       expect(texts).toHaveProperty(['shell.signInPrompt.title'])
       expect(texts).toHaveProperty(['shell.signInPrompt.message'])
-      expect(texts).toHaveProperty(['shell.home.signIn.title'])
-      expect(texts).toHaveProperty(['shell.home.signIn.message'])
       expect(texts).toHaveProperty(['shell.home.subtitle'])
       expect(texts).toHaveProperty(['shell.home.applications.title'])
     }

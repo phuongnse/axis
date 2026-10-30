@@ -14,7 +14,6 @@ for (const { name, width } of [
     await page.setViewportSize({ width, height: 900 })
     await page.goto('/')
     const main = page.getByRole('main')
-    await main.getByRole('button', { name: 'Sign in', exact: true }).click()
     await logInAtKeycloak(page, 'requester')
 
     await expect(main.getByText('Welcome to Axis', { exact: true })).toBeVisible()

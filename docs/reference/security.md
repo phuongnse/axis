@@ -110,19 +110,19 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place. _(planned f
     [D84](../decisions/d84-asvs-level-2-and-a-server-side-session.md).
   - `POST /api/auth/sign-out` ends the session and returns `200` with
     `{ "signOutUrl" }`. The SPA sends the browser there, and the identity
-    provider returns it to `/`, or _(planned for M17)_ to `/?signedOut`, see
+    provider returns it to `/?signedOut`, see
     [platform home page](shell.md#platform-home-page). The SPA calls sign-out
-    with `fetch` so it can send the CSRF header, and a `fetch` call cannot
-    follow a redirect to the identity provider as a page. A successful sign-out also
+    with `fetch` to send the CSRF header, which cannot follow a redirect to the
+    identity provider as a page. A successful sign-out also
     sends `Clear-Site-Data: "cache", "storage"`, so the browser drops the
     site's HTTP cache and storage, and a refused one sends no such header.
     The SPA keeps only the theme and the locale in browser storage, under
     `axis.themeMode` and `axis.locale`, so a sign-out resets both. See
     [headers](headers-and-rate-limits.md#security-headers). The shell header's
     [account button](frontend.md) offers sign-in and
-    sign-out. A `401` from an API call shows a sign-in prompt, and only a
-    click on its button calls `GET /api/auth/sign-in`, so no session starts
-    without an action of the person.
+    sign-out. The home page `/` calls `GET /api/auth/sign-in` at once when
+    `GET /api/me` or `GET /api/sites` answers `401`. Any other page shows a
+    sign-in prompt, and only a click on its button calls it.
   - `GET /api/me/sessions`, `DELETE /api/me/sessions/{id}` and
     `DELETE /api/me/sessions` let a person see and end their own sessions.
     They need a session, not a service account's bearer token. The shell's
