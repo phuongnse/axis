@@ -1,3 +1,4 @@
+using Axis.Data.Storage;
 using Axis.Server.Studio;
 using Axis.Server.Users;
 using Axis.Tenancy;
@@ -14,10 +15,10 @@ internal static class PlatformRoles
     private const string Author = "author";
     private const string Publisher = "publisher";
     private const string Operator = "operator";
-    private const string Administrator = "administrator";
+    private const string Administrator = UserInvitations.AdministratorKind;
 
     /// <summary>The kind of the administrator role, as the give-role and remove-role routes name it.</summary>
-    public const string AdministratorKind = Administrator;
+    public const string AdministratorKind = UserInvitations.AdministratorKind;
 
     /// <summary>The kinds of the four platform roles.</summary>
     public static IReadOnlyList<string> Kinds => [Author, Publisher, Operator, Administrator];

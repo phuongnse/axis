@@ -9,7 +9,8 @@ and
 The commands are `tenant create`, `tenant suspend`, `tenant resume`, `tenant rotate-passwords`,
 `tenant list`, `tenant backup`, `tenant restore`, `tenant oidc set`, `tenant sign-in set`, `tenant binding list|set|remove`,
 `tenant host add|remove|move`, `tenant email set|clear`, `tenant session end`, `migrate`, `activate`, `platform rekey`, `publisher` and `version`.
-`platform rekey` is in [installation key](tenant-setting-commands.md#installation-key). The
+`platform rekey` is in [installation key](tenant-setting-commands.md#installation-key). `tenant suspend`, `tenant resume` and
+`tenant list` are in [tenant status commands](tenant-status-commands.md). The
 commands that change a tenant after it is created are in
 [tenant setting commands](tenant-setting-commands.md). That page also has the client key options
 of `tenant oidc set`. A tenant can also come from the `Tenants`
@@ -119,7 +120,7 @@ So a script can tell "some tenants failed" from "nothing ran".
 
 ## Tenant create
 
-`tenant create <id> --host <host>...`
+`tenant create <id> --host <host>... [--administrator <email>]`
 creates one tenant and its realm.
 `tenant create <id> --preview-of <main> --host <host>... [--binding <name>=<value>]...`
 creates a [preview tenant](../architecture.md#preview-tenants) of a main tenant.
@@ -128,6 +129,7 @@ creates a [preview tenant](../architecture.md#preview-tenants) of a main tenant.
 | --- | --- |
 | `<id>` | The tenant id. It follows the rule of the `Tenants` section: lowercase letters, digits and hyphens. It is at most 50 characters. It is also the name of the tenant's realm, so `master`, the identity provider's own admin realm, is refused. |
 | `--host <host>` | A host of the tenant. Repeat it for more hosts. At least one is needed. |
+| `--administrator <email>` | Invites the person with this email as the tenant's first administrator, see [the first administrator](user-administration.md#the-first-administrator). Give it once. The email must be a plain address, such as `name@example.com`. It is a usage error together with `--preview-of`. |
 | `--preview-of <main>` | Makes the tenant the preview tenant of the main tenant `<main>`. |
 | `--binding <name>=<value>` | A `url` binding of the new tenant. Repeat it for more. The value is an absolute `http` or `https` URL. It is accepted only together with `--preview-of`. |
 
@@ -137,11 +139,11 @@ tenant's `Oidc` block to the realm itself: the authority `<IdentityProvider:Url>
 The command takes no `--oidc-*` option, and either one is a usage error. It does not read `AXIS_OIDC_CLIENT_SECRET`.
 The admin host's `IdentityProvider` settings give it the identity provider's admin client. The realm has no
 redirect addresses and no accounts yet, so nobody can finish a sign-in there until a later part of the
-identity provider adds them.
+identity provider adds them. With `--administrator <email>`, the realm gets one invited account. Its emailed link
+names no address to return to, so the person can set a password and an authenticator and cannot yet sign in to Axis.
 
 _(planned for M17)_ The command also turns accounts on in the tenant's
-[platform sign-in](identity-provider.md#platform-sign-in). `--administrator <email>` invites the first account with
-the administrator role, see [the first administrator](user-administration.md#the-first-administrator).
+[platform sign-in](identity-provider.md#platform-sign-in).
 `tenant host add`, `remove` and `move` do not yet change the realm, see
 [keeping the realm in step](identity-provider.md#keeping-the-realm-in-step). A preview tenant gets no realm.
 
@@ -190,7 +192,9 @@ the same, and the entry also names its main tenant.
 7. `grants`: run the grant step again. Steps 5 to 7 run as the schema role, as
    [D31](../decisions/d31-separate-database-roles.md) describes.
 8. `role-check`: run the runtime role check of D31 over the runtime role.
-9. `version`: record the schema version and set the entry `active`.
+9. `version`: record the schema version and, without `--administrator`, set the entry `active`.
+10. `administrator`: only with `--administrator`. Create the invited account, give it the `administrator` platform
+    role, write the `user.invited` and `user.roleGiven` records, have the realm email the link and set the entry `active`.
 
 Hosts serve the tenant after their next refresh, see
 [tenant directory](../architecture.md#tenant-directory). The server serves a
@@ -248,72 +252,22 @@ them in any SQL you run by hand.
   realm that it made.
 - A stop, such as Ctrl+C, writes a `failed` line for the current step and exits
   with code 1. The entry stays `provisioning`, and a rerun finishes it.
+- With `--administrator`, the entry stays `provisioning` until the invitation has gone out, so a rerun retries a failed
+  `administrator` step. The rerun finds the account by its email, so there is never a second account or a second
+  `user.invited` record. It sends the email again only when the account has no password yet.
 - On an `active` or `suspended` tenant, it fails with exit code 1 and changes
   nothing.
 
 **Exit codes.** `0` when the tenant is `active`. `1` when a step failed, and
 the entry stays `provisioning`. `2` for an invalid id, the id `master`, a missing option, an
 `--oidc-*` option, a missing or invalid `IdentityProvider` setting of a main tenant, a superuser admin role, missing `platform`
-tables or a host that another tenant holds. For a preview tenant, `2` also covers
+tables or a host that another tenant holds. `2` also covers an `--administrator` that is not a valid
+email address, that repeats or that comes with `--preview-of`. For a preview tenant, `2` also covers
 a usage error of `--preview-of` or `--binding`, and a main tenant that is
 unknown, is itself a preview tenant, already has a preview tenant or is the
 tenant itself. A host conflict is written as an
 `entry failed` line that names no host, and it creates no entry, role or
 database.
-
-## Tenant suspend
-
-`tenant suspend <id>` sets the status of an `active` tenant to `suspended`
-and raises its `version`.
-
-| Option | Meaning |
-| --- | --- |
-| `<id>` | The tenant id. |
-
-Hosts pick the change up at their next refresh. After that the tenant's hosts
-answer `503`, and the worker claims none of its new work. Work already claimed
-finishes. It writes one `status` line. Suspending a `suspended` tenant is a no-op
-that exits `0` and does not raise the `version`. The status changes with one
-conditional update, so a `tenant create` that finishes at the same moment is
-never overwritten.
-
-**Exit codes.** `0` on success. `1` when the tenant is `provisioning`, or the
-write failed. `2` for an unknown tenant.
-
-## Tenant resume
-
-`tenant resume <id>` sets the status of a `suspended` tenant to `active` and
-raises its `version`.
-
-| Option | Meaning |
-| --- | --- |
-| `<id>` | The tenant id. |
-
-Hosts pick the change up at their next refresh. It writes one `status` line.
-Resuming an `active` tenant is a no-op that exits `0` and does not raise the
-`version`.
-
-**Exit codes.** `0` on success. `1` when the tenant is `provisioning`, or the
-write failed. `2` for an unknown tenant.
-
-## Tenant list
-
-`tenant list` prints a table with one row for each tenant, in ordinal order of
-the id:
-
-| Column | Meaning |
-| --- | --- |
-| `id` | The tenant id. |
-| `status` | `provisioning`, `active` or `suspended`. |
-| `hosts` | The tenant's hosts, separated by commas. A site host shows its path, such as `shop.example.test (shop)`. |
-| `schema version` | The recorded schema version, or `-` when it is empty. |
-| `preview of` | The id of the main tenant, for a preview tenant, or `-` for a main tenant. |
-
-It takes no option. It never prints a password, an OIDC secret, a binding value
-or a connection string.
-
-**Exit codes.** `0` on success, also when there is no tenant. `1` when it
-cannot read the directory.
 
 ## Tenant backup
 
@@ -506,7 +460,7 @@ option or a missing setting.
 
 1. Set every `secret` binding again. The archive holds none of them. The restore takes the OIDC client
    secret from `AXIS_OIDC_CLIENT_SECRET`, and a tenant with a new realm has its client secret already.
-2. Run [`tenant resume <id>`](#tenant-resume).
+2. Run [`tenant resume <id>`](tenant-status-commands.md#tenant-resume).
 
 A tenant with a new realm has no accounts, because the archive carries no account, credential or role mapping. Its people
 need new invitations. A provider that the `realm` step left out comes with the next activation, once its `secret` bindings are set.
@@ -517,7 +471,7 @@ Set each `secret` binding with
 
 **Restoring over an existing tenant.** There is no in-place overwrite.
 
-1. Run [`tenant suspend`](#tenant-suspend) on the tenant.
+1. Run [`tenant suspend`](tenant-status-commands.md#tenant-suspend) on the tenant.
 2. Restore the archive under a new id, with a temporary host.
 3. Set the secrets again and resume the new tenant.
 4. Move the hosts from the old tenant to the new one with

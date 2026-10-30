@@ -50,7 +50,7 @@ public sealed partial class UserInvitationTests(KeycloakFixture keycloak, Mailpi
     private string _adminToken = null!;
     private string _patId = null!;
     private string? _connectionString;
-    private long _lastCodePeriod;
+    private readonly InvitationFlow _flow = new();
     private WebApplicationFactory<Program>? _factory;
     private TemporaryFolder? _rolesApplication;
 
@@ -73,13 +73,13 @@ public sealed partial class UserInvitationTests(KeycloakFixture keycloak, Mailpi
         Assert.Equal(email, realmUser.GetProperty("username").GetString());
         Assert.Equal("Dana Nguyen Example", realmUser.GetProperty("firstName").GetString());
 
-        var link = LinkIn((await WaitForMailsAsync(email, 1)).Single());
-        using var browser = new RealmBrowser();
+        var link = InvitationFlow.LinkIn((await InvitationFlow.WaitForMailsAsync(mailpit, email, 1)).Single());
+        using var browser = new InvitationFlow.RealmBrowser();
         var newPassword = Guid.NewGuid().ToString("N");
-        var secret = await SetPasswordAndAuthenticatorAsync(browser, link, newPassword);
+        var secret = await _flow.SetPasswordAndAuthenticatorAsync(browser, link, newPassword, "http://localhost/");
 
         using var app = CreateClient(cookies: true);
-        await SignInAsync(app, email, newPassword, secret);
+        await _flow.SignInAsync(app, email, newPassword, secret);
 
         var listed = await ListedAsync(admin, email, id);
         Assert.Equal("active", listed.GetProperty("status").GetString());
@@ -96,16 +96,16 @@ public sealed partial class UserInvitationTests(KeycloakFixture keycloak, Mailpi
         using var invited = await InviteAsync(admin, email, "Lan Tran", roles: $$"""[{ "applicationId": "{{_rolesId}}", "role": "buyer" }]""");
         Assert.Equal(HttpStatusCode.Created, invited.StatusCode);
         var id = (await invited.Content.ReadFromJsonAsync<JsonElement>(CancellationToken)).GetProperty("id").GetString()!;
-        var firstLink = LinkIn((await WaitForMailsAsync(email, 1)).Single());
+        var firstLink = InvitationFlow.LinkIn((await InvitationFlow.WaitForMailsAsync(mailpit, email, 1)).Single());
 
         using var resent = await PostAsync($"/api/users/{id}/resend-invitation", admin);
 
         Assert.Equal(HttpStatusCode.NoContent, resent.StatusCode);
-        var messages = await WaitForMailsAsync(email, 2);
-        var secondLink = LinkIn(messages[1]);
+        var messages = await InvitationFlow.WaitForMailsAsync(mailpit, email, 2);
+        var secondLink = InvitationFlow.LinkIn(messages[1]);
         Assert.NotEqual(firstLink, secondLink);
-        Assert.False(await ReachesRequiredActionAsync(firstLink));
-        Assert.True(await ReachesRequiredActionAsync(secondLink));
+        Assert.False(await InvitationFlow.ReachesRequiredActionAsync(firstLink));
+        Assert.True(await InvitationFlow.ReachesRequiredActionAsync(secondLink));
 
         using var oldUser = await SendAsync(HttpMethod.Get, $"admin/realms/{_realm}/users/{id}");
         Assert.Equal(HttpStatusCode.NotFound, oldUser.StatusCode);
@@ -142,7 +142,7 @@ public sealed partial class UserInvitationTests(KeycloakFixture keycloak, Mailpi
         Assert.Equal(email, audit["email"]!.GetValue<string>());
         Assert.Equal(3L, await UserAuditCountAsync());
         Assert.Equal(0L, await LinkAuditCountAsync());
-        Assert.Single(await WaitForMailsAsync(email, 1));
+        Assert.Single(await InvitationFlow.WaitForMailsAsync(mailpit, email, 1));
     }
 
     [Fact]
@@ -238,7 +238,7 @@ public sealed partial class UserInvitationTests(KeycloakFixture keycloak, Mailpi
         using var patStillThere = await SendAsync(HttpMethod.Get, $"admin/realms/{_realm}/users/{_patId}");
         Assert.Equal(HttpStatusCode.OK, patStillThere.StatusCode);
         Assert.Empty(await AuditDetailsAsync("user.invitationResent", email));
-        Assert.Single(await WaitForMailsAsync(email, 1));
+        Assert.Single(await InvitationFlow.WaitForMailsAsync(mailpit, email, 1));
     }
 
     public async ValueTask InitializeAsync()
@@ -296,128 +296,6 @@ public sealed partial class UserInvitationTests(KeycloakFixture keycloak, Mailpi
     // Mailpit is shared by the whole run, so every test invites addresses of its own.
     private static string NewEmail() => $"{Guid.NewGuid():N}@example.test";
 
-    private static string LinkIn(MailpitMessage message)
-    {
-        var match = ActionTokenLinkPattern().Match(message.Text);
-        Assert.True(match.Success, message.Text);
-        return match.Value;
-    }
-
-    [GeneratedRegex("""https?://[^\s<>"]*login-actions/action-token[^\s<>"]*""")]
-    private static partial Regex ActionTokenLinkPattern();
-
-    // The info page's own link, not the links of its language menu.
-    [GeneratedRegex("""id="kc-info-message".*?<a href="(?<address>[^"]*)"+""", RegexOptions.Singleline)]
-    private static partial Regex ProceedLinkPattern();
-
-    private async Task<IReadOnlyList<MailpitMessage>> WaitForMailsAsync(string address, int count)
-    {
-        var deadline = DateTimeOffset.UtcNow.AddSeconds(30);
-        while (true)
-        {
-            var messages = await mailpit.MessagesToAsync(address, CancellationToken);
-            if (messages.Count >= count)
-            {
-                Assert.Equal(count, messages.Count);
-                return messages;
-            }
-
-            Assert.True(DateTimeOffset.UtcNow < deadline, $"Mailpit received {messages.Count} of {count} emails for {address} within 30 seconds.");
-            await Task.Delay(250, CancellationToken);
-        }
-    }
-
-    /// <summary>
-    /// Opens the emailed link in the browser. Keycloak shows an info page with a link that proceeds, and then the page that sets a password.
-    /// Returns the HTML of that page, or null when the link leads somewhere else, such as an error page.
-    /// </summary>
-    private static async Task<string?> OpenLinkAsync(RealmBrowser browser, string link)
-    {
-        var html = await FollowAsync(browser, await browser.GetAsync(new Uri(link)));
-
-        for (var hops = 0; hops < 3 && html is not null && !html.Contains("axis-sign-in-context", StringComparison.Ordinal); hops++)
-        {
-            if (ProceedLinkPattern().Match(html) is not { Success: true } proceed)
-            {
-                return null;
-            }
-
-            html = await FollowAsync(browser, await browser.GetAsync(new Uri(new Uri(link), WebUtility.HtmlDecode(proceed.Groups["address"].Value))));
-        }
-
-        return html is not null && html.Contains("axis-sign-in-context", StringComparison.Ordinal) ? html : null;
-    }
-
-    // Follows redirects and returns the HTML of the page it ends on, or null when that page is not a 200.
-    private static async Task<string?> FollowAsync(RealmBrowser browser, HttpResponseMessage response)
-    {
-        for (var hops = 0; hops < 5 && response.StatusCode == HttpStatusCode.Found; hops++)
-        {
-            var location = response.Headers.Location!;
-            response.Dispose();
-            response = await browser.GetAsync(location);
-        }
-
-        using (response)
-        {
-            return response.StatusCode == HttpStatusCode.OK ? await response.Content.ReadAsStringAsync(CancellationToken) : null;
-        }
-    }
-
-    // The invitation asks for a password and an authenticator, in the order that the identity provider chooses.
-    private static async Task<bool> ReachesRequiredActionAsync(string link)
-    {
-        using var browser = new RealmBrowser();
-        var html = await OpenLinkAsync(browser, link);
-        return html is not null && KeycloakSignIn.Page(html) is "updatePassword" or "addAuthenticator";
-    }
-
-    /// <summary>Follows the link, sets the password and adds an authenticator app. Returns the authenticator's secret.</summary>
-    private async Task<string> SetPasswordAndAuthenticatorAsync(RealmBrowser browser, string link, string password)
-    {
-        var html = await OpenLinkAsync(browser, link);
-        string? secret = null;
-        for (var step = 0; step < 2; step++)
-        {
-            Assert.NotNull(html);
-            var page = KeycloakSignIn.Page(html);
-            Dictionary<string, string> form;
-            if (page == "updatePassword")
-            {
-                form = new Dictionary<string, string> { ["password-new"] = password, ["password-confirm"] = password };
-            }
-            else
-            {
-                Assert.Equal("addAuthenticator", page);
-                secret = KeycloakSignIn.Property(html, "manualKey")!.Replace(" ", "", StringComparison.Ordinal);
-                _lastCodePeriod = DateTimeOffset.UtcNow.ToUnixTimeSeconds() / 30;
-                form = new Dictionary<string, string>
-                {
-                    ["totp"] = DevelopmentTotp.CodeFromSecret(secret, DateTimeOffset.UtcNow),
-                    ["totpSecret"] = KeycloakSignIn.Property(html, "secret")!,
-                    ["userLabel"] = "Phone",
-                };
-            }
-
-            var response = await browser.PostAsync(KeycloakSignIn.LoginAction(html).AbsoluteUri, form);
-            if (step == 0)
-            {
-                html = await FollowAsync(browser, response);
-                continue;
-            }
-
-            // The last action ends on a page that links back to the address the invitation named, the tenant's home.
-            using (response)
-            {
-                var done = await response.Content.ReadAsStringAsync(CancellationToken);
-                Assert.True(response.StatusCode == HttpStatusCode.OK, done);
-                Assert.Contains("href=\"http://localhost/\"", done, StringComparison.Ordinal);
-            }
-        }
-
-        return secret ?? throw new InvalidOperationException("The invitation did not ask for an authenticator.");
-    }
-
     private async Task<HttpResponseMessage> InviteAsync(string? cookie, string email, string displayName, string? roles = null)
     {
         var body = new JsonObject { ["email"] = email, ["displayName"] = displayName };
@@ -436,47 +314,6 @@ public sealed partial class UserInvitationTests(KeycloakFixture keycloak, Mailpi
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var list = await response.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
         return list.GetProperty("items").EnumerateArray().Single(item => item.GetProperty("id").GetString() == id);
-    }
-
-    // The client of the person signs in at the server's challenge, gives the password and a code of the authenticator, and follows the callback.
-    private async Task SignInAsync(HttpClient app, string username, string password, string secret)
-    {
-        using var challenge = await app.GetAsync("/api/auth/sign-in", CancellationToken);
-        Assert.Equal(HttpStatusCode.Found, challenge.StatusCode);
-        using var browser = new RealmBrowser();
-        using var page = await browser.GetAsync(challenge.Headers.Location!);
-        var loginHtml = await page.Content.ReadAsStringAsync(CancellationToken);
-        Assert.True(page.StatusCode == HttpStatusCode.OK, loginHtml);
-        using var afterPassword = await browser.PostAsync(
-            KeycloakSignIn.LoginAction(loginHtml).AbsoluteUri,
-            new Dictionary<string, string> { ["username"] = username, ["password"] = password, ["credentialId"] = "" });
-        var html = await afterPassword.Content.ReadAsStringAsync(CancellationToken);
-        Assert.True(afterPassword.StatusCode == HttpStatusCode.OK && KeycloakSignIn.Page(html) == "twoStep", html);
-        using var login = await browser.PostAsync(
-            KeycloakSignIn.LoginAction(html).AbsoluteUri,
-            new Dictionary<string, string> { ["otp"] = await NextAuthenticatorCodeAsync(secret), ["login"] = "Sign In" });
-        Assert.True(login.StatusCode == HttpStatusCode.Found, await login.Content.ReadAsStringAsync(CancellationToken));
-        var callback = login.Headers.Location!;
-        Assert.Equal("http://localhost/api/auth/callback", callback.GetLeftPart(UriPartial.Path));
-        using var signedIn = await app.GetAsync(callback.PathAndQuery, CancellationToken);
-        Assert.Equal(HttpStatusCode.Found, signedIn.StatusCode);
-    }
-
-    // The realm accepts only the code of the current 30 seconds and refuses one it has seen, so a second sign-in waits for the next period.
-    private async Task<string> NextAuthenticatorCodeAsync(string secret)
-    {
-        while (true)
-        {
-            var now = DateTimeOffset.UtcNow;
-            var period = now.ToUnixTimeSeconds() / 30;
-            if (period > _lastCodePeriod && now.ToUnixTimeSeconds() % 30 < 27)
-            {
-                _lastCodePeriod = period;
-                return DevelopmentTotp.CodeFromSecret(secret, now);
-            }
-
-            await Task.Delay(TimeSpan.FromMilliseconds(500), CancellationToken);
-        }
     }
 
     // The axis client accepts the test host's callback and home, and puts the realm roles of a person in its roles claim.
@@ -703,49 +540,6 @@ public sealed partial class UserInvitationTests(KeycloakFixture keycloak, Mailpi
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await response.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
         return body.GetProperty("access_token").GetString()!;
-    }
-
-    /// <summary>
-    /// The browser at the realm. Keycloak marks its cookies Secure, which a browser sends to http://localhost but a
-    /// CookieContainer does not, so the browser carries them itself.
-    /// </summary>
-    private sealed class RealmBrowser : IDisposable
-    {
-        private readonly HttpClient _client = new(new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false });
-        private readonly Dictionary<string, string> _jar = [];
-
-        public async Task<HttpResponseMessage> GetAsync(Uri address)
-        {
-            using var request = new HttpRequestMessage(HttpMethod.Get, address);
-            return await SendAsync(request);
-        }
-
-        public async Task<HttpResponseMessage> PostAsync(string address, Dictionary<string, string> form)
-        {
-            using var request = new HttpRequestMessage(HttpMethod.Post, new Uri(address)) { Content = new FormUrlEncodedContent(form) };
-            return await SendAsync(request);
-        }
-
-        public void Dispose() => _client.Dispose();
-
-        private async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request)
-        {
-            if (_jar.Count > 0)
-            {
-                request.Headers.Add("Cookie", string.Join("; ", _jar.Select(cookie => $"{cookie.Key}={cookie.Value}")));
-            }
-
-            var response = await _client.SendAsync(request, CancellationToken);
-            if (response.Headers.TryGetValues("Set-Cookie", out var setCookies))
-            {
-                foreach (var pair in setCookies.Select(setCookie => setCookie.Split(';')[0].Split('=', 2)))
-                {
-                    _jar[pair[0]] = pair[1];
-                }
-            }
-
-            return response;
-        }
     }
 
     /// <summary>

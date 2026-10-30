@@ -56,7 +56,7 @@ internal static partial class AdminCommands
 
     internal const string Usage =
         """
-        Usage: tenant create <id> --host <host>...
+        Usage: tenant create <id> --host <host>... [--administrator <email>]
                tenant create <id> --preview-of <main> --host <host>... [--binding <name>=<value>]...
                tenant backup <id> --out <file>
                tenant restore <file> --tenant <id> --host <host>...
@@ -255,7 +255,7 @@ internal static partial class AdminCommands
 
         using var http = IdentityProviderClient(identityProviderHandler);
         var realm = settings.IdentityProvider is null ? null : new TenantRealm(http, settings.IdentityProvider);
-        return await new TenantCreate(settings, request, realm, new TenantAudit(command, settings.PlatformConnectionString), output, cancellationToken).RunAsync();
+        return await new TenantCreate(settings, request, realm, http, new TenantAudit(command, settings.PlatformConnectionString), command, output, cancellationToken).RunAsync();
     }
 
     // The client for the identity provider. A test passes its own handler, which the client does not dispose.
@@ -797,6 +797,7 @@ internal static partial class AdminCommands
         var hosts = new List<string>();
         var bindings = new List<KeyValuePair<string, string>>();
         string? previewOf = null;
+        string? administrator = null;
         for (var i = 3; i < args.Length; i += 2)
         {
             if (i + 1 >= args.Length || args[i + 1].StartsWith("--", StringComparison.Ordinal))
@@ -812,6 +813,15 @@ internal static partial class AdminCommands
                     break;
                 case "--preview-of" when previewOf is null:
                     previewOf = value;
+                    break;
+                case "--administrator" when administrator is null:
+                    // The usage text never echoes an argument, so the email is never printed.
+                    administrator = RealmUsers.NormalizeEmail(value);
+                    if (administrator is null)
+                    {
+                        return null;
+                    }
+
                     break;
                 case "--binding":
                     // The usage text never echoes an argument, so a binding value is never printed.
@@ -833,10 +843,10 @@ internal static partial class AdminCommands
             return null;
         }
 
-        // A binding is only for a preview tenant.
-        return previewOf is null && bindings.Count > 0
+        // A binding is only for a preview tenant, and a preview tenant has no realm for an administrator.
+        return (previewOf is null && bindings.Count > 0) || (previewOf is not null && administrator is not null)
             ? null
-            : new TenantCreateRequest(args[2], hosts, previewOf, bindings);
+            : new TenantCreateRequest(args[2], hosts, previewOf, bindings, administrator);
     }
 
     private static async Task<int> MigrateAsync(
@@ -1808,13 +1818,15 @@ internal static partial class AdminCommands
 
 /// <summary>
 /// <c>tenant create</c>. A main tenant has no <paramref name="PreviewOf"/> and gets a realm. A preview tenant has
-/// <paramref name="PreviewOf"/>, no realm and any <paramref name="Bindings"/>.
+/// <paramref name="PreviewOf"/>, no realm and any <paramref name="Bindings"/>. A main tenant may have an
+/// <paramref name="Administrator"/>, the normalised email of the person to invite as its first administrator.
 /// </summary>
 internal sealed record TenantCreateRequest(
     string Id,
     IReadOnlyList<string> Hosts,
     string? PreviewOf,
-    IReadOnlyList<KeyValuePair<string, string>> Bindings);
+    IReadOnlyList<KeyValuePair<string, string>> Bindings,
+    string? Administrator = null);
 
 /// <summary><c>tenant oidc set</c>. <paramref name="WithClientKey"/> says that the client key is to be read, and <paramref name="Change"/> does not hold it yet.</summary>
 internal sealed record OidcSetRequest(string Id, bool WithClientKey, TenantSignInChange Change);

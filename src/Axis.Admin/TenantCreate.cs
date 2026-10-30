@@ -1,6 +1,8 @@
+using Axis.Data.Storage;
 using Axis.Processes.Storage;
 using Axis.Tenancy;
 using Axis.Tenancy.Platform;
+using Axis.Tenancy.Realms;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
@@ -9,7 +11,10 @@ namespace Axis.Admin;
 /// <summary>
 /// <c>tenant create</c>: writes the directory entry as <c>provisioning</c>, creates the tenant's realm in the identity provider
 /// (a main tenant only), creates the database roles and the database, grants and migrates it as the schema role, checks the
-/// runtime role and sets the entry <c>active</c>. The realm step saves the three generated client secrets, encrypted, and the
+/// runtime role and sets the entry <c>active</c>. With an administrator email, the <c>version</c> step records the schema version
+/// only. An <c>administrator</c> step follows: it creates the invited account in the realm, gives it the administrator platform
+/// role with the audit records, has the realm email the invitation, and then sets the entry <c>active</c>. A rerun finds the
+/// account by its email. The realm step saves the three generated client secrets, encrypted, and the
 /// tenant's <c>Oidc</c> block before it calls the identity provider. A rerun on a <c>provisioning</c> entry skips what is done
 /// and reuses the secrets. Each step writes one line that names the tenant and never a password,
 /// a host or a connection string.
@@ -21,7 +26,9 @@ internal sealed class TenantCreate : IAsyncDisposable
     private readonly CreateSettings _settings;
     private readonly TenantCreateRequest _request;
     private readonly TenantRealm? _realm;
+    private readonly HttpClient _http;
     private readonly TenantAudit _audit;
+    private readonly string _command;
     private readonly TextWriter _output;
     private readonly CancellationToken _cancellationToken;
     private readonly string _id;
@@ -35,12 +42,14 @@ internal sealed class TenantCreate : IAsyncDisposable
     private TenantProvisioning? _provisioning;
     private TenantDatabaseSteps? _steps;
 
-    public TenantCreate(CreateSettings settings, TenantCreateRequest request, TenantRealm? realm, TenantAudit audit, TextWriter output, CancellationToken cancellationToken)
+    public TenantCreate(CreateSettings settings, TenantCreateRequest request, TenantRealm? realm, HttpClient http, TenantAudit audit, string command, TextWriter output, CancellationToken cancellationToken)
     {
         _settings = settings;
         _request = request;
         _realm = realm;
+        _http = http;
         _audit = audit;
+        _command = command;
         _output = output;
         _cancellationToken = cancellationToken;
         _id = request.Id;
@@ -68,7 +77,8 @@ internal sealed class TenantCreate : IAsyncDisposable
                 && await Step("migrations", () => Steps.MigrateAsync())
                 && await Step("grants", () => Steps.GrantAsync())
                 && await Step("role-check", () => Steps.CheckRuntimeRoleAsync())
-                && await Step("version", ActivateAsync))
+                && await Step("version", ActivateAsync)
+                && (_request.Administrator is not { } email || await Step("administrator", () => AdministratorAsync(email))))
             {
                 return 0;
             }
@@ -200,13 +210,57 @@ internal sealed class TenantCreate : IAsyncDisposable
     // Saves the secrets and the Oidc block before the realm exists, so a stop between the two never loses a secret.
     private Task RealmAsync() => _realm!.EnsureForTenantAsync(_platform, _row!, _settings.Cipher, _settings.Mail ?? RealmMail.None, _cancellationToken);
 
+    // With an administrator to invite, the tenant stays provisioning until the invitation is out, so a rerun can retry it.
     private async Task ActivateAsync()
     {
         var row = _row!;
         row.SchemaVersion = await Steps.ReadSchemaVersionAsync();
-        row.Status = "active";
-        row.Version++;
+        if (_request.Administrator is null)
+        {
+            await SetActiveAsync();
+        }
+        else
+        {
+            await _platform.SaveChangesAsync(_cancellationToken);
+        }
+    }
+
+    private async Task SetActiveAsync()
+    {
+        _row!.Status = "active";
+        _row.Version++;
         await _platform.SaveChangesAsync(_cancellationToken);
+    }
+
+    // Creates the invited account, or finds the one an earlier run created, gives it the administrator role with the audit
+    // records and has the realm email the link. The audit records never hold the link, and the output never names the email.
+    private async Task AdministratorAsync(string email)
+    {
+        var access = DirectoryTenantCatalog.RealmUsers(_row!, _settings.Cipher)
+            ?? throw new InvalidOperationException("The tenant has no realm to invite an administrator to.");
+        var realm = new RealmUsers(_http, access);
+        var id = await realm.FindAccountIdByEmailAsync(email, _cancellationToken);
+        var created = id is null;
+        id ??= await realm.CreateInvitedAsync(email, null, null, _cancellationToken);
+
+        var administrator = new GivenRole(null, UserInvitations.AdministratorKind);
+        await using (var connection = await Steps.OpenRuntimeConnectionAsync())
+        {
+            if (created || !(await GivenRoles.ListAsync(connection, id, _cancellationToken)).Contains(administrator))
+            {
+                await using var transaction = await connection.BeginTransactionAsync(_cancellationToken);
+                await UserInvitations.RecordAsync(transaction, _command, null, id, email, [administrator], _cancellationToken);
+                await transaction.CommitAsync(_cancellationToken);
+            }
+        }
+
+        // A person who has set a password needs no new link. The command names no return address: the realm accepts none yet.
+        if (created || !(await realm.ReadInviteeAsync(id, _cancellationToken)).HasPassword)
+        {
+            await realm.SendInvitationAsync(id, null, _cancellationToken);
+        }
+
+        await SetActiveAsync();
     }
 
     // Runs one step. Any failure, also a stop by Ctrl+C, writes a failed line and ends the command.

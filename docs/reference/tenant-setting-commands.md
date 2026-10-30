@@ -273,7 +273,7 @@ Both commands also update the tenant's realm, so its "Forgot password?" link is 
   hosts. Only `tenant host remove` refuses to remove a last host. A move keeps the host's site, and it exits with
   code 2 when the target tenant already has a host for that site.
 - `tenant backup` and `tenant restore` keep the host's site, and `tenant list` shows it, see
-  [tenant backup](administration.md#tenant-backup) and [tenant list](administration.md#tenant-list).
+  [tenant backup](administration.md#tenant-backup) and [tenant list](tenant-status-commands.md#tenant-list).
 - Every host command exits with code 2 for a tenant that is still `provisioning`, as the binding
   commands do.
 - A move raises the `version` of both tenants.
