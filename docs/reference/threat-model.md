@@ -2,7 +2,7 @@
 
 What can go wrong in Axis's own design, and what Axis does about each threat. The model follows
 [D106](../decisions/d106-a-threat-model-kept-current-like-the-asvs-tracking.md). Its threat rows are
-_(planned for M18)_. Each row comes from the issue that models one trust boundary, and the
+built. Each row comes from the issue that models one trust boundary, and the
 [ASVS](asvs.md) page covers the controls that every web application needs.
 
 ## How it is filled
@@ -41,7 +41,7 @@ _(planned for M18)_. Each row comes from the issue that models one trust boundar
     **Delegated** row names the right party. A reviewer does.
 - **Kept current.** A change that adds a trust boundary updates this page in the same change, see
   [the threat model rule](../delivery.md#keeping-the-docs-current). Each docs sweep reviews the page.
-  Once a year the owner rates Axis against OWASP SAMM _(planned for M18)_, see
+  Once a year the owner rates Axis against OWASP SAMM _(planned for M28)_, see
   [ASVS other evidence](asvs.md#other-evidence).
 
 ## The product
@@ -104,8 +104,9 @@ flowchart LR
 | P4 | Injected script or a framing page reads or changes the Axis pages. | Browser and server | Information disclosure | High | **Mitigated** | `SecurityHeadersTests` (every answer sends a Content Security Policy that forbids framing, and the nosniff header). |
 | P5 | A sign-in sends the user on to an outside address. | Browser and server | Spoofing | Medium | **Mitigated** | `SignInEndpointTests` (a return address that is not a local path is a 400 problem). |
 | P6 | A flood of sign-ins or writes slows the service for other users. | Browser and server | Denial of service | Medium | **Mitigated** | `RateLimitTests` (a user past the session limit is refused while other users still pass). |
-| P7 | A user reads or changes a page or record without a grant. | Browser and server | Elevation of privilege | High | **Mitigated** | `RecordPolicyTests` (every route is a 401 without a session and a 403 without a grant), `PageAccessTests` (a department manager can read purchase requests but cannot submit them). |
+| P7 | A user reads or changes a page or record without a grant. | Browser and server | Elevation of privilege | High | **Mitigated** | `RecordPolicyTests` (every route is a 401 without a session and a 403 without a grant), `AuthorizationRouteTests` (every route off the open list answers 401 or 403 with no session and no token), `PageAccessTests` (a department manager can read purchase requests but cannot submit them). |
 | P8 | A session stays open past its time limit or after an admin ends it. | Browser and server | Elevation of privilege | Medium | **Mitigated** | `SessionLifetimeTests` (a session ends after an hour idle or eight hours after sign in), `AdminTenantSessionEndTests` (ending one person's sessions leaves other people signed in). |
+| P100 | Crafted input to a parser, in a record body, an import file or an expression, crashes the parser or reaches SQL. | Browser and server | Tampering | High | **Mitigated** | `RecordBodyFuzzTests` (a body is accepted or refused with a 400 problem), `RecordImportFuzzTests` (any bytes give rows or refusals), `ExpressionFuzzTests` (no SQL the translator emits holds input text outside a parameter). |
 
 ### Server and databases
 

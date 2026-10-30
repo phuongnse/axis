@@ -16,7 +16,7 @@ them.
     does, and calls each one with no session and no token. Each route that is not on the open
     list must answer `401` or `403` without reaching a tenant database. A route added later is
     tested without anyone adding it.
-- **Fuzz tests** _(planned for M18)_ for the parsers that read outside input: the expression
+- **Fuzz tests** for the parsers that read outside input: the expression
   language and its SQL translation, the record API's request bodies, and CSV and spreadsheet
   import. They run with the unit or integration tests, with a fixed seed and a time limit.
 - **A penetration test by an independent tester** before the first customer's installation.

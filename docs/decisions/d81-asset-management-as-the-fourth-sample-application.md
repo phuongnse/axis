@@ -9,7 +9,7 @@ M13, as [D46](d46-a-general-purpose-low-code-platform-and-the-milestones-after-m
 planned. The owner agreed these points on 2026-10-25. The data, security, pages,
 dashboard, and import and export are built in M15. The maintenance and software
 scenario is built. The import and attachment scenarios, and the denied cases they
-lack, are _(planned for M18)_. See the
+lack, are _(planned for M26)_. See the
 [Fourth application section](../product-brief.md#fourth-application-asset-management)
 of the product brief for the data, security, pages and scenarios.
 

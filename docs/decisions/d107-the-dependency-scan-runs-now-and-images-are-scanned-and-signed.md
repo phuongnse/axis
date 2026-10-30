@@ -10,7 +10,7 @@ dependencies at once and extends the watch to its images.
 
 - **The dependency scan runs in CI now.** A hand-made change to `.github/workflows/` runs
   `scripts/scan.sh` on CI's triggers and once a week, as D50 describes. It replaces D50's
-  _(planned for M18)_. It is still not a NexKit check: a red scan on `main` opens NexKit's `bug`
+  plan to run it in M18. It is still not a NexKit check: a red scan on `main` opens NexKit's `bug`
   issue for CI on `main`, like any failing check.
 - **Today's findings are fixed at once,** by one issue in no milestone, before the time frames
   of [dependency updates](../development.md#dependency-updates) end.
