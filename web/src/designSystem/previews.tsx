@@ -146,6 +146,14 @@ const childCollectionStates: readonly PreviewState[] = [
 ]
 
 /** What a preview draws: its states, each the shared widget component over fixture metadata. */
+// Proposed: the purchase request sample's resources that the Studio cards open.
+const studioApp = 'PurchaseRequests'
+const studioEntity = 'd9ccbf89-5004-4d52-8885-2ee377b7caa5'
+const studioPage = 'e0ee63b0-ff11-4f06-95ee-e73922f2c1a9'
+const studioForm = '77c7c183-7283-46a7-b56f-5cf5cec518aa'
+const studioProcess = '4b60c03e-02d0-4329-80c6-75f972190399'
+const studioResource = (id: string) => `/studio?app=${studioApp}&resource=${id}`
+
 export const previews: Record<string, readonly PreviewState[]> = {
   table: [
     ...withAndWithoutData(
@@ -270,6 +278,27 @@ export const previews: Record<string, readonly PreviewState[]> = {
       entry: '/sample/requests',
       frameHeight: 480,
     },
+  ],
+  // Proposed: a Studio group of cards, drawn from Studio's own pages over the purchase request sample.
+  studio: [
+    { caption: 'Applications', draw: () => <ShellPreview />, entry: '/studio', frameHeight: 600 },
+    { caption: 'Application', draw: () => <ShellPreview />, entry: `/studio?app=${studioApp}`, frameHeight: 600 },
+    { caption: 'Entity', draw: () => <ShellPreview />, entry: studioResource(studioEntity), frameHeight: 600 },
+    {
+      caption: 'Policy matrix',
+      draw: () => <ShellPreview />,
+      entry: `/studio?app=${studioApp}&view=policies`,
+      frameHeight: 600,
+    },
+  ],
+  studioPageDesign: [
+    { caption: 'Page', draw: () => <ShellPreview />, entry: studioResource(studioPage), frameHeight: 600 },
+  ],
+  studioFormDesign: [
+    { caption: 'Form', draw: () => <ShellPreview />, entry: studioResource(studioForm), frameHeight: 600 },
+  ],
+  studioProcessDesign: [
+    { caption: 'Process', draw: () => <ShellPreview />, entry: studioResource(studioProcess), frameHeight: 600 },
   ],
   identitySignIn: [
     { caption: 'Sign in', draw: () => <IdentitySignIn page="signIn" />, frameHeight: 600 },

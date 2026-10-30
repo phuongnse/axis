@@ -1,4 +1,5 @@
 import type { ChartKind } from '../platform/chartOption'
+import studioFixtures from './studioFixtures.json'
 import type { CurrentUser } from '../platform/currentUser'
 import type { NotificationPage } from '../platform/notifications'
 import type { HistoryPage, RecordItem, RecordPage } from '../platform/records'
@@ -758,10 +759,11 @@ const currentUser: CurrentUser = {
   displayName: 'Alex Morgan',
   roles: ['Author', 'Operator', 'Administrator'],
   studio: true,
-  studioPublisher: false,
-  studioCreate: false,
-  studioPreviewHost: null,
-  studioTest: false,
+  // Proposed: the Studio cards show every action an author who publishes, creates and tests sees.
+  studioPublisher: true,
+  studioCreate: true,
+  studioPreviewHost: 'preview.example.com',
+  studioTest: true,
   console: true,
   users: true,
 }
@@ -974,7 +976,14 @@ export const siteTexts: Record<string, string> = {
 }
 
 /** The API paths that the fixtures answer. A request outside them is not a fixture's to answer. */
-export const fixtureScopes = [`${apiPath}/`, '/api/sites', '/api/me', '/api/about', '/health/ready'] as const
+export const fixtureScopes = [
+  `${apiPath}/`,
+  '/api/sites',
+  '/api/me',
+  '/api/about',
+  '/health/ready',
+  '/api/studio',
+] as const
 
 /**
  * The answers of the fixture application's APIs, by path or by path and query. The page's own
@@ -1004,4 +1013,6 @@ export const routes: Record<string, () => unknown> = {
   '/api/me': () => currentUser,
   '/api/about': () => ({ version: '0.1.0' }),
   '/health/ready': () => new Response(null, { status: 200 }),
+  // Proposed: Studio's answers for the purchase request sample, as the local stack gave them, with a short release history.
+  ...Object.fromEntries(Object.entries(studioFixtures).map(([path, body]) => [path, () => body])),
 }

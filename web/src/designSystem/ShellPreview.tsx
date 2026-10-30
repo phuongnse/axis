@@ -6,6 +6,7 @@ import { PageRoute } from '../pages/PageRoute'
 import { PlatformContext, type Platform } from '../pages/context'
 import { PlatformShellRoute } from '../pages/PlatformShellRoute'
 import { SiteRoute } from '../pages/SiteRoute'
+import { StudioPage } from '../pages/StudioPage'
 import { locale, platformSite } from './fixtures'
 
 const platform: Platform = {
@@ -26,6 +27,15 @@ export function ShellPreview() {
           element={
             <PlatformShellRoute>
               <HomePage />
+            </PlatformShellRoute>
+          }
+        />
+        {/* Proposed: Studio over the fixtures of the purchase request sample. */}
+        <Route
+          path="studio"
+          element={
+            <PlatformShellRoute>
+              <StudioPage />
             </PlatformShellRoute>
           }
         />

@@ -1,4 +1,4 @@
-import { mergeConfig, type Plugin } from 'vite'
+import { mergeConfig, type Plugin, type Rollup } from 'vite'
 import config from './vite.config.ts'
 
 // React Router loads route modules with a dynamic import in its framework mode, which the previews never
@@ -36,13 +36,40 @@ function escapeScriptEndings(): Plugin {
   }
 }
 
+// Proposed: the bundle is one script, so a stylesheet that a component imports, such as the process graph's, goes into
+// the script, which adds it to the page as a style element when it loads.
+function inlineStylesheets(): Plugin {
+  return {
+    name: 'inline-stylesheets',
+    enforce: 'post',
+    generateBundle(_, bundle) {
+      const sheets = Object.values(bundle).filter(
+        (item): item is Rollup.OutputAsset => item.type === 'asset' && item.fileName.endsWith('.css'),
+      )
+      if (sheets.length === 0) {
+        return
+      }
+      const css = sheets.map((sheet) => String(sheet.source)).join('\n')
+      for (const sheet of sheets) {
+        delete bundle[sheet.fileName]
+      }
+      const inject = `(function(){var s=document.createElement('style');s.textContent=${JSON.stringify(css)};document.head.appendChild(s)})();\n`
+      for (const chunk of Object.values(bundle)) {
+        if (chunk.type === 'chunk' && chunk.isEntry) {
+          chunk.code = inject + chunk.code
+        }
+      }
+    },
+  }
+}
+
 // Builds the design-system bundle: one classic script that sets `window.Axis`, never into the server's
 // web root. `vite build` with the main config builds only index.html, so the previews stay out of the
 // production bundle. scripts/design-system.sh checks the result.
 export default mergeConfig(config, {
   // Library mode does not replace this, and React and Ant Design read it.
   define: { 'process.env.NODE_ENV': JSON.stringify('production') },
-  plugins: [dropRouteModuleImport(), escapeScriptEndings()],
+  plugins: [dropRouteModuleImport(), inlineStylesheets(), escapeScriptEndings()],
   build: {
     outDir: '../artifacts/design-system',
     emptyOutDir: true,

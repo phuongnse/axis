@@ -35,4 +35,6 @@ export const cardGroups: readonly { name: string; previews: readonly string[] }[
   { name: 'Containers', previews: ['columns', 'tabs', 'section'] },
   { name: 'Shared states', previews: ['states'] },
   { name: 'Shell', previews: ['shell', 'signIn', 'identitySignIn'] },
+  // Proposed: Studio, the workspace and its designers.
+  { name: 'Studio', previews: ['studio', 'studioPageDesign', 'studioFormDesign', 'studioProcessDesign'] },
 ]
