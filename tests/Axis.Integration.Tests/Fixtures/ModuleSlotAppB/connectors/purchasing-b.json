@@ -1,0 +1,25 @@
+{
+  "id": "3e8a5b71-4c2d-4f96-8b0e-7a1d9c6e2fb2",
+  "kind": "connector",
+  "name": "PurchasingB",
+  "formatVersion": 1,
+  "baseUrl": { "binding": "PurchasingUrl" },
+  "auth": { "type": "bearer", "token": { "binding": "PurchasingToken" } },
+  "operations": [
+    {
+      "name": "createOrder",
+      "method": "POST",
+      "path": "/orders/{idempotencyKey}",
+      "input": [{ "name": "title", "type": "text", "required": true }],
+      "output": [{ "name": "orderNumber", "type": "text", "required": true }],
+      "lookup": "findOrder"
+    },
+    {
+      "name": "findOrder",
+      "method": "GET",
+      "path": "/orders/by-key/{idempotencyKey}",
+      "input": [],
+      "output": [{ "name": "orderNumber", "type": "text", "required": true }]
+    }
+  ]
+}

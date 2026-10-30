@@ -219,7 +219,7 @@ public static partial class ApplicationCompiler
         resource.File.StartsWith(ApplicationLoader.ModulesFolderPrefix, StringComparison.Ordinal);
 
     /// <summary>The module id of a qualified resource name, the text before the first <c>/</c>.</summary>
-    private static string ModuleIdOf(string qualifiedName) => qualifiedName[..qualifiedName.IndexOf('/', StringComparison.Ordinal)];
+    internal static string ModuleIdOf(string qualifiedName) => qualifiedName[..qualifiedName.IndexOf('/', StringComparison.Ordinal)];
 
     private static CompilationResult Compile(
         ApplicationLoadResult loaded,
@@ -459,6 +459,12 @@ public static partial class ApplicationCompiler
                 ]
                 : rules;
 
+        // A module process calls a connector slot, which this application maps to one of its connectors by name.
+        Func<string, ConnectorResource?> ConnectorsFor(Resource resource) =>
+            IsModuleResource(resource)
+                ? name => modules.First(pin => pin.Id == ModuleIdOf(resource.Name)).Connectors.TryGetValue(name, out var mapped) ? FindConnector(mapped) : null
+                : FindConnector;
+
         // A module data source or policy filter sees only the rules of the modules its module declares, by qualified call.
         IReadOnlyList<ExpressionRule> FilterRulesFor(Resource resource) =>
             IsModuleResource(resource) ? [.. DeclaredRulesOf(resource)] : rules;
@@ -587,7 +593,8 @@ public static partial class ApplicationCompiler
                 references,
                 RulesFor(moduleProcesses.First()),
                 declared,
-                diagnostics);
+                diagnostics,
+                name => moduleManifests[moduleId].Connectors.FirstOrDefault(slot => slot.Name == name));
         }
 
         PolicyChecker.Check(
@@ -748,7 +755,7 @@ public static partial class ApplicationCompiler
             Seeds = allSeeds.Select(seed => BuildSeed(seed, entitiesByName, applicationId)).ToList(),
             DataSources = loaded.DataSources.Select(dataSource => BuildDataSource(
                 dataSourcesByName[dataSource.Name], entities, FilterRulesFor(dataSource), DeclaredModulesOf(dataSource))).ToList(),
-            Processes = loaded.Processes.Select(process => ProcessChecker.Build(processesByName[process.Name], FindEntity, FindForm, FindConnector, FindEvent, FindAnyPackage, FindPage, FindProcess, RulesFor(process), DeclaredModulesOf(process))).ToList(),
+            Processes = loaded.Processes.Select(process => ProcessChecker.Build(processesByName[process.Name], FindEntity, FindForm, ConnectorsFor(process), FindEvent, FindAnyPackage, FindPage, FindProcess, RulesFor(process), DeclaredModulesOf(process))).ToList(),
             Forms = loaded.Forms.Select(form => BuildForm(formsByName[form.Name], entitiesByName, IsModuleResource(form) ? [] : rules, IsModuleResource(form) ? null : declaredModules)).ToList(),
             Roles = loaded.Roles,
             Policies = loaded.Policies.Select(policy => PolicyChecker.Build(

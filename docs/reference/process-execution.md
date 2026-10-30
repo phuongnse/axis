@@ -362,6 +362,14 @@ The compiled step holds the connector, the operation, the inputs in the
 operation's order, the outputs, the retry policy with its defaults filled in,
 and `next`.
 
+- A module process's step names a
+  [connector slot](modules-and-templates.md#processes-pages-policies-and-dependencies) of its
+  module and one of the slot's operations. The inputs and outputs are checked
+  against the slot's fields with the same codes, and a name that is no slot is
+  `AXC0102` and a missing slot operation is `AXC0103`, in the module's file. In
+  each application the compiled step holds the connector the slot maps to, so
+  the worker calls it as it calls an application step.
+
 ### Staging and the call
 
 **The step's transaction stages the call.** It runs as other steps do, see

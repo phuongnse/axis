@@ -1,0 +1,18 @@
+{
+  "id": "3e8a5b71-4c2d-4f96-8b0e-7a1d9c6e2fa2",
+  "kind": "connector",
+  "name": "PurchasingA",
+  "formatVersion": 1,
+  "baseUrl": { "binding": "PurchasingUrl" },
+  "auth": { "type": "bearer", "token": { "binding": "PurchasingToken" } },
+  "idempotency": "Idempotency-Key",
+  "operations": [
+    {
+      "name": "createOrder",
+      "method": "POST",
+      "path": "/purchase-orders",
+      "input": [{ "name": "title", "type": "text", "required": true }],
+      "output": [{ "name": "orderNumber", "type": "text" }]
+    }
+  ]
+}
