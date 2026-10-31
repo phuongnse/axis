@@ -4,7 +4,7 @@ Status: **Agreed**
 
 The owner agreed this on 2026-10-30. [D101](d101-the-extensibility-milestone-is-split-into-six.md) put
 "raising an event from an inbound endpoint call" in M19 without a design. This is that design. It adds to the
-`endpoint` resource of [D27](d27-inbound-endpoints.md). Everything here is _(planned for M19)_. See
+`endpoint` resource of [D27](d27-inbound-endpoints.md). It is built. See
 [endpoint resource](../reference/integration-resources.md#endpoint-resource) and
 [the call](../reference/inbound-endpoints.md).
 
