@@ -770,6 +770,8 @@ worker and the publisher serve the journey tenant too, and the run fails when th
 `Tenant journey is ready for work` or the publisher log lacks `journey ready`. The server output goes to
 `artifacts/logs/e2e-journey-server.log`.
 
+The tenant create spec also serves the tenant it creates: after `tenant create` it starts one more server in `Testing` with `Tenancy:Source=directory`, which reads `operator-made` from the tenant directory. It listens on https at `AXIS_E2E_TENANT_HTTPS_PORT` with a certificate that `scripts/e2e.sh` makes for each run, and stops when the test ends. The spec's browser maps `operator-made.localhost` on port 443 to that port and accepts the certificate, so a person signs in on the tenant host with no port in the address. No redirect address is added by hand: only `tenant create` writes them.
+
 `tests/e2e/specs/service-desk-journey.spec.ts` builds the service desk on the journey tenant with Studio only, and
 never opens the JSON view. It builds the whole data
 model: the application and its `Asia/Ho_Chi_Minh` time zone, its `en` and `vi` texts, the three roles, the `TicketNumber` sequence, the `Category` and
