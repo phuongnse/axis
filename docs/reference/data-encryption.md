@@ -89,15 +89,21 @@ Adding or removing `sensitive` or `exactLookup` is a schema change that activati
   - `platform.tenant_data_keys` holds the keys, one row per key: the tenant id, the `kind` (`data` or `lookup`), the
     key's `number` and the key, encrypted by the installation key as other secrets are.
   - The field name in the associated data is `data_key:` or `lookup_key:`, followed by the number.
+  - The stored text is the key's base64, and the field name makes the row fit its tenant, kind and number only.
   - `platform rekey` re-encrypts them with the other secrets.
 - **Under the configuration source.** `Tenants:{id}:DataKeys:{number}` and `Tenants:{id}:LookupKeys:{number}` hold the keys,
   base64-encoded. Development and the tests set them.
-- **When they are made.** `tenant create` makes data key 1 and lookup key 1. `tenant restore` takes them from the
-  archive. `migrate` makes them for a tenant that has none.
+- **When they are made.** `tenant create` makes data key 1 and lookup key 1. `migrate` makes them for a tenant that has
+  none. `tenant restore` takes them from the archive _(planned for M27)_. Until then a restored tenant has none, and
+  the next `migrate` makes them.
 - **No key, no write.** A host that finds no key for a tenant refuses to write a sensitive value, with a `500`
   problem and an error log line that names the tenant. It never writes a sensitive value in clear.
 - **Refresh.** Each host reads a tenant's keys when it first needs them, and again when a value names a number it
-  does not hold.
+  does not hold. The server and the worker do this through one key service. It gives the newest key of a kind for a
+  write and a key by number for a read, and it never logs a key.
+
+The key store, the settings, `tenant create`, `migrate`, the rekey and the refresh are built. Writing and reading
+`sensitive` values with the keys, `tenant restore` and the rotation below are _(planned for M27)_.
 
 ### Rotating the keys
 

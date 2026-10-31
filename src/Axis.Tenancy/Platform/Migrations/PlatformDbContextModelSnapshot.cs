@@ -121,6 +121,36 @@ namespace Axis.Tenancy.Platform.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Axis.Tenancy.Platform.TenantDataKeyRow", b =>
+                {
+                    b.Property<string>("TenantId")
+                        .HasColumnType("text")
+                        .HasColumnName("tenant_id");
+
+                    b.Property<string>("Kind")
+                        .HasColumnType("text")
+                        .HasColumnName("kind");
+
+                    b.Property<int>("Number")
+                        .HasColumnType("integer")
+                        .HasColumnName("number");
+
+                    b.Property<byte[]>("Key")
+                        .IsRequired()
+                        .HasColumnType("bytea")
+                        .HasColumnName("key");
+
+                    b.HasKey("TenantId", "Kind", "Number")
+                        .HasName("pk_tenant_data_keys");
+
+                    b.ToTable("tenant_data_keys", "platform", t =>
+                        {
+                            t.HasCheckConstraint("ck_tenant_data_keys_kind", "kind IN ('data', 'lookup')");
+
+                            t.HasCheckConstraint("ck_tenant_data_keys_number", "number >= 1");
+                        });
+                });
+
             modelBuilder.Entity("Axis.Tenancy.Platform.TenantHostRow", b =>
                 {
                     b.Property<string>("TenantId")
@@ -407,6 +437,16 @@ namespace Axis.Tenancy.Platform.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_tenant_bindings_tenants_tenant_id");
+                });
+
+            modelBuilder.Entity("Axis.Tenancy.Platform.TenantDataKeyRow", b =>
+                {
+                    b.HasOne("Axis.Tenancy.Platform.TenantRow", null)
+                        .WithMany()
+                        .HasForeignKey("TenantId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_tenant_data_keys_tenants_tenant_id");
                 });
 
             modelBuilder.Entity("Axis.Tenancy.Platform.TenantHostRow", b =>

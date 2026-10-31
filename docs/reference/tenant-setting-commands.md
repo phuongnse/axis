@@ -368,8 +368,10 @@ keys. It can be rotated without signing anyone out.
 - **Version.** Rekey raises the `version` of each tenant whose secrets it re-encrypted, so each
   host loads the new ciphertext at its next `Tenancy:RefreshInterval`. That refresh rebuilds the
   database pool and the sign-in client of each tenant once.
+- **Tenant keys.** Rekey re-encrypts each tenant's data keys and lookup keys in `platform.tenant_data_keys` with the
+  other tenant secrets, and counts them in `tenant secrets`.
 - **Locks.** The transaction takes an `EXCLUSIVE` lock on `platform.tenants`,
-  `platform.tenant_bindings` and `platform.data_protection_keys`. Another admin command, and a
+  `platform.tenant_bindings`, `platform.tenant_data_keys` and `platform.data_protection_keys`. Another admin command, and a
   server that stores a new data protection key, wait for the commit. Readers are not blocked.
 - **Audit record.** One record with no tenant. Its `changed` holds `tenant secrets: <n>` and
   `data protection keys: <m>`, never a value. It is written after every value has decrypted and

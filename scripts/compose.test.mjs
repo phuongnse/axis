@@ -323,6 +323,11 @@ test('the server and the publisher run on both database roles and the worker onl
   assert.match(publisher['Tenants__default-preview__ConnectionString'], /Database=axis_preview;Username=axis_preview_runtime;/)
   assert.match(publisher['Tenants__default-preview__SchemaConnectionString'], /Database=axis_preview;Username=axis_preview_schema;/)
   assert.match(worker['Tenants__default-preview__ConnectionString'], /Database=axis_preview;Username=axis_preview_runtime;/)
+  // The publisher reads no appsettings file, so it gets the development tenant keys itself.
+  for (const tenant of ['default', 'default-preview']) {
+    assert.equal(Buffer.from(publisher[`Tenants__${tenant}__DataKeys__1`], 'base64').length, 32)
+    assert.equal(Buffer.from(publisher[`Tenants__${tenant}__LookupKeys__1`], 'base64').length, 32)
+  }
   // Only the publisher gets the role that creates the databases of test scenarios.
   assert.match(publisher.Scenarios__ServerConnectionString, /Database=postgres;Username=axis_scenario;/)
   for (const [name, environment] of Object.entries({ server, worker })) {

@@ -256,17 +256,15 @@ The tables:
 | `platform.tenant_hosts`              | The tenant id, the host and `site_path`, the lower case path of the site the host belongs to, or null. The host is unique on `lower(host)` across all tenants, and a non-null `site_path` is unique per tenant                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
 | `platform.tenant_bindings`           | The tenant id, the binding name, the `kind` and the value: a URL for a `url` binding, an encrypted value for a `secret` binding. The name is unique per tenant ignoring letter case                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 | `platform.tenant_platform_providers` | The tenant id and the provider `name`, the primary key, the `type` (`oidc` or `saml`), the names of the issuer, client id, client secret, client key and metadata bindings, the claim names for the display name, email and locale, the roles claim and `role_values`, a `jsonb` object that maps a roles claim value to a platform role. It holds no secret. Rows go with their tenant                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| `platform.data_protection_keys`      | The key's `id`, its `friendly_name`, unique, and the encrypted key XML. The server only inserts rows and never updates or deletes one. `platform rekey` updates the encrypted XML. Every server replica reads them _(planned for M27)_ `platform.tenant_data_keys` holds each tenant's data keys and lookup key, see [data encryption](data-encryption.md#tenant-keys). |
+| `platform.data_protection_keys`      | The key's `id`, its `friendly_name`, unique, and the encrypted key XML. The server only inserts rows and never updates or deletes one. `platform rekey` updates the encrypted XML. Every server replica reads them.                                                                                                                                                     |
+| `platform.tenant_data_keys`          | The tenant id, the `kind` (`data` or `lookup`), the `number` and the encrypted key, the primary key together. The kind is checked, the number is at least 1, and a row goes with its tenant. `platform rekey` updates the encrypted key. See [data encryption](data-encryption.md#tenant-keys).                                                                         |
 | `platform.audit_records`             | The `id`, `occurred_at`, `command`, the `tenant_id`, which can be empty and has no foreign key, `os_user`, `machine` and `changed` (`text[]`), the names of what changed. Triggers reject every update, delete and truncate with SQLSTATE `23001`. Only `Axis.Admin` writes it, see [platform audit records](tenant-setting-commands.md#platform-audit-records)                                                                                                                                                                                                                                                                                                                                                                                                                                          |
 
-The tenant `version` grows on every change to the tenant, its hosts, its
-bindings or its platform providers.
+The tenant `version` grows on every change to the tenant, its hosts, its bindings or its platform providers.
 
-The `schema_version` is text. It is the id of the newest EF Core migration
-across the configuration, data and processes contexts that `Axis.Admin` applied
-to the tenant database, and it is empty until the first migration. A host serves
-a tenant only when this value is the one the host was built for, see
-[administration](administration.md#migrate).
+The `schema_version` is text. It is the id of the newest EF Core migration across the configuration, data and
+processes contexts that `Axis.Admin` applied to the tenant database, and it is empty until the first migration. A host
+serves a tenant only when this value is the one the host was built for, see [administration](administration.md#migrate).
 
 - **Where secrets are stored.** Each of these is stored encrypted, and nowhere
   else. The [cryptographic inventory](keys-and-data-protection.md#cryptographic-inventory)
@@ -280,6 +278,7 @@ a tenant only when this value is the one the host was built for, see
     `platform.tenants`, written by `tenant create`, see
     [keeping the realm in step](identity-provider.md#keeping-the-realm-in-step);
   - the value of a `secret` binding, in `platform.tenant_bindings`;
+  - the data keys and lookup keys of a tenant, in `platform.tenant_data_keys`;
   - the client keys of a tenant under the `fapi2` sign-in profile, in
     `platform.tenants`, with the field name `oidc_client_key` and the key id,
     see [FAPI 2.0 profile](security.md#fapi-20-profile).

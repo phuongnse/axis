@@ -32,7 +32,7 @@ public sealed class PlatformMigrationTests(PostgreSqlFixture database) : IClassF
             platform,
             "SELECT table_name FROM information_schema.tables WHERE table_schema = 'platform' ORDER BY table_name");
 
-        Assert.Equal(["__platform_migrations", "audit_records", "data_protection_keys", "tenant_bindings", "tenant_hosts", "tenant_platform_providers", "tenants"], tables);
+        Assert.Equal(["__platform_migrations", "audit_records", "data_protection_keys", "tenant_bindings", "tenant_data_keys", "tenant_hosts", "tenant_platform_providers", "tenants"], tables);
     }
 
     [Theory]
@@ -178,6 +178,23 @@ public sealed class PlatformMigrationTests(PostgreSqlFixture database) : IClassF
             UniqueViolation);
     }
 
+    [Fact]
+    public async Task A_tenant_key_needs_a_known_kind_a_number_from_1_and_a_tenant_and_leaves_with_its_tenant()
+    {
+        var platform = await StartServerAsync(directory: true);
+        await ExecuteAsync(platform, InsertTenant("one"));
+        await ExecuteAsync(platform, "INSERT INTO platform.tenant_data_keys (tenant_id, kind, number, key) VALUES ('one', 'data', 1, '\\x00')");
+
+        await AssertSqlStateAsync(platform, "INSERT INTO platform.tenant_data_keys (tenant_id, kind, number, key) VALUES ('one', 'data', 1, '\\x00')", UniqueViolation);
+        await AssertSqlStateAsync(platform, "INSERT INTO platform.tenant_data_keys (tenant_id, kind, number, key) VALUES ('one', 'other', 1, '\\x00')", PostgresErrorCodes.CheckViolation);
+        await AssertSqlStateAsync(platform, "INSERT INTO platform.tenant_data_keys (tenant_id, kind, number, key) VALUES ('one', 'lookup', 0, '\\x00')", PostgresErrorCodes.CheckViolation);
+        await AssertSqlStateAsync(platform, "INSERT INTO platform.tenant_data_keys (tenant_id, kind, number, key) VALUES ('two', 'lookup', 1, '\\x00')", PostgresErrorCodes.ForeignKeyViolation);
+
+        await ExecuteAsync(platform, "DELETE FROM platform.tenants WHERE id = 'one'");
+
+        Assert.Equal(0L, await ScalarAsync(platform, "SELECT count(*) FROM platform.tenant_data_keys"));
+    }
+
     [Theory]
     [InlineData(true)]
     [InlineData(false)]
@@ -219,7 +236,7 @@ public sealed class PlatformMigrationTests(PostgreSqlFixture database) : IClassF
             }));
         using var client = factory.CreateClient();
 
-        Assert.Equal(["__platform_migrations", "audit_records", "data_protection_keys", "tenant_bindings", "tenant_hosts", "tenant_platform_providers", "tenants"], probe.Tables);
+        Assert.Equal(["__platform_migrations", "audit_records", "data_protection_keys", "tenant_bindings", "tenant_data_keys", "tenant_hosts", "tenant_platform_providers", "tenants"], probe.Tables);
     }
 
     private async Task<string> StartServerAsync(bool directory)

@@ -311,6 +311,8 @@ while :; do
       Extensions__Path="$PWD/artifacts/extensions" \
       Modules__Path="$PWD/artifacts/modules" \
       Tenants__default__Hosts__0=localhost \
+      Tenants__default__DataKeys__1=AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE= \
+      Tenants__default__LookupKeys__1=AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI= \
       Tenants__default__Oidc__Authority="http://localhost:$keycloak_port/realms/axis" \
       Tenants__default__Realm__Name=axis \
       Tenants__default__Realm__ActivationClientSecret=axis-activation-development-secret \
@@ -332,6 +334,8 @@ while :; do
       Tenants__default__Bindings__CompanyClientSecret__Value=axis-broker-development-secret \
       'Tenants__default-preview__PreviewOf=default' \
       'Tenants__default-preview__Hosts__0=preview.localhost' \
+      'Tenants__default-preview__DataKeys__1=AwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwM=' \
+      'Tenants__default-preview__LookupKeys__1=BAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQ=' \
       "Tenants__default-preview__ConnectionString=Host=localhost;Port=$postgres_port;Database=axis_preview;Username=axis_preview_runtime;Password=axis" \
       "Tenants__default-preview__SchemaConnectionString=Host=localhost;Port=$postgres_port;Database=axis_preview;Username=axis_preview_schema;Password=axis" \
       "Scenarios__ServerConnectionString=Host=localhost;Port=$postgres_port;Database=postgres;Username=axis_scenario;Password=axis" \
