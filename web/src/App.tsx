@@ -5,6 +5,7 @@ import { ConsoleInstancePage } from './pages/ConsoleInstancePage'
 import { ConsolePage } from './pages/ConsolePage'
 import { HomePage } from './pages/HomePage'
 import { ShellError } from './pages/LocaleLoadFailed'
+import { LicencesPage } from './pages/LicencesPage'
 import { NotFoundPage } from './pages/NotFoundPage'
 import { PageRoute } from './pages/PageRoute'
 import { PlatformContext, usePlatform, type Platform, type PlatformTexts } from './pages/context'
@@ -158,6 +159,15 @@ function PlatformRoutes() {
         element={
           <PlatformShellRoute>
             <ConsoleInstancePage />
+          </PlatformShellRoute>
+        }
+      />
+      {/* Proposed: the Open source licences page, open without signing in. `licences` becomes a reserved site path. */}
+      <Route
+        path="licences"
+        element={
+          <PlatformShellRoute>
+            <LicencesPage />
           </PlatformShellRoute>
         }
       />

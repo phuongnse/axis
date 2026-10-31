@@ -500,3 +500,9 @@ async function fetchOrNull<T>(url: string, signal?: AbortSignal): Promise<T | nu
   }
   return (await response.json()) as T
 }
+
+/** Prototype only (design review 2026-10-30-studio), not to build: example links so every legal link shows under scripts/dev.sh. */
+export const developmentLegal: SiteLegal = {
+  privacyUrl: 'https://example.com/privacy',
+  termsUrl: 'https://example.com/terms',
+}

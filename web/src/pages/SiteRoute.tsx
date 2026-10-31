@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Navigate, Outlet, useParams } from 'react-router'
 import { readStoredLocale, storeLocale } from '../platform/locale'
 import { Shell } from '../platform/Shell'
-import { fetchApplicationSite, type ApplicationSite } from '../platform/site'
+import { developmentLegal, fetchApplicationSite, type ApplicationSite } from '../platform/site'
 import { useSignInNeeded } from '../platform/signInNeeded'
 import { TextProvider } from '../platform/TextProvider'
 import { fetchSiteTexts, type TextMap } from '../platform/texts'
@@ -146,7 +146,7 @@ function SiteShell({ path }: { path: string }) {
         locale={locale}
         onLocaleChange={changeLocale}
         notifications={site.notificationsPath ? { path: site.notificationsPath, sitePath: site.path } : undefined}
-        legal={site.legal}
+        legal={site.legal ?? (platform.development ? developmentLegal : undefined)}
       >
         {localeFailed && <LocaleLoadFailed onClose={() => setLocaleFailed(false)} />}
         <Outlet context={{ site, locale } satisfies SiteOutlet} />

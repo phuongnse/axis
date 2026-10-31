@@ -29,3 +29,6 @@ src/Axis.Server/wwwroot/
 
 deploy/compose/secrets/
 deploy/compose/server-tls/
+
+# Prototype only: the Open source licences data that scripts/licences.mjs writes
+web/public/licences.json

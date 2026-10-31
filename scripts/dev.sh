@@ -89,6 +89,10 @@ AXIS_POSTGRES_PORT="$postgres_port" AXIS_KEYCLOAK_PORT="$keycloak_port" AXIS_PUR
 # hold it. A Keycloak container that this script reuses gets the flow here too, and a realm that has it is not changed.
 log "Adding the axis first login flow to the axis realm"
 node scripts/lib/development-realm.mjs "http://localhost:$keycloak_port"
+# Prototype only (design review 2026-10-30-studio): the legal links that the realm sync is to write on each site.
+node scripts/lib/development-legal.mjs "http://localhost:$keycloak_port" "http://localhost:$web_port"
+# Prototype only: the data of the Open source licences page.
+node scripts/licences.mjs
 schema_connection=""
 # Bash cannot export a name with a hyphen, like Tenants__default-preview__ConnectionString. These
 # overrides reach the server and the worker through env instead.
