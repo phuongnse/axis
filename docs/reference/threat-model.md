@@ -843,7 +843,7 @@ flowchart LR
 | Id | Threat | Boundary | Category | Rating | Status | Evidence |
 | --- | --- | --- | --- | --- | --- | --- |
 | B3 | A workflow token pushes to `main` without the checks. | CI and secrets | Elevation of privilege | High | **Mitigated** | CI, CodeQL and Performance run with `contents: read`, and the [rules on main](../delivery.md#decisions) require NexKit's checks. NexKit's Actions token cannot push a change to `.github/workflows/`, because there is no push token. |
-| B6 | A secret, such as an agent's subscription token, leaks into a log or reaches a job that does not need it. | CI and secrets | Information disclosure | High | **Mitigated** | The CI, CodeQL and Performance workflows use no secret. `.github/workflows/nexkit.yml` says the NexKit pipeline passes each job only the secrets that `.nexkit/config.json` names for it. |
+| B6 | A secret, such as an agent's subscription token, leaks into a log or reaches a job that does not need it. | CI and secrets | Information disclosure | High | **Mitigated** | The CI, CodeQL, Performance and Load test workflows use no secret. `.github/workflows/nexkit.yml` says the NexKit pipeline passes each job only the secrets that `.nexkit/config.json` names for it. |
 
 Spoofing does not apply to a workflow run, which signs in no one and acts through its own token. Denial of service on the runners is rated in B9.
 
