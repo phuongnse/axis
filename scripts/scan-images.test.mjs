@@ -59,10 +59,11 @@ beforeEach(() => {
   writeFileSync(trivyLog, '')
 })
 
-// The accepted-list fixtures count their days back from this date.
+// The accepted-list fixtures count their days back from this date. The tests never read the real
+// accepted list, whose entries change with each scan and would not fit this date.
 const today = '2026-10-28'
 
-function scan({ trivy = 'trivy-clean.json', accepted, ...env } = {}) {
+function scan({ trivy = 'trivy-clean.json', accepted = 'accepted-empty.json', ...env } = {}) {
   return spawnSync('bash', [script], {
     encoding: 'utf8',
     env: {
@@ -74,9 +75,7 @@ function scan({ trivy = 'trivy-clean.json', accepted, ...env } = {}) {
       TRIVY_LOG: trivyLog,
       AXIS_RETRY_DELAY_SECONDS: '0',
       SCAN_TODAY: today,
-      SCAN_IMAGES_ACCEPTED: accepted
-        ? `${fixtures}${accepted}`
-        : path.join(path.dirname(script), 'scan-images-accepted.json'),
+      SCAN_IMAGES_ACCEPTED: `${fixtures}${accepted}`,
       ...env,
     },
   })
