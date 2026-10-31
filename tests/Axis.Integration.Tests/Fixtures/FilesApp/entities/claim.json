@@ -5,6 +5,7 @@
   "formatVersion": 1,
   "fields": [
     { "name": "title", "type": "text" },
+    { "name": "code", "type": "text", "unique": true, "maxLength": 20 },
     { "name": "note", "type": "text", "sensitive": true },
     { "name": "receipt", "type": "file", "maxSize": 1024, "accept": ["application/pdf", "image/*"] },
     { "name": "attachments", "type": "child-collection", "target": "ClaimAttachment" }

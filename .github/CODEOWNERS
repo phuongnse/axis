@@ -4,6 +4,9 @@
 /src/Axis.Server/Authentication/RouteAuthorization.cs @phuongnse
 /scripts/scan-accepted.json @phuongnse
 /scripts/scan.mjs @phuongnse
+/scripts/scan-images-accepted.json @phuongnse
+/scripts/scan-images.mjs @phuongnse
+/scripts/lib/accepted-findings.mjs @phuongnse
 /scripts/check-docs.mjs @phuongnse
 /scripts/check-raw-html.mjs @phuongnse
 /scripts/check-prototype-pollution.mjs @phuongnse

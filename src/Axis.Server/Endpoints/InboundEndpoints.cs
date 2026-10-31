@@ -78,6 +78,7 @@ internal static class InboundEndpoints
         ActiveApplicationResolver resolver,
         TenantDatabase database,
         ITenantContextAccessor tenants,
+        SensitiveValues sensitive,
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
@@ -89,7 +90,7 @@ internal static class InboundEndpoints
         // A release change under the start lock sends the call back to resolution, so every check runs on the new release.
         for (var attempt = 0; attempt < ReleaseRetry.MaxAttempts; attempt++)
         {
-            var call = await CallOnceAsync(app, name, request, caller, resolver, database, tenants, loggerFactory, cancellationToken);
+            var call = await CallOnceAsync(app, name, request, caller, resolver, database, tenants, sensitive, loggerFactory, cancellationToken);
             if (call.Committed is not { } committed)
             {
                 if (call.Result is { } result)
@@ -114,7 +115,7 @@ internal static class InboundEndpoints
     private sealed record CallAttempt(IResult? Result = null, CommittedCall? Committed = null);
 
     /// <summary>The call as committed, for the wait that follows.</summary>
-    private sealed record CommittedCall(ApplicationModel Application, EntityModel Entity, EndpointModel Endpoint, Guid RecordId, Guid InstanceId);
+    private sealed record CommittedCall(ApplicationModel Application, EntityModel Entity, EndpointModel Endpoint, Guid RecordId, Guid InstanceId, RecordCipher Cipher);
 
     private static async Task<CallAttempt> CallOnceAsync(
         string app,
@@ -124,6 +125,7 @@ internal static class InboundEndpoints
         ActiveApplicationResolver resolver,
         TenantDatabase database,
         ITenantContextAccessor tenants,
+        SensitiveValues sensitive,
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
@@ -173,6 +175,7 @@ internal static class InboundEndpoints
         }
 
         var tenantId = (tenants.Current ?? throw new InvalidOperationException("No tenant context is set.")).TenantId;
+        var cipher = new RecordCipher(sensitive, tenantId);
         var details = new JsonObject { ["endpoint"] = endpoint.Name };
         var recordId = Guid.CreateVersion7();
         Guid? instanceId = process is null ? null : Guid.CreateVersion7();
@@ -203,7 +206,7 @@ internal static class InboundEndpoints
                 var receipt = await EndpointReceipts.FindAsync(
                     connection, application.Manifest.Id, endpoint.Id, caller.Id, key, input, cancellationToken)
                     ?? throw new InvalidOperationException("The receipt of a claimed Idempotency-Key could not be found.");
-                return new(await RepeatAsync(connection, application, entity, endpoint, receipt, cancellationToken));
+                return new(await RepeatAsync(connection, application, entity, endpoint, receipt, cipher, cancellationToken));
             }
         }
 
@@ -232,7 +235,7 @@ internal static class InboundEndpoints
             return new(Results.ValidationProblem(failures));
         }
 
-        var result = await RecordCommands.CreateAsync(connection, application, entity, active.ReleaseId, computed.Values, computed.Rows, id: recordId, cancellationToken: cancellationToken);
+        var result = await RecordCommands.CreateAsync(connection, application, entity, active.ReleaseId, computed.Values, computed.Rows, id: recordId, cipher: cipher, cancellationToken: cancellationToken);
         if (result is not { Outcome: RecordWriteOutcome.Written, Record: { } record })
         {
             await transaction.RollbackAsync(cancellationToken);
@@ -327,13 +330,13 @@ internal static class InboundEndpoints
 
         return endpoint.Wait is null
             ? new(Results.Json(new EndpointCallResponse(record.Id, startedInstanceId, ProcessStarts.Running), statusCode: StatusCodes.Status201Created))
-            : new(Committed: new CommittedCall(application, entity, endpoint, record.Id, startedInstanceId));
+            : new(Committed: new CommittedCall(application, entity, endpoint, record.Id, startedInstanceId, cipher));
     }
 
     // Holds no connection between checks. The transaction of the attempt is already disposed.
     private static async Task<IResult> WaitAsync(TenantDatabase database, CommittedCall call, CancellationToken cancellationToken)
     {
-        var (application, entity, endpoint, recordId, instanceId) = call;
+        var (application, entity, endpoint, recordId, instanceId, cipher) = call;
         var wait = endpoint.Wait!.Value;
         await database.ReleaseConnectionAsync();
         var state = ProcessStarts.Running;
@@ -345,7 +348,7 @@ internal static class InboundEndpoints
             state = (await ProcessStarts.FindInstanceAsync(polled, instanceId, cancellationToken))?.State ?? state;
             if (state == ProcessStarts.Completed)
             {
-                var output = await ReadOutputAsync(polled, application, entity, endpoint, recordId, cancellationToken);
+                var output = await ReadOutputAsync(polled, application, entity, endpoint, recordId, cipher, cancellationToken);
                 await database.ReleaseConnectionAsync();
                 return Results.Json(new EndpointCallResponse(recordId, instanceId, state, output), statusCode: StatusCodes.Status201Created);
             }
@@ -372,6 +375,7 @@ internal static class InboundEndpoints
         EntityModel entity,
         EndpointModel endpoint,
         EndpointReceipt receipt,
+        RecordCipher cipher,
         CancellationToken cancellationToken)
     {
         if (!receipt.SameInput)
@@ -395,7 +399,7 @@ internal static class InboundEndpoints
 
         if (state == ProcessStarts.Completed)
         {
-            var output = await ReadOutputAsync(connection, application, entity, endpoint, receipt.RecordId, cancellationToken);
+            var output = await ReadOutputAsync(connection, application, entity, endpoint, receipt.RecordId, cipher, cancellationToken);
             return Results.Json(new EndpointCallResponse(receipt.RecordId, instanceId, state, output), statusCode: StatusCodes.Status201Created);
         }
 
@@ -412,6 +416,8 @@ internal static class InboundEndpoints
         HttpRequest request,
         ActiveApplicationResolver resolver,
         TenantDatabase database,
+        SensitiveValues sensitive,
+        ITenantContextAccessor tenants,
         CancellationToken cancellationToken)
     {
         if (await FindCallerAsync(request) is not { } caller)
@@ -451,7 +457,7 @@ internal static class InboundEndpoints
         }
 
         var output = instance.State == ProcessStarts.Completed && application.FindEntity(endpoint.Entity.Id) is { } entity
-            ? await ReadOutputAsync(connection, application, entity, endpoint, subjectId, cancellationToken)
+            ? await ReadOutputAsync(connection, application, entity, endpoint, subjectId, RecordEndpoints.Cipher(sensitive, tenants), cancellationToken)
             : null;
         return Results.Ok(new EndpointCallResponse(subjectId, id, instance.State, output));
     }
@@ -466,10 +472,11 @@ internal static class InboundEndpoints
         EntityModel entity,
         EndpointModel endpoint,
         Guid recordId,
+        RecordCipher cipher,
         CancellationToken cancellationToken)
     {
         if (endpoint.Output is not { } fields
-            || await RecordQueries.GetAsync(connection, application, entity, recordId, cancellationToken) is not { } record)
+            || await RecordQueries.GetAsync(connection, application, entity, recordId, cipher, cancellationToken) is not { } record)
         {
             return null;
         }

@@ -66,8 +66,8 @@ the `IdentityProvider` settings or `AXIS_OIDC_CLIENT_SECRET`.
 `Platform:PreviousSecretKey`. It needs no admin role, no client secret and no `Tenancy:Source`.
 
 The `tenant binding`, `tenant host` and `tenant email` commands read `ConnectionStrings:PlatformSchema` and
-need `Tenancy:Source=directory`. Only `tenant binding set --secret` and the two `tenant email` commands
-also read `Platform:SecretKey`, because they encrypt, or, for `tenant email`, decrypt the password to copy it into the realm. See
+need `Tenancy:Source=directory`. Only `tenant binding set --secret`, the three `tenant host` commands and the two `tenant email` commands
+also read `Platform:SecretKey`, because they encrypt, or, for `tenant host` and `tenant email`, decrypt the realm's activation secret to write the realm. See
 [tenant setting commands](tenant-setting-commands.md).
 `tenant session end` reads `ConnectionStrings:PlatformSchema` and `Platform:SecretKey`, because it connects to the tenant database as the schema role, and needs `Tenancy:Source=directory`. It needs no admin role.
 
@@ -137,13 +137,13 @@ The command creates the tenant's realm in
 [Axis's identity provider](identity-provider.md#keeping-the-realm-in-step), with its three clients, and sets the
 tenant's `Oidc` block to the realm itself: the authority `<IdentityProvider:Url>/realms/<id>` and the client `axis`.
 The command takes no `--oidc-*` option, and either one is a usage error. It does not read `AXIS_OIDC_CLIENT_SECRET`.
-The admin host's `IdentityProvider` settings give it the identity provider's admin client. The realm has no
-redirect addresses yet, so nobody can finish a sign-in there until M28 keeps them in step. With `--administrator <email>`, the realm gets one invited account. Its emailed link
+The admin host's `IdentityProvider` settings give it the identity provider's admin client. The command sets the
+platform client's redirect addresses from the hosts it is given, so a person can finish a sign-in on each of them. With `--administrator <email>`, the realm gets one invited account. Its emailed link
 names no address to return to, so the person can set a password and an authenticator and cannot yet sign in to Axis.
 
 The command also turns accounts on in the tenant's
 [platform sign-in](identity-provider.md#platform-sign-in).
-_(planned for M28)_ `tenant host add`, `remove` and `move` do not yet change the realm, see
+`tenant host add`, `remove` and `move` keep those addresses in step, see
 [keeping the realm in step](identity-provider.md#keeping-the-realm-in-step). A preview tenant gets no realm.
 
 **Preview tenant.** With `--preview-of`, the command creates

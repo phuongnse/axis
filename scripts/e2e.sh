@@ -102,7 +102,7 @@ fi
 image="postgres:18-alpine"
 container="axis-e2e-postgres-$$"
 password="e2e-$RANDOM$RANDOM"
-keycloak_image="quay.io/keycloak/keycloak:26.4"
+keycloak_image="quay.io/keycloak/keycloak:26.8"
 keycloak_container="axis-e2e-keycloak-$$"
 mailpit_image="axllent/mailpit:v1.32.0"
 mailpit_container="axis-e2e-mailpit-$$"

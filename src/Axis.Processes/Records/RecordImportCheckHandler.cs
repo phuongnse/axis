@@ -38,6 +38,7 @@ internal sealed record RecordImportSettings(int MaxRows);
 internal sealed partial class RecordImportCheckHandler(
     ReleaseModelCache models,
     RecordImportSettings settings,
+    SensitiveValues sensitive,
     ILoggerFactory loggerFactory,
     ILogger<RecordImportCheckHandler> logger) : IExternalWorkItemHandler
 {
@@ -74,7 +75,7 @@ internal sealed partial class RecordImportCheckHandler(
         else
         {
             var now = await RecordQueries.TransactionTimeAsync(connection, cancellationToken);
-            await CheckAsync(connection, transaction, application, entity, new RecordActor(import.UploaderId, import.UploaderRoles), import.Key, import.Format, import.File ?? [], now, errors, cancellationToken);
+            await CheckAsync(connection, transaction, application, entity, new RecordActor(import.UploaderId, import.UploaderRoles), import.Key, import.Format, import.File ?? [], now, new RecordCipher(sensitive, item.TenantId), errors, cancellationToken);
         }
 
         await RecordImports.FinishCheckAsync(
@@ -98,6 +99,7 @@ internal sealed partial class RecordImportCheckHandler(
         string format,
         byte[] file,
         DateTimeOffset now,
+        RecordCipher cipher,
         Dictionary<string, string[]> errors,
         CancellationToken cancellationToken)
     {
@@ -170,6 +172,7 @@ internal sealed partial class RecordImportCheckHandler(
                     actor,
                     columns.Body(resolved, key!.Index, match.Version),
                     now,
+                    cipher,
                     loggerFactory,
                     cancellationToken);
                 if (update?.Errors is { } updateErrors)

@@ -46,12 +46,12 @@ internal sealed class ScenarioWork : IDisposable
         var settings = new ConnectorCallSettings(false);
         _client = new ConnectorClient(stubs.HttpHandler);
         _transport = new PackageHttpTransport();
-        var handler = new ProcessStepHandler(models, packages, null, loggerFactory.CreateLogger<ProcessStepHandler>());
+        var handler = new ProcessStepHandler(models, packages, null, null, loggerFactory.CreateLogger<ProcessStepHandler>());
         var timerHandler = new ProcessTimerHandler(models, loggerFactory.CreateLogger<ProcessTimerHandler>());
         IExternalWorkItemHandler[] externalHandlers =
         [
-            new ConnectorCallHandler(models, bindings, _client, new ScenarioTokens(), settings, loggerFactory.CreateLogger<ConnectorCallHandler>()),
-            new PackageCallHandler(models, packages, bindings, settings, _transport, loggerFactory.CreateLogger<PackageCallHandler>(), stubs.CreateOperation),
+            new ConnectorCallHandler(models, bindings, _client, new ScenarioTokens(), settings, null, loggerFactory.CreateLogger<ConnectorCallHandler>()),
+            new PackageCallHandler(models, packages, bindings, settings, _transport, null, loggerFactory.CreateLogger<PackageCallHandler>(), stubs.CreateOperation),
             new EventDeliveryHandler(models, new DeliverySettings(5), loggerFactory.CreateLogger<EventDeliveryHandler>()),
         ];
         var resume = new ProcessResumeHandler(models, loggerFactory.CreateLogger<ProcessResumeHandler>());
