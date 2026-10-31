@@ -191,7 +191,9 @@ public sealed class StudioNamesTests : IAsyncLifetime
     {
         var names = await NamesAsync("BrokenRequests");
 
-        Assert.Empty(names.GetProperty("processes").EnumerateArray());
+        // Only the process of the department-budgets module resolves, the application's own process does not.
+        var process = Assert.Single(names.GetProperty("processes").EnumerateArray());
+        Assert.Equal("department-budgets/BudgetApproval", process.GetProperty("name").GetString());
         Named(names, "entities", "PurchaseRequest");
         Named(names, "roles", "employee");
     }

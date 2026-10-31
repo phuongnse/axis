@@ -43,6 +43,10 @@
       "pattern": "^[A-Za-z][A-Za-z0-9]*$",
       "maxLength": 60
     },
+    "qualifiedName": {
+      "type": "string",
+      "pattern": "^([A-Za-z][A-Za-z0-9]*|[a-z][a-z0-9-]*/[A-Za-z][A-Za-z0-9]*)$"
+    },
     "roleName": {
       "type": "string",
       "pattern": "^[a-z][a-z0-9-]*$",
@@ -126,11 +130,11 @@
             "advanceTime"
           ]
         },
-        "entity": { "$ref": "#/$defs/name", "x-axis-reference": "entity" },
+        "entity": { "$ref": "#/$defs/qualifiedName", "x-axis-reference": "entity" },
         "record": { "$ref": "#/$defs/reference" },
         "save": { "$ref": "#/$defs/reference" },
         "as": { "$ref": "#/$defs/reference" },
-        "process": { "$ref": "#/$defs/name", "x-axis-reference": "process" },
+        "process": { "$ref": "#/$defs/qualifiedName", "x-axis-reference": "process" },
         "step": { "$ref": "#/$defs/name", "x-axis-reference": { "part": "step", "of": "1/process" } },
         "outcome": { "$ref": "#/$defs/name", "x-axis-reference": { "part": "outcome", "of": "1/step" } },
         "state": { "enum": ["running", "waiting", "completed", "failed", "open"] },

@@ -1,0 +1,36 @@
+{
+  "id": "94f1cc25-6a68-435f-9383-36fc43aae860",
+  "kind": "process",
+  "name": "BudgetApproval",
+  "formatVersion": 1,
+  "entity": "Budget",
+  "start": "review",
+  "steps": [
+    {
+      "name": "review",
+      "type": "task",
+      "label": { "textKey": "department-budgets.budgetApproval.review" },
+      "assignee": { "role": "approver" },
+      "form": "BudgetReview",
+      "outcomes": [
+        { "name": "approve", "label": { "textKey": "department-budgets.budgetApproval.approve" }, "next": "markApproved" },
+        { "name": "reject", "label": { "textKey": "department-budgets.budgetApproval.reject" }, "next": "markRejected" }
+      ]
+    },
+    {
+      "name": "markApproved",
+      "type": "operation",
+      "operation": "updateRecord",
+      "set": { "status": "'approved'" },
+      "next": "done"
+    },
+    {
+      "name": "markRejected",
+      "type": "operation",
+      "operation": "updateRecord",
+      "set": { "status": "'rejected'" },
+      "next": "done"
+    },
+    { "name": "done", "type": "end" }
+  ]
+}

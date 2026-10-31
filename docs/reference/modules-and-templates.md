@@ -66,10 +66,12 @@ calls `IsDepartmentCode`, so a department code must be in capital letters.
 It has a `manager` role slot, labelled in `en` and `vi`, and a `ManagerAccess` module
 policy for the slot. The policy lets the role read the departments whose `manager` is the
 current user, and read the `Departments` data source. The leave request sample maps the
-slot to its `department-manager` role.
-`scripts/build.sh`, `scripts/dev.sh` and the E2E run install it under
-`artifacts/modules/departments/1.1.0/`, and the Compose images hold it in
-`/modules`. The server and the worker read it through `Modules:Path`.
+slot to its `department-manager` role, and so does the purchase request sample.
+`department-budgets` is the second sample module, see
+[Processes, pages, policies and dependencies](#processes-pages-policies-and-dependencies).
+`scripts/build.sh`, `scripts/dev.sh` and the E2E run install them under
+`artifacts/modules/departments/1.1.0/` and `artifacts/modules/department-budgets/1.0.0/`, and the
+Compose images hold them in `/modules`. The server and the worker read them through `Modules:Path`.
 
 - **Manifest.** `module.json` has `kind: module`, an `id` (lower-case letters,
   digits and `-`, starting with a letter), a SemVer `version`, a `label` and an
@@ -254,7 +256,7 @@ permissions, triggers and outside calls, and build on other modules, as
 [D89](../decisions/d89-modules-that-hold-processes-pages-and-policies-and-depend-on-other-modules.md)
 and [D103](../decisions/d103-modules-hold-triggers-scenarios-and-connector-slots.md) agree. It replaces the two limits above: the kinds a module may hold, and no
 dependencies. Dependencies (the `modules` list with the slot maps), resolving the graph, one
-copy each, what the application names, and what a module names and calls of the modules it declares are built, and so are module pages. The rest of this section is planned.
+copy each, what the application names, and what a module names and calls of the modules it declares are built, and so are module pages. The `department-budgets` sample module and its use by the purchase request sample are built too. The rest of this section is planned.
 
 ```json
 {
@@ -267,10 +269,13 @@ copy each, what the application names, and what a module names and calls of the 
 }
 ```
 
-`department-budgets` is the sample module that the purchase request sample
-declares, as
+`department-budgets` is the sample module, `samples/modules/department-budgets`, that the
+purchase request sample declares, as
 [D94](../decisions/d94-purchase-requests-prove-the-extensibility-milestone.md)
-agrees. An application that declares it maps the slot to one of its own roles:
+agrees. It holds a `Budget` entity with a name, a `departments/Department` reference, a year, an
+amount and a status, a `BudgetReview` form, a `Budgets` data source and page, a `BudgetApproval`
+process whose `review` task goes to `approver`, an `ApproverAccess` policy and `en` and `vi` texts.
+An application that declares it maps the slot to one of its own roles:
 
 ```json
 "modules": [

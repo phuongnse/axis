@@ -1,0 +1,15 @@
+{
+  "id": "372cf999-b3a9-4b83-abfd-9b05f61ceeb4",
+  "kind": "entity",
+  "name": "Budget",
+  "formatVersion": 1,
+  "label": { "textKey": "department-budgets.budget.label" },
+  "displayField": "name",
+  "fields": [
+    { "name": "name", "type": "text", "required": true, "maxLength": 100, "label": { "textKey": "department-budgets.budget.name" } },
+    { "name": "department", "type": "reference", "target": "departments/Department", "required": true, "label": { "textKey": "department-budgets.budget.department" } },
+    { "name": "year", "type": "integer", "required": true, "label": { "textKey": "department-budgets.budget.year" } },
+    { "name": "amount", "type": "decimal", "precision": 18, "scale": 2, "required": true, "label": { "textKey": "department-budgets.budget.amount" } },
+    { "name": "status", "type": "enum", "values": ["draft", "approved", "rejected"], "label": { "textKey": "department-budgets.budget.status" } }
+  ]
+}

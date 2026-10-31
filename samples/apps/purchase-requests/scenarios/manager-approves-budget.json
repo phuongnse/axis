@@ -1,0 +1,56 @@
+{
+  "id": "e66c1415-6219-4e0d-9d4a-65db373d2e3d",
+  "kind": "scenario",
+  "name": "ManagerApprovesBudget",
+  "formatVersion": 1,
+  "now": "2026-10-01T09:00:00Z",
+  "users": {
+    "manager": ["department-manager"],
+    "requester": ["employee"]
+  },
+  "steps": [
+    {
+      "type": "createRecord",
+      "entity": "department-budgets/Budget",
+      "as": "requester",
+      "expect": "denied",
+      "values": {
+        "name": "Engineering 2027",
+        "department": "949c1d11-aaba-44aa-b0d1-6c9d659d6bd5",
+        "year": 2027,
+        "amount": 50000,
+        "status": "draft"
+      }
+    },
+    {
+      "type": "createRecord",
+      "entity": "department-budgets/Budget",
+      "as": "manager",
+      "save": "budget",
+      "values": {
+        "name": "Engineering 2027",
+        "department": "949c1d11-aaba-44aa-b0d1-6c9d659d6bd5",
+        "year": 2027,
+        "amount": 50000,
+        "status": "draft"
+      }
+    },
+    { "type": "startProcess", "process": "department-budgets/BudgetApproval", "record": "budget", "as": "manager" },
+    {
+      "type": "completeTask",
+      "record": "budget",
+      "step": "review",
+      "outcome": "approve",
+      "as": "requester",
+      "expect": "denied"
+    },
+    { "type": "completeTask", "record": "budget", "step": "review", "outcome": "approve", "as": "manager" },
+    {
+      "type": "expectInstance",
+      "process": "department-budgets/BudgetApproval",
+      "record": "budget",
+      "state": "completed"
+    },
+    { "type": "expectRecord", "record": "budget", "values": { "status": "approved" } }
+  ]
+}

@@ -161,7 +161,7 @@ Purchase requests prove the extensibility milestones, M19 to M23, as
 and [D101](decisions/d101-the-extensibility-milestone-is-split-into-six.md)
 agree. Each step ends the milestone that builds it.
 
-1. _(planned for M20)_ The application declares the `department-budgets`
+1. The application declares the `department-budgets`
    module, which depends on the `departments` module, and maps its approver
    slot to the manager role.
 2. _(planned for M22)_ The author drags a packaged "budget usage" widget onto

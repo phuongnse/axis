@@ -448,8 +448,8 @@ public sealed class StudioEndpointTests : IAsyncLifetime
         File.WriteAllText(
             applicationPath,
             File.ReadAllText(applicationPath).Replace(
-                "\"formatVersion\": 1,",
-                "\"formatVersion\": 1,\n  \"modules\": [{ \"id\": \"cost-centers\", \"version\": \"^1.0.0\" }],",
+                "\"modules\": [",
+                "\"modules\": [{ \"id\": \"cost-centers\", \"version\": \"^1.0.0\" },",
                 StringComparison.Ordinal));
         var withoutModules = ApplicationCompiler.Compile(Folder, SamplePackages.Versions).Diagnostics;
         Assert.Contains(withoutModules, diagnostic => diagnostic.Code == DiagnosticCodes.UnknownModule);

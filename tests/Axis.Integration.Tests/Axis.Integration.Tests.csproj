@@ -59,6 +59,7 @@
     <None Include="..\..\samples\apps\service-desk\**\*" Link="Samples\service-desk\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\samples\apps\asset-management\**\*" Link="Samples\asset-management\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\samples\modules\departments\**\*" Link="SampleModules\departments\1.1.0\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\samples\modules\department-budgets\**\*" Link="SampleModules\department-budgets\1.0.0\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\samples\templates\request-approval\**\*" Link="SampleTemplates\request-approval\1.0.0\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\samples\keycloak\axis-realm.json" Link="Keycloak\axis-realm.json" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\samples\keycloak\company-realm.json" Link="Keycloak\company-realm.json" CopyToOutputDirectory="PreserveNewest" />

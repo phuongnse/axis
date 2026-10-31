@@ -1,0 +1,21 @@
+{
+  "id": "993a4113-6bb1-4f65-9414-f4f4156e5cf2",
+  "kind": "text",
+  "name": "TextsVi",
+  "formatVersion": 1,
+  "locale": "vi",
+  "texts": {
+    "department-budgets.budget.label": "Ngân sách",
+    "department-budgets.budget.name": "Tên",
+    "department-budgets.budget.department": "Phòng ban",
+    "department-budgets.budget.year": "Năm",
+    "department-budgets.budget.amount": "Số tiền",
+    "department-budgets.budget.status": "Trạng thái",
+    "department-budgets.budgetReview.title": "Ngân sách",
+    "department-budgets.pages.budgets.title": "Ngân sách",
+    "department-budgets.budgetApproval.review": "Xem xét ngân sách",
+    "department-budgets.budgetApproval.approve": "Phê duyệt",
+    "department-budgets.budgetApproval.reject": "Từ chối",
+    "department-budgets.roles.approver": "Người phê duyệt ngân sách"
+  }
+}

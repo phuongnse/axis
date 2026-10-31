@@ -14,6 +14,7 @@
     { "page": "RequestsByDepartment", "label": { "textKey": "nav.requestsByDepartment" }, "icon": "chart" },
     { "page": "Departments", "label": { "textKey": "nav.departments" }, "icon": "people" },
     { "page": "Suppliers", "label": { "textKey": "nav.suppliers" } },
+    { "page": "department-budgets/Budgets", "label": { "textKey": "nav.budgets" } },
     { "page": "Approvals", "label": { "textKey": "nav.approvals" }, "icon": "process" }
   ]
 }
