@@ -1,5 +1,6 @@
 import { Alert, Card, Flex, Result, Select, Table, Tag } from 'antd'
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router'
 import {
   fetchConsoleFailedWork,
   fetchConsoleTenant,
@@ -167,7 +168,15 @@ export function ConsolePage() {
                   dataIndex: 'process',
                   render: (value: string | null) => value ?? <EmptyDash />,
                 },
-                { title: t('shell.console.failedWork.instance'), dataIndex: 'instanceId' },
+                {
+                  title: t('shell.console.failedWork.instance'),
+                  dataIndex: 'instanceId',
+                  render: (value: string) => (
+                    <Link to={`/console/instances/${value}`} data-testid={`console-failed-work-open-${value}`}>
+                      {value}
+                    </Link>
+                  ),
+                },
                 {
                   title: t('shell.console.failedWork.stepOrCall'),
                   render: (_: unknown, row: ConsoleFailedWorkItem) =>

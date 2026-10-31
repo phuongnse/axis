@@ -1,5 +1,8 @@
 import { apiFetch } from './api'
 
+/** The path of `GET /api/console/instances/{id}`, which answers an instance in the shape of the process inspector's. */
+export const consoleInstancesPath = '/api/console/instances'
+
 /** One application of the tenant with its active release, as served by `GET /api/console/tenant`. */
 export interface ConsoleApplication {
   id: string
