@@ -157,3 +157,21 @@ export async function resendInvitation(id: string): Promise<'ok' | 'forbidden' |
   }
   return 'ok'
 }
+
+/** A command on a person, named as its route `POST /api/users/{id}/{command}`. */
+export type UserCommand = 'disable' | 'enable' | 'reset-authenticator'
+
+/** Runs a command on a person. `forbidden` is, for disable, a login that is not recent, and `conflict` is disabling oneself. */
+export async function runUserCommand(id: string, command: UserCommand): Promise<'ok' | 'forbidden' | 'conflict'> {
+  const response = await apiFetch(`/api/users/${encodeURIComponent(id)}/${command}`, { method: 'POST' })
+  if (response.status === 403) {
+    return 'forbidden'
+  }
+  if (response.status === 409) {
+    return 'conflict'
+  }
+  if (!response.ok) {
+    throw new Error(`Running ${command} failed with status ${response.status}.`)
+  }
+  return 'ok'
+}
