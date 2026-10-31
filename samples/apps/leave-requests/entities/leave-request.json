@@ -4,7 +4,7 @@
   "name": "LeaveRequest",
   "formatVersion": 1,
   "label": { "textKey": "leaveRequest.label" },
-  "displayField": "reason",
+  "displayField": "title",
   "fields": [
     {
       "name": "number",
@@ -14,6 +14,7 @@
       "sequence": "LeaveRequestNumber",
       "label": { "textKey": "leaveRequest.number" }
     },
+    { "name": "title", "type": "text", "required": true, "maxLength": 100, "label": { "textKey": "leaveRequest.title" } },
     { "name": "employee", "type": "text", "maxLength": 100, "creator": true, "label": { "textKey": "leaveRequest.employee" } },
     {
       "name": "department",
@@ -37,7 +38,7 @@
       "expression": "daysBetween(firstDay, lastDay) + 1",
       "label": { "textKey": "leaveRequest.days" }
     },
-    { "name": "reason", "type": "text", "required": true, "maxLength": 500, "label": { "textKey": "leaveRequest.reason" } },
+    { "name": "reason", "type": "text", "required": true, "sensitive": true, "maxLength": 500, "label": { "textKey": "leaveRequest.reason" } },
     {
       "name": "status",
       "type": "enum",

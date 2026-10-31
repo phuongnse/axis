@@ -201,6 +201,10 @@ that reads a record holding a stored sensitive value fails. Activation's inline 
 `computed.backfill` do not use the cipher either: on an entity that holds a stored sensitive value they fail and write
 nothing, until they do _(planned for M27)_.
 
+The leave request sample marks its `reason` `sensitive` and shows each request by a required `title`, its display
+field, because a sensitive field cannot be one. The department manager reads the reason on the review task, and another
+employee gets no record, task or task form state. Test: `tests/e2e/specs/leave-request.spec.ts`.
+
 ### Rotating the keys
 
 `tenant data-key rotate <id>` adds the next data key and the next lookup key. Then, one table at a time and each in a

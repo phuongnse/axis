@@ -10,7 +10,7 @@
       "entity": "LeaveRequest",
       "actions": ["create", "update"],
       "filter": "employee == currentUser() and status in ('draft', 'returned')",
-      "fields": ["department", "leaveType", "firstDay", "lastDay", "reason", "status"]
+      "fields": ["title", "department", "leaveType", "firstDay", "lastDay", "reason", "status"]
     },
     { "entity": "departments/Department", "actions": ["read"] },
     { "dataSource": "departments/Departments", "actions": ["read"] },

@@ -10,13 +10,14 @@ import { sessionFile, useSession, type SampleUser } from "../sessions";
 // straight to the API, so a hidden button never stands in for the server's check.
 //
 // Specs run in parallel against one database, so each test looks only for the requests it creates. Every
-// request gets its own reason, which is its display field, so the reason finds its task. requester and employee are employees. manager-2 manages
+// request gets its own title, which is its display field, so the title finds its task. The reason is
+// sensitive, so it cannot be the label. requester and employee are employees. manager-2 manages
 // Operations and manager manages Engineering.
 const appPath = "/api/apps/LeaveRequests";
 const recordsPath = `${appPath}/entities/LeaveRequest/records`;
 const tasksPath = `${appPath}/tasks`;
 
-/** A unique part for the reasons of this run, so runs and parallel specs never share a reason. */
+/** A unique part for the titles of this run, so runs and parallel specs never share a title. */
 function runId() {
   return `${Date.now()}-${test.info().retry}`;
 }
@@ -54,18 +55,23 @@ async function departmentId(request: APIRequestContext, name: string) {
   return department!.id;
 }
 
-/** Creates a draft Operations request with the given days, and returns its id. */
+/** Creates a draft Operations request with the given title and reason, and returns its id. */
 async function createRequest(
   request: APIRequestContext,
+  title: string,
   reason: string,
-  firstDay = "2026-11-02",
-  lastDay = "2026-11-04",
+  {
+    leaveType = "annual",
+    firstDay = "2026-11-02",
+    lastDay = "2026-11-04",
+  }: { leaveType?: string; firstDay?: string; lastDay?: string } = {},
 ) {
   const response = await request.post(recordsPath, {
     data: {
       values: {
         department: await departmentId(request, "Operations"),
-        leaveType: "annual",
+        title,
+        leaveType,
         firstDay,
         lastDay,
         reason,
@@ -115,9 +121,10 @@ test("requester submits a leave request, manager-2 approves it in My tasks, and 
   playwright,
   baseURL,
 }) => {
-  const reason = `Zz Approve ${runId()}`;
+  const title = `Zz Approve ${runId()}`;
+  const reason = `Reason ${runId()}`;
   const id = await asUser(playwright.request, baseURL, "requester", (requester) =>
-    createRequest(requester, reason),
+    createRequest(requester, title, reason),
   );
 
   await useSession(page, "requester");
@@ -127,7 +134,7 @@ test("requester submits a leave request, manager-2 approves it in My tasks, and 
   await expect(page.getByTestId("form-started")).toBeVisible();
 
   await useSession(page, "manager-2");
-  const row = page.getByRole("row", { name: new RegExp(reason) });
+  const row = page.getByRole("row", { name: new RegExp(title) });
   // The worker creates the task some time after the start.
   await expect(async () => {
     await page.goto("/leave/mytasks?pageSize=100");
@@ -147,13 +154,63 @@ test("requester submits a leave request, manager-2 approves it in My tasks, and 
   await expectShown(fieldValue(page, "days"), "3");
 });
 
+test("requester submits a sick leave with a reason, manager-2 reads it on the review task, and employee cannot read it", async ({
+  page,
+  playwright,
+  baseURL,
+}) => {
+  const title = `Zz Sick ${runId()}`;
+  const reason = `Sick reason ${runId()}`;
+  const id = await asUser(playwright.request, baseURL, "requester", (requester) =>
+    createRequest(requester, title, reason, { leaveType: "sick" }),
+  );
+
+  await useSession(page, "requester");
+  await page.goto(`/leave/leaverequestform/${id}`);
+  await expect(page.getByLabel(fieldLabel("Reason"))).toHaveValue(reason);
+  await page.getByRole("button", { name: "Submit", exact: true }).click();
+  await expect(page.getByTestId("form-started")).toBeVisible();
+
+  await useSession(page, "manager-2");
+  const row = page.getByRole("row", { name: new RegExp(title) });
+  // The worker creates the task some time after the start.
+  await expect(async () => {
+    await page.goto("/leave/mytasks?pageSize=100");
+    await expect(row).toBeVisible({ timeout: 1_000 });
+  }).toPass({ timeout: 30_000 });
+  await row.getByRole("link", { name: "Manager approval", exact: true }).click();
+  await expectShown(fieldValue(page, "reason"), reason);
+
+  // manager-2 manages Operations, so the task is manager-2's.
+  const task = await taskId(playwright.request, baseURL, "manager-2", id);
+  await useSession(page, "employee");
+
+  await page.goto(`/leave/leaverequestform/${id}`);
+  await expect(page.getByTestId("not-found")).toBeVisible();
+  await expect(page.getByLabel(/Reason/i)).toHaveCount(0);
+
+  expect((await page.request.get(`${recordsPath}/${id}`)).status()).toBe(404);
+  expect((await page.request.get(`${tasksPath}/${task}`)).status()).toBe(403);
+  const formState = await page.request.post(`${tasksPath}/${task}/form-state`, {
+    data: { values: {}, touched: [] },
+    headers: csrfHeaders,
+  });
+  expect(formState.status()).toBe(403);
+  const tasks = await page.request.get(`${tasksPath}?pageSize=100`);
+  expect(tasks.status()).toBe(200);
+  const { items } = (await tasks.json()) as {
+    items: { subject: { id: string } }[];
+  };
+  expect(items.filter((item) => item.subject.id === id)).toEqual([]);
+});
+
 test("an employee cannot open another employee's leave request, by its form or the API", async ({
   page,
   playwright,
   baseURL,
 }) => {
   const id = await asUser(playwright.request, baseURL, "requester", (requester) =>
-    createRequest(requester, `Zz Deny ${runId()}`),
+    createRequest(requester, `Zz Deny ${runId()}`, `Reason ${runId()}`),
   );
   await useSession(page, "employee");
 
@@ -170,7 +227,7 @@ test("a manager of another department gets no task for the request, and cannot c
   baseURL,
 }) => {
   const id = await asUser(playwright.request, baseURL, "requester", async (requester) => {
-    const created = await createRequest(requester, `Zz Scope ${runId()}`);
+    const created = await createRequest(requester, `Zz Scope ${runId()}`, `Reason ${runId()}`);
     await start(requester, created);
     return created;
   });
@@ -203,7 +260,10 @@ test("a request whose last day is before its first day cannot be submitted, and 
   baseURL,
 }) => {
   const id = await asUser(playwright.request, baseURL, "requester", (requester) =>
-    createRequest(requester, `Zz Dates ${runId()}`, "2026-11-04", "2026-11-02"),
+    createRequest(requester, `Zz Dates ${runId()}`, `Reason ${runId()}`, {
+      firstDay: "2026-11-04",
+      lastDay: "2026-11-02",
+    }),
   );
   await useSession(page, "requester");
 

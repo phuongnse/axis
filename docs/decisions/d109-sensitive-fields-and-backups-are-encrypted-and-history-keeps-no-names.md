@@ -27,8 +27,8 @@ Everything here is _(planned for M27)_, see the [roadmap](../roadmap.md#mileston
     value under a second key of the tenant, and a filter may test the field for equality only.
     The cost is that two records with the same value can be seen to match.
 - **Existing data:** a migration encrypts the values of fields that a release marks
-  `sensitive`, and decrypts them when the flag is removed. None of the samples marks a field
-  `sensitive` today.
+  `sensitive`, and decrypts them when the flag is removed. The leave request sample marks its
+  `reason` `sensitive`.
 - **Backups are encrypted.** `tenant backup` encrypts the archive with a backup key that the
   operator gives the admin tool and keeps outside the installation. It is not the installation
   key, so a stolen backup and a stolen installation do not open each other. `tenant restore`

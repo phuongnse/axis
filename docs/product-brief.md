@@ -199,10 +199,11 @@ Later samples of different shapes follow from M11: a service desk, see
 
 ### Data
 
-- **Leave request**: number (sequence `LR-{yyyy}-{n:5}`), employee, department,
-  leave type (`annual`, `sick` or `unpaid`), first day, last day, days
-  (computed), reason, status and decision comment. The reason is required.
-  It is the display field, so it labels the request in task lists.
+- **Leave request**: number (sequence `LR-{yyyy}-{n:5}`), title, employee,
+  department, leave type (`annual`, `sick` or `unpaid`), first day, last day,
+  days (computed), reason, status and decision comment. The title is required.
+  It is the display field, so it labels the request in task lists. The reason
+  is `sensitive`, so it is stored encrypted.
 - Days are calendar days, counting both ends:
   `daysBetween(firstDay, lastDay) + 1`. Weekends and holidays are not left out.
 - **Department**: comes from the `departments` module, with its seed

@@ -9,6 +9,7 @@
       "title": { "textKey": "leaveRequest.sections.request" },
       "fields": [
         { "field": "number", "readOnly": true },
+        { "field": "title", "readOnly": true },
         { "field": "employee", "readOnly": true },
         { "field": "department", "readOnly": true },
         { "field": "leaveType", "readOnly": true },

@@ -12,11 +12,12 @@ owner confirmed these points on issue #572 on 2026-10-18.
   employee asks for days off, and the department manager decides. It needs no
   platform code change.
 - **Data:**
-  - A leave request has a number from the sequence `LR-{yyyy}-{n:5}`, an
-    employee, a department, a leave type (`annual`, `sick` or `unpaid`), a
-    first day, a last day, days, a reason, a status and a decision comment.
-    The reason is required and is the display field, because a sequence number
-    cannot be required, so it cannot label a request in task lists.
+  - A leave request has a number from the sequence `LR-{yyyy}-{n:5}`, a
+    title, an employee, a department, a leave type (`annual`, `sick` or `unpaid`),
+    a first day, a last day, days, a reason, a status and a decision comment.
+    The title is required and is the display field, because a sequence number
+    cannot be required and the reason is `sensitive` ([D109](d109-sensitive-fields-and-backups-are-encrypted-and-history-keeps-no-names.md)),
+    so neither can label a request in task lists.
   - Departments come from the `departments` module of
     [D40](d40-reusable-modules.md), with its seed departments.
   - Days are computed as `daysBetween(firstDay, lastDay) + 1`. They count

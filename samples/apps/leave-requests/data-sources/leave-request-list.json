@@ -6,6 +6,7 @@
   "entity": "LeaveRequest",
   "fields": [
     { "name": "number", "path": "number" },
+    { "name": "title", "path": "title" },
     { "name": "employee", "path": "employee" },
     { "name": "department", "path": "department" },
     { "name": "leaveType", "path": "leaveType" },

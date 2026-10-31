@@ -19,6 +19,7 @@
     "actions.new": "Tạo mới",
     "leaveRequest.label": "Đơn nghỉ phép",
     "leaveRequest.number": "Số đơn",
+    "leaveRequest.title": "Tiêu đề",
     "leaveRequest.employee": "Nhân viên",
     "leaveRequest.department": "Phòng ban",
     "leaveRequest.leaveType": "Loại nghỉ phép",

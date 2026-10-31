@@ -1,0 +1,14 @@
+{
+  "id": "7a493133-68fc-49c8-a8dc-04c957f6629c",
+  "kind": "migration",
+  "name": "LeaveRequestChange20261031120000",
+  "formatVersion": 1,
+  "entity": "LeaveRequest",
+  "changes": [
+    {
+      "type": "fill",
+      "field": "title",
+      "value": "coalesce(number, 'Leave request')"
+    }
+  ]
+}
