@@ -5,6 +5,7 @@ using Axis.Configuration.Model;
 using Axis.Configuration.Packages;
 using Axis.Configuration.Releases;
 using Axis.Core.Tenancy;
+using Axis.Data.Records;
 using Axis.Policy;
 using Axis.Processes.Instances;
 using Axis.Server.Applications;
@@ -297,6 +298,7 @@ internal static class ProcessOperatorEndpoints
         TenantDatabase database,
         ITenantContextAccessor tenants,
         PackageCatalog packages,
+        SensitiveValues sensitive,
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
@@ -308,7 +310,7 @@ internal static class ProcessOperatorEndpoints
         // A release change under the start lock sends the request back to resolution, so every check runs on the new release.
         for (var attempt = 0; attempt < ReleaseRetry.MaxAttempts; attempt++)
         {
-            if (await ResolveOnceAsync(app, process, id, callId, request, user, resolver, database, tenants, packages, loggerFactory, cancellationToken) is { } result)
+            if (await ResolveOnceAsync(app, process, id, callId, request, user, resolver, database, tenants, packages, sensitive, loggerFactory, cancellationToken) is { } result)
             {
                 return result;
             }
@@ -329,6 +331,7 @@ internal static class ProcessOperatorEndpoints
         TenantDatabase database,
         ITenantContextAccessor tenants,
         PackageCatalog packages,
+        SensitiveValues sensitive,
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
@@ -399,6 +402,7 @@ internal static class ProcessOperatorEndpoints
             body.Output,
             resolver.GetReleaseModelAsync,
             packages,
+            RecordEndpoints.Cipher(sensitive, tenants),
             loggerFactory,
             cancellationToken);
         if (result.Outcome != CallResolveOutcome.Resolved)

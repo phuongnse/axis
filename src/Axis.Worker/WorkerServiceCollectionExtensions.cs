@@ -2,6 +2,7 @@ using System.Globalization;
 using Axis.Configuration.Modules;
 using Axis.Configuration.Packages;
 using Axis.Core.Telemetry;
+using Axis.Data.Records;
 using Axis.Processes;
 using Axis.Processes.Instances;
 using Axis.Tenancy;
@@ -99,6 +100,7 @@ public static class WorkerServiceCollectionExtensions
         services.AddWorkerTelemetry(configuration, environment);
         services.AddTenancy(catalog);
         services.AddTenantKeys(keySource);
+        services.AddSingleton<SensitiveValues>();
         services.AddSingleton(catalog);
         services.AddExtensionPackages(configuration, environment);
         services.AddModules(configuration, environment);

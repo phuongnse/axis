@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Model;
 using Axis.Configuration.Releases;
@@ -44,6 +45,7 @@ public sealed class TaskApiFixture : IAsyncLifetime
     private static readonly TimeSpan _lease = TimeSpan.FromSeconds(30);
 
     private readonly PostgreSqlFixture _database = new();
+    private readonly string _dataKey = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
     private readonly Dictionary<string, Tenant> _tenants = new(StringComparer.Ordinal);
     private WebApplicationFactory<Program>? _factory;
     private ServiceProvider? _services;
@@ -88,9 +90,11 @@ public sealed class TaskApiFixture : IAsyncLifetime
             builder.UseSetting("Tenants:a:Hosts:0", Host(TenantA));
             builder.UseSetting("Tenants:a:ConnectionString", PostgreSqlServer.RuntimeConnectionString(a.ConnectionString));
             builder.UseSetting("Tenants:a:SchemaConnectionString", a.ConnectionString);
+            builder.UseSetting("Tenants:a:DataKeys:1", _dataKey);
             builder.UseSetting("Tenants:b:Hosts:0", Host(TenantB));
             builder.UseSetting("Tenants:b:ConnectionString", PostgreSqlServer.RuntimeConnectionString(b.ConnectionString));
             builder.UseSetting("Tenants:b:SchemaConnectionString", b.ConnectionString);
+            builder.UseSetting("Tenants:b:DataKeys:1", _dataKey);
             builder.UseTestOidc(TenantA, TenantB);
             builder.UseSetting("Console:OperatorRole", "platform-operator");
             builder.UseTestAuthentication(
@@ -110,8 +114,10 @@ public sealed class TaskApiFixture : IAsyncLifetime
             {
                 [$"Tenants:{TenantA}:Hosts:0"] = Host(TenantA),
                 [$"Tenants:{TenantA}:ConnectionString"] = PostgreSqlServer.RuntimeConnectionString(a.ConnectionString),
+                [$"Tenants:{TenantA}:DataKeys:1"] = _dataKey,
                 [$"Tenants:{TenantB}:Hosts:0"] = Host(TenantB),
                 [$"Tenants:{TenantB}:ConnectionString"] = PostgreSqlServer.RuntimeConnectionString(b.ConnectionString),
+                [$"Tenants:{TenantB}:DataKeys:1"] = _dataKey,
             })
             .Build();
         _services = new ServiceCollection().AddLogging().AddAxisWorker(settings, new HostingEnvironment { EnvironmentName = "Testing" }).BuildServiceProvider();
@@ -217,11 +223,12 @@ public sealed class TaskApiFixture : IAsyncLifetime
     /// Starts <paramref name="process"/> in <paramref name="tenant"/> for the request
     /// <paramref name="subjectId"/>, pinned to <paramref name="releaseId"/> or else the tenant's first StepApp release, as the start endpoint
     /// does: the instance is <c>running</c> at revision 1 on the process's start step, with its
-    /// first work item due a minute ago. Returns the instance id.
+    /// first work item due a minute ago. The process is looked up in <paramref name="applicationModel"/> when it is given.
+    /// Returns the instance id.
     /// </summary>
-    public async Task<Guid> StartAsync(string tenant, string process, Guid subjectId, Guid? releaseId = null)
+    public async Task<Guid> StartAsync(string tenant, string process, Guid subjectId, Guid? releaseId = null, ApplicationModel? applicationModel = null)
     {
-        Assert.True(Model.TryGetProcess(process, out var model));
+        Assert.True((applicationModel ?? Model).TryGetProcess(process, out var model));
         Assert.True(Model.TryGetEntity("Request", out var request));
         var instanceId = Guid.CreateVersion7();
         await using var connection = await DataSource(tenant).OpenConnectionAsync();
@@ -556,11 +563,22 @@ public sealed class TaskApiFixture : IAsyncLifetime
         string tenant,
         Func<string, string, string?> edit,
         int inlineRecomputeLimit = ReleaseActivator.DefaultInlineRecomputeLimit,
+        IReadOnlyDictionary<string, string>? added = null) =>
+        (await ActivateEditedWithModelAsync(tenant, edit, inlineRecomputeLimit, added)).ReleaseId;
+
+    /// <summary>
+    /// Edits and activates the release as <see cref="ActivateEditedAsync"/> does. Returns the new release's id and
+    /// model, which <see cref="StartAsync"/> needs to start a process that only the edited release declares.
+    /// </summary>
+    public async Task<(Guid ReleaseId, ApplicationModel Model)> ActivateEditedWithModelAsync(
+        string tenant,
+        Func<string, string, string?> edit,
+        int inlineRecomputeLimit = ReleaseActivator.DefaultInlineRecomputeLimit,
         IReadOnlyDictionary<string, string>? added = null)
     {
-        var (releaseId, diagnostics) = await ActivateEditedCoreAsync(tenant, edit, inlineRecomputeLimit, added);
+        var (releaseId, model, diagnostics) = await ActivateEditedCoreAsync(tenant, edit, inlineRecomputeLimit, added);
         Assert.Empty(diagnostics);
-        return releaseId;
+        return (releaseId, model);
     }
 
     /// <summary>
@@ -570,7 +588,7 @@ public sealed class TaskApiFixture : IAsyncLifetime
     public async Task<IReadOnlyList<Diagnostic>> TryActivateEditedAsync(string tenant, Func<string, string, string?> edit) =>
         (await ActivateEditedCoreAsync(tenant, edit, ReleaseActivator.DefaultInlineRecomputeLimit, null)).Diagnostics;
 
-    private async Task<(Guid ReleaseId, IReadOnlyList<Diagnostic> Diagnostics)> ActivateEditedCoreAsync(
+    private async Task<(Guid ReleaseId, ApplicationModel Model, IReadOnlyList<Diagnostic> Diagnostics)> ActivateEditedCoreAsync(
         string tenant,
         Func<string, string, string?> edit,
         int inlineRecomputeLimit,
@@ -599,7 +617,7 @@ public sealed class TaskApiFixture : IAsyncLifetime
         Assert.Empty(compiled.Diagnostics);
         var activated = await ReleaseActivator.ActivateAsync(
             compiled, new ActiveReleaseStore(configuration), data, ProcessStepFixture.StepAppBindings(tenant), OpenInstanceCounter.Instance, inlineRecomputeLimit);
-        return (compiled.Release!.Id, activated.Diagnostics);
+        return (compiled.Release!.Id, compiled.Model!, activated.Diagnostics);
     }
 
     /// <summary>

@@ -52,6 +52,7 @@ internal sealed partial class PackageCallHandler(
     IDeploymentBindings bindings,
     ConnectorCallSettings settings,
     PackageHttpTransport transport,
+    SensitiveValues? sensitive,
     ILogger<PackageCallHandler> logger,
     Func<InstalledPackage, string, IOperation>? createOperation = null) : IExternalWorkItemHandler
 {
@@ -497,6 +498,7 @@ internal sealed partial class PackageCallHandler(
         var call = attempt.Call;
         var connection = transaction.Connection!;
         var entity = target.Entity;
+        var cipher = sensitive is null ? null : new RecordCipher(sensitive, item.TenantId);
         Record? record = null;
 
         // A process without a subject has no record to lock, read or write, and no outputs to write.
@@ -513,7 +515,7 @@ internal sealed partial class PackageCallHandler(
                 await RecordCommands.LockAsync(connection, entity, subjectId, cancellationToken);
             }
 
-            record = await RecordQueries.GetAsync(connection, target.Model, entity, subjectId, cancellationToken);
+            record = await RecordQueries.GetAsync(connection, target.Model, entity, subjectId, cipher, cancellationToken);
             if (record is null && values.Count > 0)
             {
                 return $"No record of '{entity.Name}' has the id '{subjectId}'.";
@@ -536,7 +538,7 @@ internal sealed partial class PackageCallHandler(
         if (values.Count > 0)
         {
             var now = await RecordQueries.TransactionTimeAsync(connection, cancellationToken);
-            var result = await RecordCommands.SetAsync(connection, target.Model, entity!, call.ReleaseId, record!, values, now, cancellationToken: cancellationToken);
+            var result = await RecordCommands.SetAsync(connection, target.Model, entity!, call.ReleaseId, record!, values, now, cipher: cipher, cancellationToken: cancellationToken);
             if (result is not { Outcome: RecordWriteOutcome.Written, Record: { } written })
             {
                 return $"The record update was rejected: {ProcessStepHandler.Describe(result)}";
