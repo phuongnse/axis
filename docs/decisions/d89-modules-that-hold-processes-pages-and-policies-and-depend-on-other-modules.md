@@ -5,14 +5,14 @@ Status: **Agreed**
 The owner agreed this on 2026-10-25. It replaces two points of
 [D40](d40-reusable-modules.md): that processes, pages, roles and policies stay
 out of a module, and that a module does not depend on other modules. Roles stay
-out. Everything else in D40 holds. Everything here is _(planned for M20)_. See
+out. Everything else in D40 holds. See
 [modules](../reference/modules-and-templates.md#processes-pages-policies-and-dependencies).
 
 Role slots in `module.json` and their mapping in an application's `modules` entry are built, with `AXC0292` to `AXC0294`. Policies that name a slot are built too, with `AXC0304` and `AXC0305`. Task assignees that name a slot are built too, with `AXC0307`.
 
-Module processes compile inside their module, named `<module id>/<name>` with a derived id, and see only the resources of their module and the modules it declares. Connector slots and the engines are not built yet. A module's `packages` are built: its process steps call their operations, and the release pins them with the application's.
+Module processes compile inside their module, named `<module id>/<name>` with a derived id, and see only the resources of their module and the modules it declares. Connector slots and running module processes are built too. A module's `packages` are built: its process steps call their operations, and the release pins them with the application's.
 
-The `modules` list in `module.json`, flat resolution of the graph, one copy of each module, and the rule that the application names only modules it declares are built, with `AXC0295` and `AXC0296`. The slot maps of a dependency entry are built too, with `AXC0306` for mappings that differ. A module naming resources of its dependencies is not.
+The `modules` list in `module.json`, flat resolution of the graph, one copy of each module, and the rule that the application names only modules it declares are built, with `AXC0295` and `AXC0296`. The slot maps of a dependency entry are built too, with `AXC0306` for mappings that differ. A module naming resources of its dependencies is built too, see [modules](../reference/modules-and-templates.md#processes-pages-policies-and-dependencies). A module policy's grants on the processes of its own module are _(planned for M24)_.
 
 - **New kinds in a module:** a module may also hold `process`, `page` and
   `policy` resources. It still holds no `role`, `site`, `connector`,
