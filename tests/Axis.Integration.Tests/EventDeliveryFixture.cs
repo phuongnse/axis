@@ -1,3 +1,4 @@
+using System.Globalization;
 using Axis.Processes.Instances;
 using Axis.Processes.Work;
 using Axis.Worker;
@@ -67,6 +68,23 @@ public sealed class EventDeliveryFixture : IAsyncLifetime
     public async Task RunUntilIdleAsync(string tenantId, CancellationToken cancellationToken)
     {
         var runner = (_worker ?? throw new InvalidOperationException("The fixture is not initialized.")).GetRequiredService<WorkItemRunner>();
+        while (await runner.RunNextAsync(tenantId, _lease, cancellationToken))
+        {
+        }
+    }
+
+    /// <summary>
+    /// Claims and runs the tenant's due work items on a temporary worker with <c>Worker:StatementTimeout</c> set to
+    /// <paramref name="statementTimeout"/>, until none is left.
+    /// </summary>
+    internal async Task RunUntilIdleAsync(string tenantId, TimeSpan statementTimeout, CancellationToken cancellationToken)
+    {
+        var settings = new ConfigurationBuilder()
+            .AddConfiguration(_settings ?? throw new InvalidOperationException("The fixture is not initialized."))
+            .AddInMemoryCollection(new Dictionary<string, string?> { ["Worker:StatementTimeout"] = statementTimeout.ToString("c", CultureInfo.InvariantCulture) })
+            .Build();
+        await using var worker = Worker(settings);
+        var runner = worker.GetRequiredService<WorkItemRunner>();
         while (await runner.RunNextAsync(tenantId, _lease, cancellationToken))
         {
         }

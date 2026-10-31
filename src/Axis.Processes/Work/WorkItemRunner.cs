@@ -1,3 +1,4 @@
+using System.Data;
 using System.Diagnostics;
 using Axis.Core.Telemetry;
 using Axis.Core.Tenancy;
@@ -13,7 +14,8 @@ namespace Axis.Processes.Work;
 /// A <see cref="IWorkItemHandler"/> runs in one transaction, which commits only while the claim is
 /// still current, so a worker that lost its claim commits nothing. An
 /// <see cref="IExternalWorkItemHandler"/> runs with no transaction open, and checks the claim in
-/// each transaction it opens.
+/// each transaction it opens. Every statement of a run is under the statement limit of
+/// <see cref="WorkItemSettings"/>, one minute by default.
 /// </summary>
 public sealed partial class WorkItemRunner
 {
@@ -23,6 +25,7 @@ public sealed partial class WorkItemRunner
     private readonly Dictionary<string, IWorkItemHandler> _handlers = new(StringComparer.Ordinal);
     private readonly Dictionary<string, IExternalWorkItemHandler> _externalHandlers = new(StringComparer.Ordinal);
     private readonly string[] _kinds;
+    private readonly TimeSpan _statementTimeout;
 
     /// <exception cref="InvalidOperationException">Two handlers of either sort have the same kind.</exception>
     public WorkItemRunner(
@@ -30,12 +33,14 @@ public sealed partial class WorkItemRunner
         ITenantContextAccessor accessor,
         IEnumerable<IWorkItemHandler> handlers,
         ILogger<WorkItemRunner> logger,
-        IEnumerable<IExternalWorkItemHandler>? externalHandlers = null)
+        IEnumerable<IExternalWorkItemHandler>? externalHandlers = null,
+        WorkItemSettings? settings = null)
     {
         ArgumentNullException.ThrowIfNull(handlers);
         _connections = connections;
         _accessor = accessor;
         _logger = logger;
+        _statementTimeout = settings?.StatementTimeout ?? WorkItemSettings.DefaultStatementTimeout;
         foreach (var handler in handlers)
         {
             if (!_handlers.TryAdd(handler.Kind, handler))
@@ -149,12 +154,26 @@ public sealed partial class WorkItemRunner
             await using var connection = await _connections.OpenConnectionAsync(cancellationToken);
             if (handler is null)
             {
-                return Finish(activity, item, start, await externalHandler!.ExecuteAsync(item, connection, cancellationToken));
+                await StatementTimeout.SetForConnectionAsync(connection, _statementTimeout, cancellationToken);
+                try
+                {
+                    return Finish(activity, item, start, await externalHandler!.ExecuteAsync(item, connection, cancellationToken));
+                }
+                finally
+                {
+                    // The limit belongs to the session, so it is reset before the connection goes back to the pool.
+                    // A broken connection is left for Npgsql to discard.
+                    if (connection.FullState == ConnectionState.Open)
+                    {
+                        await StatementTimeout.ResetAsync(connection, CancellationToken.None);
+                    }
+                }
             }
 
             Exception? error = null;
             await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))
             {
+                await StatementTimeout.SetLocalAsync(transaction, _statementTimeout, cancellationToken);
                 try
                 {
                     await handler.HandleAsync(new WorkItemContext(item, connection, transaction), cancellationToken);
@@ -187,6 +206,7 @@ public sealed partial class WorkItemRunner
             // An exception from here on rolls back as the transaction is disposed, so the item stays
             // claimed until its lease expires.
             await using var failure = await connection.BeginTransactionAsync(cancellationToken);
+            await StatementTimeout.SetLocalAsync(failure, _statementTimeout, cancellationToken);
             if (!await WorkItemQueue.CompleteAsync(connection, failure, item, cancellationToken))
             {
                 await failure.RollbackAsync(cancellationToken);
