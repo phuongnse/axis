@@ -31,10 +31,10 @@ public sealed class AdminPlatformAuditTests(PostgreSqlFixture database) : IClass
         Assert.Equal(0, (await scenario.RunAsync(["tenant", "resume", id])).Exit);
         Assert.Equal(0, (await scenario.RunAsync(["migrate", "--tenant", id])).Exit);
         Assert.Equal(0, (await scenario.RunAsync(["activate", _sample, "--tenant", id])).Exit);
-        Assert.Equal(0, (await scenario.RunAsync(["tenant", "backup", id, "--out", file], path: tools.PathSetting)).Exit);
+        Assert.Equal(0, (await scenario.RunAsync(["tenant", "backup", id, "--out", file, .. AdminScenario.BackupKeyArgs], path: tools.PathSetting)).Exit);
         Assert.Equal(
             0,
-            (await scenario.RunAsync(["tenant", "restore", file, "--tenant", restored, "--host", $"{restored}.example.test"], path: tools.PathSetting)).Exit);
+            (await scenario.RunAsync(["tenant", "restore", file, "--tenant", restored, "--host", $"{restored}.example.test", .. AdminScenario.BackupKeyArgs], path: tools.PathSetting)).Exit);
 
         var records = await RecordsAsync(scenario);
         Assert.Equal(

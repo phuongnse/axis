@@ -273,6 +273,37 @@ public sealed class AdminTenantOidcSetTests(PostgreSqlFixture database, Keycloak
     }
 
     [Fact]
+    public async Task A_key_id_that_starts_with_two_dashes_is_a_value_and_not_an_option()
+    {
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        var id = scenario.NewTenantId();
+        Assert.Equal(0, (await scenario.CreateAsync(id, $"{id}.example.test")).Exit);
+
+        // A key id is base64url text, so about one in 4096 starts with two dashes.
+        string dashed;
+        string dashedId;
+        do
+        {
+            dashed = NewKeyPem();
+            dashedId = KeyId(dashed, out _);
+        }
+        while (!dashedId.StartsWith("--", StringComparison.Ordinal));
+
+        var other = NewKeyPem();
+        Assert.Equal(0, (await scenario.RunAsync(["tenant", "oidc", "set", id, "--client-key", "--profile", "fapi2"], extra: Key(dashed))).Exit);
+        Assert.Equal(0, (await scenario.RunAsync(["tenant", "oidc", "set", id, "--client-key"], extra: Key(other))).Exit);
+
+        var retired = await scenario.RunAsync(["tenant", "oidc", "set", id, "--retire-client-key", dashedId], extra: _directory);
+
+        Assert.Equal(0, retired.Exit);
+        Assert.Equal(KeyId(other, out _), (await scenario.RowAsync(id)).OidcClientKeyId);
+
+        // A value that is a known option is still a missing value.
+        var missing = await scenario.RunAsync(["tenant", "oidc", "set", id, "--profile", "--client-key"], withClientSecret: false, extra: _directory);
+        Assert.Equal(2, missing.Exit);
+    }
+
+    [Fact]
     public async Task A_service_account_token_is_refused_then_accepted_after_the_service_audience_is_set_and_refused_again_after_it_is_removed()
     {
         var authority = await keycloak.StartAsync();

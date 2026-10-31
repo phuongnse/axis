@@ -24,7 +24,10 @@ namespace Axis.Admin;
 /// tenant signed in through a realm that this installation's identity provider does not have, the restored tenant gets a new
 /// realm in its own <c>realm</c> step, in step with its active releases. Otherwise it keeps the archive's sign-in. A rerun on a
 /// <c>provisioning</c> entry skips what is done, and a database that already holds tables counts as restored. Each step writes one line that names the tenant and never a password, a database host or a
-/// connection string. The dump goes to <c>pg_restore</c> on its standard input, so no copy of the business data is left on disk.
+/// connection string. The archive is encrypted with the operator's backup key, see <see cref="BackupArchive"/>. The <c>check</c> step
+/// decrypts it as far as the manifest and the start of the dump. The <c>restore</c> step decrypts it to the end, so a chunk that is changed
+/// or missing anywhere fails that step. The manifest's data keys and lookup keys come back under this installation's key, in the entry step.
+/// The dump goes to <c>pg_restore</c> on its standard input, so no copy of the business data is left on disk.
 /// </summary>
 internal sealed class TenantRestore : IAsyncDisposable
 {
@@ -93,13 +96,14 @@ internal sealed class TenantRestore : IAsyncDisposable
     public static async Task<RestorePlan?> PrepareAsync(
         RestoreSettings settings,
         TenantRestoreRequest request,
+        byte[] backupKey,
         string pgRestore,
         TenantRealm? realm,
         TextWriter output,
         TextWriter error,
         CancellationToken cancellationToken)
     {
-        var refusal = await CheckAsync(settings, request, realm, cancellationToken);
+        var refusal = await CheckAsync(settings, request, backupKey, realm, cancellationToken);
         if (refusal.Problems.Count > 0)
         {
             foreach (var problem in refusal.Problems)
@@ -117,7 +121,7 @@ internal sealed class TenantRestore : IAsyncDisposable
         }
 
         output.WriteLine($"{request.Id} check ok");
-        return new RestorePlan(request with { File = Path.GetFullPath(request.File) }, refusal.Manifest!, pgRestore, refusal.NewRealm);
+        return new RestorePlan(request with { File = Path.GetFullPath(request.File) }, refusal.Manifest!, backupKey, pgRestore, refusal.NewRealm);
     }
 
     public async Task<int> RunAsync()
@@ -181,15 +185,15 @@ internal sealed class TenantRestore : IAsyncDisposable
         new(new DbContextOptionsBuilder<PlatformDbContext>().UseNpgsql(connectionString).Options);
 
     private static async Task<CheckResult> CheckAsync(
-        RestoreSettings settings, TenantRestoreRequest request, TenantRealm? realm, CancellationToken cancellationToken)
+        RestoreSettings settings, TenantRestoreRequest request, byte[] backupKey, TenantRealm? realm, CancellationToken cancellationToken)
     {
         var problems = new List<string>();
-        var manifest = ReadManifest(request.File);
+        var (manifest, readProblem) = ReadManifest(request.File, backupKey);
         var trusted = false;
         var preview = false;
         if (manifest is null)
         {
-            problems.Add("the archive cannot be read");
+            problems.Add(readProblem);
         }
         else if (manifest.Format != SupportedFormat)
         {
@@ -337,22 +341,25 @@ internal sealed class TenantRestore : IAsyncDisposable
             }
         });
 
-    // Returns the manifest, or null when the file is not a readable archive with a complete manifest and a dump.
-    private static BackupManifest? ReadManifest(string file)
+    // Decrypts the archive as far as the manifest and the start of the dump. Returns the manifest, or null and the reason when the file is
+    // not an encrypted archive that the key opens, with a complete manifest and a dump. Chunks after that are checked by the restore step.
+    private static (BackupManifest? Manifest, string Problem) ReadManifest(string file, byte[] key)
     {
+        const string Unreadable = "the archive cannot be read";
         try
         {
             using var stream = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.Read);
-            using var reader = new TarReader(stream);
+            using var decrypted = BackupArchive.Decrypt(stream, key);
+            using var reader = new TarReader(decrypted);
             BackupManifest? manifest = null;
             var hasDump = false;
-            while (reader.GetNextEntry() is { } entry)
+            while ((manifest is null || !hasDump) && reader.GetNextEntry() is { } entry)
             {
                 if (entry.Name == ManifestEntry && entry.DataStream is { } data && manifest is null)
                 {
                     if (entry.Length > MaxManifestBytes)
                     {
-                        return null;
+                        return (null, Unreadable);
                     }
 
                     manifest = JsonSerializer.Deserialize<BackupManifest>(data, _json);
@@ -363,12 +370,16 @@ internal sealed class TenantRestore : IAsyncDisposable
                 }
             }
 
-            return hasDump && manifest is not null && IsComplete(manifest) ? manifest : null;
+            return hasDump && manifest is not null && IsComplete(manifest) ? (manifest, "") : (null, Unreadable);
+        }
+        catch (BackupArchiveException exception)
+        {
+            return (null, exception.Message);
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException or InvalidDataException or FormatException
             or JsonException or NotSupportedException or ArgumentException)
         {
-            return null;
+            return (null, Unreadable);
         }
     }
 
@@ -381,7 +392,20 @@ internal sealed class TenantRestore : IAsyncDisposable
         && manifest.Directory.Bindings.All(binding => binding is { Name: not null, Kind: "url" or "secret" or "storage" } && (binding.Kind != "url" || binding.Url is not null) && (binding.Kind != "storage" || binding.Url == StorageBindingValues.Database))
         && manifest.Directory.Bindings.Select(binding => binding.Name.ToLowerInvariant()).Distinct().Count() == manifest.Directory.Bindings.Count
         && (manifest.Directory.Sites is null || (manifest.Directory.Sites.All(site => site is { Host: not null } && SitePaths.IsValid(site.Path))
-            && manifest.Directory.Sites.Select(site => site.Path.ToLowerInvariant()).Distinct().Count() == manifest.Directory.Sites.Count));
+            && manifest.Directory.Sites.Select(site => site.Path.ToLowerInvariant()).Distinct().Count() == manifest.Directory.Sites.Count))
+        && (manifest.Keys is null || (manifest.Keys.All(IsKey)
+            && manifest.Keys.Select(key => (key.Kind, key.Number)).Distinct().Count() == manifest.Keys.Count));
+
+    private static bool IsKey(ManifestKey? key)
+    {
+        if (key is not { Kind: TenantKeyKinds.Data or TenantKeyKinds.Lookup, Number: >= 1, Key: not null })
+        {
+            return false;
+        }
+
+        var buffer = new byte[BackupArchive.KeySize + 4];
+        return Convert.TryFromBase64String(key.Key, buffer, out var length) && length == BackupArchive.KeySize;
+    }
 
     // Returns the exit code that ends the command, or null to go on.
     private async Task<int?> EntryAsync()
@@ -436,6 +460,7 @@ internal sealed class TenantRestore : IAsyncDisposable
                 _row.Version++;
                 _platform.TenantHosts.RemoveRange(_platform.TenantHosts.Where(host => host.TenantId == _id));
                 _platform.TenantBindings.RemoveRange(_platform.TenantBindings.Where(binding => binding.TenantId == _id));
+                _platform.TenantDataKeys.RemoveRange(_platform.TenantDataKeys.Where(key => key.TenantId == _id));
                 await _platform.SaveChangesAsync(_cancellationToken);
             }
 
@@ -469,6 +494,21 @@ internal sealed class TenantRestore : IAsyncDisposable
                 Url = binding.Kind == "secret" ? null : binding.Url,
                 SecretValue = null,
             }));
+
+            // The tenant keeps the archive's keys with their numbers, under this installation's key. An archive with none gets number 1 of each kind.
+            var archiveKeys = _plan.Manifest.Keys ?? [];
+            _platform.TenantDataKeys.AddRange(archiveKeys.Select(key => new TenantDataKeyRow
+            {
+                TenantId = _id,
+                Kind = key.Kind,
+                Number = key.Number,
+                Key = _settings.Cipher.Encrypt(_id, key.Kind == TenantKeyKinds.Data ? TenantSecretFields.DataKey(key.Number) : TenantSecretFields.LookupKey(key.Number), key.Key),
+            }));
+            if (archiveKeys.Count == 0)
+            {
+                await TenantKeyRows.AddMissingAsync(_platform, _id, _settings.Cipher, _cancellationToken);
+            }
+
             await _platform.SaveChangesAsync(_cancellationToken);
             await transaction.CommitAsync(_cancellationToken);
 
@@ -582,12 +622,20 @@ internal sealed class TenantRestore : IAsyncDisposable
         try
         {
             using var stream = new FileStream(_plan.Request.File, FileMode.Open, FileAccess.Read, FileShare.Read);
-            using var reader = new TarReader(stream);
+            using var decrypted = BackupArchive.Decrypt(stream, _plan.BackupKey);
+            using var reader = new TarReader(decrypted, leaveOpen: true);
             while (reader.GetNextEntry() is { } entry)
             {
                 if (entry.Name == DumpEntry && entry.DataStream is { } dump)
                 {
                     await dump.CopyToAsync(process.StandardInput.BaseStream, _cancellationToken);
+
+                    // Read to the end of the file before pg_restore sees the end of its input, so a changed or missing chunk after the dump fails this step.
+                    while (reader.GetNextEntry() is not null)
+                    {
+                    }
+
+                    await decrypted.CopyToAsync(Stream.Null, _cancellationToken);
                     return;
                 }
             }
@@ -772,7 +820,7 @@ internal sealed class TenantRestore : IAsyncDisposable
 }
 
 /// <summary>
-/// What the <c>check</c> step found: the request with the archive's full path, the manifest, the path of <c>pg_restore</c> and whether
+/// What the <c>check</c> step found: the request with the archive's full path, the manifest, the backup key, the path of <c>pg_restore</c> and whether
 /// the tenant gets a new realm (<paramref name="NewRealm"/>) or keeps the archive's sign-in.
 /// </summary>
-internal sealed record RestorePlan(TenantRestoreRequest Request, BackupManifest Manifest, string PgRestore, bool NewRealm);
+internal sealed record RestorePlan(TenantRestoreRequest Request, BackupManifest Manifest, byte[] BackupKey, string PgRestore, bool NewRealm);

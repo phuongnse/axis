@@ -79,7 +79,8 @@ Detailed behaviour, one topic per file. Sections marked _(planned for Mx)_ are n
 | [Authoring API](reference/authoring.md)                                | The API that Studio uses to read, write and publish application folders               |
 | [Draft page metadata](reference/draft-page-metadata.md)               | The routes that answer the page metadata of a draft page or form and of a module page  |
 | [Host settings](reference/host-settings.md)                            | Startup activation and the server, Studio, tenancy, data and file, admin, rate limit and telemetry settings |
-| [Administration](reference/administration.md)                          | The `Axis.Admin` commands: create a tenant, backup, restore, migrate, activate, publisher |
+| [Administration](reference/administration.md)                          | The `Axis.Admin` commands: create a tenant, migrate, activate, publisher |
+| [Tenant backup and restore](reference/tenant-backup-and-restore.md)    | `tenant backup` and `tenant restore`: the encrypted archive, the backup key, the manifest, the checks and the steps |
 | [Tenant setting commands](reference/tenant-setting-commands.md)        | The `Axis.Admin` commands that change bindings, sign-in settings, mail settings and hosts, rotate keys and passwords, end sessions, and the platform audit records |
 | [Tenant status commands](reference/tenant-status-commands.md)           | The `Axis.Admin` commands that suspend and resume a tenant and list the tenants       |
 | [Installation](reference/installation.md)                              | Production images and installs on premises and in the cloud                           |

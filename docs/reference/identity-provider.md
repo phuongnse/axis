@@ -348,7 +348,7 @@ platform sign-in's providers in it, see [keeping the realm in step](#keeping-the
 - **Brought in step by restore:** `tenant restore` of a tenant that gets a new realm creates the realm as `tenant create`
   does and brings it in step with the active releases of the restored database. The archive holds no secret value, so a
   provider whose bindings have no value yet is left out with a warning. The next activation adds it once the operator has
-  set the bindings, see [tenant restore](administration.md#tenant-restore).
+  set the bindings, see [tenant restore](tenant-backup-and-restore.md#tenant-restore).
 - **Bindings:** a missing binding, or a binding of the wrong kind, fails activation, as for a connector (`AXC0100`).
   Built for `oidc` providers: `issuer` is a `url` binding, and `clientId`, `clientSecret` and `clientKey` are `secret`
   bindings. Built for `saml` providers: `metadata` is a `url` binding, reported at `/metadata/binding`. On a preview tenant activation leaves the provider out with a warning, see
@@ -450,5 +450,5 @@ platform sign-in's providers in it, see [keeping the realm in step](#keeping-the
 - **Backup and restore:** the identity provider's database holds the accounts and their credentials. The operator
   backs it up with the installation. `tenant backup` does not carry them, so a tenant restored where its realm does
   not exist gets a new realm, and its accounts need new invitations. This is built: `tenant restore` creates the
-  realm in its `realm` step, see [tenant restore](administration.md#tenant-restore). A tenant restored where its realm
+  realm in its `realm` step, see [tenant restore](tenant-backup-and-restore.md#tenant-restore). A tenant restored where its realm
   exists keeps the realm and its users.
