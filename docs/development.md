@@ -277,7 +277,7 @@ at the address the browser uses. Development, Compose, `scripts/dev.sh` and E2E 
 bindings `CompanyIssuer` (the realm's issuer URL), `CompanyClientId` (`axis-broker`) and `CompanyClientSecret`. The purchase request
 sample's `company` provider reads them. Development, Compose, `scripts/dev.sh` and E2E also give the `default` tenant
 `PurchaseRequestApprovedWebhookUrl` (the stub's `/webhooks/purchase-request-approved` route) and
-`PurchaseRequestApprovedWebhookSecret` (the stub's default webhook secret), for the purchase request approval webhook to come.
+`PurchaseRequestApprovedWebhookSecret` (the stub's default webhook secret), for the purchase request sample's approval webhook, which delivers there.
 The `operator` role opens the purchase request sample's Approvals
 inspector page. The leave request sample, `samples/apps/leave-requests`, reuses the `employee` and
 `department-manager` users, in a site at `/leave`. The service desk sample, `samples/apps/service-desk`,

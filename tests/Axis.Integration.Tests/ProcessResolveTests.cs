@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json;
+using Axis.Processes.Instances;
 using Axis.Server.Tests;
 using Npgsql;
 using static Axis.Integration.Tests.SampleAppFixture;
@@ -278,6 +279,9 @@ public sealed class ProcessResolveTests(SampleAppFixture fixture) : IClassFixtur
         }
 
         await fixture.RunStepsUntilIdleAsync(CancellationToken);
+
+        // The approval's webhook delivery is no work item of the instance, so it is delivered here and not by a later run.
+        await fixture.RunKindsUntilIdleAsync(CancellationToken, ProcessStarts.WebhookDeliverWorkItemKind);
         Assert.Equal("waiting", await StateAsync(instance));
         var call = (Guid)(await ScalarAsync("SELECT id FROM axis.connector_calls WHERE process_instance_id = @id", instance))!;
         await fixture.ScalarAsync("UPDATE axis.connector_calls SET state = 'unknown', attempts = 1 WHERE id = @id", ("id", call));
