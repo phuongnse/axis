@@ -51,6 +51,7 @@ node --test tests/e2e/hang-guard.test.ts || status=1
 node --test tests/e2e/dialogs.test.ts || status=1
 node --test tests/e2e/design-drag.test.ts || status=1
 node --test tests/e2e/policy-violations.test.ts || status=1
+node --test tests/e2e/startup-activation.test.ts || status=1
 node --test tests/e2e/totp.test.ts || status=1
 node --test tests/load/objectives.test.mjs || status=1
 node --test tests/load/totp.test.mjs || status=1
