@@ -56,6 +56,12 @@ public sealed record MigrationContext(
     /// </summary>
     public int InlineRecomputeLimit { get; init; } = ReleaseActivator.DefaultInlineRecomputeLimit;
 
+    /// <summary>
+    /// The <c>statement_timeout</c> of the provisioning transaction, set with <c>SET LOCAL</c> semantics right after the
+    /// transaction begins, so a wait for the schema lock counts too. A statement past it fails provisioning.
+    /// </summary>
+    public TimeSpan ActivationTimeout { get; init; } = ReleaseActivator.DefaultActivationTimeout;
+
     /// <summary>The tenant whose database is activated. A pending recompute queues its work item for it.</summary>
     public string? TenantId { get; init; }
 
