@@ -57,9 +57,15 @@ internal static class ProcessStartEndpoints
 
     private const int MaxIdempotencyKeyLength = 255;
 
-    public static void MapProcessEndpoints(this IEndpointRouteBuilder endpoints) =>
-        endpoints.MapPost("/api/apps/{app}/processes/{process}/instances", StartAsync)
-            .WithMetadata(ServiceAccountRoute.Instance);
+    public static void MapProcessEndpoints(this IEndpointRouteBuilder endpoints)
+    {
+        // A process of the application has one segment, and a process of a module has the module id and
+        // the process name as two, so no process has two URLs.
+        foreach (var pattern in new[] { "/api/apps/{app}/processes/{process}/instances", "/api/apps/{app}/processes/{module}/{process}/instances" })
+        {
+            endpoints.MapPost(pattern, StartAsync).WithMetadata(ServiceAccountRoute.Instance);
+        }
+    }
 
     // The body is read here rather than bound, so the content type is checked before any of the
     // body is read and every malformed body is the same validation problem.
@@ -76,6 +82,11 @@ internal static class ProcessStartEndpoints
         if (await CurrentUsers.FindAsync(request.HttpContext) is not { } user)
         {
             return Grants.SignInRequired(request.HttpContext);
+        }
+
+        if (request.HttpContext.GetRouteValue("module") is string module)
+        {
+            process = $"{module}/{process}";
         }
 
         // A release change under the start lock sends the request back to resolution, so every check runs on the new release.

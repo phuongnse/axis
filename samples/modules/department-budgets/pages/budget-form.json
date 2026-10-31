@@ -1,0 +1,8 @@
+{
+  "id": "87f084d6-acd9-477c-ae73-e35b3f8e92b6",
+  "kind": "page",
+  "name": "BudgetForm",
+  "formatVersion": 1,
+  "title": { "textKey": "department-budgets.pages.budgetForm.title" },
+  "widgets": [{ "type": "form", "form": "BudgetReview" }]
+}

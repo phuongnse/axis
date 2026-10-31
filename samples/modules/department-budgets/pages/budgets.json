@@ -4,5 +4,14 @@
   "name": "Budgets",
   "formatVersion": 1,
   "title": { "textKey": "department-budgets.pages.budgets.title" },
-  "widgets": [{ "type": "table", "dataSource": "Budgets" }]
+  "widgets": [
+    {
+      "type": "table",
+      "dataSource": "Budgets",
+      "rowActions": [
+        { "type": "startProcess", "process": "BudgetApproval", "label": { "textKey": "department-budgets.actions.submit" } }
+      ],
+      "toolbarActions": [{ "type": "navigate", "page": "BudgetForm", "label": { "textKey": "department-budgets.actions.new" } }]
+    }
+  ]
 }

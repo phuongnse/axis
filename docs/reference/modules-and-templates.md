@@ -273,8 +273,10 @@ copy each, what the application names, and what a module names and calls of the 
 purchase request sample declares, as
 [D94](../decisions/d94-purchase-requests-prove-the-extensibility-milestone.md)
 agrees. It holds a `Budget` entity with a name, a `departments/Department` reference, a year, an
-amount and a status, a `BudgetReview` form, a `Budgets` data source and page, a `BudgetApproval`
-process whose `review` task goes to `approver`, an `ApproverAccess` policy and `en` and `vi` texts.
+amount and a status, a `BudgetReview` form, a `Budgets` data source and page, a `BudgetForm` page, a `BudgetApproval`
+process whose `review` task goes to `approver`, an `ApproverAccess` policy and `en` and `vi` texts. The
+`Budgets` page has a `New` toolbar action that opens `BudgetForm` and a `Submit for approval` row action that
+starts `BudgetApproval` for the budget.
 An application that declares it maps the slot to one of its own roles:
 
 ```json
@@ -366,8 +368,10 @@ An application that declares it maps the slot to one of its own roles:
   `<module id>/<name>`. It is pinned with the rest of the release. The worker runs a module process
   instance on the application's own copy of its module entity when a trigger or a sub-process step
   starts it or an endpoint creates the module record and starts it, and a waiting instance finishes
-  on the release it was started on, even after a newer module version is activated. Starting one
-  through the start endpoint is not proven yet. A module task assigned to a slot is listed in the task
+  on the release it was started on, even after a newer module version is activated. The start endpoint takes it at
+  `POST /api/apps/{app}/processes/{module}/{process}/instances`, and the E2E journey
+  `tests/e2e/specs/department-budgets-journey.spec.ts` starts one from the `Budgets` page row action and
+  decides its task. A module task assigned to a slot is listed in the task
   inbox of the people who hold the mapped role, and only they can decide it.
 - **Triggers.** A module trigger starts a process of its own module. It
   reacts to an event or an entity of its own module, or of a module it
