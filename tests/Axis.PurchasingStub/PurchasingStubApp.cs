@@ -91,6 +91,12 @@ public static class PurchasingStubApp
             return Results.NoContent();
         });
 
+        app.MapPost("/test/accept-webhook/{requestNumber}", (string requestNumber, WebhookDeliveryStore store) =>
+        {
+            store.Accept(requestNumber);
+            return Results.NoContent();
+        });
+
         app.MapPost("/oauth/token", async (HttpContext context, TokenStore tokens) =>
         {
             var form = await context.Request.ReadFormAsync(context.RequestAborted);
