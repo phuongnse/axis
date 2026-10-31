@@ -1,0 +1,8 @@
+{
+  "kind": "module",
+  "id": "department-budgets",
+  "version": "1.0.0",
+  "label": "Department budgets",
+  "roles": [{ "name": "approver", "label": { "textKey": "department-budgets.roles.approver" } }],
+  "modules": [{ "id": "departments", "version": "^1.1.0", "roles": { "manager": "approver" } }]
+}

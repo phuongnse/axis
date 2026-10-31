@@ -608,8 +608,9 @@ internal static partial class AdminCommands
                 continue;
             }
 
-            // A value may be empty, which removes an audience, but never starts with a second option.
-            if (i + 1 >= args.Length || args[i + 1].StartsWith("--", StringComparison.Ordinal))
+            // A value may be empty, which removes an audience, but is never a second option. A key id is base64url
+            // text, so it can start with "--" and still be a value.
+            if (i + 1 >= args.Length || _oidcSetOptions.Contains(args[i + 1]))
             {
                 return null;
             }
@@ -639,6 +640,15 @@ internal static partial class AdminCommands
             withKey,
             new TenantSignInChange(endpointAudience, serviceAudience, profile, null, retireKeyId));
     }
+
+    private static readonly string[] _oidcSetOptions =
+    [
+        "--client-key",
+        "--endpoint-audience",
+        "--service-audience",
+        "--profile",
+        "--retire-client-key",
+    ];
 
     private static async Task<int> BackupAsync(
         string command,

@@ -1,0 +1,21 @@
+{
+  "id": "b90b32ef-6b04-49d1-a001-88457d552c76",
+  "kind": "text",
+  "name": "TextsEn",
+  "formatVersion": 1,
+  "locale": "en",
+  "texts": {
+    "department-budgets.budget.label": "Budget",
+    "department-budgets.budget.name": "Name",
+    "department-budgets.budget.department": "Department",
+    "department-budgets.budget.year": "Year",
+    "department-budgets.budget.amount": "Amount",
+    "department-budgets.budget.status": "Status",
+    "department-budgets.budgetReview.title": "Budget",
+    "department-budgets.pages.budgets.title": "Budgets",
+    "department-budgets.budgetApproval.review": "Review the budget",
+    "department-budgets.budgetApproval.approve": "Approve",
+    "department-budgets.budgetApproval.reject": "Reject",
+    "department-budgets.roles.approver": "Budget approver"
+  }
+}

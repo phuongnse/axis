@@ -204,7 +204,7 @@ at http://localhost:8025, and the purchasing
 system stub at http://localhost:5207. Mailpit is a local mail server that keeps every email. Its web page shows the
 emails that the worker sends. The stub, in `tests/Axis.PurchasingStub`, stands in for
 the purchasing system that the sample calls when a request is approved. It needs only
-Docker. The images hold the `departments` sample module in `/modules`.
+Docker. The images hold the `departments` and `department-budgets` sample modules in `/modules`.
 Compose also starts one publisher, `axis-admin publisher`, which runs the
 publish requests of Studio. See [D47](decisions/d47-publishing-from-studio.md).
 It serves the tenants `default` and `default-preview`, so it runs preview requests too. It has no port and no health check, and writes `default ready` and `default-preview ready` once the server has migrated each tenant database.

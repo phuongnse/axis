@@ -1255,7 +1255,7 @@ public sealed class ScenarioRunnerTests
         Assert.True(exitCode == 0, output.ToString());
         var suites = new Dictionary<string, (string Name, string Tests)>
         {
-            ["purchase-requests"] = ("PurchaseRequests", "5"),
+            ["purchase-requests"] = ("PurchaseRequests", "6"),
             ["leave-requests"] = ("LeaveRequests", "5"),
             ["service-desk"] = ("ServiceDesk", "12"),
             ["asset-management"] = ("AssetManagement", "6"),

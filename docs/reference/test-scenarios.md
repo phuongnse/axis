@@ -139,6 +139,8 @@ Every step has a `type`. These are the step kinds:
   `completeTask` are the actions. The record actions go through the record
   command, as the record API does. `startProcess` and `completeTask` apply the
   checks of the process start and task endpoints without the HTTP layer.
+- `entity` and `process` name a resource of the application, or of a module it
+  declares, written `<module id>/<name>` such as `department-budgets/Budget`.
 - Only actions may declare `expect`. With no `expect`, an action must succeed.
   An unmet expectation fails the scenario:
   - `"denied"` means 403. A grant, a field grant or a record filter refused

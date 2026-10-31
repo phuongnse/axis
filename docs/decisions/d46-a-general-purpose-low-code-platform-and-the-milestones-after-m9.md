@@ -30,6 +30,8 @@ The owner confirmed these points on issue #702 on 2026-10-19.
     - [D117](d117-small-businesses-first-and-the-milestones-in-three-phases.md) brings Axis-hosted operations into scope in M31, which
       decides about self-service sign-up. Migrating live business data stays
       out of scope.
+      - [D118](d118-axis-saas-in-cells-with-sign-up-quotas-and-billing.md) designs it as Axis SaaS, with self-service sign-up in
+        M33.
 - **One format, changed in place:**
   - Until the first production release, each resource kind has one format.
   - A change edits that format in place. There is no second version of a kind,

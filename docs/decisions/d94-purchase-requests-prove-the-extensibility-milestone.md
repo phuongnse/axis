@@ -6,8 +6,8 @@ The owner agreed this on 2026-10-25. The end-to-end journey of the
 extensibility milestone extends the purchase request sample. It needs no new
 sample. [D101](d101-the-extensibility-milestone-is-split-into-six.md) splits
 that milestone into M19 to M23, and each one ends with its own step of the
-journey. Everything here is planned, and each point below names the milestone
-that builds it. See [extensibility](../product-brief.md#extensibility) in the
+journey. The module with a dependency is built. The rest is planned, and each
+point below names the milestone that builds it. See [extensibility](../product-brief.md#extensibility) in the
 product brief.
 
 - **Why this sample:** purchase requests already have a connector, an
@@ -25,7 +25,7 @@ product brief.
   rule that each milestone extends a sample of a new shape: M19 to M23 extend
   the platform's reach into code and operations, not into a new kind of
   application.
-- **A module with a dependency** _(planned for M20)_: a new sample module,
+- **A module with a dependency** _(built)_: a new sample module,
   `department-budgets`, under `samples/modules/`, depends on the
   `departments` module that leave requests already use. It holds a budget
   entity, a process, a page and a policy, and declares an `approver` role slot. Purchase requests declare it
