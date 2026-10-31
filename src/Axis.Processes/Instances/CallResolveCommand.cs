@@ -103,7 +103,6 @@ public static class CallResolveCommand
         Guid callId,
         RecordAccess? read,
         string userId,
-        string userName,
         string reason,
         bool succeeded,
         JsonObject? output,
@@ -178,8 +177,8 @@ public static class CallResolveCommand
             ["reason"] = reason,
         };
         var result = succeeded
-            ? await SucceedAsync(connection, transaction, tenantId, active, activeReleaseId, target, instance, values, userId, userName, loggerFactory, cancellationToken)
-            : await FailAsync(connection, transaction, target, instance, userId, userName, cancellationToken);
+            ? await SucceedAsync(connection, transaction, tenantId, active, activeReleaseId, target, instance, values, userId, loggerFactory, cancellationToken)
+            : await FailAsync(connection, transaction, target, instance, userId, cancellationToken);
         if (result.Outcome != CallResolveOutcome.Resolved)
         {
             return result;
@@ -290,7 +289,6 @@ public static class CallResolveCommand
         LockedInstance instance,
         List<KeyValuePair<FieldModel, object?>> values,
         string userId,
-        string userName,
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
@@ -407,7 +405,6 @@ public static class CallResolveCommand
         CallTarget target,
         LockedInstance instance,
         string userId,
-        string userName,
         CancellationToken cancellationToken)
     {
         if (!await ProcessSteps.TryFailWaitingAsync(transaction, instance.Id, target.Step, instance.Revision, cancellationToken))

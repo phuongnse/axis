@@ -17,7 +17,6 @@ internal static class SessionAudit
         HttpContext httpContext,
         string action,
         string actor,
-        string? actorName,
         string? reason,
         CancellationToken cancellationToken)
     {

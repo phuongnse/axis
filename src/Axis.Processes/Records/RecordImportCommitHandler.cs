@@ -84,7 +84,7 @@ internal sealed partial class RecordImportCommitHandler(
         else
         {
             var now = await RecordQueries.TransactionTimeAsync(connection, cancellationToken);
-            var actor = new RecordActor(import.UploaderId, import.UploaderName, import.UploaderRoles);
+            var actor = new RecordActor(import.UploaderId, import.UploaderRoles);
             (created, updated) = await WriteRowsAsync(item, connection, transaction, application, release!.Value, entity, actor, import.Key, import.Format, import.File ?? [], now, errors, cancellationToken);
             if (errors.Count == 0)
             {

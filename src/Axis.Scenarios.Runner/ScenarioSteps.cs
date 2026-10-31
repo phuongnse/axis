@@ -153,7 +153,7 @@ internal sealed class ScenarioSteps(
         }
 
         var started = await ProcessStarter.StartAsync(
-            connection, transaction, ScenarioRunner.TenantId, model, releaseId, process, entity, id, record, Guid.CreateVersion7(), user, user, null, cancellationToken);
+            connection, transaction, ScenarioRunner.TenantId, model, releaseId, process, entity, id, record, Guid.CreateVersion7(), user, null, cancellationToken);
         if (started.Outcome == ProcessStartOutcome.Started)
         {
             await transaction.CommitAsync(cancellationToken);
@@ -196,7 +196,7 @@ internal sealed class ScenarioSteps(
             model,
             releaseId,
             locked,
-            new RecordActor(user, user, PolicyEvaluator.HeldRoles(model, roles)),
+            new RecordActor(user, PolicyEvaluator.HeldRoles(model, roles)),
             (_, _) => Task.FromResult(model),
             _ => Task.FromResult<byte[]?>(utf8Body),
             loggerFactory,
@@ -442,7 +442,7 @@ internal sealed class ScenarioSteps(
     private RecordActor Actor(ScenarioStepDefinition step)
     {
         var (user, roles) = User(step);
-        return new RecordActor(user, user, roles);
+        return new RecordActor(user, roles);
     }
 
     private (string Name, IReadOnlyList<string> Roles) User(ScenarioStepDefinition step) =>

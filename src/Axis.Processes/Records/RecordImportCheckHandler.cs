@@ -74,7 +74,7 @@ internal sealed partial class RecordImportCheckHandler(
         else
         {
             var now = await RecordQueries.TransactionTimeAsync(connection, cancellationToken);
-            await CheckAsync(connection, transaction, application, entity, new RecordActor(import.UploaderId, import.UploaderName, import.UploaderRoles), import.Key, import.Format, import.File ?? [], now, errors, cancellationToken);
+            await CheckAsync(connection, transaction, application, entity, new RecordActor(import.UploaderId, import.UploaderRoles), import.Key, import.Format, import.File ?? [], now, errors, cancellationToken);
         }
 
         await RecordImports.FinishCheckAsync(

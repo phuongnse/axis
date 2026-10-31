@@ -327,7 +327,6 @@ public sealed class PackageCallFixture : IAsyncLifetime
             instanceId,
             new RecordAccess(true, null),
             "maria",
-            "Maria",
             "Fixed",
             NullLoggerFactory.Instance,
             cancellationToken);
@@ -350,7 +349,7 @@ public sealed class PackageCallFixture : IAsyncLifetime
         await ProcessTasks.ResumeAsync(
             transaction,
             task,
-            new TaskCompletion("approve", "describe", "maria", "Maria", null, null, []),
+            new TaskCompletion("approve", "describe", "maria", null, null, []),
             _tenant.Tenant,
             cancellationToken);
         await transaction.CommitAsync(cancellationToken);

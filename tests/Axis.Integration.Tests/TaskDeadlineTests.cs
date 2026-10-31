@@ -167,7 +167,7 @@ public sealed class TaskDeadlineTests(TaskApiFixture fixture) : IClassFixture<Ta
         await ProcessTasks.ResumeAsync(
             transaction,
             locked,
-            new TaskCompletion("approve", "approved", "maria", "Maria Manager", null, null, []),
+            new TaskCompletion("approve", "approved", "maria", null, null, []),
             TenantA,
             CancellationToken);
         await transaction.CommitAsync(CancellationToken);

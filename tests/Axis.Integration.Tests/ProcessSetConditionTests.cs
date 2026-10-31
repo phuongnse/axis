@@ -105,7 +105,7 @@ public sealed class ProcessSetConditionTests(DataDatabaseFixture database) : ICl
             model,
             release,
             locked,
-            new RecordActor("carl", "Carl Clerk", ["worker"]),
+            new RecordActor("carl", ["worker"]),
             (_, _) => Task.FromResult(model),
             _ => Task.FromResult<byte[]?>(body),
             NullLoggerFactory.Instance,

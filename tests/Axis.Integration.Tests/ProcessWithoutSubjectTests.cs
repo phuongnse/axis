@@ -157,7 +157,6 @@ public sealed class ProcessWithoutSubjectTests(ProcessStepFixture fixture) : ICl
             instanceId,
             "requester",
             null,
-            null,
             CancellationToken);
         await transaction.CommitAsync(CancellationToken);
         return (result, instanceId);

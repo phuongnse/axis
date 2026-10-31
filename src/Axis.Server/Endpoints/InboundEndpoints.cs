@@ -274,7 +274,6 @@ internal static class InboundEndpoints
                 subject: null,
                 instanceId!.Value,
                 caller.Id,
-                caller.DisplayName,
                 details,
                 cancellationToken);
             if (started.Outcome != ProcessStartOutcome.Started)

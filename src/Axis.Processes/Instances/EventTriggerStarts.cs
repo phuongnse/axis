@@ -114,7 +114,6 @@ internal static class EventTriggerStarts
             record,
             instanceId,
             AuditActors.System,
-            actorName: null,
             new JsonObject { ["trigger"] = trigger.Name, ["eventId"] = occurrence.Id },
             cancellationToken);
         return started.Outcome switch

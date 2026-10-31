@@ -334,7 +334,6 @@ internal sealed partial class TenantSignInOptions(TenantSignInSettings settings,
                 context.HttpContext,
                 AuditActions.SessionSignedIn,
                 user.Id,
-                user.DisplayName,
                 reason: null,
                 context.HttpContext.RequestAborted);
             await SaveProfileAsync(context.HttpContext, user);
@@ -362,7 +361,6 @@ internal sealed partial class TenantSignInOptions(TenantSignInSettings settings,
                     httpContext,
                     AuditActions.SessionSignInRefused,
                     AuditActors.Anonymous,
-                    actorName: null,
                     reason,
                     httpContext.RequestAborted);
             }

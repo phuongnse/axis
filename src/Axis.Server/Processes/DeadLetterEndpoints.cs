@@ -169,9 +169,9 @@ internal static class DeadLetterEndpoints
         // Nothing starts in this transaction, so the command takes no start lock.
         var result = redeliver
             ? await DeadLetterCommand.RedeliverAsync(
-                connection, transaction, tenantId, application, active.ReleaseId, model.Id, deadLetterId, user.Id, user.DisplayName, reason!, cancellationToken)
+                connection, transaction, tenantId, application, active.ReleaseId, model.Id, deadLetterId, user.Id, reason!, cancellationToken)
             : await DeadLetterCommand.DiscardAsync(
-                connection, transaction, tenantId, application, model.Id, deadLetterId, user.Id, user.DisplayName, reason!, cancellationToken);
+                connection, transaction, tenantId, application, model.Id, deadLetterId, user.Id, reason!, cancellationToken);
         if (result.Outcome != DeadLetterOutcome.Settled)
         {
             await transaction.RollbackAsync(cancellationToken);

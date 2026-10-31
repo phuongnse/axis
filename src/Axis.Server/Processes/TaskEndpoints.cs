@@ -382,7 +382,7 @@ internal static class TaskEndpoints
             var task = await TaskQueries.LockAsync(transaction, taskId, cancellationToken);
             var mayReassign = task is not null && MayReassign(active.Model, user, task);
             var outcome = await change(
-                transaction, active.Model.Manifest.Id, task, new RecordActor(user.Id, user.DisplayName, roles), mayReassign, cancellationToken);
+                transaction, active.Model.Manifest.Id, task, new RecordActor(user.Id, roles), mayReassign, cancellationToken);
             if (outcome != TaskClaimOutcome.Done)
             {
                 await transaction.RollbackAsync(cancellationToken);
@@ -513,7 +513,7 @@ internal static class TaskEndpoints
             body.Kind,
             body.Assignee,
             body.Reason,
-            new RecordActor(user.Id, user.DisplayName, roles),
+            new RecordActor(user.Id, roles),
             cancellationToken);
         return outcome switch
         {
@@ -571,7 +571,7 @@ internal static class TaskEndpoints
             current.Model,
             current.ReleaseId,
             task,
-            new RecordActor(user.Id, user.DisplayName, roles),
+            new RecordActor(user.Id, roles),
             (completing, ct) => resolver.GetReleaseModelAsync(completing.ReleaseId, ct),
             async ct => JsonRequest.IsJson(request) ? await RecordEndpoints.ReadBodyAsync(request, ct) : null,
             loggerFactory,

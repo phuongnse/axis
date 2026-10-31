@@ -10,8 +10,8 @@ using Npgsql;
 
 namespace Axis.Processes.Records;
 
-/// <summary>The person or system a record command acts for: an id, a display name and roles.</summary>
-public sealed record RecordActor(string Id, string DisplayName, IReadOnlyList<string> Roles);
+/// <summary>The person or system a record command acts for: an id and roles.</summary>
+public sealed record RecordActor(string Id, IReadOnlyList<string> Roles);
 
 /// <summary>How a record command ended.</summary>
 public enum RecordCommandOutcome

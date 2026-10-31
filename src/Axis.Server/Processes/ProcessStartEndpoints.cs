@@ -228,7 +228,6 @@ internal static class ProcessStartEndpoints
             record,
             instanceId,
             user.Id,
-            user.DisplayName,
             details: null,
             cancellationToken);
         if (started.Outcome != ProcessStartOutcome.Started)
@@ -308,7 +307,6 @@ internal static class ProcessStartEndpoints
             parameters,
             instanceId,
             user.Id,
-            user.DisplayName,
             details: null,
             cancellationToken);
         if (started.Outcome != ProcessStartOutcome.Started)

@@ -656,7 +656,7 @@ internal static class RecordEndpoints
         return ReleaseRetry.Changed();
     }
 
-    private static RecordActor Actor(CurrentUserResponse user, ApplicationModel application) => new(user.Id, user.DisplayName, user.RolesIn(application));
+    private static RecordActor Actor(CurrentUserResponse user, ApplicationModel application) => new(user.Id, user.RolesIn(application));
 
     // The route of a module entity has a module segment before the entity name.
     internal static string EntityName(HttpContext context, string entity) =>

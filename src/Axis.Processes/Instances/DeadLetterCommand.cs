@@ -59,10 +59,9 @@ public static class DeadLetterCommand
         Guid processId,
         Guid id,
         string userId,
-        string userName,
         string reason,
         CancellationToken cancellationToken) =>
-        SettleAsync(connection, transaction, tenantId, active, activeReleaseId, processId, id, userId, userName, reason, redeliver: true, cancellationToken);
+        SettleAsync(connection, transaction, tenantId, active, activeReleaseId, processId, id, userId, reason, redeliver: true, cancellationToken);
 
     /// <param name="active">The active release's model.</param>
     /// <param name="processId">The process of the route. The dead letter must belong to it.</param>
@@ -74,10 +73,9 @@ public static class DeadLetterCommand
         Guid processId,
         Guid id,
         string userId,
-        string userName,
         string reason,
         CancellationToken cancellationToken) =>
-        SettleAsync(connection, transaction, tenantId, active, Guid.Empty, processId, id, userId, userName, reason, redeliver: false, cancellationToken);
+        SettleAsync(connection, transaction, tenantId, active, Guid.Empty, processId, id, userId, reason, redeliver: false, cancellationToken);
 
     private static async Task<DeadLetterResult> SettleAsync(
         NpgsqlConnection connection,
@@ -88,7 +86,6 @@ public static class DeadLetterCommand
         Guid processId,
         Guid id,
         string userId,
-        string userName,
         string reason,
         bool redeliver,
         CancellationToken cancellationToken)
