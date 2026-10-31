@@ -287,14 +287,14 @@ second purchase order.
 ### Step shape
 
 After approval, the purchase request process creates a purchase order.
-`markApproved` names the step as its `next`:
+`announceApproved` names the step as its `next`:
 
 ```json
 {
-  "name": "markApproved",
+  "name": "announceApproved",
   "type": "operation",
-  "operation": "updateRecord",
-  "set": { "status": "'approved'" },
+  "operation": "raiseEvent",
+  "event": "PurchaseRequestApproved", "fields": { "number": "number", "totalAmount": "totalAmount" },
   "next": "createPurchaseOrder"
 },
 {
@@ -579,8 +579,8 @@ connector without `idempotency` depends on its lookup being correct.
 The purchasing system creates the order, but its response is lost. The
 request still ends with exactly one purchase order.
 
-1. The finance reviewer approves request `PR-2026-00042`. `markApproved` runs
-   and queues `createPurchaseOrder`.
+1. The finance reviewer approves request `PR-2026-00042`. `markApproved` runs,
+   `announceApproved` raises `PurchaseRequestApproved` and queues `createPurchaseOrder`.
 2. The step's transaction evaluates the input, stages call C as `pending`,
    sets the instance `waiting` and queues a `connector.call` item.
 3. Worker A claims the item. It marks C `sending` with attempt 1.

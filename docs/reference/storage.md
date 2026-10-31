@@ -67,7 +67,7 @@ apply: sections marked _(planned for Mx)_ are not built yet, and Dn refers to
     `Idempotency-Key`, unique per application, endpoint, caller and key, with a hash of the input) and
     `axis.process_work_items` (the work that
     workers claim and run), with history in `axis.__processes_migrations`.
-    See [processes](processes.md#tables).
+    See [processes](process-tables.md#tables).
   - `Axis.Data` also owns `axis.sessions`, with history in `axis.__data_migrations`. A row is one signed-in session:
     `id_hash` (`bytea`, the primary key, the SHA-256 hash of the session id), `user_id`, `display_name`, `roles`
     (`text[]`), `signed_in_at`, `last_request_at`, `authenticated_at` (nullable, the ID token's `auth_time`),

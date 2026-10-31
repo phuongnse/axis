@@ -54,6 +54,14 @@
       "type": "operation",
       "operation": "updateRecord",
       "set": { "status": "'approved'" },
+      "next": "announceApproved"
+    },
+    {
+      "name": "announceApproved",
+      "type": "operation",
+      "operation": "raiseEvent",
+      "event": "PurchaseRequestApproved",
+      "fields": { "number": "number", "totalAmount": "totalAmount" },
       "next": "createPurchaseOrder"
     },
     {

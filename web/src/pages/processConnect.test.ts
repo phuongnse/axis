@@ -3,7 +3,7 @@ import approval from '../../../samples/apps/purchase-requests/processes/purchase
 import { choiceLabel, connectChoices, connectEdit } from './processConnect'
 
 const steps = (approval as { steps: unknown[] }).steps
-const done = 9
+const done = 10
 
 describe('connectChoices', () => {
   it('offers nothing from an end step or a value that is not a step', () => {
