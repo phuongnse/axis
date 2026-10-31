@@ -838,12 +838,20 @@ test.describe("Studio edits a process in the process editor", () => {
       const deadline = page.getByTestId(
         `studio-field-/steps/${index}/deadline`,
       );
-      await deadline
-        .getByRole("button", { name: "Add deadline", exact: true })
-        .click();
-      await deadline
-        .getByRole("textbox", { name: "Deadline after", exact: true })
-        .fill("P5D");
+      const after = deadline.getByRole("textbox", {
+        name: "Deadline after",
+        exact: true,
+      });
+      // A click on the button can be lost while the form re-renders, so it is repeated until the field shows.
+      await expect(async () => {
+        if (!(await after.isVisible())) {
+          await deadline
+            .getByRole("button", { name: "Add deadline", exact: true })
+            .click({ timeout: 2_000 });
+        }
+        await expect(after).toBeVisible({ timeout: 2_000 });
+      }).toPass({ timeout: 20_000 });
+      await after.fill("P5D");
       await pick(page, `/steps/${index}/deadline/next`, "markRejected");
 
       const row = `/steps/${index}/escalations/0`;

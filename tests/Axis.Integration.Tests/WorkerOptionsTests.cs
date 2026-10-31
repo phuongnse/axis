@@ -1,4 +1,5 @@
 using Axis.Processes.Instances;
+using Axis.Processes.Work;
 using Axis.Worker;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -126,6 +127,45 @@ public sealed class WorkerOptionsTests
         var exception = Assert.Throws<InvalidOperationException>(() => builder.Services.AddAxisWorker(builder.Configuration, builder.Environment));
 
         Assert.Contains("Notifications:RetentionDays", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Without_a_statement_timeout_setting_work_items_run_under_a_limit_of_one_minute()
+    {
+        var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings { EnvironmentName = "Production", DisableDefaults = true });
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Tenants:a:Hosts:0"] = "a.example.test",
+
+            // No database is opened: the worker is built, never started.
+            ["Tenants:a:ConnectionString"] = "Host=127.0.0.1;Port=1;Database=axis;Username=axis;Password=axis",
+        });
+
+        builder.Services.AddAxisWorker(builder.Configuration, builder.Environment);
+
+        using var services = builder.Services.BuildServiceProvider();
+        Assert.Equal(TimeSpan.FromMinutes(1), services.GetRequiredService<WorkItemSettings>().StatementTimeout);
+    }
+
+    [Theory]
+    [InlineData("00:00:00")]
+    [InlineData("-00:00:05")]
+    [InlineData("soon")]
+    public void A_statement_timeout_setting_that_is_not_a_duration_of_at_least_a_millisecond_stops_the_worker_at_startup_naming_the_setting(string value)
+    {
+        var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings { EnvironmentName = "Production", DisableDefaults = true });
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Worker:StatementTimeout"] = value,
+            ["Tenants:a:Hosts:0"] = "a.example.test",
+
+            // No database is opened: the worker is built, never started.
+            ["Tenants:a:ConnectionString"] = "Host=127.0.0.1;Port=1;Database=axis;Username=axis;Password=axis",
+        });
+
+        var exception = Assert.Throws<InvalidOperationException>(() => builder.Services.AddAxisWorker(builder.Configuration, builder.Environment));
+
+        Assert.Contains("Worker:StatementTimeout", exception.Message, StringComparison.Ordinal);
     }
 
     [Fact]

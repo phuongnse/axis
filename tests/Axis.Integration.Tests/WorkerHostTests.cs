@@ -21,6 +21,7 @@ public sealed class WorkerHostTests(PostgreSqlFixture database) : IClassFixture<
     private const string BindingKind = "test.binding";
     private const string PlainSecretKind = "test.plain-secret";
     private const string SecretCallKind = "test.secret-call";
+    private const string LimitKind = "test.limit";
     private const string TokenValue = "s3cr3t-4f9b-x7q2";
 
     private static readonly TimeSpan _shortLease = TimeSpan.FromSeconds(1);
@@ -223,6 +224,60 @@ public sealed class WorkerHostTests(PostgreSqlFixture database) : IClassFixture<
         Assert.False(await runner.RunNextAsync("a", _longLease, CancellationToken));
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task External_handler_runs_under_the_statement_limit_and_the_next_user_of_its_connection_has_none(bool throws)
+    {
+        var tenantA = await CreateTenantDatabaseAsync("worker_external_limit");
+        await EnqueueAsync(tenantA, "a", LimitKind);
+        var handler = new LimitReadingExternalHandler(throws);
+
+        // The pool holds one connection, which No Reset On Close would hand on with a plain SET still in force.
+        await using var connections = CreateConnections(tenantA, ";Maximum Pool Size=1;No Reset On Close=true");
+        var runner = new WorkItemRunner(
+            connections.Factory,
+            connections.Accessor,
+            [],
+            NullLogger<WorkItemRunner>.Instance,
+            [handler],
+            new WorkItemSettings(TimeSpan.FromSeconds(5)));
+
+        if (throws)
+        {
+            await Assert.ThrowsAsync<InvalidOperationException>(() => runner.RunNextAsync("a", _longLease, CancellationToken));
+        }
+        else
+        {
+            Assert.True(await runner.RunNextAsync("a", _longLease, CancellationToken));
+        }
+
+        Assert.Equal("5s", handler.Limit);
+        connections.Accessor.Current = new TenantContext("a");
+        await using var connection = await connections.Factory.OpenConnectionAsync(CancellationToken);
+        await using var command = new NpgsqlCommand("SHOW statement_timeout", connection);
+        Assert.Equal("0", (string?)await command.ExecuteScalarAsync(CancellationToken));
+    }
+
+    [Fact]
+    public async Task In_transaction_handler_runs_in_a_transaction_with_the_statement_limit()
+    {
+        var tenantA = await CreateTenantDatabaseAsync("worker_transaction_limit");
+        await EnqueueAsync(tenantA, "a", LimitKind);
+        var handler = new LimitReadingHandler();
+        await using var connections = CreateConnections(tenantA);
+        var runner = new WorkItemRunner(
+            connections.Factory,
+            connections.Accessor,
+            [handler],
+            NullLogger<WorkItemRunner>.Instance,
+            settings: new WorkItemSettings(TimeSpan.FromSeconds(5)));
+
+        Assert.True(await runner.RunNextAsync("a", _longLease, CancellationToken));
+
+        Assert.Equal("5s", handler.Limit);
+    }
+
     [Fact]
     public async Task Worker_started_before_the_migrations_waits_then_claims_work_once_they_are_applied()
     {
@@ -295,10 +350,10 @@ public sealed class WorkerHostTests(PostgreSqlFixture database) : IClassFixture<
         return new HandBuiltWorker(runner, handler, connections);
     }
 
-    private static Connections CreateConnections(string connectionString)
+    private static Connections CreateConnections(string connectionString, string poolSettings = "")
     {
         var options = new TenantOptions();
-        options.Tenants["a"] = new TenantSettings { ConnectionString = PostgreSqlServer.RuntimeConnectionString(connectionString) };
+        options.Tenants["a"] = new TenantSettings { ConnectionString = PostgreSqlServer.RuntimeConnectionString(connectionString) + poolSettings };
         var accessor = new TenantContextAccessor();
         return new Connections(new TenantConnectionFactory(ConfigurationTenantCatalog.FromOptions(options), accessor), accessor);
     }
@@ -492,6 +547,49 @@ public sealed class WorkerHostTests(PostgreSqlFixture database) : IClassFixture<
             command.Parameters.AddWithValue("item", context.Item.Id);
             command.Parameters.AddWithValue("message", exception.Message);
             await command.ExecuteNonQueryAsync(cancellationToken);
+        }
+    }
+
+    /// <summary>Reads <c>statement_timeout</c> in the work transaction.</summary>
+    private sealed class LimitReadingHandler : IWorkItemHandler
+    {
+        public string Kind => LimitKind;
+
+        public string? Limit { get; private set; }
+
+        public async Task HandleAsync(WorkItemContext context, CancellationToken cancellationToken)
+        {
+            await using var command = new NpgsqlCommand("SHOW statement_timeout", context.Connection, context.Transaction);
+            Limit = (string?)await command.ExecuteScalarAsync(cancellationToken);
+        }
+
+        public Task OnFailedAsync(WorkItemContext context, Exception exception, CancellationToken cancellationToken) =>
+            Task.CompletedTask;
+    }
+
+    /// <summary>Reads <c>statement_timeout</c> on the open connection, then deletes the item or throws.</summary>
+    private sealed class LimitReadingExternalHandler(bool throws) : IExternalWorkItemHandler
+    {
+        public string Kind => LimitKind;
+
+        public string? Limit { get; private set; }
+
+        public async Task<WorkItemOutcome> ExecuteAsync(ClaimedWorkItem item, NpgsqlConnection connection, CancellationToken cancellationToken)
+        {
+            await using (var command = new NpgsqlCommand("SHOW statement_timeout", connection))
+            {
+                Limit = (string?)await command.ExecuteScalarAsync(cancellationToken);
+            }
+
+            if (throws)
+            {
+                throw new InvalidOperationException("boom");
+            }
+
+            await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+            Assert.True(await WorkItemQueue.CompleteAsync(connection, transaction, item, cancellationToken));
+            await transaction.CommitAsync(cancellationToken);
+            return WorkItemOutcome.Completed;
         }
     }
 }
