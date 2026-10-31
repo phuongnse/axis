@@ -15,7 +15,7 @@ namespace Axis.Integration.Tests;
 /// </summary>
 public sealed class KeycloakFixture : IAsyncDisposable
 {
-    public const string Image = "quay.io/keycloak/keycloak:26.4";
+    public const string Image = "quay.io/keycloak/keycloak:26.8";
     public const string ClientId = "axis";
     public const string ClientSecret = "axis-development-secret";
     public const string Password = "axis";

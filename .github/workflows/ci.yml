@@ -4,11 +4,14 @@ name: CI
 # branches are left out: NexKit runs the same scripts as its own checks, and its pushes and
 # pull requests use the Actions token, which starts no workflow or waits for approval.
 # A merge by NexKit starts no push workflow, so NexKit starts CI on main once every 5 of its merges
-# (D112). It also runs on a person's push and on demand.
+# (D112). It also runs on a person's push and on demand. Once a week the schedule runs the image scan
+# alone, so a new advisory in a base image fails CI on main even when nothing merged (D107).
 on:
   push:
     branches-ignore: ['nexkit/**']
   workflow_dispatch:
+  schedule:
+    - cron: '17 5 * * 1'
 
 permissions:
   contents: read
@@ -25,6 +28,7 @@ jobs:
   # NexKit's check for that shard, such as AXIS_E2E_SHARD=2/3 scripts/e2e.sh, so NexKit matches a pull
   # request's failing e2e-2 check with a failed shard 2/3 here.
   checks:
+    if: github.event_name != 'schedule'
     name: ${{ matrix.name }}
     runs-on: ubuntu-24.04
     timeout-minutes: 45
@@ -132,10 +136,35 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
+  # Builds the production images and scans them and the identity provider image with Trivy. It fails
+  # on a high or critical finding that scripts/scan-images-accepted.json does not cover (D107).
+  image-scan:
+    name: Image scan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      # Trivy's vulnerability database and the pinned Trivy binary. The key changes every day, so the
+      # database is fresh once a day and a run restores the newest one before it downloads.
+      - id: day
+        run: echo "day=$(date -u +%F)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cache/trivy
+            ~/.cache/axis-tools
+          key: ${{ runner.os }}-image-scan-${{ steps.day.outputs.day }}
+          restore-keys: ${{ runner.os }}-image-scan-
+      - name: Image scan
+        run: scripts/scan-images.sh
+
   # NexKit autopilot looks at this run as soon as it ends: a run that NexKit started with
   # the Actions token sends no workflow_run event, but it may dispatch NexKit's sweep.
   nexkit-sweep:
-    needs: [checks]
+    needs: [checks, image-scan]
     if: always() && github.ref_name == github.event.repository.default_branch
     runs-on: ubuntu-24.04
     timeout-minutes: 15

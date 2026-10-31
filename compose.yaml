@@ -47,7 +47,7 @@ services:
   # the Axis theme, which is mounted from artifacts/keycloak-theme. Build it first with
   # `npm run build:keycloak-theme --prefix web`, or Docker creates the folder owned by root and the build fails.
   keycloak:
-    image: quay.io/keycloak/keycloak:26.4
+    image: quay.io/keycloak/keycloak:26.8
     command: ["start-dev", "--import-realm"]
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: admin

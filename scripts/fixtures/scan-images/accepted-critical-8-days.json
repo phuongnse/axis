@@ -1,0 +1,5 @@
+{
+  "accepted": [
+    { "advisory": "CVE-2023-45853", "package": "zlib1g", "found": "2026-10-20", "reason": "The images never call minizip" }
+  ]
+}
