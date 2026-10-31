@@ -40,7 +40,7 @@ public static class AxisMetrics
     /// <summary>Whether each tenant database answered the last readiness probe of the server, 1 or 0, by tenant.</summary>
     public const string TenantDatabaseAvailable = "axis.tenant.database.available";
 
-    /// <summary>The interactive reads that ran past the query timeout, by tenant and application.</summary>
+    /// <summary>The reads and writes that ran past their query timeout, by tenant and application.</summary>
     public const string QueryTimeouts = "axis.queries.timeouts";
 
     /// <summary>The requests that a rate limit refused, by partition.</summary>
@@ -95,7 +95,7 @@ public static class AxisMetrics
     private static readonly Counter<long> _queryTimeouts = Meter.CreateCounter<long>(
         QueryTimeouts,
         "{query}",
-        "Interactive reads that ran past the query timeout.");
+        "Reads and writes that ran past their query timeout.");
 
     private static readonly Counter<long> _createdDeadLetters = Meter.CreateCounter<long>(
         DeadLettersCreated,
@@ -117,7 +117,7 @@ public static class AxisMetrics
             new KeyValuePair<string, object?>(AxisTelemetry.TenantTag, tenant),
             new KeyValuePair<string, object?>(AxisTelemetry.WorkItemKindTag, kind));
 
-    /// <summary>Counts one interactive read that ran past the query timeout. A <see langword="null"/> application is left out.</summary>
+    /// <summary>Counts one read or write that ran past its query timeout. A <see langword="null"/> application is left out.</summary>
     public static void RecordQueryTimeout(string tenant, string? application)
     {
         var tags = new TagList { { AxisTelemetry.TenantTag, tenant } };

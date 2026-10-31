@@ -31,7 +31,10 @@ export const templatesPath = path.resolve(repoRoot, 'artifacts', 'templates')
 export const serverProject = path.resolve(repoRoot, 'src', 'Axis.Server')
 export const serverDll = path.resolve(serverProject, 'bin', 'Release', 'net10.0', 'Axis.Server.dll')
 
-function required(name: string, meaning: string): string {
+/** The development key from appsettings.Development.json. A unit test keeps the two equal. */
+export const platformSecretKey = 'x7lhedPPY+Gx/xkG67W8XRybLeK3gghTBhDhDv9TIVw='
+
+export function required(name: string, meaning: string): string {
   const value = process.env[name]
   if (!value) {
     throw new Error(`${name} must hold ${meaning}. Run scripts/e2e.sh.`)
@@ -96,8 +99,7 @@ export function serverEnv(baseURL: string): Record<string, string> {
     ASPNETCORE_ENVIRONMENT: 'Development',
     ConnectionStrings__Platform: connectionString,
     ConnectionStrings__PlatformSchema: schemaConnectionString,
-    // The development key from appsettings.Development.json. A unit test keeps the two equal.
-    Platform__SecretKey: 'x7lhedPPY+Gx/xkG67W8XRybLeK3gghTBhDhDv9TIVw=',
+    Platform__SecretKey: platformSecretKey,
     // The browser reaches the server as 127.0.0.1, so that host is the tenant's.
     Tenants__default__Hosts__0: '127.0.0.1',
     // The host of the site host-site: it serves only that site, at its root. No other spec opens that site.
@@ -186,7 +188,7 @@ export function journeyServerEnv(): Record<string, string> {
     ASPNETCORE_ENVIRONMENT: 'Testing',
     ConnectionStrings__Platform: connectionString,
     ConnectionStrings__PlatformSchema: schemaConnectionString,
-    Platform__SecretKey: 'x7lhedPPY+Gx/xkG67W8XRybLeK3gghTBhDhDv9TIVw=',
+    Platform__SecretKey: platformSecretKey,
     Tenants__journey__Hosts__0: '127.0.0.2',
     Tenants__journey__ConnectionString: journeyConnectionString,
     Tenants__journey__SchemaConnectionString: journeySchemaConnectionString,

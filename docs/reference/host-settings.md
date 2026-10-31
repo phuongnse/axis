@@ -405,7 +405,7 @@ The server's startup activation and `Axis.Admin` activation use it.
 ## Data settings
 
 The server reads `Data:QueryTimeout`, `Data:ExportQueryTimeout`,
-`Data:ExportMaxRows`, `Data:ImportMaxBytes` and `Files:MaxSize`, and the worker
+`Data:WriteTimeout`, `Data:ExportMaxRows`, `Data:ImportMaxBytes` and `Files:MaxSize`, and the worker
 reads `Data:ImportMaxRows`. See
 [D79](../decisions/d79-import-and-export-under-policies.md) and
 [D80](../decisions/d80-search-more-aggregates-and-query-timeouts.md).
@@ -414,6 +414,7 @@ reads `Data:ImportMaxRows`. See
 | --- | --- | --- |
 | `Data:QueryTimeout` | `00:00:10` | The `statement_timeout` of every interactive read: record lists, single reads and histories, data source rows, lookups and page reads. A read past it is a `503`. |
 | `Data:ExportQueryTimeout` | `00:01:00` | The `statement_timeout` of an export's query. An export past it is a `503` and sends no file. |
+| `Data:WriteTimeout` | `00:00:15` | The `statement_timeout` of the write transaction of record create, update and delete, process start, task complete and an inbound endpoint call. A write past it rolls back, writes nothing and is a `503`. |
 | `Data:ExportMaxRows` | `100000` | The most data rows one export file holds, an integer from 1 to 2147483646. The file stops there and the response carries `Axis-Export-Truncated: true`. |
 | `Data:ImportMaxRows` | `10000` | The most data rows one import holds. A larger file fails its dry run. The worker reads it, and a value that is not an integer of at least 1 stops its start. |
 | `Data:ImportMaxBytes` | `20971520` | The largest import file, 20 MB. A larger upload is a `413`. The server reads it, and a value that is not a whole number of at least 1 stops its start. |
@@ -431,9 +432,14 @@ reads `Data:ImportMaxRows`. See
   stops the start. A missing value takes its default.
 - **A bad file size.** A `Files:MaxSize` that is not a whole number of bytes,
   at least 1, stops the start. A missing value takes the default.
-- **Writes.** Record writes, activation and the worker's own statements keep
-  their current limits. The final values are set against the performance
-  objectives _(planned for M28)_.
+- **Writes.** Only the six routes of `Data:WriteTimeout` change. The limit is
+  the first statement of their write transaction, before the start lock, so it
+  also bounds a wait behind an activation. Activation, imports, Studio and the
+  worker's own statements keep their own limits.
+- **Safety net.** Each default is about 30 times the p95 objective of its group
+  in [objectives](performance.md#objectives): 300 ms gives 10 s for reads, and
+  500 ms gives 15 s for writes. A timeout stops only a runaway statement and
+  is no budget.
 - **Environment.** As environment variables they are `Data__QueryTimeout`
   and so on.
 

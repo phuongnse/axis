@@ -177,6 +177,20 @@ describe('scripts/e2e.sh runs Playwright, or one shard of it with AXIS_E2E_SHARD
     assert.ok(keycloak > build, run.calls.join('\n'))
   })
 
+  test('Keycloak mounts the breached-password list and gets the axis-admin client, and PostgreSQL gets the role axis_admin', () => {
+    const run = runE2e()
+
+    assert.equal(run.status, 0, run.stdout + run.stderr)
+    const keycloak = run.calls.find((call) => call.startsWith('docker run ') && call.includes('/opt/keycloak/themes:ro'))
+    assert.ok(keycloak, run.calls.join('\n'))
+    assert.match(keycloak, /password-blacklists:\/opt\/keycloak\/data\/password-blacklists:ro/)
+    assert.match(keycloak, /KC_BOOTSTRAP_ADMIN_CLIENT_ID=axis-admin/)
+    assert.match(keycloak, /KC_BOOTSTRAP_ADMIN_CLIENT_SECRET=\S+/)
+    const role = run.calls.find((call) => call.startsWith('docker exec ') && call.includes('CREATE ROLE axis_admin'))
+    assert.ok(role, run.calls.join('\n'))
+    assert.match(role, /CREATE ROLE axis_admin LOGIN PASSWORD 'axis' CREATEDB CREATEROLE/)
+  })
+
   test('Mailpit runs with the alias mailpit on the network of Keycloak, and both are removed at the end', () => {
     const run = runE2e()
 

@@ -62,6 +62,10 @@ The load test sends these routes, and a test fails when this list and `tests/loa
 | Writes | `POST /api/apps/{app}/tasks/{id}/complete`              |
 | Writes | `POST /api/apps/{app}/endpoints/{name}`                 |
 
+- **Safety net.** Each query timeout is about 30 times the p95 objective of its group: 300 ms
+  gives 10 s for `Data:QueryTimeout`, and 500 ms gives 15 s for `Data:WriteTimeout`. It stops only a
+  runaway statement, so it never replaces the objective. See
+  [data settings](host-settings.md#data-settings).
 - **Same metrics in production.** Each objective uses a metric that the hosts already export, so an
   operator can watch the same numbers on a running installation. Axis builds no alerting.
 - **New routes.** A milestone that adds a route in one of the groups adds it to the load test, and

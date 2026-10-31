@@ -9,6 +9,10 @@
 # builds into artifacts/keycloak-theme and mounts read-only before Keycloak starts.
 # The axis realm sends its emails, such as a password reset link, to Mailpit. This script starts Mailpit on a Docker
 # network of its own with the alias mailpit, joins Keycloak to that network, and removes both at the end.
+# Keycloak also gets the axis-admin bootstrap client and the breached-password list, which Axis.Admin tenant create needs.
+# This script creates the PostgreSQL role axis_admin and gives Playwright AXIS_E2E_ADMIN_DATABASE and
+# AXIS_E2E_IDENTITY_ADMIN_SECRET. tests/e2e/admin-tool.ts runs Axis.Admin with them, and the realm emails go to
+# mailpit:1025.
 # The server starts with seven applications active: the generic E2E test application in
 # tests/e2e/fixtures/e2e-app, the purchase request sample in samples/apps/purchase-requests, the
 # leave request sample in samples/apps/leave-requests, the service desk sample in
@@ -102,6 +106,7 @@ fi
 image="postgres:18-alpine"
 container="axis-e2e-postgres-$$"
 password="e2e-$RANDOM$RANDOM"
+identity_admin_secret="e2e-$RANDOM$RANDOM"
 keycloak_image="quay.io/keycloak/keycloak:26.8"
 keycloak_container="axis-e2e-keycloak-$$"
 mailpit_image="axllent/mailpit:v1.32.0"
@@ -165,6 +170,8 @@ if affected playwright; then
   docker run -d --name "$mailpit_container" --network "$network" --network-alias mailpit "$mailpit_image" >/dev/null
   docker run -d --name "$keycloak_container" --network "$network" \
     -e KC_BOOTSTRAP_ADMIN_USERNAME=admin -e KC_BOOTSTRAP_ADMIN_PASSWORD=admin \
+    -e KC_BOOTSTRAP_ADMIN_CLIENT_ID=axis-admin -e KC_BOOTSTRAP_ADMIN_CLIENT_SECRET="$identity_admin_secret" \
+    -v "$PWD/deploy/keycloak/password-blacklists:/opt/keycloak/data/password-blacklists:ro" \
     -v "$PWD/samples/keycloak:/opt/keycloak/data/import:ro" \
     -v "$PWD/artifacts/keycloak-theme:/opt/keycloak/themes:ro" -p "127.0.0.1:$keycloak_port:$keycloak_port" \
     "$keycloak_image" start-dev --import-realm --http-port="$keycloak_port" >/dev/null
@@ -202,6 +209,7 @@ if affected playwright; then
   docker exec "$container" psql -U axis -d axis -v ON_ERROR_STOP=1 \
     -c "CREATE ROLE axis_journey_schema LOGIN PASSWORD 'axis'" \
     -c "CREATE ROLE axis_journey_runtime LOGIN PASSWORD 'axis'" \
+    -c "CREATE ROLE axis_admin LOGIN PASSWORD 'axis' CREATEDB CREATEROLE" \
     -c "CREATE DATABASE axis_journey OWNER axis_journey_schema" >/dev/null
 
   scripts/build.sh
@@ -303,6 +311,11 @@ if affected playwright; then
   # address 127.0.0.2, which needs no DNS.
   export AXIS_E2E_JOURNEY_URL="http://127.0.0.2:${AXIS_E2E_JOURNEY_PORT:-5282}"
   export AXIS_E2E_KEYCLOAK_URL="http://127.0.0.1:$keycloak_port"
+  # What Axis.Admin tenant create needs, for Playwright only: the connection string of axis_admin, which can create
+  # databases and roles and is no superuser, and the secret of the axis-admin client. tests/e2e/admin-tool.ts turns
+  # them into the tool's own settings, so the server, the worker and the publisher never see them.
+  export AXIS_E2E_ADMIN_DATABASE="Host=127.0.0.1;Port=$port;Database=postgres;Username=axis_admin;Password=axis"
+  export AXIS_E2E_IDENTITY_ADMIN_SECRET="$identity_admin_secret"
   # The role spec asks PostgreSQL for the roles in this container.
   export AXIS_E2E_POSTGRES_CONTAINER="$container"
   # The role that creates the databases of test scenarios. Only the publisher gets it, below, and it connects to
