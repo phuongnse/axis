@@ -139,6 +139,9 @@ publisher. A synced seed decrypts the stored value and compares it with the decl
 nothing. A seed with a sensitive value fails the whole seed run when the tenant has no data key, and stores no row. Test:
 `StartupActivationTests`.
 
+`SensitiveValueSourceTests` guards the rest of the code: it fails on a method in `src/` that builds SQL over an entity
+column without the cipher, unless an allow-list entry says why that method touches no sensitive value.
+
 Scenarios do not use the cipher yet _(planned for M27)_. A write of a sensitive value there fails, and a value is never
 written in clear. The trigger and starter reads do not use it yet either _(planned for
 M27)_: a data change trigger, the process starter, an event trigger start or a task escalation that reads a record
