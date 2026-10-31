@@ -863,8 +863,8 @@ live in memory only.
   taken from `data.fields.number`, and its `receivedAt` time.
 - `POST /test/fail-webhook/{requestNumber}` makes every delivery for that
   request number answer `500` and store nothing, while other request numbers
-  are unaffected. The switch stays on and has no off endpoint, as the
-  `unknown-request` switch does.
+  are unaffected. `POST /test/accept-webhook/{requestNumber}` turns that switch
+  off, so the deliveries for that request number are accepted again.
 - `POST /test/drop-next` drops the response of the next create.
   `POST /test/drop/{idempotencyKey}` drops the response of the first create
   with that key. A dropped create stores the order, then closes the connection

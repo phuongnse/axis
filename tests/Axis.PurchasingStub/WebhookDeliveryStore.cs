@@ -44,6 +44,14 @@ internal sealed class WebhookDeliveryStore
         }
     }
 
+    public void Accept(string requestNumber)
+    {
+        lock (_lock)
+        {
+            _failingRequests.Remove(requestNumber);
+        }
+    }
+
     public bool IsFailing(string requestNumber)
     {
         lock (_lock)

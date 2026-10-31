@@ -15,8 +15,9 @@ namespace Axis.Integration.Tests;
 
 /// <summary>
 /// The purchasing system stub's webhook receiver over real HTTP: it accepts a delivery signed with the webhook secret,
-/// stores each webhook id once, refuses a bad signature or a stale timestamp with <c>401</c> and stores nothing, and
-/// answers <c>500</c> for a request number whose deliveries a test has set to fail.
+/// stores each webhook id once, refuses a bad signature or a stale timestamp with <c>401</c> and stores nothing, answers
+/// <c>500</c> for a request number whose deliveries a test has set to fail, and accepts that number again once a test
+/// clears the switch.
 /// </summary>
 public sealed class PurchasingStubWebhookTests : IAsyncLifetime
 {
@@ -105,6 +106,24 @@ public sealed class PurchasingStubWebhookTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.NoContent, other.StatusCode);
         var delivery = Assert.Single(await ListAsync());
         Assert.Equal("PR-2026-00043", delivery.GetProperty("requestNumber").GetString());
+    }
+
+    [Fact]
+    public async Task A_request_number_accepted_again_is_answered_204_and_listed()
+    {
+        using var fail = await _client.PostAsync($"/test/fail-webhook/{RequestNumber}", null, CancellationToken);
+        Assert.Equal(HttpStatusCode.NoContent, fail.StatusCode);
+        var id = $"{Guid.NewGuid():D}_{Guid.NewGuid():D}";
+        using var failed = await SendAsync(RequestNumber, id: id);
+        Assert.Equal(HttpStatusCode.InternalServerError, failed.StatusCode);
+        Assert.Empty(await ListAsync());
+
+        using var accept = await _client.PostAsync($"/test/accept-webhook/{RequestNumber}", null, CancellationToken);
+        Assert.Equal(HttpStatusCode.NoContent, accept.StatusCode);
+        using var accepted = await SendAsync(RequestNumber, id: id);
+        Assert.Equal(HttpStatusCode.NoContent, accepted.StatusCode);
+        var delivery = Assert.Single(await ListAsync());
+        Assert.Equal(id, delivery.GetProperty("webhookId").GetString());
     }
 
     [Fact]
