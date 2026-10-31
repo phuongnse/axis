@@ -1,0 +1,7 @@
+[
+  {
+    "number": 2301,
+    "title": "Update minimist",
+    "body": "Fixes ghsa-XVCH-5gv4-984h in the web app."
+  }
+]

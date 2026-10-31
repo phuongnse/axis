@@ -17,7 +17,7 @@ dependencies at once and extends the watch to its images.
 - **Dependabot alerts are on, and Dependabot opens no pull requests.**
   - The alerts cover NuGet, npm, GitHub Actions and the Dockerfile's base images.
   - The owner turns the alerts on at once, and GitHub notifies the owner of each one.
-  - _(planned for M28)_ The hourly driver opens one NexKit issue in no milestone for each high or
+  - The hourly driver opens one NexKit issue in no milestone for each high or
     critical alert that no open issue covers, so every change still goes through NexKit with its
     checks and review. The [`axis-nexkit-routine` skill](../../.claude/skills/axis-nexkit-routine/SKILL.md)
     gets that step.
