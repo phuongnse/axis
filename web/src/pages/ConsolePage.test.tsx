@@ -3,7 +3,12 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
-import type { ConsoleDeadLetterPage, ConsoleFailedWorkPage, ConsoleTenant } from '../platform/console'
+import type {
+  ConsoleDeadLetterPage,
+  ConsoleFailedWorkPage,
+  ConsoleScheduleList,
+  ConsoleTenant,
+} from '../platform/console'
 import { TextProvider } from '../platform/TextProvider'
 import { PlatformContext, type Platform } from './context'
 import { ConsolePage } from './ConsolePage'
@@ -122,13 +127,27 @@ const allLetters: ConsoleDeadLetterPage = {
   totalCount: 3,
 }
 
-/** Answers the dead letter routes with `letters` and every other route with `answer`, and records every request. */
-function stubServer(answer: (url: string) => Response, letters: () => Response = () => json(emptyDeadLetters)) {
+const schedulesPath = '/api/console/schedules'
+
+const emptySchedules: ConsoleScheduleList = { items: [] }
+
+/**
+ * Answers the dead letter routes with `letters`, the schedules route with `schedules` and every other route with
+ * `answer`, and records every request.
+ */
+function stubServer(
+  answer: (url: string) => Response,
+  letters: () => Response = () => json(emptyDeadLetters),
+  schedules: (url: string) => Response = () => json(emptySchedules),
+) {
   const requests: string[] = []
   const bodies: (string | undefined)[] = []
   const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
     requests.push(`${init?.method ?? 'GET'} ${input}`)
     bodies.push(typeof init?.body === 'string' ? init.body : undefined)
+    if (input.startsWith(schedulesPath)) {
+      return schedules(input)
+    }
     return input.startsWith(deadLettersPath) ? letters() : answer(input)
   })
   vi.stubGlobal('fetch', fetchMock)
@@ -309,6 +328,74 @@ describe('ConsolePage', () => {
     renderPage()
 
     expect(await screen.findByTestId('console-dead-letters-error')).toBeVisible()
+    expect(screen.getByTestId('console-tenant')).toBeVisible()
+  })
+
+  it('lists the schedule triggers with their occurrences and a dash for one that never ran', async () => {
+    const schedules: ConsoleScheduleList = {
+      items: [
+        {
+          applicationId: 'a1',
+          application: 'Leave',
+          triggerId: 't1',
+          trigger: 'followups/RemindFollowups',
+          process: 'followups/Remind',
+          schedule: '0 6 * * *',
+          timeZone: 'Asia/Ho_Chi_Minh',
+          lastOccurrenceAt: '2026-10-30T23:00:00Z',
+          nextOccurrenceAt: '2026-10-31T23:00:00Z',
+        },
+        {
+          applicationId: 'a2',
+          application: 'Purchasing',
+          triggerId: 't2',
+          trigger: 'followups/RemindFollowups',
+          process: 'followups/Remind',
+          schedule: '0 6 * * *',
+          timeZone: 'Europe/Berlin',
+          lastOccurrenceAt: null,
+          nextOccurrenceAt: '2026-11-01T05:00:00Z',
+        },
+      ],
+    }
+    stubServer(tenantAndFailedWork, undefined, () => json(schedules))
+    renderPage()
+
+    const view = await screen.findByTestId('console-schedules')
+    await within(view).findByText('Asia/Ho_Chi_Minh', { exact: false })
+    for (const title of ['Application', 'Trigger', 'Process', 'Schedule', 'Last occurrence', 'Next occurrence']) {
+      expect(within(view).getByRole('columnheader', { name: title })).toBeVisible()
+    }
+    const first = within(view).getByText('0 6 * * * Asia/Ho_Chi_Minh').closest('tr')!
+    expect(within(first).getByText('Leave')).toBeVisible()
+    expect(within(first).getByText('followups/RemindFollowups')).toBeVisible()
+    expect(within(first).getByText(new Date('2026-10-30T23:00:00Z').toLocaleString('en'))).toBeVisible()
+    expect(within(first).getByText(new Date('2026-10-31T23:00:00Z').toLocaleString('en'))).toBeVisible()
+    const second = within(view).getByText('0 6 * * * Europe/Berlin').closest('tr')!
+    expect(within(second).getByText('Purchasing')).toBeVisible()
+    expect(within(second).getByText('—')).toBeVisible()
+    expect(within(second).getByText(new Date('2026-11-01T05:00:00Z').toLocaleString('en'))).toBeVisible()
+  })
+
+  it('asks for the schedules of the chosen application', async () => {
+    const server = stubServer(tenantAndFailedWork)
+    const user = userEvent.setup()
+    renderPage()
+
+    const view = await screen.findByTestId('console-schedules')
+    await waitFor(() => expect(server.requests).toContain(`GET ${schedulesPath}`))
+    await user.click(within(view).getByRole('combobox', { name: 'Application' }))
+    await user.click(await screen.findByTitle('Purchasing'))
+
+    await waitFor(() => expect(server.requests).toContain(`GET ${schedulesPath}?application=a2`))
+  })
+
+  it('shows an error in the card when the schedules cannot be loaded', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    stubServer(tenantAndFailedWork, undefined, () => new Response(null, { status: 500 }))
+    renderPage()
+
+    expect(await screen.findByTestId('console-schedules-error')).toBeVisible()
     expect(screen.getByTestId('console-tenant')).toBeVisible()
   })
 })

@@ -2,7 +2,8 @@
 
 Detailed reference for the operator console: the web page where the platform operator sees what
 failed in a tenant and runs the commands that fix it. The route, the access rules, the Tenant view, the
-list of the Failed work view, the Dead letters view and the redeliver and discard commands are built.
+list of the Failed work view, the Dead letters view, the Schedules view and the redeliver and discard
+commands are built.
 Everything else in this file is _(planned for M23)_. The design follows
 [D93](../decisions/d93-an-operator-web-console.md). Tenant provisioning stays in
 [`Axis.Admin`](administration.md), as
@@ -67,7 +68,8 @@ _(planned for Mx)_ are not built yet, and Dn refers to [decisions.md](../decisio
 
 ## Views
 
-Each view lists the newest items first, pages through them and filters by application.
+Each view filters by application. Unless a view says otherwise, it lists the newest items first
+and pages through them.
 
 - **Failed work.** Process instances that are `failed`, and connector and package calls whose
   outcome is `unknown`, across every process of every application. The list, its paging and the
@@ -80,8 +82,10 @@ Each view lists the newest items first, pages through them and filters by applic
   application, the kind, the event, the trigger or webhook, the attempts, the last error and the
   state. An `open` letter offers redeliver and discard. Built.
 - **Webhook deliveries.** Recent deliveries of each webhook, with their status code and attempts.
-- **Schedules.** Each schedule trigger of each active release, with its last and next
-  occurrence, see [schedules](process-events.md#schedules).
+- **Schedules.** Each schedule trigger of each active release, with its process, its schedule and
+  time zone, and its last and next occurrence, see [schedules](process-events.md#schedules). The
+  view is ordered by application and trigger name, is not paged and has an application filter.
+  Built.
 - **Publishing.** Publish requests and the [release history](studio.md) of each application,
   read-only. Publishing and rollback stay in Studio.
 - **Tenant.** The tenant's status and each application's active release, as a table with the

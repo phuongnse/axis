@@ -30,6 +30,10 @@ namespace Axis.Server.Console;
 /// process, the instance and the step, and for a call its connector or package and operation, when it failed and its stored
 /// error. It never holds a call input, a history input or output, or a record value.
 /// </para>
+/// <para>
+/// <c>GET /api/console/schedules</c> lists the schedule triggers of every active release with their last and next
+/// occurrence, see <see cref="ConsoleScheduleEndpoints"/>.
+/// </para>
 /// </summary>
 internal static class ConsoleEndpoints
 {
@@ -43,6 +47,7 @@ internal static class ConsoleEndpoints
         console.MapGet("/tenant", GetTenantAsync);
         console.MapGet("/failed-work", ListFailedWorkAsync);
         console.MapConsoleDeadLetterEndpoints();
+        console.MapConsoleScheduleEndpoints();
     }
 
     private static async ValueTask<object?> RequireOperatorAsync(EndpointFilterInvocationContext context, EndpointFilterDelegate next)
