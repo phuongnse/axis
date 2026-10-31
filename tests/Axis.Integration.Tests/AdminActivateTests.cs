@@ -212,12 +212,13 @@ public sealed class AdminActivateTests(PostgreSqlFixture database) : IClassFixtu
         var modules = await scenario.RunAsync(
             ["activate", _sample], extra: new Dictionary<string, string?> { ["Modules:Path"] = Path.Combine(Path.GetTempPath(), $"axis-nomodules-{Guid.NewGuid():N}") });
         var limit = await scenario.RunAsync(["activate", _sample], extra: new Dictionary<string, string?> { ["Activation:InlineRecomputeLimit"] = "0" });
+        var timeout = await scenario.RunAsync(["activate", _sample], extra: new Dictionary<string, string?> { ["Data:ActivationTimeout"] = "0" });
         var none = await scenario.RunAsync(["activate"]);
         var repeated = await scenario.RunAsync(["activate", _sample, "--tenant", active, "--tenant", active]);
         var two = await scenario.RunAsync(["activate", _sample, _sample]);
         var option = await scenario.RunAsync(["activate", _sample, "--all"]);
 
-        Assert.All([missing, unknown, notReady, packages, modules, limit, none, repeated, two, option], result =>
+        Assert.All([missing, unknown, notReady, packages, modules, limit, timeout, none, repeated, two, option], result =>
         {
             Assert.Equal(2, result.Exit);
             Assert.Empty(result.Output);
@@ -230,6 +231,7 @@ public sealed class AdminActivateTests(PostgreSqlFixture database) : IClassFixtu
         Assert.Contains("Modules:Path", modules.Error[0], StringComparison.Ordinal);
         Assert.DoesNotContain("axis-nomodules", modules.Error[0], StringComparison.Ordinal);
         Assert.Contains("Activation:InlineRecomputeLimit", limit.Error[0], StringComparison.Ordinal);
+        Assert.Contains("Data:ActivationTimeout", timeout.Error[0], StringComparison.Ordinal);
         Assert.All([none, repeated, two, option], result => Assert.StartsWith("Usage:", result.Error[0], StringComparison.Ordinal));
         Assert.Equal(before, await scenario.SnapshotAsync());
 

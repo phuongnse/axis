@@ -406,7 +406,8 @@ The server's startup activation and `Axis.Admin` activation use it.
 
 The server reads `Data:QueryTimeout`, `Data:ExportQueryTimeout`,
 `Data:WriteTimeout`, `Data:ExportMaxRows`, `Data:ImportMaxBytes` and `Files:MaxSize`, and the worker
-reads `Data:ImportMaxRows`. See
+reads `Data:ImportMaxRows`. `Data:ActivationTimeout` is read by the server when startup activation is on, and by
+`admin activate` and the publisher. See
 [D79](../decisions/d79-import-and-export-under-policies.md) and
 [D80](../decisions/d80-search-more-aggregates-and-query-timeouts.md).
 
@@ -415,6 +416,7 @@ reads `Data:ImportMaxRows`. See
 | `Data:QueryTimeout` | `00:00:10` | The `statement_timeout` of every interactive read: record lists, single reads and histories, data source rows, lookups and page reads. A read past it is a `503`. |
 | `Data:ExportQueryTimeout` | `00:01:00` | The `statement_timeout` of an export's query. An export past it is a `503` and sends no file. |
 | `Data:WriteTimeout` | `00:00:15` | The `statement_timeout` of the write transaction of record create, update and delete, process start, task complete and an inbound endpoint call. A write past it rolls back, writes nothing and is a `503`. |
+| `Data:ActivationTimeout` | `00:30:00` | The `statement_timeout` of each statement of the activation transaction (schema changes, migrations and the active release write) at startup, in `admin activate`, in a rollback and in the publisher. It also bounds a wait for a lock. Past it, the activation rolls back and the previous release stays active. It limits each statement, not the whole activation. |
 | `Data:ExportMaxRows` | `100000` | The most data rows one export file holds, an integer from 1 to 2147483646. The file stops there and the response carries `Axis-Export-Truncated: true`. |
 | `Data:ImportMaxRows` | `10000` | The most data rows one import holds. A larger file fails its dry run. The worker reads it, and a value that is not an integer of at least 1 stops its start. |
 | `Data:ImportMaxBytes` | `20971520` | The largest import file, 20 MB. A larger upload is a `413`. The server reads it, and a value that is not a whole number of at least 1 stops its start. |
@@ -429,7 +431,8 @@ reads `Data:ImportMaxRows`. See
   that a page's widgets call. Lookups use the record list route. Form state,
   task, process inspection and site list reads have no timeout.
 - **A bad value.** A value that is not a duration of at least one millisecond
-  stops the start. A missing value takes its default.
+  stops the start. A missing value takes its default. `admin activate` and the
+  publisher exit with a settings error for a bad `Data:ActivationTimeout`, before any tenant step runs.
 - **A bad file size.** A `Files:MaxSize` that is not a whole number of bytes,
   at least 1, stops the start. A missing value takes the default.
 - **Writes.** Only the six routes of `Data:WriteTimeout` change. The limit is

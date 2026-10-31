@@ -7,6 +7,7 @@ using Axis.Data.Naming;
 using Axis.Data.Records;
 using Axis.Data.Schema;
 using Axis.Data.Storage;
+using Axis.Tenancy;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
 using Npgsql;
@@ -64,6 +65,10 @@ namespace Axis.Data;
 /// A new non-unique index on an existing table that has more rows than the inline limit is not created in this
 /// transaction. The activation commits without it, leaves it out of <see cref="ProvisioningResult.Statements"/>, and
 /// <see cref="EntityIndexBuilder"/> creates it later without blocking writes.
+/// </para>
+/// <para>
+/// Each statement of the transaction runs under <see cref="MigrationContext.ActivationTimeout"/>, which is set before the
+/// schema lock is taken. A statement past it throws, and the transaction rolls back.
 /// </para>
 /// </summary>
 public static class EntityProvisioner
@@ -129,6 +134,8 @@ public static class EntityProvisioner
 
         try
         {
+            await StatementTimeout.SetLocalAsync(npgsqlTransaction, migrations.ActivationTimeout, cancellationToken);
+
             await using (var command = new NpgsqlCommand("SELECT pg_advisory_xact_lock(@key)", connection, npgsqlTransaction))
             {
                 command.Parameters.AddWithValue("key", SchemaLockKey);

@@ -1072,6 +1072,7 @@ internal static partial class AdminCommands
             settings.Packages,
             settings.Modules,
             settings.InlineRecomputeLimit,
+            settings.ActivationTimeout,
             new TenantAudit(command, settings.Platform.PlatformConnectionString),
             output,
             error,
@@ -1145,7 +1146,7 @@ internal static partial class AdminCommands
 
         using var http = IdentityProviderClient(identityProviderHandler);
         return await new Publisher(
-            new ReleaseSettings(settings.Packages, settings.Modules, settings.InlineRecomputeLimit),
+            new ReleaseSettings(settings.Packages, settings.Modules, settings.InlineRecomputeLimit, settings.ActivationTimeout),
             scenarioServer,
             new DirectoryPublisherTenants(settings.Platform, settings.Mail, refreshInterval, http),
             new SensitiveValues(new TenantKeys(new DirectoryTenantKeySource(settings.Platform.PlatformConnectionString, settings.Platform.Cipher))),
@@ -1339,7 +1340,7 @@ internal static partial class AdminCommands
         }
 
         return ReadRealmMail(configuration, out problem) is { } mail
-            ? new ActivateSettings(platform, release.Packages, release.Modules, release.InlineRecomputeLimit, mail)
+            ? new ActivateSettings(platform, release.Packages, release.Modules, release.InlineRecomputeLimit, release.ActivationTimeout, mail)
             : null;
     }
 
@@ -1355,7 +1356,7 @@ internal static partial class AdminCommands
         return problems.Count == 0 ? mail : null;
     }
 
-    // The part of the activate settings that needs no platform database: the catalogs and the inline recompute limit.
+    // The part of the activate settings that needs no platform database: the catalogs, the inline recompute limit and the activation timeout.
     private static ReleaseSettings? ReadReleaseSettings(IConfiguration configuration, TextWriter error, out string problem)
     {
         problem = string.Empty;
@@ -1365,6 +1366,17 @@ internal static partial class AdminCommands
             && (!int.TryParse(limitText, NumberStyles.None, CultureInfo.InvariantCulture, out limit) || limit < 1))
         {
             problem = $"The setting {InlineRecomputeLimitSetting} must be a positive whole number.";
+            return null;
+        }
+
+        TimeSpan activationTimeout;
+        try
+        {
+            activationTimeout = ReleaseActivator.ReadActivationTimeout(configuration);
+        }
+        catch (InvalidOperationException)
+        {
+            problem = $"The setting {ReleaseActivator.ActivationTimeoutSetting} must be a duration of at least one millisecond, such as 00:30:00.";
             return null;
         }
 
@@ -1401,7 +1413,7 @@ internal static partial class AdminCommands
             error.WriteLine($"{diagnostic.Code} {diagnostic.File} {diagnostic.Path}: {diagnostic.Message}");
         }
 
-        return new ReleaseSettings(packages, modules, limit);
+        return new ReleaseSettings(packages, modules, limit, activationTimeout);
     }
 
     private static string? ResolveFolder(string? setting) =>
@@ -1885,11 +1897,11 @@ internal sealed record TenantRestoreRequest(string File, string Id, IReadOnlyLis
 /// <summary>The settings every command reads: the platform database and the key of the tenant secrets.</summary>
 internal sealed record PlatformSettings(string PlatformConnectionString, TenantSecretCipher Cipher);
 
-/// <summary>The settings of <c>activate</c>: the common ones, the loaded packages and modules, the inline recompute limit and the realm's mail fallback.</summary>
-internal sealed record ActivateSettings(PlatformSettings Platform, PackageCatalog Packages, ModuleCatalog Modules, int InlineRecomputeLimit, RealmMail Mail);
+/// <summary>The settings of <c>activate</c>: the common ones, the loaded packages and modules, the inline recompute limit, the activation timeout and the realm's mail fallback.</summary>
+internal sealed record ActivateSettings(PlatformSettings Platform, PackageCatalog Packages, ModuleCatalog Modules, int InlineRecomputeLimit, TimeSpan ActivationTimeout, RealmMail Mail);
 
-/// <summary>The settings of the release steps that need no platform database: the loaded packages and modules and the inline recompute limit.</summary>
-internal sealed record ReleaseSettings(PackageCatalog Packages, ModuleCatalog Modules, int InlineRecomputeLimit);
+/// <summary>The settings of the release steps that need no platform database: the loaded packages and modules, the inline recompute limit and the activation timeout.</summary>
+internal sealed record ReleaseSettings(PackageCatalog Packages, ModuleCatalog Modules, int InlineRecomputeLimit, TimeSpan ActivationTimeout);
 
 /// <summary>The host environment that the tenant configuration check reads, from <c>DOTNET_ENVIRONMENT</c>. This host has no other.</summary>
 internal sealed class AdminEnvironment(string environmentName) : IHostEnvironment
