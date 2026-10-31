@@ -406,7 +406,9 @@ The server's startup activation and `Axis.Admin` activation use it.
 
 The server reads `Data:QueryTimeout`, `Data:ExportQueryTimeout`,
 `Data:WriteTimeout`, `Data:ExportMaxRows`, `Data:ImportMaxBytes` and `Files:MaxSize`, and the worker
-reads `Data:ImportMaxRows`. `Data:ActivationTimeout` is read by the server when startup activation is on, and by
+reads `Data:ImportMaxRows` and, for the statements of its work items,
+[`Worker:StatementTimeout`](process-execution.md#worker-settings).
+`Data:ActivationTimeout` is read by the server when startup activation is on, and by
 `admin activate` and the publisher. See
 [D79](../decisions/d79-import-and-export-under-policies.md) and
 [D80](../decisions/d80-search-more-aggregates-and-query-timeouts.md).
@@ -425,7 +427,10 @@ reads `Data:ImportMaxRows`. `Data:ActivationTimeout` is read by the server when 
 - **Per transaction.** Each timeout is set with `SET LOCAL`, so it never
   outlives its query's transaction and never reaches a pooled connection's
   next user. An interactive read runs in one short read-only transaction that
-  is always rolled back.
+  is always rolled back. The worker's `Worker:StatementTimeout` is set the same
+  way for a work item that runs in one transaction. For any other work item it
+  is set on the item's connection for the whole run and then reset, so it never
+  reaches the connection's next user either.
 - **Page reads.** These are the page metadata route
   `GET /api/sites/{path}/pages/{page}` and the record and data source routes
   that a page's widgets call. Lookups use the record list route. Form state,
@@ -437,8 +442,9 @@ reads `Data:ImportMaxRows`. `Data:ActivationTimeout` is read by the server when 
   at least 1, stops the start. A missing value takes the default.
 - **Writes.** Only the six routes of `Data:WriteTimeout` change. The limit is
   the first statement of their write transaction, before the start lock, so it
-  also bounds a wait behind an activation. Activation, imports, Studio and the
-  worker's own statements keep their own limits.
+  also bounds a wait behind an activation. Activation, imports and Studio keep
+  their own limits. The worker's statements run under
+  [`Worker:StatementTimeout`](process-execution.md#worker-settings).
 - **Safety net.** Each default is about 30 times the p95 objective of its group
   in [objectives](performance.md#objectives): 300 ms gives 10 s for reads, and
   500 ms gives 15 s for writes. A timeout stops only a runaway statement and

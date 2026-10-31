@@ -29,6 +29,7 @@ public static class ProcessesServiceCollectionExtensions
     /// Whether the worker may send email with <c>UseTls</c> off. Pass <see langword="true"/> only in Development.
     /// </param>
     /// <param name="deliveryAttempts">The failures of a delivery that make it a dead letter. At least 1.</param>
+    /// <param name="statementTimeout">The <c>statement_timeout</c> of every statement a work item runs. At least one millisecond.</param>
     /// <param name="importMaxRows">The most data rows an import file may hold before its dry run fails. At least 1.</param>
     /// <param name="email">The host's mail settings. A tenant's own settings replace them whole.</param>
     public static IServiceCollection AddProcesses(
@@ -36,6 +37,7 @@ public static class ProcessesServiceCollectionExtensions
         bool allowHttpConnectorUrls,
         bool allowPlainSmtp,
         int deliveryAttempts,
+        TimeSpan statementTimeout,
         int importMaxRows,
         EmailDefaults email)
     {
@@ -50,6 +52,7 @@ public static class ProcessesServiceCollectionExtensions
         services.AddSingleton<IWorkItemHandler, TaskDeadlineHandler>();
         services.AddSingleton(new ConnectorCallSettings(allowHttpConnectorUrls));
         services.AddSingleton(new DeliverySettings(deliveryAttempts));
+        services.AddSingleton(new WorkItemSettings(statementTimeout));
         services.AddSingleton<ConnectorClient>();
         services.TryAddSingleton(TimeProvider.System);
         services.AddSingleton<IConnectorTokens, ConnectorTokenCache>();
