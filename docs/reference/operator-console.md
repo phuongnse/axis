@@ -2,8 +2,8 @@
 
 Detailed reference for the operator console: the web page where the platform operator sees what
 failed in a tenant and runs the commands that fix it. The route, the access rules, the Tenant view, the
-list of the Failed work view, the Dead letters view and the redeliver and discard commands are built.
-Everything else in this file is _(planned for M23)_. The design follows
+list of the Failed work view, the instance detail it opens, the Dead letters view and the redeliver and discard
+commands are built. Everything else in this file is _(planned for M23)_. The design follows
 [D93](../decisions/d93-an-operator-web-console.md). Tenant provisioning stays in
 [`Axis.Admin`](administration.md), as
 [D43](../decisions/d43-tenant-provisioning-and-migrations-across-tenant-databases.md) agrees.
@@ -49,6 +49,17 @@ _(planned for Mx)_ are not built yet, and Dn refers to [decisions.md](../decisio
     time of a failed instance is its `ended_at`, and its error is the newest history error of the
     instance. The time of a call with an unknown outcome is the finish of its newest attempt, or its
     `created_at` when it has no attempt row, and its error is the call's `last_error`.
+  - **`GET /api/console/instances/{id}`.** Answers one instance of the tenant, whatever its
+    application or process, in the shape of the
+    [process inspection detail](process-inspection.md#instance-detail). An id that is not a
+    hyphenated UUID and an id that names no instance are one `404`. The operator role stands in
+    for the `inspect` grant and for the subject record's read check: the instance of an application
+    that is no longer active opens too, and its subject record need not exist. The operator reads
+    fields like a `read` grant with no `fields` list, so a call's `input` is hidden only by the
+    [masking rules](process-inspection.md#values-and-masking), when its mapping uses a `sensitive`
+    field or a field the active release no longer has. `commands` is empty and no call is
+    `resolvable` until the console's command routes are built. When the application has no active
+    release, the release the instance is pinned to stands in for the active one.
   - **`GET /api/console/dead-letters`.** Answers one page of the dead letters of every
     application of the tenant, newest first, as the instance list pages, including the letters
     that belong to no process. An optional `application` (an application id) keeps one
@@ -72,8 +83,9 @@ Each view lists the newest items first, pages through them and filters by applic
 - **Failed work.** Process instances that are `failed`, and connector and package calls whose
   outcome is `unknown`, across every process of every application. The list, its paging and the
   application filter are built. An entry opens the
-  [instance detail](process-inspection.md#instance-detail), with the graph, the history, the
-  tasks and the calls _(planned for M23)_.
+  [instance detail](process-inspection.md#instance-detail) at `/console/instances/{id}`, with the
+  graph, the history, the tasks and the calls. The page is outside every site, so it has no
+  release texts and shows step names, not their labels. It offers no command yet.
 - **Dead letters.** Event deliveries that reached the event delivery limit,
   including [webhook deliveries](outbound-webhooks.md#outbound-webhooks) and those that belong to
   no process. The view lists them in every state, with an application filter. Each shows the
