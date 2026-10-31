@@ -1,20 +1,19 @@
-import { Badge, Flex, Layout, Typography } from 'antd'
+import { Layout } from 'antd'
 import { useEffect, useState } from 'react'
 import { fetchAboutVersion } from './about'
 import { LegalLine } from './LegalLine'
 import type { SiteLegal } from './site'
-import { statusBadge, useServerStatus } from './serverStatus'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
 
 /**
  * The slim footer across the bottom of every site: the copyright, with the server's version for a
- * signed-in person only, the legal links and the server's readiness.
+ * signed-in person only, and the legal links. Proposed: no server readiness, which the footer read once at load and
+ * so could read Ready while the server was down; a page that cannot reach the server says so where it fails.
  */
 export function ShellFooter({ legal }: { legal?: SiteLegal | null }) {
   const t = useText()
   const { colour, spacing } = useDesignTokens()
-  const status = useServerStatus()
   const [year] = useState(() => new Date().getFullYear())
   // `null` when nobody is signed in, `undefined` while it loads or when loading failed.
   const [version, setVersion] = useState<string | null | undefined>(undefined)
@@ -53,16 +52,6 @@ export function ShellFooter({ legal }: { legal?: SiteLegal | null }) {
           terms: t('shell.legal.terms'),
           licences: t('shell.legal.licences'),
         }}
-        end={
-          <Flex align="center" gap={spacing.sm}>
-            <Typography.Text style={{ color: colour.textMuted }}>{t('shell.serverStatus.title')}</Typography.Text>
-            <Badge
-              data-testid="footer-server-status"
-              status={statusBadge[status]}
-              text={<span style={{ color: colour.textMuted }}>{t(`shell.serverStatus.${status}`)}</span>}
-            />
-          </Flex>
-        }
       />
     </Layout.Footer>
   )
