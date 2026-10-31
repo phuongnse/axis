@@ -3,8 +3,8 @@
 Detailed reference for the operator console: the web page where the platform operator sees what
 failed in a tenant and runs the commands that fix it. The route, the access rules, the Tenant view, the
 list of the Failed work view, the instance detail it opens, the retry, cancel and resolve commands, the Webhook
-deliveries view, the Dead letters view and the redeliver and discard commands are built. Everything else in this file
-is _(planned for M23)_. The design follows
+deliveries view, the Dead letters view, the Schedules view and the redeliver and discard commands are built.
+Everything else in this file is _(planned for M23)_. The design follows
 [D93](../decisions/d93-an-operator-web-console.md). Tenant provisioning stays in
 [`Axis.Admin`](administration.md), as
 [D43](../decisions/d43-tenant-provisioning-and-migrations-across-tenant-databases.md) agrees.
@@ -98,6 +98,14 @@ _(planned for Mx)_ are not built yet, and Dn refers to [decisions.md](../decisio
     a [process's dead letter](process-events.md#dead-letters) with its `applicationId` and
     `processId` (null for a letter with no process). Its `commands` are `redeliver` and `discard`
     while the letter is `open` and empty otherwise.
+  - **`GET /api/console/schedules`.** Answers `{ "items": [...] }`, not paged, with each schedule
+    trigger of the active release of every application, ordered by application name and then by
+    trigger name. An optional `application` (an application id) keeps one application. One that is
+    not a hyphenated UUID is a `400` keyed `application`. A module's schedule trigger is listed
+    once for each application that uses the module. A trigger that the active release no longer
+    has, and every trigger of an application with no active release, is left out. Each item has
+    `applicationId`, `application`, `triggerId`, `trigger`, `process`, `schedule`, `timeZone`,
+    `lastOccurrenceAt` (`null` while no occurrence has run) and `nextOccurrenceAt`.
   - **`POST /api/console/dead-letters/{id}/redeliver` and `…/discard`.** Check, in order, the
     content type (`415`), the body, which is exactly `{ "reason": "<text>" }` (`400`), the `id`
     (`404` when it is not a hyphenated UUID or no dead letter has it) and the active release of
@@ -108,7 +116,8 @@ _(planned for Mx)_ are not built yet, and Dn refers to [decisions.md](../decisio
 
 ## Views
 
-Each view lists the newest items first, pages through them and filters by application.
+Each view filters by application. Unless a view says otherwise, it lists the newest items first
+and pages through them.
 
 - **Failed work.** Process instances that are `failed`, and connector and package calls whose
   outcome is `unknown`, across every process of every application. The list, its paging and the
@@ -124,8 +133,10 @@ Each view lists the newest items first, pages through them and filters by applic
 - **Webhook deliveries.** Recent deliveries of each webhook, with their status code and attempts.
   A table under the Tenant view with the application, webhook, event, state, attempts, status
   code and delivery time, and two filters, one for the application and one for the webhook. Built.
-- **Schedules.** Each schedule trigger of each active release, with its last and next
-  occurrence, see [schedules](process-events.md#schedules).
+- **Schedules.** Each schedule trigger of each active release, with its process, its schedule and
+  time zone, and its last and next occurrence, see [schedules](process-events.md#schedules). The
+  view is ordered by application and trigger name, is not paged and has an application filter.
+  Built.
 - **Publishing.** Publish requests and the [release history](studio.md) of each application,
   read-only. Publishing and rollback stay in Studio.
 - **Tenant.** The tenant's status and each application's active release, as a table with the
