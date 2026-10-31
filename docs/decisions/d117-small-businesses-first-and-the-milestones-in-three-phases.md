@@ -68,6 +68,8 @@ the [roadmap](../roadmap.md#milestones).
   [D68](d68-issues-of-several-milestones-run-at-once.md): how a customer gets a tenant, whether
   sign-up is self-service, and what the platform operator watches. Until then its roadmap row
   states the goal only. Migrating live business data between installations stays out of scope.
+  - [D118](d118-axis-saas-in-cells-with-sign-up-quotas-and-billing.md) designs it, renames it M31 Axis SaaS, and adds M33 Sign-up and trials and
+    M34 Plans and billing to phase 1.
 - **Order inside phase 1:**
   - M19, M20 and M27 finish first.
   - M24, M25 and M26 follow M20, one after the other, and M26 waits for M27, as before.
