@@ -149,7 +149,7 @@ public sealed class PublishingPerformanceTests(PostgreSqlFixture database) : ICl
         var texts = await File.ReadAllTextAsync(textsPath, CancellationToken);
         Assert.Contains("\"Departments\"", texts, StringComparison.Ordinal);
         await File.WriteAllTextAsync(textsPath, texts.Replace("\"Departments\"", "\"Teams\"", StringComparison.Ordinal), CancellationToken);
-        await StudioReleaseHistoryTests.ActivateAsync(connectionString, folder.Path, ActivationActor.User("author", "Author User", "Spring", "Teams rename", Guid.NewGuid()));
+        await StudioReleaseHistoryTests.ActivateAsync(connectionString, folder.Path, ActivationActor.User("author", "Spring", "Teams rename", Guid.NewGuid()));
 
         // The rows alternate between the two releases, as repeated rollbacks leave them. Each release keeps its number.
         await ScalarAsync(

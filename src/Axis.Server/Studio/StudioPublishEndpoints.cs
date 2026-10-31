@@ -304,8 +304,8 @@ internal static class StudioPublishEndpoints
         await using var command = new NpgsqlCommand(
             """
             INSERT INTO axis.publish_requests
-                (id, application_id, kind, target, status, snapshot, release_id, label, note, requested_by, requested_by_name, requested_at, scenario_names)
-            VALUES (@id, @application, @kind, @target, 'queued', @snapshot, @release, @label, @note, @user, @name, clock_timestamp(), @scenarios)
+                (id, application_id, kind, target, status, snapshot, release_id, label, note, requested_by, requested_at, scenario_names)
+            VALUES (@id, @application, @kind, @target, 'queued', @snapshot, @release, @label, @note, @user, clock_timestamp(), @scenarios)
             RETURNING requested_at
             """,
             connection);
@@ -318,7 +318,6 @@ internal static class StudioPublishEndpoints
         command.Parameters.Add(new NpgsqlParameter("label", NpgsqlDbType.Text) { Value = (object?)label ?? DBNull.Value });
         command.Parameters.Add(new NpgsqlParameter("note", NpgsqlDbType.Text) { Value = (object?)note ?? DBNull.Value });
         command.Parameters.AddWithValue("user", user.Id);
-        command.Parameters.Add(new NpgsqlParameter("name", NpgsqlDbType.Text) { Value = (object?)user.DisplayName ?? DBNull.Value });
         command.Parameters.Add(new NpgsqlParameter("scenarios", NpgsqlDbType.Jsonb) { Value = (object?)scenarioNames ?? DBNull.Value });
         await using var inserted = await command.ExecuteReaderAsync(cancellationToken);
         await inserted.ReadAsync(cancellationToken);

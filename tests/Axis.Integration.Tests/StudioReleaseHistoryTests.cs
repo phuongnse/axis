@@ -48,7 +48,8 @@ public sealed class StudioReleaseHistoryTests : IAsyncLifetime
 
         await EditTextAsync(folder.Path, "\"Departments\"", "\"Teams\"");
         var requestId = Guid.NewGuid();
-        await ActivateAsync(connectionString, folder.Path, ActivationActor.User("author", "Author User", "Spring", "Teams rename", requestId));
+        await ActivateAsync(connectionString, folder.Path, ActivationActor.User("author", "Spring", "Teams rename", requestId));
+        await UpsertProfileAsync(connectionString, "author", "Author User");
 
         var history = await GetAsync(author, ReleasesUrl);
 
@@ -79,7 +80,7 @@ public sealed class StudioReleaseHistoryTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task An_activations_actor_name_is_the_one_in_the_profile_else_the_stored_one_else_null()
+    public async Task An_activations_actor_name_is_the_one_in_the_profile_else_the_stored_one_of_an_older_row_else_null()
     {
         using var folder = new TemporaryFolder();
         CopyDirectory(Path.Combine(AppContext.BaseDirectory, "Samples", "purchase-requests"), folder.Path);
@@ -87,29 +88,46 @@ public sealed class StudioReleaseHistoryTests : IAsyncLifetime
         await using var factory = CreateFactory(connectionString, folder.Path);
         using var author = factory.CreateClient().SignedInAs("author");
         await EditTextAsync(folder.Path, "\"Departments\"", "\"Teams\"");
-        await ActivateAsync(connectionString, folder.Path, ActivationActor.User("author", "Author User", null, null, null));
+        await ActivateAsync(connectionString, folder.Path, ActivationActor.User("author", null, null, null));
         await EditTextAsync(folder.Path, "\"Teams\"", "\"Groups\"");
-        await ActivateAsync(connectionString, folder.Path, ActivationActor.User("gone", null, null, null, null));
+        await ActivateAsync(connectionString, folder.Path, ActivationActor.User("gone", null, null, null));
+        await StoreOlderRowAsync(connectionString, "legacy", "Legacy User");
         await UpsertProfileAsync(connectionString, "author", "Renamed Author");
+        await UpsertProfileAsync(connectionString, "legacy", "Renamed Legacy");
         await UpsertProfileAsync(connectionString, "gone", "Gone User");
         await UpsertProfileAsync(connectionString, "startup", "Mallory");
 
         var renamed = await GetAsync(author, ReleasesUrl);
 
         Assert.Equal("Renamed Author", ActorName(renamed, "author"));
+        Assert.Equal("Renamed Legacy", ActorName(renamed, "legacy"));
         Assert.Equal("Gone User", ActorName(renamed, "gone"));
         Assert.Null(ActorName(renamed, "startup"));
 
-        await PostgreSqlServer.AdminScalarAsync(connectionString, "DELETE FROM axis.user_profiles WHERE user_id IN ('author', 'gone')", CancellationToken);
+        await PostgreSqlServer.AdminScalarAsync(connectionString, "DELETE FROM axis.user_profiles WHERE user_id IN ('author', 'legacy', 'gone')", CancellationToken);
         var deleted = await GetAsync(author, ReleasesUrl);
 
-        Assert.Equal("Author User", ActorName(deleted, "author"));
+        Assert.Null(ActorName(deleted, "author"));
+        Assert.Equal("Legacy User", ActorName(deleted, "legacy"));
         Assert.Null(ActorName(deleted, "gone"));
         Assert.Contains(deleted.GetProperty("items").EnumerateArray(), item => item.GetProperty("actor").GetString() == "gone");
     }
 
     private static string? ActorName(JsonElement history, string actor) =>
         history.GetProperty("items").EnumerateArray().Single(item => item.GetProperty("actor").GetString() == actor).GetProperty("actorName").GetString();
+
+    // The history is append-only but accepts new rows. This one stands for a row written before M27, which kept the name.
+    private static async Task StoreOlderRowAsync(string connectionString, string actor, string name)
+    {
+        await PostgreSqlServer.AdminScalarAsync(
+            connectionString,
+            $"""
+            INSERT INTO axis.release_activations (id, release_id, application_id, number, content_hash, activated_at, actor, actor_name)
+            SELECT uuidv7(), release_id, application_id, number, content_hash, activated_at, '{actor}', '{name}'
+            FROM axis.release_activations WHERE actor = 'startup'
+            """,
+            CancellationToken);
+    }
 
     private static async Task UpsertProfileAsync(string connectionString, string userId, string displayName)
     {

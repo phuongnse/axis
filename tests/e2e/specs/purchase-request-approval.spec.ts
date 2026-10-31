@@ -179,6 +179,10 @@ test('a returned request is edited and submitted again, and the manager then app
   expect(read.ok()).toBe(true)
   const record = (await read.json()) as { values: { lineItems: { quantity: number }[] } }
   expect(record.values.lineItems.map((item) => item.quantity)).toEqual([2])
+  // The worker adds history entries until the extension package has written the Payment reference. A
+  // new entry between two pages of the panel would show one entry twice.
+  const number = await requestNumber(page, id)
+  await expectPaymentReference(page, id, new RegExp(`^RF\\d{2}${number.replaceAll('-', '')}$`))
   expect(await countHistory(page, 'Process started', 'Requester User')).toBe(2)
 })
 

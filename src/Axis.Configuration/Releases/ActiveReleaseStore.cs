@@ -202,12 +202,12 @@ public sealed class ActiveReleaseStore(ConfigurationDbContext context) : IActive
                 await context.Database.ExecuteSqlAsync(
                     $"""
                     INSERT INTO axis.release_activations
-                        (id, release_id, application_id, number, content_hash, activated_at, actor, actor_name, label, note, request_id)
+                        (id, release_id, application_id, number, content_hash, activated_at, actor, label, note, request_id)
                     SELECT {Guid.CreateVersion7()}, r.id, {applicationId},
                         COALESCE(
                             (SELECT h.number FROM axis.release_activations h WHERE h.application_id = {applicationId} AND h.release_id = r.id LIMIT 1),
                             (SELECT COALESCE(max(h.number), 0) + 1 FROM axis.release_activations h WHERE h.application_id = {applicationId})),
-                        r.content_hash, {activatedAt.ToUniversalTime()}, {actor.Actor}, {actor.ActorName}, {actor.Label}, {actor.Note}, {actor.RequestId}
+                        r.content_hash, {activatedAt.ToUniversalTime()}, {actor.Actor}, {actor.Label}, {actor.Note}, {actor.RequestId}
                     FROM axis.releases r
                     WHERE r.id = {releaseId}
                     """,

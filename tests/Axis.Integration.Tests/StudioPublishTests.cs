@@ -72,6 +72,16 @@ public sealed class StudioPublishTests : IAsyncLifetime
         Assert.Equal(JsonValueKind.String, finished.RootElement.GetProperty("finishedAt").ValueKind);
         using var texts = await GetJsonAsync(client, "/api/sites/purchasing/texts/en", HostA);
         Assert.Equal("Teams", texts.RootElement.GetProperty("texts").GetProperty("nav.departments").GetString());
+
+        // The request and its activation keep the user id and no name.
+        Assert.Equal(1L, await PostgreSqlServer.AdminScalarAsync(
+            connectionString,
+            $"SELECT count(*) FROM axis.publish_requests WHERE id = '{id}' AND requested_by = 'author' AND requested_by_name IS NULL",
+            CancellationToken));
+        Assert.Equal(1L, await PostgreSqlServer.AdminScalarAsync(
+            connectionString,
+            $"SELECT count(*) FROM axis.release_activations WHERE request_id = '{id}' AND actor = 'author' AND actor_name IS NULL",
+            CancellationToken));
     }
 
     [Fact]
@@ -96,6 +106,8 @@ public sealed class StudioPublishTests : IAsyncLifetime
             Assert.Equal("Renamed Author", renamed.RootElement.GetProperty("requestedByName").GetString());
         }
 
+        // A request written before M27 kept the name. New code writes none, so the test sets it.
+        await PostgreSqlServer.AdminScalarAsync(connectionString, "UPDATE axis.publish_requests SET requested_by_name = 'Author User'", CancellationToken);
         await PostgreSqlServer.AdminScalarAsync(connectionString, "DELETE FROM axis.user_profiles WHERE user_id = 'author'", CancellationToken);
         using (var stored = await GetJsonAsync(client, location, HostA))
         {

@@ -79,7 +79,7 @@ internal sealed class Publisher(
         UPDATE axis.publish_requests
         SET status = 'failed', finished_at = clock_timestamp(), diagnostics = @diagnostics
         WHERE kind IN ('publish', 'validate', 'rollback', 'test') AND status = 'running' AND lease_until < clock_timestamp() AND claims >= @max
-        RETURNING id, application_id, requested_by, requested_by_name, kind, release_id, target
+        RETURNING id, application_id, requested_by, kind, release_id, target
         """;
 
     // clock_timestamp() and not now(): now() is fixed when the transaction starts, before the wait for the lock.
@@ -100,7 +100,7 @@ internal sealed class Publisher(
         SET status = 'running', claimed_by = @me, lease_until = clock_timestamp() + @lease,
             claims = p.claims + 1, started_at = coalesce(p.started_at, clock_timestamp())
         FROM next WHERE p.id = next.id
-        RETURNING p.id, p.application_id, p.snapshot::text, p.requested_by, p.requested_by_name, p.kind, p.claims, p.label, p.note, p.release_id, p.target, p.scenario_names::text
+        RETURNING p.id, p.application_id, p.snapshot::text, p.requested_by, p.kind, p.claims, p.label, p.note, p.release_id, p.target, p.scenario_names::text
         """;
 
     private const string RenewSql =
@@ -259,14 +259,13 @@ internal sealed class Publisher(
                     reader.GetGuid(1),
                     await reader.IsDBNullAsync(2) ? null : reader.GetString(2),
                     reader.GetString(3),
-                    await reader.IsDBNullAsync(4) ? null : reader.GetString(4),
-                    reader.GetString(5),
-                    reader.GetInt32(6),
+                    reader.GetString(4),
+                    reader.GetInt32(5),
+                    await reader.IsDBNullAsync(6) ? null : reader.GetString(6),
                     await reader.IsDBNullAsync(7) ? null : reader.GetString(7),
-                    await reader.IsDBNullAsync(8) ? null : reader.GetString(8),
-                    await reader.IsDBNullAsync(9) ? null : reader.GetGuid(9),
-                    reader.GetString(10),
-                    await reader.IsDBNullAsync(11) ? null : reader.GetString(11));
+                    await reader.IsDBNullAsync(8) ? null : reader.GetGuid(8),
+                    reader.GetString(9),
+                    await reader.IsDBNullAsync(10) ? null : reader.GetString(10));
             }
         }
 
@@ -278,7 +277,7 @@ internal sealed class Publisher(
     private async Task FailExhaustedAsync(NpgsqlConnection connection, NpgsqlTransaction transaction, string tenant)
     {
         const string message = "The publisher stopped three times while running the request.";
-        var exhausted = new List<(Guid Id, Guid ApplicationId, string RequestedBy, string? RequestedByName, string Kind, Guid? ReleaseId, string Target)>();
+        var exhausted = new List<(Guid Id, Guid ApplicationId, string RequestedBy, string Kind, Guid? ReleaseId, string Target)>();
         await using (var command = new NpgsqlCommand(ExhaustedSql, connection, transaction))
         {
             command.Parameters.Add(new NpgsqlParameter("diagnostics", NpgsqlDbType.Jsonb)
@@ -289,7 +288,7 @@ internal sealed class Publisher(
             await using var reader = await command.ExecuteReaderAsync();
             while (await reader.ReadAsync())
             {
-                exhausted.Add((reader.GetGuid(0), reader.GetGuid(1), reader.GetString(2), await reader.IsDBNullAsync(3) ? null : reader.GetString(3), reader.GetString(4), await reader.IsDBNullAsync(5) ? null : reader.GetGuid(5), reader.GetString(6)));
+                exhausted.Add((reader.GetGuid(0), reader.GetGuid(1), reader.GetString(2), reader.GetString(3), await reader.IsDBNullAsync(4) ? null : reader.GetGuid(4), reader.GetString(5)));
             }
         }
 
@@ -382,7 +381,7 @@ internal sealed class Publisher(
                 tenant.Bindings,
                 configuration => LoadStoredAsync(configuration, request, tenant.Id),
                 diagnostics,
-                ActivationActor.User(request.RequestedBy, request.RequestedByName, null, null, request.Id),
+                ActivationActor.User(request.RequestedBy, null, null, request.Id),
                 loadStep: "rollback",
                 syncRealm: tenant.SyncRealm);
             await StopRenewalAsync(renewing, renewal);
@@ -409,7 +408,7 @@ internal sealed class Publisher(
                 target.Bindings,
                 configuration => ReleaseCompiler.CompileAsync(files, configuration, settings.Packages.Versions, settings.Modules.Modules, CancellationToken.None),
                 diagnostics,
-                ActivationActor.User(request.RequestedBy, request.RequestedByName, request.Label, request.Note, request.Id),
+                ActivationActor.User(request.RequestedBy, request.Label, request.Note, request.Id),
                 syncRealm: target.SyncRealm);
         }
 
@@ -617,5 +616,5 @@ internal sealed class Publisher(
             ["resourceId"] = diagnostic.ResourceId?.ToString("D"),
         })]).ToJsonString();
 
-    private sealed record ClaimedRequest(Guid Id, Guid ApplicationId, string? Snapshot, string RequestedBy, string? RequestedByName, string Kind, int Claims, string? Label, string? Note, Guid? ReleaseId, string Target, string? ScenarioNames);
+    private sealed record ClaimedRequest(Guid Id, Guid ApplicationId, string? Snapshot, string RequestedBy, string Kind, int Claims, string? Label, string? Note, Guid? ReleaseId, string Target, string? ScenarioNames);
 }
