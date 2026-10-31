@@ -912,6 +912,7 @@
   "shell.studio.entity.sequence": "Sequence",
   "shell.studio.entity.creator": "Creator",
   "shell.studio.entity.sensitive": "Sensitive",
+  "shell.studio.entity.exactLookup": "Exact lookup",
   "shell.studio.entity.minLength": "Min length",
   "shell.studio.entity.min": "Min",
   "shell.studio.entity.max": "Max",
