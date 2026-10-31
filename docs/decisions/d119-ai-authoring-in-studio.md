@@ -22,8 +22,8 @@ whichever model the installation chooses. Everything here is _(planned for M35 a
     and no network behind them, so an agent can do nothing that its user could not do in Studio.
   - A client acts with the grants of the person it signs in as, through OAuth as the MCP
     specification asks, on Axis's own identity provider. It changes only drafts.
-  - Accepting a draft and publishing are not tools. A person does both in Studio, and publishing
-    still needs the publisher role ([D47](d47-publishing-from-studio.md)).
+  - Publishing is not a tool. A person publishes in Studio, with the publisher role
+    ([D47](d47-publishing-from-studio.md)). Accepting a draft is a tool, under the rules below.
   - The MCP server has rate limits and counts toward the tenant's AI quota. Axis pins the version
     of the MCP specification it serves, and an upgrade of that version is checked like any other
     dependency.
@@ -50,16 +50,36 @@ whichever model the installation chooses. Everything here is _(planned for M35 a
   refuse, runs through the MCP server against any model. A model is supported when it passes the
   eval, whoever makes it. The eval runs for every supported model before a release, an operator can
   run it against their own model, and the SaaS changes its default model on the eval's numbers.
-- **A change is a draft:** each request works on a draft copy of the application, never on the
-  folder that is live. Studio shows the draft's diff resource by resource, and the author accepts or
-  drops it.
+- **A change is a draft:** each request works on a draft of the application, never on its working
+  folder. The draft records the version of each resource it changes. Studio shows the draft's diff
+  resource by resource.
+- **Accepting a draft:** accepting moves the draft's changes into the working folder. It does not
+  put them live: only publishing does.
+  - The author of the request accepts or drops the draft in Studio. An agent may accept it too,
+    through the tool, when the application allows agents to accept and the request asked for it,
+    as NexKit's own automatic merge works.
+  - An agent accepts only a draft whose checks and review passed, and only for a person who holds
+    an author role on the application.
+- **No lost and no broken changes:**
+  - The authoring API already refuses a write to a resource whose version changed since it was
+    read, so no write overwrites another.
+  - Accepting is all or nothing. Every resource the draft changes must still have the version the
+    draft recorded, or nothing is written and the accept answers a conflict.
+  - Accepting runs the compiler and the scenarios again on the working folder as it is now, with the
+    draft applied, so two changes that pass alone cannot break the application together.
+  - An application has one accept at a time, in a queue, so two accepts never interleave.
+  - On a conflict, an agent reads the folder again, makes its change on a new draft and runs the
+    checks again. A person's draft shows the conflict in Studio, and the person decides.
+  - Each accept, and each save in Studio, is a revision of the working folder that names who made
+    it, and through which request. A revision can be undone.
+  - Publishing shows the whole diff from the live release, with what each agent changed marked.
 - **The same loop as NexKit:**
   - The author writes the request. The agent answers with a plan, and the author approves it.
   - The agent changes the draft. The compiler, the application's scenarios and the contract
     scenarios of its modules run as its checks.
   - A second agent session reviews the draft against the request.
   - Failed checks and review findings start a fix round, up to a set number of rounds.
-  - A person decides, in Studio. An agent never accepts a draft and never publishes.
+  - The draft is accepted as above. An agent never publishes.
 - **Built-in modules first:** when a request matches a built-in module, the agent declares the
   module and writes a customization layer instead of new resources, so the application keeps its
   upgrades and its contract ([D102](d102-built-in-modules-open-to-change-and-bound-by-a-contract.md)).
@@ -95,6 +115,7 @@ included, leaves one surface to secure, test and limit, and lets any MCP client 
 adapter, two kinds of binding and an eval keep Axis free of any one provider: a model earns its place
 by what it does, and a closed network can use a model of its own. The contract of a built-in module
 is what makes an agent's change safe to accept: a change that breaks a core rule is refused whatever
-wrote it. The cost is a new host, a new trust boundary with its sign-in, an eval to keep, model
+wrote it. Checks on an application take seconds, so every accept can check the latest folder, and
+no change is lost or breaks another. The cost is a new host, a new trust boundary with its sign-in, an eval to keep, model
 costs, weaker results with some models, and a whole application from one description waiting for
 phase 2.
