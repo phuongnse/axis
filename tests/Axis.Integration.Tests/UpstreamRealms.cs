@@ -189,7 +189,8 @@ public sealed partial class UpstreamRealms : IDisposable
 
     /// <summary>
     /// The tenant realm runs inside the container, which cannot reach its own mapped port. It calls the upstream realm's
-    /// back-channel endpoints on the container's own port instead, and the browser keeps using the mapped one.
+    /// back-channel endpoints on the container's own port instead, and the browser keeps using the mapped one. Keycloak reads the
+    /// client secret back masked and refuses a new token URL without the secret, so the update sends <see cref="BrokerSecret"/> again.
     /// </summary>
     public async Task PointBackChannelAtTheContainerAsync(string tenant, string alias, string upstream)
     {
@@ -203,6 +204,7 @@ public sealed partial class UpstreamRealms : IDisposable
             Assert.Contains($"http://localhost:8080/realms/{upstream}/", config[key], StringComparison.Ordinal);
         }
 
+        config["clientSecret"] = BrokerSecret;
         representation["config"] = JsonSerializer.SerializeToElement(config);
         using var updated = await SendAsync(HttpMethod.Put, path, representation);
         Assert.True(updated.StatusCode == HttpStatusCode.NoContent, await updated.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
