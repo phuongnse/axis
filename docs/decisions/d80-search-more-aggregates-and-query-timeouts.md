@@ -36,14 +36,20 @@ these points on 2026-10-25. It is built in M15. See
   - Every interactive read runs with `SET LOCAL statement_timeout` from
     `Data:QueryTimeout`, 10 seconds by default. Exports use
     `Data:ExportQueryTimeout`, and imports run on the worker under its own
-    limits.
+    limits. The write transaction of record create, update and delete, process
+    start, task complete and an inbound endpoint call runs with
+    `SET LOCAL statement_timeout` from `Data:WriteTimeout`, 15 seconds by
+    default.
   - A statement that runs past it, SQLSTATE `57014`, is a `503` with a fixed
-    title. The server logs the data source or entity name and the duration,
+    title. A write that ran past its limit rolled back and wrote nothing, and
+    its title says to try again. The server logs the data source or entity name and the duration,
     never a value, and counts timeouts in a metric.
   - When only the count statement of a list times out, the answer is `200`
     with `totalCount: null`.
-  - The limits are set against the SLOs of [D82](d82-performance-slos-and-load-tests.md)
-    _(planned for M28)_. M15 ships the mechanism and the defaults.
+  - The limits are set against the SLOs of [D82](d82-performance-slos-and-load-tests.md).
+    Each is about 30 times the p95 objective of its group, 10 seconds for
+    reads (300 ms) and 15 seconds for writes (500 ms), so it stops only a
+    runaway statement. M15 ships the mechanism and the read defaults.
 
 _Why:_ search on the display field alone misses what users type, and a scan
 of the whole table does not scale to the typical application size. Trigram

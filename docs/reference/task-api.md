@@ -345,6 +345,11 @@ is a `403` before any of these checks.
   }
   ```
 
+- **`503` for a write timeout.** The completion's transaction ran past
+  `Data:WriteTimeout` and PostgreSQL cancelled it. Nothing was written, and the
+  client may send the request again. The title is fixed: "The write took too
+  long. Try again." See [data settings](host-settings.md#data-settings).
+
 ## Completing a task
 
 One transaction records the decision:

@@ -88,9 +88,9 @@ internal static class RecordEndpoints
             records.MapGet("", ListAsync).WithQueryTimeout(QueryTimeoutSettings.Interactive);
             records.MapGet("/{id}", GetAsync).WithQueryTimeout(QueryTimeoutSettings.Interactive);
             records.MapGet("/{id}/history", HistoryAsync).WithQueryTimeout(QueryTimeoutSettings.Interactive);
-            records.MapPost("", CreateAsync);
-            records.MapPatch("/{id}", UpdateAsync);
-            records.MapDelete("/{id}", DeleteAsync);
+            records.MapPost("", CreateAsync).WithWriteTimeout();
+            records.MapPatch("/{id}", UpdateAsync).WithWriteTimeout();
+            records.MapDelete("/{id}", DeleteAsync).WithWriteTimeout();
 
             // Only a signed-in user exports, so a service account never reaches it. The literal segment wins over {id}.
             endpoints.MapGroup(pattern).MapGet("/export", ExportAsync).WithQueryTimeout(QueryTimeoutSettings.Export);
@@ -546,7 +546,8 @@ internal static class RecordEndpoints
                 form,
                 Cipher(sensitive, tenants),
                 loggerFactory,
-                cancellationToken);
+                cancellationToken,
+                database.WriteLimit);
             if (result.Outcome == RecordCommandOutcome.ReleaseChanged)
             {
                 continue;
@@ -610,7 +611,8 @@ internal static class RecordEndpoints
                 form,
                 Cipher(sensitive, tenants),
                 loggerFactory,
-                cancellationToken);
+                cancellationToken,
+                database.WriteLimit);
             if (result.Outcome == RecordCommandOutcome.ReleaseChanged)
             {
                 continue;
@@ -656,7 +658,7 @@ internal static class RecordEndpoints
 
             var connection = await database.GetConnectionAsync(cancellationToken);
             var result = await RecordCommand.DeleteAsync(
-                connection, TenantId(tenants), application!, releaseId, model, recordId, Actor(user, application!), loggerFactory, cancellationToken);
+                connection, TenantId(tenants), application!, releaseId, model, recordId, Actor(user, application!), loggerFactory, cancellationToken, database.WriteLimit);
             if (result.Outcome == RecordCommandOutcome.ReleaseChanged)
             {
                 continue;

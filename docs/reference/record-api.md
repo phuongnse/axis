@@ -465,13 +465,13 @@ otherwise the answer is the stale-version `409`. See
   [start lock](processes.md#releases-and-running-work). The server already ran
   the request again on the new release each time. Nothing was written, and the
   client may send the request again. The title is fixed: "The application's active release changed while the request ran. Try again."
-- **`503` for a query timeout.** A read that runs past
-  `Data:QueryTimeout` is cancelled by PostgreSQL. The title is fixed: "The
-  query took too long. Try again or narrow it." The server logs the entity
-  name and the duration, and adds one to the counter `axis.queries.timeouts`
-  (unit `{query}`, attributes `axis.tenant` and `axis.application`). When only
-  the count of a list times out, the answer is `200` with `totalCount: null`.
-  See [data settings](host-settings.md#data-settings).
+- **`503` for a query timeout.** A read past `Data:QueryTimeout`, or a create,
+  update or delete past `Data:WriteTimeout`, is cancelled by PostgreSQL. The
+  title is "The query took too long. Try again or narrow it." for a read, and
+  "The write took too long. Try again." for a write, which wrote nothing. The server logs the entity name and the duration, and counts it in
+  `axis.queries.timeouts` (unit `{query}`, attributes `axis.tenant` and
+  `axis.application`). When only the count of a list times out, the answer is
+  `200` with `totalCount: null`. See [data settings](host-settings.md#data-settings).
 - **`500`.** An unexpected error on any path is caught by the exception
   handler. The response has no exception type, message or stack trace.
 - **`traceId`**. Every problem details answer has a

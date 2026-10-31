@@ -251,6 +251,10 @@ is the record API's:
   The server already ran the call again on the new release each time. Nothing
   was written, and the caller may send the request again. The title is fixed:
   "The application's active release changed while the request ran. Try again."
+- **`503` for a write timeout.** The call's transaction ran past
+  `Data:WriteTimeout` and PostgreSQL cancelled it. Nothing was written, and the
+  caller may send the request again. The title is fixed: "The write took too
+  long. Try again." See [data settings](host-settings.md#data-settings).
 
 ## Idempotency
 
