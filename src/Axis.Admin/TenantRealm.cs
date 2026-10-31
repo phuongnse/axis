@@ -25,7 +25,7 @@ internal sealed record TenantRealmSecrets(string Platform, string Activation, st
 /// (<see cref="PlatformLocales"/>) on its sign-in pages. It allows two users to share an email, which
 /// turns sign-in by email off, so an account's username is its email. It gets a first-login flow of its own for brokered
 /// users, <see cref="RealmSync.FirstLoginFlowAlias"/>, whose only step creates a new user, and it turns off the Verify Profile step. It also gets three clients: the platform client
-/// <c>axis</c>, <c>axis-activation</c> with rights over the realm's providers and clients and over the realm's texts (<c>manage-realm</c>, which
+/// <c>axis</c>, which <see cref="EnsureForTenantAsync"/> gives the redirect addresses of the tenant's hosts, <c>axis-activation</c> with rights over the realm's providers and clients and over the realm's texts (<c>manage-realm</c>, which
 /// Keycloak requires for them and which also covers every realm setting), and <c>axis-users</c> with
 /// rights over its users only. The realm uses the Axis theme <see cref="LoginTheme"/> as its login theme. The identity provider
 /// must hold the theme and the breached-password list file. The realm's mail server (<c>smtpServer</c>) is the one that
@@ -96,6 +96,10 @@ internal sealed class TenantRealm(HttpClient http, IdentityProviderAdmin admin)
 
         // The realm has no display name until the command takes the organization's name, so the pages name Axis, never the tenant id.
         await EnsureAsync(id, string.Empty, secrets, mail.For(DirectoryTenantCatalog.Email(row, cipher)), cancellationToken);
+
+        // The platform client gets the addresses of the tenant's hosts, so a person can finish a sign-in on each of them.
+        var hosts = await platform.TenantHosts.AsNoTracking().Where(host => host.TenantId == id).Select(host => host.Host).ToListAsync(cancellationToken);
+        await new RealmSync(http, admin.BaseAddress).SyncPlatformAddressesAsync(id, secrets.Activation, hosts, cancellationToken);
 
         // A secret that is stored is kept, so a rerun never changes it.
         bool Ensure(byte[]? stored, string field, Action<byte[]> write)

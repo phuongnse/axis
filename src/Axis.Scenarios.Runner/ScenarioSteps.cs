@@ -199,6 +199,7 @@ internal sealed class ScenarioSteps(
             new RecordActor(user, PolicyEvaluator.HeldRoles(model, roles)),
             (_, _) => Task.FromResult(model),
             _ => Task.FromResult<byte[]?>(utf8Body),
+            null,
             loggerFactory,
             cancellationToken);
         if (result.Outcome == TaskCompletionOutcome.Completed)

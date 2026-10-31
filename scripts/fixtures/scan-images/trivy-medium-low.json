@@ -1,0 +1,30 @@
+{
+  "SchemaVersion": 2,
+  "ArtifactName": "axis-server:scan",
+  "ArtifactType": "container_image",
+  "Results": [
+    {
+      "Target": "axis-server:scan (debian 12.7)",
+      "Class": "os-pkgs",
+      "Type": "debian",
+      "Vulnerabilities": [
+        {
+          "VulnerabilityID": "CVE-2023-50495",
+          "PkgName": "libtinfo6",
+          "InstalledVersion": "6.4-4",
+          "Severity": "MEDIUM",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2023-50495",
+          "Title": "ncurses: segmentation fault via _nc_wrap_entry()"
+        },
+        {
+          "VulnerabilityID": "CVE-2011-3374",
+          "PkgName": "apt",
+          "InstalledVersion": "2.6.1",
+          "Severity": "LOW",
+          "PrimaryURL": "https://avd.aquasec.com/nvd/cve-2011-3374",
+          "Title": "It was found that apt-key in apt, all versions, do not correctly validate ..."
+        }
+      ]
+    }
+  ]
+}

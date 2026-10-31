@@ -23,6 +23,17 @@ public sealed class RealmSyncTests
         """;
 
     [Fact]
+    public void The_platform_addresses_name_each_host_once_in_ordinal_order_over_https_without_a_port()
+    {
+        var (redirectUris, webOrigins, postLogoutRedirectUris) = RealmSync.PlatformAddresses([" B.example.test ", "a.example.test", "b.example.test"]);
+
+        Assert.Equal(["https://a.example.test/api/auth/callback", "https://b.example.test/api/auth/callback"], redirectUris);
+        Assert.Equal(["https://a.example.test", "https://b.example.test"], webOrigins);
+        Assert.Equal(["https://a.example.test/?signedOut", "https://b.example.test/?signedOut"], postLogoutRedirectUris);
+        Assert.Empty(RealmSync.PlatformAddresses([]).RedirectUris);
+    }
+
+    [Fact]
     public async Task A_conflict_on_a_client_update_reads_the_clients_again_and_retries()
     {
         using var handler = new ScriptedHandler(HttpStatusCode.Conflict, HttpStatusCode.NoContent);

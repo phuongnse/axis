@@ -76,7 +76,7 @@ public sealed class DevelopmentRealmSecondStepTests(KeycloakFixture keycloak) : 
         using var response = await client.PostAsync(new Uri($"{_authority}/protocol/openid-connect/token"), form, TestContext.Current.CancellationToken);
         var body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
 
-        Assert.True(response.StatusCode == HttpStatusCode.Unauthorized, body);
+        Assert.True(response.StatusCode == HttpStatusCode.BadRequest, body);
         using var error = JsonDocument.Parse(body);
         Assert.Equal("invalid_grant", error.RootElement.GetProperty("error").GetString());
     }

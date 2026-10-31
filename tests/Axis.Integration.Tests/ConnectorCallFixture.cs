@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using Axis.Processes.Instances;
 using Axis.Processes.Work;
 using Axis.Worker;
@@ -53,11 +54,13 @@ public sealed class ConnectorCallFixture : IAsyncLifetime
 
         _stub = await ConnectorStub.StartAsync();
         var values = new Dictionary<string, string?>();
+        var dataKey = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
         foreach (var (tenantId, tenant) in _tenants)
         {
             _tokens[tenantId] = $"token-{tenantId}-{Guid.NewGuid():N}";
             values[$"Tenants:{tenantId}:Hosts:0"] = $"{tenantId}.example.test";
             values[$"Tenants:{tenantId}:ConnectionString"] = PostgreSqlServer.RuntimeConnectionString(tenant.ConnectionString);
+            values[$"Tenants:{tenantId}:DataKeys:1"] = dataKey;
             values[$"Tenants:{tenantId}:Bindings:PurchasingUrl:Kind"] = "url";
             values[$"Tenants:{tenantId}:Bindings:PurchasingUrl:Value"] = $"{_stub.BaseUrl}/tenant-{tenantId}";
             values[$"Tenants:{tenantId}:Bindings:PurchasingToken:Kind"] = "secret";

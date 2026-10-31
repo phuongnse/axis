@@ -6,6 +6,7 @@
   "locale": "en",
   "texts": {
     "role.employee": "Employee",
+    "role.importer": "Importer",
     "role.reader": "Reader",
     "role.fielded": "Fielded",
     "role.filtered": "Filtered",

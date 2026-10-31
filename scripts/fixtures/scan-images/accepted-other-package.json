@@ -1,0 +1,5 @@
+{
+  "accepted": [
+    { "advisory": "CVE-2023-4911", "package": "libc-bin", "found": "2026-10-20", "reason": "Names another package" }
+  ]
+}

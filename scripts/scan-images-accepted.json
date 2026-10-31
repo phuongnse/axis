@@ -1,0 +1,8 @@
+{
+  "accepted": [
+    { "advisory": "CVE-2026-102554", "package": "com.google.guava:guava", "found": "2026-10-31", "reason": "Inside the Keycloak 26.8 image, which ships guava 33.6.0; fixed in 33.7.2 once Keycloak takes it" },
+    { "advisory": "CVE-2026-91403", "package": "java-21-openjdk-headless", "found": "2026-10-31", "reason": "No fixed OpenJDK 21 in the Keycloak 26.8 image yet" },
+    { "advisory": "CVE-2026-119373", "package": "sqlite-libs", "found": "2026-10-31", "reason": "No fixed sqlite-libs for EL9 in the Keycloak 26.8 image yet" },
+    { "advisory": "CVE-2026-119586", "package": "sqlite-libs", "found": "2026-10-31", "reason": "No fixed sqlite-libs for EL9 in the Keycloak 26.8 image yet" }
+  ]
+}

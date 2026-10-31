@@ -108,6 +108,7 @@ public static class CallResolveCommand
         JsonObject? output,
         Func<Guid, CancellationToken, Task<ApplicationModel>> releaseOf,
         PackageCatalog packages,
+        RecordCipher? cipher,
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
@@ -177,7 +178,7 @@ public static class CallResolveCommand
             ["reason"] = reason,
         };
         var result = succeeded
-            ? await SucceedAsync(connection, transaction, tenantId, active, activeReleaseId, target, instance, values, userId, loggerFactory, cancellationToken)
+            ? await SucceedAsync(connection, transaction, tenantId, active, activeReleaseId, target, instance, values, userId, cipher, loggerFactory, cancellationToken)
             : await FailAsync(connection, transaction, target, instance, userId, cancellationToken);
         if (result.Outcome != CallResolveOutcome.Resolved)
         {
@@ -289,6 +290,7 @@ public static class CallResolveCommand
         LockedInstance instance,
         List<KeyValuePair<FieldModel, object?>> values,
         string userId,
+        RecordCipher? cipher,
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
@@ -306,7 +308,7 @@ public static class CallResolveCommand
                 await RecordCommands.LockAsync(connection, subject, subjectId, cancellationToken);
             }
 
-            record = await RecordQueries.GetAsync(connection, pinned, subject, subjectId, cancellationToken);
+            record = await RecordQueries.GetAsync(connection, pinned, subject, subjectId, cipher, cancellationToken);
         }
 
         var output = new JsonObject
@@ -325,7 +327,7 @@ public static class CallResolveCommand
             }
 
             var now = await RecordQueries.TransactionTimeAsync(connection, cancellationToken);
-            var written = await RecordCommands.SetAsync(connection, pinned, subject, target.ReleaseId, record, values, now, cancellationToken: cancellationToken);
+            var written = await RecordCommands.SetAsync(connection, pinned, subject, target.ReleaseId, record, values, now, cipher: cipher, cancellationToken: cancellationToken);
             if (written is not { Outcome: RecordWriteOutcome.Written, Record: { } stored })
             {
                 return new CallResolveResult(CallResolveOutcome.Invalid, Errors: Remap(written, target.Mappings));

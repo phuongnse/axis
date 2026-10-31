@@ -1,0 +1,1 @@
+2026-10-28T05:17:00Z	FATAL	init error: DB error: failed to download vulnerability DB

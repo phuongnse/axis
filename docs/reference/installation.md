@@ -319,8 +319,7 @@ the admin container only.
    `https://<AXIS_IDENTITY_HOST>/` and sets the admin client id `axis-admin`, so you set no shell variable. The
    admin client secret is the `IdentityProvider__AdminClientSecret` file, so it is in no
    command line. Every `admin` run needs that file, because Compose refuses to start a service whose secret file is
-   missing. A new realm has no redirect addresses yet, so until M28 keeps them in step, add
-   them to the realm in the identity provider yourself, before you activate an application. The activation
+   missing. The command sets the redirect addresses of the `axis` client from the hosts you give it. The activation
    copies the redirect addresses and mappers of the `axis` client to the client of each site, and it does not
    copy later changes until the next activation.
 5. Activate an application with
@@ -648,7 +647,7 @@ The values schema rejects any field in a reference other than `name` and `key`.
 | `server.resources`, `worker.resources`, `migrate.resources` | none | Kubernetes resource requests and limits. |
 | `server.service.type`, `server.service.port` | `ClusterIP`, 443 | The Service of the server. Its port is named `https` and forwards to the server's HTTPS port, 8443. Put your own Ingress in front of it, see [TLS](#tls). |
 | `secrets.serverCertificate` | none, required | Secret `name` of a Kubernetes TLS Secret with `tls.crt` and `tls.key`, for the DNS name of the server Service. It has no `key`. The server serves HTTPS only, and rendering fails with a message that names `secrets.serverCertificate.name` when it is missing. |
-| `identity.image` | `quay.io/keycloak/keycloak:26.4` | The whole image reference of the identity provider. `image.registry` and `image.tag` do not apply to it. |
+| `identity.image` | `quay.io/keycloak/keycloak:26.8` | The whole image reference of the identity provider. `image.registry` and `image.tag` do not apply to it. |
 | `identity.hostname` | none, required | The public host name of the identity provider, without a scheme. It becomes `KC_HOSTNAME=https://<hostname>`. Rendering fails with a message that names it when it is missing. |
 | `identity.resources` | none | Kubernetes resource requests and limits of the identity provider. |
 | `identity.service.type`, `identity.service.port` | `ClusterIP`, 443 | The Service of the identity provider. Its port is named `https` and forwards to Keycloak's HTTPS port, 8443. Put your own Ingress in front of it. |

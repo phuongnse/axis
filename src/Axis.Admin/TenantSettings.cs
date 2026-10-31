@@ -15,7 +15,7 @@ namespace Axis.Admin;
 
 /// <summary>
 /// <c>tenant binding list</c>, <c>set</c> and <c>remove</c> and <c>tenant host add</c>, <c>remove</c> and <c>move</c>, and
-/// <c>tenant email set</c> and <c>clear</c>, and <c>tenant session end</c>. The rules are in <c>Axis.Administration</c>. This class parses the arguments, reads
+/// <c>tenant email set</c> and <c>clear</c>, and <c>tenant session end</c>. The host and email commands also write the tenant's realm. The rules are in <c>Axis.Administration</c>. This class parses the arguments, reads
 /// the settings and prints. A message never holds a secret value, and the usage text never echoes an argument.
 /// </summary>
 internal static class TenantSettings
@@ -447,10 +447,10 @@ internal static class TenantSettings
         }
 
         var sitePath = withSite ? args[6] : null;
-        return await ChangeAsync(
+        return await HostChangeAsync(
             run,
             args[3],
-            "host",
+            movedHost: null,
             (platform, command) => TenantHostCommands.AddAsync(platform, command, args[3], args[4], sitePath, run.CancellationToken));
     }
 
@@ -463,10 +463,10 @@ internal static class TenantSettings
             return Usage(run);
         }
 
-        return await ChangeAsync(
+        return await HostChangeAsync(
             run,
             run.Args[5],
-            "host",
+            movedHost: run.Args[3],
             (platform, command) => TenantHostCommands.MoveAsync(platform, command, run.Args[3], run.Args[5], run.CancellationToken));
     }
 
@@ -479,7 +479,85 @@ internal static class TenantSettings
             return Usage(run);
         }
 
-        return await ChangeAsync(run, run.Args[3], "host", (platform, command) => change(platform, command, run.Args[3], run.Args[4], run.CancellationToken));
+        return await HostChangeAsync(run, run.Args[3], movedHost: null, (platform, command) => change(platform, command, run.Args[3], run.Args[4], run.CancellationToken));
+    }
+
+    /// <summary>
+    /// Runs a host change: the source check, the settings, the tables check, the library call, then the realm of each tenant it changed.
+    /// The key decrypts the realm's activation secret. A move changes two tenants, so <paramref name="movedHost"/> names the host to
+    /// find the tenant it leaves.
+    /// </summary>
+    private static async Task<int> HostChangeAsync(
+        AdminRun run,
+        string id,
+        string? movedHost,
+        Func<PlatformDbContext, string, Task<TenantSettingResult>> change)
+    {
+        var (setup, exit) = await PrepareAsync(run, needsCipher: true);
+        if (setup is null)
+        {
+            return exit;
+        }
+
+        var ids = new List<string> { id };
+        TenantSettingResult result;
+        try
+        {
+            await using var platform = NewContext(setup.Connection);
+            if (movedHost is not null)
+            {
+                string[] keys = [movedHost.Trim().ToLowerInvariant()];
+                var from = await platform.TenantHosts.AsNoTracking()
+                    .Where(row => keys.Contains(row.Host.ToLower()))
+                    .Select(row => row.TenantId)
+                    .FirstOrDefaultAsync(run.CancellationToken);
+                if (from is not null && from != id)
+                {
+                    ids.Add(from);
+                }
+            }
+
+            result = await change(platform, run.Command.Name);
+        }
+        catch (OperationCanceledException)
+        {
+            run.Error.WriteLine("The command was canceled before any tenant work.");
+            return 1;
+        }
+
+        return result.Outcome == TenantSettingOutcome.Changed ? await HostRealmsAsync(run, setup, ids, result) : Print(run, id, "host", result);
+    }
+
+    /// <summary>
+    /// After a stored host change, rewrites the platform client's redirect addresses in the realm of each changed tenant from its hosts.
+    /// A tenant without a realm of its own, such as a preview tenant or one that signs in through an outside identity provider, has nothing to
+    /// write. The stored change stays when the identity provider fails: any later host command for the tenant brings the realm in step.
+    /// </summary>
+    private static async Task<int> HostRealmsAsync(AdminRun run, Setup setup, List<string> ids, TenantSettingResult result)
+    {
+        foreach (var id in ids)
+        {
+            try
+            {
+                await using var platform = NewContext(setup.Connection);
+                var row = await platform.Tenants.AsNoTracking().SingleOrDefaultAsync(tenant => tenant.Id == id, run.CancellationToken);
+                if (row is null || DirectoryTenantCatalog.Realm(row, setup.Cipher!) is not { } realm)
+                {
+                    continue;
+                }
+
+                var hosts = await platform.TenantHosts.AsNoTracking().Where(host => host.TenantId == id).Select(host => host.Host).ToListAsync(run.CancellationToken);
+                using var http = AdminCommands.IdentityProviderClient(run.IdentityProviderHandler);
+                await new RealmSync(http, realm.BaseAddress).SyncPlatformAddressesAsync(realm.Name, realm.ActivationClientSecret.Reveal(), hosts, run.CancellationToken);
+            }
+            catch (Exception exception) when (exception is HttpRequestException or InvalidOperationException or OperationCanceledException or NpgsqlException)
+            {
+                run.Output.WriteLine($"{id} realm failed: {TenantDatabaseSteps.Safe(exception)}");
+                return 1;
+            }
+        }
+
+        return Print(run, ids[0], "host", result);
     }
 
     /// <summary>Runs a change that needs no secret: the source check, the settings, the tables check, the library call and the line.</summary>

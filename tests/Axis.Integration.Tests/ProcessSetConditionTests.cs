@@ -108,6 +108,7 @@ public sealed class ProcessSetConditionTests(DataDatabaseFixture database) : ICl
             new RecordActor("carl", ["worker"]),
             (_, _) => Task.FromResult(model),
             _ => Task.FromResult<byte[]?>(body),
+            null,
             NullLoggerFactory.Instance,
             CancellationToken);
     }
