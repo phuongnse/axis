@@ -5,6 +5,7 @@ import { expect, test } from "../test";
 import type { Page, TestInfo } from "@playwright/test";
 import { startServer } from "../activate";
 import { confirmDialog, waitForDialog } from "../dialogs";
+import { e2eApp } from "../server-settings";
 import { useSession } from "../sessions";
 
 // Each journey starts a second server and publishes once, which takes a while.
@@ -25,6 +26,8 @@ async function slowAnimations(page: Page) {
  * A throwaway application with the entity Order, which has the fields `number` and `note`, and a server whose
  * Studio edits it. A migration in the purchase request sample would stop the committed sample from activating
  * again, so the journeys do not use it. The application is published once, so Studio compares with a live release.
+ * The server starts with the generic test application, so it does not reset the purchase request sample that
+ * `purchase-request-release` changes.
  */
 async function publishedOrder(page: Page, testInfo: TestInfo, prefix: string) {
   const name = `${prefix}${Date.now().toString(36)}`;
@@ -54,7 +57,7 @@ async function publishedOrder(page: Page, testInfo: TestInfo, prefix: string) {
       ],
     }),
   );
-  const server = await startServer({ Studio__Folders__0: folder });
+  const server = await startServer({ ActivateOnStartup__0: e2eApp, Studio__Folders__0: folder });
   try {
     await useSession(page, "author");
     await slowAnimations(page);

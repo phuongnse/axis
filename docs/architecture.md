@@ -731,7 +731,8 @@ port, with the same settings as the E2E server and that folder in
 server. The E2E server reads the active release on each request, so it serves
 the new release at once. The helper throws an error with the server output when
 the folder does not activate. Only the spec that needs it uses
-`tests/e2e/fixtures/release-app`, so the other specs see no change.
+`tests/e2e/fixtures/release-app`, so the other specs see no change. A spec's own server
+activates `ActivateOnStartup__0` in every tenant, the preview one included, so only `purchase-request-release` may leave it unset. `startup-activation.test.ts` checks this.
 
 A step that once hung the browser until the test timeout can run through `guardStep` in
 `tests/e2e/hang-guard.ts`. It fails the step after its own limit, and attaches a screenshot and a
