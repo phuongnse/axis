@@ -9,14 +9,14 @@ using Npgsql;
 namespace Axis.Admin;
 
 /// <summary>
-/// <c>tenant create</c>: writes the directory entry as <c>provisioning</c>, creates the tenant's realm in the identity provider
-/// (a main tenant only), creates the database roles and the database, grants and migrates it as the schema role, checks the
+/// <c>tenant create</c>: writes the directory entry as <c>provisioning</c> with the tenant's data key 1 and lookup key 1, creates
+/// the tenant's realm in the identity provider (a main tenant only), creates the database roles and the database, grants and migrates it as the schema role, checks the
 /// runtime role and sets the entry <c>active</c>. With an administrator email, the <c>version</c> step records the schema version
 /// only. An <c>administrator</c> step follows: it creates the invited account in the realm, gives it the administrator platform
 /// role with the audit records, has the realm email the invitation, and then sets the entry <c>active</c>. A rerun finds the
 /// account by its email. The realm step saves the three generated client secrets, encrypted, and the
 /// tenant's <c>Oidc</c> block before it calls the identity provider. A rerun on a <c>provisioning</c> entry skips what is done
-/// and reuses the secrets. Each step writes one line that names the tenant and never a password,
+/// and reuses the secrets and the keys. Each step writes one line that names the tenant and never a password,
 /// a host or a connection string.
 /// </summary>
 internal sealed class TenantCreate : IAsyncDisposable
@@ -171,6 +171,7 @@ internal sealed class TenantCreate : IAsyncDisposable
                 Kind = DeploymentBindingKinds.Url,
                 Url = binding.Value,
             }));
+            await TenantKeyRows.AddMissingAsync(_platform, _id, _settings.Cipher, _cancellationToken);
             await _platform.SaveChangesAsync(_cancellationToken);
             await transaction.CommitAsync(_cancellationToken);
 

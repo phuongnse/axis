@@ -5,6 +5,7 @@ using Axis.Core.Telemetry;
 using Axis.Processes;
 using Axis.Processes.Instances;
 using Axis.Tenancy;
+using Axis.Tenancy.Keys;
 using Axis.Tenancy.Platform;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
@@ -63,6 +64,7 @@ public static class WorkerServiceCollectionExtensions
         }
 
         WorkerTenantCatalog catalog;
+        ITenantKeySource keySource;
         if (TenancySettings.Source(configuration) == TenancySource.Directory)
         {
             var platformConnectionString = configuration.GetConnectionString("Platform");
@@ -86,14 +88,17 @@ public static class WorkerServiceCollectionExtensions
                 cipher,
                 refreshInterval,
                 configuration.GetSection(TenantOptions.SectionName).Exists());
+            keySource = new DirectoryTenantKeySource(platformConnectionString, cipher);
         }
         else
         {
             catalog = WorkerTenantCatalog.Loaded(ConfigurationTenantCatalog.Load(configuration, environment));
+            keySource = new ConfigurationTenantKeySource(configuration);
         }
 
         services.AddWorkerTelemetry(configuration, environment);
         services.AddTenancy(catalog);
+        services.AddTenantKeys(keySource);
         services.AddSingleton(catalog);
         services.AddExtensionPackages(configuration, environment);
         services.AddModules(configuration, environment);

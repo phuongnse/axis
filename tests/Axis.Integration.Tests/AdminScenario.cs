@@ -124,6 +124,16 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
         }.ConnectionString;
     }
 
+    /// <summary>The key rows of a tenant, in the order of kind and number.</summary>
+    public async Task<List<TenantDataKeyRow>> KeysAsync(string id)
+    {
+        await using var context = NewContext();
+        return await context.TenantDataKeys.AsNoTracking()
+            .Where(row => row.TenantId == id)
+            .OrderBy(row => row.Kind).ThenBy(row => row.Number)
+            .ToListAsync(CancellationToken);
+    }
+
     public Task<AdminResult> CreateAsync(string id, params string[] hosts) => RunAsync(CreateArgs(id, hosts));
 
     /// <summary>Runs a command in process and keeps its output, so <see cref="AssertNoSecretsAsync"/> can check it.</summary>
@@ -395,6 +405,13 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
             foreach (var binding in migrated ? await context.TenantBindings.AsNoTracking().Where(row => row.Kind == "secret" && row.SecretValue != null).ToListAsync(CancellationToken) : [])
             {
                 secrets.Add(cipher.Decrypt(binding.TenantId, TenantSecretFields.Binding(binding.Name), binding.SecretValue!).Reveal());
+            }
+
+            // The base64 text of a tenant key is its secret form.
+            foreach (var key in migrated ? await context.TenantDataKeys.AsNoTracking().ToListAsync(CancellationToken) : [])
+            {
+                var field = key.Kind == TenantKeyKinds.Data ? TenantSecretFields.DataKey(key.Number) : TenantSecretFields.LookupKey(key.Number);
+                secrets.Add(cipher.Decrypt(key.TenantId, field, key.Key).Reveal());
             }
         }
 

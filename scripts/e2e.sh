@@ -326,6 +326,9 @@ if affected playwright; then
     while true; do
       env 'Tenants__default-preview__PreviewOf=default' 'Tenants__default-preview__Hosts__0=localhost' \
         "Tenants__default-preview__ConnectionString=$AXIS_E2E_PREVIEW_DATABASE" \
+        'Tenants__default-preview__DataKeys__1=AwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwM=' 'Tenants__default-preview__LookupKeys__1=BAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQ=' \
+        Tenants__journey__DataKeys__1=BQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQU= Tenants__journey__LookupKeys__1=BgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgY= \
+        Tenants__default__DataKeys__1=AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE= Tenants__default__LookupKeys__1=AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI= \
         Tenants__journey__Hosts__0=127.0.0.2 Tenants__journey__ConnectionString="$AXIS_E2E_JOURNEY_DATABASE" \
         DOTNET_ENVIRONMENT=Development Health__Urls=http://127.0.0.1:0 Tenants__default__Hosts__0=127.0.0.1 \
         Tenants__default__ConnectionString="$AXIS_E2E_DATABASE" Worker__LeaseDuration=00:00:05 \

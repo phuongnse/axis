@@ -53,6 +53,48 @@ public sealed class AdminMigrateTests(PostgreSqlFixture database) : IClassFixtur
     }
 
     [Fact]
+    public async Task Migrate_gives_keys_to_a_tenant_without_any_and_a_second_run_changes_nothing()
+    {
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        var id = scenario.NewTenantId();
+        Assert.Equal(0, (await scenario.CreateAsync(id, $"{id}.example.test")).Exit);
+        await PostgreSqlServer.AdminScalarAsync(scenario.Platform, $"DELETE FROM platform.tenant_data_keys WHERE tenant_id = '{id}'", CancellationToken);
+        Assert.Empty(await scenario.KeysAsync(id));
+
+        var first = await scenario.RunAsync(["migrate"]);
+
+        Assert.Equal(0, first.Exit);
+        Assert.Equal(_steps.Select(step => $"{id} {step} ok"), first.Output.Where(line => line.StartsWith($"{id} ", StringComparison.Ordinal)));
+        var made = await scenario.KeysAsync(id);
+        Assert.Equal([(TenantKeyKinds.Data, 1), (TenantKeyKinds.Lookup, 1)], made.Select(key => (key.Kind, key.Number)));
+        Assert.Equal(32, Convert.FromBase64String(AdminScenario.Cipher.Decrypt(id, TenantSecretFields.DataKey(1), made[0].Key).Reveal()).Length);
+        Assert.Equal(32, Convert.FromBase64String(AdminScenario.Cipher.Decrypt(id, TenantSecretFields.LookupKey(1), made[1].Key).Reveal()).Length);
+
+        var second = await scenario.RunAsync(["migrate"]);
+
+        Assert.Equal(0, second.Exit);
+        var again = await scenario.KeysAsync(id);
+        Assert.Equal(made.Select(key => (key.Kind, key.Number, key.Key)), again.Select(key => (key.Kind, key.Number, key.Key)));
+        await scenario.AssertNoSecretsAsync();
+    }
+
+    [Fact]
+    public async Task Migrate_makes_only_the_missing_kind_and_keeps_the_key_it_finds()
+    {
+        await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);
+        var id = scenario.NewTenantId();
+        Assert.Equal(0, (await scenario.CreateAsync(id, $"{id}.example.test")).Exit);
+        var before = await scenario.KeysAsync(id);
+        await PostgreSqlServer.AdminScalarAsync(scenario.Platform, $"DELETE FROM platform.tenant_data_keys WHERE tenant_id = '{id}' AND kind = 'lookup'", CancellationToken);
+
+        Assert.Equal(0, (await scenario.RunAsync(["migrate"])).Exit);
+
+        var after = await scenario.KeysAsync(id);
+        Assert.Equal(2, after.Count);
+        Assert.Equal(before.Single(key => key.Kind == TenantKeyKinds.Data).Key, after.Single(key => key.Kind == TenantKeyKinds.Data).Key);
+    }
+
+    [Fact]
     public async Task Migrate_skips_provisioning_tenants_migrates_suspended_ones_and_keeps_every_status()
     {
         await using var scenario = await AdminScenario.NewAsync(database, migrate: true, CancellationToken);

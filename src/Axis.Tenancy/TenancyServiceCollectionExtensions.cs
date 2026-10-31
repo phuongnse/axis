@@ -1,4 +1,5 @@
 using Axis.Core.Tenancy;
+using Axis.Tenancy.Keys;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -33,6 +34,20 @@ public static class TenancyServiceCollectionExtensions
         services.AddSingleton<TenantConnectionFactory>();
         services.AddSingleton<ITenantConnectionFactory>(sp => sp.GetRequiredService<TenantConnectionFactory>());
         services.AddSingleton<IDeploymentBindings, DeploymentBindings>();
+        return services;
+    }
+
+    /// <summary>
+    /// Registers the service that gives the server or the worker the data keys and lookup keys of a tenant, read from
+    /// <paramref name="source"/>.
+    /// </summary>
+    public static IServiceCollection AddTenantKeys(this IServiceCollection services, ITenantKeySource source)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(source);
+
+        services.AddSingleton(source);
+        services.AddSingleton<TenantKeys>();
         return services;
     }
 }

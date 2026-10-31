@@ -177,7 +177,7 @@ the same, and the entry also names its main tenant.
 
 1. `entry`: validate the id and check that the hosts are unique across all
    tenants, ignoring letter case. Write the directory entry with status
-   `provisioning`.
+   `provisioning` and, in the same transaction, the tenant's data key 1 and lookup key 1, see [tenant keys](data-encryption.md#tenant-keys).
 2. `realm`: generate the secrets of the realm's three clients, store them encrypted in the
    directory and point the entry's `Oidc` block at the realm. Then create the tenant's realm in the
    identity provider, or bring an existing one up to date. A preview tenant has no such step.
@@ -247,7 +247,7 @@ them in any SQL you run by hand.
   The `entry` step replaces the entry's hosts, main tenant and bindings with the new
   arguments, so an operator can fix a typo before the tenant goes live. A
   `provisioning` tenant is never served, so this is safe. It never changes the
-  stored passwords, and the `realm` step never changes the stored client secrets. It updates the
+  stored passwords or tenant keys, and the `realm` step never changes the stored client secrets. It updates the
   realm that it made.
 - A stop, such as Ctrl+C, writes a `failed` line for the current step and exits
   with code 1. The entry stays `provisioning`, and a rerun finishes it.
@@ -526,7 +526,7 @@ migration exits `2`, with the message of the setting that could not be used.
 2. `migrations`: run the configuration, data and processes EF Core migrations.
 3. `grants`: run the grant step again.
 4. `role-check`: run the runtime role check of D31.
-5. `version`: record the schema version in the directory.
+5. `version`: record the schema version in the directory, and make any missing data key 1 or lookup key 1.
 
 Steps 1 to 3 run as the tenant's schema role and step 4 as its runtime role.
 Step 5 writes over `ConnectionStrings:PlatformSchema`. `migrate` reaches each

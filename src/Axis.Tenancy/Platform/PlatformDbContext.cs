@@ -4,8 +4,8 @@ namespace Axis.Tenancy.Platform;
 
 /// <summary>
 /// The <c>platform</c> schema of the platform database: the tenant directory, which holds the tenants, their hosts,
-/// their deployment bindings and their platform sign-in providers, the data protection keys of the server and the
-/// append-only platform audit records.
+/// their deployment bindings, their platform sign-in providers and their data keys and lookup keys, the data protection keys
+/// of the server and the append-only platform audit records.
 /// The caller supplies the connection to the platform database.
 /// </summary>
 public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> options) : DbContext(options)
@@ -21,6 +21,8 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
     public DbSet<TenantBindingRow> TenantBindings => Set<TenantBindingRow>();
 
     public DbSet<TenantPlatformProviderRow> TenantPlatformProviders => Set<TenantPlatformProviderRow>();
+
+    public DbSet<TenantDataKeyRow> TenantDataKeys => Set<TenantDataKeyRow>();
 
     public DbSet<DataProtectionKeyRow> DataProtectionKeys => Set<DataProtectionKeyRow>();
 
@@ -105,6 +107,11 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
                 .HasForeignKey(provider => provider.TenantId)
                 .HasConstraintName("fk_tenant_platform_providers_tenants_tenant_id")
                 .OnDelete(DeleteBehavior.Cascade);
+            tenant.HasMany<TenantDataKeyRow>()
+                .WithOne()
+                .HasForeignKey(key => key.TenantId)
+                .HasConstraintName("fk_tenant_data_keys_tenants_tenant_id")
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         modelBuilder.Entity<TenantHostRow>(host =>
@@ -149,6 +156,20 @@ public sealed class PlatformDbContext(DbContextOptions<PlatformDbContext> option
             provider.Property(p => p.ClaimLocale).HasColumnName("claim_locale");
             provider.Property(p => p.RolesClaim).HasColumnName("roles_claim");
             provider.Property(p => p.RoleValues).HasColumnName("role_values").HasColumnType("jsonb");
+        });
+
+        modelBuilder.Entity<TenantDataKeyRow>(key =>
+        {
+            key.ToTable("tenant_data_keys", table =>
+            {
+                table.HasCheckConstraint("ck_tenant_data_keys_kind", "kind IN ('data', 'lookup')");
+                table.HasCheckConstraint("ck_tenant_data_keys_number", "number >= 1");
+            });
+            key.HasKey(k => new { k.TenantId, k.Kind, k.Number }).HasName("pk_tenant_data_keys");
+            key.Property(k => k.TenantId).HasColumnName("tenant_id");
+            key.Property(k => k.Kind).HasColumnName("kind");
+            key.Property(k => k.Number).HasColumnName("number");
+            key.Property(k => k.Key).HasColumnName("key").HasColumnType("bytea");
         });
 
         modelBuilder.Entity<DataProtectionKeyRow>(key =>

@@ -21,6 +21,7 @@ using Axis.Server.Telemetry;
 using Axis.Server.Tenancy;
 using Axis.Server.Users;
 using Axis.Tenancy;
+using Axis.Tenancy.Keys;
 using Axis.Tenancy.Platform;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.DataProtection.KeyManagement;
@@ -167,6 +168,9 @@ builder.Services.AddServerTelemetry(builder.Configuration, builder.Environment);
 // The clients that startup activation uses to bring a tenant's realm in step.
 builder.Services.AddHttpClient();
 builder.Services.AddTenancy(tenants);
+builder.Services.AddTenantKeys(directorySource
+    ? new DirectoryTenantKeySource(platformConnectionString, cipher)
+    : new ConfigurationTenantKeySource(builder.Configuration));
 builder.Services.AddExtensionPackages(builder.Configuration, builder.Environment);
 builder.Services.AddModules(builder.Configuration, builder.Environment);
 builder.Services.AddTemplates(builder.Configuration, builder.Environment);

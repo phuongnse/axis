@@ -111,6 +111,11 @@ export function serverEnv(baseURL: string): Record<string, string> {
     'Tenants__default-preview__Hosts__0': 'localhost',
     'Tenants__default-preview__ConnectionString': previewConnectionString,
     'Tenants__default-preview__SchemaConnectionString': previewSchemaConnectionString,
+    // The development tenant keys, as in appsettings.Development.json.
+    Tenants__default__DataKeys__1: 'AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE=',
+    Tenants__default__LookupKeys__1: 'AgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgI=',
+    'Tenants__default-preview__DataKeys__1': 'AwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwMDAwM=',
+    'Tenants__default-preview__LookupKeys__1': 'BAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQ=',
     // The development realm and its client, as in appsettings.Development.json.
     Tenants__default__Oidc__Authority: `${keycloakUrl}/realms/axis`,
     Tenants__default__Oidc__ClientId: 'axis',
@@ -178,6 +183,9 @@ export function journeyServerEnv(): Record<string, string> {
     Tenants__journey__Hosts__0: '127.0.0.2',
     Tenants__journey__ConnectionString: journeyConnectionString,
     Tenants__journey__SchemaConnectionString: journeySchemaConnectionString,
+    // The journey tenant is not in appsettings.Development.json, so its keys are set here.
+    Tenants__journey__DataKeys__1: 'BQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQU=',
+    Tenants__journey__LookupKeys__1: 'BgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgYGBgY=',
     // The same realm and client as the default tenant.
     Tenants__journey__Oidc__Authority: `${keycloakUrl}/realms/axis`,
     Tenants__journey__Oidc__ClientId: 'axis',
