@@ -284,6 +284,8 @@ inspector page. The leave request sample, `samples/apps/leave-requests`, reuses 
 adds the `agent` user and two `service-desk-lead` users and gives an employee the `requester` role, in a site
 at `/service-desk`. The asset management sample, `samples/apps/asset-management`, adds the `asset-manager` and `auditor` users
 and uses the `employee` user as the holder of assets, in a site at `/asset-management`.
+The department budgets journey, `tests/e2e/specs/department-budgets-journey.spec.ts`, signs in as `manager` to approve a budget
+and as `employee` to be refused.
 The request-approval template journey, `tests/e2e/specs/request-approval-journey.spec.ts`,
 adds the `approver` user. The `administrator` user holds the `tenant-administrator` role, so it sees "Users" in the shell, and the E2E shell journey uses it. The [users page](reference/user-administration.md) it links to lists the development users, and the E2E users page journey uses it. The `author` role lets the authoring API list and read the resources of every sample under
 `samples/apps/` under `scripts/dev.sh`, and opens the Studio page at http://localhost:5173/studio.
