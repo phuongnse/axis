@@ -85,7 +85,8 @@ public sealed class RestoredTenantWorkTests(AdminBackupFixture fixture) : IClass
         var stubAddress = stub.Services.GetRequiredService<IServer>().Features.GetRequiredFeature<IServerAddressesFeature>().Addresses.Single();
         Assert.Equal(0, (await scenario.RunAsync(["tenant", "binding", "set", newId, UrlBinding, "--url", stubAddress], extra: AdminScenario.Directory)).Exit);
         Assert.Equal(0, (await scenario.RunAsync(["tenant", "binding", "set", newId, PurchasingBindings.TokenUrl, "--url", $"{stubAddress}/oauth/token"], extra: AdminScenario.Directory)).Exit);
-        foreach (var (name, value) in new[] { (PurchasingBindings.ClientId, PurchasingStubApp.DefaultClientId), (PurchasingBindings.ClientSecret, PurchasingStubApp.DefaultClientSecret) })
+        Assert.Equal(0, (await scenario.RunAsync(["tenant", "binding", "set", newId, PurchasingBindings.WebhookUrl, "--url", $"{stubAddress}/webhooks/purchase-request-approved"], extra: AdminScenario.Directory)).Exit);
+        foreach (var (name, value) in new[] { (PurchasingBindings.ClientId, PurchasingStubApp.DefaultClientId), (PurchasingBindings.ClientSecret, PurchasingStubApp.DefaultClientSecret), (PurchasingBindings.WebhookSecret, PurchasingStubApp.DefaultWebhookSecret) })
         {
             Assert.Equal(
                 0,

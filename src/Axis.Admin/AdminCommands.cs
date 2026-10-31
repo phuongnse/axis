@@ -58,8 +58,8 @@ internal static partial class AdminCommands
         """
         Usage: tenant create <id> --host <host>... [--administrator <email>]
                tenant create <id> --preview-of <main> --host <host>... [--binding <name>=<value>]...
-               tenant backup <id> --out <file>
-               tenant restore <file> --tenant <id> --host <host>...
+               tenant backup <id> --out <file> --backup-key-file <file>
+               tenant restore <file> --tenant <id> --host <host>... --backup-key-file <file>
                migrate [--tenant <id>] [--parallel <n>]
                activate <folder> [--tenant <id>]
                tenant suspend <id>
@@ -608,8 +608,9 @@ internal static partial class AdminCommands
                 continue;
             }
 
-            // A value may be empty, which removes an audience, but never starts with a second option.
-            if (i + 1 >= args.Length || args[i + 1].StartsWith("--", StringComparison.Ordinal))
+            // A value may be empty, which removes an audience, but is never a second option. A key id is base64url
+            // text, so it can start with "--" and still be a value.
+            if (i + 1 >= args.Length || _oidcSetOptions.Contains(args[i + 1]))
             {
                 return null;
             }
@@ -640,6 +641,15 @@ internal static partial class AdminCommands
             new TenantSignInChange(endpointAudience, serviceAudience, profile, null, retireKeyId));
     }
 
+    private static readonly string[] _oidcSetOptions =
+    [
+        "--client-key",
+        "--endpoint-audience",
+        "--service-audience",
+        "--profile",
+        "--retire-client-key",
+    ];
+
     private static async Task<int> BackupAsync(
         string command,
         string[] args,
@@ -662,10 +672,17 @@ internal static partial class AdminCommands
             return 2;
         }
 
+        var backupKey = BackupKeyFile.Read(request.BackupKeyFile, out problem);
+        if (backupKey is null)
+        {
+            error.WriteLine(problem);
+            return 2;
+        }
+
         BackupPlan? plan;
         try
         {
-            plan = await TenantBackup.PrepareAsync(settings, request, error, cancellationToken);
+            plan = await TenantBackup.PrepareAsync(settings, request, backupKey, error, cancellationToken);
         }
         catch (OperationCanceledException)
         {
@@ -701,6 +718,13 @@ internal static partial class AdminCommands
             return 2;
         }
 
+        var backupKey = BackupKeyFile.Read(request.BackupKeyFile, out problem);
+        if (backupKey is null)
+        {
+            error.WriteLine(problem);
+            return 2;
+        }
+
         var pgRestore = FindTool(settings.SearchPath, TenantRestore.PgRestore);
         if (pgRestore is null)
         {
@@ -720,7 +744,7 @@ internal static partial class AdminCommands
                 return 2;
             }
 
-            plan = await TenantRestore.PrepareAsync(settings, request, pgRestore, realm, output, error, cancellationToken);
+            plan = await TenantRestore.PrepareAsync(settings, request, backupKey, pgRestore, realm, output, error, cancellationToken);
         }
         catch (OperationCanceledException)
         {
@@ -742,6 +766,7 @@ internal static partial class AdminCommands
 
         var hosts = new List<string>();
         string? id = null;
+        string? keyFile = null;
         for (var i = 3; i < args.Length; i += 2)
         {
             if (i + 1 >= args.Length || args[i + 1].StartsWith("--", StringComparison.Ordinal))
@@ -758,12 +783,15 @@ internal static partial class AdminCommands
                 case "--tenant" when id is null:
                     id = value;
                     break;
+                case BackupKeyFile.Option when keyFile is null:
+                    keyFile = value;
+                    break;
                 default:
                     return null;
             }
         }
 
-        return hosts.Count == 0 || id is null ? null : new TenantRestoreRequest(args[2], id, hosts);
+        return hosts.Count == 0 || id is null || keyFile is null ? null : new TenantRestoreRequest(args[2], id, hosts, keyFile);
     }
 
     private static TenantBackupRequest? ParseTenantBackup(string[] args)
@@ -774,17 +802,28 @@ internal static partial class AdminCommands
         }
 
         string? file = null;
+        string? keyFile = null;
         for (var i = 3; i < args.Length; i += 2)
         {
-            if (i + 1 >= args.Length || args[i] != "--out" || file is not null || string.IsNullOrWhiteSpace(args[i + 1]))
+            if (i + 1 >= args.Length || string.IsNullOrWhiteSpace(args[i + 1]))
             {
                 return null;
             }
 
-            file = args[i + 1];
+            switch (args[i])
+            {
+                case "--out" when file is null:
+                    file = args[i + 1];
+                    break;
+                case BackupKeyFile.Option when keyFile is null:
+                    keyFile = args[i + 1];
+                    break;
+                default:
+                    return null;
+            }
         }
 
-        return file is null ? null : new TenantBackupRequest(args[2], file);
+        return file is null || keyFile is null ? null : new TenantBackupRequest(args[2], file, keyFile);
     }
 
     private static TenantCreateRequest? ParseTenantCreate(string[] args)
@@ -1835,9 +1874,9 @@ internal sealed record MigrateRequest(string? Tenant, int Parallel);
 
 internal sealed record ActivateRequest(string Folder, string? Tenant);
 
-internal sealed record TenantBackupRequest(string Id, string Out);
+internal sealed record TenantBackupRequest(string Id, string Out, string BackupKeyFile);
 
-internal sealed record TenantRestoreRequest(string File, string Id, IReadOnlyList<string> Hosts);
+internal sealed record TenantRestoreRequest(string File, string Id, IReadOnlyList<string> Hosts, string BackupKeyFile);
 
 /// <summary>The settings every command reads: the platform database and the key of the tenant secrets.</summary>
 internal sealed record PlatformSettings(string PlatformConnectionString, TenantSecretCipher Cipher);

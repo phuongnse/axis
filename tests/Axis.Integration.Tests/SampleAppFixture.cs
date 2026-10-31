@@ -229,7 +229,7 @@ public sealed class SampleAppFixture : IAsyncLifetime
             [$"Tenants:{Tenant}:Bindings:PurchasingSystemUrl:Kind"] = "url",
             [$"Tenants:{Tenant}:Bindings:PurchasingSystemUrl:Value"] = PurchasingUrl,
         };
-        foreach (var (key, value) in PurchasingBindings.Settings(Tenant, $"{PurchasingUrl}/oauth/token"))
+        foreach (var (key, value) in PurchasingBindings.Settings(Tenant, $"{PurchasingUrl}/oauth/token", $"{PurchasingUrl}/webhooks/purchase-request-approved"))
         {
             settings[key] = value;
         }

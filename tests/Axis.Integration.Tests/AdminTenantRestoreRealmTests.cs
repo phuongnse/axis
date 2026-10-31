@@ -72,7 +72,7 @@ public sealed class AdminTenantRestoreRealmTests(KeycloakFixture keycloak, Postg
         Assert.Equal(["oidc-issuer"], await ProviderAliasesAsync(original));
         using var archive = new TemporaryFolder();
         var file = Path.Combine(archive.Path, "backup.tar");
-        Assert.Equal(0, (await scenario.RunAsync(["tenant", "backup", original, "--out", file], path: _tools.PathSetting)).Exit);
+        Assert.Equal(0, (await scenario.RunAsync(["tenant", "backup", original, "--out", file, .. AdminScenario.BackupKeyArgs], path: _tools.PathSetting)).Exit);
         await DeleteRealmAsync(original);
         var restored = scenario.NewTenantId();
         _realms.Add(restored);
@@ -110,7 +110,7 @@ public sealed class AdminTenantRestoreRealmTests(KeycloakFixture keycloak, Postg
         await CreateUserAsync(original, "kept-user");
         using var archive = new TemporaryFolder();
         var file = Path.Combine(archive.Path, "backup.tar");
-        Assert.Equal(0, (await scenario.RunAsync(["tenant", "backup", original, "--out", file], path: _tools.PathSetting)).Exit);
+        Assert.Equal(0, (await scenario.RunAsync(["tenant", "backup", original, "--out", file, .. AdminScenario.BackupKeyArgs], path: _tools.PathSetting)).Exit);
         Assert.Equal(0, (await scenario.RunAsync(["tenant", "suspend", original])).Exit);
         var restored = scenario.NewTenantId();
         _realms.Add(restored);

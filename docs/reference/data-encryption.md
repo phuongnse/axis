@@ -1,6 +1,6 @@
 # Data encryption
 
-_(planned for M27)_ Axis encrypts the values of fields marked `sensitive` and tenant backup archives, as
+Axis encrypts tenant backup archives, and _(planned for M27)_ the values of fields marked `sensitive`, as
 [D109](../decisions/d109-sensitive-fields-and-backups-are-encrypted-and-history-keeps-no-names.md) and
 [D116](../decisions/d116-how-sensitive-fields-and-backups-are-encrypted.md) agree. The keys are in the
 [cryptographic inventory](keys-and-data-protection.md#cryptographic-inventory). Secrets in the platform tables are
@@ -96,16 +96,16 @@ Adding or removing `sensitive` or `exactLookup` is a schema change that activati
 - **Under the configuration source.** `Tenants:{id}:DataKeys:{number}` and `Tenants:{id}:LookupKeys:{number}` hold the keys,
   base64-encoded. Development and the tests set them.
 - **When they are made.** `tenant create` makes data key 1 and lookup key 1. `migrate` makes them for a tenant that has
-  none. `tenant restore` takes them from the archive _(planned for M27)_. Until then a restored tenant has none, and
-  the next `migrate` makes them.
+  none. `tenant restore` takes them from the archive, with the same numbers, and makes number 1 of each kind for an
+  archive that has none.
 - **No key, no write.** A host that finds no key for a tenant refuses to write a sensitive value, with a `500`
   problem and an error log line that names the tenant. It never writes a sensitive value in clear.
 - **Refresh.** Each host reads a tenant's keys when it first needs them, and again when a value names a number it
   does not hold. The server and the worker do this through one key service. It gives the newest key of a kind for a
   write and a key by number for a read, and it never logs a key.
 
-The key store, the settings, `tenant create`, `migrate`, the rekey and the refresh are built. Writing and reading
-`sensitive` values with the keys, `tenant restore` and the rotation below are _(planned for M27)_.
+The key store, the settings, `tenant create`, `migrate`, `tenant restore`, the rekey and the refresh are built. Writing
+and reading `sensitive` values with the keys and the rotation below are _(planned for M27)_.
 
 ### Rotating the keys
 
@@ -125,20 +125,30 @@ never a key. The exit codes are those of [output and exit codes](administration.
 
 - **The backup key.** The operator makes a key of 32 random bytes, for example with `openssl rand -base64 32`, and
   keeps it outside the installation. It is never the installation key. `tenant backup` and `tenant restore` take it
-  as `--backup-key-file <file>`, a file that holds the base64 key. The key never goes on the command line, in a
-  setting or in a log. A lost backup key loses its archives.
-- **The archive.** `tenant backup` writes the tar archive of [tenant backup](administration.md#tenant-backup)
+  as `--backup-key-file <file>`, a file that holds the base64 key. The tool trims white space around it. The key
+  never goes on the command line, in a setting or in a log. A lost backup key loses its archives. The tool cannot
+  tell whether the backup key equals the installation key, so keeping the two apart is the operator's job.
+- **The archive.** `tenant backup` writes the tar archive of [tenant backup](tenant-backup-and-restore.md#tenant-backup)
   encrypted:
   - The file starts with the 8 bytes `AXISBAK1` and a random 8-byte prefix.
-  - Chunks of 1 MiB of the tar follow, each encrypted with AES-256-GCM. A chunk's nonce is the prefix and the
-    chunk's 4-byte counter. Its associated data marks whether it is the last chunk.
+  - Chunks of 1 MiB of the tar follow, each encrypted with AES-256-GCM and followed by its 16-byte tag. A chunk's
+    nonce is the prefix and the chunk's 4-byte counter, big-endian, from 0. Its associated data is one byte, 1 for the
+    last chunk and 0 for the others.
   - A cut, reordered or changed archive fails to decrypt.
+  - `tenant backup` writes the dump to a temporary file that only its owner can read, then deletes it. Only the final
+    archive is encrypted.
 - **The tenant's keys go with it.** The manifest holds the tenant's data keys and lookup keys, base64-encoded, under
-  `keys`. Only the backup key protects them, so a restored tenant can read its sensitive values. `tenant restore`
-  stores them again under the installation key.
+  `keys`, each with its `kind`, `number` and `key`. Only the backup key protects them, so a restored tenant can read
+  its sensitive values. `tenant restore` stores them again under the installation key, with the same numbers.
 - **Restore refusals.** `tenant restore` refuses, before anything changes and with exit code `2`:
-  - an archive that does not start with `AXISBAK1`, which includes every archive written before M27;
-  - a key file that is missing or does not hold 32 bytes;
+  - an archive that does not start with `AXISBAK1`, which includes every archive written before archives were
+    encrypted, so none of them can be restored;
+  - a key file that is missing or does not hold 32 bytes in base64;
   - a key that does not open the first chunk.
 
-  A chunk that fails to decrypt later fails the `restore` step, which restores nothing.
+  The `check` step decrypts only as far as the manifest and the start of `tenant.dump`. The `restore` step decrypts to
+  the end of the file, so a chunk that fails to decrypt later fails that step. The entry stays `provisioning`, nothing
+  is restored, and a rerun with a good archive finishes the restore.
+- **What the encryption does not do yet.** A `sensitive` value is not encrypted with the tenant keys until the
+  _(planned for M27)_ work that writes them. A value's associated data names the tenant id, so that work has to handle
+  a restore under a new id.

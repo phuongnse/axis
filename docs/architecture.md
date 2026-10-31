@@ -801,7 +801,9 @@ Development lets a connector call an `http` URL. Their `PurchasingSystemUrl`,
 `PurchasingSystemTokenUrl`, `PurchasingSystemClientId` and
 `PurchasingSystemClientSecret` bindings point at the stub and hold its default
 credentials, so an approved purchase request signs in and creates its purchase
-order there.
+order there. The E2E server, worker and publisher also hold the
+`PurchaseRequestApprovedWebhookUrl` and `PurchaseRequestApprovedWebhookSecret`
+bindings, which point at the stub for the approval webhook to come.
 
 ### Purchasing system stub
 

@@ -275,7 +275,10 @@ group `employees` and one person in it, `pat` (Pat Example, `pat@company.example
 listens on `AXIS_E2E_KEYCLOAK_PORT` (default 8180) inside and outside its container, so the `axis` realm reaches the `company` realm
 at the address the browser uses. Development, Compose, `scripts/dev.sh` and E2E give the `default` tenant the deployment
 bindings `CompanyIssuer` (the realm's issuer URL), `CompanyClientId` (`axis-broker`) and `CompanyClientSecret`. The purchase request
-sample's `company` provider reads them. The `operator` role opens the purchase request sample's Approvals
+sample's `company` provider reads them. Development, Compose, `scripts/dev.sh` and E2E also give the `default` tenant
+`PurchaseRequestApprovedWebhookUrl` (the stub's `/webhooks/purchase-request-approved` route) and
+`PurchaseRequestApprovedWebhookSecret` (the stub's default webhook secret), for the purchase request approval webhook to come.
+The `operator` role opens the purchase request sample's Approvals
 inspector page. The leave request sample, `samples/apps/leave-requests`, reuses the `employee` and
 `department-manager` users, in a site at `/leave`. The service desk sample, `samples/apps/service-desk`,
 adds the `agent` user and two `service-desk-lead` users and gives an employee the `requester` role, in a site
@@ -401,7 +404,8 @@ works on a fresh clone:
   `Tenants__default__Bindings__CompanyIssuer__Value` at the `company` realm there. When
   `AXIS_PURCHASING_PORT` is set, it points the server's and the worker's
   `Tenants__default__Bindings__PurchasingSystemUrl__Value` and
-  `Tenants__default__Bindings__PurchasingSystemTokenUrl__Value` at the purchasing
+  `Tenants__default__Bindings__PurchasingSystemTokenUrl__Value` and
+  `Tenants__default__Bindings__PurchaseRequestApprovedWebhookUrl__Value` at the purchasing
   system stub on that port.
 - The worker serves `/health/live` and `/health/ready` at `http://127.0.0.1:5208` and
   answers `404` elsewhere. `Health__Urls` moves that address. Two workers on one machine

@@ -14,26 +14,28 @@ test.describe('Studio redraws a large process after a panel edit', () => {
   const file = 'processes/purchase-request-approval.json'
   const folder = '/api/studio/apps/PurchaseRequests'
   let copy: string
+  let firstFiller: number
   let server: Awaited<ReturnType<typeof startServer>>
 
   test.beforeAll(async () => {
     copy = await mkdtemp(path.join(os.tmpdir(), 'axis-studio-process-redraw-'))
     await cp(purchaseRequests, copy, { recursive: true })
-    // The approval process grows to 40 steps: 30 chained updateRecord steps follow markRejected, before done.
+    // The approval process grows to 40 steps: 29 chained updateRecord steps follow markRejected, before done.
     const processFile = path.join(copy, file)
     const process = JSON.parse(await readFile(processFile, 'utf8')) as { steps: Record<string, unknown>[] }
     const steps = process.steps
     const markRejected = steps.find((step) => step.name === 'markRejected')!
     const done = steps.findIndex((step) => step.name === 'done')
-    const fillers = Array.from({ length: 30 }, (_, index) => ({
+    const fillers = Array.from({ length: 29 }, (_, index) => ({
       name: `filler${index + 1}`,
       type: 'operation',
       operation: 'updateRecord',
       set: { status: "'rejected'" },
-      next: index < 29 ? `filler${index + 2}` : 'done',
+      next: index < 28 ? `filler${index + 2}` : 'done',
     }))
     markRejected.next = 'filler1'
     steps.splice(done, 0, ...fillers)
+    firstFiller = done
     expect(steps.length).toBe(40)
     await writeFile(processFile, JSON.stringify(process, null, 2))
     server = await startServer({ ActivateOnStartup__0: e2eApp, Studio__Folders__0: copy })
@@ -54,8 +56,8 @@ test.describe('Studio redraws a large process after a panel edit', () => {
 
     await page.goto(`${server.url}/studio?app=PurchaseRequests&resource=${id}`)
     await expect(page.locator('[data-testid^="studio-graph-node-"]')).toHaveCount(40)
-    // Node 23 is filler15, a step in the middle of the chain.
-    const index = 23
+    // filler15 sits in the middle of the chain, 14 places after the first filler.
+    const index = firstFiller + 14
     await page.getByTestId(`studio-graph-node-${index}`).click()
     const name = page
       .getByTestId('studio-process-design')
