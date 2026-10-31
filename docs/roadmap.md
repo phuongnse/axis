@@ -57,7 +57,8 @@ The closed milestones are on [GitHub](https://github.com/phuongnse/axis/mileston
 ### Phase 1: the first small businesses
 
 Done when a small business signs up for Axis SaaS, pays for a plan and runs its approvals, changed
-to fit in Studio, while the module's contract holds: the journeys of M26 and M34 pass.
+to fit in Studio by hand or by a request in words, while the module's contract holds: the journeys
+of M26, M34 and M35 pass.
 
 | | Milestone | Status | Done when |
 | --- | --- | --- | --- |
@@ -72,6 +73,7 @@ to fit in Studio, while the module's contract holds: the journeys of M26 and M34
 | **M31** | Axis SaaS | Planned | Axis runs as a SaaS in cells: each cell is a full installation in a region, the first region is `vn`, and up to 1,000 tenants share a cell. Each tenant's Studio application folders are kept apart. Each tenant has quotas for storage, users, applications, emails a day and work at once, its usage is measured, and the worker shares its time fairly between tenants. A new tenant gets a subdomain of the region's domain, and may add a host of its own. Every tenant is backed up each day, encrypted, kept 30 days, with a restore tried every week. The platform operator creates a tenant from a built-in application, exports a tenant's data and deletes a tenant, and sees every tenant of the cell with its status, usage and failed work. A load test sets how many tenants a cell holds. The journey: the operator creates two tenants from the built-in approvals application, one reaches its storage quota and is refused while the other keeps working, and the first is exported and deleted. It runs beside M24 to M26. See [D118](decisions/d118-axis-saas-in-cells-with-sign-up-quotas-and-billing.md). |
 | **M33** | Sign-up and trials | Planned | A person signs up on Axis's public page, chooses a region and a built-in application, and verifies their email. Axis picks a cell of the region with room, creates the tenant, its realm and its subdomain, activates the application and invites the person as the first administrator. A new tenant is a 30-day trial, with emails before its end, a suspension at the end and a deletion 30 days later. There is no free plan that never ends. Sign-up has rate limits and a bot check. A directory of regions and cells routes each sign-up and each host to its cell. The journey: a person signs up, uses a working approvals site, and the trial ends with a suspension after the reminder emails. It follows M31 and M26. See [D118](decisions/d118-axis-saas-in-cells-with-sign-up-quotas-and-billing.md). |
 | **M34** | Plans and billing | Planned | Each tenant has a plan that sets its quotas, with a price for the whole tenant, not per user, and prices set from the measured cost of a cell. A tenant administrator chooses a plan and pays: in Vietnam by bank transfer through VietQR or a payment gateway, abroad through a merchant of record. Each payment gets an electronic invoice. A trial becomes paid without losing anything, and a failed or late payment sends reminders, then a grace period, then a suspension. The journey: a trial tenant chooses a plan, pays, gets its invoice and its new quotas, and a later failed payment ends in a suspension after the grace period. It follows M33. See [D118](decisions/d118-axis-saas-in-cells-with-sign-up-quotas-and-billing.md). |
+| **M35** | AI changes an application | Planned | An author describes a change in words in Studio, and an agent in the agent host makes it on a draft of the application, through typed tools over the authoring API only. The agent answers with a plan that the author approves, prefers declaring a built-in module and writing its customization layer to new resources, and writes scenarios for what it adds. The compiler, the application's scenarios and the contract scenarios run as its checks, a second agent session reviews the draft, and failures start a bounded fix round. Studio shows the draft's diff, the author accepts or drops it, and only the publisher role publishes. The model is a binding: Claude through the Anthropic API, Amazon Bedrock or Google Vertex AI, or an OpenAI-compatible endpoint. No record of the tenant reaches the model, each request is audited, and a SaaS plan includes a number of requests. The journey: an author asks for a director's approval above a threshold on an approvals application, approves the plan, sees the layer change and its new scenario pass, and publishes, and a second request that would let a requester decide their own request is refused by the contract. It follows M25 and M26 and runs beside M31 to M34. See [D119](decisions/d119-ai-authoring-in-studio.md). |
 
 ### Phase 2: growth
 
@@ -84,6 +86,7 @@ when every milestone of phase 1 is broken down.
 | **M30** | More built-in modules | Planned | The built-in modules `service-desk` and `assets`, which the service desk and the asset management samples become, with built-in applications that use them. Carried over from M18: the asset management scenarios for import and attachments, with their denied cases. The journey: a business starts from the built-in service desk, adds a category of its own in Studio, and a request in it reaches the right team. It follows M26. See [D102](decisions/d102-built-in-modules-open-to-change-and-bound-by-a-contract.md), [D81](decisions/d81-asset-management-as-the-fourth-sample-application.md) and [D117](decisions/d117-small-businesses-first-and-the-milestones-in-three-phases.md). |
 | **M21** | Package runners | Planned | Outside Development, package operations run in the package runners of `Axis.PackageHost`, with an empty environment, a read-only file system, CPU and memory limits, one network route through an egress proxy, and a kill at the operation's timeout. The journey: the payment reference package of purchase requests runs in the package host. See [D90](decisions/d90-extension-packages-run-out-of-process.md). |
 | **M22** | Custom widgets and the published SDK | Planned | An extension package holds custom widgets that the SPA loads through an import map, and the page designer offers them in its palette with a property panel. `Axis.Extensions` and `@axis/widgets-sdk` are published, with a package template and a test harness. The journey: the author drags the "budget usage" widget onto a purchase request page in Studio. It waits for M20. See [D88](decisions/d88-custom-widgets-in-the-designer-palette-and-a-published-sdk.md). |
+| **M36** | AI builds applications and modules | Planned | An agent builds a whole application, or a reusable module, from a description, with its entities, forms, pages, processes, roles, policies and scenarios, in the same loop as M35. An MCP server over the authoring API lets a developer or a partner drive Axis from Claude Code or NexKit on their own machine, under their own grants. The journey: an author describes a small register, accepts the draft and publishes it, and a developer adds a field to it through the MCP server. It follows M35. See [D119](decisions/d119-ai-authoring-in-studio.md). |
 
 ### Phase 3: large organizations and government
 
@@ -111,7 +114,9 @@ direction after M9, and [D117](decisions/d117-small-businesses-first-and-the-mil
   banks and government come in phase 3.
 - **What sets Axis apart.** Built-in modules _(planned for M26)_ that a business changes anywhere,
   that keep their upgrades, and whose contract holds on every write, see
-  [D102](decisions/d102-built-in-modules-open-to-change-and-bound-by-a-contract.md).
+  [D102](decisions/d102-built-in-modules-open-to-change-and-bound-by-a-contract.md). An author
+  can also describe a change in words, and an agent makes it under the same contract, wherever
+  Axis runs _(planned for M35)_, see [D119](decisions/d119-ai-authoring-in-studio.md).
 - **No domain gets platform code.** Samples prove the platform. Built-in
   modules serve real businesses as configuration, not platform code.
 - **Order.** M10 to M16 and M18 to M26 follow the vertical slice: create an
@@ -128,7 +133,9 @@ direction after M9, and [D117](decisions/d117-small-businesses-first-and-the-mil
   M23 waits for M19, see
   [D101](decisions/d101-the-extensibility-milestone-is-split-into-six.md).
   M28 can run beside any of them, and M31 runs beside M24 to M26. M33
-  follows M31 and M26, and M34 follows M33, see [D118](decisions/d118-axis-saas-in-cells-with-sign-up-quotas-and-billing.md). In phase 2, M29 follows M25, M30 follows M26, and M22
+  follows M31 and M26, and M34 follows M33, see [D118](decisions/d118-axis-saas-in-cells-with-sign-up-quotas-and-billing.md).
+  M35 follows M25 and M26 and runs beside M31 to M34, see [D119](decisions/d119-ai-authoring-in-studio.md).
+  In phase 2, M29 follows M25, M30 follows M26, M36 follows M35, and M22
   waits for M20.
 - **Proving it is general.** From M11 on, each milestone extends a sample of a
   new shape: a service desk, then asset management. Neither needs platform
