@@ -49,8 +49,10 @@ namespace Axis.Processes.Instances;
 /// <c>process.resume</c> item that moves the parent on. A step that throws is rolled back, and the
 /// failure callback then records the error in the history and marks the instance <c>failed</c>.
 /// </summary>
-internal sealed partial class ProcessStepHandler(ReleaseModelCache models, PackageCatalog packages, ITenantCatalog? tenants, ILogger<ProcessStepHandler> logger) : IWorkItemHandler
+internal sealed partial class ProcessStepHandler(ReleaseModelCache models, PackageCatalog packages, ITenantCatalog? tenants, SensitiveValues? sensitive, ILogger<ProcessStepHandler> logger) : IWorkItemHandler
 {
+    private RecordCipher? Cipher(WorkItemContext context) => sensitive is null ? null : new(sensitive, context.Item.TenantId);
+
     /// <summary>The decision recorded when no branch was true.</summary>
     internal const string Otherwise = "otherwise";
 
@@ -194,7 +196,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
                 await RecordCommands.LockAsync(context.Connection, subjectEntity, subjectId, cancellationToken);
             }
 
-            stored = await RecordQueries.GetAsync(context.Connection, model, subjectEntity, subjectId, cancellationToken)
+            stored = await RecordQueries.GetAsync(context.Connection, model, subjectEntity, subjectId, Cipher(context), cancellationToken)
                 ?? throw Failure($"No record of '{subjectEntity.Name}' has the id '{subjectId}'.", instance, input);
             input["subjectVersion"] = stored.Version;
 
@@ -581,7 +583,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
         Record? updated = null;
         if (assignments is not null)
         {
-            var result = await RecordCommands.SetAsync(context.Connection, model, entity!, instance.ReleaseId, stored!, assignments, instance.Now, cancellationToken: cancellationToken);
+            var result = await RecordCommands.SetAsync(context.Connection, model, entity!, instance.ReleaseId, stored!, assignments, instance.Now, cipher: Cipher(context), cancellationToken: cancellationToken);
             if (result is not { Outcome: RecordWriteOutcome.Written, Record: { } written })
             {
                 throw Failure($"The record update was rejected: {Describe(result)}", instance, input);
@@ -608,7 +610,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
         if (creation is not null)
         {
             var result = await RecordCommands.CreateFromAsync(
-                context.Connection, model, created!, instance.ReleaseId, creation, AuditActors.System, instance.Now, cancellationToken: cancellationToken);
+                context.Connection, model, created!, instance.ReleaseId, creation, AuditActors.System, instance.Now, cipher: Cipher(context), cancellationToken: cancellationToken);
             if (result is not { Outcome: RecordWriteOutcome.Written, Record: { } written })
             {
                 throw Failure($"The record create was rejected: {Describe(result)}", instance, input);
@@ -909,7 +911,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
         // The lock makes the read below and the start condition see the latest version, as for a trigger start.
         var noRecord = $"The step '{step.Name}' found no record of '{childEntity.Name}' to start the process '{childProcess.Name}' for.";
         if (!await RecordCommands.LockAsync(context.Connection, childEntity, subjectId, cancellationToken)
-            || await RecordQueries.GetAsync(context.Connection, model, childEntity, subjectId, cancellationToken) is not { } stored)
+            || await RecordQueries.GetAsync(context.Connection, model, childEntity, subjectId, Cipher(context), cancellationToken) is not { } stored)
         {
             throw Failure(noRecord, instance, input);
         }

@@ -205,6 +205,7 @@ internal static class TaskEndpoints
         ActiveApplicationResolver resolver,
         TenantDatabase database,
         ITenantContextAccessor tenants,
+        SensitiveValues sensitive,
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
@@ -242,7 +243,7 @@ internal static class TaskEndpoints
                 // The lock makes a concurrent completion of the task wait until this one commits or
                 // rolls back, and then find the task as it was left.
                 var task = await TaskQueries.LockAsync(transaction, taskId, cancellationToken);
-                var failure = await CompleteLockedAsync(request, resolver, connection, transaction, active, task, user, roles, tenantId, loggerFactory, cancellationToken);
+                var failure = await CompleteLockedAsync(request, resolver, connection, transaction, active, task, user, roles, tenantId, sensitive, loggerFactory, cancellationToken);
                 if (failure is not null)
                 {
                     await transaction.RollbackAsync(cancellationToken);
@@ -561,6 +562,7 @@ internal static class TaskEndpoints
         CurrentUserResponse user,
         IReadOnlyList<string> roles,
         string tenantId,
+        SensitiveValues sensitive,
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
@@ -574,6 +576,7 @@ internal static class TaskEndpoints
             new RecordActor(user.Id, roles),
             (completing, ct) => resolver.GetReleaseModelAsync(completing.ReleaseId, ct),
             async ct => JsonRequest.IsJson(request) ? await RecordEndpoints.ReadBodyAsync(request, ct) : null,
+            new RecordCipher(sensitive, tenantId),
             loggerFactory,
             cancellationToken);
         return result.Outcome switch

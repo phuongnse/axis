@@ -54,6 +54,7 @@ internal sealed partial class ConnectorCallHandler(
     ConnectorClient client,
     IConnectorTokens tokens,
     ConnectorCallSettings settings,
+    SensitiveValues? sensitive,
     ILogger<ConnectorCallHandler> logger) : IExternalWorkItemHandler
 {
     /// <summary>The error of a call that a worker finds still <c>sending</c> from an earlier attempt.</summary>
@@ -884,6 +885,7 @@ internal sealed partial class ConnectorCallHandler(
         var call = attempt.Call;
         var connection = transaction.Connection!;
         var entity = target.Entity;
+        var cipher = sensitive is null ? null : new RecordCipher(sensitive, item.TenantId);
         Record? record = null;
 
         // A process without a subject has no record to lock, read or write, and no outputs to write.
@@ -900,7 +902,7 @@ internal sealed partial class ConnectorCallHandler(
                 await RecordCommands.LockAsync(connection, entity, subjectId, cancellationToken);
             }
 
-            record = await RecordQueries.GetAsync(connection, target.Model, entity, subjectId, cancellationToken);
+            record = await RecordQueries.GetAsync(connection, target.Model, entity, subjectId, cipher, cancellationToken);
             if (record is null && values.Count > 0)
             {
                 return $"No record of '{entity.Name}' has the id '{subjectId}'.";
@@ -923,7 +925,7 @@ internal sealed partial class ConnectorCallHandler(
         if (values.Count > 0)
         {
             var now = await RecordQueries.TransactionTimeAsync(connection, cancellationToken);
-            var result = await RecordCommands.SetAsync(connection, target.Model, entity!, call.ReleaseId, record!, values, now, cancellationToken: cancellationToken);
+            var result = await RecordCommands.SetAsync(connection, target.Model, entity!, call.ReleaseId, record!, values, now, cipher: cipher, cancellationToken: cancellationToken);
             if (result is not { Outcome: RecordWriteOutcome.Written, Record: { } written })
             {
                 return $"The record update was rejected: {ProcessStepHandler.Describe(result)}";

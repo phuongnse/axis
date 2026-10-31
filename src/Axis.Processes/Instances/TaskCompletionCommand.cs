@@ -83,6 +83,7 @@ public static class TaskCompletionCommand
         RecordActor actor,
         Func<ProcessTaskRow, CancellationToken, Task<ApplicationModel>> releaseOf,
         RecordBodyReader readBody,
+        RecordCipher? cipher,
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
@@ -146,7 +147,7 @@ public static class TaskCompletionCommand
             // The values are written as a record update on the task's release. The lock makes the
             // read below see the latest version, which the computed fields and validations use.
             await RecordCommands.LockAsync(connection, entity, task.SubjectId, cancellationToken);
-            if (await RecordQueries.GetAsync(connection, release, entity, task.SubjectId, cancellationToken) is not { } stored)
+            if (await RecordQueries.GetAsync(connection, release, entity, task.SubjectId, cipher, cancellationToken) is not { } stored)
             {
                 return new TaskCompletionResult(
                     TaskCompletionOutcome.WriteFailed, Write: new RecordWriteResult(RecordWriteOutcome.NotFound));
@@ -172,7 +173,7 @@ public static class TaskCompletionCommand
             }
 
             var result = await RecordCommands.UpdateAsync(
-                connection, release, entity, task.ReleaseId, task.SubjectId, input.Version!.Value, computed.Values, computed.Rows, input.Links, cancellationToken: cancellationToken);
+                connection, release, entity, task.ReleaseId, task.SubjectId, input.Version!.Value, computed.Values, computed.Rows, input.Links, cipher: cipher, cancellationToken: cancellationToken);
             if (result is not { Outcome: RecordWriteOutcome.Written, Record: { } written })
             {
                 return result.Outcome == RecordWriteOutcome.StaleVersion
@@ -191,7 +192,7 @@ public static class TaskCompletionCommand
         {
             // A completion that sends no values still needs the form's required fields, as stored.
             var now = await RecordQueries.TransactionTimeAsync(connection, cancellationToken);
-            if (await RecordQueries.GetAsync(connection, release, entity, task.SubjectId, cancellationToken) is not { } stored)
+            if (await RecordQueries.GetAsync(connection, release, entity, task.SubjectId, cipher, cancellationToken) is not { } stored)
             {
                 return new TaskCompletionResult(
                     TaskCompletionOutcome.WriteFailed, Write: new RecordWriteResult(RecordWriteOutcome.NotFound));
