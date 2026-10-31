@@ -1,4 +1,5 @@
 using Axis.Configuration.Packages;
+using Axis.Data.Records;
 using Axis.Expressions.Sql;
 using Axis.Processes.Instances;
 using Axis.Processes.Work;
@@ -36,7 +37,7 @@ internal sealed class ScenarioWork : IDisposable
     private readonly ConnectorClient _client;
     private readonly PackageHttpTransport _transport;
 
-    public ScenarioWork(string connectionString, ILoggerFactory loggerFactory, int limit, PackageCatalog packages, ScenarioStubs stubs)
+    public ScenarioWork(string connectionString, ILoggerFactory loggerFactory, int limit, PackageCatalog packages, ScenarioStubs stubs, SensitiveValues sensitive)
     {
         _connectionString = connectionString;
         _limit = limit;
@@ -46,12 +47,12 @@ internal sealed class ScenarioWork : IDisposable
         var settings = new ConnectorCallSettings(false);
         _client = new ConnectorClient(stubs.HttpHandler);
         _transport = new PackageHttpTransport();
-        var handler = new ProcessStepHandler(models, packages, null, null, loggerFactory.CreateLogger<ProcessStepHandler>());
+        var handler = new ProcessStepHandler(models, packages, null, sensitive, loggerFactory.CreateLogger<ProcessStepHandler>());
         var timerHandler = new ProcessTimerHandler(models, loggerFactory.CreateLogger<ProcessTimerHandler>());
         IExternalWorkItemHandler[] externalHandlers =
         [
-            new ConnectorCallHandler(models, bindings, _client, new ScenarioTokens(), settings, null, loggerFactory.CreateLogger<ConnectorCallHandler>()),
-            new PackageCallHandler(models, packages, bindings, settings, _transport, null, loggerFactory.CreateLogger<PackageCallHandler>(), stubs.CreateOperation),
+            new ConnectorCallHandler(models, bindings, _client, new ScenarioTokens(), settings, sensitive, loggerFactory.CreateLogger<ConnectorCallHandler>()),
+            new PackageCallHandler(models, packages, bindings, settings, _transport, sensitive, loggerFactory.CreateLogger<PackageCallHandler>(), stubs.CreateOperation),
             new EventDeliveryHandler(models, new DeliverySettings(5), loggerFactory.CreateLogger<EventDeliveryHandler>()),
         ];
         var resume = new ProcessResumeHandler(models, loggerFactory.CreateLogger<ProcessResumeHandler>());

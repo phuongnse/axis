@@ -27,6 +27,7 @@ internal sealed class ScenarioSteps(
     ApplicationModel model,
     Guid releaseId,
     ScenarioResource scenario,
+    RecordCipher cipher,
     ILoggerFactory loggerFactory)
 {
     private readonly Dictionary<string, (EntityModel Entity, Guid Id)> _saved = new(StringComparer.Ordinal);
@@ -72,7 +73,7 @@ internal sealed class ScenarioSteps(
         var entity = Entity(step.Entity);
         var body = Body(version: null, Resolve(entity, step.Values));
         var result = await RecordCommand.CreateAsync(
-            connection, ScenarioRunner.TenantId, model, releaseId, entity, Actor(step), _ => Task.FromResult<byte[]?>(body), null, null, loggerFactory, cancellationToken);
+            connection, ScenarioRunner.TenantId, model, releaseId, entity, Actor(step), _ => Task.FromResult<byte[]?>(body), null, cipher, loggerFactory, cancellationToken);
         Check(step, Action(result, RecordCommandOutcome.Written));
         if (step.Save is { } alias)
         {
@@ -83,12 +84,12 @@ internal sealed class ScenarioSteps(
     private async Task UpdateAsync(ScenarioStepDefinition step, CancellationToken cancellationToken)
     {
         var (entity, id) = Saved(step.Record);
-        var stored = await RecordQueries.GetAsync(connection, model, entity, id, cancellationToken);
+        var stored = await RecordQueries.GetAsync(connection, model, entity, id, cipher, cancellationToken);
 
         // A record that no longer exists still goes to the record command, which answers NotFound.
         var body = Body(stored?.Version ?? 1, Resolve(entity, step.Values));
         var result = await RecordCommand.UpdateAsync(
-            connection, ScenarioRunner.TenantId, model, releaseId, entity, id, Actor(step), _ => Task.FromResult<byte[]?>(body), null, null, loggerFactory, cancellationToken);
+            connection, ScenarioRunner.TenantId, model, releaseId, entity, id, Actor(step), _ => Task.FromResult<byte[]?>(body), null, cipher, loggerFactory, cancellationToken);
         Check(step, Action(result, RecordCommandOutcome.Written));
     }
 
@@ -103,7 +104,7 @@ internal sealed class ScenarioSteps(
     private async Task ExpectRecordAsync(ScenarioStepDefinition step, CancellationToken cancellationToken)
     {
         var (entity, id) = Saved(step.Record);
-        var stored = await RecordQueries.GetAsync(connection, model, entity, id, cancellationToken)
+        var stored = await RecordQueries.GetAsync(connection, model, entity, id, cipher, cancellationToken)
             ?? throw new StepFailedException($"record '{step.Record}' does not exist");
         if (RecordExpectation.FirstDifference(model, entity, stored.Values, Resolve(entity, step.Values) ?? new Dictionary<string, JsonElement>()) is { } difference)
         {
@@ -145,7 +146,7 @@ internal sealed class ScenarioSteps(
             || (read.Filters is { } filters
                 && await RecordCommand.MatchAsync(connection, transaction, model, entity, id, filters, user, loggerFactory, cancellationToken)
                     is not { Found: true, Matched: true })
-            || await RecordQueries.GetAsync(connection, model, entity, id, cancellationToken) is not { } record)
+            || await RecordQueries.GetAsync(connection, model, entity, id, cipher, cancellationToken) is not { } record)
         {
             await transaction.RollbackAsync(cancellationToken);
             Check(step, Failed("notFound", "NotFound"));
@@ -183,7 +184,7 @@ internal sealed class ScenarioSteps(
         if (step.Values is { } values)
         {
             body["values"] = Resolve(entity, values);
-            body["version"] = (await RecordQueries.GetAsync(connection, model, entity, id, cancellationToken))?.Version ?? 1;
+            body["version"] = (await RecordQueries.GetAsync(connection, model, entity, id, cipher, cancellationToken))?.Version ?? 1;
         }
 
         var utf8Body = JsonSerializer.SerializeToUtf8Bytes(body);
@@ -199,7 +200,7 @@ internal sealed class ScenarioSteps(
             new RecordActor(user, PolicyEvaluator.HeldRoles(model, roles)),
             (_, _) => Task.FromResult(model),
             _ => Task.FromResult<byte[]?>(utf8Body),
-            null,
+            cipher,
             loggerFactory,
             cancellationToken);
         if (result.Outcome == TaskCompletionOutcome.Completed)

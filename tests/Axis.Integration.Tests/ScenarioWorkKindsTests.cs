@@ -2,6 +2,7 @@ using Axis.Configuration.Packages;
 using Axis.Data.Records;
 using Axis.Processes.Instances;
 using Axis.Scenarios.Runner;
+using Axis.Tenancy.Keys;
 using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Axis.Integration.Tests;
@@ -29,7 +30,7 @@ public sealed class ScenarioWorkKindsTests
             .Select(field => (string)field.GetRawConstantValue()!)
             .Distinct()
             .ToList();
-        using var work = new ScenarioWork("Host=localhost;Database=unused", NullLoggerFactory.Instance, 10, PackageCatalog.Empty, new ScenarioStubs([]));
+        using var work = new ScenarioWork("Host=localhost;Database=unused", NullLoggerFactory.Instance, 10, PackageCatalog.Empty, new ScenarioStubs([]), new SensitiveValues(new TenantKeys(new ScenarioKeys())));
 
         // The search finds the kinds, so a rename of the constants cannot make the test pass with none.
         Assert.Contains(ProcessStarts.TimerWorkItemKind, kinds);

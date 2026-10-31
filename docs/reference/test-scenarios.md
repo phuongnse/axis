@@ -313,7 +313,8 @@ The runner runs the scenarios one at a time. Each gets a new
 `axis_scenario_<uuid>` database, which the runner drops when the scenario ends,
 whether it passed or failed. The `--server` login must be allowed to create
 databases. A scenario runs as the tenant `scenario`, with no deployment
-real bindings. The runner API reads the manifests of the extension packages it is
+real bindings. The tenant has a random data key and lookup key that live only in
+memory for the run, so sensitive values are encrypted as on a real tenant. The runner API reads the manifests of the extension packages it is
 given and runs none of their code. `--extensions` names the folder of installed
 packages, which plays the role of `Extensions:Path`. The command compiles the
 application against them. It prints the problems it finds with a package and carries
