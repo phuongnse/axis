@@ -1,10 +1,7 @@
 # Operator console
 
 Detailed reference for the operator console: the web page where the platform operator sees what
-failed in a tenant and runs the commands that fix it. The route, the access rules, the Tenant view, the
-list of the Failed work view, the instance detail it opens, the retry, cancel and resolve commands, the Webhook
-deliveries view, the Publishing view, the Dead letters view, the Schedules view and the redeliver and discard
-commands are built. Everything else in this file is _(planned for M23)_. The design follows
+failed in a tenant and runs the commands that fix it. Everything in this file is built. The design follows
 [D93](../decisions/d93-an-operator-web-console.md). Tenant provisioning stays in
 [`Axis.Admin`](administration.md), as
 [D43](../decisions/d43-tenant-provisioning-and-migrations-across-tenant-databases.md) agrees.
@@ -173,7 +170,7 @@ and pages through them.
 - **Redeliver and discard.** The commands on [dead letters](process-events.md#dead-letters), run
   from the Dead letters view. The operator role stands in for the `process` grant `retry`. Built.
 - **A reason each time.** Every command needs a reason. It writes the same history rows and audit
-  records as from the process inspector, with the operator as actor.
+  records as from the process inspector, with the operator as actor. Built.
 - **Nothing else.** The console has no command that creates, suspends, backs up or restores a
   tenant, sets a binding, migrates a database or activates a release. Those stay in
   [`Axis.Admin`](administration.md).

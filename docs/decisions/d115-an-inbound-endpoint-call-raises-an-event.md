@@ -27,7 +27,7 @@ The owner agreed this on 2026-10-30. [D101](d101-the-extensibility-milestone-is-
   - The occurrence names the instance the call started as the one that raised it, or no instance when the
     endpoint has no `process`, and the active release.
   - A webhook dead letter of an occurrence that no instance raised has no process. No process's dead letter routes
-    list it, and the [operator console](d93-an-operator-web-console.md) _(planned for M23)_ shows it.
+    list it, and the [operator console](d93-an-operator-web-console.md) shows it.
   - Any failure writes nothing, as for the rest of the call. A run-time error in an expression is a `400` keyed
     `/event/fields/<key>`.
   - A repeated call with the same `Idempotency-Key` answers the stored result and raises nothing.

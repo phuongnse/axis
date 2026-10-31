@@ -184,7 +184,7 @@ agree. Each step ends the milestone that builds it.
    line items as a list.
 4. _(planned for M21)_ The payment reference package runs out of process.
 5. A signed webhook announces the approval, and a receiver
-   that fails leaves a dead letter. _(planned for M23)_ The platform operator
+   that fails leaves a dead letter. The platform operator
    redelivers the dead letter from the console.
 
 ## Second application: leave requests
