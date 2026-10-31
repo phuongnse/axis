@@ -81,7 +81,10 @@ export function IdentityFrame({
           {children}
         </Flex>
       </Card>
-      <LegalLine copyright={`© ${year} Axis`} links={legal.links} texts={legal.texts} />
+      {/* Proposed: the line is as wide as the card, so the copyright lines up with its start and the links with its end. */}
+      <div style={{ width: '100%', maxWidth: 400 }}>
+        <LegalLine copyright={`© ${year} Axis`} links={legal.links} texts={legal.texts} />
+      </div>
     </Flex>
   )
 }

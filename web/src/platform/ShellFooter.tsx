@@ -40,30 +40,30 @@ export function ShellFooter({ legal }: { legal?: SiteLegal | null }) {
         borderTop: `1px solid ${colour.borderSubtle}`,
       }}
     >
-      <Flex justify="space-between" align="center" gap={spacing.md} wrap>
-        <LegalLine
-          copyright={copyright}
-          links={{
-            privacy: legal?.privacyUrl ?? undefined,
-            terms: legal?.termsUrl ?? undefined,
-            licences: '/licences',
-          }}
-          texts={{
-            label: t('shell.legal.label'),
-            privacy: t('shell.legal.privacy'),
-            terms: t('shell.legal.terms'),
-            licences: t('shell.legal.licences'),
-          }}
-        />
-        <Flex align="center" gap={spacing.sm}>
-          <Typography.Text style={{ color: colour.textMuted }}>{t('shell.serverStatus.title')}</Typography.Text>
-          <Badge
-            data-testid="footer-server-status"
-            status={statusBadge[status]}
-            text={<span style={{ color: colour.textMuted }}>{t(`shell.serverStatus.${status}`)}</span>}
-          />
-        </Flex>
-      </Flex>
+      <LegalLine
+        copyright={copyright}
+        links={{
+          privacy: legal?.privacyUrl ?? undefined,
+          terms: legal?.termsUrl ?? undefined,
+          licences: '/licences',
+        }}
+        texts={{
+          label: t('shell.legal.label'),
+          privacy: t('shell.legal.privacy'),
+          terms: t('shell.legal.terms'),
+          licences: t('shell.legal.licences'),
+        }}
+        end={
+          <Flex align="center" gap={spacing.sm}>
+            <Typography.Text style={{ color: colour.textMuted }}>{t('shell.serverStatus.title')}</Typography.Text>
+            <Badge
+              data-testid="footer-server-status"
+              status={statusBadge[status]}
+              text={<span style={{ color: colour.textMuted }}>{t(`shell.serverStatus.${status}`)}</span>}
+            />
+          </Flex>
+        }
+      />
     </Layout.Footer>
   )
 }
