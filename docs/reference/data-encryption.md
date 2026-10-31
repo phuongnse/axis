@@ -172,8 +172,9 @@ nothing. A seed with a sensitive value fails the whole seed run when the tenant 
 `SensitiveValueSourceTests` guards the rest of the code: it fails on a method in `src/` that builds SQL over an entity
 column without the cipher, unless an allow-list entry says why that method touches no sensitive value.
 
-Scenarios do not use the cipher yet _(planned for M27)_. A write of a sensitive value there fails, and a value is never
-written in clear. The trigger and starter reads do not use it yet either _(planned for
+A scenario's tenant gets a random data key and lookup key, held in memory for the run only and never stored. Its record
+steps, task completions, seeds and process steps use the cipher, so a value is never written in clear. Test:
+`ScenarioRunnerTests`. The trigger and starter reads do not use it yet _(planned for
 M27)_: a data change trigger, an event trigger start, a task escalation, or an inbound endpoint's start condition
 that reads a record holding a stored sensitive value fails. Activation's inline recompute of computed fields and the worker's
 `computed.backfill` do not use the cipher either: on an entity that holds a stored sensitive value they fail and write
@@ -223,7 +224,6 @@ never a key. The exit codes are those of [output and exit codes](administration.
   is restored, and a rerun with a good archive finishes the restore.
 - **What the encryption does not do yet.** A `sensitive` field has a `bytea` column. The record API, forms and the
   detail widget, an import, an inbound endpoint, a seed, a process step, a connector or package call output, the process
-  start endpoint, task completion, the task form state and the operator's call resolve encrypt and decrypt a value with the tenant keys. A scenario does not yet
-  _(planned for M27)_, and a write of a value there fails. The
+  start endpoint, task completion, the task form state, a scenario and the operator's call resolve encrypt and decrypt a value with the tenant keys. The
   planner refuses a flag change until the [changing the flag](data-encryption.md#changing-the-flag) migration is built. A value's associated data names the tenant id, so that work has to handle
   a restore under a new id.

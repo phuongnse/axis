@@ -9,11 +9,13 @@ using Axis.Configuration.Resources;
 using Axis.Configuration.Storage;
 using Axis.Data;
 using Axis.Data.Profiles;
+using Axis.Data.Records;
 using Axis.Data.Seeding;
 using Axis.Data.Storage;
 using Axis.Processes.Instances;
 using Axis.Processes.Records;
 using Axis.Processes.Storage;
+using Axis.Tenancy.Keys;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Npgsql;
@@ -25,7 +27,8 @@ namespace Axis.Scenarios.Runner;
 /// temporary tenant database. The database is created, migrated,
 /// given the compiled and activated application and its seed data, and dropped when the scenario
 /// ends, whether it passed or failed. The scenario runs as the tenant <see cref="TenantId"/> with
-/// placeholder deployment bindings, never a real URL or secret. It reads the manifests of the
+/// placeholder deployment bindings, never a real URL or secret. The tenant has a random data key and lookup key that live
+/// only in memory for the run, so sensitive values are encrypted as on a real tenant. It reads the manifests of the
 /// installed extension packages it is given, and runs none of their code. Each step runs as its user,
 /// with the roles the scenario gives that user. The first failing step ends the scenario. After each
 /// action the runner runs the due process steps, the connector and package calls and the event
@@ -77,6 +80,7 @@ public static class ScenarioRunner
             loggerFactory,
             workItemLimit,
             packages,
+            null,
             cancellationToken);
     }
 
@@ -105,6 +109,33 @@ public static class ScenarioRunner
             loggerFactory,
             workItemLimit,
             packages,
+            null,
+            cancellationToken);
+    }
+
+    /// <summary>
+    /// Runs <paramref name="scenario"/> of the application in <paramref name="folder"/> as the public overload does. After the last
+    /// step, and before the database is dropped, <paramref name="beforeDrop"/> gets the connection string of the scenario's database,
+    /// so a test can read what the scenario stored. An exception of the callback fails the scenario.
+    /// </summary>
+    internal static Task<ScenarioResult> RunAsync(
+        string folder,
+        ScenarioResource scenario,
+        string serverConnectionString,
+        ILoggerFactory loggerFactory,
+        Func<string, CancellationToken, Task> beforeDrop,
+        CancellationToken cancellationToken,
+        PackageCatalog? packages = null)
+    {
+        packages ??= PackageCatalog.Empty;
+        return RunAsync(
+            (context, token) => ReleaseCompiler.CompileAsync(folder, context, packages.Versions, ModuleCatalog.Empty.Modules, token),
+            scenario,
+            serverConnectionString,
+            loggerFactory,
+            WorkItemLimit,
+            packages,
+            beforeDrop,
             cancellationToken);
     }
 
@@ -115,6 +146,7 @@ public static class ScenarioRunner
         ILoggerFactory loggerFactory,
         int workItemLimit,
         PackageCatalog packages,
+        Func<string, CancellationToken, Task>? beforeDrop,
         CancellationToken cancellationToken)
     {
         var stopwatch = Stopwatch.StartNew();
@@ -155,6 +187,10 @@ public static class ScenarioRunner
             // The setting reaches every connection of the scenario, including the work item runner's.
             var connectionString = now is { } time ? WithNow(builder.ConnectionString, time) : builder.ConnectionString;
             failure = await RunInDatabaseAsync(compile, scenario, builder.ConnectionString, connectionString, now, loggerFactory, workItemLimit, packages, cancellationToken);
+            if (beforeDrop is not null)
+            {
+                await beforeDrop(builder.ConnectionString, cancellationToken);
+            }
         }
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
@@ -243,7 +279,11 @@ public static class ScenarioRunner
             return Setup("could not be compiled", compiled.Diagnostics);
         }
 
-        var activated = await ReleaseActivator.ActivateAsync(compiled, new ActiveReleaseStore(configuration), data, ScenarioBindings.ForActivation(compiled.Model), OpenInstanceCounter.Instance, cancellationToken);
+        // The keys are random and live in memory for this run, so sensitive values are encrypted as on a real tenant.
+        var sensitive = new SensitiveValues(new TenantKeys(new ScenarioKeys()));
+        var cipher = new RecordCipher(sensitive, TenantId);
+
+        var activated = await ReleaseActivator.ActivateAsync(compiled, new ActiveReleaseStore(configuration), data, ScenarioBindings.ForActivation(compiled.Model) with { Sensitive = sensitive }, OpenInstanceCounter.Instance, cancellationToken);
         if (activated.Diagnostics.Count > 0)
         {
             return Setup("could not be activated", activated.Diagnostics);
@@ -253,7 +293,7 @@ public static class ScenarioRunner
         await TriggerSchedules.ActivateAsync(connection, TenantId, model, compiled.Release.Id, cancellationToken);
         if (model.Seeds.Count > 0)
         {
-            var seeded = await SeedApplier.ApplyAsync(model, compiled.Release.Id, connection, null, cancellationToken);
+            var seeded = await SeedApplier.ApplyAsync(model, compiled.Release.Id, connection, cipher, cancellationToken);
             if (seeded.Diagnostics.Count > 0)
             {
                 return Setup("could not be seeded", seeded.Diagnostics);
@@ -266,8 +306,8 @@ public static class ScenarioRunner
             await UserProfiles.UpsertAsync(connection, user, user, $"{user}@{EmailDomain}", null, cancellationToken);
         }
 
-        var steps = new ScenarioSteps(connection, model, compiled.Release.Id, scenario, loggerFactory);
-        using var work = new ScenarioWork(connectionString, loggerFactory, workItemLimit, packages, new ScenarioStubs(scenario.Stubs));
+        var steps = new ScenarioSteps(connection, model, compiled.Release.Id, scenario, cipher, loggerFactory);
+        using var work = new ScenarioWork(connectionString, loggerFactory, workItemLimit, packages, new ScenarioStubs(scenario.Stubs), sensitive);
         for (var index = 0; index < scenario.Steps.Count; index++)
         {
             var step = scenario.Steps[index];

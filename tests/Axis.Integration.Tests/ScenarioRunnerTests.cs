@@ -6,11 +6,14 @@ using Axis.Configuration.Releases;
 using Axis.Configuration.Storage;
 using Axis.Configuration.Tests;
 using Axis.Data;
+using Axis.Data.Naming;
+using Axis.Data.Records;
 using Axis.Data.Storage;
 using Axis.Processes.Storage;
 using Axis.Processes.Work;
 using Axis.Scenarios;
 using Axis.Scenarios.Runner;
+using Axis.Tenancy.Keys;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -890,6 +893,52 @@ public sealed class ScenarioRunnerTests
     }
 
     [Fact]
+    public async Task A_scenario_writes_and_reads_a_sensitive_value_encrypted_through_a_process_step_and_a_task()
+    {
+        using var folder = SensitiveApplication(Scenario("SensitiveValue", Purchasing, """
+            { "type": "createRecord", "entity": "PurchaseRequest", "as": "requester", "save": "request", "values": { "title": "Chairs", "manager": "manager", "amount": 5000, "decisionComments": "Needed soon" } },
+            """ + StartApproval + """
+            { "type": "completeTask", "record": "request", "step": "managerApproval", "outcome": "approve", "as": "manager", "values": { "decisionComments": "Looks fine" } },
+            { "type": "expectInstance", "process": "PurchaseRequestApproval", "record": "request", "state": "completed" },
+            { "type": "expectRecord", "record": "request", "values": { "decisionComments": "Looks fine (approved)", "status": "approved" } }
+            """));
+        var scenario = Axis.Configuration.Loading.ApplicationLoader.Load(folder.Path).Scenarios.Single(candidate => candidate.Name == "SensitiveValue");
+        var entityId = Guid.Parse("6d15f627-8b3e-4376-bd50-d8b65c7b7168");
+        var stored = new List<object>();
+
+        var result = await ScenarioRunner.RunAsync(
+            folder.Path,
+            scenario,
+            await PostgreSqlServer.AdminConnectionStringAsync(),
+            NullLoggerFactory.Instance,
+            async (connectionString, token) =>
+            {
+                // The runner turns an exception here into a failed scenario, so the test only collects the values.
+                await using var connection = new NpgsqlConnection(connectionString);
+                await connection.OpenAsync(token);
+                var column = EntityNaming.Quote(EntityNaming.Column("decisionComments"));
+                await using var command = new NpgsqlCommand($"SELECT {column} FROM {EntityNaming.QualifiedTable(EntityNaming.Table(entityId))} WHERE {column} IS NOT NULL", connection);
+                await using var reader = await command.ExecuteReaderAsync(token);
+                while (await reader.ReadAsync(token))
+                {
+                    stored.Add(reader.GetValue(0));
+                }
+            },
+            CancellationToken);
+
+        Assert.True(result.Passed, result.Failure);
+        Assert.NotEmpty(stored);
+        foreach (var value in stored)
+        {
+            var bytes = Assert.IsType<byte[]>(value);
+            foreach (var plain in new[] { "Needed soon", "Looks fine", "approved" })
+            {
+                Assert.True(bytes.AsSpan().IndexOf(System.Text.Encoding.UTF8.GetBytes(plain)) < 0, $"The stored value holds the plain text '{plain}'.");
+            }
+        }
+    }
+
+    [Fact]
     public async Task An_action_that_runs_more_work_items_than_the_limit_fails_at_that_step()
     {
         using var folder = PurchaseApplication(Scenario("TooManySteps", Purchasing, CreateRequest + StartApproval + """
@@ -1051,7 +1100,7 @@ public sealed class ScenarioRunnerTests
                 await insert.ExecuteNonQueryAsync(CancellationToken);
             }
 
-            using (var work = new ScenarioWork(connectionString, NullLoggerFactory.Instance, 10, PackageCatalog.Empty, new ScenarioStubs([])))
+            using (var work = new ScenarioWork(connectionString, NullLoggerFactory.Instance, 10, PackageCatalog.Empty, new ScenarioStubs([]), new SensitiveValues(new TenantKeys(new ScenarioKeys()))))
             {
                 await work.RunDueAsync(CancellationToken);
             }
@@ -1407,6 +1456,13 @@ public sealed class ScenarioRunnerTests
     /// </summary>
     private static TemporaryFolder NotifyApplication((string Name, string Json) scenario) =>
         Application("ScenarioPurchaseApp", [scenario], overlay: "ScenarioNotifyApp");
+
+    /// <summary>
+    /// A copy of the ScenarioPurchaseApp fixture with the ScenarioSensitiveApp files over it: the field <c>decisionComments</c> is
+    /// sensitive, and the step <c>markApproved</c> adds <c>(approved)</c> to it.
+    /// </summary>
+    private static TemporaryFolder SensitiveApplication((string Name, string Json) scenario) =>
+        Application("ScenarioPurchaseApp", [scenario], overlay: "ScenarioSensitiveApp");
 
     /// <summary>
     /// A copy of the ScenarioApp fixture with the ScenarioOidcApp files over it: an <c>oidc</c> identity provider named
