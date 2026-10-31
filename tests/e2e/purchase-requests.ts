@@ -1,7 +1,7 @@
 import { expect, test } from './test'
 import type { Page } from '@playwright/test'
 import { csrfHeaders } from './csrf'
-import { expectShown, fieldLabel, fieldValue } from './fields'
+import { expectShown, fieldLabel, fieldValue, shownValue } from './fields'
 
 // Specs run in parallel against one database, so each test looks only for the request and the tasks
 // it creates. They use Operations, whose manager is manager-2, so that the per-department test keeps the
@@ -93,6 +93,19 @@ export async function expectStatus(page: Page, id: string, status: string) {
   }).toPass({ timeout: 30_000 })
 }
 
+/**
+ * Opens the request form until it shows a purchase order number, since the worker calls the
+ * purchasing system after approval, and returns it. It waits up to `timeout` milliseconds.
+ */
+export async function expectPurchaseOrderNumber(page: Page, id: string, timeout = 30_000) {
+  const field = fieldValue(page, 'purchaseOrderNumber')
+  await expect(async () => {
+    await page.goto(`/purchasing/purchaserequestform/${id}`)
+    await expect.poll(() => shownValue(field), { timeout: 1_000 }).not.toBe('Not set')
+  }).toPass({ timeout })
+  return shownValue(field)
+}
+
 /** The value of the environment variable `name`, which scripts/e2e.sh sets. */
 export function env(name: string) {
   const value = process.env[name]
@@ -115,6 +128,19 @@ export async function requestNumber(page: Page, id: string) {
 export async function purchaseOrders(page: Page, number: string) {
   const response = await page.request.get(`${env('AXIS_E2E_PURCHASING_URL')}/purchase-orders`)
   expect(response.ok()).toBe(true)
-  const orders = (await response.json()) as { requestNumber: string; orderNumber: string }[]
+  const orders = (await response.json()) as {
+    requestNumber: string
+    orderNumber: string
+    clientId: string
+    lines: { description: string; quantity: number; unitPrice: number; amount: number }[]
+  }[]
   return orders.filter((order) => order.requestNumber === number)
+}
+
+/** The deliveries of the approved webhook that the purchasing system stub received for the request numbered `number`. */
+export async function webhookDeliveries(page: Page, number: string) {
+  const response = await page.request.get(`${env('AXIS_E2E_PURCHASING_URL')}/webhooks/purchase-request-approved`)
+  expect(response.ok()).toBe(true)
+  const deliveries = (await response.json()) as { webhookId: string; type: string; requestNumber: string }[]
+  return deliveries.filter((delivery) => delivery.requestNumber === number)
 }
