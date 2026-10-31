@@ -47,7 +47,8 @@ public sealed class RecordSets
     /// from <paramref name="links"/> when the body sends the field, otherwise from the
     /// <paramref name="stored"/> record, otherwise the set is empty. An entity without a
     /// <c>references</c> field runs no command. Reading stops at the first stored decimal that cannot
-    /// be held exactly, and the result then has <see cref="Inexact"/> set.
+    /// be held exactly, and the result then has <see cref="Inexact"/> set. A target's sensitive values are
+    /// decrypted with <paramref name="cipher"/>. Without a cipher, a target record that holds one throws.
     /// </summary>
     public static async Task<RecordSets> ReadAsync(
         NpgsqlConnection connection,
@@ -55,7 +56,8 @@ public sealed class RecordSets
         EntityModel entity,
         Record? stored,
         IReadOnlyList<RecordLinks> links,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        RecordCipher? cipher = null)
     {
         ArgumentNullException.ThrowIfNull(connection);
         ArgumentNullException.ThrowIfNull(application);
@@ -87,7 +89,9 @@ public sealed class RecordSets
                 await using var reader = await command.ExecuteReaderAsync(cancellationToken);
                 while (await reader.ReadAsync(cancellationToken))
                 {
-                    var record = RecordQueries.ReadRecord(reader, target);
+                    var storedValues = new List<(FieldModel Field, byte[] Stored)>();
+                    var record = await RecordCipher.OpenAsync(
+                        cipher, target, RecordQueries.ReadRecord(reader, target, storedValues), storedValues, cancellationToken);
                     var values = new List<KeyValuePair<string, object?>>(columns.Count);
                     foreach (var column in columns)
                     {

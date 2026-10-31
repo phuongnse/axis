@@ -123,7 +123,7 @@ export function ProcessInstancePage({
 
   return (
     <TextProvider catalogs={catalogs} development={outer.development}>
-      <InstanceBody
+      <InstanceDetailView
         instance={instance}
         instancesPath={instancesPath}
         sitePath={sitePath}
@@ -150,19 +150,29 @@ function inputEntries(input: unknown): [string, string][] {
   ])
 }
 
-interface InstanceBodyProps {
+interface InstanceDetailViewProps {
   instance: InstanceDetail
   instancesPath: string
   sitePath: string
-  /** The inspector page of each process, once loaded. */
+  /** The inspector page of each process, once loaded. Without it, the parent and the sub-processes show without links. */
   inspectors: ReadonlyMap<string, string> | undefined
   locale: string
   /** Called after a command was accepted, so the page reads the instance again. */
   onChanged: () => void
+  /** Shows the name of a step and not its label, for a page outside every site, which has no release texts. */
+  stepNames?: boolean
 }
 
-/** The sections of an instance. It reads the release texts. */
-function InstanceBody({ instance, instancesPath, sitePath, inspectors, locale, onChanged }: InstanceBodyProps) {
+/** The sections of an instance. It reads the release texts, unless `stepNames` is set. */
+export function InstanceDetailView({
+  instance,
+  instancesPath,
+  sitePath,
+  inspectors,
+  locale,
+  onChanged,
+  stepNames = false,
+}: InstanceDetailViewProps) {
   const t = useText()
   const { colour, spacing } = useDesignTokens()
   const rowStyle = { paddingBlock: spacing.sm, borderBlockEnd: `1px solid ${colour.divider}` }
@@ -171,7 +181,7 @@ function InstanceBody({ instance, instancesPath, sitePath, inspectors, locale, o
     [instance.graph.steps],
   )
   const stepLabel = (name: string) => {
-    const labelKey = stepsByName.get(name)?.labelKey
+    const labelKey = stepNames ? undefined : stepsByName.get(name)?.labelKey
     return labelKey ? t(labelKey) : name
   }
   const time = (name: string, value: string | null) => formatValue(dateTime(name), value, {}, { locale, text: t })

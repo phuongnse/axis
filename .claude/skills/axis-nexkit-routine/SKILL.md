@@ -60,10 +60,26 @@ because its change needs those paths:
 
 ## Issues the driver opens
 
-An issue the driver opens for one CI failure is in no milestone, like the
-`bug` issues NexKit opens, as
+The driver opens its issues in no milestone, like the `bug` issues NexKit
+opens, as
 [D68](../../../docs/decisions/d68-issues-of-several-milestones-run-at-once.md)
-says. Autopilot takes it all the same.
+says. Autopilot takes them all the same.
+
+1. For one CI failure, open one issue.
+2. For Dependabot alerts, run `node scripts/dependabot-issues.mjs`, as
+   [D107](../../../docs/decisions/d107-the-dependency-scan-runs-now-and-images-are-scanned-and-signed.md)
+   and [dependency updates](../../../docs/development.md#dependency-updates)
+   say. It prints a JSON list of issues, one for each high or critical alert
+   that no open issue names, and opens nothing. For each printed issue:
+   - keep the printed labels that `gh label list` shows, and add every other
+     label whose description fits, as
+     [delivery](../../../docs/delivery.md#the-life-of-an-issue) says;
+   - write the body to a temporary file and run `gh issue create --title ...
+     --label ... --body-file ...` with no `--milestone`.
+
+   The issue names the advisory id, so the next run prints nothing for it.
+   When the script fails, open no issue in that run and
+   [hand it to the owner](#hand-to-the-owner).
 
 ## Hand to the owner
 
@@ -74,7 +90,9 @@ skill lists, only for:
   with no basis in the plan, the issue or `docs/`;
 - a NexKit pull request that NexKit did not merge because its issue was
   closed (`merge_issue_closed`), for the owner to merge or close;
-- a hand-made pull request that is ready for the admin-bypass merge.
+- a hand-made pull request that is ready for the admin-bypass merge;
+- `scripts/dependabot-issues.mjs` failing, for example with no access to the
+  Dependabot alerts, because alerts then go unhandled.
 
 ## Timing
 

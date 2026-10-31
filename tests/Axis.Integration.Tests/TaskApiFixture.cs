@@ -29,7 +29,7 @@ namespace Axis.Integration.Tests;
 /// migrations applied and the StepApp fixture activated, served by the real server on hosts
 /// <c>a.example.test</c> and <c>b.example.test</c>. The test authentication scheme signs in
 /// <c>maria</c> and <c>fiona</c>, who hold the role <c>finance</c>, <c>rita</c>, who holds
-/// <c>reviewer</c>, <c>ines</c>, who holds <c>inspector</c>, <c>lena</c>, who holds <c>finance</c> and <c>inspector</c>, <c>ada</c>, who holds <c>auditor</c>, <c>carl</c>, who holds <c>clerk</c>, and <c>otto</c>, who holds <c>employee</c>, which StepApp does not declare.
+/// <c>reviewer</c>, <c>ines</c>, who holds <c>inspector</c>, <c>lena</c>, who holds <c>finance</c> and <c>inspector</c>, <c>ada</c>, who holds <c>auditor</c>, <c>carl</c>, who holds <c>clerk</c>, <c>otto</c>, who holds <c>employee</c>, which StepApp does not declare, and <c>pia</c>, who holds <c>platform-operator</c>, the console's operator role.
 /// The fixture also holds the worker's services for both tenants, with the host never started, so
 /// a test runs the work items that create tasks itself.
 /// </summary>
@@ -64,6 +64,9 @@ public sealed class TaskApiFixture : IAsyncLifetime
     /// <summary>The title <see cref="InsertRequestAsync"/> gives the request <paramref name="id"/>.</summary>
     public static string RequestTitle(Guid id) => $"Request {id:N}";
 
+    /// <summary>The factory of the test host, for a test that adds settings with <c>WithWebHostBuilder</c>.</summary>
+    internal WebApplicationFactory<Program> Factory => _factory ?? throw new InvalidOperationException("The test host is not started.");
+
     /// <summary>A new client of the server with its own cookies. The caller disposes it.</summary>
     public HttpClient CreateClient() =>
         (_factory ?? throw new InvalidOperationException("The test host is not started.")).CreateClient();
@@ -89,6 +92,7 @@ public sealed class TaskApiFixture : IAsyncLifetime
             builder.UseSetting("Tenants:b:ConnectionString", PostgreSqlServer.RuntimeConnectionString(b.ConnectionString));
             builder.UseSetting("Tenants:b:SchemaConnectionString", b.ConnectionString);
             builder.UseTestOidc(TenantA, TenantB);
+            builder.UseSetting("Console:OperatorRole", "platform-operator");
             builder.UseTestAuthentication(
                 new TestIdentity("maria", "Maria Manager", "finance"),
                 new TestIdentity("fiona", "Fiona Finance", "finance"),
@@ -97,7 +101,8 @@ public sealed class TaskApiFixture : IAsyncLifetime
                 new TestIdentity("lena", "Lena Lead", "finance", "inspector"),
                 new TestIdentity("ada", "Ada Auditor", "auditor"),
                 new TestIdentity("carl", "Carl Clerk", "clerk"),
-                new TestIdentity("otto", "Otto Other", "employee"));
+                new TestIdentity("otto", "Otto Other", "employee"),
+                new TestIdentity("pia", "Pia Operator", "platform-operator"));
         });
 
         var settings = new ConfigurationBuilder()

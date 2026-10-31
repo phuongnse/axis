@@ -357,6 +357,10 @@ evaluated input that the call sent, so it holds field values.
   settles, so inspection shows a settled package call with `input` `null` and
   `inputHidden` `false`.
 
+The [operator console](operator-console.md#route-and-access) shows the same detail with the same
+rules and the operator as the reader. The operator reads every field that the active release has, so only a
+sensitive field, or a field the active release no longer has, hides an `input`.
+
 ### Call input kept
 
 A connector call keeps its input after it settles, whether it succeeded or
@@ -512,8 +516,9 @@ two apart. An instance without a subject has no record, so the grant is the
 only check. No `read` check runs and there is no policy `409` for a pending
 field. The check depends on the stored instance, so an instance with a subject
 is never exempt from the read check. Every request is also checked on the server, whatever the widget
-shows. _(planned for M23)_ In the [operator console](operator-console.md), the
-operator role stands in for these grants.
+shows. In the [operator console](operator-console.md), the
+operator role stands in for these grants and for the read check on the subject
+record.
 
 ### Retry
 

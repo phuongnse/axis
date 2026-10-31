@@ -1,8 +1,10 @@
 # Operator console
 
 Detailed reference for the operator console: the web page where the platform operator sees what
-failed in a tenant and runs the commands that fix it. Everything in this file is
-_(planned for M23)_. The design follows
+failed in a tenant and runs the commands that fix it. The route, the access rules, the Tenant view, the
+list of the Failed work view, the instance detail it opens, the retry, cancel and resolve commands, the Webhook
+deliveries view, the Publishing view, the Dead letters view, the Schedules view and the redeliver and discard
+commands are built. Everything else in this file is _(planned for M23)_. The design follows
 [D93](../decisions/d93-an-operator-web-console.md). Tenant provisioning stays in
 [`Axis.Admin`](administration.md), as
 [D43](../decisions/d43-tenant-provisioning-and-migrations-across-tenant-databases.md) agrees.
@@ -21,37 +23,155 @@ _(planned for Mx)_ are not built yet, and Dn refers to [decisions.md](../decisio
 - **Application policies play no part.** The role gives read access to the console views across
   every application of the tenant, and the commands below. It gives no grant on records, data
   sources, tasks or Studio.
-- **Header link.** `GET /api/me` already answers `console: true` for a user who holds the role, while the
-  console stays planned for M23. The app switcher then lists the operator console, linked to `/console`. A user without the role who opens the route gets a `403`
-  from the API and sees a forbidden page. A signed-out user is sent to sign in.
-- **API.** The console calls routes under `/api/console/`. Each needs a session and the operator
-  role, and every write needs the CSRF header, as the other session routes do. They are checked
-  on the server whatever the page shows.
+- **Header link.** `GET /api/me` answers `console: true` for a user who holds the role. The app
+  switcher then lists the operator console, linked to `/console`. A user without the role who opens
+  the route gets a `403` from the API and sees a forbidden page. A signed-out user gets the shell's
+  sign-in prompt after the `401`.
+- **API.** The console calls routes under `/api/console/`. Each needs a session (`401`) and the
+  operator role (`403`, also for everyone when `Console:OperatorRole` has no value), and every
+  write needs the CSRF header, as the other session routes do. They are checked on the server
+  whatever the page shows.
+  - **`GET /api/console/tenant`.** Answers the tenant of the host: `id`, `status` and
+    `applications`. Each application has its `id`, `name`, `releaseId` (the active release),
+    `releaseNumber` and `releaseLabel` (the number and label of that release in the application's
+    release history, as Studio shows them) and `activatedAt`. The applications are the ones with an
+    active release, in name order. The `status` is `active`, because a host serves only active
+    tenants: the hosts of a suspended tenant answer `503`.
+  - **`GET /api/console/failed-work`.** Lists the failed work of the tenant, newest first, in the
+    paging shape of the record API (`items`, `page`, `pageSize`, `totalCount`). The parameters are
+    `application` (an application id), `page` and `pageSize`, all optional. An invalid one is a
+    `400` keyed by its name, and an `application` that is not a hyphenated UUID is keyed
+    `application`. Each item has `kind` (`instance`, `connector` or `package`), `applicationId`,
+    `application`, `process`, `instanceId`, `step`, `callId`, `connector`, `package`, `operation`,
+    `failedAt` and `error`. The keys that do not apply are `null`: an instance has no `callId`,
+    `connector`, `package` or `operation`. The `application` and `process` names come from the
+    active release, and from the release the instance is pinned to when the application is not
+    active. An item never holds a call input, a history input or output, or a record value. The
+    time of a failed instance is its `ended_at`, and its error is the newest history error of the
+    instance. The time of a call with an unknown outcome is the finish of its newest attempt, or its
+    `created_at` when it has no attempt row, and its error is the call's `last_error`.
+  - **`GET /api/console/webhook-deliveries`.** Answers one page of the webhook deliveries of the
+    tenant, newest first. The query parameters are `page` and `pageSize`, read as the other list
+    routes read them, and the optional `application` and `webhook` ids, each a hyphenated UUID. A
+    malformed parameter answers one `400` validation problem. An item has its `id`,
+    `applicationId`, `application`, `webhookId`, `webhook`, `eventId` and `event`, the names of
+    the application, the webhook and the event as the release the delivery was staged with holds
+    them (`null` when that release no longer holds the webhook), then the `state`, the `attempts`,
+    the last `statusCode`, `createdAt` and `deliveredAt`. The `state` is `delivered`, `pending`,
+    `deadLettered` (an open dead letter of the delivery) or `discarded` (a discarded one). A
+    redelivered dead letter is queued again and shows as `pending`. The answer also lists
+    `webhooks`, the webhooks of every active release with their application, for the view's
+    filter, and `totalCount`. It never holds a body, a URL, a secret or a binding value.
+  - **`GET /api/console/instances/{id}`.** Answers one instance of the tenant, whatever its
+    application or process, in the shape of the
+    [process inspection detail](process-inspection.md#instance-detail). An id that is not a
+    hyphenated UUID and an id that names no instance are one `404`. The operator role stands in
+    for the `inspect` grant and for the subject record's read check: the instance of an application
+    that is no longer active opens too, and its subject record need not exist. The operator reads
+    fields like a `read` grant with no `fields` list, so a call's `input` is hidden only by the
+    [masking rules](process-inspection.md#values-and-masking), when its mapping uses a `sensitive`
+    field or a field the active release no longer has. `commands` lists the commands that apply to
+    the instance and a call is `resolvable`, as for a user who holds the grants, because the
+    operator role stands in for them. They are listed only when the application has an active
+    release that still has the instance's process, and an instance of a process without a subject
+    lists none, as in the process inspector. Otherwise `commands` is empty and no call is
+    `resolvable`. When the application has no active release, the release the instance is pinned
+    to stands in for the active one.
+  - **`POST /api/console/instances/{id}/retry`, `…/cancel` and `…/calls/{callId}/resolve`.**
+    Check, in order, the content type (`415`), the body (`400`), which is the body of the
+    [process route](process-inspection.md#operator-commands), the `id` and then the `callId`
+    (`404` when it is not a hyphenated UUID), the instance (`404` when none has the id), the
+    active release of its application (`409` when it has none) and the instance's process in
+    that release (`409` when it is no longer there). The CSRF middleware refuses a write without
+    its header with `403`. Then the command runs against the active release, in the same
+    transaction and under the same start lock as the process route, with the operator as actor.
+    The operator needs no grant in the application, and the operator role also stands in for the
+    `read` check on the subject record, so a command runs even when the operator could not read
+    that record. The rules, bodies and `409` errors are those of the process routes. A command
+    that is refused writes nothing. A success answers `200` with the instance, as the process
+    routes do.
+  - **`GET /api/console/applications/{id}/publishing`.** Answers one application, named by its id,
+    with its release history and its publish requests, read-only. The group's checks apply (`401`,
+    `403`) and the Studio author and publisher roles play no part. An `id` that is not a hyphenated
+    UUID is a `404`. A valid `id` that no release or request names answers empty lists. `active` is
+    the active release (`releaseId`, `number` and `contentHash`), or `null`. `releases` is the
+    whole history, newest first, with the rows and fields of Studio's
+    [releases route](studio.md): `releaseId`, `number`, `contentHash`, `activatedAt`, `actor`,
+    `actorName`, `label`, `note` and `requestId`. It leaves out the folder's content hash, because
+    the console has no Studio folders. `requests` is one page of the publish requests, newest
+    first, and the answer has `page`, `pageSize` and `totalCount`. The optional `page` and
+    `pageSize` are read as the other list routes read them, and an invalid one is a `400`. A
+    request has its `id`, `kind`, `target`, `status`, `label`, `note`, `requestedBy`,
+    `requestedByName`, `requestedAt`, `startedAt`, `finishedAt` and `releaseId`. It never holds the
+    file snapshot, the diagnostics or the test results.
+  - **`GET /api/console/dead-letters`.** Answers one page of the dead letters of every
+    application of the tenant, newest first, as the instance list pages, including the letters
+    that belong to no process. An optional `application` (an application id) keeps one
+    application and an optional `state` (`open`, `redelivered` or `discarded`) keeps one state.
+    An invalid `application`, `state`, `page` or `pageSize` is a `400` that names each. An item is
+    a [process's dead letter](process-events.md#dead-letters) with its `applicationId` and
+    `processId` (null for a letter with no process). Its `commands` are `redeliver` and `discard`
+    while the letter is `open` and empty otherwise.
+  - **`GET /api/console/schedules`.** Answers `{ "items": [...] }`, not paged, with each schedule
+    trigger of the active release of every application, ordered by application name and then by
+    trigger name. An optional `application` (an application id) keeps one application. One that is
+    not a hyphenated UUID is a `400` keyed `application`. A module's schedule trigger is listed
+    once for each application that uses the module. A trigger that the active release no longer
+    has, and every trigger of an application with no active release, is left out. Each item has
+    `applicationId`, `application`, `triggerId`, `trigger`, `process`, `schedule`, `timeZone`,
+    `lastOccurrenceAt` (`null` while no occurrence has run) and `nextOccurrenceAt`.
+  - **`POST /api/console/dead-letters/{id}/redeliver` and `…/discard`.** Check, in order, the
+    content type (`415`), the body, which is exactly `{ "reason": "<text>" }` (`400`), the `id`
+    (`404` when it is not a hyphenated UUID or no dead letter has it) and the active release of
+    the letter's application (`409` when it has none). Then one transaction runs the same command
+    as the process routes, with the operator as actor. It answers `409` for a letter that is not
+    `open`, for a trigger that is not in the active release and for a kind that cannot be
+    redelivered, and writes nothing then. A success answers `200` with the settled letter.
+- **The test.** `ConsoleRouteGuardTests` reads every route under `/api/console/` from the
+  endpoint data source, so a route added later is checked without a list. It expects `401` signed
+  out, `403` without the role and, for a write, `403` without the CSRF header. Every read must
+  answer the operator `200` without a seeded sensitive value, secret, binding value or webhook
+  body. `ConsoleRouteGuardSelfTests` shows the guard reports a route that breaks each rule.
 
 ## Views
 
-Each view lists the newest items first, pages through them and filters by application.
+Each view filters by application. Unless a view says otherwise, it lists the newest items first
+and pages through them.
 
 - **Failed work.** Process instances that are `failed`, and connector and package calls whose
-  outcome is `unknown`, across every process of every application. An entry opens the
-  [instance detail](process-inspection.md#instance-detail), with the graph, the history, the
-  tasks and the calls.
-- **Dead letters.** Event deliveries that reached the event delivery limit that M14 adds,
-  including [webhook deliveries](outbound-webhooks.md#outbound-webhooks). Each shows the
-  event, the trigger or webhook, the attempts and the last error.
+  outcome is `unknown`, across every process of every application. The list, its paging and the
+  application filter are built. An entry opens the
+  [instance detail](process-inspection.md#instance-detail) at `/console/instances/{id}`, with the
+  graph, the history, the tasks and the calls. The page is outside every site, so it has no
+  release texts and shows step names, not their labels. It offers the commands that the detail lists. Built.
+- **Dead letters.** Event deliveries that reached the event delivery limit,
+  including [webhook deliveries](outbound-webhooks.md#outbound-webhooks) and those that belong to
+  no process. The view lists them in every state, with an application filter. Each shows the
+  application, the kind, the event, the trigger or webhook, the attempts, the last error and the
+  state. An `open` letter offers redeliver and discard. Built.
 - **Webhook deliveries.** Recent deliveries of each webhook, with their status code and attempts.
-- **Schedules.** Each schedule trigger of each active release, with its last and next
-  occurrence, see [schedules](process-events.md#schedules).
+  A table under the Tenant view with the application, webhook, event, state, attempts, status
+  code and delivery time, and two filters, one for the application and one for the webhook. Built.
+- **Schedules.** Each schedule trigger of each active release, with its process, its schedule and
+  time zone, and its last and next occurrence, see [schedules](process-events.md#schedules). The
+  view is ordered by application and trigger name, is not paged and has an application filter.
+  Built.
 - **Publishing.** Publish requests and the [release history](studio.md) of each application,
-  read-only. Publishing and rollback stay in Studio.
-- **Tenant.** The tenant's status and each application's active release.
+  read-only. Publishing and rollback stay in Studio. A card under the Webhook deliveries view with
+  a picker of the applications of the Tenant view, which starts on the first one. A releases table
+  shows the number, label, note, who activated it and when, and marks the active release. A paged
+  table shows each publish request with its kind, target, status, label, who asked, when it was
+  asked and when it finished. It offers no publish, activate or rollback button. Built.
+- **Tenant.** The tenant's status and each application's active release, as a table with the
+  application, the release number and label, and the activation time. Built.
 
 ## Commands
 
 - **Retry, cancel and resolve.** The [operator commands](process-inspection.md#operator-commands)
   with their rules, run from the instance detail. The operator role stands in for the `process`
-  grants `retry`, `cancel` and `resolve`.
-- **Redeliver and discard.** The commands that M14 adds for dead letters.
+  grants `retry`, `cancel` and `resolve`. Built.
+- **Redeliver and discard.** The commands on [dead letters](process-events.md#dead-letters), run
+  from the Dead letters view. The operator role stands in for the `process` grant `retry`. Built.
 - **A reason each time.** Every command needs a reason. It writes the same history rows and audit
   records as from the process inspector, with the operator as actor.
 - **Nothing else.** The console has no command that creates, suspends, backs up or restores a

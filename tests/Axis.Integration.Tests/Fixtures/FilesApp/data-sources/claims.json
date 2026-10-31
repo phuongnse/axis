@@ -1,0 +1,11 @@
+{
+  "id": "3b7c1d52-4e8a-4f60-9a1b-7d2e5c8f0a10",
+  "kind": "dataSource",
+  "name": "Claims",
+  "formatVersion": 1,
+  "entity": "Claim",
+  "fields": [
+    { "name": "title", "path": "title" },
+    { "name": "note", "path": "note" }
+  ]
+}

@@ -455,7 +455,9 @@ Each item is `{ "id", "values", "labels" }`:
 - **`values`.** Every projected field under its name, in `fields` order. The
   value forms are those of
   [record-api.md](record-api.md#reading-values). A field that is `NULL`,
-  including one behind a `null` reference, is `null`.
+  including one behind a `null` reference, is `null`. A projected `sensitive`
+  field reads as its plain value, also through a reference path, see
+  [data encryption](data-encryption.md#sensitive-field-values).
 - **`labels`.** Each projected field whose path ends at a non-null
   `reference` maps to the display field value of the target. It is `{}`
   otherwise. Like the record API, the labels come from the same SQL statement

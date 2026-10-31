@@ -345,8 +345,8 @@ user:
   encrypt the stored values _(planned for M27)_, see
   [changing the flag](data-encryption.md#changing-the-flag).
 - **Uses it cannot serve.** A filter, sort, aggregate, group field, index,
-  `unique`, `searchable`, stored computed field, migration value or other
-  expression that runs as SQL on the field is
+  `unique`, `searchable`, stored computed field, migration `fill` or `convert`
+  target or value, or other expression that runs as SQL on the field is
   [`AXC0308`](diagnostic-codes.md), and a caller's `sort` on it in the record
   API or a data source is a `400`. See
   [what a sensitive field cannot do](data-encryption.md#what-a-sensitive-field-cannot-do).

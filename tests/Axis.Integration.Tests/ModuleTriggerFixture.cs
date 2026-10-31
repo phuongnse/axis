@@ -13,7 +13,7 @@ namespace Axis.Integration.Tests;
 /// its own state of the schedule trigger <c>RemindFollowups</c>, which runs in the time zone of the
 /// application: <c>Asia/Ho_Chi_Minh</c> for ModuleTriggerApp and <c>Europe/Berlin</c> for ModuleTriggerOtherApp. The real
 /// server serves them on host <c>a.example.test</c> and signs in <c>clerk</c>, who holds the role
-/// <c>clerk</c> in both, and <c>outsider</c>, who holds no role. The worker is the one of
+/// <c>clerk</c> in both, <c>operator</c>, who holds the operator role of the console, and <c>outsider</c>, who holds no role. The worker is the one of
 /// <see cref="Steps"/>, which runs only when a test calls it, so a started instance stays
 /// <c>running</c> until then.
 /// </summary>
@@ -56,6 +56,7 @@ public sealed class ModuleTriggerFixture : IAsyncLifetime
             builder.UseSetting($"Tenants:{Steps.Tenant}:Hosts:0", Host);
             builder.UseSetting($"Tenants:{Steps.Tenant}:ConnectionString", PostgreSqlServer.RuntimeConnectionString(Steps.ConnectionString));
             builder.UseSetting($"Tenants:{Steps.Tenant}:SchemaConnectionString", Steps.ConnectionString);
+            builder.UseSetting("Console:OperatorRole", "operator");
             builder.UseTestOidc(Steps.Tenant);
             builder.UseTestAuthentication(
                 new TestIdentity("clerk", "Clerk User")
@@ -66,6 +67,7 @@ public sealed class ModuleTriggerFixture : IAsyncLifetime
                         [OtherAppId] = ["clerk"],
                     },
                 },
+                new TestIdentity("operator", "Operator User", "operator"),
                 new TestIdentity("outsider", "Outsider No Role"));
         });
     }

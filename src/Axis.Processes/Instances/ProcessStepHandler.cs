@@ -581,7 +581,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
         Record? updated = null;
         if (assignments is not null)
         {
-            var result = await RecordCommands.SetAsync(context.Connection, model, entity!, instance.ReleaseId, stored!, assignments, instance.Now, cancellationToken);
+            var result = await RecordCommands.SetAsync(context.Connection, model, entity!, instance.ReleaseId, stored!, assignments, instance.Now, cancellationToken: cancellationToken);
             if (result is not { Outcome: RecordWriteOutcome.Written, Record: { } written })
             {
                 throw Failure($"The record update was rejected: {Describe(result)}", instance, input);
@@ -608,7 +608,7 @@ internal sealed partial class ProcessStepHandler(ReleaseModelCache models, Packa
         if (creation is not null)
         {
             var result = await RecordCommands.CreateFromAsync(
-                context.Connection, model, created!, instance.ReleaseId, creation, AuditActors.System, instance.Now, cancellationToken);
+                context.Connection, model, created!, instance.ReleaseId, creation, AuditActors.System, instance.Now, cancellationToken: cancellationToken);
             if (result is not { Outcome: RecordWriteOutcome.Written, Record: { } written })
             {
                 throw Failure($"The record create was rejected: {Describe(result)}", instance, input);

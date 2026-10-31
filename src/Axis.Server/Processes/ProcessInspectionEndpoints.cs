@@ -13,6 +13,7 @@ using Axis.Server.Authentication;
 using Axis.Server.Http;
 using Axis.Server.Tenancy;
 using Axis.Server.Users;
+using Npgsql;
 
 namespace Axis.Server.Processes;
 
@@ -316,6 +317,27 @@ internal static class ProcessInspectionEndpoints
             return InstanceNotFound();
         }
 
+        return Results.Ok(await DetailAsync(
+            connection, resolver, packages, application, model, entity, row, InspectionViewer.ForUser(user.RolesIn(application)), cancellationToken));
+    }
+
+    /// <summary>
+    /// Builds the detail of <paramref name="row"/> for <paramref name="viewer"/>. <paramref name="active"/> is the active release
+    /// of the instance's application, or its pinned release when the application has none. <paramref name="process"/> and
+    /// <paramref name="subject"/> are the process and the subject entity in that release. The caller has checked that the viewer
+    /// may read the instance, so this applies no read grant, filter or subject check of its own.
+    /// </summary>
+    internal static async Task<ProcessInstanceDetailResponse> DetailAsync(
+        NpgsqlConnection connection,
+        ActiveApplicationResolver resolver,
+        PackageCatalog packages,
+        ApplicationModel active,
+        ProcessModel process,
+        EntityModel? subject,
+        ProcessInstanceRow row,
+        InspectionViewer viewer,
+        CancellationToken cancellationToken)
+    {
         // The due time shows only while the instance waits, from the timer item of its current revision.
         var timerDueAt = row.State == ProcessStarts.Waiting
             ? await InstanceQueries.TimerDueAtAsync(connection, row.Id, row.Revision, cancellationToken)
@@ -323,15 +345,15 @@ internal static class ProcessInspectionEndpoints
 
         // A parent or sub-process is named only when the user may inspect its process in the active release.
         // The subject record's read filters do not apply, and no subject id is shown.
-        var relatives = await InstanceQueries.RelativesAsync(connection, application.Manifest.Id, row.Id, cancellationToken);
-        var parentProcess = relatives.Parent is { } relatedParent ? InspectableProcess(application, user.RolesIn(application), relatedParent.ProcessId) : null;
+        var relatives = await InstanceQueries.RelativesAsync(connection, row.ApplicationId, row.Id, cancellationToken);
+        var parentProcess = relatives.Parent is { } relatedParent ? InspectableProcess(active, viewer, relatedParent.ProcessId) : null;
         var parent = relatives.Parent is { } parentRow && parentProcess is not null
             ? new ProcessInstanceParent(parentRow.Id, parentProcess.Name, parentRow.Step)
             : null;
         var subProcesses = new List<ProcessSubProcess>();
         foreach (var child in relatives.Children)
         {
-            if (InspectableProcess(application, user.RolesIn(application), child.ProcessId) is { } childProcess)
+            if (InspectableProcess(active, viewer, child.ProcessId) is { } childProcess)
             {
                 subProcesses.Add(new ProcessSubProcess(
                     child.Id,
@@ -345,34 +367,34 @@ internal static class ProcessInspectionEndpoints
 
         // The graph is the pinned release's, so a newer release does not change a running instance.
         var pinned = await resolver.GetReleaseModelAsync(row.ReleaseId, cancellationToken);
-        var graph = Graph(pinned.Processes.Single(candidate => candidate.Id == model.Id));
+        var graph = Graph(pinned.Processes.Single(candidate => candidate.Id == process.Id));
         var history = await InstanceQueries.HistoryAsync(connection, row.Id, cancellationToken);
         var tasks = await TaskQueries.ListByInstanceAsync(connection, row.Id, cancellationToken);
         var calls = await CallQueries.ListByInstanceAsync(connection, row.Id, cancellationToken);
         var mappings = new Dictionary<string, IReadOnlySet<MappedField>?>(StringComparer.Ordinal);
-        var pinnedProcess = pinned.Processes.Single(candidate => candidate.Id == model.Id);
-        var pinnedSubject = entity is null ? null : pinned.FindEntity(entity.Id);
+        var pinnedProcess = pinned.Processes.Single(candidate => candidate.Id == process.Id);
+        var pinnedSubject = subject is null ? null : pinned.FindEntity(subject.Id);
 
         // The operator commands do not serve an instance without a subject yet, so the detail
         // offers none of them and no call is resolvable.
-        var allowsResolve = entity is not null && PolicyEvaluator.AllowsResolve(application, user.RolesIn(application), model);
+        var allowsResolve = subject is not null && viewer.AllowsResolve(active, process);
         var commands = new List<string>();
-        if (entity is not null && row.State == ProcessStarts.Failed && PolicyEvaluator.AllowsRetry(application, user.RolesIn(application), model))
+        if (subject is not null && row.State == ProcessStarts.Failed && viewer.AllowsRetry(active, process))
         {
             commands.Add("retry");
         }
 
-        if (entity is not null
+        if (subject is not null
             && row.State is ProcessStarts.Running or ProcessStarts.Waiting
             && !calls.Any(call => call.State is ConnectorCalls.Sending or ConnectorCalls.Unknown)
-            && PolicyEvaluator.AllowsCancel(application, user.RolesIn(application), model))
+            && viewer.AllowsCancel(active, process))
         {
             commands.Add("cancel");
         }
 
-        return Results.Ok(new ProcessInstanceDetailResponse(
+        return new ProcessInstanceDetailResponse(
             row.Id,
-            model.Name,
+            process.Name,
             row.SubjectId,
             row.ReleaseId,
             row.State,
@@ -413,7 +435,7 @@ internal static class ProcessInspectionEndpoints
                     }
 
                     var hidden = call.Input is not null
-                        && (!Readable(application, user.RolesIn(application), fields) || Sensitive(pinned, application, fields));
+                        && (!Readable(active, viewer, fields) || Sensitive(pinned, active, fields));
                     var outputs = allowsResolve && call.State == ConnectorCalls.Unknown && row.State == ProcessStarts.Waiting && row.Step == call.Step
                         ? DeclaredOutputs(pinned, call, packages)
                         : null;
@@ -443,13 +465,13 @@ internal static class ProcessInspectionEndpoints
                         outputs);
                 })
                 .ToList(),
-            commands));
+            commands);
     }
 
-    // The process in the active release when it exists and the user may inspect it, otherwise null.
-    private static ProcessModel? InspectableProcess(ApplicationModel application, IReadOnlyCollection<string> roles, Guid processId) =>
+    // The process in the active release when it exists and the viewer may inspect it, otherwise null.
+    private static ProcessModel? InspectableProcess(ApplicationModel application, InspectionViewer viewer, Guid processId) =>
         application.Processes.FirstOrDefault(candidate => candidate.Id == processId) is { } process
-        && PolicyEvaluator.AllowsInspect(application, roles, process)
+        && viewer.MayInspect(application, process)
             ? process
             : null;
 
@@ -488,9 +510,9 @@ internal static class ProcessInspectionEndpoints
         };
     }
 
-    // Readable comes from the fields of the user's read grants in the active release. A field or
+    // Readable comes from the fields of the viewer's read grants in the active release. A field or
     // entity that the active release no longer has is not readable.
-    private static bool Readable(ApplicationModel active, IReadOnlyList<string> roles, IReadOnlySet<MappedField>? fields)
+    private static bool Readable(ApplicationModel active, InspectionViewer viewer, IReadOnlySet<MappedField>? fields)
     {
         if (fields is null)
         {
@@ -504,7 +526,7 @@ internal static class ProcessInspectionEndpoints
                 return false;
             }
 
-            if (PolicyEvaluator.Fields(active, roles, entity, PolicyAction.Read) is { } readable && !readable.Contains(field.Name))
+            if (viewer.ReadableFields(active, entity) is { } readable && !readable.Contains(field.Name))
             {
                 return false;
             }
@@ -593,6 +615,51 @@ internal static class ProcessInspectionEndpoints
 
     private static IResult NotFound(string title) =>
         Results.Problem(statusCode: StatusCodes.Status404NotFound, title: title);
+}
+
+/// <summary>
+/// Who reads an instance detail. A user holds the grants of their roles in the application. The operator of the
+/// console stands in for the <c>inspect</c> grant and for a <c>read</c> grant with no <c>fields</c> list, so they
+/// inspect every process and read every field. <see cref="Operator"/> also stands in for the <c>retry</c>, <c>cancel</c> and
+/// <c>resolve</c> grants, and <see cref="OperatorReadOnly"/> holds none of them, for an instance whose commands cannot run.
+/// </summary>
+internal sealed class InspectionViewer
+{
+    private readonly IReadOnlyList<string>? _roles;
+
+    private readonly bool _commands;
+
+    private InspectionViewer(IReadOnlyList<string>? roles, bool commands = false)
+    {
+        _roles = roles;
+        _commands = commands;
+    }
+
+    public static InspectionViewer Operator { get; } = new(null, commands: true);
+
+    public static InspectionViewer OperatorReadOnly { get; } = new(null);
+
+    public static InspectionViewer ForUser(IReadOnlyList<string> roles)
+    {
+        ArgumentNullException.ThrowIfNull(roles);
+        return new(roles);
+    }
+
+    public bool MayInspect(ApplicationModel application, ProcessModel process) =>
+        _roles is null || PolicyEvaluator.AllowsInspect(application, _roles, process);
+
+    // The fields of the viewer's read grants on the entity, or null when every field is readable.
+    public IReadOnlySet<string>? ReadableFields(ApplicationModel application, EntityModel entity) =>
+        _roles is null ? null : PolicyEvaluator.Fields(application, _roles, entity, PolicyAction.Read);
+
+    public bool AllowsRetry(ApplicationModel application, ProcessModel process) =>
+        _roles is null ? _commands : PolicyEvaluator.AllowsRetry(application, _roles, process);
+
+    public bool AllowsCancel(ApplicationModel application, ProcessModel process) =>
+        _roles is null ? _commands : PolicyEvaluator.AllowsCancel(application, _roles, process);
+
+    public bool AllowsResolve(ApplicationModel application, ProcessModel process) =>
+        _roles is null ? _commands : PolicyEvaluator.AllowsResolve(application, _roles, process);
 }
 
 /// <summary>One page of the instances of a process, and the number of them on every page.</summary>

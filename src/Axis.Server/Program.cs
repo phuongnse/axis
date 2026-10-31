@@ -2,11 +2,13 @@ using Axis.Configuration.Modules;
 using Axis.Configuration.Packages;
 using Axis.Configuration.Templates;
 using Axis.Data;
+using Axis.Data.Records;
 using Axis.Presentation.Sites;
 using Axis.Presentation.Texts;
 using Axis.Processes.Storage;
 using Axis.Server.Applications;
 using Axis.Server.Authentication;
+using Axis.Server.Console;
 using Axis.Server.DataSources;
 using Axis.Server.Endpoints;
 using Axis.Server.Exports;
@@ -164,6 +166,7 @@ if (directorySource)
 
 // Every problem details answer carries the request's trace id.
 builder.Services.AddProblemDetails(options => options.CustomizeProblemDetails = ProblemTraceId.Apply);
+builder.Services.AddExceptionHandler<TenantDataKeyMissingHandler>();
 builder.Services.AddServerTelemetry(builder.Configuration, builder.Environment);
 // The clients that startup activation uses to bring a tenant's realm in step.
 builder.Services.AddHttpClient();
@@ -171,6 +174,7 @@ builder.Services.AddTenancy(tenants);
 builder.Services.AddTenantKeys(directorySource
     ? new DirectoryTenantKeySource(platformConnectionString, cipher)
     : new ConfigurationTenantKeySource(builder.Configuration));
+builder.Services.AddSingleton<SensitiveValues>();
 builder.Services.AddExtensionPackages(builder.Configuration, builder.Environment);
 builder.Services.AddModules(builder.Configuration, builder.Environment);
 builder.Services.AddTemplates(builder.Configuration, builder.Environment);
@@ -299,6 +303,7 @@ sessions.MapNotificationEndpoints();
 sessions.MapDataSourceEndpoints();
 sessions.MapUserEndpoints();
 sessions.MapUserCommandEndpoints();
+sessions.MapConsoleEndpoints();
 sessions.MapAboutEndpoints();
 sessions.MapSessionEndpoints();
 sessions.MapUserPickerEndpoints();

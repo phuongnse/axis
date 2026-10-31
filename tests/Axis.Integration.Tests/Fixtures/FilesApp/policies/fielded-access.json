@@ -6,6 +6,7 @@
   "roles": ["fielded"],
   "grants": [
     { "entity": "Claim", "actions": ["update"], "fields": ["title"] },
-    { "entity": "Claim", "actions": ["read"], "fields": ["title"] }
+    { "entity": "Claim", "actions": ["read"], "fields": ["title"] },
+    { "dataSource": "Claims", "actions": ["read"] }
   ]
 }
