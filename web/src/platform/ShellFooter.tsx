@@ -8,11 +8,6 @@ import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
 
 /**
- * Proposed: Axis's public source, until the server names the source of the exact version it runs.
- */
-const sourceUrl = 'https://github.com/phuongnse/axis'
-
-/**
  * The slim footer across the bottom of every site: the copyright, with the server's version for a
  * signed-in person only, the legal links and the server's readiness.
  */
@@ -51,14 +46,12 @@ export function ShellFooter({ legal }: { legal?: SiteLegal | null }) {
           links={{
             privacy: legal?.privacyUrl ?? undefined,
             terms: legal?.termsUrl ?? undefined,
-            source: sourceUrl,
             licences: '/licences',
           }}
           texts={{
             label: t('shell.legal.label'),
             privacy: t('shell.legal.privacy'),
             terms: t('shell.legal.terms'),
-            source: t('shell.legal.source'),
             licences: t('shell.legal.licences'),
           }}
         />

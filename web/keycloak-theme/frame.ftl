@@ -28,32 +28,28 @@
 
 <#-- Proposed: <@axis.legal/> writes the legal links under the card. The site's client carries them as attributes, which
      the realm sync writes: axis.privacyUrl and axis.termsUrl, the site's or else its tenant's, left out when neither
-     sets one; axis.sourceUrl, the source of the running Axis; axis.licencesUrl, the site's Open source licences page.
-     Until the sync writes them, the source falls back to the public repository, and the licences fall back to the
-     client's base address when it is absolute and are left out otherwise, never guessed. -->
+     sets one; axis.licencesUrl, the site's Open source licences page, which also links Axis's source. Until the sync
+     writes it, the licences fall back to the client's base address when it is absolute and are left out otherwise,
+     never guessed. -->
 <#macro legal>
     <#assign privacyUrl = (client.attributes['axis.privacyUrl'])!''>
     <#assign termsUrl = (client.attributes['axis.termsUrl'])!''>
     <#assign baseUrl = ((client.baseUrl)!'')?remove_ending('/')>
     <#assign licencesUrl = (client.attributes['axis.licencesUrl'])!(baseUrl?starts_with('http')?then(baseUrl + '/licences', ''))>
     "legal": {
+      <#assign links = {}>
+      <#if privacyUrl?has_content><#assign links = links + {"privacy": privacyUrl}></#if>
+      <#if termsUrl?has_content><#assign links = links + {"terms": termsUrl}></#if>
+      <#if licencesUrl?has_content><#assign links = links + {"licences": licencesUrl}></#if>
       "links": {
-        <#if privacyUrl?has_content>
-        "privacy": "${privacyUrl?json_string?no_esc}",
-        </#if>
-        <#if termsUrl?has_content>
-        "terms": "${termsUrl?json_string?no_esc}",
-        </#if>
-        <#if licencesUrl?has_content>
-        "licences": "${licencesUrl?json_string?no_esc}",
-        </#if>
-        "source": "${((client.attributes['axis.sourceUrl'])!'https://github.com/phuongnse/axis')?json_string?no_esc}"
+        <#list links as key, value>
+        "${key}": "${value?json_string?no_esc}"<#sep>,</#sep>
+        </#list>
       },
       "texts": {
         "label": "${msg("axisLegal")?json_string?no_esc}",
         "privacy": "${msg("axisPrivacy")?json_string?no_esc}",
         "terms": "${msg("axisTerms")?json_string?no_esc}",
-        "source": "${msg("axisSourceCode")?json_string?no_esc}",
         "licences": "${msg("axisLicences")?json_string?no_esc}"
       }
     },

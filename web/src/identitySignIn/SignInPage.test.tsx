@@ -31,12 +31,11 @@ const context: SignInContext = {
     },
   },
   legal: {
-    links: { source: 'https://github.com/phuongnse/axis', licences: '/licences' },
+    links: { licences: '/licences' },
     texts: {
       label: 'Legal',
       privacy: 'Privacy',
       terms: 'Terms',
-      source: 'Source code',
       licences: 'Open source licences',
     },
   },
