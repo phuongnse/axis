@@ -61,7 +61,7 @@ Detailed behaviour, one topic per file. Sections marked _(planned for Mx)_ are n
 | [Migrations](reference/migrations.md)                                  | `migration` resources and recomputing stored computed fields                          |
 | [Security](reference/security.md)                                      | Sign-in and the session, machine callers, service accounts, the FAPI 2.0 profile, authorization, development users |
 | [Axis's identity provider](reference/identity-provider.md)           | The identity provider Axis ships: realms, the `identityProvider` resource, sign-in per site, platform sign-in, the Axis theme, installation |
-| [User administration](reference/user-administration.md)              | The administrator role, the users page, accounts and their MFA, and the roles an administrator gives |
+| [User administration](reference/user-administration.md)              | The administrator role, the users page, accounts and their MFA, disabled users, and the roles an administrator gives |
 | [Security headers and rate limits](reference/headers-and-rate-limits.md) | The headers the server sets on every response, and the rate limits per partition      |
 | [Keys and data protection](reference/keys-and-data-protection.md) | The key policy, the cryptographic inventory and crypto agility, and the data protection levels |
 | [Data encryption](reference/data-encryption.md) | Encrypted `sensitive` field values, exact lookup, tenant data keys and their rotation, encrypted backups |
@@ -93,5 +93,5 @@ Detailed behaviour, one topic per file. Sections marked _(planned for Mx)_ are n
 | Doc                           | What it holds                                                                |
 | ----------------------------- | ---------------------------------------------------------------------------- |
 | [AGENTS.md](../AGENTS.md)     | The working rules and the commands, for people and agents                    |
-| [Development](development.md) | Running Axis locally, the scripts, test reports, database roles, realm users |
+| [Development](development.md) | Running Axis locally, the scripts, dependency updates and scans, test reports, database roles, realm users |
 | [Delivery](delivery.md)       | How work flows through NexKit, and how the docs are kept current             |
