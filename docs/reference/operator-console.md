@@ -68,6 +68,14 @@ _(planned for Mx)_ are not built yet, and Dn refers to [decisions.md](../decisio
     a [process's dead letter](process-events.md#dead-letters) with its `applicationId` and
     `processId` (null for a letter with no process). Its `commands` are `redeliver` and `discard`
     while the letter is `open` and empty otherwise.
+  - **`GET /api/console/schedules`.** Answers `{ "items": [...] }`, not paged, with each schedule
+    trigger of the active release of every application, ordered by application name and then by
+    trigger name. An optional `application` (an application id) keeps one application. One that is
+    not a hyphenated UUID is a `400` keyed `application`. A module's schedule trigger is listed
+    once for each application that uses the module. A trigger that the active release no longer
+    has, and every trigger of an application with no active release, is left out. Each item has
+    `applicationId`, `application`, `triggerId`, `trigger`, `process`, `schedule`, `timeZone`,
+    `lastOccurrenceAt` (`null` while no occurrence has run) and `nextOccurrenceAt`.
   - **`POST /api/console/dead-letters/{id}/redeliver` and `…/discard`.** Check, in order, the
     content type (`415`), the body, which is exactly `{ "reason": "<text>" }` (`400`), the `id`
     (`404` when it is not a hyphenated UUID or no dead letter has it) and the active release of
