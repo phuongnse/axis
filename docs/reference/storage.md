@@ -575,8 +575,8 @@ access. It returns diagnostics, SQL statements and the new records to write.
   - The type must equal the expected type. Widening text
     (`character varying(n)` to a larger `n` or to `text`) is applied.
     Narrowing it, including `text` to `character varying(n)`, is `AXC0016` at
-    `/fields/{i}/maxLength`. Any other type difference, including a field that becomes or
-    stops being `sensitive`, is `AXC0016` at `/fields/{i}/type`, even with a `convert`.
+    `/fields/{i}/maxLength`. Any other type difference is `AXC0016` at `/fields/{i}/type`. A field that becomes or
+    stops being `sensitive` gets a new column that activation fills, see [changing the flag](data-encryption.md#changing-the-flag).
   - Dropping `required` drops `NOT NULL`, and dropping `unique` drops the
     unique constraint. Adding either to an existing column is `AXC0016` at
     `/fields/{i}/required` or `/fields/{i}/unique`. A pending `fill` of the

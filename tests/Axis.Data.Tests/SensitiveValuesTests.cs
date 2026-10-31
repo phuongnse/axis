@@ -186,6 +186,42 @@ public sealed class SensitiveValuesTests
         Assert.Contains(Tenant, failure.Message, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task A_text_encrypted_under_a_field_name_decrypts_as_the_same_text()
+    {
+        var cipher = new SensitiveValues(new TenantKeys(new FakeSource(Key(TenantKeyKind.Data, 1))));
+
+        var stored = await cipher.EncryptTextAsync(_scope, "note", "Ngô Thị Hạnh", CancellationToken.None);
+
+        Assert.Equal("Ngô Thị Hạnh", await cipher.DecryptTextAsync(_scope, "NOTE", stored, CancellationToken.None));
+        Assert.Equal("Ngô Thị Hạnh", (await cipher.DecryptAsync(_scope, _text, stored, CancellationToken.None)).GetValue<string>());
+    }
+
+    [Fact]
+    public async Task A_re_encrypted_value_decrypts_under_the_new_name_with_the_newest_key_and_not_under_the_old_one()
+    {
+        var source = new FakeSource(Key(TenantKeyKind.Data, 1));
+        var cipher = new SensitiveValues(new TenantKeys(source));
+        var stored = await cipher.EncryptTextAsync(_scope, "note", "secret", CancellationToken.None);
+        source.Add(Key(TenantKeyKind.Data, 2));
+        var later = new SensitiveValues(new TenantKeys(source));
+
+        var renamed = await later.ReEncryptAsync(_scope, "note", "memo", stored, CancellationToken.None);
+
+        Assert.Equal(2, BinaryPrimitives.ReadInt32BigEndian(renamed));
+        Assert.Equal("secret", await later.DecryptTextAsync(_scope, "memo", renamed, CancellationToken.None));
+        await Assert.ThrowsAsync<SensitiveValueDecryptionException>(() => later.DecryptTextAsync(_scope, "note", renamed, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task A_value_that_was_not_stored_under_the_old_name_does_not_re_encrypt()
+    {
+        var cipher = new SensitiveValues(new TenantKeys(new FakeSource(Key(TenantKeyKind.Data, 1))));
+        var stored = await cipher.EncryptTextAsync(_scope, "other", "secret", CancellationToken.None);
+
+        await Assert.ThrowsAsync<SensitiveValueDecryptionException>(() => cipher.ReEncryptAsync(_scope, "note", "memo", stored, CancellationToken.None));
+    }
+
     private static async Task AssertFailsAsync(SensitiveValues cipher, SensitiveValueScope scope, FieldModel field, byte[] stored) =>
         await Assert.ThrowsAsync<SensitiveValueDecryptionException>(() => cipher.DecryptAsync(scope, field, stored, CancellationToken.None));
 

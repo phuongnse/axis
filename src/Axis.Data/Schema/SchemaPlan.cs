@@ -71,7 +71,43 @@ public sealed record SchemaCommand(string Sql)
     /// Activation may skip the create when the table has more rows than the inline limit, and the index builder creates it later.
     /// </summary>
     public string? DeferrableOn { get; init; }
+
+    /// <summary>
+    /// Set on a statement that needs the tenant's data keys: <see cref="Sql"/> is the batch update that stores the values
+    /// activation encrypts, decrypts or re-encrypts row by row in C#, because PostgreSQL never sees a key or a plain
+    /// sensitive value.
+    /// </summary>
+    public SensitiveRewrite? Rewrite { get; init; }
 }
+
+/// <summary>What a <see cref="SensitiveRewrite"/> does to each stored value.</summary>
+public enum SensitiveRewriteKind
+{
+    /// <summary>Reads the plain column of the field's type and writes the encrypted bytes.</summary>
+    Encrypt,
+
+    /// <summary>Reads the encrypted bytes and writes the plain value.</summary>
+    Decrypt,
+
+    /// <summary>Reads the encrypted bytes and writes them again with the new field name in the associated data.</summary>
+    Rename,
+}
+
+/// <summary>
+/// The rewrite of the stored values of one sensitive field of the entity with id <see cref="EntityId"/>. <see cref="Source"/>
+/// is the column read for each row and <see cref="Target"/> the column written. <see cref="FieldName"/> is the field name
+/// in the associated data after the step, and <see cref="FromFieldName"/> the one before it, for a rename.
+/// <see cref="Field"/> is <see langword="null"/> for a rename, which needs no type.
+/// </summary>
+public sealed record SensitiveRewrite(
+    SensitiveRewriteKind Kind,
+    Guid EntityId,
+    string Table,
+    string Source,
+    string Target,
+    FieldModel? Field,
+    string FieldName,
+    string? FromFieldName = null);
 
 /// <summary>The change of a pending <c>fill</c> migration, which names it in a diagnostic.</summary>
 public sealed record FillTarget(Guid MigrationId, string File, int ChangeIndex, string Field);

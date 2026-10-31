@@ -35,15 +35,24 @@ public sealed class SensitiveValues(TenantKeys keys)
         ArgumentNullException.ThrowIfNull(value);
         ArgumentException.ThrowIfNullOrEmpty(scope.TenantId);
 
-        if (value.Value is null)
-        {
-            return null;
-        }
+        return value.Value is null ? null : await EncryptTextAsync(scope, value.Field.Name, ToText(value), cancellationToken);
+    }
+
+    /// <summary>
+    /// Returns the stored bytes of <paramref name="text"/>, the value as the record API shows it, under the newest data
+    /// key of the tenant, with <paramref name="fieldName"/> in the associated data.
+    /// </summary>
+    /// <exception cref="TenantDataKeyMissingException">The tenant has no data key.</exception>
+    public async Task<byte[]> EncryptTextAsync(SensitiveValueScope scope, string fieldName, string text, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(fieldName);
+        ArgumentNullException.ThrowIfNull(text);
+        ArgumentException.ThrowIfNullOrEmpty(scope.TenantId);
 
         var key = await keys.NewestAsync(scope.TenantId, TenantKeyKind.Data, cancellationToken)
             ?? throw new TenantDataKeyMissingException(scope.TenantId);
 
-        var plain = Encoding.UTF8.GetBytes(ToText(value));
+        var plain = Encoding.UTF8.GetBytes(text);
         var stored = new byte[NumberSize + NonceSize + plain.Length + TagSize];
         BinaryPrimitives.WriteInt32BigEndian(stored, key.Number);
         var nonce = stored.AsSpan(NumberSize, NonceSize);
@@ -55,7 +64,7 @@ public sealed class SensitiveValues(TenantKeys keys)
             plain,
             stored.AsSpan(NumberSize + NonceSize, plain.Length),
             stored.AsSpan(NumberSize + NonceSize + plain.Length, TagSize),
-            AssociatedData(scope, value.Field.Name));
+            AssociatedData(scope, fieldName));
         return stored;
     }
 
@@ -67,19 +76,28 @@ public sealed class SensitiveValues(TenantKeys keys)
     public async Task<JsonValue> DecryptAsync(SensitiveValueScope scope, FieldModel field, byte[] stored, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(field);
+
+        return FromText(field, await DecryptTextAsync(scope, field.Name, stored, cancellationToken));
+    }
+
+    /// <summary>Returns the text form of the value, as <see cref="EncryptTextAsync"/> took it, stored with <paramref name="fieldName"/>.</summary>
+    /// <exception cref="SensitiveValueDecryptionException">The value does not decrypt, as <see cref="DecryptAsync"/> says.</exception>
+    public async Task<string> DecryptTextAsync(SensitiveValueScope scope, string fieldName, byte[] stored, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(fieldName);
         ArgumentNullException.ThrowIfNull(stored);
         ArgumentException.ThrowIfNullOrEmpty(scope.TenantId);
 
         if (stored.Length < NumberSize + NonceSize + TagSize)
         {
-            throw new SensitiveValueDecryptionException(Failure(scope, field, "is too short"));
+            throw new SensitiveValueDecryptionException(Failure(scope, fieldName, "is too short"));
         }
 
         var number = BinaryPrimitives.ReadInt32BigEndian(stored);
         var key = number < 1 ? null : await keys.FindAsync(scope.TenantId, TenantKeyKind.Data, number, cancellationToken);
         if (key is null)
         {
-            throw new SensitiveValueDecryptionException(Failure(scope, field, $"names data key {number}, which the tenant does not hold"));
+            throw new SensitiveValueDecryptionException(Failure(scope, fieldName, $"names data key {number}, which the tenant does not hold"));
         }
 
         var cipherLength = stored.Length - NumberSize - NonceSize - TagSize;
@@ -92,18 +110,27 @@ public sealed class SensitiveValues(TenantKeys keys)
                 stored.AsSpan(NumberSize + NonceSize, cipherLength),
                 stored.AsSpan(NumberSize + NonceSize + cipherLength, TagSize),
                 plain,
-                AssociatedData(scope, field.Name));
+                AssociatedData(scope, fieldName));
         }
         catch (CryptographicException exception)
         {
-            throw new SensitiveValueDecryptionException(Failure(scope, field, $"does not decrypt with data key {number}"), exception);
+            throw new SensitiveValueDecryptionException(Failure(scope, fieldName, $"does not decrypt with data key {number}"), exception);
         }
 
-        return FromText(field, Encoding.UTF8.GetString(plain));
+        return Encoding.UTF8.GetString(plain);
     }
 
-    private static string Failure(SensitiveValueScope scope, FieldModel field, string reason) =>
-        $"The stored value of field '{field.Name}' of entity '{scope.EntityId}' of tenant '{scope.TenantId}' {reason}.";
+    /// <summary>
+    /// Returns the stored value decrypted with the associated data of <paramref name="fromField"/> and encrypted again under
+    /// the newest data key with the associated data of <paramref name="toField"/>.
+    /// </summary>
+    /// <exception cref="SensitiveValueDecryptionException">The value does not decrypt.</exception>
+    /// <exception cref="TenantDataKeyMissingException">The tenant has no data key.</exception>
+    public async Task<byte[]> ReEncryptAsync(SensitiveValueScope scope, string fromField, string toField, byte[] stored, CancellationToken cancellationToken) =>
+        await EncryptTextAsync(scope, toField, await DecryptTextAsync(scope, fromField, stored, cancellationToken), cancellationToken);
+
+    private static string Failure(SensitiveValueScope scope, string fieldName, string reason) =>
+        $"The stored value of field '{fieldName}' of entity '{scope.EntityId}' of tenant '{scope.TenantId}' {reason}.";
 
     // The text form is the record API value. A file field shows its file id.
     private static string ToText(RecordValue value)

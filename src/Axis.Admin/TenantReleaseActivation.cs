@@ -91,7 +91,7 @@ internal sealed class TenantReleaseActivation(
                 && await Step(id, "activate", async () =>
                 {
                     var activated = await ReleaseActivator.ActivateAsync(
-                        compiled!, new ActiveReleaseStore(configuration!), data!, bindings, OpenInstanceCounter.Instance, inlineRecomputeLimit, actor, cancellationToken);
+                        compiled!, new ActiveReleaseStore(configuration!), data!, bindings with { Sensitive = sensitive }, OpenInstanceCounter.Instance, inlineRecomputeLimit, actor, cancellationToken);
                     diagnostics.AddRange(activated.Diagnostics);
                     WriteWarnings(id, activated.Diagnostics);
                     if (activated.Diagnostics.Any(IsError))
@@ -180,7 +180,7 @@ internal sealed class TenantReleaseActivation(
                     }
 
                     var activated = await ReleaseActivator.ActivateAsync(
-                        compiled, new ActiveReleaseStore(configuration), data, bindings, OpenInstanceCounter.Instance, inlineRecomputeLimit, cancellationToken);
+                        compiled, new ActiveReleaseStore(configuration), data, bindings with { Sensitive = sensitive }, OpenInstanceCounter.Instance, inlineRecomputeLimit, cancellationToken);
                     diagnostics.AddRange(activated.Diagnostics);
                     WriteWarnings(id, activated.Diagnostics);
                     if (activated.Diagnostics.Any(IsError))

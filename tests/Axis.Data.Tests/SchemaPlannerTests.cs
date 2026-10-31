@@ -352,6 +352,33 @@ public sealed class SchemaPlannerTests
     }
 
     [Fact]
+    public void Pending_rename_of_a_bytea_column_encrypts_each_value_again_under_the_new_field_name_and_a_plain_one_does_not()
+    {
+        var stored = ChangeOrderField(BaseModel(), 5, note => note with { Sensitive = true });
+        var renamed = ChangeOrderField(stored, 5, note => note with { Name = "memo" });
+        var migration = Migration("Order", new MigrationChangeModel(MigrationChangeType.RenameField, null, "note", "memo", null));
+        var plain = ChangeOrderField(BaseModel(), 5, note => note with { Name = "memo" });
+
+        var plan = SchemaPlanner.Plan(renamed, Catalog(stored, hasRows: true), Models.Records(stored), [migration], StoredIds(stored));
+        var plainPlan = SchemaPlanner.Plan(plain, Catalog(BaseModel(), hasRows: true), Models.Records(BaseModel()), [migration], StoredIds(BaseModel()));
+
+        Assert.Empty(plan.Diagnostics);
+        var table = EntityNaming.QualifiedTable(OrderTable);
+        Assert.Equal(
+            [
+                $"ALTER TABLE {table} RENAME COLUMN {Quote("f_note")} TO {Quote("f_memo")}",
+                $"UPDATE {table} AS t SET {Quote("f_memo")} = v.value FROM unnest(@ids, @values) AS v(id, value) WHERE t.\"id\" = v.id",
+            ],
+            plan.Statements);
+        var rewrite = Assert.IsType<SensitiveRewrite>(plan.Commands[1].Rewrite);
+        Assert.Equal(SensitiveRewriteKind.Rename, rewrite.Kind);
+        Assert.Equal((_orderId, OrderTable, "f_memo", "f_memo", "memo", "note"), (rewrite.EntityId, rewrite.Table, rewrite.Source, rewrite.Target, rewrite.FieldName, rewrite.FromFieldName));
+        Assert.Null(rewrite.Field);
+        Assert.Empty(plainPlan.Diagnostics);
+        Assert.All(plainPlan.Commands, command => Assert.Null(command.Rewrite));
+    }
+
+    [Fact]
     public void Pending_drop_field_plans_no_index_drop_for_the_indexes_the_column_takes_with_it()
     {
         var stored = DeclareOrderIndexes(BaseModel(), new EntityIndexModel(["note"], false), new EntityIndexModel(["title", "note"], false));
@@ -617,8 +644,10 @@ public sealed class SchemaPlannerTests
     [InlineData("existing field made unique", "/fields/4/unique")]
     [InlineData("enum to text", "/fields/3/type")]
     [InlineData("text to enum", "/fields/5/type")]
-    [InlineData("text made sensitive", "/fields/5/type")]
-    [InlineData("integer made sensitive", "/fields/4/type")]
+    [InlineData("type changed and made sensitive", "/fields/4/type")]
+    [InlineData("text narrowed and made sensitive", "/fields/0/maxLength")]
+    [InlineData("text to integer and made sensitive", "/fields/5/type")]
+    [InlineData("sensitive and unique", "/fields/1/unique")]
     public void Incompatible_field_change_is_reported_at_the_field_property(string change, string path)
     {
         var model = BaseModel();
@@ -635,8 +664,10 @@ public sealed class SchemaPlannerTests
             "existing field made unique" => ChangeOrderField(model, 4, amount => amount with { Unique = true }),
             "enum to text" => ChangeOrderField(model, 3, status => status with { Type = FieldType.Text, Values = null }),
             "text to enum" => ChangeOrderField(model, 5, note => note with { Type = FieldType.Enum, Values = ["a"] }),
-            "text made sensitive" => ChangeOrderField(model, 5, note => note with { Sensitive = true }),
-            "integer made sensitive" => ChangeOrderField(model, 4, amount => amount with { Sensitive = true }),
+            "type changed and made sensitive" => ChangeOrderField(model, 4, amount => amount with { Type = FieldType.Decimal, Sensitive = true }),
+            "text narrowed and made sensitive" => ChangeOrderField(model, 0, title => title with { MaxLength = 50, Sensitive = true }),
+            "text to integer and made sensitive" => ChangeOrderField(model, 5, note => note with { Type = FieldType.Integer, Sensitive = true }),
+            "sensitive and unique" => ChangeOrderField(model, 1, code => code with { Sensitive = true }),
             _ => throw new ArgumentOutOfRangeException(nameof(change)),
         };
 
@@ -650,23 +681,133 @@ public sealed class SchemaPlannerTests
         AssertNothingPlanned(plan);
     }
 
+    private static string AddStaging(string type) => $"""ALTER TABLE "entities"."{OrderTable}" ADD COLUMN "axis_sensitive" {type}""";
+
+    private static string RewriteStaging(string cast = "") =>
+        $"""UPDATE "entities"."{OrderTable}" AS t SET "axis_sensitive" = v.value{cast} FROM unnest(@ids, @values) AS v(id, value) WHERE t."id" = v.id""";
+
+    private static string DropOrderColumn(string column) => $"""ALTER TABLE "entities"."{OrderTable}" DROP COLUMN {Quote(column)}""";
+
+    private static string RenameStaging(string column) => $"""ALTER TABLE "entities"."{OrderTable}" RENAME COLUMN "axis_sensitive" TO {Quote(column)}""";
+
     [Fact]
-    public void Field_that_stops_being_sensitive_is_reported_at_the_field_type()
+    public void Field_that_becomes_sensitive_gets_a_bytea_column_that_activation_fills_before_it_replaces_the_plain_one()
+    {
+        var stored = BaseModel();
+        var changed = ChangeOrderField(stored, 5, note => note with { Sensitive = true });
+
+        var plan = SchemaPlanner.Plan(changed, Catalog(stored, hasRows: true), Models.Records(stored));
+
+        Assert.Empty(plan.Diagnostics);
+        Assert.Equal([AddStaging("bytea"), RewriteStaging(), DropOrderColumn("f_note"), RenameStaging("f_note")], plan.Statements);
+        var rewrite = Assert.IsType<SensitiveRewrite>(plan.Commands[1].Rewrite);
+        Assert.Equal(SensitiveRewriteKind.Encrypt, rewrite.Kind);
+        Assert.Equal((_orderId, OrderTable, "f_note", "axis_sensitive", "note"), (rewrite.EntityId, rewrite.Table, rewrite.Source, rewrite.Target, rewrite.FieldName));
+        Assert.Equal(changed.Entities.First(entity => entity.Id == _orderId).Fields[5], rewrite.Field);
+        Assert.Equal(1, plan.Commands.Count(command => command.Rewrite is not null));
+    }
+
+    [Fact]
+    public void Index_over_a_column_that_becomes_sensitive_is_not_dropped_again()
+    {
+        var stored = DeclareOrderIndexes(BaseModel(), new EntityIndexModel(["note"], false));
+        var changed = ChangeOrderField(DeclareOrderIndexes(stored), 5, note => note with { Sensitive = true });
+        var catalog = Catalog(stored, hasRows: true);
+        Assert.Contains(catalog.Tables.First(table => table.Name == OrderTable).Indexes, index => index.Columns.Contains("f_note"));
+
+        var plan = SchemaPlanner.Plan(changed, catalog, Models.Records(stored));
+
+        Assert.Empty(plan.Diagnostics);
+        Assert.Equal([AddStaging("bytea"), RewriteStaging(), DropOrderColumn("f_note"), RenameStaging("f_note")], plan.Statements);
+    }
+
+    [Fact]
+    public void Unique_constraint_of_a_column_that_becomes_sensitive_goes_with_the_column()
+    {
+        var stored = BaseModel();
+        var changed = ChangeOrderField(stored, 1, code => code with { Sensitive = true, Unique = false });
+
+        var plan = SchemaPlanner.Plan(changed, Catalog(stored, hasRows: true), Models.Records(stored));
+
+        Assert.Empty(plan.Diagnostics);
+        Assert.Equal([AddStaging("bytea"), RewriteStaging(), DropOrderColumn("f_code"), RenameStaging("f_code")], plan.Statements);
+    }
+
+    [Fact]
+    public void Text_field_that_becomes_sensitive_may_widen_at_the_same_time()
+    {
+        var stored = BaseModel();
+        var changed = ChangeOrderField(stored, 0, title => title with { MaxLength = 200, Sensitive = true });
+
+        var plan = SchemaPlanner.Plan(changed, Catalog(stored, hasRows: true), Models.Records(stored));
+
+        Assert.Empty(plan.Diagnostics);
+        Assert.Equal(SensitiveRewriteKind.Encrypt, plan.Commands[1].Rewrite!.Kind);
+        Assert.Contains($"""ALTER TABLE "entities"."{OrderTable}" ALTER COLUMN "f_title" SET NOT NULL""", plan.Statements);
+    }
+
+    [Fact]
+    public void Required_field_that_becomes_sensitive_keeps_its_not_null_and_one_that_was_not_required_cannot_become_required()
+    {
+        var stored = BaseModel();
+
+        var kept = SchemaPlanner.Plan(ChangeOrderField(stored, 0, title => title with { Sensitive = true }), Catalog(stored, hasRows: true), Models.Records(stored));
+        var refused = SchemaPlanner.Plan(ChangeOrderField(stored, 5, note => note with { Sensitive = true, Required = true }), Catalog(stored, hasRows: true), Models.Records(stored));
+
+        Assert.Empty(kept.Diagnostics);
+        Assert.Equal(
+            [AddStaging("bytea"), RewriteStaging(), DropOrderColumn("f_title"), RenameStaging("f_title"), $"""ALTER TABLE "entities"."{OrderTable}" ALTER COLUMN "f_title" SET NOT NULL"""],
+            kept.Statements);
+        var diagnostic = Assert.Single(refused.Diagnostics);
+        Assert.Equal((DiagnosticCodes.IncompatibleFieldChange, "/fields/5/required"), (diagnostic.Code, diagnostic.Path));
+    }
+
+    [Fact]
+    public void Field_that_stops_being_sensitive_gets_a_column_of_its_type_that_activation_fills_before_it_replaces_the_bytea_one()
     {
         var stored = ChangeOrderField(BaseModel(), 5, note => note with { Sensitive = true });
         var changed = ChangeOrderField(stored, 5, note => note with { Sensitive = false });
 
         var plan = SchemaPlanner.Plan(changed, Catalog(stored, hasRows: true), Models.Records(stored));
 
-        var diagnostic = Assert.Single(plan.Diagnostics);
-        Assert.Equal(
-            (DiagnosticCodes.IncompatibleFieldChange, "entities/order.json", "/fields/5/type", _orderId),
-            (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.ResourceId));
-        AssertNothingPlanned(plan);
+        Assert.Empty(plan.Diagnostics);
+        Assert.Equal([AddStaging("text"), RewriteStaging("::text"), DropOrderColumn("f_note"), RenameStaging("f_note")], plan.Statements);
+        var rewrite = Assert.IsType<SensitiveRewrite>(plan.Commands[1].Rewrite);
+        Assert.Equal(SensitiveRewriteKind.Decrypt, rewrite.Kind);
+        Assert.Equal(("f_note", "axis_sensitive", "note"), (rewrite.Source, rewrite.Target, rewrite.FieldName));
+    }
+
+    [Theory]
+    [InlineData(4, "bigint", "::bigint")]
+    [InlineData(0, "character varying(100)", "::text")]
+    public void Decrypted_values_are_cast_to_the_type_of_the_field_and_a_limited_text_takes_them_as_text(int index, string type, string cast)
+    {
+        var stored = ChangeOrderField(BaseModel(), index, field => field with { Sensitive = true });
+        var changed = BaseModel();
+
+        var plan = SchemaPlanner.Plan(changed, Catalog(stored, hasRows: true), Models.Records(stored));
+
+        Assert.Empty(plan.Diagnostics);
+        var column = EntityNaming.Column(changed.Entities.First(entity => entity.Id == _orderId).Fields[index].Name);
+        Assert.Equal(AddStaging(type), plan.Statements[0]);
+        Assert.Equal(RewriteStaging(cast), plan.Statements[1]);
+        Assert.Equal(RenameStaging(column), plan.Statements[3]);
     }
 
     [Fact]
-    public void Pending_convert_of_a_field_that_becomes_sensitive_plans_nothing_and_is_refused()
+    public void Field_that_stops_being_sensitive_and_becomes_unique_is_refused()
+    {
+        var stored = ChangeOrderField(BaseModel(), 4, amount => amount with { Sensitive = true });
+        var changed = ChangeOrderField(BaseModel(), 4, amount => amount with { Unique = true });
+
+        var plan = SchemaPlanner.Plan(changed, Catalog(stored, hasRows: true), Models.Records(stored));
+
+        var diagnostic = Assert.Single(plan.Diagnostics);
+        Assert.Equal((DiagnosticCodes.IncompatibleFieldChange, "/fields/4/unique"), (diagnostic.Code, diagnostic.Path));
+    }
+
+    [Fact]
+    public void Pending_convert_of_a_field_that_becomes_sensitive_adds_nothing_to_the_flip()
     {
         var stored = BaseModel();
         var changed = ChangeOrderField(stored, 5, note => note with { Sensitive = true });
@@ -674,11 +815,8 @@ public sealed class SchemaPlannerTests
 
         var plan = SchemaPlanner.Plan(changed, Catalog(stored, hasRows: true), Models.Records(stored), [migration], StoredIds(stored));
 
-        var diagnostic = Assert.Single(plan.Diagnostics);
-        Assert.Equal(
-            (DiagnosticCodes.IncompatibleFieldChange, "entities/order.json", "/fields/5/type", _orderId),
-            (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.ResourceId));
-        AssertNothingPlanned(plan);
+        Assert.Empty(plan.Diagnostics);
+        Assert.Equal([AddStaging("bytea"), RewriteStaging(), DropOrderColumn("f_note"), RenameStaging("f_note")], plan.Statements);
     }
 
     [Fact]

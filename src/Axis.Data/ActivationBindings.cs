@@ -26,6 +26,13 @@ public sealed record ActivationBindings(string TenantId, IReadOnlyDictionary<str
     /// <summary>The brokered providers of the tenant's platform sign-in. Empty when it has none.</summary>
     public IReadOnlyList<IdentityProviderModel> PlatformProviders { get; init; } = [];
 
+    /// <summary>
+    /// The tenant's data keys. Activation needs them to encrypt or decrypt the stored values of a field that gains or loses
+    /// <c>sensitive</c>, and to re-encrypt those of a renamed sensitive field. Without them such a release throws and
+    /// nothing changes.
+    /// </summary>
+    public Records.SensitiveValues? Sensitive { get; init; }
+
     /// <summary>A tenant with no bindings, for an application without connectors.</summary>
     public static ActivationBindings None(string tenantId) =>
         new(tenantId, new Dictionary<string, ActivationBinding>(StringComparer.OrdinalIgnoreCase), AllowHttp: false);

@@ -59,6 +59,13 @@ public sealed record MigrationContext(
     /// <summary>The tenant whose database is activated. A pending recompute queues its work item for it.</summary>
     public string? TenantId { get; init; }
 
+    /// <summary>
+    /// The tenant's data keys. Provisioning encrypts or decrypts the stored values of a field that gains or loses <c>sensitive</c>
+    /// with them, encrypts the values of a sensitive field that a rename moves again, and reads and writes the sensitive values
+    /// the recompute touches. When it is <see langword="null"/>, a plan that needs the keys throws and nothing changes.
+    /// </summary>
+    public Records.RecordCipher? Cipher { get; init; }
+
     /// <summary>No release, no stored entities and no active release write.</summary>
     public static MigrationContext None { get; } = new(
         Guid.Empty,

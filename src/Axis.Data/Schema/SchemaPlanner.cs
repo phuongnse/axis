@@ -13,6 +13,8 @@ namespace Axis.Data.Schema;
 /// The indexes of a table, named with the <c>ix_</c> prefix, follow the release: the planner creates the ones it
 /// lacks or finds invalid and drops the ones it does not declare, and a unique index on a table with rows is reported.
 /// The create of a non-unique index on an existing table with rows is marked as one activation may defer.
+/// A field that gains or loses <c>sensitive</c> gets a new column that activation fills with the encrypted or decrypted values
+/// (a command marked with a <see cref="SensitiveRewrite"/>), then the old column is dropped and the new one renamed.
 /// </summary>
 public static class SchemaPlanner
 {
@@ -64,6 +66,10 @@ public static class SchemaPlanner
         // An index drop comes before a create, so an index that changes its unique flag keeps its name.
         private readonly List<string> _creates = [];
         private readonly List<string> _alters = [];
+
+        // The steps of each field that gains or loses sensitive, after the other column changes and before the index drops:
+        // the old column goes with its indexes, so the planner must not drop them again.
+        private readonly List<SchemaCommand> _flagChanges = [];
         private readonly List<string> _indexDrops = [];
         private readonly List<SchemaCommand> _indexCreates = [];
         private readonly List<string> _foreignKeys = [];
@@ -133,7 +139,7 @@ public static class SchemaPlanner
                 ? new SchemaPlan(DiagnosticOrder.Sort(_diagnostics), [], [], [])
                 : new SchemaPlan(
                     [],
-                    [.. migrations.Commands, .. _creates.Concat(_alters).Concat(_indexDrops).Select(sql => new SchemaCommand(sql)), .. _indexCreates, .. _foreignKeys.Select(sql => new SchemaCommand(sql))],
+                    [.. migrations.Commands, .. _creates.Concat(_alters).Select(sql => new SchemaCommand(sql)), .. _flagChanges, .. _indexDrops.Select(sql => new SchemaCommand(sql)), .. _indexCreates, .. _foreignKeys.Select(sql => new SchemaCommand(sql))],
                     _newEntities,
                     _newEnumValues)
                 {
@@ -249,6 +255,7 @@ public static class SchemaPlanner
                 _diagnostics.Add(new Diagnostic(DiagnosticCodes.IncompatibleFieldChange, message, entity.File, path, entity.Id));
 
             var columnsByName = table.Columns.ToDictionary(column => column.Name, StringComparer.Ordinal);
+            var flipped = new HashSet<string>(StringComparer.Ordinal);
 
             string[] systemColumns;
             if (childOwner is null)
@@ -294,7 +301,10 @@ public static class SchemaPlanner
                     }
                     else
                     {
-                        PlanExistingColumn(entity, table, field, column, path, Report);
+                        if (PlanExistingColumn(entity, table, field, column, path, Report))
+                        {
+                            flipped.Add(column.Name);
+                        }
                     }
                 }
                 else
@@ -320,7 +330,11 @@ public static class SchemaPlanner
                 }
             }
 
-            PlanIndexes(entity, table, childOwner is not null);
+            // PostgreSQL drops every index over a flipped column along with it.
+            PlanIndexes(
+                entity,
+                flipped.Count == 0 ? table : table with { Indexes = [.. table.Indexes.Where(index => !index.Columns.Any(flipped.Contains))] },
+                childOwner is not null);
         }
 
         // Creates the expected indexes the table lacks and drops the ix_ indexes the release does not declare. An index
@@ -438,7 +452,8 @@ public static class SchemaPlanner
             RecordNewEnumValues(entity, field);
         }
 
-        private void PlanExistingColumn(
+        // Returns whether the field gains or loses sensitive, so its column is replaced and holds no unique constraint or index.
+        private bool PlanExistingColumn(
             EntityModel entity,
             CatalogTable table,
             FieldModel field,
@@ -451,6 +466,7 @@ public static class SchemaPlanner
 
             var recordedValues = RecordedEnumValues(entity, field);
             var isEnum = field.Type == FieldType.Enum;
+            var flipped = false;
             if (isEnum != (recordedValues.Count > 0))
             {
                 report(
@@ -466,13 +482,10 @@ public static class SchemaPlanner
                 {
                     // Nothing to change.
                 }
-                else if (field.Sensitive || column.Type == ColumnTypes.Encrypted)
+                else if (field.Sensitive != (column.Type == ColumnTypes.Encrypted))
                 {
-                    report(
-                        field.Sensitive
-                            ? $"The existing field '{field.Name}' cannot become sensitive: its column holds plain values."
-                            : $"The field '{field.Name}' cannot stop being sensitive: its column holds encrypted values.",
-                        $"{path}/type");
+                    flipped = true;
+                    PlanSensitivityChange(entity, table, field, column, path, report);
                 }
                 else if (IsTextType(column.Type) && field.Type == FieldType.Text)
                 {
@@ -491,7 +504,11 @@ public static class SchemaPlanner
                 }
             }
 
-            if (column.NotNull && !field.Required)
+            if (flipped)
+            {
+                // The replaced column is the one planned above, so the checks below do not apply to it.
+            }
+            else if (column.NotNull && !field.Required)
             {
                 _alters.Add($"{alterTable} ALTER COLUMN {quotedColumn} DROP NOT NULL");
             }
@@ -507,7 +524,14 @@ public static class SchemaPlanner
                 }
             }
 
-            if (column.Unique && !field.Unique)
+            if (flipped)
+            {
+                if (field.Unique)
+                {
+                    report($"The existing field '{field.Name}' cannot become unique.", $"{path}/unique");
+                }
+            }
+            else if (column.Unique && !field.Unique)
             {
                 _alters.Add($"{alterTable} DROP CONSTRAINT {EntityNaming.Quote(EntityNaming.Unique(table.Name, column.Name))}");
             }
@@ -545,6 +569,61 @@ public static class SchemaPlanner
                 }
 
                 RecordNewEnumValues(entity, field);
+            }
+
+            return flipped;
+        }
+
+        // Replaces the column by a new one that holds the values encrypted, or decrypted into the field's type: the new column
+        // is added, activation fills it, the old column goes with its unique constraint and indexes, and the new one takes
+        // its name. The old plain type is known only when the field becomes sensitive, so a type change at the same time is
+        // reported only then. When the mark goes, a value that does not fit the new type fails the activation.
+        private void PlanSensitivityChange(EntityModel entity, CatalogTable table, FieldModel field, CatalogColumn column, string path, Action<string, string> report)
+        {
+            var plain = ColumnTypes.Render(field with { Sensitive = false });
+            if (field.Sensitive && column.Type != plain)
+            {
+                if (!IsTextType(column.Type) || !IsTextType(plain))
+                {
+                    report(
+                        $"The existing field '{field.Name}' cannot become sensitive and change its type from {column.Type} to {plain} in one release. Change the type in a release of its own.",
+                        $"{path}/type");
+                    return;
+                }
+
+                if (!IsWider(plain, column.Type))
+                {
+                    report($"The maximum length of '{field.Name}' cannot shrink from {column.Type} to {plain}.", $"{path}/maxLength");
+                    return;
+                }
+            }
+
+            if (field.Required && !column.NotNull && !column.Filled)
+            {
+                report($"The existing field '{field.Name}' cannot become required.", $"{path}/required");
+                return;
+            }
+
+            var alterTable = $"ALTER TABLE {EntityNaming.QualifiedTable(table.Name)}";
+            var staging = EntityNaming.Quote(EntityNaming.SensitiveStagingColumn);
+            var kind = field.Sensitive ? SensitiveRewriteKind.Encrypt : SensitiveRewriteKind.Decrypt;
+            var newType = field.Sensitive ? ColumnTypes.Encrypted : plain;
+
+            // The decrypted text is cast to the field's type. A character varying column takes it as text, so the assignment
+            // checks the length and fails for a value that is too long, and does not cut it.
+            var cast = field.Sensitive ? "" : $"::{(ColumnTypes.TryParseVarying(plain, out _) ? ColumnTypes.Text : plain)}";
+            _flagChanges.Add(new SchemaCommand($"{alterTable} ADD COLUMN {staging} {newType}"));
+            _flagChanges.Add(new SchemaCommand(
+                $"UPDATE {EntityNaming.QualifiedTable(table.Name)} AS t SET {staging} = v.value{cast} "
+                + $"FROM unnest(@ids, @values) AS v(id, value) WHERE t.{EntityNaming.Quote(EntityNaming.IdColumn)} = v.id")
+            {
+                Rewrite = new SensitiveRewrite(kind, entity.Id, table.Name, column.Name, EntityNaming.SensitiveStagingColumn, field, field.Name),
+            });
+            _flagChanges.Add(new SchemaCommand($"{alterTable} DROP COLUMN {EntityNaming.Quote(column.Name)}"));
+            _flagChanges.Add(new SchemaCommand($"{alterTable} RENAME COLUMN {staging} TO {EntityNaming.Quote(column.Name)}"));
+            if (field.Required)
+            {
+                _flagChanges.Add(new SchemaCommand($"{alterTable} ALTER COLUMN {EntityNaming.Quote(column.Name)} SET NOT NULL"));
             }
         }
 
