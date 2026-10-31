@@ -12,8 +12,8 @@ A webhook tells another system that an event happened, as
 [D92](../decisions/d92-outbound-webhooks.md) agrees. The author configures it
 in the application, so it is part of the release. There is no API through
 which another system subscribes itself. The webhook resource, its compile
-checks, the activation check of its bindings and the delivery are built. The
-dead letter of a delivery that keeps failing, rotation tooling and the console
+checks, the activation check of its bindings, the delivery and the dead letter
+of a delivery that keeps failing are built. Rotation tooling and the console
 view are _(planned for M19)_.
 
 ### Webhook resource

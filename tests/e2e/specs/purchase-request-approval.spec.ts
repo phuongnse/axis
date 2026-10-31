@@ -1,5 +1,5 @@
 import { readFileSync, writeFileSync } from 'node:fs'
-import { expectShown, fieldLabel, fieldValue, shownValue } from '../fields'
+import { expectShown, fieldLabel, fieldValue } from '../fields'
 import { expect, test } from '../test'
 import type { Page } from '@playwright/test'
 import {
@@ -7,6 +7,7 @@ import {
   createRequest,
   decide,
   env,
+  expectPurchaseOrderNumber,
   expectStatus,
   purchaseOrders,
   recordsPath,
@@ -31,19 +32,6 @@ async function restartWorker() {
   process.kill(pid, 'SIGTERM')
   await expect.poll(readyCount, { timeout: 60_000 }).toBeGreaterThan(before)
   expect(Number(readFileSync(pidFile, 'utf8').trim())).not.toBe(pid)
-}
-
-/**
- * Opens the request form until it shows a purchase order number, since the worker calls the
- * purchasing system after approval, and returns it. It waits up to `timeout` milliseconds.
- */
-async function expectPurchaseOrderNumber(page: Page, id: string, timeout = 30_000) {
-  const field = fieldValue(page, 'purchaseOrderNumber')
-  await expect(async () => {
-    await page.goto(`/purchasing/purchaserequestform/${id}`)
-    await expect.poll(() => shownValue(field), { timeout: 1_000 }).not.toBe('Not set')
-  }).toPass({ timeout })
-  return shownValue(field)
 }
 
 /**
@@ -191,6 +179,10 @@ test('a returned request is edited and submitted again, and the manager then app
   expect(read.ok()).toBe(true)
   const record = (await read.json()) as { values: { lineItems: { quantity: number }[] } }
   expect(record.values.lineItems.map((item) => item.quantity)).toEqual([2])
+  // The worker adds history entries until the extension package has written the Payment reference. A
+  // new entry between two pages of the panel would show one entry twice.
+  const number = await requestNumber(page, id)
+  await expectPaymentReference(page, id, new RegExp(`^RF\\d{2}${number.replaceAll('-', '')}$`))
   expect(await countHistory(page, 'Process started', 'Requester User')).toBe(2)
 })
 
