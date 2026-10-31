@@ -128,3 +128,4 @@ files agree, title and status included.
 | [D115](decisions/d115-an-inbound-endpoint-call-raises-an-event.md) | An inbound endpoint call raises an event | **Agreed** |
 | [D116](decisions/d116-how-sensitive-fields-and-backups-are-encrypted.md) | How sensitive fields and backups are encrypted | **Agreed** |
 | [D117](decisions/d117-small-businesses-first-and-the-milestones-in-three-phases.md) | Small businesses first, and the milestones in three phases | **Agreed** |
+| [D118](decisions/d118-axis-saas-in-cells-with-sign-up-quotas-and-billing.md) | Axis SaaS in cells, with sign-up, quotas and billing | **Agreed** |

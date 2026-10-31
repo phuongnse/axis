@@ -56,8 +56,8 @@ The closed milestones are on [GitHub](https://github.com/phuongnse/axis/mileston
 
 ### Phase 1: the first small businesses
 
-Done when a small business runs its approvals on Axis as a service, changed to fit in Studio,
-while the module's contract holds: M26's journey passes and M31 is built.
+Done when a small business signs up for Axis SaaS, pays for a plan and runs its approvals, changed
+to fit in Studio, while the module's contract holds: the journeys of M26 and M34 pass.
 
 | | Milestone | Status | Done when |
 | --- | --- | --- | --- |
@@ -69,7 +69,9 @@ while the module's contract holds: M26's journey passes and M31 is built.
 | **M26** | The first built-in modules | Planned | The built-in modules `organization` and `approvals` under `modules/`, and a built-in application that uses them under `applications/`. The `departments` sample module and the `request-approval` template become them. The journey: two businesses customize `approvals` differently, one adds a director's approval above a threshold and the other adds a request type of its own, and the contract holds for both: nobody decides their own request, and each step is decided once. `service-desk` and `assets` are in M30, as [D117](decisions/d117-small-businesses-first-and-the-milestones-in-three-phases.md) agrees. It follows M25 and waits for M27. See [D102](decisions/d102-built-in-modules-open-to-change-and-bound-by-a-contract.md). |
 | **M23** | Operator console | Planned | The platform operator sees a tenant's failed work, dead letters, webhook deliveries, schedules and publishing at `/console`, and retries, cancels, resolves, redelivers and discards with a reason. The journey: the operator redelivers the dead letter of the failed webhook and sees it delivered. It waits for M19. See [D93](decisions/d93-an-operator-web-console.md). |
 | **M28** | Security operations | Planned | Axis's images are scanned with Trivy in CI. The hourly driver turns each high or critical Dependabot alert into a NexKit issue. An administrator disables, enables and resets an authenticator from the users page, and `tenant host add`, `remove` and `move` keep the realm's redirect addresses in step. CI runs the load test once a week, and the query limits get their final values. The journey: an administrator disables an account on the users page and its next sign-in is refused, and after `tenant host add` a person signs in on the new host. Carried over from M18: the weekly CI run of the load test and the final query limits. Carried over from M17: the users page's buttons and the realm's redirect addresses. Image signing, the alert rules and the hardening checklist are in M32, as [D117](decisions/d117-small-businesses-first-and-the-milestones-in-three-phases.md) agrees. It can run beside any other milestone. See [D107](decisions/d107-the-dependency-scan-runs-now-and-images-are-scanned-and-signed.md). |
-| **M31** | Hosted Axis | Planned | Axis runs one installation that hosts the tenants of many small customers, and the owner operates it. A decision of its own sets how a customer gets a tenant, whether sign-up is self-service and what the platform operator watches, and then the "Done when" of this row. It runs beside M24 to M26 once that decision is agreed. See [D117](decisions/d117-small-businesses-first-and-the-milestones-in-three-phases.md). |
+| **M31** | Axis SaaS | Planned | Axis runs as a SaaS in cells: each cell is a full installation in a region, the first region is `vn`, and up to 1,000 tenants share a cell. Each tenant's Studio application folders are kept apart. Each tenant has quotas for storage, users, applications, emails a day and work at once, its usage is measured, and the worker shares its time fairly between tenants. A new tenant gets a subdomain of the region's domain, and may add a host of its own. Every tenant is backed up each day, encrypted, kept 30 days, with a restore tried every week. The platform operator creates a tenant from a built-in application, exports a tenant's data and deletes a tenant, and sees every tenant of the cell with its status, usage and failed work. A load test sets how many tenants a cell holds. The journey: the operator creates two tenants from the built-in approvals application, one reaches its storage quota and is refused while the other keeps working, and the first is exported and deleted. It runs beside M24 to M26. See [D118](decisions/d118-axis-saas-in-cells-with-sign-up-quotas-and-billing.md). |
+| **M33** | Sign-up and trials | Planned | A person signs up on Axis's public page, chooses a region and a built-in application, and verifies their email. Axis picks a cell of the region with room, creates the tenant, its realm and its subdomain, activates the application and invites the person as the first administrator. A new tenant is a 30-day trial, with emails before its end, a suspension at the end and a deletion 30 days later. There is no free plan that never ends. Sign-up has rate limits and a bot check. A directory of regions and cells routes each sign-up and each host to its cell. The journey: a person signs up, uses a working approvals site, and the trial ends with a suspension after the reminder emails. It follows M31 and M26. See [D118](decisions/d118-axis-saas-in-cells-with-sign-up-quotas-and-billing.md). |
+| **M34** | Plans and billing | Planned | Each tenant has a plan that sets its quotas, with a price for the whole tenant, not per user, and prices set from the measured cost of a cell. A tenant administrator chooses a plan and pays: in Vietnam by bank transfer through VietQR or a payment gateway, abroad through a merchant of record. Each payment gets an electronic invoice. A trial becomes paid without losing anything, and a failed or late payment sends reminders, then a grace period, then a suspension. The journey: a trial tenant chooses a plan, pays, gets its invoice and its new quotas, and a later failed payment ends in a suspension after the grace period. It follows M33. See [D118](decisions/d118-axis-saas-in-cells-with-sign-up-quotas-and-billing.md). |
 
 ### Phase 2: growth
 
@@ -105,7 +107,8 @@ direction after M9, and [D117](decisions/d117-small-businesses-first-and-the-mil
   code.
 - **Small businesses first.** Individuals and small and medium businesses have no IT team and
   do not install software. They start from a built-in application, change it in Studio and use
-  Axis as a service _(planned for M31)_. Large organizations, banks and government come in phase 3.
+  Axis SaaS _(planned for M31, M33 and M34)_, see [D118](decisions/d118-axis-saas-in-cells-with-sign-up-quotas-and-billing.md). Large organizations,
+  banks and government come in phase 3.
 - **What sets Axis apart.** Built-in modules _(planned for M26)_ that a business changes anywhere,
   that keep their upgrades, and whose contract holds on every write, see
   [D102](decisions/d102-built-in-modules-open-to-change-and-bound-by-a-contract.md).
@@ -124,8 +127,8 @@ direction after M9, and [D117](decisions/d117-small-businesses-first-and-the-mil
   [D109](decisions/d109-sensitive-fields-and-backups-are-encrypted-and-history-keeps-no-names.md).
   M23 waits for M19, see
   [D101](decisions/d101-the-extensibility-milestone-is-split-into-six.md).
-  M28 can run beside any of them, and M31 runs beside M24 to M26 once its
-  decision is agreed. In phase 2, M29 follows M25, M30 follows M26, and M22
+  M28 can run beside any of them, and M31 runs beside M24 to M26. M33
+  follows M31 and M26, and M34 follows M33, see [D118](decisions/d118-axis-saas-in-cells-with-sign-up-quotas-and-billing.md). In phase 2, M29 follows M25, M30 follows M26, and M22
   waits for M20.
 - **Proving it is general.** From M11 on, each milestone extends a sample of a
   new shape: a service desk, then asset management. Neither needs platform

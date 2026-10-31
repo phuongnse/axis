@@ -47,7 +47,8 @@ this order, see the [roadmap](roadmap.md#milestones).
 - **What they need:**
   - a built-in application to start from, changed to fit in Studio, that keeps its upgrades;
   - Vietnamese and English;
-  - Axis as a service, with nothing to install _(planned for M31)_;
+  - Axis as a service, with nothing to install: they sign up, try it and pay online
+    _(planned for M31, M33 and M34)_;
   - their data kept safe as Vietnam's personal data rules ask, see
     [D109](decisions/d109-sensitive-fields-and-backups-are-encrypted-and-history-keeps-no-names.md).
 - **What sets Axis apart for them:** they change a standard process anywhere, keep its upgrades,
@@ -55,6 +56,18 @@ this order, see the [roadmap](roadmap.md#milestones).
 - **Later, large organizations, banks and government:** what only they ask for, such as
   conformance runs, signed images and alert rules for their own operations teams, is
   _(planned for M32)_.
+
+## Ways to run Axis
+
+The same software runs in three ways, as [D118](decisions/d118-axis-saas-in-cells-with-sign-up-quotas-and-billing.md) agrees.
+
+- **SaaS, shared** _(planned for M31)_: many customers share a cell, a full installation in a
+  region that Axis runs. Each tenant keeps its own database, realm, files, Studio applications
+  and quotas. This is how small businesses and individuals use Axis.
+- **SaaS, dedicated** _(planned for M31)_: one customer has a cell of its own that Axis runs.
+- **Self-hosted:** the customer installs Axis on premises or in its own cloud, see
+  [installation](reference/installation.md). This serves large organizations, banks and
+  government.
 
 ## Who uses it
 
@@ -94,8 +107,6 @@ the agreed extension points (see [decisions](decisions.md)).
   Hardening milestone, M16. The conformance run and the ASVS sign-off are
   _(planned for M32)_, for large and regulated customers (see the
   [roadmap](roadmap.md#milestones)).
-- Self-service sign-up for many tenants, until the decision of M31, Hosted Axis, settles it
-  ([D117](decisions/d117-small-businesses-first-and-the-milestones-in-three-phases.md)).
 - Custom UI widgets. They come after the visual designers (D8, D46), in phase 2.
 - Migrating live business data between installations.
 
