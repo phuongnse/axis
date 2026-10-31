@@ -242,7 +242,7 @@ internal static class MigrationChecker
 
             if (change.Type is "fill" or "convert")
             {
-                var problem = CheckValue(change, before[k], after[k], missingAfter || droppedBefore[k], out var type);
+                var problem = CheckValue(change, migration.Entity, before[k], after[k], missingAfter || droppedBefore[k], out var type);
                 references.RecordExpression(migration, $"/changes/{index}/value", type, problem);
                 if (problem is not null)
                 {
@@ -292,9 +292,11 @@ internal static class MigrationChecker
     /// type-checked against the field's type when <paramref name="untyped"/> is false and the
     /// types of the field and of every field the value names are known. Returns the first problem.
     /// <paramref name="type"/> is the value's type when that check ran and succeeded, and null otherwise.
+    /// A value that reads a sensitive field is refused, because it runs as SQL over the stored value, which is encrypted.
     /// </summary>
     private static ExpressionDiagnostic? CheckValue(
         MigrationChangeDefinition change,
+        string entity,
         Dictionary<string, FieldDefinition?>? before,
         Dictionary<string, FieldDefinition?>? after,
         bool untyped,
@@ -309,6 +311,15 @@ internal static class MigrationChecker
 
         var expression = parsed.Expression!;
         static string Column(IReadOnlyList<string> path) => string.Join('.', path);
+
+        if (before is not null
+            && NamedFields(expression).FirstOrDefault(name => before.GetValueOrDefault(name) is { Sensitive: true }) is { } sensitive)
+        {
+            return new ExpressionDiagnostic(
+                DiagnosticCodes.SensitiveFieldUse,
+                ApplicationCompiler.SensitiveUseMessage(entity, before[sensitive]!.Name, "a migration value"),
+                0);
+        }
 
         if (!untyped
             && before is not null

@@ -8,7 +8,8 @@ public sealed record RecordSort(FieldModel Field, bool Descending)
 {
     /// <summary>
     /// Parses a declared field name, optionally preceded by one <c>-</c> for descending order.
-    /// Only a field with a column can be sorted on, so a child collection is no sort.
+    /// Only a field with a column can be sorted on, so a child collection is no sort. A sensitive
+    /// field is no sort either, because its stored value is encrypted.
     /// The name is matched exactly; <see cref="EntityModel.TryGetField"/> ignores letter case.
     /// </summary>
     public static bool TryParse(string text, EntityModel entity, [NotNullWhen(true)] out RecordSort? sort)
@@ -18,7 +19,7 @@ public sealed record RecordSort(FieldModel Field, bool Descending)
 
         var descending = text.StartsWith('-');
         var name = descending ? text[1..] : text;
-        var field = RecordQueries.Columns(entity).FirstOrDefault(candidate => string.Equals(candidate.Name, name, StringComparison.Ordinal));
+        var field = RecordQueries.Columns(entity).FirstOrDefault(candidate => !candidate.Sensitive && string.Equals(candidate.Name, name, StringComparison.Ordinal));
         sort = field is null ? null : new RecordSort(field, descending);
         return sort is not null;
     }

@@ -449,6 +449,8 @@ internal static class PolicyChecker
             var problem = ApplicationCompiler.CheckFilter(
                 filter, ExpressionScopes.ForDataSource(entityResource.Fields, [], findEntity, rules, modules, undeclaredModuleIsUnknown: moduleId is not null),
                 policyFilter: true,
+                entityResource,
+                findEntity,
                 out var check);
             if (check is not null)
             {

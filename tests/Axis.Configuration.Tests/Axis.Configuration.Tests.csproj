@@ -35,6 +35,7 @@
     <None Include="..\..\tests\e2e\fixtures\subprocess-app\**\*" Link="Fixtures\subprocess-app\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\tests\e2e\fixtures\host-site-app\**\*" Link="Fixtures\host-site-app\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\tests\e2e\fixtures\module-app\**\*" Link="Fixtures\module-app\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\src\**\*.cs" Exclude="..\..\src\**\obj\**;..\..\src\**\bin\**" Link="Source\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
     <None Include="..\..\docs\**\*.md" Link="Docs\%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 

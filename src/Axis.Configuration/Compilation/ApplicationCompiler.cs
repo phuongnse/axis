@@ -1069,6 +1069,7 @@ public static partial class ApplicationCompiler
             CheckSequence(entity, field, path, childOwner, findSequence, unloadedSequenceNames, moduleReferences, references, Report);
             CheckCreator(field, path, childOwner, Report);
             CheckSearchable(field, path, Report);
+            CheckSensitiveFlags(entity, field, path, Report);
             CheckMoney(entity, field, path, Report);
             CheckDefault(entity, field, path, defaultScope, references, Report);
 
@@ -1139,6 +1140,13 @@ public static partial class ApplicationCompiler
                         $"The index field '{field.Name}' has the type '{field.Type}', which an index cannot hold.",
                         $"{path}/fields/{position}");
                 }
+                else if (field.Sensitive == true)
+                {
+                    report(
+                        DiagnosticCodes.SensitiveFieldUse,
+                        SensitiveUseMessage(entity.Name, field.Name, "an index"),
+                        $"{path}/fields/{position}");
+                }
             }
 
             // The names are joined with a comma, which no field name holds.
@@ -1196,6 +1204,17 @@ public static partial class ApplicationCompiler
                 ? ExpressionTypeChecker.Check(parsed.Expression, scope, ExpressionScopes.TypeOf(field)!, storedValue: true)
                 : null;
             var problem = parsed.Succeeded ? check!.Diagnostic : parsed.Diagnostic;
+
+            // A computed field is always stored, so its expression runs over the stored values.
+            if (problem is null
+                && SensitiveReads.Find(parsed.Expression!, check!, entity, scope, findEntity) is var (readEntity, readField))
+            {
+                problem = new ExpressionDiagnostic(
+                    DiagnosticCodes.SensitiveFieldUse,
+                    SensitiveUseMessage(readEntity, readField, "a stored computed field"),
+                    0);
+            }
+
             references.RecordExpression(entity, $"/fields/{index}/expression", check?.Type, problem);
             if (problem is not null)
             {
@@ -1346,6 +1365,29 @@ public static partial class ApplicationCompiler
     }
 
     /// <summary>Checks a field's <c>searchable</c> property: it applies only to text fields, whatever its value.</summary>
+    /// <summary>
+    /// A sensitive field is stored encrypted, so it cannot be <c>unique</c>, which needs a unique
+    /// index, or <c>searchable</c>, which is searched with <c>LIKE</c>.
+    /// </summary>
+    private static void CheckSensitiveFlags(
+        EntityResource entity, FieldDefinition field, string path, Action<string, string, string> report)
+    {
+        if (field.Sensitive != true)
+        {
+            return;
+        }
+
+        if (field.Unique == true)
+        {
+            report(DiagnosticCodes.SensitiveFieldUse, SensitiveUseMessage(entity.Name, field.Name, "'unique'"), $"{path}/unique");
+        }
+
+        if (field.Searchable == true)
+        {
+            report(DiagnosticCodes.SensitiveFieldUse, SensitiveUseMessage(entity.Name, field.Name, "'searchable'"), $"{path}/searchable");
+        }
+    }
+
     private static void CheckSearchable(FieldDefinition field, string path, Action<string, string, string> report)
     {
         if (field.Searchable is not null && FieldTypes.Parse(field.Type) != FieldType.Text)
@@ -2017,6 +2059,22 @@ public static partial class ApplicationCompiler
             var hopsByName = new Dictionary<string, IReadOnlyList<FieldDefinition>>(StringComparer.Ordinal);
             var searchable = false;
             var unresolvedPath = false;
+
+            // The entity and field of a projected field that is sensitive, or null.
+            (string Entity, string Field)? SensitiveProjected(string name)
+            {
+                if (!fieldsByName.TryGetValue(name, out var projectedField)
+                    || projectedField is not { Sensitive: true }
+                    || !hopsByName.TryGetValue(name, out var hops))
+                {
+                    return null;
+                }
+
+                // The field belongs to the entity that its path reaches: the target of the reference before it.
+                var owner = hops.Count > 1 ? findEntity(hops[^2].Target ?? "")?.Name : entity.Name;
+                return (owner ?? entity.Name, projectedField.Name);
+            }
+
             for (var index = 0; index < dataSource.Fields.Count; index++)
             {
                 var projected = dataSource.Fields[index];
@@ -2095,6 +2153,13 @@ public static partial class ApplicationCompiler
                             $"The group field '{name}' is a file field. A data source cannot group by a file.",
                             at);
                     }
+                    else if (SensitiveProjected(name) is var (groupEntity, groupFieldName))
+                    {
+                        Report(
+                            DiagnosticCodes.SensitiveFieldUse,
+                            SensitiveUseMessage(groupEntity, groupFieldName, "a group field"),
+                            group.Bucket is null ? at : at + "/field");
+                    }
                     else if (group.Bucket is not null
                         && fieldsByName[name] is { } bucketField
                         && FieldTypes.Parse(bucketField.Type) is var bucketType
@@ -2119,7 +2184,14 @@ public static partial class ApplicationCompiler
                             $"{path}/name");
                     }
 
-                    if (CheckMeasure(measure, fieldsByName) is ({ } message, { } problemPath))
+                    if (measure.Field is { } measureField && SensitiveProjected(measureField) is var (measureEntity, measureFieldName))
+                    {
+                        Report(
+                            DiagnosticCodes.SensitiveFieldUse,
+                            SensitiveUseMessage(measureEntity, measureFieldName, "a measure"),
+                            $"{path}/field");
+                    }
+                    else if (CheckMeasure(measure, fieldsByName) is ({ } message, { } problemPath))
                     {
                         Report(DiagnosticCodes.InvalidDataSourceMeasure, message, path + problemPath);
                     }
@@ -2154,6 +2226,13 @@ public static partial class ApplicationCompiler
                     Report(
                         DiagnosticCodes.InvalidDataSourceSort,
                         $"The sort '{sort}' names the reference field '{name}'. A data source cannot sort by a reference.",
+                        "/sort");
+                }
+                else if (!isMeasure && SensitiveProjected(name) is var (sortEntity, sortFieldName))
+                {
+                    Report(
+                        DiagnosticCodes.SensitiveFieldUse,
+                        SensitiveUseMessage(sortEntity, sortFieldName, "a sort"),
                         "/sort");
                 }
                 else if (!isMeasure
@@ -2227,7 +2306,7 @@ public static partial class ApplicationCompiler
 
                 void CheckDataSourceFilter(string filter, string path)
                 {
-                    var problem = CheckFilter(filter, filterScope, policyFilter: false, out var check);
+                    var problem = CheckFilter(filter, filterScope, policyFilter: false, entity, findEntity, out var check);
                     if (check is not null)
                     {
                         references.AddRuleCalls(dataSource, path, check);
@@ -2389,11 +2468,17 @@ public static partial class ApplicationCompiler
     /// fields and the named rules, or outside the SQL subset with each rule call inlined. Only a
     /// policy filter can call <c>currentUser()</c>. A filter that calls a rule without a checked
     /// expression, directly or through the rules it calls, is not translated: that rule already has
-    /// its own diagnostic, as for a validation. <paramref name="check"/> is the type check when it
-    /// succeeds, and null otherwise.
+    /// its own diagnostic, as for a validation. A filter that reads a sensitive field of
+    /// <paramref name="entity"/>, or of an entity it reaches, is refused: the stored value is
+    /// encrypted. <paramref name="check"/> is the type check when it succeeds, and null otherwise.
     /// </summary>
     internal static ExpressionDiagnostic? CheckFilter(
-        string filter, ExpressionScope scope, bool policyFilter, out ExpressionCheckResult? check)
+        string filter,
+        ExpressionScope scope,
+        bool policyFilter,
+        EntityResource entity,
+        Func<string, EntityResource?> findEntity,
+        out ExpressionCheckResult? check)
     {
         check = null;
         var parsed = ExpressionParser.Parse(filter);
@@ -2409,6 +2494,14 @@ public static partial class ApplicationCompiler
         }
 
         check = typeCheck;
+        if (SensitiveReads.Find(parsed.Expression, typeCheck, entity, scope, findEntity) is var (readEntity, readField))
+        {
+            return new ExpressionDiagnostic(
+                DiagnosticCodes.SensitiveFieldUse,
+                SensitiveUseMessage(readEntity, readField, "a filter"),
+                0);
+        }
+
         return CallsRuleWithoutBody(typeCheck, new HashSet<ExpressionRule>(ReferenceEqualityComparer.Instance))
             ? null
             : SqlTranslator.Translate(
@@ -2417,6 +2510,10 @@ public static partial class ApplicationCompiler
                 typeCheck,
                 collection: name => new SqlCollection(name, "TRUE", path => string.Join('.', [name, .. path]))).Diagnostic;
     }
+
+    /// <summary>The message of <see cref="DiagnosticCodes.SensitiveFieldUse"/>, which names the field and the use that cannot have it.</summary>
+    internal static string SensitiveUseMessage(string entity, string field, string use) =>
+        $"The field '{entity}.{field}' is sensitive, so {use} cannot use it. Its stored value is encrypted.";
 
     /// <summary>
     /// Whether a checked expression calls a rule without a checked body, directly or through the

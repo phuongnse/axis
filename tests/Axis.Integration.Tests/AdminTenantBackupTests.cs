@@ -60,9 +60,11 @@ public sealed class AdminTenantBackupTests(AdminBackupFixture fixture) : IClassF
         var package = root.GetProperty("packages").EnumerateArray().Single(p => p.GetProperty("id").GetString() == "payment-references");
         Assert.True(package.GetProperty("required").GetBoolean());
         Assert.Matches(@"^1\.\d+\.\d+$", package.GetProperty("version").GetString()!);
-        var module = root.GetProperty("modules").EnumerateArray().Single();
-        Assert.Equal("departments", module.GetProperty("id").GetString());
+        var modules = root.GetProperty("modules").EnumerateArray().ToList();
+        var module = modules.Single(m => m.GetProperty("id").GetString() == "departments");
         Assert.Equal("1.1.0", module.GetProperty("version").GetString());
+        var budgets = modules.Single(m => m.GetProperty("id").GetString() == "department-budgets");
+        Assert.Equal("1.0.0", budgets.GetProperty("version").GetString());
 
         var directory = root.GetProperty("directory");
         Assert.Equal("active", directory.GetProperty("status").GetString());
@@ -339,7 +341,7 @@ public sealed class AdminTenantBackupTests(AdminBackupFixture fixture) : IClassF
 /// One platform database with one active tenant, <c>t-…</c>, made by <c>tenant create</c> and served by the real server on
 /// <see cref="Host"/>. The tenant has a <c>url</c> binding and a <c>secret</c> binding for the purchasing system, and the
 /// Company sign-in bindings. The server activates the purchase request and leave request samples in it, so releases pin the
-/// payment references package and the departments module.
+/// payment references package and the departments and department-budgets modules.
 /// </summary>
 public sealed class AdminBackupFixture : IAsyncLifetime
 {
