@@ -345,9 +345,9 @@ public sealed class WebhookDeliveryTests(WebhookDeliveryFixture fixture) : IClas
         await using var transaction = await connection.BeginTransactionAsync(CancellationToken);
         var result = redeliver
             ? await DeadLetterCommand.RedeliverAsync(
-                connection, transaction, fixture.Tenant.Tenant, fixture.Model, fixture.ReleaseId, processId, deadLetterId, "maria", "Maria", "The receiver is back.", CancellationToken)
+                connection, transaction, fixture.Tenant.Tenant, fixture.Model, fixture.ReleaseId, processId, deadLetterId, "maria", "The receiver is back.", CancellationToken)
             : await DeadLetterCommand.DiscardAsync(
-                connection, transaction, fixture.Tenant.Tenant, fixture.Model, processId, deadLetterId, "maria", "Maria", "The receiver is retired.", CancellationToken);
+                connection, transaction, fixture.Tenant.Tenant, fixture.Model, processId, deadLetterId, "maria", "The receiver is retired.", CancellationToken);
         await transaction.CommitAsync(CancellationToken);
         return result;
     }

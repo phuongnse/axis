@@ -83,7 +83,6 @@ public static class ProcessCancelCommand
         Guid instanceId,
         RecordAccess? read,
         string userId,
-        string userName,
         string reason,
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
@@ -134,7 +133,7 @@ public static class ProcessCancelCommand
             return new ProcessCancelResult(ProcessCancelOutcome.NotActive);
         }
 
-        var result = await CancelTreeAsync(connection, transaction, instanceId, userId, userName, reason, cancellationToken);
+        var result = await CancelTreeAsync(connection, transaction, instanceId, userId, reason, cancellationToken);
         if (result.Outcome == ProcessCancelOutcome.Cancelled && parent is not null)
         {
             await FailParentAsync(connection, transaction, parentId!.Value, parent, instance.ParentStep, instanceId, cancellationToken);
@@ -154,7 +153,6 @@ public static class ProcessCancelCommand
         NpgsqlTransaction transaction,
         Guid instanceId,
         string userId,
-        string userName,
         string reason,
         CancellationToken cancellationToken)
     {
@@ -170,7 +168,7 @@ public static class ProcessCancelCommand
         var startedAt = await RecordQueries.TransactionTimeAsync(connection, cancellationToken);
         foreach (var instance in tree.Instances)
         {
-            await CancelOneAsync(transaction, instance, userId, userName, reason, startedAt, cancellationToken);
+            await CancelOneAsync(transaction, instance, userId, reason, startedAt, cancellationToken);
         }
 
         return new ProcessCancelResult(ProcessCancelOutcome.Cancelled, ReleaseId: root.ReleaseId, SubjectId: root.SubjectId);
@@ -202,7 +200,6 @@ public static class ProcessCancelCommand
         NpgsqlTransaction transaction,
         LockedInstance instance,
         string userId,
-        string userName,
         string reason,
         DateTimeOffset startedAt,
         CancellationToken cancellationToken)

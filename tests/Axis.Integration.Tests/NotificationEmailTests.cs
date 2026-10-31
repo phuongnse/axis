@@ -239,7 +239,7 @@ public sealed class NotificationEmailTests(ProcessStepFixture fixture, MailpitFi
         await using (var transaction = await connection.BeginTransactionAsync(CancellationToken))
         {
             result = await DeadLetterCommand.RedeliverAsync(
-                connection, transaction, fixture.Tenant, model, releaseId, process, deadLetterId, "maria", "Maria", "The mail server is back.", CancellationToken);
+                connection, transaction, fixture.Tenant, model, releaseId, process, deadLetterId, "maria", "The mail server is back.", CancellationToken);
             await transaction.CommitAsync(CancellationToken);
         }
 

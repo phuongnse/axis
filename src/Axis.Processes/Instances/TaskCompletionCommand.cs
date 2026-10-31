@@ -215,7 +215,7 @@ public static class TaskCompletionCommand
         await ProcessTasks.ResumeAsync(
             transaction,
             task,
-            new TaskCompletion(outcome.Name, outcome.Next, actor.Id, actor.DisplayName, readVersion, writtenVersion, fields),
+            new TaskCompletion(outcome.Name, outcome.Next, actor.Id, readVersion, writtenVersion, fields),
             tenantId,
             cancellationToken);
 

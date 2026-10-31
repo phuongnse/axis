@@ -88,7 +88,6 @@ public static class ProcessRetryCommand
         Guid instanceId,
         RecordAccess? read,
         string userId,
-        string userName,
         string reason,
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)

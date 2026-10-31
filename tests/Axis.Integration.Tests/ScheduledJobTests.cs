@@ -144,7 +144,6 @@ public sealed class ScheduledJobTests(ScheduleTriggerFixture fixture) : IClassFi
                 process.Id,
                 id,
                 "maria",
-                "Maria",
                 "The job is fixed.",
                 CancellationToken);
             await transaction.CommitAsync(CancellationToken);

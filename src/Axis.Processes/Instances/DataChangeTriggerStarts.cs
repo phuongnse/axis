@@ -242,7 +242,6 @@ public static partial class DataChangeTriggerStarts
                 computed,
                 Guid.CreateVersion7(),
                 AuditActors.System,
-                actorName: null,
                 new JsonObject { ["trigger"] = trigger.Name },
                 cancellationToken);
             if (started.Outcome != ProcessStartOutcome.Started)
@@ -387,7 +386,6 @@ public static partial class DataChangeTriggerStarts
                 parameters,
                 Guid.CreateVersion7(),
                 AuditActors.System,
-                actorName: null,
                 new JsonObject { ["trigger"] = trigger.Name },
                 cancellationToken);
             if (started.Outcome != ProcessStartOutcome.Started)

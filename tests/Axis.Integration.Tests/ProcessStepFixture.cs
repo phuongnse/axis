@@ -423,7 +423,6 @@ public sealed class ProcessStepFixture : IAsyncLifetime
             instanceId,
             new RecordAccess(true, null),
             "maria",
-            "Maria",
             "Fixed",
             NullLoggerFactory.Instance,
             cancellationToken);
@@ -451,7 +450,6 @@ public sealed class ProcessStepFixture : IAsyncLifetime
             instanceId,
             new RecordAccess(true, null),
             "maria",
-            "Maria",
             "Fixed",
             NullLoggerFactory.Instance,
             cancellationToken);

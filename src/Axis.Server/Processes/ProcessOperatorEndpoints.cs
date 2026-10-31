@@ -141,7 +141,6 @@ internal static class ProcessOperatorEndpoints
             instanceId,
             read,
             user.Id,
-            user.DisplayName,
             reason!,
             loggerFactory,
             cancellationToken);
@@ -263,7 +262,6 @@ internal static class ProcessOperatorEndpoints
             instanceId,
             read,
             user.Id,
-            user.DisplayName,
             reason!,
             loggerFactory,
             cancellationToken);
@@ -396,7 +394,6 @@ internal static class ProcessOperatorEndpoints
             operationId,
             read,
             user.Id,
-            user.DisplayName,
             body!.Reason,
             body.Succeeded,
             body.Output,

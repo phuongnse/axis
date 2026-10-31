@@ -332,7 +332,6 @@ internal static partial class UserCommandEndpoints
             await UserInvitations.RecordAsync(
                 transaction,
                 opening.Caller.Id,
-                opening.Caller.DisplayName,
                 id,
                 email,
                 [.. roles.Select(role => new GivenRole(role.ApplicationId, role.Role!))],

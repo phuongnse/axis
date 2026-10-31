@@ -302,7 +302,6 @@ public static class ProcessTasks
 /// <param name="Outcome">The declared name of the outcome.</param>
 /// <param name="Next">The declared name of the step the outcome leads to.</param>
 /// <param name="UserId">The user who completed the task.</param>
-/// <param name="UserName">The display name of the user who completed the task, stored in its audit record.</param>
 /// <param name="SubjectVersion">The subject record version the values were written over, or <see langword="null"/> when no values were written.</param>
 /// <param name="WrittenVersion">The subject record version the values wrote, or <see langword="null"/> when no values were written.</param>
 /// <param name="Fields">The declared names of the fields the completion set, in declaration order.</param>
@@ -310,7 +309,6 @@ public sealed record TaskCompletion(
     string Outcome,
     string Next,
     string UserId,
-    string UserName,
     long? SubjectVersion,
     long? WrittenVersion,
     IReadOnlyList<string> Fields);

@@ -250,7 +250,7 @@ internal sealed class TenantCreate : IAsyncDisposable
             if (created || !(await GivenRoles.ListAsync(connection, id, _cancellationToken)).Contains(administrator))
             {
                 await using var transaction = await connection.BeginTransactionAsync(_cancellationToken);
-                await UserInvitations.RecordAsync(transaction, _command, null, id, email, [administrator], _cancellationToken);
+                await UserInvitations.RecordAsync(transaction, _command, id, email, [administrator], _cancellationToken);
                 await transaction.CommitAsync(_cancellationToken);
             }
         }

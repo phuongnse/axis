@@ -19,7 +19,7 @@ namespace Axis.Server.Tests;
 /// </summary>
 public sealed class RecordBodyFuzzTests
 {
-    private static readonly RecordActor _requester = new("requester", "Requester", ["employee"]);
+    private static readonly RecordActor _requester = new("requester", ["employee"]);
 
     private static readonly Lazy<(ApplicationModel Application, EntityModel Specimen)> _fixture = new(() =>
     {

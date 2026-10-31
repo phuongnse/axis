@@ -90,7 +90,7 @@ internal static class AuthEndpoints
         // A session of another tenant, or an expired one, counts as none and writes no record.
         if (await CurrentUsers.FindAsync(httpContext) is { } user)
         {
-            await SessionAudit.AppendAsync(httpContext, AuditActions.SessionSignedOut, user.Id, user.DisplayName, reason: null, cancellationToken);
+            await SessionAudit.AppendAsync(httpContext, AuditActions.SessionSignedOut, user.Id, reason: null, cancellationToken);
         }
 
         await httpContext.SignOutAsync(Session.Scheme);

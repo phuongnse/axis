@@ -30,7 +30,6 @@ public static class UserInvitations
     public static async Task RecordAsync(
         NpgsqlTransaction transaction,
         string actor,
-        string? actorName,
         string userId,
         string email,
         IReadOnlyList<GivenRole> roles,

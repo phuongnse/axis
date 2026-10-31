@@ -308,7 +308,6 @@ internal sealed partial class TriggerFanOutHandler(ReleaseModelCache models, Del
             record,
             instanceId,
             AuditActors.System,
-            actorName: null,
             new JsonObject { ["trigger"] = trigger.Name, ["occurrenceAt"] = occurrence },
             cancellationToken);
         if (started.Outcome == ProcessStartOutcome.Started)
@@ -367,7 +366,6 @@ internal sealed partial class TriggerFanOutHandler(ReleaseModelCache models, Del
             parameters,
             instanceId,
             AuditActors.System,
-            actorName: null,
             new JsonObject { ["trigger"] = trigger.Name, ["occurrenceAt"] = occurrence },
             cancellationToken);
         if (started.Outcome == ProcessStartOutcome.Started)
