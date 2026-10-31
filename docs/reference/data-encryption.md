@@ -51,8 +51,10 @@ A sensitive field may declare an exact lookup, so a filter can find a record by 
   grant's `filter`, a data source `filter` and a measure's `filter`. A name longer than 54 characters is `AXC0309`, because `f_`, the name and `_lookup` must fit
   PostgreSQL's 63 bytes.
 - A policy grant's `filter` may test the field with `==` or `!=` against a text, integer, decimal or boolean value,
-  in either order, and nothing else. Axis hashes the value under every lookup key the tenant holds and matches any
-  of the hashes, so a search stays right while a rotation runs. `!=` also holds for a record whose field is empty.
+  in either order, and nothing else. Axis hashes the value under every lookup key the tenant holds, as far as the
+  server has read them, and matches any of the hashes. A server that read the keys before a rotation can miss a record that the
+  rotation re-hashed in an exact lookup search until it reads a value under the new key or restarts, and a search that reads
+  the keys again _(planned for M27)_ closes that window, see [rotating the keys](#rotating-the-keys). `!=` also holds for a record whose field is empty.
   The record list and its export, the data source rows and their export, process inspection and every
   single-record check apply the grant this way. A filter that reaches Axis without the tenant's keys throws, and
   never compares plain text. A tenant with no lookup key has no hashes, so `==` matches no record and `!=` matches
@@ -163,7 +165,7 @@ refusal without one, `SensitiveValuesTests` for the hash, and `SchemaPlannerTest
   does not hold. The server and the worker do this through one key service. It gives the newest key of a kind for a
   write and a key by number for a read, and it never logs a key.
 
-The key store, the settings, `tenant create`, `migrate`, `tenant restore`, the rekey, the refresh and the cipher that
+The key store, the settings, `tenant create`, `migrate`, `tenant restore`, the rekey, the refresh, the rotation and the cipher that
 encrypts and decrypts a sensitive value under the data keys are built, and so is the `bytea` column of a sensitive field.
 The record API, forms, the detail widget, record imports (the dry run and the commit), inbound endpoints, process steps,
 connector and package call outputs, the process start endpoint, task completion, the task form state and the operator's call resolve write and read `sensitive` values with the cipher, also in the rows of a child
@@ -197,21 +199,41 @@ trigger and starter reads do not use it yet _(planned for
 M27)_: a data change trigger, an event trigger start, a task escalation, or an inbound endpoint's start condition
 that reads a record holding a stored sensitive value fails. Activation's inline recompute of computed fields and the worker's
 `computed.backfill` do not use the cipher either: on an entity that holds a stored sensitive value they fail and write
-nothing, until they do _(planned for M27)_. The rotation below is also _(planned for M27)_.
+nothing, until they do _(planned for M27)_.
 
 ### Rotating the keys
 
 `tenant data-key rotate <id>` adds the next data key and the next lookup key. Then, one table at a time and each in a
 transaction of its own, it re-encrypts every sensitive value under an older data key and recomputes every lookup hash
-under an older lookup key. It prints `<id> data-key rotate ok: data key <n>, lookup key <k>, <m> values updated`. A
-host that wrote with an older key during the rotation leaves values that a second run updates.
+under an older lookup key. It prints `<id> data-key rotate ok: data key <n>, lookup key <k>, <m> values updated`. `<m>`
+counts the values it re-encrypted and the hashes it recomputed, so `0` means that nothing used an older key.
 
-`tenant data-key retire <id>` deletes every data key and lookup key older than the newest that no stored value or
-hash names. It refuses,
-with exit code `1`, while a value still names one, and says how many. Run `rotate` again, then `retire`.
+- **Which columns.** Rotate reads the tenant database's catalogue, not the active release. It takes every `bytea` column named
+  `f_` and a field name in the `entities` schema, and the `_lookup` column beside it. That includes child tables, and tables
+  that no active release uses any more.
+- **A host that writes meanwhile.** Rotate writes a value back only if the row still holds the bytes it read, so a row that a
+  host changed while rotate ran stays as the host wrote it. A host that read the keys before the rotation writes with its older
+  key until it reads a value under the new one, or restarts. Those values name an older key, and a second `rotate` updates them.
+  A server that read the keys before the rotation still reads a rewritten value, because the new number is one it does not
+  hold, so it reads the keys again.
+- **A stale search.** A server with cached keys hashes an exact lookup search value only under the lookup keys it has read, so
+  until it reads a value under the new key or restarts, its search can miss a record that rotate re-hashed. The search that
+  reads the keys again _(planned for M27)_ closes the window, and [D116](../decisions/d116-how-sensitive-fields-and-backups-are-encrypted.md)
+  stays the agreed target.
+- **A failure.** A value that does not decrypt stops rotate at its table, with the line
+  `<id> data-key rotate failed: <message>` and exit code `1`. The message holds no value and no key. The tables before it stay
+  rewritten and the new keys stay, so running `rotate` again finishes the work.
+
+`tenant data-key retire <id>` deletes every data key and lookup key older than the newest, once no stored value or hash names
+one. While any value or hash still names an older key, it deletes no key at all, prints
+`<id> data-key retire refused: <c> stored values still name an older key. Run tenant data-key rotate again.` and exits with
+code `1`. Run `rotate` again, then `retire`. Otherwise it prints `<id> data-key retire ok: <d> data keys, <l> lookup keys deleted`.
+A tenant with no older key prints it with `0` and writes no record. Restart the hosts, or wait until they have read the new
+keys, before `retire`: a host that still writes with a deleted key stores values that no host can read after it restarts.
 
 Both write a [platform audit record](tenant-setting-commands.md#platform-audit-records) with the key numbers and
-never a key. The exit codes are those of [output and exit codes](administration.md#output-and-exit-codes).
+never a key. A refused `retire` writes none. Both need `Tenancy:Source=directory`, and the exit codes are those of
+[output and exit codes](administration.md#output-and-exit-codes). Test: `AdminTenantDataKeyTests`.
 
 ## Encrypted backups
 

@@ -23,21 +23,25 @@ internal static class TenantKeyRows
 
         if (!existing.Contains(TenantKeyKinds.Data))
         {
-            Add(platform, tenantId, cipher, TenantKeyKinds.Data, TenantSecretFields.DataKey(1));
+            Add(platform, tenantId, cipher, TenantKeyKinds.Data, 1);
         }
 
         if (!existing.Contains(TenantKeyKinds.Lookup))
         {
-            Add(platform, tenantId, cipher, TenantKeyKinds.Lookup, TenantSecretFields.LookupKey(1));
+            Add(platform, tenantId, cipher, TenantKeyKinds.Lookup, 1);
         }
     }
 
-    private static void Add(PlatformDbContext platform, string tenantId, TenantSecretCipher cipher, string kind, string field) =>
+    /// <summary>Adds a key of the kind with the number, 32 random bytes encrypted by the installation key. It does not save.</summary>
+    public static void Add(PlatformDbContext platform, string tenantId, TenantSecretCipher cipher, string kind, int number) =>
         platform.TenantDataKeys.Add(new TenantDataKeyRow
         {
             TenantId = tenantId,
             Kind = kind,
-            Number = 1,
-            Key = cipher.Encrypt(tenantId, field, Convert.ToBase64String(RandomNumberGenerator.GetBytes(KeyBytes))),
+            Number = number,
+            Key = cipher.Encrypt(
+                tenantId,
+                kind == TenantKeyKinds.Data ? TenantSecretFields.DataKey(number) : TenantSecretFields.LookupKey(number),
+                Convert.ToBase64String(RandomNumberGenerator.GetBytes(KeyBytes))),
         });
 }

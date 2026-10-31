@@ -8,7 +8,7 @@ and
 [D45](../decisions/d45-tenant-backup-and-restore.md).
 The commands are `tenant create`, `tenant suspend`, `tenant resume`, `tenant rotate-passwords`,
 `tenant list`, `tenant backup`, `tenant restore`, `tenant oidc set`, `tenant sign-in set`, `tenant binding list|set|remove`,
-`tenant host add|remove|move`, `tenant email set|clear`, `tenant session end`, `migrate`, `activate`, `platform rekey`, `publisher` and `version`.
+`tenant host add|remove|move`, `tenant email set|clear`, `tenant session end`, `tenant data-key rotate|retire`, `migrate`, `activate`, `platform rekey`, `publisher` and `version`.
 `platform rekey` is in [installation key](tenant-setting-commands.md#installation-key). `tenant suspend`, `tenant resume` and
 `tenant list` are in [tenant status commands](tenant-status-commands.md). The
 commands that change a tenant after it is created are in
@@ -70,6 +70,7 @@ need `Tenancy:Source=directory`. Only `tenant binding set --secret`, the three `
 also read `Platform:SecretKey`, because they encrypt, or, for `tenant host` and `tenant email`, decrypt the realm's activation secret to write the realm. See
 [tenant setting commands](tenant-setting-commands.md).
 `tenant session end` reads `ConnectionStrings:PlatformSchema` and `Platform:SecretKey`, because it connects to the tenant database as the schema role, and needs `Tenancy:Source=directory`. It needs no admin role.
+`tenant data-key rotate` and `tenant data-key retire` read the same two settings and need `Tenancy:Source=directory` and no admin role, because they connect to the tenant database as the schema role and read and write the tenant's keys, see [rotating the keys](data-encryption.md#rotating-the-keys).
 
 `tenant backup` reads only `ConnectionStrings:PlatformSchema`,
 `Platform:SecretKey` and `PATH`. It creates no role or database, so it needs

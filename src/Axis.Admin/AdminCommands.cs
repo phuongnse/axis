@@ -73,6 +73,8 @@ internal static partial class AdminCommands
                tenant email clear <id>
                tenant session end <id> --user <user>
                tenant session end <id> --all
+               tenant data-key rotate <id>
+               tenant data-key retire <id>
                tenant list
                tenant binding list <id>
                tenant binding set <id> <name> --url <value>
@@ -165,6 +167,8 @@ internal static partial class AdminCommands
         new("tenant email set", AuditMark.OnePerTenant, TenantSettings.EmailSetAsync),
         new("tenant email clear", AuditMark.OnePerTenant, TenantSettings.EmailClearAsync),
         new("tenant session end", AuditMark.OnePerTenant, TenantSettings.SessionEndAsync),
+        new("tenant data-key rotate", AuditMark.OnePerTenant, TenantDataKeyCommands.RotateAsync),
+        new("tenant data-key retire", AuditMark.OnePerTenant, TenantDataKeyCommands.RetireAsync),
         new("tenant list", AuditMark.None, run => StatusAsync(run.Command.Name, run.Args, run.Configuration, run.Output, run.Error, run.CancellationToken)),
         new("tenant binding list", AuditMark.None, TenantSettings.BindingListAsync),
         new("tenant binding set", AuditMark.OnePerTenant, TenantSettings.BindingSetAsync),
