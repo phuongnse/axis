@@ -1,8 +1,9 @@
 # Operator console
 
 Detailed reference for the operator console: the web page where the platform operator sees what
-failed in a tenant and runs the commands that fix it. The route, the access rules and the Tenant view
-are built, and so are the Dead letters view and the redeliver and discard commands. Everything else in this file is _(planned for M23)_. The design follows
+failed in a tenant and runs the commands that fix it. The route, the access rules, the Tenant view, the
+list of the Failed work view, the Dead letters view and the redeliver and discard commands are built.
+Everything else in this file is _(planned for M23)_. The design follows
 [D93](../decisions/d93-an-operator-web-console.md). Tenant provisioning stays in
 [`Axis.Admin`](administration.md), as
 [D43](../decisions/d43-tenant-provisioning-and-migrations-across-tenant-databases.md) agrees.
@@ -35,6 +36,19 @@ _(planned for Mx)_ are not built yet, and Dn refers to [decisions.md](../decisio
     release history, as Studio shows them) and `activatedAt`. The applications are the ones with an
     active release, in name order. The `status` is `active`, because a host serves only active
     tenants: the hosts of a suspended tenant answer `503`.
+  - **`GET /api/console/failed-work`.** Lists the failed work of the tenant, newest first, in the
+    paging shape of the record API (`items`, `page`, `pageSize`, `totalCount`). The parameters are
+    `application` (an application id), `page` and `pageSize`, all optional. An invalid one is a
+    `400` keyed by its name, and an `application` that is not a hyphenated UUID is keyed
+    `application`. Each item has `kind` (`instance`, `connector` or `package`), `applicationId`,
+    `application`, `process`, `instanceId`, `step`, `callId`, `connector`, `package`, `operation`,
+    `failedAt` and `error`. The keys that do not apply are `null`: an instance has no `callId`,
+    `connector`, `package` or `operation`. The `application` and `process` names come from the
+    active release, and from the release the instance is pinned to when the application is not
+    active. An item never holds a call input, a history input or output, or a record value. The
+    time of a failed instance is its `ended_at`, and its error is the newest history error of the
+    instance. The time of a call with an unknown outcome is the finish of its newest attempt, or its
+    `created_at` when it has no attempt row, and its error is the call's `last_error`.
   - **`GET /api/console/dead-letters`.** Answers one page of the dead letters of every
     application of the tenant, newest first, as the instance list pages, including the letters
     that belong to no process. An optional `application` (an application id) keeps one
@@ -56,9 +70,10 @@ _(planned for Mx)_ are not built yet, and Dn refers to [decisions.md](../decisio
 Each view lists the newest items first, pages through them and filters by application.
 
 - **Failed work.** Process instances that are `failed`, and connector and package calls whose
-  outcome is `unknown`, across every process of every application. An entry opens the
+  outcome is `unknown`, across every process of every application. The list, its paging and the
+  application filter are built. An entry opens the
   [instance detail](process-inspection.md#instance-detail), with the graph, the history, the
-  tasks and the calls.
+  tasks and the calls _(planned for M23)_.
 - **Dead letters.** Event deliveries that reached the event delivery limit,
   including [webhook deliveries](outbound-webhooks.md#outbound-webhooks) and those that belong to
   no process. The view lists them in every state, with an application filter. Each shows the

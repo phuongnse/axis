@@ -35,6 +35,53 @@ export async function fetchConsoleTenant(signal?: AbortSignal): Promise<ConsoleT
   return { kind: 'ok', tenant: (await response.json()) as ConsoleTenant }
 }
 
+/** One failed instance or call with an unknown outcome, as served by `GET /api/console/failed-work`. */
+export interface ConsoleFailedWorkItem {
+  kind: 'instance' | 'connector' | 'package'
+  applicationId: string
+  application: string | null
+  process: string | null
+  instanceId: string
+  step: string
+  callId: string | null
+  connector: string | null
+  package: string | null
+  operation: string | null
+  /** When the work failed, as an ISO 8601 time. */
+  failedAt: string
+  error: string | null
+}
+
+/** One page of failed work, newest first. */
+export interface ConsoleFailedWorkPage {
+  items: ConsoleFailedWorkItem[]
+  page: number
+  pageSize: number
+  totalCount: number
+}
+
+/** The answer of the failed work route: a page, or the refusal that the page shows. */
+export type ConsoleFailedWorkResult = { kind: 'ok'; page: ConsoleFailedWorkPage } | { kind: 'forbidden' }
+
+/** Loads a page of the tenant's failed work, of one application when `application` is set. */
+export async function fetchConsoleFailedWork(
+  query: { application?: string; page: number; pageSize: number },
+  signal?: AbortSignal,
+): Promise<ConsoleFailedWorkResult> {
+  const parameters = new URLSearchParams({ page: String(query.page), pageSize: String(query.pageSize) })
+  if (query.application) {
+    parameters.set('application', query.application)
+  }
+  const response = await apiFetch(`/api/console/failed-work?${parameters}`, { signal })
+  if (response.status === 403) {
+    return { kind: 'forbidden' }
+  }
+  if (!response.ok) {
+    throw new Error(`Loading the console failed work failed with status ${response.status}.`)
+  }
+  return { kind: 'ok', page: (await response.json()) as ConsoleFailedWorkPage }
+}
+
 /** The path of the console's dead letter routes. A command goes to `<path>/<id>/<command>`. */
 export const consoleDeadLettersPath = '/api/console/dead-letters'
 

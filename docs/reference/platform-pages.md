@@ -38,3 +38,6 @@ so their paths are reserved site paths.
     asks for confirmation and calls the give-role or remove-role route, see
     [the users page](user-administration.md#the-users-page). Its texts are
     `shell.users.roles.*`.
+  - Each row has buttons for its commands: Resend invitation, Disable or Enable,
+    and Reset authenticator. Each asks for confirmation and calls its route, see
+    [the users page](user-administration.md#the-users-page).

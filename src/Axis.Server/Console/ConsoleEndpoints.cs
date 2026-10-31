@@ -1,5 +1,8 @@
+using Axis.Configuration.Model;
 using Axis.Configuration.Releases;
 using Axis.Core.Tenancy;
+using Axis.Processes.Instances;
+using Axis.Server.Applications;
 using Axis.Server.Http;
 using Axis.Server.Tenancy;
 using Axis.Server.Users;
@@ -20,6 +23,13 @@ namespace Axis.Server.Console;
 /// The dead letter routes under <c>/api/console/dead-letters</c> list, redeliver and discard the dead letters of every
 /// application of the tenant, see <see cref="ConsoleDeadLetterEndpoints"/>.
 /// </para>
+/// <para>
+/// <c>GET /api/console/failed-work</c> lists the failed work of the tenant, newest first, in the paging shape of the record
+/// API: the instances that are <c>failed</c> and the connector and package calls whose outcome is <c>unknown</c>, across every
+/// application. <c>application</c> (an application id) narrows it to one application. An item names the application, the
+/// process, the instance and the step, and for a call its connector or package and operation, when it failed and its stored
+/// error. It never holds a call input, a history input or output, or a record value.
+/// </para>
 /// </summary>
 internal static class ConsoleEndpoints
 {
@@ -31,6 +41,7 @@ internal static class ConsoleEndpoints
         var console = endpoints.MapGroup("/api/console");
         console.AddEndpointFilter(RequireOperatorAsync);
         console.MapGet("/tenant", GetTenantAsync);
+        console.MapGet("/failed-work", ListFailedWorkAsync);
         console.MapConsoleDeadLetterEndpoints();
     }
 
@@ -69,8 +80,85 @@ internal static class ConsoleEndpoints
 
         return Results.Ok(new ConsoleTenantResponse(tenant.TenantId, ActiveStatus, applications));
     }
+
+    private static async Task<IResult> ListFailedWorkAsync(
+        string? application,
+        string? page,
+        string? pageSize,
+        ActiveApplicationResolver resolver,
+        TenantDatabase database,
+        CancellationToken cancellationToken)
+    {
+        var errors = new SortedDictionary<string, string[]>(StringComparer.Ordinal);
+        PagingQuery.TryRead(page, pageSize, errors, out var pageNumber, out var size);
+        Guid? applicationId = null;
+        if (application is not null)
+        {
+            if (application is { Length: 36 } && Guid.TryParseExact(application, "D", out var parsed))
+            {
+                applicationId = parsed;
+            }
+            else
+            {
+                errors["application"] = ["Must be the id of an application."];
+            }
+        }
+
+        if (errors.Count > 0)
+        {
+            return Results.ValidationProblem(errors);
+        }
+
+        var work = await FailedWorkQueries.ListAsync(await database.GetConnectionAsync(cancellationToken), applicationId, pageNumber, size, cancellationToken);
+        var activeNames = (await new ActiveReleaseStore(await database.GetConfigurationAsync(cancellationToken)).ListAsync(cancellationToken))
+            .ToDictionary(active => active.ApplicationId, active => active.Name);
+
+        // The process and, for an application that is not active, the application name come from the release the instance is pinned to.
+        var models = new Dictionary<Guid, ApplicationModel?>();
+        var items = new List<ConsoleFailedWorkItem>();
+        foreach (var item in work.Items)
+        {
+            if (!models.TryGetValue(item.ReleaseId, out var model))
+            {
+                model = await resolver.FindReleaseModelAsync(item.ApplicationId, item.ReleaseId, cancellationToken);
+                models[item.ReleaseId] = model;
+            }
+
+            items.Add(new ConsoleFailedWorkItem(
+                item.Kind,
+                item.ApplicationId,
+                activeNames.GetValueOrDefault(item.ApplicationId) ?? model?.Manifest.Name,
+                model?.Processes.FirstOrDefault(process => process.Id == item.ProcessId)?.Name,
+                item.InstanceId,
+                item.Step,
+                item.CallId,
+                item.Connector,
+                item.Package,
+                item.Operation,
+                item.FailedAt.UtcDateTime,
+                item.Error));
+        }
+
+        return Results.Ok(new ConsoleFailedWorkResponse(items, pageNumber, size, work.TotalCount));
+    }
 }
 
 internal sealed record ConsoleTenantResponse(string Id, string Status, IReadOnlyList<ConsoleApplication> Applications);
 
 internal sealed record ConsoleApplication(Guid Id, string Name, Guid ReleaseId, int? ReleaseNumber, string? ReleaseLabel, DateTimeOffset ActivatedAt);
+
+internal sealed record ConsoleFailedWorkResponse(IReadOnlyList<ConsoleFailedWorkItem> Items, int Page, int PageSize, long TotalCount);
+
+internal sealed record ConsoleFailedWorkItem(
+    string Kind,
+    Guid ApplicationId,
+    string? Application,
+    string? Process,
+    Guid InstanceId,
+    string Step,
+    Guid? CallId,
+    string? Connector,
+    string? Package,
+    string? Operation,
+    DateTime FailedAt,
+    string? Error);

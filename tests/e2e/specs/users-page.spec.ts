@@ -2,6 +2,7 @@ import type { Page } from '@playwright/test'
 import { expect, test } from '../test'
 import { csrfHeaders } from '../csrf'
 import { waitForDialog } from '../dialogs'
+import { logInAtKeycloak } from '../keycloak'
 import { useSession } from '../sessions'
 
 // The leave requests sample, which no journey of the auditor touches. The dev realm gives the user the id `auditor`.
@@ -133,5 +134,43 @@ test.describe('invitations', () => {
     await expect(page.getByTestId('users-done')).toHaveText('The invitation was sent again.')
     await expect(page.getByTestId('user-roles')).toHaveCount(0)
     await expect(await findRow(page, email)).toContainText('Invited')
+  })
+
+  test('an administrator disables an invited person after a confirmation and enables them again', async ({
+    browser,
+    baseURL,
+  }) => {
+    // Disabling needs a sign-in at Keycloak that is at most 5 minutes old, and the saved session may be older.
+    const context = await browser.newContext({ baseURL })
+    try {
+      const page = await context.newPage()
+      await page.goto('/')
+      await logInAtKeycloak(page, 'administrator')
+      await expect(page.getByRole('banner').getByRole('button', { name: 'Administrator User', exact: true })).toBeVisible()
+      const email = inviteeEmail()
+      const invited = await page.request.post('/api/users/invite', {
+        headers: csrfHeaders,
+        data: { email, displayName: 'Disabled Person' },
+      })
+      expect(invited.status()).toBe(201)
+      await page.goto('/users')
+
+      const row = await findRow(page, email)
+      await row.getByRole('button', { name: 'Disable', exact: true }).click()
+      const disableDialog = await waitForDialog(page, 'Disable this person?')
+      await expect(disableDialog).toContainText(email)
+      await disableDialog.getByRole('button', { name: 'Disable', exact: true }).click()
+      await expect(page.getByTestId('users-done')).toHaveText('The person was disabled.')
+      await expect(await findRow(page, email)).toContainText('Disabled')
+
+      await (await findRow(page, email)).getByRole('button', { name: 'Enable', exact: true }).click()
+      const enableDialog = await waitForDialog(page, 'Enable this person?')
+      await expect(enableDialog).toContainText(email)
+      await enableDialog.getByRole('button', { name: 'Enable', exact: true }).click()
+      await expect(page.getByTestId('users-done')).toHaveText('The person was enabled.')
+      await expect(await findRow(page, email)).toContainText('Invited')
+    } finally {
+      await context.close()
+    }
   })
 })

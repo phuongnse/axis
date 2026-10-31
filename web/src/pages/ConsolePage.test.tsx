@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import platformEnglish from '../../../src/Axis.Presentation/Texts/en.json'
-import type { ConsoleDeadLetterPage, ConsoleTenant } from '../platform/console'
+import type { ConsoleDeadLetterPage, ConsoleFailedWorkPage, ConsoleTenant } from '../platform/console'
 import { TextProvider } from '../platform/TextProvider'
 import { PlatformContext, type Platform } from './context'
 import { ConsolePage } from './ConsolePage'
@@ -48,6 +48,42 @@ function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } })
 }
 
+const failedWork: ConsoleFailedWorkPage = {
+  items: [
+    {
+      kind: 'connector',
+      applicationId: 'a1',
+      application: 'Leave',
+      process: 'Approve',
+      instanceId: 'i-1',
+      step: 'send',
+      callId: 'c-1',
+      connector: 'Payroll',
+      package: null,
+      operation: 'createRecord',
+      failedAt: '2026-10-30T09:00:00Z',
+      error: 'Timed out.',
+    },
+    {
+      kind: 'instance',
+      applicationId: 'a2',
+      application: 'Purchasing',
+      process: null,
+      instanceId: 'i-2',
+      step: 'review',
+      callId: null,
+      connector: null,
+      package: null,
+      operation: null,
+      failedAt: '2026-10-29T09:00:00Z',
+      error: null,
+    },
+  ],
+  page: 1,
+  pageSize: 20,
+  totalCount: 45,
+}
+
 const deadLettersPath = '/api/console/dead-letters'
 
 const emptyDeadLetters: ConsoleDeadLetterPage = { items: [], page: 1, pageSize: 20, totalCount: 0 }
@@ -86,17 +122,21 @@ const allLetters: ConsoleDeadLetterPage = {
   totalCount: 3,
 }
 
-/** Answers the tenant route with `answer` and the dead letter routes with `letters`, and records every request. */
-function stubServer(answer: () => Response, letters: () => Response = () => json(emptyDeadLetters)) {
+/** Answers the dead letter routes with `letters` and every other route with `answer`, and records every request. */
+function stubServer(answer: (url: string) => Response, letters: () => Response = () => json(emptyDeadLetters)) {
   const requests: string[] = []
   const bodies: (string | undefined)[] = []
   const fetchMock = vi.fn(async (input: string, init?: RequestInit) => {
     requests.push(`${init?.method ?? 'GET'} ${input}`)
     bodies.push(typeof init?.body === 'string' ? init.body : undefined)
-    return input.startsWith(deadLettersPath) ? letters() : answer()
+    return input.startsWith(deadLettersPath) ? letters() : answer(input)
   })
   vi.stubGlobal('fetch', fetchMock)
   return Object.assign(fetchMock, { requests, bodies })
+}
+
+function tenantAndFailedWork(url: string) {
+  return json(url.startsWith('/api/console/tenant') ? tenant : failedWork)
 }
 
 function renderPage() {
@@ -116,9 +156,13 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
+function failedWorkRequests(fetchMock: ReturnType<typeof stubServer>) {
+  return fetchMock.mock.calls.map(([url]) => url).filter((url) => url.startsWith('/api/console/failed-work'))
+}
+
 describe('ConsolePage', () => {
   it('shows the status and each application with its active release', async () => {
-    const fetchMock = stubServer(() => json(tenant))
+    const fetchMock = stubServer((url) => json(url.startsWith('/api/console/tenant') ? tenant : failedWork))
     renderPage()
 
     const view = await screen.findByTestId('console-tenant')
@@ -151,11 +195,56 @@ describe('ConsolePage', () => {
     expect(await screen.findByTestId('console-error')).toBeVisible()
   })
 
-  it('lists the dead letters of every application, including one with no process', async () => {
-    const server = stubServer(
-      () => json(tenant),
-      () => json(allLetters),
+  it('shows the failed work with each item', async () => {
+    const fetchMock = stubServer((url) => json(url.startsWith('/api/console/tenant') ? tenant : failedWork))
+    renderPage()
+
+    const view = await screen.findByTestId('console-failed-work')
+    expect(await within(view).findByText('Timed out.')).toBeVisible()
+    expect(failedWorkRequests(fetchMock)).toEqual(['/api/console/failed-work?page=1&pageSize=20'])
+    for (const title of ['Application', 'Process', 'Instance', 'Step or call', 'Failed', 'Error']) {
+      expect(within(view).getByRole('columnheader', { name: title })).toBeVisible()
+    }
+    const call = within(view).getByText('Timed out.').closest('tr')!
+    expect(within(call).getByText('Leave')).toBeVisible()
+    expect(within(call).getByText('Approve')).toBeVisible()
+    expect(within(call).getByText('i-1')).toBeVisible()
+    expect(within(call).getByText('send: Payroll createRecord')).toBeVisible()
+    const instance = within(view).getByText('i-2').closest('tr')!
+    expect(within(instance).getByText('Purchasing')).toBeVisible()
+    expect(within(instance).getByText('review')).toBeVisible()
+    expect(within(instance).getAllByText('—')).toHaveLength(2)
+  })
+
+  it('requests the next page of failed work', async () => {
+    const fetchMock = stubServer((url) => json(url.startsWith('/api/console/tenant') ? tenant : failedWork))
+    renderPage()
+    const view = await screen.findByTestId('console-failed-work')
+    expect(await within(view).findByText('Timed out.')).toBeVisible()
+
+    await userEvent.click(within(view).getByTitle('2'))
+
+    await waitFor(() => expect(failedWorkRequests(fetchMock)).toContain('/api/console/failed-work?page=2&pageSize=20'))
+  })
+
+  it('filters the failed work by application and returns to the first page', async () => {
+    const fetchMock = stubServer((url) => json(url.startsWith('/api/console/tenant') ? tenant : failedWork))
+    renderPage()
+    const view = await screen.findByTestId('console-failed-work')
+    expect(await within(view).findByText('Timed out.')).toBeVisible()
+    await userEvent.click(within(view).getByTitle('2'))
+    await waitFor(() => expect(failedWorkRequests(fetchMock)).toContain('/api/console/failed-work?page=2&pageSize=20'))
+
+    await userEvent.click(within(view).getByRole('combobox'))
+    await userEvent.click(await screen.findByTitle('Purchasing'))
+
+    await waitFor(() =>
+      expect(failedWorkRequests(fetchMock).at(-1)).toBe('/api/console/failed-work?page=1&pageSize=20&application=a2'),
     )
+  })
+
+  it('lists the dead letters of every application, including one with no process', async () => {
+    const server = stubServer(tenantAndFailedWork, () => json(allLetters))
     renderPage()
 
     const view = await screen.findByTestId('console-dead-letters')
@@ -175,10 +264,7 @@ describe('ConsolePage', () => {
   })
 
   it('asks for the dead letters of the chosen application', async () => {
-    const server = stubServer(
-      () => json(tenant),
-      () => json(allLetters),
-    )
+    const server = stubServer(tenantAndFailedWork, () => json(allLetters))
     const user = userEvent.setup()
     renderPage()
 
@@ -194,10 +280,7 @@ describe('ConsolePage', () => {
     ['redeliver', 'Redeliver'],
     ['discard', 'Discard'],
   ])('asks for a reason before it sends %s', async (command, title) => {
-    const server = stubServer(
-      () => json(tenant),
-      () => json(allLetters),
-    )
+    const server = stubServer(tenantAndFailedWork, () => json(allLetters))
     const user = userEvent.setup()
     renderPage()
 
@@ -222,10 +305,7 @@ describe('ConsolePage', () => {
 
   it('shows an error in the card when the dead letters cannot be loaded', async () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {})
-    stubServer(
-      () => json(tenant),
-      () => new Response(null, { status: 500 }),
-    )
+    stubServer(tenantAndFailedWork, () => new Response(null, { status: 500 }))
     renderPage()
 
     expect(await screen.findByTestId('console-dead-letters-error')).toBeVisible()

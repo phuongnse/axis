@@ -40,6 +40,9 @@ public sealed class ProcessStartFixture : IAsyncLifetime
     /// <summary>The compiled model of the ProcessApp fixture.</summary>
     public ApplicationModel Model => _model ?? throw new InvalidOperationException("The fixture is not initialized.");
 
+    /// <summary>The factory of the test host, for a test that needs a host with other settings.</summary>
+    public WebApplicationFactory<Program> Factory => _factory ?? throw new InvalidOperationException("The test host is not started.");
+
     /// <summary>The release of ProcessApp that the fixture activated first.</summary>
     public Guid FirstReleaseId { get; private set; }
 
@@ -236,6 +239,23 @@ public sealed class ProcessStartFixture : IAsyncLifetime
             """);
         var (releaseId, _) = await ActivateAsync(folder.Path, wrap);
         return releaseId;
+    }
+
+    /// <summary>
+    /// Activates a second application called <paramref name="name"/>, with a new id and one process without a subject,
+    /// <c>NightlyJob</c>, with a new id. Returns its release and model.
+    /// </summary>
+    public async Task<(Guid ReleaseId, ApplicationModel Model)> ActivateApplicationAsync(string name)
+    {
+        using var folder = new TemporaryFolder();
+        folder.With(
+            "application.json",
+            $$"""{ "id": "{{Guid.NewGuid()}}", "kind": "application", "name": "{{name}}", "formatVersion": 1 }""");
+        var job = await File.ReadAllTextAsync(Path.Combine(_appFolder, "processes", "nightly-job.json"));
+        folder.With(
+            Path.Combine("processes", "nightly-job.json"),
+            job.Replace("2f6b9c0e-4d1a-4e57-8b3c-5a7d9e1f3b24", Guid.NewGuid().ToString(), StringComparison.Ordinal));
+        return await ActivateAsync(folder.Path);
     }
 
     /// <summary>The number of lock requests that wait on an advisory lock.</summary>
