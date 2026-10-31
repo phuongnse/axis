@@ -341,6 +341,10 @@ if affected playwright; then
         Tenants__default__Bindings__PurchasingSystemClientId__Value=axis-purchasing \
         Tenants__default__Bindings__PurchasingSystemClientSecret__Kind=secret \
         Tenants__default__Bindings__PurchasingSystemClientSecret__Value=axis-development-purchasing-secret \
+        Tenants__default__Bindings__PurchaseRequestApprovedWebhookUrl__Kind=url \
+        Tenants__default__Bindings__PurchaseRequestApprovedWebhookUrl__Value="$AXIS_E2E_PURCHASING_URL/webhooks/purchase-request-approved" \
+        Tenants__default__Bindings__PurchaseRequestApprovedWebhookSecret__Kind=secret \
+        Tenants__default__Bindings__PurchaseRequestApprovedWebhookSecret__Value=whsec_YXhpcy1kZXZlbG9wbWVudC13ZWJob29rLXNlY3JldA== \
         dotnet src/Axis.Worker/bin/Release/net10.0/Axis.Worker.dll >>"$AXIS_E2E_WORKER_LOG" 2>&1 &
       child=$!
       echo "$child" >"$AXIS_E2E_WORKER_PID_FILE"
@@ -376,6 +380,10 @@ if affected playwright; then
     Tenants__default__Bindings__PurchasingSystemClientId__Value=axis-purchasing \
     Tenants__default__Bindings__PurchasingSystemClientSecret__Kind=secret \
     Tenants__default__Bindings__PurchasingSystemClientSecret__Value=axis-development-purchasing-secret \
+    Tenants__default__Bindings__PurchaseRequestApprovedWebhookUrl__Kind=url \
+    Tenants__default__Bindings__PurchaseRequestApprovedWebhookUrl__Value="$AXIS_E2E_PURCHASING_URL/webhooks/purchase-request-approved" \
+    Tenants__default__Bindings__PurchaseRequestApprovedWebhookSecret__Kind=secret \
+    Tenants__default__Bindings__PurchaseRequestApprovedWebhookSecret__Value=whsec_YXhpcy1kZXZlbG9wbWVudC13ZWJob29rLXNlY3JldA== \
     Tenants__default__Bindings__CompanyIssuer__Kind=url \
     Tenants__default__Bindings__CompanyIssuer__Value="http://127.0.0.1:$keycloak_port/realms/company" \
     Tenants__default__Bindings__CompanyClientId__Kind=secret \

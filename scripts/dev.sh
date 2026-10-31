@@ -119,6 +119,7 @@ if [ -n "${AXIS_PURCHASING_PORT:-}" ]; then
   # The server checks these bindings when it activates the sample, and the worker calls them.
   export Tenants__default__Bindings__PurchasingSystemUrl__Value="http://localhost:$AXIS_PURCHASING_PORT"
   export Tenants__default__Bindings__PurchasingSystemTokenUrl__Value="http://localhost:$AXIS_PURCHASING_PORT/oauth/token"
+  export Tenants__default__Bindings__PurchaseRequestApprovedWebhookUrl__Value="http://localhost:$AXIS_PURCHASING_PORT/webhooks/purchase-request-approved"
 fi
 
 # Job control leaves SIGINT enabled for the background processes. Without it, a
@@ -326,6 +327,10 @@ while :; do
       Tenants__default__Bindings__PurchasingSystemClientId__Value=axis-purchasing \
       Tenants__default__Bindings__PurchasingSystemClientSecret__Kind=secret \
       Tenants__default__Bindings__PurchasingSystemClientSecret__Value=axis-development-purchasing-secret \
+      Tenants__default__Bindings__PurchaseRequestApprovedWebhookUrl__Kind=url \
+      Tenants__default__Bindings__PurchaseRequestApprovedWebhookUrl__Value="http://localhost:$purchasing_port/webhooks/purchase-request-approved" \
+      Tenants__default__Bindings__PurchaseRequestApprovedWebhookSecret__Kind=secret \
+      Tenants__default__Bindings__PurchaseRequestApprovedWebhookSecret__Value=whsec_YXhpcy1kZXZlbG9wbWVudC13ZWJob29rLXNlY3JldA== \
       Tenants__default__Bindings__CompanyIssuer__Kind=url \
       Tenants__default__Bindings__CompanyIssuer__Value="http://localhost:$keycloak_port/realms/company" \
       Tenants__default__Bindings__CompanyClientId__Kind=secret \

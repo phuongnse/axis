@@ -129,7 +129,8 @@ export function serverEnv(baseURL: string): Record<string, string> {
     // The users list reads the realm's users through the axis-users client, as in appsettings.Development.json.
     Tenants__default__Oidc__UsersClientSecret: 'axis-users-development-secret',
     // The purchase request sample activates only with its purchasing system bindings. They hold the
-    // stub's default client credentials. The worker gets the same bindings from scripts/e2e.sh.
+    // stub's default client credentials. The approval webhook bindings to come point at the stub's webhook route
+    // and hold its default webhook secret. The worker gets the same bindings from scripts/e2e.sh.
     Tenants__default__Bindings__PurchasingSystemUrl__Kind: 'url',
     Tenants__default__Bindings__PurchasingSystemUrl__Value: purchasingUrl,
     Tenants__default__Bindings__PurchasingSystemTokenUrl__Kind: 'url',
@@ -138,6 +139,10 @@ export function serverEnv(baseURL: string): Record<string, string> {
     Tenants__default__Bindings__PurchasingSystemClientId__Value: 'axis-purchasing',
     Tenants__default__Bindings__PurchasingSystemClientSecret__Kind: 'secret',
     Tenants__default__Bindings__PurchasingSystemClientSecret__Value: 'axis-development-purchasing-secret',
+    Tenants__default__Bindings__PurchaseRequestApprovedWebhookUrl__Kind: 'url',
+    Tenants__default__Bindings__PurchaseRequestApprovedWebhookUrl__Value: `${purchasingUrl}/webhooks/purchase-request-approved`,
+    Tenants__default__Bindings__PurchaseRequestApprovedWebhookSecret__Kind: 'secret',
+    Tenants__default__Bindings__PurchaseRequestApprovedWebhookSecret__Value: 'whsec_YXhpcy1kZXZlbG9wbWVudC13ZWJob29rLXNlY3JldA==',
     // The company realm's broker client, as in appsettings.Development.json. The purchase request sample's company provider reads them.
     Tenants__default__Bindings__CompanyIssuer__Kind: 'url',
     Tenants__default__Bindings__CompanyIssuer__Value: `${keycloakUrl}/realms/company`,
