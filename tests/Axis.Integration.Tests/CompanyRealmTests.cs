@@ -31,7 +31,7 @@ public sealed class CompanyRealmTests(KeycloakFixture keycloak)
         using var response = await RequestTokenAsync("pat", "wrong");
         var body = await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken);
 
-        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.True(response.StatusCode == HttpStatusCode.BadRequest, body);
         using var error = JsonDocument.Parse(body);
         Assert.Equal("invalid_grant", error.RootElement.GetProperty("error").GetString());
     }

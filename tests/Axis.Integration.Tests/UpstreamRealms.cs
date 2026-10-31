@@ -205,7 +205,7 @@ public sealed partial class UpstreamRealms : IDisposable
 
         representation["config"] = JsonSerializer.SerializeToElement(config);
         using var updated = await SendAsync(HttpMethod.Put, path, representation);
-        Assert.Equal(HttpStatusCode.NoContent, updated.StatusCode);
+        Assert.True(updated.StatusCode == HttpStatusCode.NoContent, await updated.Content.ReadAsStringAsync(TestContext.Current.CancellationToken));
     }
 
     /// <summary>
