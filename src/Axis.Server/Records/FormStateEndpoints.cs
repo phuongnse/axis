@@ -102,7 +102,7 @@ internal static class FormStateEndpoints
                     return Grants.PendingFilter();
                 }
 
-                if (await RecordCommand.MatchAsync(connection, null, application, entity, recordId, filters, user.Id, loggerFactory, cancellationToken) is not { Found: true, Matched: true })
+                if (await RecordCommand.MatchAsync(connection, null, application, entity, recordId, filters, user.Id, RecordEndpoints.Cipher(sensitive, tenants), loggerFactory, cancellationToken) is not { Found: true, Matched: true })
                 {
                     return RecordNotFound();
                 }

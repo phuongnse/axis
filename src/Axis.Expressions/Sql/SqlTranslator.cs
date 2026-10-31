@@ -23,7 +23,12 @@ namespace Axis.Expressions.Sql;
 /// <c>count(list)</c> and <c>count(list, condition)</c> over a child collection or a references field
 /// at the filter's top level are subqueries, <c>EXISTS</c> or <c>count(*)</c>, over the source the
 /// caller's <c>collection</c> callback gives. A row whose condition is null does not count. Without that
-/// callback, and for every other aggregate, an aggregate is not in the subset.
+/// callback, and for every other aggregate, an aggregate is not in the subset. With a
+/// <c>lookupColumn</c> callback, <c>field == literal</c> and <c>field != literal</c> at the filter's top level,
+/// in either order and with a literal other than <c>null</c>, over a field the callback gives a lookup column for,
+/// compare that column with a <c>bytea[]</c> parameter <c>@fl0</c>, <c>@fl1</c>, … (the parameter prefix and <c>l</c>) instead of the field. The literal
+/// is not a parameter then, it is reported in <see cref="SqlTranslationResult.Lookups"/> for the caller to hash.
+/// <c>==</c> is never null, and <c>!=</c> also holds for an empty field, as <c>IS DISTINCT FROM</c> does.
 /// </summary>
 public static class SqlTranslator
 {
@@ -53,6 +58,8 @@ public static class SqlTranslator
     /// application's time zone, which <c>today()</c> and <c>toDate</c> use. It is UTC when null.
     /// <paramref name="collection"/> gives the subquery source of the child collection or references
     /// field named in <c>any</c> or <c>count</c>. Without it, every aggregate is not translated.
+    /// <paramref name="lookupColumn"/> maps a field path to the SQL text of its lookup column, or to
+    /// null when the field has none.
     /// </summary>
     public static SqlTranslationResult Translate(
         ExpressionNode expression,
@@ -60,8 +67,9 @@ public static class SqlTranslator
         ExpressionCheckResult? check = null,
         string parameterPrefix = "f",
         TimeZoneInfo? timeZone = null,
-        Func<string, SqlCollection>? collection = null) =>
-        TranslateCountingNodes(expression, column, check, parameterPrefix, timeZone, collection).Result;
+        Func<string, SqlCollection>? collection = null,
+        Func<IReadOnlyList<string>, string?>? lookupColumn = null) =>
+        TranslateCountingNodes(expression, column, check, parameterPrefix, timeZone, collection, lookupColumn).Result;
 
     /// <summary>
     /// Translates like <see cref="Translate"/> and also gives the syntax nodes counted for the
@@ -73,7 +81,8 @@ public static class SqlTranslator
         ExpressionCheckResult? check = null,
         string parameterPrefix = "f",
         TimeZoneInfo? timeZone = null,
-        Func<string, SqlCollection>? collection = null)
+        Func<string, SqlCollection>? collection = null,
+        Func<IReadOnlyList<string>, string?>? lookupColumn = null)
     {
         ArgumentNullException.ThrowIfNull(expression);
         ArgumentNullException.ThrowIfNull(column);
@@ -81,6 +90,7 @@ public static class SqlTranslator
 
         var ruleCalls = check?.RuleCalls ?? new Dictionary<CallNode, ExpressionRule>(ReferenceEqualityComparer.Instance);
         var parameters = new List<SqlValue>();
+        var lookups = new List<SqlLookup>();
         var size = new InlinedSize();
         try
         {
@@ -91,8 +101,10 @@ public static class SqlTranslator
                 parameters,
                 ruleCalls,
                 parameterPrefix,
-                timeZone ?? TimeZoneInfo.Utc).Render(expression);
-            return (new SqlTranslationResult(sql, parameters, null), size.Nodes);
+                timeZone ?? TimeZoneInfo.Utc,
+                lookupColumn,
+                lookups).Render(expression);
+            return (new SqlTranslationResult(sql, parameters, null) { Lookups = lookups }, size.Nodes);
         }
         catch (TranslationFailure failure)
         {
@@ -106,7 +118,9 @@ public static class SqlTranslator
         List<SqlValue> parameters,
         IReadOnlyDictionary<CallNode, ExpressionRule> ruleCalls,
         string parameterPrefix,
-        TimeZoneInfo timeZone)
+        TimeZoneInfo timeZone,
+        Func<IReadOnlyList<string>, string?>? lookupColumn,
+        List<SqlLookup> lookups)
     {
         /// <summary>The rule calls of the expression being rendered: the filter's, or the body's inside a rule.</summary>
         private IReadOnlyDictionary<CallNode, ExpressionRule> _ruleCalls = ruleCalls;
@@ -182,6 +196,11 @@ public static class SqlTranslator
                 throw Fail("Operator '/' is not translated to SQL", binary.Offset);
             }
 
+            if (Lookup(binary) is { } lookup)
+            {
+                return lookup;
+            }
+
             var left = Render(binary.Left);
             var right = Render(binary.Right);
             var op = binary.Operator switch
@@ -201,6 +220,49 @@ public static class SqlTranslator
             };
             return $"({left} {op} {right})";
         }
+
+        /// <summary>
+        /// The exact lookup form of <c>field == literal</c> or <c>field != literal</c>, or null when
+        /// <paramref name="binary"/> is not one the callback gives a lookup column for. Neither form is ever
+        /// SQL <c>NULL</c>, so both keep the meaning of <c>IS NOT DISTINCT FROM</c> and <c>IS DISTINCT FROM</c>, also under <c>NOT</c>.
+        /// </summary>
+        private string? Lookup(BinaryNode binary)
+        {
+            if (lookupColumn is null
+                || binary.Operator is not (BinaryOperator.Equal or BinaryOperator.NotEqual)
+                || _bindings is not null
+                || !ReferenceEquals(_column, _filterColumn))
+            {
+                return null;
+            }
+
+            var (field, literal) = binary.Left is NameNode ? (binary.Left, binary.Right) : (binary.Right, binary.Left);
+            if (field is not NameNode name || LiteralValue(literal) is not var (kind, value))
+            {
+                return null;
+            }
+
+            IReadOnlyList<string> path = [name.Name];
+            if (lookupColumn(path) is not { } sql)
+            {
+                return null;
+            }
+
+            var parameter = parameterPrefix + "l" + lookups.Count.ToString(CultureInfo.InvariantCulture);
+            lookups.Add(new SqlLookup(parameter, path, kind, value));
+            return binary.Operator == BinaryOperator.Equal
+                ? $"({sql} IS NOT NULL AND {sql} = ANY(@{parameter}))"
+                : $"({sql} IS NULL OR NOT ({sql} = ANY(@{parameter})))";
+        }
+
+        private static (ExpressionTypeKind Kind, object Value)? LiteralValue(ExpressionNode node) => node switch
+        {
+            IntegerLiteral literal => (ExpressionTypeKind.Integer, literal.Value),
+            DecimalLiteral literal => (ExpressionTypeKind.Decimal, literal.Value),
+            TextLiteral literal => (ExpressionTypeKind.Text, literal.Value),
+            BooleanLiteral literal => (ExpressionTypeKind.Boolean, literal.Value),
+            _ => null,
+        };
 
         /// <summary>A <c>null</c> operand is false, never <c>null</c>, as in the interpreter. The operand is rendered once.</summary>
         private string In(InNode inNode)

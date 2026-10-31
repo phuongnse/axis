@@ -1,6 +1,8 @@
 using System.Security.Cryptography;
 using Axis.Configuration.Model;
+using Axis.Core.Tenancy;
 using Axis.Data.Files;
+using Axis.Data.Records;
 using Axis.Policy;
 using Axis.Processes.Records;
 using Axis.Server.Applications;
@@ -82,6 +84,8 @@ internal static class FileEndpoints
         HttpContext httpContext,
         ActiveApplicationResolver resolver,
         TenantDatabase database,
+        SensitiveValues sensitive,
+        ITenantContextAccessor tenants,
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
@@ -120,7 +124,7 @@ internal static class FileEndpoints
         // The entity is known only now, so a pending filter is a 404 too: a 409 would show that the file exists.
         if (read.Filters is { } filters
             && (await RecordCommand.ReadsPendingAsync(connection, database.ReadTransaction, application, owner, filters, loggerFactory, cancellationToken)
-                || await RecordCommand.MatchAsync(connection, database.ReadTransaction, application, owner, file.OwnerRecordId, filters, user.Id, loggerFactory, cancellationToken) is not { Found: true, Matched: true }))
+                || await RecordCommand.MatchAsync(connection, database.ReadTransaction, application, owner, file.OwnerRecordId, filters, user.Id, RecordEndpoints.Cipher(sensitive, tenants), loggerFactory, cancellationToken) is not { Found: true, Matched: true }))
         {
             return FileNotFound();
         }

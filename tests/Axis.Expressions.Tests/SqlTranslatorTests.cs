@@ -587,6 +587,80 @@ public sealed class SqlTranslatorTests
         };
     }
 
+    private const string LookupColumn = "r.f_t_lookup";
+
+    [Theory]
+    [InlineData("t == 'x'", "(r.f_t_lookup IS NOT NULL AND r.f_t_lookup = ANY(@fl0))")]
+    [InlineData("'x' == t", "(r.f_t_lookup IS NOT NULL AND r.f_t_lookup = ANY(@fl0))")]
+    [InlineData("t != 'x'", "(r.f_t_lookup IS NULL OR NOT (r.f_t_lookup = ANY(@fl0)))")]
+    [InlineData("'x' != t", "(r.f_t_lookup IS NULL OR NOT (r.f_t_lookup = ANY(@fl0)))")]
+    [InlineData("not (t == 'x')", "(NOT (r.f_t_lookup IS NOT NULL AND r.f_t_lookup = ANY(@fl0)))")]
+    public void An_equality_on_a_lookup_field_renders_against_the_lookup_column_with_one_lookup_and_no_literal(string expression, string sql)
+    {
+        var result = TranslateWithLookup(expression);
+
+        Assert.True(result.Succeeded, result.Diagnostic?.Message);
+        Assert.Equal(sql, result.Sql);
+        Assert.Empty(result.Parameters);
+        var lookup = Assert.Single(result.Lookups);
+        Assert.Equal(("fl0", ExpressionTypeKind.Text, "x"), (lookup.Name, lookup.Kind, lookup.Value));
+        Assert.Equal(["t"], lookup.Path);
+    }
+
+    [Fact]
+    public void A_lookup_keeps_the_prefix_and_numbers_each_lookup_apart_from_the_literal_parameters()
+    {
+        var parsed = ExpressionParser.Parse("t == 'x' and i == 3 and t != 'y'");
+        Assert.True(parsed.Succeeded, parsed.Diagnostic?.Message);
+
+        var result = SqlTranslator.Translate(
+            parsed.Expression, Column, parameterPrefix: "g0f", lookupColumn: path => path is ["t"] ? LookupColumn : null);
+
+        Assert.True(result.Succeeded, result.Diagnostic?.Message);
+        Assert.Equal(["g0fl0", "g0fl1"], result.Lookups.Select(lookup => lookup.Name));
+        var parameter = Assert.Single(result.Parameters);
+        Assert.Equal(("g0f0", 3L), (parameter.Name, parameter.Value));
+        Assert.Contains("@g0fl1", result.Sql, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("i == 3")]
+    [InlineData("t == null")]
+    [InlineData("t is null")]
+    [InlineData("t == t")]
+    [InlineData("length(t) == 3")]
+    public void Anything_else_on_a_lookup_field_or_a_field_without_a_lookup_column_renders_as_before(string expression)
+    {
+        var parsed = ExpressionParser.Parse(expression);
+        Assert.True(parsed.Succeeded, parsed.Diagnostic?.Message);
+        var check = ExpressionTypeChecker.Check(parsed.Expression, _scope, ExpressionType.Boolean);
+        Assert.True(check.Succeeded, check.Diagnostic?.Message);
+
+        var plain = SqlTranslator.Translate(parsed.Expression, Column);
+        var withCallback = SqlTranslator.Translate(parsed.Expression, Column, lookupColumn: path => path is ["t"] ? LookupColumn : null);
+
+        Assert.Equal(plain.Sql, withCallback.Sql);
+        Assert.Empty(withCallback.Lookups);
+    }
+
+    [Fact]
+    public void Without_a_lookup_callback_an_equality_on_the_field_renders_as_before()
+    {
+        var result = Translate("t == 'x'");
+
+        Assert.Equal("(\"t\" IS NOT DISTINCT FROM @f0)", result.Sql);
+        Assert.Empty(result.Lookups);
+    }
+
+    private static SqlTranslationResult TranslateWithLookup(string expression)
+    {
+        var parsed = ExpressionParser.Parse(expression);
+        Assert.True(parsed.Succeeded, parsed.Diagnostic?.Message);
+        var check = ExpressionTypeChecker.Check(parsed.Expression, _scope, ExpressionType.Boolean);
+        Assert.True(check.Succeeded, check.Diagnostic?.Message);
+        return SqlTranslator.Translate(parsed.Expression, Column, lookupColumn: path => path is ["t"] ? LookupColumn : null);
+    }
+
     /// <summary>Parses and type-checks <paramref name="expression"/> as a boolean over the fields and <paramref name="rules"/>, then translates it.</summary>
     private static SqlTranslationResult TranslateWithRules(string expression, IEnumerable<ExpressionRule> rules)
     {

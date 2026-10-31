@@ -264,6 +264,34 @@ public sealed class SensitiveValuesTests
         Assert.Contains("lookup key", exception.Message, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task A_value_is_hashed_under_each_lookup_key_in_the_order_of_their_numbers()
+    {
+        var cipher = CipherWith(Key(TenantKeyKind.Data, 1), Key(TenantKeyKind.Lookup, 3), Key(TenantKeyKind.Lookup, 1));
+
+        var hashes = await cipher.LookupAllAsync(Tenant, _entityId, new RecordValue(_text, "x"), CancellationToken.None);
+
+        Assert.Equal(2, hashes.Count);
+        Assert.Equal([0, 0, 0, 1], hashes[0][..4]);
+        Assert.Equal([0, 0, 0, 3], hashes[1][..4]);
+        foreach (var number in new[] { 1, 3 })
+        {
+            var single = CipherWith(Key(TenantKeyKind.Lookup, number));
+            var hash = await single.LookupTextAsync(Tenant, _entityId, "note", "x", CancellationToken.None);
+            Assert.Contains(hashes, candidate => candidate.SequenceEqual(hash));
+        }
+    }
+
+    [Fact]
+    public async Task A_null_value_and_a_tenant_without_a_lookup_key_have_no_hashes_to_look_up()
+    {
+        var withoutLookup = CipherWith(Key(TenantKeyKind.Data, 1));
+        var withLookup = CipherWith(Key(TenantKeyKind.Lookup, 1));
+
+        Assert.Empty(await withoutLookup.LookupAllAsync(Tenant, _entityId, new RecordValue(_text, "x"), CancellationToken.None));
+        Assert.Empty(await withLookup.LookupAllAsync(Tenant, _entityId, new RecordValue(_text, null), CancellationToken.None));
+    }
+
     private static async Task AssertFailsAsync(SensitiveValues cipher, SensitiveValueScope scope, FieldModel field, byte[] stored) =>
         await Assert.ThrowsAsync<SensitiveValueDecryptionException>(() => cipher.DecryptAsync(scope, field, stored, CancellationToken.None));
 

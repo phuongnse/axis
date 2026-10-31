@@ -344,7 +344,8 @@ user:
   `AXC0016` at `/fields/{i}/type`, even with a `convert`, until activation can
   encrypt the stored values _(planned for M27)_, see
   [changing the flag](data-encryption.md#changing-the-flag).
-- **Uses it cannot serve.** A filter, sort, aggregate, group field, index,
+- **Uses it cannot serve.** A filter (except the equality of an exact lookup in
+  a grant's `filter`), sort, aggregate, group field, index,
   `unique`, `searchable`, stored computed field, migration `fill` or `convert`
   target or value, or other expression that runs as SQL on the field is
   [`AXC0308`](diagnostic-codes.md), and a caller's `sort` on it in the record
@@ -353,7 +354,8 @@ user:
 - **Encrypted at rest** _(planned for M27)_. The value is stored encrypted under
   its tenant's data key, and adding or removing the flag encrypts or decrypts the
   stored values in a migration. A field that declares an exact lookup may be
-  filtered for equality. The record API still shows the field to users whose
+  tested with `==` or `!=` against a literal other than `null` in a grant's
+  `filter`, see [exact lookup](data-encryption.md#exact-lookup). The record API still shows the field to users whose
   grants cover it. See
   [D109](../decisions/d109-sensitive-fields-and-backups-are-encrypted-and-history-keeps-no-names.md) and
   [data encryption](data-encryption.md), which also describes `exactLookup`.

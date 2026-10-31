@@ -185,7 +185,7 @@ internal sealed partial class RecordImportCommitHandler(
             {
                 var (match, keyFailure) = key is null
                     ? (null, null)
-                    : await key.FindAsync(connection, transaction, application, entity, actor, resolved, loggerFactory, cancellationToken);
+                    : await key.FindAsync(connection, transaction, application, entity, actor, resolved, cipher, loggerFactory, cancellationToken);
                 var update = match is not null;
                 var result = keyFailure
                     ?? (match is null

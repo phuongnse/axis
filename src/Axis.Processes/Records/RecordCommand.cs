@@ -296,7 +296,7 @@ public static class RecordCommand
             return WriteResult(result);
         }
 
-        if (!await WithinFiltersAsync(connection, transaction, application, model, written.Id, access, actor.Id, loggerFactory, cancellationToken))
+        if (!await WithinFiltersAsync(connection, transaction, application, model, written.Id, access, actor.Id, cipher, loggerFactory, cancellationToken))
         {
             return new RecordCommandResult(RecordCommandOutcome.OutsideFilters);
         }
@@ -399,7 +399,7 @@ public static class RecordCommand
         // An update needs the stored record to be readable, then to match an update filter. Each
         // check gives the version it saw, which the body must name, so a write in between cannot
         // carry the record past them.
-        var (access, checkedVersions, denied) = await CheckUpdateAccessAsync(connection, null, application, model, recordId, actor, loggerFactory, cancellationToken);
+        var (access, checkedVersions, denied) = await CheckUpdateAccessAsync(connection, null, application, model, recordId, actor, cipher, loggerFactory, cancellationToken);
         if (denied is not null)
         {
             return denied;
@@ -605,7 +605,7 @@ public static class RecordCommand
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
-        var (access, checkedVersions, denied) = await CheckUpdateAccessAsync(connection, transaction, application, model, recordId, actor, loggerFactory, cancellationToken);
+        var (access, checkedVersions, denied) = await CheckUpdateAccessAsync(connection, transaction, application, model, recordId, actor, cipher, loggerFactory, cancellationToken);
         if (denied is not null)
         {
             return new UpdatePrepared(null, null, null, denied);
@@ -657,6 +657,7 @@ public static class RecordCommand
         EntityModel model,
         Guid recordId,
         RecordActor actor,
+        RecordCipher? cipher,
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
@@ -680,7 +681,7 @@ public static class RecordCommand
                 return (null, checkedVersions, new RecordCommandResult(RecordCommandOutcome.PendingFilter));
             }
 
-            var match = await MatchAsync(connection, transaction, application, model, recordId, readFilters, actor.Id, loggerFactory, cancellationToken);
+            var match = await MatchAsync(connection, transaction, application, model, recordId, readFilters, actor.Id, cipher, loggerFactory, cancellationToken);
             if (match is not { Found: true, Matched: true })
             {
                 return (null, checkedVersions, new RecordCommandResult(RecordCommandOutcome.NotFound));
@@ -691,7 +692,7 @@ public static class RecordCommand
 
         if (access.Filters is { } updateFilters)
         {
-            var match = await MatchAsync(connection, transaction, application, model, recordId, updateFilters, actor.Id, loggerFactory, cancellationToken);
+            var match = await MatchAsync(connection, transaction, application, model, recordId, updateFilters, actor.Id, cipher, loggerFactory, cancellationToken);
             if (!match.Found)
             {
                 return (null, checkedVersions, new RecordCommandResult(RecordCommandOutcome.NotFound));
@@ -746,7 +747,7 @@ public static class RecordCommand
             return WriteResult(result);
         }
 
-        if (!await WithinFiltersAsync(connection, transaction, application, model, written.Id, access, actor.Id, loggerFactory, cancellationToken))
+        if (!await WithinFiltersAsync(connection, transaction, application, model, written.Id, access, actor.Id, cipher, loggerFactory, cancellationToken))
         {
             return new RecordCommandResult(RecordCommandOutcome.OutsideFilters);
         }
@@ -770,7 +771,7 @@ public static class RecordCommand
 
     private sealed record UpdatePrepared(RecordAccess? Access, RecordInput? Input, RecordComputeResult? Computed, RecordCommandResult? Failure);
 
-    /// <summary>Deletes the record with <paramref name="recordId"/>.</summary>
+    /// <summary>Deletes the record with <paramref name="recordId"/>. <paramref name="cipher"/> hashes the literal of a filter on an exact lookup field.</summary>
     public static async Task<RecordCommandResult> DeleteAsync(
         NpgsqlConnection connection,
         string tenantId,
@@ -779,6 +780,7 @@ public static class RecordCommand
         EntityModel model,
         Guid recordId,
         RecordActor actor,
+        RecordCipher? cipher,
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken,
         TimeSpan? writeTimeout = null)
@@ -824,7 +826,7 @@ public static class RecordCommand
 
             if (!await RecordCommands.LockAsync(connection, model, recordId, cancellationToken)
                 || (read.Filters is { } readFilters
-                    && await MatchAsync(connection, transaction, application, model, recordId, readFilters, actor.Id, loggerFactory, cancellationToken) is not { Found: true, Matched: true }))
+                    && await MatchAsync(connection, transaction, application, model, recordId, readFilters, actor.Id, cipher, loggerFactory, cancellationToken) is not { Found: true, Matched: true }))
             {
                 await transaction.RollbackAsync(cancellationToken);
                 return new RecordCommandResult(RecordCommandOutcome.NotFound);
@@ -838,7 +840,7 @@ public static class RecordCommand
                     return new RecordCommandResult(RecordCommandOutcome.PendingFilter);
                 }
 
-                if (!await WithinFiltersAsync(connection, transaction, application, model, recordId, access, actor.Id, loggerFactory, cancellationToken))
+                if (!await WithinFiltersAsync(connection, transaction, application, model, recordId, access, actor.Id, cipher, loggerFactory, cancellationToken))
                 {
                     await transaction.RollbackAsync(cancellationToken);
                     return new RecordCommandResult(RecordCommandOutcome.OutsideFilters);
@@ -885,7 +887,7 @@ public static class RecordCommand
     /// <summary>
     /// Checks the record with <paramref name="recordId"/> against <paramref name="filters"/> for the
     /// actor with id <paramref name="actorId"/>, and logs the policy and grant of each filter that
-    /// failed for it.
+    /// failed for it. <paramref name="cipher"/> hashes the literal of a filter on an exact lookup field.
     /// </summary>
     public static async Task<RecordFilterMatch> MatchAsync(
         NpgsqlConnection connection,
@@ -895,11 +897,12 @@ public static class RecordCommand
         Guid recordId,
         IReadOnlyList<RecordFilter> filters,
         string actorId,
+        RecordCipher? cipher,
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
         var match = await RecordFilters.MatchAsync(
-            connection, transaction, application, model, recordId, Expressions(filters), actorId, cancellationToken);
+            connection, transaction, application, model, recordId, Expressions(filters), actorId, cipher, cancellationToken);
         if (match.Failed.Count > 0)
         {
             var logger = loggerFactory.CreateLogger(typeof(RecordCommand).FullName!);
@@ -1007,10 +1010,11 @@ public static class RecordCommand
         Guid recordId,
         RecordAccess access,
         string actorId,
+        RecordCipher? cipher,
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken) =>
         access.Filters is not { } filters
-        || (await MatchAsync(connection, transaction, application, model, recordId, filters, actorId, loggerFactory, cancellationToken)).Matched;
+        || (await MatchAsync(connection, transaction, application, model, recordId, filters, actorId, cipher, loggerFactory, cancellationToken)).Matched;
 
     /// <summary>
     /// Appends <paramref name="audit"/>, runs <paramref name="beforeCommit"/> and commits the write

@@ -103,6 +103,31 @@ public sealed class SensitiveValues(TenantKeys keys)
         var key = await keys.NewestAsync(tenantId, TenantKeyKind.Lookup, cancellationToken)
             ?? throw new TenantDataKeyMissingException(tenantId, TenantKeyKind.Lookup);
 
+        return Hash(key, tenantId, entityId, fieldName, text);
+    }
+
+    /// <summary>
+    /// Returns the lookup hash of the value under each lookup key of the tenant, one for each key, ordered by key number, so a
+    /// record written under an older key still matches while keys are rotated. It is empty for a null value and for a tenant
+    /// without a lookup key.
+    /// </summary>
+    public async Task<IReadOnlyList<byte[]>> LookupAllAsync(string tenantId, Guid entityId, RecordValue value, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(tenantId);
+        ArgumentNullException.ThrowIfNull(value);
+
+        if (value.Value is null)
+        {
+            return [];
+        }
+
+        var text = ToText(value);
+        return [.. (await keys.AllAsync(tenantId, TenantKeyKind.Lookup, cancellationToken))
+            .Select(key => Hash(key, tenantId, entityId, value.Field.Name, text))];
+    }
+
+    private static byte[] Hash(TenantKey key, string tenantId, Guid entityId, string fieldName, string text)
+    {
         var message = new List<byte>(Parts([tenantId, entityId.ToString("D"), fieldName.ToLowerInvariant()]));
         message.AddRange(Encoding.UTF8.GetBytes(text));
 

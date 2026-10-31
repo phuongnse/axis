@@ -209,7 +209,7 @@ internal static class ProcessStartEndpoints
         if (!await RecordCommands.LockAsync(connection, entity, subjectId, cancellationToken)
             || !read.Granted
             || (read.Filters is { } filters
-                && await RecordCommand.MatchAsync(connection, transaction, application, entity, subjectId, filters, user.Id, loggerFactory, cancellationToken)
+                && await RecordCommand.MatchAsync(connection, transaction, application, entity, subjectId, filters, user.Id, cipher, loggerFactory, cancellationToken)
                     is not { Found: true, Matched: true })
             || await RecordQueries.GetAsync(connection, application, entity, subjectId, cipher, cancellationToken) is not { } record)
         {
