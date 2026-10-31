@@ -509,7 +509,7 @@ public static class RecordCommand
     /// checks it, up to and including the entity's validations, and writes nothing. It runs in
     /// <paramref name="transaction"/>, a transaction the caller owns. The result is <see langword="null"/> when the
     /// update would pass these checks, and the failure otherwise. Storage can still refuse the write, for example on a
-    /// unique value that is taken.
+    /// unique value that is taken. <paramref name="cipher"/> decrypts the sensitive values of the stored record.
     /// </summary>
     public static async Task<RecordCommandResult?> CheckUpdateAsync(
         NpgsqlConnection connection,
@@ -520,6 +520,7 @@ public static class RecordCommand
         RecordActor actor,
         ReadOnlyMemory<byte> body,
         DateTimeOffset now,
+        RecordCipher? cipher,
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
@@ -530,7 +531,7 @@ public static class RecordCommand
         ArgumentNullException.ThrowIfNull(actor);
         ArgumentNullException.ThrowIfNull(loggerFactory);
 
-        return (await PrepareUpdateInTransactionAsync(connection, transaction, application, model, recordId, actor, body, now, null, loggerFactory, cancellationToken)).Failure;
+        return (await PrepareUpdateInTransactionAsync(connection, transaction, application, model, recordId, actor, body, now, cipher, loggerFactory, cancellationToken)).Failure;
     }
 
     /// <summary>
