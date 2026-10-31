@@ -61,7 +61,9 @@
 # makes a throwaway certificate with openssl for the run, in a temporary folder that it removes at the end, and gives
 # Playwright its paths as AXIS_E2E_TLS_CERT and AXIS_E2E_TLS_KEY. It also gives AXIS_E2E_TENANT_HTTPS_PORT (default
 # 5283), the https port of the server that the spec starts after tenant create. That server reads its tenants from the
-# tenant directory and stops when the test ends. The spec's browser maps the tenant host on port 443 to it.
+# tenant directory and stops when the test ends. The spec's browser maps the tenant host on port 443 to it. The same
+# spec runs the M28 journey on that tenant: its first administrator disables a person on the users page, the person's
+# sign-in is refused until the administrator enables them, and after tenant host add a person signs in on the added host.
 # Playwright and the services it starts are skipped when every path changed since NexKit's commit (see
 # scripts/lib/affected.mjs) is under docs/, .github/ or .nexkit/ or is a Markdown file. The smoke tests run in scripts/smoke.sh.
 # The design-system bundle is built and checked into artifacts/design-system before Playwright runs. Its spec

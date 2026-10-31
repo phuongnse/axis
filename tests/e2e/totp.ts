@@ -37,6 +37,18 @@ export function totp(secret: string | Uint8Array, at = Date.now()) {
   return String(binary % 1_000_000).padStart(6, "0");
 }
 
+/**
+ * A code for `secret` that differs from `used`, the code that the same person gave before. Keycloak refuses a code that
+ * was used in its period, so this waits for the next period when the current code is `used`.
+ */
+export async function nextTotp(secret: string | Uint8Array, used: string) {
+  while (totp(secret) === used) {
+    const wait = period * 1000 - (Date.now() % (period * 1000)) + 500;
+    await new Promise((resolve) => setTimeout(resolve, wait));
+  }
+  return totp(secret);
+}
+
 /** The Base32 secret of `user`'s `otp` credential in the development realm file, which is the only place that holds it. */
 export function totpSecret(user: string) {
   const realm = JSON.parse(
