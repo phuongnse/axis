@@ -202,7 +202,7 @@ and a JSON view, and shows the diagnostics.
 
 ## Console settings
 
-_(planned for M23)_ One server setting controls the
+One server setting controls the
 [operator console](operator-console.md), as
 [D93](../decisions/d93-an-operator-web-console.md) agrees.
 
@@ -212,7 +212,8 @@ _(planned for M23)_ One server setting controls the
   no value nobody may. The Development settings set it to `platform-operator`, apart from the `operator` role of the purchase request sample.
   Application policies play no part. `GET /api/me` answers `console: true` for
   a user who holds it, and `console: false` for everyone when no value is set. That endpoint
-  already reads the setting. The console itself is planned for M23.
+  already reads the setting. The route `GET /api/console/tenant` and the Tenant view of the
+  console are built, and the other views are planned for M23.
 
 ## Users settings
 

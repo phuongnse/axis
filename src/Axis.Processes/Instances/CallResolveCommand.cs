@@ -325,7 +325,7 @@ public static class CallResolveCommand
             }
 
             var now = await RecordQueries.TransactionTimeAsync(connection, cancellationToken);
-            var written = await RecordCommands.SetAsync(connection, pinned, subject, target.ReleaseId, record, values, now, cancellationToken);
+            var written = await RecordCommands.SetAsync(connection, pinned, subject, target.ReleaseId, record, values, now, cancellationToken: cancellationToken);
             if (written is not { Outcome: RecordWriteOutcome.Written, Record: { } stored })
             {
                 return new CallResolveResult(CallResolveOutcome.Invalid, Errors: Remap(written, target.Mappings));

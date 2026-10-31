@@ -76,6 +76,10 @@
           "clientRole": true
         },
         {
+          "name": "platform-operator",
+          "clientRole": true
+        },
+        {
           "name": "purchasing-system",
           "clientRole": true
         },
@@ -680,6 +684,34 @@
       "clientRoles": {
         "axis": [
           "tenant-administrator"
+        ]
+      }
+    },
+    {
+      "id": "platform-operator",
+      "username": "platform-operator",
+      "enabled": true,
+      "email": "platform-operator@axis.local",
+      "emailVerified": true,
+      "firstName": "Platform Operator",
+      "lastName": "User",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "axis",
+          "temporary": false
+        },
+        {
+          "type": "otp",
+          "userLabel": "Development authenticator",
+          "secretData": "{\"value\":\"5CUMQN44XZLQUYTJVW7OU2ZIDA2VULEZ\"}",
+          "credentialData": "{\"subType\":\"totp\",\"digits\":6,\"counter\":0,\"period\":30,\"algorithm\":\"HmacSHA1\",\"secretEncoding\":\"BASE32\"}"
+        }
+      ],
+      "requiredActions": [],
+      "clientRoles": {
+        "axis": [
+          "platform-operator"
         ]
       }
     },

@@ -34,6 +34,7 @@ public sealed class RecordCommandTests(RecordApiFixture fixture) : IClassFixture
             new RecordActor("rita", ["reader"]),
             Body,
             null,
+            null,
             NullLoggerFactory.Instance,
             CancellationToken);
 
@@ -59,6 +60,7 @@ public sealed class RecordCommandTests(RecordApiFixture fixture) : IClassFixture
             item,
             new RecordActor("cmd-actor", ["employee"]),
             Body,
+            null,
             null,
             NullLoggerFactory.Instance,
             CancellationToken);
@@ -88,6 +90,7 @@ public sealed class RecordCommandTests(RecordApiFixture fixture) : IClassFixture
             new RecordActor("cmd-actor", ["employee"]),
             Body,
             null,
+            null,
             NullLoggerFactory.Instance,
             CancellationToken);
 
@@ -113,6 +116,7 @@ public sealed class RecordCommandTests(RecordApiFixture fixture) : IClassFixture
             reminder,
             new RecordActor(AuditActors.System, ["employee"]),
             _ => Task.FromResult<byte[]?>(Encoding.UTF8.GetBytes("""{ "values": { "title": "Sys" } }""")),
+            null,
             null,
             NullLoggerFactory.Instance,
             CancellationToken);

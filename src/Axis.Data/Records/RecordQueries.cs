@@ -40,7 +40,7 @@ public static class RecordQueries
     /// (SQLSTATE 57014) then leaves <see cref="RecordPage.TotalCount"/> null, and the page is still
     /// read. Without a transaction that error is thrown.
     /// </summary>
-    public static async Task<RecordPage?> ListAsync(
+    public static Task<RecordPage?> ListAsync(
         NpgsqlConnection connection,
         NpgsqlTransaction? transaction,
         EntityModel entity,
@@ -49,6 +49,23 @@ public static class RecordQueries
         RecordSort? sort,
         RecordSearch? search,
         RecordCondition? condition = null,
+        CancellationToken cancellationToken = default) =>
+        ListAsync(connection, transaction, entity, page, pageSize, sort, search, condition, null, cancellationToken);
+
+    /// <summary>
+    /// Reads a page as the list without a cipher does, and decrypts the sensitive values with <paramref name="cipher"/>.
+    /// Without a cipher, a record that holds a stored sensitive value throws.
+    /// </summary>
+    public static async Task<RecordPage?> ListAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction? transaction,
+        EntityModel entity,
+        int page,
+        int pageSize,
+        RecordSort? sort,
+        RecordSearch? search,
+        RecordCondition? condition,
+        RecordCipher? cipher,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(connection);
@@ -95,7 +112,9 @@ public static class RecordQueries
             await using var reader = await command.ExecuteReaderAsync(cancellationToken);
             while (await reader.ReadAsync(cancellationToken))
             {
-                items.Add(ReadRecord(reader, entity));
+                var storedValues = new List<(FieldModel Field, byte[] Stored)>();
+                var item = ReadRecord(reader, entity, storedValues);
+                items.Add(await RecordCipher.OpenAsync(cipher, entity, item, storedValues, cancellationToken));
             }
 
             return new RecordPage(items, totalCount);
@@ -113,6 +132,20 @@ public static class RecordQueries
     /// error is thrown as it is, including a data exception (SQLSTATE class 22) that the
     /// <paramref name="condition"/> raises for some record, which the caller maps.
     /// </summary>
+    public static IAsyncEnumerable<Record> ReadAllAsync(
+        NpgsqlConnection connection,
+        EntityModel entity,
+        RecordSort? sort,
+        RecordSearch? search,
+        RecordCondition? condition,
+        int limit,
+        CancellationToken cancellationToken = default) =>
+        ReadAllAsync(connection, entity, sort, search, condition, limit, null, cancellationToken);
+
+    /// <summary>
+    /// Streams the records as the stream without a cipher does, and decrypts the sensitive values of each with
+    /// <paramref name="cipher"/>. Without a cipher, a record that holds a stored sensitive value throws.
+    /// </summary>
     public static async IAsyncEnumerable<Record> ReadAllAsync(
         NpgsqlConnection connection,
         EntityModel entity,
@@ -120,6 +153,7 @@ public static class RecordQueries
         RecordSearch? search,
         RecordCondition? condition,
         int limit,
+        RecordCipher? cipher,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(connection);
@@ -137,7 +171,9 @@ public static class RecordQueries
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
         {
-            yield return ReadRecord(reader, entity);
+            var storedValues = new List<(FieldModel Field, byte[] Stored)>();
+            var item = ReadRecord(reader, entity, storedValues);
+            yield return await RecordCipher.OpenAsync(cipher, entity, item, storedValues, cancellationToken);
         }
     }
 
@@ -207,19 +243,32 @@ public static class RecordQueries
     /// Reads the record with <paramref name="id"/> and the rows of its child collections, or
     /// <see langword="null"/> when there is none. <paramref name="application"/> declares the child entities.
     /// </summary>
+    public static Task<Record?> GetAsync(
+        NpgsqlConnection connection,
+        ApplicationModel application,
+        EntityModel entity,
+        Guid id,
+        CancellationToken cancellationToken = default) =>
+        GetAsync(connection, application, entity, id, null, cancellationToken);
+
+    /// <summary>
+    /// Reads the record as the read without a cipher does, and decrypts its sensitive values, also in its rows, with
+    /// <paramref name="cipher"/>. Without a cipher, a record that holds a stored sensitive value throws.
+    /// </summary>
     public static async Task<Record?> GetAsync(
         NpgsqlConnection connection,
         ApplicationModel application,
         EntityModel entity,
         Guid id,
+        RecordCipher? cipher,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(connection);
         ArgumentNullException.ThrowIfNull(application);
         ArgumentNullException.ThrowIfNull(entity);
 
-        var record = await FindRowAsync(connection, entity, id, cancellationToken);
-        return record is null ? null : await WithRowsAsync(connection, application, entity, record, cancellationToken);
+        var record = await FindRowAsync(connection, entity, id, cipher, cancellationToken);
+        return record is null ? null : await WithRowsAsync(connection, application, entity, record, cipher, cancellationToken);
     }
 
     /// <summary>
@@ -322,15 +371,26 @@ public static class RecordQueries
     /// of its child collections, in one command. <see langword="null"/> when there is none.
     /// </summary>
     internal static async Task<Record?> FindRowAsync(
-        NpgsqlConnection connection, EntityModel entity, Guid id, CancellationToken cancellationToken)
+        NpgsqlConnection connection, EntityModel entity, Guid id, RecordCipher? cipher, CancellationToken cancellationToken)
     {
         var row = EntityNaming.Quote(RowAlias);
         await using var command = new NpgsqlCommand(
             $"SELECT {SelectList(entity, RowAlias)} FROM {Table(entity)} AS {row}{LabelJoins(entity, RowAlias)} WHERE {row}.{EntityNaming.Quote(EntityNaming.IdColumn)} = @id",
             connection);
         command.Parameters.AddWithValue("id", id);
-        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-        return await reader.ReadAsync(cancellationToken) ? ReadRecord(reader, entity) : null;
+        var storedValues = new List<(FieldModel Field, byte[] Stored)>();
+        Record record;
+        await using (var reader = await command.ExecuteReaderAsync(cancellationToken))
+        {
+            if (!await reader.ReadAsync(cancellationToken))
+            {
+                return null;
+            }
+
+            record = ReadRecord(reader, entity, storedValues);
+        }
+
+        return await RecordCipher.OpenAsync(cipher, entity, record, storedValues, cancellationToken);
     }
 
     /// <summary>
@@ -347,6 +407,7 @@ public static class RecordQueries
         ApplicationModel application,
         EntityModel entity,
         Record record,
+        RecordCipher? cipher,
         CancellationToken cancellationToken)
     {
         var values = new Dictionary<string, JsonNode?>(entity.Fields.Count, StringComparer.Ordinal);
@@ -361,7 +422,7 @@ public static class RecordQueries
             }
             else if (field.Type == FieldType.ChildCollection)
             {
-                var (rows, rowLabels) = await ReadRowsAsync(connection, application, field, record.Id, cancellationToken);
+                var (rows, rowLabels) = await ReadRowsAsync(connection, application, field, record.Id, cipher, cancellationToken);
                 values[field.Name] = rows;
                 if (rowLabels is not null)
                 {
@@ -425,6 +486,7 @@ public static class RecordQueries
         ApplicationModel application,
         FieldModel collection,
         Guid ownerId,
+        RecordCipher? cipher,
         CancellationToken cancellationToken)
     {
         var child = application.FindEntity(collection.Target!.Id)
@@ -433,11 +495,11 @@ public static class RecordQueries
         var references = References(child).ToList();
         var files = Files(child).ToList();
         var alias = EntityNaming.Quote(RowAlias);
-        var selected = columns.Select(field =>
-            alias + "." + EntityNaming.Quote(EntityNaming.Column(field.Name)) + (FieldTypes.HoldsDecimal(field.Type) ? "::text" : ""))
+        var selected = columns.Select(field => alias + "." + ColumnSql(field))
             .Concat(references.Select((field, index) =>
                 $"{EntityNaming.Quote(LabelAlias(index))}.{EntityNaming.Quote(EntityNaming.Column(field.TargetDisplayField!))}"))
-            .Concat(files.Select((_, index) => FileColumns(index)));
+            .Concat(files.Select((_, index) => FileColumns(index)))
+            .Append($"{alias}.{EntityNaming.Quote(EntityNaming.IdColumn)}");
         await using var command = new NpgsqlCommand(
             $"SELECT {string.Join(", ", selected)} FROM {Table(child)} AS {alias}{LabelJoins(child, RowAlias)} WHERE {alias}.{EntityNaming.Quote(EntityNaming.OwnerColumn)} = @owner ORDER BY {alias}.{EntityNaming.Quote(EntityNaming.PositionColumn)}",
             connection);
@@ -445,16 +507,24 @@ public static class RecordQueries
 
         var rows = new JsonArray();
         var labels = references.Count > 0 ? new JsonArray() : null;
+        var sealedRows = new List<(JsonObject Row, Guid RowId, List<(FieldModel Field, byte[] Stored)> Values)>();
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
         {
             var row = new JsonObject();
+            var storedValues = new List<(FieldModel Field, byte[] Stored)>();
             for (var ordinal = 0; ordinal < columns.Count; ordinal++)
             {
-                row[columns[ordinal].Name] = reader.IsDBNull(ordinal) ? null : ReadValue(reader, ordinal, columns[ordinal]);
+                row[columns[ordinal].Name] = reader.IsDBNull(ordinal) ? null : ReadStoredValue(reader, ordinal, columns[ordinal], storedValues);
             }
 
             ReadFiles(reader, columns.Count + references.Count, files, row);
+            if (storedValues.Count > 0)
+            {
+                // The id of the row is the last column, after the labels and the file columns.
+                sealedRows.Add((row, reader.GetGuid(columns.Count + references.Count + (files.Count * 3)), storedValues));
+            }
+
             rows.Add(row);
 
             if (labels is not null)
@@ -470,6 +540,15 @@ public static class RecordQueries
                 }
 
                 labels.Add(rowLabels);
+            }
+        }
+
+        // The decrypted value of a cell is bound to the id of its row.
+        foreach (var (row, rowId, storedValues) in sealedRows)
+        {
+            foreach (var (field, stored) in storedValues)
+            {
+                row[field.Name] = await RecordCipher.DecryptAsync(cipher, child, rowId, field, stored, cancellationToken);
             }
         }
 
@@ -502,7 +581,7 @@ public static class RecordQueries
 
     /// <summary>
     /// The id, the version, then every column field in declaration order, all of the row named
-    /// <paramref name="alias"/>; decimals as text so no digit is lost. Then the display field of
+    /// <paramref name="alias"/>; decimals as text so no digit is lost, and a sensitive field as its stored bytes. Then the display field of
     /// each reference's target, then the name, media type and size of each file field's file, both
     /// joined by <see cref="LabelJoins"/>.
     /// </summary>
@@ -512,13 +591,16 @@ public static class RecordQueries
         return string.Join(", ", [
             row + EntityNaming.Quote(EntityNaming.IdColumn),
             row + EntityNaming.Quote(EntityNaming.VersionColumn),
-            .. Columns(entity).Select(field =>
-                row + EntityNaming.Quote(EntityNaming.Column(field.Name)) + (FieldTypes.HoldsDecimal(field.Type) ? "::text" : "")),
+            .. Columns(entity).Select(field => row + ColumnSql(field)),
             .. References(entity).Select((field, index) =>
                 $"{EntityNaming.Quote(LabelAlias(index))}.{EntityNaming.Quote(EntityNaming.Column(field.TargetDisplayField!))}"),
             .. Files(entity).Select((_, index) => FileColumns(index)),
         ]);
     }
+
+    // A sensitive column holds bytes whatever the type of its field, so it is never cast to text.
+    private static string ColumnSql(FieldModel field) =>
+        EntityNaming.Quote(EntityNaming.Column(field.Name)) + (FieldTypes.HoldsDecimal(field.Type) && !field.Sensitive ? "::text" : "");
 
     private static string FileColumns(int index)
     {
@@ -561,7 +643,12 @@ public static class RecordQueries
     internal static IReadOnlyList<FieldModel> Columns(EntityModel entity) =>
         [.. entity.Fields.Where(field => field.HasColumn)];
 
-    internal static Record ReadRecord(NpgsqlDataReader reader, EntityModel entity)
+    /// <summary>
+    /// Reads the record at the reader's row. The stored bytes of a non-null sensitive value are added to
+    /// <paramref name="storedValues"/> and the value is left <see langword="null"/>, for <see cref="RecordCipher"/> to
+    /// decrypt. Without a list, such a value throws.
+    /// </summary>
+    internal static Record ReadRecord(NpgsqlDataReader reader, EntityModel entity, List<(FieldModel Field, byte[] Stored)>? storedValues = null)
     {
         var columns = Columns(entity);
         var values = new Dictionary<string, JsonNode?>(columns.Count, StringComparer.Ordinal);
@@ -569,7 +656,7 @@ public static class RecordQueries
         {
             var field = columns[index];
             var ordinal = index + 2;
-            values[field.Name] = reader.IsDBNull(ordinal) ? null : ReadValue(reader, ordinal, field);
+            values[field.Name] = reader.IsDBNull(ordinal) ? null : ReadStoredValue(reader, ordinal, field, storedValues);
         }
 
         // A null reference, or a target whose display column is NULL, has no label.
@@ -610,6 +697,24 @@ public static class RecordQueries
 
             ordinal += 3;
         }
+    }
+
+    // A sensitive value is bytes that the cipher opens later, so its value stays null until then.
+    private static JsonValue? ReadStoredValue(
+        NpgsqlDataReader reader, int ordinal, FieldModel field, List<(FieldModel Field, byte[] Stored)>? storedValues)
+    {
+        if (!field.Sensitive)
+        {
+            return ReadValue(reader, ordinal, field);
+        }
+
+        if (storedValues is null)
+        {
+            throw new InvalidOperationException(RecordCipher.MissingMessage);
+        }
+
+        storedValues.Add((field, reader.GetFieldValue<byte[]>(ordinal)));
+        return null;
     }
 
     internal static JsonValue ReadValue(NpgsqlDataReader reader, int ordinal, FieldModel field) =>

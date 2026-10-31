@@ -72,7 +72,7 @@ internal sealed class ScenarioSteps(
         var entity = Entity(step.Entity);
         var body = Body(version: null, Resolve(entity, step.Values));
         var result = await RecordCommand.CreateAsync(
-            connection, ScenarioRunner.TenantId, model, releaseId, entity, Actor(step), _ => Task.FromResult<byte[]?>(body), null, loggerFactory, cancellationToken);
+            connection, ScenarioRunner.TenantId, model, releaseId, entity, Actor(step), _ => Task.FromResult<byte[]?>(body), null, null, loggerFactory, cancellationToken);
         Check(step, Action(result, RecordCommandOutcome.Written));
         if (step.Save is { } alias)
         {
@@ -88,7 +88,7 @@ internal sealed class ScenarioSteps(
         // A record that no longer exists still goes to the record command, which answers NotFound.
         var body = Body(stored?.Version ?? 1, Resolve(entity, step.Values));
         var result = await RecordCommand.UpdateAsync(
-            connection, ScenarioRunner.TenantId, model, releaseId, entity, id, Actor(step), _ => Task.FromResult<byte[]?>(body), null, loggerFactory, cancellationToken);
+            connection, ScenarioRunner.TenantId, model, releaseId, entity, id, Actor(step), _ => Task.FromResult<byte[]?>(body), null, null, loggerFactory, cancellationToken);
         Check(step, Action(result, RecordCommandOutcome.Written));
     }
 

@@ -181,7 +181,7 @@ internal static class ComputedRecompute
         Guid id,
         CancellationToken cancellationToken)
     {
-        if (await RecordQueries.FindRowAsync(connection, owner, id, cancellationToken) is not { } record)
+        if (await RecordQueries.FindRowAsync(connection, owner, id, null, cancellationToken) is not { } record)
         {
             return null;
         }
