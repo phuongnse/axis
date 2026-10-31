@@ -164,7 +164,7 @@ apply: sections marked _(planned for Mx)_ are not built yet, and Dn refers to
   module versions, so an upgrade maps onto the same table. See
   [Modules](modules-and-templates.md#modules).
 - **Column types.** Each field type maps to one PostgreSQL type, spelled as
-  `format_type` renders it, so a catalog column matches by string equality.
+  `format_type` renders it, so a catalog column matches by string equality. A `sensitive` field's column is `bytea`.
 
   | Field type         | Column type                                                                                                                          |
   | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
@@ -575,8 +575,8 @@ access. It returns diagnostics, SQL statements and the new records to write.
   - The type must equal the expected type. Widening text
     (`character varying(n)` to a larger `n` or to `text`) is applied.
     Narrowing it, including `text` to `character varying(n)`, is `AXC0016` at
-    `/fields/{i}/maxLength`. Any other type difference is `AXC0016` at
-    `/fields/{i}/type`.
+    `/fields/{i}/maxLength`. Any other type difference, including a field that becomes or
+    stops being `sensitive`, is `AXC0016` at `/fields/{i}/type`, even with a `convert`.
   - Dropping `required` drops `NOT NULL`, and dropping `unique` drops the
     unique constraint. Adding either to an existing column is `AXC0016` at
     `/fields/{i}/required` or `/fields/{i}/unique`. A pending `fill` of the

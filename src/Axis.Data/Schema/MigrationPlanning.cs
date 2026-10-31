@@ -226,6 +226,12 @@ internal sealed class MigrationPlanning
             return;
         }
 
+        // SQL cannot convert into or out of encrypted values, so the planner's refusal stands.
+        if (field.Sensitive || existing.Type == ColumnTypes.Encrypted)
+        {
+            return;
+        }
+
         var expected = ColumnTypes.Render(field);
         var recorded = _enumValues
             .Where(value => value.EntityId == entityId && string.Equals(value.FieldName, change.Field, StringComparison.OrdinalIgnoreCase))

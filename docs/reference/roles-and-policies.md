@@ -338,8 +338,12 @@ user:
   inspection, as [Values and masking](process-inspection.md#values-and-masking) says.
   The record API still shows the field to users whose grants cover it, but it
   refuses a `sort` on it.
-- **Default.** `sensitive` defaults to `false`. It changes no table, so adding
-  or removing it needs no migration.
+- **Default.** `sensitive` defaults to `false`. A sensitive field's column is
+  `bytea`, whatever the field's type, so it can hold ciphertext. A new field or a
+  new table gets that column. Adding or removing the flag on an existing field is
+  `AXC0016` at `/fields/{i}/type`, even with a `convert`, until activation can
+  encrypt the stored values _(planned for M27)_, see
+  [changing the flag](data-encryption.md#changing-the-flag).
 - **Uses it cannot serve.** A filter, sort, aggregate, group field, index,
   `unique`, `searchable`, stored computed field, migration value or other
   expression that runs as SQL on the field is

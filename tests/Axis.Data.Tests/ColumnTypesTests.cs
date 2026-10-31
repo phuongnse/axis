@@ -23,6 +23,28 @@ public sealed class ColumnTypesTests
         Assert.Equal(expected, ColumnTypes.Render(Field("f", type, maxLength: maxLength, precision: precision, scale: scale)));
     }
 
+    [Theory]
+    [InlineData(FieldType.Text, null, null, null)]
+    [InlineData(FieldType.Text, 200, null, null)]
+    [InlineData(FieldType.Integer, null, null, null)]
+    [InlineData(FieldType.Decimal, null, 18, 2)]
+    [InlineData(FieldType.Money, null, 18, 2)]
+    [InlineData(FieldType.Boolean, null, null, null)]
+    [InlineData(FieldType.Date, null, null, null)]
+    [InlineData(FieldType.DateTime, null, null, null)]
+    public void Sensitive_field_renders_as_bytea_whatever_its_type(FieldType type, int? maxLength, int? precision, int? scale)
+    {
+        var field = Field("f", type, maxLength: maxLength, precision: precision, scale: scale) with { Sensitive = true };
+
+        Assert.Equal("bytea", ColumnTypes.Render(field));
+    }
+
+    [Fact]
+    public void Sensitive_enum_renders_as_bytea()
+    {
+        Assert.Equal("bytea", ColumnTypes.Render(Field("f", FieldType.Enum, values: ["a", "b"]) with { Sensitive = true }));
+    }
+
     [Fact]
     public void Enum_renders_as_text_and_reference_as_uuid()
     {
