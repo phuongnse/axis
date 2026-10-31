@@ -92,15 +92,22 @@ A sensitive field's column is `bytea`, in a new table and in a new column, whate
   field's type.
 - **Renamed.** A `renameField` migration of a sensitive field encrypts each value again under the new field name,
   because the field name is part of the associated data.
+- **Exact lookup.** Adding `exactLookup` to a sensitive field that has a column adds the `_lookup` column and its
+  index, and a marked step that fills it. The step decrypts each stored value in C# and writes its hash under the newest
+  lookup key, in batches. A field that becomes `sensitive` and `exactLookup` in one release is encrypted first and then
+  hashed, in the same activation. Removing `exactLookup` drops the `_lookup` column, and its index with it. A
+  `renameField` of an exact lookup field renames the `_lookup` column and its index and hashes each value again under
+  the new name, because the field name is part of the hash. A `dropField` of an exact lookup field drops its `_lookup`
+  column too.
 - **Keys.** The planner does not see keys or values. It plans the new column, a marked step that fills it, the drop and
-  the rename, and activation runs the marked step in the same transaction with the tenant's data keys: it reads each row,
-  encrypts or decrypts the value in C# and writes it back in batches. Every new encryption uses the newest data key.
-  PostgreSQL never sees a key or a plain sensitive value.
+  the rename, and activation runs the marked step in the same transaction with the tenant's keys: it reads each row,
+  encrypts, decrypts or hashes the value in C# and writes it back in batches. Every new encryption uses the newest data
+  key, and every new hash the newest lookup key. PostgreSQL never sees a key or a plain sensitive value.
 - **Failure.** A stored value that does not decrypt fails the activation with a
   `SensitiveValueDecryptionException` that names the tenant, entity, field and key number, never a value. A decrypted
   value that does not fit the field's type fails it too. Activation without the tenant's data keys fails when a flag
-  change or a sensitive rename needs them, and a plain value is never written into an encrypted column. The
-  transaction rolls back, so the table and the active release stay as they were.
+  change or a sensitive rename needs them, and without the newest lookup key when a step hashes. A plain value is never
+  written into an encrypted column. The transaction rolls back, so the table and the active release stay as they were.
 - **One change at a time.** A field that becomes `sensitive` and changes its type in the same release is `AXC0016` at
   `/fields/{i}/type`, except that text may widen. The old type behind a `bytea` column is not known, so when the mark
   goes the planner cannot see a type change. The cast of each decrypted value fails the activation when it does not
@@ -112,12 +119,8 @@ A sensitive field's column is `bytea`, in a new table and in a new column, whate
   field after the change fails with a type error. Values that record history or exports already hold in plain text stay
   plain after a field is marked.
 
-Test: `SensitiveFlagActivationTests` for the flag change, the rename, a value that does not decrypt and a missing key,
-and `SchemaPlannerTests` for the planned statements.
-
-Adding or removing `exactLookup` on a field that already has a column is `AXC0016` at `/fields/{i}/exactLookup` for
-now. _(Planned for M27: it will add the lookup column and fill it, or drop it.)_ A `dropField` or `renameField` of an
-exact lookup field is refused too until then, because its `_lookup` column looks like a column without a field.
+Test: `SensitiveFlagActivationTests` for the flag change, the exact lookup fill and drop, the rename, a value that does
+not decrypt and a missing key, and `SchemaPlannerTests` for the planned statements.
 
 Test: `ExactLookupWriteTests` for the hash a create, an update and a child row store, the newest lookup key and the
 refusal without one, `SensitiveValuesTests` for the hash, and `SchemaPlannerTests` for the lookup column and index.
@@ -224,6 +227,5 @@ never a key. The exit codes are those of [output and exit codes](administration.
   is restored, and a rerun with a good archive finishes the restore.
 - **What the encryption does not do yet.** A `sensitive` field has a `bytea` column. The record API, forms and the
   detail widget, an import, an inbound endpoint, a seed, a process step, a connector or package call output, the process
-  start endpoint, task completion, the task form state, a scenario and the operator's call resolve encrypt and decrypt a value with the tenant keys. The
-  planner refuses a flag change until the [changing the flag](data-encryption.md#changing-the-flag) migration is built. A value's associated data names the tenant id, so that work has to handle
-  a restore under a new id.
+  start endpoint, task completion, the task form state, a scenario and the operator's call resolve encrypt and decrypt a value with the tenant keys. A value's associated data names the tenant id, so that work
+  has to handle a restore under a new id.

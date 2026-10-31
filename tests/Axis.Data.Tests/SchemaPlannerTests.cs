@@ -160,7 +160,7 @@ public sealed class SchemaPlannerTests
     }
 
     [Fact]
-    public void Existing_column_cannot_gain_or_lose_an_exact_lookup_yet()
+    public void Existing_column_gains_a_lookup_column_a_hash_fill_and_an_index_and_loses_it_with_one_drop_column()
     {
         var plain = ChangeOrder(BaseModel(), fields => [.. fields, Field("secret", FieldType.Text) with { Sensitive = true }]);
         var withLookup = ChangeOrderField(plain, 6, secret => secret with { ExactLookup = true });
@@ -168,10 +168,21 @@ public sealed class SchemaPlannerTests
         var gained = SchemaPlanner.Plan(withLookup, Catalog(plain, hasRows: true), Models.Records(plain));
         var lost = SchemaPlanner.Plan(plain, Catalog(withLookup, hasRows: true), Models.Records(withLookup));
 
-        var gain = Assert.Single(gained.Diagnostics);
-        Assert.Equal((DiagnosticCodes.IncompatibleFieldChange, "entities/order.json", "/fields/6/exactLookup"), (gain.Code, gain.File, gain.Path));
-        var loss = Assert.Single(lost.Diagnostics);
-        Assert.Equal((DiagnosticCodes.IncompatibleFieldChange, "entities/order.json", "/fields/6/exactLookup"), (loss.Code, loss.File, loss.Path));
+        Assert.Empty(gained.Diagnostics);
+        var table = EntityNaming.QualifiedTable(OrderTable);
+        Assert.Equal(
+            [
+                $"ALTER TABLE {table} ADD COLUMN {Quote("f_secret_lookup")} bytea",
+                $"UPDATE {table} AS t SET {Quote("f_secret_lookup")} = v.value FROM unnest(@ids, @values) AS v(id, value) WHERE t.\"id\" = v.id",
+                CreateIndex(OrderTable, "f_secret_lookup"),
+            ],
+            gained.Statements);
+        var rewrite = Assert.IsType<SensitiveRewrite>(gained.Commands[1].Rewrite);
+        Assert.Equal(SensitiveRewriteKind.Hash, rewrite.Kind);
+        Assert.Equal((_orderId, OrderTable, "f_secret", "f_secret_lookup", "secret"), (rewrite.EntityId, rewrite.Table, rewrite.Source, rewrite.Target, rewrite.FieldName));
+        Assert.Null(rewrite.Field);
+        Assert.Empty(lost.Diagnostics);
+        Assert.Equal([$"ALTER TABLE {table} DROP COLUMN {Quote("f_secret_lookup")}"], lost.Statements);
     }
 
     [Fact]
@@ -431,6 +442,50 @@ public sealed class SchemaPlannerTests
         Assert.Null(rewrite.Field);
         Assert.Empty(plainPlan.Diagnostics);
         Assert.All(plainPlan.Commands, command => Assert.Null(command.Rewrite));
+    }
+
+    [Fact]
+    public void Pending_rename_of_an_exact_lookup_field_renames_its_lookup_column_and_index_and_hashes_each_value_again()
+    {
+        var stored = ChangeOrderField(BaseModel(), 5, note => note with { Sensitive = true, ExactLookup = true });
+        var renamed = ChangeOrderField(stored, 5, note => note with { Name = "memo" });
+        var migration = Migration("Order", new MigrationChangeModel(MigrationChangeType.RenameField, null, "note", "memo", null));
+
+        var plan = SchemaPlanner.Plan(renamed, Catalog(stored, hasRows: true), Models.Records(stored), [migration], StoredIds(stored));
+
+        Assert.Empty(plan.Diagnostics);
+        var table = EntityNaming.QualifiedTable(OrderTable);
+        Assert.Equal(
+            [
+                $"ALTER TABLE {table} RENAME COLUMN {Quote("f_note")} TO {Quote("f_memo")}",
+                $"ALTER TABLE {table} RENAME COLUMN {Quote("f_note_lookup")} TO {Quote("f_memo_lookup")}",
+                $"UPDATE {table} AS t SET {Quote("f_memo")} = v.value FROM unnest(@ids, @values) AS v(id, value) WHERE t.\"id\" = v.id",
+                $"UPDATE {table} AS t SET {Quote("f_memo_lookup")} = v.value FROM unnest(@ids, @values) AS v(id, value) WHERE t.\"id\" = v.id",
+                $"ALTER INDEX \"entities\".{Quote(EntityNaming.Index(OrderTable, ["f_note_lookup"]))} RENAME TO {Quote(EntityNaming.Index(OrderTable, ["f_memo_lookup"]))}",
+            ],
+            plan.Statements);
+        var hash = Assert.IsType<SensitiveRewrite>(plan.Commands[3].Rewrite);
+        Assert.Equal(SensitiveRewriteKind.Hash, hash.Kind);
+        Assert.Equal((_orderId, OrderTable, "f_memo", "f_memo_lookup", "memo"), (hash.EntityId, hash.Table, hash.Source, hash.Target, hash.FieldName));
+    }
+
+    [Fact]
+    public void Pending_drop_field_of_an_exact_lookup_field_drops_its_lookup_column_and_index_with_it()
+    {
+        var stored = ChangeOrderField(BaseModel(), 5, note => note with { Sensitive = true, ExactLookup = true });
+        var dropped = ChangeOrder(stored, fields => [.. fields.Where(field => field.Name != "note")]);
+        var migration = Migration("Order", new MigrationChangeModel(MigrationChangeType.DropField, "note", null, null, null));
+
+        var plan = SchemaPlanner.Plan(dropped, Catalog(stored, hasRows: true), Models.Records(stored), [migration], StoredIds(stored));
+
+        Assert.Empty(plan.Diagnostics);
+        var table = EntityNaming.QualifiedTable(OrderTable);
+        Assert.Equal(
+            [
+                $"ALTER TABLE {table} DROP COLUMN {Quote("f_note")}",
+                $"ALTER TABLE {table} DROP COLUMN {Quote("f_note_lookup")}",
+            ],
+            plan.Statements);
     }
 
     [Fact]

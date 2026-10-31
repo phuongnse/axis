@@ -260,7 +260,7 @@ public static class SchemaPlanner
                 _diagnostics.Add(new Diagnostic(DiagnosticCodes.IncompatibleFieldChange, message, entity.File, path, entity.Id));
 
             var columnsByName = table.Columns.ToDictionary(column => column.Name, StringComparer.Ordinal);
-            var flipped = new HashSet<string>(StringComparer.Ordinal);
+            var replaced = new HashSet<string>(StringComparer.Ordinal);
 
             string[] systemColumns;
             if (childOwner is null)
@@ -308,18 +308,27 @@ public static class SchemaPlanner
                     {
                         if (PlanExistingColumn(entity, table, field, column, path, Report))
                         {
-                            flipped.Add(column.Name);
+                            replaced.Add(column.Name);
                         }
 
-                        // An exact lookup cannot be added to or removed from a column that exists yet.
-                        var hasLookup = columnsByName.ContainsKey(EntityNaming.LookupColumn(field.Name));
+                        // The lookup column is added and filled after any encrypt step above, and dropped with its index.
+                        var lookup = EntityNaming.LookupColumn(field.Name);
+                        var hasLookup = columnsByName.ContainsKey(lookup);
                         if (field.ExactLookup && !hasLookup)
                         {
-                            Report($"The existing field '{field.Name}' cannot gain an exact lookup yet.", $"{path}/exactLookup");
+                            var alterTable = $"ALTER TABLE {EntityNaming.QualifiedTable(table.Name)}";
+                            _flagChanges.Add(new SchemaCommand($"{alterTable} ADD COLUMN {EntityNaming.Quote(lookup)} bytea"));
+                            _flagChanges.Add(new SchemaCommand(
+                                $"UPDATE {EntityNaming.QualifiedTable(table.Name)} AS t SET {EntityNaming.Quote(lookup)} = v.value "
+                                + $"FROM unnest(@ids, @values) AS v(id, value) WHERE t.{EntityNaming.Quote(EntityNaming.IdColumn)} = v.id")
+                            {
+                                Rewrite = new SensitiveRewrite(SensitiveRewriteKind.Hash, entity.Id, table.Name, column.Name, lookup, null, field.Name),
+                            });
                         }
                         else if (!field.ExactLookup && hasLookup)
                         {
-                            Report($"The existing field '{field.Name}' cannot lose its exact lookup yet.", $"{path}/exactLookup");
+                            _flagChanges.Add(new SchemaCommand($"ALTER TABLE {EntityNaming.QualifiedTable(table.Name)} DROP COLUMN {EntityNaming.Quote(lookup)}"));
+                            replaced.Add(lookup);
                         }
                     }
                 }
@@ -329,7 +338,7 @@ public static class SchemaPlanner
                 }
             }
 
-            // The lookup column is part of its field. A field that lost exactLookup is reported once, above, and not again as a column without a field.
+            // The lookup column is part of its field. A field that lost exactLookup drops it, so it is not reported as a column without a field.
             var fieldColumns = entity.Fields
                 .Where(field => field.HasColumn)
                 .SelectMany(field => new[] { EntityNaming.Column(field.Name), EntityNaming.LookupColumn(field.Name) })
@@ -347,10 +356,10 @@ public static class SchemaPlanner
                 }
             }
 
-            // PostgreSQL drops every index over a flipped column along with it.
+            // PostgreSQL drops every index over a replaced or dropped column along with it.
             PlanIndexes(
                 entity,
-                flipped.Count == 0 ? table : table with { Indexes = [.. table.Indexes.Where(index => !index.Columns.Any(flipped.Contains))] },
+                replaced.Count == 0 ? table : table with { Indexes = [.. table.Indexes.Where(index => !index.Columns.Any(replaced.Contains))] },
                 childOwner is not null);
         }
 

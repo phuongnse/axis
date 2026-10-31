@@ -74,8 +74,8 @@ public sealed record SchemaCommand(string Sql)
 
     /// <summary>
     /// Set on a statement that needs the tenant's data keys: <see cref="Sql"/> is the batch update that stores the values
-    /// activation encrypts, decrypts or re-encrypts row by row in C#, because PostgreSQL never sees a key or a plain
-    /// sensitive value.
+    /// activation encrypts, decrypts, re-encrypts or hashes row by row in C#, because PostgreSQL never sees a data key,
+    /// a lookup key or a plain sensitive value.
     /// </summary>
     public SensitiveRewrite? Rewrite { get; init; }
 }
@@ -91,13 +91,17 @@ public enum SensitiveRewriteKind
 
     /// <summary>Reads the encrypted bytes and writes them again with the new field name in the associated data.</summary>
     Rename,
+
+    /// <summary>Reads the encrypted bytes and writes the lookup hash of the plain value under the newest lookup key.</summary>
+    Hash,
 }
 
 /// <summary>
 /// The rewrite of the stored values of one sensitive field of the entity with id <see cref="EntityId"/>. <see cref="Source"/>
 /// is the column read for each row and <see cref="Target"/> the column written. <see cref="FieldName"/> is the field name
 /// in the associated data after the step, and <see cref="FromFieldName"/> the one before it, for a rename.
-/// <see cref="Field"/> is <see langword="null"/> for a rename, which needs no type.
+/// <see cref="Field"/> is <see langword="null"/> for a rename and a hash, which need no type. A hash reads the field's
+/// column and writes its lookup column.
 /// </summary>
 public sealed record SensitiveRewrite(
     SensitiveRewriteKind Kind,

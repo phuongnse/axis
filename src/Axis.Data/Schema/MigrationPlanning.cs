@@ -443,6 +443,8 @@ internal sealed class MigrationPlanning
         var table = _tables[tableIndex];
         var from = EntityNaming.Column(change.From!);
         var to = EntityNaming.Column(change.To!);
+        var fromLookup = EntityNaming.LookupColumn(change.From!);
+        var toLookup = EntityNaming.LookupColumn(change.To!);
         var column = table.Columns.FirstOrDefault(candidate => candidate.Name == from);
         if (column is null || table.Columns.Any(candidate => candidate.Name == to))
         {
@@ -451,6 +453,12 @@ internal sealed class MigrationPlanning
 
         var alterTable = $"ALTER TABLE {EntityNaming.QualifiedTable(table.Name)}";
         Commands.Add(new SchemaCommand($"{alterTable} RENAME COLUMN {EntityNaming.Quote(from)} TO {EntityNaming.Quote(to)}"));
+        var lookup = table.Columns.FirstOrDefault(candidate => candidate.Name == fromLookup);
+        if (lookup is not null)
+        {
+            Commands.Add(new SchemaCommand($"{alterTable} RENAME COLUMN {EntityNaming.Quote(fromLookup)} TO {EntityNaming.Quote(toLookup)}"));
+        }
+
         if (column.Unique)
         {
             Commands.Add(new SchemaCommand($"{alterTable} RENAME CONSTRAINT {EntityNaming.Quote(EntityNaming.Unique(table.Name, from))} TO {EntityNaming.Quote(EntityNaming.Unique(table.Name, to))}"));
@@ -472,17 +480,29 @@ internal sealed class MigrationPlanning
             });
         }
 
-        // An index is named after its columns, so each index over the column gets the name its renamed column list has.
+        // The field name is part of the lookup hash too, so activation hashes each value again under the new name.
+        if (lookup is not null)
+        {
+            Commands.Add(new SchemaCommand(
+                $"UPDATE {EntityNaming.QualifiedTable(table.Name)} AS t SET {EntityNaming.Quote(toLookup)} = v.value "
+                + $"FROM unnest(@ids, @values) AS v(id, value) WHERE t.{EntityNaming.Quote(EntityNaming.IdColumn)} = v.id")
+            {
+                Rewrite = new SensitiveRewrite(SensitiveRewriteKind.Hash, entityId, table.Name, to, toLookup, null, change.To!),
+            });
+        }
+
+        // An index is named after its columns, so each index over the column or its lookup column gets the name its renamed column list has.
+        string Renamed(string name) => name == from ? to : name == fromLookup ? toLookup : name;
         var indexes = new List<CatalogIndex>();
         foreach (var index in table.Indexes)
         {
-            if (!index.Columns.Contains(from, StringComparer.Ordinal))
+            if (!index.Columns.Contains(from, StringComparer.Ordinal) && !index.Columns.Contains(fromLookup, StringComparer.Ordinal))
             {
                 indexes.Add(index);
                 continue;
             }
 
-            List<string> columns = [.. index.Columns.Select(candidate => candidate == from ? to : candidate)];
+            List<string> columns = [.. index.Columns.Select(Renamed)];
             var name = index.Trigram ? EntityNaming.TrigramIndex(table.Name, to) : EntityNaming.Index(table.Name, columns);
             Commands.Add(new SchemaCommand($"ALTER INDEX {EntityNaming.Quote(EntityNaming.Schema)}.{EntityNaming.Quote(index.Name)} RENAME TO {EntityNaming.Quote(name)}"));
             indexes.Add(index with { Name = name, Columns = columns });
@@ -490,7 +510,7 @@ internal sealed class MigrationPlanning
 
         _tables[tableIndex] = table with
         {
-            Columns = [.. table.Columns.Select(candidate => candidate == column ? column with { Name = to } : candidate)],
+            Columns = [.. table.Columns.Select(candidate => candidate.Name == column.Name || candidate.Name == fromLookup ? candidate with { Name = Renamed(candidate.Name) } : candidate)],
             Indexes = [.. indexes.OrderBy(index => index.Name, StringComparer.Ordinal)],
         };
         for (var index = 0; index < _enumValues.Count; index++)
@@ -517,12 +537,17 @@ internal sealed class MigrationPlanning
 
         // Without CASCADE, so a dependency the planner does not know of stops the drop.
         Commands.Add(new SchemaCommand($"ALTER TABLE {EntityNaming.QualifiedTable(table.Name)} DROP COLUMN {EntityNaming.Quote(name)}"));
+        var lookup = EntityNaming.LookupColumn(change.Field!);
+        if (table.Columns.Any(candidate => candidate.Name == lookup))
+        {
+            Commands.Add(new SchemaCommand($"ALTER TABLE {EntityNaming.QualifiedTable(table.Name)} DROP COLUMN {EntityNaming.Quote(lookup)}"));
+        }
 
         // PostgreSQL drops every index over the column along with it, so the planner must not drop them again.
         _tables[tableIndex] = table with
         {
-            Columns = [.. table.Columns.Where(candidate => candidate.Name != name)],
-            Indexes = [.. table.Indexes.Where(index => !index.Columns.Contains(name, StringComparer.Ordinal))],
+            Columns = [.. table.Columns.Where(candidate => candidate.Name != name && candidate.Name != lookup)],
+            Indexes = [.. table.Indexes.Where(index => !index.Columns.Contains(name, StringComparer.Ordinal) && !index.Columns.Contains(lookup, StringComparer.Ordinal))],
         };
         _enumValues.RemoveAll(recorded => recorded.EntityId == entityId && string.Equals(recorded.FieldName, change.Field, StringComparison.OrdinalIgnoreCase));
         RecordChanges.Add(new MigrationRecordChange(MigrationChangeType.DropField, entityId, change.Field, null));
