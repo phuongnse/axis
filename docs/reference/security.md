@@ -412,22 +412,23 @@ sample reuses a user that holds the role it needs before it adds a user.
 Every user signs in with the password `axis` and a 6-digit code. Each user's TOTP secret is the `otp` credential in that
 file, and the realm accepts a code more than once. See [development realm and users](../development.md#development-realm-and-users).
 
-| User               | Roles                   | Used by                                                                                                                                       |
-| ------------------ | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| `requester`        | `employee`, `requester` | Purchase request, leave request and service desk samples; E2E journeys, request approval journey. Has the locale `vi`, the only user with one |
-| `employee`         | `employee`              | Purchase request, leave request and asset management samples (holds assets); E2E journeys                                                     |
-| `manager`          | `department-manager`    | Purchase request and leave request samples; E2E journeys                                                                                      |
-| `manager-2`        | `department-manager`    | Purchase request and leave request samples; E2E journeys                                                                                      |
-| `finance-reviewer` | `finance-reviewer`      | Purchase request sample seeds; E2E journeys                                                                                                   |
-| `operator`         | `operator`              | Purchase request sample's Approvals inspector; E2E journeys                                                                                   |
-| `author`           | `author`, `publisher`   | Studio and the authoring API under `scripts/dev.sh`; E2E Studio journeys                                                                      |
-| `agent`            | `agent`                 | Service desk sample; E2E journeys                                                                                                             |
-| `lead`             | `service-desk-lead`     | Service desk sample; E2E journeys                                                                                                             |
-| `approver`         | `approver`              | Request approval template journey; E2E journeys                                                                                               |
-| `lead-2`           | `service-desk-lead`     | Service desk sample; E2E claim and reassign journey                                                                                           |
-| `asset-manager`    | `asset-manager`         | Asset management sample; E2E asset management journey                                                                                         |
-| `auditor`          | `auditor`               | Asset management sample; E2E asset management journey; the user whose roles the E2E users page journey gives and removes                       |
-| `administrator`    | `tenant-administrator`  | "Users" in the shell, E2E shell journey; E2E users page journey                                                                              |
+| User                | Roles                   | Used by                                                                                                                                       |
+| ------------------- | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `requester`         | `employee`, `requester` | Purchase request, leave request and service desk samples; E2E journeys, request approval journey. Has the locale `vi`, the only user with one |
+| `employee`          | `employee`              | Purchase request, leave request and asset management samples (holds assets); E2E journeys                                                     |
+| `manager`           | `department-manager`    | Purchase request and leave request samples; E2E journeys                                                                                      |
+| `manager-2`         | `department-manager`    | Purchase request and leave request samples; E2E journeys                                                                                      |
+| `finance-reviewer`  | `finance-reviewer`      | Purchase request sample seeds; E2E journeys                                                                                                   |
+| `operator`          | `operator`              | Purchase request sample's Approvals inspector; E2E journeys                                                                                   |
+| `author`            | `author`, `publisher`   | Studio and the authoring API under `scripts/dev.sh`; E2E Studio journeys                                                                      |
+| `agent`             | `agent`                 | Service desk sample; E2E journeys                                                                                                             |
+| `lead`              | `service-desk-lead`     | Service desk sample; E2E journeys                                                                                                             |
+| `approver`          | `approver`              | Request approval template journey; E2E journeys                                                                                               |
+| `lead-2`            | `service-desk-lead`     | Service desk sample; E2E claim and reassign journey                                                                                           |
+| `asset-manager`     | `asset-manager`         | Asset management sample; E2E asset management journey                                                                                         |
+| `auditor`           | `auditor`               | Asset management sample; E2E asset management journey; the user whose roles the E2E users page journey gives and removes                      |
+| `administrator`     | `tenant-administrator`  | "Users" in the shell, E2E shell journey; E2E users page journey                                                                               |
+| `platform-operator` | `platform-operator`     | The operator console under `scripts/dev.sh`; E2E operator console journey                                                                     |
 
 ## Machine callers
 
