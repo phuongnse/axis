@@ -40,6 +40,14 @@ const users: UserList = {
       status: 'active',
       lastSignedInAt: '2026-10-28T09:00:00Z',
     },
+    {
+      id: 'u3',
+      displayName: 'Cid Disabled',
+      email: 'cid@axis.local',
+      provider: null,
+      status: 'disabled',
+      lastSignedInAt: '2026-10-27T09:00:00Z',
+    },
   ],
 }
 
@@ -374,7 +382,9 @@ describe('UsersPage', () => {
     renderPage()
     const row = (await screen.findByText('Ann Invited')).closest('tr')!
     expect(screen.getAllByRole('button', { name: 'Resend invitation' })).toHaveLength(1)
-    expect(within(screen.getByText('Bob Active').closest('tr')!).queryByRole('button')).toBeNull()
+    const other = within(screen.getByText('Bob Active').closest('tr')!)
+    expect(other.queryByRole('button', { name: 'Resend invitation' })).toBeNull()
+    expect(other.queryByRole('button', { name: 'Reset authenticator' })).toBeNull()
 
     await userEvent.click(within(row).getByRole('button', { name: 'Resend invitation' }))
     const dialog = await confirmation('Resend the invitation?')
@@ -408,5 +418,91 @@ describe('UsersPage', () => {
 
     expect(await screen.findByTestId('users-command-problem')).toHaveTextContent(text)
     expect(screen.queryByTestId('users-done')).toBeNull()
+  })
+
+  it('offers Disable, Enable and Reset authenticator by status and by how the person signs in', async () => {
+    stubInvitations()
+    renderPage()
+    await screen.findByText('Ann Invited')
+    const names = (person: string) =>
+      within(screen.getByText(person).closest('tr')!)
+        .getAllByRole('button')
+        .map((button) => button.textContent)
+
+    expect(names('Ann Invited')).toEqual(['Resend invitation', 'Disable', 'Reset authenticator'])
+    expect(names('Bob Active')).toEqual(['Disable'])
+    expect(names('Cid Disabled')).toEqual(['Enable', 'Reset authenticator'])
+  })
+
+  it.each([
+    ['Ann Invited', 'u1', 'Disable', 'Disable this person?', 'disable', 'The person was disabled.'],
+    ['Cid Disabled', 'u3', 'Enable', 'Enable this person?', 'enable', 'The person was enabled.'],
+    [
+      'Cid Disabled',
+      'u3',
+      'Reset authenticator',
+      'Reset the authenticator?',
+      'reset-authenticator',
+      'The authenticator was reset.',
+    ],
+  ])(
+    'asks before %s gets %s, then calls the route and loads the list again',
+    async (person, id, button, title, route, done) => {
+      const fetchMock = stubInvitations()
+      renderPage()
+      const row = (await screen.findByText(person)).closest('tr')!
+
+      await userEvent.click(within(row).getByRole('button', { name: button }))
+      const dialog = await confirmation(title)
+      expect(within(dialog).getByTestId('users-command-confirm')).toHaveTextContent(`Person: ${person}`)
+      expect(dialog).toHaveTextContent(`Email: ${users.items.find((user) => user.id === id)!.email}`)
+      expect(posts(fetchMock)).toHaveLength(0)
+      await userEvent.click(
+        within(dialog).getByRole('button', { name: button === 'Reset authenticator' ? 'Reset' : button }),
+      )
+
+      expect(await screen.findByTestId('users-done')).toHaveTextContent(done)
+      const [post] = posts(fetchMock)
+      expect(post[0]).toBe(`/api/users/${id}/${route}`)
+      expect(post[1]!.body).toBeUndefined()
+      await vi.waitFor(() =>
+        expect(requested(fetchMock).filter((input) => input.startsWith('/api/users?'))).toHaveLength(2),
+      )
+    },
+  )
+
+  it.each([
+    [403, 'Sign in again to disable a person.'],
+    [409, 'An administrator cannot disable themselves.'],
+    [502, 'The change was not made.'],
+  ])('shows a fixed text when the disable answers %i', async (status, text) => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const fetchMock = stubInvitations(status)
+    renderPage()
+    const row = (await screen.findByText('Bob Active')).closest('tr')!
+    await userEvent.click(within(row).getByRole('button', { name: 'Disable' }))
+    const dialog = await confirmation('Disable this person?')
+    expect(dialog).toHaveTextContent('Their sessions end and they cannot sign in until they are enabled.')
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Disable' }))
+
+    expect(await screen.findByTestId('users-command-problem')).toHaveTextContent(text)
+    expect(screen.queryByTestId('users-done')).toBeNull()
+    await vi.waitFor(() =>
+      expect(requested(fetchMock).filter((input) => input.startsWith('/api/users?'))).toHaveLength(2),
+    )
+  })
+
+  it('shows the generic text when an enable or a reset is refused', async () => {
+    stubInvitations(403)
+    renderPage()
+    const row = (await screen.findByText('Cid Disabled')).closest('tr')!
+    await userEvent.click(within(row).getByRole('button', { name: 'Reset authenticator' }))
+    const dialog = await confirmation('Reset the authenticator?')
+    expect(dialog).toHaveTextContent(
+      'Their sessions end, and their next sign-in asks them to add an authenticator again.',
+    )
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Reset' }))
+
+    expect(await screen.findByTestId('users-command-problem')).toHaveTextContent('The change was not made.')
   })
 })

@@ -3,7 +3,15 @@ import { useEffect, useState } from 'react'
 import { EmptyDash } from '../platform/EmptyValue'
 import { PageLayout } from '../platform/PageLayout'
 import { useText } from '../platform/texts'
-import { fetchUsers, resendInvitation, type UserList, type UserListItem, type UserListResult } from '../platform/users'
+import {
+  fetchUsers,
+  resendInvitation,
+  runUserCommand,
+  type UserCommand,
+  type UserList,
+  type UserListItem,
+  type UserListResult,
+} from '../platform/users'
 import { usePlatform } from './context'
 import { InviteUserModal } from './InviteUserModal'
 import { NotFoundPage } from './NotFoundPage'
@@ -17,17 +25,34 @@ const statusColors: Record<UserListItem['status'], string> = {
   disabled: 'default',
 }
 
+type Command = 'resend' | 'disable' | 'enable' | 'reset'
+
+const commandFailedKey = 'shell.users.command.failed'
+
 const resendProblemKeys = {
   forbidden: 'shell.users.forbidden',
   conflict: 'shell.users.resend.conflict',
-  failed: 'shell.users.invite.failed',
+}
+
+// Only disable names its 403 and 409. Enable and reset have no row that can reach either one.
+const disableProblemKeys = {
+  forbidden: 'shell.users.disable.forbidden',
+  conflict: 'shell.users.disable.conflict',
+}
+
+const userCommands: Record<Exclude<Command, 'resend'>, UserCommand> = {
+  disable: 'disable',
+  enable: 'enable',
+  reset: 'reset-authenticator',
 }
 
 /**
  * The tenant's users for an administrator: a table that is searched by name or email and paged by the
  * server. A search starts on Enter or on the search button and goes back to page 1. Clicking a row opens a side panel
  * with the person's roles. The Invite button opens the form that invites a person. An invited account has a Resend
- * invitation button, which asks for a confirmation. Both reload the list, because a resend gives the person a new id.
+ * invitation button. A row that is not disabled has a Disable button, a disabled row has an Enable button, and an
+ * account has a Reset authenticator button. Each of these asks for a confirmation, then reloads the list, because a
+ * resend gives the person a new id.
  */
 export function UsersPage() {
   const t = useText()
@@ -40,10 +65,10 @@ export function UsersPage() {
   const [loadFailed, setLoadFailed] = useState(false)
   const [selected, setSelected] = useState<UserListItem | null>(null)
   const [inviting, setInviting] = useState(false)
-  const [resending, setResending] = useState<UserListItem | null>(null)
+  const [pending, setPending] = useState<{ command: Command; user: UserListItem } | null>(null)
   const [busy, setBusy] = useState(false)
-  const [done, setDone] = useState<'invite' | 'resend'>()
-  const [problem, setProblem] = useState<'forbidden' | 'conflict' | 'failed'>()
+  const [done, setDone] = useState<'invite' | Command>()
+  const [problem, setProblem] = useState<string>()
   // Counts the commands, so each one loads the list again.
   const [reloads, setReloads] = useState(0)
 
@@ -69,26 +94,30 @@ export function UsersPage() {
     return () => controller.abort()
   }, [search, page, reloads])
 
-  async function resend() {
-    if (!resending) {
+  async function run() {
+    if (!pending) {
       return
     }
+    const { command, user } = pending
     setBusy(true)
     setDone(undefined)
     setProblem(undefined)
     try {
-      const result = await resendInvitation(resending.id)
+      const result =
+        command === 'resend' ? await resendInvitation(user.id) : await runUserCommand(user.id, userCommands[command])
       if (result === 'ok') {
-        setDone('resend')
+        setDone(command)
+      } else if (command === 'resend') {
+        setProblem(resendProblemKeys[result])
       } else {
-        setProblem(result)
+        setProblem(command === 'disable' ? disableProblemKeys[result] : commandFailedKey)
       }
     } catch (error: unknown) {
-      console.warn('Resending the invitation failed', error)
-      setProblem('failed')
+      console.warn(`Running ${command} on a person failed`, error)
+      setProblem(command === 'resend' ? 'shell.users.invite.failed' : commandFailedKey)
     } finally {
       setBusy(false)
-      setResending(null)
+      setPending(null)
     }
     setReloads((count) => count + 1)
   }
@@ -134,7 +163,7 @@ export function UsersPage() {
             </Button>
           </Flex>
           {done && <Alert data-testid="users-done" type="success" title={t(`shell.users.${done}.done`)} />}
-          {problem && <Alert data-testid="users-command-problem" type="error" title={t(resendProblemKeys[problem])} />}
+          {problem && <Alert data-testid="users-command-problem" type="error" title={t(problem)} />}
           <Table<UserListItem>
             style={{ width: '100%' }}
             rowKey="id"
@@ -166,20 +195,33 @@ export function UsersPage() {
                 render: (value: string | null) => (value ? new Date(value).toLocaleString(locale) : <EmptyDash />),
               },
               {
-                // Brokered users get no button: the resend route answers 409 for them.
-                render: (_: unknown, row: UserListItem) =>
-                  row.status === 'invited' &&
-                  row.provider === null && (
-                    <Button
-                      size="small"
-                      onClick={(event) => {
-                        event.stopPropagation()
-                        setResending(row)
-                      }}
-                    >
-                      {t('shell.users.resend')}
-                    </Button>
-                  ),
+                // Brokered users get no Resend and no Reset: those routes answer 409 for them.
+                render: (_: unknown, row: UserListItem) => {
+                  const buttons: Command[] = []
+                  if (row.status === 'invited' && row.provider === null) {
+                    buttons.push('resend')
+                  }
+                  buttons.push(row.status === 'disabled' ? 'enable' : 'disable')
+                  if (row.provider === null) {
+                    buttons.push('reset')
+                  }
+                  return (
+                    <Flex gap="small">
+                      {buttons.map((command) => (
+                        <Button
+                          key={command}
+                          size="small"
+                          onClick={(event) => {
+                            event.stopPropagation()
+                            setPending({ command, user: row })
+                          }}
+                        >
+                          {t(`shell.users.${command}`)}
+                        </Button>
+                      ))}
+                    </Flex>
+                  )
+                },
               },
             ]}
           />
@@ -198,22 +240,27 @@ export function UsersPage() {
         />
       )}
       <Modal
-        open={resending !== null}
-        title={t('shell.users.resend.confirm')}
-        okText={t('shell.users.resend.ok')}
+        open={pending !== null}
+        title={pending && t(`shell.users.${pending.command}.confirm`)}
+        okText={pending && t(`shell.users.${pending.command}.ok`)}
         cancelText={t('shell.users.roles.cancel')}
         confirmLoading={busy}
-        onOk={() => void resend()}
-        onCancel={() => setResending(null)}
+        onOk={() => void run()}
+        onCancel={() => setPending(null)}
       >
-        {resending && (
+        {pending && (
           <Flex vertical>
-            <Typography.Text data-testid="users-resend-confirm">
-              {t('shell.users.roles.person')}: {resending.displayName}
+            <Typography.Text
+              data-testid={pending.command === 'resend' ? 'users-resend-confirm' : 'users-command-confirm'}
+            >
+              {t('shell.users.roles.person')}: {pending.user.displayName}
             </Typography.Text>
             <Typography.Text>
-              {t('shell.users.email')}: {resending.email}
+              {t('shell.users.email')}: {pending.user.email}
             </Typography.Text>
+            {(pending.command === 'disable' || pending.command === 'reset') && (
+              <Typography.Text>{t(`shell.users.${pending.command}.effect`)}</Typography.Text>
+            )}
           </Flex>
         )}
       </Modal>

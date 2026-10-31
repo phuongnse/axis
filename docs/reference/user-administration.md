@@ -2,12 +2,11 @@
 
 Detailed reference for the accounts of [Axis's identity provider](identity-provider.md), the roles that an
 administrator gives, and the users page where both are managed.
-[D100](../decisions/d100-identity-providers-per-application-and-sign-in-per-site.md) agrees it. M17 built it, so
-what is not built yet is marked _(planned for M28)_. The account rules are built: every realm that `tenant create` makes
+[D100](../decisions/d100-identity-providers-per-application-and-sign-in-per-site.md) agrees it. M17 built it. The account rules are built: every realm that `tenant create` makes
 holds them. The users page's list and the server commands that disable, enable and reset an authenticator are built, and so are
 the server routes that give and remove an application or a platform role. A user's roles panel with the Give and Remove
-buttons is built too, and so are the Invite button and the Resend invitation button. The server routes that invite an account and resend an invitation are built, and so is `tenant create --administrator`.
-The buttons of disable, enable and reset an authenticator are _(planned for M28)_. The conventions of [architecture.md](../architecture.md)
+buttons is built too, and so are the Invite, Resend invitation, Disable, Enable and Reset authenticator buttons. The server routes that invite an account and resend an invitation are built, and so is `tenant create --administrator`.
+The conventions of [architecture.md](../architecture.md)
 apply.
 
 ## The administrator role
@@ -27,7 +26,7 @@ The setting, the shell entry and the users page's list are built.
 ## The users page
 
 The server's list route, the page's list, a user's roles panel with its Give and Remove buttons, and the server routes of
-seven commands are built. The invite and resend an invitation buttons are built. The buttons of disable, enable and reset an authenticator are _(planned for M28)_.
+seven commands are built. The invite, resend an invitation, disable, enable and reset an authenticator buttons are built.
 
 - **The list route:** `GET /api/users?search=&page=&pageSize=` answers `{ items, totalCount }` for the tenant's realm to an
   administrator. `page` starts at 1 and defaults to 1. `pageSize` is 1 to 50 and defaults to 50. A value outside these
@@ -56,6 +55,15 @@ seven commands are built. The invite and resend an invitation buttons are built.
   loads the list again, because the resend gives the person a new id. It shows a `403` as "This page is for
   administrators." and a `409` as "This person has a password or signs in through a provider, so they cannot get a new
   invitation."
+- **Disable, Enable and Reset authenticator:** a row that is `active` or `invited` has a "Disable" button, and a row that
+  is `disabled` has an "Enable" button instead. A row for an account, not a brokered user, has a "Reset authenticator"
+  button. Each asks for confirmation, names the person and the email, calls its route and loads the list again. The
+  Disable and Reset confirmations add a line on the effect: the person's sessions end, and they cannot sign in until they
+  are enabled, or their next sign-in asks them to add an authenticator again. A success shows "The person was
+  disabled.", "The person was enabled." or "The authenticator was reset." The page shows a `403` on disable as "Sign in
+  again to disable a person." and a `409` as "An administrator cannot disable themselves." Any other failure of the three
+  commands, including a `403` or a `409` on enable and reset, shows "The change was not made." and loads the list again.
+  The Disable button also shows on the administrator's own row, where the server's `409` answers.
 - **The roles route:** `GET /api/users/{id}/roles` answers `{ given, applications, platformRoles }` to an administrator.
   `given` holds the person's given roles, each as `{ applicationId, role, declared }`, with a `null` `applicationId` for a
   platform role. `declared` is `false` for an application role that the application's active release no longer declares,
@@ -76,7 +84,7 @@ seven commands are built. The invite and resend an invitation buttons are built.
 - **Commands:** invite, resend an invitation, disable, enable, reset an account's authenticator, give a role and remove
   a role. Each command asks for confirmation, and each writes an [audit record](#audit). Disable, enable, reset an
   authenticator, give and remove an application or a platform role, invite and resend an invitation are built as server routes.
-  The roles panel calls give and remove, and the users page calls invite and resend an invitation. The buttons of disable, enable and reset an authenticator are _(planned for M28)_.
+  The roles panel calls give and remove, and the users page calls invite, resend an invitation, disable, enable and reset an authenticator.
   - `POST /api/users/{id}/disable`, `POST /api/users/{id}/enable` and `POST /api/users/{id}/reset-authenticator` answer
     `204` and take no body. They take a browser session only, so a service account's bearer token gets `401`.
   - A request is checked in this order: signed-in user (`401`), `Users:AdministratorRole` (`403`), a tenant with a users
@@ -156,7 +164,7 @@ asks its development users for a code, because each one has an authenticator, an
 
 ## Disabled users
 
-The server routes are built.
+The server routes and the users page's buttons are built.
 
 - Disabling a person, an account or a user of a brokered provider, stops every sign-in of theirs to the tenant and
   ends their Axis sessions and their realm sessions at once.
