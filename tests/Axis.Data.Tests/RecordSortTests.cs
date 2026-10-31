@@ -38,4 +38,19 @@ public sealed class RecordSortTests
 
         Assert.Null(sort);
     }
+
+    [Theory]
+    [InlineData("secret", false)]
+    [InlineData("-secret", true)]
+    public void Sensitive_field_does_not_parse_and_the_same_field_that_is_not_sensitive_does(string text, bool descending)
+    {
+        var plain = Entity(
+            Guid.Parse("4b6f0c1e-6a0e-4c47-9a53-0f5f8f8b1a03"), "Order", "entities/order.json", Field("secret", FieldType.Text));
+        var sensitive = plain with { Fields = [plain.Fields[0] with { Sensitive = true }] };
+
+        Assert.False(RecordSort.TryParse(text, sensitive, out var refused));
+        Assert.Null(refused);
+        Assert.True(RecordSort.TryParse(text, plain, out var accepted));
+        Assert.Equal(descending, accepted.Descending);
+    }
 }

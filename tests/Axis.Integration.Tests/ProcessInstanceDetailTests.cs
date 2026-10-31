@@ -402,6 +402,7 @@ public sealed class ProcessInstanceDetailTests(TaskApiFixture fixture) : IClassF
 
     // Edits the Request entity so that each of the named fields declares "sensitive": true. A notify step may not
     // read a sensitive field, so the notify processes and the notify escalation of the app give the same values a literal instead.
+    // A filter may not read one either, so the inspector policy's filter becomes "true".
     private static Func<string, string, string?> MarkSensitive(params string[] fields) =>
         (path, content) =>
         {
@@ -410,6 +411,11 @@ public sealed class ProcessInstanceDetailTests(TaskApiFixture fixture) : IClassF
                 || path == Path.Combine("processes", "escalate-notify.json"))
             {
                 return fields.Aggregate(content, (text, field) => text.Replace($"\"{field}\": \"{field}\"", $"\"{field}\": \"0\"", StringComparison.Ordinal));
+            }
+
+            if (path == Path.Combine("policies", "inspector-access.json"))
+            {
+                return content.Replace("\"filter\": \"department is null\"", "\"filter\": \"true\"", StringComparison.Ordinal);
             }
 
             if (path != Path.Combine("entities", "request.json"))

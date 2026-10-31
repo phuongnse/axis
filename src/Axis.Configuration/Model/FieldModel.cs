@@ -88,8 +88,8 @@ public sealed record FieldModel
     public ExpressionModel? Default { get; init; }
 
     /// <summary>
-    /// Whether the field's value never appears in process inspection. The record API ignores it, and
-    /// it changes no table.
+    /// Whether the field's value never appears in process inspection. It changes no table. The record
+    /// API and data sources refuse a sort on it, because a stored value that is encrypted has no order.
     /// </summary>
     public bool Sensitive { get; init; }
 
