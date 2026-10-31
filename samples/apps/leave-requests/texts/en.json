@@ -19,6 +19,7 @@
     "actions.new": "New",
     "leaveRequest.label": "Leave request",
     "leaveRequest.number": "Number",
+    "leaveRequest.title": "Title",
     "leaveRequest.employee": "Employee",
     "leaveRequest.department": "Department",
     "leaveRequest.leaveType": "Leave type",
