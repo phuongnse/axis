@@ -40,6 +40,10 @@ namespace Axis.Server.Console;
 /// every active release for the view's filter. It never holds a body, a URL, a secret or a binding value.
 /// </para>
 /// <para>
+/// <c>GET /api/console/schedules</c> lists the schedule triggers of every active release with their last and next
+/// occurrence, see <see cref="ConsoleScheduleEndpoints"/>.
+/// </para>
+/// <para>
 /// <c>GET /api/console/instances/{id}</c> answers one instance, whatever its application or process, with the shape of the
 /// process inspection detail. The operator role stands in for the <c>inspect</c> grant and for a <c>read</c> grant with no
 /// <c>fields</c> list, and the instance's subject record need not exist. A call's stored input is hidden by the masking
@@ -62,6 +66,7 @@ internal static class ConsoleEndpoints
         console.MapGet("/webhook-deliveries", ListWebhookDeliveriesAsync);
         console.MapGet("/instances/{id}", GetInstanceAsync);
         console.MapConsoleDeadLetterEndpoints();
+        console.MapConsoleScheduleEndpoints();
     }
 
     private static async ValueTask<object?> RequireOperatorAsync(EndpointFilterInvocationContext context, EndpointFilterDelegate next)
