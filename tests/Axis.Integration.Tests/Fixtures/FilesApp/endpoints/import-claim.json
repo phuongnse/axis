@@ -1,0 +1,21 @@
+{
+  "id": "3b7c1d52-4e8a-4f60-9a1b-7d2e5c8f0a11",
+  "kind": "endpoint",
+  "name": "ImportClaim",
+  "formatVersion": 1,
+  "entity": "Claim",
+  "input": [
+    { "name": "title", "type": "text", "required": true, "maxLength": 50 },
+    { "name": "note", "type": "text" }
+  ],
+  "values": {
+    "title": "title",
+    "note": "note"
+  },
+  "event": {
+    "name": "ClaimImported",
+    "fields": {
+      "title": "title"
+    }
+  }
+}
