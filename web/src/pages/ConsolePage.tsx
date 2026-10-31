@@ -11,6 +11,7 @@ import {
 import { EmptyDash } from '../platform/EmptyValue'
 import { PageLayout } from '../platform/PageLayout'
 import { useText } from '../platform/texts'
+import { ConsoleDeadLetters } from './ConsoleDeadLetters'
 import { usePlatform } from './context'
 
 const pageSize = 20
@@ -18,8 +19,9 @@ const pageSize = 20
 /**
  * The operator console for the platform operator. It shows the Tenant view: the status of the tenant of the host and a
  * table of its applications with each active release. Below it, the Failed work view lists the failed instances and the
- * calls with an unknown outcome, newest first, with paging and an application filter. A user without the operator role
- * sees the forbidden page.
+ * calls with an unknown outcome, newest first, with paging and an application filter. Under it, the Dead letters view
+ * lists the dead letters of every application and redelivers or discards each. A user without the operator role sees the
+ * forbidden page.
  */
 export function ConsolePage() {
   const t = useText()
@@ -190,6 +192,7 @@ export function ConsolePage() {
           </Flex>
         </Card>
       )}
+      {tenant && !forbidden && <ConsoleDeadLetters applications={tenant.applications} locale={locale} />}
     </PageLayout>
   )
 }

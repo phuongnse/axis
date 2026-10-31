@@ -20,6 +20,10 @@ namespace Axis.Server.Console;
 /// and the time it was activated. The status is always <c>active</c>, because a host serves only active tenants.
 /// </para>
 /// <para>
+/// The dead letter routes under <c>/api/console/dead-letters</c> list, redeliver and discard the dead letters of every
+/// application of the tenant, see <see cref="ConsoleDeadLetterEndpoints"/>.
+/// </para>
+/// <para>
 /// <c>GET /api/console/failed-work</c> lists the failed work of the tenant, newest first, in the paging shape of the record
 /// API: the instances that are <c>failed</c> and the connector and package calls whose outcome is <c>unknown</c>, across every
 /// application. <c>application</c> (an application id) narrows it to one application. An item names the application, the
@@ -38,6 +42,7 @@ internal static class ConsoleEndpoints
         console.AddEndpointFilter(RequireOperatorAsync);
         console.MapGet("/tenant", GetTenantAsync);
         console.MapGet("/failed-work", ListFailedWorkAsync);
+        console.MapConsoleDeadLetterEndpoints();
     }
 
     private static async ValueTask<object?> RequireOperatorAsync(EndpointFilterInvocationContext context, EndpointFilterDelegate next)

@@ -655,7 +655,8 @@ the event, that instance in `process_instance_id`, the occurrence in `event_id`
 and the webhook in `webhook_id`. The process is read through the row's
 instance. For an occurrence that an inbound endpoint without a `process` raised,
 no instance raised it, so `process_id` and `process_instance_id` are null and no
-process's dead letter routes list the letter. Other webhooks of the occurrence
+process's dead letter routes list the letter. The [operator console](operator-console.md)
+lists it and can redeliver or discard it. Other webhooks of the occurrence
 have their own rows and items, so they still deliver.
 
 **The counter.** `axis.delivery_failures` holds one row per target:
@@ -712,6 +713,9 @@ Content-Type: application/json
 - The [process inspector widget](process-inspector-widget.md) lists the open
   dead letters of its process, with Redeliver and Discard for a user with the
   grant.
+- The [operator console](operator-console.md#route-and-access) has its own routes under
+  `/api/console/dead-letters`. They list the dead letters of every application, including the ones
+  with no process, and run the same redeliver and discard with the operator as actor.
 
 **The list.** It shows the dead letters of the process, newest first, paged as
 the instance list is, with `page`, `pageSize`, `totalCount` and `items`. The
