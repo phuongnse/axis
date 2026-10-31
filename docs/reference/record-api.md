@@ -875,8 +875,8 @@ can be read as its history (D21).
     they were written in.
   - Each item has its `id`, `occurredAt`, `actor`, `actorName`, `action`,
     `processInstanceId` and `details`, as stored. `actorName` is the display
-    name stored with the audit record. It is `null` for `system`,
-    `anonymous` and audit records written before names were stored.
+    name in the actor's [user profile](notifications.md#user-profiles), else the
+    name stored with the audit record, else `null`. Always `null` for `system` and `anonymous`.
   - Each item also has `inspectPath`, the last property of the item. It is the
     [instance detail](process-inspection.md#instance-detail) path of the entry's
     process instance, such as

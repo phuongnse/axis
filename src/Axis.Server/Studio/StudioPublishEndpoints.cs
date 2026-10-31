@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Axis.Configuration.Releases;
 using Axis.Core.Tenancy;
+using Axis.Data.Profiles;
 using Axis.Server.Http;
 using Axis.Server.Tenancy;
 using Axis.Server.Users;
@@ -322,9 +323,12 @@ internal static class StudioPublishEndpoints
         await using var inserted = await command.ExecuteReaderAsync(cancellationToken);
         await inserted.ReadAsync(cancellationToken);
         var requestedAt = inserted.GetFieldValue<DateTimeOffset>(0);
+        await inserted.DisposeAsync();
 
+        // The name is the one in the user's profile, else the session's, as GET answers it.
+        var names = await UserProfiles.FindDisplayNamesAsync(connection, [user.Id], cancellationToken);
         var response = new StudioPublishRequestResponse(
-            id.ToString("D"), name ?? application, kind, target, "queued", label, note, user.Id, requestedAt,
+            id.ToString("D"), name ?? application, kind, target, "queued", label, note, user.Id, names.GetValueOrDefault(user.Id) ?? user.DisplayName, requestedAt,
             null, null, releaseId?.ToString("D"), JsonDocument.Parse("[]").RootElement.Clone(),
             kind == "test" ? JsonDocument.Parse("[]").RootElement.Clone() : null);
         return Results.Accepted($"/api/studio/apps/{Uri.EscapeDataString(application)}/requests/{id:D}", response);
@@ -350,7 +354,7 @@ internal static class StudioPublishEndpoints
         var connection = await database.GetConnectionAsync(cancellationToken);
         await using var command = new NpgsqlCommand(
             """
-            SELECT kind, status, label, note, requested_by, requested_at, started_at, finished_at, release_id, diagnostics::text, target, scenario_results::text
+            SELECT kind, status, label, note, requested_by, requested_at, started_at, finished_at, release_id, diagnostics::text, target, scenario_results::text, requested_by_name
             FROM axis.publish_requests
             WHERE id = @id AND application_id = @application
             """,
@@ -366,7 +370,9 @@ internal static class StudioPublishEndpoints
         using var diagnostics = JsonDocument.Parse(reader.IsDBNull(9) ? "[]" : reader.GetString(9));
         var kind = reader.GetString(0);
         using var scenarios = kind == "test" ? JsonDocument.Parse(reader.IsDBNull(11) ? "[]" : reader.GetString(11)) : null;
-        return Results.Ok(new StudioPublishRequestResponse(
+        var requestedBy = reader.GetString(4);
+        var storedName = reader.IsDBNull(12) ? null : reader.GetString(12);
+        var response = new StudioPublishRequestResponse(
             requestId.ToString("D"),
             manifest.Name ?? application,
             kind,
@@ -374,13 +380,19 @@ internal static class StudioPublishEndpoints
             reader.GetString(1),
             reader.IsDBNull(2) ? null : reader.GetString(2),
             reader.IsDBNull(3) ? null : reader.GetString(3),
-            reader.GetString(4),
+            requestedBy,
+            storedName,
             reader.GetFieldValue<DateTimeOffset>(5),
             reader.IsDBNull(6) ? null : reader.GetFieldValue<DateTimeOffset>(6),
             reader.IsDBNull(7) ? null : reader.GetFieldValue<DateTimeOffset>(7),
             reader.IsDBNull(8) ? null : reader.GetGuid(8).ToString("D"),
             diagnostics.RootElement.Clone(),
-            scenarios?.RootElement.Clone()));
+            scenarios?.RootElement.Clone());
+
+        // Npgsql allows one open reader per connection, so the profile is read after the request.
+        await reader.DisposeAsync();
+        var names = await UserProfiles.FindDisplayNamesAsync(connection, [requestedBy], cancellationToken);
+        return Results.Ok(response with { RequestedByName = names.GetValueOrDefault(requestedBy) ?? storedName });
     }
 
     private static IResult NoRequest() =>
@@ -390,7 +402,8 @@ internal static class StudioPublishEndpoints
 /// <summary>
 /// A publish request as the authoring API shows it. <c>Application</c> is the manifest name, <c>Target</c> is
 /// <c>tenant</c> or <c>preview</c> and <c>Diagnostics</c> is empty until the request ends. <c>Scenarios</c> is null unless
-/// the kind is <c>test</c>. For a <c>test</c> it is empty until the request ends.
+/// the kind is <c>test</c>. For a <c>test</c> it is empty until the request ends. <c>RequestedByName</c> is the name in the
+/// requesting user's profile, else the one stored with the request, else null.
 /// </summary>
 internal sealed record StudioPublishRequestResponse(
     string Id,
@@ -401,6 +414,7 @@ internal sealed record StudioPublishRequestResponse(
     string? Label,
     string? Note,
     string RequestedBy,
+    string? RequestedByName,
     DateTimeOffset RequestedAt,
     DateTimeOffset? StartedAt,
     DateTimeOffset? FinishedAt,

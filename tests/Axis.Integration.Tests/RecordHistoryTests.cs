@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Axis.Data.Audit;
 using Axis.Server.Tests;
 using static Axis.Integration.Tests.TaskApiFixture;
@@ -86,6 +87,68 @@ public sealed class RecordHistoryTests(TaskApiFixture fixture) : IClassFixture<T
             Assert.Single(second.RootElement.GetProperty("items").EnumerateArray()).GetProperty("id").GetGuid());
         Assert.Equal(items.Count, second.RootElement.GetProperty("totalCount").GetInt64());
     }
+
+    [Fact]
+    public async Task An_actors_name_is_the_one_in_the_profile_else_the_stored_one_and_a_reserved_actor_has_none()
+    {
+        using var maria = fixture.CreateClient().SignedInAs("maria");
+        var subject = await CreateAsync(maria, TenantA, """{ "values": { "title": "Lamps" } }""");
+        Assert.True(fixture.Model.TryGetEntity("Request", out var entity));
+        var renamed = $"renamed-{Guid.NewGuid():N}";
+        var goneNamed = $"gone-named-{Guid.NewGuid():N}";
+        var gone = $"gone-{Guid.NewGuid():N}";
+        await using (var connection = await fixture.OpenConnectionAsync(TenantA))
+        await using (var transaction = await connection.BeginTransactionAsync(CancellationToken))
+        {
+            foreach (var (actor, name) in new (string, string?)[] { (renamed, "Old"), (goneNamed, "Kept"), (gone, null), (AuditActors.System, null) })
+            {
+                await AuditRecords.AppendAsync(
+                    transaction,
+                    new AuditEntry(actor, AuditActions.RecordUpdated, fixture.Model.Manifest.Id, entity.Id, subject, null, new JsonObject(), name),
+                    CancellationToken);
+            }
+
+            await transaction.CommitAsync(CancellationToken);
+        }
+
+        await fixture.InsertProfileAsync(TenantA, renamed, "New");
+        await fixture.InsertProfileAsync(TenantA, goneNamed, "Profile Name");
+        await fixture.InsertProfileAsync(TenantA, gone, "Profile Name");
+        await fixture.InsertProfileAsync(TenantA, AuditActors.System, "Mallory");
+        try
+        {
+            using (var withProfiles = await GetJsonAsync(maria, $"{Records}/{subject:D}/history", TenantA))
+            {
+                Assert.Equal("New", ActorName(withProfiles, renamed));
+                Assert.Equal("Profile Name", ActorName(withProfiles, goneNamed));
+                Assert.Equal("Profile Name", ActorName(withProfiles, gone));
+            }
+
+            Assert.Equal(2, await fixture.ExecuteAsync(
+                TenantA, "DELETE FROM axis.user_profiles WHERE user_id IN (@first, @second)", ("first", goneNamed), ("second", gone)));
+
+            using var withoutProfiles = await GetJsonAsync(maria, $"{Records}/{subject:D}/history", TenantA);
+            Assert.Equal("New", ActorName(withoutProfiles, renamed));
+            Assert.Equal("Kept", ActorName(withoutProfiles, goneNamed));
+            Assert.Null(ActorName(withoutProfiles, gone));
+            Assert.Contains(
+                withoutProfiles.RootElement.GetProperty("items").EnumerateArray(),
+                item => item.GetProperty("actor").GetString() == gone);
+
+            // A profile with a reserved id never names the reserved actor.
+            Assert.Null(ActorName(withoutProfiles, AuditActors.System));
+        }
+        finally
+        {
+            await fixture.ExecuteAsync(
+                TenantA, "DELETE FROM axis.user_profiles WHERE user_id IN (@first, @second)", ("first", renamed), ("second", AuditActors.System));
+        }
+    }
+
+    private static string? ActorName(JsonDocument history, string actor) =>
+        history.RootElement.GetProperty("items").EnumerateArray()
+            .Single(item => item.GetProperty("actor").GetString() == actor && item.GetProperty("action").GetString() == AuditActions.RecordUpdated)
+            .GetProperty("actorName").GetString();
 
     [Fact]
     public async Task A_process_steps_entry_has_an_inspect_path_only_for_a_user_who_may_inspect_the_process()

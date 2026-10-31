@@ -1,3 +1,5 @@
+using System.Collections.Frozen;
+using Axis.Data.Audit;
 using Npgsql;
 using NpgsqlTypes;
 
@@ -14,6 +16,12 @@ public static class UserProfiles
     private const string LocaleSql = """SELECT "locale" FROM "axis"."user_profiles" WHERE "user_id" = @user""";
 
     private const string ContactsSql = """SELECT "user_id", "email", "locale" FROM "axis"."user_profiles" WHERE "user_id" = ANY(@users)""";
+
+    private const string DisplayNamesSql = """SELECT "user_id", "display_name" FROM "axis"."user_profiles" WHERE "user_id" = ANY(@users)""";
+
+    // Actors that are not users. A profile with one of these ids never names them.
+    private static readonly FrozenSet<string> _reservedActors =
+        new[] { AuditActors.System, AuditActors.Anonymous, "startup", "operator", "unknown" }.ToFrozenSet(StringComparer.Ordinal);
 
     private const string LastSignInsSql = """SELECT "user_id", "last_signed_in_at" FROM "axis"."user_profiles" WHERE "user_id" = ANY(@users)""";
 
@@ -114,6 +122,34 @@ public static class UserProfiles
         }
 
         return contacts;
+    }
+
+    /// <summary>
+    /// The display names of the profiles of <paramref name="userIds"/>, by user id. A user with no profile and a reserved
+    /// actor (<c>system</c>, <c>anonymous</c>, <c>startup</c>, <c>operator</c>, <c>unknown</c>) are not in the result.
+    /// </summary>
+    public static async Task<IReadOnlyDictionary<string, string>> FindDisplayNamesAsync(
+        NpgsqlConnection connection, IReadOnlyCollection<string> userIds, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+        ArgumentNullException.ThrowIfNull(userIds);
+
+        var names = new Dictionary<string, string>(StringComparer.Ordinal);
+        var users = userIds.Where(id => !_reservedActors.Contains(id)).Distinct(StringComparer.Ordinal).ToArray();
+        if (users.Length == 0)
+        {
+            return names;
+        }
+
+        await using var command = new NpgsqlCommand(DisplayNamesSql, connection);
+        command.Parameters.Add(new NpgsqlParameter("users", NpgsqlDbType.Array | NpgsqlDbType.Text) { Value = users });
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            names[reader.GetString(0)] = reader.GetString(1);
+        }
+
+        return names;
     }
 
     /// <summary>
