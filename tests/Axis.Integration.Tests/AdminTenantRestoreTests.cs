@@ -4,6 +4,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using Axis.Admin;
 using Axis.Configuration.Storage;
 using Axis.Configuration.Tests;
 using Axis.Data.Storage;
@@ -260,7 +261,9 @@ public sealed class AdminTenantRestoreTests(AdminBackupFixture fixture) : IClass
         var scenario = fixture.Scenario;
 
         var unreadable = Path.Combine(folder.Path, "unreadable.tar");
-        await File.WriteAllBytesAsync(unreadable, System.Security.Cryptography.RandomNumberGenerator.GetBytes(4096), CancellationToken);
+        await WriteEncryptedAsync(unreadable, System.Security.Cryptography.RandomNumberGenerator.GetBytes(4096));
+        var plain = Path.Combine(folder.Path, "plain.tar");
+        await File.WriteAllBytesAsync(plain, System.Security.Cryptography.RandomNumberGenerator.GetBytes(4096), CancellationToken);
         var unknownFormat = Rewrite(file, folder.Path, "format", manifest => manifest["format"] = 2);
         var newer = Rewrite(file, folder.Path, "newer", manifest => manifest["schemaVersion"] = "99991231235959_Future");
         var unknownVersion = Rewrite(file, folder.Path, "unknown", manifest => manifest["schemaVersion"] = "20000101000000_Unknown");
@@ -274,6 +277,7 @@ public sealed class AdminTenantRestoreTests(AdminBackupFixture fixture) : IClass
         var cases = new (string Name, string Source, string? Host, string Message)[]
         {
             ("unreadable", unreadable, null, "the archive cannot be read"),
+            ("plain", plain, null, "the archive is not an encrypted backup"),
             ("format", unknownFormat, null, "format 2"),
             ("newer", newer, null, "99991231235959_Future"),
             ("unknown version", unknownVersion, null, "20000101000000_Unknown"),
@@ -315,7 +319,7 @@ public sealed class AdminTenantRestoreTests(AdminBackupFixture fixture) : IClass
         await AssertNothingCreatedAsync(noSecretId, entriesBefore);
 
         var noTool = await scenario.RunAsync(
-            ["tenant", "restore", file, "--tenant", noSecretId, "--host", $"{noSecretId}.example.test"],
+            ["tenant", "restore", file, "--tenant", noSecretId, "--host", $"{noSecretId}.example.test", .. AdminScenario.BackupKeyArgs],
             path: folder.Path);
         Assert.Equal(2, noTool.Exit);
         Assert.Empty(noTool.Output);
@@ -323,7 +327,7 @@ public sealed class AdminTenantRestoreTests(AdminBackupFixture fixture) : IClass
         await AssertNothingCreatedAsync(noSecretId, entriesBefore);
 
         var noPackages = await scenario.RunAsync(
-            ["tenant", "restore", file, "--tenant", noSecretId, "--host", $"{noSecretId}.example.test"],
+            ["tenant", "restore", file, "--tenant", noSecretId, "--host", $"{noSecretId}.example.test", .. AdminScenario.BackupKeyArgs],
             path: fixture.Tools.PathSetting,
             extra: new Dictionary<string, string?> { ["Extensions:Path"] = folder.Path });
         Assert.Equal(2, noPackages.Exit);
@@ -332,10 +336,12 @@ public sealed class AdminTenantRestoreTests(AdminBackupFixture fixture) : IClass
 
         string[][] usages =
         [
-            ["tenant", "restore", file, "--host", "x.example.test"],
-            ["tenant", "restore", file, "--tenant", noSecretId],
-            ["tenant", "restore", "--tenant", noSecretId, "--host", "x.example.test"],
-            ["tenant", "restore", file, "--tenant", noSecretId, "--tenant", noSecretId, "--host", "x.example.test"],
+            ["tenant", "restore", file, "--host", "x.example.test", .. AdminScenario.BackupKeyArgs],
+            ["tenant", "restore", file, "--tenant", noSecretId, .. AdminScenario.BackupKeyArgs],
+            ["tenant", "restore", "--tenant", noSecretId, "--host", "x.example.test", .. AdminScenario.BackupKeyArgs],
+            ["tenant", "restore", file, "--tenant", noSecretId, "--tenant", noSecretId, "--host", "x.example.test", .. AdminScenario.BackupKeyArgs],
+            ["tenant", "restore", file, "--tenant", noSecretId, "--host", "x.example.test"],
+            ["tenant", "restore", file, "--tenant", noSecretId, "--host", "x.example.test", .. AdminScenario.BackupKeyArgs, .. AdminScenario.BackupKeyArgs],
         ];
         foreach (var usage in usages)
         {
@@ -392,7 +398,7 @@ public sealed class AdminTenantRestoreTests(AdminBackupFixture fixture) : IClass
         Assert.Equal(0, (await scenario.RunAsync(AdminScenario.PreviewArgs(previewId, mainId, $"{previewId}.example.test"), withClientSecret: false)).Exit);
         using var folder = new TemporaryFolder();
         var file = Path.Combine(folder.Path, "backup.tar");
-        Assert.Equal(0, (await scenario.RunAsync(["tenant", "backup", previewId, "--out", file], path: fixture.Tools.PathSetting)).Exit);
+        Assert.Equal(0, (await scenario.RunAsync(["tenant", "backup", previewId, "--out", file, .. AdminScenario.BackupKeyArgs], path: fixture.Tools.PathSetting)).Exit);
 
         // An archive from before previewOf existed has the empty sign-in settings of a preview entry only.
         var old = Rewrite(file, folder.Path, "old-preview", manifest => ((JsonObject)manifest["directory"]!).Remove("previewOf"));
@@ -460,7 +466,7 @@ public sealed class AdminTenantRestoreTests(AdminBackupFixture fixture) : IClass
 
         // The id and host checks need no manifest, so they run for an archive that cannot be read.
         var unreadable = Path.Combine(folder.Path, "unreadable.tar");
-        await File.WriteAllBytesAsync(unreadable, System.Security.Cryptography.RandomNumberGenerator.GetBytes(4096), CancellationToken);
+        await WriteEncryptedAsync(unreadable, System.Security.Cryptography.RandomNumberGenerator.GetBytes(4096));
         var before = await scenario.SnapshotAsync();
         var both = await RestoreAsync(unreadable, fixture.TenantId, $"{id}.example.test");
         Assert.Equal(2, both.Exit);
@@ -556,7 +562,7 @@ public sealed class AdminTenantRestoreTests(AdminBackupFixture fixture) : IClass
     }
 
     internal static string[] RestoreArgs(string file, string id, params string[] hosts) =>
-        ["tenant", "restore", file, "--tenant", id, .. hosts.SelectMany(host => new[] { "--host", host })];
+        ["tenant", "restore", file, "--tenant", id, .. hosts.SelectMany(host => new[] { "--host", host }), .. AdminScenario.BackupKeyArgs];
 
     private Task<AdminResult> RestoreAsync(string file, string id, string host, bool withClientSecret = true) =>
         fixture.Scenario.RunAsync(
@@ -660,7 +666,8 @@ public sealed class AdminTenantRestoreTests(AdminBackupFixture fixture) : IClass
     private static string ReadManifest(string file)
     {
         using var stream = File.OpenRead(file);
-        using var reader = new TarReader(stream);
+        using var decrypted = BackupArchive.Decrypt(stream, AdminScenario.BackupKeyBytes);
+        using var reader = new TarReader(decrypted);
         while (reader.GetNextEntry() is { } entry)
         {
             if (entry.Name == "manifest.json")
@@ -679,7 +686,8 @@ public sealed class AdminTenantRestoreTests(AdminBackupFixture fixture) : IClass
         string? manifest = null;
         var dump = Path.Combine(folder, $"{name}.dump");
         using (var stream = File.OpenRead(source))
-        using (var reader = new TarReader(stream))
+        using (var decrypted = BackupArchive.Decrypt(stream, AdminScenario.BackupKeyBytes))
+        using (var reader = new TarReader(decrypted))
         {
             while (reader.GetNextEntry() is { } entry)
             {
@@ -703,12 +711,23 @@ public sealed class AdminTenantRestoreTests(AdminBackupFixture fixture) : IClass
         return destination;
     }
 
+    // A file that decrypts but is not a tar archive.
+    private static async Task WriteEncryptedAsync(string destination, byte[] content)
+    {
+        await using var archive = File.Create(destination);
+        await using var encrypted = BackupArchive.Encrypt(archive, AdminScenario.BackupKeyBytes);
+        await encrypted.WriteAsync(content, CancellationToken);
+    }
+
     private static void WriteArchive(string destination, string manifest, string dumpFile)
     {
         using var archive = File.Create(destination);
-        using var writer = new TarWriter(archive, TarEntryFormat.Pax);
-        writer.WriteEntry(new PaxTarEntry(TarEntryType.RegularFile, "manifest.json") { DataStream = new MemoryStream(Encoding.UTF8.GetBytes(manifest)) });
-        using var dump = File.OpenRead(dumpFile);
-        writer.WriteEntry(new PaxTarEntry(TarEntryType.RegularFile, "tenant.dump") { DataStream = dump });
+        using (var encrypted = BackupArchive.Encrypt(archive, AdminScenario.BackupKeyBytes))
+        using (var writer = new TarWriter(encrypted, TarEntryFormat.Pax, leaveOpen: true))
+        {
+            writer.WriteEntry(new PaxTarEntry(TarEntryType.RegularFile, "manifest.json") { DataStream = new MemoryStream(Encoding.UTF8.GetBytes(manifest)) });
+            using var dump = File.OpenRead(dumpFile);
+            writer.WriteEntry(new PaxTarEntry(TarEntryType.RegularFile, "tenant.dump") { DataStream = dump });
+        }
     }
 }

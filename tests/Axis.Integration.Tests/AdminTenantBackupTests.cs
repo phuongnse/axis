@@ -5,6 +5,7 @@ using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Axis.Admin;
 using Axis.Configuration.Tests;
 using Axis.Data.Naming;
 using Axis.Processes.Instances;
@@ -106,7 +107,7 @@ public sealed class AdminTenantBackupTests(AdminBackupFixture fixture) : IClassF
         using var folder = new TemporaryFolder();
         var file = Path.Combine(folder.Path, "backup.tar");
 
-        var result = await scenario.RunAsync(["tenant", "backup", previewId, "--out", file], path: fixture.Tools.PathSetting);
+        var result = await scenario.RunAsync(["tenant", "backup", previewId, "--out", file, .. AdminScenario.BackupKeyArgs], path: fixture.Tools.PathSetting);
 
         Assert.Equal(0, result.Exit);
         using var manifest = JsonDocument.Parse(ReadArchive(file, folder.Path).Manifest);
@@ -220,7 +221,7 @@ public sealed class AdminTenantBackupTests(AdminBackupFixture fixture) : IClassF
         using var folder = new TemporaryFolder();
         var file = Path.Combine(folder.Path, "backup.tar");
 
-        var result = await fixture.Scenario.RunAsync(["tenant", "backup", "no-such-tenant", "--out", file], path: fixture.Tools.PathSetting);
+        var result = await fixture.Scenario.RunAsync(["tenant", "backup", "no-such-tenant", "--out", file, .. AdminScenario.BackupKeyArgs], path: fixture.Tools.PathSetting);
 
         Assert.Equal(2, result.Exit);
         Assert.Empty(result.Output);
@@ -239,7 +240,7 @@ public sealed class AdminTenantBackupTests(AdminBackupFixture fixture) : IClassF
         using var folder = new TemporaryFolder();
         var file = Path.Combine(folder.Path, "backup.tar");
 
-        var result = await fixture.Scenario.RunAsync(["tenant", "backup", id, "--out", file], path: fixture.Tools.PathSetting);
+        var result = await fixture.Scenario.RunAsync(["tenant", "backup", id, "--out", file, .. AdminScenario.BackupKeyArgs], path: fixture.Tools.PathSetting);
 
         Assert.Equal(2, result.Exit);
         Assert.Empty(result.Output);
@@ -271,10 +272,11 @@ public sealed class AdminTenantBackupTests(AdminBackupFixture fixture) : IClassF
         var scenario = fixture.Scenario;
 
         var noFolder = await fixture.BackupAsync(Path.Combine(folder.Path, "missing", "backup.tar"));
-        var noTool = await scenario.RunAsync(["tenant", "backup", fixture.TenantId, "--out", file], path: folder.Path);
-        var noPath = await scenario.RunAsync(["tenant", "backup", fixture.TenantId, "--out", file]);
-        var noOut = await scenario.RunAsync(["tenant", "backup", fixture.TenantId], path: fixture.Tools.PathSetting);
-        var twice = await scenario.RunAsync(["tenant", "backup", fixture.TenantId, "--out", file, "--out", file], path: fixture.Tools.PathSetting);
+        var noTool = await scenario.RunAsync(["tenant", "backup", fixture.TenantId, "--out", file, .. AdminScenario.BackupKeyArgs], path: folder.Path);
+        var noPath = await scenario.RunAsync(["tenant", "backup", fixture.TenantId, "--out", file, .. AdminScenario.BackupKeyArgs]);
+        var noOut = await scenario.RunAsync(["tenant", "backup", fixture.TenantId, .. AdminScenario.BackupKeyArgs], path: fixture.Tools.PathSetting);
+        var noKey = await scenario.RunAsync(["tenant", "backup", fixture.TenantId, "--out", file], path: fixture.Tools.PathSetting);
+        var twice = await scenario.RunAsync(["tenant", "backup", fixture.TenantId, "--out", file, "--out", file, .. AdminScenario.BackupKeyArgs], path: fixture.Tools.PathSetting);
 
         Assert.Equal(2, noFolder.Exit);
         Assert.Equal(2, noTool.Exit);
@@ -283,6 +285,8 @@ public sealed class AdminTenantBackupTests(AdminBackupFixture fixture) : IClassF
         Assert.Contains("PATH", noPath.Error[0], StringComparison.Ordinal);
         Assert.Equal(2, noOut.Exit);
         Assert.StartsWith("Usage:", noOut.Error[0], StringComparison.Ordinal);
+        Assert.Equal(2, noKey.Exit);
+        Assert.StartsWith("Usage:", noKey.Error[0], StringComparison.Ordinal);
         Assert.Equal(2, twice.Exit);
         Assert.Empty(Directory.GetFileSystemEntries(folder.Path));
         await scenario.AssertNoSecretsAsync();
@@ -298,7 +302,7 @@ public sealed class AdminTenantBackupTests(AdminBackupFixture fixture) : IClassF
         using var folder = new TemporaryFolder();
         var file = Path.Combine(folder.Path, "backup.tar");
 
-        var result = await fixture.Scenario.RunAsync(["tenant", "backup", fixture.TenantId, "--out", file], path: tools.Path);
+        var result = await fixture.Scenario.RunAsync(["tenant", "backup", fixture.TenantId, "--out", file, .. AdminScenario.BackupKeyArgs], path: tools.Path);
 
         Assert.Equal(1, result.Exit);
         Assert.Equal([$"{fixture.TenantId} dump failed: pg_dump exited with code 3"], result.Output);
@@ -313,7 +317,8 @@ public sealed class AdminTenantBackupTests(AdminBackupFixture fixture) : IClassF
         string? manifest = null;
         var dump = Path.Combine(folder, "extracted.dump");
         using var stream = File.OpenRead(file);
-        using var reader = new TarReader(stream);
+        using var decrypted = BackupArchive.Decrypt(stream, AdminScenario.BackupKeyBytes);
+        using var reader = new TarReader(decrypted);
         while (reader.GetNextEntry() is { } entry)
         {
             names.Add(entry.Name);
@@ -435,7 +440,7 @@ public sealed class AdminBackupFixture : IAsyncLifetime
 
     /// <summary>Runs <c>tenant backup</c> for the tenant with the wrapped <c>pg_dump</c>.</summary>
     internal Task<AdminResult> BackupAsync(string file) =>
-        Scenario.RunAsync(["tenant", "backup", TenantId, "--out", file], path: Tools.PathSetting);
+        Scenario.RunAsync(["tenant", "backup", TenantId, "--out", file, .. AdminScenario.BackupKeyArgs], path: Tools.PathSetting);
 
     /// <summary>Runs a statement in the tenant database as the schema role.</summary>
     internal async Task ExecuteAsync(string sql) => await ScalarAsync(sql);

@@ -163,7 +163,7 @@ service account may download, as they may read records.
   [process execution](process-execution.md#worker-settings). An `attached` file is never
   purged. It is internal, so it needs no scheduled job.
 - **Backup** _(built)_. Files in the tenant database are in the tenant's `pg_dump`, so
-  [tenant backup](administration.md) archives hold them.
+  [tenant backup](tenant-backup-and-restore.md) archives hold them.
 - **Audit** _(built)_. An audit record names the file field that changed,
   never the file's name or bytes. A `sensitive` file field also hides its name
   and id in step history and inspection. Step history stores no field values,

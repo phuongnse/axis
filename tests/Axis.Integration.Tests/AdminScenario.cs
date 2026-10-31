@@ -26,6 +26,25 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
 
     public const string TestSecretKey = TestPlatform.SecretKey;
 
+    /// <summary>The backup key that the tests give to <c>tenant backup</c> and <c>tenant restore</c>: 32 bytes in base64.</summary>
+    public const string BackupKey = "Yh3dQe0v2uKq7mP9sXr4TgLw1Zc8NfAjB5oEi6UyHtk=";
+
+    private static readonly Lazy<string> _backupKeyFile = new(() =>
+    {
+        var path = Path.Combine(Path.GetTempPath(), $"axis-backup-key-{Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(6))}.key");
+        File.WriteAllText(path, BackupKey + "\n");
+        return path;
+    });
+
+    /// <summary>A file that holds <see cref="BackupKey"/>, written once for the test run.</summary>
+    public static string BackupKeyFile => _backupKeyFile.Value;
+
+    /// <summary>The decoded <see cref="BackupKey"/>.</summary>
+    public static byte[] BackupKeyBytes => Convert.FromBase64String(BackupKey);
+
+    /// <summary>The arguments that <c>tenant backup</c> and <c>tenant restore</c> need for the backup key.</summary>
+    public static string[] BackupKeyArgs => ["--backup-key-file", BackupKeyFile];
+
     /// <summary>The settings that make the tenant setting commands run: they need the directory source. It is not the default, because the publisher tests branch on it.</summary>
     public static readonly IReadOnlyDictionary<string, string?> Directory = new Dictionary<string, string?> { ["Tenancy:Source"] = "directory" };
 
@@ -354,7 +373,7 @@ internal sealed class AdminScenario(string platform, bool migrated) : IAsyncDisp
     public async Task AssertNoSecretsAsync(TenantSecretCipher? cipher = null)
     {
         cipher ??= Cipher;
-        var secrets = new List<string>([.. _adminPasswords, _clientSecret, _identityProviderSecret]);
+        var secrets = new List<string>([.. _adminPasswords, _clientSecret, _identityProviderSecret, BackupKey]);
         await using (var context = NewContext())
         {
             // Without the platform tables there is no directory, so no generated password.

@@ -20,8 +20,10 @@ namespace Axis.Admin;
 /// <summary>
 /// <c>tenant backup</c>: dumps the tenant database with <c>pg_dump</c> as its schema role and writes the dump and a manifest
 /// into one tar archive. The manifest is read inside the database snapshot that <c>pg_dump</c> uses, so it always matches the
-/// dump. Each step writes one line that names the tenant and never a password, a host or a connection string. The archive
-/// holds no secret: the manifest is built from explicit fields, and the binding secrets are never read.
+/// dump. Each step writes one line that names the tenant and never a password, a host or a connection string. The whole archive
+/// is encrypted with the operator's backup key, see <see cref="BackupArchive"/>. It holds the tenant's data keys and lookup keys,
+/// and no other secret: the manifest is built from explicit fields, and the binding secrets are never read. The plain dump is in a
+/// temporary file that only its owner can read until the archive is written, and the file is deleted then.
 /// </summary>
 internal sealed class TenantBackup : IAsyncDisposable
 {
@@ -75,6 +77,7 @@ internal sealed class TenantBackup : IAsyncDisposable
     public static async Task<BackupPlan?> PrepareAsync(
         BackupSettings settings,
         TenantBackupRequest request,
+        byte[] backupKey,
         TextWriter error,
         CancellationToken cancellationToken)
     {
@@ -95,6 +98,7 @@ internal sealed class TenantBackup : IAsyncDisposable
         TenantRow? row;
         (string Host, string? SitePath)[] hostRows;
         BackupBinding[] bindings;
+        TenantDataKeyRow[] keyRows;
         try
         {
             await using var platform = NewPlatform(settings.PlatformConnectionString);
@@ -114,6 +118,10 @@ internal sealed class TenantBackup : IAsyncDisposable
             bindings = await platform.TenantBindings.AsNoTracking()
                 .Where(binding => binding.TenantId == request.Id)
                 .Select(binding => new BackupBinding(binding.Name, binding.Kind, binding.Url))
+                .ToArrayAsync(cancellationToken);
+
+            keyRows = await platform.TenantDataKeys.AsNoTracking()
+                .Where(key => key.TenantId == request.Id)
                 .ToArrayAsync(cancellationToken);
         }
         catch (Exception exception) when (exception is NpgsqlException or InvalidOperationException)
@@ -141,9 +149,32 @@ internal sealed class TenantBackup : IAsyncDisposable
             return null;
         }
 
+        ManifestKey[] keys;
+        try
+        {
+            keys = [.. keyRows.Select(key => DecryptKey(settings.Cipher, request.Id, key)).OrderBy(key => key.Kind, StringComparer.Ordinal).ThenBy(key => key.Number)];
+        }
+        catch (InvalidOperationException exception)
+        {
+            error.WriteLine(exception.Message);
+            return null;
+        }
+
         string[] hosts = [.. hostRows.Select(host => host.Host)];
         ManifestSite[] sites = [.. hostRows.Where(host => host.SitePath is not null).Select(host => new ManifestSite(host.SitePath!, host.Host))];
-        return new BackupPlan(row, hosts, sites, bindings, pgDump, outPath);
+        return new BackupPlan(row, hosts, sites, bindings, pgDump, outPath, backupKey, keys);
+    }
+
+    private static ManifestKey DecryptKey(TenantSecretCipher cipher, string id, TenantDataKeyRow key)
+    {
+        var field = key.Kind switch
+        {
+            TenantKeyKinds.Data => TenantSecretFields.DataKey(key.Number),
+            TenantKeyKinds.Lookup => TenantSecretFields.LookupKey(key.Number),
+            _ => throw new InvalidOperationException($"The tenant '{id}' has a key of unknown kind '{key.Kind}'."),
+        };
+
+        return new ManifestKey(key.Kind, key.Number, cipher.Decrypt(id, field, key.Key).Reveal());
     }
 
     public async Task<int> RunAsync()
@@ -359,8 +390,9 @@ internal sealed class TenantBackup : IAsyncDisposable
     private async Task ArchiveAsync()
     {
         var manifest = JsonSerializer.SerializeToUtf8Bytes(BuildManifest(), _json);
-        await using (var archive = new FileStream(_archiveTemp, Create()))
-        await using (var writer = new TarWriter(archive, TarEntryFormat.Pax))
+        await using (var file = new FileStream(_archiveTemp, Create()))
+        await using (var encrypted = BackupArchive.Encrypt(file, _plan.BackupKey))
+        await using (var writer = new TarWriter(encrypted, TarEntryFormat.Pax, leaveOpen: true))
         {
             await writer.WriteEntryAsync(NewEntry(ManifestEntry, new MemoryStream(manifest)), _cancellationToken);
             await using var dump = new FileStream(_dumpTemp, FileMode.Open, FileAccess.Read, FileShare.Read);
@@ -404,7 +436,8 @@ internal sealed class TenantBackup : IAsyncDisposable
             DateTime.UtcNow.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", CultureInfo.InvariantCulture),
             directory,
             _packages,
-            _modules);
+            _modules,
+            _plan.Keys);
     }
 
     private static string AxisVersion()
@@ -450,7 +483,15 @@ internal sealed class TenantBackup : IAsyncDisposable
 }
 
 /// <summary>What the checks before the backup found: the directory entry, with no secret binding value, and the resolved paths.</summary>
-internal sealed record BackupPlan(TenantRow Row, string[] Hosts, IReadOnlyList<ManifestSite> Sites, BackupBinding[] Bindings, string PgDump, string OutPath);
+internal sealed record BackupPlan(
+    TenantRow Row,
+    string[] Hosts,
+    IReadOnlyList<ManifestSite> Sites,
+    BackupBinding[] Bindings,
+    string PgDump,
+    string OutPath,
+    byte[] BackupKey,
+    IReadOnlyList<ManifestKey> Keys);
 
 /// <summary>A binding of the tenant as the backup reads it. A <c>secret</c> binding has no value here.</summary>
 internal sealed record BackupBinding(string Name, string Kind, string? Url);
@@ -464,7 +505,15 @@ internal sealed record BackupManifest(
     string CreatedAt,
     ManifestDirectory Directory,
     IReadOnlyList<ManifestPackage> Packages,
-    IReadOnlyList<ManifestModule> Modules);
+    IReadOnlyList<ManifestModule> Modules,
+    IReadOnlyList<ManifestKey>? Keys = null);
+
+/// <summary>
+/// One data key or lookup key of the tenant: <paramref name="Kind"/> is <c>data</c> or <c>lookup</c>, and <paramref name="Key"/> is the
+/// base64 text of its 32 bytes. This is the only place an archive holds a secret, and the archive is encrypted. An archive with no
+/// <c>keys</c> reads as null.
+/// </summary>
+internal sealed record ManifestKey(string Kind, int Number, string Key);
 
 /// <summary>
 /// <paramref name="Realm"/> says that the tenant signs in through its own realm in Axis's identity provider. An archive from before it reads as <c>false</c>.
