@@ -55,3 +55,51 @@ await call(
   token,
   client,
 );
+
+// Prototype only: turns on Keycloak's "Terms and Conditions" required action and asks it of every user who has not
+// accepted yet (no terms_and_conditions attribute), so each development user sees the terms page once.
+const actions = await call(
+  "read the required actions",
+  "GET",
+  `${admin}/authentication/required-actions`,
+  token,
+);
+const termsAction = actions.find(
+  (action) => action.alias === "TERMS_AND_CONDITIONS",
+);
+if (termsAction && !termsAction.enabled) {
+  await call(
+    "turn on the terms action",
+    "PUT",
+    `${admin}/authentication/required-actions/TERMS_AND_CONDITIONS`,
+    token,
+    {
+      ...termsAction,
+      enabled: true,
+    },
+  );
+}
+const users = await call(
+  "list the users",
+  "GET",
+  `${admin}/users?max=500&briefRepresentation=false`,
+  token,
+);
+for (const user of users) {
+  const accepted = Boolean(user.attributes?.terms_and_conditions);
+  if (!accepted && !user.requiredActions?.includes("TERMS_AND_CONDITIONS")) {
+    await call(
+      `ask ${user.username} for the terms`,
+      "PUT",
+      `${admin}/users/${user.id}`,
+      token,
+      {
+        ...user,
+        requiredActions: [
+          ...(user.requiredActions ?? []),
+          "TERMS_AND_CONDITIONS",
+        ],
+      },
+    );
+  }
+}

@@ -18,6 +18,7 @@ function copyThemeFiles(): Plugin {
         'login-reset-password.ftl',
         'login-update-password.ftl',
         'frame.ftl',
+        'terms.ftl',
         'messages',
       ]) {
         cpSync(path.resolve(import.meta.dirname, 'keycloak-theme', name), path.join(themeFolder, name), {

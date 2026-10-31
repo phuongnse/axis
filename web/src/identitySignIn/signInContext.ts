@@ -196,6 +196,35 @@ export interface UpdatePasswordContext {
   texts: UpdatePasswordTexts
 }
 
+/** Proposed: the texts of the terms page. `agree*` hold `{terms}` and `{privacy}` placeholders for the two links. */
+export interface TermsTexts {
+  title: string
+  message: string
+  agreeBoth: string
+  agreeTerms: string
+  agreePrivacy: string
+  termsLink: string
+  privacyLink: string
+  agreeRequired: string
+  accept: string
+  decline: string
+}
+
+/** Proposed: what the terms page draws: the site's terms and privacy policy, which the person accepts once. */
+export interface TermsContext {
+  page: 'terms'
+  title: string
+  /** The realm's display name. Absent when the realm has none or it equals the realm id, so the heading names Axis. */
+  realmName?: string
+  /** The message to show above the form. No error means no alert. */
+  error?: string
+  /** Where the form posts `accept`, or `cancel` to decline. */
+  loginAction: string
+  preferences: SignInPreferences
+  legal: SignInLegal
+  texts: TermsTexts
+}
+
 /** What the page of the identity provider's theme draws, told apart by `page`. */
 export type IdentityContext =
-  SignInContext | TwoStepContext | AddAuthenticatorContext | ResetPasswordContext | UpdatePasswordContext
+  SignInContext | TwoStepContext | AddAuthenticatorContext | ResetPasswordContext | UpdatePasswordContext | TermsContext

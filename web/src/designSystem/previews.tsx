@@ -353,6 +353,17 @@ export const previews: Record<string, readonly PreviewState[]> = {
     { caption: 'Forgot password', draw: () => <IdentitySignIn page="resetPassword" />, frameHeight: 600 },
     { caption: 'Set password', draw: () => <IdentitySignIn page="updatePassword" />, frameHeight: 600 },
     { caption: 'Add an authenticator', draw: () => <IdentitySignIn page="addAuthenticator" />, frameHeight: 760 },
+    // Proposed: the terms page after the first sign-in, then sent without the box ticked.
+    { caption: 'Terms and privacy', draw: () => <IdentitySignIn page="terms" />, frameHeight: 600 },
+    {
+      caption: 'Terms not accepted',
+      draw: () => (
+        <SubmittedOnMount>
+          <IdentitySignIn page="terms" />
+        </SubmittedOnMount>
+      ),
+      frameHeight: 600,
+    },
   ],
 }
 

@@ -1,12 +1,14 @@
 import { AddAuthenticatorPage } from '../identitySignIn/AddAuthenticatorPage'
 import { ResetPasswordPage } from '../identitySignIn/ResetPasswordPage'
 import { SignInPage } from '../identitySignIn/SignInPage'
+import { TermsPage } from '../identitySignIn/TermsPage'
 import { TwoStepPage } from '../identitySignIn/TwoStepPage'
 import { UpdatePasswordPage } from '../identitySignIn/UpdatePasswordPage'
 import {
   identityAddAuthenticatorContext,
   identityInvalid,
   identityResetPasswordContext,
+  identityTermsContext,
   identitySignInContext,
   identityTwoStepContext,
   identityUpdatePasswordContext,
@@ -21,6 +23,7 @@ export type IdentitySignInPage =
   | 'resetPassword'
   | 'updatePassword'
   | 'addAuthenticator'
+  | 'terms'
 
 /** The identity provider's sign-in page in one of its states, built from fixtures through the shared sign-in components. */
 export function IdentitySignIn({ page }: { page: IdentitySignInPage }) {
@@ -41,5 +44,7 @@ export function IdentitySignIn({ page }: { page: IdentitySignInPage }) {
       return <UpdatePasswordPage context={identityUpdatePasswordContext} />
     case 'addAuthenticator':
       return <AddAuthenticatorPage context={identityAddAuthenticatorContext} />
+    case 'terms':
+      return <TermsPage context={identityTermsContext} />
   }
 }

@@ -30,6 +30,8 @@ import type {
   TwoStepTexts,
   UpdatePasswordContext,
   UpdatePasswordTexts,
+  TermsContext,
+  TermsTexts,
 } from '../identitySignIn/signInContext'
 
 /** The fixture application. Its name is also the marker that tells a design-system build from the production SPA. */
@@ -930,6 +932,31 @@ export const identityUpdatePasswordContext: UpdatePasswordContext = {
   preferences: identitySignInContext.preferences,
   legal: identitySignInContext.legal,
   texts: identityUpdatePasswordTexts,
+}
+
+/** Proposed: the texts of the terms page, in English. */
+export const identityTermsTexts: TermsTexts = {
+  title: 'Terms and privacy',
+  message: 'Before you continue, read and accept the terms that apply to your account.',
+  agreeBoth: 'I have read and agree to the {terms} and the {privacy}.',
+  agreeTerms: 'I have read and agree to the {terms}.',
+  agreePrivacy: 'I have read and agree to the {privacy}.',
+  termsLink: 'Terms of service',
+  privacyLink: 'Privacy policy',
+  agreeRequired: 'Tick the box to accept before you continue.',
+  accept: 'Continue',
+  decline: 'Decline and sign out',
+}
+
+/** Proposed: what the terms page draws in the design system. */
+export const identityTermsContext: TermsContext = {
+  page: 'terms',
+  title: identityTermsTexts.title,
+  realmName: identitySignInContext.realmName,
+  loginAction: '#terms',
+  preferences: identitySignInContext.preferences,
+  legal: identitySignInContext.legal,
+  texts: identityTermsTexts,
 }
 
 /** The texts of the page that adds an authenticator, in English. */
