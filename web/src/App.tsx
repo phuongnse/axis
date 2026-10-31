@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Route, Routes } from 'react-router'
 import { AccountPage } from './pages/AccountPage'
+import { ConsoleInstancePage } from './pages/ConsoleInstancePage'
 import { ConsolePage } from './pages/ConsolePage'
 import { HomePage } from './pages/HomePage'
 import { ShellError } from './pages/LocaleLoadFailed'
@@ -149,6 +150,14 @@ function PlatformRoutes() {
         element={
           <PlatformShellRoute>
             <ConsolePage />
+          </PlatformShellRoute>
+        }
+      />
+      <Route
+        path="console/instances/:id"
+        element={
+          <PlatformShellRoute>
+            <ConsoleInstancePage />
           </PlatformShellRoute>
         }
       />

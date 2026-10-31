@@ -118,6 +118,26 @@ public static class InstanceQueries
     }
 
     /// <summary>
+    /// Reads the instance <paramref name="id"/>, or returns <see langword="null"/> when there is none.
+    /// It applies no application, process or subject filter and no read filter, so the caller must be
+    /// someone who reads every instance of the tenant, such as the operator console.
+    /// </summary>
+    public static async Task<ProcessInstanceRow?> FindByIdAsync(
+        NpgsqlConnection connection,
+        Guid id,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+
+        await using var command = new NpgsqlCommand(
+            $"SELECT {Columns} FROM axis.process_instances AS {InstanceAlias} WHERE i.id = @id",
+            connection);
+        command.Parameters.AddWithValue("id", id);
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        return await reader.ReadAsync(cancellationToken) ? ReadInstance(reader) : null;
+    }
+
+    /// <summary>
     /// Reads page <paramref name="page"/> of <paramref name="pageSize"/> instances of a process without
     /// a subject, newest first, and counts them. Each item has no subject label. <paramref name="state"/> narrows the list when set.
     /// <paramref name="subjectId"/> matches no instance when set, because these instances have no

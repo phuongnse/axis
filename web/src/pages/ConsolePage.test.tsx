@@ -274,6 +274,19 @@ describe('ConsolePage', () => {
     expect(within(instance).getAllByText('—')).toHaveLength(2)
   })
 
+  it('links each entry of the failed work to its instance', async () => {
+    stubServer((url) => json(url.startsWith('/api/console/tenant') ? tenant : failedWork))
+    renderPage()
+
+    const view = await screen.findByTestId('console-failed-work')
+
+    expect(await within(view).findByTestId('console-failed-work-open-i-1')).toHaveAttribute(
+      'href',
+      '/console/instances/i-1',
+    )
+    expect(within(view).getByTestId('console-failed-work-open-i-2')).toHaveAttribute('href', '/console/instances/i-2')
+  })
+
   it('requests the next page of failed work', async () => {
     const fetchMock = stubServer((url) => json(url.startsWith('/api/console/tenant') ? tenant : failedWork))
     renderPage()
