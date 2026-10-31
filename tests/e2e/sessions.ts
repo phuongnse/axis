@@ -17,7 +17,8 @@ export type SampleUser =
   | "lead-2"
   | "asset-manager"
   | "auditor"
-  | "administrator";
+  | "administrator"
+  | "platform-operator";
 
 /** The sample users and the roles the development realm gives them. */
 export const sampleUsers: Record<SampleUser, string[]> = {
@@ -35,6 +36,7 @@ export const sampleUsers: Record<SampleUser, string[]> = {
   "asset-manager": ["asset-manager"],
   auditor: ["auditor"],
   administrator: ["tenant-administrator"],
+  "platform-operator": ["platform-operator"],
 };
 
 const journeyRoles = [

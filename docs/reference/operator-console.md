@@ -1,8 +1,8 @@
 # Operator console
 
 Detailed reference for the operator console: the web page where the platform operator sees what
-failed in a tenant and runs the commands that fix it. Everything in this file is
-_(planned for M23)_. The design follows
+failed in a tenant and runs the commands that fix it. The route, the access rules and the Tenant view
+are built. Everything else in this file is _(planned for M23)_. The design follows
 [D93](../decisions/d93-an-operator-web-console.md). Tenant provisioning stays in
 [`Axis.Admin`](administration.md), as
 [D43](../decisions/d43-tenant-provisioning-and-migrations-across-tenant-databases.md) agrees.
@@ -21,12 +21,20 @@ _(planned for Mx)_ are not built yet, and Dn refers to [decisions.md](../decisio
 - **Application policies play no part.** The role gives read access to the console views across
   every application of the tenant, and the commands below. It gives no grant on records, data
   sources, tasks or Studio.
-- **Header link.** `GET /api/me` already answers `console: true` for a user who holds the role, while the
-  console stays planned for M23. The app switcher then lists the operator console, linked to `/console`. A user without the role who opens the route gets a `403`
-  from the API and sees a forbidden page. A signed-out user is sent to sign in.
-- **API.** The console calls routes under `/api/console/`. Each needs a session and the operator
-  role, and every write needs the CSRF header, as the other session routes do. They are checked
-  on the server whatever the page shows.
+- **Header link.** `GET /api/me` answers `console: true` for a user who holds the role. The app
+  switcher then lists the operator console, linked to `/console`. A user without the role who opens
+  the route gets a `403` from the API and sees a forbidden page. A signed-out user gets the shell's
+  sign-in prompt after the `401`.
+- **API.** The console calls routes under `/api/console/`. Each needs a session (`401`) and the
+  operator role (`403`, also for everyone when `Console:OperatorRole` has no value), and every
+  write needs the CSRF header, as the other session routes do. They are checked on the server
+  whatever the page shows.
+  - **`GET /api/console/tenant`.** Answers the tenant of the host: `id`, `status` and
+    `applications`. Each application has its `id`, `name`, `releaseId` (the active release),
+    `releaseNumber` and `releaseLabel` (the number and label of that release in the application's
+    release history, as Studio shows them) and `activatedAt`. The applications are the ones with an
+    active release, in name order. The `status` is `active`, because a host serves only active
+    tenants: the hosts of a suspended tenant answer `503`.
 
 ## Views
 
@@ -44,7 +52,8 @@ Each view lists the newest items first, pages through them and filters by applic
   occurrence, see [schedules](process-events.md#schedules).
 - **Publishing.** Publish requests and the [release history](studio.md) of each application,
   read-only. Publishing and rollback stay in Studio.
-- **Tenant.** The tenant's status and each application's active release.
+- **Tenant.** The tenant's status and each application's active release, as a table with the
+  application, the release number and label, and the activation time. Built.
 
 ## Commands
 

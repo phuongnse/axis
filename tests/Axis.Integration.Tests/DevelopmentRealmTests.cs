@@ -29,6 +29,7 @@ public sealed class DevelopmentRealmTests(KeycloakFixture keycloak) : IAsyncLife
         { "asset-manager", "Asset Manager User", ["asset-manager"] },
         { "auditor", "Auditor User", ["auditor"] },
         { "administrator", "Administrator User", ["tenant-administrator"] },
+        { "platform-operator", "Platform Operator User", ["platform-operator"] },
     };
 
     public async ValueTask InitializeAsync() => _authority = await keycloak.StartAsync();

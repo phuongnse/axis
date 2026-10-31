@@ -287,7 +287,7 @@ and uses the `employee` user as the holder of assets, in a site at `/asset-manag
 The department budgets journey, `tests/e2e/specs/department-budgets-journey.spec.ts`, signs in as `manager` to approve a budget
 and as `employee` to be refused.
 The request-approval template journey, `tests/e2e/specs/request-approval-journey.spec.ts`,
-adds the `approver` user. The `administrator` user holds the `tenant-administrator` role, so it sees "Users" in the shell, and the E2E shell journey uses it. The [users page](reference/user-administration.md) it links to lists the development users, and the E2E users page journey uses it. The `author` role lets the authoring API list and read the resources of every sample under
+adds the `approver` user. The `administrator` user holds the `tenant-administrator` role, so it sees "Users" in the shell, and the E2E shell journey uses it. The `platform-operator` user holds the `platform-operator` role, so it sees the [operator console](reference/operator-console.md) in the shell, and the E2E operator console journey uses it. The [users page](reference/user-administration.md) it links to lists the development users, and the E2E users page journey uses it. The `author` role lets the authoring API list and read the resources of every sample under
 `samples/apps/` under `scripts/dev.sh`, and opens the Studio page at http://localhost:5173/studio.
 Each sample declares one `accounts` identity provider in `identity-providers/accounts.json`, because a site needs one.
 The purchase request sample also declares the `oidc` provider `company` in `identity-providers/company.json`, which brokers to the

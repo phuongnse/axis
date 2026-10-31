@@ -168,6 +168,8 @@ export function serverEnv(baseURL: string): Record<string, string> {
     Studio__Tests: 'true',
     // Makes GET /api/me answer users: true for the administrator user, who holds this role.
     Users__AdministratorRole: 'tenant-administrator',
+    // Makes GET /api/me answer console: true for the platform-operator user, who holds this role, and lets the operator console routes answer it.
+    Console__OperatorRole: 'platform-operator',
   }
 }
 
