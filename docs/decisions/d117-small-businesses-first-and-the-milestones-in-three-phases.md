@@ -2,9 +2,9 @@
 
 Status: **Agreed**
 
-The owner asked on 2026-10-30, and agreed these points on 2026-10-31, for Axis to serve individuals and small and medium businesses first,
+The owner asked on 2026-10-30 for Axis to serve individuals and small and medium businesses first,
 and large organizations, banks and government later, and for the planned milestones to be ordered
-by that goal. No planned work is dropped. Each part keeps its design and moves to the phase that
+by that goal, and agreed these points on 2026-10-31. No planned work is dropped. Each part keeps its design and moves to the phase that
 needs it. This changes the order and the milestone of parts of
 [D46](d46-a-general-purpose-low-code-platform-and-the-milestones-after-m9.md),
 [D101](d101-the-extensibility-milestone-is-split-into-six.md),
