@@ -392,7 +392,7 @@ keys. It can be rotated without signing anyone out.
   built. `PlatformAuditRecords.WriteAsync` in `Axis.Administration` writes one record.
 - **What writes it.** Every `Axis.Admin` command that acts on a tenant: `tenant create`,
   `tenant suspend`, `tenant resume`, `tenant rotate-passwords`, `tenant oidc set`, `tenant sign-in set`, `tenant backup`,
-  `tenant restore`, `migrate` and `activate` are built. So is `tenant session end`. `tenant backup` writes one because an
+  `tenant restore`, `migrate` and `activate` are built. So is `tenant session end`. So are `tenant data-key rotate` and `tenant data-key retire`. `tenant backup` writes one because an
   archive holds a tenant's data. `tenant binding set`, `tenant binding remove`, `tenant host add`,
   `tenant host remove` and `tenant host move` are built and write one each. So are `tenant email set`
   and `tenant email clear`, which name the [mail settings](#mail-settings) they changed. `platform rekey` is
@@ -405,12 +405,16 @@ keys. It can be rotated without signing anyone out.
   host that another tenant holds writes none, because nothing started. A record means the command
   started work for the tenant, not that the work succeeded. The `changed` names of these commands
   are empty, because the command already says what changed. `tenant rotate-passwords`,
-  `tenant oidc set` and `tenant session end` are the exceptions. The record of `tenant rotate-passwords` names both roles,
+  `tenant oidc set`, `tenant session end`, `tenant data-key rotate` and `tenant data-key retire` are the exceptions. The record of `tenant rotate-passwords` names both roles,
   `axis_<id>_runtime` and `axis_<id>_schema`, and never a password. The record of `tenant oidc set`
   names the [settings](#sign-in-settings) it was given and never a value. `tenant oidc set` writes
   its record after its checks and before the change. The record of `tenant sign-in set` names `accounts` and
   `provider:<name>`, and never a value. The record of `tenant session end` holds
   `user:<user>` or `all`, and is written after its checks and before the delete.
+  The record of `tenant data-key rotate` holds `data_key:<n>` and `lookup_key:<k>`, the numbers it adds, and is written
+  before it adds them. The record of `tenant data-key retire` holds `data_key:<i>` and `lookup_key:<j>` for each key it
+  deletes, and is written after its count passes and before the delete. A refused `retire`, and one with nothing to delete,
+  writes none. Neither holds a key.
   The binding and host commands differ: each is one small transaction that writes its record and
   makes its change together, so a record means the change was made. A command that is refused or
   fails rolls its record back too.
