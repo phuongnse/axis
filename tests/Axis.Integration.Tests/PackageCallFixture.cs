@@ -328,6 +328,7 @@ public sealed class PackageCallFixture : IAsyncLifetime
             new RecordAccess(true, null),
             "maria",
             "Fixed",
+            null,
             NullLoggerFactory.Instance,
             cancellationToken);
         Assert.Equal(ProcessRetryOutcome.Retried, result.Outcome);

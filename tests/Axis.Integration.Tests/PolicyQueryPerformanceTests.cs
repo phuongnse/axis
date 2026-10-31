@@ -50,7 +50,7 @@ public sealed class PolicyQueryPerformanceTests(DataDatabaseFixture fixture) : I
     {
         var model = await SeedAsync();
         Assert.True(model.TryGetEntity("Request", out var request));
-        var condition = ManagerCondition(model, request);
+        var condition = await ManagerCondition(model, request);
         await using var dataSource = NpgsqlDataSource.Create(fixture.ConnectionString);
         await using var connection = await dataSource.OpenConnectionAsync(CancellationToken);
         await RecordQueries.ListAsync(connection, null, request, 1, PageSize, null, null, condition, CancellationToken);
@@ -77,7 +77,7 @@ public sealed class PolicyQueryPerformanceTests(DataDatabaseFixture fixture) : I
         var model = await SeedAsync();
         Assert.True(model.TryGetEntity("Request", out var request));
         Assert.True(model.TryGetDataSource("RequestTotals", out var totals));
-        var condition = ManagerCondition(model, request);
+        var condition = await ManagerCondition(model, request);
         await using var dataSource = NpgsqlDataSource.Create(fixture.ConnectionString);
         await using var connection = await dataSource.OpenConnectionAsync(CancellationToken);
         await DataSourceQueries.ListAsync(connection, null, model, totals, 1, PageSize, null, [], condition, cancellationToken: CancellationToken);
@@ -119,12 +119,12 @@ public sealed class PolicyQueryPerformanceTests(DataDatabaseFixture fixture) : I
     private static long Amount(int n) => n % 100;
 
     /// <summary>The read filters of the manager role as one condition for <see cref="Manager"/>, as the endpoints build it.</summary>
-    private static RecordCondition ManagerCondition(ApplicationModel model, EntityModel request)
+    private static Task<RecordCondition> ManagerCondition(ApplicationModel model, EntityModel request)
     {
         var read = PolicyEvaluator.Access(model, ["manager"], request, PolicyAction.Read);
         Assert.True(read.Granted);
         Assert.NotNull(read.Filters);
-        return RecordFilters.Condition(model, request, [.. read.Filters.Select(filter => filter.Expression)], Manager);
+        return RecordFilters.ConditionAsync(model, request, [.. read.Filters.Select(filter => filter.Expression)], Manager, null, CancellationToken);
     }
 
     /// <summary>

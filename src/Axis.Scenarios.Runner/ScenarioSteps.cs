@@ -96,7 +96,7 @@ internal sealed class ScenarioSteps(
     {
         var (entity, id) = Saved(step.Record);
         var result = await RecordCommand.DeleteAsync(
-            connection, ScenarioRunner.TenantId, model, releaseId, entity, id, Actor(step), loggerFactory, cancellationToken);
+            connection, ScenarioRunner.TenantId, model, releaseId, entity, id, Actor(step), null, loggerFactory, cancellationToken);
         Check(step, Action(result, RecordCommandOutcome.Deleted));
     }
 
@@ -143,7 +143,7 @@ internal sealed class ScenarioSteps(
         if (!await RecordCommands.LockAsync(connection, entity, id, cancellationToken)
             || !read.Granted
             || (read.Filters is { } filters
-                && await RecordCommand.MatchAsync(connection, transaction, model, entity, id, filters, user, loggerFactory, cancellationToken)
+                && await RecordCommand.MatchAsync(connection, transaction, model, entity, id, filters, user, null, loggerFactory, cancellationToken)
                     is not { Found: true, Matched: true })
             || await RecordQueries.GetAsync(connection, model, entity, id, cancellationToken) is not { } record)
         {

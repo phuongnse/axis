@@ -42,6 +42,8 @@ internal static class ConsoleOperatorEndpoints
         HttpRequest request,
         ActiveApplicationResolver resolver,
         TenantDatabase database,
+        SensitiveValues sensitive,
+        ITenantContextAccessor tenants,
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
@@ -70,7 +72,17 @@ internal static class ConsoleOperatorEndpoints
 
         var (entity, read) = SubjectAccess(target.Active!.Model, target.Process!);
         return await ProcessOperatorEndpoints.RunCancelAsync(
-            database, target.Active.Model, target.Process!, entity, read, instanceId, user.Id, reason!, loggerFactory, cancellationToken);
+            database,
+            target.Active.Model,
+            target.Process!,
+            entity,
+            read,
+            instanceId,
+            user.Id,
+            reason!,
+            new RecordCipher(sensitive, (tenants.Current ?? throw new InvalidOperationException("No tenant context is set.")).TenantId),
+            loggerFactory,
+            cancellationToken);
     }
 
     private static async Task<IResult> RetryAsync(
@@ -79,6 +91,7 @@ internal static class ConsoleOperatorEndpoints
         ActiveApplicationResolver resolver,
         TenantDatabase database,
         ITenantContextAccessor tenants,
+        SensitiveValues sensitive,
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
@@ -122,6 +135,7 @@ internal static class ConsoleOperatorEndpoints
                 instanceId,
                 user.Id,
                 reason!,
+                new RecordCipher(sensitive, tenantId),
                 loggerFactory,
                 cancellationToken) is { } result)
             {

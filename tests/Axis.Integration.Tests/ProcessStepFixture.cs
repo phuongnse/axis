@@ -424,6 +424,7 @@ public sealed class ProcessStepFixture : IAsyncLifetime
             new RecordAccess(true, null),
             "maria",
             "Fixed",
+            null,
             NullLoggerFactory.Instance,
             cancellationToken);
         Assert.Equal(ProcessRetryOutcome.Retried, result.Outcome);
@@ -451,6 +452,7 @@ public sealed class ProcessStepFixture : IAsyncLifetime
             new RecordAccess(true, null),
             "maria",
             "Fixed",
+            null,
             NullLoggerFactory.Instance,
             cancellationToken);
         if (result.Outcome == ProcessCancelOutcome.Cancelled)

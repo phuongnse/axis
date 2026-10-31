@@ -111,9 +111,9 @@ public sealed class DataSourcePolicyTests(RecordApiFixture fixture) : IClassFixt
         Assert.True(model.TryGetDataSource("ItemsByDepartment", out var byDepartment));
 
         var tickets = DataSourceQueries.Statement(
-            model, overdue, DataSourceSort.Default(overdue), Condition(model, ticket, SqlTextUser));
+            model, overdue, DataSourceSort.Default(overdue), await Condition(model, ticket, SqlTextUser));
         var items = DataSourceQueries.Statement(
-            model, byDepartment, DataSourceSort.Default(byDepartment), Condition(model, item, SqlTextUser));
+            model, byDepartment, DataSourceSort.Default(byDepartment), await Condition(model, item, SqlTextUser));
 
         foreach (var sql in new[] { tickets.CountSql, tickets.PageSql })
         {
@@ -176,11 +176,11 @@ public sealed class DataSourcePolicyTests(RecordApiFixture fixture) : IClassFixt
     }
 
     /// <summary>The condition of the <c>read</c> filters of the <c>filtered</c> role on <paramref name="entity"/>.</summary>
-    private static RecordCondition Condition(ApplicationModel model, EntityModel entity, string userId)
+    private static Task<RecordCondition> Condition(ApplicationModel model, EntityModel entity, string userId)
     {
         var filters = PolicyEvaluator.Access(model, ["filtered"], entity, PolicyAction.Read).Filters;
         Assert.NotNull(filters);
-        return RecordFilters.Condition(model, entity, [.. filters.Select(filter => filter.Expression)], userId);
+        return RecordFilters.ConditionAsync(model, entity, [.. filters.Select(filter => filter.Expression)], userId, null, TestContext.Current.CancellationToken);
     }
 
     private Task<Guid> InsertItemAsync(string name, bool active, string? status) =>

@@ -60,6 +60,7 @@ internal sealed class RecordImportKey
         EntityModel entity,
         RecordActor actor,
         IReadOnlyList<string> cells,
+        RecordCipher? cipher,
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
@@ -82,7 +83,7 @@ internal sealed class RecordImportKey
                 return (null, new RecordCommandResult(RecordCommandOutcome.PendingFilter));
             }
 
-            if (await RecordCommand.MatchAsync(connection, transaction, application, entity, id, filters, actor.Id, loggerFactory, cancellationToken) is not { Found: true, Matched: true })
+            if (await RecordCommand.MatchAsync(connection, transaction, application, entity, id, filters, actor.Id, cipher, loggerFactory, cancellationToken) is not { Found: true, Matched: true })
             {
                 return (null, null);
             }

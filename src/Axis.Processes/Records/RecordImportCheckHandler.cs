@@ -153,7 +153,7 @@ internal sealed partial class RecordImportCheckHandler(
             var (resolved, lookupErrors) = await references.ResolveAsync(connection, cells, cancellationToken);
             var (match, keyFailure) = key is null
                 ? (null, null)
-                : await key.FindAsync(connection, transaction, application, entity, actor, resolved, loggerFactory, cancellationToken);
+                : await key.FindAsync(connection, transaction, application, entity, actor, resolved, cipher, loggerFactory, cancellationToken);
             if (keyFailure is not null)
             {
                 errors[prefix] = [RecordImportRefusals.Message(keyFailure, update: true)];

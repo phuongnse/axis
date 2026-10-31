@@ -149,7 +149,7 @@ internal static class DataSourceEndpoints
         }
 
         var condition = read.Filters is { } filters
-            ? RecordFilters.Condition(application, root, [.. filters.Select(filter => filter.Expression)], user.Id)
+            ? await RecordFilters.ConditionAsync(application, root, [.. filters.Select(filter => filter.Expression)], user.Id, RecordEndpoints.Cipher(sensitive, tenants), cancellationToken)
             : null;
         var result = await DataSourceQueries.ListAsync(
             connection, database.ReadTransaction, application, model, pageNumber, size, order, parameters, condition, search, RecordEndpoints.Cipher(sensitive, tenants), cancellationToken);
@@ -246,7 +246,7 @@ internal static class DataSourceEndpoints
         }
 
         var condition = read.Filters is { } filters
-            ? RecordFilters.Condition(application, root, [.. filters.Select(filter => filter.Expression)], user.Id)
+            ? await RecordFilters.ConditionAsync(application, root, [.. filters.Select(filter => filter.Expression)], user.Id, RecordEndpoints.Cipher(sensitive, tenants), cancellationToken)
             : null;
         var columns = ExportColumns(model);
         string?[] Cells(DataSourceRow row)

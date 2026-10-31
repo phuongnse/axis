@@ -246,7 +246,7 @@ public static class DataSourceQueries
         ArgumentOutOfRangeException.ThrowIfLessThan(limit, 1);
 
         var id = $"{EntityNaming.Quote(RowAlias)}.{EntityNaming.Quote(EntityNaming.IdColumn)}";
-        var cursor = after is null ? null : new RecordCondition($"({id} > @after)", [], "");
+        var cursor = after is null ? null : new RecordCondition($"({id} > @after)", [], [], "");
         var statement = Statement(application, dataSource, sort: null, cursor);
         try
         {

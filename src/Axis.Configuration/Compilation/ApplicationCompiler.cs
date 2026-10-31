@@ -2506,7 +2506,8 @@ public static partial class ApplicationCompiler
     /// expression, directly or through the rules it calls, is not translated: that rule already has
     /// its own diagnostic, as for a validation. A filter that reads a sensitive field of
     /// <paramref name="entity"/>, or of an entity it reaches, is refused: the stored value is
-    /// encrypted. <paramref name="check"/> is the type check when it succeeds, and null otherwise.
+    /// encrypted. Only a policy filter may test an exact lookup field of <paramref name="entity"/> with
+    /// <c>==</c> or <c>!=</c> against a literal. <paramref name="check"/> is the type check when it succeeds, and null otherwise.
     /// </summary>
     internal static ExpressionDiagnostic? CheckFilter(
         string filter,
@@ -2530,7 +2531,7 @@ public static partial class ApplicationCompiler
         }
 
         check = typeCheck;
-        if (SensitiveReads.Find(parsed.Expression, typeCheck, entity, scope, findEntity) is var (readEntity, readField))
+        if (SensitiveReads.Find(parsed.Expression, typeCheck, entity, scope, findEntity, allowExactLookupEquality: policyFilter) is var (readEntity, readField))
         {
             return new ExpressionDiagnostic(
                 DiagnosticCodes.SensitiveFieldUse,

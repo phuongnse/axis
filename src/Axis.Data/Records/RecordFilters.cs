@@ -13,6 +13,9 @@ namespace Axis.Data.Records;
 /// is translated by <see cref="SqlTranslator"/>, with the body of each rule it calls inlined. The
 /// literals of filter <c>i</c> are <c>@g{i}f0</c>, <c>@g{i}f1</c>, …, and <c>currentUser()</c> is
 /// <c>@currentUser</c>, bound as text to the user's id. So no value is ever part of the SQL text.
+/// A test of an exact lookup field with <c>==</c> or <c>!=</c> against a literal compares the field's
+/// lookup column with the parameter <c>@g{i}fl{n}</c>, a <c>bytea[]</c> that holds the literal's hash
+/// under every lookup key of the tenant, so it needs the tenant's <see cref="RecordCipher"/>.
 /// A bare name is a column of the row aliased <see cref="RecordQueries.RowAlias"/>, and a path
 /// through reference fields is one scalar subquery per step, so a null reference gives a null
 /// value and the row stays one row. <c>any</c> and <c>count</c> over a child collection or a
@@ -25,10 +28,17 @@ public static class RecordFilters
 
     /// <summary>
     /// The condition that a row matches any of <paramref name="filters"/>, combined with OR, for
-    /// the user <paramref name="userId"/>. No filter matches no row.
+    /// the user <paramref name="userId"/>. No filter matches no row. A test of an exact lookup field
+    /// is hashed with <paramref name="cipher"/>, which it needs.
     /// </summary>
-    public static RecordCondition Condition(
-        ApplicationModel application, EntityModel entity, IReadOnlyList<ExpressionModel> filters, string userId)
+    /// <exception cref="InvalidOperationException">A filter tests an exact lookup field and <paramref name="cipher"/> is null.</exception>
+    public static async Task<RecordCondition> ConditionAsync(
+        ApplicationModel application,
+        EntityModel entity,
+        IReadOnlyList<ExpressionModel> filters,
+        string userId,
+        RecordCipher? cipher,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(application);
         ArgumentNullException.ThrowIfNull(entity);
@@ -37,12 +47,13 @@ public static class RecordFilters
 
         if (filters.Count == 0)
         {
-            return new RecordCondition("FALSE", [], userId);
+            return new RecordCondition("FALSE", [], [], userId);
         }
 
         var aliases = new AliasCounter();
         var conditions = new List<string>(filters.Count);
         var values = new List<SqlValue>();
+        var lookups = new List<(string Name, byte[][] Hashes)>();
         for (var index = 0; index < filters.Count; index++)
         {
             var filter = filters[index];
@@ -57,18 +68,60 @@ public static class RecordFilters
                     entity,
                     name,
                     $"{EntityNaming.Quote(RecordQueries.RowAlias)}.{EntityNaming.Quote(EntityNaming.IdColumn)}",
-                    aliases));
+                    aliases),
+                names => names is [var name] && entity.TryGetField(name, out var field) && field.ExactLookup
+                    ? $"{EntityNaming.Quote(RecordQueries.RowAlias)}.{EntityNaming.Quote(EntityNaming.LookupColumn(field.Name))}"
+                    : null);
             if (!translated.Succeeded)
             {
                 throw new InvalidOperationException($"The compiler let through a policy filter outside the SQL subset: {translated.Diagnostic.Message}");
+            }
+
+            foreach (var lookup in translated.Lookups)
+            {
+                lookups.Add((lookup.Name, await HashesAsync(entity, lookup, cipher, cancellationToken)));
             }
 
             conditions.Add($"({translated.Sql})");
             values.AddRange(translated.Parameters);
         }
 
-        return new RecordCondition($"({string.Join(" OR ", conditions)})", values, userId);
+        return new RecordCondition($"({string.Join(" OR ", conditions)})", values, lookups, userId);
     }
+
+    /// <summary>
+    /// The hashes of the literal of <paramref name="lookup"/> under every lookup key of the tenant. A literal that
+    /// no stored value can equal, such as a fraction for an integer field, has none, so <c>==</c> matches no row.
+    /// </summary>
+    private static async Task<byte[][]> HashesAsync(EntityModel entity, SqlLookup lookup, RecordCipher? cipher, CancellationToken cancellationToken)
+    {
+        if (cipher is null)
+        {
+            throw new InvalidOperationException("A filter on an exact lookup field needs the tenant's lookup keys.");
+        }
+
+        var name = lookup.Path[0];
+        if (!entity.TryGetField(name, out var field) || LookupValue(field, lookup) is not { } value)
+        {
+            return [];
+        }
+
+        return [.. await cipher.Values.LookupAllAsync(cipher.TenantId, entity.Id, new RecordValue(field, value), cancellationToken)];
+    }
+
+    // The literal in the shape that a write of the field has, so its text form is the one a write hashed.
+    private static object? LookupValue(FieldModel field, SqlLookup lookup) =>
+        (field.Type, lookup.Value) switch
+        {
+            (FieldType.Text or FieldType.Enum, string text) => text,
+            (FieldType.Integer, long number) => number,
+            (FieldType.Integer, decimal number) => number == decimal.Truncate(number) ? (long)number : null,
+            (FieldType.Decimal or FieldType.Money, long number) => number.ToString(CultureInfo.InvariantCulture),
+            (FieldType.Decimal or FieldType.Money, decimal number) => number.ToString(CultureInfo.InvariantCulture),
+            (FieldType.Boolean, bool flag) => flag,
+            _ => throw new InvalidOperationException(
+                $"The compiler let through an exact lookup filter on the field '{field.Name}' with a {lookup.Kind} literal."),
+        };
 
     /// <summary>
     /// Checks the record with <paramref name="id"/> against each of <paramref name="filters"/> in
@@ -76,7 +129,8 @@ public static class RecordFilters
     /// rejects for this record with a data exception (SQLSTATE class 22), such as an integer
     /// overflow, does not match, and its index is in <see cref="RecordFilterMatch.Failed"/>. Any
     /// other database error is thrown. Inside <paramref name="transaction"/>, each statement runs
-    /// under a savepoint, so a failed filter leaves the transaction usable.
+    /// under a savepoint, so a failed filter leaves the transaction usable. A test of an exact lookup
+    /// field is hashed with <paramref name="cipher"/>, as in <see cref="ConditionAsync"/>.
     /// </summary>
     public static async Task<RecordFilterMatch> MatchAsync(
         NpgsqlConnection connection,
@@ -86,6 +140,7 @@ public static class RecordFilters
         Guid id,
         IReadOnlyList<ExpressionModel> filters,
         string userId,
+        RecordCipher? cipher,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(connection);
@@ -101,7 +156,7 @@ public static class RecordFilters
         long? found = null;
         for (var index = 0; index < filters.Count; index++)
         {
-            var condition = Condition(application, entity, [filters[index]], userId);
+            var condition = await ConditionAsync(application, entity, [filters[index]], userId, cipher, cancellationToken);
             await using var command = new NpgsqlCommand($"SELECT {row}.{version}, {condition.Sql} IS TRUE {from}", connection);
             command.Parameters.AddWithValue("id", id);
             condition.AddTo(command);
@@ -314,28 +369,35 @@ internal sealed class AliasCounter
 }
 
 /// <summary>
-/// A record condition as SQL over the row aliased <c>r</c>, with the values it names and the
-/// user id that <c>@currentUser</c> stands for.
+/// A record condition as SQL over the row aliased <c>r</c>, with the values it names, the lookup
+/// hashes it names and the user id that <c>@currentUser</c> stands for.
 /// </summary>
 public sealed class RecordCondition
 {
     private readonly IReadOnlyList<SqlValue> _values;
+    private readonly IReadOnlyList<(string Name, byte[][] Hashes)> _lookups;
     private readonly string _userId;
 
-    internal RecordCondition(string sql, IReadOnlyList<SqlValue> values, string userId)
+    internal RecordCondition(string sql, IReadOnlyList<SqlValue> values, IReadOnlyList<(string Name, byte[][] Hashes)> lookups, string userId)
     {
         Sql = sql;
         _values = values;
+        _lookups = lookups;
         _userId = userId;
     }
 
     /// <summary>The condition, wrapped in parentheses.</summary>
     public string Sql { get; }
 
-    /// <summary>Adds new parameters for the values and the user id to <paramref name="command"/>.</summary>
+    /// <summary>Adds new parameters for the values, the lookup hashes and the user id to <paramref name="command"/>.</summary>
     internal void AddTo(NpgsqlCommand command)
     {
         DataSourceQueries.AddValues(command, _values);
+        foreach (var (name, hashes) in _lookups)
+        {
+            command.Parameters.Add(new NpgsqlParameter(name, NpgsqlDbType.Array | NpgsqlDbType.Bytea) { Value = hashes });
+        }
+
         command.Parameters.Add(new NpgsqlParameter(SqlTranslator.CurrentUserParameter, NpgsqlDbType.Text) { Value = _userId });
     }
 }

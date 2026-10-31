@@ -3,6 +3,7 @@ using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using Axis.Configuration.Model;
 using Axis.Configuration.Packages;
+using Axis.Core.Tenancy;
 using Axis.Data.Records;
 using Axis.Policy;
 using Axis.Processes.Instances;
@@ -11,6 +12,7 @@ using Axis.Processes.Storage;
 using Axis.Server.Applications;
 using Axis.Server.Authentication;
 using Axis.Server.Http;
+using Axis.Server.Records;
 using Axis.Server.Tenancy;
 using Axis.Server.Users;
 using Npgsql;
@@ -84,6 +86,8 @@ internal static class ProcessInspectionEndpoints
         HttpContext httpContext,
         ActiveApplicationResolver resolver,
         TenantDatabase database,
+        SensitiveValues sensitive,
+        ITenantContextAccessor tenants,
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
@@ -169,7 +173,7 @@ internal static class ProcessInspectionEndpoints
         }
 
         var condition = read.Filters is { } filters
-            ? RecordFilters.Condition(application, entity, RecordCommand.Expressions(filters), user.Id)
+            ? await RecordFilters.ConditionAsync(application, entity, RecordCommand.Expressions(filters), user.Id, RecordEndpoints.Cipher(sensitive, tenants), cancellationToken)
             : null;
         if (await InstanceQueries.ListAsync(
                 connection, application.Manifest.Id, model.Id, entity, state, subjectId, condition, pageNumber, size, cancellationToken) is not { } result)
@@ -244,6 +248,8 @@ internal static class ProcessInspectionEndpoints
         ActiveApplicationResolver resolver,
         TenantDatabase database,
         PackageCatalog packages,
+        SensitiveValues sensitive,
+        ITenantContextAccessor tenants,
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
@@ -306,7 +312,7 @@ internal static class ProcessInspectionEndpoints
             // FindAsync filters by the subject entity, so the instance has a subject.
             if (row is not null
                 && read.Filters is { } filters
-                && await RecordCommand.MatchAsync(connection, null, application, entity, row.SubjectId!.Value, filters, user.Id, loggerFactory, cancellationToken) is not { Found: true, Matched: true })
+                && await RecordCommand.MatchAsync(connection, null, application, entity, row.SubjectId!.Value, filters, user.Id, RecordEndpoints.Cipher(sensitive, tenants), loggerFactory, cancellationToken) is not { Found: true, Matched: true })
             {
                 row = null;
             }

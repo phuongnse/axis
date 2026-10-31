@@ -48,7 +48,7 @@ public sealed class AnyPolicyPerformanceTests(DataDatabaseFixture fixture) : ICl
         var model = await SeedAsync();
         Assert.True(model.TryGetEntity("Ticket", out var ticket));
         Assert.True(model.TryGetEntity("Assignee", out var assignee));
-        var condition = AssigneeCondition(model, ticket);
+        var condition = await AssigneeCondition(model, ticket);
         await using var dataSource = NpgsqlDataSource.Create(fixture.ConnectionString);
         await using var connection = await dataSource.OpenConnectionAsync(CancellationToken);
         await RecordQueries.ListAsync(connection, null, ticket, 1, PageSize, null, null, condition, CancellationToken);
@@ -78,12 +78,12 @@ public sealed class AnyPolicyPerformanceTests(DataDatabaseFixture fixture) : ICl
         Enumerable.Range(0, AssigneesPerTicket).Any(j => $"user-{(AssigneesPerTicket * p + j) % UserCount}" == User);
 
     /// <summary>The read filters of the assignee role as one condition for <see cref="User"/>, as the endpoints build it.</summary>
-    private static RecordCondition AssigneeCondition(ApplicationModel model, EntityModel ticket)
+    private static Task<RecordCondition> AssigneeCondition(ApplicationModel model, EntityModel ticket)
     {
         var read = PolicyEvaluator.Access(model, ["assignee"], ticket, PolicyAction.Read);
         Assert.True(read.Granted);
         Assert.NotNull(read.Filters);
-        return RecordFilters.Condition(model, ticket, [.. read.Filters.Select(filter => filter.Expression)], User);
+        return RecordFilters.ConditionAsync(model, ticket, [.. read.Filters.Select(filter => filter.Expression)], User, null, CancellationToken);
     }
 
     /// <summary>

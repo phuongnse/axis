@@ -90,6 +90,8 @@ internal static class ProcessOperatorEndpoints
         HttpRequest request,
         ActiveApplicationResolver resolver,
         TenantDatabase database,
+        SensitiveValues sensitive,
+        ITenantContextAccessor tenants,
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
@@ -131,7 +133,8 @@ internal static class ProcessOperatorEndpoints
         }
 
         var (entity, read) = SubjectAccess(application, user, model);
-        return await RunCancelAsync(database, application, model, entity, read, instanceId, user.Id, reason!, loggerFactory, cancellationToken);
+        return await RunCancelAsync(
+            database, application, model, entity, read, instanceId, user.Id, reason!, RecordEndpoints.Cipher(sensitive, tenants), loggerFactory, cancellationToken);
     }
 
     /// <summary>
@@ -147,6 +150,7 @@ internal static class ProcessOperatorEndpoints
         Guid instanceId,
         string userId,
         string reason,
+        RecordCipher? cipher,
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
@@ -162,6 +166,7 @@ internal static class ProcessOperatorEndpoints
             read,
             userId,
             reason,
+            cipher,
             loggerFactory,
             cancellationToken);
         if (result.Outcome != ProcessCancelOutcome.Cancelled)
@@ -194,6 +199,7 @@ internal static class ProcessOperatorEndpoints
         ActiveApplicationResolver resolver,
         TenantDatabase database,
         ITenantContextAccessor tenants,
+        SensitiveValues sensitive,
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
@@ -205,7 +211,7 @@ internal static class ProcessOperatorEndpoints
         // A release change under the start lock sends the request back to resolution, so every check runs on the new release.
         for (var attempt = 0; attempt < ReleaseRetry.MaxAttempts; attempt++)
         {
-            if (await RetryOnceAsync(app, process, id, request, user, resolver, database, tenants, loggerFactory, cancellationToken) is { } result)
+            if (await RetryOnceAsync(app, process, id, request, user, resolver, database, tenants, sensitive, loggerFactory, cancellationToken) is { } result)
             {
                 return result;
             }
@@ -224,6 +230,7 @@ internal static class ProcessOperatorEndpoints
         ActiveApplicationResolver resolver,
         TenantDatabase database,
         ITenantContextAccessor tenants,
+        SensitiveValues sensitive,
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
@@ -262,7 +269,7 @@ internal static class ProcessOperatorEndpoints
         var tenantId = (tenants.Current ?? throw new InvalidOperationException("No tenant context is set.")).TenantId;
         var (entity, read) = SubjectAccess(application, user, model);
         return await RunRetryAsync(
-            database, tenantId, application, active.ReleaseId, model, entity, read, instanceId, user.Id, reason!, loggerFactory, cancellationToken);
+            database, tenantId, application, active.ReleaseId, model, entity, read, instanceId, user.Id, reason!, new RecordCipher(sensitive, tenantId), loggerFactory, cancellationToken);
     }
 
     /// <summary>
@@ -282,6 +289,7 @@ internal static class ProcessOperatorEndpoints
         Guid instanceId,
         string userId,
         string reason,
+        RecordCipher? cipher,
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
@@ -307,6 +315,7 @@ internal static class ProcessOperatorEndpoints
             read,
             userId,
             reason,
+            cipher,
             loggerFactory,
             cancellationToken);
         if (result.Outcome != ProcessRetryOutcome.Retried)

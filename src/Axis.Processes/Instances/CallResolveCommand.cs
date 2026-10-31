@@ -141,7 +141,7 @@ public static class CallResolveCommand
             && (entity is null
                 || read is not { Granted: true }
                 || (read.Filters is { } filters
-                    && await RecordCommand.MatchAsync(connection, transaction, active, entity, subjectId, filters, userId, loggerFactory, cancellationToken)
+                    && await RecordCommand.MatchAsync(connection, transaction, active, entity, subjectId, filters, userId, cipher, loggerFactory, cancellationToken)
                         is not { Found: true, Matched: true })))
         {
             return new CallResolveResult(CallResolveOutcome.NotFound);

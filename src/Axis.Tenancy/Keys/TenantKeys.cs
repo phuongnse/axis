@@ -3,7 +3,7 @@ using System.Collections.Concurrent;
 namespace Axis.Tenancy.Keys;
 
 /// <summary>
-/// Gives the server and the worker the keys of a tenant: the newest key of a kind for a write and a key by number for a read.
+/// Gives the server and the worker the keys of a tenant: the newest key of a kind for a write, a key by number for a read and every key of a kind for a lookup.
 /// It reads a tenant's keys from the <see cref="ITenantKeySource"/> when first needed, and again when asked for a number it
 /// does not hold. It writes no log, and no message holds a key.
 /// </summary>
@@ -22,6 +22,19 @@ public sealed class TenantKeys(ITenantKeySource source)
         }
 
         return keys.Where(key => key.Kind == kind).MaxBy(key => key.Number);
+    }
+
+    /// <summary>Returns every key of the kind, ordered by number. It is empty when the tenant has none of that kind.</summary>
+    public async Task<IReadOnlyList<TenantKey>> AllAsync(string tenantId, TenantKeyKind kind, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(tenantId);
+
+        if (!_cache.TryGetValue(tenantId, out var keys))
+        {
+            keys = await LoadAsync(tenantId, cancellationToken);
+        }
+
+        return [.. keys.Where(key => key.Kind == kind).OrderBy(key => key.Number)];
     }
 
     /// <summary>

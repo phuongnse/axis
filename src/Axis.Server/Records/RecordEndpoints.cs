@@ -155,7 +155,7 @@ internal static class RecordEndpoints
         }
 
         var condition = read.Filters is { } filters
-            ? RecordFilters.Condition(application!, model, Expressions(filters), user.Id)
+            ? await RecordFilters.ConditionAsync(application!, model, Expressions(filters), user.Id, Cipher(sensitive, tenants), cancellationToken)
             : null;
         if (await RecordQueries.ListAsync(connection, database.ReadTransaction, model, pageNumber, size, order, searched, condition, Cipher(sensitive, tenants), cancellationToken) is not { } result)
         {
@@ -229,7 +229,7 @@ internal static class RecordEndpoints
         }
 
         var condition = read.Filters is { } filters
-            ? RecordFilters.Condition(application!, model, Expressions(filters), user.Id)
+            ? await RecordFilters.ConditionAsync(application!, model, Expressions(filters), user.Id, Cipher(sensitive, tenants), cancellationToken)
             : null;
 
         // A child collection and a references field have no column to export.
@@ -385,7 +385,7 @@ internal static class RecordEndpoints
         }
 
         if (read.Filters is { } filters
-            && await RecordCommand.MatchAsync(connection, database.ReadTransaction, application!, model, recordId, filters, user.Id, loggerFactory, cancellationToken) is not { Found: true, Matched: true })
+            && await RecordCommand.MatchAsync(connection, database.ReadTransaction, application!, model, recordId, filters, user.Id, Cipher(sensitive, tenants), loggerFactory, cancellationToken) is not { Found: true, Matched: true })
         {
             return RecordNotFound();
         }
@@ -456,7 +456,7 @@ internal static class RecordEndpoints
         }
 
         var readable = read.Filters is { } filters
-            ? await RecordCommand.MatchAsync(connection, database.ReadTransaction, application!, model, recordId, filters, user.Id, loggerFactory, cancellationToken) is { Found: true, Matched: true }
+            ? await RecordCommand.MatchAsync(connection, database.ReadTransaction, application!, model, recordId, filters, user.Id, Cipher(sensitive, tenants), loggerFactory, cancellationToken) is { Found: true, Matched: true }
             : await RecordQueries.GetAsync(connection, application!, model, recordId, Cipher(sensitive, tenants), cancellationToken) is not null;
         if (!readable)
         {
@@ -634,6 +634,7 @@ internal static class RecordEndpoints
         ActiveApplicationResolver resolver,
         TenantDatabase database,
         ITenantContextAccessor tenants,
+        SensitiveValues sensitive,
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
@@ -658,7 +659,7 @@ internal static class RecordEndpoints
 
             var connection = await database.GetConnectionAsync(cancellationToken);
             var result = await RecordCommand.DeleteAsync(
-                connection, TenantId(tenants), application!, releaseId, model, recordId, Actor(user, application!), loggerFactory, cancellationToken, database.WriteLimit);
+                connection, TenantId(tenants), application!, releaseId, model, recordId, Actor(user, application!), Cipher(sensitive, tenants), loggerFactory, cancellationToken, database.WriteLimit);
             if (result.Outcome == RecordCommandOutcome.ReleaseChanged)
             {
                 continue;

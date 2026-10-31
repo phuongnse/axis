@@ -89,6 +89,7 @@ public static class ProcessRetryCommand
         RecordAccess? read,
         string userId,
         string reason,
+        RecordCipher? cipher,
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
@@ -119,7 +120,7 @@ public static class ProcessRetryCommand
             && (entity is null
                 || read is not { Granted: true }
                 || (read.Filters is { } filters
-                    && await RecordCommand.MatchAsync(connection, transaction, active, entity, subjectId, filters, userId, loggerFactory, cancellationToken)
+                    && await RecordCommand.MatchAsync(connection, transaction, active, entity, subjectId, filters, userId, cipher, loggerFactory, cancellationToken)
                         is not { Found: true, Matched: true })))
         {
             return new ProcessRetryResult(ProcessRetryOutcome.NotFound);
