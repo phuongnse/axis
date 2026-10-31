@@ -210,7 +210,7 @@ export interface TermsTexts {
   decline: string
 }
 
-/** Proposed: what the terms page draws: the site's terms and privacy policy, which the person accepts once. */
+/** Proposed: what the terms page draws: the tenant's terms and privacy policy, which the person accepts once. */
 export interface TermsContext {
   page: 'terms'
   title: string
@@ -220,6 +220,8 @@ export interface TermsContext {
   error?: string
   /** Where the form posts `accept`, or `cancel` to decline. */
   loginAction: string
+  /** The tenant's terms and privacy policy, which the person accepts. The action shows only while one is set. */
+  accept: { privacy?: string; terms?: string }
   preferences: SignInPreferences
   legal: SignInLegal
   texts: TermsTexts

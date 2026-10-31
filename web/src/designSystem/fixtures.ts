@@ -952,6 +952,7 @@ export const identityTermsContext: TermsContext = {
   title: identityTermsTexts.title,
   realmName: identitySignInContext.realmName,
   loginAction: '#terms',
+  accept: { privacy: '#privacy', terms: '#terms' },
   preferences: identitySignInContext.preferences,
   legal: identitySignInContext.legal,
   texts: identityTermsTexts,

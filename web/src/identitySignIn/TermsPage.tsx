@@ -13,13 +13,13 @@ function withLinks(sentence: string, links: Record<string, ReactNode>): ReactNod
 
 /**
  * Proposed: the terms page, which Keycloak's "Terms and Conditions" required action shows after a person's first
- * sign-in and again when the site's terms change version. It names the site's terms of service and privacy policy as
- * links in one required checkbox. Continue is a real `<form method="post">` to the login address with `accept`, and
- * Keycloak records when the person accepted. "Decline and sign out" posts `cancel`, which ends the sign-in. The legal
+ * sign-in and again when the tenant's terms change version. It names the tenant's terms of service and privacy policy
+ * as links in one required checkbox; a site's own links change only the legal line under the card. Continue is a real
+ * `<form method="post">` to the login address with `accept`, and Keycloak records when the person accepted. "Decline and sign out" posts `cancel`, which ends the sign-in. The legal
  * links stay under the card, as on every page.
  */
 export function TermsPage({ context }: { context: TermsContext }) {
-  const { texts, error, loginAction, legal } = context
+  const { texts, error, loginAction, legal, accept } = context
   const formId = useId()
   const [form] = Form.useForm<{ agree?: boolean }>()
   const submitRef = useRef<HTMLInputElement>(null)
@@ -28,7 +28,7 @@ export function TermsPage({ context }: { context: TermsContext }) {
       {label}
     </Typography.Link>
   )
-  const { privacy, terms } = legal.links
+  const { privacy, terms } = accept
   const sentence = terms && privacy ? texts.agreeBoth : terms ? texts.agreeTerms : texts.agreePrivacy
   const label = withLinks(sentence, {
     '{terms}': terms ? link(terms, texts.termsLink) : null,
