@@ -47,6 +47,8 @@ public sealed class SensitiveUseCompilerTests
         { "searchable", OrderFile, "/fields/5/searchable" },
         { "a stored computed field", OrderFile, "/fields/5/expression" },
         { "a migration value", "migrations/0001-fill.json", "/changes/0/value" },
+        { "a migration fill target", "migrations/0001-fill.json", "/changes/0/field" },
+        { "a migration convert target", "migrations/0001-fill.json", "/changes/0/field" },
     };
 
     [Theory]
@@ -247,6 +249,13 @@ public sealed class SensitiveUseCompilerTests
                 folder.With("migrations/0001-fill.json", $$"""
                     { "id": "{{MigrationId}}", "kind": "migration", "name": "Fill", "formatVersion": 1, "entity": "Order",
                       "changes": [{ "type": "fill", "field": "title", "value": "secret" }] }
+                    """);
+                break;
+            case "a migration fill target":
+            case "a migration convert target":
+                folder.With("migrations/0001-fill.json", $$"""
+                    { "id": "{{MigrationId}}", "kind": "migration", "name": "Fill", "formatVersion": 1, "entity": "Order",
+                      "changes": [{ "type": "{{(use == "a migration fill target" ? "fill" : "convert")}}", "field": "secret", "value": "title" }] }
                     """);
                 break;
         }

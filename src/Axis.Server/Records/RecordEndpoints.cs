@@ -396,7 +396,7 @@ internal static class RecordEndpoints
         }
 
         // A computed field that is pending shows as the active release computes it. The read stores nothing.
-        record = await PendingComputedReads.ApplyAsync(connection, database.ReadTransaction, application!, model, record, cancellationToken);
+        record = await PendingComputedReads.ApplyAsync(connection, database.ReadTransaction, application!, model, record, cancellationToken, cipher: Cipher(sensitive, tenants));
         return Results.Ok(RecordFieldAccess.Read(application!, user.RolesIn(application!), model).Visible(record));
     }
 

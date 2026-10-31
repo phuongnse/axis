@@ -458,6 +458,11 @@ built: it is `AXC0016`. A `convert` of a `reference` field to another type
 fails on its foreign key, as `AXC0177`. Both values must translate to the
 [SQL subset](expressions.md#sql-subset).
 
+The target of a `fill` or `convert` cannot be a `sensitive` field, and neither
+can a field its value reads (`AXC0308`, at `/changes/{i}/field` or
+`/changes/{i}/value`). The SQL would write plain text into the encrypted
+column, see [data encryption](data-encryption.md#what-a-sensitive-field-cannot-do).
+
 A `convert` that cannot convert a row rolls the whole activation back. That
 covers unparsable text, a value that is too long, a required field left empty
 and a duplicate in a unique field. It is `AXC0177`, reported with a fixed

@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text.Json.Nodes;
 using Axis.Configuration.Model;
+using Axis.Core.Tenancy;
 using Axis.Data.Audit;
 using Axis.Data.DataSources;
 using Axis.Data.Records;
@@ -77,6 +78,8 @@ internal static class DataSourceEndpoints
         string? search,
         ActiveApplicationResolver resolver,
         TenantDatabase database,
+        SensitiveValues sensitive,
+        ITenantContextAccessor tenants,
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
@@ -149,7 +152,7 @@ internal static class DataSourceEndpoints
             ? RecordFilters.Condition(application, root, [.. filters.Select(filter => filter.Expression)], user.Id)
             : null;
         var result = await DataSourceQueries.ListAsync(
-            connection, database.ReadTransaction, application, model, pageNumber, size, order, parameters, condition, search, cancellationToken);
+            connection, database.ReadTransaction, application, model, pageNumber, size, order, parameters, condition, search, RecordEndpoints.Cipher(sensitive, tenants), cancellationToken);
         if (result is null)
         {
             // PostgreSQL cannot say which part of the WHERE clause failed, so every read filter is named.
@@ -183,6 +186,8 @@ internal static class DataSourceEndpoints
         string? format,
         ActiveApplicationResolver resolver,
         TenantDatabase database,
+        SensitiveValues sensitive,
+        ITenantContextAccessor tenants,
         ExportSettings export,
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
@@ -262,7 +267,7 @@ internal static class DataSourceEndpoints
                 exportFormat,
                 model.Name,
                 columns,
-                DataSourceQueries.ReadAllAsync(connection, application, model, order, parameters, condition, search, export.MaxRows + 1, cancellationToken),
+                DataSourceQueries.ReadAllAsync(connection, application, model, order, parameters, condition, search, export.MaxRows + 1, RecordEndpoints.Cipher(sensitive, tenants), cancellationToken),
                 Cells,
                 export.MaxRows,
                 (rows, truncated) => new AuditEntry(
