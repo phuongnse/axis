@@ -115,8 +115,8 @@ A `waitEvent` step waits until an event about the subject record is raised:
 - History output: `{ "state": "waiting" }` when it waits, `{ "next",
   "eventId" }` for a match and `{ "next", "timeout": true }` for a timeout.
 
-Events are raised by `raiseEvent` steps. Raising an event from an inbound
-endpoint call waits for M19.
+Events are raised by `raiseEvent` steps and by an inbound endpoint call that
+names an `event`, see [inbound endpoint calls](inbound-endpoints.md#the-call).
 
 ## Sub-process step
 

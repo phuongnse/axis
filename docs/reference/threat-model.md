@@ -3,46 +3,8 @@
 What can go wrong in Axis's own design, and what Axis does about each threat. The model follows
 [D106](../decisions/d106-a-threat-model-kept-current-like-the-asvs-tracking.md). Its threat rows are
 built. Each row comes from the issue that models one trust boundary, and the
-[ASVS](asvs.md) page covers the controls that every web application needs.
-
-## How it is filled
-
-- **The four questions.** The Threat Modeling Manifesto frames the model. What are we working on?
-  What can go wrong? What are we going to do about it? Did we do a good job?
-- **Methods.**
-  - STRIDE finds the threats at each trust boundary.
-  - LINDDUN finds the privacy threats to personal data.
-  - OWASP's agentic AI threats find the threats to the AI agents that write and review code.
-- **One row per threat.** The table has these columns: id, threat, boundary, category, rating,
-  status and evidence. A scope letter and a number make an id, such as `P1`, `I1` or `B1`. An id is
-  unique on the whole page, so a later row or issue can name a threat by its id alone.
-- **Rating.** The rating is Low, Medium, High or Critical. It comes from likelihood and impact, a
-  short form of the OWASP Risk Rating Methodology.
-  - A **Gap** has time to close, as a vulnerable dependency does, see
-    [dependency updates](../development.md#dependency-updates). Critical is 7 days, High 30 days,
-    Medium 90 days (Moderate in that table) and Low the next routine update.
-  - The time starts on the day the row is written.
-- **Status.** Each row has one of four statuses.
-  - **Mitigated:** Axis has a control. The evidence names a test class in backticks, ending in
-    `Tests`, a doc section or a check.
-  - **Gap:** Axis does not have the control yet. The evidence links the GitHub issue that closes it.
-  - **Delegated:** the identity provider or the operator meets the threat. The evidence names which.
-  - **Accepted:** the owner accepts the threat. The evidence gives the reason and the date, as
-    YYYY-MM-DD. Only the owner accepts a threat.
-- **Checked.** `scripts/check-docs.mjs` fails on these problems:
-  - an id that another row already uses, on the whole page
-  - a status that is not one of the four above
-  - a rating that is missing or is not one of the four above
-  - a row without evidence
-  - a **Mitigated** row that names a test class no `.cs` file under `tests/` or `samples/` declares
-  - a **Gap** row that links no GitHub issue
-  - an **Accepted** row that gives no date
-  - It does not judge that a test covers its threat, that a time frame was kept, or that a
-    **Delegated** row names the right party. A reviewer does.
-- **Kept current.** A change that adds a trust boundary updates this page in the same change, see
-  [the threat model rule](../delivery.md#keeping-the-docs-current). Each docs sweep reviews the page.
-  Once a year the owner rates Axis against OWASP SAMM _(planned for M32)_, see
-  [ASVS other evidence](asvs.md#other-evidence).
+[ASVS](asvs.md) page covers the controls that every web application needs. How the model is filled is in
+[threat model method](threat-model-method.md).
 
 ## The product
 
@@ -191,7 +153,7 @@ flowchart LR
 | --- | --- | --- | --- | --- | --- | --- |
 | P24 | A connector call goes over plain http, where someone else can answer for the outside system. | Worker and outside system | Spoofing | High | **Mitigated** | `ConnectorCallTests` (outside Development the worker sends nothing to an http URL), and the [deployment bindings](integration-resources.md#deployment-bindings) rule that a URL binding is https outside Development. |
 | P25 | A reply that does not fit the expected output is written as a result. | Worker and outside system | Tampering | Medium | **Mitigated** | `ConnectorCallTests` (a 200 whose body does not fit leaves the call unknown, even with an idempotency key). |
-| P26 | The connector token appears in a log, history row or audit record. | Worker and outside system | Information disclosure | High | **Mitigated** | `SecretValueTests` (a secret shows no part of its value in text, JSON or logs), `ConnectorCallTests` (no audit record, history row, call row or log entry holds the secret token). |
+| P26 | The connector token appears in a log, history row or audit record. | Worker and outside system | Information disclosure | High | **Mitigated** | `SecretValueTests` (a secret shows no part of its value in text, JSON or logs), `ConnectorCallTests` (no audit record, history row, call row or log entry holds the secret token), `ConnectorOAuth2Tests` (no log entry, span tag, audit record, history row, call row or attempt row holds the token or the client secret). |
 | P27 | A call is redirected to a host the connector does not name. | Worker and outside system | Elevation of privilege | High | **Mitigated** | [Connector resource](integration-resources.md#connector-resource) (the path is added to the bound base URL, and the worker never follows a redirect), `ConnectorCallTests` (each tenant call uses its own URL and token). |
 | P28 | A slow or failing outside system ties up worker capacity. | Worker and outside system | Denial of service | Medium | **Mitigated** | `ConnectorCallBackoffTests` (the wait doubles after each attempt, up to an hour). |
 | P29 | A connector call happens with no record in the step history. | Worker and outside system | Repudiation | Low | **Mitigated** | `ProcessConnectorStepTests` (a connector step writes its history and a staged call audit record without input values). |
@@ -228,7 +190,34 @@ flowchart LR
 
 Spoofing does not apply. The operator installs each package, and a caller does not send a package an identity.
 
-Webhooks come with M19.
+### Worker and webhook receiver
+
+The worker sends each webhook's event to the receiver's bound URL, signed with the webhook's secret.
+
+```mermaid
+flowchart LR
+    subgraph worker [Worker]
+        Deliver[Webhook delivery]
+    end
+    subgraph secrets [Tenant secrets]
+        Secret[Signing secret binding]
+    end
+    subgraph receiver [Receiving system]
+        Recv[Receiver over https]
+    end
+    Deliver -->|reads binding| Secret
+    Deliver -->|signed POST| Recv
+    Recv -->|status code| Deliver
+```
+
+| Id | Threat | Boundary | Category | Rating | Status | Evidence |
+| --- | --- | --- | --- | --- | --- | --- |
+| P102 | A webhook goes over plain http, where someone else can answer for the receiver. | Worker and webhook receiver | Spoofing | High | **Mitigated** | `WebhookDeliveryTests` (outside Development the worker refuses an http URL and sends nothing). |
+| P103 | A request is forged, or a repeat is taken for a new event. | Worker and webhook receiver | Tampering | High | **Mitigated** | `WebhookSignatureTests` (a `whsec_` secret and a plain secret each give the specified signature, and two secrets give two signatures), `WebhookDeliveryTests` (a receiver that answers 500 gets the same webhook-id and body again). |
+| P104 | A sensitive value reaches a receiver, or a delivery's body is kept in an audit record. | Worker and webhook receiver | Information disclosure | High | **Mitigated** | `WebhookDeliveryTests` (the audit record of a delivered request holds no body), `RaiseEventSensitiveTests` (a raise step that maps a sensitive field into an event with a webhook is refused at the field), `EndpointEventCompilerTests` (an endpoint's event that reads a sensitive input is refused when a webhook names it). |
+| P105 | A receiver redirects the signed request to another host. | Worker and webhook receiver | Elevation of privilege | High | **Mitigated** | `WebhookDeliveryTests` (a redirect is not followed and fails the attempt). |
+| P106 | A failing receiver blocks the other webhooks of the same event. | Worker and webhook receiver | Denial of service | Medium | **Mitigated** | `WebhookDeliveryTests` (at the limit a delivery becomes a dead letter, and the other webhook of the event still delivers). |
+| P107 | A delivered webhook leaves no record of who sent it. | Worker and webhook receiver | Repudiation | Low | **Mitigated** | `WebhookDeliveryTests` (a delivered request writes one audit record as system). |
 
 ### Authoring
 

@@ -12,9 +12,9 @@ A webhook tells another system that an event happened, as
 [D92](../decisions/d92-outbound-webhooks.md) agrees. The author configures it
 in the application, so it is part of the release. There is no API through
 which another system subscribes itself. The webhook resource, its compile
-checks, the activation check of its bindings, the delivery and the dead letter
-of a delivery that keeps failing are built. Rotation tooling and the console
-view are _(planned for M19)_.
+checks, the activation check of its bindings, the delivery, the rotation by two
+secrets and the dead letter of a delivery that keeps failing are built. The
+console view is _(planned for M23)_.
 
 ### Webhook resource
 
@@ -63,7 +63,7 @@ A webhook that tells a chat system when a note is closed, in
 
 ### Webhook delivery
 
-The delivery is built, apart from the parts marked _(planned for M19)_.
+The delivery is built, apart from the part marked _(planned for M23)_.
 
 - **Staged with the event.** Raising the event stages one delivery for each
   webhook of the event, in the same transaction, as a row in
@@ -124,6 +124,6 @@ The delivery is built, apart from the parts marked _(planned for M19)_.
   record's history.
 - **Test scenarios.** A [scenario](test-scenarios.md) tenant sends no webhook.
   Its deliveries stay queued.
-- **Seen in the console.** _(planned for M19)_ The
+- **Seen in the console.** _(planned for M23)_ The
   [operator console](operator-console.md#views) lists recent deliveries and
   dead letters.

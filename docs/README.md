@@ -67,7 +67,8 @@ Detailed behaviour, one topic per file. Sections marked _(planned for Mx)_ are n
 | [Data encryption](reference/data-encryption.md) | Encrypted `sensitive` field values, exact lookup, tenant data keys and their rotation, encrypted backups |
 | [ASVS](reference/asvs.md)                                              | The ASVS 5.0 Level 2 tracking: each requirement, its status and its evidence          |
 | [Fuzz tests](reference/fuzz-tests.md)                                  | The parsers that get fuzz tests, how they are fuzzed and how to replay a failure      |
-| [Threat model](reference/threat-model.md)                              | What can go wrong in Axis's own design: the frame, the scopes and each threat's status |
+| [Threat model](reference/threat-model.md)                              | What can go wrong in Axis's own design, and each threat's status                      |
+| [Threat model method](reference/threat-model-method.md)                | How the threat model is filled: the methods, the rows, the ratings and the statuses    |
 | [Log inventory](reference/log-inventory.md)                            | Every log Axis writes: events, format, destination, readers, retention and the security events |
 | [Performance](reference/performance.md)                                | The service level objectives, the reference environment and the load test             |
 | [Frontend](reference/frontend.md)                                      | The SPA, sites, pages and widgets                                                     |
