@@ -2,6 +2,7 @@
      code. It writes Keycloak's data as JSON into the same element as login.ftl and the React bundle draws the page from
      it. The "page" field tells the bundle which page to draw. Keycloak escapes output as HTML, so every string goes
      through ?json_string?no_esc: ?json_string also escapes "</", which keeps the script element closed. -->
+<#import "preferences.ftl" as axis>
 <!DOCTYPE html>
 <html lang="${(locale.currentLanguageTag)!'en'}">
 <head>
@@ -32,16 +33,7 @@
     "mode": "${mode?json_string?no_esc}",
     </#if>
     "deviceNameRequired": ${(totp.otpCredentials?size gte 1)?c},
-    "locales": [
-      <#if locale??>
-        <#list locale.supported as l>
-      {
-        "label": "${l.label?json_string?no_esc}",
-        "url": "${l.url?json_string?no_esc}"
-      }<#sep>,</#sep>
-        </#list>
-      </#if>
-    ],
+    <@axis.preferences/>
     "texts": {
       "title": "${msg("axisAddAuthenticatorTitle")?json_string?no_esc}",
       "message": "${msg("axisAddAuthenticatorMessage")?json_string?no_esc}",

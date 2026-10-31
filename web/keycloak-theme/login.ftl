@@ -8,6 +8,7 @@
      writes for each language, so advancedMsg gives the label in the page's language. The "realmName" is the realm's
      display name. Keycloak's realm.displayName falls back to the realm id, so the context leaves it out when the
      display name is empty or equals the id, and the page then names Axis, never the tenant id. -->
+<#import "preferences.ftl" as axis>
 <!DOCTYPE html>
 <html lang="${(locale.currentLanguageTag)!'en'}">
 <head>
@@ -55,16 +56,7 @@
     <#if realm.resetPasswordAllowed>
     "forgotPasswordUrl": "${url.loginResetCredentialsUrl?json_string?no_esc}",
     </#if>
-    "locales": [
-      <#if locale??>
-        <#list locale.supported as l>
-      {
-        "label": "${l.label?json_string?no_esc}",
-        "url": "${l.url?json_string?no_esc}"
-      }<#sep>,</#sep>
-        </#list>
-      </#if>
-    ],
+    <@axis.preferences/>
     "texts": {
       "continueWith": "${msg("axisContinueWith", "{provider}")?json_string?no_esc}",
       "providerOnly": "${msg("axisProviderOnly", "{provider}")?json_string?no_esc}",

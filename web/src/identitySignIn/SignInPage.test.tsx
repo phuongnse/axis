@@ -15,10 +15,21 @@ const context: SignInContext = {
   loginAction: '/realms/contoso/login-actions/authenticate',
   rememberMe: true,
   forgotPasswordUrl: '/realms/contoso/reset-credentials',
-  locales: [
-    { label: 'English', url: '/en' },
-    { label: 'Tiếng Việt', url: '/vi' },
-  ],
+  preferences: {
+    locale: 'en',
+    locales: [
+      { tag: 'en', url: '/en' },
+      { tag: 'vi', url: '/vi' },
+    ],
+    texts: {
+      label: 'Language and theme',
+      language: 'Language',
+      theme: 'Theme',
+      system: 'System',
+      light: 'Light',
+      dark: 'Dark',
+    },
+  },
   texts: {
     continueWith: 'Continue with {provider}',
     providerOnly: 'Your organization signs in only with {provider}.',

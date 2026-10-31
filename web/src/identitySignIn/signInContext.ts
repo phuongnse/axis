@@ -5,9 +5,19 @@ export interface SignInProvider {
   loginUrl: string
 }
 
+import type { PreferencesTexts } from '../platform/PreferencesMenu'
+
+/** A language that the identity provider offers: its tag, such as `vi`, and the address that shows the page in it. */
 export interface SignInLocale {
-  label: string
+  tag: string
   url: string
+}
+
+/** Proposed: what the language and theme menu below the card needs: the page's language, every language offered and the menu's texts. */
+export interface SignInPreferences {
+  locale: string
+  locales: SignInLocale[]
+  texts: PreferencesTexts
 }
 
 /** The page's texts. `continueWith` and `providerOnly` hold a `{provider}` placeholder for the provider's label. */
@@ -96,7 +106,7 @@ export interface SignInContext {
   /** Whether the "Keep me signed in" checkbox shows. */
   rememberMe: boolean
   forgotPasswordUrl?: string
-  locales: SignInLocale[]
+  preferences: SignInPreferences
   texts: SignInTexts
 }
 
@@ -114,7 +124,7 @@ export interface TwoStepContext {
   restartUrl: string
   /** Whether Keycloak offers another way to sign in, which shows "Try another way". */
   tryAnotherWay: boolean
-  locales: SignInLocale[]
+  preferences: SignInPreferences
   texts: TwoStepTexts
 }
 
@@ -138,7 +148,7 @@ export interface AddAuthenticatorContext {
   mode?: string
   /** Whether the person already has an authenticator, so that the device name is required. */
   deviceNameRequired: boolean
-  locales: SignInLocale[]
+  preferences: SignInPreferences
   texts: AddAuthenticatorTexts
 }
 
@@ -156,7 +166,7 @@ export interface ResetPasswordContext {
   loginAction: string
   /** Where "Back to sign in" goes. */
   loginUrl: string
-  locales: SignInLocale[]
+  preferences: SignInPreferences
   texts: ResetPasswordTexts
 }
 
@@ -170,7 +180,7 @@ export interface UpdatePasswordContext {
   error?: string
   /** Where the form posts `password-new`, `password-confirm` and `logout-sessions`. */
   loginAction: string
-  locales: SignInLocale[]
+  preferences: SignInPreferences
   texts: UpdatePasswordTexts
 }
 

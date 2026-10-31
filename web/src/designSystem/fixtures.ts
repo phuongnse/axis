@@ -827,10 +827,21 @@ export const identitySignInContext: SignInContext = {
   loginAction: '#sign-in',
   rememberMe: true,
   forgotPasswordUrl: '#forgot-password',
-  locales: [
-    { label: 'English', url: '#en' },
-    { label: 'Tiếng Việt', url: '#vi' },
-  ],
+  preferences: {
+    locale: 'en',
+    locales: [
+      { tag: 'en', url: '#en' },
+      { tag: 'vi', url: '#vi' },
+    ],
+    texts: {
+      label: 'Language and theme',
+      language: 'Language',
+      theme: 'Theme',
+      system: 'System',
+      light: 'Light',
+      dark: 'Dark',
+    },
+  },
   texts: identitySignInTexts,
 }
 
@@ -855,7 +866,7 @@ export const identityTwoStepContext: TwoStepContext = {
   loginAction: '#verify',
   restartUrl: '#sign-in',
   tryAnotherWay: true,
-  locales: identitySignInContext.locales,
+  preferences: identitySignInContext.preferences,
   texts: identityTwoStepTexts,
 }
 
@@ -877,7 +888,7 @@ export const identityResetPasswordContext: ResetPasswordContext = {
   username: identitySignInContext.username,
   loginAction: '#reset',
   loginUrl: '#sign-in',
-  locales: identitySignInContext.locales,
+  preferences: identitySignInContext.preferences,
   texts: identityResetPasswordTexts,
 }
 
@@ -898,7 +909,7 @@ export const identityUpdatePasswordContext: UpdatePasswordContext = {
   title: identityUpdatePasswordTexts.title,
   realmName: identitySignInContext.realmName,
   loginAction: '#set-password',
-  locales: identitySignInContext.locales,
+  preferences: identitySignInContext.preferences,
   texts: identityUpdatePasswordTexts,
 }
 
@@ -929,7 +940,7 @@ export const identityAddAuthenticatorContext: AddAuthenticatorContext = {
   manualKey: 'JBSW Y3DP EHPK 3PXP',
   secret: 'fixture-secret',
   deviceNameRequired: false,
-  locales: identitySignInContext.locales,
+  preferences: identitySignInContext.preferences,
   texts: identityAddAuthenticatorTexts,
 }
 

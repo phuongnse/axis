@@ -15,7 +15,7 @@ export function TwoStepPage({ context }: { context: TwoStepContext }) {
   const [form] = Form.useForm<{ code?: string }>()
   const submitRef = useRef<HTMLInputElement>(null)
   return (
-    <IdentityFrame title={texts.title} organization={context.realmName} locales={context.locales}>
+    <IdentityFrame title={texts.title} organization={context.realmName} preferences={context.preferences}>
       <Typography.Paragraph style={{ margin: 0 }}>{texts.message}</Typography.Paragraph>
       {error && <Alert type="error" showIcon title={error} />}
       <Form

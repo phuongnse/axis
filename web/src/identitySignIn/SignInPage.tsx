@@ -7,7 +7,7 @@ import type { SignInContext } from './signInContext'
 /** The identity provider's sign-in page: the providers first, then the account form when accounts are allowed. */
 export function SignInPage({ context }: { context: SignInContext }) {
   return (
-    <IdentityFrame title={context.title} organization={context.realmName} locales={context.locales}>
+    <IdentityFrame title={context.title} organization={context.realmName} preferences={context.preferences}>
       <SignInBody context={context} />
     </IdentityFrame>
   )

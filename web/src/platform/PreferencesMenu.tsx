@@ -1,6 +1,6 @@
 import { SettingOutlined } from '@ant-design/icons'
 import { Dropdown, type MenuProps } from 'antd'
-import { useMemo, type CSSProperties } from 'react'
+import { useMemo, type CSSProperties, type ReactElement } from 'react'
 import { selectedItemTint } from './antTheme'
 import { AxisButton } from './AxisButton'
 import { useText } from './texts'
@@ -8,20 +8,40 @@ import { useDesignTokens, useThemeMode, type ThemeChoice } from './themeMode'
 
 const choices: readonly ThemeChoice[] = ['system', 'light', 'dark']
 
+/** The texts of the language and theme menu: the trigger's name, the two group titles and the three theme choices. */
+export interface PreferencesTexts {
+  label: string
+  language: string
+  theme: string
+  system: string
+  light: string
+  dark: string
+}
+
+/** A language the menu offers: its tag and the name it shows. */
+export interface PreferencesLanguage {
+  tag: string
+  label: string
+}
+
 /**
- * The "Language and theme" button in the shell header. Its menu holds the site's languages and
- * System, Light and Dark, with the current ones marked. Picking the current one changes nothing.
+ * Proposed: the language and theme menu that `children` opens, shared by the shell header and the identity provider's
+ * pages. It holds every language offered and System, Light and Dark, with the current ones marked, so more languages
+ * only add rows. Picking the current one changes nothing. The theme choice goes to the theme provider.
  */
-export function PreferencesMenu({
-  locales,
-  locale,
-  onLocaleChange,
+export function PreferencesDropdown({
+  languages,
+  language,
+  texts,
+  onLanguageChange,
+  children,
 }: {
-  locales: readonly string[]
-  locale: string
-  onLocaleChange: (locale: string) => void
+  languages: readonly PreferencesLanguage[]
+  language: string
+  texts: PreferencesTexts
+  onLanguageChange: (tag: string) => void
+  children: ReactElement
 }) {
-  const t = useText()
   const { mode, choice, choose } = useThemeMode()
   const { colour } = useDesignTokens()
   const selected = useMemo<CSSProperties>(
@@ -37,33 +57,64 @@ export function PreferencesMenu({
     {
       type: 'group',
       key: 'locale',
-      label: t('shell.locale.label'),
-      children: locales.map((tag) => option(`locale:${tag}`, t(`shell.locale.${tag}`), tag === locale)),
+      label: texts.language,
+      children: languages.map((entry) => option(`locale:${entry.tag}`, entry.label, entry.tag === language)),
     },
     { type: 'divider' },
     {
       type: 'group',
       key: 'theme',
-      label: t('shell.theme.label'),
-      children: choices.map((candidate) =>
-        option(`theme:${candidate}`, t(`shell.theme.${candidate}`), candidate === choice),
-      ),
+      label: texts.theme,
+      children: choices.map((candidate) => option(`theme:${candidate}`, texts[candidate], candidate === choice)),
     },
   ] as MenuProps['items']
-  const label = t('shell.preferences.label')
 
   function pick({ key }: { key: string }) {
     const [kind, value] = key.split(':')
-    if (kind === 'locale' && value !== locale) {
-      onLocaleChange(value)
+    if (kind === 'locale' && value !== language) {
+      onLanguageChange(value)
     } else if (kind === 'theme' && value !== choice) {
       choose(value as ThemeChoice)
     }
   }
 
   return (
-    <Dropdown trigger={['click']} menu={{ items, onClick: pick, 'aria-label': label }}>
-      <AxisButton role="icon" nameKey="shell.preferences.label" icon={<SettingOutlined />} />
+    <Dropdown trigger={['click']} menu={{ items, onClick: pick, 'aria-label': texts.label }}>
+      {children}
     </Dropdown>
+  )
+}
+
+/**
+ * The "Language and theme" button in the shell header. Its menu holds the site's languages and
+ * System, Light and Dark, with the current ones marked. Picking the current one changes nothing.
+ */
+export function PreferencesMenu({
+  locales,
+  locale,
+  onLocaleChange,
+}: {
+  locales: readonly string[]
+  locale: string
+  onLocaleChange: (locale: string) => void
+}) {
+  const t = useText()
+  const texts: PreferencesTexts = {
+    label: t('shell.preferences.label'),
+    language: t('shell.locale.label'),
+    theme: t('shell.theme.label'),
+    system: t('shell.theme.system'),
+    light: t('shell.theme.light'),
+    dark: t('shell.theme.dark'),
+  }
+  return (
+    <PreferencesDropdown
+      languages={locales.map((tag) => ({ tag, label: t(`shell.locale.${tag}`) }))}
+      language={locale}
+      texts={texts}
+      onLanguageChange={onLocaleChange}
+    >
+      <AxisButton role="icon" nameKey="shell.preferences.label" icon={<SettingOutlined />} />
+    </PreferencesDropdown>
   )
 }
