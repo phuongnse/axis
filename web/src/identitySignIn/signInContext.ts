@@ -5,12 +5,19 @@ export interface SignInProvider {
   loginUrl: string
 }
 
+import type { LegalLinks, LegalTexts } from '../platform/LegalLine'
 import type { PreferencesTexts } from '../platform/PreferencesMenu'
 
 /** A language that the identity provider offers: its tag, such as `vi`, and the address that shows the page in it. */
 export interface SignInLocale {
   tag: string
   url: string
+}
+
+/** Proposed: the legal links under the card and their names. The realm sync writes the site's or its tenant's links. */
+export interface SignInLegal {
+  links: LegalLinks
+  texts: LegalTexts
 }
 
 /** Proposed: what the language and theme menu below the card needs: the page's language, every language offered and the menu's texts. */
@@ -107,6 +114,7 @@ export interface SignInContext {
   rememberMe: boolean
   forgotPasswordUrl?: string
   preferences: SignInPreferences
+  legal: SignInLegal
   texts: SignInTexts
 }
 
@@ -125,6 +133,7 @@ export interface TwoStepContext {
   /** Whether Keycloak offers another way to sign in, which shows "Try another way". */
   tryAnotherWay: boolean
   preferences: SignInPreferences
+  legal: SignInLegal
   texts: TwoStepTexts
 }
 
@@ -149,6 +158,7 @@ export interface AddAuthenticatorContext {
   /** Whether the person already has an authenticator, so that the device name is required. */
   deviceNameRequired: boolean
   preferences: SignInPreferences
+  legal: SignInLegal
   texts: AddAuthenticatorTexts
 }
 
@@ -167,6 +177,7 @@ export interface ResetPasswordContext {
   /** Where "Back to sign in" goes. */
   loginUrl: string
   preferences: SignInPreferences
+  legal: SignInLegal
   texts: ResetPasswordTexts
 }
 
@@ -181,6 +192,7 @@ export interface UpdatePasswordContext {
   /** Where the form posts `password-new`, `password-confirm` and `logout-sessions`. */
   loginAction: string
   preferences: SignInPreferences
+  legal: SignInLegal
   texts: UpdatePasswordTexts
 }
 

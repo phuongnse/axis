@@ -12,7 +12,7 @@ import { PreferencesMenu } from './PreferencesMenu'
 import { ShellFooter } from './ShellFooter'
 import { ShellSidebarContext } from './shellSidebar'
 import { SiteMark } from './SiteMark'
-import type { NavigationItem } from './site'
+import type { NavigationItem, SiteLegal } from './site'
 import { useText } from './texts'
 import { useDesignTokens, useThemeMode } from './themeMode'
 import { UserMenu } from './UserMenu'
@@ -26,6 +26,8 @@ interface ShellProps {
   onLocaleChange: (locale: string) => void
   /** Where the notification bell reads, set on an application site. Without it the header has no bell. */
   notifications?: { path: string; sitePath: string }
+  /** Proposed: the site's privacy policy and terms, which the footer links. */
+  legal?: SiteLegal | null
   children: ReactNode
 }
 
@@ -56,7 +58,16 @@ function activeNavigationKey(navigation: readonly NavigationItem[], pathname: st
  * theme menu sit in a panel that a Menu button opens and closes, and there is no sidebar. The app
  * switcher stays in the header.
  */
-export function Shell({ titleKey, navigation, locales, locale, onLocaleChange, notifications, children }: ShellProps) {
+export function Shell({
+  titleKey,
+  navigation,
+  locales,
+  locale,
+  onLocaleChange,
+  notifications,
+  legal,
+  children,
+}: ShellProps) {
   const t = useText()
   const { mode } = useThemeMode()
   const { pathname } = useLocation()
@@ -244,7 +255,7 @@ export function Shell({ titleKey, navigation, locales, locale, onLocaleChange, n
               <ShellSidebarContext.Provider value={sidebarContext}>{children}</ShellSidebarContext.Provider>
             </Layout.Content>
           </Layout>
-          <ShellFooter />
+          <ShellFooter legal={legal} />
         </Layout>
       </ConfigProvider>
     </div>

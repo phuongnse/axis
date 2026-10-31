@@ -30,6 +30,16 @@ const context: SignInContext = {
       dark: 'Dark',
     },
   },
+  legal: {
+    links: { source: 'https://github.com/phuongnse/axis', licences: '/licences' },
+    texts: {
+      label: 'Legal',
+      privacy: 'Privacy',
+      terms: 'Terms',
+      source: 'Source code',
+      licences: 'Open source licences',
+    },
+  },
   texts: {
     continueWith: 'Continue with {provider}',
     providerOnly: 'Your organization signs in only with {provider}.',

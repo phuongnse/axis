@@ -68,6 +68,14 @@ export interface ApplicationSite {
   navigation: { page: string; labelKey: string; icon?: string | null }[]
   /** The address of the application's notification routes. */
   notificationsPath?: string | null
+  /** Proposed: the site's privacy policy and terms, its own or else its tenant's. Absent when neither sets them. */
+  legal?: SiteLegal | null
+}
+
+/** Proposed: the addresses of a site's privacy policy and terms of service, which the organization writes. */
+export interface SiteLegal {
+  privacyUrl?: string | null
+  termsUrl?: string | null
 }
 
 /** A field type as written in entity files. */

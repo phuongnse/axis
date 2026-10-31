@@ -738,6 +738,7 @@ export const applicationSite: ApplicationSite = {
     { page: 'Tasks', labelKey: 'nav.tasks', icon: 'tasks' },
   ],
   notificationsPath,
+  legal: { privacyUrl: '#privacy', termsUrl: '#terms' },
 }
 
 const requestsPage: PageMetadata = {
@@ -842,6 +843,21 @@ export const identitySignInContext: SignInContext = {
       dark: 'Dark',
     },
   },
+  legal: {
+    links: {
+      privacy: '#privacy',
+      terms: '#terms',
+      source: 'https://github.com/phuongnse/axis',
+      licences: '#licences',
+    },
+    texts: {
+      label: 'Legal',
+      privacy: 'Privacy',
+      terms: 'Terms',
+      source: 'Source code',
+      licences: 'Open source licences',
+    },
+  },
   texts: identitySignInTexts,
 }
 
@@ -867,6 +883,7 @@ export const identityTwoStepContext: TwoStepContext = {
   restartUrl: '#sign-in',
   tryAnotherWay: true,
   preferences: identitySignInContext.preferences,
+  legal: identitySignInContext.legal,
   texts: identityTwoStepTexts,
 }
 
@@ -889,6 +906,7 @@ export const identityResetPasswordContext: ResetPasswordContext = {
   loginAction: '#reset',
   loginUrl: '#sign-in',
   preferences: identitySignInContext.preferences,
+  legal: identitySignInContext.legal,
   texts: identityResetPasswordTexts,
 }
 
@@ -910,6 +928,7 @@ export const identityUpdatePasswordContext: UpdatePasswordContext = {
   realmName: identitySignInContext.realmName,
   loginAction: '#set-password',
   preferences: identitySignInContext.preferences,
+  legal: identitySignInContext.legal,
   texts: identityUpdatePasswordTexts,
 }
 
@@ -941,6 +960,7 @@ export const identityAddAuthenticatorContext: AddAuthenticatorContext = {
   secret: 'fixture-secret',
   deviceNameRequired: false,
   preferences: identitySignInContext.preferences,
+  legal: identitySignInContext.legal,
   texts: identityAddAuthenticatorTexts,
 }
 

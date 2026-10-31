@@ -1,15 +1,22 @@
 import { Badge, Flex, Layout, Typography } from 'antd'
 import { useEffect, useState } from 'react'
 import { fetchAboutVersion } from './about'
+import { LegalLine } from './LegalLine'
+import type { SiteLegal } from './site'
 import { statusBadge, useServerStatus } from './serverStatus'
 import { useText } from './texts'
 import { useDesignTokens } from './themeMode'
 
 /**
- * The slim footer across the bottom of every site: the copyright, with the server's version for a
- * signed-in person only, and the server's readiness.
+ * Proposed: Axis's public source, until the server names the source of the exact version it runs.
  */
-export function ShellFooter() {
+const sourceUrl = 'https://github.com/phuongnse/axis'
+
+/**
+ * The slim footer across the bottom of every site: the copyright, with the server's version for a
+ * signed-in person only, the legal links and the server's readiness.
+ */
+export function ShellFooter({ legal }: { legal?: SiteLegal | null }) {
   const t = useText()
   const { colour, spacing } = useDesignTokens()
   const status = useServerStatus()
@@ -39,7 +46,22 @@ export function ShellFooter() {
       }}
     >
       <Flex justify="space-between" align="center" gap={spacing.md} wrap>
-        <Typography.Text style={{ color: colour.textMuted }}>{copyright}</Typography.Text>
+        <LegalLine
+          copyright={copyright}
+          links={{
+            privacy: legal?.privacyUrl ?? undefined,
+            terms: legal?.termsUrl ?? undefined,
+            source: sourceUrl,
+            licences: '/licences',
+          }}
+          texts={{
+            label: t('shell.legal.label'),
+            privacy: t('shell.legal.privacy'),
+            terms: t('shell.legal.terms'),
+            source: t('shell.legal.source'),
+            licences: t('shell.legal.licences'),
+          }}
+        />
         <Flex align="center" gap={spacing.sm}>
           <Typography.Text style={{ color: colour.textMuted }}>{t('shell.serverStatus.title')}</Typography.Text>
           <Badge

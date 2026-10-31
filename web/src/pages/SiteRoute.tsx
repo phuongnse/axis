@@ -146,6 +146,7 @@ function SiteShell({ path }: { path: string }) {
         locale={locale}
         onLocaleChange={changeLocale}
         notifications={site.notificationsPath ? { path: site.notificationsPath, sitePath: site.path } : undefined}
+        legal={site.legal}
       >
         {localeFailed && <LocaleLoadFailed onClose={() => setLocaleFailed(false)} />}
         <Outlet context={{ site, locale } satisfies SiteOutlet} />

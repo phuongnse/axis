@@ -17,7 +17,12 @@ export function AddAuthenticatorPage({ context }: { context: AddAuthenticatorCon
   const [form] = Form.useForm<{ code?: string; userLabel?: string }>()
   const submitRef = useRef<HTMLInputElement>(null)
   return (
-    <IdentityFrame title={texts.title} organization={context.realmName} preferences={context.preferences}>
+    <IdentityFrame
+      title={texts.title}
+      organization={context.realmName}
+      preferences={context.preferences}
+      legal={context.legal}
+    >
       <Typography.Paragraph style={{ margin: 0 }}>{texts.message}</Typography.Paragraph>
       {error && <Alert type="error" showIcon title={error} />}
       <Flex vertical align="center" gap={8}>

@@ -7,22 +7,25 @@ import { OrganizationHeading } from '../platform/OrganizationHeading'
 import { nativeLanguageName } from '../platform/languageName'
 import { PreferencesDropdown } from '../platform/PreferencesMenu'
 import { useDesignTokens } from '../platform/themeMode'
-import type { SignInPreferences } from './signInContext'
+import { LegalLine } from '../platform/LegalLine'
+import type { SignInLegal, SignInPreferences } from './signInContext'
 
 /**
- * The frame of the identity provider's pages: the organization's mark and name above one card, the copyright line
- * below, and the language and theme button at the page's top right.
+ * The frame of the identity provider's pages: the organization's mark and name above one card, the copyright and the
+ * legal links below, and the language and theme button at the page's top right.
  */
 export function IdentityFrame({
   title,
   organization,
   preferences,
+  legal,
   children,
 }: {
   title: string
   /** The organization's name for the heading above the card. Absent means Axis. */
   organization?: string
   preferences: SignInPreferences
+  legal: SignInLegal
   children: ReactNode
 }) {
   const { colour, spacing, radius } = useDesignTokens()
@@ -78,7 +81,7 @@ export function IdentityFrame({
           {children}
         </Flex>
       </Card>
-      <Typography.Text type="secondary">{`© ${year} Axis`}</Typography.Text>
+      <LegalLine copyright={`© ${year} Axis`} links={legal.links} texts={legal.texts} />
     </Flex>
   )
 }
