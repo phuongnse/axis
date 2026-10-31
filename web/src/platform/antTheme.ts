@@ -21,6 +21,7 @@ export function antThemeFor(mode: ThemeMode, page?: PageTokenValues, reducedMoti
   // the mode keeps the light seed, as the dark value is already a shade. Any other colour is the seed itself.
   const seed = (name: ColourName) =>
     colour[name].toLowerCase() === colourTokens[name][mode] ? colourTokens[name].light : colour[name]
+  const inputError = { colorError: colour.dangerText, colorErrorBorderHover: colour.dangerText }
   return {
     algorithm: [mode === 'dark' ? theme.darkAlgorithm : theme.defaultAlgorithm, keepLink],
     token: {
@@ -74,6 +75,16 @@ export function antThemeFor(mode: ThemeMode, page?: PageTokenValues, reducedMoti
     },
     components: {
       Form: { colorError: colour.dangerText },
+      // Proposed: a field control with an error has its border in dangerText, as its message, so the border keeps 3:1 on
+      // surface in dark mode; Ant Design draws it in the danger fill, at 2.8:1 there. Fills, such as a danger button,
+      // keep the danger colour.
+      Input: inputError,
+      InputNumber: inputError,
+      Select: inputError,
+      DatePicker: inputError,
+      Mentions: inputError,
+      Cascader: inputError,
+      TreeSelect: inputError,
       // D114: every dropdown menu keeps spacing-xs round its items.
       Dropdown: { colorError: colour.dangerText, paddingXXS: spacing.xs },
       Tabs: {
