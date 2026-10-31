@@ -65,8 +65,8 @@ export const fieldTypeSettings: Record<FieldType, FieldSetting[]> = {
   date: ['required', 'unique', 'min', 'max', 'expression', 'default', 'sensitive'],
   'date-time': ['required', 'unique', 'min', 'max', 'expression', 'default', 'sensitive'],
   enum: ['required', 'unique', 'values', 'valueLabels', 'expression', 'default', 'sensitive'],
-  reference: ['required', 'unique', 'target', 'sensitive'],
-  references: ['required', 'target', 'sensitive'],
+  reference: ['required', 'unique', 'target'],
+  references: ['required', 'target'],
   'child-collection': ['target'],
   money: [
     'required',
@@ -81,7 +81,7 @@ export const fieldTypeSettings: Record<FieldType, FieldSetting[]> = {
     'default',
     'sensitive',
   ],
-  file: ['required', 'maxSize', 'accept', 'sensitive'],
+  file: ['required', 'maxSize', 'accept'],
 }
 
 /** The field keys of `entity.schema.json` that are not settings, and where each is edited. */

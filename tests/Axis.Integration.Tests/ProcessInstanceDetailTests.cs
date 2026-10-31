@@ -394,7 +394,7 @@ public sealed class ProcessInstanceDetailTests(TaskApiFixture fixture) : IClassF
         Assert.True(fixture.Model.TryGetEntity("Request", out var request));
         var before = await fixture.ReadTableAsync(TenantB, request.Id);
 
-        await fixture.ActivateEditedAsync(TenantB, MarkSensitive("amount", "department"));
+        await fixture.ActivateEditedAsync(TenantB, MarkSensitive("amount", "divisor"));
 
         var after = await fixture.ReadTableAsync(TenantB, request.Id);
         Assert.Equal(before.Columns, after.Columns);

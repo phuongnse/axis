@@ -29,8 +29,8 @@ const table: Record<FieldType, string[]> = {
   date: ['required', 'unique', 'min', 'max', 'expression', 'default', 'sensitive'],
   'date-time': ['required', 'unique', 'min', 'max', 'expression', 'default', 'sensitive'],
   enum: ['required', 'unique', 'values', 'valueLabels', 'expression', 'default', 'sensitive'],
-  reference: ['required', 'unique', 'target', 'sensitive'],
-  references: ['required', 'target', 'sensitive'],
+  reference: ['required', 'unique', 'target'],
+  references: ['required', 'target'],
   'child-collection': ['target'],
   money: [
     'required',
@@ -45,7 +45,7 @@ const table: Record<FieldType, string[]> = {
     'default',
     'sensitive',
   ],
-  file: ['required', 'maxSize', 'accept', 'sensitive'],
+  file: ['required', 'maxSize', 'accept'],
 }
 
 const schemaField = entitySchema.$defs.field.properties

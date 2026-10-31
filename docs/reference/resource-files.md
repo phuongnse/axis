@@ -454,7 +454,7 @@ is `AXC0013`.
 | `date` | yes | yes | | | yes | | | | | yes | | | yes |
 | `date-time` | yes | yes | | | yes | | | | | yes | | | yes |
 | `enum` | yes | yes | | | | | | | needed | yes | | | yes |
-| `reference` | yes | yes | | | | | | needed | | | | | yes |
+| `reference` | yes | yes | | | | | | needed | | | | | |
 | `child-collection` | | | | | | | | needed | | | | | |
 | `money` | yes | yes | | | yes | 1..1000, default 18 | 0..`precision`, default from the currency | | | yes | | | yes |
 - `required` and `unique` default to `false`.
@@ -510,9 +510,9 @@ is `AXC0013`.
   `required: true`, `expression` or `sequence`, and a child entity's field
   cannot have it. Each is `AXC0013` at `/fields/{i}/creator`. See
   [Record creator](roles-and-policies.md#record-creator).
-- `sensitive` is allowed on every type except
-  `child-collection`. It defaults to `false`. On a `child-collection` field it
-  is `AXC0013` at `/fields/{i}/sensitive`. See
+- `sensitive` is allowed on `text`, `integer`, `decimal`, `boolean`, `date`, `date-time`, `enum` and
+  `money`, and defaults to `false`. `true` on a `reference`, `references` or `file` field is `AXC0308`
+  at `/fields/{i}/sensitive`, on the `displayField` at `/displayField`, on `child-collection` `AXC0013`. See
   [Sensitive fields](roles-and-policies.md#sensitive-fields).
 
 ### Types and properties added in M15
@@ -526,7 +526,7 @@ They follow
 new check is a new compile diagnostic.
 
 - **`file`.** One file, with optional `maxSize` and `accept`. It takes
-  `required` and `sensitive`, and no `unique`, `default` or `expression`. See
+  `required`, and no `unique`, `default` or `expression`. See
   [file fields](file-fields.md). The compiler reports a `maxSize` below 1 or
   above the file size limit (`AXC0257`), an `accept` entry that is not
   `type/subtype` or `type/*` (`AXC0258`), and `unique` on the field
@@ -534,7 +534,7 @@ new check is a new compile diagnostic.
   `file`, are `AXC0013`. In an expression a file allows only `is null` and
   `is not null`.
 - **`references`.** A set of records of `target`, at most 1,000. It takes
-  `required` and `sensitive`, and no `unique`, `default` or `expression`. Its
+  `required`, and no `unique`, `default` or `expression`. Its
   expression type is `list<Target>`. The compile side is built. `unique`,
   `expression` and `default` are `AXC0013`, and a missing `target` is
   `AXC0014`. A `target` that is a child

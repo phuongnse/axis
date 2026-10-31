@@ -6,7 +6,7 @@
   "fields": [
     { "name": "title", "type": "text" },
     { "name": "note", "type": "text", "sensitive": true },
-    { "name": "receipt", "type": "file", "sensitive": true, "maxSize": 1024, "accept": ["application/pdf", "image/*"] },
+    { "name": "receipt", "type": "file", "maxSize": 1024, "accept": ["application/pdf", "image/*"] },
     { "name": "attachments", "type": "child-collection", "target": "ClaimAttachment" }
   ]
 }

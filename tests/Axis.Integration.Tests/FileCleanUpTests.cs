@@ -12,7 +12,7 @@ namespace Axis.Integration.Tests;
 /// <summary>
 /// Marking replaced and removed files <c>deleted</c>, and keeping a file's name and id out of audit records, on the
 /// FilesApp fixture in tenant A. <c>requester</c> may create and update claims but not delete them, so a delete is a call
-/// of the command. The <c>receipt</c> field of a claim is <c>sensitive</c>.
+/// of the command.
 /// </summary>
 public sealed class FileCleanUpTests(RecordApiFixture fixture) : IClassFixture<RecordApiFixture>
 {
@@ -257,7 +257,7 @@ public sealed class FileCleanUpTests(RecordApiFixture fixture) : IClassFixture<R
     }
 
     [Fact]
-    public async Task The_audit_record_of_a_sensitive_receipt_change_names_the_field_and_neither_the_file_id_nor_its_name()
+    public async Task The_audit_record_of_a_receipt_change_names_the_field_and_neither_the_file_id_nor_its_name()
     {
         using var requester = fixture.CreateClient().SignedInAs("requester");
         var claim = await CreateClaimAsync(requester);

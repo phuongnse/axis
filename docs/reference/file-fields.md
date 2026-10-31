@@ -165,8 +165,7 @@ service account may download, as they may read records.
 - **Backup** _(built)_. Files in the tenant database are in the tenant's `pg_dump`, so
   [tenant backup](tenant-backup-and-restore.md) archives hold them.
 - **Audit** _(built)_. An audit record names the file field that changed,
-  never the file's name or bytes. A `sensitive` file field also hides its name
-  and id in step history and inspection. Step history stores no field values,
+  never the file's name or bytes. Step history stores no field values,
   and a call input can never map a file, because only `is null` and
   `is not null` accept one, so a file's name and id never reach either.
 
