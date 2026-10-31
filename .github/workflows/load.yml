@@ -1,0 +1,82 @@
+name: Load test
+
+# The load test of D82 runs here once a week and on demand. It is not a NexKit check and gates no merge,
+# because a run on a shared CI machine varies too much. A missed objective marks only this run red, and
+# NexKit does not watch it.
+on:
+  schedule:
+    - cron: '0 3 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A run always finishes: a newer one only replaces a run still waiting.
+concurrency:
+  group: load-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  load:
+    name: Load test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # The runner image has .NET SDKs, and NexKit's checks use them as they are. When one matches
+      # global.json, CI uses it too, so an outage of the SDK download cannot fail the run.
+      - name: Find a .NET SDK that matches global.json
+        id: sdk
+        run: |
+          if dotnet --version; then
+            echo "DOTNET_ROOT=$(dirname "$(readlink -f "$(command -v dotnet)")")" >> "$GITHUB_ENV"
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          fi
+      # Without one, CI downloads the SDK. The download fails at times, so a failed install is
+      # tried once more after a pause.
+      - id: dotnet
+        if: steps.sdk.outputs.found != 'true'
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        continue-on-error: true
+        with:
+          global-json-file: global.json
+      - if: steps.dotnet.outcome == 'failure'
+        run: sleep 60
+      - if: steps.dotnet.outcome == 'failure'
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      # NexKit restores these caches before its setup but never saves them; CI on main does.
+      # Each step must match its `cache` entry in .nexkit/config.json: the same paths and
+      # key files, in the same order, and before Setup so the key files are as committed.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.nuget/packages
+          key: nexkit-${{ runner.os }}-nuget-${{ hashFiles('Directory.Packages.props', '**/*.csproj', '.config/dotnet-tools.json') }}
+          restore-keys: nexkit-${{ runner.os }}-nuget-
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.npm
+          key: nexkit-${{ runner.os }}-npm-${{ hashFiles('web/package-lock.json', 'tests/e2e/package-lock.json') }}
+          restore-keys: nexkit-${{ runner.os }}-npm-
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: nexkit-${{ runner.os }}-playwright-${{ hashFiles('tests/e2e/package-lock.json') }}
+          restore-keys: nexkit-${{ runner.os }}-playwright-
+      - name: Setup
+        run: scripts/setup.sh
+      - name: Load test
+        run: scripts/load.sh
+      # The k6 summary and the worker metrics are kept even when an objective is missed or the job times out.
+      - name: Upload load results
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: load-results
+          path: artifacts/load-results
+          if-no-files-found: warn
+          retention-days: 90

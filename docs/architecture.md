@@ -391,7 +391,7 @@ bindings work. Status rules and publishing are built too.
     The final sign-off is _(planned for M32)_.
   - Authentication by default (D111), `.github/CODEOWNERS` and a threat model (D106) are built, see
     [authorization](reference/security.md#authorization) and [ASVS](reference/asvs.md#other-evidence).
-  - Performance objectives and the load test are built, except the weekly CI run _(planned for M28)_.
+  - Performance objectives, the load test and its weekly CI run are built.
     See [performance](reference/performance.md).
 - **Authorization (D12, D24).**
   - The record API, the data source endpoint and the process start endpoint

@@ -5,7 +5,7 @@ test that measures them. The conventions of [architecture.md](../architecture.md
 marked _(planned for Mx)_ are not built yet, and Dn refers to [decisions.md](../decisions.md).
 
 The design follows [D82](../decisions/d82-performance-slos-and-load-tests.md). All of this page is
-built, except the weekly CI run _(planned for M28)_. The per-request budgets of the `*PerformanceTests` classes are built. They
+built. The per-request budgets of the `*PerformanceTests` classes are built. They
 run in the performance workflow, as [D97](../decisions/d97-reliable-test-runs.md) says. See
 [testing](../architecture.md#testing).
 
@@ -127,12 +127,14 @@ to find its own numbers.
   measured value and exits non-zero when one is missed or a metric is missing from the summary. The
   evaluator also reads `worker-metrics.json` and checks the claim delay p95 of the tenant `load` against
   5 s. It interpolates the percentile inside the histogram buckets, and it fails when the metric is
-  missing. The k6 summary is kept as a CI artifact _(planned for M28, with the weekly run)_.
+  missing. The load test workflow keeps `artifacts/load-results`, the k6 summary and the worker
+  metrics, as the `load-results` artifact of each run, even when an objective is missed.
 - **Worker metrics.** _(Built.)_ `scripts/load.sh` adds an OpenTelemetry Collector to the stack. The worker
   exports its metrics to it every 5 s over OTLP with https, because the worker refuses plain http
   outside Development. The collector's certificate comes from the run's own authority, which the worker
   trusts. The collector writes the metrics, as OTLP JSON with one document per line, to
   `artifacts/load-results/worker-metrics.json`. After k6 the script stops the worker and then the
   collector, so the last values reach the file, and the cleanup keeps it.
-- **When it runs.** CI runs it once a week and on demand _(planned for M28)_. It never gates a merge, and it is not a
+- **When it runs.** _(Built.)_ The load test workflow, `.github/workflows/load.yml`, runs `scripts/load.sh`
+  every Monday at 03:00 UTC and on demand, and a missed objective marks the run red. It never gates a merge, and it is not a
   NexKit check, because a run on a shared CI machine varies too much to block a pull request.
