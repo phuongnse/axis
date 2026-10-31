@@ -205,7 +205,8 @@ public sealed class PackageResolveTests(SampleAppFixture fixture) : IClassFixtur
             Assert.Equal(HttpStatusCode.OK, approved.StatusCode);
         }
 
-        await fixture.RunKindsUntilIdleAsync(CancellationToken, ProcessStarts.StepWorkItemKind, ProcessStarts.ConnectorCallWorkItemKind);
+        await fixture.RunKindsUntilIdleAsync(
+            CancellationToken, ProcessStarts.StepWorkItemKind, ProcessStarts.ConnectorCallWorkItemKind, ProcessStarts.WebhookDeliverWorkItemKind);
         Assert.Equal("waiting", await StateAsync(instance));
         Assert.Equal("assignPaymentReference", await fixture.ScalarAsync("SELECT step FROM axis.process_instances WHERE id = @id", ("id", instance)));
         var call = (Guid)(await fixture.ScalarAsync("SELECT id FROM axis.package_calls WHERE process_instance_id = @id", ("id", instance)))!;

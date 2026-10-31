@@ -251,12 +251,12 @@ Compose images hold them in `/modules`. The server and the worker read them thro
 
 ### Processes, pages, policies and dependencies
 
-_(planned for M20)_ A module can ship a working feature with its screens,
+A module can ship a working feature with its screens,
 permissions, triggers and outside calls, and build on other modules, as
 [D89](../decisions/d89-modules-that-hold-processes-pages-and-policies-and-depend-on-other-modules.md)
 and [D103](../decisions/d103-modules-hold-triggers-scenarios-and-connector-slots.md) agree. It replaces the two limits above: the kinds a module may hold, and no
 dependencies. Dependencies (the `modules` list with the slot maps), resolving the graph, one
-copy each, what the application names, and what a module names and calls of the modules it declares are built, and so are module pages. The `department-budgets` sample module and its use by the purchase request sample are built too. The rest of this section is planned.
+copy each, what the application names, and what a module names and calls of the modules it declares are built, and so are module pages. Processes, pages, policies, triggers, connector slots, dependencies and the `department-budgets` sample are built. Module scenarios and module policy grants on the module's processes are _(planned for M24)_.
 
 ```json
 {
@@ -324,8 +324,7 @@ An application that declares it maps the slot to one of its own roles:
   data source filter does. Default deny still holds: without the mapped role a
   person gets `403` on the module entity and data source. A module that the
   application reaches only as a dependency gets its slot map through the chain, so its policies
-  grant the role the chain reaches. _(planned for M20)_ A module policy grants on the processes and
-  endpoints of its own module.
+  grant the role the chain reaches. _(planned for M24)_ A module policy grants on the processes of its own module.
 - **Pages.** _(built)_ A module page is a `page` file in the module. In an application it is
   named `<module id>/<name>`, and its id is derived from the application `id` as for other module
   resources. Its widgets name resources of its own module by their plain names: the `entity`,
