@@ -107,7 +107,9 @@ The process submits the request and records when, asks the department
 manager, asks a finance reviewer at or above the threshold, and ends
 approved, returned or rejected. After `markApproved`, `announceApproved`
 raises the `PurchaseRequestApproved` event with the request's number and total,
-see [Raise event step](process-events.md#raise-event-step). An approved request
+see [Raise event step](process-events.md#raise-event-step). The sample's
+`PurchaseRequestApprovedWebhook` delivers the event to the purchasing system, see
+[Webhook resource](outbound-webhooks.md#webhook-resource). An approved request
 then gets its purchase order from the purchasing system, see [Connector calls](process-execution.md#connector-calls), and
 a payment reference from the sample extension package, see
 [Package steps](process-execution.md#package-step-shape):

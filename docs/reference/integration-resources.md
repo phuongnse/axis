@@ -229,7 +229,10 @@ The sample's `PurchaseRequest` entity has a `purchaseOrderNumber` `text`
 field, which the call writes. No policy lets a user update it, so the request
 form shows it read-only. The sample activates only for a tenant that holds the
 `PurchasingSystemUrl`, `PurchasingSystemTokenUrl`, `PurchasingSystemClientId`
-and `PurchasingSystemClientSecret` bindings. The entity also
+and `PurchasingSystemClientSecret` bindings. Its `PurchaseRequestApprovedWebhook`
+also needs the `PurchaseRequestApprovedWebhookUrl` and
+`PurchaseRequestApprovedWebhookSecret` bindings, see
+[Webhook resource](outbound-webhooks.md#webhook-resource). The entity also
 has a `paymentReference` `text` field, which the sample extension package
 writes after the purchase order is created, so the form shows it read-only too.
 Development,

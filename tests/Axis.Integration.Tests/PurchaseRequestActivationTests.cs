@@ -10,8 +10,8 @@ namespace Axis.Integration.Tests;
 
 /// <summary>
 /// The purchase request sample calls the purchasing system through a connector and signs people in
-/// through the <c>company</c> identity provider, so it activates only for a tenant that holds the
-/// connector's two deployment bindings and the provider's three.
+/// through the <c>company</c> identity provider, and delivers its approval webhook, so it activates only for a tenant that
+/// holds the connector's four deployment bindings, the provider's three and the webhook's two.
 /// </summary>
 public sealed class PurchaseRequestActivationTests(DataDatabaseFixture database) : IClassFixture<DataDatabaseFixture>
 {
@@ -20,7 +20,7 @@ public sealed class PurchaseRequestActivationTests(DataDatabaseFixture database)
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
 
     [Fact]
-    public async Task The_sample_activates_only_for_a_tenant_with_the_purchasing_and_company_bindings()
+    public async Task The_sample_activates_only_for_a_tenant_with_the_purchasing_company_and_webhook_bindings()
     {
         ReleaseCompilationResult compiled;
         await using (var context = database.CreateConfigurationContext())
@@ -38,6 +38,11 @@ public sealed class PurchaseRequestActivationTests(DataDatabaseFixture database)
             (DiagnosticCodes.MissingDeploymentBinding, "identity-providers/company.json", "/clientSecret/binding", "Tenant 'acme' has no binding 'CompanyClientSecret'. Add a 'secret' binding with that name to the tenant."),
             (DiagnosticCodes.MissingDeploymentBinding, "identity-providers/company.json", "/issuer/binding", "Tenant 'acme' has no binding 'CompanyIssuer'. Add a 'url' binding with that name to the tenant."),
         ];
+        (string Code, string File, string Path, string Message)[] webhookDiagnostics =
+        [
+            (DiagnosticCodes.MissingDeploymentBinding, "webhooks/purchase-request-approved.json", "/secret/binding", "Tenant 'acme' has no binding 'PurchaseRequestApprovedWebhookSecret'. Add a 'secret' binding with that name to the tenant."),
+            (DiagnosticCodes.MissingDeploymentBinding, "webhooks/purchase-request-approved.json", "/url/binding", "Tenant 'acme' has no binding 'PurchaseRequestApprovedWebhookUrl'. Add a 'url' binding with that name to the tenant."),
+        ];
         Assert.Equal(
             [
                 (DiagnosticCodes.MissingDeploymentBinding, "connectors/purchasing-system.json", "/auth/clientId/binding", "Tenant 'acme' has no binding 'PurchasingSystemClientId'. Add a 'secret' binding with that name to the tenant."),
@@ -45,6 +50,7 @@ public sealed class PurchaseRequestActivationTests(DataDatabaseFixture database)
                 (DiagnosticCodes.MissingDeploymentBinding, "connectors/purchasing-system.json", "/auth/tokenUrl/binding", "Tenant 'acme' has no binding 'PurchasingSystemTokenUrl'. Add a 'url' binding with that name to the tenant."),
                 (DiagnosticCodes.MissingDeploymentBinding, "connectors/purchasing-system.json", "/baseUrl/binding", "Tenant 'acme' has no binding 'PurchasingSystemUrl'. Add a 'url' binding with that name to the tenant."),
                 .. companyDiagnostics,
+                .. webhookDiagnostics,
             ],
             refused.Diagnostics.Select(diagnostic => (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.Message)).Order());
         Assert.Null(await FindActiveAsync());
@@ -63,6 +69,17 @@ public sealed class PurchaseRequestActivationTests(DataDatabaseFixture database)
         Assert.Null(await FindActiveAsync());
 
         CompanyBindings.AddTo(bindings);
+        bindings.Remove(PurchasingBindings.WebhookUrl);
+        bindings.Remove(PurchasingBindings.WebhookSecret);
+
+        var withoutWebhook = await ActivateAsync(compiled, new ActivationBindings("acme", bindings, AllowHttp: false));
+
+        Assert.Equal(
+            webhookDiagnostics,
+            withoutWebhook.Diagnostics.Select(diagnostic => (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.Message)).Order());
+        Assert.Null(await FindActiveAsync());
+
+        PurchasingBindings.AddTo(bindings);
 
         var activated = await ActivateAsync(compiled, new ActivationBindings("acme", bindings, AllowHttp: false));
 

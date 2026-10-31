@@ -1,0 +1,9 @@
+{
+  "id": "a515d557-18da-45c7-826e-938e2cf4a473",
+  "kind": "webhook",
+  "name": "PurchaseRequestApprovedWebhook",
+  "formatVersion": 1,
+  "event": "PurchaseRequestApproved",
+  "url": { "binding": "PurchaseRequestApprovedWebhookUrl" },
+  "secret": { "binding": "PurchaseRequestApprovedWebhookSecret" }
+}
