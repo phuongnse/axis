@@ -79,7 +79,9 @@ public sealed class AdminTenantBackupTests(AdminBackupFixture fixture) : IClassF
         Assert.Equal("https://purchasing.example.test", bindings["PurchasingSystemUrl"].GetProperty("url").GetString());
         Assert.Equal("url", bindings[PurchasingBindings.TokenUrl].GetProperty("kind").GetString());
         Assert.Equal(PurchasingBindings.PlaceholderTokenUrl, bindings[PurchasingBindings.TokenUrl].GetProperty("url").GetString());
-        foreach (var name in new[] { PurchasingBindings.ClientId, PurchasingBindings.ClientSecret })
+        Assert.Equal("url", bindings[PurchasingBindings.WebhookUrl].GetProperty("kind").GetString());
+        Assert.Equal(PurchasingBindings.PlaceholderWebhookUrl, bindings[PurchasingBindings.WebhookUrl].GetProperty("url").GetString());
+        foreach (var name in new[] { PurchasingBindings.ClientId, PurchasingBindings.ClientSecret, PurchasingBindings.WebhookSecret })
         {
             Assert.Equal("secret", bindings[name].GetProperty("kind").GetString());
             Assert.False(bindings[name].TryGetProperty("url", out _));
@@ -198,6 +200,7 @@ public sealed class AdminTenantBackupTests(AdminBackupFixture fixture) : IClassF
             AdminScenario.Cipher.Decrypt(row.Id, TenantSecretFields.RuntimePassword, row.RuntimePassword).Reveal(),
             fixture.Scenario.ClientSecret,
             PurchasingBindings.ClientSecretValue,
+            PurchasingBindings.WebhookSecretValue,
             .. fixture.Scenario.AdminPasswords,
         ];
         var archive = ReadArchive(file, folder.Path);

@@ -73,7 +73,7 @@ public sealed class AdminTenantRestoreTests(AdminBackupFixture fixture) : IClass
         Assert.NotEqual(original.DatabaseName, row.DatabaseName);
         Assert.Equal(0, await CountSecretBindingValuesAsync(newId));
         Assert.Equal(
-            [CompanyBindings.ClientId, CompanyBindings.ClientSecret, CompanyBindings.Issuer, PurchasingBindings.ClientId, PurchasingBindings.ClientSecret, PurchasingBindings.TokenUrl, "PurchasingSystemUrl"],
+            [CompanyBindings.ClientId, CompanyBindings.ClientSecret, CompanyBindings.Issuer, PurchasingBindings.WebhookSecret, PurchasingBindings.WebhookUrl, PurchasingBindings.ClientId, PurchasingBindings.ClientSecret, PurchasingBindings.TokenUrl, "PurchasingSystemUrl"],
             await BindingNamesAsync(newId));
         Assert.Equal(0, await CountSessionsAsync(newId));
 
@@ -89,7 +89,7 @@ public sealed class AdminTenantRestoreTests(AdminBackupFixture fixture) : IClass
         var setBinding = await scenario.RunAsync(["tenant", "binding", "set", newId, PurchasingBindings.ClientSecret, "--secret"], input: "restored-token", extra: AdminScenario.Directory);
         Assert.Equal(0, setBinding.Exit);
         Assert.Equal([$"{newId} binding ok"], setBinding.Output);
-        foreach (var name in new[] { CompanyBindings.ClientId, CompanyBindings.ClientSecret, PurchasingBindings.ClientId })
+        foreach (var name in new[] { CompanyBindings.ClientId, CompanyBindings.ClientSecret, PurchasingBindings.ClientId, PurchasingBindings.WebhookSecret })
         {
             var setCompany = await scenario.RunAsync(["tenant", "binding", "set", newId, name, "--secret"], input: $"{name}-restored", extra: AdminScenario.Directory);
             Assert.Equal(0, setCompany.Exit);
