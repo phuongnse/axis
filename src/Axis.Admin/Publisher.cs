@@ -6,6 +6,7 @@ using Axis.Configuration.Releases;
 using Axis.Configuration.Storage;
 using Axis.Data;
 using Axis.Data.Audit;
+using Axis.Data.Records;
 using Axis.Processes.Instances;
 using Axis.Processes.Storage;
 using Axis.Tenancy.Platform;
@@ -51,6 +52,7 @@ internal sealed class Publisher(
     ReleaseSettings settings,
     string? scenarioServer,
     IPublisherTenants tenants,
+    SensitiveValues sensitive,
     TimeSpan leaseDuration,
     TimeSpan testLimit,
     TextWriter output,
@@ -326,7 +328,7 @@ internal sealed class Publisher(
     {
         var diagnostics = new List<Diagnostic>();
         var files = ParseSnapshot(request.Snapshot);
-        var activation = new TenantReleaseActivation(settings.InlineRecomputeLimit, _output, _error, CancellationToken.None);
+        var activation = new TenantReleaseActivation(settings.InlineRecomputeLimit, sensitive, _output, _error, CancellationToken.None);
         var preview = request.Target == "preview";
         if (preview && tenant.Preview is null)
         {

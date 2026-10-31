@@ -11,6 +11,7 @@ using Axis.Configuration.Releases;
 using Axis.Configuration.Resources;
 using Axis.Configuration.Storage;
 using Axis.Data;
+using Axis.Data.Records;
 using Axis.Data.Seeding;
 using Axis.Data.Storage;
 using Axis.Processes.Instances;
@@ -46,6 +47,7 @@ internal readonly record struct ScenarioTestRun(bool Succeeded, JsonArray Scenar
 /// </summary>
 internal sealed class TenantReleaseActivation(
     int inlineRecomputeLimit,
+    SensitiveValues sensitive,
     TextWriter output,
     TextWriter error,
     CancellationToken cancellationToken)
@@ -361,7 +363,7 @@ internal sealed class TenantReleaseActivation(
         await TriggerSchedules.ActivateAsync(runtime, id, model, compiled.Release!.Id, cancellationToken);
         if (model.Seeds.Count > 0)
         {
-            var seeded = await SeedApplier.ApplyAsync(model, compiled.Release.Id, runtime, cancellationToken);
+            var seeded = await SeedApplier.ApplyAsync(model, compiled.Release.Id, runtime, new RecordCipher(sensitive, id), cancellationToken);
             diagnostics.AddRange(seeded.Diagnostics);
             WriteWarnings(id, seeded.Diagnostics);
             if (seeded.Diagnostics.Any(IsError))

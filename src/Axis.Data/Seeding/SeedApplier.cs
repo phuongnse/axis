@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Model;
 using Axis.Data.Records;
@@ -32,13 +33,16 @@ public static class SeedApplier
     /// <summary>
     /// Applies <paramref name="model"/>'s seeds over <paramref name="connection"/>, whose entity
     /// tables are provisioned for the model. Every written record is stamped with
-    /// <paramref name="releaseId"/>, the release of <paramref name="model"/>. Must run outside an
-    /// explicit transaction.
+    /// <paramref name="releaseId"/>, the release of <paramref name="model"/>.
+    /// <paramref name="cipher"/> holds the tenant's data keys, and is <see langword="null"/> where there are none.
+    /// Must run outside an explicit transaction.
     /// </summary>
+    /// <exception cref="TenantDataKeyMissingException">A seed has a sensitive value and the tenant has no data key.</exception>
     public static async Task<SeedResult> ApplyAsync(
         ApplicationModel model,
         Guid releaseId,
         NpgsqlConnection connection,
+        RecordCipher? cipher,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(model);
@@ -82,9 +86,20 @@ public static class SeedApplier
             var updating = false;
             if (seed.Sync)
             {
-                // Only the declared values are compared, so a computed value alone never causes a write.
-                var found = await RecordCommands.FindVersionAsync(connection, entity, id, input.Values, cancellationToken);
-                if (found is { Differs: false })
+                // Only the declared values are compared, so a computed value alone never causes a write. SQL cannot
+                // compare a sensitive value, since each encryption differs, so it is compared after decrypting.
+                var plain = input.Values.Where(value => !value.Field.Sensitive).ToList();
+                var sensitive = input.Values.Where(value => value.Field.Sensitive).ToList();
+                var found = await RecordCommands.FindVersionAsync(connection, entity, id, plain, cancellationToken);
+                Record? stored = null;
+                if (found is not null && (entity.HasComputedFields || sensitive.Count > 0))
+                {
+                    stored = await RecordQueries.GetAsync(connection, model, entity, id, cipher, cancellationToken);
+                }
+
+                if (found is { } unchanged
+                    && !unchanged.Differs
+                    && !sensitive.Any(value => !JsonNode.DeepEquals(RecordValueJson.ToJson(value), stored!.Values.GetValueOrDefault(value.Field.Name))))
                 {
                     continue;
                 }
@@ -93,17 +108,14 @@ public static class SeedApplier
                 if (found is { } existing)
                 {
                     // The seed declares only some values, so the others come from the stored record.
-                    var stored = entity.HasComputedFields
-                        ? await RecordQueries.GetAsync(connection, model, entity, id, cancellationToken)
-                        : null;
-                    var computed = RecordComputer.ComputeUpdate(model, entity, stored, input.Values, input.Rows);
+                    var computed = RecordComputer.ComputeUpdate(model, entity, entity.HasComputedFields ? stored : null, input.Values, input.Rows);
                     if (computed.Errors is { } errors)
                     {
                         await transaction.RollbackAsync(cancellationToken);
                         return NotComputed(seed, index, errors);
                     }
 
-                    result = await RecordCommands.UpdateAsync(connection, model, entity, releaseId, id, existing.Version, computed.Values, computed.Rows, input.Links, cancellationToken: cancellationToken);
+                    result = await RecordCommands.UpdateAsync(connection, model, entity, releaseId, id, existing.Version, computed.Values, computed.Rows, input.Links, cipher: cipher, cancellationToken: cancellationToken);
                 }
                 else
                 {
@@ -121,7 +133,7 @@ public static class SeedApplier
                         return NotComputed(seed, index, errors);
                     }
 
-                    result = await RecordCommands.CreateAsync(connection, model, entity, releaseId, computed.Values, computed.Rows, input.Links, id, cancellationToken: cancellationToken);
+                    result = await RecordCommands.CreateAsync(connection, model, entity, releaseId, computed.Values, computed.Rows, input.Links, id, cipher: cipher, cancellationToken: cancellationToken);
                 }
             }
             else
@@ -145,7 +157,7 @@ public static class SeedApplier
                     return NotComputed(seed, index, errors);
                 }
 
-                result = await RecordCommands.CreateAsync(connection, model, entity, releaseId, computed.Values, computed.Rows, input.Links, id, cancellationToken: cancellationToken);
+                result = await RecordCommands.CreateAsync(connection, model, entity, releaseId, computed.Values, computed.Rows, input.Links, id, cipher: cipher, cancellationToken: cancellationToken);
             }
 
             if (result.Outcome != RecordWriteOutcome.Written)

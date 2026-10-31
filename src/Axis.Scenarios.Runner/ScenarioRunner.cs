@@ -253,7 +253,7 @@ public static class ScenarioRunner
         await TriggerSchedules.ActivateAsync(connection, TenantId, model, compiled.Release.Id, cancellationToken);
         if (model.Seeds.Count > 0)
         {
-            var seeded = await SeedApplier.ApplyAsync(model, compiled.Release.Id, connection, cancellationToken);
+            var seeded = await SeedApplier.ApplyAsync(model, compiled.Release.Id, connection, null, cancellationToken);
             if (seeded.Diagnostics.Count > 0)
             {
                 return Setup("could not be seeded", seeded.Diagnostics);

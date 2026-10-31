@@ -31,7 +31,7 @@ public sealed class AssetManagementActivationTests(DataDatabaseFixture database)
         var activated = await ActivateAsync(compiled);
         Assert.Empty(activated.Diagnostics);
         await using var connection = await OpenAsync(pooling: true);
-        var seeded = await SeedApplier.ApplyAsync(compiled.Model!, compiled.Release!.Id, connection, CancellationToken);
+        var seeded = await SeedApplier.ApplyAsync(compiled.Model!, compiled.Release!.Id, connection, null, CancellationToken);
 
         Assert.Empty(seeded.Diagnostics);
         Assert.Equal(["Furniture", "Laptop", "Monitor", "Phone"], await ReadNamesAsync(compiled, "Category"));
@@ -68,7 +68,7 @@ public sealed class AssetManagementActivationTests(DataDatabaseFixture database)
         Assert.Empty((await ActivateAsync(compiled)).Diagnostics);
         await using (var seeding = await OpenAsync(pooling: true))
         {
-            Assert.Empty((await SeedApplier.ApplyAsync(compiled.Model!, compiled.Release!.Id, seeding, CancellationToken)).Diagnostics);
+            Assert.Empty((await SeedApplier.ApplyAsync(compiled.Model!, compiled.Release!.Id, seeding, null, CancellationToken)).Diagnostics);
         }
 
         await InsertAssetsAsync(compiled);

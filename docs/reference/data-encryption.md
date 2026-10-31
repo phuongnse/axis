@@ -130,7 +130,12 @@ rows and its export, for a user whose grants cover the field. A value that does 
 target's decrypted values, and the server reads a pending computed field, and writes a sensitive computed value, with
 the cipher. Test: `SensitiveComputedReadTests`.
 
-Process steps, connector and package calls, imports, seeds and scenarios do not use the cipher yet _(planned for M27)_.
+Seeds encrypt a sensitive value with the tenant's data key, at server start, in `axis-admin activate` and in the
+publisher. A synced seed decrypts the stored value and compares it with the declared one, so an unchanged value writes
+nothing. A seed with a sensitive value fails the whole seed run when the tenant has no data key, and stores no row. Test:
+`StartupActivationTests`.
+
+Process steps, connector and package calls, imports and scenarios do not use the cipher yet _(planned for M27)_.
 A write of a sensitive value on those paths fails with a `500`, and a value is never written in clear. A process
 started on an entity that holds a stored sensitive value fails in the worker when it reads the record, until the worker
 uses the cipher. The same holds for the task form state and the task completion of a process. Activation's inline
@@ -182,6 +187,6 @@ never a key. The exit codes are those of [output and exit codes](administration.
   is restored, and a rerun with a good archive finishes the restore.
 - **What the encryption does not do yet.** A `sensitive` field has a `bytea` column. The record API, forms and the
   detail widget encrypt and decrypt a value with the tenant keys. A process step, a connector or package call, an
-  import, a seed or a scenario does not yet _(planned for M27)_, and a write of a value there fails. The
+  import or a scenario does not yet _(planned for M27)_, and a write of a value there fails. The
   planner refuses a flag change until the [changing the flag](data-encryption.md#changing-the-flag) migration is built. A value's associated data names the tenant id, so that work has to handle
   a restore under a new id.

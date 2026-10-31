@@ -43,7 +43,7 @@ public sealed class SeedApplierTests
             ],
         };
 
-        var result = await SeedApplier.ApplyAsync(model, Guid.NewGuid(), connection, TestContext.Current.CancellationToken);
+        var result = await SeedApplier.ApplyAsync(model, Guid.NewGuid(), connection, null, TestContext.Current.CancellationToken);
 
         Assert.Equal(0, result.Inserted);
         Assert.Equal(0, result.Updated);
@@ -74,7 +74,7 @@ public sealed class SeedApplierTests
             ],
         };
 
-        var result = await SeedApplier.ApplyAsync(model, Guid.NewGuid(), connection, TestContext.Current.CancellationToken);
+        var result = await SeedApplier.ApplyAsync(model, Guid.NewGuid(), connection, null, TestContext.Current.CancellationToken);
 
         Assert.Equal(0, result.Inserted);
         Assert.Equal(
@@ -101,7 +101,7 @@ public sealed class SeedApplierTests
             Seeds = [Seed("seeds/tickets.json", ticket, Record("""{ "title": "First", "number": "T-2026-0001" }"""))],
         };
 
-        var result = await SeedApplier.ApplyAsync(model, Guid.NewGuid(), connection, TestContext.Current.CancellationToken);
+        var result = await SeedApplier.ApplyAsync(model, Guid.NewGuid(), connection, null, TestContext.Current.CancellationToken);
 
         Assert.Equal(0, result.Inserted);
         var diagnostic = Assert.Single(result.Diagnostics);

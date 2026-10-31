@@ -6,7 +6,9 @@ using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Modules;
 using Axis.Configuration.Packages;
 using Axis.Data;
+using Axis.Data.Records;
 using Axis.Tenancy;
+using Axis.Tenancy.Keys;
 using Axis.Tenancy.Platform;
 using Axis.Tenancy.Realms;
 using Microsoft.EntityFrameworkCore;
@@ -1146,6 +1148,7 @@ internal static partial class AdminCommands
             new ReleaseSettings(settings.Packages, settings.Modules, settings.InlineRecomputeLimit),
             scenarioServer,
             new DirectoryPublisherTenants(settings.Platform, settings.Mail, refreshInterval, http),
+            new SensitiveValues(new TenantKeys(new DirectoryTenantKeySource(settings.Platform.PlatformConnectionString, settings.Platform.Cipher))),
             lease,
             testLimit,
             output,
@@ -1204,6 +1207,7 @@ internal static partial class AdminCommands
             settings,
             scenarioServer,
             new ConfigurationPublisherTenants(catalog.Tenants, mail, allowHttp, output, http),
+            new SensitiveValues(new TenantKeys(new ConfigurationTenantKeySource(configuration))),
             lease,
             testLimit,
             output,
