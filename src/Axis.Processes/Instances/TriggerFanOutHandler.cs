@@ -38,7 +38,11 @@ namespace Axis.Processes.Instances;
 /// <see cref="DeliverySettings.Attempts"/> failures it writes an <c>open</c> dead letter with the
 /// occurrence and deletes the item. The count belongs to the occurrence, so a failure in any batch adds to it.
 /// </summary>
-internal sealed partial class TriggerFanOutHandler(ReleaseModelCache models, DeliverySettings settings, ILogger<TriggerFanOutHandler> logger) : IDeliveryWorkItemHandler
+internal sealed partial class TriggerFanOutHandler(
+    ReleaseModelCache models,
+    DeliverySettings settings,
+    SensitiveValues? sensitive,
+    ILogger<TriggerFanOutHandler> logger) : IDeliveryWorkItemHandler
 {
     private const int PageSize = 100;
 
@@ -110,7 +114,7 @@ internal sealed partial class TriggerFanOutHandler(ReleaseModelCache models, Del
 
                         outcome = WorkItemOutcome.Rescheduled;
                     }
-                    else if (await ListIdsAsync(connection, transaction, stored, dataSource, parameters, item.Cursor, cancellationToken) is not { } ids)
+                    else if (await ListIdsAsync(connection, transaction, stored, dataSource, parameters, item.Cursor, sensitive is null ? null : new RecordCipher(sensitive, item.TenantId), cancellationToken) is not { } ids)
                     {
                         LogDataError(trigger.Name, occurrence);
                     }
@@ -235,7 +239,7 @@ internal sealed partial class TriggerFanOutHandler(ReleaseModelCache models, Del
     /// Reads one batch of root record ids of the data source, after <paramref name="after"/>.
     /// Returns <see langword="null"/> when the database rejects the filter with a data exception.
     /// That aborts the statement, so the read runs in a savepoint that is rolled back, which keeps
-    /// the transaction usable.
+    /// the transaction usable. A filter that tests an exact lookup field is hashed with <paramref name="cipher"/>.
     /// </summary>
     private static async Task<IReadOnlyList<Guid>?> ListIdsAsync(
         NpgsqlConnection connection,
@@ -244,10 +248,11 @@ internal sealed partial class TriggerFanOutHandler(ReleaseModelCache models, Del
         DataSourceModel dataSource,
         IReadOnlyList<DataSourceParameterValue> parameters,
         Guid? after,
+        RecordCipher? cipher,
         CancellationToken cancellationToken)
     {
         await transaction.SaveAsync(Savepoint, cancellationToken);
-        var ids = await DataSourceQueries.ListIdsAfterAsync(connection, model, dataSource, parameters, after, PageSize, cancellationToken);
+        var ids = await DataSourceQueries.ListIdsAfterAsync(connection, model, dataSource, parameters, after, PageSize, cipher, cancellationToken);
         if (ids is null)
         {
             await transaction.RollbackAsync(Savepoint, cancellationToken);

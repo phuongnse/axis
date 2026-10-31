@@ -643,6 +643,34 @@ public sealed class SqlTranslatorTests
         Assert.Empty(withCallback.Lookups);
     }
 
+    private const string ParameterEqual =
+        "((@p0 IS NULL AND r.f_t_lookup IS NULL) OR (@p0 IS NOT NULL AND r.f_t_lookup IS NOT NULL AND r.f_t_lookup = ANY(@fl0)))";
+
+    [Theory]
+    [InlineData("t == p", ParameterEqual)]
+    [InlineData("p == t", ParameterEqual)]
+    [InlineData("t != p", "(NOT " + ParameterEqual + ")")]
+    [InlineData("not (t == p)", "(NOT " + ParameterEqual + ")")]
+    public void An_equality_of_a_lookup_field_and_a_parameter_names_the_parameter_and_has_no_literal(string expression, string sql)
+    {
+        var result = TranslateWithParameter(expression);
+
+        Assert.True(result.Succeeded, result.Diagnostic?.Message);
+        Assert.Equal(sql, result.Sql);
+        Assert.Empty(result.Parameters);
+        var lookup = Assert.Single(result.Lookups);
+        Assert.Equal(("fl0", "p", null), (lookup.Name, lookup.Parameter, lookup.Value));
+        Assert.Equal(["t"], lookup.Path);
+    }
+
+    [Fact]
+    public void A_literal_lookup_has_no_parameter_name()
+    {
+        var lookup = Assert.Single(TranslateWithLookup("t == 'x'").Lookups);
+
+        Assert.Null(lookup.Parameter);
+    }
+
     [Fact]
     public void Without_a_lookup_callback_an_equality_on_the_field_renders_as_before()
     {
@@ -650,6 +678,19 @@ public sealed class SqlTranslatorTests
 
         Assert.Equal("(\"t\" IS NOT DISTINCT FROM @f0)", result.Sql);
         Assert.Empty(result.Lookups);
+    }
+
+    private static SqlTranslationResult TranslateWithParameter(string expression)
+    {
+        var parsed = ExpressionParser.Parse(expression);
+        Assert.True(parsed.Succeeded, parsed.Diagnostic?.Message);
+        var scope = new ExpressionScope(new Dictionary<string, ExpressionType>(_fields) { ["p"] = ExpressionType.Text });
+        var check = ExpressionTypeChecker.Check(parsed.Expression, scope, ExpressionType.Boolean);
+        Assert.True(check.Succeeded, check.Diagnostic?.Message);
+        return SqlTranslator.Translate(
+            parsed.Expression,
+            path => path is ["p"] ? "@p0" : Column(path),
+            lookupColumn: path => path is ["t"] ? LookupColumn : null);
     }
 
     private static SqlTranslationResult TranslateWithLookup(string expression)

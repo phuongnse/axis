@@ -4,6 +4,7 @@ using Axis.Configuration.Model;
 using Axis.Configuration.Releases;
 using Axis.Configuration.Tests;
 using Axis.Data;
+using Axis.Data.DataSources;
 using Axis.Data.Records;
 using Axis.Policy;
 using Axis.Processes.Instances;
@@ -17,7 +18,9 @@ namespace Axis.Integration.Tests;
 
 /// <summary>
 /// A policy grant's filter <c>nationalId == '…'</c> or <c>!= '…'</c> on an exact lookup field runs against the stored lookup
-/// hashes, in the record list and in the single-record match. A filter that needs the tenant's lookup keys and gets none throws.
+/// hashes, in the record list and in the single-record match. So does a data source's filter or a measure's filter, against a
+/// literal or a data source parameter, in the rows and in the trigger fan-out's id read. A filter that needs the tenant's
+/// lookup keys and gets none throws.
 /// </summary>
 public sealed class ExactLookupFilterTests(DataDatabaseFixture database) : IClassFixture<DataDatabaseFixture>
 {
@@ -116,6 +119,124 @@ public sealed class ExactLookupFilterTests(DataDatabaseFixture database) : IClas
         Assert.Equal(
             new HashSet<Guid> { ids.Matching, ids.Other, ids.Empty },
             [.. await ListAsync(connection, compiled, person, withKey, "other", withoutKey)]);
+    }
+
+    [Fact]
+    public async Task A_data_source_equality_on_a_parameter_returns_the_record_with_that_value_under_any_lookup_key()
+    {
+        var older = Cipher(1);
+        var (compiled, person, connection) = await ProvisionAsync();
+        await using var _ = connection;
+        var ids = await CreateRecordsAsync(connection, compiled, person, older);
+
+        Assert.Equal([ids.Matching], await RowIdsAsync(connection, compiled, "PeopleEqual", older, Matching));
+
+        var rotated = Cipher(1, 2);
+        var newer = await CreateAsync(connection, compiled, person, rotated, $$"""{ "values": { "name": "Newer", "nationalId": "{{Matching}}" } }""");
+
+        Assert.Equal(
+            new HashSet<Guid> { ids.Matching, newer.Record!.Id },
+            [.. await RowIdsAsync(connection, compiled, "PeopleEqual", rotated, Matching)]);
+    }
+
+    [Fact]
+    public async Task A_data_source_inequality_on_a_parameter_returns_the_other_records_including_an_empty_value()
+    {
+        var cipher = Cipher(1);
+        var (compiled, person, connection) = await ProvisionAsync();
+        await using var _ = connection;
+        var ids = await CreateRecordsAsync(connection, compiled, person, cipher);
+
+        var rows = await RowIdsAsync(connection, compiled, "PeopleNotEqual", cipher, Matching);
+
+        Assert.Equal(new HashSet<Guid> { ids.Other, ids.Empty }, [.. rows]);
+    }
+
+    [Fact]
+    public async Task A_data_source_equality_without_the_parameter_returns_only_the_record_with_an_empty_value()
+    {
+        var cipher = Cipher(1);
+        var (compiled, person, connection) = await ProvisionAsync();
+        await using var _ = connection;
+        var ids = await CreateRecordsAsync(connection, compiled, person, cipher);
+
+        Assert.Equal([ids.Empty], await RowIdsAsync(connection, compiled, "PeopleEqual", cipher, null));
+        Assert.Equal(
+            new HashSet<Guid> { ids.Matching, ids.Other },
+            [.. await RowIdsAsync(connection, compiled, "PeopleNotEqual", cipher, null)]);
+    }
+
+    [Fact]
+    public async Task A_data_source_equality_on_a_literal_returns_the_record_with_that_value()
+    {
+        var cipher = Cipher(1);
+        var (compiled, person, connection) = await ProvisionAsync();
+        await using var _ = connection;
+        var ids = await CreateRecordsAsync(connection, compiled, person, cipher);
+
+        Assert.Equal([ids.Matching], await RowIdsAsync(connection, compiled, "PeopleLiteral", cipher, null));
+    }
+
+    [Fact]
+    public async Task A_measure_filter_on_a_parameter_counts_only_the_records_with_that_value()
+    {
+        var cipher = Cipher(1);
+        var (compiled, person, connection) = await ProvisionAsync();
+        await using var _ = connection;
+        await CreateRecordsAsync(connection, compiled, person, cipher);
+        Assert.True(compiled.Model!.TryGetDataSource("PeopleMatching", out var dataSource));
+
+        var page = await DataSourceQueries.ListAsync(
+            connection, null, compiled.Model, dataSource, 1, 50, null, [new(dataSource.Parameters[0], Matching)], null, null, cipher, CancellationToken);
+
+        Assert.NotNull(page);
+        var counts = page.Items.ToDictionary(row => row.Values["name"]!.GetValue<string>(), row => row.Values["matching"]!.GetValue<long>());
+        Assert.Equal(new Dictionary<string, long> { ["Match"] = 1, ["Other"] = 0, ["Empty"] = 0 }, counts);
+    }
+
+    [Fact]
+    public async Task A_data_source_read_by_id_after_a_cursor_applies_the_lookup_filter_and_needs_a_cipher()
+    {
+        var cipher = Cipher(1);
+        var (compiled, person, connection) = await ProvisionAsync();
+        await using var _ = connection;
+        var ids = await CreateRecordsAsync(connection, compiled, person, cipher);
+        Assert.True(compiled.Model!.TryGetDataSource("PeopleEqual", out var dataSource));
+        DataSourceParameterValue[] parameters = [new(dataSource.Parameters[0], Matching)];
+
+        var listed = await DataSourceQueries.ListIdsAfterAsync(connection, compiled.Model, dataSource, parameters, null, 50, cipher, CancellationToken);
+
+        Assert.Equal([ids.Matching], listed);
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => DataSourceQueries.ListIdsAfterAsync(connection, compiled.Model, dataSource, parameters, null, 50, null, CancellationToken));
+    }
+
+    [Fact]
+    public async Task A_data_source_read_of_rows_without_a_cipher_throws_for_a_lookup_filter_and_never_compares_plain_text()
+    {
+        var (compiled, _, connection) = await ProvisionAsync();
+        await using var _ = connection;
+        Assert.True(compiled.Model!.TryGetDataSource("PeopleEqual", out var dataSource));
+        DataSourceParameterValue[] parameters = [new(dataSource.Parameters[0], Matching)];
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => DataSourceQueries.ListAsync(connection, null, compiled.Model, dataSource, 1, 50, null, parameters, null, null, null, CancellationToken));
+        await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+        {
+            await foreach (var _ in DataSourceQueries.ReadAllAsync(connection, compiled.Model, dataSource, null, parameters, null, null, 50, null, CancellationToken))
+            {
+            }
+        });
+    }
+
+    private static async Task<List<Guid>> RowIdsAsync(
+        NpgsqlConnection connection, ReleaseCompilationResult compiled, string name, RecordCipher cipher, string? parameter)
+    {
+        Assert.True(compiled.Model!.TryGetDataSource(name, out var dataSource));
+        var page = await DataSourceQueries.ListAsync(
+            connection, null, compiled.Model, dataSource, 1, 50, null, [.. dataSource.Parameters.Select(declared => new DataSourceParameterValue(declared, parameter))], null, null, cipher, CancellationToken);
+        Assert.NotNull(page);
+        return [.. page.Items.Select(row => row.Id!.Value)];
     }
 
     private static IReadOnlyList<ExpressionModel> Filters(ReleaseCompilationResult compiled, EntityModel person, string role)
@@ -221,6 +342,34 @@ public sealed class ExactLookupFilterTests(DataDatabaseFixture database) : IClas
                 { "id": "{{_personId}}", "kind": "entity", "name": "Person", "formatVersion": 1, "fields": [
                     { "name": "name", "type": "text" },
                     { "name": "nationalId", "type": "text", "sensitive": true, "exactLookup": true } ] }
+                """)
+            .With(
+                "data-sources/people-equal.json",
+                $$"""
+                { "id": "{{Guid.NewGuid()}}", "kind": "dataSource", "name": "PeopleEqual", "formatVersion": 1, "entity": "Person",
+                  "fields": [{ "name": "name", "path": "name" }, { "name": "nationalId", "path": "nationalId" }],
+                  "parameters": [{ "name": "id", "type": "text" }], "filter": "nationalId == id" }
+                """)
+            .With(
+                "data-sources/people-not-equal.json",
+                $$"""
+                { "id": "{{Guid.NewGuid()}}", "kind": "dataSource", "name": "PeopleNotEqual", "formatVersion": 1, "entity": "Person",
+                  "fields": [{ "name": "name", "path": "name" }, { "name": "nationalId", "path": "nationalId" }],
+                  "parameters": [{ "name": "id", "type": "text" }], "filter": "nationalId != id" }
+                """)
+            .With(
+                "data-sources/people-literal.json",
+                $$"""
+                { "id": "{{Guid.NewGuid()}}", "kind": "dataSource", "name": "PeopleLiteral", "formatVersion": 1, "entity": "Person",
+                  "fields": [{ "name": "name", "path": "name" }], "filter": "'{{Matching}}' == nationalId" }
+                """)
+            .With(
+                "data-sources/people-matching.json",
+                $$"""
+                { "id": "{{Guid.NewGuid()}}", "kind": "dataSource", "name": "PeopleMatching", "formatVersion": 1, "entity": "Person",
+                  "fields": [{ "name": "name", "path": "name" }],
+                  "parameters": [{ "name": "id", "type": "text" }],
+                  "aggregate": { "groupBy": ["name"], "measures": [{ "name": "matching", "function": "count", "filter": "nationalId == id" }] } }
                 """)
             .With("roles/clerk.json", $$"""{ "id": "{{Guid.NewGuid()}}", "kind": "role", "name": "clerk", "formatVersion": 1, "label": { "textKey": "role.clerk" } }""")
             .With("roles/matcher.json", $$"""{ "id": "{{Guid.NewGuid()}}", "kind": "role", "name": "matcher", "formatVersion": 1, "label": { "textKey": "role.matcher" } }""")

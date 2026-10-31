@@ -11,10 +11,11 @@ namespace Axis.Configuration.Compilation;
 /// entity, a path step is a field of the entity the step's target resolves to, a rule call reads
 /// the fields its arguments read, because a rule body sees only its parameters, and the item
 /// expression of an aggregate reads the fields of the child entity. An entity that
-/// <c>findEntity</c> cannot find is skipped. A policy grant's filter may test an exact lookup
+/// <c>findEntity</c> cannot find is skipped. A filter may test an exact lookup
 /// field of its entity with <c>==</c> or <c>!=</c> against a literal other than <c>null</c>, outside
 /// the arguments of a call and outside an item expression: that test runs against the stored
-/// lookup hashes, so it is not a read.
+/// lookup hashes, so it is not a read. A data source's filter and a measure's filter may also test
+/// it against a text, enum, integer, decimal or boolean parameter of the data source.
 /// </summary>
 internal static class SensitiveReads
 {
@@ -25,7 +26,9 @@ internal static class SensitiveReads
     /// The entity name and field name of the first sensitive field that <paramref name="node"/>
     /// reads, or null when it reads none. <paramref name="entity"/> is the entity that a bare name
     /// belongs to, and <paramref name="scope"/> is the scope the expression was checked against.
-    /// <paramref name="allowExactLookupEquality"/> is true for a policy grant's filter.
+    /// <paramref name="allowExactLookupEquality"/> is true for a filter, which may test an exact lookup
+    /// field. <paramref name="isParameter"/> says whether a name is a data source parameter, which a
+    /// data source filter may test the field against. Without it, only a literal is allowed.
     /// </summary>
     public static (string Entity, string Field)? Find(
         ExpressionNode node,
@@ -33,8 +36,9 @@ internal static class SensitiveReads
         EntityResource entity,
         ExpressionScope scope,
         Func<string, EntityResource?> findEntity,
-        bool allowExactLookupEquality = false) =>
-        Walk(node, check, entity, scope, findEntity, inItem: false, inCall: false, allowExactLookupEquality);
+        bool allowExactLookupEquality = false,
+        Func<string, bool>? isParameter = null) =>
+        Walk(node, check, entity, scope, findEntity, inItem: false, inCall: false, allowExactLookupEquality, isParameter);
 
     // inItem is true inside the item expression of an aggregate, where a bare name is a field of the child row.
     // inCall is true inside the arguments of a call, where an exact lookup test is not translated.
@@ -46,7 +50,8 @@ internal static class SensitiveReads
         Func<string, EntityResource?> findEntity,
         bool inItem,
         bool inCall,
-        bool allowExactLookupEquality)
+        bool allowExactLookupEquality,
+        Func<string, bool>? isParameter)
     {
         switch (node)
         {
@@ -61,29 +66,29 @@ internal static class SensitiveReads
                     return read;
                 }
 
-                return Walk(member.Target, check, entity, scope, findEntity, inItem, inCall, allowExactLookupEquality);
+                return Walk(member.Target, check, entity, scope, findEntity, inItem, inCall, allowExactLookupEquality, isParameter);
 
             case UnaryNode unary:
-                return Walk(unary.Operand, check, entity, scope, findEntity, inItem, inCall, allowExactLookupEquality);
+                return Walk(unary.Operand, check, entity, scope, findEntity, inItem, inCall, allowExactLookupEquality, isParameter);
 
             case BinaryNode binary:
-                if (allowExactLookupEquality && !inItem && !inCall && IsExactLookupEquality(binary, entity))
+                if (allowExactLookupEquality && !inItem && !inCall && IsExactLookupEquality(binary, entity, scope, isParameter))
                 {
                     return null;
                 }
 
-                return Walk(binary.Left, check, entity, scope, findEntity, inItem, inCall, allowExactLookupEquality)
-                    ?? Walk(binary.Right, check, entity, scope, findEntity, inItem, inCall, allowExactLookupEquality);
+                return Walk(binary.Left, check, entity, scope, findEntity, inItem, inCall, allowExactLookupEquality, isParameter)
+                    ?? Walk(binary.Right, check, entity, scope, findEntity, inItem, inCall, allowExactLookupEquality, isParameter);
 
             case IsNullNode isNull:
-                return Walk(isNull.Operand, check, entity, scope, findEntity, inItem, inCall, allowExactLookupEquality);
+                return Walk(isNull.Operand, check, entity, scope, findEntity, inItem, inCall, allowExactLookupEquality, isParameter);
 
             case InNode inList:
-                return Walk(inList.Operand, check, entity, scope, findEntity, inItem, inCall, allowExactLookupEquality)
-                    ?? FirstOf(inList.Items, check, entity, scope, findEntity, inItem, inCall, allowExactLookupEquality);
+                return Walk(inList.Operand, check, entity, scope, findEntity, inItem, inCall, allowExactLookupEquality, isParameter)
+                    ?? FirstOf(inList.Items, check, entity, scope, findEntity, inItem, inCall, allowExactLookupEquality, isParameter);
 
             case CallNode call:
-                return WalkCall(call, check, entity, scope, findEntity, inItem, inCall, allowExactLookupEquality);
+                return WalkCall(call, check, entity, scope, findEntity, inItem, inCall, allowExactLookupEquality, isParameter);
 
             default:
                 return null;
@@ -98,7 +103,8 @@ internal static class SensitiveReads
         Func<string, EntityResource?> findEntity,
         bool inItem,
         bool inCall,
-        bool allowExactLookupEquality)
+        bool allowExactLookupEquality,
+        Func<string, bool>? isParameter)
     {
         if (!check.RuleCalls.ContainsKey(call)
             && !inItem
@@ -107,10 +113,10 @@ internal static class SensitiveReads
             && scope.TryGetCollection(list.Name, out var collection)
             && findEntity(collection.Entity) is { } child)
         {
-            return FirstOf(call.Arguments.Skip(1), check, child, scope, findEntity, inItem: true, inCall: true, allowExactLookupEquality);
+            return FirstOf(call.Arguments.Skip(1), check, child, scope, findEntity, inItem: true, inCall: true, allowExactLookupEquality, isParameter);
         }
 
-        return FirstOf(call.Arguments, check, entity, scope, findEntity, inItem, inCall: true, allowExactLookupEquality);
+        return FirstOf(call.Arguments, check, entity, scope, findEntity, inItem, inCall: true, allowExactLookupEquality, isParameter);
     }
 
     private static (string Entity, string Field)? FirstOf(
@@ -121,11 +127,12 @@ internal static class SensitiveReads
         Func<string, EntityResource?> findEntity,
         bool inItem,
         bool inCall,
-        bool allowExactLookupEquality)
+        bool allowExactLookupEquality,
+        Func<string, bool>? isParameter)
     {
         foreach (var node in nodes)
         {
-            if (Walk(node, check, entity, scope, findEntity, inItem, inCall, allowExactLookupEquality) is { } read)
+            if (Walk(node, check, entity, scope, findEntity, inItem, inCall, allowExactLookupEquality, isParameter) is { } read)
             {
                 return read;
             }
@@ -136,17 +143,29 @@ internal static class SensitiveReads
 
     /// <summary>
     /// Whether <paramref name="binary"/> is <c>==</c> or <c>!=</c> between a bare name that is an exact
-    /// lookup field of <paramref name="entity"/>, in either order, and a text, integer, decimal or boolean literal.
+    /// lookup field of <paramref name="entity"/>, in either order, and a text, integer, decimal or boolean literal
+    /// or a data source parameter of one of those kinds or an enum.
     /// </summary>
-    private static bool IsExactLookupEquality(BinaryNode binary, EntityResource entity) =>
+    private static bool IsExactLookupEquality(
+        BinaryNode binary, EntityResource entity, ExpressionScope scope, Func<string, bool>? isParameter) =>
         binary.Operator is BinaryOperator.Equal or BinaryOperator.NotEqual
-        && (IsLookupAgainstLiteral(binary.Left, binary.Right, entity) || IsLookupAgainstLiteral(binary.Right, binary.Left, entity));
+        && (IsLookupAgainstValue(binary.Left, binary.Right, entity, scope, isParameter)
+            || IsLookupAgainstValue(binary.Right, binary.Left, entity, scope, isParameter));
 
-    private static bool IsLookupAgainstLiteral(ExpressionNode field, ExpressionNode literal, EntityResource entity) =>
-        field is NameNode name && IsLiteral(literal) && IsExactLookup(entity, name.Name);
+    private static bool IsLookupAgainstValue(
+        ExpressionNode field, ExpressionNode value, EntityResource entity, ExpressionScope scope, Func<string, bool>? isParameter) =>
+        field is NameNode name && (IsLiteral(value) || IsParameter(value, scope, isParameter)) && IsExactLookup(entity, name.Name);
 
     private static bool IsLiteral(ExpressionNode node) =>
         node is TextLiteral or IntegerLiteral or DecimalLiteral or BooleanLiteral;
+
+    private static bool IsParameter(ExpressionNode node, ExpressionScope scope, Func<string, bool>? isParameter) =>
+        isParameter is not null
+        && node is NameNode name
+        && isParameter(name.Name)
+        && scope.TryGetField(name.Name, out var type)
+        && type.Kind is ExpressionTypeKind.Text or ExpressionTypeKind.Enum or ExpressionTypeKind.Integer
+            or ExpressionTypeKind.Decimal or ExpressionTypeKind.Boolean;
 
     private static bool IsExactLookup(EntityResource entity, string name) =>
         entity.Fields.FirstOrDefault(field => string.Equals(field.Name, name, StringComparison.OrdinalIgnoreCase))

@@ -308,7 +308,10 @@ see the Data sources bullet of the Resolve step in
   field whose path ends at a `sensitive` field, and neither can a `filter`
   or a measure's `filter` read one (`AXC0308`, at `/sort`,
   `/aggregate/groupBy/{i}`, `/aggregate/measures/{i}/field`, `/filter` or
-  `/aggregate/measures/{i}/filter`).
+  `/aggregate/measures/{i}/filter`). A `filter` or a measure's `filter` may
+  test an exact lookup field of the root entity with `==` or `!=` against a
+  literal or a parameter, which Axis matches by the stored hashes, see
+  [exact lookup](data-encryption.md#exact-lookup).
 
 ## Endpoint
 
