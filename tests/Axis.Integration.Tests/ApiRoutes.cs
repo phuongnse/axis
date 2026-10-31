@@ -30,4 +30,13 @@ internal sealed record ApiRoute(RouteEndpoint Endpoint, string Method, RoutePatt
             RoutePatternLiteralPart literal => literal.Content,
             _ => "x",
         }))));
+
+    /// <summary>The path with each parameter filled from <paramref name="values"/> by name, or with <c>x</c> when it has no value.</summary>
+    public string PathWith(IReadOnlyDictionary<string, string> values) => string.Concat(Pattern.PathSegments.Select(segment =>
+        "/" + string.Concat(segment.Parts.Select(part => part switch
+        {
+            RoutePatternLiteralPart literal => literal.Content,
+            RoutePatternParameterPart parameter => values.GetValueOrDefault(parameter.Name, "x"),
+            _ => "x",
+        }))));
 }
