@@ -48,7 +48,7 @@ A sensitive field may declare an exact lookup, so a filter can find a record by 
   record API, child rows, imports, seeds, process steps and the computed recompute. A null value stores `null`. A
   tenant with no lookup key refuses a value like one with no data key, and nothing is written in clear.
 - The lookup column, its index and the hash on every write are built. So is the filter on the hash for a policy
-  grant's `filter`. A name longer than 54 characters is `AXC0309`, because `f_`, the name and `_lookup` must fit
+  grant's `filter`, a data source `filter` and a measure's `filter`. A name longer than 54 characters is `AXC0309`, because `f_`, the name and `_lookup` must fit
   PostgreSQL's 63 bytes.
 - A policy grant's `filter` may test the field with `==` or `!=` against a text, integer, decimal or boolean value,
   in either order, and nothing else. Axis hashes the value under every lookup key the tenant holds and matches any
@@ -57,8 +57,13 @@ A sensitive field may declare an exact lookup, so a filter can find a record by 
   single-record check apply the grant this way. A filter that reaches Axis without the tenant's keys throws, and
   never compares plain text. A tenant with no lookup key has no hashes, so `==` matches no record and `!=` matches
   every record.
-- A data source `filter` and a caller's filter may test the field the same way _(planned for M27)_. Until then a
-  data source `filter` on the field is `AXC0308`.
+- A data source `filter` and a measure's `filter` may test the field with `==` or `!=` against a text, integer,
+  decimal or boolean literal, or against a data source parameter of one of those types or an enum, in either order,
+  and nothing else. A date or date-time parameter is `AXC0308`. Axis hashes the literal, or the parameter's value,
+  under every lookup key the tenant holds, as for a grant. A parameter that was not given is `null` in the `filter`,
+  so `==` matches the records whose field is empty and `!=` matches the records whose field has a value. The rows,
+  their export and the trigger fan-out of a schedule trigger apply the `filter` this way, and a read that reaches it
+  without the tenant's keys throws. A caller's filter may test the field the same way _(planned for M27)_.
 - Two records with the same value have the same hash, so whoever reads the table can see that they match. That is
   the cost of the lookup.
 
@@ -66,10 +71,10 @@ A sensitive field may declare an exact lookup, so a filter can find a record by 
 
 Compilation refuses each of these on a sensitive field with [`AXC0308`](diagnostic-codes.md), at the path of the use.
 The message names the field and the use. The refusals and the run-time `400` for `sort` below are built, and hold
-before the values are encrypted. The exact lookup exception is built for a policy grant's `filter` only, and is
-planned for a data source `filter`.
+before the values are encrypted. The exact lookup exception is built for a policy grant's `filter`, a data source
+`filter` and a measure's `filter`.
 
-- A filter, other than the equality of an exact lookup in a policy grant's `filter`.
+- A filter, other than the equality of an exact lookup in a policy grant's, data source's or measure's `filter`.
 - A sort, in a data source or a table.
 - An aggregate over it, and a data source column that groups by it.
 - An index, `unique` or `searchable`.
@@ -79,11 +84,12 @@ planned for a data source `filter`.
 - A migration `fill` or `convert` whose target is a sensitive field, at `/changes/{i}/field`. Its SQL would write
   plain text into the encrypted column.
 - An expression that runs as SQL, such as a data source `filter` or a policy grant's `filter`, other than the
-  equality of an exact lookup in a policy grant's `filter`. A migration `fill` or `convert` value is one, so it may not read a sensitive field.
+  equality of an exact lookup in a policy grant's, data source's or measure's `filter`. A migration `fill` or `convert` value is one, so it may not read a sensitive field.
 
 `exactLookup` on a field that is not `sensitive` is [`AXC0309`](diagnostic-codes.md) at `/fields/{i}/exactLookup`. A
 caller's `sort` on a sensitive field, in the record API or a data source, is a `400` problem keyed `sort`. The record
-API has no other filter, and a data source's parameters only reach its `filter`, which cannot read a sensitive field.
+API has no other filter, and a data source's parameters only reach its `filter`, which tests an exact lookup field
+against a parameter by its hash and cannot read a sensitive field.
 Import and export read and write the plain values, under the same grants as
 the record API.
 
@@ -185,7 +191,8 @@ column without the cipher, unless an allow-list entry says why that method touch
 
 A scenario's tenant gets a random data key and lookup key, held in memory for the run only and never stored. Its record
 steps, task completions, seeds and process steps use the cipher, so a value is never written in clear, and a read under a
-grant whose `filter` tests an exact lookup field matches through the lookup hashes. Test: `ScenarioRunnerTests`. The
+grant whose `filter` tests an exact lookup field matches through the lookup hashes. Test: `ScenarioRunnerTests`. A data source `filter` and a measure's `filter` that test an exact lookup field match the same
+way, in the rows, the export and the id read of the trigger fan-out. Test: `ExactLookupFilterTests`. The
 trigger and starter reads do not use it yet _(planned for
 M27)_: a data change trigger, an event trigger start, a task escalation, or an inbound endpoint's start condition
 that reads a record holding a stored sensitive value fails. Activation's inline recompute of computed fields and the worker's

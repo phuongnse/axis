@@ -28,7 +28,10 @@ namespace Axis.Expressions.Sql;
 /// in either order and with a literal other than <c>null</c>, over a field the callback gives a lookup column for,
 /// compare that column with a <c>bytea[]</c> parameter <c>@fl0</c>, <c>@fl1</c>, … (the parameter prefix and <c>l</c>) instead of the field. The literal
 /// is not a parameter then, it is reported in <see cref="SqlTranslationResult.Lookups"/> for the caller to hash.
-/// <c>==</c> is never null, and <c>!=</c> also holds for an empty field, as <c>IS DISTINCT FROM</c> does.
+/// The other side may also be a bare name that is not a lookup field: the caller's <c>column</c> callback renders it, as the
+/// SQL of a data source parameter, and the lookup reports its name in <see cref="SqlLookup.Parameter"/> for the caller to hash the
+/// parameter's value. A <c>NULL</c> parameter then makes <c>==</c> match an empty field. <c>==</c> is never null,
+/// and <c>!=</c> also holds for an empty field, as <c>IS DISTINCT FROM</c> does.
 /// </summary>
 public static class SqlTranslator
 {
@@ -222,9 +225,11 @@ public static class SqlTranslator
         }
 
         /// <summary>
-        /// The exact lookup form of <c>field == literal</c> or <c>field != literal</c>, or null when
-        /// <paramref name="binary"/> is not one the callback gives a lookup column for. Neither form is ever
-        /// SQL <c>NULL</c>, so both keep the meaning of <c>IS NOT DISTINCT FROM</c> and <c>IS DISTINCT FROM</c>, also under <c>NOT</c>.
+        /// The exact lookup form of <c>field == value</c> or <c>field != value</c>, in either order, or null when
+        /// <paramref name="binary"/> is not one the callback gives a lookup column for. The value is a literal or a
+        /// bare name that is not a lookup field, which the caller's column callback renders as a data source parameter.
+        /// Neither form is ever SQL <c>NULL</c>, so both keep the meaning of <c>IS NOT DISTINCT FROM</c> and
+        /// <c>IS DISTINCT FROM</c>, also under <c>NOT</c>. Against a name, a <c>NULL</c> value matches an empty field.
         /// </summary>
         private string? Lookup(BinaryNode binary)
         {
@@ -236,23 +241,42 @@ public static class SqlTranslator
                 return null;
             }
 
-            var (field, literal) = binary.Left is NameNode ? (binary.Left, binary.Right) : (binary.Right, binary.Left);
-            if (field is not NameNode name || LiteralValue(literal) is not var (kind, value))
+            return LookupOf(binary.Left, binary.Right, binary.Operator) ?? LookupOf(binary.Right, binary.Left, binary.Operator);
+        }
+
+        /// <summary>The lookup form of the test of <paramref name="field"/> against <paramref name="value"/>, or null when it is not one.</summary>
+        private string? LookupOf(ExpressionNode field, ExpressionNode value, BinaryOperator op)
+        {
+            if (field is not NameNode name)
             {
                 return null;
             }
 
             IReadOnlyList<string> path = [name.Name];
-            if (lookupColumn(path) is not { } sql)
+            if (lookupColumn!(path) is not { } sql)
             {
                 return null;
             }
 
             var parameter = parameterPrefix + "l" + lookups.Count.ToString(CultureInfo.InvariantCulture);
-            lookups.Add(new SqlLookup(parameter, path, kind, value));
-            return binary.Operator == BinaryOperator.Equal
-                ? $"({sql} IS NOT NULL AND {sql} = ANY(@{parameter}))"
-                : $"({sql} IS NULL OR NOT ({sql} = ANY(@{parameter})))";
+            if (LiteralValue(value) is var (kind, literal))
+            {
+                lookups.Add(new SqlLookup(parameter, path, kind, literal));
+                return op == BinaryOperator.Equal
+                    ? $"({sql} IS NOT NULL AND {sql} = ANY(@{parameter}))"
+                    : $"({sql} IS NULL OR NOT ({sql} = ANY(@{parameter})))";
+            }
+
+            // A name that is itself a lookup field is not a data source parameter.
+            if (value is not NameNode valueName || lookupColumn([valueName.Name]) is not null)
+            {
+                return null;
+            }
+
+            var given = Name(valueName);
+            lookups.Add(new SqlLookup(parameter, path, default, null) { Parameter = valueName.Name });
+            var equal = $"(({given} IS NULL AND {sql} IS NULL) OR ({given} IS NOT NULL AND {sql} IS NOT NULL AND {sql} = ANY(@{parameter})))";
+            return op == BinaryOperator.Equal ? equal : $"(NOT {equal})";
         }
 
         private static (ExpressionTypeKind Kind, object Value)? LiteralValue(ExpressionNode node) => node switch

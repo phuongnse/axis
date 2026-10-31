@@ -17,7 +17,10 @@ namespace Axis.Data.DataSources;
 /// of both the count and the page statement, with the body of each rule it calls inlined. Its
 /// literals are <c>@f0</c>, <c>@f1</c>, … and the data source parameters are <c>@p0</c>,
 /// <c>@p1</c>, … in declaration order. The filter of measure <c>i</c> has its own literals,
-/// <c>@m{i}_0</c>, <c>@m{i}_1</c>, …. A group that buckets a date-time reads the application time
+/// <c>@m{i}_0</c>, <c>@m{i}_1</c>, …. A test of an exact lookup field with <c>==</c> or <c>!=</c>, in the filter or
+/// in a measure filter, compares the field's lookup column with a <c>bytea[]</c> parameter, <c>@fl{n}</c> or <c>@m{i}_l{n}</c>, that holds the
+/// hashes of the literal or the parameter's value under every lookup key of the tenant, so it needs the tenant's
+/// <see cref="RecordCipher"/>. A group that buckets a date-time reads the application time
 /// zone from the text parameter <c>@tz</c>, which only the count and page statements of such a data
 /// source carry. Each distinct path
 /// through reference fields, from the projection, the labels, the sort or the filter, is one left
@@ -97,6 +100,7 @@ public static class DataSourceQueries
 
         var searching = !string.IsNullOrEmpty(search) && dataSource.SearchFields.Count > 0;
         var statement = Statement(application, dataSource, sort, condition, searching);
+        var lookups = await LookupsAsync(application, dataSource, statement, parameters, cipher, cancellationToken);
         try
         {
             long? totalCount = null;
@@ -110,6 +114,7 @@ public static class DataSourceQueries
                 await using var count = new NpgsqlCommand(statement.CountSql, connection);
                 AddValues(count, statement.Values);
                 AddParameters(count, parameters);
+                AddLookups(count, lookups);
                 AddTimeZone(count, statement);
                 condition?.AddTo(count);
                 if (searching)
@@ -133,6 +138,7 @@ public static class DataSourceQueries
             await using var command = new NpgsqlCommand(statement.PageSql, connection);
             AddValues(command, statement.Values);
             AddParameters(command, parameters);
+            AddLookups(command, lookups);
             AddTimeZone(command, statement);
             condition?.AddTo(command);
             if (searching)
@@ -202,9 +208,11 @@ public static class DataSourceQueries
 
         var searching = !string.IsNullOrEmpty(search) && dataSource.SearchFields.Count > 0;
         var statement = Statement(application, dataSource, sort, condition, searching);
+        var lookups = await LookupsAsync(application, dataSource, statement, parameters, cipher, cancellationToken);
         await using var command = new NpgsqlCommand(statement.PageSql, connection);
         AddValues(command, statement.Values);
         AddParameters(command, parameters);
+        AddLookups(command, lookups);
         AddTimeZone(command, statement);
         condition?.AddTo(command);
         if (searching)
@@ -228,8 +236,10 @@ public static class DataSourceQueries
     /// reads by id and not by page, so rows added or removed between two calls never shift it, and
     /// it does not count. <paramref name="parameters"/> holds one value per declared parameter, in
     /// declaration order. Returns <see langword="null"/> when the database rejects the filter with
-    /// a data exception (SQLSTATE class 22). Any other database error is thrown.
+    /// a data exception (SQLSTATE class 22). Any other database error is thrown. A test of an exact
+    /// lookup field in the filter is hashed with <paramref name="cipher"/>, which it needs.
     /// </summary>
+    /// <exception cref="InvalidOperationException">The filter tests an exact lookup field and <paramref name="cipher"/> is null.</exception>
     public static async Task<IReadOnlyList<Guid>?> ListIdsAfterAsync(
         NpgsqlConnection connection,
         ApplicationModel application,
@@ -237,6 +247,7 @@ public static class DataSourceQueries
         IReadOnlyList<DataSourceParameterValue> parameters,
         Guid? after,
         int limit,
+        RecordCipher? cipher,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(connection);
@@ -248,11 +259,13 @@ public static class DataSourceQueries
         var id = $"{EntityNaming.Quote(RowAlias)}.{EntityNaming.Quote(EntityNaming.IdColumn)}";
         var cursor = after is null ? null : new RecordCondition($"({id} > @after)", [], [], "");
         var statement = Statement(application, dataSource, sort: null, cursor);
+        var lookups = await LookupsAsync(application, dataSource, statement, parameters, cipher, cancellationToken);
         try
         {
             await using var command = new NpgsqlCommand($"SELECT {id} FROM {statement.From} ORDER BY {id} ASC LIMIT @limit", connection);
             AddValues(command, statement.Values);
             AddParameters(command, parameters);
+            AddLookups(command, lookups);
             if (after is { } last)
             {
                 command.Parameters.Add(new NpgsqlParameter("after", NpgsqlDbType.Uuid) { Value = last });
@@ -283,7 +296,8 @@ public static class DataSourceQueries
     /// over the root row before any grouping. When <paramref name="search"/> is set, they also hold
     /// one term per search field, joined with <c>OR</c>, that matches <c>@search</c>. Neither holds a
     /// value from a filter, a parameter, the condition or the search: each is a parameter that the caller adds.
-    /// The count statement names no measure filter, so it ignores their values.
+    /// The count statement names no measure filter, so it ignores their values. The statement also lists the
+    /// exact lookup tests of the filter and then of each measure filter, whose <c>bytea[]</c> parameters the caller binds.
     /// </summary>
     internal static DataSourceStatement Statement(
         ApplicationModel application, DataSourceModel dataSource, DataSourceSort? sort, RecordCondition? condition, bool search = false)
@@ -293,6 +307,7 @@ public static class DataSourceQueries
         var joins = new Joins();
         string select, groupBy, order;
         var measureValues = new List<SqlValue>();
+        var lookups = new List<SqlLookup>();
         if (dataSource.Aggregate is { } aggregate)
         {
             // Keyed by measure name, which is unique in a data source.
@@ -301,9 +316,10 @@ public static class DataSourceQueries
             {
                 if (aggregate.Measures[index].Filter is { } measureFilter)
                 {
-                    var (sql, values) = Translate(application, dataSource, measureFilter, joins, $"m{index}_");
+                    var (sql, values, measureLookups) = Translate(application, dataSource, measureFilter, joins, $"m{index}_");
                     measureFilters.Add(aggregate.Measures[index].Name, sql);
                     measureValues.AddRange(values);
+                    lookups.AddRange(measureLookups);
                 }
             }
 
@@ -321,9 +337,10 @@ public static class DataSourceQueries
             order = sort is null ? $"{id} ASC" : $"{OrderTerm(sort, joins, null)}, {id} ASC";
         }
 
-        var (filter, filterValues) = dataSource.Filter is { } dataSourceFilter
+        var (filter, filterValues, filterLookups) = dataSource.Filter is { } dataSourceFilter
             ? Translate(application, dataSource, dataSourceFilter, joins, "f")
-            : (null, []);
+            : (null, [], []);
+        lookups.InsertRange(0, filterLookups);
 
         // The search joins its paths here, before the joins are read below.
         var searched = search
@@ -345,7 +362,7 @@ public static class DataSourceQueries
         var timeZoneId = dataSource.Aggregate is { } bucketed && bucketed.GroupBy.Any(field => field.Bucket is not null && field.Field.Type == FieldType.DateTime)
             ? application.TimeZone.Id
             : null;
-        return new DataSourceStatement(countSql, pageSql, [.. filterValues, .. measureValues], from, timeZoneId);
+        return new DataSourceStatement(countSql, pageSql, [.. filterValues, .. measureValues], from, timeZoneId) { Lookups = lookups };
     }
 
     /// <summary>
@@ -355,7 +372,7 @@ public static class DataSourceQueries
     /// column of a joined target. The names inside <c>any</c> and <c>count</c> are columns of the child
     /// row or the linked record, and a path there is a scalar subquery.
     /// </summary>
-    private static (string Sql, IReadOnlyList<SqlValue> Values) Translate(
+    private static (string Sql, IReadOnlyList<SqlValue> Values, IReadOnlyList<SqlLookup> Lookups) Translate(
         ApplicationModel application, DataSourceModel dataSource, ExpressionModel filter, Joins joins, string prefix)
     {
         var aliases = new AliasCounter();
@@ -386,13 +403,19 @@ public static class DataSourceQueries
                 root,
                 list,
                 $"{EntityNaming.Quote(RowAlias)}.{EntityNaming.Quote(EntityNaming.IdColumn)}",
-                aliases));
+                aliases),
+            lookupColumn: names => names is [var name]
+                && ParameterIndex(dataSource, name) < 0
+                && root.TryGetField(name, out var field)
+                && field.ExactLookup
+                    ? $"{EntityNaming.Quote(RowAlias)}.{EntityNaming.Quote(EntityNaming.LookupColumn(field.Name))}"
+                    : null);
         if (!translated.Succeeded)
         {
             throw new InvalidOperationException($"The compiler let through a filter outside the SQL subset: {translated.Diagnostic.Message}");
         }
 
-        return (translated.Sql, translated.Parameters);
+        return (translated.Sql, translated.Parameters, translated.Lookups);
     }
 
     /// <summary>
@@ -546,6 +569,79 @@ public static class DataSourceQueries
     }
 
     private static string ParameterName(int index) => $"p{index}";
+
+    /// <summary>The declaration index of the parameter <paramref name="name"/> of <paramref name="dataSource"/>, ignoring letter case, or -1.</summary>
+    private static int ParameterIndex(DataSourceModel dataSource, string name)
+    {
+        for (var index = 0; index < dataSource.Parameters.Count; index++)
+        {
+            if (string.Equals(dataSource.Parameters[index].Name, name, StringComparison.OrdinalIgnoreCase))
+            {
+                return index;
+            }
+        }
+
+        return -1;
+    }
+
+    /// <summary>
+    /// The hashes of each exact lookup test of <paramref name="statement"/> under every lookup key of the
+    /// tenant. A test against a literal hashes the literal. A test against a parameter hashes the
+    /// parameter's value, or has no hashes when the parameter was not given, and its SQL then decides on
+    /// <c>@pN IS NULL</c>.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">The statement tests an exact lookup field and <paramref name="cipher"/> is null.</exception>
+    private static async Task<IReadOnlyList<(string Name, byte[][] Hashes)>> LookupsAsync(
+        ApplicationModel application,
+        DataSourceModel dataSource,
+        DataSourceStatement statement,
+        IReadOnlyList<DataSourceParameterValue> parameters,
+        RecordCipher? cipher,
+        CancellationToken cancellationToken)
+    {
+        if (statement.Lookups.Count == 0)
+        {
+            return [];
+        }
+
+        var root = application.FindEntity(dataSource.Entity.Id)
+            ?? throw new InvalidOperationException($"The data source '{dataSource.Name}' names an entity that is not in the application.");
+        var hashes = new List<(string, byte[][])>(statement.Lookups.Count);
+        foreach (var lookup in statement.Lookups)
+        {
+            if (cipher is null)
+            {
+                throw new InvalidOperationException("A filter on an exact lookup field needs the tenant's lookup keys.");
+            }
+
+            object? value = lookup.Value;
+            if (lookup.Parameter is { } name)
+            {
+                var index = ParameterIndex(dataSource, name);
+                if (index < 0 || index >= parameters.Count)
+                {
+                    throw new InvalidOperationException($"The compiler let through an exact lookup filter on the name '{name}', which is not a parameter of the data source '{dataSource.Name}'.");
+                }
+
+                value = parameters[index].Value;
+            }
+
+            hashes.Add((
+                lookup.Name,
+                value is null ? [] : await RecordFilters.LookupHashesAsync(root, lookup.Path[0], value, cipher, cancellationToken)));
+        }
+
+        return hashes;
+    }
+
+    /// <summary>Adds each lookup's hashes as a <c>bytea[]</c> parameter, as <see cref="RecordCondition"/> does.</summary>
+    private static void AddLookups(NpgsqlCommand command, IReadOnlyList<(string Name, byte[][] Hashes)> lookups)
+    {
+        foreach (var (name, hashes) in lookups)
+        {
+            command.Parameters.Add(new NpgsqlParameter(name, NpgsqlDbType.Array | NpgsqlDbType.Bytea) { Value = hashes });
+        }
+    }
 
     /// <summary>
     /// The root id, then every projected field in projection order, decimals as text so no digit is
@@ -806,4 +902,11 @@ public static class DataSourceQueries
 /// when neither names it.
 /// </summary>
 internal sealed record DataSourceStatement(
-    string CountSql, string PageSql, IReadOnlyList<SqlValue> Values, string From, string? TimeZoneId = null);
+    string CountSql, string PageSql, IReadOnlyList<SqlValue> Values, string From, string? TimeZoneId = null)
+{
+    /// <summary>
+    /// The exact lookup tests of the data source filter and then of each measure filter. The caller hashes
+    /// each test's value and binds the <c>bytea[]</c> parameter that its <see cref="SqlLookup.Name"/> names.
+    /// </summary>
+    public IReadOnlyList<SqlLookup> Lookups { get; init; } = [];
+}

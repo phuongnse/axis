@@ -4,9 +4,10 @@ using Axis.Configuration.Diagnostics;
 namespace Axis.Configuration.Tests;
 
 /// <summary>
-/// A policy grant's filter may test an exact lookup field with <c>==</c> or <c>!=</c> against a
-/// literal, because Axis runs that test against the stored lookup hashes. Every other filter use of
-/// a sensitive field stays <see cref="DiagnosticCodes.SensitiveFieldUse"/>.
+/// A policy grant's filter, a data source's filter and a measure's filter may test an exact lookup
+/// field with <c>==</c> or <c>!=</c> against a literal, and the data source's filters also against a
+/// data source parameter, because Axis runs that test against the stored lookup hashes. Every other
+/// filter use of a sensitive field stays <see cref="DiagnosticCodes.SensitiveFieldUse"/>.
 /// </summary>
 public sealed class ExactLookupFilterCompilerTests
 {
@@ -76,19 +77,78 @@ public sealed class ExactLookupFilterCompilerTests
         Assert.Equal(("policies/people.json", "/grants/0/filter"), (diagnostic.File, diagnostic.Path));
     }
 
-    [Fact]
-    public void A_data_source_filter_on_an_exact_lookup_field_is_still_refused()
+    [Theory]
+    [InlineData("nationalId == id")]
+    [InlineData("id == nationalId")]
+    [InlineData("nationalId != id")]
+    [InlineData("nationalId == 'x'")]
+    [InlineData("level == n")]
+    [InlineData("nationalId == id and name == 'y'")]
+    public void An_exact_lookup_equality_in_a_data_source_filter_compiles(string filter)
     {
-        using var folder = PolicyFolder("name == 'x'")
-            .With("data-sources/people.json", $$"""
-                { "id": "{{DataSourceId}}", "kind": "dataSource", "name": "People", "formatVersion": 1, "entity": "Person",
-                  "fields": [{ "name": "name", "path": "name" }], "filter": "nationalId == 'x'" }
-                """);
+        using var folder = DataSourceFolder(filter);
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+    }
+
+    [Theory]
+    [InlineData("level > 1")]
+    [InlineData("nationalId == name")]
+    [InlineData("bornOn == d")]
+    [InlineData("nationalId == null")]
+    [InlineData("nationalId == nationalId")]
+    [InlineData("length(nationalId) == 1")]
+    [InlineData("nationalId == id or nationalId is null")]
+    [InlineData("secret == id")]
+    public void Every_other_data_source_filter_use_of_an_exact_lookup_field_is_refused(string filter)
+    {
+        using var folder = DataSourceFolder(filter);
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
         var diagnostic = Assert.Single(result.Diagnostics, candidate => candidate.Code == DiagnosticCodes.SensitiveFieldUse);
         Assert.Equal(("data-sources/people.json", "/filter"), (diagnostic.File, diagnostic.Path));
+        Assert.Null(result.Model);
+    }
+
+    [Theory]
+    [InlineData("nationalId == 'x'", null)]
+    [InlineData("nationalId != id", null)]
+    [InlineData("nationalId == name", DiagnosticCodes.SensitiveFieldUse)]
+    [InlineData("nationalId is not null", DiagnosticCodes.SensitiveFieldUse)]
+    public void A_measure_filter_may_test_an_exact_lookup_field_in_the_same_way(string filter, string? code)
+    {
+        using var folder = DataSourceFolder(
+            null,
+            $$"""{ "groupBy": ["name"], "measures": [{ "name": "people", "function": "count", "filter": "{{filter}}" }] }""");
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        if (code is null)
+        {
+            Assert.Empty(result.Diagnostics);
+            Assert.NotNull(result.Model);
+            return;
+        }
+
+        var diagnostic = Assert.Single(result.Diagnostics, candidate => candidate.Code == code);
+        Assert.Equal(("data-sources/people.json", "/aggregate/measures/0/filter"), (diagnostic.File, diagnostic.Path));
+    }
+
+    private static TemporaryFolder DataSourceFolder(string? filter, string? aggregate = null)
+    {
+        var filterMember = filter is null ? "" : ", \"filter\": \"" + filter + "\"";
+        var aggregateMember = aggregate is null ? "" : ", \"aggregate\": " + aggregate;
+        return PolicyFolder("name == 'x'")
+            .With("data-sources/people.json", $$"""
+                { "id": "{{DataSourceId}}", "kind": "dataSource", "name": "People", "formatVersion": 1, "entity": "Person",
+                  "fields": [{ "name": "name", "path": "name" }],
+                  "parameters": [{ "name": "id", "type": "text" }, { "name": "n", "type": "integer" }, { "name": "d", "type": "date" }]
+                  {{filterMember}}{{aggregateMember}} }
+                """);
     }
 
     private static TemporaryFolder PolicyFolder(string filter) =>
@@ -101,6 +161,7 @@ public sealed class ExactLookupFilterCompilerTests
                     { "name": "nationalId", "type": "text", "sensitive": true, "exactLookup": true },
                     { "name": "secret", "type": "text", "sensitive": true },
                     { "name": "level", "type": "integer", "sensitive": true, "exactLookup": true },
+                    { "name": "bornOn", "type": "date", "sensitive": true, "exactLookup": true },
                     { "name": "children", "type": "child-collection", "target": "Child" }
                   ] }
                 """)

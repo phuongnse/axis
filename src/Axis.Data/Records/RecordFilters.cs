@@ -79,7 +79,13 @@ public static class RecordFilters
 
             foreach (var lookup in translated.Lookups)
             {
-                lookups.Add((lookup.Name, await HashesAsync(entity, lookup, cipher, cancellationToken)));
+                if (lookup.Parameter is not null)
+                {
+                    throw new InvalidOperationException(
+                        $"The compiler let through a policy filter that tests the field '{lookup.Path[0]}' against the name '{lookup.Parameter}'. A policy filter has no parameters.");
+                }
+
+                lookups.Add((lookup.Name, await LookupHashesAsync(entity, lookup.Path[0], lookup.Value!, cipher, cancellationToken)));
             }
 
             conditions.Add($"({translated.Sql})");
@@ -90,28 +96,32 @@ public static class RecordFilters
     }
 
     /// <summary>
-    /// The hashes of the literal of <paramref name="lookup"/> under every lookup key of the tenant. A literal that
-    /// no stored value can equal, such as a fraction for an integer field, has none, so <c>==</c> matches no row.
+    /// The hashes of <paramref name="value"/> for the exact lookup field <paramref name="fieldName"/> of
+    /// <paramref name="entity"/>, under every lookup key of the tenant. A value that no stored value can equal,
+    /// such as a fraction for an integer field, has none, so <c>==</c> matches no row. The value is a literal
+    /// of the filter or the value of a data source parameter, as <see cref="SqlValue"/> and
+    /// <see cref="Axis.Data.DataSources.DataSourceParameterValue"/> give it.
     /// </summary>
-    private static async Task<byte[][]> HashesAsync(EntityModel entity, SqlLookup lookup, RecordCipher? cipher, CancellationToken cancellationToken)
+    /// <exception cref="InvalidOperationException"><paramref name="cipher"/> is null, or the value's type does not fit the field.</exception>
+    internal static async Task<byte[][]> LookupHashesAsync(
+        EntityModel entity, string fieldName, object value, RecordCipher? cipher, CancellationToken cancellationToken)
     {
         if (cipher is null)
         {
             throw new InvalidOperationException("A filter on an exact lookup field needs the tenant's lookup keys.");
         }
 
-        var name = lookup.Path[0];
-        if (!entity.TryGetField(name, out var field) || LookupValue(field, lookup) is not { } value)
+        if (!entity.TryGetField(fieldName, out var field) || LookupValue(field, value) is not { } stored)
         {
             return [];
         }
 
-        return [.. await cipher.Values.LookupAllAsync(cipher.TenantId, entity.Id, new RecordValue(field, value), cancellationToken)];
+        return [.. await cipher.Values.LookupAllAsync(cipher.TenantId, entity.Id, new RecordValue(field, stored), cancellationToken)];
     }
 
-    // The literal in the shape that a write of the field has, so its text form is the one a write hashed.
-    private static object? LookupValue(FieldModel field, SqlLookup lookup) =>
-        (field.Type, lookup.Value) switch
+    // The value in the shape that a write of the field has, so its text form is the one a write hashed.
+    private static object? LookupValue(FieldModel field, object value) =>
+        (field.Type, value) switch
         {
             (FieldType.Text or FieldType.Enum, string text) => text,
             (FieldType.Integer, long number) => number,
@@ -120,7 +130,7 @@ public static class RecordFilters
             (FieldType.Decimal or FieldType.Money, decimal number) => number.ToString(CultureInfo.InvariantCulture),
             (FieldType.Boolean, bool flag) => flag,
             _ => throw new InvalidOperationException(
-                $"The compiler let through an exact lookup filter on the field '{field.Name}' with a {lookup.Kind} literal."),
+                $"The compiler let through an exact lookup filter on the field '{field.Name}' with a {value.GetType().Name} value."),
         };
 
     /// <summary>

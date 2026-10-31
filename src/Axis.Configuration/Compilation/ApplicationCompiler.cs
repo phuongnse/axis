@@ -2342,7 +2342,8 @@ public static partial class ApplicationCompiler
 
                 void CheckDataSourceFilter(string filter, string path)
                 {
-                    var problem = CheckFilter(filter, filterScope, policyFilter: false, entity, findEntity, out var check);
+                    var problem = CheckFilter(
+                        filter, filterScope, policyFilter: false, entity, findEntity, out var check, parameterNames: dataSource.Parameters.Select(p => p.Name).ToList());
                     if (check is not null)
                     {
                         references.AddRuleCalls(dataSource, path, check);
@@ -2506,8 +2507,9 @@ public static partial class ApplicationCompiler
     /// expression, directly or through the rules it calls, is not translated: that rule already has
     /// its own diagnostic, as for a validation. A filter that reads a sensitive field of
     /// <paramref name="entity"/>, or of an entity it reaches, is refused: the stored value is
-    /// encrypted. Only a policy filter may test an exact lookup field of <paramref name="entity"/> with
-    /// <c>==</c> or <c>!=</c> against a literal. <paramref name="check"/> is the type check when it succeeds, and null otherwise.
+    /// encrypted. A filter may test an exact lookup field of <paramref name="entity"/> with
+    /// <c>==</c> or <c>!=</c> against a literal, and against a data source parameter named in
+    /// <paramref name="parameterNames"/>. <paramref name="check"/> is the type check when it succeeds, and null otherwise.
     /// </summary>
     internal static ExpressionDiagnostic? CheckFilter(
         string filter,
@@ -2515,7 +2517,8 @@ public static partial class ApplicationCompiler
         bool policyFilter,
         EntityResource entity,
         Func<string, EntityResource?> findEntity,
-        out ExpressionCheckResult? check)
+        out ExpressionCheckResult? check,
+        IReadOnlyCollection<string>? parameterNames = null)
     {
         check = null;
         var parsed = ExpressionParser.Parse(filter);
@@ -2531,7 +2534,14 @@ public static partial class ApplicationCompiler
         }
 
         check = typeCheck;
-        if (SensitiveReads.Find(parsed.Expression, typeCheck, entity, scope, findEntity, allowExactLookupEquality: policyFilter) is var (readEntity, readField))
+        if (SensitiveReads.Find(
+                parsed.Expression,
+                typeCheck,
+                entity,
+                scope,
+                findEntity,
+                allowExactLookupEquality: true,
+                isParameter: parameterNames is null ? null : name => parameterNames.Contains(name, StringComparer.OrdinalIgnoreCase)) is var (readEntity, readField))
         {
             return new ExpressionDiagnostic(
                 DiagnosticCodes.SensitiveFieldUse,
