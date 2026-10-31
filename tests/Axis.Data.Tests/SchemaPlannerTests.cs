@@ -98,6 +98,28 @@ public sealed class SchemaPlannerTests
     }
 
     [Fact]
+    public void New_sensitive_column_and_sensitive_column_of_a_new_table_are_bytea()
+    {
+        var model = BaseModel();
+        var secret = Field("secret", FieldType.Text) with { Sensitive = true };
+        var changed = ChangeOrder(model, fields => [.. fields, secret]);
+
+        var plan = SchemaPlanner.Plan(changed, Catalog(model, hasRows: true), Models.Records(model));
+
+        Assert.Empty(plan.Diagnostics);
+        Assert.Equal([$"""ALTER TABLE "entities"."{OrderTable}" ADD COLUMN "f_secret" bytea"""], plan.Statements);
+
+        var created = SchemaPlanner.Plan(
+            Application(Entity(_orderId, "Order", "order.json", Field("salary", FieldType.Decimal, precision: 18, scale: 2) with { Sensitive = true })),
+            CatalogSnapshot.Empty,
+            ProvisioningRecords.Empty);
+
+        Assert.Empty(created.Diagnostics);
+        var statement = Assert.Single(created.Statements, text => text.StartsWith("CREATE TABLE", StringComparison.Ordinal));
+        Assert.Contains("\"f_salary\" bytea", statement, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Missing_version_column_on_a_table_with_rows_is_added_before_the_field_changes()
     {
         var model = BaseModel();
@@ -595,6 +617,8 @@ public sealed class SchemaPlannerTests
     [InlineData("existing field made unique", "/fields/4/unique")]
     [InlineData("enum to text", "/fields/3/type")]
     [InlineData("text to enum", "/fields/5/type")]
+    [InlineData("text made sensitive", "/fields/5/type")]
+    [InlineData("integer made sensitive", "/fields/4/type")]
     public void Incompatible_field_change_is_reported_at_the_field_property(string change, string path)
     {
         var model = BaseModel();
@@ -611,6 +635,8 @@ public sealed class SchemaPlannerTests
             "existing field made unique" => ChangeOrderField(model, 4, amount => amount with { Unique = true }),
             "enum to text" => ChangeOrderField(model, 3, status => status with { Type = FieldType.Text, Values = null }),
             "text to enum" => ChangeOrderField(model, 5, note => note with { Type = FieldType.Enum, Values = ["a"] }),
+            "text made sensitive" => ChangeOrderField(model, 5, note => note with { Sensitive = true }),
+            "integer made sensitive" => ChangeOrderField(model, 4, amount => amount with { Sensitive = true }),
             _ => throw new ArgumentOutOfRangeException(nameof(change)),
         };
 
@@ -621,6 +647,37 @@ public sealed class SchemaPlannerTests
             (DiagnosticCodes.IncompatibleFieldChange, "entities/order.json", path, _orderId),
             (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.ResourceId));
         Assert.True(plan.HasErrors);
+        AssertNothingPlanned(plan);
+    }
+
+    [Fact]
+    public void Field_that_stops_being_sensitive_is_reported_at_the_field_type()
+    {
+        var stored = ChangeOrderField(BaseModel(), 5, note => note with { Sensitive = true });
+        var changed = ChangeOrderField(stored, 5, note => note with { Sensitive = false });
+
+        var plan = SchemaPlanner.Plan(changed, Catalog(stored, hasRows: true), Models.Records(stored));
+
+        var diagnostic = Assert.Single(plan.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.IncompatibleFieldChange, "entities/order.json", "/fields/5/type", _orderId),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.ResourceId));
+        AssertNothingPlanned(plan);
+    }
+
+    [Fact]
+    public void Pending_convert_of_a_field_that_becomes_sensitive_plans_nothing_and_is_refused()
+    {
+        var stored = BaseModel();
+        var changed = ChangeOrderField(stored, 5, note => note with { Sensitive = true });
+        var migration = Migration("Order", new MigrationChangeModel(MigrationChangeType.Convert, "note", null, null, "note"));
+
+        var plan = SchemaPlanner.Plan(changed, Catalog(stored, hasRows: true), Models.Records(stored), [migration], StoredIds(stored));
+
+        var diagnostic = Assert.Single(plan.Diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.IncompatibleFieldChange, "entities/order.json", "/fields/5/type", _orderId),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path, diagnostic.ResourceId));
         AssertNothingPlanned(plan);
     }
 

@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text.Json;
+using Axis.Configuration.Diagnostics;
 using Axis.Server.Tests;
 using static Axis.Integration.Tests.TaskApiFixture;
 
@@ -351,51 +352,17 @@ public sealed class ProcessInstanceDetailTests(TaskApiFixture fixture) : IClassF
     }
 
     [Fact]
-    public async Task A_sensitive_field_is_in_the_record_but_the_input_that_maps_it_is_hidden_from_a_user_who_may_read_it()
-    {
-        await fixture.ActivateEditedAsync(TenantB, MarkSensitive("amount"));
-        var subject = await fixture.InsertRequestAsync(TenantB, null, amount: 500m);
-        var instance = await fixture.StartAsync(TenantB, "DepartmentOrder", subject);
-        await fixture.InsertConnectorCallAsync(TenantB, instance, "createOrder", """{"reference":"Sales","amount":500}""");
-
-        using var client = fixture.CreateClient().SignedInAs("ada");
-        using var request = RecordApiFixture.Request($"/api/apps/StepApp/entities/Request/records/{subject:D}", Host(TenantB));
-        using var response = await client.SendAsync(request, CancellationToken);
-        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        using var record = JsonDocument.Parse(await response.Content.ReadAsStringAsync(CancellationToken));
-        Assert.Equal(500, record.RootElement.GetProperty("values").GetProperty("amount").GetDecimal());
-
-        using var body = await GetOkAsync(TenantB, "DepartmentOrder", instance, "ada");
-        var call = Assert.Single(body.RootElement.GetProperty("calls").EnumerateArray());
-        Assert.Equal(JsonValueKind.Null, call.GetProperty("input").ValueKind);
-        Assert.True(call.GetProperty("inputHidden").GetBoolean());
-        Assert.False(call.TryGetProperty("amount", out _));
-    }
-
-    [Fact]
-    public async Task An_instance_pinned_to_a_release_that_marks_a_field_sensitive_keeps_its_input_hidden_after_a_newer_release_drops_the_flag()
-    {
-        var flagged = await fixture.ActivateEditedAsync(TenantB, MarkSensitive("amount"));
-        var subject = await fixture.InsertRequestAsync(TenantB, null, amount: 500m);
-        var instance = await fixture.StartAsync(TenantB, "DepartmentOrder", subject, flagged);
-        await fixture.InsertConnectorCallAsync(TenantB, instance, "createOrder", """{"reference":"Sales","amount":500}""");
-        await fixture.ActivateEditedAsync(TenantB, MarkSensitive("divisor"));
-
-        using var body = await GetOkAsync(TenantB, "DepartmentOrder", instance, "ada");
-
-        var call = Assert.Single(body.RootElement.GetProperty("calls").EnumerateArray());
-        Assert.Equal(JsonValueKind.Null, call.GetProperty("input").ValueKind);
-        Assert.True(call.GetProperty("inputHidden").GetBoolean());
-    }
-
-    [Fact]
-    public async Task Adding_the_sensitive_flag_in_a_new_release_changes_no_table()
+    public async Task Marking_an_existing_field_sensitive_is_refused_and_changes_no_table()
     {
         Assert.True(fixture.Model.TryGetEntity("Request", out var request));
         var before = await fixture.ReadTableAsync(TenantB, request.Id);
 
-        await fixture.ActivateEditedAsync(TenantB, MarkSensitive("amount", "divisor"));
+        var diagnostics = await fixture.TryActivateEditedAsync(TenantB, MarkSensitive("amount"));
 
+        var diagnostic = Assert.Single(diagnostics);
+        Assert.Equal(
+            (DiagnosticCodes.IncompatibleFieldChange, "entities/request.json", "/fields/1/type"),
+            (diagnostic.Code, diagnostic.File, diagnostic.Path));
         var after = await fixture.ReadTableAsync(TenantB, request.Id);
         Assert.Equal(before.Columns, after.Columns);
     }

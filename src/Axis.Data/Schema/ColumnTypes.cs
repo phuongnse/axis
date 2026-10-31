@@ -5,16 +5,19 @@ namespace Axis.Data.Schema;
 
 /// <summary>
 /// The PostgreSQL column type of each field type, spelled as <c>format_type</c> renders it, so a
-/// catalog column matches the expected type by string equality.
+/// catalog column matches the expected type by string equality. The column of a sensitive field is
+/// <c>bytea</c> whatever its type, because it holds ciphertext.
 /// </summary>
 public static class ColumnTypes
 {
     public const string Text = "text";
 
+    public const string Encrypted = "bytea";
+
     private const string VaryingPrefix = "character varying(";
 
     public static string Render(FieldModel field) =>
-        field.Type switch
+        field.Sensitive ? Encrypted : field.Type switch
         {
             FieldType.Text => field.MaxLength is { } maxLength ? $"{VaryingPrefix}{maxLength})" : Text,
             FieldType.Integer => "bigint",

@@ -466,6 +466,14 @@ public static class SchemaPlanner
                 {
                     // Nothing to change.
                 }
+                else if (field.Sensitive || column.Type == ColumnTypes.Encrypted)
+                {
+                    report(
+                        field.Sensitive
+                            ? $"The existing field '{field.Name}' cannot become sensitive: its column holds plain values."
+                            : $"The field '{field.Name}' cannot stop being sensitive: its column holds encrypted values.",
+                        $"{path}/type");
+                }
                 else if (IsTextType(column.Type) && field.Type == FieldType.Text)
                 {
                     if (IsWider(expected, column.Type))

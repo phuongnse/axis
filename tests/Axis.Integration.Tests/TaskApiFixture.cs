@@ -1,3 +1,4 @@
+using Axis.Configuration.Diagnostics;
 using Axis.Configuration.Model;
 using Axis.Configuration.Releases;
 using Axis.Configuration.Storage;
@@ -552,6 +553,24 @@ public sealed class TaskApiFixture : IAsyncLifetime
         int inlineRecomputeLimit = ReleaseActivator.DefaultInlineRecomputeLimit,
         IReadOnlyDictionary<string, string>? added = null)
     {
+        var (releaseId, diagnostics) = await ActivateEditedCoreAsync(tenant, edit, inlineRecomputeLimit, added);
+        Assert.Empty(diagnostics);
+        return releaseId;
+    }
+
+    /// <summary>
+    /// Edits and activates the release as <see cref="ActivateEditedAsync"/> does. Returns the diagnostics
+    /// of the activation instead of asserting that there are none.
+    /// </summary>
+    public async Task<IReadOnlyList<Diagnostic>> TryActivateEditedAsync(string tenant, Func<string, string, string?> edit) =>
+        (await ActivateEditedCoreAsync(tenant, edit, ReleaseActivator.DefaultInlineRecomputeLimit, null)).Diagnostics;
+
+    private async Task<(Guid ReleaseId, IReadOnlyList<Diagnostic> Diagnostics)> ActivateEditedCoreAsync(
+        string tenant,
+        Func<string, string, string?> edit,
+        int inlineRecomputeLimit,
+        IReadOnlyDictionary<string, string>? added)
+    {
         using var folder = new TemporaryFolder();
         foreach (var file in Directory.EnumerateFiles(_appFolder, "*", SearchOption.AllDirectories))
         {
@@ -575,8 +594,7 @@ public sealed class TaskApiFixture : IAsyncLifetime
         Assert.Empty(compiled.Diagnostics);
         var activated = await ReleaseActivator.ActivateAsync(
             compiled, new ActiveReleaseStore(configuration), data, ProcessStepFixture.StepAppBindings(tenant), OpenInstanceCounter.Instance, inlineRecomputeLimit);
-        Assert.Empty(activated.Diagnostics);
-        return compiled.Release!.Id;
+        return (compiled.Release!.Id, activated.Diagnostics);
     }
 
     /// <summary>

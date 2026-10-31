@@ -73,7 +73,12 @@ the record API.
 
 ## Changing the flag
 
-Adding or removing `sensitive` or `exactLookup` is a schema change that activation applies in its transaction, as
+A sensitive field's column is `bytea`, in a new table and in a new column, whatever the field's type. This is built.
+Until the change below is built, the planner refuses to add or remove `sensitive` on a field that already has a column.
+It reports `AXC0016` at `/fields/{i}/type`, even when a `convert` migration covers the field, so plain values are never
+cast into a `bytea` column.
+
+_(planned for M27)_ Adding or removing `sensitive` or `exactLookup` will be a schema change that activation applies in its transaction, as
 [schema planning](storage.md#schema-planning) describes for other changes:
 
 - **Marked `sensitive`.** Activation adds a `bytea` column, writes each row's encrypted value into it, drops the
@@ -107,8 +112,9 @@ Adding or removing `sensitive` or `exactLookup` is a schema change that activati
   write and a key by number for a read, and it never logs a key.
 
 The key store, the settings, `tenant create`, `migrate`, `tenant restore`, the rekey, the refresh and the cipher that
-encrypts and decrypts a sensitive value under the data keys are built. Writing and reading `sensitive` values in records
-with it, and the rotation below, are _(planned for M27)_.
+encrypts and decrypts a sensitive value under the data keys are built, and so is the `bytea` column of a sensitive field.
+Writing and reading `sensitive` values in records with the cipher, and the rotation below, are _(planned for M27)_.
+Until then a write that gives a sensitive field a value fails with a `500`, because nothing encrypts it for the column.
 
 ### Rotating the keys
 
@@ -152,6 +158,7 @@ never a key. The exit codes are those of [output and exit codes](administration.
   The `check` step decrypts only as far as the manifest and the start of `tenant.dump`. The `restore` step decrypts to
   the end of the file, so a chunk that fails to decrypt later fails that step. The entry stays `provisioning`, nothing
   is restored, and a rerun with a good archive finishes the restore.
-- **What the encryption does not do yet.** A `sensitive` value is not encrypted with the tenant keys until the
-  _(planned for M27)_ work that writes them. A value's associated data names the tenant id, so that work has to handle
+- **What the encryption does not do yet.** A `sensitive` field has a `bytea` column, but a value is not encrypted with
+  the tenant keys until the _(planned for M27)_ work that writes them. A write of a value fails until then, and the
+  planner refuses a flag change until the [changing the flag](data-encryption.md#changing-the-flag) migration is built. A value's associated data names the tenant id, so that work has to handle
   a restore under a new id.
