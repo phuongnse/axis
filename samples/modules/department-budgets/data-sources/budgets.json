@@ -1,0 +1,14 @@
+{
+  "id": "74e1db38-87c8-4711-90d2-f022e98aae00",
+  "kind": "dataSource",
+  "name": "Budgets",
+  "formatVersion": 1,
+  "entity": "Budget",
+  "fields": [
+    { "name": "name", "path": "name" },
+    { "name": "department", "path": "department" },
+    { "name": "year", "path": "year" },
+    { "name": "amount", "path": "amount" },
+    { "name": "status", "path": "status" }
+  ]
+}

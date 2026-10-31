@@ -1,0 +1,8 @@
+{
+  "id": "f7e6e78e-2ef4-49f4-9d38-c9db95fc2ba2",
+  "kind": "page",
+  "name": "Budgets",
+  "formatVersion": 1,
+  "title": { "textKey": "department-budgets.pages.budgets.title" },
+  "widgets": [{ "type": "table", "dataSource": "Budgets" }]
+}

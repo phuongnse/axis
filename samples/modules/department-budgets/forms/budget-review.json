@@ -1,0 +1,13 @@
+{
+  "id": "12dffe7c-7ed8-47c0-9ed5-fa9b4251d85e",
+  "kind": "form",
+  "name": "BudgetReview",
+  "formatVersion": 1,
+  "entity": "Budget",
+  "sections": [
+    {
+      "title": { "textKey": "department-budgets.budgetReview.title" },
+      "fields": [{ "field": "name" }, { "field": "department" }, { "field": "year" }, { "field": "amount" }]
+    }
+  ]
+}

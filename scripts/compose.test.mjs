@@ -176,10 +176,12 @@ test('the stack runs from source', { timeout }, async () => {
   }
   assert.match(serverLogs, /AXC0100 in application folder .* for tenant default-preview/, serverLogs)
 
-  // Both images hold the sample module departments, and the server loads it.
+  // Both images hold the sample modules departments and department-budgets, and the server loads them.
   for (const service of ['server', 'worker']) {
-    const module = compose(['exec', '-T', service, 'test', '-f', '/modules/departments/1.1.0/module.json'])
-    assert.equal(module.status, 0, `${service}: ${module.stderr}`)
+    for (const version of ['departments/1.1.0', 'department-budgets/1.0.0']) {
+      const module = compose(['exec', '-T', service, 'test', '-f', `/modules/${version}/module.json`])
+      assert.equal(module.status, 0, `${service} ${version}: ${module.stderr}`)
+    }
   }
   assert.doesNotMatch(compose(['logs', 'server']).stdout, /The module version is not loaded/)
 

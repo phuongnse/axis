@@ -124,9 +124,16 @@ public sealed class StudioStarterTests : IAsyncLifetime
             Assert.True(empty.Contains(diagnostic.GetProperty("path").GetString()!), diagnostic.ToString());
         }
 
-        // The create changes no diagnostic of another resource.
+        // The create changes no diagnostic of another resource. A new locale is the exception: each module
+        // the application pins has no text in it, so application.json reports AXC0210 for each (/modules/0 and /modules/1).
         var others = after.Where(item => item.GetProperty("resourceId").GetString() != id).Select(Describe).Order(StringComparer.Ordinal);
-        Assert.Equal(before.Select(Describe).Order(StringComparer.Ordinal), others);
+        var expected = before.Select(Describe);
+        if (kind == "text")
+        {
+            expected = expected.Concat(["AXC0210|application.json|/modules/0", "AXC0210|application.json|/modules/1"]);
+        }
+
+        Assert.Equal(expected.Order(StringComparer.Ordinal), others);
     }
 
     private static string Describe(JsonElement diagnostic) =>

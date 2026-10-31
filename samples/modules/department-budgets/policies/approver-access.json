@@ -1,0 +1,11 @@
+{
+  "id": "414e4a09-e2f0-4c68-8940-9d47fd28b179",
+  "kind": "policy",
+  "name": "ApproverAccess",
+  "formatVersion": 1,
+  "roles": ["approver"],
+  "grants": [
+    { "entity": "Budget", "actions": ["read", "create", "update"] },
+    { "dataSource": "Budgets", "actions": ["read"] }
+  ]
+}

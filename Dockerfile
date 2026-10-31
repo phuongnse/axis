@@ -2,7 +2,7 @@
 # the last stage, so it is the default target. The worker stage runs the worker host with its health
 # endpoints, the publisher stage runs `axis-admin publisher`, and the purchasing stage runs the purchasing
 # system stub from tests/Axis.PurchasingStub.
-# The images hold the sample module departments in /modules.
+# The images hold the sample modules departments and department-budgets in /modules.
 # For local use: the Development environment and the sample credentials are not for production.
 #
 # The targets axis-server, axis-worker and axis-admin are the production images. They run the
@@ -48,6 +48,7 @@ WORKDIR /app
 COPY --from=build /worker .
 COPY --from=build /src/artifacts/extensions /extensions
 COPY samples/modules/departments/ /modules/departments/1.1.0/
+COPY samples/modules/department-budgets/ /modules/department-budgets/1.0.0/
 USER $APP_UID
 ENTRYPOINT ["dotnet", "Axis.Worker.dll"]
 
@@ -58,6 +59,7 @@ WORKDIR /app
 COPY --from=build /admin .
 COPY --from=build /src/artifacts/extensions /extensions
 COPY samples/modules/departments/ /modules/departments/1.1.0/
+COPY samples/modules/department-budgets/ /modules/department-budgets/1.0.0/
 USER $APP_UID
 ENTRYPOINT ["dotnet", "Axis.Admin.dll"]
 
@@ -139,6 +141,7 @@ WORKDIR /app
 COPY --from=build /app .
 COPY --from=build /src/artifacts/extensions /extensions
 COPY samples/modules/departments/ /modules/departments/1.1.0/
+COPY samples/modules/department-budgets/ /modules/department-budgets/1.0.0/
 COPY samples/ /samples/
 COPY samples/templates/request-approval/ /templates/request-approval/1.0.0/
 USER $APP_UID

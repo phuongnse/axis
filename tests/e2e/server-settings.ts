@@ -148,7 +148,7 @@ export function serverEnv(baseURL: string): Record<string, string> {
     // The sample extension package payment-references, which scripts/build.sh installs. The worker gets
     // the same folder from scripts/e2e.sh.
     Extensions__Path: extensionsPath,
-    // The sample module departments, which scripts/build.sh installs. The worker gets the same folder from
+    // The sample modules departments and department-budgets, which scripts/build.sh installs. The worker gets the same folder from
     // scripts/e2e.sh.
     Modules__Path: modulesPath,
     // The sample templates, which scripts/build.sh installs. Only the server reads them.

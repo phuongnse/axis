@@ -1,4 +1,5 @@
 using Axis.Configuration.Compilation;
+using Axis.Configuration.Model;
 using Axis.Configuration.Releases;
 
 namespace Axis.Configuration.Tests;
@@ -12,12 +13,12 @@ public sealed class SampleApplicationTests
 
         Assert.Empty(result.Diagnostics);
         Assert.NotNull(result.Model);
-        Assert.Equal(["Department", "LineItem", "PurchaseRequest", "Supplier"], result.Model.Entities.Select(entity => entity.Name));
-        Assert.Equal(2, result.Model.Seeds.Count);
+        Assert.Equal(["departments/Department", "department-budgets/Budget", "Department", "LineItem", "PurchaseRequest", "Supplier"], result.Model.Entities.Select(entity => entity.Name));
+        Assert.Equal(3, result.Model.Seeds.Count);
         Assert.Equal("purchasing", Assert.Single(result.Model.Sites).Path);
         Assert.Equal(["en", "vi"], result.Model.Texts.Select(texts => texts.Locale));
-        Assert.Equal("PurchaseRequestApproval", Assert.Single(result.Model.Processes).Name);
-        Assert.Equal("PurchaseRequestReview", Assert.Single(result.Model.Forms).Name);
+        Assert.Single(result.Model.Processes, process => process.Name == "PurchaseRequestApproval");
+        Assert.Single(result.Model.Forms, form => form.Name == "PurchaseRequestReview");
         Assert.Equal(["department-manager", "employee", "finance-reviewer", "operator", "purchasing-system"], result.Model.Roles.Select(role => role.Name));
         Assert.Equal("SubmitPurchaseRequest", Assert.Single(result.Model.Endpoints).Name);
 
@@ -80,7 +81,7 @@ public sealed class SampleApplicationTests
         var result = ApplicationCompiler.Compile(Path.Combine(AppContext.BaseDirectory, "Samples", "purchase-requests"), SamplePackages.Versions, SampleModules.Modules);
 
         Assert.NotNull(result.Model);
-        var process = Assert.Single(result.Model.Processes);
+        var process = Assert.Single(result.Model.Processes, process => process.Name == "PurchaseRequestApproval");
         Assert.NotNull(process.StartCondition);
         Assert.Equal("purchaseRequest.cannotSubmit", process.StartCondition.Message.TextKey);
         foreach (var locale in new[] { "en", "vi" })
@@ -108,5 +109,20 @@ public sealed class SampleApplicationTests
         Assert.NotNull(entityGrant.Filter);
         var dataSourceGrant = Assert.Single(policy.Grants, grant => grant.DataSource is not null);
         Assert.Equal("departments/Departments", dataSourceGrant.DataSource!.Name);
+    }
+
+    [Fact]
+    public void Purchase_request_sample_maps_the_slots_of_the_departments_and_department_budgets_modules_to_department_manager()
+    {
+        var result = ApplicationCompiler.Compile(Path.Combine(AppContext.BaseDirectory, "Samples", "purchase-requests"), SamplePackages.Versions, SampleModules.Modules);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+        Assert.Equal(["department-budgets 1.0.0", "departments 1.1.0"], result.Model.Modules.Select(module => $"{module.Id} {module.Version}").Order());
+        var policy = Assert.Single(result.Model.Policies, policy => policy.Name == "department-budgets/ApproverAccess");
+        Assert.Equal(["department-manager"], policy.Roles);
+        var process = Assert.Single(result.Model.Processes, process => process.Name == "department-budgets/BudgetApproval");
+        var review = Assert.IsType<TaskStepModel>(Assert.Single(process.Steps, step => step.Name == "review"));
+        Assert.Equal("department-manager", review.Assignee.Role);
     }
 }
