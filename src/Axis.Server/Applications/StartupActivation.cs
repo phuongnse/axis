@@ -6,6 +6,7 @@ using Axis.Configuration.Releases;
 using Axis.Core.Telemetry;
 using Axis.Core.Tenancy;
 using Axis.Data;
+using Axis.Data.Records;
 using Axis.Data.Seeding;
 using Axis.Data.Storage;
 using Axis.Processes.Instances;
@@ -45,6 +46,7 @@ internal sealed partial class StartupActivation(
     IServiceScopeFactory scopes,
     IHostEnvironment environment,
     IHttpClientFactory http,
+    SensitiveValues sensitive,
     StartupActivationStatus status,
     ILogger<StartupActivation> logger) : IHostedLifecycleService
 {
@@ -140,7 +142,7 @@ internal sealed partial class StartupActivation(
                 LogActivated(compiled.Model.Manifest.Name, compiled.Release.Id, folder, tenantId);
                 if (compiled.Model.Seeds.Count > 0)
                 {
-                    var seeded = await SeedApplier.ApplyAsync(compiled.Model, compiled.Release.Id, await runtime.GetConnectionAsync(cancellationToken), cancellationToken);
+                    var seeded = await SeedApplier.ApplyAsync(compiled.Model, compiled.Release.Id, await runtime.GetConnectionAsync(cancellationToken), new RecordCipher(sensitive, tenantId), cancellationToken);
                     if (seeded.Diagnostics.Count > 0)
                     {
                         LogDiagnostics(seeded.Diagnostics, folder, tenantId);

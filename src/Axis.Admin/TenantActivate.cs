@@ -2,7 +2,9 @@ using Axis.Configuration.Modules;
 using Axis.Configuration.Packages;
 using Axis.Configuration.Releases;
 using Axis.Data;
+using Axis.Data.Records;
 using Axis.Tenancy;
+using Axis.Tenancy.Keys;
 using Axis.Tenancy.Platform;
 
 namespace Axis.Admin;
@@ -32,6 +34,9 @@ internal sealed class TenantActivate(
     TextWriter error,
     CancellationToken cancellationToken)
 {
+    // The tenants' data keys come from the tenant directory, and the seeds of every tenant share the cache.
+    private readonly SensitiveValues _sensitive = new(new TenantKeys(new DirectoryTenantKeySource(settings.PlatformConnectionString, settings.Cipher)));
+
     public async Task<int> RunAsync()
     {
         var failed = 0;
@@ -59,7 +64,7 @@ internal sealed class TenantActivate(
         }
 
         await using var steps = new TenantDatabaseSteps(settings.Cipher, row, row.DatabaseHost, row.DatabasePort, TenantDatabaseTls.From(settings.PlatformConnectionString), cancellationToken);
-        var run = await new TenantReleaseActivation(inlineRecomputeLimit, output, error, cancellationToken).RunAsync(
+        var run = await new TenantReleaseActivation(inlineRecomputeLimit, _sensitive, output, error, cancellationToken).RunAsync(
             row.Id,
             row.SchemaVersion,
             steps,

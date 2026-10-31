@@ -79,7 +79,9 @@ development or E2E server serves a real application without a separate step.
     is updated by the record update command, and its version grows by one.
     PostgreSQL compares the typed values, so `1.5` equals a stored `1.50`.
     A record that is identical is not written, and its version stays the
-    same. Fields the seed does not declare keep their stored values, and a
+    same. A sensitive value is compared after decrypting it, since each
+    encryption differs. A seed with a sensitive value and no data key for the
+    tenant stops the start and writes nothing. Fields the seed does not declare keep their stored values, and a
     record removed from the seed file stays in the table. A `null` value
     clears the stored field. Only declared values are compared, so a
     computed value alone never causes a write.
