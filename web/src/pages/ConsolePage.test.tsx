@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -8,6 +8,8 @@ import type {
   ConsoleFailedWorkPage,
   ConsoleScheduleList,
   ConsoleTenant,
+  ConsoleWebhookDelivery,
+  ConsoleWebhookDeliveryPage,
 } from '../platform/console'
 import { TextProvider } from '../platform/TextProvider'
 import { PlatformContext, type Platform } from './context'
@@ -47,6 +49,47 @@ const tenant: ConsoleTenant = {
       activatedAt: '2026-10-29T09:00:00Z',
     },
   ],
+}
+
+function delivery(overrides: Partial<ConsoleWebhookDelivery>): ConsoleWebhookDelivery {
+  return {
+    id: 'd1',
+    applicationId: 'a1',
+    application: 'Leave',
+    webhookId: 'w1',
+    webhook: 'LeaveHook',
+    eventId: 'e1',
+    event: 'LeaveApproved',
+    state: 'delivered',
+    attempts: 1,
+    statusCode: 200,
+    createdAt: '2026-10-30T09:00:00Z',
+    deliveredAt: '2026-10-30T09:00:01Z',
+    ...overrides,
+  }
+}
+
+const webhooks = [
+  { id: 'w1', name: 'LeaveHook', applicationId: 'a1', application: 'Leave' },
+  { id: 'w2', name: 'OrderHook', applicationId: 'a2', application: 'Purchasing' },
+]
+
+const leaveDelivery = delivery({})
+const orderDelivery = delivery({
+  id: 'd2',
+  applicationId: 'a2',
+  application: 'Purchasing',
+  webhookId: 'w2',
+  webhook: 'OrderHook',
+  event: 'OrderPlaced',
+  state: 'deadLettered',
+  attempts: 5,
+  statusCode: 503,
+  deliveredAt: null,
+})
+
+function deliveryPage(items: ConsoleWebhookDelivery[]): ConsoleWebhookDeliveryPage {
+  return { items, page: 1, pageSize: 20, totalCount: items.length, webhooks }
 }
 
 function json(body: unknown, status = 200) {
@@ -132,13 +175,14 @@ const schedulesPath = '/api/console/schedules'
 const emptySchedules: ConsoleScheduleList = { items: [] }
 
 /**
- * Answers the dead letter routes with `letters`, the schedules route with `schedules` and every other route with
- * `answer`, and records every request.
+ * Answers the dead letter routes with `letters`, the schedules route with `schedules`, the webhook deliveries route with
+ * `deliveries`, filtered by the `webhook` parameter, and every other route with `answer`, and records every request.
  */
 function stubServer(
   answer: (url: string) => Response,
   letters: () => Response = () => json(emptyDeadLetters),
   schedules: (url: string) => Response = () => json(emptySchedules),
+  deliveries = [leaveDelivery, orderDelivery],
 ) {
   const requests: string[] = []
   const bodies: (string | undefined)[] = []
@@ -147,6 +191,10 @@ function stubServer(
     bodies.push(typeof init?.body === 'string' ? init.body : undefined)
     if (input.startsWith(schedulesPath)) {
       return schedules(input)
+    }
+    if (input.startsWith('/api/console/webhook-deliveries')) {
+      const webhook = new URL(input, 'http://localhost').searchParams.get('webhook')
+      return json(deliveryPage(deliveries.filter((row) => !webhook || row.webhookId === webhook)))
     }
     return input.startsWith(deadLettersPath) ? letters() : answer(input)
   })
@@ -273,6 +321,35 @@ describe('ConsolePage', () => {
     await waitFor(() =>
       expect(failedWorkRequests(fetchMock).at(-1)).toBe('/api/console/failed-work?page=1&pageSize=20&application=a2'),
     )
+  })
+
+  it('lists the webhook deliveries and filters them by webhook', async () => {
+    const fetchMock = stubServer((url) => json(url.startsWith('/api/console/tenant') ? tenant : failedWork))
+    renderPage()
+
+    const view = await screen.findByTestId('console-webhook-deliveries')
+    for (const title of ['Application', 'Webhook', 'Event', 'State', 'Attempts', 'Status code', 'Delivered']) {
+      expect(await within(view).findByRole('columnheader', { name: title })).toBeVisible()
+    }
+    const leave = (await within(view).findByText('LeaveHook')).closest('tr')!
+    expect(within(leave).getByText('Delivered', { selector: '.ant-tag' })).toBeVisible()
+    expect(within(leave).getByText('200')).toBeVisible()
+    const order = within(view).getByText('OrderHook').closest('tr')!
+    expect(within(order).getByText('Dead-lettered')).toBeVisible()
+    expect(within(order).getByText('5')).toBeVisible()
+    expect(within(order).getByText('503')).toBeVisible()
+    expect(within(order).getByText('—')).toBeVisible()
+
+    fireEvent.mouseDown(within(view).getByRole('combobox', { name: 'Webhook' }))
+    fireEvent.click(await screen.findByText('Purchasing / OrderHook'))
+
+    await waitFor(() =>
+      expect(fetchMock.requests.filter((request) => request.includes('webhook-deliveries')).at(-1)).toContain(
+        'webhook=w2',
+      ),
+    )
+    await waitFor(() => expect(within(view).queryByText('LeaveHook')).toBeNull())
+    expect(within(view).getByText('OrderHook')).toBeVisible()
   })
 
   it('lists the dead letters of every application, including one with no process', async () => {
