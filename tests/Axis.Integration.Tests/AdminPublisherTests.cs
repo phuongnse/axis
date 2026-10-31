@@ -101,7 +101,7 @@ public sealed class AdminPublisherTests(PostgreSqlFixture database) : IClassFixt
         Assert.Equal(1, details["number"]!.GetValue<int>());
         Assert.Equal(1L, await ScalarAsync(scenario, ids[0], "SELECT count(*) FROM axis.release_activations"));
         Assert.Equal("author", await ScalarAsync(scenario, ids[0], "SELECT actor FROM axis.release_activations"));
-        Assert.Equal("Author User", await ScalarAsync(scenario, ids[0], "SELECT actor_name FROM axis.release_activations"));
+        Assert.Equal(1L, await ScalarAsync(scenario, ids[0], "SELECT count(*) FROM axis.release_activations WHERE actor = 'author' AND actor_name IS NULL"));
         Assert.Equal(request, await ScalarAsync(scenario, ids[0], "SELECT request_id FROM axis.release_activations"));
         await scenario.AssertNoSecretsAsync();
     }

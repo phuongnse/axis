@@ -62,18 +62,18 @@ public sealed class ReleaseHistoryTests(DataDatabaseFixture database) : IClassFi
     }
 
     [Fact]
-    public async Task A_user_actor_stores_its_name_label_note_and_request()
+    public async Task A_user_actor_stores_its_id_label_note_and_request_and_no_name()
     {
         using var folder = Folder("Sales");
         var compiled = await CompileAsync(folder);
         var requestId = Guid.NewGuid();
-        var actor = ActivationActor.User("author", "Author User", "Spring", "Fixes the title.", requestId);
+        var actor = ActivationActor.User("author", "Spring", "Fixes the title.", requestId);
 
         Assert.Empty((await ActivateAsync(compiled, actor)).Diagnostics);
 
         var row = Assert.Single(await ListAsync());
         Assert.Equal(
-            ("author", "Author User", "Spring", "Fixes the title.", requestId, 1),
+            ("author", null, "Spring", "Fixes the title.", requestId, 1),
             (row.Actor, row.ActorName, row.Label, row.Note, row.RequestId, row.Number));
         Assert.Equal(compiled.Release!.Id, row.ReleaseId);
     }

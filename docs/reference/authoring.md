@@ -727,7 +727,7 @@ A request is shown as `{ id, application, kind, target, status, label, note, req
 | `label` | The optional label of a `publish`, up to 100 characters, or null |
 | `note` | The optional note of a `publish`, up to 2000 characters, or null |
 | `requestedBy` | The requesting user's id |
-| `requestedByName` | The requesting user's display name from their [user profile](notifications.md#user-profiles), else the name stored with the request, else null |
+| `requestedByName` | The requesting user's display name from their [user profile](notifications.md#user-profiles), else the name stored in a request written before M27, else null |
 | `requestedAt` | When the request was stored |
 | `startedAt` | When a publisher first started it, or null while `queued` |
 | `finishedAt` | When it reached `succeeded` or `failed`, or null before |
@@ -885,7 +885,7 @@ newest first.
   a rollback. `actor` is a user id, `startup` or `operator`. A row that a
   migration added for a release that was live before the history existed has
   the actor `unknown`. `actorName` is the actor's name from their [user profile](notifications.md#user-profiles),
-  else the name stored with the activation, else null. `requestId` is null for a startup and for an `axis-admin activate`.
+  else the name stored in an activation written before M27, else null. `requestId` is null for a startup and for an `axis-admin activate`.
 - A release gets its `number` the first time it is activated in the tenant:
   1, 2, 3… per application. Activating it again keeps the number, so the same
   content can have different numbers in two tenants.
