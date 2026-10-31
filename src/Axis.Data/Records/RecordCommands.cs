@@ -47,6 +47,7 @@ public static class RecordCommands
         IReadOnlyList<RecordLinks>? links = null,
         Guid? id = null,
         string? uploader = null,
+        RecordCipher? cipher = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(connection);
@@ -68,6 +69,7 @@ public static class RecordCommands
         }
 
         values = await WithSequenceNumbersAsync(connection, application, entity, values, cancellationToken);
+        values = await RecordCipher.SealAsync(cipher, entity, recordId, values, cancellationToken);
         await using var command = new NpgsqlCommand { Connection = connection };
         command.Parameters.AddWithValue("id", recordId);
         command.Parameters.AddWithValue("release", releaseId);
@@ -87,9 +89,9 @@ public static class RecordCommands
         command.CommandText = WithLabels(
             entity,
             $"INSERT INTO {RecordQueries.Table(entity)} ({string.Join(", ", columns)}) VALUES ({string.Join(", ", placeholders)}) RETURNING *");
-        var result = await WriteAsync(command, entity, cancellationToken)
+        var result = await WriteAsync(command, entity, cipher, cancellationToken)
             ?? throw new InvalidOperationException("The insert returned no row.");
-        return await WriteRowsAsync(connection, application, entity, result, rows, links, replace: false, cancellationToken);
+        return await WriteRowsAsync(connection, application, entity, result, rows, links, replace: false, cipher, cancellationToken);
     }
 
     /// <summary>
@@ -124,6 +126,7 @@ public static class RecordCommands
         IReadOnlyList<RecordRows> rows,
         IReadOnlyList<RecordLinks>? links = null,
         string? uploader = null,
+        RecordCipher? cipher = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(connection);
@@ -143,6 +146,7 @@ public static class RecordCommands
             return refused;
         }
 
+        values = await RecordCipher.SealAsync(cipher, entity, id, values, cancellationToken);
         var table = RecordQueries.Table(entity);
         var idColumn = EntityNaming.Quote(EntityNaming.IdColumn);
         var versionColumn = EntityNaming.Quote(EntityNaming.VersionColumn);
@@ -165,9 +169,9 @@ public static class RecordCommands
         command.CommandText = WithLabels(
             entity,
             $"UPDATE {table} SET {string.Join(", ", assignments)} WHERE {idColumn} = @id AND {versionColumn} = @version RETURNING *");
-        if (await WriteAsync(command, entity, cancellationToken) is { } result)
+        if (await WriteAsync(command, entity, cipher, cancellationToken) is { } result)
         {
-            var written = await WriteRowsAsync(connection, application, entity, result, rows, links, replace: true, cancellationToken);
+            var written = await WriteRowsAsync(connection, application, entity, result, rows, links, replace: true, cipher, cancellationToken);
             if (written.Outcome == RecordWriteOutcome.Written)
             {
                 await MarkReplacedFilesAsync(connection, application, id, values, rows, cancellationToken);
@@ -204,6 +208,7 @@ public static class RecordCommands
         Record stored,
         IReadOnlyList<KeyValuePair<FieldModel, object?>> values,
         DateTimeOffset now,
+        RecordCipher? cipher = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(connection);
@@ -249,7 +254,7 @@ public static class RecordCommands
             return new RecordWriteResult(RecordWriteOutcome.Invalid, Errors: failures);
         }
 
-        return await UpdateAsync(connection, application, entity, releaseId, stored.Id, stored.Version, computed.Values, computed.Rows, cancellationToken: cancellationToken);
+        return await UpdateAsync(connection, application, entity, releaseId, stored.Id, stored.Version, computed.Values, computed.Rows, cipher: cipher, cancellationToken: cancellationToken);
     }
 
     /// <summary>
@@ -276,6 +281,7 @@ public static class RecordCommands
         IReadOnlyList<KeyValuePair<FieldModel, object?>> values,
         string creatorId,
         DateTimeOffset now,
+        RecordCipher? cipher = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(connection);
@@ -340,7 +346,7 @@ public static class RecordCommands
             return new RecordWriteResult(RecordWriteOutcome.Invalid, Errors: failures);
         }
 
-        return await CreateAsync(connection, application, entity, releaseId, computed.Values, computed.Rows, cancellationToken: cancellationToken);
+        return await CreateAsync(connection, application, entity, releaseId, computed.Values, computed.Rows, cipher: cipher, cancellationToken: cancellationToken);
     }
 
     /// <summary>
@@ -447,6 +453,7 @@ public static class RecordCommands
         IReadOnlyList<RecordRows> rows,
         IReadOnlyList<RecordLinks> links,
         bool replace,
+        RecordCipher? cipher,
         CancellationToken cancellationToken)
     {
         if (owner is not { Outcome: RecordWriteOutcome.Written, Record: { } record })
@@ -467,9 +474,11 @@ public static class RecordCommands
 
             for (var position = 0; position < collection.Rows.Count; position++)
             {
-                var values = collection.Rows[position];
+                // The id of the row is made before the insert, because a sensitive value is bound to it.
+                var rowId = Guid.CreateVersion7();
+                var values = await RecordCipher.SealAsync(cipher, collection.Child, rowId, collection.Rows[position], cancellationToken);
                 await using var insert = new NpgsqlCommand { Connection = connection };
-                insert.Parameters.AddWithValue("id", Guid.CreateVersion7());
+                insert.Parameters.AddWithValue("id", rowId);
                 insert.Parameters.AddWithValue("owner", record.Id);
                 insert.Parameters.AddWithValue("position", position);
                 var columns = new List<string>
@@ -505,7 +514,7 @@ public static class RecordCommands
             }
         }
 
-        return owner with { Record = await RecordQueries.WithRowsAsync(connection, application, entity, record, cancellationToken) };
+        return owner with { Record = await RecordQueries.WithRowsAsync(connection, application, entity, record, cipher, cancellationToken) };
     }
 
     /// <summary>
@@ -565,19 +574,26 @@ public static class RecordCommands
     }
 
     /// <summary>Runs the write and reads the returned row; <see langword="null"/> when no row was written.</summary>
-    private static async Task<RecordWriteResult?> WriteAsync(NpgsqlCommand command, EntityModel entity, CancellationToken cancellationToken)
+    private static async Task<RecordWriteResult?> WriteAsync(NpgsqlCommand command, EntityModel entity, RecordCipher? cipher, CancellationToken cancellationToken)
     {
+        var storedValues = new List<(FieldModel Field, byte[] Stored)>();
+        Record record;
         try
         {
             await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-            return await reader.ReadAsync(cancellationToken)
-                ? new RecordWriteResult(RecordWriteOutcome.Written, RecordQueries.ReadRecord(reader, entity))
-                : null;
+            if (!await reader.ReadAsync(cancellationToken))
+            {
+                return null;
+            }
+
+            record = RecordQueries.ReadRecord(reader, entity, storedValues);
         }
         catch (PostgresException exception) when (MapViolation(exception, entity, ValuesPointer) is { } result)
         {
             return result;
         }
+
+        return new RecordWriteResult(RecordWriteOutcome.Written, await RecordCipher.OpenAsync(cipher, entity, record, storedValues, cancellationToken));
     }
 
     /// <summary>
@@ -877,11 +893,23 @@ public static class RecordCommands
 
     /// <summary>
     /// Adds the value as parameter <c>p</c> and its index, typed so that a null binds as a typed
-    /// <c>NULL</c>, and returns its SQL placeholder. A decimal is text cast to <c>numeric</c>.
+    /// <c>NULL</c>, and returns its SQL placeholder. A decimal is text cast to <c>numeric</c>. A sensitive value is
+    /// <c>bytea</c> and must be sealed bytes or null, never a plain value.
     /// </summary>
     internal static string AddValue(NpgsqlCommand command, int index, RecordValue value)
     {
         var name = $"p{index}";
+        if (value.Field.Sensitive)
+        {
+            if (value.Value is not (null or byte[]))
+            {
+                throw new InvalidOperationException(RecordCipher.MissingMessage);
+            }
+
+            command.Parameters.Add(new NpgsqlParameter(name, NpgsqlDbType.Bytea) { Value = value.Value ?? DBNull.Value });
+            return $"@{name}";
+        }
+
         var type = value.Field.Type switch
         {
             FieldType.Text or FieldType.Enum or FieldType.Decimal or FieldType.Money => NpgsqlDbType.Text,

@@ -5,6 +5,7 @@
   "formatVersion": 1,
   "fields": [
     { "name": "file", "type": "file" },
-    { "name": "note", "type": "text" }
+    { "name": "note", "type": "text" },
+    { "name": "secret", "type": "text", "sensitive": true }
   ]
 }

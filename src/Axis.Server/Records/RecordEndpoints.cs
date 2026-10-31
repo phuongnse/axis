@@ -110,6 +110,8 @@ internal static class RecordEndpoints
         HttpRequest request,
         ActiveApplicationResolver resolver,
         TenantDatabase database,
+        SensitiveValues sensitive,
+        ITenantContextAccessor tenants,
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
@@ -155,7 +157,7 @@ internal static class RecordEndpoints
         var condition = read.Filters is { } filters
             ? RecordFilters.Condition(application!, model, Expressions(filters), user.Id)
             : null;
-        if (await RecordQueries.ListAsync(connection, database.ReadTransaction, model, pageNumber, size, order, searched, condition, cancellationToken) is not { } result)
+        if (await RecordQueries.ListAsync(connection, database.ReadTransaction, model, pageNumber, size, order, searched, condition, Cipher(sensitive, tenants), cancellationToken) is not { } result)
         {
             // PostgreSQL cannot fail one branch of an OR, so every filter of the list is named.
             var logger = Logger(loggerFactory);
@@ -183,6 +185,8 @@ internal static class RecordEndpoints
         ActiveApplicationResolver resolver,
         TenantDatabase database,
         ExportSettings export,
+        SensitiveValues sensitive,
+        ITenantContextAccessor tenants,
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
@@ -246,7 +250,7 @@ internal static class RecordEndpoints
                 exportFormat,
                 model.Name,
                 [.. columns.Select(column => new ExportColumn(column.Name, column.Type))],
-                RecordQueries.ReadAllAsync(connection, model, order, searched, condition, export.MaxRows + 1, cancellationToken),
+                RecordQueries.ReadAllAsync(connection, model, order, searched, condition, export.MaxRows + 1, Cipher(sensitive, tenants), cancellationToken),
                 Cells,
                 export.MaxRows,
                 (rows, truncated) => new AuditEntry(
@@ -346,6 +350,8 @@ internal static class RecordEndpoints
         HttpContext httpContext,
         ActiveApplicationResolver resolver,
         TenantDatabase database,
+        SensitiveValues sensitive,
+        ITenantContextAccessor tenants,
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
@@ -384,7 +390,7 @@ internal static class RecordEndpoints
             return RecordNotFound();
         }
 
-        if (await RecordQueries.GetAsync(connection, application!, model, recordId, cancellationToken) is not { } record)
+        if (await RecordQueries.GetAsync(connection, application!, model, recordId, Cipher(sensitive, tenants), cancellationToken) is not { } record)
         {
             return RecordNotFound();
         }
@@ -409,6 +415,8 @@ internal static class RecordEndpoints
         HttpContext httpContext,
         ActiveApplicationResolver resolver,
         TenantDatabase database,
+        SensitiveValues sensitive,
+        ITenantContextAccessor tenants,
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
@@ -449,7 +457,7 @@ internal static class RecordEndpoints
 
         var readable = read.Filters is { } filters
             ? await RecordCommand.MatchAsync(connection, database.ReadTransaction, application!, model, recordId, filters, user.Id, loggerFactory, cancellationToken) is { Found: true, Matched: true }
-            : await RecordQueries.GetAsync(connection, application!, model, recordId, cancellationToken) is not null;
+            : await RecordQueries.GetAsync(connection, application!, model, recordId, Cipher(sensitive, tenants), cancellationToken) is not null;
         if (!readable)
         {
             return RecordNotFound();
@@ -508,6 +516,7 @@ internal static class RecordEndpoints
         ActiveApplicationResolver resolver,
         TenantDatabase database,
         ITenantContextAccessor tenants,
+        SensitiveValues sensitive,
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
@@ -535,6 +544,7 @@ internal static class RecordEndpoints
                 Actor(user, application!),
                 BodyReader(request),
                 form,
+                Cipher(sensitive, tenants),
                 loggerFactory,
                 cancellationToken);
             if (result.Outcome == RecordCommandOutcome.ReleaseChanged)
@@ -562,6 +572,7 @@ internal static class RecordEndpoints
         ActiveApplicationResolver resolver,
         TenantDatabase database,
         ITenantContextAccessor tenants,
+        SensitiveValues sensitive,
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
@@ -597,6 +608,7 @@ internal static class RecordEndpoints
                 Actor(user, application!),
                 BodyReader(request),
                 form,
+                Cipher(sensitive, tenants),
                 loggerFactory,
                 cancellationToken);
             if (result.Outcome == RecordCommandOutcome.ReleaseChanged)
@@ -694,6 +706,9 @@ internal static class RecordEndpoints
             ? (application, model, null, active.ReleaseId)
             : (null, null, NotFound("The application has no entity with this name."), Guid.Empty);
     }
+
+    // Every sensitive value is encrypted under the data keys of the tenant of the request.
+    internal static RecordCipher Cipher(SensitiveValues sensitive, ITenantContextAccessor tenants) => new(sensitive, TenantId(tenants));
 
     private static string TenantId(ITenantContextAccessor tenants) =>
         (tenants.Current ?? throw new InvalidOperationException("No tenant context is set.")).TenantId;

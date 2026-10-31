@@ -106,15 +106,24 @@ _(planned for M27)_ Adding or removing `sensitive` or `exactLookup` will be a sc
   none. `tenant restore` takes them from the archive, with the same numbers, and makes number 1 of each kind for an
   archive that has none.
 - **No key, no write.** A host that finds no key for a tenant refuses to write a sensitive value, with a `500`
-  problem and an error log line that names the tenant. It never writes a sensitive value in clear.
+  problem and an error log line that names the tenant. It never writes a sensitive value in clear. The `500` problem
+  and the log line are built for the record API. The other write paths fail closed, see below.
 - **Refresh.** Each host reads a tenant's keys when it first needs them, and again when a value names a number it
   does not hold. The server and the worker do this through one key service. It gives the newest key of a kind for a
   write and a key by number for a read, and it never logs a key.
 
 The key store, the settings, `tenant create`, `migrate`, `tenant restore`, the rekey, the refresh and the cipher that
 encrypts and decrypts a sensitive value under the data keys are built, and so is the `bytea` column of a sensitive field.
-Writing and reading `sensitive` values in records with the cipher, and the rotation below, are _(planned for M27)_.
-Until then a write that gives a sensitive field a value fails with a `500`, because nothing encrypts it for the column.
+The record API, forms and the detail widget write and read `sensitive` values with the cipher, also in the rows of a child
+collection. A row's value is bound to that row's id, so it reads back only in that row. A stored value copied to another
+record, row or field does not decrypt, and the read is a `500`. When the tenant has no data key, a record API write of a
+sensitive value is a `500` problem, an error log line names the tenant, and no row is stored. Test:
+`RecordSensitiveValueTests`.
+
+Process steps, connector and package calls, imports, seeds and scenarios do not use the cipher yet _(planned for M27)_.
+A write of a sensitive value on those paths fails with a `500`, and a value is never written in clear. A process
+started on an entity that holds a stored sensitive value fails in the worker when it reads the record, until the worker
+uses the cipher. The rotation below is also _(planned for M27)_.
 
 ### Rotating the keys
 
@@ -158,7 +167,8 @@ never a key. The exit codes are those of [output and exit codes](administration.
   The `check` step decrypts only as far as the manifest and the start of `tenant.dump`. The `restore` step decrypts to
   the end of the file, so a chunk that fails to decrypt later fails that step. The entry stays `provisioning`, nothing
   is restored, and a rerun with a good archive finishes the restore.
-- **What the encryption does not do yet.** A `sensitive` field has a `bytea` column, but a value is not encrypted with
-  the tenant keys until the _(planned for M27)_ work that writes them. A write of a value fails until then, and the
+- **What the encryption does not do yet.** A `sensitive` field has a `bytea` column. The record API, forms and the
+  detail widget encrypt and decrypt a value with the tenant keys. A process step, a connector or package call, an
+  import, a seed or a scenario does not yet _(planned for M27)_, and a write of a value there fails. The
   planner refuses a flag change until the [changing the flag](data-encryption.md#changing-the-flag) migration is built. A value's associated data names the tenant id, so that work has to handle
   a restore under a new id.

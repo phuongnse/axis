@@ -1,4 +1,5 @@
 using Axis.Configuration.Model;
+using Axis.Core.Tenancy;
 using Axis.Data.Forms;
 using Axis.Data.Records;
 using Axis.Policy;
@@ -36,6 +37,8 @@ internal static class FormStateEndpoints
         HttpRequest request,
         ActiveApplicationResolver resolver,
         TenantDatabase database,
+        SensitiveValues sensitive,
+        ITenantContextAccessor tenants,
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
@@ -105,7 +108,7 @@ internal static class FormStateEndpoints
                 }
             }
 
-            stored = await RecordQueries.GetAsync(connection, application, entity, recordId, cancellationToken);
+            stored = await RecordQueries.GetAsync(connection, application, entity, recordId, RecordEndpoints.Cipher(sensitive, tenants), cancellationToken);
             if (stored is null)
             {
                 return RecordNotFound();

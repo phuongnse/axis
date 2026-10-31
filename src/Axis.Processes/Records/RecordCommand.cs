@@ -152,6 +152,7 @@ public static class RecordCommand
         RecordActor actor,
         RecordBodyReader readBody,
         string? form,
+        RecordCipher? cipher,
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
@@ -192,7 +193,7 @@ public static class RecordCommand
             }
 
             var now = await RecordQueries.TransactionTimeAsync(connection, cancellationToken);
-            result = await WriteCreateAsync(connection, transaction, tenantId, application, releaseId, model, actor, access, input, formModel, now, loggerFactory, cancellationToken);
+            result = await WriteCreateAsync(connection, transaction, tenantId, application, releaseId, model, actor, access, input, formModel, now, cipher, loggerFactory, cancellationToken);
             if (result.Outcome == RecordCommandOutcome.Written)
             {
                 await transaction.CommitAsync(cancellationToken);
@@ -227,6 +228,7 @@ public static class RecordCommand
         RecordActor actor,
         ReadOnlyMemory<byte> body,
         DateTimeOffset now,
+        RecordCipher? cipher,
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
@@ -245,7 +247,7 @@ public static class RecordCommand
 
         var parse = ParseCreate(application, model, actor, body);
         return parse.Failure
-            ?? await WriteCreateAsync(connection, transaction, tenantId, application, releaseId, model, actor, access, parse.Input!, form: null, now, loggerFactory, cancellationToken);
+            ?? await WriteCreateAsync(connection, transaction, tenantId, application, releaseId, model, actor, access, parse.Input!, form: null, now, cipher, loggerFactory, cancellationToken);
     }
 
     // The write steps of a create after the start lock, in the transaction of the caller, which commits or
@@ -263,6 +265,7 @@ public static class RecordCommand
         RecordInput input,
         FormModel? form,
         DateTimeOffset now,
+        RecordCipher? cipher,
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
@@ -276,7 +279,7 @@ public static class RecordCommand
         }
 
         var computed = prepared.Computed!;
-        var result = await RecordCommands.CreateAsync(connection, application, model, releaseId, computed.Values, computed.Rows, input.Links, uploader: actor.Id, cancellationToken: cancellationToken);
+        var result = await RecordCommands.CreateAsync(connection, application, model, releaseId, computed.Values, computed.Rows, input.Links, uploader: actor.Id, cipher: cipher, cancellationToken: cancellationToken);
         if (result is not { Outcome: RecordWriteOutcome.Written, Record: { } written })
         {
             return WriteResult(result);
@@ -377,6 +380,7 @@ public static class RecordCommand
         RecordActor actor,
         RecordBodyReader readBody,
         string? form,
+        RecordCipher? cipher,
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
@@ -418,7 +422,7 @@ public static class RecordCommand
         Record? stored = null;
         if (model.Validations.Count > 0 || model.HasComputedFields || formModel?.HasRequiredWhen == true)
         {
-            stored = await RecordQueries.GetAsync(connection, application, model, recordId, cancellationToken);
+            stored = await RecordQueries.GetAsync(connection, application, model, recordId, cipher, cancellationToken);
             if (stored is null)
             {
                 return new RecordCommandResult(RecordCommandOutcome.NotFound);
@@ -457,7 +461,7 @@ public static class RecordCommand
                 return Invalid(failures);
             }
 
-            result = await WriteUpdateAsync(connection, transaction, tenantId, application, releaseId, model, recordId, actor, access!, input, computed, loggerFactory, cancellationToken);
+            result = await WriteUpdateAsync(connection, transaction, tenantId, application, releaseId, model, recordId, actor, access!, input, computed, cipher, loggerFactory, cancellationToken);
             if (result.Outcome == RecordCommandOutcome.Written)
             {
                 await transaction.CommitAsync(cancellationToken);
@@ -526,7 +530,7 @@ public static class RecordCommand
         ArgumentNullException.ThrowIfNull(actor);
         ArgumentNullException.ThrowIfNull(loggerFactory);
 
-        return (await PrepareUpdateInTransactionAsync(connection, transaction, application, model, recordId, actor, body, now, loggerFactory, cancellationToken)).Failure;
+        return (await PrepareUpdateInTransactionAsync(connection, transaction, application, model, recordId, actor, body, now, null, loggerFactory, cancellationToken)).Failure;
     }
 
     /// <summary>
@@ -551,6 +555,7 @@ public static class RecordCommand
         RecordActor actor,
         ReadOnlyMemory<byte> body,
         DateTimeOffset now,
+        RecordCipher? cipher,
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
@@ -561,9 +566,9 @@ public static class RecordCommand
         ArgumentNullException.ThrowIfNull(actor);
         ArgumentNullException.ThrowIfNull(loggerFactory);
 
-        var prepared = await PrepareUpdateInTransactionAsync(connection, transaction, application, model, recordId, actor, body, now, loggerFactory, cancellationToken);
+        var prepared = await PrepareUpdateInTransactionAsync(connection, transaction, application, model, recordId, actor, body, now, cipher, loggerFactory, cancellationToken);
         return prepared.Failure
-            ?? await WriteUpdateAsync(connection, transaction, tenantId, application, releaseId, model, recordId, actor, prepared.Access!, prepared.Input!, prepared.Computed!, loggerFactory, cancellationToken);
+            ?? await WriteUpdateAsync(connection, transaction, tenantId, application, releaseId, model, recordId, actor, prepared.Access!, prepared.Input!, prepared.Computed!, cipher, loggerFactory, cancellationToken);
     }
 
     // The checks of an update before storage, in the transaction of the caller: the access, the body, the version,
@@ -577,6 +582,7 @@ public static class RecordCommand
         RecordActor actor,
         ReadOnlyMemory<byte> body,
         DateTimeOffset now,
+        RecordCipher? cipher,
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
@@ -601,7 +607,7 @@ public static class RecordCommand
         Record? stored = null;
         if (model.Validations.Count > 0 || model.HasComputedFields)
         {
-            stored = await RecordQueries.GetAsync(connection, application, model, recordId, cancellationToken);
+            stored = await RecordQueries.GetAsync(connection, application, model, recordId, cipher, cancellationToken);
             if (stored is null)
             {
                 return new UpdatePrepared(null, null, null, new RecordCommandResult(RecordCommandOutcome.NotFound));
@@ -702,6 +708,7 @@ public static class RecordCommand
         RecordAccess access,
         RecordInput input,
         RecordComputeResult computed,
+        RecordCipher? cipher,
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
@@ -711,10 +718,10 @@ public static class RecordCommand
         if (DataChangeTriggerStarts.NeedsPreviousRecord(application, model)
             && await RecordCommands.LockAsync(connection, model, recordId, cancellationToken))
         {
-            before = await RecordQueries.GetAsync(connection, application, model, recordId, cancellationToken);
+            before = await RecordQueries.GetAsync(connection, application, model, recordId, cipher, cancellationToken);
         }
 
-        var result = await RecordCommands.UpdateAsync(connection, application, model, releaseId, recordId, input.Version!.Value, computed.Values, computed.Rows, input.Links, uploader: actor.Id, cancellationToken: cancellationToken);
+        var result = await RecordCommands.UpdateAsync(connection, application, model, releaseId, recordId, input.Version!.Value, computed.Values, computed.Rows, input.Links, uploader: actor.Id, cipher: cipher, cancellationToken: cancellationToken);
         if (result is not { Outcome: RecordWriteOutcome.Written, Record: { } written })
         {
             return WriteResult(result);

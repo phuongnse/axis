@@ -197,6 +197,7 @@ internal sealed partial class RecordImportCommitHandler(
                             actor,
                             columns.Body(resolved),
                             now,
+                            null,
                             loggerFactory,
                             cancellationToken)
                         : await RecordCommand.UpdateInTransactionAsync(
@@ -210,6 +211,7 @@ internal sealed partial class RecordImportCommitHandler(
                             actor,
                             columns.Body(resolved, key!.Index, match.Version),
                             now,
+                            null,
                             loggerFactory,
                             cancellationToken));
                 if (result.Outcome == RecordCommandOutcome.Written)
