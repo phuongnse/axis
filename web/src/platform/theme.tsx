@@ -1,6 +1,7 @@
 import { ConfigProvider } from 'antd'
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { antThemeFor } from './antTheme'
+import { choiceAlignment } from './choiceAlignment'
 import { designTokensFor } from './designTokens'
 import { dialogButtons } from './dialogButtons'
 import { fieldErrors } from './fieldErrors'
@@ -45,6 +46,7 @@ export function ThemeModeProvider({ initialMode, children }: ThemeModeProviderPr
   const value = useMemo(() => ({ mode, choice, choose }), [mode, choice, choose])
   const reducedMotion = useReducedMotion()
   const config = useMemo(() => antThemeFor(mode, undefined, reducedMotion), [mode, reducedMotion])
+  const choices = useMemo(() => choiceAlignment(config), [config])
 
   useEffect(() => {
     document.body.style.backgroundColor = designTokensFor(mode).colour.canvas
@@ -55,7 +57,14 @@ export function ThemeModeProvider({ initialMode, children }: ThemeModeProviderPr
   return (
     <ThemeModeContext.Provider value={value}>
       {/* Proposed: beside a dialog's solid button, Cancel is a text button, as every action beside a solid one. */}
-      <ConfigProvider theme={config} modal={dialogButtons} form={fieldErrors}>
+      {/* Proposed: a checkbox's or radio's box sits on its label's first line, in every form. */}
+      <ConfigProvider
+        theme={config}
+        modal={dialogButtons}
+        form={fieldErrors}
+        checkbox={choices.checkbox}
+        radio={choices.radio}
+      >
         {children}
       </ConfigProvider>
     </ThemeModeContext.Provider>
