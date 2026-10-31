@@ -11,7 +11,7 @@ internal static class EntityIndexes
 {
     /// <summary>
     /// The indexes of <paramref name="entity"/>'s table, in the order they are created: the owner column of a child table,
-    /// each reference column in field order, then each declared index in declaration order, then the trigram index of each text field that is searchable or is the display field.
+    /// each reference column in field order, then each declared index in declaration order, then the trigram index of each text field that is searchable or is the display field, then the index of each exact lookup column.
     /// An index of the same columns has the same name, so a declared index over one reference column merges with the automatic one, and is unique when the declared one is.
     /// </summary>
     public static IReadOnlyList<ExpectedIndex> Expected(EntityModel entity, string table, bool isChild)
@@ -56,6 +56,11 @@ internal static class EntityIndexes
             {
                 indexes.Add(new ExpectedIndex(name, [column], false, null, Trigram: true));
             }
+        }
+
+        foreach (var field in entity.Fields.Where(field => field.ExactLookup && field.HasColumn))
+        {
+            Add([EntityNaming.LookupColumn(field.Name)], false, null);
         }
 
         return indexes;

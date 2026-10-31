@@ -58,6 +58,7 @@ const settingColumns: FieldSetting[] = [
   'creator',
   'searchable',
   'sensitive',
+  'exactLookup',
 ]
 
 function isContent(value: unknown): value is Content {
@@ -544,12 +545,18 @@ function Settings({
     )
   }
 
-  function flag(setting: 'creator' | 'sensitive') {
+  function flag(setting: 'creator' | 'sensitive' | 'exactLookup') {
     return (
       <Checkbox
         aria-label={labelOf(setting)}
         checked={field[setting] === true}
-        onChange={(event) => onChange(`${pointer}/${setting}`, event.target.checked)}
+        // Even a false exactLookup is refused on a field that is not sensitive, so unchecking removes it.
+        onChange={(event) =>
+          onChange(
+            `${pointer}/${setting}`,
+            setting === 'exactLookup' && !event.target.checked ? undefined : event.target.checked,
+          )
+        }
       />
     )
   }
@@ -564,6 +571,7 @@ function Settings({
         return number(setting)
       case 'creator':
       case 'sensitive':
+      case 'exactLookup':
         return flag(setting)
       case 'searchable':
         return (

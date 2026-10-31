@@ -71,4 +71,7 @@ public sealed record FieldDefinition
 
     /// <summary>Whether the field's value is kept out of process inspection, or null when not declared.</summary>
     public bool? Sensitive { get; init; }
+
+    /// <summary>Whether a sensitive field keeps a lookup hash beside its encrypted value, or null when not declared.</summary>
+    public bool? ExactLookup { get; init; }
 }

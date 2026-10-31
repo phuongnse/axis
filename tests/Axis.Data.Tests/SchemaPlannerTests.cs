@@ -120,6 +120,61 @@ public sealed class SchemaPlannerTests
     }
 
     [Fact]
+    public void New_exact_lookup_field_and_exact_lookup_field_of_a_new_table_get_a_lookup_column_and_index()
+    {
+        var model = BaseModel();
+        var secret = Field("secret", FieldType.Text) with { Sensitive = true, ExactLookup = true };
+        var changed = ChangeOrder(model, fields => [.. fields, secret]);
+
+        var plan = SchemaPlanner.Plan(changed, Catalog(model, hasRows: false), Models.Records(model));
+
+        Assert.Empty(plan.Diagnostics);
+        Assert.Equal(
+            [
+                $"""ALTER TABLE "entities"."{OrderTable}" ADD COLUMN "f_secret" bytea""",
+                $"""ALTER TABLE "entities"."{OrderTable}" ADD COLUMN "f_secret_lookup" bytea""",
+                CreateIndex(OrderTable, "f_secret_lookup"),
+            ],
+            plan.Statements);
+
+        var created = SchemaPlanner.Plan(
+            Application(Entity(_orderId, "Order", "order.json", Field("nationalId", FieldType.Text) with { Sensitive = true, ExactLookup = true })),
+            CatalogSnapshot.Empty,
+            ProvisioningRecords.Empty);
+
+        Assert.Empty(created.Diagnostics);
+        var statement = Assert.Single(created.Statements, text => text.StartsWith("CREATE TABLE", StringComparison.Ordinal));
+        Assert.Contains("\"f_nationalid\" bytea, \"f_nationalid_lookup\" bytea", statement, StringComparison.Ordinal);
+        Assert.Contains(CreateIndex(OrderTable, "f_nationalid_lookup"), created.Statements);
+    }
+
+    [Fact]
+    public void Catalog_that_holds_the_lookup_column_and_its_index_plans_nothing()
+    {
+        var stored = ChangeOrder(BaseModel(), fields => [.. fields, Field("secret", FieldType.Text) with { Sensitive = true, ExactLookup = true }]);
+
+        var plan = SchemaPlanner.Plan(stored, Catalog(stored, hasRows: true), Models.Records(stored));
+
+        Assert.Empty(plan.Diagnostics);
+        Assert.Empty(plan.Statements);
+    }
+
+    [Fact]
+    public void Existing_column_cannot_gain_or_lose_an_exact_lookup_yet()
+    {
+        var plain = ChangeOrder(BaseModel(), fields => [.. fields, Field("secret", FieldType.Text) with { Sensitive = true }]);
+        var withLookup = ChangeOrderField(plain, 6, secret => secret with { ExactLookup = true });
+
+        var gained = SchemaPlanner.Plan(withLookup, Catalog(plain, hasRows: true), Models.Records(plain));
+        var lost = SchemaPlanner.Plan(plain, Catalog(withLookup, hasRows: true), Models.Records(withLookup));
+
+        var gain = Assert.Single(gained.Diagnostics);
+        Assert.Equal((DiagnosticCodes.IncompatibleFieldChange, "entities/order.json", "/fields/6/exactLookup"), (gain.Code, gain.File, gain.Path));
+        var loss = Assert.Single(lost.Diagnostics);
+        Assert.Equal((DiagnosticCodes.IncompatibleFieldChange, "entities/order.json", "/fields/6/exactLookup"), (loss.Code, loss.File, loss.Path));
+    }
+
+    [Fact]
     public void Missing_version_column_on_a_table_with_rows_is_added_before_the_field_changes()
     {
         var model = BaseModel();

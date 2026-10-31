@@ -55,6 +55,9 @@ public static partial class ApplicationCompiler
     /// <summary>The precision of a money field that does not set one.</summary>
     public const int MoneyDefaultPrecision = 18;
 
+    /// <summary>The longest name of a field with <c>exactLookup</c>: <c>f_</c>, the name and <c>_lookup</c> must fit PostgreSQL's 63 bytes.</summary>
+    public const int MaxExactLookupFieldNameLength = 54;
+
     /// <summary>The scale of a money field with a <c>currencyField</c> that does not set one.</summary>
     public const int MoneyDefaultScale = 2;
 
@@ -1381,6 +1384,22 @@ public static partial class ApplicationCompiler
     private static void CheckSensitiveFlags(
         EntityResource entity, FieldDefinition field, string path, Action<string, string, string> report)
     {
+        if (field.ExactLookup is not null && field.Sensitive != true)
+        {
+            report(
+                DiagnosticCodes.ExactLookupUse,
+                $"The field '{entity.Name}.{field.Name}' has 'exactLookup' but is not sensitive. Only a sensitive field can have an exact lookup.",
+                $"{path}/exactLookup");
+        }
+
+        if (field.ExactLookup == true && field.Name.Length > MaxExactLookupFieldNameLength)
+        {
+            report(
+                DiagnosticCodes.ExactLookupUse,
+                $"The field '{entity.Name}.{field.Name}' has an exact lookup, but its name is longer than {MaxExactLookupFieldNameLength} characters, so its lookup column name would pass PostgreSQL's 63-byte limit.",
+                $"{path}/exactLookup");
+        }
+
         if (field.Sensitive != true)
         {
             return;
@@ -2692,6 +2711,7 @@ public static partial class ApplicationCompiler
                 ? null
                 : ExpressionModel.Compile(field.Default, defaultScope, ExpressionScopes.TypeOf(field)!),
             Sensitive = field.Sensitive == true,
+            ExactLookup = field.ExactLookup == true,
         };
     }
 

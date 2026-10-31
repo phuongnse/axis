@@ -44,7 +44,11 @@ A sensitive field may declare an exact lookup, so a filter can find a record by 
   with an index. The hash is the lookup key's number, a 4-byte big-endian integer, then the 32-byte HMAC-SHA256 of
   the value's plain text under that key. The HMAC's message starts with the same associated data as the value,
   without the record id, so equal values in two fields hash differently.
-- A write uses the newest lookup key.
+- A write uses the newest lookup key. Every write that encrypts the value stores the hash in the same statement: the
+  record API, child rows, imports, seeds, process steps and the computed recompute. A null value stores `null`. A
+  tenant with no lookup key refuses a value like one with no data key, and nothing is written in clear.
+- The lookup column, its index and the hash on every write are built. The filter on the hash is planned. A name
+  longer than 54 characters is `AXC0309`, because `f_`, the name and `_lookup` must fit PostgreSQL's 63 bytes.
 - A data source filter, a policy grant's `filter` or a caller's filter may test the field with `==` or `!=` against
   a value, and nothing else. Axis hashes the value under every lookup key the tenant holds and matches any of the
   hashes, so a search stays right while a rotation runs.
@@ -111,7 +115,12 @@ A sensitive field's column is `bytea`, in a new table and in a new column, whate
 Test: `SensitiveFlagActivationTests` for the flag change, the rename, a value that does not decrypt and a missing key,
 and `SchemaPlannerTests` for the planned statements.
 
-_(planned for M27)_ Adding or removing `exactLookup` will add the lookup column and fill it, or drop it.
+Adding or removing `exactLookup` on a field that already has a column is `AXC0016` at `/fields/{i}/exactLookup` for
+now. _(Planned for M27: it will add the lookup column and fill it, or drop it.)_ A `dropField` or `renameField` of an
+exact lookup field is refused too until then, because its `_lookup` column looks like a column without a field.
+
+Test: `ExactLookupWriteTests` for the hash a create, an update and a child row store, the newest lookup key and the
+refusal without one, `SensitiveValuesTests` for the hash, and `SchemaPlannerTests` for the lookup column and index.
 
 ## Tenant keys
 

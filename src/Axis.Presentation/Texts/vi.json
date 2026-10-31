@@ -912,6 +912,7 @@
   "shell.studio.entity.sequence": "Dãy số",
   "shell.studio.entity.creator": "Người tạo",
   "shell.studio.entity.sensitive": "Nhạy cảm",
+  "shell.studio.entity.exactLookup": "Tra cứu chính xác",
   "shell.studio.entity.minLength": "Độ dài tối thiểu",
   "shell.studio.entity.min": "Tối thiểu",
   "shell.studio.entity.max": "Tối đa",

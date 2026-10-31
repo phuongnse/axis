@@ -94,6 +94,13 @@ public sealed record FieldModel
     public bool Sensitive { get; init; }
 
     /// <summary>
+    /// Whether the field keeps a lookup hash beside its encrypted value, so a later change can filter
+    /// on an exact match. Only a sensitive field can have it. Activation gives it a <c>_lookup</c>
+    /// column with an index, and every write stores the hash there.
+    /// </summary>
+    public bool ExactLookup { get; init; }
+
+    /// <summary>
     /// Whether the field is stored in a column of its entity's table. A child collection has no
     /// column: its rows live in the child entity's table. A references field has none either: its
     /// links live in a table of their own.

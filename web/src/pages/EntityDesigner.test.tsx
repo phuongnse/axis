@@ -70,6 +70,7 @@ const everySetting = {
   sequence: 'InvoiceNumbers',
   creator: true,
   sensitive: true,
+  exactLookup: true,
   maxSize: 1048576,
   accept: ['application/pdf'],
   currency: 'VND',

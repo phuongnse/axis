@@ -16,6 +16,12 @@ public readonly record struct SensitiveValueScope(string TenantId, Guid EntityId
 /// nonce, the ciphertext and a 16-byte tag. The associated data is the tenant id, the entity id, the record id and the
 /// lower-cased field name, each as UTF-8 bytes followed by one zero byte, so a value moved to another tenant, entity,
 /// record or field does not decrypt. No message holds a value or a key.
+/// <para>
+/// An exact lookup field also keeps a lookup hash beside its encrypted value: the number of the newest lookup key (4 bytes,
+/// big-endian) and the HMAC-SHA256 of the plain text under that key. The message starts with the tenant id, the entity id
+/// and the lower-cased field name, each followed by one zero byte, which is the associated data without the record id.
+/// Equal values of one field then give equal hashes in every record, and equal values of two fields give different ones.
+/// </para>
 /// </summary>
 public sealed class SensitiveValues(TenantKeys keys)
 {
@@ -25,6 +31,9 @@ public sealed class SensitiveValues(TenantKeys keys)
     public const int NonceSize = 12;
 
     public const int TagSize = 16;
+
+    /// <summary>The size of a lookup hash: the key number and the 32-byte HMAC-SHA256.</summary>
+    public const int LookupSize = NumberSize + 32;
 
     /// <summary>
     /// Returns the stored bytes of the value under the newest data key of the tenant, or <see langword="null"/> for a null value.
@@ -65,6 +74,41 @@ public sealed class SensitiveValues(TenantKeys keys)
             stored.AsSpan(NumberSize + NonceSize, plain.Length),
             stored.AsSpan(NumberSize + NonceSize + plain.Length, TagSize),
             AssociatedData(scope, fieldName));
+        return stored;
+    }
+
+    /// <summary>
+    /// Returns the lookup hash of the value under the newest lookup key of the tenant, or <see langword="null"/> for a null value.
+    /// </summary>
+    /// <exception cref="TenantDataKeyMissingException">The tenant has no lookup key.</exception>
+    public async Task<byte[]?> LookupAsync(SensitiveValueScope scope, RecordValue value, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        ArgumentException.ThrowIfNullOrEmpty(scope.TenantId);
+
+        return value.Value is null ? null : await LookupTextAsync(scope.TenantId, scope.EntityId, value.Field.Name, ToText(value), cancellationToken);
+    }
+
+    /// <summary>
+    /// Returns the lookup hash of <paramref name="text"/>, the value as the record API shows it, under the newest lookup key
+    /// of the tenant, for the field <paramref name="fieldName"/> of the entity <paramref name="entityId"/>.
+    /// </summary>
+    /// <exception cref="TenantDataKeyMissingException">The tenant has no lookup key.</exception>
+    public async Task<byte[]> LookupTextAsync(string tenantId, Guid entityId, string fieldName, string text, CancellationToken cancellationToken)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(tenantId);
+        ArgumentException.ThrowIfNullOrEmpty(fieldName);
+        ArgumentNullException.ThrowIfNull(text);
+
+        var key = await keys.NewestAsync(tenantId, TenantKeyKind.Lookup, cancellationToken)
+            ?? throw new TenantDataKeyMissingException(tenantId, TenantKeyKind.Lookup);
+
+        var message = new List<byte>(Parts([tenantId, entityId.ToString("D"), fieldName.ToLowerInvariant()]));
+        message.AddRange(Encoding.UTF8.GetBytes(text));
+
+        var stored = new byte[LookupSize];
+        BinaryPrimitives.WriteInt32BigEndian(stored, key.Number);
+        HMACSHA256.HashData(key.Reveal(), [.. message], stored.AsSpan(NumberSize));
         return stored;
     }
 
@@ -153,9 +197,12 @@ public sealed class SensitiveValues(TenantKeys keys)
             _ => throw new ArgumentOutOfRangeException(nameof(field), field.Type, "A field of this type cannot be sensitive."),
         };
 
-    private static byte[] AssociatedData(SensitiveValueScope scope, string fieldName)
+    private static byte[] AssociatedData(SensitiveValueScope scope, string fieldName) =>
+        Parts([scope.TenantId, scope.EntityId.ToString("D"), scope.RecordId.ToString("D"), fieldName.ToLowerInvariant()]);
+
+    // Each part as UTF-8 bytes followed by one zero byte. The associated data and the start of a lookup message share it.
+    private static byte[] Parts(string[] parts)
     {
-        var parts = new[] { scope.TenantId, scope.EntityId.ToString("D"), scope.RecordId.ToString("D"), fieldName.ToLowerInvariant() };
         var data = new List<byte>();
         foreach (var part in parts)
         {
@@ -167,11 +214,14 @@ public sealed class SensitiveValues(TenantKeys keys)
     }
 }
 
-/// <summary>A tenant has no data key, so a sensitive value cannot be written. It is never written in clear.</summary>
-public sealed class TenantDataKeyMissingException(string tenantId)
-    : InvalidOperationException($"Tenant '{tenantId}' has no data key, so a sensitive value cannot be written.")
+/// <summary>A tenant has no data key, or no lookup key, so a sensitive value cannot be written. It is never written in clear.</summary>
+public sealed class TenantDataKeyMissingException(string tenantId, TenantKeyKind kind = TenantKeyKind.Data)
+    : InvalidOperationException($"Tenant '{tenantId}' has no {(kind == TenantKeyKind.Lookup ? "lookup" : "data")} key, so a sensitive value cannot be written.")
 {
     public string TenantId { get; } = tenantId;
+
+    /// <summary>The kind of the key the tenant lacks.</summary>
+    public TenantKeyKind Kind { get; } = kind;
 }
 
 /// <summary>A stored sensitive value does not decrypt. The message never holds the value or a key.</summary>
