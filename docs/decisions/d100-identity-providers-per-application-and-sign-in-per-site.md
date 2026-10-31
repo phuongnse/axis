@@ -6,7 +6,7 @@ The owner agreed these points on 2026-10-28. They replace the points of
 [D99](d99-axis-ships-its-own-identity-provider.md) that made brokering and accounts settings of the tenant, and its
 direct sign-in point. D99's identity provider, its realm per tenant, its MFA rule and its theme hold.
 [Axis's identity provider](../reference/identity-provider.md) and [user administration](../reference/user-administration.md)
-hold the detail. It is built in M17, except keeping the realm's redirect addresses in step with tenant hosts, which is _(planned for M28)_.
+hold the detail. It is built in M17, and keeping the realm's redirect addresses in step with tenant hosts is built in M28.
 
 - **An `identityProvider` resource:** an application declares how its people sign in, as a resource of the release.
   - Its `type` is `accounts`, for accounts that Axis's identity provider holds, `oidc` or `saml`, for a provider that

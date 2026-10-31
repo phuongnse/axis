@@ -4,7 +4,7 @@ Status: **Agreed**
 
 The owner wants every tenant's people to sign in on one standard Axis page, not on a default Keycloak page or on each
 organization's own, and agreed these points on 2026-10-28. [Axis's identity provider](../reference/identity-provider.md)
-holds the detail. It is built in M17, except keeping the realm's redirect addresses in step with tenant hosts, which is _(planned for M28)_.
+holds the detail. It is built in M17, and keeping the realm's redirect addresses in step with tenant hosts is built in M28.
 
 - **One identity provider in every installation:** Axis ships Keycloak with the Axis theme, and Docker Compose, the
   Helm chart and the on-premises install run it. The server stays the confidential OIDC client of
