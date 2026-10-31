@@ -340,15 +340,14 @@ export const previews: Record<string, readonly PreviewState[]> = {
     },
     { caption: 'Organization sign-in only', draw: () => <IdentitySignIn page="organizationOnly" />, frameHeight: 600 },
     {
-      // Proposed: the language and theme menu below the card, open.
+      // Proposed: the language and theme menu at the card's top right, open.
       caption: 'Language and theme',
       draw: () => (
-        <ClickOnMount selector='button[aria-label="English, Language and theme"]'>
+        <ClickOnMount selector='button[aria-label="Language and theme"]'>
           <IdentitySignIn page="signIn" />
         </ClickOnMount>
       ),
-      // The open menu hangs below the button, so the frame leaves room for it.
-      frameHeight: 920,
+      frameHeight: 600,
     },
     { caption: 'Two-step verification', draw: () => <IdentitySignIn page="twoStep" />, frameHeight: 600 },
     { caption: 'Forgot password', draw: () => <IdentitySignIn page="resetPassword" />, frameHeight: 600 },

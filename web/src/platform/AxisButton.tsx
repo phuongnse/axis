@@ -53,16 +53,15 @@ export function AxisButton(props: AxisButtonProps) {
     const name = t(nameKey)
     const tint: CSSProperties = destructive && !disabled ? { color: colour.dangerText } : {}
     return (
-      <Tooltip title={name} trigger={['hover', 'focus']}>
-        <Button
-          {...rest}
-          type={joined ? 'default' : 'text'}
-          disabled={disabled}
-          aria-label={nameSuffix ? `${name} ${nameSuffix}` : name}
-          icon={<span aria-hidden>{icon}</span>}
-          style={{ ...tint, ...style }}
-        />
-      </Tooltip>
+      <NamedIconButton
+        {...rest}
+        name={name}
+        accessibleName={nameSuffix ? `${name} ${nameSuffix}` : name}
+        joined={joined}
+        disabled={disabled}
+        icon={icon}
+        style={{ ...tint, ...style }}
+      />
     )
   }
 
@@ -105,4 +104,34 @@ export function AxisButton(props: AxisButtonProps) {
     case 'secondary':
       return <Button {...rest} type="default" disabled={disabled} style={style} />
   }
+}
+
+/**
+ * Proposed: the icon button that `AxisButton`'s `icon` role draws, named by a text already in hand rather than a text
+ * key, for a page with no text catalogue such as the identity provider's. The name is its tooltip on hover and on
+ * keyboard focus and its accessible name.
+ */
+export function NamedIconButton({
+  name,
+  accessibleName,
+  joined,
+  icon,
+  ...rest
+}: Omit<Base, 'children' | 'aria-label'> & {
+  name: string
+  /** The accessible name when it adds to the tooltip, such as a row number. */
+  accessibleName?: string
+  joined?: boolean
+  icon: ReactNode
+}) {
+  return (
+    <Tooltip title={name} trigger={['hover', 'focus']}>
+      <Button
+        {...rest}
+        type={joined ? 'default' : 'text'}
+        aria-label={accessibleName ?? name}
+        icon={<span aria-hidden>{icon}</span>}
+      />
+    </Tooltip>
+  )
 }
