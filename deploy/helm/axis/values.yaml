@@ -89,7 +89,7 @@ studio:
 identity:
   # The whole image reference of Keycloak. It is not the image.registry and image.tag of Axis's images.
   # Use the version that development, the tests and the Compose example pin.
-  image: quay.io/keycloak/keycloak:26.4
+  image: quay.io/keycloak/keycloak:26.8
   # Required. The one public host name of the identity provider, without a scheme, such as "id.example.com".
   hostname: ""
   resources: {}

@@ -10,7 +10,9 @@ using Axis.Processes.Instances;
 using Axis.Processes.Records;
 using Axis.Processes.Work;
 using Axis.Server.Tests;
+using Axis.Tenancy.Keys;
 using Microsoft.AspNetCore.Hosting;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Npgsql;
 using static Axis.Integration.Tests.RecordApiFixture;
@@ -730,7 +732,7 @@ public sealed class RecordImportEndpointTests(RecordApiFixture fixture) : IClass
     /// <summary>Claims and runs every dry run the tenant has queued, and returns how many ran.</summary>
     private async Task<int> RunChecksAsync(int maxRows = 10000)
     {
-        var handler = new RecordImportCheckHandler(new ReleaseModelCache(PackageCatalog.Empty), new RecordImportSettings(maxRows), NullLoggerFactory.Instance, NullLogger<RecordImportCheckHandler>.Instance);
+        var handler = new RecordImportCheckHandler(new ReleaseModelCache(PackageCatalog.Empty), new RecordImportSettings(maxRows), new SensitiveValues(new TenantKeys(new ConfigurationTenantKeySource(new ConfigurationBuilder().Build()))), NullLoggerFactory.Instance, NullLogger<RecordImportCheckHandler>.Instance);
         await using var connection = new NpgsqlConnection(fixture.ConnectionString(TenantA));
         await connection.OpenAsync(CancellationToken);
         var ran = 0;
@@ -746,7 +748,7 @@ public sealed class RecordImportEndpointTests(RecordApiFixture fixture) : IClass
     /// <summary>Claims and runs every commit the tenant has queued, and returns how many ran.</summary>
     private async Task<int> RunCommitsAsync()
     {
-        var handler = new RecordImportCommitHandler(new ReleaseModelCache(PackageCatalog.Empty), NullLoggerFactory.Instance, NullLogger<RecordImportCommitHandler>.Instance);
+        var handler = new RecordImportCommitHandler(new ReleaseModelCache(PackageCatalog.Empty), new SensitiveValues(new TenantKeys(new ConfigurationTenantKeySource(new ConfigurationBuilder().Build()))), NullLoggerFactory.Instance, NullLogger<RecordImportCommitHandler>.Instance);
         await using var connection = new NpgsqlConnection(fixture.ConnectionString(TenantA));
         await connection.OpenAsync(CancellationToken);
         var ran = 0;

@@ -33,6 +33,7 @@ namespace Axis.Processes.Records;
 /// </summary>
 internal sealed partial class RecordImportCommitHandler(
     ReleaseModelCache models,
+    SensitiveValues sensitive,
     ILoggerFactory loggerFactory,
     ILogger<RecordImportCommitHandler> logger) : IExternalWorkItemHandler
 {
@@ -162,6 +163,7 @@ internal sealed partial class RecordImportCommitHandler(
         }
 
         var references = RecordImportReferences.Create(application, actor.Roles, columns);
+        var cipher = new RecordCipher(sensitive, item.TenantId);
         await transaction.SaveAsync(RowsSavepoint, cancellationToken);
         var (created, updated) = (0, 0);
         foreach (var row in reader.Rows())
@@ -197,7 +199,7 @@ internal sealed partial class RecordImportCommitHandler(
                             actor,
                             columns.Body(resolved),
                             now,
-                            null,
+                            cipher,
                             loggerFactory,
                             cancellationToken)
                         : await RecordCommand.UpdateInTransactionAsync(
@@ -211,7 +213,7 @@ internal sealed partial class RecordImportCommitHandler(
                             actor,
                             columns.Body(resolved, key!.Index, match.Version),
                             now,
-                            null,
+                            cipher,
                             loggerFactory,
                             cancellationToken));
                 if (result.Outcome == RecordCommandOutcome.Written)

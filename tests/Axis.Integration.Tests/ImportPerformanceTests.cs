@@ -9,6 +9,8 @@ using Axis.Data.Records;
 using Axis.Processes.Instances;
 using Axis.Processes.Records;
 using Axis.Processes.Work;
+using Axis.Tenancy.Keys;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using Npgsql;
 using static Axis.Integration.Tests.PerformanceServerFixture;
@@ -44,8 +46,8 @@ public sealed class ImportPerformanceTests(ImportPerformanceTests.ImportFixture 
     public async Task An_import_of_ten_thousand_rows_with_a_reference_a_sequence_and_a_validation_checks_and_commits_within_the_time_limits_in_one_transaction()
     {
         var models = new ReleaseModelCache(PackageCatalog.Empty);
-        var check = new RecordImportCheckHandler(models, new RecordImportSettings(RowCount), NullLoggerFactory.Instance, NullLogger<RecordImportCheckHandler>.Instance);
-        var commit = new RecordImportCommitHandler(models, NullLoggerFactory.Instance, NullLogger<RecordImportCommitHandler>.Instance);
+        var check = new RecordImportCheckHandler(models, new RecordImportSettings(RowCount), new SensitiveValues(new TenantKeys(new ConfigurationTenantKeySource(new ConfigurationBuilder().Build()))), NullLoggerFactory.Instance, NullLogger<RecordImportCheckHandler>.Instance);
+        var commit = new RecordImportCommitHandler(models, new SensitiveValues(new TenantKeys(new ConfigurationTenantKeySource(new ConfigurationBuilder().Build()))), NullLoggerFactory.Instance, NullLogger<RecordImportCommitHandler>.Instance);
 
         // The first import compiles the model and warms the connections, so the timed steps measure the work.
         var warmUp = await UploadAsync(File("W", WarmUpRowCount));

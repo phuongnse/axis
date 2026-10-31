@@ -28,7 +28,8 @@ them.
     the security checks: the route inventory tests and their shared helper, the fallback
     policy's open list, `scripts/scan-accepted.json`, `scripts/scan.mjs`,
     `scripts/check-docs.mjs`, `scripts/check-raw-html.mjs` and
-    `scripts/check-prototype-pollution.mjs`, and the Trivy accepted list once it exists.
+    `scripts/check-prototype-pollution.mjs`, and the image scan's `scripts/scan-images-accepted.json`,
+    `scripts/scan-images.mjs` and the shared `scripts/lib/accepted-findings.mjs`.
   - The owner adds a rule on `main` that requires a code owner's review. NexKit cannot merge a
     pull request that touches those files: it waits, and the owner approves and merges it.
   - Every other pull request still merges by itself, as

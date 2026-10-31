@@ -1,0 +1,12 @@
+{
+  "SchemaVersion": 2,
+  "ArtifactName": "axis-server:scan",
+  "ArtifactType": "container_image",
+  "Results": [
+    {
+      "Target": "axis-server:scan (debian 12.7)",
+      "Class": "os-pkgs",
+      "Type": "debian"
+    }
+  ]
+}

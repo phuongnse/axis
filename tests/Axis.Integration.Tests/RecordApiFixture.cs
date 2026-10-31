@@ -27,7 +27,8 @@ namespace Axis.Integration.Tests;
 /// RecordsApp fixture application activated, served by the real server on hosts
 /// <c>a.example.test</c> and <c>b.example.test</c>. Tenant A also has the SecondApp and FilesApp fixtures
 /// activated, and a compiled release of an application that was never activated. FilesApp names a
-/// <c>storage</c> binding, <c>Files</c>, which tenant A holds with the value <c>database</c>. The test
+/// <c>storage</c> binding, <c>Files</c>, which tenant A holds with the value <c>database</c>. FilesApp also has
+/// the <c>ImportClaim</c> endpoint, which the <c>importer</c> role may call, and the employee may import and export claims. The test
 /// authentication scheme signs in <c>requester</c>, an employee with every grant of both applications,
 /// and users with fewer grants: <c>manager</c> holds no role, <c>rita</c> is a reader, <c>uma</c>
 /// holds only undeclared role names, <c>fia</c> holds only grants with fields, on items,

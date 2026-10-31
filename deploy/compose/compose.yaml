@@ -111,7 +111,7 @@ services:
   # master realm, with the same secret file that the admin tool reads. Keycloak rebuilds itself at start and
   # writes into its image, so this service has no read-only root file system.
   identity:
-    image: quay.io/keycloak/keycloak:26.4
+    image: quay.io/keycloak/keycloak:26.8
     restart: unless-stopped
     entrypoint: [bash, /opt/axis/identity-entrypoint.sh]
     command: [start]

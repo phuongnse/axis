@@ -647,7 +647,7 @@ The values schema rejects any field in a reference other than `name` and `key`.
 | `server.resources`, `worker.resources`, `migrate.resources` | none | Kubernetes resource requests and limits. |
 | `server.service.type`, `server.service.port` | `ClusterIP`, 443 | The Service of the server. Its port is named `https` and forwards to the server's HTTPS port, 8443. Put your own Ingress in front of it, see [TLS](#tls). |
 | `secrets.serverCertificate` | none, required | Secret `name` of a Kubernetes TLS Secret with `tls.crt` and `tls.key`, for the DNS name of the server Service. It has no `key`. The server serves HTTPS only, and rendering fails with a message that names `secrets.serverCertificate.name` when it is missing. |
-| `identity.image` | `quay.io/keycloak/keycloak:26.4` | The whole image reference of the identity provider. `image.registry` and `image.tag` do not apply to it. |
+| `identity.image` | `quay.io/keycloak/keycloak:26.8` | The whole image reference of the identity provider. `image.registry` and `image.tag` do not apply to it. |
 | `identity.hostname` | none, required | The public host name of the identity provider, without a scheme. It becomes `KC_HOSTNAME=https://<hostname>`. Rendering fails with a message that names it when it is missing. |
 | `identity.resources` | none | Kubernetes resource requests and limits of the identity provider. |
 | `identity.service.type`, `identity.service.port` | `ClusterIP`, 443 | The Service of the identity provider. Its port is named `https` and forwards to Keycloak's HTTPS port, 8443. Put your own Ingress in front of it. |

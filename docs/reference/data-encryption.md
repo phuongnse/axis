@@ -118,13 +118,15 @@ _(planned for M27)_ Adding or removing `sensitive` or `exactLookup` will be a sc
 
 The key store, the settings, `tenant create`, `migrate`, `tenant restore`, the rekey, the refresh and the cipher that
 encrypts and decrypts a sensitive value under the data keys are built, and so is the `bytea` column of a sensitive field.
-The record API, forms, the detail widget, process steps, connector and package call outputs, task completion and the
-operator's call resolve write and read `sensitive` values with the cipher, also in the rows of a child
+The record API, forms, the detail widget, record imports (the dry run and the commit), inbound endpoints, process steps,
+connector and package call outputs, task completion and the operator's call resolve write and read `sensitive` values with the cipher, also in the rows of a child
 collection. A row's value is bound to that row's id, so it reads back only in that row. A stored value copied to another
 record, row or field does not decrypt, and the read is a `500`. When the tenant has no data key, a record API write of a
 sensitive value is a `500` problem, an error log line names the tenant, and no row is stored. A process step that
-finds no key fails with the same error and stores nothing in clear. Test: `RecordSensitiveValueTests` for the record
-API, `ProcessSensitiveValueTests` for process steps and `ConnectorCallSensitiveOutputTests` for connector call outputs.
+finds no key fails with the same error and stores nothing in clear. An import by key checks and updates a record that
+holds a stored sensitive value, and an inbound endpoint reads the record for its output with the cipher. Test:
+`RecordSensitiveValueTests` for the record API, `RecordImportSensitiveValueTests` for imports and inbound endpoints,
+`ProcessSensitiveValueTests` for process steps and `ConnectorCallSensitiveOutputTests` for connector call outputs.
 
 A data source decrypts the value of a projected sensitive field, on the root entity and through a reference path, in its
 rows and its export, for a user whose grants cover the field. A value that does not decrypt is a `500`. Test:
@@ -137,8 +139,8 @@ publisher. A synced seed decrypts the stored value and compares it with the decl
 nothing. A seed with a sensitive value fails the whole seed run when the tenant has no data key, and stores no row. Test:
 `StartupActivationTests`.
 
-Imports and scenarios do not use the cipher yet _(planned for M27)_. A write of a sensitive value on those paths
-fails, and a value is never written in clear. The trigger and starter reads do not use it yet either _(planned for
+Scenarios do not use the cipher yet _(planned for M27)_. A write of a sensitive value there fails, and a value is never
+written in clear. The trigger and starter reads do not use it yet either _(planned for
 M27)_: a data change trigger, the process starter, an event trigger start or a task escalation that reads a record
 holding a stored sensitive value fails. Activation's inline recompute of computed fields and the worker's
 `computed.backfill` do not use the cipher either: on an entity that holds a stored sensitive value they fail and write
@@ -187,8 +189,8 @@ never a key. The exit codes are those of [output and exit codes](administration.
   the end of the file, so a chunk that fails to decrypt later fails that step. The entry stays `provisioning`, nothing
   is restored, and a rerun with a good archive finishes the restore.
 - **What the encryption does not do yet.** A `sensitive` field has a `bytea` column. The record API, forms and the
-  detail widget, a seed, a process step, a connector or package call output, task completion and the operator's call
-  resolve encrypt and decrypt a value with the tenant keys. An import or a scenario does not yet _(planned for M27)_,
-  and a write of a value there fails. The
+  detail widget, an import, an inbound endpoint, a seed, a process step, a connector or package call output, task
+  completion and the operator's call resolve encrypt and decrypt a value with the tenant keys. A scenario does not yet
+  _(planned for M27)_, and a write of a value there fails. The
   planner refuses a flag change until the [changing the flag](data-encryption.md#changing-the-flag) migration is built. A value's associated data names the tenant id, so that work has to handle
   a restore under a new id.
