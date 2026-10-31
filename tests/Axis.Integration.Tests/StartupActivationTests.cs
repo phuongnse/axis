@@ -1,6 +1,8 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Net.Http.Json;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using Axis.Admin;
 using Axis.Configuration.Diagnostics;
@@ -24,6 +26,7 @@ public sealed class StartupActivationTests(PostgreSqlFixture database, KeycloakF
     private const string HostB = "b.example.test";
 
     private const string TitleField = """{ "name": "title", "type": "text", "required": true, "maxLength": 200 }""";
+    private const string SecretField = """{ "name": "secret", "type": "text", "sensitive": true }""";
     private const string DoneField = """{ "name": "done", "type": "boolean" }""";
 
     // Each test uses its own application, so active releases and tables never meet across tests.
@@ -228,6 +231,74 @@ public sealed class StartupActivationTests(PostgreSqlFixture database, KeycloakF
         }
 
         Assert.Contains(logs.Entries, entry => entry.Contains("Inserted 0 seed record(s) and updated 1 ", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Seed_stores_a_sensitive_value_encrypted_and_the_record_api_shows_it_plain()
+    {
+        var (a, b) = (await CreateDatabaseAsync(), await CreateDatabaseAsync());
+        using var folder = ApplicationFolder(TitleField, SecretField)
+            .With("seeds/notes.json", SeedFile("""{ "title": "First", "secret": "Top secret" }""", null));
+        var keys = DataKeySettings();
+
+        await using var factory = CreateFactory(a, b, folder.Path, new LogCollector(), keys);
+        using var client = factory.CreateClient().SignedInAs("requester");
+
+        var stored = (byte[])(await ScalarAsync(
+            a, $"SELECT {EntityNaming.Quote(EntityNaming.Column("secret"))} FROM {EntityNaming.QualifiedTable(EntityNaming.Table(_noteId))} WHERE id = '{_firstSeedId}'"))!;
+        Assert.NotEmpty(stored);
+        Assert.DoesNotContain("Top secret", Encoding.UTF8.GetString(stored), StringComparison.Ordinal);
+        Assert.Equal(("Top secret", 1L), await GetSecretAsync(client, HostA, _firstSeedId));
+    }
+
+    [Fact]
+    public async Task Synced_seed_compares_a_sensitive_value_after_decrypting_it()
+    {
+        var (a, b) = (await CreateDatabaseAsync(), await CreateDatabaseAsync());
+        using var folder = ApplicationFolder(TitleField, SecretField)
+            .With("seeds/notes.json", SeedFile("""{ "title": "First", "secret": "Top secret" }""", null, sync: true));
+        var keys = DataKeySettings();
+
+        var logs = new LogCollector();
+        await using (var factory = CreateFactory(a, b, folder.Path, logs, keys))
+        {
+            factory.CreateClient().Dispose();
+        }
+
+        Assert.Contains(logs.Entries, entry => entry.Contains("Inserted 1 seed record(s) and updated 0 ", StringComparison.Ordinal));
+
+        logs = new LogCollector();
+        await using (var factory = CreateFactory(a, b, folder.Path, logs, keys))
+        {
+            using var client = factory.CreateClient().SignedInAs("requester");
+            Assert.Equal(("Top secret", 1L), await GetSecretAsync(client, HostA, _firstSeedId));
+        }
+
+        Assert.Contains(logs.Entries, entry => entry.Contains("Inserted 0 seed record(s) and updated 0 ", StringComparison.Ordinal));
+
+        folder.With("seeds/notes.json", SeedFile("""{ "title": "First", "secret": "Other secret" }""", null, sync: true));
+        logs = new LogCollector();
+        await using (var factory = CreateFactory(a, b, folder.Path, logs, keys))
+        {
+            using var client = factory.CreateClient().SignedInAs("requester");
+            Assert.Equal(("Other secret", 2L), await GetSecretAsync(client, HostA, _firstSeedId));
+        }
+
+        Assert.Contains(logs.Entries, entry => entry.Contains("Inserted 0 seed record(s) and updated 1 ", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Seed_with_a_sensitive_value_and_no_data_key_stops_the_start_and_stores_no_row()
+    {
+        var (a, b) = (await CreateDatabaseAsync(), await CreateDatabaseAsync());
+        using var folder = ApplicationFolder(TitleField, SecretField)
+            .With("seeds/notes.json", SeedFile("""{ "title": "First", "secret": "Top secret" }""", null));
+        await using var factory = CreateFactory(a, b, folder.Path, new LogCollector());
+
+        var exception = Assert.ThrowsAny<Exception>(() => factory.CreateClient());
+
+        Assert.Contains("has no data key", exception.ToString(), StringComparison.Ordinal);
+        Assert.Equal(0L, await ScalarAsync(a, $"SELECT count(*) FROM {EntityNaming.QualifiedTable(EntityNaming.Table(_noteId))}"));
     }
 
     [Fact]
@@ -860,6 +931,24 @@ public sealed class StartupActivationTests(PostgreSqlFixture database, KeycloakF
         var values = record.GetProperty("values");
         bool? done = values.TryGetProperty("done", out var value) && value.ValueKind != JsonValueKind.Null ? value.GetBoolean() : null;
         return (values.GetProperty("title").GetString(), done, record.GetProperty("version").GetInt64());
+    }
+
+    /// <summary>The data keys of both tenants, one new random key for each tenant.</summary>
+    private static Dictionary<string, string> DataKeySettings() => new()
+    {
+        ["Tenants:a:DataKeys:1"] = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)),
+        ["Tenants:b:DataKeys:1"] = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32)),
+    };
+
+    /// <summary>Reads the sensitive <c>secret</c> of a <c>Note</c> record through the record API.</summary>
+    private async Task<(string? Secret, long Version)> GetSecretAsync(HttpClient client, string host, Guid id)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, $"/api/apps/{_name}/entities/Note/records/{id}");
+        request.Headers.Host = host;
+        using var response = await client.SendAsync(request, CancellationToken);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var record = await response.Content.ReadFromJsonAsync<JsonElement>(CancellationToken);
+        return (record.GetProperty("values").GetProperty("secret").GetString(), record.GetProperty("version").GetInt64());
     }
 
     /// <summary>Reads the computed <c>summary</c> of a <c>Note</c> record in tenant A.</summary>
