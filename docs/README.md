@@ -15,6 +15,7 @@ kept current and how they are split is in
 | [Concepts](domain/concepts.md)    | The vocabulary and what each resource does                       | You name anything in code, APIs, UI or issues               |
 | [Knowledge](domain/knowledge.md)  | What business applications need and the pitfalls to avoid        | You change configuration, execution, storage or security    |
 | [Architecture](architecture.md)   | Modules, hosts, tenancy, security, execution, telemetry, testing | You add a module or host, or change how they fit together   |
+| [Repository layout](repository-layout.md) | The folders of the repository and the rules that modules follow | You add a project, a folder or a module |
 
 ## Reference
 

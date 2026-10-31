@@ -172,7 +172,7 @@ stay in this order.
 This milestone is done directly, not through NexKit, because NexKit needs
 working checks before it can verify anything.
 
-1. Create the .NET 10 solution following the [repository layout](architecture.md#repository-layout).
+1. Create the .NET 10 solution following the [repository layout](repository-layout.md#repository-layout).
    Include `Directory.Build.props` (nullable enabled, warnings as errors,
    analyzers on), central package management and an `.editorconfig`.
 2. `Axis.Server` serves `/health` and a placeholder SPA page.

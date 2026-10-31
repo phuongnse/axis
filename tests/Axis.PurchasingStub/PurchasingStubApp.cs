@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text;
+using System.Text.Json;
 
 namespace Axis.PurchasingStub;
 
@@ -17,6 +18,11 @@ namespace Axis.PurchasingStub;
 /// <c>Purchasing:TokenLifetime</c> seconds. The list of orders, the health route and the test
 /// switches need no token.
 /// </para>
+/// <para>
+/// It receives the purchase request approval webhook at <c>POST /webhooks/purchase-request-approved</c>
+/// and lists the deliveries it accepted. The webhook routes need no token, but a delivery must carry a
+/// Standard Webhooks signature made with <c>Webhook:Secret</c>, or the stub answers <c>401</c>.
+/// </para>
 /// </summary>
 public static class PurchasingStubApp
 {
@@ -26,6 +32,9 @@ public static class PurchasingStubApp
     /// <summary>The client secret the stub accepts when <c>Purchasing:ClientSecret</c> is not set. A development placeholder.</summary>
     public const string DefaultClientSecret = "axis-development-purchasing-secret";
 
+    /// <summary>The webhook secret the stub accepts when <c>Webhook:Secret</c> is not set. A development placeholder.</summary>
+    public const string DefaultWebhookSecret = "whsec_YXhpcy1kZXZlbG9wbWVudC13ZWJob29rLXNlY3JldA==";
+
     private const int DefaultTokenLifetimeSeconds = 120;
     private const string IdempotencyHeader = "Idempotency-Key";
 
@@ -34,14 +43,53 @@ public static class PurchasingStubApp
         var builder = WebApplication.CreateBuilder(args);
         builder.Services.AddSingleton<PurchaseOrderStore>();
         builder.Services.AddSingleton<TokenStore>();
+        builder.Services.AddSingleton<WebhookDeliveryStore>();
 
         var app = builder.Build();
 
         var clientId = app.Configuration["Purchasing:ClientId"] ?? DefaultClientId;
         var clientSecret = app.Configuration["Purchasing:ClientSecret"] ?? DefaultClientSecret;
         var lifetime = TimeSpan.FromSeconds(app.Configuration.GetValue("Purchasing:TokenLifetime", DefaultTokenLifetimeSeconds));
+        var webhookKey = WebhookVerifier.Key(app.Configuration["Webhook:Secret"] ?? DefaultWebhookSecret);
 
         app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
+
+        app.MapPost("/webhooks/purchase-request-approved", async (HttpContext context, WebhookDeliveryStore store) =>
+        {
+            // The signature is over the raw bytes, so the body is read as text and never bound to a model.
+            using var reader = new StreamReader(context.Request.Body, Encoding.UTF8);
+            var body = await reader.ReadToEndAsync(context.RequestAborted);
+            var headers = context.Request.Headers;
+            var webhookId = headers["webhook-id"].ToString();
+            var now = DateTimeOffset.UtcNow;
+
+            if (!WebhookVerifier.IsValid(webhookId, headers["webhook-timestamp"].ToString(), headers["webhook-signature"].ToString(), body, webhookKey, now))
+            {
+                return Results.Problem("The webhook signature or timestamp is not valid.", statusCode: StatusCodes.Status401Unauthorized);
+            }
+
+            using var document = TryParse(body);
+            if (document is null || RequestNumberOf(document.RootElement) is not { } requestNumber)
+            {
+                return Results.Problem("The body must be JSON with a string at data.fields.number.", statusCode: StatusCodes.Status400BadRequest);
+            }
+
+            if (store.IsFailing(requestNumber))
+            {
+                return Results.Problem("The stub is set to fail this request's webhook.", statusCode: StatusCodes.Status500InternalServerError);
+            }
+
+            store.Add(new WebhookDelivery(webhookId, TypeOf(document.RootElement), requestNumber, now));
+            return Results.NoContent();
+        });
+
+        app.MapGet("/webhooks/purchase-request-approved", (WebhookDeliveryStore store) => Results.Ok(store.List()));
+
+        app.MapPost("/test/fail-webhook/{requestNumber}", (string requestNumber, WebhookDeliveryStore store) =>
+        {
+            store.Fail(requestNumber);
+            return Results.NoContent();
+        });
 
         app.MapPost("/oauth/token", async (HttpContext context, TokenStore tokens) =>
         {
@@ -194,6 +242,27 @@ public static class PurchasingStubApp
         context.Response.Headers.WWWAuthenticate = "Bearer error=\"invalid_token\"";
         return Results.Problem("A valid access token is required.", statusCode: StatusCodes.Status401Unauthorized);
     }
+
+    private static JsonDocument? TryParse(string body)
+    {
+        try
+        {
+            return JsonDocument.Parse(body);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    private static string? RequestNumberOf(JsonElement root) =>
+        Property(Property(Property(root, "data"), "fields"), "number") is { ValueKind: JsonValueKind.String } number ? number.GetString() : null;
+
+    private static string? TypeOf(JsonElement root) =>
+        Property(root, "type") is { ValueKind: JsonValueKind.String } type ? type.GetString() : null;
+
+    private static JsonElement Property(JsonElement element, string name) =>
+        element.ValueKind == JsonValueKind.Object && element.TryGetProperty(name, out var value) ? value : default;
 
     /// <summary>Whether the Basic header holds the client. The worker form-encodes both parts before it encodes the pair.</summary>
     private static bool IsClient(string header, string clientId, string clientSecret)
