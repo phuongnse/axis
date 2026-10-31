@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { PageLayout } from '../platform/PageLayout'
 import { useText } from '../platform/texts'
 import { useDesignTokens } from '../platform/themeMode'
+import { useNarrowWidth } from '../platform/useNarrowWidth'
 
 /** One library that Axis ships, as scripts/licences.mjs writes it. */
 interface ShippedPackage {
@@ -27,13 +28,15 @@ const spdxIdentifier = /^[A-Za-z0-9.+-]+$/
  * Proposed: the Open source licences page at /licences, open to everyone without signing in. It names Axis's licence
  * and its source, then every library the web app and the server ship with its version and licence. A library opens to
  * its licence text, or links the standard text on spdx.org when it carries none. The build writes the list, so the page
- * always matches what runs. A search narrows both lists by name or licence.
+ * always matches what runs. A search narrows both lists by name or licence. The two lists sit side by side across the
+ * page, and one above the other below the narrow width.
  */
 export function LicencesPage() {
   const t = useText()
   const { colour, spacing, radius } = useDesignTokens()
   const [data, setData] = useState<Licences | 'failed'>()
   const [search, setSearch] = useState('')
+  const narrow = useNarrowWidth()
 
   useEffect(() => {
     const controller = new AbortController()
@@ -66,8 +69,8 @@ export function LicencesPage() {
   function section(title: string, items: ShippedPackage[], testId: string) {
     const shown = filter(items)
     return (
-      <section data-testid={testId}>
-        <Typography.Title level={4}>{`${title} (${shown.length})`}</Typography.Title>
+      <section data-testid={testId} style={{ display: 'flex', flexDirection: 'column', gap: spacing.sm, minWidth: 0 }}>
+        <Typography.Title level={4} style={{ margin: 0 }}>{`${title} (${shown.length})`}</Typography.Title>
         <Collapse
           size="small"
           items={shown.map((item) => ({
@@ -123,7 +126,7 @@ export function LicencesPage() {
     <PageLayout title={t('shell.licences.title')}>
       {data === 'failed' && <Alert type="error" title={t('shell.licences.loadFailed')} />}
       {data && data !== 'failed' && (
-        <Flex vertical gap={spacing.lg} style={{ maxWidth: 880 }}>
+        <Flex vertical gap={spacing.lg}>
           <Typography.Paragraph style={{ margin: 0 }}>
             {t('shell.licences.axis').replace('{licence}', data.axis.licence)}{' '}
             <Typography.Link href={data.axis.licenceUrl} target="_blank" rel="noreferrer">
@@ -142,8 +145,18 @@ export function LicencesPage() {
             value={search}
             onChange={(event) => setSearch(event.target.value)}
           />
-          {section(t('shell.licences.web'), data.npm, 'licences-npm')}
-          {section(t('shell.licences.server'), data.nuget, 'licences-nuget')}
+          {/* Proposed: the two lists side by side across the page, one column each below the narrow width. */}
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: narrow ? 'minmax(0, 1fr)' : 'repeat(2, minmax(0, 1fr))',
+              gap: spacing.lg,
+              alignItems: 'start',
+            }}
+          >
+            {section(t('shell.licences.web'), data.npm, 'licences-npm')}
+            {section(t('shell.licences.server'), data.nuget, 'licences-nuget')}
+          </div>
         </Flex>
       )}
     </PageLayout>
