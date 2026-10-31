@@ -1,8 +1,8 @@
 # D117. Small businesses first, and the milestones in three phases
 
-Status: **Proposed**
+Status: **Agreed**
 
-The owner asked on 2026-10-30 for Axis to serve individuals and small and medium businesses first,
+The owner asked on 2026-10-30, and agreed these points on 2026-10-31, for Axis to serve individuals and small and medium businesses first,
 and large organizations, banks and government later, and for the planned milestones to be ordered
 by that goal. No planned work is dropped. Each part keeps its design and moves to the phase that
 needs it. This changes the order and the milestone of parts of
