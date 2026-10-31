@@ -38,7 +38,7 @@ public sealed class StudioAuthoringPerformanceTests(PostgreSqlFixture database) 
     private static readonly TimeSpan _testDeadline = TimeSpan.FromMinutes(3);
 
     private const int Patches = 20;
-    private const int CopiesPerScenario = 3;
+    private const int Scenarios = 20;
     private const int TemplateFiles = 300;
     private const string Application = "Typical";
     private const string TemplateId = "typical";
@@ -169,7 +169,7 @@ public sealed class StudioAuthoringPerformanceTests(PostgreSqlFixture database) 
         Assert.True(status == "succeeded", string.Join('\n', result.Output));
         Assert.Equal(0, result.Exit);
         var results = JsonNode.Parse((string)(await ScalarAsync(scenario, tenant, $"SELECT scenario_results::text FROM axis.publish_requests WHERE id = '{request}'"))!)!.AsArray();
-        Assert.Equal(20, results.Count);
+        Assert.Equal(Scenarios, results.Count);
         Assert.All(results, item => Assert.Equal("passed", item!["outcome"]!.GetValue<string>()));
         Assert.True(elapsed < _testTime, $"The test request took {elapsed}.");
     }
@@ -291,7 +291,7 @@ public sealed class StudioAuthoringPerformanceTests(PostgreSqlFixture database) 
         return files.Count;
     }
 
-    // The sample's scenarios, and three copies of each with a new id and name. Every file is versioned as the publish route stores it.
+    // The sample's scenarios, filled up to 20 by copying them in turn, each copy with a new id and name. Every file is versioned as the publish route stores it.
     private static async Task<string> SnapshotAsync()
     {
         var items = new JsonArray();
@@ -301,18 +301,19 @@ public sealed class StudioAuthoringPerformanceTests(PostgreSqlFixture database) 
             items.Add(Item(Path.GetRelativePath(_sample, path).Replace('\\', '/'), bytes));
         }
 
-        foreach (var path in Directory.EnumerateFiles(Path.Combine(_sample, "scenarios"), "*.json").Order(StringComparer.Ordinal))
+        var originals = Directory.EnumerateFiles(Path.Combine(_sample, "scenarios"), "*.json").Order(StringComparer.Ordinal).ToList();
+        Assert.True(originals.Count <= Scenarios, $"The sample holds {originals.Count} scenarios, more than the {Scenarios} of the test.");
+        for (var k = 0; k < Scenarios - originals.Count; k++)
         {
+            var path = originals[k % originals.Count];
+            var n = (k / originals.Count) + 1;
             var original = JsonNode.Parse(await File.ReadAllTextAsync(path, CancellationToken))!.AsObject();
             var name = original["name"]!.GetValue<string>();
             var stem = Path.GetFileNameWithoutExtension(path);
-            for (var n = 1; n <= CopiesPerScenario; n++)
-            {
-                var copy = JsonNode.Parse(original.ToJsonString())!.AsObject();
-                copy["id"] = Guid.NewGuid().ToString();
-                copy["name"] = $"{name}Copy{n}";
-                items.Add(Item($"scenarios/{stem}-copy-{n}.json", Encoding.UTF8.GetBytes(copy.ToJsonString())));
-            }
+            var copy = JsonNode.Parse(original.ToJsonString())!.AsObject();
+            copy["id"] = Guid.NewGuid().ToString();
+            copy["name"] = $"{name}Copy{n}";
+            items.Add(Item($"scenarios/{stem}-copy-{n}.json", Encoding.UTF8.GetBytes(copy.ToJsonString())));
         }
 
         return items.ToJsonString();
