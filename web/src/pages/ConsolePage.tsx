@@ -15,6 +15,7 @@ import { EmptyDash } from '../platform/EmptyValue'
 import { PageLayout } from '../platform/PageLayout'
 import { useText } from '../platform/texts'
 import { ConsoleDeadLetters } from './ConsoleDeadLetters'
+import { ConsoleSchedules } from './ConsoleSchedules'
 import { usePlatform } from './context'
 
 const pageSize = 20
@@ -25,7 +26,8 @@ const pageSize = 20
  * calls with an unknown outcome, newest first, with paging and an application filter. Under it, the Webhook deliveries
  * view lists the recent webhook deliveries, then the Publishing view lists the release history and the publish requests of
  * one application, read only, and the Dead letters view lists the dead letters of every application and redelivers or
- * discards each. A user without the operator role sees the forbidden page.
+ * discards each. Under that, the Schedules view lists the schedule triggers of the active releases with their last and
+ * next occurrence. A user without the operator role sees the forbidden page.
  */
 export function ConsolePage() {
   const t = useText()
@@ -207,6 +209,7 @@ export function ConsolePage() {
       {tenant && !forbidden && <ConsoleWebhookDeliveries applications={tenant.applications} locale={locale} />}
       {tenant && !forbidden && <ConsolePublishing applications={tenant.applications} locale={locale} />}
       {tenant && !forbidden && <ConsoleDeadLetters applications={tenant.applications} locale={locale} />}
+      {tenant && !forbidden && <ConsoleSchedules applications={tenant.applications} locale={locale} />}
     </PageLayout>
   )
 }

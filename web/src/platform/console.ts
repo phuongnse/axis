@@ -234,3 +234,43 @@ export async function fetchConsolePublishing(
   }
   return { kind: 'ok', publishing: (await response.json()) as ConsolePublishing }
 }
+
+/**
+ * A schedule trigger of an active release, as served by `GET /api/console/schedules`. The times are ISO strings, and
+ * `lastOccurrenceAt` is `null` while no occurrence has run.
+ */
+export interface ConsoleScheduleItem {
+  applicationId: string
+  application: string
+  triggerId: string
+  trigger: string
+  process: string
+  schedule: string
+  timeZone: string
+  lastOccurrenceAt: string | null
+  nextOccurrenceAt: string
+}
+
+/** The schedule triggers of the tenant, ordered by application and trigger name. They are not paged. */
+export interface ConsoleScheduleList {
+  items: ConsoleScheduleItem[]
+}
+
+/** The answer of the schedules route: the list, or the refusal that the view shows. */
+export type ConsoleSchedulesResult = { kind: 'ok'; schedules: ConsoleScheduleList } | { kind: 'forbidden' }
+
+/** Loads the schedule triggers of the tenant, of one application when `application` is set. */
+export async function fetchConsoleSchedules(
+  application: string | undefined,
+  signal?: AbortSignal,
+): Promise<ConsoleSchedulesResult> {
+  const query = application ? `?${new URLSearchParams({ application })}` : ''
+  const response = await apiFetch(`/api/console/schedules${query}`, { signal })
+  if (response.status === 403) {
+    return { kind: 'forbidden' }
+  }
+  if (!response.ok) {
+    throw new Error(`Loading the console schedules failed with status ${response.status}.`)
+  }
+  return { kind: 'ok', schedules: (await response.json()) as ConsoleScheduleList }
+}

@@ -412,7 +412,9 @@ the release is active. A [module](modules-and-templates.md#processes-pages-polic
 schedule trigger has an id of its own in each application, so each application
 that uses the module has its own state and work item for it. Its `timeZone` is
 the application's time zone, so an application that changes its time zone
-gets a new next occurrence at its next activation.
+gets a new next occurrence at its next activation. The
+[operator console](operator-console.md#views) lists this state for each schedule trigger of
+each active release.
 
 **Occurrences.** Each schedule trigger has one `trigger.schedule` work item,
 due at its next occurrence. Workers claim it with `FOR UPDATE SKIP LOCKED`,

@@ -14,6 +14,41 @@ namespace Axis.Processes.Instances;
 public static class TriggerSchedules
 {
     /// <summary>
+    /// Reads the state rows of the schedule triggers over <paramref name="connection"/>: every row, or only the rows of
+    /// <paramref name="applicationId"/> when it is given. The order is not defined.
+    /// </summary>
+    public static async Task<IReadOnlyList<TriggerScheduleEntry>> ListAsync(
+        NpgsqlConnection connection,
+        Guid? applicationId,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(connection);
+
+        await using var command = new NpgsqlCommand(
+            """
+            SELECT trigger_id, application_id, schedule, time_zone, next_occurrence_at, last_occurrence_at
+            FROM axis.trigger_schedules
+            WHERE @application::uuid IS NULL OR application_id = @application
+            """,
+            connection);
+        command.Parameters.Add(new NpgsqlParameter("application", NpgsqlDbType.Uuid) { Value = (object?)applicationId ?? DBNull.Value });
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        var entries = new List<TriggerScheduleEntry>();
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            entries.Add(new TriggerScheduleEntry(
+                reader.GetGuid(0),
+                reader.GetGuid(1),
+                reader.IsDBNull(2) ? null : reader.GetString(2),
+                reader.IsDBNull(3) ? null : reader.GetString(3),
+                reader.GetFieldValue<DateTimeOffset>(4),
+                reader.IsDBNull(5) ? null : reader.GetFieldValue<DateTimeOffset>(5)));
+        }
+
+        return entries;
+    }
+
+    /// <summary>
     /// In one transaction, stores for each schedule trigger of <paramref name="model"/> its state
     /// row and its <c>trigger.schedule</c> work item, both at the trigger's next occurrence, and
     /// releases a claim on the item. A new or changed trigger gets its next occurrence after the
@@ -115,3 +150,15 @@ public static class TriggerSchedules
         await transaction.CommitAsync(cancellationToken);
     }
 }
+
+/// <summary>
+/// The stored state of a schedule trigger: its <c>schedule</c> and <c>timeZone</c> as activation stored them, the next
+/// occurrence and the latest occurrence that ran, which is null while none has.
+/// </summary>
+public sealed record TriggerScheduleEntry(
+    Guid TriggerId,
+    Guid ApplicationId,
+    string? Schedule,
+    string? TimeZone,
+    DateTimeOffset NextOccurrenceAt,
+    DateTimeOffset? LastOccurrenceAt);
