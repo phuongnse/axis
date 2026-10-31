@@ -11,7 +11,8 @@ Realms made by `tenant create` name the login theme `axis`, which `npm run build
 The on-premises Compose example in `deploy/compose/` mounts both: the password list from this folder and the theme
 from `AXIS_IDENTITY_THEME_DIR`, see [on premises](../../docs/reference/installation.md#on-premises). The Helm chart
 mounts both from the volumes `identity.passwordBlacklists.volume` and `identity.theme.volume`, see
-[in the cloud](../../docs/reference/installation.md#in-the-cloud).
+[in the cloud](../../docs/reference/installation.md#in-the-cloud). `scripts/e2e.sh` mounts the password list into the
+Keycloak of the E2E run, so a spec can run `tenant create`.
 
 The list comes from the top 1,000,000 passwords of the Xato 10 million password list in
 [SecLists](https://github.com/danielmiessler/SecLists/blob/master/Passwords/Common-Credentials/xato-net-10-million-passwords-1000000.txt)
