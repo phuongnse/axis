@@ -57,6 +57,11 @@
 # shares the platform database. The worker and the publisher serve the journey tenant too, and the run fails if
 # either log never reports it ready. The setup step signs the author, the requester, the service desk lead,
 # the agent, the approver, the asset manager, the employee and the auditor in on its host.
+# The tenant create spec signs a person in on the host of the tenant it creates, over https and with no port. This script
+# makes a throwaway certificate with openssl for the run, in a temporary folder that it removes at the end, and gives
+# Playwright its paths as AXIS_E2E_TLS_CERT and AXIS_E2E_TLS_KEY. It also gives AXIS_E2E_TENANT_HTTPS_PORT (default
+# 5283), the https port of the server that the spec starts after tenant create. That server reads its tenants from the
+# tenant directory and stops when the test ends. The spec's browser maps the tenant host on port 443 to it.
 # Playwright and the services it starts are skipped when every path changed since NexKit's commit (see
 # scripts/lib/affected.mjs) is under docs/, .github/ or .nexkit/ or is a Markdown file. The smoke tests run in scripts/smoke.sh.
 # The design-system bundle is built and checked into artifacts/design-system before Playwright runs. Its spec
@@ -125,6 +130,8 @@ export AXIS_E2E_STUDIO_FOLDER="$studio_dir/purchase-requests"
 # Studio creates the journey tenant's applications folder when its server starts.
 journey_dir="$(mktemp -d)"
 export AXIS_E2E_JOURNEY_APPLICATIONS="$journey_dir/applications"
+# The certificate of the https server for a created tenant. Only the tenant create spec uses it.
+tls_dir="$(mktemp -d)"
 
 # stop_worker: stops the restart loop first, so it starts no new worker, then the worker itself.
 stop_worker() {
@@ -143,7 +150,7 @@ cleanup() {
     kill "$publisher_pid" 2>/dev/null || true
     wait "$publisher_pid" 2>/dev/null || true
   fi
-  rm -rf "$studio_dir" "$journey_dir"
+  rm -rf "$studio_dir" "$journey_dir" "$tls_dir"
   if [ -n "$purchasing_pid" ]; then
     kill "$purchasing_pid" 2>/dev/null || true
     wait "$purchasing_pid" 2>/dev/null || true
@@ -211,6 +218,13 @@ if affected playwright; then
     -c "CREATE ROLE axis_journey_runtime LOGIN PASSWORD 'axis'" \
     -c "CREATE ROLE axis_admin LOGIN PASSWORD 'axis' CREATEDB CREATEROLE" \
     -c "CREATE DATABASE axis_journey OWNER axis_journey_schema" >/dev/null
+
+  # The tenant create spec's server answers https on *.localhost with this certificate, and Chromium accepts it there.
+  openssl req -x509 -newkey rsa:2048 -nodes -days 2 -subj '/CN=localhost' \
+    -addext 'subjectAltName=DNS:localhost,DNS:*.localhost,DNS:operator-made.localhost' \
+    -keyout "$tls_dir/tls.key" -out "$tls_dir/tls.crt" 2>/dev/null
+  export AXIS_E2E_TLS_CERT="$tls_dir/tls.crt" AXIS_E2E_TLS_KEY="$tls_dir/tls.key"
+  export AXIS_E2E_TENANT_HTTPS_PORT="${AXIS_E2E_TENANT_HTTPS_PORT:-5283}"
 
   scripts/build.sh
   # The design-system spec mounts the bundle, which the server never ships.

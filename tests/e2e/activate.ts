@@ -5,7 +5,7 @@ import { serverDll, serverEnv, serverProject } from './server-settings'
 const readyTimeout = 120_000
 
 /** A free port on the loopback address. Another process can take it before the caller listens. */
-async function sparePort(): Promise<number> {
+export async function sparePort(): Promise<number> {
   const probe = net.createServer()
   await new Promise<void>((resolve, reject) => {
     probe.once('error', reject)
@@ -25,20 +25,18 @@ async function answersReady(url: string): Promise<boolean> {
 }
 
 /**
- * Starts the built server with `env` over the settings of the main E2E server, and returns once it answers
- * /health/ready on `port`, or on a spare port. `stop` ends it with SIGTERM, then SIGKILL after 15 seconds.
+ * Starts the built server with exactly `env` added to the environment of this process, and returns once it
+ * answers /health/ready at `url`. `stop` ends it with SIGTERM, then SIGKILL after 15 seconds.
  * The server activates before it listens, so the first answer of /health/ready means its releases are active.
  * Throws an Error with the server output when it exits or does not become ready.
  */
-export async function startServer(
+export async function runServer(
+  url: string,
   env: Record<string, string>,
-  port?: number,
-): Promise<{ url: string; port: number; stop(): Promise<void> }> {
-  const listenPort = port ?? (await sparePort())
-  const url = `http://127.0.0.1:${listenPort}`
+): Promise<{ stop(): Promise<void> }> {
   const child = spawn('dotnet', [serverDll], {
     cwd: serverProject,
-    env: { ...process.env, ...serverEnv(url), ...env },
+    env: { ...process.env, ...env },
     stdio: ['ignore', 'pipe', 'pipe'],
   })
   let output = ''
@@ -68,7 +66,7 @@ export async function startServer(
       if (exitCode !== undefined) {
         throw failure(`The server exited with code ${exitCode} before it became ready.`)
       }
-      if (await answersReady(url)) return { url, port: listenPort, stop }
+      if (await answersReady(url)) return { stop }
       if (Date.now() > deadline) {
         throw failure(`The server did not become ready within ${readyTimeout / 1000} seconds.`)
       }
@@ -78,6 +76,21 @@ export async function startServer(
     await stop()
     throw error
   }
+}
+
+/**
+ * Starts the built server with `env` over the settings of the main E2E server, and returns once it answers
+ * /health/ready on `port`, or on a spare port. `stop` ends it, see `runServer`.
+ * Throws an Error with the server output when it exits or does not become ready.
+ */
+export async function startServer(
+  env: Record<string, string>,
+  port?: number,
+): Promise<{ url: string; port: number; stop(): Promise<void> }> {
+  const listenPort = port ?? (await sparePort())
+  const url = `http://127.0.0.1:${listenPort}`
+  const { stop } = await runServer(url, { ...serverEnv(url), ...env })
+  return { url, port: listenPort, stop }
 }
 
 /**
