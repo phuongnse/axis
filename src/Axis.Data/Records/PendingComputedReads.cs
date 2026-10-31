@@ -25,7 +25,8 @@ public static class PendingComputedReads
     /// field of the record is replaced only when the active release has a computed field of the same name
     /// and type, because the work's expressions are typed by its own release. The rows of a child collection
     /// are replaced by position, and only when the stored row count is the one read now. The version and the
-    /// labels are kept.
+    /// labels are kept. A record that holds a stored sensitive value is computed with <paramref name="cipher"/>,
+    /// and a sensitive computed field reads back plain. Without a cipher, such a record throws.
     /// </summary>
     public static async Task<Record> ApplyAsync(
         NpgsqlConnection connection,
@@ -34,7 +35,8 @@ public static class PendingComputedReads
         EntityModel entity,
         Record record,
         CancellationToken cancellationToken,
-        ApplicationModel? recordApplication = null)
+        ApplicationModel? recordApplication = null,
+        RecordCipher? cipher = null)
     {
         ArgumentNullException.ThrowIfNull(connection);
         ArgumentNullException.ThrowIfNull(active);
@@ -83,7 +85,7 @@ public static class PendingComputedReads
             return record;
         }
 
-        if (await ComputedRecompute.ComputeRecordAsync(connection, transaction, activeEntity, collections, record.Id, cancellationToken) is not { } computed)
+        if (await ComputedRecompute.ComputeRecordAsync(connection, transaction, activeEntity, collections, record.Id, cipher, cancellationToken) is not { } computed)
         {
             return record;
         }

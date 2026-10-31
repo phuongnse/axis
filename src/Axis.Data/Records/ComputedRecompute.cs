@@ -12,7 +12,9 @@ namespace Axis.Data.Records;
 /// collections, with a release, inside the transaction of an activation. The owner's expressions read the
 /// rows' new values, as a record write does. Each record is stamped with the release. The recompute leaves
 /// <c>version</c> unchanged, writes no audit record and starts no trigger. A record that a concurrent
-/// write changed after it was read is skipped, never overwritten.
+/// write changed after it was read is skipped, never overwritten. A recompute with a <see cref="RecordCipher"/>
+/// reads the sensitive values decrypted and seals the sensitive computed values it writes. Without one, a record
+/// that holds a stored sensitive value fails the recompute and nothing is written.
 /// <para>
 /// A computed field whose expression fails for a record, or reads a value that cannot be held exactly, gets
 /// <c>NULL</c>, and <c>axis.computed_field_errors</c> gets a row with the fixed message of the record API.
@@ -39,7 +41,8 @@ internal static class ComputedRecompute
         EntityModel owner,
         Guid releaseId,
         CancellationToken cancellationToken,
-        bool unstampedOnly = false)
+        bool unstampedOnly = false,
+        RecordCipher? cipher = null)
     {
         var collections = CollectionsOf(application, owner);
 
@@ -78,7 +81,7 @@ internal static class ComputedRecompute
 
         foreach (var id in ids)
         {
-            await RecomputeRecordAsync(connection, transaction, owner, collections, releaseId, id, cancellationToken);
+            await RecomputeRecordAsync(connection, transaction, owner, collections, releaseId, id, cipher, cancellationToken);
         }
     }
 
@@ -95,7 +98,8 @@ internal static class ComputedRecompute
         EntityModel owner,
         Guid releaseId,
         IReadOnlyList<Guid> ids,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        RecordCipher? cipher = null)
     {
         if (ids.Count == 0)
         {
@@ -106,7 +110,7 @@ internal static class ComputedRecompute
         await DeleteErrorsOfAsync(connection, transaction, owner, collections, ids, cancellationToken);
         foreach (var id in ids)
         {
-            await RecomputeRecordAsync(connection, transaction, owner, collections, releaseId, id, cancellationToken);
+            await RecomputeRecordAsync(connection, transaction, owner, collections, releaseId, id, cipher, cancellationToken);
         }
     }
 
@@ -179,9 +183,10 @@ internal static class ComputedRecompute
         EntityModel owner,
         List<Collection> collections,
         Guid id,
+        RecordCipher? cipher,
         CancellationToken cancellationToken)
     {
-        if (await RecordQueries.FindRowAsync(connection, owner, id, null, cancellationToken) is not { } record)
+        if (await RecordQueries.FindRowAsync(connection, owner, id, cipher, cancellationToken) is not { } record)
         {
             return null;
         }
@@ -200,7 +205,7 @@ internal static class ComputedRecompute
                 continue;
             }
 
-            foreach (var (rowId, stored) in await ReadRowsAsync(connection, transaction, child, id, cancellationToken))
+            foreach (var (rowId, stored) in await ReadRowsAsync(connection, transaction, child, id, cipher, cancellationToken))
             {
                 var inputs = RecordComputer.NewRecord(child);
                 foreach (var column in RecordQueries.Columns(child).Where(column => !column.IsComputed))
@@ -279,9 +284,10 @@ internal static class ComputedRecompute
         List<Collection> collections,
         Guid releaseId,
         Guid id,
+        RecordCipher? cipher,
         CancellationToken cancellationToken)
     {
-        if (await ComputeRecordAsync(connection, transaction, owner, collections, id, cancellationToken) is not { } computed)
+        if (await ComputeRecordAsync(connection, transaction, owner, collections, id, cipher, cancellationToken) is not { } computed)
         {
             return;
         }
@@ -294,7 +300,8 @@ internal static class ComputedRecompute
             update.Parameters.AddWithValue("id", id);
             update.Parameters.AddWithValue("version", record.Version);
             update.Parameters.AddWithValue("release", releaseId);
-            var assignments = ownerValues.Select((value, index) =>
+            var sealedOwner = await RecordCipher.SealAsync(cipher, owner, id, ownerValues, cancellationToken);
+            var assignments = sealedOwner.Select((value, index) =>
                 $"{EntityNaming.Quote(EntityNaming.Column(value.Field.Name))} = {RecordCommands.AddValue(update, index, value)}").ToList();
             assignments.Add($"{EntityNaming.Quote(EntityNaming.ComputedReleaseColumn)} = @release");
             update.CommandText =
@@ -309,7 +316,8 @@ internal static class ComputedRecompute
         {
             await using var update = new NpgsqlCommand { Connection = connection, Transaction = transaction };
             update.Parameters.AddWithValue("id", rowId);
-            var assignments = values.Select((value, index) =>
+            var sealedRow = await RecordCipher.SealAsync(cipher, child, rowId, values, cancellationToken);
+            var assignments = sealedRow.Select((value, index) =>
                 $"{EntityNaming.Quote(EntityNaming.Column(value.Field.Name))} = {RecordCommands.AddValue(update, index, value)}");
             update.CommandText = $"UPDATE {RecordQueries.Table(child)} SET {string.Join(", ", assignments)} WHERE {EntityNaming.Quote(EntityNaming.IdColumn)} = @id";
             await update.ExecuteNonQueryAsync(cancellationToken);
@@ -354,11 +362,12 @@ internal static class ComputedRecompute
         NpgsqlTransaction? transaction,
         EntityModel child,
         Guid ownerId,
+        RecordCipher? cipher,
         CancellationToken cancellationToken)
     {
         var columns = RecordQueries.Columns(child);
         var selected = new[] { EntityNaming.Quote(EntityNaming.IdColumn) }.Concat(columns.Select(field =>
-            EntityNaming.Quote(EntityNaming.Column(field.Name)) + (FieldTypes.HoldsDecimal(field.Type) ? "::text" : "")));
+            EntityNaming.Quote(EntityNaming.Column(field.Name)) + (!field.Sensitive && FieldTypes.HoldsDecimal(field.Type) ? "::text" : "")));
         await using var command = new NpgsqlCommand(
             $"SELECT {string.Join(", ", selected)} FROM {RecordQueries.Table(child)} WHERE {EntityNaming.Quote(EntityNaming.OwnerColumn)} = @owner ORDER BY {EntityNaming.Quote(EntityNaming.PositionColumn)}",
             connection,
@@ -366,17 +375,42 @@ internal static class ComputedRecompute
         command.Parameters.AddWithValue("owner", ownerId);
 
         var rows = new List<(Guid, JsonObject)>();
+        var sealedRows = new List<(JsonObject Row, Guid RowId, List<(FieldModel Field, byte[] Stored)> Values)>();
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
         {
             var row = new JsonObject();
+            var storedValues = new List<(FieldModel Field, byte[] Stored)>();
             for (var index = 0; index < columns.Count; index++)
             {
                 var ordinal = index + 1;
+                if (columns[index].Sensitive && !reader.IsDBNull(ordinal))
+                {
+                    // The cipher opens the bytes below, so the value stays null until then.
+                    storedValues.Add((columns[index], reader.GetFieldValue<byte[]>(ordinal)));
+                    row[columns[index].Name] = null;
+                    continue;
+                }
+
                 row[columns[index].Name] = reader.IsDBNull(ordinal) ? null : RecordQueries.ReadValue(reader, ordinal, columns[index]);
             }
 
-            rows.Add((reader.GetGuid(0), row));
+            var rowId = reader.GetGuid(0);
+            if (storedValues.Count > 0)
+            {
+                sealedRows.Add((row, rowId, storedValues));
+            }
+
+            rows.Add((rowId, row));
+        }
+
+        // The decrypted value of a cell is bound to the id of its row.
+        foreach (var (row, rowId, storedValues) in sealedRows)
+        {
+            foreach (var (field, stored) in storedValues)
+            {
+                row[field.Name] = await RecordCipher.DecryptAsync(cipher, child, rowId, field, stored, cancellationToken);
+            }
         }
 
         return rows;

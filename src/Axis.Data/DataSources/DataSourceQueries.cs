@@ -55,7 +55,7 @@ public static class DataSourceQueries
     /// (SQLSTATE 57014) then leaves <see cref="DataSourceRowPage.TotalCount"/> null, and the page is still
     /// read. Without a transaction that error is thrown.
     /// </summary>
-    public static async Task<DataSourceRowPage?> ListAsync(
+    public static Task<DataSourceRowPage?> ListAsync(
         NpgsqlConnection connection,
         NpgsqlTransaction? transaction,
         ApplicationModel application,
@@ -66,6 +66,26 @@ public static class DataSourceQueries
         IReadOnlyList<DataSourceParameterValue> parameters,
         RecordCondition? condition = null,
         string? search = null,
+        CancellationToken cancellationToken = default) =>
+        ListAsync(connection, transaction, application, dataSource, page, pageSize, sort, parameters, condition, search, null, cancellationToken);
+
+    /// <summary>
+    /// Lists a page as the list without a cipher does, and decrypts the value of each projected sensitive field with
+    /// <paramref name="cipher"/>, also through a reference path. Without a cipher, a row that holds a stored sensitive
+    /// value throws.
+    /// </summary>
+    public static async Task<DataSourceRowPage?> ListAsync(
+        NpgsqlConnection connection,
+        NpgsqlTransaction? transaction,
+        ApplicationModel application,
+        DataSourceModel dataSource,
+        int page,
+        int pageSize,
+        DataSourceSort? sort,
+        IReadOnlyList<DataSourceParameterValue> parameters,
+        RecordCondition? condition,
+        string? search,
+        RecordCipher? cipher,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(connection);
@@ -127,7 +147,7 @@ public static class DataSourceQueries
             await using var reader = await command.ExecuteReaderAsync(cancellationToken);
             while (await reader.ReadAsync(cancellationToken))
             {
-                items.Add(dataSource.Aggregate is { } grouped ? ReadGroupedRow(reader, grouped) : ReadRow(reader, dataSource));
+                items.Add(dataSource.Aggregate is { } grouped ? ReadGroupedRow(reader, grouped) : await ReadRowAsync(reader, dataSource, cipher, cancellationToken));
             }
 
             return new DataSourceRowPage(items, totalCount);
@@ -146,6 +166,22 @@ public static class DataSourceQueries
     /// exception (SQLSTATE class 22) that the filter or the condition raises for some row, which the
     /// caller maps.
     /// </summary>
+    public static IAsyncEnumerable<DataSourceRow> ReadAllAsync(
+        NpgsqlConnection connection,
+        ApplicationModel application,
+        DataSourceModel dataSource,
+        DataSourceSort? sort,
+        IReadOnlyList<DataSourceParameterValue> parameters,
+        RecordCondition? condition,
+        string? search,
+        int limit,
+        CancellationToken cancellationToken = default) =>
+        ReadAllAsync(connection, application, dataSource, sort, parameters, condition, search, limit, null, cancellationToken);
+
+    /// <summary>
+    /// Streams the rows as the stream without a cipher does, and decrypts the value of each projected sensitive field with
+    /// <paramref name="cipher"/>. Without a cipher, a row that holds a stored sensitive value throws.
+    /// </summary>
     public static async IAsyncEnumerable<DataSourceRow> ReadAllAsync(
         NpgsqlConnection connection,
         ApplicationModel application,
@@ -155,6 +191,7 @@ public static class DataSourceQueries
         RecordCondition? condition,
         string? search,
         int limit,
+        RecordCipher? cipher,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(connection);
@@ -181,7 +218,7 @@ public static class DataSourceQueries
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         while (await reader.ReadAsync(cancellationToken))
         {
-            yield return dataSource.Aggregate is { } grouped ? ReadGroupedRow(reader, grouped) : ReadRow(reader, dataSource);
+            yield return dataSource.Aggregate is { } grouped ? ReadGroupedRow(reader, grouped) : await ReadRowAsync(reader, dataSource, cipher, cancellationToken);
         }
     }
 
@@ -512,16 +549,23 @@ public static class DataSourceQueries
 
     /// <summary>
     /// The root id, then every projected field in projection order, decimals as text so no digit is
-    /// lost. Then the display field of each projected reference's target, from its join.
+    /// lost and a sensitive value as its stored bytes. Then the display field of each projected reference's
+    /// target, from its join. Then the id of the row that holds each projected sensitive field reached through a
+    /// reference path, which scopes its decryption.
     /// </summary>
     private static string SelectList(DataSourceModel dataSource, Joins joins) =>
         string.Join(", ", [
             $"{EntityNaming.Quote(RowAlias)}.{EntityNaming.Quote(EntityNaming.IdColumn)}",
             .. dataSource.Fields.Select(field =>
-                joins.ColumnOf(field.Path) + (FieldTypes.HoldsDecimal(field.Field.Type) ? "::text" : "")),
+                joins.ColumnOf(field.Path) + (!field.Field.Sensitive && FieldTypes.HoldsDecimal(field.Field.Type) ? "::text" : "")),
             .. References(dataSource).Select(field =>
                 $"{joins.TargetAlias(field.Path)}.{EntityNaming.Quote(EntityNaming.Column(field.Field.TargetDisplayField!))}"),
+            .. NestedSensitive(dataSource).Select(field =>
+                $"{joins.TargetAlias([.. field.Path.Take(field.Path.Count - 1)])}.{EntityNaming.Quote(EntityNaming.IdColumn)}"),
         ]);
+
+    private static IEnumerable<DataSourceFieldModel> NestedSensitive(DataSourceModel dataSource) =>
+        dataSource.Fields.Where(field => field.Field.Sensitive && field.Path.Count > 1);
 
     private static IEnumerable<DataSourceFieldModel> References(DataSourceModel dataSource) =>
         References(dataSource.Fields);
@@ -655,14 +699,35 @@ public static class DataSourceQueries
         return new DataSourceRow(null, values, labels);
     }
 
-    private static DataSourceRow ReadRow(NpgsqlDataReader reader, DataSourceModel dataSource)
+    private static async Task<DataSourceRow> ReadRowAsync(
+        NpgsqlDataReader reader, DataSourceModel dataSource, RecordCipher? cipher, CancellationToken cancellationToken)
     {
+        // The ids of the rows that hold the sensitive fields of a reference path come after the labels.
+        var references = References(dataSource).Count();
+        var idOrdinal = dataSource.Fields.Count + 1 + references;
         var values = new Dictionary<string, JsonValue?>(dataSource.Fields.Count, StringComparer.Ordinal);
         for (var index = 0; index < dataSource.Fields.Count; index++)
         {
             var field = dataSource.Fields[index];
             var ordinal = index + 1;
-            values[field.Name] = reader.IsDBNull(ordinal) ? null : RecordQueries.ReadValue(reader, ordinal, field.Field);
+            if (!field.Field.Sensitive)
+            {
+                values[field.Name] = reader.IsDBNull(ordinal) ? null : RecordQueries.ReadValue(reader, ordinal, field.Field);
+                continue;
+            }
+
+            // The value is bound to the entity and the id of the row that holds it. Through a null reference both are null.
+            var nested = field.Path.Count > 1;
+            var idColumn = nested ? idOrdinal++ : 0;
+            if (reader.IsDBNull(ordinal))
+            {
+                values[field.Name] = null;
+                continue;
+            }
+
+            var entityId = nested ? field.Path[^2].Target!.Id : dataSource.Entity.Id;
+            values[field.Name] = (JsonValue)await RecordCipher.DecryptAsync(
+                cipher, entityId, reader.GetGuid(idColumn), field.Field, reader.GetFieldValue<byte[]>(ordinal), cancellationToken);
         }
 
         // A null reference, or a target whose display column is NULL, has no label.

@@ -620,15 +620,24 @@ internal static class ProcessInspectionEndpoints
 /// <summary>
 /// Who reads an instance detail. A user holds the grants of their roles in the application. The operator of the
 /// console stands in for the <c>inspect</c> grant and for a <c>read</c> grant with no <c>fields</c> list, so they
-/// inspect every process and read every field, and they hold no operator command yet.
+/// inspect every process and read every field. <see cref="Operator"/> also stands in for the <c>retry</c>, <c>cancel</c> and
+/// <c>resolve</c> grants, and <see cref="OperatorReadOnly"/> holds none of them, for an instance whose commands cannot run.
 /// </summary>
 internal sealed class InspectionViewer
 {
     private readonly IReadOnlyList<string>? _roles;
 
-    private InspectionViewer(IReadOnlyList<string>? roles) => _roles = roles;
+    private readonly bool _commands;
 
-    public static InspectionViewer Operator { get; } = new(null);
+    private InspectionViewer(IReadOnlyList<string>? roles, bool commands = false)
+    {
+        _roles = roles;
+        _commands = commands;
+    }
+
+    public static InspectionViewer Operator { get; } = new(null, commands: true);
+
+    public static InspectionViewer OperatorReadOnly { get; } = new(null);
 
     public static InspectionViewer ForUser(IReadOnlyList<string> roles)
     {
@@ -644,13 +653,13 @@ internal sealed class InspectionViewer
         _roles is null ? null : PolicyEvaluator.Fields(application, _roles, entity, PolicyAction.Read);
 
     public bool AllowsRetry(ApplicationModel application, ProcessModel process) =>
-        _roles is not null && PolicyEvaluator.AllowsRetry(application, _roles, process);
+        _roles is null ? _commands : PolicyEvaluator.AllowsRetry(application, _roles, process);
 
     public bool AllowsCancel(ApplicationModel application, ProcessModel process) =>
-        _roles is not null && PolicyEvaluator.AllowsCancel(application, _roles, process);
+        _roles is null ? _commands : PolicyEvaluator.AllowsCancel(application, _roles, process);
 
     public bool AllowsResolve(ApplicationModel application, ProcessModel process) =>
-        _roles is not null && PolicyEvaluator.AllowsResolve(application, _roles, process);
+        _roles is null ? _commands : PolicyEvaluator.AllowsResolve(application, _roles, process);
 }
 
 /// <summary>One page of the instances of a process, and the number of them on every page.</summary>

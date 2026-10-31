@@ -65,11 +65,15 @@ public sealed record RecordCipher(SensitiveValues Values, string TenantId)
         return record with { Values = values };
     }
 
+    internal static Task<JsonNode> DecryptAsync(
+        RecordCipher? cipher, EntityModel entity, Guid rowId, FieldModel field, byte[] stored, CancellationToken cancellationToken) =>
+        DecryptAsync(cipher, entity.Id, rowId, field, stored, cancellationToken);
+
     internal static async Task<JsonNode> DecryptAsync(
-        RecordCipher? cipher, EntityModel entity, Guid rowId, FieldModel field, byte[] stored, CancellationToken cancellationToken)
+        RecordCipher? cipher, Guid entityId, Guid rowId, FieldModel field, byte[] stored, CancellationToken cancellationToken)
     {
         RequireCipher(cipher);
-        return await cipher.Values.DecryptAsync(new SensitiveValueScope(cipher.TenantId, entity.Id, rowId), field, stored, cancellationToken);
+        return await cipher.Values.DecryptAsync(new SensitiveValueScope(cipher.TenantId, entityId, rowId), field, stored, cancellationToken);
     }
 
     /// <summary>Throws when there is no cipher, for a read of a stored sensitive value or a write of one.</summary>

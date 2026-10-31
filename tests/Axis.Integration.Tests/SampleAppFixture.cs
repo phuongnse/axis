@@ -30,7 +30,8 @@ namespace Axis.Integration.Tests;
 /// server migrates it and activates the purchase request sample through <c>ActivateOnStartup</c>,
 /// so the sample's department seeds are applied as well. The test authentication scheme signs in
 /// <c>requester</c> and <c>employee</c>, two employees, <c>manager-2</c>, the Operations manager, <c>manager</c>, the
-/// Engineering manager, and <c>finance-reviewer</c> and <c>reviewer</c>, two finance reviewers. The fixture also holds the worker's services for the tenant, with the host never
+/// Engineering manager, and <c>finance-reviewer</c> and <c>reviewer</c>, two finance reviewers. <c>platform-operator</c> holds only the role that
+/// <c>Console:OperatorRole</c> names, so it is the operator of the console with no grant in the sample. The fixture also holds the worker's services for the tenant, with the host never
 /// started, so a test runs the work items itself. A test can instead start real worker hosts with
 /// <see cref="StartWorkerAsync"/>, and stop them to stand for a worker that is down.
 /// The purchasing system stub runs in process over <c>http</c>. The workers run in Development, the
@@ -102,6 +103,7 @@ public sealed class SampleAppFixture : IAsyncLifetime
             builder.UseSetting("Extensions:Path", SamplePackages.Path);
             builder.UseSetting("Modules:Path", SampleModules.Path);
             builder.UseSetting("ActivateOnStartup:0", _appFolder);
+            builder.UseSetting("Console:OperatorRole", "platform-operator");
             builder.UseTestAuthentication(
                 new TestIdentity("requester", "Requester User", "employee"),
                 new TestIdentity("employee", "Employee User", "employee"),
@@ -110,7 +112,8 @@ public sealed class SampleAppFixture : IAsyncLifetime
                 new TestIdentity("finance-reviewer", "Finance Reviewer User", "finance-reviewer"),
                 new TestIdentity("reviewer", "Reviewer User", "finance-reviewer"),
                 new TestIdentity("operator", "Operator User", "operator"),
-                new TestIdentity("khanh", "Khanh Operator Reviewer", "operator", "finance-reviewer"));
+                new TestIdentity("khanh", "Khanh Operator Reviewer", "operator", "finance-reviewer"),
+                new TestIdentity("platform-operator", "Platform Operator User", "platform-operator"));
         });
 
         // Creating a client starts the server, which migrates the database and activates the sample first.

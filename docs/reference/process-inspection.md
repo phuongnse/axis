@@ -516,8 +516,9 @@ two apart. An instance without a subject has no record, so the grant is the
 only check. No `read` check runs and there is no policy `409` for a pending
 field. The check depends on the stored instance, so an instance with a subject
 is never exempt from the read check. Every request is also checked on the server, whatever the widget
-shows. _(planned for M23)_ In the [operator console](operator-console.md), the
-operator role stands in for these grants.
+shows. In the [operator console](operator-console.md), the
+operator role stands in for these grants and for the read check on the subject
+record.
 
 ### Retry
 

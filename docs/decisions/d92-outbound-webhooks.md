@@ -8,8 +8,8 @@ It builds on the events of [D26](d26-events-and-triggers.md), the bindings of
 [D25](d25-connectors-deployment-bindings-and-secrets.md), and the event
 delivery limit and dead letters that M14 adds. The resource, its compile
 checks, the activation check of its bindings, the delivery, the rotation by two
-secrets and the dead letters of a failing delivery are built. The console view
-is _(planned for M23)_. See
+secrets, the dead letters of a failing delivery and the console view are built.
+See
 [outbound webhooks](../reference/outbound-webhooks.md#outbound-webhooks).
 
 - **A `webhook` resource:**

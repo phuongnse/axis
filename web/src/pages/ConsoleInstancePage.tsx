@@ -14,8 +14,8 @@ type InstanceState = InstanceDetail | null | typeof forbidden | 'failed'
 /**
  * One instance of the operator console, opened from an entry of Failed work. It shows the same steps, history, tasks
  * and calls as the process inspector, from `GET /api/console/instances/{id}`. The page is outside every site, so it has
- * no release texts and shows the names of the steps. The detail offers no command yet. A user without the operator
- * role sees the forbidden page.
+ * no release texts and shows the names of the steps. The detail offers the commands the server lists, which the
+ * operator sends to the console routes. A user without the operator role sees the forbidden page.
  */
 export function ConsoleInstancePage() {
   const t = useText()

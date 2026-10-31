@@ -46,6 +46,6 @@ product brief.
 - **A webhook** _(built)_: an approved request raises an event that
   a webhook delivers, signed ([D92](d92-outbound-webhooks.md)). In the journey
   the receiver first fails, so the delivery becomes a dead letter.
-- **The console** _(planned for M23)_: the platform operator finds that dead
+- **The console** _(built)_: the platform operator finds that dead
   letter in the console, redelivers it and sees it delivered
   ([D93](d93-an-operator-web-console.md)).

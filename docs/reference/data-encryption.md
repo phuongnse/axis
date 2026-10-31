@@ -26,8 +26,10 @@ encrypted as [storage](storage.md#platform-database) describes, and nothing here
   A field rename is a [migration](migrations.md#migrations), and it re-encrypts the field's values under the new
   name.
 - **Child entities.** A sensitive field of a child entity is bound to the child row's id.
-- **What reads it.** Computed fields that are not stored, rules and process expressions read the decrypted value, as
-  they read any field. Process inspection still hides it, see
+- **What reads it.** A computed field is always stored, and it cannot read a sensitive field. A computed field may be
+  sensitive itself. Data sources, a computed field that a read works out on the spot because activation has not
+  recomputed it yet, and an aggregate over a `references` field read the decrypted value, as they read any field. So do
+  rules and process expressions. Process inspection still hides it, see
   [sensitive fields](roles-and-policies.md#sensitive-fields).
 
 ## Exact lookup
@@ -62,6 +64,8 @@ before the values are encrypted. The exact lookup exception is planned.
 - A reference, references or file field. These cannot be `sensitive` at all.
 - The entity's `displayField`, which shows as a record's label in lists and links.
 - A stored computed field that reads it.
+- A migration `fill` or `convert` whose target is a sensitive field, at `/changes/{i}/field`. Its SQL would write
+  plain text into the encrypted column.
 - An expression that runs as SQL, such as a data source `filter` or a policy grant's `filter`, other than the
   equality of an exact lookup. A migration `fill` or `convert` value is one, so it may not read a sensitive field.
 
@@ -122,10 +126,18 @@ sensitive value is a `500` problem, an error log line names the tenant, and no r
 finds no key fails with the same error and stores nothing in clear. Test: `RecordSensitiveValueTests` for the record
 API, `ProcessSensitiveValueTests` for process steps and `ConnectorCallSensitiveOutputTests` for connector call outputs.
 
+A data source decrypts the value of a projected sensitive field, on the root entity and through a reference path, in its
+rows and its export, for a user whose grants cover the field. A value that does not decrypt is a `500`. Test:
+`DataSourceSensitiveValueTests`. A rule or form requirement that aggregates over a `references` field reads the
+target's decrypted values, and the server reads a pending computed field, and writes a sensitive computed value, with
+the cipher. Test: `SensitiveComputedReadTests`.
+
 Imports, seeds and scenarios do not use the cipher yet _(planned for M27)_. A write of a sensitive value on those paths
 fails, and a value is never written in clear. The trigger and starter reads do not use it yet either _(planned for
 M27)_: a data change trigger, the process starter, an event trigger start or a task escalation that reads a record
-holding a stored sensitive value fails. The rotation below is also _(planned for M27)_.
+holding a stored sensitive value fails. Activation's inline recompute of computed fields and the worker's
+`computed.backfill` do not use the cipher either: on an entity that holds a stored sensitive value they fail and write
+nothing, until they do _(planned for M27)_. The rotation below is also _(planned for M27)_.
 
 ### Rotating the keys
 

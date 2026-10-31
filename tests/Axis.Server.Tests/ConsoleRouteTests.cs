@@ -9,7 +9,8 @@ using Microsoft.Extensions.DependencyInjection;
 namespace Axis.Server.Tests;
 
 /// <summary>
-/// The operator console only reads, apart from the two dead letter commands. The routes come from the server's endpoint
+/// The operator console only reads, apart from the operator commands: discard and redeliver a dead letter, and retry,
+/// cancel and resolve on an instance. The routes come from the server's endpoint
 /// data source, so a route added to the console later is checked without anyone adding it here.
 /// </summary>
 public sealed class ConsoleRouteTests
@@ -21,10 +22,13 @@ public sealed class ConsoleRouteTests
     [
         "POST /api/console/dead-letters/{id}/discard",
         "POST /api/console/dead-letters/{id}/redeliver",
+        "POST /api/console/instances/{id}/calls/{callId}/resolve",
+        "POST /api/console/instances/{id}/cancel",
+        "POST /api/console/instances/{id}/retry",
     ];
 
     [Fact]
-    public async Task The_console_has_no_write_route_except_the_dead_letter_commands()
+    public async Task The_console_has_no_write_route_except_the_operator_commands()
     {
         await using var factory = CreateFactory();
 

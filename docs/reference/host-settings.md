@@ -212,10 +212,8 @@ One server setting controls the
   no value nobody may. The Development settings set it to `platform-operator`, apart from the `operator` role of the purchase request sample.
   Application policies play no part. `GET /api/me` answers `console: true` for
   a user who holds it, and `console: false` for everyone when no value is set. That endpoint
-  already reads the setting. The routes `GET /api/console/tenant`, `GET /api/console/failed-work`,
-  `GET /api/console/instances/{id}`, `GET /api/console/webhook-deliveries` and
-  `GET /api/console/applications/{id}/publishing` and the Tenant, Failed work, Webhook deliveries and
-  Publishing views of the console are built, and the other views are planned for M23.
+  already reads the setting. The setting, every route under `/api/console/` and every view of the console are built, as
+  [operator console](operator-console.md) lists them.
 
 ## Users settings
 
