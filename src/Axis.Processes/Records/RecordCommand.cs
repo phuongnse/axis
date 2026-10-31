@@ -5,6 +5,7 @@ using Axis.Data.Audit;
 using Axis.Data.Records;
 using Axis.Policy;
 using Axis.Processes.Instances;
+using Axis.Tenancy;
 using Microsoft.Extensions.Logging;
 using Npgsql;
 
@@ -123,6 +124,9 @@ public delegate Task<byte[]?> RecordBodyReader(CancellationToken cancellationTok
 /// A delete starts the processes of the delete triggers on the entity, in the same transaction, after the
 /// audit record. Each starts a process without a subject, with parameters worked out from the record as it
 /// was before the delete. A delete that is refused starts none.
+/// A create, update or delete given a <c>writeTimeout</c> sets it as the <c>statement_timeout</c> of its write
+/// transaction, before the start lock. A statement past it is cancelled by PostgreSQL, the write rolls back and
+/// the command throws the <see cref="PostgresException"/>, so the caller decides how to answer.
 /// A create, update or delete takes the application's start lock shared, as the first statement of its write
 /// transaction. When the active release is no longer the given release, it writes nothing and the
 /// outcome is <see cref="RecordCommandOutcome.ReleaseChanged"/>, so the caller can run it again on the
@@ -154,7 +158,8 @@ public static class RecordCommand
         string? form,
         RecordCipher? cipher,
         ILoggerFactory loggerFactory,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        TimeSpan? writeTimeout = null)
     {
         var access = PolicyEvaluator.Access(application, actor.Roles, model, PolicyAction.Create);
         if (!access.Granted)
@@ -183,6 +188,12 @@ public static class RecordCommand
         RecordCommandResult result;
         await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))
         {
+            // The write limit comes first, so it also bounds the wait for the start lock.
+            if (writeTimeout is { } limit)
+            {
+                await StatementTimeout.SetLocalAsync(transaction, limit, cancellationToken);
+            }
+
             // The start lock comes first, before any entity table is touched in this transaction, so a
             // migrating activation cannot deadlock with this write. A create or update can start a process
             // whatever the release it was given declares, since the new release may add triggers.
@@ -382,7 +393,8 @@ public static class RecordCommand
         string? form,
         RecordCipher? cipher,
         ILoggerFactory loggerFactory,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        TimeSpan? writeTimeout = null)
     {
         // An update needs the stored record to be readable, then to match an update filter. Each
         // check gives the version it saw, which the body must name, so a write in between cannot
@@ -438,6 +450,12 @@ public static class RecordCommand
         RecordCommandResult result;
         await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))
         {
+            // The write limit comes first, so it also bounds the wait for the start lock.
+            if (writeTimeout is { } limit)
+            {
+                await StatementTimeout.SetLocalAsync(transaction, limit, cancellationToken);
+            }
+
             // The start lock comes first, before any entity table is touched in this transaction, so a
             // migrating activation cannot deadlock with this write. A create or update can start a process
             // whatever the release it was given declares, since the new release may add triggers.
@@ -761,7 +779,8 @@ public static class RecordCommand
         Guid recordId,
         RecordActor actor,
         ILoggerFactory loggerFactory,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        TimeSpan? writeTimeout = null)
     {
         var access = PolicyEvaluator.Access(application, actor.Roles, model, PolicyAction.Delete);
         if (!access.Granted)
@@ -779,6 +798,12 @@ public static class RecordCommand
         RecordDeleteResult result;
         await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))
         {
+            // The write limit comes first, so it also bounds the wait for the start lock.
+            if (writeTimeout is { } limit)
+            {
+                await StatementTimeout.SetLocalAsync(transaction, limit, cancellationToken);
+            }
+
             // The start lock comes first, so a migrating activation cannot deadlock with this delete, and the
             // record's row lock below orders the delete with a start. The delete triggers and their starts come
             // from the active release, so a delete given another release runs again on it.

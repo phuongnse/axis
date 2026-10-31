@@ -25,7 +25,8 @@ namespace Axis.Server.Endpoints;
 /// <c>WWW-Authenticate: Bearer</c>, which never says which check failed.
 /// The transaction takes the application's start lock shared first. When the active release is no
 /// longer the one resolved, the call runs again from resolution on the new release, and answers 503
-/// after three attempts.
+/// after three attempts. The transaction runs under <c>Data:WriteTimeout</c>, set before the start lock. A call past it
+/// rolls back, writes nothing and answers 503.
 /// A call is checked in order: bearer token (401), application and endpoint (404), the caller's
 /// <c>invoke</c> grant on the endpoint (403), content type (415), the body against the
 /// endpoint's input fields (400 keyed <c>/input/…</c>), and <c>Idempotency-Key</c> (400). One
@@ -64,7 +65,7 @@ internal static class InboundEndpoints
 
     public static void MapInboundEndpoints(this IEndpointRouteBuilder endpoints)
     {
-        endpoints.MapPost("/api/apps/{app}/endpoints/{name}", CallAsync);
+        endpoints.MapPost("/api/apps/{app}/endpoints/{name}", CallAsync).WithWriteTimeout();
         endpoints.MapGet("/api/apps/{app}/endpoints/{name}/instances/{instanceId}", StatusAsync);
     }
 
@@ -177,6 +178,9 @@ internal static class InboundEndpoints
         Guid? instanceId = process is null ? null : Guid.CreateVersion7();
         var connection = await database.GetConnectionAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+
+        // The write limit comes first, so it also bounds the wait for the start lock.
+        await database.LimitWriteAsync(transaction, cancellationToken);
 
         // The start lock comes first, before any entity table is touched, so a migrating activation
         // cannot deadlock with this call. The release is read again under it.

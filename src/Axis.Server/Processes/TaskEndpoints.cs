@@ -27,7 +27,8 @@ namespace Axis.Server.Processes;
 /// completion the task id and the task's application (404) and who may act (403).
 /// A completion takes the application's start lock shared first. When the active release is no
 /// longer the one resolved, it runs again from resolution on the new release, and answers 503
-/// after three attempts.
+/// after three attempts. The completion's transaction runs under <c>Data:WriteTimeout</c>, set before the start lock.
+/// A completion past it rolls back, writes nothing and answers 503.
 /// A completion then locks the task and runs <see cref="TaskCompletionCommand"/>, which checks that
 /// it is open (409), then the content type (415), the body (400) and the record write of its
 /// values (400, 409). One transaction writes the values, closes the task, resumes the instance
@@ -84,7 +85,7 @@ internal static class TaskEndpoints
         var tasks = endpoints.MapGroup("/api/apps/{app}/tasks");
         tasks.MapGet("", ListAsync);
         tasks.MapGet("/{id}", GetAsync);
-        tasks.MapPost("/{id}/complete", CompleteAsync);
+        tasks.MapPost("/{id}/complete", CompleteAsync).WithWriteTimeout();
         tasks.MapPost("/{id}/form-state", FormStateAsync);
         tasks.MapPost("/{id}/claim", ClaimAsync);
         tasks.MapPost("/{id}/release", ReleaseAsync);
@@ -231,6 +232,9 @@ internal static class TaskEndpoints
             var connection = await database.GetConnectionAsync(cancellationToken);
             await using (var transaction = await connection.BeginTransactionAsync(cancellationToken))
             {
+                // The write limit comes first, so it also bounds the wait for the start lock.
+                await database.LimitWriteAsync(transaction, cancellationToken);
+
                 // The start lock comes first, before any table is touched, so a migrating activation
                 // cannot deadlock with this completion. The release is read again under it.
                 if (await StartLock.TakeSharedAsync(transaction, active.Model.Manifest.Id, cancellationToken) != active.ReleaseId)

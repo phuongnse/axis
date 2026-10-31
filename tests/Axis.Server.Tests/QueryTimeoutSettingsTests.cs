@@ -12,15 +12,17 @@ public sealed class QueryTimeoutSettingsTests
 
         Assert.Equal(TimeSpan.FromSeconds(10), settings.For(QueryTimeoutSettings.Interactive));
         Assert.Equal(TimeSpan.FromMinutes(1), settings.For(QueryTimeoutSettings.Export));
+        Assert.Equal(TimeSpan.FromSeconds(15), settings.For(QueryTimeoutSettings.Write));
     }
 
     [Fact]
     public void A_duration_is_read_for_each_setting()
     {
-        var settings = Load((QueryTimeoutSettings.Interactive, "00:00:00.200"), (QueryTimeoutSettings.Export, "00:05:00"));
+        var settings = Load((QueryTimeoutSettings.Interactive, "00:00:00.200"), (QueryTimeoutSettings.Export, "00:05:00"), (QueryTimeoutSettings.Write, "00:00:02"));
 
         Assert.Equal(TimeSpan.FromMilliseconds(200), settings.For(QueryTimeoutSettings.Interactive));
         Assert.Equal(TimeSpan.FromMinutes(5), settings.For(QueryTimeoutSettings.Export));
+        Assert.Equal(TimeSpan.FromSeconds(2), settings.For(QueryTimeoutSettings.Write));
     }
 
     [Theory]
@@ -32,6 +34,9 @@ public sealed class QueryTimeoutSettingsTests
     [InlineData("Data:QueryTimeout", "30.00:00:00")]
     [InlineData("Data:ExportQueryTimeout", "0")]
     [InlineData("Data:ExportQueryTimeout", "abc")]
+    [InlineData("Data:WriteTimeout", "0")]
+    [InlineData("Data:WriteTimeout", "00:00:00.0001")]
+    [InlineData("Data:WriteTimeout", "abc")]
     public void A_value_that_is_not_a_positive_duration_stops_the_start(string setting, string value)
     {
         var exception = Assert.Throws<InvalidOperationException>(() => Load((setting, value)));

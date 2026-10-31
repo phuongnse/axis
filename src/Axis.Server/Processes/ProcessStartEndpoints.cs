@@ -35,7 +35,8 @@ namespace Axis.Server.Processes;
 /// claimed key returns the stored response, or 422 for another record. A start that fails writes
 /// nothing. The transaction takes the application's start lock shared first. When the active
 /// release is no longer the one resolved, the start runs again from resolution on the new release,
-/// and answers 503 after three attempts. The problem titles never contain text from the request.
+/// and answers 503 after three attempts. The transaction runs under <c>Data:WriteTimeout</c>, set before the start lock. A start past it
+/// rolls back, writes nothing and answers 503. The problem titles never contain text from the request.
 /// </summary>
 internal static class ProcessStartEndpoints
 {
@@ -63,7 +64,7 @@ internal static class ProcessStartEndpoints
         // the process name as two, so no process has two URLs.
         foreach (var pattern in new[] { "/api/apps/{app}/processes/{process}/instances", "/api/apps/{app}/processes/{module}/{process}/instances" })
         {
-            endpoints.MapPost(pattern, StartAsync).WithMetadata(ServiceAccountRoute.Instance);
+            endpoints.MapPost(pattern, StartAsync).WithMetadata(ServiceAccountRoute.Instance).WithWriteTimeout();
         }
     }
 
@@ -161,6 +162,9 @@ internal static class ProcessStartEndpoints
 
         var connection = await database.GetConnectionAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+
+        // The write limit comes first, so it also bounds the wait for the start lock.
+        await database.LimitWriteAsync(transaction, cancellationToken);
 
         // The start lock comes first, before any entity table is touched, so a migrating activation
         // cannot deadlock with this start. The release is read again under it.
@@ -276,6 +280,9 @@ internal static class ProcessStartEndpoints
 
         var connection = await database.GetConnectionAsync(cancellationToken);
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
+
+        // The write limit comes first, so it also bounds the wait for the start lock.
+        await database.LimitWriteAsync(transaction, cancellationToken);
 
         if (await StartLock.TakeSharedAsync(transaction, application.Manifest.Id, cancellationToken) != active.ReleaseId)
         {

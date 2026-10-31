@@ -36,6 +36,26 @@ internal sealed class TenantDatabase(ITenantConnectionFactory connections) : IAs
     /// </summary>
     public void LimitReads(TimeSpan timeout) => _readLimit = timeout;
 
+    /// <summary>
+    /// The <c>statement_timeout</c> that <see cref="LimitWrites"/> asked for, or <see langword="null"/> when
+    /// this scope's writes run with no limit of their own.
+    /// </summary>
+    public TimeSpan? WriteLimit { get; private set; }
+
+    /// <summary>
+    /// Asks for each write transaction of this scope to run under a <c>statement_timeout</c> of
+    /// <paramref name="timeout"/>, which <see cref="LimitWriteAsync"/> sets. It does no I/O.
+    /// </summary>
+    public void LimitWrites(TimeSpan timeout) => WriteLimit = timeout;
+
+    /// <summary>
+    /// Sets the write limit for <paramref name="transaction"/> only, so it never reaches the next user of the
+    /// pooled connection. It does nothing when no limit is set. Call it first in the write transaction, before
+    /// the start lock, so the limit also bounds a wait behind an activation.
+    /// </summary>
+    public Task LimitWriteAsync(NpgsqlTransaction transaction, CancellationToken cancellationToken) =>
+        WriteLimit is { } limit ? StatementTimeout.SetLocalAsync(transaction, limit, cancellationToken) : Task.CompletedTask;
+
     /// <summary>The scope's tenant connection, which the scope owns.</summary>
     /// <exception cref="InvalidOperationException">No tenant context is set.</exception>
     public async ValueTask<NpgsqlConnection> GetConnectionAsync(CancellationToken cancellationToken = default)
