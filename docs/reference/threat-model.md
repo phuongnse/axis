@@ -592,9 +592,6 @@ Open, waiting for an issue:
 - (Data disclosure, High) a database login, a dump or a replica reads personal data and `sensitive` fields
   in clear, _(planned for M27)_, [D109](../decisions/d109-sensitive-fields-and-backups-are-encrypted-and-history-keeps-no-names.md).
   Until then the operator's control is I15.
-- (Data disclosure, High) a backup archive is readable by whoever holds it, _(planned for M27)_,
-  [D109](../decisions/d109-sensitive-fields-and-backups-are-encrypted-and-history-keeps-no-names.md).
-  Until then the operator's control is I15.
 - (Non-compliance, Medium) `axis.email_outbox` rows keep the address and the body forever.
 - (Non-compliance, Medium) `axis.user_profiles` rows and old audit records cannot be removed for a person's
   removal request.
@@ -742,8 +739,8 @@ flowchart LR
 
 | Id | Threat | Boundary | Category | Rating | Status | Evidence |
 | --- | --- | --- | --- | --- | --- | --- |
-| I14 | A backup archive or its output holds a tenant secret. | Database and backups | Information disclosure | High | **Mitigated** | `AdminTenantBackupTests` (the archive and the output of a backup hold no secret of the tenant). |
-| I15 | A stolen archive or database dump exposes business data. | Database and backups | Information disclosure | High | **Delegated** | The operator stores backups under access control and under disk or database encryption, see [What else to back up](administration.md#what-else-to-back-up) and [Restricted](keys-and-data-protection.md#restricted). Encrypted archives are planned for M27, see [D109](../decisions/d109-sensitive-fields-and-backups-are-encrypted-and-history-keeps-no-names.md). |
+| I14 | A backup archive or its output holds a tenant secret in clear. | Database and backups | Information disclosure | High | **Mitigated** | `AdminTenantBackupTests` (the archive and the output of a backup hold no password, client secret or binding secret of the tenant) and `AdminEncryptedBackupTests` (the archive bytes hold no tenant key, in base64 or raw, and no backup key). |
+| I15 | A stolen tenant archive exposes business data. | Database and backups | Information disclosure | High | **Mitigated** | `AdminEncryptedBackupTests` (the archive is encrypted with the backup key, holds neither the dump's bytes nor the tenant id, a restore refuses an archive that is not encrypted, a wrong key or a cut archive, and a changed chunk fails the restore). The operator keeps the backup key outside the installation, see [What else to back up](administration.md#what-else-to-back-up), and stores a dump that the operator made with its own tools under access control, see [Restricted](keys-and-data-protection.md#restricted). |
 | I16 | A backup is stored with the installation key, so a stolen backup yields the stored secrets. | Database and backups | Information disclosure | High | **Delegated** | The operator keeps the installation key apart from the backups, see [What else to back up](administration.md#what-else-to-back-up). |
 | I17 | A failed upgrade or a lost database cannot be restored. | Database and backups | Denial of service | Medium | **Delegated** | The operator backs up the platform and tenant databases before each upgrade, see [Upgrade](installation.md#upgrade). |
 | I18 | A host connects to PostgreSQL without a full certificate check. | Database and backups | Tampering | High | **Mitigated** | `DatabaseTlsStartTests` (a production server stops at start on a connection string without full certificate checks), `AdminDatabaseTlsTests` (an admin command exits with status 2 for such a string). |

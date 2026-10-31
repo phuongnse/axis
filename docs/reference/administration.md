@@ -39,7 +39,7 @@ which host holds which connection. There is no HTTP API for provisioning.
 | `ConnectionStrings:PlatformSchema` | `ConnectionStrings__PlatformSchema` | The role that owns the `platform` schema. The tool writes the tenant directory over it. |
 | `Platform:SecretKey` | `Platform__SecretKey` | The installation key that encrypts the generated passwords and the OIDC client secret, see [platform database](storage.md#platform-database). |
 | `Platform:PreviousSecretKey` | `Platform__PreviousSecretKey` | Optional. The old installation key during a rotation. Every command decrypts with it when `Platform:SecretKey` does not match. `platform rekey` needs it. A malformed value exits with code 2, naming the setting. See [installation key](tenant-setting-commands.md#installation-key). |
-| `IdentityProvider:Url` | `IdentityProvider__Url` | The base address of [Axis's identity provider](identity-provider.md), such as `https://idp.example.com/`. `tenant create` of a main tenant reads it, and `tenant restore` reads it when it is set. `tenant restore` needs it when the archive's tenant signed in through its own realm, see [Tenant restore](#tenant-restore). It must be an absolute URL, and `https` outside `Development` and `Testing`. A path in it is kept. |
+| `IdentityProvider:Url` | `IdentityProvider__Url` | The base address of [Axis's identity provider](identity-provider.md), such as `https://idp.example.com/`. `tenant create` of a main tenant reads it, and `tenant restore` reads it when it is set. `tenant restore` needs it when the archive's tenant signed in through its own realm, see [Tenant restore](tenant-backup-and-restore.md#tenant-restore). It must be an absolute URL, and `https` outside `Development` and `Testing`. A path in it is kept. |
 | `IdentityProvider:AdminClientId` | `IdentityProvider__AdminClientId` | The client of the identity provider's `master` realm that `tenant create` signs in as, with the client credentials grant, to create a tenant's realm. `tenant create` of a main tenant reads it, and so does `tenant restore` when it is set. |
 | `IdentityProvider:AdminClientSecret` | `IdentityProvider__AdminClientSecret` | The secret of that client. `tenant create` of a main tenant reads it, and so does `tenant restore` when `IdentityProvider:Url` is set. It is never stored and never printed. |
 | `Email:*` | `Email__...` | The host's mail settings, with the same keys as the worker's, see [mail settings](notifications.md#mail-settings). A tenant without mail settings of its own gets them in its realm's mail server, see [keeping the realm in step](identity-provider.md#keeping-the-realm-in-step). `tenant create`, `tenant restore`, `activate`, `publisher` and `tenant email set` and `clear` read them. A value that is not valid exits with code 2, naming the setting. Without them, a tenant that has no mail settings of its own gets no mail server in its realm. |
@@ -268,235 +268,9 @@ tenant itself. A host conflict is written as an
 `entry failed` line that names no host, and it creates no entry, role or
 database.
 
-## Tenant backup
+## Tenant backup and restore
 
-`tenant backup <id> --out <file>` writes one
-archive of one tenant. See [D45](../decisions/d45-tenant-backup-and-restore.md).
-
-| Option | Meaning |
-| --- | --- |
-| `<id>` | The tenant id. |
-| `--out <file>` | The archive to write. The file must not exist, and its folder must exist. Only its owner can read it, because it holds all of the tenant's business data. |
-
-The archive is one tar file with two entries: `manifest.json` and `tenant.dump`.
-It holds no secret. No database password, OIDC client secret or `secret` binding
-value is ever in it, so it can be stored like any data file. _(planned for M27)_ The archive is encrypted with a backup key that the operator keeps outside the installation and gives as `--backup-key-file <file>`, and `tenant restore` needs the same key. The archive then carries the tenant's data keys. See [encrypted backups](data-encryption.md#encrypted-backups).
-
-**Steps, in order.**
-
-1. `dump`: run `pg_dump --format=custom --no-owner --no-privileges` over the
-   tenant database as its schema role. It reads one consistent snapshot, so the
-   tenant keeps running and its hosts keep answering. The tool reads the
-   manifest data inside the same snapshot, so a release that is activated during
-   the backup is in both the dump and the manifest or in neither. The schema
-   role's password goes to `pg_dump` in its environment, never in its
-   arguments. The tool holds one transaction open until the dump ends, so
-   vacuum on the tenant database waits, and so does an activation that changes
-   tables.
-2. `archive`: write the manifest and the dump into `--out`.
-
-A tenant in any status except `provisioning` can be backed up, also a
-`suspended` one. A `provisioning` tenant has no complete database.
-
-**Manifest.** `manifest.json` holds these fields:
-
-| Field | Meaning |
-| --- | --- |
-| `format` | The archive format version. It is `1`. |
-| `tenantId` | The id of the backed-up tenant. |
-| `axisVersion` | The version of the `Axis.Admin` build that wrote the archive. |
-| `schemaVersion` | The tenant's schema version at backup, see [Migrate](#migrate). |
-| `createdAt` | The time of the backup, in UTC. |
-| `directory` | The directory entry without any secret, see below. |
-| `packages` | Every extension package version that a stored release pins. Each has `id`, `version` and `required`. |
-| `modules` | Every module version that a stored release pins. Each has `id` and `version`. |
-
-`directory` holds these fields:
-
-| Field | Meaning |
-| --- | --- |
-| `status` | The status at backup, `active` or `suspended`. |
-| `previewOf` | The id of the main tenant for a [preview tenant](../architecture.md#preview-tenants), or `null` for a main tenant. |
-| `hosts`, `sites` | The tenant's hosts, in ordinal order. `sites` lists the hosts that belong to a site, each with `path` and `host`, in ordinal order of the path. An archive from before `sites` reads as no sites. |
-| `oidcAuthority` | The OIDC authority. |
-| `oidcClientId` | The OIDC client id. |
-| `realm` | `true` when the tenant signs in through its own realm in Axis's identity provider, see [identity provider](identity-provider.md). An archive from before the field reads as `false`, and a restore of it keeps its sign-in as it is. |
-| `claimUserId` | The claim name of the user id, or `null` for the default. |
-| `claimDisplayName` | The claim name of the display name, or `null` for the default. |
-| `claimRoles` | The claim name of the roles, or `null` for the default. |
-| `claimEmail` | The claim name of the email, or `null` for the default. |
-| `claimLocale` | The claim name of the locale, or `null` for the default. |
-| `endpointAudience` | The endpoint audience, or `null` for the default. |
-| `serviceAudience` | The service audience, or `null` when the tenant accepts no service account token. An archive from before the field reads as `null`. |
-| `bindings` | The bindings, in ordinal order of the name. Each has `name`, `kind` and, for a `url` or `storage` binding, `url`. |
-
-An archive written before `claimEmail` and `claimLocale` existed has neither, and a
-restore reads both as `null`.
-
-A `secret` binding holds only its name and kind. The database server, the
-database name, the role names and the `version` of the entry are not in the
-manifest, because a restore creates new ones. The tool builds the manifest from
-these named fields, so no other column of the directory reaches the archive.
-
-`required` is `true` for a package version that an active release, or a release
-with a running or waiting process instance, pins. These are the releases that the
-start check `AXC0146` rebuilds, see
-[extension packages](extension-packages.md). Other stored releases are listed
-with `required` set to `false`.
-
-**Failures.** A failed dump or write exits `1` and leaves no partial file. A
-`--out` that appears during the backup is never overwritten.
-
-**Exit codes.** `0` when the archive is written. `1` when the dump or the write
-failed. `2` for an unknown tenant, a `provisioning` tenant, an `--out` file that
-exists, a missing option, a missing tool or a missing setting.
-
-## Tenant restore
-
-`tenant restore <file> --tenant <id> --host <host>...`
-restores an archive into a new tenant. See [D45](../decisions/d45-tenant-backup-and-restore.md). _(planned for M27)_ It also takes `--backup-key-file <file>` and refuses an archive that is not encrypted, see [encrypted backups](data-encryption.md#encrypted-backups).
-
-| Option | Meaning |
-| --- | --- |
-| `<file>` | The archive that `tenant backup` wrote. |
-| `--tenant <id>` | The id of the new tenant. It follows the rule of `tenant create`. |
-| `--host <host>` | A host of the new tenant. Repeat it for more hosts. At least one is needed. |
-
-The authority and client id come from the manifest. The restored tenant either keeps the archive's sign-in or gets a new realm:
-
-- **Keeps the archive's sign-in.** This is the case when the archive's `realm` is `false`, and when it is `true` and the
-  realm that its authority names exists on the address in `IdentityProvider:Url`. The tenant keeps that realm and its users.
-  The OIDC client secret comes from `AXIS_OIDC_CLIENT_SECRET`.
-- **Gets a new realm.** This is the case when the archive's `realm` is `true` and that realm does not exist there, because it
-  is another installation's or was deleted. The `realm` step creates a realm named after the new tenant id, as `tenant create`
-  does. The tenant's sign-in settings point at it and its client secrets are generated, so `AXIS_OIDC_CLIENT_SECRET` is not used.
-
-**Refusals.** Each refusal happens before anything changes, exits `2` and names
-what is missing:
-
-- The archive is unreadable, has no `manifest.json` or `tenant.dump`, or has a
-  `format` this build does not know.
-- The archive's `schemaVersion` is newer than this build's, or is not the id of
-  one of its migrations.
-- The tenant id exists in the directory as `active` or `suspended`.
-- A host belongs to another tenant, ignoring letter case.
-- The archive is of a preview tenant. Preview data is
-  disposable, so the operator creates the preview again with
-  [`tenant create --preview-of`](#tenant-create). An archive written before
-  `previewOf` existed is recognised as a preview by its empty OIDC authority and
-  client id.
-- A package version with `required` set to `true` is not installed under
-  `Extensions:Path`. The message lists every missing version, not only the first.
-- The archive's `realm` is `true` and `IdentityProvider:Url` is not set, or the identity provider cannot say whether the realm exists.
-- The restored tenant keeps the archive's sign-in and `AXIS_OIDC_CLIENT_SECRET` is missing. This one is written to standard error, before any `check` line.
-
-Every failed check is reported, not only the first. Each one is a
-`<id> check failed: <message>` line on standard output, in the order of the list
-above. A refusal of the archive, the tenant id, the hosts or the packages is
-written this way. The message names the cause: the tenant id, the host as the
-operator typed it (it does not say which tenant holds it), the schema version
-and whether it is newer than this build's or unknown to it, or the package id
-and version. When the archive is unreadable or its format is unknown, the schema
-version and package checks are skipped, because the manifest cannot be trusted.
-The tenant id and host checks still run. A missing or invalid
-setting, a missing `pg_restore` and a usage error go to standard error. Both exit
-`2`, and nothing has changed.
-
-A module version that is not installed under `Modules:Path` is listed in the
-manifest but never refuses a restore. A stored release holds its module files, so
-it keeps working without the module installed.
-
-**Steps, in order.** Each step writes its own line.
-
-1. `check`: read the archive and make every check above. It asks the identity provider whether the archive's realm exists.
-2. `entry`: write the directory entry with status `provisioning`. It takes the
-   new id and hosts, and everything else from `directory` in the manifest. A `--host` that matches a `sites` entry's `host`, ignoring letter case, gets its site. A tenant that gets a new realm has empty sign-in settings until the `realm` step. A
-   `secret` binding is restored by name and kind, without a value. A `url` or `storage`
-   binding is restored with its value. The check refuses an archive whose `storage` binding has
-   a value other than `database`.
-3. `roles`: create `axis_<id>_schema` and `axis_<id>_runtime` with new random
-   passwords, as `tenant create` does.
-4. `database`: create `axis_<id>`, owned by the schema role.
-5. `restore`: run `pg_restore --single-transaction --no-owner --no-privileges`
-   as the schema role. It restores everything or nothing. The tool streams
-   `tenant.dump` from the archive to the standard input of `pg_restore`, so no
-   unpacked copy of the data is left on disk. The schema role's password goes
-   in the environment of `pg_restore`, never in its arguments. A database that
-   already holds tables counts as restored, and the step runs no `pg_restore`.
-6. `grants`: run the grant step. This builds every privilege for the new roles,
-   as [D31](../decisions/d31-separate-database-roles.md) describes.
-7. `migrations`: run the EF Core migrations. This step runs only when the
-   archive's schema version is older than this build's.
-8. `grants`: run the grant step again.
-9. `work`: give every work item the new tenant id. The worker claims only the
-   work items of its own tenant, so without this the work that was due at
-   backup would never run.
-10. `sessions`: empty `axis.sessions`, so no session of the archive signs
-    anyone in. The migrations ran before this step, so an archive older than the
-    table has it here.
-11. `role-check`: run the runtime role check of D31 over the runtime role.
-12. `realm`: only for a tenant that gets a new realm. Create the realm named after the new tenant id, with the clients `axis`,
-    `axis-activation` and `axis-users`, and save the generated client secrets, encrypted, as `tenant create` does. Then bring
-    the realm in step with the tenant's active releases: a `site-` client for each site, and a brokered provider for each `oidc`
-    identity provider. The archive holds no secret value, so a provider whose bindings have no value yet is left out, with a
-    `<id> warning ...` line on standard error that names the provider and the binding. The next `activate`, publish or
-    server start adds it once the operator has set those bindings.
-13. `version`: record the schema version and set the entry `suspended`. The step
-    fails unless the database is on the schema of this build, which catches an
-    archive whose manifest does not match its dump.
-
-**Running it again.** On a `provisioning` entry, the same command skips every
-step already done and finishes the rest, as `tenant create` does. An entry that already holds the secrets of a new realm goes on with the new realm. A failed
-`restore` step restored nothing, so the rerun restores again. A database that
-already holds tables counts as restored, so the rerun does not restore it a
-second time. On an `active` or `suspended` tenant it is refused.
-
-**Exit codes.** `0` when the tenant is `suspended` and restored. `1` when a step
-failed, and the entry stays `provisioning`. `2` for a refusal above, a missing
-option or a missing setting.
-
-**After a restore.** The tenant is `suspended`, and its hosts answer `503`.
-
-1. Set every `secret` binding again. The archive holds none of them. The restore takes the OIDC client
-   secret from `AXIS_OIDC_CLIENT_SECRET`, and a tenant with a new realm has its client secret already.
-2. Run [`tenant resume <id>`](tenant-status-commands.md#tenant-resume).
-
-A tenant with a new realm has no accounts, because the archive carries no account, credential or role mapping. Its people
-need new invitations. A provider that the `realm` step left out comes with the next activation, once its `secret` bindings are set.
-
-Set each `secret` binding with
-[`tenant binding set <id> <name> --secret`](tenant-setting-commands.md#deployment-bindings), see
-[tenant setting commands](tenant-setting-commands.md).
-
-**Restoring over an existing tenant.** There is no in-place overwrite.
-
-1. Run [`tenant suspend`](tenant-status-commands.md#tenant-suspend) on the tenant.
-2. Restore the archive under a new id, with a temporary host.
-3. Set the secrets again and resume the new tenant.
-4. Move the hosts from the old tenant to the new one with
-   [`tenant host move`](tenant-setting-commands.md#hosts).
-
-The old tenant stays in the directory, because there is no tenant delete. The new tenant keeps the old tenant's realm and its
-users, so its people sign in as before once the hosts move.
-
-**What a restore does to running work.** Work goes back to backup time, see
-[execution](../domain/knowledge.md#execution):
-
-- Process instances, tasks, work items and connector calls are as they were at
-  backup. The worker runs them again once the tenant resumes.
-- A call that was staged before the backup and sent after it is sent again,
-  with the same idempotency key, so a system that honours the key does not act
-  twice.
-- A call that was staged after the backup is not in the archive. Its step runs
-  again and stages a new call, with a new operation identity and so a new
-  idempotency key. The system may already have acted on the first call, so
-  even a system that honours the key can act twice. See
-  [staging and the call](process-execution.md#staging-and-the-call).
-- A connector without `idempotency` sends no key, so the system may act twice
-  in either case.
-- Sequence counters, inbound endpoint receipts and schedule state go back too.
-  A number issued after the backup can be issued again, and an inbound request
-  accepted after it is lost.
+`tenant backup` and `tenant restore` have their own page: [tenant backup and restore](tenant-backup-and-restore.md).
 
 ## Migrate
 
@@ -917,6 +691,10 @@ installation. See [D45](../decisions/d45-tenant-backup-and-restore.md). The oper
   value can be read, and every one must be set again by hand. Keep it apart from
   the backups, so a stolen backup does not hold its own key. See
   [platform database](storage.md#platform-database).
+- **The backup key.** The file that `--backup-key-file` names decrypts every archive made with it. Keep it outside the
+  installation and apart from the archives, so a stolen archive is useless. Keep it apart from the installation key too:
+  the tool cannot tell whether the two are the same. Without the backup key an archive cannot be restored, and nothing in
+  Axis can recover it.
 - **Installed packages and modules.** The folders `Extensions:Path` and
   `Modules:Path` hold the installed extension packages and modules. A restore
   needs the package versions that the archive marks `required`.

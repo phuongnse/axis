@@ -64,7 +64,7 @@ public sealed class BackupRestorePerformanceTests(AdminBackupFixture fixture) : 
         var newId = fixture.Scenario.NewTenantId();
         stopwatch.Restart();
         var restore = await fixture.Scenario.RunAsync(
-            ["tenant", "restore", file, "--tenant", newId, "--host", "perf-restored.example.test"],
+            ["tenant", "restore", file, "--tenant", newId, "--host", "perf-restored.example.test", .. AdminScenario.BackupKeyArgs],
             path: fixture.Tools.PathSetting);
         stopwatch.Stop();
         var restoreElapsed = stopwatch.Elapsed;

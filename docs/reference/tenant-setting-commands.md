@@ -59,7 +59,7 @@ built, see [installation key](#installation-key). The
   is still `provisioning`. A rerun of `tenant create` or `tenant restore` replaces its bindings and
   hosts, so a change made before then would be lost.
 - **After a restore.** A restored tenant needs its secret bindings set again, and this command does
-  it. See [tenant restore](administration.md#tenant-restore).
+  it. See [tenant restore](tenant-backup-and-restore.md#tenant-restore).
 
 ## Sign-in settings
 
@@ -269,11 +269,11 @@ Both commands also update the tenant's realm, so its "Forgot password?" link is 
   removing the tenant's last host that belongs to no site. Removing a site's host succeeds.
 - `tenant host move <host> --to <id>` moves a host to another tenant in one transaction. It is the
   last step of restoring over an existing tenant, see
-  [tenant restore](administration.md#tenant-restore). A move may leave the source tenant with no
+  [tenant restore](tenant-backup-and-restore.md#tenant-restore). A move may leave the source tenant with no
   hosts. Only `tenant host remove` refuses to remove a last host. A move keeps the host's site, and it exits with
   code 2 when the target tenant already has a host for that site.
 - `tenant backup` and `tenant restore` keep the host's site, and `tenant list` shows it, see
-  [tenant backup](administration.md#tenant-backup) and [tenant list](tenant-status-commands.md#tenant-list).
+  [tenant backup](tenant-backup-and-restore.md#tenant-backup) and [tenant list](tenant-status-commands.md#tenant-list).
 - Every host command exits with code 2 for a tenant that is still `provisioning`, as the binding
   commands do.
 - A move raises the `version` of both tenants.
