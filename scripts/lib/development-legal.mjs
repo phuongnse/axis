@@ -90,3 +90,16 @@ const smtpServer = { host: 'mailpit', port: '1025', from: 'no-reply@axis.localho
 if (realmSettings.emailTheme !== 'axis' || realmSettings.smtpServer?.host !== 'mailpit') {
   await call('use the Axis email theme', 'PUT', admin, token, { ...realmSettings, emailTheme: 'axis', smtpServer })
 }
+
+// Prototype only: the sample company realm signs people in with its own theme, as samples/keycloak/company-realm.json
+// now names it; a Keycloak container that already holds the realm gets it here.
+const companyRealm = await call('read the company realm', 'GET', `${keycloak}/admin/realms/company`, token)
+if (companyRealm.loginTheme !== 'example-company') {
+  await call('use the company theme', 'PUT', `${keycloak}/admin/realms/company`, token, {
+    ...companyRealm,
+    loginTheme: 'example-company',
+    internationalizationEnabled: true,
+    supportedLocales: ['en', 'vi'],
+    defaultLocale: 'en',
+  })
+}

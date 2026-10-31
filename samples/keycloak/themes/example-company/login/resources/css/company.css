@@ -1,0 +1,45 @@
+/* The sample company's own look: forest green and amber, a serif title, underlined fields and a pill button. */
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif; color: #1f2a24; background: #fbfaf7; }
+.company { display: flex; min-height: 100%; }
+.company-brand {
+  flex: 0 0 40%; display: flex; flex-direction: column; justify-content: center; gap: 12px; padding: 64px;
+  color: #f4f1e8; background: linear-gradient(160deg, #0b3d2e 0%, #14532d 100%);
+}
+.company-mark {
+  width: 56px; height: 56px; border-radius: 12px; display: grid; place-items: center;
+  background: #f5b301; color: #0b3d2e; font-weight: 800; font-size: 22px; letter-spacing: 1px;
+}
+.company-name { margin: 12px 0 0; font-family: Georgia, 'Times New Roman', serif; font-size: 32px; line-height: 1.2; }
+.company-tagline { margin: 0; font-size: 16px; color: #c9dccf; }
+.company-help { margin: auto 0 0; font-size: 13px; color: #a9c4b2; }
+.company-page { flex: 1; display: flex; align-items: center; justify-content: center; padding: 48px 24px; }
+.company-panel { width: 100%; max-width: 360px; }
+.company-title { margin: 0 0 32px; font-family: Georgia, 'Times New Roman', serif; font-weight: 400; font-size: 34px; color: #0b3d2e; }
+.company-form { display: flex; flex-direction: column; }
+.company-label { margin: 0 0 6px; font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #4a5a51; }
+.company-input {
+  margin: 0 0 24px; padding: 8px 2px; font: inherit; font-size: 16px; color: inherit; background: transparent;
+  border: 0; border-bottom: 2px solid #6b8577; border-radius: 0; outline: none;
+}
+.company-input:focus { border-bottom-color: #0b3d2e; }
+.company-input[aria-invalid='true'] { border-bottom-color: #b42318; }
+.company-error, .company-alert-error { color: #b42318; }
+.company-error { margin: -12px 0 20px; font-size: 14px; }
+.company-alert { margin: 0 0 24px; padding: 12px 14px; border-radius: 8px; background: #fff4e5; font-size: 14px; }
+.company-alert-error { background: #fdecea; }
+.company-alert-success, .company-alert-info { background: #e7f4ec; color: #14532d; }
+.company-button {
+  margin-top: 8px; padding: 12px 24px; font: inherit; font-weight: 700; font-size: 15px; color: #1f2a24;
+  background: #f5b301; border: 0; border-radius: 999px; cursor: pointer;
+}
+.company-button:hover { background: #e0a400; }
+.company-button:focus-visible, .company-input:focus-visible { outline: 3px solid #0b3d2e; outline-offset: 2px; }
+.company-info { margin-top: 24px; font-size: 14px; }
+.company-info a, .company-alert a { color: #0b3d2e; }
+@media (max-width: 768px) {
+  .company { flex-direction: column; }
+  .company-brand { flex: none; padding: 32px 24px; }
+  .company-help { margin-top: 8px; }
+}

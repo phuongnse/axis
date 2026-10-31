@@ -77,6 +77,8 @@ fi
 # Keycloak's compose service mounts the theme from artifacts/keycloak-theme.
 log "Building the Keycloak theme"
 npm run build:keycloak-theme --prefix web
+# Prototype only (design review 2026-10-30-studio): the sample company realm's own login theme, beside the Axis theme.
+cp -R samples/keycloak/themes/. artifacts/keycloak-theme/
 
 # The health checks make --wait return once PostgreSQL accepts connections, the realm answers
 # and the purchasing system stub and Mailpit answer. --build rebuilds the stub's image when it changed.
