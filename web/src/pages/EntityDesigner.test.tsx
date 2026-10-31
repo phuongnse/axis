@@ -232,6 +232,23 @@ describe.each(['light', 'dark'])('EntityDesigner in %s mode', (mode) => {
       expect(types.length, setting).toBeGreaterThan(0)
     }
   })
+
+  it('offers no sensitive setting on reference, references and file fields, and still offers it on text', () => {
+    renderDesigner(entity({ fields: plain, displayField: undefined }))
+
+    const offered = (type: string) =>
+      plain.flatMap((field, index) =>
+        field.type === type && screen.queryByTestId(`studio-field-/fields/${index}/sensitive`) !== null ? [index] : [],
+      )
+    for (const type of ['reference', 'references', 'file']) {
+      expect(
+        plain.some((field) => field.type === type),
+        type,
+      ).toBe(true)
+      expect(offered(type), type).toEqual([])
+    }
+    expect(offered('text').length).toBeGreaterThan(0)
+  })
 })
 
 describe('EntityDesigner', () => {

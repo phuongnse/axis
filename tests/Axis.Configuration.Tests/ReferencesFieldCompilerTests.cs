@@ -30,9 +30,9 @@ public sealed class ReferencesFieldCompilerTests
     };
 
     [Fact]
-    public void Field_with_required_and_sensitive_compiles_without_a_column()
+    public void Field_with_required_compiles_without_a_column()
     {
-        using var folder = Folder("""{ "name": "software", "type": "references", "target": "Software", "required": true, "sensitive": true }""");
+        using var folder = Folder("""{ "name": "software", "type": "references", "target": "Software", "required": true }""");
 
         var result = ApplicationCompiler.Compile(folder.Path);
 
@@ -44,7 +44,6 @@ public sealed class ReferencesFieldCompilerTests
         Assert.Equal(new EntityReference(Guid.Parse(SoftwareId), "Software"), field.Target);
         Assert.Equal("name", field.TargetDisplayField);
         Assert.True(field.Required);
-        Assert.True(field.Sensitive);
         Assert.False(field.HasColumn);
     }
 

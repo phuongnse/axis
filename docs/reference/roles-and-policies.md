@@ -353,9 +353,12 @@ user:
   grants cover it. See
   [D109](../decisions/d109-sensitive-fields-and-backups-are-encrypted-and-history-keeps-no-names.md) and
   [data encryption](data-encryption.md), which also describes `exactLookup`.
-- **Allowed fields.** `sensitive` is allowed on every type except
-  `child-collection`, and on the fields of a child entity. On a
-  `child-collection` field it is `AXC0013` at `/fields/{i}/sensitive`. A value
+- **Allowed fields.** `sensitive` is allowed on `text`, `integer`, `decimal`,
+  `boolean`, `date`, `date-time`, `enum` and `money` fields, and on the fields of
+  a child entity. On a `reference`, `references` or `file` field, `"sensitive": true`
+  is `AXC0308` at `/fields/{i}/sensitive`, and so it is on the entity's
+  `displayField`, at `/displayField`. On a `child-collection` field it is
+  `AXC0013` at `/fields/{i}/sensitive`. A value
   that is not a boolean is `AXC0004`. Even `"sensitive": false` on a
   `child-collection` field is `AXC0013`, as `required` and `unique` are. A
   `child-collection` field in a call mapping counts as sensitive when any field

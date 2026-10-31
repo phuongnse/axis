@@ -1103,6 +1103,14 @@ public static partial class ApplicationCompiler
                     $"The display field must be a required text field, but '{field.Name}' is {kind} field.",
                     "/displayField");
             }
+
+            if (field is { Sensitive: true })
+            {
+                Report(
+                    DiagnosticCodes.SensitiveFieldUse,
+                    SensitiveUseMessage(entity.Name, field.Name, "the display field"),
+                    "/displayField");
+            }
         }
 
         CheckComputedFields(entity, findEntity, references, Report);
@@ -1367,7 +1375,8 @@ public static partial class ApplicationCompiler
     /// <summary>Checks a field's <c>searchable</c> property: it applies only to text fields, whatever its value.</summary>
     /// <summary>
     /// A sensitive field is stored encrypted, so it cannot be <c>unique</c>, which needs a unique
-    /// index, or <c>searchable</c>, which is searched with <c>LIKE</c>.
+    /// index, or <c>searchable</c>, which is searched with <c>LIKE</c>. A reference, references or
+    /// file field cannot be sensitive at all.
     /// </summary>
     private static void CheckSensitiveFlags(
         EntityResource entity, FieldDefinition field, string path, Action<string, string, string> report)
@@ -1375,6 +1384,14 @@ public static partial class ApplicationCompiler
         if (field.Sensitive != true)
         {
             return;
+        }
+
+        if (FieldTypes.Parse(field.Type) is FieldType.Reference or FieldType.References or FieldType.File)
+        {
+            report(
+                DiagnosticCodes.SensitiveFieldUse,
+                $"The field '{entity.Name}.{field.Name}' is a {field.Type} field, which cannot be sensitive.",
+                $"{path}/sensitive");
         }
 
         if (field.Unique == true)

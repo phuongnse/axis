@@ -59,6 +59,8 @@ before the values are encrypted. The exact lookup exception is planned.
 - A sort, in a data source or a table.
 - An aggregate over it, and a data source column that groups by it.
 - An index, `unique` or `searchable`.
+- A reference, references or file field. These cannot be `sensitive` at all.
+- The entity's `displayField`, which shows as a record's label in lists and links.
 - A stored computed field that reads it.
 - An expression that runs as SQL, such as a data source `filter` or a policy grant's `filter`, other than the
   equality of an exact lookup. A migration `fill` or `convert` value is one, so it may not read a sensitive field.

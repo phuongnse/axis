@@ -211,7 +211,7 @@ public sealed class ApplicationCompilerTests
     [Fact]
     public void File_field_with_a_size_and_media_types_compiles_on_a_root_and_a_child_entity()
     {
-        const string file = """{ "name": "receipt", "type": "file", "required": true, "sensitive": true, "maxSize": 1000, "accept": ["image/*", "application/pdf", "Text/Vnd.Custom+json"] }""";
+        const string file = """{ "name": "receipt", "type": "file", "required": true, "maxSize": 1000, "accept": ["image/*", "application/pdf", "Text/Vnd.Custom+json"] }""";
         using var folder = new TemporaryFolder()
             .With("application.json", Manifest)
             .With("line-item.json", Entity("LineItem", $$"""{ "name": "description", "type": "text" }, {{file}}""", LineItemId))
@@ -226,7 +226,7 @@ public sealed class ApplicationCompilerTests
             Assert.True(result.Model.TryGetEntity(name, out var entity));
             var receipt = entity.Fields.Single(field => field.Name == "receipt");
             Assert.Equal(FieldType.File, receipt.Type);
-            Assert.Equal((true, true, 1000L), (receipt.Required, receipt.Sensitive, receipt.MaxSize));
+            Assert.Equal((true, false, 1000L), (receipt.Required, receipt.Sensitive, receipt.MaxSize));
             Assert.Equal(["image/*", "application/pdf", "Text/Vnd.Custom+json"], receipt.Accept);
             Assert.True(receipt.HasColumn);
         }

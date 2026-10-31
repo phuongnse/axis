@@ -6,7 +6,7 @@ using static Axis.Integration.Tests.TaskApiFixture;
 namespace Axis.Integration.Tests;
 
 /// <summary>
-/// A <c>sensitive</c> file field in process inspection and step history. It has its own fixture, because the release
+/// A file field in process inspection and step history. It has its own fixture, because the release
 /// that adds the field leaves its column in the tenant, and a later release without the field would be refused.
 /// </summary>
 public sealed class ProcessInstanceFileFieldTests(TaskApiFixture fixture) : IClassFixture<TaskApiFixture>
@@ -14,12 +14,12 @@ public sealed class ProcessInstanceFileFieldTests(TaskApiFixture fixture) : ICla
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
 
     [Fact]
-    public async Task A_sensitive_file_field_leaves_the_id_and_the_name_of_its_file_out_of_the_detail_and_the_step_history()
+    public async Task A_file_field_leaves_the_id_and_the_name_of_its_file_out_of_the_detail_and_the_step_history()
     {
         var release = await fixture.ActivateEditedAsync(
             TenantB,
             (path, content) => path == Path.Combine("entities", "request.json")
-                ? content.Replace("\"fields\": [", "\"fields\": [\n    { \"name\": \"scan\", \"type\": \"file\", \"sensitive\": true },", StringComparison.Ordinal)
+                ? content.Replace("\"fields\": [", "\"fields\": [\n    { \"name\": \"scan\", \"type\": \"file\" },", StringComparison.Ordinal)
                 : content);
         Assert.True(fixture.Model.TryGetEntity("Request", out var entity));
         var subject = await fixture.InsertRequestAsync(TenantB, null);

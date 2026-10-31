@@ -104,6 +104,66 @@ public sealed class SensitiveUseCompilerTests
         Assert.NotNull(result.Model);
     }
 
+    [Theory]
+    [InlineData("""{ "name": "customer", "type": "reference", "target": "Customer", "sensitive": true }""")]
+    [InlineData("""{ "name": "customer", "type": "references", "target": "Customer", "sensitive": true }""")]
+    [InlineData("""{ "name": "customer", "type": "file", "sensitive": true }""")]
+    public void A_sensitive_reference_references_or_file_field_is_refused_at_its_flag(string field)
+    {
+        using var folder = TypedFieldFolder(field);
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.SensitiveFieldUse, OrderFile, "/fields/1/sensitive"), (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Contains("cannot be sensitive", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Null(result.Model);
+    }
+
+    [Theory]
+    [InlineData("""{ "name": "customer", "type": "reference", "target": "Customer", "sensitive": false }""")]
+    [InlineData("""{ "name": "customer", "type": "references", "target": "Customer", "sensitive": false }""")]
+    [InlineData("""{ "name": "customer", "type": "file", "sensitive": false }""")]
+    public void A_reference_references_or_file_field_that_is_not_sensitive_compiles(string field)
+    {
+        using var folder = TypedFieldFolder(field);
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+    }
+
+    [Fact]
+    public void A_sensitive_display_field_is_refused_at_the_display_field()
+    {
+        using var folder = new TemporaryFolder()
+            .With("application.json", PresentationCompilerTests.Manifest)
+            .With("entities/customer.json", $$"""
+                { "id": "{{CustomerId}}", "kind": "entity", "name": "Customer", "formatVersion": 1,
+                  "displayField": "name", "fields": [ { "name": "name", "type": "text", "required": true, "sensitive": true } ] }
+                """);
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.SensitiveFieldUse, "entities/customer.json", "/displayField"), (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Contains("the display field", diagnostic.Message, StringComparison.Ordinal);
+        Assert.Null(result.Model);
+    }
+
+    private static TemporaryFolder TypedFieldFolder(string field) =>
+        new TemporaryFolder()
+            .With("application.json", PresentationCompilerTests.Manifest)
+            .With(OrderFile, $$"""
+                { "id": "{{OrderId}}", "kind": "entity", "name": "Order", "formatVersion": 1,
+                  "fields": [ {{Title}}, {{field}} ] }
+                """)
+            .With("entities/customer.json", $$"""
+                { "id": "{{CustomerId}}", "kind": "entity", "name": "Customer", "formatVersion": 1,
+                  "displayField": "name", "fields": [ { "name": "name", "type": "text", "required": true } ] }
+                """);
+
     private static TemporaryFolder Folder(string use, bool sensitive)
     {
         var flag = sensitive ? ", \"sensitive\": true" : "";
