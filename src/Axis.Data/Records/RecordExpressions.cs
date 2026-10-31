@@ -110,7 +110,7 @@ public static class RecordExpressions
                 ?? throw new InvalidOperationException("The application has no entity for the reference.");
             if (!loaded.TryGetValue((target.Id, id), out var found))
             {
-                if (await RecordQueries.FindRowAsync(connection, target, id, cancellationToken) is { } row)
+                if (await RecordQueries.FindRowAsync(connection, target, id, null, cancellationToken) is { } row)
                 {
                     var values = new List<KeyValuePair<string, object?>>();
                     foreach (var field in RecordQueries.Columns(target))

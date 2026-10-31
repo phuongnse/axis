@@ -6,6 +6,7 @@ namespace Axis.Data.Records;
 /// A parsed field value, typed as it is bound: <see cref="string"/> for text, enum and decimal (in
 /// plain notation), <see cref="long"/>, <see cref="bool"/>, <see cref="DateOnly"/>,
 /// <see cref="DateTimeOffset"/> in UTC with offset zero, and <see cref="Guid"/> for reference.
+/// A sealed sensitive value is <c>byte[]</c>, the stored bytes of the ciphertext, whatever the field type.
 /// A null value is SQL <c>NULL</c>.
 /// </summary>
 public sealed record RecordValue(FieldModel Field, object? Value);

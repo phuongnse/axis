@@ -50,6 +50,7 @@ public sealed class PendingComputedUpdateResponseTests(DataDatabaseFixture datab
             new RecordActor("requester", ["clerk"]),
             _ => Task.FromResult<byte[]?>(Encoding.UTF8.GetBytes("""{ "version": 1, "values": { "title": "Renamed" } }""")),
             null,
+            null,
             NullLoggerFactory.Instance,
             CancellationToken);
 
