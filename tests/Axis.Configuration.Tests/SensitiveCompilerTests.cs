@@ -60,6 +60,47 @@ public sealed class SensitiveCompilerTests
         Assert.Null(result.Model);
     }
 
+    [Theory]
+    [InlineData("true")]
+    [InlineData("false")]
+    public void Exact_lookup_without_sensitive_is_reported_even_when_false(string value)
+    {
+        using var folder = Folder($$"""{ "name": "nationalId", "type": "text", "exactLookup": {{value}} }""", null);
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal((DiagnosticCodes.ExactLookupUse, "entities/order.json", "/fields/2/exactLookup"), (diagnostic.Code, diagnostic.File, diagnostic.Path));
+        Assert.Null(result.Model);
+    }
+
+    [Fact]
+    public void Exact_lookup_on_a_sensitive_field_is_on_the_field_model()
+    {
+        using var folder = Folder(
+            """{ "name": "nationalId", "type": "text", "sensitive": true, "exactLookup": true }""",
+            """{ "name": "note", "type": "text", "sensitive": true }""");
+
+        var result = ApplicationCompiler.Compile(folder.Path);
+
+        Assert.Empty(result.Diagnostics);
+        Assert.NotNull(result.Model);
+        Assert.True(result.Model.TryGetEntity("Order", out var order));
+        Assert.Equal(["nationalId"], order.Fields.Where(field => field.ExactLookup).Select(field => field.Name));
+    }
+
+    [Fact]
+    public void Exact_lookup_on_a_field_whose_name_is_too_long_for_the_lookup_column_is_reported()
+    {
+        var longest = new string('a', ApplicationCompiler.MaxExactLookupFieldNameLength);
+        using var fits = Folder($$"""{ "name": "{{longest}}", "type": "text", "sensitive": true, "exactLookup": true }""", null);
+        using var tooLong = Folder($$"""{ "name": "{{longest}}b", "type": "text", "sensitive": true, "exactLookup": true }""", null);
+
+        Assert.Empty(ApplicationCompiler.Compile(fits.Path).Diagnostics);
+        var diagnostic = Assert.Single(ApplicationCompiler.Compile(tooLong.Path).Diagnostics);
+        Assert.Equal((DiagnosticCodes.ExactLookupUse, "/fields/2/exactLookup"), (diagnostic.Code, diagnostic.Path));
+    }
+
     /// <summary>
     /// An Order entity with <c>title</c>, then <paramref name="linesField"/> (by default a plain
     /// <c>lines</c> child collection) at index 1, then the two optional fields. Its child entity

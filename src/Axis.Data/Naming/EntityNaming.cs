@@ -50,6 +50,12 @@ public static class EntityNaming
     /// <summary><c>f_</c> and the field name in lowercase (at most 62 characters).</summary>
     public static string Column(string fieldName) => "f_" + fieldName.ToLowerInvariant();
 
+    /// <summary>
+    /// The column of an exact lookup field that holds its lookup hash: the field's column name and <c>_lookup</c> (at most
+    /// 63 characters for a name of at most 54). A field name has no underscore, so no field column can be named so.
+    /// </summary>
+    public static string LookupColumn(string fieldName) => Column(fieldName) + "_lookup";
+
     /// <summary><c>pk_</c> and the table name (37 characters).</summary>
     public static string PrimaryKey(string table) => "pk_" + table;
 

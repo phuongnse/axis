@@ -69,7 +69,7 @@ public static class RecordCommands
         }
 
         values = await WithSequenceNumbersAsync(connection, application, entity, values, cancellationToken);
-        values = await RecordCipher.SealAsync(cipher, entity, recordId, values, cancellationToken);
+        var sealedValues = await RecordCipher.SealAsync(cipher, entity, recordId, values, cancellationToken);
         await using var command = new NpgsqlCommand { Connection = connection };
         command.Parameters.AddWithValue("id", recordId);
         command.Parameters.AddWithValue("release", releaseId);
@@ -80,10 +80,10 @@ public static class RecordCommands
             EntityNaming.Quote(EntityNaming.ComputedReleaseColumn),
         };
         var placeholders = new List<string> { "@id", "1", "@release" };
-        for (var index = 0; index < values.Count; index++)
+        for (var index = 0; index < sealedValues.Count; index++)
         {
-            columns.Add(EntityNaming.Quote(EntityNaming.Column(values[index].Field.Name)));
-            placeholders.Add(AddValue(command, index, values[index]));
+            columns.Add(EntityNaming.Quote(sealedValues[index].Column));
+            placeholders.Add(AddValue(command, index, sealedValues[index].Value));
         }
 
         command.CommandText = WithLabels(
@@ -146,7 +146,7 @@ public static class RecordCommands
             return refused;
         }
 
-        values = await RecordCipher.SealAsync(cipher, entity, id, values, cancellationToken);
+        var sealedValues = await RecordCipher.SealAsync(cipher, entity, id, values, cancellationToken);
         var table = RecordQueries.Table(entity);
         var idColumn = EntityNaming.Quote(EntityNaming.IdColumn);
         var versionColumn = EntityNaming.Quote(EntityNaming.VersionColumn);
@@ -155,9 +155,9 @@ public static class RecordCommands
         command.Parameters.AddWithValue("version", version);
         command.Parameters.AddWithValue("release", releaseId);
         var assignments = new List<string>();
-        for (var index = 0; index < values.Count; index++)
+        for (var index = 0; index < sealedValues.Count; index++)
         {
-            assignments.Add($"{EntityNaming.Quote(EntityNaming.Column(values[index].Field.Name))} = {AddValue(command, index, values[index])}");
+            assignments.Add($"{EntityNaming.Quote(sealedValues[index].Column)} = {AddValue(command, index, sealedValues[index].Value)}");
         }
 
         var stamp = EntityNaming.Quote(EntityNaming.ComputedReleaseColumn);
@@ -476,7 +476,7 @@ public static class RecordCommands
             {
                 // The id of the row is made before the insert, because a sensitive value is bound to it.
                 var rowId = Guid.CreateVersion7();
-                var values = await RecordCipher.SealAsync(cipher, collection.Child, rowId, collection.Rows[position], cancellationToken);
+                var sealedValues = await RecordCipher.SealAsync(cipher, collection.Child, rowId, collection.Rows[position], cancellationToken);
                 await using var insert = new NpgsqlCommand { Connection = connection };
                 insert.Parameters.AddWithValue("id", rowId);
                 insert.Parameters.AddWithValue("owner", record.Id);
@@ -488,10 +488,10 @@ public static class RecordCommands
                     EntityNaming.Quote(EntityNaming.PositionColumn),
                 };
                 var placeholders = new List<string> { "@id", "@owner", "@position" };
-                for (var index = 0; index < values.Count; index++)
+                for (var index = 0; index < sealedValues.Count; index++)
                 {
-                    columns.Add(EntityNaming.Quote(EntityNaming.Column(values[index].Field.Name)));
-                    placeholders.Add(AddValue(insert, index, values[index]));
+                    columns.Add(EntityNaming.Quote(sealedValues[index].Column));
+                    placeholders.Add(AddValue(insert, index, sealedValues[index].Value));
                 }
 
                 insert.CommandText = $"INSERT INTO {table} ({string.Join(", ", columns)}) VALUES ({string.Join(", ", placeholders)})";

@@ -223,6 +223,11 @@ public static class SchemaPlanner
             {
                 var column = EntityNaming.Column(field.Name);
                 definitions.Add($"{EntityNaming.Quote(column)} {ColumnTypes.Render(field)}{(field.Required ? " NOT NULL" : "")}");
+                if (field.ExactLookup)
+                {
+                    definitions.Add($"{EntityNaming.Quote(EntityNaming.LookupColumn(field.Name))} bytea");
+                }
+
                 if (field.Unique)
                 {
                     constraints.Add($"CONSTRAINT {EntityNaming.Quote(EntityNaming.Unique(table, column))} UNIQUE ({EntityNaming.Quote(column)})");
@@ -305,6 +310,17 @@ public static class SchemaPlanner
                         {
                             flipped.Add(column.Name);
                         }
+
+                        // An exact lookup cannot be added to or removed from a column that exists yet.
+                        var hasLookup = columnsByName.ContainsKey(EntityNaming.LookupColumn(field.Name));
+                        if (field.ExactLookup && !hasLookup)
+                        {
+                            Report($"The existing field '{field.Name}' cannot gain an exact lookup yet.", $"{path}/exactLookup");
+                        }
+                        else if (!field.ExactLookup && hasLookup)
+                        {
+                            Report($"The existing field '{field.Name}' cannot lose its exact lookup yet.", $"{path}/exactLookup");
+                        }
                     }
                 }
                 else
@@ -313,9 +329,10 @@ public static class SchemaPlanner
                 }
             }
 
+            // The lookup column is part of its field. A field that lost exactLookup is reported once, above, and not again as a column without a field.
             var fieldColumns = entity.Fields
                 .Where(field => field.HasColumn)
-                .Select(field => EntityNaming.Column(field.Name))
+                .SelectMany(field => new[] { EntityNaming.Column(field.Name), EntityNaming.LookupColumn(field.Name) })
                 .ToHashSet(StringComparer.Ordinal);
             foreach (var column in table.Columns)
             {
@@ -446,6 +463,11 @@ public static class SchemaPlanner
             if (field.Unique)
             {
                 _alters.Add($"ALTER TABLE {EntityNaming.QualifiedTable(table.Name)} ADD CONSTRAINT {EntityNaming.Quote(EntityNaming.Unique(table.Name, column))} UNIQUE ({EntityNaming.Quote(column)})");
+            }
+
+            if (field.ExactLookup && table.Columns.All(existing => existing.Name != EntityNaming.LookupColumn(field.Name)))
+            {
+                _alters.Add($"{alterTable} ADD COLUMN {EntityNaming.Quote(EntityNaming.LookupColumn(field.Name))} bytea");
             }
 
             AddForeignKey(table.Name, column, field);

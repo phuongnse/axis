@@ -301,8 +301,8 @@ internal static class ComputedRecompute
             update.Parameters.AddWithValue("version", record.Version);
             update.Parameters.AddWithValue("release", releaseId);
             var sealedOwner = await RecordCipher.SealAsync(cipher, owner, id, ownerValues, cancellationToken);
-            var assignments = sealedOwner.Select((value, index) =>
-                $"{EntityNaming.Quote(EntityNaming.Column(value.Field.Name))} = {RecordCommands.AddValue(update, index, value)}").ToList();
+            var assignments = sealedOwner.Select((entry, index) =>
+                $"{EntityNaming.Quote(entry.Column)} = {RecordCommands.AddValue(update, index, entry.Value)}").ToList();
             assignments.Add($"{EntityNaming.Quote(EntityNaming.ComputedReleaseColumn)} = @release");
             update.CommandText =
                 $"UPDATE {RecordQueries.Table(owner)} SET {string.Join(", ", assignments)} WHERE {EntityNaming.Quote(EntityNaming.IdColumn)} = @id AND {EntityNaming.Quote(EntityNaming.VersionColumn)} = @version";
@@ -317,8 +317,8 @@ internal static class ComputedRecompute
             await using var update = new NpgsqlCommand { Connection = connection, Transaction = transaction };
             update.Parameters.AddWithValue("id", rowId);
             var sealedRow = await RecordCipher.SealAsync(cipher, child, rowId, values, cancellationToken);
-            var assignments = sealedRow.Select((value, index) =>
-                $"{EntityNaming.Quote(EntityNaming.Column(value.Field.Name))} = {RecordCommands.AddValue(update, index, value)}");
+            var assignments = sealedRow.Select((entry, index) =>
+                $"{EntityNaming.Quote(entry.Column)} = {RecordCommands.AddValue(update, index, entry.Value)}");
             update.CommandText = $"UPDATE {RecordQueries.Table(child)} SET {string.Join(", ", assignments)} WHERE {EntityNaming.Quote(EntityNaming.IdColumn)} = @id";
             await update.ExecuteNonQueryAsync(cancellationToken);
         }
