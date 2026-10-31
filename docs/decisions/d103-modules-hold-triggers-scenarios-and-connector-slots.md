@@ -10,7 +10,7 @@ widens what a module holds. It replaces the point of
 [D89](d89-modules-that-hold-processes-pages-and-policies-and-depend-on-other-modules.md)
 that a module holds no trigger, and adds connector slots beside its role
 slots. Triggers, connector slots and endpoints on module processes are
-_(planned for M20)_. Module scenarios are _(planned for M24)_. See the
+built. Module scenarios are _(planned for M24)_. See the
 [roadmap](../roadmap.md#milestones).
 
 - **Triggers:**
