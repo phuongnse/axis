@@ -104,8 +104,9 @@ Adding or removing `sensitive` or `exactLookup` is a schema change that activati
   does not hold. The server and the worker do this through one key service. It gives the newest key of a kind for a
   write and a key by number for a read, and it never logs a key.
 
-The key store, the settings, `tenant create`, `migrate`, `tenant restore`, the rekey and the refresh are built. Writing
-and reading `sensitive` values with the keys and the rotation below are _(planned for M27)_.
+The key store, the settings, `tenant create`, `migrate`, `tenant restore`, the rekey, the refresh and the cipher that
+encrypts and decrypts a sensitive value under the data keys are built. Writing and reading `sensitive` values in records
+with it, and the rotation below, are _(planned for M27)_.
 
 ### Rotating the keys
 
