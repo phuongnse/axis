@@ -82,3 +82,11 @@ for (const each of clients) {
     (error) => console.warn(`Skipped ${each.clientId}: ${error.message.slice(0, 80)}`),
   )
 }
+
+// Prototype only: the realm sends its emails in the Axis email theme, as tenant create is to set it.
+const realmSettings = await call('read the realm', 'GET', admin, token)
+// Prototype only: the development realm sends its emails to Mailpit, so the Axis emails can be seen at its web page.
+const smtpServer = { host: 'mailpit', port: '1025', from: 'no-reply@axis.localhost', fromDisplayName: 'Axis' }
+if (realmSettings.emailTheme !== 'axis' || realmSettings.smtpServer?.host !== 'mailpit') {
+  await call('use the Axis email theme', 'PUT', admin, token, { ...realmSettings, emailTheme: 'axis', smtpServer })
+}

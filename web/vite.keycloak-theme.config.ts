@@ -34,6 +34,10 @@ function copyThemeFiles(): Plugin {
           recursive: true,
         })
       }
+      // Proposed: the Axis email theme sits beside the login theme, in the theme's email folder.
+      cpSync(path.resolve(import.meta.dirname, 'keycloak-theme', 'email'), path.join(themeFolder, '..', 'email'), {
+        recursive: true,
+      })
     },
   }
 }
