@@ -49,7 +49,13 @@ namespace Axis.Server.Console;
 /// <c>fields</c> list, and the instance's subject record need not exist. A call's stored input is hidden by the masking
 /// rule of process inspection: when its mapping reads or writes a sensitive field, or a field the active release no longer
 /// has. The active release is the pinned release when the application has no active release. A malformed id and an unknown
-/// id are one 404. <c>commands</c> is empty and no call is resolvable, because the console has no command routes yet.
+/// id are one 404. <c>commands</c> lists the commands that apply, and a call is resolvable, only when the application has an
+/// active release that still has the instance's process, because the console's command routes run against that release, see
+/// <see cref="ConsoleOperatorEndpoints"/>.
+/// </para>
+/// <para>
+/// <c>GET /api/console/applications/{id}/publishing</c> answers one application's release history and publish requests, read
+/// only, see <see cref="ConsolePublishingEndpoints"/>.
 /// </para>
 /// </summary>
 internal static class ConsoleEndpoints
@@ -67,6 +73,7 @@ internal static class ConsoleEndpoints
         console.MapGet("/instances/{id}", GetInstanceAsync);
         console.MapConsoleDeadLetterEndpoints();
         console.MapConsoleOperatorEndpoints();
+        console.MapConsolePublishingEndpoints();
         console.MapConsoleScheduleEndpoints();
     }
 

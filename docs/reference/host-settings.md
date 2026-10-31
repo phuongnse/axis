@@ -213,9 +213,10 @@ One server setting controls the
   Application policies play no part. `GET /api/me` answers `console: true` for
   a user who holds it, and `console: false` for everyone when no value is set. That endpoint
   already reads the setting. The routes `GET /api/console/tenant`, `GET /api/console/failed-work`,
-  `GET /api/console/instances/{id}` and `GET /api/console/webhook-deliveries`, the retry, cancel and resolve routes
-  under `/api/console/instances/{id}` and the Tenant, Failed work and Webhook deliveries views of the console are
-  built, and the other views are planned for M23.
+  `GET /api/console/instances/{id}`, `GET /api/console/webhook-deliveries` and
+  `GET /api/console/applications/{id}/publishing`, the retry, cancel and resolve routes
+  under `/api/console/instances/{id}` and the Tenant, Failed work, Webhook deliveries and
+  Publishing views of the console are built, and the other views are planned for M23.
 
 ## Users settings
 
