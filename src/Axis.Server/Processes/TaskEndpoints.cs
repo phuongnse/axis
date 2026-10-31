@@ -273,6 +273,8 @@ internal static class TaskEndpoints
         HttpRequest request,
         ActiveApplicationResolver resolver,
         TenantDatabase database,
+        SensitiveValues sensitive,
+        ITenantContextAccessor tenants,
         CancellationToken cancellationToken)
     {
         if (await CurrentUsers.FindAsync(request.HttpContext) is not { } user)
@@ -323,14 +325,15 @@ internal static class TaskEndpoints
             return Results.ValidationProblem(malformed);
         }
 
-        if (await RecordQueries.GetAsync(connection, release, entity, task.SubjectId, cancellationToken) is not { } stored)
+        var cipher = RecordEndpoints.Cipher(sensitive, tenants);
+        if (await RecordQueries.GetAsync(connection, release, entity, task.SubjectId, cipher, cancellationToken) is not { } stored)
         {
             return Results.Problem(statusCode: StatusCodes.Status404NotFound, title: "No record has this id.");
         }
 
         var now = await RecordQueries.TransactionTimeAsync(connection, cancellationToken);
         var readable = TaskCompletionCommand.Readable(active.Model, roles, task.SubjectEntityId);
-        var sets = await RecordSets.ReadAsync(connection, release, entity, stored, body.Draft!.Input.Links, cancellationToken);
+        var sets = await RecordSets.ReadAsync(connection, release, entity, stored, body.Draft!.Input.Links, cancellationToken, cipher);
         return Results.Ok(FormStateEvaluator.Evaluate(release, form, entity, stored, body.Draft!, body.Touched!, readable, user.Id, now, sets));
     }
 

@@ -77,6 +77,7 @@ internal static class ProcessStartEndpoints
         ActiveApplicationResolver resolver,
         TenantDatabase database,
         ITenantContextAccessor tenants,
+        SensitiveValues sensitive,
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
@@ -93,7 +94,7 @@ internal static class ProcessStartEndpoints
         // A release change under the start lock sends the request back to resolution, so every check runs on the new release.
         for (var attempt = 0; attempt < ReleaseRetry.MaxAttempts; attempt++)
         {
-            if (await StartOnceAsync(app, process, request, user, resolver, database, tenants, loggerFactory, cancellationToken) is { } result)
+            if (await StartOnceAsync(app, process, request, user, resolver, database, tenants, sensitive, loggerFactory, cancellationToken) is { } result)
             {
                 return result;
             }
@@ -111,6 +112,7 @@ internal static class ProcessStartEndpoints
         ActiveApplicationResolver resolver,
         TenantDatabase database,
         ITenantContextAccessor tenants,
+        SensitiveValues sensitive,
         ILoggerFactory loggerFactory,
         CancellationToken cancellationToken)
     {
@@ -156,6 +158,7 @@ internal static class ProcessStartEndpoints
         }
 
         var tenantId = (tenants.Current ?? throw new InvalidOperationException("No tenant context is set.")).TenantId;
+        var cipher = RecordEndpoints.Cipher(sensitive, tenants);
         var instanceId = Guid.CreateVersion7();
         var response = new ProcessInstanceResponse(instanceId, model.Name, subjectId, active.ReleaseId, ProcessStarts.Running);
         var body = JsonSerializer.Serialize(response, JsonSerializerOptions.Web);
@@ -208,7 +211,7 @@ internal static class ProcessStartEndpoints
             || (read.Filters is { } filters
                 && await RecordCommand.MatchAsync(connection, transaction, application, entity, subjectId, filters, user.Id, loggerFactory, cancellationToken)
                     is not { Found: true, Matched: true })
-            || await RecordQueries.GetAsync(connection, application, entity, subjectId, cancellationToken) is not { } record)
+            || await RecordQueries.GetAsync(connection, application, entity, subjectId, cipher, cancellationToken) is not { } record)
         {
             await transaction.RollbackAsync(cancellationToken);
             return SubjectProblem("No record of the process's entity has this id.");
@@ -217,7 +220,7 @@ internal static class ProcessStartEndpoints
         // The start condition reads the record with its pending computed fields computed by the active release.
         if (model.StartCondition is not null)
         {
-            record = await PendingComputedReads.ApplyAsync(connection, transaction, application, entity, record, cancellationToken);
+            record = await PendingComputedReads.ApplyAsync(connection, transaction, application, entity, record, cancellationToken, cipher: cipher);
         }
 
         var started = await ProcessStarter.StartAsync(
