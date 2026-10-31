@@ -6,8 +6,8 @@ their organization uses. [D99](../decisions/d99-axis-ships-its-own-identity-prov
 its people sign in and each site pick from that. M17 built it, and each section says what is built. The `identityProvider` resource, a site's `signIn` and their
 compile checks are built, and so is the tenant's realm that `tenant create` makes. Activation checks the bindings of
 `oidc` and `saml` providers and refuses providers that would split a person. Sign-in reads the `roles` mapping of each
-provider, and activation keeps the realm in step, role mappers included. One gap is left: a new realm has no redirect
-addresses until `tenant host` commands keep them in step _(planned for M28)_, so an operator adds them by hand. The
+provider, and activation keeps the realm in step, role mappers included. The `tenant host` commands keep the redirect
+addresses of the platform client in step. The
 `Oidc` block can still point at an identity provider that runs outside Axis, as
 [security](security.md#sign-in-and-the-session) describes. No command does that. Accounts, roles given by an
 administrator and the users page are in [user administration](user-administration.md).
@@ -276,8 +276,17 @@ platform sign-in's providers in it, see [keeping the realm in step](#keeping-the
   identity provider that `tenant create` targets must hold in its `data/password-blacklists` folder. The repository
   keeps it in `deploy/keycloak/password-blacklists`, see `deploy/keycloak/README.md`. Without the file, `tenant create`
   fails at its realm step, also for a realm that exists.
-- _(planned for M28)_ **Kept in step later:** `tenant host add`, `remove` and `move` do not change the realm yet, so the
-  platform client has no redirect addresses until M28 adds them.
+- **Redirect addresses:** `tenant create`, `tenant restore` and `tenant host add`, `remove` and `move` set the
+  platform client `axis` from the tenant's hosts. For each host the client gets the redirect address
+  `https://<host>/api/auth/callback`, the web origin `https://<host>` and the post-logout redirect address
+  `https://<host>/?signedOut`, which is the exact address that sign-out sends. Every address uses `https` and no port. Each write
+  replaces the three lists with exactly the tenant's current hosts and keeps every other attribute of the client, such as the
+  settings that `tenant oidc set` wrote. A rerun, or a later host command, therefore repairs a realm that fell out of step, and
+  an address added by hand is replaced. A move rewrites both tenants. The command signs in to the realm as `axis-activation`, so it
+  reads `Platform:SecretKey` to decrypt the activation secret. A preview tenant, and a tenant whose sign-in points at an
+  identity provider outside Axis, have no realm to write and no identity provider is called. When the identity provider fails, the host
+  change stays stored and the command exits with code 1: any later host command for the tenant writes the realm again. The
+  next realm sync copies the addresses to the site clients.
 - **Realm sync:** the realm sync is built. It signs in to the realm as `axis-activation` and makes the realm's
   `site-<path>` clients and `oidc-` and `saml-` providers match a desired state. Each site client puts the alias of the provider that
   signed the person in into its ID token as the `identity_provider` claim, and each provider gets claim mappers for the

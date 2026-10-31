@@ -63,6 +63,9 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
 
     private const string PostLogoutRedirectUrisAttribute = "post.logout.redirect.uris";
 
+    // The same path as TenantSignIn.CallbackPath in Axis.Server, which this project cannot reference.
+    private const string PlatformCallbackPath = "/api/auth/callback";
+
     /// <summary>The alias of the first-login flow that <c>TenantRealm</c> makes and every provider names.</summary>
     public const string FirstLoginFlowAlias = "axis first login";
 
@@ -133,6 +136,71 @@ public sealed class RealmSync(HttpClient http, Uri baseAddress)
         using var response = await SendAsync(
             token, HttpMethod.Put, $"admin/realms/{Uri.EscapeDataString(realm)}", new Dictionary<string, object> { ["smtpServer"] = smtpServer }, cancellationToken);
         EnsureSuccess(response, "update the mail server");
+    }
+
+    /// <summary>
+    /// Replaces the redirect addresses, web origins and post-logout redirect addresses of the platform client <c>axis</c> with
+    /// the ones <see cref="PlatformAddresses"/> builds from <paramref name="hosts"/>. Every other attribute of the client stays,
+    /// because Keycloak removes the attributes that an update leaves out, and the client secret is not sent. It signs in as
+    /// <c>axis-activation</c>, whose <c>manage-clients</c> right covers the client. An error names the step and the status
+    /// code, never a response body or a secret.
+    /// </summary>
+    public async Task SyncPlatformAddressesAsync(
+        string realm, string activationSecret, IReadOnlyCollection<string> hosts, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(hosts);
+
+        var token = await ActivationTokenAsync(realm, activationSecret, cancellationToken);
+        var clientsPath = $"admin/realms/{Uri.EscapeDataString(realm)}/clients";
+        using var listed = await SendAsync(
+            token, HttpMethod.Get, $"{clientsPath}?clientId={Uri.EscapeDataString(RealmClientProfile.PlatformClientId)}", null, cancellationToken);
+        EnsureSuccess(listed, $"find the client '{RealmClientProfile.PlatformClientId}'");
+        JsonElement? platformClient = null;
+        foreach (var client in (await listed.Content.ReadFromJsonAsync<JsonElement>(cancellationToken)).EnumerateArray())
+        {
+            if (client.GetProperty("clientId").GetString() == RealmClientProfile.PlatformClientId)
+            {
+                platformClient = client;
+                break;
+            }
+        }
+
+        if (platformClient is not { } platform)
+        {
+            throw new InvalidOperationException($"The identity provider step 'find the client '{RealmClientProfile.PlatformClientId}'' found no client.");
+        }
+
+        var addresses = PlatformAddresses(hosts);
+        var representation = platform.Deserialize<Dictionary<string, JsonElement>>()!;
+        representation.Remove("secret");
+        representation["redirectUris"] = JsonSerializer.SerializeToElement(addresses.RedirectUris);
+        representation["webOrigins"] = JsonSerializer.SerializeToElement(addresses.WebOrigins);
+        var attributes = RealmClientProfile.ReadAttributes(platform);
+        attributes[PostLogoutRedirectUrisAttribute] = string.Join("##", addresses.PostLogoutRedirectUris);
+        representation["attributes"] = JsonSerializer.SerializeToElement(attributes);
+
+        using var updated = await SendAsync(
+            token, HttpMethod.Put, $"{clientsPath}/{platform.GetProperty("id").GetString()}", representation, cancellationToken);
+        EnsureSuccess(updated, $"update the client '{RealmClientProfile.PlatformClientId}'");
+    }
+
+    /// <summary>
+    /// The redirect addresses, web origins and post-logout redirect addresses of the hosts, each list in ordinal order. Hosts are
+    /// trimmed, lower-cased and listed once. Every address uses <c>https</c> and no port. The post-logout address is the exact
+    /// address that sign-out sends, because the identity provider matches it exactly.
+    /// </summary>
+    internal static (string[] RedirectUris, string[] WebOrigins, string[] PostLogoutRedirectUris) PlatformAddresses(IEnumerable<string> hosts)
+    {
+        var distinct = hosts
+            .Select(host => host.Trim().ToLowerInvariant())
+            .Where(host => host.Length > 0)
+            .Distinct(StringComparer.Ordinal)
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+        return (
+            [.. distinct.Select(host => $"https://{host}{PlatformCallbackPath}")],
+            [.. distinct.Select(host => $"https://{host}")],
+            [.. distinct.Select(host => $"https://{host}/?signedOut")]);
     }
 
     private static void Validate(RealmState state)

@@ -319,8 +319,7 @@ the admin container only.
    `https://<AXIS_IDENTITY_HOST>/` and sets the admin client id `axis-admin`, so you set no shell variable. The
    admin client secret is the `IdentityProvider__AdminClientSecret` file, so it is in no
    command line. Every `admin` run needs that file, because Compose refuses to start a service whose secret file is
-   missing. A new realm has no redirect addresses yet, so until M28 keeps them in step, add
-   them to the realm in the identity provider yourself, before you activate an application. The activation
+   missing. The command sets the redirect addresses of the `axis` client from the hosts you give it. The activation
    copies the redirect addresses and mappers of the `axis` client to the client of each site, and it does not
    copy later changes until the next activation.
 5. Activate an application with

@@ -21,7 +21,7 @@ built, see [installation key](#installation-key). The
   hold the tenants, so the command exits with code 2. `platform rekey` is the exception: it works
   under both sources, see [installation key](#installation-key).
 - **Over the schema role.** The commands write over `ConnectionStrings:PlatformSchema`, as
-  `tenant create` does. A command that encrypts needs `Platform:SecretKey`.
+  `tenant create` does. A command that encrypts or decrypts needs `Platform:SecretKey`.
 - **Picked up without a restart.** Every change raises the tenant `version`. The server and the
   worker pick it up at their next `Tenancy:RefreshInterval`.
 - **Secrets never on the command line.** A secret value comes from an environment variable or from
@@ -280,6 +280,14 @@ Both commands also update the tenant's realm, so its "Forgot password?" link is 
 - A host that belongs to a site serves only that site, and the tenant's other hosts redirect the site's path to it,
   see [sites and sign-in](identity-provider.md#sites-and-sign-in). Only the `directory` tenant source has site
   hosts.
+- **The realm.** After `add`, `remove` or `move` commits, the command rewrites the redirect addresses of the platform
+  client `axis` in the realm of each tenant it changed, so a move rewrites two realms. The client holds the callback,
+  web origin and post-logout address of exactly the tenant's current hosts, see
+  [keeping the realm in step](identity-provider.md#keeping-the-realm-in-step). A preview tenant, and a tenant that signs in
+  through an outside identity provider, have no realm details, so the command calls no identity provider for them. When the
+  identity provider fails, the host change stays stored and the command prints `<id> realm failed: <step and status>` and exits
+  with code 1. Any later host command for the tenant writes the realm again.
+- **Settings.** The commands read `Platform:SecretKey`, to decrypt the realm's activation secret, even for a tenant without a realm.
 
 ## Sessions
 
