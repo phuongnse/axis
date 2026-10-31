@@ -23,6 +23,7 @@ public sealed class SensitiveFlagActivationTests(DataDatabaseFixture database) :
     private const string Note = "Secret note of Ngô Thị Hạnh";
     private const string PlainNote = """{ "name": "note", "type": "text" }""";
     private const string SensitiveNote = """{ "name": "note", "type": "text", "sensitive": true }""";
+    private const string LookupNote = """{ "name": "note", "type": "text", "sensitive": true, "exactLookup": true }""";
     private const string PlainAmount = """{ "name": "amount", "type": "decimal", "precision": 12, "scale": 2 }""";
     private const string SensitiveAmount = """{ "name": "amount", "type": "decimal", "precision": 12, "scale": 2, "sensitive": true }""";
     private const string PlainDue = """{ "name": "due", "type": "date" }""";
@@ -32,15 +33,21 @@ public sealed class SensitiveFlagActivationTests(DataDatabaseFixture database) :
     private readonly Guid _orderId = Guid.NewGuid();
     private readonly string _name = $"App{Guid.NewGuid():N}";
     private readonly string _tenant = $"t{Guid.NewGuid():N}";
+    private readonly string _dataKey = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
 
     private static CancellationToken CancellationToken => TestContext.Current.CancellationToken;
 
-    private SensitiveValues Values(bool withKey = true)
+    private SensitiveValues Values(bool withKey = true, bool withLookupKey = true)
     {
         var settings = new Dictionary<string, string?>();
         if (withKey)
         {
-            settings[$"Tenants:{_tenant}:DataKeys:1"] = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
+            settings[$"Tenants:{_tenant}:DataKeys:1"] = _dataKey;
+        }
+
+        if (withLookupKey)
+        {
+            settings[$"Tenants:{_tenant}:LookupKeys:1"] = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32));
         }
 
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(settings).Build();
@@ -197,6 +204,124 @@ public sealed class SensitiveFlagActivationTests(DataDatabaseFixture database) :
 
         Assert.Equal(["f_note"], await ReadScalarsAsync($"SELECT column_name FROM information_schema.columns WHERE table_schema = 'entities' AND table_name = '{EntityNaming.Table(_orderId)}' AND column_name LIKE 'f\\_%'"));
         Assert.Equal(marked.Release!.Id, await ActiveReleaseIdAsync());
+    }
+
+    [Fact]
+    public async Task Adding_exact_lookup_fills_a_hash_for_every_row_and_removing_it_drops_the_column()
+    {
+        var values = Values();
+        using var folder = Application(SensitiveNote);
+        await ActivateAsync(await CompileAsync(folder), values);
+        var rows = await InsertEncryptedRowsAsync(values, "note");
+        var empty = Guid.NewGuid();
+        await InsertStoredAsync("f_note", empty, null);
+
+        folder.With("entities/order.json", Order(LookupNote));
+        var gained = await CompileAsync(folder);
+        await ActivateAsync(gained, values);
+
+        Assert.Equal(gained.Release!.Id, await ActiveReleaseIdAsync());
+        foreach (var (id, text) in rows)
+        {
+            Assert.Equal(
+                Convert.ToHexString(await values.LookupTextAsync(_tenant, _orderId, "note", text, CancellationToken)),
+                Convert.ToHexString((await StoredBytesAsync("f_note_lookup", id))!));
+        }
+
+        Assert.Null(await StoredBytesAsync("f_note_lookup", empty));
+
+        folder.With("entities/order.json", Order(SensitiveNote));
+        var lost = await CompileAsync(folder);
+        await ActivateAsync(lost, values);
+
+        Assert.Equal(lost.Release!.Id, await ActiveReleaseIdAsync());
+        Assert.Equal(["f_note"], await ColumnNamesAsync());
+    }
+
+    [Fact]
+    public async Task A_field_that_becomes_sensitive_and_exact_lookup_in_one_release_is_encrypted_and_hashed()
+    {
+        var values = Values();
+        var cipher = new RecordCipher(values, _tenant);
+        using var folder = Application(PlainNote);
+        await ActivateAsync(await CompileAsync(folder), values);
+        var first = await InsertPlainAsync(null, null, Note);
+        var empty = await InsertPlainAsync(null, null, null);
+
+        folder.With("entities/order.json", Order(LookupNote));
+        var second = await CompileAsync(folder);
+        await ActivateAsync(second, values);
+
+        Assert.Equal(Note, (await ReadAsync(second, first, cipher))["note"]!.GetValue<string>());
+        Assert.Equal(
+            Convert.ToHexString(await values.LookupTextAsync(_tenant, _orderId, "note", Note, CancellationToken)),
+            Convert.ToHexString((await StoredBytesAsync("f_note_lookup", first))!));
+        Assert.Null(await StoredBytesAsync("f_note_lookup", empty));
+    }
+
+    [Fact]
+    public async Task A_rename_of_an_exact_lookup_field_hashes_each_value_under_the_new_name()
+    {
+        var values = Values();
+        using var folder = Application(LookupNote);
+        await ActivateAsync(await CompileAsync(folder), values);
+        var rows = new List<(Guid Id, string Text)>();
+        for (var index = 0; index < 3; index++)
+        {
+            var row = (Id: Guid.NewGuid(), Text: $"{Note} {index}");
+            rows.Add(row);
+            await InsertStoredAsync("f_note", row.Id, await EncryptAsync(values, row.Id, "note", row.Text));
+            await ExecuteAsync(
+                $"UPDATE {Table()} SET f_note_lookup = decode('{Convert.ToHexString(await values.LookupTextAsync(_tenant, _orderId, "note", row.Text, CancellationToken))}', 'hex') WHERE id = '{row.Id}'");
+        }
+
+        folder
+            .With("entities/order.json", Order("""{ "name": "remark", "type": "text", "sensitive": true, "exactLookup": true }"""))
+            .With("migrations/0001-rename-note.json", $$"""
+                { "id": "{{Guid.NewGuid()}}", "kind": "migration", "name": "RenameNote", "formatVersion": 1, "entity": "Order", "changes": [{ "type": "renameField", "from": "note", "to": "remark" }] }
+                """);
+        var second = await CompileAsync(folder);
+
+        await ActivateAsync(second, values);
+
+        Assert.Equal(["f_remark", "f_remark_lookup"], (await ColumnNamesAsync()).Order().ToList());
+        foreach (var (id, text) in rows)
+        {
+            var stored = Convert.ToHexString((await StoredBytesAsync("f_remark_lookup", id))!);
+            Assert.Equal(Convert.ToHexString(await values.LookupTextAsync(_tenant, _orderId, "remark", text, CancellationToken)), stored);
+            Assert.NotEqual(Convert.ToHexString(await values.LookupTextAsync(_tenant, _orderId, "note", text, CancellationToken)), stored);
+        }
+    }
+
+    [Fact]
+    public async Task Activation_without_a_lookup_key_fails_closed_when_exact_lookup_is_added()
+    {
+        var values = Values();
+        using var folder = Application(SensitiveNote);
+        var first = await CompileAsync(folder);
+        await ActivateAsync(first, values);
+        await InsertEncryptedRowsAsync(values, "note");
+        folder.With("entities/order.json", Order(LookupNote));
+        var gained = await CompileAsync(folder);
+
+        var failure = await Assert.ThrowsAsync<TenantDataKeyMissingException>(() => ActivateAsync(gained, Values(withLookupKey: false)));
+
+        Assert.Equal(TenantKeyKind.Lookup, failure.Kind);
+        Assert.Equal(["f_note"], await ColumnNamesAsync());
+        Assert.Equal(first.Release!.Id, await ActiveReleaseIdAsync());
+    }
+
+    private async Task<List<(Guid Id, string Text)>> InsertEncryptedRowsAsync(SensitiveValues values, string field)
+    {
+        var rows = new List<(Guid Id, string Text)>();
+        for (var index = 0; index < 3; index++)
+        {
+            var row = (Id: Guid.NewGuid(), Text: $"{Note} {index}");
+            rows.Add(row);
+            await InsertStoredAsync($"f_{field}", row.Id, await EncryptAsync(values, row.Id, field, row.Text));
+        }
+
+        return rows;
     }
 
     private string Table() => EntityNaming.QualifiedTable(EntityNaming.Table(_orderId));

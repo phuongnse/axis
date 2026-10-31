@@ -9,10 +9,10 @@ namespace Axis.Data.Records;
 
 /// <summary>
 /// Runs the <see cref="SensitiveRewrite"/> of a plan command inside the activation transaction: it reads the ids and the
-/// source column in batches by id, encrypts, decrypts or re-encrypts each value in C# with the tenant's data keys, and
-/// stores the batch with the command's batch update. PostgreSQL never sees a key or a plain sensitive value, and a value that
-/// does not decrypt throws, so the transaction rolls back. A rewrite without a cipher throws before it reads a row, so a
-/// plain value is never written into an encrypted column.
+/// source column in batches by id, encrypts, decrypts, re-encrypts or hashes each value in C# with the tenant's data keys
+/// and lookup keys, and stores the batch with the command's batch update. PostgreSQL never sees a key or a plain sensitive
+/// value, and a value that does not decrypt throws, so the transaction rolls back. A rewrite without a cipher throws
+/// before it reads a row, so a plain value is never written into an encrypted column.
 /// </summary>
 internal static class SensitiveRewriter
 {
@@ -56,6 +56,10 @@ internal static class SensitiveRewriter
                         break;
                     case SensitiveRewriteKind.Rename:
                         bytes[index] = await cipher.Values.ReEncryptAsync(scope, rewrite.FromFieldName!, rewrite.FieldName, (byte[])value!, cancellationToken);
+                        break;
+                    case SensitiveRewriteKind.Hash:
+                        var text = await cipher.Values.DecryptTextAsync(scope, rewrite.FieldName, (byte[])value!, cancellationToken);
+                        bytes[index] = await cipher.Values.LookupTextAsync(cipher.TenantId, rewrite.EntityId, rewrite.FieldName, text, cancellationToken);
                         break;
                     default:
                         throw new InvalidOperationException($"Unknown sensitive rewrite kind '{rewrite.Kind}'.");
