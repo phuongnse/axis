@@ -1,0 +1,87 @@
+{
+  "id": "6d15f627-8b3e-4376-bd50-d8b65c7b7168",
+  "kind": "entity",
+  "name": "PurchaseRequest",
+  "formatVersion": 1,
+  "label": {
+    "textKey": "purchaseRequest.label"
+  },
+  "displayField": "title",
+  "fields": [
+    {
+      "name": "number",
+      "type": "text",
+      "maxLength": 20,
+      "unique": true,
+      "sequence": "PurchaseRequestNumber",
+      "label": {
+        "textKey": "purchaseRequest.number"
+      }
+    },
+    {
+      "name": "title",
+      "type": "text",
+      "required": true,
+      "maxLength": 200,
+      "label": {
+        "textKey": "purchaseRequest.title"
+      }
+    },
+    {
+      "name": "requester",
+      "type": "text",
+      "maxLength": 100,
+      "creator": true,
+      "label": {
+        "textKey": "purchaseRequest.requester"
+      }
+    },
+    {
+      "name": "manager",
+      "type": "text",
+      "maxLength": 100,
+      "label": {
+        "textKey": "purchaseRequest.manager"
+      }
+    },
+    {
+      "name": "amount",
+      "type": "decimal",
+      "precision": 18,
+      "scale": 2,
+      "label": {
+        "textKey": "purchaseRequest.amount"
+      }
+    },
+    {
+      "name": "status",
+      "type": "enum",
+      "values": [
+        "draft",
+        "submitted",
+        "approved",
+        "returned",
+        "rejected"
+      ],
+      "label": {
+        "textKey": "purchaseRequest.status"
+      }
+    },
+    {
+      "name": "submittedAt",
+      "type": "date-time",
+      "label": {
+        "textKey": "purchaseRequest.submittedAt"
+      }
+    },
+    {
+      "name": "decisionComments",
+      "type": "text",
+      "maxLength": 2000,
+      "label": {
+        "textKey": "purchaseRequest.decisionComments"
+      },
+      "sensitive": true
+    }
+  ]
+}
