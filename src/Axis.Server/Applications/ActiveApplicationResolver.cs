@@ -44,6 +44,19 @@ internal sealed class ActiveApplicationResolver(TenantDatabase database, ITenant
         return active is null ? null : new ActiveApplication(active.ReleaseId, await LoadAsync(store, tenantId, active, cancellationToken));
     }
 
+    /// <summary>
+    /// Returns the release active for the application <paramref name="applicationId"/> with its model, or
+    /// <see langword="null"/> when the application has no active release.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">No tenant context is set.</exception>
+    public async Task<ActiveApplication?> ResolveReleaseByIdAsync(Guid applicationId, CancellationToken cancellationToken = default)
+    {
+        var tenantId = CurrentTenantId();
+        var store = new ActiveReleaseStore(await database.GetConfigurationAsync(cancellationToken));
+        var active = await store.FindByApplicationIdAsync(applicationId, cancellationToken);
+        return active is null ? null : new ActiveApplication(active.ReleaseId, await LoadAsync(store, tenantId, active, cancellationToken));
+    }
+
     /// <summary>Returns the models of every release active in the current tenant, in name order.</summary>
     /// <exception cref="InvalidOperationException">No tenant context is set.</exception>
     public async Task<IReadOnlyList<ApplicationModel>> ListAsync(CancellationToken cancellationToken = default)

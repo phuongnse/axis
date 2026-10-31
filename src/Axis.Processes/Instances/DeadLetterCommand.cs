@@ -4,6 +4,7 @@ using Axis.Configuration.Model;
 using Axis.Data.Audit;
 using Axis.Processes.Work;
 using Npgsql;
+using NpgsqlTypes;
 
 namespace Axis.Processes.Instances;
 
@@ -49,14 +50,17 @@ public static class DeadLetterCommand
 {
     /// <param name="active">The active release's model.</param>
     /// <param name="activeReleaseId">The id of the active release.</param>
-    /// <param name="processId">The process of the route. The dead letter must belong to it.</param>
+    /// <param name="processId">
+    /// The process of the route. The dead letter must belong to it. <see langword="null"/> matches a dead letter of the
+    /// application whatever its process, even none, for the operator console.
+    /// </param>
     public static Task<DeadLetterResult> RedeliverAsync(
         NpgsqlConnection connection,
         NpgsqlTransaction transaction,
         string tenantId,
         ApplicationModel active,
         Guid activeReleaseId,
-        Guid processId,
+        Guid? processId,
         Guid id,
         string userId,
         string reason,
@@ -64,13 +68,16 @@ public static class DeadLetterCommand
         SettleAsync(connection, transaction, tenantId, active, activeReleaseId, processId, id, userId, reason, redeliver: true, cancellationToken);
 
     /// <param name="active">The active release's model.</param>
-    /// <param name="processId">The process of the route. The dead letter must belong to it.</param>
+    /// <param name="processId">
+    /// The process of the route. The dead letter must belong to it. <see langword="null"/> matches a dead letter of the
+    /// application whatever its process, even none, for the operator console.
+    /// </param>
     public static Task<DeadLetterResult> DiscardAsync(
         NpgsqlConnection connection,
         NpgsqlTransaction transaction,
         string tenantId,
         ApplicationModel active,
-        Guid processId,
+        Guid? processId,
         Guid id,
         string userId,
         string reason,
@@ -83,7 +90,7 @@ public static class DeadLetterCommand
         string tenantId,
         ApplicationModel active,
         Guid activeReleaseId,
-        Guid processId,
+        Guid? processId,
         Guid id,
         string userId,
         string reason,
@@ -333,17 +340,17 @@ public static class DeadLetterCommand
         NpgsqlConnection connection,
         NpgsqlTransaction transaction,
         Guid applicationId,
-        Guid processId,
+        Guid? processId,
         Guid id,
         CancellationToken cancellationToken)
     {
         await using var command = new NpgsqlCommand(
-            $"SELECT {DeadLetters.Columns} FROM axis.dead_letters WHERE id = @id AND application_id = @application AND process_id = @process FOR UPDATE",
+            $"SELECT {DeadLetters.Columns} FROM axis.dead_letters WHERE id = @id AND application_id = @application AND (@process::uuid IS NULL OR process_id = @process) FOR UPDATE",
             connection,
             transaction);
         command.Parameters.AddWithValue("id", id);
         command.Parameters.AddWithValue("application", applicationId);
-        command.Parameters.AddWithValue("process", processId);
+        command.Parameters.Add(new NpgsqlParameter("process", NpgsqlDbType.Uuid) { Value = (object?)processId ?? DBNull.Value });
         await using var reader = await command.ExecuteReaderAsync(cancellationToken);
         return await reader.ReadAsync(cancellationToken) ? DeadLetters.Read(reader) : null;
     }
