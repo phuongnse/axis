@@ -694,7 +694,7 @@ schema of the tenant database.
   | `id`                  | `uuid`                           | A version 7 UUID                                                                                                                                                                                                                                 |
   | `occurred_at`         | `timestamptz`                    | When the action happened: the transaction time, `now()`, so the audit records of one transaction share it                                                                                                                                        |
   | `actor`               | `text`                           | A user id, or `system` for the worker. The record API and the process start endpoint need a session, so they never write `anonymous`. Only process starts from before M4, with nobody signed in, have it. `session.signInRefused` also writes it |
-  | `actor_name`          | `text`, null                     | The actor's display name at the time of the action. It is null for `system` and `anonymous`, and for audit records written before it was added. _(planned for M27)_ Null in new rows: a history view reads the name from the user's profile, see [D109](../decisions/d109-sensitive-fields-and-backups-are-encrypted-and-history-keeps-no-names.md)                                                                                                   |
+  | `actor_name`          | `text`, null                     | The actor's display name, only in audit records written before M27. It is null in every new row: a history view reads the name from the user's profile, see [D109](../decisions/d109-sensitive-fields-and-backups-are-encrypted-and-history-keeps-no-names.md)                                                                                                   |
   | `action`              | `text`                           | The action, such as `record.created`                                                                                                                                                                                                             |
   | `application_id`      | `uuid`, null for session actions | The application `id`. A session action belongs to no application                                                                                                                                                                                 |
   | `entity_id`           | `uuid`, null                     | The entity `id`, when the action concerns a record                                                                                                                                                                                               |
@@ -708,8 +708,8 @@ schema of the tenant database.
     [publish requests and release history](#publish-requests-and-release-history).
   - **Import actions.** The commit of a [record import](import-export.md#import)
     writes `records.imported`, after the `record.created` or `record.updated` audit
-    record of each row, in the transaction that writes the rows. The actor is the uploader
-    with their display name. `entity_id` is set, and `record_id` and
+    record of each row, in the transaction that writes the rows. The actor is the uploader's
+    user id and `actor_name` is null. `entity_id` is set, and `record_id` and
     `process_instance_id` are null. `details` is
     `{ "created", "updated" }`, the counts of records, and it holds no value.
   - **Session actions.** The
@@ -720,8 +720,8 @@ schema of the tenant database.
 
     | Action                  | When                                     | `actor` / `actor_name`           | `details`                       |
     | ----------------------- | ---------------------------------------- | -------------------------------- | ------------------------------- |
-    | `session.signedIn`      | The callback creates a session           | The user id and the display name | `{ "clientAddress" }`           |
-    | `session.signedOut`     | `POST /api/auth/sign-out` with a session | The user id and the display name | `{ "clientAddress" }`           |
+    | `session.signedIn`      | The callback creates a session           | The user id, null                | `{ "clientAddress" }`           |
+    | `session.signedOut`     | `POST /api/auth/sign-out` with a session | The user id, null                | `{ "clientAddress" }`           |
     | `session.signInRefused` | The callback is refused                  | `anonymous`, null                | `{ "reason", "clientAddress" }` |
     - `reason` is one of `otherTenant`, `invalidToken`, `invalidState`,
       `invalidIssuer`, `providerError`, `providerNotAccepted`, `providerNotAllowed` or `acrNotAccepted`. `invalidToken` also covers an ID token
@@ -751,7 +751,7 @@ schema of the tenant database.
   - **User actions.** An administrator's command on a user of the tenant's realm
     writes one action, see [user administration](user-administration.md#audit):
     `user.invited`, `user.invitationResent`, `user.disabled`, `user.enabled`, `user.authenticatorReset`, `user.roleGiven` or `user.roleRemoved`. The `actor` is
-    the administrator's user id and `actor_name` their display name. `details`
+    the administrator's user id and `actor_name` is null. `details`
     is `{ "userId" }`, the id of the realm user the command acted on, and a role action adds `role`. An invitation adds `email`, a resend adds `previousUserId` (the id before the realm user was created again), and no record holds the invitation link.
     `entity_id`, `record_id` and `process_instance_id` are null, and so is `application_id`, except that a role
     action on an application role holds it. A platform role action adds `"platform": true` to `details` and its `role` is the kind.

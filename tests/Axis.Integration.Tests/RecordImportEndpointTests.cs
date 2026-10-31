@@ -325,7 +325,7 @@ public sealed class RecordImportEndpointTests(RecordApiFixture fixture) : IClass
             3L,
             (long)(await fixture.ScalarAsync(
                 TenantA,
-                $"SELECT count(*) FROM axis.audit_records WHERE action = 'record.created' AND actor = 'requester' AND actor_name = 'Requester User' AND record_id IN (SELECT id FROM {TicketTable})"))!);
+                $"SELECT count(*) FROM axis.audit_records WHERE action = 'record.created' AND actor = 'requester' AND actor_name IS NULL AND record_id IN (SELECT id FROM {TicketTable})"))!);
         Assert.Equal(audits + 4, await fixture.AuditRecordCountAsync(TenantA));
         Assert.Equal(imported + 1, await ImportedAuditCountAsync());
         Assert.Equal(importedByAnna + 1, await ImportedAuditCountAsync(ImportedByAnnaFilter));
@@ -359,7 +359,7 @@ public sealed class RecordImportEndpointTests(RecordApiFixture fixture) : IClass
             2L,
             (long)(await fixture.ScalarAsync(
                 TenantA,
-                $"SELECT count(*) FROM axis.audit_records WHERE action = 'record.updated' AND actor = 'requester' AND actor_name = 'Requester User' AND record_id IN (SELECT id FROM {TicketTable} WHERE f_code IN ('a1', 'b1'))"))!);
+                $"SELECT count(*) FROM axis.audit_records WHERE action = 'record.updated' AND actor = 'requester' AND actor_name IS NULL AND record_id IN (SELECT id FROM {TicketTable} WHERE f_code IN ('a1', 'b1'))"))!);
         Assert.Equal(updates + 2, (long)(await fixture.ScalarAsync(TenantA, "SELECT count(*) FROM axis.audit_records WHERE action = 'record.updated'"))!);
         Assert.Equal(
             1L,
@@ -796,7 +796,7 @@ public sealed class RecordImportEndpointTests(RecordApiFixture fixture) : IClass
         (long)(await fixture.ScalarAsync(TenantA, $"SELECT count(*) FROM {TicketTable}{(where is null ? "" : $" WHERE {where}")}"))!;
 
     private const string ImportedByAnnaFilter =
-        "actor = 'requester' AND actor_name = 'Requester User' AND record_id IS NULL AND process_instance_id IS NULL AND entity_id IS NOT NULL AND details = '{\"created\": 3, \"updated\": 0}'::jsonb";
+        "actor = 'requester' AND actor_name IS NULL AND record_id IS NULL AND process_instance_id IS NULL AND entity_id IS NOT NULL AND details = '{\"created\": 3, \"updated\": 0}'::jsonb";
 
     private async Task<long> ImportedAuditCountAsync(string? where = null) =>
         (long)(await fixture.ScalarAsync(TenantA, $"SELECT count(*) FROM axis.audit_records WHERE action = 'records.imported'{(where is null ? "" : $" AND {where}")}"))!;

@@ -278,8 +278,7 @@ internal static class DataSourceEndpoints
                         ["format"] = exportFormat.Name(),
                         ["rowCount"] = rows,
                         ["truncated"] = truncated,
-                    },
-                    user.DisplayName),
+                    }),
                 cancellationToken);
         }
         catch (PostgresException exception) when (exception.SqlState.StartsWith("22", StringComparison.Ordinal))

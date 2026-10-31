@@ -1,6 +1,5 @@
 using System.Net;
 using System.Text.Json;
-using System.Text.Json.Nodes;
 using Axis.Data.Audit;
 using Axis.Server.Tests;
 using static Axis.Integration.Tests.TaskApiFixture;
@@ -17,6 +16,7 @@ public sealed class RecordHistoryTests(TaskApiFixture fixture) : IClassFixture<T
     public async Task A_create_an_update_a_process_start_and_a_task_decision_are_listed_newest_first_with_their_actor()
     {
         using var maria = fixture.CreateClient().SignedInAs("maria");
+        await fixture.InsertProfileAsync(TenantA, "maria", "Maria Manager");
         var department = await fixture.InsertDepartmentAsync(TenantA, "maria");
         var subject = await CreateAsync(maria, TenantA, $$"""{ "values": { "title": "Chairs", "department": "{{department:D}}" } }""");
         await UpdateAsync(maria, subject, TenantA, """{ "version": 1, "values": { "title": "Desks" } }""");
@@ -75,10 +75,10 @@ public sealed class RecordHistoryTests(TaskApiFixture fixture) : IClassFixture<T
             items.Where(item => item.GetProperty("actor").GetString() == AuditActors.System),
             item => Assert.Equal(JsonValueKind.Null, item.GetProperty("actorName").ValueKind));
 
-        // The names are stored with the audit records. They come from the user's session.
+        // New audit records store no name. The history reads it from the user profile.
         var stored = await fixture.ActorsAsync(TenantA, subject);
         Assert.Contains(stored, row => row.Actor == AuditActors.System);
-        Assert.All(stored, row => Assert.Equal(row.Actor == AuditActors.System ? null : "Maria Manager", row.ActorName));
+        Assert.All(stored, row => Assert.Null(row.ActorName));
         Assert.Equal(4, stored.Count(row => row.Actor == "maria"));
 
         using var second = await GetJsonAsync(maria, $"{Records}/{subject:D}/history?page=2&pageSize=1", TenantA);
@@ -97,18 +97,22 @@ public sealed class RecordHistoryTests(TaskApiFixture fixture) : IClassFixture<T
         var renamed = $"renamed-{Guid.NewGuid():N}";
         var goneNamed = $"gone-named-{Guid.NewGuid():N}";
         var gone = $"gone-{Guid.NewGuid():N}";
-        await using (var connection = await fixture.OpenConnectionAsync(TenantA))
-        await using (var transaction = await connection.BeginTransactionAsync(CancellationToken))
-        {
-            foreach (var (actor, name) in new (string, string?)[] { (renamed, "Old"), (goneNamed, "Kept"), (gone, null), (AuditActors.System, null) })
-            {
-                await AuditRecords.AppendAsync(
-                    transaction,
-                    new AuditEntry(actor, AuditActions.RecordUpdated, fixture.Model.Manifest.Id, entity.Id, subject, null, new JsonObject(), name),
-                    CancellationToken);
-            }
 
-            await transaction.CommitAsync(CancellationToken);
+        // Rows written before names were dropped keep one. AuditEntry cannot carry a name any more, so insert them directly.
+        foreach (var (actor, name) in new (string, string?)[] { (renamed, "Old"), (goneNamed, "Kept"), (gone, null), (AuditActors.System, null) })
+        {
+            Assert.Equal(1, await fixture.ExecuteAsync(
+                TenantA,
+                """
+                INSERT INTO axis.audit_records (id, occurred_at, actor, actor_name, action, application_id, entity_id, record_id, details)
+                VALUES (gen_random_uuid(), now(), @actor, @name::text, @action, @application, @entity, @record, '{}'::jsonb)
+                """,
+                ("actor", actor),
+                ("name", (object?)name ?? DBNull.Value),
+                ("action", AuditActions.RecordUpdated),
+                ("application", fixture.Model.Manifest.Id),
+                ("entity", entity.Id),
+                ("record", subject)));
         }
 
         await fixture.InsertProfileAsync(TenantA, renamed, "New");
@@ -187,6 +191,7 @@ public sealed class RecordHistoryTests(TaskApiFixture fixture) : IClassFixture<T
     {
         using var maria = fixture.CreateClient().SignedInAs("maria");
         using var fiona = fixture.CreateClient().SignedInAs("fiona");
+        await fixture.InsertProfileAsync(TenantB, "fiona", "Fiona Finance");
         var shared = await CreateAsync(maria, TenantA, """{ "values": { "title": "Shared" } }""");
         await UpdateAsync(maria, shared, TenantA, """{ "version": 1, "values": { "title": "Shared A" } }""");
         await fixture.InsertRequestAsync(TenantB, department: null, id: shared);

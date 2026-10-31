@@ -35,7 +35,7 @@ internal static class SessionAudit
         await using var transaction = await connection.BeginTransactionAsync(cancellationToken);
         await AuditRecords.AppendAsync(
             transaction,
-            new AuditEntry(actor, action, null, null, null, null, details, actorName),
+            new AuditEntry(actor, action, null, null, null, null, details),
             cancellationToken);
         await transaction.CommitAsync(cancellationToken);
     }

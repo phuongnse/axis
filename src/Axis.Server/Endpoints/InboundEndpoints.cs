@@ -244,8 +244,7 @@ internal static class InboundEndpoints
                 entity.Id,
                 record.Id,
                 ProcessInstanceId: null,
-                new JsonObject { ["version"] = record.Version, ["endpoint"] = endpoint.Name },
-                caller.DisplayName),
+                new JsonObject { ["version"] = record.Version, ["endpoint"] = endpoint.Name }),
             cancellationToken);
 
         // The data change triggers of the create fire before the endpoint's own start, as system.

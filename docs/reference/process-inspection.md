@@ -503,7 +503,7 @@ A `process` grant takes the actions `retry`, `cancel` and `resolve`, as well as
 `start` and `inspect`, see [Authorization](security.md#authorization).
 A [service account](security.md#service-accounts) may run the commands with a
 bearer token, under the grants of its roles. It needs no session and no CSRF
-header. The audit records name it as the actor, by its id and its display name.
+header. The audit records name it as the actor, by its id.
 Each is checked
 on its own, and none implies another. The subject record must also be readable
 by the user, by the same rule as a start. A subject record the user may not

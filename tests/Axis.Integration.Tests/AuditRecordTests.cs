@@ -26,7 +26,7 @@ public sealed class AuditRecordTests(RecordApiFixture fixture) : IClassFixture<R
 
         var created = Assert.Single(await fixture.AuditRecordsAsync(TenantA, id));
 
-        Assert.Equal(new AuditRecord("requester", "Requester User", "record.created", fixture.Model.Manifest.Id, item.Id, id, created.Details), created);
+        Assert.Equal(new AuditRecord("requester", null, "record.created", fixture.Model.Manifest.Id, item.Id, id, created.Details), created);
         AssertDetails("""{ "version": 1 }""", created.Details);
 
         // The body names the fields out of declaration order. The computed total changes too, but
@@ -46,14 +46,14 @@ public sealed class AuditRecordTests(RecordApiFixture fixture) : IClassFixture<R
         var audits = await fixture.AuditRecordsAsync(TenantA, id);
 
         Assert.Equal(["record.created", "record.updated", "record.deleted"], audits.Select(audit => audit.Action));
-        Assert.All(audits, audit => Assert.Equal(("requester", "Requester User", fixture.Model.Manifest.Id, item.Id, id), (audit.Actor, audit.ActorName, audit.ApplicationId, audit.EntityId, audit.RecordId)));
+        Assert.All(audits, audit => Assert.Equal(("requester", null, fixture.Model.Manifest.Id, item.Id, id), (audit.Actor, audit.ActorName, audit.ApplicationId, audit.EntityId, audit.RecordId)));
         AssertDetails("""{ "version": 2, "fields": ["name", "quantity", "parts"] }""", audits[1].Details);
         // A deleted record has no new version: the details hold the version it had.
         AssertDetails("""{ "version": 2 }""", audits[2].Details);
     }
 
     [Fact]
-    public async Task The_actor_and_their_name_are_the_signed_in_user()
+    public async Task The_actor_is_the_signed_in_user_and_their_name_is_not_stored()
     {
         using var client = fixture.CreateClient().SignedInAs("requester");
 
@@ -65,7 +65,7 @@ public sealed class AuditRecordTests(RecordApiFixture fixture) : IClassFixture<R
         }
 
         Assert.Equal(
-            [("requester", "Requester User", "record.created"), ("requester", "Requester User", "record.updated")],
+            [("requester", null, "record.created"), ("requester", null, "record.updated")],
             (await fixture.AuditRecordsAsync(TenantA, annas)).Select(audit => (audit.Actor, audit.ActorName, audit.Action)));
     }
 

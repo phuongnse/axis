@@ -6,9 +6,6 @@ namespace Axis.Data.Audit;
 /// An audit record to append: who did what, to which application, entity, record and process
 /// instance. A session action or a user action has no application. <see cref="Details"/> depends on the action and never holds field values.
 /// </summary>
-/// <param name="ActorName">
-/// The actor's display name, stored as it is now, or null for <c>system</c> and <c>anonymous</c>.
-/// </param>
 public sealed record AuditEntry(
     string Actor,
     string Action,
@@ -16,5 +13,4 @@ public sealed record AuditEntry(
     Guid? EntityId,
     Guid? RecordId,
     Guid? ProcessInstanceId,
-    JsonObject Details,
-    string? ActorName = null);
+    JsonObject Details);

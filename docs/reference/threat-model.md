@@ -587,8 +587,8 @@ a business action, see P3, P12 and P20. What they keep about a person is in the 
 
 Open, waiting for an issue:
 
-- (Identifying, Medium) audit records keep the actor's display name, `actor_name`, forever, _(planned for
-  M27)_, [D109](../decisions/d109-sensitive-fields-and-backups-are-encrypted-and-history-keeps-no-names.md).
+- (Identifying, Medium) audit records written before M27 keep the actor's display name, `actor_name`, forever.
+  New rows store no name, [D109](../decisions/d109-sensitive-fields-and-backups-are-encrypted-and-history-keeps-no-names.md).
 - (Data disclosure, High) a database login, a dump or a replica reads personal data and `sensitive` fields
   in clear, _(planned for M27)_, [D109](../decisions/d109-sensitive-fields-and-backups-are-encrypted-and-history-keeps-no-names.md).
   Until then the operator's control is I15.

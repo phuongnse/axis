@@ -80,8 +80,7 @@ public static class TaskReassignCommand
                     ["from"] = new JsonObject { [task.AssigneeKind] = task.Assignee },
                     ["to"] = new JsonObject { [assigneeKind] = assignee },
                     ["reason"] = reason,
-                },
-                actor.DisplayName),
+                }),
             cancellationToken);
         return TaskReassignOutcome.Done;
     }

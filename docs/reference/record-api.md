@@ -841,14 +841,14 @@ can be read as its history (D21).
   `record.deleted`.
 - **Actor.** The actor is the user of the
   [session](security.md#sign-in-and-the-session). Every write needs a
-  session, so the record API never writes `anonymous`. The audit record also
-  stores the user's display name as it was at that moment. A process
+  session, so the record API never writes `anonymous`. The audit record
+  stores no display name. A process
   [operation step](process-execution.md#running-a-step) that updates its subject
-  record writes `record.updated` with the actor `system`, no display name and
+  record writes `record.updated` with the actor `system` and
   its instance id. A [task completion](task-api.md#completing-a-task) that
   writes values writes no `record.updated`. Its `task.completed` record names
   the fields. An [endpoint call](inbound-endpoints.md) writes `record.created`
-  with the caller as the actor, and the caller's display name.
+  with the caller as the actor.
 - **Details.** `details` is `{ "version": n }` with the record's new version.
   A delete holds the version the record had when it was deleted. An endpoint
   call's `record.created` also has `"endpoint"`, the endpoint's name.
@@ -876,7 +876,7 @@ can be read as its history (D21).
   - Each item has its `id`, `occurredAt`, `actor`, `actorName`, `action`,
     `processInstanceId` and `details`, as stored. `actorName` is the display
     name in the actor's [user profile](notifications.md#user-profiles), else the
-    name stored with the audit record, else `null`. Always `null` for `system` and `anonymous`.
+    name stored with an audit record written before M27, else `null`. A new audit record stores no name, so `actorName` is `null` for a caller with no profile, such as a service account. Always `null` for `system` and `anonymous`.
   - Each item also has `inspectPath`, the last property of the item. It is the
     [instance detail](process-inspection.md#instance-detail) path of the entry's
     process instance, such as

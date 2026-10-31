@@ -64,7 +64,7 @@ public sealed class TaskCompletionTests(TaskApiFixture fixture) : IClassFixture<
         }, resumed);
 
         var (actor, actorName, details) = Assert.Single(await fixture.AuditRecordsAsync(TenantA, instance, AuditActions.TaskCompleted));
-        Assert.Equal(("maria", "Maria Manager"), (actor, actorName));
+        Assert.Equal(("maria", null), (actor, actorName));
         Assert.True(JsonNode.DeepEquals(JsonNode.Parse("""{ "outcome": "approve", "fields": ["comment"] }"""), JsonNode.Parse(details)));
         Assert.Empty(await fixture.AuditRecordsAsync(TenantA, instance, AuditActions.RecordUpdated));
 
@@ -295,7 +295,7 @@ public sealed class TaskCompletionTests(TaskApiFixture fixture) : IClassFixture<
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var (actor, actorName, _) = Assert.Single(await fixture.AuditRecordsAsync(TenantA, instance, AuditActions.TaskCompleted));
-        Assert.Equal(("fiona", "Fiona Finance"), (actor, actorName));
+        Assert.Equal(("fiona", null), (actor, actorName));
     }
 
     [Fact]

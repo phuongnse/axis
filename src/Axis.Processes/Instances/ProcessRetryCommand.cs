@@ -194,8 +194,7 @@ public static class ProcessRetryCommand
                 instance.SubjectEntityId,
                 instance.SubjectId,
                 instanceId,
-                details,
-                userName),
+                details),
             cancellationToken);
 
         return new ProcessRetryResult(ProcessRetryOutcome.Retried, ReleaseId: instance.ReleaseId, SubjectId: instance.SubjectId);

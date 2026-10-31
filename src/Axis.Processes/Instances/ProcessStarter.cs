@@ -251,7 +251,7 @@ public static class ProcessStarter
 
         await AuditRecords.AppendAsync(
             transaction,
-            new AuditEntry(actorId, AuditActions.ProcessStarted, application.Manifest.Id, instance.SubjectEntityId, instance.SubjectId, instance.Id, auditDetails, actorName),
+            new AuditEntry(actorId, AuditActions.ProcessStarted, application.Manifest.Id, instance.SubjectEntityId, instance.SubjectId, instance.Id, auditDetails),
             cancellationToken);
         return new ProcessStartResult(ProcessStartOutcome.Started);
     }

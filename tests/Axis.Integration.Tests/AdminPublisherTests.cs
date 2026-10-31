@@ -92,7 +92,7 @@ public sealed class AdminPublisherTests(PostgreSqlFixture database) : IClassFixt
         Assert.Equal(1L, await ScalarAsync(scenario, ids[0], "SELECT count(*) FROM axis.audit_records WHERE action LIKE 'release.%'"));
         Assert.Equal(1L, await ScalarAsync(scenario, ids[0], "SELECT count(*) FROM axis.audit_records WHERE action = 'release.published'"));
         Assert.Equal("author", await ScalarAsync(scenario, ids[0], "SELECT actor FROM axis.audit_records WHERE action = 'release.published'"));
-        Assert.Equal("Author User", await ScalarAsync(scenario, ids[0], "SELECT actor_name FROM axis.audit_records WHERE action = 'release.published'"));
+        Assert.Equal(1L, await ScalarAsync(scenario, ids[0], "SELECT count(*) FROM axis.audit_records WHERE action = 'release.published' AND actor_name IS NULL"));
         Assert.Equal(await ApplicationIdAsync(), await ScalarAsync(scenario, ids[0], "SELECT application_id::text FROM axis.audit_records WHERE action = 'release.published'"));
         var details = JsonNode.Parse((string)(await ScalarAsync(scenario, ids[0], "SELECT details::text FROM axis.audit_records WHERE action = 'release.published'"))!)!;
         Assert.Equal(request.ToString("D"), details["requestId"]!.GetValue<string>());

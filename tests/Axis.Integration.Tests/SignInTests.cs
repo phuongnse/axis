@@ -259,7 +259,7 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
 
         var record = Assert.Single(await ReadAuditAsync("a", "session.signedIn"));
         Assert.Equal("requester", record.Actor);
-        Assert.Equal("Requester User", record.ActorName);
+        Assert.Null(record.ActorName);
         Assert.Null(record.ApplicationId);
         using var details = JsonDocument.Parse(record.Details);
         Assert.Equal(ShortenedClientAddress, details.RootElement.GetProperty("clientAddress").GetString());
@@ -305,7 +305,7 @@ public sealed partial class SignInTests(KeycloakFixture keycloak, PostgreSqlFixt
         Assert.Equal(HttpStatusCode.OK, signOut.StatusCode);
         var record = Assert.Single(await ReadAuditAsync("a", "session.signedOut"));
         Assert.Equal("requester", record.Actor);
-        Assert.Equal("Requester User", record.ActorName);
+        Assert.Null(record.ActorName);
         using var details = JsonDocument.Parse(record.Details);
         Assert.Equal(ShortenedClientAddress, details.RootElement.GetProperty("clientAddress").GetString());
     }

@@ -243,8 +243,7 @@ public static class ProcessCancelCommand
                 instance.SubjectEntityId,
                 instance.SubjectId,
                 instance.Id,
-                details,
-                userName),
+                details),
             cancellationToken);
     }
 

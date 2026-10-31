@@ -148,7 +148,6 @@ public static class TaskClaimCommand
                 task.SubjectEntityId,
                 task.SubjectId,
                 task.ProcessInstanceId,
-                new JsonObject { ["taskId"] = task.Id },
-                actor.DisplayName),
+                new JsonObject { ["taskId"] = task.Id }),
             cancellationToken);
 }

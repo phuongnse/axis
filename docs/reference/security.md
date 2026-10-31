@@ -274,7 +274,7 @@ Sign-in, the session, `GET /api/me` and sign-in needed are in place. Every tenan
   [D51](../decisions/d51-creating-applications-and-resources-from-studio.md).
   Without a session it is a `401`, as today. Record writes, process starts and the
   task API read the current user the same way, and their audit records store
-  the user's id and display name.
+  the user's id and no display name.
 - **Sign-in needed.** Without a session, these answer a `401` problem
   details response:
   - every route under `/api/apps/{app}/`: records, record history, data
@@ -488,10 +488,9 @@ systems.
 - **Caller id.** The caller's id comes from the configured user id claim
   (`Claims:UserId`, default `sub`). It is the audit actor and the new
   record's creator.
-- **Display name.** The audit display name comes from the configured display
-  name claim. When the token has none, it is the token's client id (`azp`).
-  Keycloak service-account tokens have no `name` claim, and a bare id would
-  be hard to read in a record's history.
+- **Display name.** The display name comes from the configured display
+  name claim, else the token's client id (`azp`). Audit records store no
+  display name, so a history shows the caller's id, as a caller has no profile.
 - **Endpoint routes only.** The endpoint audience is accepted only on
   `POST /api/apps/{app}/endpoints/{name}` and its status location. Everywhere
   else a bearer token with that audience is ignored, so it never reaches the

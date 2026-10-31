@@ -116,7 +116,7 @@ public sealed class ProcessCancelTests(SampleAppFixture fixture) : IClassFixture
             await fixture.CountAsync(
                 "SELECT count(*) FROM axis.audit_records WHERE process_instance_id = @id AND action = 'process.cancelled'", ("id", instance)));
         Assert.Equal(
-            ("finance-reviewer", "Finance Reviewer User", subject),
+            ("finance-reviewer", null, subject),
             await AuditActorAsync(instance));
         using var details = JsonDocument.Parse((string)(await fixture.ScalarAsync(
             "SELECT details::text FROM axis.audit_records WHERE process_instance_id = @id AND action = 'process.cancelled'", ("id", instance)))!);
@@ -389,7 +389,7 @@ public sealed class ProcessCancelTests(SampleAppFixture fixture) : IClassFixture
         command.Parameters.AddWithValue("id", instance);
         await using var reader = await command.ExecuteReaderAsync(CancellationToken);
         Assert.True(await reader.ReadAsync(CancellationToken));
-        return (reader.GetString(0), reader.GetString(1), reader.GetGuid(2));
+        return (reader.GetString(0), reader.IsDBNull(1) ? null : reader.GetString(1), reader.GetGuid(2));
     }
 
     private async Task SetStatusAsync(Guid subject, string status)

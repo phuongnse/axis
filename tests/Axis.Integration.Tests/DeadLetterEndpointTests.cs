@@ -227,7 +227,7 @@ public sealed class DeadLetterEndpointTests(TaskApiFixture fixture) : IClassFixt
         foreach (var (action, letter) in new[] { ("deadLetter.redelivered", redelivered), ("deadLetter.discarded", discarded) })
         {
             var audit = Assert.Single(await AuditAsync(action, letter.Id));
-            Assert.Equal(("maria", "Maria Manager", fixture.Model.Manifest.Id), (audit.Actor, audit.ActorName, audit.ApplicationId));
+            Assert.Equal(("maria", null, fixture.Model.Manifest.Id), (audit.Actor, audit.ActorName, audit.ApplicationId));
             Assert.True(audit.NoSubject);
             using var details = JsonDocument.Parse(audit.Details);
             Assert.Equal(

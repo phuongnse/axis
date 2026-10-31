@@ -158,7 +158,7 @@ internal static partial class UserCommandEndpoints
 
         await AuditRecords.AppendAsync(
             transaction,
-            new AuditEntry(caller.Id, Action(command), null, null, null, null, new JsonObject { ["userId"] = id }, caller.DisplayName),
+            new AuditEntry(caller.Id, Action(command), null, null, null, null, new JsonObject { ["userId"] = id }),
             cancellationToken);
         await transaction.CommitAsync(cancellationToken);
         return Results.NoContent();
@@ -243,8 +243,7 @@ internal static partial class UserCommandEndpoints
                     null,
                     null,
                     null,
-                    UserInvitations.RoleDetails(id, body.ApplicationId, body.Role),
-                    caller.DisplayName),
+                    UserInvitations.RoleDetails(id, body.ApplicationId, body.Role)),
                 cancellationToken);
         }
 
@@ -414,8 +413,7 @@ internal static partial class UserCommandEndpoints
                     null,
                     null,
                     null,
-                    new JsonObject { ["userId"] = newId, ["previousUserId"] = id, ["email"] = email },
-                    opening.Caller.DisplayName),
+                    new JsonObject { ["userId"] = newId, ["previousUserId"] = id, ["email"] = email }),
                 cancellationToken);
             await transaction.CommitAsync(cancellationToken);
         }
