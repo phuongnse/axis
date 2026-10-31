@@ -117,7 +117,7 @@ internal static class FormStateEndpoints
 
         var now = await RecordQueries.TransactionTimeAsync(connection, cancellationToken);
         var readable = RecordFieldAccess.Read(application, user.RolesIn(application), entity).Readable;
-        var sets = await RecordSets.ReadAsync(connection, application, entity, stored, body.Draft!.Input.Links, cancellationToken);
+        var sets = await RecordSets.ReadAsync(connection, application, entity, stored, body.Draft!.Input.Links, cancellationToken, RecordEndpoints.Cipher(sensitive, tenants));
         return Results.Ok(FormStateEvaluator.Evaluate(application, model, entity, stored, body.Draft!, body.Touched!, readable, user.Id, now, sets));
     }
 

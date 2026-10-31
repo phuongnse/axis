@@ -247,7 +247,7 @@ public static class RecordCommands
         }
 
         var sets = entity.Validations.Count > 0
-            ? await RecordSets.ReadAsync(connection, application, entity, stored, [], cancellationToken)
+            ? await RecordSets.ReadAsync(connection, application, entity, stored, [], cancellationToken, cipher)
             : RecordSets.Empty;
         if (RecordValidator.ValidateUpdate(application, entity, stored, computed.Values, computed.Rows, now, sets) is { } failures)
         {

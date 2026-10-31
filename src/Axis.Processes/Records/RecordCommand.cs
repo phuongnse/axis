@@ -270,7 +270,7 @@ public static class RecordCommand
         CancellationToken cancellationToken)
     {
         var sets = model.Validations.Count > 0 || form?.HasRequiredWhen == true
-            ? await RecordSets.ReadAsync(connection, application, model, null, input.Links, cancellationToken)
+            ? await RecordSets.ReadAsync(connection, application, model, null, input.Links, cancellationToken, cipher)
             : RecordSets.Empty;
         var prepared = PrepareCreate(application, model, actor, input, form, now, sets);
         if (prepared.Errors is { } prepareErrors)
@@ -450,7 +450,7 @@ public static class RecordCommand
             // The validations run in the write transaction, so their now() is its start time.
             var now = await RecordQueries.TransactionTimeAsync(connection, cancellationToken);
             var sets = model.Validations.Count > 0 || formModel?.HasRequiredWhen == true
-                ? await RecordSets.ReadAsync(connection, application, model, stored, input.Links, cancellationToken)
+                ? await RecordSets.ReadAsync(connection, application, model, stored, input.Links, cancellationToken, cipher)
                 : RecordSets.Empty;
             var failures = RecordFormRequirements.Merge(
                 formModel is null ? null : RecordFormRequirements.Check(application, model, formModel, stored, computed.Values, computed.Rows, now, sets: sets),
@@ -476,7 +476,7 @@ public static class RecordCommand
         // out the rows of a collection with computed fields stamps nothing, so the row can still be out of date.
         if (result is { Outcome: RecordCommandOutcome.Written, Record: { } updated })
         {
-            result = result with { Record = await PendingComputedReads.ApplyAsync(connection, null, application, model, updated, cancellationToken) };
+            result = result with { Record = await PendingComputedReads.ApplyAsync(connection, null, application, model, updated, cancellationToken, cipher: cipher) };
         }
 
         return result;
@@ -621,7 +621,7 @@ public static class RecordCommand
         }
 
         var sets = model.Validations.Count > 0
-            ? await RecordSets.ReadAsync(connection, application, model, stored, input.Links, cancellationToken)
+            ? await RecordSets.ReadAsync(connection, application, model, stored, input.Links, cancellationToken, cipher)
             : RecordSets.Empty;
         return RecordValidator.ValidateUpdate(application, model, stored, computed.Values, computed.Rows, now, sets) is { } failures
             ? new UpdatePrepared(null, null, null, Invalid(failures))

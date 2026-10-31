@@ -7,6 +7,7 @@
   "grants": [
     { "entity": "Claim", "actions": ["read", "create", "update"] },
     { "entity": "Specimen", "actions": ["read", "create", "update"] },
-    { "entity": "SpecimenTag", "actions": ["read", "create"] }
+    { "entity": "SpecimenTag", "actions": ["read", "create"] },
+    { "dataSource": "Claims", "actions": ["read"] }
   ]
 }

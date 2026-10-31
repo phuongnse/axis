@@ -20,7 +20,9 @@ namespace Axis.Configuration.Compilation;
 /// a <c>renameField</c> gives a name that is not yet a field, and a <c>fill</c> or <c>convert</c>
 /// names a field of the entity as the release has it. A child collection is not a field for these
 /// checks, because it has no column. Every <c>fill</c> and <c>convert</c> value is parsed and
-/// checked against the SQL subset. It is also type-checked against the field's type, over the
+/// checked against the SQL subset. A <c>fill</c> or <c>convert</c> whose target field is sensitive
+/// is refused with <see cref="DiagnosticCodes.SensitiveFieldUse"/>, because its SQL would write
+/// plain text into the encrypted column. It is also type-checked against the field's type, over the
 /// record's own fields only, when the type is known at that point. It is not when a later change
 /// drops or converts the field, when the value comes after a <c>dropEntity</c>, or when it reads a
 /// field that this migration's own undo leaves without a type. The stored schema is known only at
@@ -181,6 +183,16 @@ internal static class MigrationChecker
                 Report(
                     DiagnosticCodes.MigrationFieldNotInEntity,
                     $"The field '{change.Field}' is not a field of the entity '{migration.Entity}' in this release. A child collection or a references field is not a field here.",
+                    $"/changes/{index}/field");
+            }
+
+            if (change.Type is "fill" or "convert"
+                && !missingAfter
+                && after[k]?.GetValueOrDefault(change.Field!) is { Sensitive: true } target)
+            {
+                Report(
+                    DiagnosticCodes.SensitiveFieldUse,
+                    ApplicationCompiler.SensitiveUseMessage(migration.Entity, target.Name, "a migration fill or convert"),
                     $"/changes/{index}/field");
             }
 
